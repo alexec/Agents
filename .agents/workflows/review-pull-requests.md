@@ -4,8 +4,9 @@ on:
   - pr.opened
 agent: new
 labels: [review]
-enabled: false
 when-done: archive
+enabled: false
+model: smart
 ---
 
 A pull request was opened, or a draft was marked ready for review. The event's data says

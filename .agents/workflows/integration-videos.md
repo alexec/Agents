@@ -5,6 +5,7 @@ agent: new
 labels: [video, integrations]
 hosts: [8AB85821-9D24-59CE-9737-8FC556923733]
 when-done: archive
+permission-mode: approve-for-me
 ---
 
 You are the Integration videos run for Agents (#1857, part of #1793). You make and upload

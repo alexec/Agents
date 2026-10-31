@@ -10,6 +10,7 @@ runs-on: [8AB85821-9D24-59CE-9737-8FC556923733]
 labels: [crashes, review]
 when-done: archive
 enabled: false
+permission-mode: approve-for-me
 ---
 
 You read the crash reports this folder's apps wrote on this Mac since the last run, and
