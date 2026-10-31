@@ -25,6 +25,11 @@
       "name": "host.suspend/1",
       "by": "host",
       "description": "The host hears user/suspended (#1002, FR-018): it stops its person's running turns, pauses their workflows and queued prompts, refuses new work and the window's direct path, and keeps every agent and file; off: true ends the pause. It keeps the state in <root>/suspended.json. A notification it hears, not a method it serves, so declared."
+    },
+    {
+      "name": "host.policy-layers/1",
+      "by": "host",
+      "description": "A host resolves the effective policy from the organisation, your and a folder's layers through policylayers.Resolve (#2957), instead of only the organisation's ceiling. Declared so slice 2's policy/effective, policy/yours and policy/setYours, and the organisation's new rules of FR-003, have a capability to require."
     }
   ],
   "methods": [

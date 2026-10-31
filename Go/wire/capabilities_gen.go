@@ -58,6 +58,7 @@ const CapGovernance1 = "governance/1"
 const CapGroups1 = "groups/1"
 const CapHandover1 = "handover/1"
 const CapHostOrgRoutes1 = "host.org-routes/1"
+const CapHostPolicyLayers1 = "host.policy-layers/1"
 const CapHostPolicy1 = "host.policy/1"
 const CapHostSuspend1 = "host.suspend/1"
 const CapHostTeam1 = "host.team/1"
@@ -812,5 +813,6 @@ var DeclaredCapabilities = map[string][]string{
 		"agents.move-worktree/1",
 		"host.team/1",
 		"host.suspend/1",
+		"host.policy-layers/1",
 	},
 }

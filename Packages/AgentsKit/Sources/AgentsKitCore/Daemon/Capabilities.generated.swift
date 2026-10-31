@@ -59,6 +59,7 @@ public enum Capability {
     public static let groups1 = "groups/1"
     public static let handover1 = "handover/1"
     public static let hostOrgRoutes1 = "host.org-routes/1"
+    public static let hostPolicyLayers1 = "host.policy-layers/1"
     public static let hostPolicy1 = "host.policy/1"
     public static let hostSuspend1 = "host.suspend/1"
     public static let hostTeam1 = "host.team/1"
@@ -712,6 +713,7 @@ public enum Capability {
             "agents.move-worktree/1",
             "host.team/1",
             "host.suspend/1",
+            "host.policy-layers/1",
         ],
     ]
 }
