@@ -3,6 +3,8 @@ package agentsd
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -71,6 +73,31 @@ func TestAnAgentFoundWorkingIsPickedBackUpAndToldWhy(t *testing.T) {
 		t.Fatalf("%+v %v", a.RestartPickUps, *a.RuntimeSessionID)
 	}
 	waitFor(t, "it left the queue of agents coming back", func() bool { return len(d.resumingNow()) == 0 })
+}
+
+// The fresh process a reconnect relaunches hands back its own mode first (here,
+// "default"); the daemon re-pushes the agent's saved mode ("plan") right after, and the
+// mode pill must show that, not the runtime's own default (#3082).
+func TestAReconnectKeepsTheSavedModeNotTheRuntimesOwn(t *testing.T) {
+	fakeRuntimes(t)
+	root := t.TempDir()
+	dir := filepath.Join(t.TempDir(), "reconnecting")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	mode, _ := json.Marshal("plan")
+	id := leftWorking(t, root, wire.AgentStateWaitingOnUser, "fake-session", func(a *wire.Agent) {
+		a.Cwd = store.FolderURL(dir)
+		a.StartOptions.Values["mode"] = mode
+	})
+	d, _ := start(t, root)
+	defer d.Shutdown()
+	d.PickUpAfterRestart()
+	waitFor(t, "finished", func() bool { return d.Store.Agent(id).State == wire.AgentStateFinished })
+	a := d.Store.Agent(id)
+	if o := modeOption(a.AdvertisedOptions); o == nil || string(o.CurrentValue) != `"plan"` {
+		t.Fatalf("mode after reconnect: %+v", o)
+	}
 }
 
 func TestAConversationTheRuntimeLostGoesOnInANewOne(t *testing.T) {
