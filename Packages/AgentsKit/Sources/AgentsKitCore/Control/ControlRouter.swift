@@ -769,15 +769,6 @@ public actor ControlRouter {
         case .toHost(let host, let message):
             clients[sessionID]?.wrapped = true
             toHost(host, message, from: sessionID)
-        case .legacy(let message):
-            if let request = ControlWire.request(in: message), handler.handles(request.method) {
-                toControl(message, from: sessionID, wrapped: false)
-            } else if let homeHost {
-                toHost(homeHost, message, from: sessionID)
-            } else if let request = ControlWire.request(in: message) {
-                reply(to: sessionID, host: nil, id: request.id, wrapped: false,
-                      error: JSONRPCError(code: DaemonAPI.Failure.noSuchHost, message: "This control plane has no home machine."))
-            }
         }
     }
 

@@ -305,7 +305,7 @@ func TestAHostAndAWindowThroughTheControlPlane(t *testing.T) {
 	}
 	var clients []map[string]any
 	json.Unmarshal(call(t, window, "", "clients/list", nil), &clients)
-	if len(clients) != 1 || clients[0]["grant"] != "operator" || clients[0]["kind"] != "mac" {
+	if len(clients) != 1 || clients[0]["kind"] != "mac" {
 		t.Fatalf("%+v", clients)
 	}
 

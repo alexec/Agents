@@ -197,7 +197,6 @@ export interface AddFolderRequest {
 export interface Admitted {
   client?: UUID;
   host?: MachineRef;
-  grant?: string;
 }
 
 export interface AdoptRequest {
@@ -1580,12 +1579,8 @@ export interface ChannelLinkRequest {
   expires: WireDate;
 }
 
-/**
- * What a channel on a host's uplink is opened as (ControlWire.ChannelOpen). `grant` is always
- * `operator`, for an older host (#111).
- */
+/** What a channel on a host's uplink is opened as (ControlWire.ChannelOpen). */
 export interface ChannelOpen {
-  grant: string;
   client: string;
   device?: UUID;
   relayed?: boolean;
@@ -1670,16 +1665,12 @@ export interface ClientPermissionSettings {
   setBy?: PolicySetBy;
 }
 
-/**
- * A paired screen, as clients/list says it (ClientRecord). `grant` is always `operator`, for an
- * older build (#111).
- */
+/** A paired screen, as clients/list says it (ClientRecord). */
 export interface ClientRecord {
   id: UUID;
   name: string;
   kind: ClientKind;
   publicKey: Base64;
-  grant: string;
   paired: WireDate;
   lastSeen?: WireDate;
   mayNotify?: boolean;
@@ -2311,7 +2302,6 @@ export interface ControlNotice {
 /** The control plane's proof back: {"ok":…} (ControlAuth.OK). */
 export interface ControlOK {
   mac: string;
-  grant?: string;
   host?: MachineRef;
   relayed?: boolean;
   endpoints?: ControlEndpoint[];
@@ -9559,7 +9549,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ActivityToken: { required: ["agentID", "environment", "startedAt"], optional: ["token"] },
   AddAccountRequest: { required: ["runtimeID", "name"], optional: [] },
   AddFolderRequest: { required: ["folder"], optional: ["project"] },
-  Admitted: { required: [], optional: ["client", "host", "grant"] },
+  Admitted: { required: [], optional: ["client", "host"] },
   AdoptRequest: { required: ["runtimeID", "sessionID", "cwd"], optional: [] },
   Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID", "auto", "clientPermission", "levels", "voiceHungUpAt", "goal"] },
   AgentConfigEditorFile: { required: ["path", "content"], optional: [] },
@@ -9681,14 +9671,14 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ChannelLinkDecided: { required: ["request", "result"], optional: [] },
   ChannelLinkRemove: { required: ["channel", "identity"], optional: [] },
   ChannelLinkRequest: { required: ["request", "channel", "identity", "expires"], optional: ["name", "email", "for", "forName"] },
-  ChannelOpen: { required: ["grant", "client"], optional: ["device", "relayed", "tunnel", "tunnelRef", "fanOut", "actor"] },
+  ChannelOpen: { required: ["client"], optional: ["device", "relayed", "tunnel", "tunnelRef", "fanOut", "actor"] },
   ChannelSender: { required: ["channel", "identity"], optional: ["name", "email", "dkim"] },
   ChartHint: { required: ["mark", "x", "y"], optional: ["color", "title"] },
   ClientAnnounce: { required: ["id", "publicKey", "name", "kind"], optional: [] },
   ClientConnection: { required: ["client", "relayed"], optional: ["through"] },
   ClientPairingRequest: { required: [], optional: ["kind", "grant"] },
   ClientPermissionSettings: { required: ["cursor", "grok", "opencode"], optional: ["setBy"] },
-  ClientRecord: { required: ["id", "name", "kind", "publicKey", "grant", "paired", "rev"], optional: ["lastSeen", "mayNotify", "owner", "forgotten", "forgottenAt", "knownEpoch"] },
+  ClientRecord: { required: ["id", "name", "kind", "publicKey", "paired", "rev"], optional: ["lastSeen", "mayNotify", "owner", "forgotten", "forgottenAt", "knownEpoch"] },
   ClientRequest: { required: ["client"], optional: [] },
   CloneNotification: { required: ["clone", "finished"], optional: [] },
   CloneRequest: { required: ["url"], optional: [] },
@@ -9732,7 +9722,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ControlMoved: { required: ["url", "controlKey", "name"], optional: ["pin"] },
   ControlNewKey: { required: ["key", "proof"], optional: [] },
   ControlNotice: { required: ["kind", "words"], optional: ["user", "group"] },
-  ControlOK: { required: ["mac"], optional: ["grant", "host", "relayed", "endpoints", "epoch", "newKey"] },
+  ControlOK: { required: ["mac"], optional: ["host", "relayed", "endpoints", "epoch", "newKey"] },
   ControlPerson: { required: ["id", "name", "role"], optional: ["localOwner"] },
   ControlPush: { required: ["sealed"], optional: [] },
   ControlPushItem: { required: ["needID", "alert"], optional: ["headline"] },

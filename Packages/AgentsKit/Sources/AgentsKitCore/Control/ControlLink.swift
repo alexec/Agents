@@ -130,9 +130,6 @@ public final class ControlLink: @unchecked Sendable {
                 lock.unlock()
                 gone?.finish()
             }
-        case .legacy:
-            // A control plane always wraps what it sends a client that wraps.
-            return
         }
     }
 

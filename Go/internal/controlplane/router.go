@@ -859,10 +859,8 @@ func wrap(host, msg string) string {
 func channelFrame(c int, msg string) string { return `{"c":` + strconv.Itoa(c) + `,"m":` + msg + `}` }
 func closeFrame(c int) string               { return `{"c":` + strconv.Itoa(c) + `,"close":true}` }
 
-// openFrame opens a channel as ControlWire.ChannelOpen says: always with grant operator,
-// which an older host needs to open the channel at all (#111).
+// openFrame opens a channel as ControlWire.ChannelOpen says.
 func openFrame(c int, open wire.ChannelOpen) string {
-	open.Grant = records.LegacyGrant
 	b, _ := json.Marshal(open)
 	return `{"c":` + strconv.Itoa(c) + `,"open":` + string(b) + `}`
 }
@@ -1375,7 +1373,6 @@ const (
 	frameBad = iota
 	frameControl
 	frameHost
-	frameLegacy
 )
 
 // readClientFrame is ControlWire.readClient.
@@ -1393,9 +1390,6 @@ func readClientFrame(line string) (host, msg string, kind int) {
 	if json.Unmarshal([]byte(line), &o) != nil {
 		return "", "", frameBad
 	}
-	if _, ok := o["jsonrpc"]; ok {
-		return "", line, frameLegacy
-	}
 	m, ok := o["m"]
 	if !ok {
 		return "", "", frameBad
@@ -1412,7 +1406,7 @@ func readClientFrame(line string) (host, msg string, kind int) {
 
 func (r *Router) clientLine(line, sessionID string) {
 	host, msg, kind := readClientFrame(line)
-	if r.refusedRate(sessionID, host, line, msg, kind) || kind != frameBad && r.refusedOld(sessionID, host, msg, kind) {
+	if r.refusedRate(sessionID, host, line, msg, kind) || kind != frameBad && r.refusedOld(sessionID, host, msg) {
 		return
 	}
 	switch kind {
@@ -1453,19 +1447,6 @@ func (r *Router) clientLine(line, sessionID string) {
 			s.wrapped = true
 		}
 		r.toHostLocked(host, msg, sessionID)
-		r.mu.Unlock()
-	case frameLegacy:
-		m, ok := decode(msg)
-		if ok && m.isRequest() && r.handler.Handles(m.Method) {
-			r.toControl(msg, sessionID, false)
-			return
-		}
-		r.mu.Lock()
-		if r.homeHost != "" {
-			r.toHostLocked(r.homeHost, msg, sessionID)
-		} else if ok && m.isRequest() {
-			r.writeLocked(sessionID, replyError(m.ID, fail(noSuchHost, "This control plane has no home machine.")))
-		}
 		r.mu.Unlock()
 	}
 }

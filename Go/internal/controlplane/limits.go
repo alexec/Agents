@@ -268,10 +268,7 @@ func (r *Router) refusedRate(sessionID, host, line, msg string, kind int) bool {
 		m, _ = decode(msg)
 	}
 	if m != nil && m.isRequest() {
-		e := replyError(m.ID, tooMany)
-		if kind != frameLegacy {
-			e = wrap(host, e)
-		}
+		e := wrap(host, replyError(m.ID, tooMany))
 		r.mu.Lock()
 		r.writeLocked(sessionID, e)
 		r.mu.Unlock()

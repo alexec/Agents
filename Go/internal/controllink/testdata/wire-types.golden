@@ -7,7 +7,7 @@ ControlHello full
 ControlHello zero
 {"v":0,"name":"","control":"","nonce":"","copy":""}
 ControlOK full
-{"mac":"MAC","grant":"GRANT","host":"HOST","relayed":true,"endpoints":[{"url":"URL","pin":"PIN"}],"epoch":7}
+{"mac":"MAC","host":"HOST","relayed":true,"endpoints":[{"url":"URL","pin":"PIN"}],"epoch":7}
 ControlOK zero
 {"mac":""}
 MachineAnnounce full

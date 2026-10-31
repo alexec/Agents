@@ -206,7 +206,7 @@ func TestACodeRoundTrips(t *testing.T) {
 	id, secret := MakeCodeSecret(priv)
 	c := &Code{ControlKey: pub, Secret: secret, URL: "https://192.168.1.2:8791", Pin: B64URL(make([]byte, 32)), Name: "Alex's Mac"}
 	text := c.Text()
-	if !strings.HasPrefix(text, "agents-control:2:c:operator:") || !strings.HasSuffix(text, ":Alex%27s%20Mac") {
+	if !strings.HasPrefix(text, "agents-control:2:c:-:") || !strings.HasSuffix(text, ":Alex%27s%20Mac") {
 		t.Fatal(text)
 	}
 	back, err := ParseCode("  " + text + "\n")
@@ -239,8 +239,8 @@ func TestCodesSwiftRefuses(t *testing.T) {
 	if _, err := ParseCode(ok.Text()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := ParseCode(strings.Replace(ok.Text(), ":c:operator:", ":h:operator:", 1)); err == nil {
-		t.Fatal("a host code with a grant")
+	if _, err := ParseCode(strings.Replace(ok.Text(), ":c:-:", ":h:X:", 1)); err == nil {
+		t.Fatal("a host code with something other than -")
 	}
 }
 
