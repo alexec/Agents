@@ -95,5 +95,43 @@
       "lastUsed" : null
     },
     "name" : "none can start"
+  },
+  {
+    "expected" : "auto",
+    "input" : {
+      "available" : [
+        "auto",
+        "claude",
+        "codex"
+      ],
+      "kept" : "auto",
+      "lastUsed" : "claude"
+    },
+    "name" : "kept Auto wins over last used"
+  },
+  {
+    "expected" : "claude",
+    "input" : {
+      "available" : [
+        "claude",
+        "codex"
+      ],
+      "kept" : "auto",
+      "lastUsed" : "claude"
+    },
+    "name" : "kept Auto that cannot start falls back to last used"
+  },
+  {
+    "expected" : "auto",
+    "input" : {
+      "available" : [
+        "auto",
+        "claude",
+        "codex"
+      ],
+      "kept" : "codex",
+      "lastUsed" : "auto"
+    },
+    "name" : "last used Auto wins over a kept runtime"
   }
 ]

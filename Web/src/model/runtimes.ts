@@ -6,6 +6,7 @@ import { line, runtimeName, tokens } from "./orgPolicy";
 import { fromWireDate } from "../protocol/dates";
 import { fromOrganisation, noPlanLimit, requires, routeMissing, routeRemoved } from "./orgAccounts";
 import { hasTurnInFlight } from "./promptWords";
+import { autoID } from "./levels";
 
 export function byName(a: { name: string; id: string }, b: { name: string; id: string }): number {
   return a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true })
@@ -17,10 +18,13 @@ export function sortedRuntimes(runtimes: RuntimeStatus[]): RuntimeStatus[] {
 }
 
 /**
- * The runtime a new session opens on: the most recently used runtime that can start, then the
- * start form's kept choice, then the first available runtime (#264).
+ * The runtime a new session opens on: a kept Auto while it can start, then the most recently used
+ * runtime that can start, then the start form's kept choice, then the first available runtime
+ * (#264). Auto, once picked, stays (#3017): a session started on a named runtime (a persona, a
+ * continued session, another client) does not move the form off it.
  */
 export function newSessionRuntime(lastUsed: string | undefined, kept: string | undefined, available: readonly string[]): string | undefined {
+  if (kept === autoID && available.includes(autoID)) return autoID;
   if (lastUsed !== undefined && available.includes(lastUsed)) return lastUsed;
   if (kept !== undefined && available.includes(kept)) return kept;
   return available[0];
