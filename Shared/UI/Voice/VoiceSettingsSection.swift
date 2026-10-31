@@ -108,7 +108,6 @@ private struct VoiceTuningSections: View {
             }
             slider("Speed", value: $speed, in: 0.8...1.6, step: 0.05, shows: String(format: "%.2f×", speed))
             slider("Pause between sentences", value: $gap, in: 0...800, step: 25, shows: "\(Int(gap)) ms")
-            slider("Wait before your words go", value: $wait, in: 0.8...3.5, step: 0.1, shows: String(format: "%.1f s", wait))
             // Last, as it plays what the settings above it make (Alex, 2026-10-29).
             LabeledContent("Sample") {
                 Button {
@@ -132,6 +131,17 @@ private struct VoiceTuningSections: View {
             Text("How it speaks")
         } footer: {
             Text("Each sentence's own silence is cut off, and the pause is what is left between sentences. The sample plays these settings.")
+                .appText(.fine)
+                .foregroundStyle(.secondary)
+        }
+        .paperListRow()
+        // Apart from How it speaks, so it is not mixed up with the pause between sentences (#3018).
+        Section {
+            slider("Wait before your words go", value: $wait, in: 0.8...3.5, step: 0.1, shows: String(format: "%.1f s", wait))
+        } header: {
+            Text("How it listens")
+        } footer: {
+            Text("How long you stay quiet before what you said is sent.")
                 .appText(.fine)
                 .foregroundStyle(.secondary)
         }
