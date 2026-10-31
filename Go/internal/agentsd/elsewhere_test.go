@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -219,5 +220,47 @@ func TestOnlyTheStarterReachesASessionFromAnotherMachine(t *testing.T) {
 	mu.Unlock()
 	if e.Machine != "Alex's Mac" || e.Session != id || string(e.Starter) != starter || e.How.Finished == nil {
 		t.Fatalf("%+v", e)
+	}
+}
+
+// #2977: a status that says what was already held writes nothing; one that changes a record
+// writes elsewhere.json again.
+func TestHeardThereWritesOnlyWhatChanged(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := t.TempDir()
+	a := seeded(t, d, dir, func(a *wire.Agent) { a.State, a.RuntimeID = wire.AgentStateRunning, "claude" })
+	d.noteStartedThere(startedThere{Machine: "pc", Session: there, Starter: a.ID, Folder: dir, There: "/home/me/app", Title: "watch", At: now()})
+	written := func() bool {
+		_, err := os.Stat(d.elsewherePath())
+		return err == nil
+	}
+	if !written() {
+		t.Fatal("elsewhere.json was not written when the session was kept")
+	}
+
+	os.Remove(d.elsewherePath())
+	for range 3 {
+		d.heardThere(there, "pc", "watch", nil)
+		d.heardThere(there, "", "", nil)
+	}
+	if written() {
+		t.Fatal("elsewhere.json was written though nothing changed")
+	}
+
+	d.heardThere(there, "", "watch v2", nil)
+	if !written() {
+		t.Fatal("a new title was not written")
+	}
+	os.Remove(d.elsewherePath())
+	ended := &wire.WaitEndingHow{Stopped: &wire.WaitEndingHowStopped{}}
+	d.heardThere(there, "", "", ended)
+	if !written() {
+		t.Fatal("an ending was not written")
+	}
+	os.Remove(d.elsewherePath())
+	d.heardThere(there, "", "", &wire.WaitEndingHow{Stopped: &wire.WaitEndingHowStopped{}})
+	if written() {
+		t.Fatal("the same ending was written again")
 	}
 }
