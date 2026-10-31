@@ -28,6 +28,9 @@ const adminUsage = `usage: agents-hosted admin <verb> …
   block <github id|login> [why]  refuse a GitHub user, and suspend their account
   unblock <github id>        let them sign up again
   plan <account> free|pro    put an account on a plan by hand
+  backup <dir> [account…]    copy accounts (every one when none is named) into dir
+  restore <dir> <account>    put one suspended or deleted account back from dir
+  delete <account>           delete a suspended account and everything it keeps
 
 It reads AGENTS_STORE and AGENTS_HOSTED_DOMAIN, as serve does.`
 
@@ -48,7 +51,11 @@ func admin(args []string, out, errOut io.Writer) int {
 		return 1
 	}
 	a := hosted.Admin{Store: st, Domain: strings.ToLower(os.Getenv("AGENTS_HOSTED_DOMAIN"))}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	limit := 2 * time.Minute
+	if args[0] == "backup" || args[0] == "restore" {
+		limit = 6 * time.Hour
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), limit)
 	defer cancel()
 	if err := runAdmin(ctx, a, args, out); err != nil {
 		fmt.Fprintln(errOut, "agents-hosted admin: "+err.Error())
@@ -152,6 +159,29 @@ func runAdmin(ctx context.Context, a hosted.Admin, args []string, out io.Writer)
 			return err
 		}
 		return a.SetPlan(ctx, rest[0], rest[1])
+	case "backup":
+		if err := need(1); err != nil {
+			return err
+		}
+		done, err := a.Backup(ctx, rest[0], rest[1:])
+		for _, id := range done {
+			fmt.Fprintln(out, "backed up "+id)
+		}
+		return err
+	case "delete":
+		if err := need(1); err != nil {
+			return err
+		}
+		return a.Delete(ctx, rest[0])
+	case "restore":
+		if err := need(2); err != nil {
+			return err
+		}
+		n, err := a.Restore(ctx, rest[0], rest[1])
+		if err == nil {
+			fmt.Fprintf(out, "restored %s: %d records\n", rest[1], n)
+		}
+		return err
 	case "unblock":
 		if err := need(1); err != nil {
 			return err

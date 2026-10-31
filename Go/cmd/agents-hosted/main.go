@@ -39,6 +39,11 @@
 //	AGENTS_HOSTED_STRIPE_KEY            Stripe's secret (or restricted) key
 //	AGENTS_HOSTED_STRIPE_PRICE          the Pro plan's price, price_…
 //	AGENTS_HOSTED_STRIPE_WEBHOOK_SECRET the webhook endpoint's signing secret, whsec_…
+//
+// Metrics (#2226), on a port of their own that the proxy does not pass:
+//
+//	AGENTS_HOSTED_METRICS_PORT     Prometheus text at /metrics, 9795; off turns it off
+//	AGENTS_HOSTED_METRICS_FROM     who else may read it, besides loopback (addresses or CIDRs)
 package main
 
 import (
@@ -123,6 +128,9 @@ func serve() error {
 	} else if os.Getenv("AGENTS_HOSTED_MIN_GITHUB_AGE") == "0" {
 		cfg.MinGitHubAge = -1
 	}
+	if cfg.MetricsFrom, err = controlplane.ParseTrustedProxies(os.Getenv("AGENTS_HOSTED_METRICS_FROM")); err != nil {
+		return fmt.Errorf("AGENTS_HOSTED_METRICS_FROM: %w", err)
+	}
 	service, err := hosted.New(ctx, cfg)
 	if err != nil {
 		return err
@@ -133,10 +141,29 @@ func serve() error {
 		port = "8795"
 	}
 	server := &http.Server{Addr: ":" + port, Handler: service, ReadHeaderTimeout: 20 * time.Second}
+	metricsPort := os.Getenv("AGENTS_HOSTED_METRICS_PORT")
+	if metricsPort == "" {
+		metricsPort = "9795"
+	}
+	var metrics *http.Server
+	if metricsPort != "off" {
+		if metricsPort == port {
+			return errors.New("AGENTS_HOSTED_METRICS_PORT is the service's own port: the proxy would pass it")
+		}
+		metrics = &http.Server{Addr: ":" + metricsPort, Handler: service.Metrics(), ReadHeaderTimeout: 20 * time.Second}
+		go func() {
+			if err := metrics.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				logf("metrics: " + err.Error())
+			}
+		}()
+	}
 	go func() {
 		<-ctx.Done()
 		shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
+		if metrics != nil {
+			_ = metrics.Shutdown(shutdown)
+		}
 		_ = server.Shutdown(shutdown)
 	}()
 	billing := "off"

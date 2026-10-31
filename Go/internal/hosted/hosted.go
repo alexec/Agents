@@ -68,6 +68,10 @@ type Config struct {
 	// Stripe's address, API when ""; Stripe itself, for tests (a fake), over the key.
 	StripeAPI string
 	Stripe    billing.Stripe
+
+	// Who else may read Metrics (#2226), besides loopback: the host's address on the
+	// service's network, say. Never the proxy's: it would pass the internet's requests.
+	MetricsFrom []netip.Prefix
 }
 
 // Service is the hosted service.
@@ -90,6 +94,7 @@ type Service struct {
 	stop chan struct{}
 	// When the Stripe events acted on were last swept (billing.go).
 	stripeSwept time.Time
+	metrics     metrics
 }
 
 // New makes the service: its session key comes from its own key, sealed in the store
@@ -167,8 +172,17 @@ func (s *Service) Stop() {
 }
 
 // ServeHTTP routes by host name: the pages at Domain, an account's control plane at
-// <id>.<AccountsDomain>, and nothing anywhere else.
+// <id>.<AccountsDomain>, and nothing anywhere else. Each answer's status is counted.
 func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	sw := &statusWriter{ResponseWriter: w}
+	s.route(sw, r)
+	if sw.status == 0 {
+		sw.status = http.StatusOK
+	}
+	s.metrics.answered(sw.status)
+}
+
+func (s *Service) route(w http.ResponseWriter, r *http.Request) {
 	host := strings.ToLower(r.Host)
 	if h, _, err := splitHostPort(host); err == nil {
 		host = h
@@ -209,6 +223,7 @@ func (s *Service) tlsAllowed(w http.ResponseWriter, r *http.Request) {
 				plain(w, http.StatusOK, "yes\n")
 				return
 			}
+			s.metrics.refused("certificates")
 			s.log(id + ": no certificate yet, at the cap")
 		}
 	}
@@ -256,6 +271,7 @@ func (s *Service) newCertificate(ctx context.Context, id string) bool {
 		return false
 	}
 	c.times = append(c.times, at)
+	s.metrics.certificate()
 	return true
 }
 
