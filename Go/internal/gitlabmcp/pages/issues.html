@@ -81,8 +81,9 @@
       el("span", { className: "title", textContent: issue.title, title: issue.title }),
       start,
       el("span", { className: "meta" }, [
+        ui.agentOn(issue.agentOn),
         ...assignees,
-        ...ui.who(issue.author, issue.authorBot),
+        ...ui.who(issue.author, issue.authorBot, issue.authorName),
         el("span", { textContent: [comments, issue.updatedAt ? ui.ago(issue.updatedAt) : ""].filter(Boolean).join(" · ") }),
         ...issueLabels,
       ]),

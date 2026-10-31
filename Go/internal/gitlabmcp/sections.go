@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // The lists' sections for a team (#2952, specs/2453-team-lists.md), as the github server
@@ -27,7 +29,7 @@ const developerAccess = 30
 // or when the viewer's own has a failed pipeline, a conflict, or a reviewer who asked for
 // changes. checks is its pipeline in the github server's words; team says its author is a
 // member with Developer access or more.
-func mrSection(m mergeRequest, checks, viewer string, team bool) string {
+func mrSection(m mergeRequest, checks, viewer string, team bool, people teamMeta) string {
 	mine := viewer != "" && strings.EqualFold(m.Author.Username, viewer)
 	conflicts := m.conflicts()
 	switch {
@@ -38,26 +40,82 @@ func mrSection(m mergeRequest, checks, viewer string, team bool) string {
 	case mine:
 		return sectionYours
 	}
-	return otherSection(m.Author, team)
+	return otherSection(m.Author, team, people)
 }
 
 // issueSection is an issue's section: Needs you when it is assigned to the viewer.
-func issueSection(i issueJSON, viewer string, team bool) string {
+func issueSection(i issueJSON, viewer string, team bool, people teamMeta) string {
 	switch {
 	case viewer != "" && slices.ContainsFunc(i.Assignees, func(u user) bool { return strings.EqualFold(u.Username, viewer) }):
 		return sectionNeedsYou
 	case viewer != "" && strings.EqualFold(i.Author.Username, viewer):
 		return sectionYours
 	}
-	return otherSection(i.Author, team)
+	return otherSection(i.Author, team, people)
 }
 
-// otherSection: the project's Developers and up, and bots, are the team; the rest are others.
-func otherSection(u user, team bool) string {
-	if team || isBot(u.Username, u.Bot) {
+// otherSection: with no control-plane people (#2951), the project's Developers and up, and
+// bots, are the team; with them, Team is the people and bots on this control plane
+// instead, by their GitLab username, as the issue's part 4 asks.
+func otherSection(u user, team bool, people teamMeta) string {
+	if len(people) > 0 {
+		_, on := people[strings.ToLower(u.Username)]
+		return sectionIf(on)
+	}
+	return sectionIf(team || isBot(u.Username, u.Bot))
+}
+
+func sectionIf(team bool) string {
+	if team {
 		return sectionTeam
 	}
 	return sectionOthers
+}
+
+// teamMeta is the control plane's people and bots, by GitLab username lowercased (#2951):
+// read from the call's _meta, which the host fills in, so this server makes no
+// control-plane call of its own. Empty with no control plane, or an older host.
+type teamMeta map[string]teamPerson
+
+// teamPerson is one of teamMeta's people, as the control plane knows them.
+type teamPerson struct {
+	Name string
+	Bot  bool
+	You  bool
+}
+
+// teamMetaOf reads _meta's people (#2951): each with the login for forge, lowercased.
+func teamMetaOf(meta mcp.Meta, forge string) teamMeta {
+	list, ok := meta["people"].([]any)
+	if !ok {
+		return nil
+	}
+	out := teamMeta{}
+	for _, item := range list {
+		row, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		login, _ := row[forge].(string)
+		if login == "" {
+			continue
+		}
+		name, _ := row["name"].(string)
+		bot, _ := row["bot"].(bool)
+		you, _ := row["you"].(bool)
+		out[strings.ToLower(login)] = teamPerson{Name: name, Bot: bot, You: you}
+	}
+	return out
+}
+
+// agentOnOf reads _meta's agentOnMR or agentOnIssue (#2951): who is on that number, or "".
+func agentOnOf(meta mcp.Meta, key string, number int) string {
+	m, ok := meta[key].(map[string]any)
+	if !ok {
+		return ""
+	}
+	who, _ := m[strconv.Itoa(number)].(string)
+	return who
 }
 
 // developers is which of these people are the project's members, directly or through a group,

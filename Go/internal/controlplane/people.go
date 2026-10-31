@@ -203,6 +203,35 @@ func (m *Methods) peopleMethod(ctx context.Context, method string, params json.R
 		}
 		m.s.peopleChanged(request.User, false)
 		return map[string]any{}, nil
+	case "people/forViews":
+		return m.peopleForViews(user), nil
+	case "people/setForgeLogins":
+		request, err := require[wire.ForgeLogins](params, "ForgeLogins")
+		if err != nil {
+			return nil, err
+		}
+		err = m.records.ChangePeople(ctx, func(all map[string]records.Person) ([]records.Person, error) {
+			p, ok := all[user]
+			if !ok || p.IsRemoved() {
+				// The local owner's own record may not exist yet (#994's migration).
+				p = records.Person{ID: user, Kind: records.KindPerson, Role: records.RoleAdmin}
+			}
+			if request.Github != nil {
+				p.GitHubLogin = *request.Github
+			}
+			if request.Gitlab != nil {
+				p.GitLabLogin = *request.Gitlab
+			}
+			if request.Linear != nil {
+				p.LinearLogin = *request.Linear
+			}
+			return []records.Person{p}, nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		m.s.peopleChanged(user, false)
+		return map[string]any{}, nil
 	case "people/remove", "people/removePreview":
 		if !admin {
 			return nil, fail(notPermitted, "Only an admin can remove a person.")
@@ -313,6 +342,30 @@ func (m *Methods) peopleList(user string, admin bool) wire.PeopleList {
 			}
 		}
 		if p.ID == user {
+			row.You = &yes
+		}
+		out.People = append(out.People, row)
+	}
+	return out
+}
+
+// peopleForViews is people/forViews (#2951): every person and bot on this control plane,
+// open to a member as much as an admin, for the github, gitlab and linear servers' Team
+// section and "An agent is on it". Narrower than peopleList: no role, clients or machines.
+func (m *Methods) peopleForViews(user string) wire.PeopleForViews {
+	people := m.records.People()
+	if len(people) == 0 {
+		people = []records.Person{{ID: m.s.localOwner(), Kind: records.KindPerson, Role: records.RoleAdmin}}
+	}
+	out := wire.PeopleForViews{People: []wire.TeamPerson{}}
+	for _, p := range people {
+		row := wire.TeamPerson{ID: p.ID, Name: p.Name, Kind: kindOf(p),
+			GithubLogin: optional(p.GitHubLogin), GitlabLogin: optional(p.GitLabLogin), LinearLogin: optional(p.LinearLogin)}
+		if p.ID == m.s.localOwner() && (row.Name == "" || (m.records.Settings() != nil && row.Name == m.records.Settings().Name)) {
+			row.Name = localOwnerName
+		}
+		if p.ID == user {
+			yes := true
 			row.You = &yes
 		}
 		out.People = append(out.People, row)

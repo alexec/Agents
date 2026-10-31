@@ -3949,6 +3949,15 @@ type FoldersListRequest struct {
 	IncludeArchived bool `json:"includeArchived"`
 }
 
+// people/setForgeLogins (#2951): the caller's own GitHub, GitLab and Linear logins, for Settings ▸ You, replacing what was kept; blank clears one.
+type ForgeLogins struct {
+	Github *string `json:"github,omitzero"`
+
+	Gitlab *string `json:"gitlab,omitzero"`
+
+	Linear *string `json:"linear,omitzero"`
+}
+
 type FoundFolder struct {
 	Typed *string `json:"typed,omitzero"`
 
@@ -6409,6 +6418,11 @@ type PeopleChanged struct {
 	User *string `json:"user,omitzero"`
 
 	Removed *bool `json:"removed,omitzero"`
+}
+
+// people/forViews (#2951): every person and bot on this control plane, with their forge logins and which is the caller, for the github, gitlab and linear servers' Team section and "An agent is on it". Narrower than PeopleList: open to a member as much as an admin, and holds no role, clients or machines.
+type PeopleForViews struct {
+	People []TeamPerson `json:"people"`
 }
 
 // people/list (#994): every user for an admin; for a member, only themselves.
@@ -9638,6 +9652,23 @@ type TeamBotRun struct {
 	Workflow *string `json:"workflow,omitzero"`
 
 	Since *Date `json:"since,omitzero"`
+}
+
+// people/forViews (#2951): one person or bot on this control plane, as the github, gitlab and linear servers' feeding tools are fed it in their call's _meta, so a row can name them and Team can be told from Others.
+type TeamPerson struct {
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	Kind string `json:"kind"`
+
+	GithubLogin *string `json:"githubLogin,omitzero"`
+
+	GitlabLogin *string `json:"gitlabLogin,omitzero"`
+
+	LinearLogin *string `json:"linearLogin,omitzero"`
+
+	You *bool `json:"you,omitzero"`
 }
 
 // workflows/trigger and workflows/fire (#2011, spec 736 FR-035): a folder or control-plane event (a server's, such as github or a channel's) or a schedule that a runs-on: workflow's trigger matched. A machine sends it to the control plane, which sends it once to one of the bot's machines. workflow is the folder's name and the workflow's id; trigger, the same words on every machine that heard it; event, the event (none for a schedule); dueAt, a schedule's due time.

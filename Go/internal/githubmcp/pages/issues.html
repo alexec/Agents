@@ -99,8 +99,9 @@ button.pill.colored:hover { filter: brightness(0.9); }
       el("span", { className: "title", textContent: issue.title, title: issue.title }),
       start,
       el("span", { className: "meta" }, [
+        ui.agentOn(issue.agentOn),
         ...assignees,
-        ...ui.who(issue.author, issue.authorBot),
+        ...ui.who(issue.author, issue.authorBot, issue.authorName),
         el("span", { textContent: [comments, issue.updatedAt ? ui.ago(issue.updatedAt) : ""].filter(Boolean).join(" · ") }),
         issue.milestone ? el("span", { className: "pill", textContent: issue.milestone, title: "Milestone" }) : null,
         ...issueLabels,

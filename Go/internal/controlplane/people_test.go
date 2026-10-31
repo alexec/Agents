@@ -135,6 +135,66 @@ func TestOnePersonSeesNoChange(t *testing.T) {
 	}
 }
 
+// people/forViews is narrower than people/list, and open to a member as much as an
+// admin (#2951): every person's forge logins, not only the caller's own. Each person
+// sets only their own with people/setForgeLogins; blank clears a login, left out keeps
+// what was there.
+func TestForgeLoginsAreSelfOnlyAndSeenByEveryone(t *testing.T) {
+	t.Parallel()
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	_, alexWindow := p.client("Alex's Mac")
+	sam := p.invite(alexWindow, "Sam", wire.UserRoleMember)
+	owner := p.s.localOwner()
+
+	call(t, alexWindow, "", "people/setForgeLogins",
+		wire.ForgeLogins{Github: optional("alexec"), Gitlab: optional("alex"), Linear: optional("alex@example.com")})
+	call(t, sam.window, "", "people/setForgeLogins", wire.ForgeLogins{Github: optional("sam-gh")})
+
+	var forSam wire.PeopleForViews
+	json.Unmarshal(call(t, sam.window, "", "people/forViews", nil), &forSam)
+	if len(forSam.People) != 2 {
+		t.Fatalf("a member sees every person's forge logins, not only their own: %+v", forSam)
+	}
+
+	var forAlex wire.PeopleForViews
+	json.Unmarshal(call(t, alexWindow, "", "people/forViews", nil), &forAlex)
+	var me, them *wire.TeamPerson
+	for i := range forAlex.People {
+		switch forAlex.People[i].ID {
+		case owner:
+			me = &forAlex.People[i]
+		case sam.id:
+			them = &forAlex.People[i]
+		}
+	}
+	if me == nil || me.You == nil || !*me.You || me.GithubLogin == nil || *me.GithubLogin != "alexec" ||
+		me.GitlabLogin == nil || *me.GitlabLogin != "alex" {
+		t.Fatalf("alex's own row: %+v", me)
+	}
+	if them == nil || (them.You != nil && *them.You) || them.GithubLogin == nil || *them.GithubLogin != "sam-gh" {
+		t.Fatalf("sam's row, from alex's own answer: %+v", them)
+	}
+
+	// Blank clears github; gitlab, left out, stays. optional("") is nil (#1313), not a
+	// pointer to "", so the blank is made by hand.
+	blank := ""
+	call(t, alexWindow, "", "people/setForgeLogins", wire.ForgeLogins{Github: &blank})
+	// A fresh PeopleForViews: json.Unmarshal leaves a field its JSON omits as it found it.
+	var cleared wire.PeopleForViews
+	json.Unmarshal(call(t, alexWindow, "", "people/forViews", nil), &cleared)
+	for i := range cleared.People {
+		if cleared.People[i].ID != owner {
+			continue
+		}
+		if cleared.People[i].GithubLogin != nil {
+			t.Errorf("blank cleared github: %+v", cleared.People[i])
+		}
+		if cleared.People[i].GitlabLogin == nil || *cleared.People[i].GitlabLogin != "alex" {
+			t.Errorf("left out kept gitlab: %+v", cleared.People[i])
+		}
+	}
+}
+
 // FR-018 (SC-003): with three people and two machines each, every person reaches only
 // their own machines; another's is not found, through the router and through every
 // control-plane method that names a machine. Admins see the name, user and state only.
@@ -236,7 +296,8 @@ func TestEveryClientMethodChecksTheOwner(t *testing.T) {
 		"clients/connections": true, "clients/forgetSelf": true, "clients/setPushToken": true, "clients/setActivityToken": true, "clients/setWebPush": true, "clients/webPushKey": true, "devices/list": true,
 		"devices/startPairing": true, "devices/stopPairing": true, "devices/forget": true, "audit/list": true, "audit/sinks": true, "audit/setSinks": true,
 		"audit/export": true, "control/setAuditDays": true, "people/list": true, "people/invite": true,
-		"people/setRole": true, "people/remove": true, "people/removePreview": true, "hosts/joinRequests": true, "hosts/approveJoin": true,
+		"people/setRole": true, "people/remove": true, "people/removePreview": true, "people/forViews": true,
+		"people/setForgeLogins": true, "hosts/joinRequests": true, "hosts/approveJoin": true,
 		"hosts/denyJoin": true, "control/rotate": true,
 		"providers/list": true, "providers/refresh": true, "providers/add": true, "providers/update": true,
 		"providers/remove": true, "providers/options": true, "providers/runtimes": true, "providers/draftStart": true,

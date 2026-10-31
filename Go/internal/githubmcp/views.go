@@ -155,11 +155,12 @@ func AddViews(server *mcp.Server, gh Views, person bool) {
 		Description: "The repo's open pull requests, newest created first, each with its checks (passing, failing, running or none), " +
 			"its review (approved, changes_requested or review_required), whether it conflicts with its base, whether auto-merge is on, " +
 			"and its section for the signed-in login (viewer): needs_you (a review asked of you, or yours with failing checks, a conflict or " +
-			"changes requested), yours, team (the repo's members and bots) or others; attention counts needs_you. " +
-			"Each has its labels; labelColors maps each label to its #rrggbb. " +
+			"changes requested), yours, team (the people and bots on this control plane, or the repo's own with no control plane) or " +
+			"others; attention counts needs_you. A row the control plane knows has authorName; agentOn says who is on one of the " +
+			"viewer's own. Each has its labels; labelColors maps each label to its #rrggbb. " +
 			"Its view is the Pull requests page, where a person opens a pull request's page.",
 		Annotations: readOnly, Meta: uiMeta(pullsURI, "model", "app")},
-		func(ctx context.Context, _ *mcp.CallToolRequest, in repoArgs) (*mcp.CallToolResult, any, error) {
+		func(ctx context.Context, req *mcp.CallToolRequest, in repoArgs) (*mcp.CallToolResult, any, error) {
 			repo, err := repoOf(ctx, in.Repo)
 			if err != nil {
 				return failed(err), nil, nil
@@ -168,6 +169,8 @@ func AddViews(server *mcp.Server, gh Views, person bool) {
 			if err != nil {
 				return failed(err), nil, nil
 			}
+			// The control plane's people (#2951): names a row, tells Team from Others.
+			people := teamMetaOf(req.Params.Meta, "github")
 			prs := make([]any, len(b.PRs))
 			// The count on the sidebar's row (#2033), and the PRs that need the signed-in person (#2453).
 			colors := map[string]string{}
@@ -177,9 +180,21 @@ func AddViews(server *mcp.Server, gh Views, person bool) {
 				for name, color := range p.LabelColors {
 					colors[name] = color
 				}
-				j["section"] = prSection(p, b.Viewer)
-				if j["section"] == sectionNeedsYou {
+				section := prSection(p, b.Viewer, people)
+				j["section"] = section
+				if tp, on := people[strings.ToLower(p.Author)]; on {
+					j["authorName"] = tp.Name
+					if tp.Bot {
+						j["authorBot"] = true
+					}
+				}
+				if section == sectionNeedsYou {
 					needsYou++
+				}
+				if section == sectionNeedsYou || section == sectionYours {
+					if who := agentOnOf(req.Params.Meta, "agentOnPR", p.Number); who != "" {
+						j["agentOn"] = who
+					}
 				}
 				prs[i] = j
 			}
@@ -190,10 +205,12 @@ func AddViews(server *mcp.Server, gh Views, person bool) {
 	mcp.AddTool(server, &mcp.Tool{Name: "show_issues", Title: "Show issues",
 		Description: "The repo's open issues (not pull requests), newest created first, at most 100, each with its labels, " +
 			"assignees (logins), milestone, comment count and section for the signed-in login (viewer): needs_you (assigned to you), " +
-			"yours, team (the repo's members and bots) or others; attention counts needs_you. labelColors maps each label to its #rrggbb. " +
+			"yours, team (the people and bots on this control plane, or the repo's own with no control plane) or others; attention " +
+			"counts needs_you. A row the control plane knows has authorName; agentOn says who is on one of the viewer's own. " +
+			"labelColors maps each label to its #rrggbb. " +
 			"A query searches titles and descriptions. Its view is the Issues page, where a person expands a row to read its rich-text description and linked pull requests.",
 		Annotations: readOnly, Meta: uiMeta(issuesURI, "model", "app")},
-		func(ctx context.Context, _ *mcp.CallToolRequest, in issuesArgs) (*mcp.CallToolResult, any, error) {
+		func(ctx context.Context, req *mcp.CallToolRequest, in issuesArgs) (*mcp.CallToolResult, any, error) {
 			repo, err := repoOf(ctx, in.Repo)
 			if err != nil {
 				return failed(err), nil, nil
@@ -208,14 +225,28 @@ func AddViews(server *mcp.Server, gh Views, person bool) {
 			}
 			// Without the viewer the list still shows, as Team and Others only.
 			viewer, _ := gh.Viewer(ctx)
+			// The control plane's people (#2951): names a row, tells Team from Others.
+			people := teamMetaOf(req.Params.Meta, "github")
 			issues := make([]any, len(list))
 			colors := map[string]string{}
 			needsYou := 0
 			for i, l := range list {
 				j := l.json()
-				j["section"] = issueSection(l, viewer)
-				if j["section"] == sectionNeedsYou {
+				section := issueSection(l, viewer, people)
+				j["section"] = section
+				if tp, on := people[strings.ToLower(l.Author)]; on {
+					j["authorName"] = tp.Name
+					if tp.Bot {
+						j["authorBot"] = true
+					}
+				}
+				if section == sectionNeedsYou {
 					needsYou++
+				}
+				if section == sectionNeedsYou || section == sectionYours {
+					if who := agentOnOf(req.Params.Meta, "agentOnIssue", l.Number); who != "" {
+						j["agentOn"] = who
+					}
 				}
 				issues[i] = j
 				for name, color := range l.LabelColors {
