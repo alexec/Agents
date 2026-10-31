@@ -53,7 +53,6 @@ COMMANDS = {
     "copilot": ["copilot", *extra_args, "--acp"],
     "cursor": ["cursor-agent", *extra_args, "acp"],
     "codex": [f"{TOOLS}/codex/current/bin/codex-acp", *extra_args],
-    "gemini": [f"{TOOLS}/gemini/current/bin/gemini", *extra_args, "--acp", "--skip-trust"],
     "antigravity": [f"{TOOLS}/antigravity/current/bin/agy_acp_server", *extra_args],
     "opencode": [f"{TOOLS}/opencode/current/bin/opencode", *extra_args, "acp"],
 }

@@ -180,7 +180,7 @@ func TestTheBriefSaysWhatToAskAndWhatToDecide(t *testing.T) {
 	if got := escalationBrief("antigravity"); !strings.Contains(got, "ask me with your runtime's own ask_question (or the app's ask_question, from the agents server, if yours is missing) rather than guessing") {
 		t.Fatal(got)
 	}
-	if got := escalationBrief("gemini"); !strings.Contains(got, "ask me with ask_question rather than guessing") ||
+	if got := escalationBrief("grok"); !strings.Contains(got, "ask me with ask_question rather than guessing") ||
 		!strings.Contains(got, "Ask for a missing secret (an API key, a token) with ask_secret") {
 		t.Fatal(got)
 	}

@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "./load.mjs";
 
-const { Store, CallFailed } = await load("test/tokenAsk.ts");
+const { Store, CallFailed } = await load("test/store-call.ts");
 
 const mappings = { cells: [], choices: [] };
 

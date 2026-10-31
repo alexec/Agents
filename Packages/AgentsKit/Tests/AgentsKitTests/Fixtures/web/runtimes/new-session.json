@@ -20,7 +20,7 @@
         "grok"
       ],
       "kept" : "grok",
-      "lastUsed" : "gemini"
+      "lastUsed" : "cursor"
     },
     "name" : "unavailable last used falls back to kept choice"
   },
@@ -44,7 +44,7 @@
         "claude",
         "codex"
       ],
-      "kept" : "gemini",
+      "kept" : "cursor",
       "lastUsed" : null
     },
     "name" : "kept but gone"
@@ -62,10 +62,10 @@
     "name" : "nothing kept"
   },
   {
-    "expected" : "gemini",
+    "expected" : "cursor",
     "input" : {
       "available" : [
-        "gemini",
+        "cursor",
         "codex"
       ],
       "kept" : null,
@@ -78,7 +78,7 @@
     "input" : {
       "available" : [
         "codex",
-        "gemini"
+        "cursor"
       ],
       "kept" : "opencode",
       "lastUsed" : null

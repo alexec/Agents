@@ -67,7 +67,7 @@ export const modeNames: Record<ModeName, string> = {
 
 /** RuntimeCatalog's runtimes, by name, for a runtime this page may not be told about. */
 export const runtimeNames: Record<string, string> = {
-  antigravity: "Antigravity", claude: "Claude", codex: "Codex", copilot: "Copilot", cursor: "Cursor", gemini: "Gemini",
+  antigravity: "Antigravity", claude: "Claude", codex: "Codex", copilot: "Copilot", cursor: "Cursor",
   grok: "Grok", opencode: "OpenCode",
 };
 export const runtimeIDs: readonly string[] = Object.keys(runtimeNames).sort((a, b) => runtimeName(a).localeCompare(runtimeName(b)));

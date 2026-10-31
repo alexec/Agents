@@ -121,14 +121,14 @@ func TestAutoPicksTheRuntime(t *testing.T) {
 		t.Fatalf("%s %+v", a.RuntimeID, a.Auto)
 	}
 	// The person's order and Include switches.
-	c.call(t, 3, "auto/set", map[string]any{"order": []string{"gemini", "codex"}, "excluded": []string{"codex"}, "overrides": []any{}})
-	if a := startAuto(4, nil); a.RuntimeID != "gemini" {
+	c.call(t, 3, "auto/set", map[string]any{"order": []string{"grok", "codex"}, "excluded": []string{"codex"}, "overrides": []any{}})
+	if a := startAuto(4, nil); a.RuntimeID != "grok" {
 		t.Fatal(a.RuntimeID)
 	}
-	// Runtime sandbox: Gemini cannot, and nor can the rest once Claude is out and Codex
+	// Runtime sandbox: Grok cannot, and nor can the rest once Claude is out and Codex
 	// left out. The prompt stays, with why for each.
 	err := c.callError(t, 5, "agents/start", map[string]any{"runtimeID": "auto", "cwd": dir, "prompt": "hello", "sandbox": "on"})
-	if err == nil || !strings.Contains(err.Message, "Gemini: no Runtime sandbox") {
+	if err == nil || !strings.Contains(err.Message, "Grok: no Runtime sandbox") {
 		t.Fatalf("%+v", err)
 	}
 }

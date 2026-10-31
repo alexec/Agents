@@ -158,41 +158,6 @@ func TestAPersonMovesAndDoesNotCancelTheAgentsOwnMove(t *testing.T) {
 	}
 }
 
-func TestALentGeminiKeyIsUsedAndThenDropped(t *testing.T) {
-	fakeRuntimes(t)
-	t.Setenv("GEMINI_API_KEY", "already")
-	t.Setenv("GOOGLE_API_KEY", "google")
-	d, c := start(t, t.TempDir())
-	defer d.Shutdown()
-	c.call(t, 1, "credentials/lend", map[string]any{"runtime": "gemini", "kind": "geminiAPIKey", "secret": "lent-key"})
-	l, err := d.launchFor(runtimeByID("gemini"), t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	env := strings.Join(l.Env, "\n")
-	if !strings.Contains(env, "GEMINI_API_KEY=lent-key") || strings.Contains(env, "GOOGLE_API_KEY=") || strings.Contains(env, "GEMINI_API_KEY=already") {
-		t.Fatal(env)
-	}
-	anti, err := d.launchFor(runtimeByID("antigravity"), t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(strings.Join(anti.Env, "\n"), "GEMINI_API_KEY") {
-		t.Fatal(strings.Join(anti.Env, "\n"))
-	}
-	c.call(t, 2, "credentials/offer", map[string]any{"runtimes": []string{}, "ownSignInOnly": false})
-	l, err = d.launchFor(runtimeByID("gemini"), t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(strings.Join(l.Env, "\n"), "lent-key") {
-		t.Fatal("a dropped lend was still used")
-	}
-	if e := c.callError(t, 3, "credentials/lend", map[string]any{"runtime": "gemini", "kind": "geminiAPIKey", "secret": "a\nb"}); e == nil || strings.Contains(e.Message, "a\nb") {
-		t.Fatalf("%+v", e)
-	}
-}
-
 func TestGitFillStaysOffTheWindowAndAnswersTheControlPlane(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()

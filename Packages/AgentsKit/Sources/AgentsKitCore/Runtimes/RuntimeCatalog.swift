@@ -23,12 +23,6 @@ import Foundation
 /// first turn instead of on the set-up page. `codex-acp` is the shim's name in that
 /// toolset, and nothing of that name on the PATH is ever run.
 ///
-/// Gemini (046) is the one that is only ever the app's own copy: a pinned Gemini CLI on
-/// a pinned Node, installed from the set-up page like Claude's toolset, and never a
-/// `gemini` found on the PATH, because its ACP surface moves between releases. It speaks
-/// ACP itself with `--acp`. The version is `App/Resources/toolsets/gemini/manifest.json`'s
-/// (0.61.0 when this was written), and a test holds the two together.
-///
 /// OpenCode (049) has Cursor's trap twice over. Two programs are called `opencode`: SST's,
 /// now `anomalyco/opencode`, which speaks ACP as `opencode acp`, and the archived Go agent
 /// of the same name (continued as Charm's Crush), still on Macs from its Homebrew tap, with no
@@ -79,18 +73,6 @@ public enum RuntimeCatalog {
         installPage: URL(string: "https://github.com/agentclientprotocol/codex-acp")!,
         usesAppCopyOnly: true)
 
-    public static let gemini = Runtime(
-        id: "gemini",
-        name: "Gemini",
-        executable: "gemini",
-        // `--skip-trust`: Gemini starts no stdio MCP server in a folder it does not trust,
-        // and the app's own tools are one. Trusted for this session only; nothing is
-        // written to Gemini's `trustedFolders.json` (Alex, 2026-09-25; research R13).
-        arguments: ["--acp", "--skip-trust"],
-        install: .toolset(runtimeID: "gemini"),
-        installPage: URL(string: "https://github.com/google-gemini/gemini-cli")!,
-        usesAppCopyOnly: true)
-
     /// Google's Antigravity ACP server (049), not the `agy` CLI: the CLI has no ACP mode
     /// (google-antigravity/antigravity-cli#31), and Google publishes this server for ACP
     /// clients. A signed binary per platform, downloaded from Google by the set-up page and
@@ -119,7 +101,7 @@ public enum RuntimeCatalog {
     /// Every runtime, alphabetical by the name shown (#154), so every list of them, on
     /// the Mac, the Remote, the web page and in the daemon's replies, reads the same way.
     /// The default is `defaultRuntime`, not whichever comes first.
-    public static var builtIn: [Runtime] { sortedByName([claude, grok, copilot, cursor, codex, gemini, antigravity, opencode] + extra) }
+    public static var builtIn: [Runtime] { sortedByName([claude, grok, copilot, cursor, codex, antigravity, opencode] + extra) }
 
     /// The runtime an agent or workflow gets when it names none.
     public static var defaultRuntime: Runtime { claude }
@@ -181,8 +163,8 @@ public enum RuntimeCatalog {
     /// different folder, which is what moving an agent into a worktree mid-work asks of
     /// them (053). Measured, not assumed, by `RuntimeMoveLiveTests` through each ACP
     /// adapter (research R3, 2026-09-26): Claude, Copilot, Cursor and Codex did; Grok
-    /// answers "Path not found", because it files sessions by folder. Gemini and
-    /// Antigravity are left out until measured. OpenCode loads its conversation in a new
+    /// answers "Path not found", because it files sessions by folder. Antigravity is left
+    /// out until measured. OpenCode loads its conversation in a new
     /// folder but keeps working in the old one (049, research R9), so it is left out too. A runtime not here is never offered the
     /// move tools, and cannot be moved, so nobody loses a conversation to a move.
     public static let carriesConversationAcrossFolders: Set<String> = ["claude", "copilot", "cursor", "codex"]

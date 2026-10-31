@@ -73,7 +73,7 @@ extension DaemonAPI {
         case leftOut(String)
         /// It has no way to take this from the app.
         case noWay(String)
-        /// Nobody has measured it yet (Gemini, research R14).
+        /// Nobody has measured it yet (research R14).
         case unchecked(String?)
 
         public var gets: Bool { if case .gets = self { true } else { false } }

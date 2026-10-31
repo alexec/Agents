@@ -2,8 +2,8 @@ import AgentsKitCore
 import Foundation
 import Observation
 
-/// The credentials this window lends. Settings shows Gemini's under Agent Runtimes
-/// (046); a server is lent the same key only while an agent runs there (043, US2).
+/// The credentials this window lends. No runtime takes one from Settings now that
+/// Gemini, the last one that did, is retired (#3043), so this always keeps none.
 ///
 /// A thin face on `CredentialStore`: the records to draw, the check in flight, and what the
 /// last save found. The secret itself is read from the Keychain only when it is saved,
@@ -48,7 +48,7 @@ final class ServerCredentials {
 
     /// False for text that is not a credential for `runtimeID`, with no side effect.
     func save(_ text: String, for runtimeID: String) async -> Bool {
-        guard let secret = Secret(text), secret.kind.runtimeID == runtimeID else { return false }
+        guard let secret = Secret(text), secret.isFor(runtimeID) else { return false }
         do {
             try store.save(secret, for: runtimeID)
         } catch {

@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "./load.mjs";
 
-const { Store } = await load("test/tokenAsk.ts");
+const { Store } = await load("test/store-call.ts");
 const { workflowHostChoices } = await load("src/model/workflows.ts");
 const { folderLabel, orderedFolders } = await load("src/views/Sidebar.tsx");
 const { offlineStrip } = await load("src/views/OfflineStrip.tsx");

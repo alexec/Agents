@@ -63,7 +63,7 @@ What a runtime does with the list differs:
 - **Grok** hides MCP tools behind `search_tool` too, so the app writes the tools into its
   rules instead (see [Why agents' own tools are taken away](scoped-tools.md)). That is about
   2,200 tokens, fixed for the session.
-- **Codex, OpenCode, Gemini, Copilot, Cursor and Antigravity** send every listed schema
+- **Codex, OpenCode, Copilot, Cursor and Antigravity** send every listed schema
   with every request: about 10,650 tokens, against the 97 K a Codex turn reads on average.
 
 A folder's own connectors (MCP servers) are added on top, in the same way for each runtime. They are

@@ -141,7 +141,7 @@ func (f *fakeRuntime) ResumeSession(_ context.Context, r sdk.ResumeSessionReques
 }
 
 // NewSession in a folder called offers offers a model, and a command a moment after; in
-// one called signedout it wants a sign-in, as Cursor, Gemini and Antigravity do (#1430).
+// one called signedout it wants a sign-in, as Cursor and Antigravity do (#1430).
 func (f *fakeRuntime) NewSession(_ context.Context, r sdk.NewSessionRequest) (sdk.NewSessionResponse, error) {
 	var out sdk.NewSessionResponse
 	if filepath.Base(r.Cwd) == "signedout" {
@@ -524,7 +524,7 @@ func TestRuntimesList(t *testing.T) {
 	_, c := start(t, t.TempDir())
 	var rs []wire.RuntimeStatus
 	json.Unmarshal(c.call(t, 1, "runtimes/list", nil), &rs)
-	if len(rs) != 8 || rs[0].Runtime.ID != "antigravity" {
+	if len(rs) != 7 || rs[0].Runtime.ID != "antigravity" {
 		t.Fatalf("%d runtimes, first %v", len(rs), rs)
 	}
 	for _, r := range rs {

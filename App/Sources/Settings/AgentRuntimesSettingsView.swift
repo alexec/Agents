@@ -17,11 +17,6 @@ struct AgentRuntimesSettingsView: View {
                     // A runtime the organisation does not allow here: shown, with why (#998).
                     if let mark = status.setBy { OrgPolicyLine(mark: mark) }
                     RuntimeInstallRow(status: status)
-                    // A runtime whose only way in is a key from Settings (Gemini, 046) takes
-                    // it here, beside where it is installed. The same key is lent to servers.
-                    if CredentialKind.kinds(for: status.id).contains(where: \.isLentOnTheMac) {
-                        CredentialRow(runtimeID: status.id, name: status.runtime.name)
-                    }
                 } footer: {
                     // Where its allowance stands is on the Runtimes page under Activity, not
                     // here (065). This is where a runtime is changed; that is where its state

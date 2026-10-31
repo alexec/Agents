@@ -31,7 +31,7 @@ public enum ChoiceOrder {
         }
     }
 
-    /// Auto or Default first; then by family (Claude, GPT, Gemini, Grok, then the rest by
+    /// Auto or Default first; then by family (Claude, GPT, Grok, then the rest by
     /// name); within a family the newest first, the most capable first at one version,
     /// then by name. Numbers compare as numbers, so 5.10 is newer than 5.9. Ties keep
     /// the order they came in, so a list never reorders between redraws.
@@ -103,7 +103,6 @@ public enum ChoiceOrder {
         Family(marks: ["claude", "opus", "sonnet", "haiku", "anthropic"]),
         // OpenAI's o-series (o3, o4) is told by its shape: o and a number.
         Family(marks: ["gpt", "codex", "openai", "chatgpt"], prefix: "o"),
-        Family(marks: ["gemini", "google"]),
         Family(marks: ["grok", "xai"]),
     ]
 

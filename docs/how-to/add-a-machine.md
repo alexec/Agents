@@ -53,7 +53,7 @@ it and no port needs opening. See [Folders, hosts and worktrees](../explanation/
 
 The host then installs Claude by itself, into `~/.agents-server/tools`, from the pins
 the control plane gives with the host (#1312). This takes about a minute and 500 MB. Until
-it is done, **Runtimes** says Claude is installing. Codex and Gemini install the same way
+it is done, **Runtimes** says Claude is installing. Codex installs the same way
 when you click **Install** under **Runtimes**. The server needs glibc 2.28 or later. Alpine
 (musl) can't run them.
 

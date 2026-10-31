@@ -429,52 +429,14 @@ final class RemoteModel {
 
     // MARK: A server's key (#344)
 
-    /// A server asked for a key this device has none of to lend: the window's card asks the
-    /// person, and the key is lent on this device's own connection to it (043, #344).
-    var tokenAsk: TokenAsk?
+    /// The home host's asks: the control plane's, which may be a server. No runtime takes
+    /// a pasted key now that Gemini, the only one that did, is retired (#3043), and this
+    /// device has no sign-in of its own to relay (that is the Mac window's alone), so
+    /// there is nothing to lend here.
+    private func answerHomeCredentialWanted(_ wanted: DaemonAPI.CredentialWanted) async -> Bool { false }
 
-    /// The home host's asks: the control plane's, which may be a server.
-    private func answerHomeCredentialWanted(_ wanted: DaemonAPI.CredentialWanted) async -> Bool {
-        await answerCredentialWanted(wanted, on: controlHome ?? .mac)
-    }
-
-    /// A server's daemon wants a key to start a runtime (043, R6): asked of the person, as the
-    /// window asks. True when one was lent, and the refused call is then sent again, as
-    /// it was. A second ask while one is showing is refused rather than left waiting.
-    private func answerCredentialWanted(_ wanted: DaemonAPI.CredentialWanted, on id: MachineRef) async -> Bool {
-        guard id != .mac, !CredentialKind.kinds(for: wanted.runtime).isEmpty, tokenAsk == nil else { return false }
-        let label = hostName(id)
-        return await withCheckedContinuation { answer in
-            tokenAsk = TokenAsk(runtimeID: wanted.runtime, host: id, label: label,
-                                keeping: "Paste a key and Agents lends it to \(label) while this \(UIDevice.current.model) "
-                                    + "is connected. It is kept nowhere.",
-                                whereToGet: CredentialKind.source(for: wanted.runtime),
-                                action: "Lend and start", answer: answer)
-        }
-    }
-
-    /// The person pasted a key: offered and lent to the server that asked, on this device's
-    /// connection to it, and nowhere else. The ask is answered either way.
-    func lend(_ secret: Secret, for ask: TokenAsk) async {
-        let server = ask.host == controlHome ? client : otherHosts[ask.host]
-        var lent = false
-        if let server {
-            lent = (try? await server.call(DaemonAPI.Method.credentialsOffer,
-                                           DaemonAPI.CredentialsOffer(runtimes: [ask.runtimeID], ownSignInOnly: false))) != nil
-            if lent {
-                lent = (try? await server.call(DaemonAPI.Method.credentialsLend,
-                                               DaemonAPI.CredentialsLend(runtime: ask.runtimeID, secret: secret))) != nil
-            }
-        }
-        finishTokenAsk(lent: lent)
-    }
-
-    /// The ask answered: lent (true), or cancelled. Once per ask: its answer is a continuation.
-    func finishTokenAsk(lent: Bool) {
-        guard let ask = tokenAsk else { return }
-        tokenAsk = nil
-        ask.answer.resume(returning: lent)
-    }
+    /// A server's daemon wants a key to start a runtime (043, R6): nothing to lend (#3043).
+    private func answerCredentialWanted(_ wanted: DaemonAPI.CredentialWanted, on id: MachineRef) async -> Bool { false }
 
     /// Put what the person typed on a page on disk, through the daemon, which is the one
     /// writer and the one that tells the agent (022). The same request the Mac's page

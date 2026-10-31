@@ -45,7 +45,7 @@ type sharedRule struct {
 	skillsFolder     string // where its skill links go, when it does not
 	instructionsFile string // "" when it has none
 	takesStdio       bool
-	handover         string // sessionMeta, sessionMetaWithServers, codexMarketplace, extensionLink, none
+	handover         string // sessionMeta, sessionMetaWithServers, codexMarketplace, none
 	appSkillsFolder  string // inside the home the app gives it (Antigravity)
 	noInstructions   string // why it has no instructions file, once measured
 }
@@ -57,7 +57,6 @@ var sharedRules = []sharedRule{
 	{id: "grok", readsShared: true, instructionsFile: ".grok/AGENTS.md", takesStdio: true, handover: "sessionMetaWithServers"},
 	{id: "cursor", readsShared: true, takesStdio: true, handover: "none", noInstructions: "Cursor keeps User Rules in its own settings"},
 	{id: "copilot", readsShared: true, instructionsFile: ".copilot/copilot-instructions.md", handover: "none"},
-	{id: "gemini", readsShared: true, instructionsFile: ".gemini/AGENTS.md", takesStdio: true, handover: "extensionLink"},
 	{id: "antigravity", takesStdio: true, handover: "none", appSkillsFolder: "config/skills",
 		noInstructions: "Antigravity reads no personal instructions file when the app starts it"},
 	{id: "opencode", readsShared: true, instructionsFile: ".claude/CLAUDE.md", takesStdio: true, handover: "none"},
@@ -72,8 +71,10 @@ var (
 	refusesSSE = map[string]bool{"codex": true}
 	// ownServerConfigs: where each runtime keeps MCP servers of its own, under the home.
 	ownServerConfigs = map[string]string{
-		"claude": ".claude.json", "codex": ".codex/config.toml", "cursor": ".cursor/mcp.json",
-		"copilot": ".copilot/mcp-config.json", "gemini": ".gemini/settings.json",
+		"claude":   ".claude.json",
+		"codex":    ".codex/config.toml",
+		"cursor":   ".cursor/mcp.json",
+		"copilot":  ".copilot/mcp-config.json",
 		"opencode": ".config/opencode/opencode.json",
 	}
 	// managedSkillNames: names another tool owns inside a runtime's skills folder (FR-007).
@@ -82,8 +83,6 @@ var (
 	folderAppFiles = map[string]bool{"folder.json": true, "pins.json": true, "workflows": true, "worktrees": true,
 		"dropbox": true, "attachments": true, "chat": true}
 )
-
-const geminiExtensions = ".gemini/extensions"
 
 // layoutRecord is PersonalDotAgents.Record, <root>/personal-layout.json: what the Swift
 // host placed in the home, so a link the person removed reads as removed.
@@ -498,8 +497,6 @@ func sharedMCP(home string, present []sharedRule, secrets map[string]string, loo
 				reach[id] = leftOut("the app's own agents server has the name")
 			case taken:
 				reach[id] = leftOut("an earlier server has the name")
-			case id == "gemini":
-				reach[id] = unchecked("")
 			case e.kind == wire.MCPTransportNameSse && refusesSSE[id]:
 				reach[id] = leftOut(runtimeName(id) + " takes no sse servers")
 				sseLeftOut[id] = append(sseLeftOut[id], e.name)
@@ -836,12 +833,6 @@ func pluginReach(home, plugin string, present []sharedRule, record layoutRecord)
 			} else {
 				reach[r.id] = leftOut("not added to Codex yet: the next Codex agent adds it")
 			}
-		case "extensionLink":
-			note := ""
-			if lexists(filepath.Join(home, geminiExtensions, filepath.Base(plugin))) {
-				note = "link in ~/" + geminiExtensions + ", not checked yet"
-			}
-			reach[r.id] = unchecked(note)
 		default:
 			if r.id == "copilot" {
 				reach[r.id] = noWay("not in agents the app starts (its own CLI has it)")

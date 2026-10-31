@@ -102,11 +102,6 @@ func TestAFolderPluginWaitsUntilApproved(t *testing.T) {
 		len(list.Plugins[0].Carries) != 2 || list.Plugins[0].Carries[0] != "hooks" || list.Plugins[0].Carries[1] != "connectors" {
 		t.Fatalf("%+v", list)
 	}
-	gemini, _ := os.ReadFile(filepath.Join(plugins, "old", "gemini-extension.json"))
-	if string(gemini) != "{\n  \"description\" : \"\",\n  \"mcpServers\" : {\n    \"x\" : {\n      \"command\" : \"${extensionPath}/x\"\n    }\n  },\n  \"name\" : \"old\",\n  \"version\" : \"0.1.0\"\n}\n" {
-		t.Fatal(string(gemini))
-	}
-
 	// One that arrives after waits, and one changed after approval waits again.
 	os.MkdirAll(filepath.Join(plugins, "new", "skills"), 0o755)
 	os.WriteFile(filepath.Join(plugins, "old", "hooks", "run.sh"), []byte("echo hi"), 0o755)

@@ -83,9 +83,9 @@ for server in github-mcp linear-mcp gitlab-mcp email-mcp; do
 done
 
 # The Node toolsets the control plane carries (#1312): the Go host installs Claude from
-# them by itself, and Codex or Gemini when asked, into ~/.agents-server/tools.
+# them by itself, and Codex when asked, into ~/.agents-server/tools.
 offered=
-for runtime in claude codex gemini; do
+for runtime in claude codex; do
     mkdir -p "$tmp/toolsets/$runtime"
     ok=1
     for file in manifest.json package.json package-lock.json; do

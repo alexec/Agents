@@ -109,7 +109,6 @@ Agents has no operating-system sandbox of its own. It turns on each runtime's ow
 | Claude | Claude Code's sandbox, on or off |
 | Codex | Read only, or full access |
 | Grok | `--sandbox workspace`, or off |
-| Gemini | Off only |
 | Cursor, Copilot | The runtime decides |
 | Antigravity, OpenCode | None |
 

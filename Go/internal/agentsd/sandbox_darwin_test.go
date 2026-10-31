@@ -47,7 +47,7 @@ func TestARuntimesOwnSeatbeltCannotNest(t *testing.T) {
 	if err == nil {
 		t.Fatal("a sandbox-exec nested in another started: a host profile would not break the runtimes' own")
 	}
-	for _, runtime := range []string{"claude", "codex", "gemini"} {
+	for _, runtime := range []string{"claude", "codex"} {
 		if sandboxMatch(runtime, said) == "" {
 			t.Errorf("%s's failure is not recognised: %q", runtime, said)
 		}

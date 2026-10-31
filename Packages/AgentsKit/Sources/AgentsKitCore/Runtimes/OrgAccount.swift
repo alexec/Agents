@@ -52,7 +52,7 @@ public extension DaemonAPI {
         public var name: String
         /// `key`, `bedrock`, `vertex`, `azure` or `baseURL`.
         public var kind: String
-        /// `anthropic`, `openai`, `gemini` or `xai`.
+        /// `anthropic`, `openai` or `xai`.
         public var vendor: String?
         public var runtimes: [String]
         public var settings: OrgRouteSettings?

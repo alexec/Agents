@@ -176,9 +176,8 @@ func classifyLimit(runtimeID string, failure *sessionFailure, window *wire.RateL
 		}
 		return limit{kind: limitOtherTyped}
 	}
-	// Paid use has begun on a plan: out, whatever the turn itself did (R3). Gemini runs
-	// on a key's free tier, never a plan.
-	if runtimeID != "gemini" && payingOverage(window) {
+	// Paid use has begun on a plan: out, whatever the turn itself did (R3).
+	if payingOverage(window) {
 		at := window.OverageResetsAt
 		if at == nil {
 			at = window.ResetsAt
@@ -252,7 +251,7 @@ func wordsLimit(runtimeID string, code *int, message, said string) limitKind {
 }
 
 // authRequired is ACP's auth_required (JSONRPCError.authRequired): the runtime has no
-// sign-in to use. Gemini sends it for a missing API key too.
+// sign-in to use.
 const authRequired = -32000
 
 // refusal is a prompt's error as a code and message, when the runtime refused it.

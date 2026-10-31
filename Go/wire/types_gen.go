@@ -2813,16 +2813,6 @@ type CostState struct {
 	SetBy *PolicySetBy `json:"setBy,omitzero"`
 }
 
-type CredentialKind string
-
-type CredentialsLend struct {
-	Runtime string `json:"runtime"`
-
-	Kind CredentialKind `json:"kind"`
-
-	Secret string `json:"secret"`
-}
-
 type CredentialsOffer struct {
 	Runtimes []string `json:"runtimes"`
 
@@ -6291,7 +6281,6 @@ type OrgRouteVendor string
 
 const OrgRouteVendorAnthropic OrgRouteVendor = "anthropic"
 const OrgRouteVendorOpenai OrgRouteVendor = "openai"
-const OrgRouteVendorGemini OrgRouteVendor = "gemini"
 const OrgRouteVendorXai OrgRouteVendor = "xai"
 
 // A route a machine keeps, and its version (#999).

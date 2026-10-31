@@ -40,9 +40,6 @@ public enum LimitRecognition {
         "Fable 5 requires usage credits", "You're out of extra usage", "Your seat type doesn't include extra usage",
     ]
 
-    /// Gemini's spent free tier (046, research R13).
-    public static let geminiDailyQuota = "exhausted your daily quota"
-
     /// Copilot's monthly allowance refusal, captured on 2026-09-26.
     public static let copilotMonthlyQuota = "You have exceeded your monthly quota"
 
@@ -117,7 +114,6 @@ public enum LimitRecognition {
                claudeUsageLimitPrefixes.contains(where: { message.hasPrefix($0) || message.contains(": \($0)") }) {
                 return .spent(resetsAt: resets)
             }
-            if lower.contains(geminiDailyQuota) { return .spent(resetsAt: nil) }
             if code == 429 || lower.contains("rate limit") || lower.contains("resource_exhausted") {
                 return .rateLimited(retryAfter: nil)
             }

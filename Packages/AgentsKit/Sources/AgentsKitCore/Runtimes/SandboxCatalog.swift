@@ -12,7 +12,7 @@ public enum SandboxCatalog {
     public enum Route: Sendable, Hashable {
         /// Arguments before the runtime's own (Grok).
         case arguments(on: [String], off: [String])
-        /// Environment for the process. `nil` means the choice is not offered (Gemini's On).
+        /// Environment for the process. `nil` means the choice is not offered (no On route).
         case environment(on: [String: String]?, off: [String: String])
         /// `_meta.claudeCode.options.sandbox` on every session the app opens (Claude).
         case claudeMeta
@@ -35,7 +35,7 @@ public enum SandboxCatalog {
         public let failurePatterns: [String]
         /// Codex only: a failed sandbox shows in no tool call, only in the agent's reply.
         public let readsReply: Bool
-        /// Gemini only: a sandbox that is on makes it hang before `initialize` (R6).
+        /// True when turning the sandbox on makes the runtime hang before `initialize` (R6).
         public let hangsWhenOn: Bool
     }
 
@@ -58,12 +58,6 @@ public enum SandboxCatalog {
               why: "Grok 1.0.67 does not accept --sandbox with agent stdio. The app cannot change Grok’s sandbox.",
               failurePatterns: ["Refusing to start with its protections missing", "sandbox initialization failed"],
               readsReply: false, hangsWhenOn: false),
-        Entry(runtimeID: RuntimeCatalog.gemini.id,
-              route: .environment(on: nil, off: ["GEMINI_SANDBOX": "false"]),
-              measuredOn: "Gemini CLI 0.61.0",
-              why: "Gemini’s own sandbox cannot start when the app runs it, so On is not offered.",
-              failurePatterns: ["failed to determine command for sandbox", "Missing sandbox command", seatbelt],
-              readsReply: false, hangsWhenOn: true),
         Entry(runtimeID: RuntimeCatalog.cursor.id, route: .fixed(.runtimeControlled),
               measuredOn: "Cursor 2026.09.26",
               why: "Cursor’s own sandbox setting decides. The app cannot change it.",

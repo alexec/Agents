@@ -106,29 +106,6 @@ func TestOpenCodesToolPolicy(t *testing.T) {
 	}
 }
 
-// Gemini's --policy file is written only for a deny rule, and there are none; its system
-// defaults, which read AGENTS.md after GEMINI.md, are.
-func TestGeminisToolPolicy(t *testing.T) {
-	l, root := launchOf(t, "gemini")
-	if slices.Contains(l.Args, "--policy") {
-		t.Fatalf("%q", l.Args)
-	}
-	file := filepath.Join(root, "runtimes", "gemini-system-defaults.json")
-	if v, ok := envValue(l.Env, "GEMINI_CLI_SYSTEM_DEFAULTS_PATH"); !ok || v != file {
-		t.Fatalf("%q", l.Env)
-	}
-	var defaults struct {
-		Context struct{ FileName []string } `json:"context"`
-	}
-	text, _ := os.ReadFile(file)
-	if err := json.Unmarshal(text, &defaults); err != nil || !slices.Equal(defaults.Context.FileName, []string{"GEMINI.md", "AGENTS.md"}) {
-		t.Fatalf("%v %s", err, text)
-	}
-	if sessionMeta("gemini") != nil {
-		t.Fatal(sessionMeta("gemini"))
-	}
-}
-
 // Codex's switches ride in CODEX_CONFIG on every launch (#1432), and Cursor, with no
 // lever, is launched as it is.
 func TestCodexAndCursorsToolPolicy(t *testing.T) {

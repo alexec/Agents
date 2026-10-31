@@ -71,7 +71,6 @@ var (
 var orgRouteKinds = map[string][]wire.OrgRouteKind{
 	"claude":   {wire.OrgRouteKindKey, wire.OrgRouteKindBedrock, wire.OrgRouteKindVertex, wire.OrgRouteKindAzure, wire.OrgRouteKindBaseURL},
 	"codex":    {wire.OrgRouteKindKey, wire.OrgRouteKindAzure, wire.OrgRouteKindBaseURL},
-	"gemini":   {wire.OrgRouteKindKey, wire.OrgRouteKindVertex, wire.OrgRouteKindBaseURL},
 	"opencode": {wire.OrgRouteKindKey, wire.OrgRouteKindBedrock, wire.OrgRouteKindVertex, wire.OrgRouteKindAzure, wire.OrgRouteKindBaseURL},
 }
 
@@ -79,7 +78,6 @@ var orgRouteKinds = map[string][]wire.OrgRouteKind{
 var orgRouteVendors = map[string][]wire.OrgRouteVendor{
 	"claude":   {wire.OrgRouteVendorAnthropic},
 	"codex":    {wire.OrgRouteVendorOpenai},
-	"gemini":   {wire.OrgRouteVendorGemini},
 	"opencode": {wire.OrgRouteVendorAnthropic, wire.OrgRouteVendorOpenai},
 }
 
@@ -545,7 +543,7 @@ func (s *Service) boundOrgRoute(r wire.OrgRoute, values map[string]string) error
 	}
 	needsVendor := r.Kind == wire.OrgRouteKindKey || r.Kind == wire.OrgRouteKindAzure || r.Kind == wire.OrgRouteKindBaseURL
 	if needsVendor && r.Vendor == nil {
-		return fail(invalidParams, "Say whose API the route speaks: anthropic, openai, gemini or xai.")
+		return fail(invalidParams, "Say whose API the route speaks: anthropic, openai or xai.")
 	}
 	seen := map[string]bool{}
 	for _, runtime := range r.Runtimes {

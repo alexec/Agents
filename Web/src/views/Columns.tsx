@@ -16,7 +16,6 @@ import { Chat } from "./Chat";
 import { NewAgent } from "./NewAgent";
 import { NewFolderDialog } from "./NewFolder";
 import { DropboxDialog } from "./DropboxDialog";
-import { TokenAskDialog } from "./TokenAsk";
 import { GitLendDialog } from "./GitLend";
 import { ExportImportDialog } from "./ExportImport";
 import { Problem } from "./Errors";
@@ -93,7 +92,6 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
       </div>}
       <NewFolderDialog store={store} />
       <DropboxDialog store={store} />
-      <TokenAskDialog store={store} />
       <GitLendDialog store={store} />
       <ExportImportDialog store={store} />
       <ContextMenu />

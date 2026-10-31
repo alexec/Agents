@@ -29,9 +29,7 @@ type sandboxRoute struct {
 var sandboxCatalog = map[string]sandboxRoute{
 	"claude": {claudeMeta: true},
 	"codex":  {codexMode: true},
-	"grok":   {fixed: wire.SandboxStateRuntimeControlled, why: "Grok 1.0.67 does not accept --sandbox with agent stdio. The app cannot change Grok’s sandbox."},
-	"gemini": {offEnv: map[string]string{"GEMINI_SANDBOX": "false"},
-		why: "Gemini’s own sandbox cannot start when the app runs it, so On is not offered."},
+	"grok":        {fixed: wire.SandboxStateRuntimeControlled, why: "Grok 1.0.67 does not accept --sandbox with agent stdio. The app cannot change Grok’s sandbox."},
 	"cursor":      {fixed: wire.SandboxStateRuntimeControlled, why: "Cursor’s own sandbox setting decides. The app cannot change it."},
 	"copilot":     {fixed: wire.SandboxStateRuntimeControlled, why: "Copilot’s own sandbox setting decides. The app cannot change it yet."},
 	"antigravity": {fixed: wire.SandboxStateNone, why: "Antigravity sandboxes commands only when a business account’s admin turns Sandbox mode on."},

@@ -19,7 +19,7 @@ import (
 const appToolsets = "../../../../App/Resources/toolsets"
 
 func TestTheAppsNodeToolsetsAreReadAndItsArchivesAreNot(t *testing.T) {
-	all := loadToolsets(appToolsets, []string{"claude", "codex", "gemini", "opencode", "antigravity"})
+	all := loadToolsets(appToolsets, []string{"claude", "codex", "opencode", "antigravity"})
 	var got []string
 	for _, ts := range all {
 		got = append(got, ts.manifest.RuntimeID+":"+ts.shimName())
@@ -27,7 +27,7 @@ func TestTheAppsNodeToolsetsAreReadAndItsArchivesAreNot(t *testing.T) {
 			t.Fatalf("id %q", ts.id)
 		}
 	}
-	if strings.Join(got, " ") != "claude:npx codex:codex-acp gemini:gemini" {
+	if strings.Join(got, " ") != "claude:npx codex:codex-acp" {
 		t.Fatalf("%v", got)
 	}
 	// The id is the window's: the manifest's and the lock's bytes, one after the other.
@@ -35,10 +35,6 @@ func TestTheAppsNodeToolsetsAreReadAndItsArchivesAreNot(t *testing.T) {
 	cmd.Dir = filepath.Join(appToolsets, "claude")
 	if want, err := cmd.Output(); err == nil && strings.TrimSpace(string(want)) != all[0].id {
 		t.Fatalf("id %s, sha256sum says %s", all[0].id, want)
-	}
-	// Gemini is started with --acp, which its shim passes on.
-	if last := all[2].shimLines()[3]; !strings.HasSuffix(last, `"$@"`) {
-		t.Fatalf("gemini's shim %q", last)
 	}
 	if last := all[0].shimLines()[3]; strings.HasSuffix(last, `"$@"`) ||
 		!strings.Contains(last, "lib/node_modules/@agentclientprotocol/claude-agent-acp/dist/index.js") {

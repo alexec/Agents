@@ -7,8 +7,8 @@ devices: [mac, server]
 # Compaction in each runtime
 
 A long conversation eventually fills the model's context. Compaction is how a runtime keeps
-going: it replaces the older part of the conversation with a shorter record. Gemini calls
-it compression and Cursor calls it summarization. This page records, for each runtime the
+going: it replaces the older part of the conversation with a shorter record. Cursor calls
+it summarization. This page records, for each runtime the
 app can start, three things:
 
 - whether compaction happens on its own when nothing is set;
@@ -32,13 +32,12 @@ They differ in what the app sees:
   advertising `session.compaction`.
 - **Grok** tells it in a message of its own, which the app reads into the same row (#447).
 - **OpenCode** shows its summary as ordinary agent text.
-- **Gemini, Copilot, Cursor and Antigravity** say nothing. At most, the context meter drops.
+- **Copilot, Cursor and Antigravity** say nothing. At most, the context meter drops.
 
 | Runtime | Version read | On with nothing set | When it fires | What the app sees | `/compact` over ACP | Lever the app could use |
 | --- | --- | --- | --- | --- | --- | --- |
 | **Claude** | adapter 0.85.1, Claude Code 2.1.286 | Yes (`autoCompactEnabled`, default on) | About 83% of a 200K window (window − min(max output, 20K) − 13K) | `compaction_update` with its summary, then a `usage_update` that resets the meter | Yes, advertised | `_meta.claudeCode.options.settings.autoCompactEnabled` / `autoCompactWindow` |
 | **Codex** | codex-acp 1.13.1, Codex 0.156.1 | Yes, with no off switch | 90% of the window: 244,800 of 272,000 tokens for every bundled model | `compaction_update` with status only, no summary | Yes, advertised | `model_auto_compact_token_limit` (lower only) and `compact_prompt` in `CODEX_CONFIG` |
-| **Gemini** | 0.61.0 | Yes (`model.compressionThreshold`, 0.5) | Half the window: about 524K of 1M tokens | Nothing over ACP | No: `/compress` is in its terminal only | `model.compressionThreshold` in the app's system defaults file. 1.0 is in effect off; 0 is not off. |
 | **Antigravity** | agy-acp-server 1.2.1 | Yes, in its Go harness | Its backend's default, not readable. A forum measurement puts it at about 220–260K. | Nothing over ACP | No | None: the ACP server reads no compaction setting |
 | **Grok** | 1.0.46 | Yes ("auto-compact") | 85% by its docs; its bundled grok-4.5 and 4.6 say 80% | Its own `auto_compact_*` updates in `_x.ai/session_notification`, drawn as the compaction row (#447) | Yes, advertised | `GROK_AUTO_COMPACT_THRESHOLD_PERCENT`, `GROK_COMPACTION_MODE`. There is no off switch. |
 | **OpenCode** | 1.18.33 | Yes (`compaction.auto`, default on) | When the usable window is full: the input limit minus up to 20K reserved | The summary as agent text; after an automatic one, a "continue" turn (inferred). No `compaction_update`. | Works, but not advertised | `compaction.*` in `OPENCODE_CONFIG_CONTENT`; `OPENCODE_DISABLE_AUTOCOMPACT` to turn it off |
@@ -109,21 +108,6 @@ Codex's rows have no summary under them, because Codex sends none. That is right
   recent *user* messages, then a summary. Assistant turns, tool calls and tool output are
   dropped. With a ChatGPT sign-in, compaction happens on OpenAI's side and comes back as an
   encrypted item, so what it keeps cannot be read.
-
-### Gemini
-
-- **Default.** Before every turn, it compresses once the last prompt reached
-  `compressionThreshold` × the model's limit: 0.5 × 1,048,576. Apart from that, every turn
-  masks old tool output beyond 50K protected tokens, whatever the threshold.
-- **Lever.** The app already writes `gemini-system-defaults.json` and passes it in
-  `GEMINI_CLI_SYSTEM_DEFAULTS_PATH`; today it holds only the context file names. Adding
-  `"model": {"compressionThreshold": X}` there changes the default, and your own setting
-  still wins. A value of 0 counts as unset; 1.0 is in effect off.
-- **Over ACP.** Nothing. `ChatCompressed` falls through the ACP loop's `default`. A
-  `PreCompress` hook does fire. An overflow ends the turn as `max_tokens`.
-- **What is kept.** About the newest 30% of the history word for word. The rest becomes a
-  `<state_snapshot>` written by the model. Large tool output is cut down to a stub that
-  points to a file in its temp folder.
 
 ### Antigravity
 
@@ -229,7 +213,7 @@ What this shows:
 ## On servers
 
 The levers above travel with the launch, so they reach a server too: `_meta` for Claude,
-`CODEX_CONFIG`, the Gemini defaults file, `OPENCODE_CONFIG_CONTENT`, and environment
+`CODEX_CONFIG`, `OPENCODE_CONFIG_CONTENT`, and environment
 variables for Grok and Copilot. On a server, the runtime's own settings files are the
 server's.
 
@@ -242,7 +226,7 @@ Antigravity runs on this Mac only.
   has been seen. Grok and Copilot have not been seen at all; they need allowance.
 - **Whether to change any defaults.** Nothing needs turning on. Whether the app should *show*
   a switch or a threshold is a product decision. These have a lever the app can reach:
-  Claude, Codex (threshold only), Gemini, Grok (threshold only), OpenCode and Copilot
+  Claude, Codex (threshold only), Grok (threshold only), OpenCode and Copilot
   (untested). Antigravity and Cursor have none.
 - **Showing the silent ones.** Grok's own updates are drawn (#447). For the others, the app
   could only infer a compaction from a sudden drop in the context meter, and Cursor does

@@ -98,15 +98,10 @@ its `.claude-plugin/plugin.json`, and `.mcp.json` if it has servers.
 - Codex keeps a copy of each plugin. The app writes `~/.agents/plugins/marketplace.json`
   and adds the plugin to Codex, and adds it again whenever anything in its folder changes,
   before the next Codex agent starts. An index you wrote yourself is left alone.
-- Gemini gets a link in `~/.gemini/extensions`. Gemini has no folder for a folder's own
-  plugins, so before a Gemini agent starts, each plugin in the folder's `.agents/plugins`
-  gets a link there too, switched on only inside that folder in
-  `~/.gemini/extensions/extension-enablement.json`. A name Gemini already has is left to
-  whoever has it: two extensions with one name stop Gemini loading any.
 - Cursor, Copilot and Antigravity cannot take a plugin from the app.
 
 To remove a plugin, delete its folder. The next agent starts without it, and the app takes
-it out of Codex and removes its Gemini link.
+it out of Codex.
 
 ## A folder's own plugins
 

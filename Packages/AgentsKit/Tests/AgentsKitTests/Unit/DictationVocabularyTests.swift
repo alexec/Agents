@@ -14,7 +14,6 @@ struct DictationVocabularyTests {
         #expect(seeds.contains("control plane"))
         #expect(seeds.contains("Claude"))
         #expect(seeds.contains("OpenCode"))
-        #expect(seeds.contains("Gemini"))
         #expect(seeds.contains("Agents"))
     }
 

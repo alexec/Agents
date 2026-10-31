@@ -991,8 +991,6 @@ final class AppModel {
     let hosts = HostSet(locations: .default)
     /// What this window may lend to servers (043). Never to this Mac's own daemon (D5).
     let credentials = ServerCredentials(locations: .default)
-    /// A server asked for a credential there is none of; the window asks the person (043).
-    var tokenAsk: TokenAsk?
     /// The Export… or Import Agents… on its way, drawn as a busy sheet with Cancel (#2437).
     var exportImport: ExportImportProgress?
     /// A server asked for a sign-in this Mac relays; the window asks the person (T091).
@@ -1076,18 +1074,6 @@ final class AppModel {
     /// The window cannot ask this host right now: the control plane is away, or the host is.
     func hostUnreachable(_ host: MachineRef) -> Bool {
         (controlPlaneAway && directHost != host) || hosts.isOffline(host)
-    }
-
-    /// Lend to a host the control plane reaches (058, FR-020). Nil when this window
-    /// still reaches that host over its own ssh, so the caller uses that path.
-    func lendThroughControl(_ id: MachineRef, runtime: String, secret: Secret, offered: Bool) async -> Bool? {
-        guard controlHosts[id] != nil else { return nil }
-        if !offered {
-            _ = try? await client(for: id).call(DaemonAPI.Method.credentialsOffer, credentialOffer(id))
-        }
-        return (try? await client(for: id).call(
-            DaemonAPI.Method.credentialsLend,
-            DaemonAPI.CredentialsLend(runtime: runtime, secret: secret))) != nil
     }
 
     /// Why this Mac's host is quiet (#303), once the control plane has listed its hosts.
@@ -3594,7 +3580,6 @@ final class AppModel {
             return
         case DaemonAPI.Notification.costChanged:
             serverCosts[host] = try? params?.decode(DaemonAPI.CostState.self)
-            noteServerSpent(host)
             return
         case DaemonAPI.Notification.diskChanged:
             serverDisks[host] = try? params?.decode(DiskState.self)

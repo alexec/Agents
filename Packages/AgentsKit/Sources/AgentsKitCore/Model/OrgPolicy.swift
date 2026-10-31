@@ -228,7 +228,7 @@ public extension DaemonAPI {
     struct PolicySetBy: Codable, Sendable, Hashable {
         /// Always `organisation`.
         public var by: String
-        /// The rule's name, such as `modeCeiling` or `runtimes.gemini.models`.
+        /// The rule's name, such as `modeCeiling` or `runtimes.codex.models`.
         public var rule: String
         public var words: String
 
@@ -445,7 +445,7 @@ public enum OrgPolicyWords {
 
     /// RuntimeCatalog's names, for a runtime this client may not be told about.
     public static let runtimeNames: [String: String] = [
-        "claude": "Claude", "codex": "Codex", "gemini": "Gemini", "cursor": "Cursor", "copilot": "Copilot",
+        "claude": "Claude", "codex": "Codex", "cursor": "Cursor", "copilot": "Copilot",
         "antigravity": "Antigravity", "opencode": "OpenCode", "grok": "Grok",
     ]
 

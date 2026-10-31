@@ -217,7 +217,6 @@ var HostCapabilities = pairs([][2]string{
 	{"connectors/setup/skip", "connectors.setup/1"},
 	{"cost/setLimits", "cost/1"},
 	{"cost/state", "cost/1"},
-	{"credentials/lend", "credentials/1"},
 	{"credentials/offer", "credentials/1"},
 	{"daemon/ping", "daemon/1"},
 	{"daemon/policyState", "host.policy/1"},

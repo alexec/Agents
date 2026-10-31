@@ -133,8 +133,8 @@ restart or resume, and archiving, which cleans up the worktree it moved into jus
 had started there. A shell you had open stays where it is, since it is yours.
 
 A runtime has to be able to pick its conversation back up in another folder for this to
-work. Claude, Copilot, Cursor and Codex can. Grok cannot, and Gemini and Antigravity have not
-been checked, so their agents are never moved: they would carry on having forgotten
+work. Claude, Copilot, Cursor and Codex can. Grok cannot, and Antigravity has not
+been checked, so its agents are never moved: they would carry on having forgotten
 everything.
 
 ## A folder is in a project

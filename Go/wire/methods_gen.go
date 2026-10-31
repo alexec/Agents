@@ -84,7 +84,6 @@ var CallConnectorsSetup = Method[ConnectorSetupRequest, ConnectorSetup]{"connect
 var CallConnectorsSetupSkip = Method[ConnectorSkipRequest, ConnectorSetup]{"connectors/setup/skip"}
 var CallCostSetLimits = Method[SetLimitsRequest, CostState]{"cost/setLimits"}
 var CallCostState = Method[Empty, CostState]{"cost/state"}
-var CallCredentialsLend = Method[CredentialsLend, Empty]{"credentials/lend"}
 var CallCredentialsOffer = Method[CredentialsOffer, Empty]{"credentials/offer"}
 var CallDaemonPing = Method[Empty, PingResponse]{"daemon/ping"}
 var CallDaemonPolicyState = Method[Empty, PolicyState]{"daemon/policyState"}

@@ -118,7 +118,7 @@ struct WireSchemaTests {
         let reach: [String: DaemonAPI.Reach] = [
             "claude": .gets("sent at start"), "codex": .ownCopy("/h/.codex/config.toml"),
             "copilot": .leftOut("needs sign-in"), "cursor": .noWay("no way in"),
-            "gemini": .unchecked(nil), "grok": .unchecked("not checked yet"),
+            "antigravity": .unchecked(nil), "grok": .unchecked("not checked yet"),
         ]
         let snapshot = DaemonAPI.SharedSnapshot(
             home: "/h/.agents", laidOut: true, runtimes: [.init(id: "claude", name: "Claude")],

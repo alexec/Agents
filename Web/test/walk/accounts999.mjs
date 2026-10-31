@@ -124,7 +124,7 @@ try {
   // The org path only: the own sign-in dimmed, and a session on it told to move.
   const kept = await admin.ask("policy/get");
   const policy = { version: 0, issued: 0, changedBy: { user: "walk" }, requires: ["host.policy/1", "host.org-routes/1"],
-    runtimes: { claude: { reach: ["orgKey", "gateway"] }, codex: {}, gemini: {}, opencode: {}, antigravity: {}, copilot: {}, cursor: {}, grok: {} } };
+    runtimes: { claude: { reach: ["orgKey", "gateway"] }, codex: {}, opencode: {}, antigravity: {}, copilot: {}, cursor: {}, grok: {} } };
   const p = await admin.ask("policy/set", { policy, rev: kept.result?.rev });
   check(!p.error, `policy/set: ${p.error ? p.error.message : `v${p.result.policy?.version}`}`);
   await sleep(4000);

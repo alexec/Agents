@@ -60,8 +60,8 @@ func endingBrief(runtimeID string) string {
 // compatibilitySystemPromptDelivery describes runtime-specific fallback routes, used only
 // when initialize does not advertise ACP's session system-prompt capability. Codex ACP 2.2.2
 // reads customInstructions from JetBrains AIR metadata. Antigravity 1.4.5 advertises its own
-// route in initialize, which acp reads like the standard one (#2613). Cursor and Gemini have
-// no fallback.
+// route in initialize, which acp reads like the standard one (#2613). Cursor has no
+// fallback.
 var compatibilitySystemPromptDelivery = map[string]string{"claude": "append", "grok": "rules", "codex": "customInstructions"}
 
 // brief is the whole of it for an agent, in the order it is said: who is who first, since

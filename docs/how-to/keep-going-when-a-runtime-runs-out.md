@@ -16,7 +16,7 @@ chat stays as it was.
 ## Before you start
 
 - At least two runtimes installed and signed in. See [Sign a runtime in](sign-a-runtime-in.md).
-- Recognising a spent allowance works for Claude, Codex, Gemini, Antigravity, Copilot, Cursor
+- Recognising a spent allowance works for Claude, Codex, Antigravity, Copilot, Cursor
   and Grok. See [Runtimes](../reference/runtimes.md).
 
 ## When a chat runs out

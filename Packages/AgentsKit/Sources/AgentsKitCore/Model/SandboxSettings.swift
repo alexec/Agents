@@ -85,7 +85,7 @@ public struct SandboxFailureRecord: Codable, Sendable, Hashable {
     public var runtimeID: String
     /// The runtime's own words that were recognised, trimmed, for "Show details".
     public var detail: String
-    /// Gemini never answered: the text is the app's, not the runtime's (R6).
+    /// The runtime never answered: the text is the app's, not the runtime's (R6).
     public var hang: Bool
     /// Whether **Continue without sandbox** is offered: the runtime has an Off route.
     public var recoveryOffered: Bool

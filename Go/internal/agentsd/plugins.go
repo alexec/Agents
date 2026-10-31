@@ -239,11 +239,8 @@ var pluginDigests = struct {
 	m map[string][2]string // key → stamp, digest
 }{m: map[string][2]string{}}
 
-// pluginDigest is the digest of plugin's folder; false when it cannot be read at all. Its
-// gemini-extension.json is written first where it has none, as the Swift host writes it on
-// the way to every Gemini session: a manifest the app wrote must not read as a change.
+// pluginDigest is the digest of plugin's folder; false when it cannot be read at all.
 func pluginDigest(plugin string) (string, bool) {
-	writeGeminiManifest(plugin)
 	key := filepath.Clean(plugin)
 	stamp, stamped := pluginStamp(plugin)
 	pluginDigests.Lock()
@@ -383,8 +380,7 @@ func jsonObjectAt(path string) map[string]any {
 	return m
 }
 
-// pluginMCPServers is the plugin's MCP servers, from its .mcp.json or its manifest, with
-// Claude's name for the plugin's folder put in Gemini's.
+// pluginMCPServers is the plugin's MCP servers, from its .mcp.json or its manifest.
 func pluginMCPServers(plugin string, manifest map[string]any) any {
 	var servers map[string]any
 	if file := jsonObjectAt(filepath.Join(plugin, ".mcp.json")); file != nil {
@@ -434,114 +430,3 @@ func pluginCarries(plugin string) []string {
 	return carries
 }
 
-// writeGeminiManifest writes gemini-extension.json where the plugin has none
-// (DotAgents.writeGeminiManifest), sorted and pretty as Foundation writes it.
-func writeGeminiManifest(plugin string) {
-	path := filepath.Join(plugin, "gemini-extension.json")
-	if _, err := os.Lstat(path); err == nil {
-		return
-	}
-	if info, err := os.Stat(plugin); err != nil || !info.IsDir() {
-		return
-	}
-	manifest := pluginManifest(plugin)
-	nameOf, _ := manifest["name"].(string)
-	if nameOf == "" {
-		nameOf = filepath.Base(plugin)
-	}
-	name := kebab(nameOf)
-	if name == "" {
-		name = kebab(filepath.Base(plugin))
-	}
-	version, ok := manifest["version"].(string)
-	if !ok {
-		version = "0.1.0"
-	}
-	description, _ := manifest["description"].(string)
-	m := map[string]any{"name": name, "version": version, "description": description}
-	if servers := pluginMCPServers(plugin, manifest); servers != nil {
-		m["mcpServers"] = servers
-	}
-	var b strings.Builder
-	foundationJSON(&b, m, "")
-	b.WriteString("\n")
-	if err := store.WriteAtomically(path, []byte(b.String()), 0o644); err != nil {
-		log.Printf("plugins: could not write gemini-extension.json for %s: %v", filepath.Base(plugin), err)
-	}
-}
-
-// kebab is lower-case letters, digits, dots and single dashes.
-func kebab(name string) string {
-	var b strings.Builder
-	for _, r := range strings.ToLower(name) {
-		if r < 0x80 && (r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '.') {
-			b.WriteRune(r)
-		} else if !strings.HasSuffix(b.String(), "-") {
-			b.WriteRune('-')
-		}
-	}
-	return strings.Trim(b.String(), "-.")
-}
-
-// foundationJSON is JSONSerialization's .prettyPrinted, .sortedKeys, .withoutEscapingSlashes:
-// two spaces, "key" : value.
-func foundationJSON(b *strings.Builder, v any, indent string) {
-	switch v := v.(type) {
-	case map[string]any:
-		if len(v) == 0 {
-			b.WriteString("{\n\n" + indent + "}")
-			return
-		}
-		keys := make([]string, 0, len(v))
-		for k := range v {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		b.WriteString("{\n")
-		for i, k := range keys {
-			b.WriteString(indent + "  ")
-			foundationString(b, k)
-			b.WriteString(" : ")
-			foundationJSON(b, v[k], indent+"  ")
-			if i < len(keys)-1 {
-				b.WriteString(",")
-			}
-			b.WriteString("\n")
-		}
-		b.WriteString(indent + "}")
-	case []any:
-		if len(v) == 0 {
-			b.WriteString("[\n\n" + indent + "]")
-			return
-		}
-		b.WriteString("[\n")
-		for i, x := range v {
-			b.WriteString(indent + "  ")
-			foundationJSON(b, x, indent+"  ")
-			if i < len(v)-1 {
-				b.WriteString(",")
-			}
-			b.WriteString("\n")
-		}
-		b.WriteString(indent + "]")
-	case string:
-		foundationString(b, v)
-	case json.Number:
-		b.WriteString(v.String())
-	case bool:
-		fmt.Fprint(b, v)
-	case nil:
-		b.WriteString("null")
-	default:
-		x, _ := json.Marshal(v)
-		b.Write(x)
-	}
-}
-
-func foundationString(b *strings.Builder, s string) {
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetEscapeHTML(false)
-	enc.Encode(s)
-	b.WriteString(strings.TrimSuffix(buf.String(), "\n"))
-}

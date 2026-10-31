@@ -69,7 +69,7 @@ func noMorePastApproveForMe(runtimeID string) autoCell {
 var clientAnswered = map[string]bool{"cursor": true, "grok": true, "opencode": true}
 
 // autoShippedOrder is the order Auto tries the runtimes in before the person sets one.
-var autoShippedOrder = []string{"claude", "codex", "cursor", "copilot", "gemini", "grok", "opencode", "antigravity"}
+var autoShippedOrder = []string{"claude", "codex", "cursor", "copilot", "grok", "opencode", "antigravity"}
 
 func cp(m wire.ClientPermissionMode) *wire.ClientPermissionMode { return &m }
 
@@ -131,12 +131,6 @@ var autoPermissions = map[string]map[string]autoCell{
 		"plan":         {options: map[string]string{"mode": "read-only", "collaboration_mode": "plan"}, words: "Ask for approval, Plan", rank: 0},
 		"ask":          {options: map[string]string{"mode": "read-only", "collaboration_mode": "default"}, words: "Ask for approval", rank: 1},
 		"approveForMe": {options: map[string]string{"mode": "agent", "collaboration_mode": "default"}, words: "Approve for me", rank: 2},
-	},
-	"gemini": {
-		"plan":              {options: map[string]string{"mode": "plan"}, words: "Plan", rank: 0},
-		"ask":               {options: map[string]string{"mode": "default"}, words: "Default", rank: 1},
-		"approveForMe":      {options: map[string]string{"mode": "autoEdit"}, words: "Auto Edit", rank: 2},
-		"bypassPermissions": {options: map[string]string{"mode": "yolo"}, words: "YOLO", rank: 3},
 	},
 	"grok": {
 		"plan":         {client: requestCards, words: "Default, Request cards", mark: wire.AutoMarkNearestSafer, note: "nearest safer: no plan mode", rank: 1},
@@ -209,9 +203,6 @@ func sandboxCell(runtimeID, level string) autoCell {
 		return autoCell{sandbox: &own, words: fixedWords, rank: 1, mark: wire.AutoMarkNearestSafer, note: "nearest safer: its own sandbox setting decides"}
 	}
 	why := "the app cannot turn its sandbox on"
-	if runtimeID == "gemini" {
-		why = "its sandbox never answers the app"
-	}
 	return autoCell{mark: wire.AutoMarkNotPossible, words: "Not possible", note: why}
 }
 

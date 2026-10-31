@@ -22,8 +22,8 @@ func TestALimitInWords(t *testing.T) {
 	}{
 		{"claude", c(-32603), "Internal error: You've hit your session limit · resets 5pm", "", limitSpent},
 		{"codex", c(-32603), "insufficient_quota", "", limitCreditGone},
-		{"gemini", c(429), "Too many requests", "", limitRateLimited},
-		{"gemini", c(-32603), "You have exhausted your daily quota", "", limitSpent},
+		{"codex", c(429), "Too many requests", "", limitRateLimited},
+		{"codex", c(-32603), "You have exhausted your daily quota", "", limitSpent},
 		{"copilot", nil, "", "You have exceeded your monthly quota for premium requests.", limitSpent},
 		{"grok", nil, "", "Error: Usage balance exhausted", limitSpent},
 		{"claude", nil, "", "You've hit your limit, says the doc I read.", limitNone},
@@ -57,8 +57,7 @@ func TestACreditGoneStopsTheAgent(t *testing.T) {
 }
 
 // The typed layer and the plan window (SessionFailure, RateLimitInfo): a limit with no
-// action is spent, one with retry a rate limit, another kind only said; paid overage on a
-// plan is out, never on Gemini's key.
+// action is spent, one with retry a rate limit, another kind only said.
 func TestATypedFailureAndAPlanWindow(t *testing.T) {
 	f := failureIn(map[string]any{"jetbrains": map[string]any{"air": map[string]any{"sessionFailure": map[string]any{
 		"id": "f", "revision": 2.0, "category": "limit", "title": "Spent", "actions": []any{"retry"}}}}})
@@ -79,7 +78,7 @@ func TestATypedFailureAndAPlanWindow(t *testing.T) {
 		t.Fatal("an older revision won")
 	}
 	paying := rateLimitIn(map[string]any{"_claude/rateLimit": map[string]any{"status": "allowed", "overageInUse": true}})
-	if classifyLimit("claude", nil, paying, nil, "", "").kind != limitOverage || classifyLimit("gemini", nil, paying, nil, "", "").kind != limitNone {
+	if classifyLimit("claude", nil, paying, nil, "", "").kind != limitOverage {
 		t.Fatal("overage")
 	}
 	if failureIn(map[string]any{"jetbrains": "no"}) != nil || rateLimitIn(nil) != nil {

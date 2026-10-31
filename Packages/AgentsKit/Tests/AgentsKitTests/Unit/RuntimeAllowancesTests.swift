@@ -34,8 +34,7 @@ struct RuntimeAllowancesTests {
         #expect(!rows.anyOut)
     }
 
-    @Test func aKeyedRowKnowsItsRuntime() {
-        #expect(row("gemini:geminiAPIKey").runtimeID == "gemini")
+    @Test func aRowKnowsItsRuntimeFromItsCredentialKey() {
         #expect(AllowanceState.runtimeID(of: "claude:sign-in") == "claude")
     }
 }
@@ -153,7 +152,7 @@ struct RuntimeTallyTests {
         let tally = try #require(RuntimeTally([status("claude", available),
                                                status("codex", .needsSignIn(authMethods: [], fixCommand: nil)),
                                                status("grok", .failed(reason: "no")),
-                                               status("gemini", .missing(lookedIn: [])),
+                                               status("antigravity", .missing(lookedIn: [])),
                                                status("cursor", .installing(progress: nil)),
                                                status("copilot", .installFailed(reason: "no"))], allowances: nil))
         #expect(tally.words == "1/3")

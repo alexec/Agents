@@ -87,8 +87,6 @@ struct StartAgentView: View {
             StartDraftKeeper.shared.flush()
             model.startPageDisappeared(page)
         }
-        // A start on a server with no key of its own asks for one here, over the page (#344).
-        .tokenAskSheet(model)
     }
 
     private var form: some View {

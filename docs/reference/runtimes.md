@@ -8,7 +8,7 @@ description: The coding agents the app can start, what it runs for each, and wha
 
 A runtime is the coding agent that does the work in a conversation. This page lists the
 ones the app knows how to start. Most you install and sign in to yourself, and the app
-finds them on your Mac, or on a server when the folder is on a server. Codex, Gemini,
+finds them on your Mac, or on a server when the folder is on a server. Codex,
 Antigravity and OpenCode are only ever the app's own copies: **Install** on their rows in **Settings ▸ Agent Runtimes** puts
 them in place.
 
@@ -22,10 +22,9 @@ newer version.
 | **Claude** | `npx -y @agentclientprotocol/claude-agent-acp` | Yes | Partly. Sign in with Claude Code itself, in Terminal: run `claude` and type `/login`. The sheet then shows the account, such as **Claude Max**, and offers **Sign out** and **Who answers**. | All | `claude` has no mode the app can talk to, so the app runs this adapter through your Node instead. Its questions reach you as a card you can answer on the Mac or phone. It asks your permission before using some of the app's tools. Its subagents and background commands are shown over the prompt as they run. |
 | **Grok** | `grok --permission-mode default agent stdio` | No | Yes, with **grok.com** | All | It cannot ask you a question mid-turn in a way the app can show, so it ends its turn with the question instead, and the agent shows **Waiting on your answer**. Its image and video generation is switched off for the conversations the app starts. Under the prompt, set **Request cards** or **Yes to all**. Agents the app starts follow this Mac-wide choice, even when Grok's own saved mode elsewhere would approve everything. |
 | **Copilot** | `copilot --acp` | Yes | Hands you the exact command to run in Terminal, with **Open Terminal** and **Copy** | All | It takes no MCP server it would have to start itself, so the app runs those and hands each to Copilot over a local http address only that agent can use. It uses its own follow-up suggestions instead of the app's. It asks permission before every tool call. |
-| **Gemini** | the app's own `gemini --acp --skip-trust`, installed from **Settings ▸ Agent Runtimes** | Yes | No. Paste a Gemini API key under Gemini in **Settings ▸ Agent Runtimes** (get one at aistudio.google.com/apikey). | All | A `gemini` you installed yourself is never used: the app runs the version it was built against. Google's own sign-in no longer works for individuals, so a key is the way in; the same key is used on servers. The app's tools reach Gemini only in a folder it trusts, so the app trusts the agent's folder for that conversation only, which also loads that folder's own Gemini hooks and settings. It cannot ask you a question mid-turn, so it ends its turn with the question and the agent shows **Waiting on your answer**. Its own subagents and task tracker stay. It reports tokens but no cost. On Google's free tier a spent daily quota ends the turn with Google's own sentence, and **Auto** in the model menu may pick a Pro model, which has the smallest free quota: choose a Flash model to go further. Picking a conversation back up may make Gemini record, once, that it signs in with an API key, in its own `~/.gemini/settings.json`. |
 | **Cursor** | `cursor-agent acp` | Yes | Yes | All | The command is `cursor-agent`, not `agent`, which is Grok's. It offers no options to pick from and no way to sign out, so the app shows neither. Three of its own tools, which overlap with the app's, cannot be turned off. It asks your permission before using some of the app's tools. Its Agent, Plan and Ask stay under the prompt beside a separate, Mac-wide permission capsule: **Request cards** or **Yes to all**. |
 | **Codex** | The app's own copy of `@agentclientprotocol/codex-acp`, installed from the set-up page or **Settings ▸ Agent Runtimes** | Yes | Yes: **ChatGPT** first, then a ChatGPT device code or an OpenAI API key | All | Never a `codex` or `npx` of yours: the app runs the exact version it carries, and offers **Update** when a newer app carries a newer one. Signing in with ChatGPT is shared with Codex in Terminal. Its questions reach you as a card. Its three modes are **Ask for approval**, **Approve for me** and **Full access**. It shows how much of its context is used, with no cost. Its own sub-agents and goals are on, and its sub-agents are shown over the prompt as they run. A goal set with `/goal` is shown as a card at the head of the chat, over the plan: the goal, its state, why it stopped, and how much of its token budget is used. |
-| **Antigravity** | The app's own copy of Google's Antigravity ACP server (`agy_acp_server`, not the `agy` command), downloaded from Google by the set-up page or **Settings ▸ Agent Runtimes** | Yes | Yes, with a personal or business Google account, in your browser | All | The one Google runtime a Google account alone can sign in to; Gemini is for an API key, and the Gemini key is never lent to Antigravity. It keeps its settings, conversations and sign-in in a folder of the app's own, never in `~/.gemini`. It runs on this Mac only; servers are not supported yet. Its questions reach you as a card. Its own tool for starting subagents stays. |
+| **Antigravity** | The app's own copy of Google's Antigravity ACP server (`agy_acp_server`, not the `agy` command), downloaded from Google by the set-up page or **Settings ▸ Agent Runtimes** | Yes | Yes, with a personal or business Google account, in your browser | All | The one Google runtime a Google account alone can sign in to. It keeps its settings, conversations and sign-in in a folder of the app's own, never in `~/.gemini`. It runs on this Mac only; servers are not supported yet. Its questions reach you as a card. Its own tool for starting subagents stays. |
 | **OpenCode** | The app's own copy of OpenCode (`opencode acp`), downloaded from its GitHub releases by the set-up page or **Settings ▸ Agent Runtimes** | Yes | Hands you the command to run in Terminal, the app's own copy by its full path, with **Open Terminal** and **Copy**. It adds one provider at a time, so the sheet keeps offering it when ready, and names `opencode auth logout` for taking one away. | All | Never an `opencode` of yours: two different programs go by that name, and the app runs the version it carries. It works signed out, on OpenCode Zen's free models. It asks your permission before editing files, running commands and fetching web pages; set **Request cards** or **Yes to all** in the permission capsule under the prompt. The choice applies to every OpenCode agent this Mac starts. Its questions reach you as a card. Sharing and self-update are off, and its own tool for starting subagents stays. A picked model whose provider is not signed in is dropped at the next start, with a note saying so. On a server it borrows this Mac's provider keys for each run. |
 
 In every column:
@@ -39,10 +38,9 @@ In every column:
   needs signing in** or **Not asked yet**.
 - **App tools available**: the tools on [Tools the app gives agents](agent-tools.md).
 - **On a server**: an agent in a server folder is offered only the runtimes on that
-  server. Claude, Codex, Gemini and OpenCode are the exceptions: Agents installs them on the
-  server itself. Claude and Codex sign in there through this Mac's own sign-ins, Gemini with
-  the key in Settings, and OpenCode borrows the provider keys it is signed in with on this Mac,
-  for each run. See
+  server. Claude, Codex and OpenCode are the exceptions: Agents installs them on the
+  server itself. Claude and Codex sign in there through this Mac's own sign-ins, and OpenCode
+  borrows the provider keys it is signed in with on this Mac, for each run. See
   [Add a machine](../how-to/add-a-machine.md).
 
 ## What the app shows from a runtime
@@ -54,7 +52,7 @@ Each of these is offered to every runtime, and shown for those that say they can
 | **Send now**: a prompt sent into the running turn | On a prompt waiting its turn. See [Send a prompt while an agent is working](../how-to/send-while-an-agent-works.md). | Claude, Codex |
 | Background shells and subagents | A list over the prompt, and the **Background** pane. See [Watch an agent's background work](../how-to/watch-background-work.md). | Claude, Codex |
 | The plan | A checklist in the conversation, and a strip at the top of the chat on iPhone and iPad. Cursor's to-do list is shown as its plan, without the items it cancelled. | Runtimes that send a plan; Cursor through its to-do list |
-| Questions as a card | Above the prompt. See [Answer a question or a permission request](../how-to/answer-a-question.md). | Claude, Codex, Cursor, Antigravity, OpenCode. Grok and Gemini end their turn with the question instead. |
+| Questions as a card | Above the prompt. See [Answer a question or a permission request](../how-to/answer-a-question.md). | Claude, Codex, Cursor, Antigravity, OpenCode. Grok ends its turn with the question instead. |
 | Which account is signed in | Under the runtime's name in the runtime menu, and in its sign-in sheet, such as **Claude Max**. | Runtimes that report it |
 | Notices | A line in the conversation with a title and a detail: an error in red, a warning or information in grey. | Runtimes that send them |
 | Providers you can turn off | **Turn off** beside a provider under **Who answers** in the sign-in sheet. | Runtimes with more than one provider |
@@ -81,7 +79,6 @@ The app recognises the refusal per runtime:
 | --- | --- | --- | --- |
 | **Claude** | Recognised: Claude says so in a form the app reads. Paid extra usage starting counts as spent. | Recognised, and tried again on the same chat: after 30 seconds, then 2 minutes. Three in ten minutes on one chat counts as spent. | Checked every four hours; its plan window is shown when known. |
 | **Codex** | Recognised, as for Claude, on this Mac and on a server that signs in through this Mac. | Recognised, as for Claude. | Checked every four hours; its plan window is shown when known. |
-| **Gemini** | Recognised from Google's sentence about the daily quota, and from Google saying the key's credit is used up. | Recognised from Google's 429. | Checked every four hours; the free tier's daily reset is shown. |
 | **Antigravity** | Treated as a rate limit, since Google uses the same words for both: three in ten minutes counts as spent. | Recognised from "Resource has been exhausted". | Checked every four hours. |
 | **Copilot** | Recognised from "You have exceeded your monthly quota". | Not yet recognised. | Checked every four hours. |
 | **Grok** | Recognised from Grok's 402 "usage balance exhausted" (Build / SuperGrok). | Not yet recognised. | Checked every four hours; what is left of its plan is shown. |
@@ -107,7 +104,6 @@ keeps its sign-in:
 | **Codex** | Yes | `CODEX_HOME` | The folder holds `auth.json`. |
 | **Cursor** | Not yet | `CURSOR_CONFIG_DIR` | The folder holds the sign-in too, but a second sign-in in it is not measured yet. |
 | **Copilot** | No | | It keeps its own sign-ins and changes user itself (`/user`). |
-| **Gemini** | No | | Its account is an API key. A second key is an organisation key (#999). |
 | **OpenCode** | No | | One `auth.json` already holds a sign-in for each provider. |
 | **Grok** | No | | No variable moves its sign-in alone. |
 | **Antigravity** | No | | Its home is the app's own already. |
@@ -150,7 +146,7 @@ adds it in Console ▸ Model Access; the machine gets it sealed to its own key a
   address and a **stand-in**, a token that works only on that relay and only for its route.
   The relay puts in the real key, sends the request on, and streams the answer back.
 - **First, everything of your own is taken out.** Your `ANTHROPIC_*`, `OPENAI_*`,
-  `GEMINI_*`, `GOOGLE_*`, `AWS_*`, `CLAUDE_CODE_USE_*` and the like, from your login
+  `GOOGLE_*`, `AWS_*`, `CLAUDE_CODE_USE_*` and the like, from your login
   environment and your pass-through list, do not reach a session on an org account.
 - **Reaches the Model By** is each runtime's default account for new sessions
   (`runtimes/setDefaultAccount`, kept on the machine in `default-accounts.json`). Without a
@@ -183,8 +179,6 @@ What each runtime is given, measured on 2026-10-22 against each CLI with a fake 
 | **Claude** | Vertex | `CLAUDE_CODE_USE_VERTEX=1`, `ANTHROPIC_VERTEX_BASE_URL=<relay>/~<stand-in>`, `CLAUDE_CODE_SKIP_VERTEX_AUTH=1`, `ANTHROPIC_VERTEX_PROJECT_ID`, `CLOUD_ML_REGION` |
 | **Claude** | Azure (Foundry) | `CLAUDE_CODE_USE_FOUNDRY=1`, `ANTHROPIC_FOUNDRY_BASE_URL=<relay>/~<stand-in>`, `CLAUDE_CODE_SKIP_FOUNDRY_AUTH=1` |
 | **Codex** | Org key, Azure, base URL | `CODEX_HOME` of the route's own, whose `config.toml` has a model provider with `base_url = "<relay>/v1"` and `env_key = "AGENTS_ORG_STAND_IN"` |
-| **Gemini** | Org key, base URL | `GEMINI_API_KEY=<stand-in>`, `GOOGLE_GEMINI_BASE_URL=<relay>`, and `GEMINI_CLI_HOME` of the route's own, which chooses the API key |
-| **Gemini** | Vertex | `GOOGLE_GENAI_USE_VERTEXAI=true`, `GOOGLE_VERTEX_BASE_URL=<relay>`, `GOOGLE_API_KEY=<stand-in>`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION` |
 | **OpenCode** | Org key, Azure, base URL (Anthropic or OpenAI API) | `OPENCODE_CONFIG` of the route's own, with one provider whose `baseURL` is `<relay>/v1` and whose `apiKey` is `{env:AGENTS_ORG_STAND_IN}` |
 
 Claude on Bedrock, Vertex and Foundry is told to skip its own auth, so the stand-in is in
@@ -205,7 +199,6 @@ way it can take them. See [Share skills, instructions and connectors with every 
 | **Grok** | reads `~/.agents/skills` | `~/.grok/AGENTS.md`, a link | sent at start | handed at start, with its servers sent as MCP servers |
 | **Cursor** | reads `~/.agents/skills` | none: User Rules are in Cursor's settings | sent at start; its own of the same name runs too | no way in |
 | **Copilot** | reads `~/.agents/skills` | `~/.copilot/copilot-instructions.md`, a link | through the app's local bridge for servers it would start; its own of the same name wins | no way in over the app |
-| **Gemini** | reads `~/.agents/skills` | `~/.gemini/AGENTS.md`, a link, beside its own `GEMINI.md` | sent at start | a link in `~/.gemini/extensions`; a folder's plugins are switched on only in that folder |
 | **Antigravity** | a link in the folder the app gives it | none | sent at start | no way in |
 | **OpenCode** | reads `~/.agents/skills` | follows `~/.claude/CLAUDE.md`, the link above, unless you keep your own `~/.config/opencode/AGENTS.md` | sent at start | no way in: its plugins are its own npm packages |
 
@@ -243,7 +236,7 @@ many more options than it offers there, in four places:
   edits these. The Mac's files stay on the Mac: on a server, the server's own files apply.
 
 Measured on 2026-09-29 against Claude Code 2.1.280 (adapter 0.81.2), Codex 0.156.1 (adapter
-1.13.1), Gemini CLI 0.61.0, Antigravity server 1.2.1, OpenCode 1.18.33, Grok 1.0.44, Copilot
+1.13.1), Antigravity server 1.2.1, OpenCode 1.18.33, Grok 1.0.44, Copilot
 1.0.89-5 and Cursor 2026.09.26, from each one's own code, help and documentation, and from a
 handshake in an empty home. `scripts/acp-handshake.sh` names any option or `_meta` key a
 newer version starts offering.
@@ -274,12 +267,8 @@ on Linux).
 | | On a server: this Mac's sign-in, through a relay | Environment | One sign-in, on the Mac. |
 | **Codex** | Sleep, automations, memories and ChatGPT apps off; its sub-agents and goals on; its question tool outside plan mode | `CODEX_CONFIG` | The work stays where the app can see it; questions reach you as a card. |
 | | On a server: this Mac's ChatGPT sign-in, through a relay | `CODEX_HOME` of the app's own | One sign-in, on the Mac. It also means the server's own `~/.codex/config.toml` is not read. |
-| **Gemini** | The agent's folder trusted for this run | `--skip-trust` | The app's tools start only in a trusted folder. Nothing is written to Gemini's list of trusted folders. |
-| | Nothing denied, so no `--policy` file is sent | `--policy`, when there is a rule in it | It has its own subagents and task tracker. The file is only ever for rules the app has, and there are none today. |
-| | `AGENTS.md` read beside `GEMINI.md` | `GEMINI_CLI_SYSTEM_DEFAULTS_PATH` | Shared instructions reach Gemini. Your own `context.fileName` wins. |
-| | Your key from Settings | `GEMINI_API_KEY` | The only way in for individuals. |
-| **Antigravity** | A home of the app's own, never `~/.gemini` | `GEMINI_HOME` | Its settings, conversations and sign-in stay apart from Gemini's. |
-| | The agent's folder trusted | `AGY_ACP_DISABLE_WORKSPACE_TRUST` | As Gemini's. It also means a folder's `.agents/hooks.json` runs without Antigravity asking first. |
+| **Antigravity** | A home of the app's own, never `~/.gemini` | `GEMINI_HOME` | Its settings, conversations and sign-in stay in a folder of the app's own. |
+| | The agent's folder trusted | `AGY_ACP_DISABLE_WORKSPACE_TRUST` | The app trusts the agent's folder for that conversation only, so a folder's `.agents/hooks.json` runs without Antigravity asking first. |
 | | Its sign-in in a file, not the Keychain | `AGY_ACP_FORCE_FILE_STORAGE` | So it can be copied to a server without a Keychain prompt. |
 | | No deny list sent | `_meta.agy.disabledTools`, while there is something in it | There is nothing to deny; the list is only ever for tools the app has a reason to take away. |
 | | Keys in the environment ignored | `GEMINI_API_KEY`, `GOOGLE_API_KEY` removed | It signs in with a Google account only. |
@@ -349,28 +338,6 @@ every turn, so those in your config file only choose the first value, or nothing
 | Verbosity, subagent limits, profiles, instructions, MCP, hooks | config file | its defaults | Yes | Not read on a relayed server | Leave alone |
 | Sandbox and network | `sandbox_mode`, `sandbox_workspace_write.network_access` | from the mode: network off except **Full access** | The mode decides; measured | Yes; On needs user namespaces there | Show: **Command sandbox**, Off is **Full access** |
 | Updates, notifications and terminal settings | config file | — | No | — | Leave alone |
-
-#### Gemini
-
-Gemini offers no options under the prompt beyond model and mode, and reads no `_meta` when a
-conversation starts. Its settings come from files only: the app's own system defaults file
-is the lowest of them, so yours always win over it.
-
-| Option | Where | Values (default) | Under ACP | On servers | Decided |
-| --- | --- | --- | --- | --- | --- |
-| Thinking level | `modelConfigs` in settings | high | Yes | Through the app's defaults file | Leave alone: no flag, and a file per agent to vary it |
-| Web search and fetch | tools `google_web_search`, `web_fetch` | on | Yes | Its own settings | Show, planned: the web access switch |
-| Usage statistics | `privacy.usageStatisticsEnabled` | on | Yes | Through the app's defaults file | Show, planned: the usage data switch; your own file still wins |
-| Session retention | `general.sessionRetention` | 30 days, deleted at every start | Yes | Through the app's defaults file | Set, planned: long enough that an idle agent can still be picked back up |
-| Subagents, task tracker | `invoke_agent`, `tracker_*` | on | Yes | Yes | Leave alone |
-| Folder trust | `--skip-trust` | asks | Yes: loads the folder's own hooks and settings | Yes | Set today |
-| Compression | `model.compressionThreshold` | on, at 0.5 of the window | Yes, but nothing is sent over ACP and `/compress` is not offered | Through the app's defaults file | Leave alone: on with nothing set; see [Compaction in each runtime](../explanation/compaction-by-runtime.md) |
-| Turn limit, loop detection, tool output, shell | settings | its defaults | Yes | Server's own | Leave alone |
-| Checkpoints | `general.checkpointing.enabled` | off | No: only its terminal writes them | — | Leave alone |
-| MCP, hooks, extensions, skills, `.env` files | settings | loaded | Yes | Server's own | Leave alone. A folder `.env` can set Gemini's variables. |
-| Telemetry to your own collector | `telemetry.*`, `GEMINI_TELEMETRY_*` | off | Yes | Yes | Leave alone |
-| Sandbox | `GEMINI_SANDBOX`, above `--sandbox` and `tools.sandbox` | off | Off works; with it on, Gemini never answers the app | On needs Docker or Podman there | Show: **Command sandbox**, Off only |
-| Updates, output format, theme and other terminal settings | settings, flags | — | No | — | Leave alone |
 
 #### Antigravity
 
@@ -492,7 +459,6 @@ version below. A runtime the app cannot reach offers no choice, and says why.
 | **Claude** | Claude Code 2.1.284 | `sandbox.enabled` true, through `_meta`: writes only in the folder, asks before a new website | false | your settings decide: **Default sandbox** | On a server without bubblewrap and socat, it will not start the conversation. On a Mac already inside a sandbox, each command fails. |
 | **Codex** | Codex 0.156.1 | **Ask for approval** or **Approve for me**: writes only in the folder, no network | **Full access**, which also stops approval prompts | the mode decides | Each command fails, on a server without user namespaces or a Mac already inside a sandbox; Codex says so in its reply. |
 | **Grok** | Grok 1.0.67 | not offered: `grok agent stdio --help` has no `--sandbox` option | not offered | **Default sandbox**: the app cannot change Grok’s sandbox | Grok 1.0.44 refused to start when the flag was passed. |
-| **Gemini** | Gemini CLI 0.61.0 | not offered: with its sandbox on, Gemini never answers the app | `GEMINI_SANDBOX=false`, above your own settings | your settings decide: **Default sandbox** | On a server without Docker or Podman it will not start; on a Mac it never answers, and after 90 seconds the app says so. |
 | **Cursor** | 2026.09.26 | — | — | **Default sandbox**: its own `sandbox.mode` | — |
 | **Copilot** | 1.0.89-5 | — | — | **Default sandbox**; not measured yet | — |
 | **Antigravity** | 1.2.1 | — | — | **No sandbox**, unless a business account's admin turns **Sandbox mode** on | Never fails: it asks before each command instead. |
@@ -534,7 +500,6 @@ permission requests; the other two give a card):
 | --- | --- | --- | --- | --- |
 | Claude | Plan | Manual (default) | Accept edits | Bypass permissions |
 | Codex | Ask for approval, with Plan | Ask for approval | Approve for me | Approve for me (nearest safer: no mode past Approve for me) |
-| Gemini | Plan | Default | Auto Edit | YOLO |
 | Grok | Default, Request cards (nearest safer: no plan mode) | Default, Request cards | Default, Yes to all | Default, Yes to all (nearest safer: no mode past Approve for me) |
 | Cursor | Plan | Agent, Request cards | Agent, Yes to all | Agent, Yes to all (nearest safer: no mode past Approve for me) |
 | OpenCode | plan | build, Request cards | build, Yes to all | build, Yes to all (nearest safer: no mode past Approve for me) |
@@ -550,7 +515,7 @@ permission requests; the other two give a card):
 | Grok | Grok 4.7 Fast | its default | Grok 4.7 |
 | Antigravity | Gemini 3.8 Flash (Low) | its default | Gemini 3.8 Flash (High) |
 | Copilot | its default (nearest safer: no smaller model known) | its default | Claude Sonnet 5.5 |
-| Gemini, Cursor, OpenCode | its default (nearest safer: no other model known) | its default | its default (nearest safer: no other model known) |
+| Cursor, OpenCode | its default (nearest safer: no other model known) | its default | its default (nearest safer: no other model known) |
 
 Smart is the runtime's most capable model that its model picker offers. The runtime check (`scripts/nightly-runtimes.py`) files an "Auto models" issue when a runtime offers a model that it did not offer at its last check, so that this table does not go stale (#3041).
 
@@ -560,13 +525,11 @@ Smart is the runtime's most capable model that its model picker offers. The runt
 | --- | --- | --- | --- |
 | Claude | as configured | on | off |
 | Codex | as configured | on (Ask for approval or Approve for me) | off (Full access) |
-| Gemini | as configured | Not possible | off |
 | Grok, Cursor, Copilot | its own setting (fixed) | Not possible | its own setting (nearest safer) |
 | OpenCode, Antigravity | no sandbox (fixed) | Not possible | no sandbox (fixed) |
 
 A runtime's own value that matches no shared one makes its pill say **Custom**; the
-runtime's own choices stay under **⋯ <runtime>'s own**. Gemini's own **Auto** model is one of
-those: it is not the Auto runtime.
+runtime's own choices stay under **⋯ <runtime>'s own**.
 
 ## See also
 

@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac]
-description: Sign a runtime such as Claude Code, Codex, Copilot, Cursor, Gemini, Grok or OpenCode in or out, from the app.
+description: Sign a runtime such as Claude Code, Codex, Copilot, Cursor, Grok or OpenCode in or out, from the app.
 ---
 
 # Sign a runtime in
@@ -57,19 +57,6 @@ prompt it again once you have signed in.
 
 If you close the sheet without signing in, it does not open by itself again for that
 runtime until a turn on it works. Open it from the runtime menu when you are ready.
-
-**Gemini: paste a key**
-
-Gemini signs in with a Gemini API key, not from the sheet: Google's own sign-in no longer
-works for individuals in Gemini CLI.
-
-1. Get a key at aistudio.google.com/apikey. It starts `AIza` or `AQ.`.
-2. In **Settings ▸ Agent Runtimes**, paste it into the field under Gemini and click **Save**. The
-   app checks it with Google and says **Works** or **Refused**.
-
-It is kept in this Mac's Keychain and handed to Gemini agents on this Mac and on servers.
-A `GEMINI_API_KEY` already in your shell profile is used when Settings has none. Starting a
-Gemini agent with neither says **Gemini needs an API key. Add one in Settings ▸ Agent Runtimes.**
 
 **OpenCode: one provider at a time**
 

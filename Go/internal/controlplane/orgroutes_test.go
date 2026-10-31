@@ -557,7 +557,7 @@ func TestCloudCredentialsGoAsShortLivedTokens(t *testing.T) {
 	setRoute(t, window, wire.OrgRoute{ID: "bedrock", Name: "Acme Bedrock", Kind: wire.OrgRouteKindBedrock, Runtimes: []string{"claude"},
 		Settings: &wire.OrgRouteSettings{Region: optional("us-east-1")}, Models: map[string]string{"claude-sonnet-4-5": "us.anthropic.claude-sonnet-4-5-v1:0"}},
 		map[string]string{"awsAccessKeyId": "AKIAEXAMPLE", "awsSecretAccessKey": awsSecret, "awsRoleArn": "arn:aws:iam::1:role/agents", "externalId": "ext-1"}, nil)
-	setRoute(t, window, wire.OrgRoute{ID: "vertex", Name: "Acme Vertex", Kind: wire.OrgRouteKindVertex, Runtimes: []string{"claude", "gemini"},
+	setRoute(t, window, wire.OrgRoute{ID: "vertex", Name: "Acme Vertex", Kind: wire.OrgRouteKindVertex, Runtimes: []string{"claude"},
 		Settings: &wire.OrgRouteSettings{Project: optional("acme-ai"), Location: optional("us-east5")}}, map[string]string{"serviceAccount": account}, nil)
 	setRoute(t, window, wire.OrgRoute{ID: "azure", Name: "Acme Azure", Kind: wire.OrgRouteKindAzure, Vendor: vendor(wire.OrgRouteVendorOpenai),
 		Runtimes: []string{"codex"}, Settings: &wire.OrgRouteSettings{Resource: optional("acme-openai"), Tenant: optional("acme.onmicrosoft.com"),

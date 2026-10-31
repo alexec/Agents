@@ -524,7 +524,7 @@ func (d *Daemon) relayModelRefusal(p *wire.OrgPolicy, runtimeID string, a *wire.
 	return nil
 }
 
-// requestModels is the models a request names: in a Bedrock, Gemini or Vertex path, and
+// requestModels is the models a request names: in a Bedrock or Vertex path, and
 // in the body's "model".
 func requestModels(p string, body []byte) []string {
 	var models []string
@@ -618,7 +618,6 @@ func (d *Daemon) relayCounted(r *modelRelay, s standIn, t wire.RelayTokens) {
 var vendorAddress = map[wire.OrgRouteVendor]string{
 	wire.OrgRouteVendorAnthropic: "https://api.anthropic.com",
 	wire.OrgRouteVendorOpenai:    "https://api.openai.com",
-	wire.OrgRouteVendorGemini:    "https://generativelanguage.googleapis.com",
 	wire.OrgRouteVendorXai:       "https://api.x.ai",
 }
 
@@ -701,8 +700,7 @@ func cloneQuery(q url.Values) url.Values {
 	return out
 }
 
-// bedrockModel is the model in a Bedrock path; geminiModel is the model in a Gemini or
-// Vertex path.
+// bedrockModel is the model in a Bedrock path; pathModel is the model in a Vertex path.
 var (
 	bedrockModel = regexp.MustCompile(`/model/([^/]+)/`)
 	pathModel    = regexp.MustCompile(`/models/([^/:]+):`)
@@ -856,8 +854,6 @@ func setVendorKey(req *http.Request, vendor wire.OrgRouteVendor, key string) {
 	switch vendor {
 	case wire.OrgRouteVendorAnthropic:
 		req.Header.Set("X-Api-Key", key)
-	case wire.OrgRouteVendorGemini:
-		req.Header.Set("X-Goog-Api-Key", key)
 	default:
 		req.Header.Set("Authorization", "Bearer "+key)
 	}
@@ -942,9 +938,9 @@ type usageMeter struct {
 	buf   []byte
 	over  bool
 	usage struct {
-		seen                                      bool
-		input, output, cacheRead, cacheWrite      int64
-		openAICached, geminiCached, geminiThought int64
+		seen                                 bool
+		input, output, cacheRead, cacheWrite int64
+		openAICached                         int64
 	}
 }
 
@@ -1049,12 +1045,6 @@ func (m *usageMeter) object(b []byte) {
 		Response *struct {
 			Usage *usageFields `json:"usage"`
 		} `json:"response"`
-		UsageMetadata *struct {
-			Prompt   int64 `json:"promptTokenCount"`
-			Output   int64 `json:"candidatesTokenCount"`
-			Cached   int64 `json:"cachedContentTokenCount"`
-			Thoughts int64 `json:"thoughtsTokenCount"`
-		} `json:"usageMetadata"`
 	}
 	if json.Unmarshal(b, &o) != nil {
 		return
@@ -1087,11 +1077,6 @@ func (m *usageMeter) object(b []byte) {
 		m.openAI(o.Usage)
 	case strings.HasPrefix(o.Object, "chat.completion") && o.Usage != nil:
 		m.openAI(o.Usage)
-	case o.UsageMetadata != nil:
-		// Gemini's counts are the answer's so far, on each chunk.
-		g := o.UsageMetadata
-		u.seen = true
-		u.input, u.output, u.geminiCached, u.geminiThought = g.Prompt, g.Output, g.Cached, g.Thoughts
 	}
 }
 
@@ -1138,14 +1123,10 @@ func (m *usageMeter) done() *wire.RelayTokens {
 		return nil
 	}
 	t := wire.RelayTokens{Input: u.input, Output: u.output, CacheRead: u.cacheRead, CacheWrite: u.cacheWrite}
-	// OpenAI's and Gemini's input counts the cached part; Anthropic's does not.
+	// OpenAI's input counts the cached part; Anthropic's does not.
 	if u.openAICached > 0 {
 		t.CacheRead, t.Input = u.openAICached, max(0, u.input-u.openAICached)
 	}
-	if u.geminiCached > 0 {
-		t.CacheRead, t.Input = u.geminiCached, max(0, u.input-u.geminiCached)
-	}
-	t.Output += u.geminiThought
 	return &t
 }
 

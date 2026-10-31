@@ -37,9 +37,6 @@ RUNTIMES = {
     # Never the person's npx or codex-acp (047, R1): the app's own toolset's shim, named by
     # AGENTS_CODEX_SHIM, e.g. <root>/tools/codex/current/bin/codex-acp.
     "codex": [os.environ.get("AGENTS_CODEX_SHIM", "agents-codex-shim-not-set")],
-    # Never a gemini on the PATH (046, D1): the app's own toolset's shim, named by
-    # AGENTS_GEMINI_SHIM, e.g. <root>/tools/gemini/current/bin/gemini.
-    "gemini": [os.environ.get("AGENTS_GEMINI_SHIM", "agents-gemini-shim-not-set"), "--acp", "--skip-trust"],
     # Google's ACP server, never the agy CLI (049, R1): the app's own copy's shim, named by
     # AGENTS_ANTIGRAVITY_SHIM, e.g. <root>/tools/antigravity/current/bin/agy_acp_server.
     "antigravity": [os.environ.get("AGENTS_ANTIGRAVITY_SHIM", "agents-antigravity-shim-not-set")],
@@ -168,19 +165,6 @@ POLICIES = {
             "sleep_tool": False, "goals": True, "in_app_local_automation": False,
             "memories": False, "apps": False, "multi_agent": True,
             "default_mode_request_user_input": True}}, sort_keys=True, separators=(",", ":"))},
-    },
-    # A file named by an argument rather than a variable (046, R5), written only while
-    # there is a deny rule in it. There is none today, so Gemini is sent no file.
-    "gemini": {
-        "lever": "a deny file named by --policy, and none to write",
-        "removed": [],
-        "kept": ["invoke_agent", "tracker_create_task", "tracker_update_task",
-                 "tracker_get_task", "tracker_list_tasks", "tracker_add_dependency",
-                 "tracker_visualize"],
-        "residue": [],
-        "meta": None,
-        "args": [],
-        "env": {},
     },
 }
 

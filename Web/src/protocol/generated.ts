@@ -2383,14 +2383,6 @@ export interface CostState {
   setBy?: PolicySetBy;
 }
 
-export type CredentialKind = "geminiAPIKey";
-
-export interface CredentialsLend {
-  runtime: string;
-  kind: CredentialKind;
-  secret: string;
-}
-
 export interface CredentialsOffer {
   runtimes: string[];
   ownSignInOnly: boolean;
@@ -5064,7 +5056,6 @@ export interface OrgRouteStamp {
 export type OrgRouteVendor =
   | "anthropic"
   | "openai"
-  | "gemini"
   | "xai";
 
 /** A route a machine keeps, and its version (#999). */
@@ -8929,7 +8920,6 @@ export interface Methods {
   "control/setAuditDays": { params: AuditDays; result: AuditDays };
   "control/status": { params: Empty; result: ControlStatus };
   "cost/state": { params: Empty; result: CostState };
-  "credentials/lend": { params: CredentialsLend; result: Empty };
   "credentials/offer": { params: CredentialsOffer; result: Empty };
   "daemon/policyState": { params: Empty; result: PolicyState };
   "disk/state": { params: Empty; result: DiskState };
@@ -9221,7 +9211,6 @@ export const MethodTarget = {
   "control/setAuditDays": "control",
   "control/status": "control",
   "cost/state": "host",
-  "credentials/lend": "host",
   "credentials/offer": "host",
   "daemon/policyState": "host",
   "disk/state": "host",
@@ -9669,7 +9658,6 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },
   CostState: { required: ["limits", "today", "day", "tokensToday"], optional: ["note", "organisation", "setBy"] },
-  CredentialsLend: { required: ["runtime", "kind", "secret"], optional: [] },
   CredentialsOffer: { required: ["runtimes", "ownSignInOnly"], optional: ["notRelayed", "signIns"] },
   DaemonStatus: { required: ["turnsInFlight", "agentsLive"], optional: [] },
   DayRecap: { required: ["agents", "peakAgents", "longestClear"], optional: ["prsMerged"] },

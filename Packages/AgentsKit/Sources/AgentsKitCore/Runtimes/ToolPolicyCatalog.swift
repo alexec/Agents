@@ -290,110 +290,6 @@ public enum ToolPolicyCatalog {
                                            configTemplate: "chatgpt_base_url = \"https://127.0.0.1:{port}/backend-api/\"\n"),
                            certificateVariable: "CODEX_CA_CERTIFICATE"))
 
-    /// Gemini: deny rules in a policy file, handed over with `--policy` (046).
-    ///
-    /// Nothing is denied any more. `invoke_agent` starts Gemini's own subagents
-    /// (`codebase_investigator`, `cli_help`, `generalist`) and the six `tracker_*` tools
-    /// keep a task queue of Gemini's own; both came back with the rest on 2026-09-29, and
-    /// with them this file. `write_todos` was always kept, as Claude's to-do tool is: a
-    /// list inside the turn, not a standing arrangement.
-    ///
-    /// The lever is still here, and still a file, because the file is what a future deny
-    /// rule needs: it adds to the person's own policies rather than replacing them, which
-    /// is why it was never `GEMINI_CLI_SYSTEM_SETTINGS_PATH` — system settings override
-    /// the person's key by key, so their own `tools.exclude` and MCP servers would
-    /// quietly go. Priority is 999, the top of the band Gemini allows (0–999), so a
-    /// person's own `allow` for the same tool does not win inside the app's agents. A deny
-    /// rule with no `argsPattern` takes the tool out of the model's list, not only refuses
-    /// it: measured on a real turn, `invoke_agent` is listed without the file and gone
-    /// with it (R13). So nothing here is residue.
-    ///
-    /// A file with no rules in it is not written and `--policy` is not passed, rather than
-    /// a deny list of nothing: the same rule as an empty `disabledTools`, and for the same
-    /// reason — an empty policy says we thought about it and had nothing to say, which is
-    /// not the same as saying nothing. A test names the two, so a rule that comes back
-    /// brings the file with it.
-    ///
-    /// Beside it, system defaults named by `GEMINI_CLI_SYSTEM_DEFAULTS_PATH`, the one
-    /// settings file below the person's own: Gemini reads `GEMINI.md` and, from these,
-    /// `AGENTS.md` too — the folder's, and `~/.gemini/AGENTS.md`, which links to
-    /// `~/.agents/AGENTS.md` (054). `GEMINI.md` stays first because Gemini's memory tool
-    /// writes to the first name, and it must not append to the file every agent shares. A
-    /// `context.fileName` of the person's own replaces this one, as it should. Read off
-    /// Gemini CLI 0.61.0's code (`getAllGeminiMdFilenames`, `getGlobalMemoryPaths`).
-    public static let gemini: ToolPolicy = {
-        let kept = [
-            KeptTool(name: "invoke_agent",
-                     because: "Gemini's own subagents, alongside the app's (2026-09-29)."),
-            KeptTool(name: "tracker_create_task",
-                     because: "Gemini's own task queue, alongside every other runtime's (2026-09-29)."),
-            KeptTool(name: "tracker_update_task",
-                     because: "Writing to that same queue (2026-09-29)."),
-            KeptTool(name: "tracker_get_task",
-                     because: "Reading one of its own tasks (2026-09-29)."),
-            KeptTool(name: "tracker_list_tasks",
-                     because: "Listing its own task queue (2026-09-29)."),
-            KeptTool(name: "tracker_add_dependency",
-                     because: "Its own task queue's own dependencies (2026-09-29)."),
-            KeptTool(name: "tracker_visualize",
-                     because: "Its own task queue's own graph (2026-09-29)."),
-        ]
-        // The deny file exists for the rules we have, and there are none today, so it is
-        // left out rather than written empty. Anything that removes a Gemini tool must put
-        // its name back in `removed` below for it to come back.
-        let removed: [RemovedTool] = []
-        var files: [EnvironmentFile] = []
-        if !removed.isEmpty {
-            files.append(EnvironmentFile(name: "gemini-policy.toml",
-                                         contents: geminiPolicy(removing: removed),
-                                         argument: "--policy"))
-        }
-        files.append(EnvironmentFile(name: "gemini-system-defaults.json",
-                                     contents: geminiSystemDefaults,
-                                     variable: "GEMINI_CLI_SYSTEM_DEFAULTS_PATH"))
-        return ToolPolicy(
-            runtimeID: RuntimeCatalog.gemini.id,
-            removed: removed,
-            kept: kept,
-            lever: .file,
-            environmentFiles: files,
-            readsFilesItself: true,
-            authMethodBeforeContinuing: "gemini-api-key")
-    }()
-    // No `escalationTool`, measured rather than omitted: in ACP mode Gemini takes its own
-    // `ask_user` out of its tool list (`if (!interactive || isAcpMode)
-    // extraExcludes.push(ASK_USER_TOOL_NAME)`), and its ACP code has no elicitation. A
-    // question ends the turn and arrives as needs_answer, exactly as Grok's does. R6.
-
-    /// Gemini's system defaults: its own context file name, then the one every agent reads.
-    static let geminiSystemDefaults = """
-        {
-          "context": {
-            "fileName": ["GEMINI.md", "AGENTS.md"]
-          }
-        }
-
-        """
-
-    /// Gemini's policy file: one deny rule per category, whose refusal says what to use.
-    static func geminiPolicy(removing removed: [RemovedTool]) -> String {
-        var text = "# Written by the Agents app. Do not edit: rebuilt on every launch.\n"
-        for category in RemitCategory.allCases {
-            let names = removed.filter { $0.category == category }.map(\.name)
-            guard !names.isEmpty else { continue }
-            text += "\n[[rule]]\n"
-            text += "toolName = [\(names.map(tomlString).joined(separator: ", "))]\n"
-            text += "decision = \"deny\"\n"
-            text += "priority = 999\n"
-            text += "denyMessage = \(tomlString(category.instead))\n"
-        }
-        return text
-    }
-
-    private static func tomlString(_ text: String) -> String {
-        "\"" + text.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\""
-    }
-
     /// Antigravity: a deny list in `_meta.agy.disabledTools` on `session/new`, and again on
     /// `session/load` and `session/resume`, which is exactly the lever the server documents
     /// for an ACP client ("Clients pass the filter under `_meta.agy`"). Measured against
@@ -464,7 +360,7 @@ public enum ToolPolicyCatalog {
         preferredAuthMethods: ["opencode-login"])
 
     /// In the order `RuntimeCatalog` declares its runtimes, so the two read side by side.
-    public static let builtIn: [ToolPolicy] = [claude, grok, copilot, cursor, codex, gemini, antigravity, opencode]
+    public static let builtIn: [ToolPolicy] = [claude, grok, copilot, cursor, codex, antigravity, opencode]
 }
 
 // MARK: The writer (#858)

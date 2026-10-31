@@ -57,7 +57,7 @@ func displayArchitecture(uname string) string {
 
 // toolsetRuntimes is ServerInstaller.toolsetRuntimes: every runtime the app installs as
 // a toolset, by name, whose current the probe reads (046).
-const toolsetRuntimes = "antigravity claude codex gemini opencode"
+const toolsetRuntimes = "antigravity claude codex opencode"
 
 // probeScript is ServerInstaller.probeScript (037, contracts/ssh.md § 5).
 const probeScript = `uname -sm; printf '%s\n' "$HOME"; df -Pk "$HOME" | tail -1; ` +
@@ -71,8 +71,7 @@ const probeScript = `uname -sm; printf '%s\n' "$HOME"; df -Pk "$HOME" | tail -1;
 	`for r in ` + toolsetRuntimes + `; do t="$HOME/.agents-server/tools/$r/current"; ` +
 	`printf 'toolset.%s:%s\n' "$r" "$([ -f "$t/ok" ] && basename "$(readlink "$t")" || echo none)"; done; ` +
 	`${SHELL:-/bin/sh} -lc 'command -v npx >/dev/null 2>&1 && echo npx:yes || echo npx:no; ` +
-	`[ -n "$ANTHROPIC_API_KEY$CLAUDE_CODE_OAUTH_TOKEN" ] && echo signin:env || echo signin:none; ` +
-	`[ -n "$GEMINI_API_KEY$GOOGLE_API_KEY" ] && echo signin.gemini:env || echo signin.gemini:none' 2>/dev/null </dev/null; ` +
+	`[ -n "$ANTHROPIC_API_KEY$CLAUDE_CODE_OAUTH_TOKEN" ] && echo signin:env || echo signin:none' 2>/dev/null </dev/null; ` +
 	`[ -f "$HOME/.claude/.credentials.json" ] && echo signin:file || echo signin:none; ` +
 	`[ -f "$HOME/.codex/auth.json" ] && echo signin.codex:file || echo signin.codex:none; ` +
 	// Go's own (#1136): whether the server can unpack Node's .tar.xz itself.

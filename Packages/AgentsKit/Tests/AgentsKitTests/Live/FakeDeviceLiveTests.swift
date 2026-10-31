@@ -47,7 +47,7 @@ struct FakeDeviceLiveTests {
             let folders = try await phone.call(DaemonAPI.Method.foldersList, DaemonAPI.FoldersListRequest(includeArchived: false),
                                                 returning: [DaemonAPI.FolderSummary].self)
             print("fake-device: bare folders/list → \(folders.map(\.name))")
-            await expectNotRefused(phone, DaemonAPI.Method.credentialsLend, "bare")
+            await expectNotRefused(phone, DaemonAPI.Method.credentialsOffer, "bare")
         }
 
         // 4. The wrapped wire, over one more connection: every host.
@@ -95,7 +95,7 @@ struct FakeDeviceLiveTests {
             let folders = try await away.call(DaemonAPI.Method.foldersList, DaemonAPI.FoldersListRequest(includeArchived: false),
                                                returning: [DaemonAPI.FolderSummary].self)
             print("fake-device: relayed folders/list → \(folders.map(\.name))")
-            await expectNotRefused(away, DaemonAPI.Method.credentialsLend, "relayed")
+            await expectNotRefused(away, DaemonAPI.Method.credentialsOffer, "relayed")
             try await catchUpTimed(away)
             // Away, and happy to be told: as the Remote says it.
             _ = try await away.call(DaemonAPI.Method.presenceReport,

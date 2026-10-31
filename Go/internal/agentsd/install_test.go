@@ -41,7 +41,7 @@ func sha(b []byte) string { s := sha256.Sum256(b); return hex.EncodeToString(s[:
 
 func TestTheBundlesToolsetsLoad(t *testing.T) {
 	ts := loadToolsets("../../../App/Resources/toolsets")
-	for _, id := range []string{"claude", "codex", "gemini", "antigravity", "opencode"} {
+	for _, id := range []string{"claude", "codex", "antigravity", "opencode"} {
 		if ts[id] == nil || len(ts[id].id) != 16 {
 			t.Fatalf("%s: %+v", id, ts[id])
 		}

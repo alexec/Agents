@@ -30,7 +30,7 @@ test("the refusals name the runtime and the route", () => {
 test("each kind serves only the runtimes the relay can carry, by the API they speak", () => {
   assert.deepEqual(a.runtimesFor("bedrock", undefined), ["claude", "opencode"]);
   assert.deepEqual(a.runtimesFor("key", "openai"), ["codex", "opencode"]);
-  assert.deepEqual(a.runtimesFor("vertex", undefined), ["claude", "gemini", "opencode"]);
+  assert.deepEqual(a.runtimesFor("vertex", undefined), ["claude", "opencode"]);
   assert.deepEqual(a.runtimesFor("key", undefined), []);
   assert.deepEqual(a.vendorsFor("azure").sort(), ["anthropic", "openai"]);
   assert.deepEqual(a.vendorsFor("bedrock"), []);

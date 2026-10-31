@@ -30,7 +30,6 @@ uses each person's own sign-in.
 |---|---|---|---|---|---|
 | Claude | Anthropic key | Yes | Yes | Yes | Yes |
 | Codex | OpenAI key | No | No | Yes | Yes |
-| Gemini | Gemini API key | No | Yes | No | Yes |
 | OpenCode | Anthropic or OpenAI key | Yes | Yes | Yes | Yes |
 
 Cursor, Copilot, Antigravity and Grok cannot use a route: their model traffic cannot go
@@ -42,7 +41,7 @@ through the machine's relay. They use each person's own sign-in.
 2. Choose **Add Route…**.
 3. Type the **Name members see**, for example "Acme Bedrock".
 4. Choose the **Kind**. For an org key, Azure or a gateway, also choose the API that it
-   **Speaks**: Anthropic, OpenAI or Google Gemini.
+   **Speaks**: Anthropic or OpenAI.
 5. Choose the runtimes that it is **For**. Choose **Default** beside a runtime to make the
    route the account that each member's new sessions of that runtime use, unless the member
    chooses another.

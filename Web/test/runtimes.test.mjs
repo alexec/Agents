@@ -10,10 +10,10 @@ const status = (id, name, available = true) => ({
 
 test("runtimes: alphabetical by the name shown, not the id or the order sent", () => {
   const sent = [status("claude", "Claude"), status("grok", "Grok"), status("copilot", "Copilot"),
-    status("cursor", "Cursor"), status("codex", "Codex"), status("gemini", "Gemini"),
+    status("cursor", "Cursor"), status("codex", "Codex"),
     status("antigravity", "Antigravity"), status("opencode", "OpenCode")];
   assert.deepEqual(r.sortedRuntimes(sent).map((s) => s.runtime.name),
-    ["Antigravity", "Claude", "Codex", "Copilot", "Cursor", "Gemini", "Grok", "OpenCode"]);
+    ["Antigravity", "Claude", "Codex", "Copilot", "Cursor", "Grok", "OpenCode"]);
 });
 
 test("runtimes: case does not count, and the id breaks a tie", () => {
@@ -49,7 +49,7 @@ test("runtimes: an empty list says so when nothing on this Mac can start (#257)"
   assert.deepEqual(r.emptyListRuntimeLine(failed), { line: "disk full", failed: true, page: "https://example.com/codex" });
   const signing = { ...status("claude", "Claude", false), availability: { needsSignIn: { authMethods: [] } } };
   assert.equal(r.emptyListRuntimeLine(signing).line, "Signed out.");
-  const installing = { ...status("gemini", "Gemini", false), availability: { installing: { progress: "Fetching" } } };
+  const installing = { ...status("cursor", "Cursor", false), availability: { installing: { progress: "Fetching" } } };
   assert.deepEqual(r.emptyListRuntimeLine(installing), { line: "Fetching…", failed: false });
 });
 
@@ -66,7 +66,7 @@ test("runtimes: the Runtimes row counts working out of installed (#379)", () => 
   const installing = { runtime: { id: "cursor", name: "Cursor" }, availability: { installing: {} } };
   assert.equal(r.runtimeTally([]), undefined, "not yet listed is not none");
   assert.deepEqual(r.runtimeTally([status("claude", "Claude"), { ...status("grok", "Grok"), isOut: true }, signedOut,
-    status("gemini", "Gemini", false), installing]), { working: 1, total: 3 });
+    status("opencode", "OpenCode", false), installing]), { working: 1, total: 3 });
   assert.deepEqual(r.runtimeTally([{ ...status("claude", "Claude"), isOut: true }, signedOut]), { working: 0, total: 2 });
 });
 
@@ -93,10 +93,10 @@ test("runtimes: an added account's row is apart from the runtime's own, and name
 });
 
 test("runtimes: one the organisation does not allow cannot start, and says why (#998)", () => {
-  const refused = { ...status("gemini", "Gemini"), setBy: { by: "organisation", rule: "runtimes", words: "Your organisation does not allow Gemini." } };
+  const refused = { ...status("cursor", "Cursor"), setBy: { by: "organisation", rule: "runtimes", words: "Your organisation does not allow Cursor." } };
   const got = r.runtimeRuns([status("claude", "Claude"), refused]);
-  assert.deepEqual([got.available, got.out, got.cannot].map((run) => run.map((s) => s.runtime.id)), [["claude"], [], ["gemini"]]);
-  assert.equal(r.unavailableReason(refused), "Set by your organisation. Your organisation does not allow Gemini.");
+  assert.deepEqual([got.available, got.out, got.cannot].map((run) => run.map((s) => s.runtime.id)), [["claude"], [], ["cursor"]]);
+  assert.equal(r.unavailableReason(refused), "Set by your organisation. Your organisation does not allow Cursor.");
 });
 
 // An org account as a member sees it (#999, slice 3): OrgAccountMemberWordsTests says the same.

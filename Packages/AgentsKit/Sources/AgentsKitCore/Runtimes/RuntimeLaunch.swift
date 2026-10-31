@@ -169,11 +169,6 @@ public enum RuntimeLaunchCatalog {
         runtimeID: "codex",
         passedVariables: ["OPENAI_*", "CODEX_HOME"])
 
-    public static let gemini = RuntimeLaunch(
-        runtimeID: "gemini",
-        passedVariables: ["GEMINI_*", "GOOGLE_API_KEY", "GOOGLE_CLOUD_PROJECT", "GOOGLE_CLOUD_LOCATION",
-                          "GOOGLE_GENAI_USE_VERTEXAI"])
-
     public static let grok = RuntimeLaunch(
         runtimeID: "grok",
         passedVariables: ["GROK_*", "XAI_*"])
@@ -196,8 +191,7 @@ public enum RuntimeLaunchCatalog {
     /// - `AGY_ACP_FORCE_FILE_STORAGE`: see D8.
     /// - `GOOGLE_API_KEY`/`GEMINI_API_KEY` removed, so neither Agent Platform nor a key in
     ///   the daemon's environment is picked up behind the person's back. Antigravity signs in
-    ///   with a Google account only, and the Gemini key in Settings is Gemini's (Alex,
-    ///   2026-09-26: not shared).
+    ///   with a Google account only (Alex, 2026-09-26: not shared).
     /// - A failed turn arrives as an agent message, `Agent execution error: …`, then
     ///   `end_turn` (R9). A spent plan arrives the same way as `Usage Limit Reached` plus
     ///   the quota sentence (captured 2026-09-27 from “hi Antigravity”).
@@ -270,7 +264,7 @@ public enum RuntimeLaunchCatalog {
                                    defaultPath: ".local/share/opencode/auth.json",
                                    lendableTypes: ["api", "wellknown"], signInCommand: "opencode auth login"))
 
-    public static let builtIn: [RuntimeLaunch] = [claude, codex, gemini, grok, antigravity, copilot, cursor, opencode]
+    public static let builtIn: [RuntimeLaunch] = [claude, codex, grok, antigravity, copilot, cursor, opencode]
 
     /// Nothing extra for a runtime that is not listed.
     public static func launch(for runtimeID: String) -> RuntimeLaunch {

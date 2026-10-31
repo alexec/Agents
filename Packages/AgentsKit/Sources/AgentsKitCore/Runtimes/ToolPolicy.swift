@@ -118,9 +118,10 @@ public struct ResidualTool: Codable, Hashable, Sendable {
 /// before the process starts, pointed at by an environment variable or by a launch
 /// argument, and rebuilt every launch from the policy above it (Research R11).
 ///
-/// Grok reads its switches only from a file named by `GROK_CONFIG_PATH`. Gemini reads
-/// extra policy from `--policy <path>`, which adds to the person's own policies where a
-/// settings file named by a variable would replace theirs key by key (046, R5).
+/// Grok reads its switches only from a file named by `GROK_CONFIG_PATH`. A policy file
+/// pointed at by a launch flag such as `--policy <path>` can add to a runtime's own
+/// policies, where a settings file named by a variable would replace theirs key by key
+/// (046, R5).
 public struct EnvironmentFile: Codable, Hashable, Sendable {
     /// The file's name under `<root>/runtimes/`.
     public var name: String
@@ -231,7 +232,7 @@ public enum Lever: Hashable, Sendable {
     case environmentJSON(variable: String, value: JSONValue)
     /// The removed names are written into one of the policy's `environmentFiles`, which the
     /// runtime is pointed at; nothing rides on the session or the command line besides the
-    /// file's own path (046: Gemini's `--policy`).
+    /// file's own path (046: a runtime's `--policy` flag).
     case file
     /// No mechanism at all. Everything conflicting is residue.
     case words
@@ -288,14 +289,14 @@ public struct ToolPolicy: Hashable, Sendable {
     /// is not.
     public var relay: SignInRelay?
     /// Not offered the client's file reading, so the runtime reads from disk itself; writes
-    /// still come through the app (046). Gemini's `write_file` reads first and treats only
-    /// an error carrying code `ENOENT` as "a new file", which a JSON-RPC error over ACP can
-    /// never carry: every new file it tried to write through the app failed (walk,
-    /// 2026-09-25).
+    /// still come through the app (046). For a runtime whose own file-write tool reads
+    /// first and treats only an error carrying code `ENOENT` as "a new file", which a
+    /// JSON-RPC error over ACP can never carry: every new file it tried to write through
+    /// the app would fail.
     public var readsFilesItself: Bool
     /// The sign-in method to call `authenticate` with when picking a conversation back up is
-    /// refused as not signed in, before trying once more (046: Gemini's `gemini-api-key`,
-    /// which reads the key from its environment and records that choice in Gemini's own
+    /// refused as not signed in, before trying once more (046: a runtime's own key-based
+    /// method, which reads the key from its environment and records that choice in its own
     /// settings — so only when needed).
     public var authMethodBeforeContinuing: String?
 
