@@ -7824,7 +7824,7 @@ type ReportScopes struct {
 	Admin bool `json:"admin"`
 }
 
-// reports/value (#2351): what the work in a scope cost and what it delivered, from the lineage nodes that the scope's machines send (#2350). A node is in the range when it last changed in it, with its whole cost. total is the work on issues and PRs; waste is the PRs closed without a merge and merged reverts; unlinked is the turns with no issue or PR. perMergedPR is total by the PRs merged, by currency. leadTimeSeconds is the median of the issues' lead times. issues and milestones are the most costly first, at most 100 each; limited says there are more.
+// reports/value (#2351): what the work in a scope cost and what it delivered, from the lineage nodes that the scope's machines send (#2350). A node is in the range when it last changed in it, with its whole cost. total is the work on issues and PRs; waste is the PRs closed without a merge and merged reverts; unlinked is the turns with no issue or PR. perMergedPR is total by the PRs merged, by currency. leadTimeSeconds is the median of the issues' lead times. issues, milestones and releases (#3023) are the most costly first, at most 100 each; limited says there are more.
 type ReportValue struct {
 	Range ReportRange `json:"range"`
 
@@ -7852,6 +7852,9 @@ type ReportValue struct {
 	Issues []ReportValueRow `json:"issues"`
 
 	Milestones []ReportValueRow `json:"milestones"`
+
+	// One row per release (#3023): the PRs part-of it and the issues those PRs fix, the same way as a milestone.
+	Releases []ReportValueRow `json:"releases"`
 
 	Limited *bool `json:"limited,omitzero"`
 }

@@ -11,6 +11,7 @@ test("a node is named without its tracker, as the window names it", () => {
   assert.equal(v.nodeName({ kind: "issue", ref: "github:alexec/agents#12" }), "alexec/agents#12");
   assert.equal(v.nodeName({ kind: "issue", ref: "linear:ENG-4" }), "ENG-4");
   assert.equal(v.nodeName({ kind: "milestone", ref: "github:alexec/agents/milestone/15" }), "alexec/agents milestone 15");
+  assert.equal(v.nodeName({ kind: "release", ref: "github:alexec/agents/release/v0.14.0" }), "alexec/agents release v0.14.0");
 });
 
 test("the headline, the waste and the lead time", () => {
@@ -32,9 +33,10 @@ test("an issue's line", () => {
   assert.equal(v.rowLine({ ...row, prsMerged: 0, prsClosed: 0, waste: cost(0), failedChecks: 0, leadTimeSeconds: undefined }), "$10.00 · Not merged yet");
 });
 
-test("a GitHub issue's or milestone's address, as ReportValueWords.url has it; none for another tracker", () => {
+test("a GitHub issue's, milestone's or release's address, as ReportValueWords.url has it; none for another tracker", () => {
   assert.equal(v.nodeUrl({ kind: "issue", ref: "github:alexec/agents#12" }), "https://github.com/alexec/agents/issues/12");
   assert.equal(v.nodeUrl({ kind: "milestone", ref: "github:alexec/agents/milestone/15" }), "https://github.com/alexec/agents/milestone/15");
+  assert.equal(v.nodeUrl({ kind: "release", ref: "github:alexec/agents/release/v0.14.0" }), "https://github.com/alexec/agents/releases/tag/v0.14.0");
   assert.equal(v.nodeUrl({ kind: "issue", ref: "linear:ENG-4" }), undefined);
   assert.equal(v.nodeUrl({ kind: "issue", ref: "github:alexec/agents#x" }), undefined);
 });

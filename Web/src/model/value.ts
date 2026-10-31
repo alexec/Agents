@@ -16,22 +16,26 @@ export function costWords(c: LineageCost): string {
 
 export const spent = (c: LineageCost) => Object.values(c.cost).some((v) => v > 0) || c.inputTokens + c.outputTokens > 0;
 
-/** An issue's, a PR's or a milestone's name without its tracker: "alexec/agents#12", "ENG-4",
- * "alexec/agents milestone 15". */
+/** An issue's, a PR's, a milestone's or a release's name without its tracker: "alexec/agents#12",
+ * "ENG-4", "alexec/agents milestone 15", "alexec/agents release v0.14.0" (#3023). */
 export function nodeName(n: LineageNode): string {
   const [, id = n.ref] = /^[a-z][a-z0-9-]*:(.*)$/.exec(n.ref) ?? [];
   const milestone = /^(.*)\/milestone\/(.+)$/.exec(id);
-  return milestone ? `${milestone[1]} milestone ${milestone[2]}` : id;
+  if (milestone) return `${milestone[1]} milestone ${milestone[2]}`;
+  const release = /^(.*)\/release\/(.+)$/.exec(id);
+  return release ? `${release[1]} release ${release[2]}` : id;
 }
 
-/** Where a GitHub issue, PR or milestone is, as ReportValueWords.url has it; nothing for a tracker whose
- * address the ref does not say. */
+/** Where a GitHub issue, PR, milestone or release is, as ReportValueWords.url has it; nothing for a
+ * tracker whose address the ref does not say. */
 export function nodeUrl(n: LineageNode): string | undefined {
   const github = "https://github.com/";
   if (!n.ref.startsWith("github:")) return undefined;
   const id = n.ref.slice("github:".length);
   const milestone = /^(.*?)\/milestone\/(.*)$/.exec(id);
   if (milestone) return `${github}${milestone[1]}/milestone/${milestone[2]}`;
+  const release = /^(.*?)\/release\/(.*)$/.exec(id);
+  if (release) return `${github}${release[1]}/releases/tag/${release[2]}`;
   const issue = /^([^#]*)#(\d+)$/.exec(id);
   return issue ? `${github}${issue[1]}/issues/${issue[2]}` : undefined;
 }

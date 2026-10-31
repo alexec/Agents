@@ -6374,8 +6374,8 @@ export interface ReportScopes {
  * nodes that the scope's machines send (#2350). A node is in the range when it last changed in it,
  * with its whole cost. total is the work on issues and PRs; waste is the PRs closed without a merge
  * and merged reverts; unlinked is the turns with no issue or PR. perMergedPR is total by the PRs
- * merged, by currency. leadTimeSeconds is the median of the issues' lead times. issues and
- * milestones are the most costly first, at most 100 each; limited says there are more.
+ * merged, by currency. leadTimeSeconds is the median of the issues' lead times. issues, milestones
+ * and releases (#3023) are the most costly first, at most 100 each; limited says there are more.
  */
 export interface ReportValue {
   range: ReportRange;
@@ -6392,6 +6392,11 @@ export interface ReportValue {
   leadTimeSeconds?: number;
   issues: ReportValueRow[];
   milestones: ReportValueRow[];
+  /**
+   * One row per release (#3023): the PRs part-of it and the issues those PRs fix, the same way as a
+   * milestone.
+   */
+  releases: ReportValueRow[];
   limited?: boolean;
 }
 
@@ -10069,7 +10074,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ReportScope: { required: ["kind"], optional: ["group"] },
   ReportScopeOption: { required: ["scope", "name"], optional: [] },
   ReportScopes: { required: ["scopes", "admin"], optional: [] },
-  ReportValue: { required: ["range", "scope", "total", "waste", "unlinked", "perMergedPR", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "issues", "milestones"], optional: ["leadTimeSeconds", "limited"] },
+  ReportValue: { required: ["range", "scope", "total", "waste", "unlinked", "perMergedPR", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "issues", "milestones", "releases"], optional: ["leadTimeSeconds", "limited"] },
   ReportValueRow: { required: ["node", "total", "waste", "prsMerged", "prsClosed", "prsReverted", "failedChecks"], optional: ["leadTimeSeconds"] },
   ReportView: { required: ["id", "name", "page", "scope", "range"], optional: ["by"] },
   ReportViewID: { required: ["id"], optional: [] },

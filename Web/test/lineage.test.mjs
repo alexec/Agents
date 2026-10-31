@@ -58,13 +58,14 @@ test("only issues and PRs are costed", () => {
   assert.ok(!l.costed(helper));
 });
 
-test("an issue, a PR or a milestone on GitHub has its address; a session has none", () => {
+test("an issue, a PR, a milestone or a release on GitHub has its address; a session has none", () => {
   const rows = l.lineageRows(session, graph, new Map(), () => undefined);
   const url = (ref) => rows.find((r) => r.node.ref === ref).url;
   assert.equal(url(issue.ref), "https://github.com/alexec/agents/issues/12");
   assert.equal(url(pr.ref), "https://github.com/alexec/agents/pull/34");
   assert.equal(url(helper.ref), undefined);
   assert.equal(l.lineageUrl({ kind: "milestone", ref: "github:alexec/agents/milestone/15" }), "https://github.com/alexec/agents/milestone/15");
+  assert.equal(l.lineageUrl({ kind: "release", ref: "github:alexec/agents/release/v0.14.0" }), "https://github.com/alexec/agents/releases/tag/v0.14.0");
 });
 
 // The graph (#3019), as LineageLayoutTests has it on the window.

@@ -12,10 +12,13 @@ struct ReportValueWordsTests {
         #expect(ReportValueWords.name(.init(kind: "issue", ref: "github:alexec/agents#12")) == "alexec/agents#12")
         #expect(ReportValueWords.name(.init(kind: "issue", ref: "linear:ENG-4")) == "ENG-4")
         #expect(ReportValueWords.name(.init(kind: "milestone", ref: "github:alexec/agents/milestone/15")) == "alexec/agents milestone 15")
+        #expect(ReportValueWords.name(.init(kind: "release", ref: "github:alexec/agents/release/v0.14.0")) == "alexec/agents release v0.14.0")
         #expect(ReportValueWords.url(.init(kind: "issue", ref: "github:alexec/agents#12"))?.absoluteString
             == "https://github.com/alexec/agents/issues/12")
         #expect(ReportValueWords.url(.init(kind: "milestone", ref: "github:alexec/agents/milestone/15"))?.absoluteString
             == "https://github.com/alexec/agents/milestone/15")
+        #expect(ReportValueWords.url(.init(kind: "release", ref: "github:alexec/agents/release/v0.14.0"))?.absoluteString
+            == "https://github.com/alexec/agents/releases/tag/v0.14.0")
         #expect(ReportValueWords.url(.init(kind: "issue", ref: "gitlab:g/p#3")) == nil)
     }
 

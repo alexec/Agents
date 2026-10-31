@@ -85,6 +85,7 @@ public enum LineageLayout {
         case "workflow-run": return "Workflow run"
         case "workflow": return "Workflow"
         case "milestone": return "Milestone"
+        case "release": return "Release"
         default: return kind
         }
     }
@@ -100,14 +101,16 @@ public enum LineageLayout {
     /// How far a line between two boxes of one tier bends down below it.
     public static let arc = 40.0
 
-    /// The graph's tier for a kind, so it reads top to bottom: milestone, issue, session, PR.
+    /// The graph's tier for a kind, so it reads top to bottom: milestone, issue, session, PR,
+    /// release (#3023: what shipped it, last).
     static func tier(_ kind: String) -> Int {
         switch kind {
         case "milestone", "workflow": return 0
         case "issue", "workflow-run": return 1
         case "session": return 2
         case "pr": return 3
-        default: return 4
+        case "release": return 4
+        default: return 5
         }
     }
 
