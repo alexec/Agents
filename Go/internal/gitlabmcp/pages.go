@@ -49,16 +49,23 @@ func (g *RealGitLab) viewer(ctx context.Context) (string, error) {
 // autoMerge says whether it merges once its pipeline succeeds.
 func (m mergeRequest) autoMerge() bool { return m.MergeWhenPipelineSucceeds }
 
-// review is approved, review_required or "": GitLab's merge status says whether approvals are missing.
+// review is changes_requested, review_required or "": GitLab's merge status says whether a
+// reviewer asked for changes or approvals are missing.
 func (m mergeRequest) review() string {
-	if m.DetailedMergeStatus == "not_approved" {
+	switch {
+	case m.changesRequested():
+		return "changes_requested"
+	case m.DetailedMergeStatus == "not_approved":
 		return "review_required"
 	}
 	return ""
 }
 
+// changesRequested says a reviewer asked for changes, which blocks the merge.
+func (m mergeRequest) changesRequested() bool { return m.DetailedMergeStatus == "requested_changes" }
+
 // Board is the open merge requests, newest created first, each with its head commit's
-// pipeline, and who is signed in.
+// pipeline and its section for who is signed in (#2952).
 func (g *RealGitLab) Board(ctx context.Context, project string) (map[string]any, error) {
 	var mrs []mergeRequest
 	if err := g.get(ctx, fmt.Sprintf("projects/%s/merge_requests?state=opened&order_by=created_at&sort=desc&per_page=100", pid(project)), false, &mrs); err != nil {
@@ -80,7 +87,13 @@ func (g *RealGitLab) Board(ctx context.Context, project string) (map[string]any,
 	if err != nil {
 		return nil, err
 	}
+	authors := make([]user, len(mrs))
+	for i, m := range mrs {
+		authors[i] = m.Author
+	}
+	team := g.developers(ctx, project, authors)
 	out := make([]any, len(mrs))
+	needsYou := 0
 	for i, m := range mrs {
 		j := m.mr().json()
 		j["base"], j["author"], j["updatedAt"], j["draft"], j["autoMerge"], j["checks"] =
@@ -97,15 +110,23 @@ func (g *RealGitLab) Board(ctx context.Context, project string) (map[string]any,
 		if r := m.review(); r != "" {
 			j["review"] = r
 		}
+		if isBot(m.Author.Username, m.Author.Bot) {
+			j["authorBot"] = true
+		}
+		j["section"] = mrSection(m, j["checks"].(string), viewer, team[m.Author.ID])
+		if j["section"] == sectionNeedsYou {
+			needsYou++
+		}
 		out[i] = j
 	}
-	// count is the sidebar row's (#2033).
-	return map[string]any{"project": project, "viewer": viewer, "mergeRequests": out, "count": len(out)}, nil
+	// count and attention, the Needs you count, are the sidebar row's (#2033).
+	return map[string]any{"project": project, "viewer": viewer, "mergeRequests": out, "count": len(out), "attention": needsYou}, nil
 }
 
 // MARK: Issues
 
-// OpenIssues are the open issues, newest created first, at most 100, with label's only when it is set.
+// OpenIssues are the open issues, newest created first, at most 100, with label's only when it
+// is set, each with its section for who is signed in (#2952).
 func (g *RealGitLab) OpenIssues(ctx context.Context, project, label string) (map[string]any, error) {
 	path := fmt.Sprintf("projects/%s/issues?state=opened&order_by=created_at&sort=desc&per_page=100", pid(project))
 	if label != "" {
@@ -115,13 +136,28 @@ func (g *RealGitLab) OpenIssues(ctx context.Context, project, label string) (map
 	if err := g.get(ctx, path, false, &list); err != nil {
 		return nil, err
 	}
+	// Without the viewer the list still shows, as Team and Others only.
+	viewer, _ := g.viewer(ctx)
+	authors := make([]user, len(list))
+	for i, is := range list {
+		authors[i] = is.Author
+	}
+	team := g.developers(ctx, project, authors)
 	out := make([]any, len(list))
+	needsYou := 0
 	for i, is := range list {
 		j := is.issue().json()
 		j["comments"], j["updatedAt"] = is.UserNotesCount, is.UpdatedAt
+		if isBot(is.Author.Username, is.Author.Bot) {
+			j["authorBot"] = true
+		}
+		j["section"] = issueSection(is, viewer, team[is.Author.ID])
+		if j["section"] == sectionNeedsYou {
+			needsYou++
+		}
 		out[i] = j
 	}
-	return map[string]any{"project": project, "issues": out, "count": len(out)}, nil
+	return map[string]any{"project": project, "viewer": viewer, "issues": out, "count": len(out), "attention": needsYou}, nil
 }
 
 // MARK: A merge request's page

@@ -374,6 +374,7 @@ type mergeRequest struct {
 	TargetBranch        string `json:"target_branch"`
 	WebURL              string `json:"web_url"`
 	Author              user   `json:"author"`
+	Reviewers           []user `json:"reviewers"`
 	Draft               bool   `json:"draft"`
 	WorkInProgress      bool   `json:"work_in_progress"`
 	SourceProjectID     int    `json:"source_project_id"`

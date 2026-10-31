@@ -1,7 +1,8 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>Merge requests</title>
 <!-- The gitlab server's Merge requests (ui://gitlab/merge-requests, #1631): show_merge_requests's
-     result, each with its pipeline, conflict, approvals and auto-merge, and Retry on a failed one.
+     result, in sections by how each relates to the viewer (#2952), each with its pipeline, conflict,
+     approvals and auto-merge, and Retry on a failed one.
      A merge request's title opens its page (show_merge_request) in place, with a way back to the
      list. It has no network: it speaks only the MCP Apps bridge. -->
 <style>
@@ -9,6 +10,11 @@
 /*mrpage.css*/
 #list { display: grid; gap: 8px; }
 #list[hidden], #page[hidden] { display: none; }
+/* The Remote's narrow width (#2952): GitLab's pills are long, so they go under the title. */
+@media (max-width: 520px) {
+  #mrs li:not(.section) { grid-template-columns: auto minmax(0, 1fr); }
+  #mrs .pills, #mrs .meta { grid-column: 2; justify-content: flex-start; }
+}
 </style></head>
 <body><main><div id="list">
   <header><h1>Merge requests</h1><span id="project" class="muted"></span><span class="grow"></span>
@@ -21,7 +27,7 @@
 /*lineage.js*/
 /*mrpage.js*/
 (() => {
-  let project = "";
+  let project = "", viewer = "";
   const ui = bridge("gitlab-merge-requests", {
     input: (args) => { project = args.project || ""; ui.$("project").textContent = project; say("Listing…"); },
     result: (result) => draw(result),
@@ -35,8 +41,9 @@
     const found = ui.data(result);
     if (!found) { say("Couldn't list merge requests: " + ui.errorText(result), true); $("refresh").disabled = !project; return; }
     if (found.project) { project = found.project; $("project").textContent = project; }
+    viewer = found.viewer || "";
     const mrs = Array.isArray(found.mergeRequests) ? found.mergeRequests : [];
-    $("mrs").replaceChildren(...mrs.map(row));
+    $("mrs").replaceChildren(...ui.sections(mrs, row));
     say(mrs.length ? `${mrs.length} open · as of ${new Date().toLocaleTimeString()}` : "No open merge requests.");
     $("refresh").disabled = !project;
   };
@@ -50,14 +57,19 @@
     return el("li", {}, [
       link(`!${mr.number}`, mr.url),
       title,
-      el("span", { className: "pills" }, [...mrPills(ui, mr), retry]),
+      el("span", { className: "pills" }, [yourReview(mr), ...mrPills(ui, mr), retry]),
       el("span", { className: "meta" }, [
         el("span", { className: "branch", textContent: mr.branch, title: `${mr.branch} → ${mr.base}` }),
-        el("span", { textContent: `${mr.author || "someone"}${mr.updatedAt ? " · " + ui.ago(mr.updatedAt) : ""}` }),
+        ...ui.who(mr.author, mr.authorBot),
+        mr.updatedAt ? el("span", { textContent: ui.ago(mr.updatedAt) }) : null,
       ]),
       action,
     ]);
   };
+
+  // In Needs you and not the viewer's own: the viewer is one of its reviewers (#2952).
+  const yourReview = (mr) => mr.section === "needs_you" && viewer && (mr.author || "").toLowerCase() !== viewer.toLowerCase()
+    ? el("span", { className: "pill review_required", textContent: "Your review", title: "You are a reviewer of it" }) : null;
 
   const page = mrPage(ui, () => project, () => back());
   const open = (number) => { $("list").hidden = true; $("page").hidden = false; page.show(number); };
