@@ -146,6 +146,7 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	}
 	d.checkMilestonesSoon()
 	d.countMergedPRsEveryHour()
+	d.checkReleaseTagsEveryHour()
 	d.saveFeaturesEveryMinute()
 	d.watchDisk()
 	// The counts on the servers' list view rows (#2033).

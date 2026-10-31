@@ -182,7 +182,13 @@ func (d *Daemon) lineageSettle(wait time.Duration) {
 }
 
 func (d *Daemon) link(from, to wire.LineageNode, rel, source string) {
-	if _, err := d.lineage().Link(wire.LineageLinkRequest{From: from, To: to, Rel: rel, Source: source}, nowFunc()); err != nil {
+	d.linkAt(from, to, rel, source, nowFunc())
+}
+
+// linkAt is link, at a time other than now: a release's links are backfilled to the tag's
+// commit time (#3023), so a tag found hours or days late still lands where it happened.
+func (d *Daemon) linkAt(from, to wire.LineageNode, rel, source string, at time.Time) {
+	if _, err := d.lineage().Link(wire.LineageLinkRequest{From: from, To: to, Rel: rel, Source: source}, at); err != nil {
 		log.Printf("lineage: %s %s %s: %v", from.Ref, rel, to.Ref, err)
 	}
 }

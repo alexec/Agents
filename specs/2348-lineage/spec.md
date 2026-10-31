@@ -9,15 +9,15 @@ A graph that links the parts of the SDLC. The host keeps it. The other slices fi
 
 - **A node** is a `kind` and a `ref`.
   - `kind`: `issue`, `pr`, `session`, `workflow-run`, `commit`, `file`, `branch`,
-    `milestone`. The list is open.
+    `milestone`, `workflow`, `release`. The list is open.
   - `ref` names the node apart from any tracker, as `<scheme>:<id>`:
     `github:alexec/Agents#123`, `gitlab:group/repo!45`, `linear:ENG-4`, `jira:ABC-9`,
     `session:<agent id>`.
   - A node is in the graph while a link names it. Nothing stores a node on its own.
 - **A link** has `from`, `to`, `rel`, `source`, `at`, and `endedAt` when it stops being
   active.
-  - `rel`: `works-on`, `opens`, `fixes`, `started`, `reviews`, `closes`, `part-of`. The
-    list is open.
+  - `rel`: `works-on`, `opens`, `fixes`, `started`, `reviews`, `closes`, `part-of`,
+    `shipped-in`. The list is open.
   - `source` (how the host knows it): `start`, `branch`, `pr-body`, `helper`, `agent`,
     `person`, `forge`. The list is open.
   - At most one link from, to, rel is active at a time. To link it again while it is active
@@ -257,6 +257,48 @@ Slice 5 comments on a pull request when it merges, in `Go/internal/agentsd/linea
   Alex can overrule.
 - **Decided: the Remote has no setting.** Because Folder Settings is Mac + web (#2798).
   Alex can overrule.
+
+## Releases from tags (#3023)
+
+The graph stopped at "merged"; this adds a release node, so it reaches "got to people",
+and gives a milestone's and a release's cost the PRs that shipped in each. Part 1 (this):
+the host linker and the cost rollup, in `Go/internal/agentsd/lineagerelease.go`, no client.
+Part 2 (a later PR): Reports ▸ Value's release rows and the release node in the Lineage
+pane (#3019).
+
+- **A release node.** Kind `release`, ref `github:<owner>/<repo>/release/<tag>` (GitLab:
+  `gitlab:<group>/<project>/release/<tag>`), the tag with its `v`.
+- **PR `part-of` release**, source `forge`. A new `v*` tag gets the commits since the
+  version tag before it (the forge's compare API), each one's PR from the `(#n)` a GitHub
+  squash title ends with, or `(!n)` on GitLab, or, when the title has none, the forge's own
+  `commits/<sha>/pulls` (GitLab: a commit's merge requests). Bounded at 1,000 commits; a
+  longer release links only the first 1,000.
+- **Milestone `shipped-in` release**, source `forge`. A milestone's title must start with
+  the tag's version, its own `v` dropped, and a `.0` patch dropped too, as this repo names
+  its minor milestones: `v0.14.0` matches "0.14 Lineage and value"; `v0.14.1` matches
+  "0.14.1 Bug fixes". No match links nothing.
+- **Hearing about a tag:** the host reads a folder's tags with `git ls-remote --tags
+  origin`, at most once an hour (`checkReleaseTagsEveryHour`); no forge event says "tag
+  pushed" today. A tag is done once it links, kept in `<root>/release-tags.json` by repo,
+  so a host that was off when a tag was pushed still finds it, and never re-asks the forge
+  for one it already did.
+- **A tag with no earlier version tag** (the first in a repo) links no PR: the first
+  release does not get the whole history. It can still get a `shipped-in` link.
+- **A release's links are at the tag's commit time**, not when the host happened to notice
+  it: `lineage/link`'s `at`, not `now`.
+- **Cost rollup.** `lineage/cost` on a release adds up its PRs (`part-of` it) and the
+  issues those PRs fix, the same way as a milestone (#2350); each part counts once.
+
+### Decisions on the open questions
+
+- **Decided: the host reads a folder's tags at most once an hour**, because no forge event
+  says "release published" or "tag pushed" today, and a tag missed while the Mac was off
+  is still found within the hour. Alex can overrule.
+- **Decided: a release with no earlier tag links no PR**, so the first release in a repo
+  does not get the whole history. Alex can overrule.
+- **Decided: release time is the tag's commit time**, not when the GitHub release was
+  published or the host noticed it. The time the person got it is a later `deploy`/`ships`
+  node (a follow-up), not this. Alex can overrule.
 
 ## Clients
 

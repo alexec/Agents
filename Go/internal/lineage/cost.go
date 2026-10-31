@@ -100,6 +100,7 @@ func blankCost() wire.LineageCost { return wire.LineageCost{Cost: map[string]flo
 //   - a PR, or any other node: itself;
 //   - an issue: itself and the PRs that fix it;
 //   - a milestone: the issues and PRs part of it, and the PRs that fix those issues;
+//   - a release (#3023): the PRs part of it, and the issues those PRs fix;
 //   - a project (kind project, ref as LineageCostNode.project): every node in it.
 //
 // Each part counts once. Waste is the parts' PRs closed without a merge or reverted, and
@@ -142,6 +143,21 @@ func Rollup(nodes []wire.LineageCostNode, of wire.LineageNode) wire.LineageCostR
 				if issues[f] {
 					in[n.Node] = true
 				}
+			}
+		}
+	case KindRelease:
+		fixed := map[string]bool{}
+		for _, n := range nodes {
+			if n.Node.Kind == KindPR && has(n.PartOf, of.Ref) {
+				in[n.Node] = true
+				for _, f := range n.Fixes {
+					fixed[f] = true
+				}
+			}
+		}
+		for _, n := range nodes {
+			if n.Node.Kind == KindIssue && fixed[n.Node.Ref] {
+				in[n.Node] = true
 			}
 		}
 	case KindProject:

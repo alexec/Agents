@@ -214,7 +214,7 @@ func (d *Daemon) refreshCostLinksLocked() {
 			switch {
 			case c.Node.Kind == lineage.KindPR && l.Rel == lineage.RelFixes && l.To.Kind == lineage.KindIssue:
 				fixes = append(fixes, l.To.Ref)
-			case l.Rel == lineage.RelPartOf && l.To.Kind == lineage.KindMilestone:
+			case l.Rel == lineage.RelPartOf && (l.To.Kind == lineage.KindMilestone || l.To.Kind == lineage.KindRelease):
 				partOf = append(partOf, l.To.Ref)
 			}
 		}
