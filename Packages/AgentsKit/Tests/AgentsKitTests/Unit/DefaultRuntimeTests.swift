@@ -62,6 +62,17 @@ struct DefaultRuntimeTests {
         #expect(model.rememberedMode(for: "codex") == nil)
     }
 
+    /// Auto, once picked, stays (#3017): a later session on a named runtime does not move
+    /// a new session off it, while Auto can start.
+    @Test func aKeptAutoWinsOverTheLastUsedRuntime() {
+        let model = AgentsModel()
+        model.replaceAgents([agent("claude", minutesAgo: 1)])
+        #expect(model.defaultRuntimeID(available: ["auto", "claude", "codex"], kept: "auto") == "auto")
+        #expect(model.defaultRuntimeID(available: ["claude", "codex"], kept: "auto") == "claude")
+        #expect(model.defaultRuntimeID(available: ["auto", "claude", "codex"], kept: "codex") == "claude")
+        #expect(RuntimeCatalog.startFormRuntime(current: nil, lastUsed: "claude", kept: "auto", available: ["auto", "claude"]) == "auto")
+    }
+
     @Test func lastUsedThenKeptRuntimeThatCannotStartArePassedOver() {
         let model = AgentsModel()
         model.replaceAgents([agent("gemini", minutesAgo: 1)])

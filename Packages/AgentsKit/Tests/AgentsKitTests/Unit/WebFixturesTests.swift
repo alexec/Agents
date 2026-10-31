@@ -1160,6 +1160,9 @@ struct WebFixturesTests {
             ("no Claude", nil, nil, ["gemini", "codex"]),
             ("kept, no Claude", nil, "opencode", ["codex", "gemini"]),
             ("none can start", nil, "claude", []),
+            ("kept Auto wins over last used", "claude", "auto", ["auto", "claude", "codex"]),
+            ("kept Auto that cannot start falls back to last used", "claude", "auto", ["claude", "codex"]),
+            ("last used Auto wins over a kept runtime", "auto", "codex", ["auto", "claude", "codex"]),
         ]
         let startCases = starts.map { name, lastUsed, kept, available in
             Case(name: name, input: .object(["lastUsed": lastUsed.map(JSONValue.string) ?? .null,
