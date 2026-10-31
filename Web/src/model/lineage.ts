@@ -3,7 +3,7 @@
 // or a PR, what lineage/cost says was banked on it.
 import type { LineageCostRollup, LineageGraph, LineageLink, LineageNode } from "../protocol/generated";
 import { timeWords } from "./time";
-import { costWords, nodeName, spent } from "./value";
+import { costWords, nodeName, nodeUrl, spent } from "./value";
 
 /** How far the pane walks: issue, its sessions, their PRs. */
 export const lineageDepth = 2;
@@ -23,6 +23,8 @@ export interface LineageRow {
   cost?: string | undefined;
   /** The session it is, for a session node. */
   session?: string | undefined;
+  /** Where a GitHub issue, PR or milestone is, as LineageList.Row.url has it. */
+  url?: string | undefined;
 }
 
 export interface LineageGroup { title: string; rows: LineageRow[] }
@@ -31,6 +33,12 @@ const kinds: [string, string][] = [
   ["issue", "Issues"], ["pr", "Pull Requests"], ["session", "Sessions"], ["workflow-run", "Workflow Runs"],
   ["milestone", "Milestones"],
 ];
+
+/** A node's address on GitHub: a PR's is its /pull/ page. */
+export function lineageUrl(n: LineageNode): string | undefined {
+  const url = nodeUrl(n);
+  return url && n.kind === "pr" ? url.replace("/issues/", "/pull/") : url;
+}
 
 /** Whether a node's cost is asked for. */
 export const costed = (n: LineageNode) => n.kind === "issue" || n.kind === "pr";
@@ -81,6 +89,7 @@ export function lineageGroups(session: LineageNode, graph: LineageGraph, costs: 
       links: graph.links.filter((l) => same(l.from, n) || same(l.to, n)).map((l) => linkLine(l, n, session, name)),
       cost: rollup && costLine(rollup),
       session: n.kind === "session" ? n.ref.slice("session:".length) : undefined,
+      url: lineageUrl(n),
     };
   });
   const groups = kinds.map(([kind, title]) => ({ title, rows: rows.filter((r) => r.node.kind === kind) })).filter((g) => g.rows.length > 0);

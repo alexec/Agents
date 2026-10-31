@@ -24,6 +24,18 @@ export function nodeName(n: LineageNode): string {
   return milestone ? `${milestone[1]} milestone ${milestone[2]}` : id;
 }
 
+/** Where a GitHub issue, PR or milestone is, as ReportValueWords.url has it; nothing for a tracker whose
+ * address the ref does not say. */
+export function nodeUrl(n: LineageNode): string | undefined {
+  const github = "https://github.com/";
+  if (!n.ref.startsWith("github:")) return undefined;
+  const id = n.ref.slice("github:".length);
+  const milestone = /^(.*?)\/milestone\/(.*)$/.exec(id);
+  if (milestone) return `${github}${milestone[1]}/milestone/${milestone[2]}`;
+  const issue = /^([^#]*)#(\d+)$/.exec(id);
+  return issue ? `${github}${issue[1]}/issues/${issue[2]}` : undefined;
+}
+
 /** The figures at the top: "$12.40 on issues and pull requests · 3 merged · $4.13 a merged pull request". */
 export function valueHeadline(v: ReportValue): string {
   const parts = [`${costWords(v.total)} on issues and pull requests`, `${v.prsMerged} merged`];
