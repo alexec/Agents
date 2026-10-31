@@ -3514,6 +3514,9 @@ type EventWait struct {
 	ResumePromptID *UUID `json:"resumePromptID,omitzero"`
 
 	ServerEvents []WaitServerEvent `json:"serverEvents,omitzero"`
+
+	// Only the connected person can carry this on (#3051): review.requested or issue.assigned today. Left out or false for everything else.
+	ForPerson *bool `json:"forPerson,omitzero"`
 }
 
 type EventWaitEnding struct {

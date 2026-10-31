@@ -599,6 +599,57 @@
     "expected" : {
       "asksToArchive" : false,
       "group" : "needsAttention",
+      "isWaiting" : true,
+      "needsAPerson" : true,
+      "showsUnread" : false,
+      "title" : "Needs you"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/folder/",
+        "endedReason" : "endTurn",
+        "eventWait" : {
+          "forPerson" : true,
+          "from" : 4,
+          "id" : "00000000-0000-0000-0000-000000000902",
+          "patterns" : [
+            {
+              "filters" : {
+
+              },
+              "name" : "review.requested"
+            }
+          ],
+          "since" : 812500000
+        },
+        "id" : "00000000-0000-0000-0000-000000000038",
+        "lastActivityAt" : 812500000,
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "finished",
+        "title" : "Session 38"
+      }
+    },
+    "name" : "finished, waiting on the person"
+  },
+  {
+    "expected" : {
+      "asksToArchive" : false,
+      "group" : "needsAttention",
       "isWaiting" : false,
       "needsAPerson" : false,
       "showsUnread" : false,

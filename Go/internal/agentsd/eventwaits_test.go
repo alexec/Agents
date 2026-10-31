@@ -1,6 +1,9 @@
 package agentsd
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -168,4 +171,74 @@ func TestAWaitEnds(t *testing.T) {
 	if text := <-second; text != "Replaced your earlier wait on lease.granted. You were stopped, which ended your wait for lease.released." {
 		t.Fatal(text)
 	}
+}
+
+// aPersonEventsServer is a streamable HTTP MCP server offering review.requested by poll,
+// an event raised only about the connected account (#2034), never the repo.
+func aPersonEventsServer(t *testing.T) *httptest.Server {
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			return
+		}
+		var m struct {
+			ID     *int            `json:"id"`
+			Method string          `json:"method"`
+			Params json.RawMessage `json:"params"`
+		}
+		json.NewDecoder(r.Body).Decode(&m)
+		if m.ID == nil {
+			w.WriteHeader(http.StatusAccepted)
+			return
+		}
+		var result any
+		switch m.Method {
+		case "initialize":
+			result = map[string]any{"protocolVersion": "2026-07-28", "capabilities": map[string]any{"events": map[string]any{"listChanged": true}}}
+		case "events/list":
+			result = map[string]any{"events": []any{map[string]any{"name": "review.requested", "delivery": []string{"poll"},
+				"inputSchema": map[string]any{"type": "object", "additionalProperties": false,
+					"properties": map[string]any{"repo": map[string]any{"type": "string"}, "pr": map[string]any{"type": "integer"}}}}}}
+		case "events/poll":
+			result = map[string]any{"events": []any{}, "cursor": "c1", "truncated": false, "hasMore": false, "nextPollMs": 10}
+		default:
+			result = map[string]any{}
+		}
+		w.Header().Set("Mcp-Session-Id", "s1")
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": *m.ID, "result": result})
+	}))
+	t.Cleanup(s.Close)
+	return s
+}
+
+// A wait on review.requested, which is always about the connected account (#2034), sets
+// ForPerson on the record, unlike an ordinary server event (#3051).
+func TestAWaitOnAPersonEventIsMarkedForPerson(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	gh := aPersonEventsServer(t)
+	a := seeded(t, d, t.TempDir(), nil)
+	m := appClient(t, d, a.ID)
+	m.post("initialize", map[string]any{}, 1)
+	serverHome(t, d, gh.URL)
+	quickPolls(d)
+	d.StartMCPEvents()
+	answered := make(chan string, 1)
+	go func() {
+		text, _ := m.tool(2, "wait_for_event", map[string]any{"events": "review.requested", "until_minutes": 10})
+		answered <- text
+	}()
+	waitFor(t, "the wait on the record", func() bool { return d.Store.Agent(a.ID).EventWait != nil })
+	w := d.Store.Agent(a.ID).EventWait
+	if w.ForPerson == nil || !*w.ForPerson {
+		t.Fatalf("%+v", w)
+	}
+	if got := Group(d.Store.Agent(a.ID)); got != "needsAttention" {
+		t.Fatalf("Group() = %s, want needsAttention", got)
+	}
+	// Ended cleanly, so no poll outlives the test and its server (#577).
+	if text, _ := m.tool(3, "cancel_wait", nil); !strings.HasPrefix(text, "Stopped waiting for review.requested") {
+		t.Fatal(text)
+	}
+	<-answered
 }

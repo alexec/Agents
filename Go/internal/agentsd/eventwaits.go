@@ -88,6 +88,17 @@ func isServerPattern(name string) bool {
 	return isServerEventName(name) || strings.HasSuffix(name, ".*") && !isSubject(strings.TrimSuffix(name, ".*"))
 }
 
+// forPersonEventNames are server events always raised about the connected account, never
+// the repo (#2034): review.requested and issue.assigned, the same names on GitHub and
+// GitLab. Waiting on one is waiting for something only that person can settle, so it
+// shows as needing them (#3051), unlike an ownership filter such as mine, which only
+// narrows which PRs to watch.
+var forPersonEventNames = map[string]bool{"review.requested": true, "issue.assigned": true}
+
+// isForPersonEvent is whether a wait on this event name can only be settled by the
+// connected person.
+func isForPersonEvent(name string) bool { return forPersonEventNames[name] }
+
 // isMacOnly is EventCatalogue.isMacOnly.
 func isMacOnly(name string) bool {
 	kinds, _ := catalogue()
@@ -770,6 +781,13 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 	}
 	for _, p := range patterns {
 		wait.Patterns = append(wait.Patterns, p.wire())
+	}
+	for _, n := range serverNames {
+		if isForPersonEvent(n) {
+			forPerson := true
+			wait.ForPerson = &forPerson
+			break
+		}
 	}
 
 	// Something already after from: answered now, and nothing is left waiting.

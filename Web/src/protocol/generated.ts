@@ -2856,6 +2856,11 @@ export interface EventWait {
   ending?: EventWaitEnding;
   resumePromptID?: UUID;
   serverEvents?: WaitServerEvent[];
+  /**
+   * Only the connected person can carry this on (#3051): review.requested or issue.assigned today.
+   * Left out or false for everything else.
+   */
+  forPerson?: boolean;
 }
 
 export type EventWaitEnding =
@@ -9709,7 +9714,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   EventPattern: { required: ["name", "filters"], optional: ["anyOf"] },
   EventPublisher: { required: ["agentID", "title"], optional: [] },
   EventRaiseRequest: { required: ["draft"], optional: ["consequences"] },
-  EventWait: { required: ["id", "patterns", "from", "since"], optional: ["deadline", "ending", "resumePromptID", "serverEvents"] },
+  EventWait: { required: ["id", "patterns", "from", "since"], optional: ["deadline", "ending", "resumePromptID", "serverEvents", "forPerson"] },
   EventsChange: { required: ["waiting"], optional: ["event"] },
   EventsListRequest: { required: ["limit"], optional: ["before", "scope", "groups"] },
   EventsPage: { required: ["events", "waiting", "hasMore"], optional: [] },

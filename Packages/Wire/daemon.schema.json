@@ -7601,6 +7601,10 @@
           "items": {
             "$ref": "#/definitions/WaitServerEvent"
           }
+        },
+        "forPerson": {
+          "type": "boolean",
+          "description": "Only the connected person can carry this on (#3051): review.requested or issue.assigned today. Left out or false for everything else."
         }
       },
       "required": [

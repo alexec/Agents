@@ -70,6 +70,7 @@ struct AgentCard: View {
                            isWaiting: agent.isWaiting,
                            endedReason: agent.endedReason,
                            outcomeUnknown: agent.endingIsUnaccountedFor,
+                           isWaitingForPerson: agent.isWaitingForPerson,
                            tool: RunningToolWords.tool(agent))
                     .padding(.top, 1)
 
@@ -454,6 +455,8 @@ struct StatusIcon: View {
     var endedReason: EndedReason?
     var outcomeUnknown = false
     var isWaitingForAllowance = false
+    /// Only the connected person can carry this on (`Agent.isWaitingForPerson`, #3051).
+    var isWaitingForPerson = false
     /// The tool it runs, which tips the working ring (#2044, #2332).
     var tool: String?
 
@@ -461,7 +464,8 @@ struct StatusIcon: View {
         StatusShape(state: state, outcome: outcome, isWaiting: isWaiting, isComingBack: isComingBack,
                     endedReason: endedReason,
                     waitingForAllowance: isWaitingForAllowance,
-                    outcomeUnknown: outcomeUnknown)
+                    outcomeUnknown: outcomeUnknown,
+                    waitingForPerson: isWaitingForPerson)
     }
 
     var body: some View {

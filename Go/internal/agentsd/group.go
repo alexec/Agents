@@ -15,7 +15,10 @@ func waitingOnEvents(a *wire.Agent) bool {
 func Group(a *wire.Agent) string {
 	outcomeAsked := a.OutcomeAsked != nil && *a.OutcomeAsked
 	waiting := waitingOnEvents(a)
-	wantsAnswer := a.Report != nil && needsAPerson(a.Report.Outcome)
+	// A wait only the connected person can settle (#3051) needs them too, as a question
+	// does: review.requested or issue.assigned today, waitForEvent sets ForPerson.
+	forPerson := waiting && a.EventWait.ForPerson != nil && *a.EventWait.ForPerson
+	wantsAnswer := a.Report != nil && needsAPerson(a.Report.Outcome) || forPerson
 	switch a.State {
 	case wire.AgentStateStarting:
 		return "running"
