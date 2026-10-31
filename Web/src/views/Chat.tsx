@@ -51,7 +51,7 @@ import { comingBackDescription, footStatusWords } from "../model/status";
 import { ArchiveCard } from "./ArchiveCard";
 import { showsThoughts, shownItems } from "../model/thoughts";
 import { hasTurnInFlight, promptPlaceholder, willQueue } from "../model/promptWords";
-import { eventWaitLine, eventWaitMinutes, eventWaitSummaryLines, leaseMark, lineResource } from "../model/rowLines";
+import { eventCarryOnPrompt, eventWaitLine, eventWaitMinutes, eventWaitSummaryLines, leaseMark, lineResource } from "../model/rowLines";
 import { routeHash } from "../route";
 import { sessionRuntimeName } from "../model/runtimes";
 import { GuardedChangeCard } from "./GuardedChange";
@@ -625,7 +625,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         {/* Under them, and not in "Waiting for you": the agent waits, not the person (#2084). Only
             while the wait is open: an ended one stays on the record until the agent goes on (#2749). */}
         {agent?.eventWait && agent.eventWait.ending === undefined && <WaitCard agent={agent} title={(id) => store.agent(host, id)?.title}
-          disabled={down} stop={() => store.cancelWait(host, agent.id)} />}
+          disabled={down} continueNow={async () => { await store.prompt(host, agent.id, eventCarryOnPrompt, []); }}
+          stop={() => store.cancelWait(host, agent.id)} />}
         {agent && !store.isComingBack(host, agent.id) && agent.state !== "running" && agent.state !== "starting" && (
           <QuietLine since={lastEntryAt(store.entries.value, store.turns.value) ?? fromWireDate(agent.lastActivityAt)} />
         )}
@@ -836,10 +837,10 @@ function LeaseLine({ store, host, agent }: { store: Store; host: string; agent: 
 
 /**
  * The agent's wait on events, as a card under the questions (WaitCard.swift, #1995): what, since
- * when, until when, a way to it on the Events page, and Stop Waiting. Not tinted.
+ * when, until when, Continue and Cancel (#3052). Not tinted.
  */
-function WaitCard({ agent, title, disabled, stop }: { agent: Agent; title: (id: string) => string | undefined;
-  disabled: boolean; stop: () => Promise<void> }) {
+function WaitCard({ agent, title, disabled, continueNow, stop }: { agent: Agent; title: (id: string) => string | undefined;
+  disabled: boolean; continueNow: () => Promise<void>; stop: () => Promise<void> }) {
   const busy = useSignal(false);
   const now = useSignal(Date.now());
   useEffect(() => {
@@ -871,9 +872,10 @@ function WaitCard({ agent, title, disabled, stop }: { agent: Agent; title: (id: 
           </div>}
         </>}
         <p class="wait-answers">
-          <button onClick={() => { location.hash = routeHash({ nav: "reports", section: "events" }); }}>Show in Events</button>
-          <button disabled={disabled || busy.value} title="Stop waiting. Nothing will start it again for this wait."
-            onClick={() => { busy.value = true; void stop().finally(() => (busy.value = false)); }}>Stop Waiting</button>
+          <button disabled={disabled || busy.value} title="Carry on now, without waiting for the event."
+            onClick={() => { busy.value = true; void continueNow().finally(() => (busy.value = false)); }}>Continue</button>
+          <button disabled={disabled || busy.value} title="Cancel this wait. Nothing will start it again for this wait."
+            onClick={() => { busy.value = true; void stop().finally(() => (busy.value = false)); }}>Cancel</button>
         </p>
       </div>
     </div>

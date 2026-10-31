@@ -373,7 +373,7 @@ struct ChatView: View {
                 WaitCard(status: status, eventWait: agent.eventWait,
                          isLineWait: agent.eventWait?.lineResource != nil,
                          lines: model.work.waitEventLines(of: agent),
-                         open: { model.showEvents(at: .waitingNow) },
+                         continueNow: { await model.continueWaiting(of: agent.id) },
                          stop: { await model.cancelWait(of: agent.id) },
                          isDisabled: selectedHostOffline)
                     .chatColumn()

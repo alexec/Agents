@@ -160,6 +160,9 @@ export function eventWaitLine(agent: Agent, title: (id: string) => string | unde
   return line;
 }
 
+/** EventWait.carryOnPrompt: what Continue sends, as the person (#3052). */
+export const eventCarryOnPrompt = "I've stopped waiting for the event. Carry on.";
+
 /** The event wait card's readable lines, with its timeout and elapsed minutes (#2565). */
 export function eventWaitCardLines(agent: Agent, title: (id: string) => string | undefined,
   now: Date): string[] | null {

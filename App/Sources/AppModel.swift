@@ -369,16 +369,14 @@ final class AppModel {
         }
     }
 
-    /// The event a workflow row asked to be shown, or `waitingNow` for the strip a
-    /// chat's waiting capsule asked for. Scrolled to, once.
+    /// The event a workflow row asked to be shown. Scrolled to, once.
     var eventsFocus: EventsFocus?
 
     enum EventsFocus: Equatable {
         case event(EventPosition)
-        case waitingNow
     }
 
-    /// Events, at one event or at Waiting now if something asked for it.
+    /// Events, at one event if something asked for it.
     func showEvents(at focus: EventsFocus? = nil) {
         eventsFocus = focus
         showsEvents = true
@@ -2017,6 +2015,15 @@ final class AppModel {
             _ = try await self.client(for: host).call(DaemonAPI.Method.eventsCancelWait,
                                                       DaemonAPI.CancelWaitRequest(agentID: agentID),
                                                       returning: [DaemonAPI.WaitingAgent].self)
+        }
+    }
+
+    /// Continue, on an event wait (#3052): an ordinary prompt, as Carry on sends on a
+    /// block (039), which ends the wait itself.
+    func continueWaiting(of agentID: UUID) async {
+        await attempt(on: host(ofAgent: agentID)) {
+            try await self.client(forAgent: agentID).call(DaemonAPI.Method.agentsPrompt,
+                                       DaemonAPI.PromptRequest(agentID: agentID, text: EventWait.carryOnPrompt))
         }
     }
 
