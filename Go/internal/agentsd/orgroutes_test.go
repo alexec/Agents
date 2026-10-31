@@ -270,7 +270,7 @@ func TestNoOrgRouteChangesNothing(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if !slices.Contains(told, wire.CallHostOrgRoutesApplied.Name) {
+	if !slices.Contains(told, wire.NewMethodName(wire.CallHostOrgRoutesApplied.Name)) {
 		t.Fatalf("%v", told)
 	}
 	if !slices.Contains(d.Capabilities(), wire.CapHostOrgRoutes1) {
@@ -987,7 +987,7 @@ func TestOrgRoutesOffline(t *testing.T) {
 	deadline := time.Now().Add(5 * time.Second)
 	for {
 		mu.Lock()
-		ok := slices.Contains(asked, wire.CallHostOrgRoutesAgain.Name)
+		ok := slices.Contains(asked, wire.NewMethodName(wire.CallHostOrgRoutesAgain.Name))
 		mu.Unlock()
 		if ok {
 			break

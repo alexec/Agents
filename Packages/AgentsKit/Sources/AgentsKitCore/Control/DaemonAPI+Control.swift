@@ -1,5 +1,23 @@
 import Foundation
 
+// The wire's host/* and hosts/* methods are renamed machine/* and machines/* over three
+// releases (#2653): this tree's documents, and so every `DaemonAPI.Method` constant below,
+// keep the old names until the last one, but a sender sends the new name. newMethodName is
+// applied once, at each physical place a method is put on the wire (JSONRPCConnection.call,
+// ControlUplink, ControlRelay, ControlCodeUse.announce), so the typed (old) names stay put
+// everywhere else, including the schema-consistency tests.
+public extension DaemonAPI {
+    private static let renamed: [(new: String, old: String)] = [("machine/", "host/"), ("machines/", "hosts/")]
+
+    /// method's new name: a host/* or hosts/* method sent as machine/* or machines/* (#2653).
+    static func newMethodName(_ method: String) -> String {
+        for pair in renamed where method.hasPrefix(pair.old) {
+            return pair.new + method.dropFirst(pair.old.count)
+        }
+        return method
+    }
+}
+
 /// What the control plane answers itself, and says (058, contracts/control-api.md).
 public extension DaemonAPI.Method {
     static let controlStatus = "control/status"

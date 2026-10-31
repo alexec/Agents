@@ -185,7 +185,7 @@ func (s *Service) sendUserSettings(host string, always bool) {
 	}
 	// The person may have changed while the secrets were opened: a machine that is no
 	// longer theirs is sent nothing.
-	if s.records.Host(host) == nil || s.ownerOf(host) != user || !s.router.Tell(host, wire.NotifyHostUserSettings.Name, delivery) {
+	if s.records.Host(host) == nil || s.ownerOf(host) != user || !s.router.Tell(host, wire.NewMethodName(wire.NotifyHostUserSettings.Name), delivery) {
 		s.toldUsers.mu.Lock()
 		delete(s.toldUsers.last, host)
 		s.toldUsers.mu.Unlock()

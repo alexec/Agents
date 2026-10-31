@@ -74,7 +74,7 @@ struct IdlessFailureTests {
     }
 
     @Test func throughAControlLinkTheFailureReachesItsCaller() async throws {
-        let far = FarEnd(refusing: DaemonAPI.Method.hostsList, wrapped: true)
+        let far = FarEnd(refusing: DaemonAPI.newMethodName(DaemonAPI.Method.hostsList), wrapped: true)
         let link = ControlLink { try await far.transport() }
         let client = DaemonClient(link: link.controlLink)
         try await client.connect(startIfNeeded: false)

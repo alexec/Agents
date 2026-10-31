@@ -625,7 +625,7 @@ func (s *Service) sendPolicy(host string, always bool) {
 	if same && !always {
 		return
 	}
-	if !s.router.Tell(host, wire.NotifyHostPolicy.Name, json.RawMessage(b)) {
+	if !s.router.Tell(host, wire.NewMethodName(wire.NotifyHostPolicy.Name), json.RawMessage(b)) {
 		s.policies.mu.Lock()
 		delete(s.policies.told, host)
 		s.policies.mu.Unlock()

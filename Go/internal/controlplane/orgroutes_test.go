@@ -33,7 +33,7 @@ type routesTold struct {
 func newRoutesTold() *routesTold { return &routesTold{got: map[string][]wire.OrgRouteDelivery{}} }
 
 func (d *routesTold) heard(host, method string, params json.RawMessage) {
-	if method != wire.NotifyHostOrgRoutes.Name {
+	if method != wire.NewMethodName(wire.NotifyHostOrgRoutes.Name) {
 		return
 	}
 	var delivery wire.OrgRouteDelivery

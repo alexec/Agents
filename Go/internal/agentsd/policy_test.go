@@ -128,7 +128,7 @@ func TestThePolicyFileIsKeptAndChecked(t *testing.T) {
 	d.SetControl(func(method string, params any) {
 		mu.Lock()
 		defer mu.Unlock()
-		if method == wire.CallHostPolicyApplied.Name {
+		if method == wire.NewMethodName(wire.CallHostPolicyApplied.Name) {
 			told = append(told, params)
 		}
 	})

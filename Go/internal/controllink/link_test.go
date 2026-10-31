@@ -106,7 +106,7 @@ func (f *fakeControl) serve(w http.ResponseWriter, r *http.Request) {
 			} `json:"params"`
 		}
 		json.Unmarshal([]byte(req), &call)
-		if call.Method != "hosts/announce" {
+		if call.Method != "machines/announce" {
 			f.t.Errorf("enrol said %s", call.Method)
 		}
 		f.mu.Lock()
@@ -125,7 +125,7 @@ func (f *fakeControl) serve(w http.ResponseWriter, r *http.Request) {
 		} `json:"m"`
 	}
 	json.Unmarshal([]byte(first), &frame)
-	if frame.C != 0 || frame.M.Method != "host/hello" {
+	if frame.C != 0 || frame.M.Method != "machine/hello" {
 		f.t.Errorf("first uplink line %s", first)
 	}
 	f.hellos <- frame.M.Params

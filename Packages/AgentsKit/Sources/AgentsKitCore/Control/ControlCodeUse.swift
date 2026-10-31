@@ -31,7 +31,7 @@ public enum ControlCodeUse {
         let reader = try await join(url, pin: code.pin, as: .init(identity: identity, key: ControlAuth.codeKey(secret: code.secret),
                                                                  kind: kind, controlKey: code.controlKey), dial: dial)
         defer { reader.close() }
-        try reader.write(line: JSONRPCCodec.encode(.request(id: .number(1), method: method, params: params)))
+        try reader.write(line: JSONRPCCodec.encode(.request(id: .number(1), method: DaemonAPI.newMethodName(method), params: params)))
         guard let line = try await reader.next(within: 15) else { throw Failure.noAnswer }
         switch try JSONRPCCodec.decode(line: line) {
         case .success(_, let result): return try result.decode(DaemonAPI.Admitted.self)

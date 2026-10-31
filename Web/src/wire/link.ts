@@ -4,7 +4,7 @@
 // with a `control/status` every few seconds.
 import { log } from "../log";
 import type { Method, Params, Result } from "../protocol/methods";
-import { targetOf } from "../protocol/methods";
+import { newMethodName, targetOf } from "../protocol/methods";
 import { type Admitted, connect, type LineSocket, Refused, WrongControlPlane } from "./auth";
 import { type KeyRecord, type KeyStore, UnsupportedBrowser } from "./keys";
 
@@ -256,7 +256,7 @@ export class Link {
   call<M extends Method>(method: M, params: Params<M>, host?: string): Promise<Result<M>> {
     if (this.state.kind !== "open" || !this.socket) return Promise.reject(new LinkDown());
     const id = this.nextID++;
-    const message = { jsonrpc: "2.0", id, method, params };
+    const message = { jsonrpc: "2.0", id, method: newMethodName(method), params };
     const route = targetOf(method) === "host" ? host ?? "mac" : null;
     const line = route !== null ? JSON.stringify({ h: route, m: message }) : JSON.stringify({ m: message });
     return new Promise<Result<M>>((resolve, reject) => {

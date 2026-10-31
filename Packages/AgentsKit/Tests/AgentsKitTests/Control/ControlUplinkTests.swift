@@ -104,7 +104,7 @@ struct ControlUplinkTests {
         let dials = Dials()
         let (_, uplink) = host(heard: Heard(), dials: dials)
         defer { uplink.stop() }
-        await eventually { dials.all.first?.lines(on: 0).first?.contains(DaemonAPI.Method.hostHello) == true }
+        await eventually { dials.all.first?.lines(on: 0).first?.contains(DaemonAPI.newMethodName(DaemonAPI.Method.hostHello)) == true }
     }
 
     @Test func aWindowsChannelAndAPhonesMayBothLend() async throws {

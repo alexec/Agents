@@ -22,3 +22,22 @@ func TestOldMethodName(t *testing.T) {
 		}
 	}
 }
+
+// A sender sends host/* and hosts/* as machine/* and machines/* (#2653).
+func TestNewMethodName(t *testing.T) {
+	for method, want := range map[string]string{
+		"hosts/list":        "machines/list",
+		"hosts/announce":    "machines/announce",
+		"host/hello":        "machine/hello",
+		"host/clients":      "machine/clients",
+		// Names with no old prefix, including the new ones already, stay.
+		"machines/list":     "machines/list",
+		"machines/forAgent": "machines/forAgent",
+		"agents/list":       "agents/list",
+		"":                  "",
+	} {
+		if got := NewMethodName(method); got != want {
+			t.Errorf("NewMethodName(%q) = %q, want %q", method, got, want)
+		}
+	}
+}

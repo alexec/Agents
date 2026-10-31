@@ -90,7 +90,7 @@ public final class ControlRelay: @unchecked Sendable {
         open.set(transport)
         for (id, method, params) in [(1, DaemonAPI.Method.hostHello, try JSONValue.encoding(hello(name: name))),
                                      (2, DaemonAPI.Method.relaySwitch, try JSONValue.encoding(DaemonAPI.RelaySwitch(relay: on)))] {
-            let line = try JSONRPCCodec.encode(.request(id: .number(id), method: method, params: params))
+            let line = try JSONRPCCodec.encode(.request(id: .number(id), method: DaemonAPI.newMethodName(method), params: params))
             try transport.write(line: ControlWire.channel(0, message: line))
         }
         do {
@@ -228,7 +228,7 @@ public final class ControlRelay: @unchecked Sendable {
                 let transport = try await hostDial()
                 backoff.connected()
                 lock.withLock { uplink = transport }
-                let line = try JSONRPCCodec.encode(.request(id: .number(1), method: DaemonAPI.Method.hostHello,
+                let line = try JSONRPCCodec.encode(.request(id: .number(1), method: DaemonAPI.newMethodName(DaemonAPI.Method.hostHello),
                                                             params: try JSONValue.encoding(hello)))
                 try transport.write(line: ControlWire.channel(0, message: line))
                 log("relay: connected to \(membership.name)")

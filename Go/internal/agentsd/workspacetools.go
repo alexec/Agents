@@ -16,10 +16,10 @@ import (
 
 // The app's workspace tools for agents (#691 US6, #1444), as DaemonCore+WorkspaceTools: list,
 // start, stop, make and delete, relayed to this host's control plane on channel 0 as
-// host/machines, which answers them as a client's request would be. Making and deleting
+// machine/machines, which answers them as a client's request would be. Making and deleting
 // ask the person first, on the agent's question card, and do nothing without a yes (FR-051).
 
-// What an agent may ask of the control plane through host/machines.
+// What an agent may ask of the control plane through machine/machines.
 const (
 	machinesForAgent   = "machines/forAgent"
 	hostsStart         = "hosts/start"
@@ -31,7 +31,7 @@ const (
 // askControl is a request of the control plane on channel 0, and its answer.
 type askControl = func(ctx context.Context, method string, params any) (json.RawMessage, error)
 
-// SetControlAsk is how this host asks its control plane something (host/machines): the
+// SetControlAsk is how this host asks its control plane something (machine/machines): the
 // uplink's Ask. Not set off a control plane.
 func (d *Daemon) SetControlAsk(ask askControl) {
 	if ask == nil {
@@ -43,7 +43,7 @@ func (d *Daemon) SetControlAsk(ask askControl) {
 	safe.Go("ask how sessions elsewhere stand", d.askThereWaits)
 }
 
-// askWorkspaces is one host/machines call for an agent, named for the control plane's log.
+// askWorkspaces is one machine/machines call for an agent, named for the control plane's log.
 func (d *Daemon) askWorkspaces(agent wire.UUID, method string, params any) (json.RawMessage, error) {
 	return d.askWorkspacesCtx(d.ctx, agent, method, params)
 }
@@ -63,7 +63,7 @@ func (d *Daemon) askWorkspacesCtx(ctx context.Context, agent wire.UUID, method s
 		return nil, &Error{Code: wire.FailureNotSupported, Message: "This machine isn’t on a control plane, so it has no machines."}
 	}
 	p, _ := json.Marshal(params)
-	out, err := (*ask)(ctx, "host/machines", wire.MachineWorkspaceCall{Agent: d.agentWho(agent), Method: method, Params: json.RawMessage(p)})
+	out, err := (*ask)(ctx, "machine/machines", wire.MachineWorkspaceCall{Agent: d.agentWho(agent), Method: method, Params: json.RawMessage(p)})
 	var refused *controllink.AskError
 	if errors.As(err, &refused) {
 		return nil, &Error{Code: refused.Code, Message: refused.Message}

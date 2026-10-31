@@ -201,7 +201,7 @@ public actor JSONRPCConnection {
         return try await withCheckedThrowingContinuation { continuation in
             pending[id] = continuation
             do {
-                try send(.request(id: id, method: method, params: params))
+                try send(.request(id: id, method: DaemonAPI.newMethodName(method), params: params))
             } catch {
                 pending.removeValue(forKey: id)
                 continuation.resume(throwing: error)
@@ -225,7 +225,7 @@ public actor JSONRPCConnection {
     /// printing a build log could arrive scrambled. Written straight out, lines leave
     /// in the order they were handed over, which for terminal output is not a nicety.
     public nonisolated func notify(_ method: String, _ params: JSONValue? = nil) throws {
-        try send(.notification(method: method, params: params))
+        try send(.notification(method: DaemonAPI.newMethodName(method), params: params))
     }
 
     /// A notification already encoded, for saying one thing to many connections: it is
