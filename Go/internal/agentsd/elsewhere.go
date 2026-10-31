@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 	"sync"
@@ -158,21 +159,30 @@ func (d *Daemon) thereNamed(starter wire.UUID, value string) *startedThere {
 
 // heardThere is what the session's machine said of it: its title, and how it ended, nil
 // while it goes on. An archived one is dropped, and the waits on an ended one close.
+// elsewhere.json is written only when what was heard changes a record (#2977): a status
+// probe of a session that goes on as before costs no write.
 func (d *Daemon) heardThere(session wire.UUID, machine, title string, ended *wire.WaitEndingHow) {
 	d.elsewhereMu.Lock()
 	f := d.elsewhereLocked()
+	changed := false
 	for i := range f.Started {
-		if f.Started[i].Session == session {
-			if machine != "" {
-				f.Started[i].Machine = machine
-			}
-			if title != "" {
-				f.Started[i].Title = title
-			}
-			f.Started[i].Ended = ended
+		s := &f.Started[i]
+		if s.Session != session {
+			continue
+		}
+		if machine != "" && s.Machine != machine {
+			s.Machine, changed = machine, true
+		}
+		if title != "" && s.Title != title {
+			s.Title, changed = title, true
+		}
+		if !reflect.DeepEqual(s.Ended, ended) {
+			s.Ended, changed = ended, true
 		}
 	}
-	d.saveElsewhereLocked()
+	if changed {
+		d.saveElsewhereLocked()
+	}
 	d.elsewhereMu.Unlock()
 	if ended != nil {
 		d.closeWaits(session, *ended)
