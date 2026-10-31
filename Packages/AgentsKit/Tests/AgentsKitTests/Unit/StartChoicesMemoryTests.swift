@@ -18,7 +18,7 @@ struct StartChoicesMemoryTests {
 
     @Test func oneListForEachRuntimeOnEachHost() {
         var memory = StartChoicesMemory()
-        let server = HostID(rawValue: "server-1")
+        let server = MachineRef(rawValue: "server-1")
         #expect(memory.options(for: "claude", on: .mac) == nil)
 
         memory.remember([Self.model(["opus"], current: "opus")], for: "claude", on: .mac)

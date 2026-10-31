@@ -86,6 +86,7 @@ func readWakeSettings(path string) wire.WakeSettings {
 	var m map[string]json.RawMessage
 	if json.Unmarshal(b, &m) != nil {
 		os.Rename(path, fmt.Sprintf("%s.corrupt-%d", path, time.Now().Unix()))
+		store.TrimSetAsides(path)
 		return s
 	}
 	json.Unmarshal(m["keepsAwake"], &s.KeepsAwake)
@@ -328,16 +329,4 @@ func sameTime(a, b *time.Time) bool {
 		return a == b
 	}
 	return a.Equal(*b)
-}
-
-// agentsInFlight counts the agents starting or running: what keeps the Mac awake. One
-// waiting on a person is not counted, so a question left overnight holds nothing.
-func (d *Daemon) agentsInFlight() int {
-	n := 0
-	for _, a := range d.Store.Agents() {
-		if a.State == wire.AgentStateStarting || a.State == wire.AgentStateRunning {
-			n++
-		}
-	}
-	return n
 }

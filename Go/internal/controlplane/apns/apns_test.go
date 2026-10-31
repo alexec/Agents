@@ -361,12 +361,16 @@ func TestTokensAndCollapseIDs(t *testing.T) {
 	if got := Token(wire.NeedID{Report: &wire.NeedIDReport{AgentID: id, At: 800000000.25}}); !strings.HasSuffix(got, ":800000000.25") {
 		t.Fatal(got)
 	}
-	guarded := wire.NeedID{GuardedChange: &wire.NeedIDGuardedChange{Folder: "file:///Users/me/secret-project/", Path: "plan.md"}}
-	if got := Token(guarded); got != "guarded:/Users/me/secret-project/:plan.md" {
+	guarded := wire.NeedID{GuardedChange: &wire.NeedIDGuardedChange{Folder: "file:///Users/me/secret-folder/", Path: "plan.md"}}
+	if got := Token(guarded); got != "guarded:/Users/me/secret-folder/:plan.md" {
 		t.Fatal(got)
 	}
 	if c := CollapseID(guarded); strings.Contains(c, "secret") || len(c) != 64 {
 		t.Fatal(c)
+	}
+	notice := "e0000000-0000-4000-8000-000000000006"
+	if got := Token(wire.NeedID{Notice: &notice}); got != "notice:"+notice {
+		t.Fatal(got)
 	}
 }
 

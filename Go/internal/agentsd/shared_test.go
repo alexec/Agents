@@ -11,7 +11,7 @@ import (
 )
 
 // Ports PersonalSnapshotTests: personal/shared reads the person's ~/.agents (no params) or a
-// project's .agents (folder, #754), says which runtime gets each thing, and never returns a
+// folder's .agents (folder, #754), says which runtime gets each thing, and never returns a
 // value from mcp.json.
 
 func sharedHome(t *testing.T) string {
@@ -160,20 +160,20 @@ func TestSharedSnapshotAnsweredOverTheSocket(t *testing.T) {
 	if err := json.Unmarshal(c.call(t, 1, "personal/shared", nil), &s); err != nil {
 		t.Fatal(err)
 	}
-	if !s.LaidOut || s.Home != filepath.Join(home, ".agents") || len(s.Skills) != 4 || len(s.MCP.Servers) != 3 {
+	if !s.LaidOut || s.Home != filepath.Join(home, ".agents") || len(s.Skills) != 4+len(readyMadeIDs()) || len(s.MCP.Servers) != 3 {
 		t.Fatalf("%+v", s)
 	}
 
-	// A project's .agents, with no reach, and only a project's.
-	project := t.TempDir()
-	c.call(t, 2, "projects/add", map[string]any{"folder": "file://" + project})
-	os.MkdirAll(filepath.Join(project, ".agents", "skills", "build"), 0o755)
-	os.WriteFile(filepath.Join(project, ".agents", "project.json"), []byte("{}"), 0o644)
-	os.WriteFile(filepath.Join(project, ".agents", "mcp.json"), []byte("{not json"), 0o644)
+	// A folder's .agents, with no reach, and only a folder's.
+	folder := t.TempDir()
+	c.call(t, 2, "folders/add", map[string]any{"folder": "file://" + folder})
+	os.MkdirAll(filepath.Join(folder, ".agents", "skills", "build"), 0o755)
+	os.WriteFile(filepath.Join(folder, ".agents", "folder.json"), []byte("{}"), 0o644)
+	os.WriteFile(filepath.Join(folder, ".agents", "mcp.json"), []byte("{not json"), 0o644)
 	s = wire.SharedSnapshot{}
-	json.Unmarshal(c.call(t, 3, "personal/shared", map[string]any{"folder": project}), &s)
-	if s.Home != filepath.Join(project, ".agents") || s.Instructions == nil || s.Instructions.Exists ||
-		s.Instructions.Path != filepath.Join(project, "AGENTS.md") || len(s.Skills) != 1 || len(s.Skills[0].Reach) != 0 ||
+	json.Unmarshal(c.call(t, 3, "personal/shared", map[string]any{"folder": folder}), &s)
+	if s.Home != filepath.Join(folder, ".agents") || s.Instructions == nil || s.Instructions.Exists ||
+		s.Instructions.Path != filepath.Join(folder, "AGENTS.md") || len(s.Skills) != 1 || len(s.Skills[0].Reach) != 0 ||
 		s.MCP.Problem == nil || len(s.OtherFiles) != 1 || s.OtherFiles[0].Kind != wire.SharedOtherFileKindApp ||
 		len(s.NeedsALook) != 1 || s.NeedsALook[0].Kind != wire.SharedLookKindProblem {
 		t.Fatalf("%+v", s)
@@ -186,7 +186,7 @@ func TestSharedSnapshotAnsweredOverTheSocket(t *testing.T) {
 func TestSharedSnapshotWithNoPersonalHome(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	d.ChatHome = ""
+	d.PersonalHome = ""
 	t.Setenv("AGENTS_PERSONAL_HOME", "")
 	raw := c.call(t, 1, "personal/shared", nil)
 	var s wire.SharedSnapshot

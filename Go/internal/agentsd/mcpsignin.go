@@ -149,7 +149,7 @@ func (d *Daemon) mcpSignInServer(t wire.MCPSignInTarget) (string, []sdk.HttpHead
 	if t.Entry == nil {
 		return "", nil, invalid("Name a server to sign in to.")
 	}
-	if err := d.requireMCPProject(t.Entry.Destination); err != nil {
+	if err := d.requireMCPFolder(t.Entry.Destination); err != nil {
 		return "", nil, err
 	}
 	if d.personalHome() == "" {
@@ -432,7 +432,7 @@ func (d *Daemon) mcpSignOut(ctx context.Context, t wire.MCPSignInTarget) wire.MC
 
 // mcpSignInStates is each row's sign-in, from what is kept, asking an http server that has
 // not been asked this run once, briefly: an approved one, with no Authorization of its own.
-func (d *Daemon) mcpSignInStates(rows []wire.ProjectMCPServer, dest wire.SkillDestination) []wire.ProjectMCPServer {
+func (d *Daemon) mcpSignInStates(rows []wire.FolderMCPServer, dest wire.SkillDestination) []wire.FolderMCPServer {
 	path, err := d.mcpFile(dest)
 	if err != nil {
 		return rows
@@ -512,8 +512,6 @@ type loopback struct {
 	server   *http.Server
 	once     sync.Once
 	arrived  chan map[string]string
-	got      map[string]string
-	ok       bool
 	page     chan [2]string
 	stopped  chan struct{}
 	stopOnce sync.Once

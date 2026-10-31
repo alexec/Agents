@@ -1,5 +1,6 @@
 import AgentsKitCore
 import SwiftUI
+import UIKit
 
 /// The remote: the same app, laid out for the screen it is on.
 ///
@@ -40,7 +41,16 @@ struct RemoteApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RemoteView()
+            Group {
+                // The organisation turned this person's access off: only that (#1002, FR-029),
+                // in place of the screens, so VoiceOver reaches nothing under it and their
+                // sheets close (#2439).
+                if model.signIn.suspended {
+                    SuspendedPage(device: UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone")
+                } else {
+                    RemoteView()
+                }
+            }
                 .background(Paper.ground)
                 // Undo after Archive (#1534), for a few seconds, over the foot of whatever shows.
                 .modifier(ArchiveUndoOverlay())
@@ -68,14 +78,14 @@ struct RemoteApp: App {
                           let url = URL(string: args[at + 1]) else { return }
                     model.openedFromTheWidget(url)
                 }
-                // A project alone (#2191), as its heading's long press opens it: a menu no walk
-                // can open. Named as its heading is, once the projects have come.
+                // A folder alone (#2191), as its heading's long press opens it: a menu no walk
+                // can open. Named as its heading is, once the folders have come.
                 .task {
                     let args = ProcessInfo.processInfo.arguments
                     guard args.contains("-walk"), let at = args.firstIndex(of: "-alone"), at + 1 < args.count else { return }
                     for _ in 0..<50 {
-                        if let project = model.projects.first(where: { $0.name == args[at + 1] }) {
-                            model.phoneProject = project.key
+                        if let folder = model.folders.first(where: { $0.name == args[at + 1] }) {
+                            model.phoneFolder = folder.key
                             return
                         }
                         try? await Task.sleep(for: .milliseconds(200))
@@ -113,10 +123,10 @@ struct RemoteApp: App {
         }
         .handlesExternalEvents(matching: [PoppedChat.activityType])
 
-        // A project in a scene of its own on an iPad (#1089), from its heading's menu. One
-        // scene per project: opening one already open brings it forward.
-        WindowGroup(id: RemoteProjectState.sceneID, for: ProjectKey.self) { $key in
-            RemoteProjectScene(key: key)
+        // A folder in a scene of its own on an iPad (#1089), from its heading's menu. One
+        // scene per folder: opening one already open brings it forward.
+        WindowGroup(id: RemoteFolderState.sceneID, for: FolderKey.self) { $key in
+            RemoteFolderScene(key: key)
                 .environment(model)
         }
     }
@@ -136,24 +146,24 @@ struct RemoteView: View {
     @Environment(\.openWindow) private var openWindow
     /// Which column a phone shows: the detail whenever something is picked.
     @State private var compactColumn = NavigationSplitViewColumn.sidebar
-    /// The project's own shell is up (#418).
-    @State private var showsProjectTerminal = false
+    /// The folder's own shell is up (#418).
+    @State private var showsFolderTerminal = false
     /// This scene, among the app's, for where the person is (021, #888).
     @State private var sceneID = UUID()
 
-    /// What is open over the project, in the order each was opened from the one before:
+    /// What is open over the folder, in the order each was opened from the one before:
     /// a pinned page, a workflow, a conversation. The first is the detail's own page, the
     /// one the sidebar lights; the rest are pushed over it. With none, a new session in the
-    /// project when one was asked for (#366), else nothing (#2090).
+    /// folder when one was asked for (#366), else nothing (#2090).
     private var routes: [RemoteRoute] {
-        let open = [model.openArchive ? RemoteRoute.archive : nil, model.openMCPServers ? RemoteRoute.mcpServers : nil,
+        let open = [model.openArchive ? RemoteRoute.archive : nil,
                     model.openPin.map(RemoteRoute.page),
                     model.openWorkflow.map(RemoteRoute.workflow), model.selection.map(RemoteRoute.agent),
                     model.openReview.map(RemoteRoute.review)]
             .compactMap { $0 }
-        // A project with nothing open over it starts a session (#366): its New session row (#375).
+        // A folder with nothing open over it starts a session (#366): its New session row (#375).
         // Only when asked for: leaving a session does not open one (#2090).
-        if open.isEmpty, model.selectedProject != nil, model.composing { return [.start] }
+        if open.isEmpty, model.selectedFolder != nil, model.composing { return [.start] }
         return open
     }
 
@@ -163,7 +173,6 @@ struct RemoteView: View {
                     guard let root = routes.first else { return }
                     let all = [root] + more
                     model.openArchive = all.contains(.archive)
-                    model.openMCPServers = all.contains(.mcpServers)
                     model.openPin = all.lazy.compactMap(\.pinPath).first
                     model.openWorkflow = all.lazy.compactMap(\.workflowID).first
                     model.selection = all.compactMap(\.agentID).last
@@ -193,19 +202,8 @@ struct RemoteView: View {
             .id(model.sidebarItem)
         }
         .navigationSplitViewStyle(.balanced)
-        // A project shown alone on an iPhone (#1089), over every project, with ‹ All.
-        .modifier(PhoneProjectCover())
-        // A milestone just earned (#984), on the iPad: once, until closed or opened.
-        .overlay(alignment: .bottomTrailing) {
-            if let milestone = model.milestoneCard {
-                MilestoneCard(milestone: milestone,
-                              open: { model.dismissMilestone(milestone); model.sidebarItem = .milestones },
-                              dismiss: { model.dismissMilestone(milestone) })
-                    .frame(maxWidth: 320)
-                    .shadow(color: .black.opacity(0.12), radius: 8, y: 2)
-                    .padding(20)
-            }
-        }
+        // A folder shown alone on an iPhone (#1089), over every folder, with ‹ All.
+        .modifier(PhoneFolderCover())
         // Something picked, here or from a banner, a widget or a start, is shown; back to
         // the list on a phone puts it down, so the same row opens it again.
         // Nothing left to show, as after Archive: back to the list it came from (#2090).
@@ -220,12 +218,12 @@ struct RemoteView: View {
         .onChange(of: compactColumn) { _, column in
             if column == .sidebar, sizeClass == .compact { model.sidebarItem = nil }
         }
-        .task(id: model.selectedProject) {
-            if let folder = model.selectedProject { await model.loadLabelVocabulary(in: folder) }
+        .task(id: model.selectedFolder) {
+            if let folder = model.selectedFolder { await model.loadLabelVocabulary(in: folder) }
         }
-        .sheet(isPresented: $showsProjectTerminal) {
-            if let folder = model.selectedProject {
-                ProjectTerminalSheet(folder: folder)
+        .sheet(isPresented: $showsFolderTerminal) {
+            if let folder = model.selectedFolder {
+                FolderTerminalSheet(folder: folder)
                     .environment(model)
             }
         }
@@ -286,35 +284,13 @@ struct RemoteView: View {
         } message: { _ in
             Text("An empty title gives the session the runtime's name again.")
         }
-        // Archive… on a project's long press (#668), named as its row is.
-        .confirmationDialog(ProjectArchiveWords.confirmTitle(model.askingToArchiveProject.map { summary in
-                                SidebarOrder.label(summary) { model.hostLabel($0) } } ?? ""),
-                            isPresented: Binding(get: { model.askingToArchiveProject != nil },
-                                                 set: { if !$0 { model.askingToArchiveProject = nil } }),
-                            titleVisibility: .visible, presenting: model.askingToArchiveProject) { summary in
-            Button("Archive") { Task { await model.archiveProject(summary) } }
-            Button("Cancel", role: .cancel) {}
-        } message: { _ in
-            Text(ProjectArchiveWords.confirmMessage)
-        }
-        // Delete… on an archived project (#677), asked here as a session's is.
-        .confirmationDialog(DeletionWords.projectConfirmTitle(model.askingToDeleteProject.map { summary in
-                                SidebarOrder.label(summary) { model.hostLabel($0) } } ?? ""),
-                            isPresented: Binding(get: { model.askingToDeleteProject != nil },
-                                                 set: { if !$0 { model.askingToDeleteProject = nil } }),
-                            titleVisibility: .visible, presenting: model.askingToDeleteProject) { summary in
-            Button("Delete", role: .destructive) { Task { await model.deleteProject(summary) } }
-            Button("Cancel", role: .cancel) {}
-        } message: { _ in
-            Text(DeletionWords.projectConfirmMessage)
-        }
         // A send refused because the folder has gone (#119), with the ways on.
         .alert("This agent’s folder isn’t there",
                isPresented: Binding(get: { model.folderGone != nil && model.problem == nil },
                                     set: { if !$0 { model.folderGone = nil } }),
                presenting: model.folderGone) { ask in
-            Button(MissingFolderWords.continueInProject) {
-                Task { await model.continueInProject(ask.agentID, text: ask.text, attachments: ask.attachments) }
+            Button(MissingFolderWords.continueInFolder) {
+                Task { await model.continueInFolder(ask.agentID, text: ask.text, attachments: ask.attachments) }
             }
             if model.work.agent(ask.agentID)?.mayRecreateWorktree == true {
                 Button(MissingFolderWords.recreateWorktree) { Task { await model.recreateWorktree(ask.agentID) } }
@@ -326,17 +302,32 @@ struct RemoteView: View {
         }
     }
 
-    /// A page of the project, with the way to the project's own shell (#418) on it:
+    /// A page of the folder, with the way to the folder's own shell (#418) on it:
     /// Control-` from an iPad's keyboard, as on the Mac.
     private func page(_ route: RemoteRoute) -> some View {
-        pageContent(route)
+        let folder = model.selectedFolder
+        let opensTerminal = folder != nil
+        // On a chat it is in the chat's ··· menu: one menu in the bar, not two (#2808).
+        let isChat = if case .agent = route { true } else { false }
+        return pageContent(route)
+            .environment(\.openFolderTerminal, folder.flatMap { folder in
+                isChat ? OpenFolderTerminal(folder: folder) { showsFolderTerminal = true } : nil
+            })
+            .background {
+                if opensTerminal, isChat {
+                    Button("Folder Terminal") { showsFolderTerminal = true }
+                        .keyboardShortcut("`", modifiers: .control)
+                        .opacity(0)
+                        .accessibilityHidden(true)
+                }
+            }
             .toolbar {
-                if model.selectedProject != nil {
+                if opensTerminal, !isChat {
                     ToolbarItem(placement: .secondaryAction) {
                         Button {
-                            showsProjectTerminal = true
+                            showsFolderTerminal = true
                         } label: {
-                            Label("Project Terminal", systemImage: "apple.terminal")
+                            Label("Folder Terminal", systemImage: "apple.terminal")
                         }
                         .keyboardShortcut("`", modifiers: .control)
                     }
@@ -352,38 +343,41 @@ struct RemoteView: View {
         case .workflow(let id): WorkflowPage(workflowID: id).paperGround()
         case .review(let id):
             if let summary = model.selectedSummary {
-                RemoteReviewDestination(id: id, project: summary.key).paperGround()
+                RemoteReviewDestination(id: id, folder: summary.key).paperGround()
             }
         case .archive:
             if let summary = model.selectedSummary {
-                ArchivePage(project: summary.key).paperGround()
-            }
-        case .mcpServers:
-            if let summary = model.selectedSummary {
-                MCPServersListView(project: summary.key).paperGround()
+                ArchivePage(folder: summary.key).paperGround()
             }
         case .start:
-            if let folder = model.selectedProject {
+            if let folder = model.selectedFolder {
                 // Held open while it is on screen: the runtime behind its choices is let
                 // go when it is not (029).
-                StartAgentView(project: folder)
+                StartAgentView(folder: folder)
                     .paperGround()
             }
         case .page(let path):
-            if let folder = model.selectedProject {
-                if let pin = model.pins(in: folder).first(where: { $0.path == path }), let view = pin.view {
-                    // A pinned view (#189), fed afresh, through the host a chat's views use.
+            if let folder = model.selectedFolder {
+                if let pin = model.work.pinOrView(path, in: folder), let view = pin.view {
+                    // A pinned view (#189), or a server's list view (#2032), fed afresh,
+                    // through the host a chat's views use.
                     PinnedViewPage(folder: folder, pin: pin, view: view,
                                    call: { method, params in try await model.viewCall(method, params) },
-                                   unpin: { await model.unpin(path, in: folder) },
+                                   unpin: {
+                                       if pin.isServerView {
+                                           await model.setViewHidden(path, true, in: folder)
+                                       } else {
+                                           await model.unpin(path, in: folder)
+                                       }
+                                   },
                                    startAgent: { start in
-                                       guard let key = model.work.project(folder)?.key else {
-                                           return "This project isn’t one the phone knows."
+                                       guard let key = model.work.folder(folder)?.key else {
+                                           return "This folder isn’t one the phone knows."
                                        }
                                        return model.offerStart(start, in: key)
                                    },
                                    recipient: { message in
-                                       model.work.project(folder).flatMap { model.recipient(of: message, in: $0.key) }
+                                       model.work.folder(folder).flatMap { model.recipient(of: message, in: $0.key) }
                                    },
                                    sendTo: { id, text in await model.send(text, to: id) },
                                    connected: model.isConnected)
@@ -403,28 +397,23 @@ struct RemoteView: View {
         case .events: EventsListView().paperGround()
         case .resources: ResourcesListView().paperGround()
         case .runtimes: RuntimesView().paperGround()
-        case .mcpServers: MCPServersListView().paperGround()
-        case .tokens: TokensView().paperGround()
-        case .time: TimeView().paperGround()
-        case .milestones: MilestonesView().paperGround()
         case .worktrees: WorktreesListView().paperGround()
-        default: TotalsView().paperGround()
+        // Usage and connectors are Mac + web (#2798): nothing opens them here.
+        default: NothingPickedPage()
         }
     }
 }
 
-/// Somewhere to go over the project: the detail's own page, or one pushed over it.
+/// Somewhere to go over the folder: the detail's own page, or one pushed over it.
 enum RemoteRoute: Hashable {
     case workflow(Workflow.ID)
     case agent(UUID)
-    /// A new session in the project (#366): its page when nothing is open over it.
+    /// A new session in the folder (#366): its page when nothing is open over it.
     case start
-    /// One of the project's pinned pages (#159), by its path in the project.
+    /// One of the folder's pinned pages (#159), by its path in the folder.
     case page(String)
-    /// What the project has archived (#495, #498), from its Archived row in the sidebar.
+    /// What the folder has archived (#495, #498), from its Archived row in the sidebar.
     case archive
-    /// The project's MCP servers (#753), from its MCP Servers row in the sidebar.
-    case mcpServers
     /// A change waiting for an OK, on its Review page (#1472), by its `Approval.id`.
     case review(String)
 
@@ -449,20 +438,20 @@ enum RemoteRoute: Hashable {
     }
 }
 
-/// The project an iPhone shows alone (#1089), as the cover's item.
-private struct PhoneProject: Identifiable {
-    let key: ProjectKey
+/// The folder an iPhone shows alone (#1089), as the cover's item.
+private struct PhoneFolder: Identifiable {
+    let key: FolderKey
     var id: String { key.stored }
 }
 
-/// The project an iPhone shows alone (#1089), over every project, with ‹ All.
-private struct PhoneProjectCover: ViewModifier {
+/// The folder an iPhone shows alone (#1089), over every folder, with ‹ All.
+private struct PhoneFolderCover: ViewModifier {
     @Environment(RemoteModel.self) private var model
 
     func body(content: Content) -> some View {
-        content.fullScreenCover(item: Binding(get: { model.phoneProject.map(PhoneProject.init) },
-                                              set: { model.phoneProject = $0?.key })) { project in
-            RemoteProjectScene(key: project.key, back: { model.phoneProject = nil })
+        content.fullScreenCover(item: Binding(get: { model.phoneFolder.map(PhoneFolder.init) },
+                                              set: { model.phoneFolder = $0?.key })) { folder in
+            RemoteFolderScene(key: folder.key, back: { model.phoneFolder = nil })
                 .environment(model)
         }
     }

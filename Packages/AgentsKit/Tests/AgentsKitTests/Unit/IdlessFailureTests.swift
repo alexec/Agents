@@ -69,7 +69,7 @@ struct IdlessFailureTests {
             try await client.call(DaemonAPI.Method.agentsList)
         }
         // The next call still goes through.
-        _ = try await client.call(DaemonAPI.Method.projectsList)
+        _ = try await client.call(DaemonAPI.Method.foldersList)
         #expect(await client.isConnected)
     }
 
@@ -104,7 +104,7 @@ struct IdlessFailureTests {
 
 @Suite("The router answers what it cannot read (#93)")
 struct UnreadableClientLineTests {
-    let home = HostID(rawValue: "mac")
+    let home = MachineRef(rawValue: "mac")
 
     /// The router reads its clients weakly, so each test holds it to the end.
     private func connected() async -> (ControlRouter, FakeControlClient) {

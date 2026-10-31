@@ -19,7 +19,7 @@ control exchange. The Mac window, the Remote, `Shared/UI`, the web page, Agents 
 | `cmd/linear-mcp/`, `internal/linearmcp/` | The `linear` MCP server (#839): Linear's issue events, in github-mcp's shape (tools are Linear's own server's) | ci-server |
 | `cmd/email-mcp/`, `internal/emailmcp/` | The `email` MCP server (#1780): one IMAP mailbox's new mail as `email.received`, and tools that read it; it never sends | email |
 | `cmd/gitlab-mcp/`, `internal/gitlabmcp/` | The `gitlab` MCP server (#1629): merge requests, pipelines and issues on GitLab, tools and events on REST v4 | gitlab |
-| `cmd/workspace-commands/`, `internal/workspacecommands/` | The command workspace provider (#691, in Go since #1364): workspaces as shell commands and presets, an MCP server the control plane runs | workspaces |
+| `cmd/workspace-commands/`, `internal/workspacecommands/` | The command machine provider (#691, in Go since #1364): workspaces as shell commands and presets, an MCP server the control plane runs | workspaces |
 
 ## Building and testing
 
@@ -63,9 +63,9 @@ build added kept whole), the copies' own messages, and the JSON-RPC envelope.
 | `controlplane/records` | `ControlRecords`, in today's JSON |
 | `controlplane/kms` | The key sealed by a keeper (an option, `AGENTS_CONTROL_KMS`) |
 | `controlplane/web` | The web page's loopback listener |
-| `controlplane/hostinstall`, `hosttunnels` | Add a Server over ssh, Detect, the ssh config's hosts, bastion tunnels |
+| `controlplane/hostinstall`, `hosttunnels` | Add a Machine over ssh, Detect, the ssh config's hosts, bastion tunnels |
 | `controlplane/notices` | Where a need shows (`Routing`), and the relay host's deliveries |
-| `controlplane/providers` | Workspace providers, kept requests, Write It for Me |
+| `controlplane/providers` | Machine providers, kept requests, Write It for Me |
 
 **Linux hosts run the Go agentsd** (#1136). `install.sh` installs it, from
 `agentsd-linux-<arch>` (`scripts/build-linux-agentsd.sh`).
@@ -107,7 +107,7 @@ names. It has no account of its own and does not use `gh`.
 
 Agents Host carries it in `Contents/Helpers` (`scripts/go-github-mcp.sh`, a build phase,
 as `agents-control` is), and `scripts/build-linux-agentsd.sh` builds
-`github-mcp-linux-<arch>`, which every Linux host installs beside agentsd. A project names
+`github-mcp-linux-<arch>`, which every Linux host installs beside agentsd. A folder names
 it by bare name: `"github": { "command": "github-mcp", "hosted": true }`.
 
 ## The linear MCP server (`linear-mcp`, #839)
@@ -186,9 +186,9 @@ carries it (`scripts/go-github-mcp.sh email-mcp`) and every Linux host installs
 `email-mcp-linux-<arch>`; the catalogue lists it as `agents/email`, which asks for no secret:
 it reads the connection.
 
-## The command workspace provider (`workspace-commands`, #691, #1364)
+## The command machine provider (`workspace-commands`, #691, #1364)
 
-A workspace provider whose workspaces are shell commands: written out, listed by one command,
+A machine provider whose workspaces are shell commands: written out, listed by one command,
 or a preset (`docker`, `doctl`, `codespaces`, `coder`, `gcloud-workstations`). Its configuration
 is the JSON in `WORKSPACE_COMMANDS_CONFIG`, as
 `specs/691-workspace-providers/contracts/command-provider.md` says; it was Swift

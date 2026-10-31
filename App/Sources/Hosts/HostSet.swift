@@ -9,40 +9,37 @@ import Observation
 @Observable
 final class HostSet {
     private(set) var hosts = HostList()
-    private(set) var states: [HostID: ServerConnection.State] = [:]
-    private(set) var nextTry: [HostID: Date] = [:]
-    private(set) var goneProjects: [HostID: [String]] = [:]
-    var rebuiltAsk: HostID?
-    private(set) var claude: [HostID: ServerConnection.Claude] = [:]
-    @ObservationIgnored var claudeWanted: (HostID) -> Bool = { _ in false }
-    private(set) var toolsets: [HostID: [String: ServerConnection.Claude]] = [:]
-    @ObservationIgnored var toolsetWanted: (HostID, String) -> Bool = { _, _ in false }
-    @ObservationIgnored var offerFor: (HostID) -> DaemonAPI.CredentialsOffer? = { _ in nil }
-    @ObservationIgnored var lenderFor: (HostID) -> DaemonClient.CredentialLender? = { _ in nil }
-    @ObservationIgnored var onNotification: ((HostID, String, JSONValue?) async -> Void)?
-    @ObservationIgnored var onConnected: ((HostID) async -> Void)?
+    private(set) var states: [MachineRef: ServerConnection.State] = [:]
+    private(set) var nextTry: [MachineRef: Date] = [:]
+    private(set) var goneFolders: [MachineRef: [String]] = [:]
+    var rebuiltAsk: MachineRef?
+    private(set) var claude: [MachineRef: ServerConnection.Claude] = [:]
+    private(set) var toolsets: [MachineRef: [String: ServerConnection.Claude]] = [:]
+    @ObservationIgnored var toolsetWanted: (MachineRef, String) -> Bool = { _, _ in false }
+    @ObservationIgnored var offerFor: (MachineRef) -> DaemonAPI.CredentialsOffer? = { _ in nil }
+    @ObservationIgnored var lenderFor: (MachineRef) -> DaemonClient.CredentialLender? = { _ in nil }
+    @ObservationIgnored var onNotification: ((MachineRef, String, JSONValue?) async -> Void)?
+    @ObservationIgnored var onConnected: ((MachineRef) async -> Void)?
     @ObservationIgnored var onReachability: ((String, Bool) async -> Void)?
 
     /// Hosts the control plane reaches for this window: their names, and whether each is
     /// online.
-    var controlled: [HostID: (label: String, online: Bool)] = [:]
+    var controlled: [MachineRef: (label: String, online: Bool)] = [:]
     /// Each server's row as the control plane last listed it: its state's word, and the
     /// workspace it runs on when it is linked to one (#691).
-    var controlRows: [HostID: DaemonAPI.ControlHost] = [:]
-    var offlineSince: [HostID: Date] { [:] }
+    var controlRows: [MachineRef: DaemonAPI.ControlMachine] = [:]
+    var offlineSince: [MachineRef: Date] { [:] }
 
     init(locations: StoreLocations) {}
 
-    func stopForQuit() {}
-    func handOver() -> [HostID] { [] }
     var isEmpty: Bool { controlled.isEmpty }
 
-    var servers: [HostID] {
+    var servers: [MachineRef] {
         controlled.filter { $0.key != .mac }
             .sorted { $0.value.label.localizedStandardCompare($1.value.label) == .orderedAscending }.map(\.key)
     }
 
-    func host(_ id: HostID) -> ServerHost? { nil }
+    func host(_ id: MachineRef) -> ServerHost? { nil }
 
     /// What an action aimed at this Mac's host says when it enrolled and then went quiet
     /// (#83). A host that never enrolled, or is not running, says so instead (#303).
@@ -53,15 +50,15 @@ final class HostSet {
     static let noMacHostProblem = "This Mac is not one of your machines, so that didn’t happen. This Mac’s runtimes and settings are kept only when it is one. To add it, make a code in Settings ▸ Machines ▸ Add by Code…, then paste it in Agents Host under Join one elsewhere."
 
     /// Why a button aimed at `id` does nothing now, in a tooltip's few words.
-    func offlineHelp(_ id: HostID) -> String {
+    func offlineHelp(_ id: MachineRef) -> String {
         id == .mac ? "This Mac isn’t answering" : "\(label(id)) is offline"
     }
 
-    func label(_ id: HostID) -> String {
+    func label(_ id: MachineRef) -> String {
         id == .mac ? "This Mac" : controlled[id]?.label ?? "a machine"
     }
 
-    func state(_ id: HostID) -> ServerConnection.State {
+    func state(_ id: MachineRef) -> ServerConnection.State {
         guard id != .mac else { return macDownSince.map { .offline(since: $0) } ?? .connected }
         guard let controlled = controlled[id] else { return .idle }
         return controlled.online ? .connected : .offline(since: Date())
@@ -73,25 +70,22 @@ final class HostSet {
     /// greys out or holds back for an offline server does the same for this Mac.
     var macDownSince: Date?
 
-    func isOffline(_ id: HostID) -> Bool {
+    func isOffline(_ id: MachineRef) -> Bool {
         guard id != .mac else { return macDownSince != nil }
         if case .connected = state(id) { return false }
         return true
     }
 
-    func client(for id: HostID) -> DaemonClient? { nil }
+    func client(for id: MachineRef) -> DaemonClient? { nil }
     func start() {}
-    func connect(_ id: HostID) {}
+    func connect(_ id: MachineRef) {}
     func retryNow() {}
     func update(_ host: ServerHost) {}
-    func setOwnSignInOnly(_ id: HostID, _ on: Bool) {}
-    func claudeLine(_ id: HostID, canRelay: Bool) -> String { "" }
-    func toolsetLine(_ id: HostID, runtimeID: String, hasCredential: Bool) -> String { "" }
-    func agentsLive(_ id: HostID) async -> Int { 0 }
-    func remove(_ id: HostID, purge: Bool = false) async {}
-    func noteProjects(_ id: HostID, listed: [DaemonAPI.ProjectSummary]) {}
-    func forgetGoneProject(_ id: HostID, path: String) {}
-    func installClaude(_ id: HostID) async {}
+    func agentsLive(_ id: MachineRef) async -> Int { 0 }
+    func remove(_ id: MachineRef, purge: Bool = false) async {}
+    func noteFolders(_ id: MachineRef, listed: [DaemonAPI.FolderSummary]) {}
+    func forgetGoneFolder(_ id: MachineRef, path: String) {}
+    func installClaude(_ id: MachineRef) async {}
 }
 
 /// The states the window's own ssh connection to a server could be in, before 058. The

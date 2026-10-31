@@ -44,9 +44,9 @@ struct FakeDeviceLiveTests {
         let status = try await phone.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self)
         print("fake-device: control/status → \(status.name), home host \(status.homeHost?.rawValue ?? "-")")
         if status.homeHost != nil {
-            let projects = try await phone.call(DaemonAPI.Method.projectsList, DaemonAPI.ProjectsListRequest(includeArchived: false),
-                                                returning: [DaemonAPI.ProjectSummary].self)
-            print("fake-device: bare projects/list → \(projects.map(\.name))")
+            let folders = try await phone.call(DaemonAPI.Method.foldersList, DaemonAPI.FoldersListRequest(includeArchived: false),
+                                                returning: [DaemonAPI.FolderSummary].self)
+            print("fake-device: bare folders/list → \(folders.map(\.name))")
             await expectNotRefused(phone, DaemonAPI.Method.credentialsLend, "bare")
         }
 
@@ -54,14 +54,14 @@ struct FakeDeviceLiveTests {
         let wrapped = ControlLink(dial: dial)
         let control = DaemonClient(link: wrapped.controlLink)
         try await control.connect(startIfNeeded: false)
-        let hosts = try await control.call(DaemonAPI.Method.hostsList, returning: [DaemonAPI.ControlHost].self)
+        let hosts = try await control.call(DaemonAPI.Method.hostsList, returning: [DaemonAPI.ControlMachine].self)
         print("fake-device: hosts/list → \(hosts.map { "\($0.name) (\($0.id), \($0.state))" })")
         for host in hosts where host.state == "online" && host.relay != true {
             let there = DaemonClient(link: wrapped.link(for: host.id))
             try await there.connect(startIfNeeded: false)
-            let listed = try await there.call(DaemonAPI.Method.projectsList, DaemonAPI.ProjectsListRequest(includeArchived: false),
-                                              returning: [DaemonAPI.ProjectSummary].self)
-            print("fake-device: \(host.name) projects → \(listed.map(\.name))")
+            let listed = try await there.call(DaemonAPI.Method.foldersList, DaemonAPI.FoldersListRequest(includeArchived: false),
+                                              returning: [DaemonAPI.FolderSummary].self)
+            print("fake-device: \(host.name) folders → \(listed.map(\.name))")
             await expectNotRefused(there, DaemonAPI.Method.runtimesInstall, "on \(host.id)")
         }
         let clients = try await control.call(DaemonAPI.Method.clientsList)
@@ -92,9 +92,9 @@ struct FakeDeviceLiveTests {
         #expect(there.you == id)
         print("fake-device: relayed control/status → \(there.name), you \(there.you?.uuidString.prefix(8) ?? "-")")
         if there.homeHost != nil {
-            let projects = try await away.call(DaemonAPI.Method.projectsList, DaemonAPI.ProjectsListRequest(includeArchived: false),
-                                               returning: [DaemonAPI.ProjectSummary].self)
-            print("fake-device: relayed projects/list → \(projects.map(\.name))")
+            let folders = try await away.call(DaemonAPI.Method.foldersList, DaemonAPI.FoldersListRequest(includeArchived: false),
+                                               returning: [DaemonAPI.FolderSummary].self)
+            print("fake-device: relayed folders/list → \(folders.map(\.name))")
             await expectNotRefused(away, DaemonAPI.Method.credentialsLend, "relayed")
             try await catchUpTimed(away)
             // Away, and happy to be told: as the Remote says it.
@@ -106,7 +106,7 @@ struct FakeDeviceLiveTests {
         // 6. A need from a host, sealed by the relay to this device, read back with its key.
         guard let hostCode, let code = ControlCode(text: hostCode) else { return await hold() }
         let hostKey = ControlAgreement.generate()
-        let hello = DaemonAPI.HostHello(version: "walk", platform: "fake", machineID: "fake-\(UUID().uuidString.prefix(8))",
+        let hello = DaemonAPI.MachineHello(version: "walk", platform: "fake", machineID: "fake-\(UUID().uuidString.prefix(8))",
                                         name: "fake host for a notice")
         let hostMembership = try await ControlJoin.enrollHost(code, privateKey: hostKey.privateKey, hello: hello)
         let uplink = try await ControlJoin.hostDial(hostMembership, privateKey: hostKey.privateKey)()
@@ -167,7 +167,7 @@ struct FakeDeviceLiveTests {
         let none = Optional<String>.none
         var began = ContinuousClock.now
         _ = try await away.catchUp()
-        _ = try await away.call(DaemonAPI.Method.leasesSnapshot, none)
+        _ = try await away.call(DaemonAPI.Method.resourcesSnapshot, none)
         _ = try await away.call(DaemonAPI.Method.mcpHosted, none)
         _ = try await away.call(DaemonAPI.Method.mcpHealth, none)
         _ = try await away.call(DaemonAPI.Method.pinsList, DaemonAPI.Empty())

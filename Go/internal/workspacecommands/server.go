@@ -27,7 +27,7 @@ var ProtocolVersions = []string{"2026-07-28", "2025-11-25", "2025-06-18", "2025-
 const MaxLine = 1 << 20
 
 // Instructions are the server's words.
-var Instructions = fmt.Sprintf("A workspace provider (contract %d): lists, starts and stops workspaces by running the shell commands it was configured with.", Contract)
+var Instructions = fmt.Sprintf("A machine provider (contract %d): lists, starts and stops workspaces by running the shell commands it was configured with.", Contract)
 
 // RPCError is a JSON-RPC error answer.
 type RPCError struct {
@@ -151,7 +151,7 @@ func NewServer(config Config, timing Timing, run Runner, version string) *Server
 	tools := []Tool{
 		{Name: "workspaces_list", Title: "List workspaces",
 			Description: "Every workspace, with its state and how to reach it over ssh.", Annotations: readOnly},
-		{Name: "workspace_start", Title: "Start a workspace",
+		{Name: "workspace_start", Title: "Start a machine",
 			Description: "Starts the workspace and answers once it is running, or with why it isn't.",
 			Properties:  id, Required: []string{"id"}},
 		{Name: "workspace_stop", Title: "Stop a workspace",
@@ -161,11 +161,11 @@ func NewServer(config Config, timing Timing, run Runner, version string) *Server
 	if config.Making.CanCreate() {
 		tools = append(tools,
 			Tool{Name: "workspace_options", Title: "New workspace options",
-				Description: "The choices for a new workspace, as a JSON Schema object.", Annotations: readOnly},
+				Description: "The choices for a new machine, as a JSON Schema object.", Annotations: readOnly},
 			Tool{Name: "workspace_create", Title: "Make a workspace",
 				Description: "Makes a workspace with the choices given, and answers once it is listed.",
 				Properties: []Property{
-					{Name: "name", Kind: "string", Description: "The new workspace's name.", MaxLength: 128},
+					{Name: "name", Kind: "string", Description: "The new machine's name.", MaxLength: 128},
 					{Name: "options", Kind: "object", Description: "The choices, as workspace_options describes them."},
 					{Name: "firstBoot", Kind: "string", Description: "A command to run on its first boot.", MaxLength: 8192},
 				}, Required: []string{"name"}})
@@ -177,9 +177,6 @@ func NewServer(config Config, timing Timing, run Runner, version string) *Server
 	}
 	return &Server{Provider: &Provider{Config: config, Timing: timing, Run: run}, Version: version, tools: tools}
 }
-
-// Tools are the tools it lists.
-func (s *Server) Tools() []Tool { return s.tools }
 
 // Handle answers one method with its params (decoded, numbers as json.Number).
 func (s *Server) Handle(method string, params map[string]any) (any, error) {

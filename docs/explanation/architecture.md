@@ -38,7 +38,7 @@ devices** is on.
 | Control plane | `Go/cmd/agents-control`, `Go/internal/controlplane` | Go server, `agents-control` | Pairs clients, routes each request to its host, sends updates to clients. `:8791` wss, `:8792` loopback http. |
 | Control plane store | | A folder or an S3 bucket | Who is paired, which hosts there are, unused codes, settings. Nothing about agents. |
 | Host daemon | `Go/cmd/agentsd`, `Go/internal/agentsd` | Go daemon, `agentsd`, macOS and Linux | Owns agents, terminals, files, git and workflows on its host. Serves the agents MCP tools. |
-| Host data | | Files on the host | Agent records and transcripts in `~/Library/Application Support/Agents`; the person's settings in `~/.agents/settings`, and shared skills and instructions in `~/.agents` ([the `~/.agents` folder](../reference/agents-folder.md)); a project's own `.agents/`. |
+| Host data | | Files on the host | Agent records and transcripts in `~/Library/Application Support/Agents`; the person's settings in `~/.agents/settings`, and shared skills and instructions in `~/.agents` ([the `~/.agents` folder](../reference/agents-folder.md)); a folder's own `.agents/`. |
 | agents-relay | `Host/Relay` | macOS helper | Planned: an iCloud mailbox for phones away from home. |
 
 Every connection to the control plane is made **outwards**: from a client, and from each
@@ -63,11 +63,11 @@ reach without cgo: `agents-peer` (callers' code signatures) and `agents-watch` (
 | Workflows and events | `workflows.go`, `workflowruns.go`, `events.go`, `eventwaits.go` | Schedules, triggers, cooldowns and queues. `wait_for_event` and the event log. |
 | Leases and wakefulness | `leases.go`, `leasecalls.go`, `wake.go` | A line per declared resource. Keeps the Mac awake while a turn runs. |
 | MCP clients | `mcpclient.go`, `mcpevents.go`, `mcpsignin.go`, `viewservers.go` | The daemon's own connections to MCP servers: `events/poll` for workflow triggers, server views and OAuth sign-ins. |
-| Projects, files and git | `projects.go`, `files.go`, `git.go`, `worktrees.go`, `changes.go` | `.agents/` config and plugins, worktrees, changes, clones, folder watching, and file reads and writes for clients. |
+| Folders, files and git | `folders.go`, `files.go`, `git.go`, `worktrees.go`, `changes.go` | `.agents/` config and plugins, worktrees, changes, clones, folder watching, and file reads and writes for clients. |
 | Installers and catalog | `install.go`, `runtimes.go`, `mcpcatalog/`, `skillcatalog/` | Finds and installs runtimes, and installs skills and MCP servers from the marketplace. |
 | ACP sessions | `acp/` | Starts each runtime, and prompts, cancels and resumes it over ACP. |
 | App tools endpoint | `apptools.go`, `agenttools.go` | The `mcp__agents__*` tools, over loopback http with a token per session. |
-| Shells | `shells.go` | Terminals and the project shell, each a pseudo-terminal with its scrollback. |
+| Shells | `shells.go` | Terminals and the folder shell, each a pseudo-terminal with its scrollback. |
 | Stores | `store/`, `diskjson/` | Whole-file JSON and append-only logs in the host data, in the layout the Swift host kept. |
 
 ## Processes on this Mac
@@ -94,7 +94,7 @@ with it:
   (the Agent SDK binary). The runtime starts its own children: shells for its Bash tool,
   and the stdio MCP servers in `.mcp.json` and plugins.
 - **Terminals**: shells on a pseudo-terminal, such as the Files pane's terminal and the
-  Control-` project shell.
+  Control-` folder shell.
 - **Commands for an agent**: what a runtime asks its client to run over ACP's `terminal/*`.
 - **MCP servers for events**: stdio servers in `.agents/mcp.json` that a workflow triggers
   on, polled by the daemon.

@@ -112,7 +112,7 @@ public enum TimeKind: String, Codable, CaseIterable, Sendable, Hashable, Identif
     case agent
     /// A tool call open, other than an ask or a wait.
     case tools
-    /// Waiting on other agents or shared things: `wait_for_event`, `lease_resource`.
+    /// Waiting on other agents or shared things: `wait_for_event`, `wait_for_agents`, `check_again`, `lease_resource`.
     case others
     /// Waiting for the person: a question, a form, a permission.
     case person
@@ -239,10 +239,17 @@ public enum TimeMark: Sendable, Hashable {
     /// (`mcp__agents__`, `mcp.agents.`, `agents_`).
     public static func kind(ofTool name: String) -> TimeKind {
         let name = name.lowercased()
-        if name.hasSuffix("askuserquestion") || name.hasSuffix(AppTool.askForm) { return .person }
+        // Antigravity's own `ask_question` has the app's name, and is the person's time all the
+        // same; `ask_form` is the app's name before #2298, in older records. `ask_secret` waits
+        // on the person too (#2885).
+        if name.hasSuffix("askuserquestion") || name.hasSuffix(AppTool.askQuestion) || name.hasSuffix("ask_form")
+            || name.hasSuffix(AppTool.askSecret) {
+            return .person
+        }
         // `release_resource` ends with `lease_resource`: a release is quick, and a tool.
         if name.hasSuffix(AppTool.releaseResource) { return .tools }
-        if name.hasSuffix(AppTool.waitForEvent) || name.hasSuffix(AppTool.leaseResource) { return .others }
+        if name.hasSuffix(AppTool.waitForEvent) || name.hasSuffix(AppTool.waitForAgents)
+            || name.hasSuffix(AppTool.checkAgain) || name.hasSuffix(AppTool.leaseResource) { return .others }
         return .tools
     }
 
@@ -321,7 +328,7 @@ public enum TimeMark: Sendable, Hashable {
     /// A tool name `kind(ofTool:)` reads back as this kind, for a carried call.
     private static func name(of kind: TimeKind) -> String {
         switch kind {
-        case .person: AppTool.askForm
+        case .person: AppTool.askQuestion
         case .others: AppTool.waitForEvent
         case .agent, .tools: "tool"
         }

@@ -73,9 +73,9 @@ public struct LeaseStatus: Equatable, Sendable {
 
     // MARK: Words
 
-    /// One capsule each, holdings first: "▣ Screen · 18 min", "◷ Waiting for Screen ·
-    /// held by “Fix login” until 14:12 · 2nd".
-    public var capsules: [String] {
+    /// One line each at the chat's foot (#2344), holdings first: "▣ Screen · 18 min",
+    /// "◷ Waiting for Screen · held by “Fix login” until 14:12 · 2nd".
+    public var lines: [String] {
         holding.map { "\(Self.holdingSymbol) \(Self.holdingWords($0))" }
             + waiting.map { "\(Self.waitingSymbol) \(Self.waitingWords($0))" }
     }
@@ -99,6 +99,14 @@ public struct LeaseStatus: Equatable, Sendable {
     /// the row's one wait line (#582). Nil when it holds nothing.
     public var holdingOnly: LeaseStatus? {
         holding.isEmpty ? nil : LeaseStatus(holding: holding, waiting: [])
+    }
+
+    /// Without the place in line that the agent's wait card says (#2361), so the chat's foot
+    /// and the row do not say it twice. Nil when nothing is left.
+    public func without(_ wait: EventWait?) -> LeaseStatus? {
+        guard let wait, wait.isOpen, let resource = wait.lineResource else { return self }
+        let left = LeaseStatus(holding: holding, waiting: waiting.filter { $0.name != resource })
+        return left.holding.isEmpty && left.waiting.isEmpty ? nil : left
     }
 
     /// The first lease or wait, in short: the card's mark and the row's.

@@ -1,4 +1,4 @@
-// workspace-commands: the command workspace provider (#691), an MCP server on stdio, in Go
+// workspace-commands: the command machine provider (#691), an MCP server on stdio, in Go
 // since #1364. The control plane runs it from beside itself for a provider of kind
 // "commands". Its configuration is the JSON in WORKSPACE_COMMANDS_CONFIG
 // (specs/691-workspace-providers/contracts/command-provider.md); any secret its commands use

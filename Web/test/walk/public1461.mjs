@@ -3,12 +3,12 @@
 // view is drawn from the views name, and runs a turn in that session.
 // Fails on any error the page throws.
 //
-//   node Web/test/walk/public1461.mjs <page URL> <browser code> <project> <view session title> <out dir>
+//   node Web/test/walk/public1461.mjs <page URL> <browser code> <folder> <view session title> <out dir>
 
 import { setTimeout as sleep } from "node:timers/promises";
 import { launch } from "./cdp.mjs";
 
-const [pageURL, code, project, title, out] = process.argv.slice(2);
+const [pageURL, code, folder, title, out] = process.argv.slice(2);
 const views = new URL(pageURL);
 views.hostname = views.hostname.replace(/^[^.]+/, "views");
 const js = JSON.stringify;
@@ -23,10 +23,10 @@ try {
   await page.focus("textarea");
   await page.type(code);
   await page.press("Connect");
-  await page.waitFor(`document.querySelectorAll(".sidebar .row.project").length >= 1`, 20_000);
+  await page.waitFor(`document.querySelectorAll(".sidebar .row.folder").length >= 1`, 20_000);
   await page.eval(`(() => {
-    for (const b of document.querySelectorAll(".sidebar .row.project .disclosure"))
-      if (b.getAttribute("aria-label").endsWith(${js(project)}) && b.getAttribute("aria-expanded") !== "true") b.click();
+    for (const b of document.querySelectorAll(".sidebar .row.folder .disclosure"))
+      if (b.getAttribute("aria-label").endsWith(${js(folder)}) && b.getAttribute("aria-expanded") !== "true") b.click();
   })()`);
   const session = `[...document.querySelectorAll(".sidebar .row.session")].find((r) => r.textContent.includes(${js(title)}))`;
   await page.waitFor(session, 20_000);

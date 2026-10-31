@@ -5,7 +5,7 @@ import Foundation
 /// (058, US6, R7).
 ///
 /// Nothing in the old root moves: it becomes this Mac's host, `mac`, so no agent,
-/// conversation or project can be lost on the way (FR-023, SC-006). What changes is
+/// conversation or folder can be lost on the way (FR-023, SC-006). What changes is
 /// written beside it, in the control root: the devices the host paired become device
 /// clients with their own keys, so they connect afterwards without pairing again
 /// (FR-024). The servers the window reached by ssh are handed to the control plane,

@@ -17,12 +17,12 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// The app's own files in a project (#502, #531), as DaemonCore+GuardedFiles keeps them:
-// .agents/project.json and .agents/pins.json. A change made outside the app while an
+// The app's own files in a folder (#502, #531), as DaemonCore+GuardedFiles keeps them:
+// .agents/folder.json and .agents/pins.json. A change made outside the app while an
 // agent works there, or by a pull, waits for the person to keep or undo it, and the app
 // goes on using the copy last approved, kept in <root>/guarded-files.json.
 
-var guardedFiles = map[string]string{".agents/project.json": "the helper limits and disk space lines", ".agents/pins.json": "the pins"}
+var guardedFiles = map[string]string{".agents/folder.json": "the helper limits, disk space lines and cost on pull requests", ".agents/pins.json": "the pins"}
 
 type guardedPending struct {
 	Digest       *string     `json:"digest,omitempty"`
@@ -59,6 +59,15 @@ func (d *Daemon) guardedRecs() *guardedRecords {
 		if b, err := os.ReadFile(d.guardedFile()); err == nil {
 			diskjson.Unmarshal(b, d.guarded)
 		}
+		// A file the app no longer keeps (.agents/project.json before #2617) cannot be
+		// kept or undone, so its record goes (#2680).
+		kept := d.guarded.States[:0]
+		for _, s := range d.guarded.States {
+			if _, ok := guardedFiles[s.Path]; ok {
+				kept = append(kept, s)
+			}
+		}
+		d.guarded.States = kept
 	}
 	return d.guarded
 }
@@ -189,7 +198,7 @@ func (d *Daemon) checkGuarded(folder, path string, ended *wire.UUID) {
 }
 
 func (d *Daemon) guardedFilesMoved(folder string) {
-	d.sendProject(folder)
+	d.sendFolder(folder)
 	d.pinsChanged(folder)
 }
 
@@ -217,7 +226,7 @@ func (d *Daemon) settled(folder, path string) bool {
 }
 
 func guardedRefusal(path, lead string) error {
-	return Invalid("%s%s was changed outside the app and is waiting for the person to keep or undo the change in Project Settings.", lead, path)
+	return Invalid("%s%s was changed outside the app and is waiting for the person to keep or undo the change in Folder Settings.", lead, path)
 }
 
 // approveWrite records the app's own write as approved.
@@ -230,25 +239,25 @@ func (d *Daemon) approveWrite(folder, path string) {
 	d.guardedMu.Unlock()
 }
 
-// guardedTurnEnded checks a project's files as a turn there ends.
+// guardedTurnEnded checks a folder's files as a turn there ends.
 func (d *Daemon) guardedTurnEnded(id wire.UUID) {
 	a := d.Store.Agent(id)
 	if a == nil {
 		return
 	}
-	folder := projectFolder(a)
+	folder := folderPath(a)
 	for path := range guardedFiles {
 		d.checkGuarded(folder, path, &id)
 	}
 }
 
-// guardedChanges is a summary's: the changes waiting in a project, by path, then the
+// guardedChanges is a summary's: the changes waiting in a folder, by path, then the
 // workflows waiting for an OK (#569, #1322).
 func (d *Daemon) guardedChanges(folder string) []wire.GuardedChange {
 	return append(d.guardedFileChanges(folder), d.waitingWorkflowChanges(folder)...)
 }
 
-// guardedFileChanges is the guarded files' changes waiting in a project, by path.
+// guardedFileChanges is the guarded files' changes waiting in a folder, by path.
 func (d *Daemon) guardedFileChanges(folder string) []wire.GuardedChange {
 	d.guardedMu.Lock()
 	defer d.guardedMu.Unlock()
@@ -372,7 +381,7 @@ func diffLines(old, new string) []wire.GuardedDiffLine {
 func (d *Daemon) readGuardedChange(r wire.GuardedChangeRequest) (wire.GuardedChangeReading, error) {
 	folder := store.FolderPath(r.Folder)
 	if _, ok := d.summaryFor(folder); !ok {
-		return wire.GuardedChangeReading{}, noSuchProject(folder + " is not a project.")
+		return wire.GuardedChangeReading{}, noSuchFolder(folder + " is not a folder.")
 	}
 	if id, ok := workflowIDInPath(r.Path); ok {
 		return d.readWorkflowChange(folder, id)
@@ -406,17 +415,17 @@ func (d *Daemon) readGuardedChange(r wire.GuardedChangeRequest) (wire.GuardedCha
 	return out, nil
 }
 
-// keepOrUndo is projects/keepGuardedChange and projects/undoGuardedChange.
-func (d *Daemon) keepOrUndo(r wire.GuardedChangeRequest, keep bool) (wire.ProjectSummary, error) {
+// keepOrUndo is folders/keepGuardedChange and folders/undoGuardedChange.
+func (d *Daemon) keepOrUndo(r wire.GuardedChangeRequest, keep bool) (wire.FolderSummary, error) {
 	folder := store.FolderPath(r.Folder)
 	if _, ok := d.summaryFor(folder); !ok {
-		return wire.ProjectSummary{}, noSuchProject(folder + " is not a project.")
+		return wire.FolderSummary{}, noSuchFolder(folder + " is not a folder.")
 	}
 	if id, ok := workflowIDInPath(r.Path); ok {
 		return d.keepOrUndoWorkflow(folder, id, r.Digest, keep)
 	}
 	if _, ok := guardedFiles[r.Path]; !ok {
-		return wire.ProjectSummary{}, Invalid("%s is not a file the app keeps.", r.Path)
+		return wire.FolderSummary{}, Invalid("%s is not a file the app keeps.", r.Path)
 	}
 	digest, _ := diskRead(folder, r.Path)
 	verb := "undone"
@@ -424,7 +433,7 @@ func (d *Daemon) keepOrUndo(r wire.GuardedChangeRequest, keep bool) (wire.Projec
 		verb = "kept"
 	}
 	if !same(digest, r.Digest) {
-		return wire.ProjectSummary{}, &Error{Code: wire.FailureNotChanged, Message: r.Path + " changed again after you looked at it, so it was not " + verb + ". Look again."}
+		return wire.FolderSummary{}, &Error{Code: wire.FailureNotChanged, Message: r.Path + " changed again after you looked at it, so it was not " + verb + ". Look again."}
 	}
 	if !keep {
 		d.guardedMu.Lock()
@@ -442,7 +451,7 @@ func (d *Daemon) keepOrUndo(r wire.GuardedChangeRequest, keep bool) (wire.Projec
 			err = nil
 		}
 		if err != nil {
-			return wire.ProjectSummary{}, &Error{Code: CodeInternal, Message: r.Path + " could not be put back: " + err.Error()}
+			return wire.FolderSummary{}, &Error{Code: CodeInternal, Message: r.Path + " could not be put back: " + err.Error()}
 		}
 	}
 	d.approveWrite(folder, r.Path)
@@ -452,13 +461,13 @@ func (d *Daemon) keepOrUndo(r wire.GuardedChangeRequest, keep bool) (wire.Projec
 }
 
 func (d *Daemon) registerGuarded() {
-	On(d, wire.CallProjectsReadGuardedChange, func(ctx context.Context, c *Client, r wire.GuardedChangeRequest) (wire.GuardedChangeReading, error) {
+	On(d, wire.CallFoldersReadGuardedChange, func(ctx context.Context, c *Client, r wire.GuardedChangeRequest) (wire.GuardedChangeReading, error) {
 		return d.readGuardedChange(r)
 	})
-	On(d, wire.CallProjectsKeepGuardedChange, func(ctx context.Context, c *Client, r wire.GuardedChangeRequest) (wire.ProjectSummary, error) {
+	On(d, wire.CallFoldersKeepGuardedChange, func(ctx context.Context, c *Client, r wire.GuardedChangeRequest) (wire.FolderSummary, error) {
 		return d.keepOrUndo(r, true)
 	})
-	On(d, wire.CallProjectsUndoGuardedChange, func(ctx context.Context, c *Client, r wire.GuardedChangeRequest) (wire.ProjectSummary, error) {
+	On(d, wire.CallFoldersUndoGuardedChange, func(ctx context.Context, c *Client, r wire.GuardedChangeRequest) (wire.FolderSummary, error) {
 		return d.keepOrUndo(r, false)
 	})
 	On(d, wire.CallApprovalsRead, func(ctx context.Context, c *Client, r wire.ApprovalReadRequest) (wire.GuardedChangeReading, error) {
@@ -474,21 +483,21 @@ func (d *Daemon) registerGuarded() {
 		}
 		return wire.GuardedChangeReading{}, Invalid("There is no such approval here.")
 	})
-	On(d, wire.CallApprovalsAnswer, func(ctx context.Context, c *Client, r wire.ApprovalAnswer) (wire.ProjectSummary, error) {
+	On(d, wire.CallApprovalsAnswer, func(ctx context.Context, c *Client, r wire.ApprovalAnswer) (wire.FolderSummary, error) {
 		return d.answerApproval(r)
 	})
 }
 
 // answerApproval is approvals/answer for what this host asks: a file's change, a workflow
 // waiting for an OK, a session asking to be archived, and a workflow that failed (#989).
-func (d *Daemon) answerApproval(r wire.ApprovalAnswer) (wire.ProjectSummary, error) {
+func (d *Daemon) answerApproval(r wire.ApprovalAnswer) (wire.FolderSummary, error) {
 	folder := store.FolderPath(r.Folder)
 	// A failed workflow takes Dismiss and nothing else; nothing else takes Dismiss.
 	if failed := r.Kind == wire.ApprovalKindWorkflowFailed; failed != (r.Action == wire.ApprovalActionDismiss) {
 		if failed {
-			return wire.ProjectSummary{}, Invalid("A failed workflow can only be dismissed.")
+			return wire.FolderSummary{}, Invalid("A failed workflow can only be dismissed.")
 		}
-		return wire.ProjectSummary{}, Invalid("Only a failed workflow can be dismissed.")
+		return wire.FolderSummary{}, Invalid("Only a failed workflow can be dismissed.")
 	}
 	switch r.Kind {
 	case wire.ApprovalKindWorkflowFailed:
@@ -496,7 +505,7 @@ func (d *Daemon) answerApproval(r wire.ApprovalAnswer) (wire.ProjectSummary, err
 	case wire.ApprovalKindFile:
 		if r.Action == wire.ApprovalActionRequestChanges {
 			if r.Note == nil || strings.TrimSpace(*r.Note) == "" {
-				return wire.ProjectSummary{}, Invalid("Say what to change.")
+				return wire.FolderSummary{}, Invalid("Say what to change.")
 			}
 			var asked *wire.UUID
 			for _, ch := range d.guardedChanges(folder) {
@@ -505,12 +514,12 @@ func (d *Daemon) answerApproval(r wire.ApprovalAnswer) (wire.ProjectSummary, err
 				}
 			}
 			if asked == nil {
-				return wire.ProjectSummary{}, Invalid("No agent made this change, so there is nobody to ask. Approve or deny it.")
+				return wire.FolderSummary{}, Invalid("No agent made this change, so there is nobody to ask. Approve or deny it.")
 			}
 			text := "Before approving your change to " + r.Key + ", I'd like changes:\n\n" + strings.TrimSpace(*r.Note) +
 				"\n\nIt stays waiting for approval; your next version of it asks again."
 			if err := d.prompt(wire.PromptRequest{AgentID: *asked, Text: text, From: wire.PromptOriginPerson}); err != nil {
-				return wire.ProjectSummary{}, err
+				return wire.FolderSummary{}, err
 			}
 			s, _ := d.summaryFor(folder)
 			return s, nil
@@ -518,24 +527,24 @@ func (d *Daemon) answerApproval(r wire.ApprovalAnswer) (wire.ProjectSummary, err
 		return d.keepOrUndo(wire.GuardedChangeRequest{Folder: r.Folder, Path: r.Key, Digest: r.Digest}, r.Action == wire.ApprovalActionApprove)
 	case wire.ApprovalKindWorkflow:
 		if r.Action == wire.ApprovalActionRequestChanges {
-			return wire.ProjectSummary{}, Invalid("No agent made this change, so there is nobody to ask. Approve or deny it.")
+			return wire.FolderSummary{}, Invalid("No agent made this change, so there is nobody to ask. Approve or deny it.")
 		}
 		if _, ok := d.summaryFor(folder); !ok {
-			return wire.ProjectSummary{}, noSuchProject(folder + " is not a project.")
+			return wire.FolderSummary{}, noSuchFolder(folder + " is not a folder.")
 		}
 		return d.answerWorkflow(folder, r.Key, r.Digest, r.Action == wire.ApprovalActionApprove)
 	case wire.ApprovalKindArchive:
 		id := wire.UUID(strings.ToUpper(r.Key))
 		a := d.Store.Agent(id)
 		if a == nil || a.ArchiveRequest == nil {
-			return wire.ProjectSummary{}, Invalid("That session is not asking to be archived any more.")
+			return wire.FolderSummary{}, Invalid("That session is not asking to be archived any more.")
 		}
 		if r.Action == wire.ApprovalActionApprove {
 			d.archive(id)
 		} else {
 			d.change(id, func(a *wire.Agent) { a.ArchiveRequest = nil })
 		}
-		return d.sendProject(folder)
+		return d.sendFolder(folder)
 	}
-	return wire.ProjectSummary{}, Invalid("There is no such approval here.")
+	return wire.FolderSummary{}, Invalid("There is no such approval here.")
 }

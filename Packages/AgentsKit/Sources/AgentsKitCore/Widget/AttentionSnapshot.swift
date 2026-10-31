@@ -50,7 +50,7 @@ public struct AttentionSnapshot: Codable, Hashable, Sendable {
     /// Mac counted it for a push (#1163). Not when the file was written: an app with no
     /// link writes what it last heard, and must not call it new.
     public var writtenAt: Date
-    /// Every session needing a person across the live projects.
+    /// Every session needing a person across the live folders.
     public var total: Int
     /// The newest of them, capped at `rowLimit`, for the rows.
     public var sessions: [AttentionSnapshotSession]
@@ -132,6 +132,8 @@ public struct AttentionSnapshot: Codable, Hashable, Sendable {
 
     /// The push's need on the rows, and the count guessed from it.
     private func laying(_ push: AttentionPush, at date: Date) -> AttentionSnapshot? {
+        // A notice (#2805) asks nothing, so it is no row and not in the count.
+        if push.kind == .notice { return nil }
         var next = self
         // As of the Mac's count where the push carries one, so the count lays over it.
         next.writtenAt = push.count?.countedAt ?? date
@@ -143,7 +145,7 @@ public struct AttentionSnapshot: Codable, Hashable, Sendable {
         }
         if sessions.contains(where: { $0.needToken == push.token }) { return nil }
         let row = AttentionSnapshotSession(
-            id: push.agentID ?? UUID(), project: push.headline?.h1 ?? "Agents",
+            id: push.agentID ?? UUID(), folder: push.headline?.h1 ?? "Agents",
             title: push.headline?.h2 ?? "An agent", wanted: push.headline?.h3, kind: push.kind,
             since: date, needToken: push.token, agentUnknown: push.agentID == nil ? true : nil)
         // The same session asking again is one row, and one in the count (FR-005).
@@ -173,7 +175,7 @@ public struct AttentionSnapshot: Codable, Hashable, Sendable {
     /// The snapshot of what the app can see, at `date`.
     ///
     /// The count is the Dock badge's count and not a second rule: `AgentsModel.wantsALook`
-    /// over the same live projects, so the widget cannot disagree with the badge
+    /// over the same live folders, so the widget cannot disagree with the badge
     /// (FR-001, FR-019). An unread finish is not counted or drawn: it does not need the
     /// person (#1565).
     @MainActor
@@ -183,14 +185,15 @@ public struct AttentionSnapshot: Codable, Hashable, Sendable {
         var waiting: [Agent] = []
         var newestNeed: [UUID: Need] = [:]
         for need in model.needs.values {
-            // A project's own question (#531) has no session to stand beside.
-            guard let agentID = need.agentID,
+            // A folder's own question (#531) has no session to stand beside.
+            // A notice (#2805) asks nothing: it is no row's words.
+            guard !need.id.isNotice, let agentID = need.agentID,
                   newestNeed[agentID].map({ $0.raisedAt < need.raisedAt }) ?? true else { continue }
             newestNeed[agentID] = need
         }
-        for summary in model.liveProjects {
-            total += model.attentionCount(in: summary.folder)
-            waiting += AgentGroup.allCases.flatMap { model.agents(in: summary.folder, group: $0) }
+        for summary in model.liveFolders {
+            total += model.attentionCount(in: summary.folder.folder)
+            waiting += AgentGroup.allCases.flatMap { model.agents(in: summary.folder.folder, group: $0) }
                 .filter(model.wantsALook)
         }
         // One row per session. An agent that asked twice is one session waiting on you and
@@ -213,7 +216,7 @@ public struct AttentionSnapshot: Codable, Hashable, Sendable {
     private static func session(for agent: Agent, model: AgentsModel, need: Need?) -> AttentionSnapshotSession {
         return AttentionSnapshotSession(
             id: agent.id,
-            project: model.project(agent.projectFolder)?.name ?? agent.projectFolder.lastPathComponent,
+            folder: model.folder(agent.folderPath)?.name ?? agent.folderPath.lastPathComponent,
             title: agent.title ?? "Untitled",
             wanted: need?.headline.h3 ?? agent.report?.message,
             kind: need?.kind,
@@ -267,18 +270,20 @@ public struct AttentionPush: Hashable, Sendable {
             self.init(token: need.token, kind: .report, agentID: agentID, headline: headline, withdrawn: withdrawn, count: count)
         case .guardedChange:
             self.init(token: need.token, kind: .guardedChange, agentID: nil, headline: headline, withdrawn: withdrawn, count: count)
+        case .notice:
+            self.init(token: need.token, kind: .notice, agentID: nil, headline: headline, withdrawn: withdrawn, count: count)
         }
     }
 }
 
-/// One session as a widget row names it: which conversation, in which project, called what,
+/// One session as a widget row names it: which conversation, in which folder, called what,
 /// and what is being asked for.
 public struct AttentionSnapshotSession: Codable, Hashable, Sendable, Identifiable {
 
     /// The agent. One session, one row, whatever it has asked (FR-005).
     public var id: UUID
-    /// The project's name, as the projects list spells it.
-    public var project: String
+    /// The folder's name, as the folders list spells it.
+    public var folder: String
     /// The agent's own title, or `Untitled` where it has none.
     public var title: String
     /// What it wants, in the words the banner uses, where there is something to say.
@@ -295,10 +300,10 @@ public struct AttentionSnapshotSession: Codable, Hashable, Sendable, Identifiabl
     /// and a tap opens the need instead.
     public var agentUnknown: Bool?
 
-    public init(id: UUID, project: String, title: String, wanted: String?, kind: Need.Kind?, since: Date,
+    public init(id: UUID, folder: String, title: String, wanted: String?, kind: Need.Kind?, since: Date,
                 needToken: String? = nil, agentUnknown: Bool? = nil) {
         self.id = id
-        self.project = project
+        self.folder = folder
         self.title = title
         self.wanted = wanted
         self.kind = kind

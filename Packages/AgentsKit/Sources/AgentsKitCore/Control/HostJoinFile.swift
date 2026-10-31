@@ -3,7 +3,7 @@ import Foundation
 public extension DaemonAPI {
     /// How a host's joining its control plane stands (#113): what Agents Host and the
     /// window's Settings ▸ Control plane say, rather than one line in `daemon.log`.
-    struct HostJoinStatus: Codable, Sendable, Hashable {
+    struct MachineJoinStatus: Codable, Sendable, Hashable {
         /// It has a membership: it enrolled, and now only dials as itself.
         public var member: Bool
         /// Its uplink is up.
@@ -42,9 +42,9 @@ public struct HostJoinFile: Codable, Sendable, Equatable {
     public static let name = "control-join.json"
 
     public var pid: Int32
-    public var status: DaemonAPI.HostJoinStatus
+    public var status: DaemonAPI.MachineJoinStatus
 
-    public init(pid: Int32, status: DaemonAPI.HostJoinStatus) {
+    public init(pid: Int32, status: DaemonAPI.MachineJoinStatus) {
         self.pid = pid
         self.status = status
     }
@@ -56,7 +56,7 @@ public struct HostJoinFile: Codable, Sendable, Equatable {
 
     /// The status at `file`, if the daemon running as `pid` wrote it; any daemon's when
     /// `pid` is nil and the one that wrote it is still running.
-    public static func read(_ file: URL, pid: Int32? = nil) -> DaemonAPI.HostJoinStatus? {
+    public static func read(_ file: URL, pid: Int32? = nil) -> DaemonAPI.MachineJoinStatus? {
         guard let data = try? Data(contentsOf: file),
               let read = try? JSONDecoder.iso8601.decode(HostJoinFile.self, from: data) else { return nil }
         if let pid { return read.pid == pid ? read.status : nil }

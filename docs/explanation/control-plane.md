@@ -11,27 +11,27 @@ service of your own: the control plane. This page explains what it is made of, w
 can run it, what happens when it or what it remembers cannot be reached, and why the app is
 built around it.
 
-## Hosts, clients and the control plane
+## Machines, clients and the control plane
 
-A **host** is a machine that runs agents. Your Mac is one, once Agents Host is installed on
-it. A Linux server is another, and so is a second Mac. A host owns its agents: it starts
+A **machine** runs agents. Your Mac is one, once Agents Host is installed on
+it. A Linux server is another, and so is a second Mac. A machine owns its agents: it starts
 their runtimes, holds their conversations and keeps their records on its own disk.
 
 A **client** is a screen: the Agents window on a Mac, Agents on an iPhone or iPad, or a
-browser on the Mac that runs the control plane. A client runs nothing. It shows what the hosts hold and passes on what you type and click.
+browser on the Mac that runs the control plane. A client runs nothing. It shows what the machines hold and passes on what you type and click.
 
-The **control plane** sits between them. Every host and every client connects to it, and
-it sends each request to the host it concerns and each update to the clients that should
-hear it. A client never connects to a host on another machine directly, and a host never
+The **control plane** sits between them. Every machine and every client connects to it, and
+it sends each request to the machine it concerns and each update to the clients that should
+hear it. A client never connects to a machine on another machine directly, and a machine never
 needs to be reached: it connects out, like a client does. The one exception is the same
-machine: the window on a Mac reaches that Mac's own host directly (see
-[The window and this Mac's host](#the-window-and-this-macs-host)).
+machine: the window on a Mac reaches that Mac's own machine directly (see
+[The window and this Mac's machine](#the-window-and-this-macs-machine)).
 
 So a server you add once is seen by every window and phone, with nothing to set up on each
 one, and who may do what is decided in one place.
 
 Every arrow points the way its connection is made. Everything connects out to the control
-plane, and nothing connects in to a host.
+plane, and nothing connects in to a machine.
 
 ```text
                       ┌───────────────────────── CLIENTS ──────────────────────────┐
@@ -48,24 +48,24 @@ plane, and nothing connects in to a host.
 │          │                                                                          │
 │   ┌──────▼───────┐   copies link   ┌──────────────┐     one or more copies:         │
 │   │ copy A       │◄───────────────►│ copy B       │     - a channel for each        │
-│   │              │   to each other │              │       client and host pair      │
+│   │              │   to each other │              │       client and machine pair      │
 │   └──────┬───────┘                 └──────┬───────┘     - checks each client's      │
 │          └──────────────┬─────────────────┘               key, and nothing else     │
 │                         ▼                                                           │
 │              ┌─────────────────────┐   who is paired, and of what kind; which       │
-│              │ store: folder or S3 │   hosts there are; codes not yet used;         │
+│              │ store: folder or S3 │   machines there are; codes not yet used;         │
 │              └─────────────────────┘   settings                                     │
 └──────────────▲───────────────────────────────▲──────────────────────────────▲───────┘
                │ connects out, joined          │ connects out                 │ connects out
-               │ by a host code                │                              │
+               │ by a join code                │                              │
 ┌──────────────┴────────────┐   ┌──────────────┴────────────┐   ┌─────────────┴──────────────┐
-│ HOST: this Mac            │   │ HOST: another Mac         │   │ HOST: a Linux server       │
+│ MACHINE: this Mac            │   │ MACHINE: another Mac         │   │ MACHINE: a Linux server       │
 │ Agents Host               │   │ Agents Host,              │   │ agentsd, installed over    │
 │  ├ agentsd                │   │ Join one elsewhere        │   │ ssh or by one command      │
 │  ├ agents-control, if the │   │  ├ agentsd                │   │                            │
 │  │ control plane runs here│   │  └ agents-relay, optional │   │                            │
 │  └ agents-relay, optional │   │                           │   │                            │
-│ projects, agents,         │   │ projects, agents,         │   │ projects, agents,          │
+│ folders, agents,         │   │ folders, agents,         │   │ folders, agents,          │
 │ runtimes, files, terminals│   │ runtimes                  │   │ runtimes                   │
 └──────────────┬────────────┘   └───────────────────────────┘   └────────────────────────────┘
                │ agents-relay, when Relay for my devices is on
@@ -74,12 +74,12 @@ plane, and nothing connects in to a host.
 ```
 
 Your agents, their conversations, files and terminals, and the runtimes' sign-ins stay on
-the host they belong to. The control plane's store only remembers who is paired and which
-hosts there are.
+the machine they belong to. The control plane's store only remembers who is paired and which
+machines there are.
 
 ## People
 
-Every client belongs to a person, and every host (a machine) to one user (#994). A person
+Every client belongs to a person, and every machine (a machine) to one user (#994). A person
 reaches only their own machines: the control plane opens a client's channels only to its
 person's machines, and a call to another person's machine is answered as if there were
 no such machine. The first person is the **local owner**, who holds the control plane's
@@ -89,20 +89,20 @@ key, and an **admin**. With one person, everything below is as it was. See
 ## One grant for every client
 
 Each client is paired once, with a code the control plane shows, and may then do
-everything its person's other clients may: start and stop agents on their hosts, open terminals,
-sign runtimes in, add and remove hosts and projects, set helper limits, and pair or forget
+everything its person's other clients may: start and stop agents on their machines, open terminals,
+sign runtimes in, add and remove machines and folders, set helper limits, and pair or forget
 other clients. A window, an iPhone, an iPad and a browser are all the same in this.
 
 There used to be two grants, **operator** and **device**, and a phone was a device. That
 was retired on 2026-10-02 (#111): a device could already start agents and open terminals
-on any host, so it could run any command there, and the split protected the hosts very
+on any machine, so it could run any command there, and the split protected the machines very
 little while asking a question on every pairing sheet. What it cost, accepted: a lost
-phone or a hijacked browser tab can pair more clients, forget yours, add hosts or sign
+phone or a hijacked browser tab can pair more clients, forget yours, add machines or sign
 runtimes in, until you forget it from another screen.
 
 What still tells clients apart is who they are, not what they may do. A phone's or a
-browser's connection to a host is bound to that one client: it reports where you are as
-itself, and can't speak as another. An agent's own connection to its host still reaches
+browser's connection to a machine is bound to that one client: it reports where you are as
+itself, and can't speak as another. An agent's own connection to its machine still reaches
 only its tools, and anything else on the Mac reaches nothing.
 
 You can forget a client in **Settings ▸ Control plane ▸ Clients**; forgetting cuts it off at
@@ -110,7 +110,7 @@ once, at home and away. Any client may be forgotten, the last one too: Agents Ho
 control plane's own Mac, can always make a new code.
 
 Older builds keep working. A record, a code or a channel still carries the word `grant`,
-always `operator`, which an older copy, host, Remote or web page reads as everything; a
+always `operator`, which an older copy, machine, Remote or web page reads as everything; a
 record written before as `device` is read as a full client. An older window that tries to
 change a grant is told there is nothing to change.
 
@@ -189,8 +189,8 @@ relies on nothing the browser sends by itself.
 What someone holding a browser's session could do, in brief:
 
 - **Script running in the page**, such as a malicious extension, can do whatever the
-  window can while the page is open: on a host that includes running commands, and at the
-  control plane pairing or forgetting clients and adding hosts.
+  window can while the page is open: on a machine that includes running commands, and at the
+  control plane pairing or forgetting clients and adding machines.
   The page draws nothing an agent wrote as HTML, and loads nothing from anywhere else.
   Forgetting the browser stops it at once.
 - **A copy of the browser's profile on another computer** can do nothing: the listener is
@@ -202,38 +202,38 @@ What someone holding a browser's session could do, in brief:
 
 ### With the control plane elsewhere
 
-When the control plane runs elsewhere, this Mac's host serves the page instead, with the same
-listener: the same address checks, the same list of files and the same origin rule. The host
-can't check a browser's key, because that needs the control plane's private key, which a host
-never has. So for each page, the host opens a socket of its own to the control plane and proves
-itself there as a host that carries a page, from its loopback listener on a given port. The
+When the control plane runs elsewhere, this Mac's machine serves the page instead, with the same
+listener: the same address checks, the same list of files and the same origin rule. The machine
+can't check a browser's key, because that needs the control plane's private key, which a machine
+never has. So for each page, the machine opens a socket of its own to the control plane and proves
+itself there as a machine that carries a page, from its loopback listener on a given port. The
 page's own exchange then runs on that socket, with the control plane, bound to
 `localhost` on that port.
 
-That is a rule of trust: the control plane takes the host's word that the socket came in on
-the host's loopback listener. It gives a host nothing new. A host can carry only the sessions
+That is a rule of trust: the control plane takes the machine's word that the socket came in on
+the machine's loopback listener. It gives a machine nothing new. A machine can carry only the sessions
 of browsers that paired at its own `localhost` address, because only the browser's key can
-prove itself there, and a host already reads and answers everything its own agents do. A
-relay host, which runs no agents, can't carry a page. See `specs/1480-local-page-on-agentsd/`.
+prove itself there, and a machine already reads and answers everything its own agents do. A
+relay machine, which runs no agents, can't carry a page. See `specs/1480-local-page-on-agentsd/`.
 
 Since every client may do everything (#111), the listener's address and origin checks and
 the key that can't be read are what keep a browser's session its own. Serving the page at a
 public address, for a browser elsewhere, waits on issue #61.
 
-## The window and this Mac's host
+## The window and this Mac's machine
 
-The window on a Mac talks to that Mac's own host over a local socket, not out to the
+The window on a Mac talks to that Mac's own machine over a local socket, not out to the
 control plane and back. It is quicker, and when the control plane cannot be reached, the
 window still works with the agents on this Mac.
 
-The control plane is still the authority for who may connect. It tells each host which
-windows are paired, with their keys, and the host keeps that list for when the control
-plane is away. A window proves its own key to the host, as it does to the control plane.
-Forget a window, and its host cuts it off at once, as the control plane does.
+The control plane is still the authority for who may connect. It tells each machine which
+windows are paired, with their keys, and the machine keeps that list for when the control
+plane is away. A window proves its own key to the machine, as it does to the control plane.
+Forget a window, and its machine cuts it off at once, as the control plane does.
 
-Everything else is as before. What the window does on the local path, the host tells every
+Everything else is as before. What the window does on the local path, the machine tells every
 client, those through the control plane too, so every other screen sees the same thing. The
-window still uses the control plane for every other host, for pairing, and for the
+window still uses the control plane for every other machine, for pairing, and for the
 control plane's own settings.
 
 The socket is in a folder that only Agents and Agents Host can reach (their shared app
@@ -243,18 +243,18 @@ before. The iPhone, the iPad and a browser always go through the control plane f
 
 ## Copies and the store
 
-The control plane itself remembers little: the clients, the hosts, the
-codes it has handed out, and which of its copies is holding each host's connection. That
-is its **store**. It is either a folder on disk or an S3-compatible bucket. Nothing else,
+The control plane itself remembers little: the clients, the machines, the
+codes it has handed out, and which of its copies is holding each machine's connection. That
+is its **store**. It is either a folder or an S3-compatible bucket. Nothing else,
 no database, is needed. Your agents and their conversations are not in it: they stay on
-their hosts.
+their machines.
 
 A **copy** is one running control plane. Because everything a copy needs to remember is in
 the store, a copy holds only live connections, and any number of copies can share one
-store. Any copy will take any client or host, and a request for a host held by another
+store. Any copy will take any client or machine, and a request for a machine held by another
 copy is passed across. A code shown by one copy works at any other, once.
 
-Every copy is given the same private key, which proves to clients and hosts that they have
+Every copy is given the same private key, which proves to clients and machines that they have
 reached your control plane and not someone else's. That key is never written to the store
 in clear: whatever runs the copies hands it to each one as a secret, or a cloud machine's
 KMS seals it in the store.
@@ -273,7 +273,7 @@ see [Back up and restore a control plane](../how-to/back-up-a-control-plane.md).
 There are two ordinary shapes.
 
 **On this Mac.** Agents Host, a free download from us that is not in the App Store, runs
-this Mac's host and a single copy of the control plane, kept running by macOS with every
+this Mac's machine and a single copy of the control plane, kept running by macOS with every
 window closed. Its store is a folder on this Mac by default, or a bucket of your own. This
 is the shape for one person at home.
 
@@ -284,79 +284,79 @@ back.
 
 **Several copies with a bucket.** The control plane also runs as a container on Linux. Run
 two or more copies on hosting you rent, with one bucket for their store, behind any load
-balancer that passes WebSockets through. If one copy stops, the clients and hosts that were
+balancer that passes WebSockets through. If one copy stops, the clients and machines that were
 on it reconnect to another within seconds. This is the shape for staying up while your Mac
 sleeps. The copies are for staying up, not for load: the control plane is sized for one
-person, with a handful of screens and up to about twenty hosts.
+person, with a handful of screens and up to about twenty machines.
 
 Either way it is yours. Nothing passes through a service we run, and the control plane has
 one address, a name, that every code carries.
 
 ## When the control plane is down
 
-When no copy can be reached, no client can reach a host on another machine. The window
+When no copy can be reached, no client can reach a machine on another machine. The window
 says **Can't reach the control plane**, names the address it expected, and shows what it
-last knew rather than an empty list. The window still works with this Mac's own host, and
+last knew rather than an empty list. The window still works with this Mac's own machine, and
 the strip says so.
 
-Nothing stops on the hosts. An agent that was working carries on and finishes. A question
-it asks waits on its host until a client is back to answer it. The tools an agent is given
-talk to the host on its own machine, never through the control plane, so they keep working
-too. When a copy is back, hosts and clients reconnect by themselves, and every client
+Nothing stops on the machines. An agent that was working carries on and finishes. A question
+it asks waits on its machine until a client is back to answer it. The tools an agent is given
+talk to the machine on its own machine, never through the control plane, so they keep working
+too. When a copy is back, machines and clients reconnect by themselves, and every client
 catches up on what happened meanwhile.
 
-When one copy of several stops, the connections it held move to the others. A host is
+When one copy of several stops, the connections it held move to the others. A machine is
 shown offline only for as long as that takes, and a request made in the gap is answered
 afterwards or refused with a reason, never lost without a word.
 
-A host that loses its own network keeps its agents working in the same way, and reconnects
+A machine that loses its own network keeps its agents working in the same way, and reconnects
 when the network returns.
 
-A host that has not joined yet tries the same way. Its host code is spent only by a join
+A machine that has not joined yet tries the same way. Its join code is spent only by a join
 that worked, so a first try that fails, because the control plane isn't up yet or its
 address doesn't resolve yet, is tried again on the same backoff, and at once on a wake or
 a network change. Until it joins, Agents Host and **Settings ▸ Control plane** say
 **Couldn't join the control plane**, with the reason. The address in every code is this
 Mac's Bonjour name (System Settings ▸ General ▸ Sharing ▸ Local hostname), the one other
 machines on the network can resolve, not its Unix host name, which a managed Mac may set
-to something nothing answers for. A request for a host that is offline is refused at once with
+to something nothing answers for. A request for a machine that is offline is refused at once with
 that reason, rather than left to time out.
 
-## Starting the machines hosts run on
+## Starting machines
 
-A host that stops (a cloud machine turned off, a container stopped) is offline like any
+A machine that stops (a cloud machine turned off, a container stopped) is offline like any
 other, and nothing reaches it. When it runs on a provider's workspace, the control plane can
-start it again. It asks a **workspace provider**, which is an MCP server, and then waits for
-the host to connect. See [Start workspaces from Agents](../how-to/start-workspaces-from-agents.md).
+start it again. It asks a **machine provider**, which is an MCP server, and then waits for
+the machine to connect. See [Start machines from Agents](../how-to/start-machines-from-agents.md).
 
-Providers run on the control plane, not on a host, because the host is what is down. Their
-secrets stay in the control plane's own folder, never in its store. A host linked to a
+Providers run on the control plane, not on a machine, because the machine is what is down. Their
+secrets stay in the control plane's own folder, never in its store. A machine linked to a
 workspace adds three states to the usual ones: **stopped**, **starting** and **stopping**.
 Every client draws them, from the same `hosts/list` and `control/hostChanged` as the rest.
 
-A prompt or a new agent for a stopped workspace's host is **kept** by the control plane, in
-its store, and the workspace is started. When the host connects, the control plane sends each
+A prompt or a new agent for a stopped workspace's machine is **kept** by the control plane, in
+its store, and the workspace is started. When the machine connects, the control plane sends each
 kept request to it in order, as the client that sent it, with the same id the client would
 have retried with, so it is done once. Nothing else is kept: any other request for a stopped
-host is refused, and says it is stopped.
+machine is refused, and says it is stopped.
 
-A host also tells the control plane, on its own channel, whether it is idle: no turns, no
-questions waiting and no shells open. The control plane counts down each linked host's
+A machine also tells the control plane, on its own channel, whether it is idle: no turns, no
+questions waiting and no shells open. The control plane counts down each linked machine's
 **stop when idle** from that, and stops the workspace through its provider when the time
-is up. The host's own clock isn't used.
+is up. The machine's own clock isn't used.
 
-With its idle status, a host also sends the time and name of its next scheduled workflow. The
-control plane keeps the last one on the host's link. While the workspace is stopped, it gives
+With its idle status, a machine also sends the time and name of its next scheduled workflow. The
+control plane keeps the last one on the machine's link. While the workspace is stopped, it gives
 it a **wake-up call**: it starts the workspace before that time, by the last measured start
-time plus 2 minutes (5 minutes before one is measured), once for each due time. The host
+time plus 2 minutes (5 minutes before one is measured), once for each due time. The machine
 connects, and its own clock fires the workflow; the control plane decides only when the
-machine runs. It does not stop a host as idle while its next workflow is due within its idle
+machine runs. It does not stop a machine as idle while its next workflow is due within its idle
 time. While the Mac that runs the control plane sleeps, no wake-up calls are made.
 
 For now only a control plane with one copy runs providers, as only one holds ssh tunnels.
 
 **Write It for Me** puts an agent in the Add Provider sheet, at authoring time only. The
-agent runs on the host on the control plane's own machine, because the server and the CLI
+agent runs on the machine on the control plane's own machine, because the server and the CLI
 must be read there. The control plane does every call to the server or the CLI itself, with
 the secrets, and gives the agent only the results, with each secret's value replaced by its
 name. The agent has no tools of its runtime's own and is in no list. Start and Stop never
@@ -366,19 +366,19 @@ call an agent: they use the map that was kept.
 
 If the copies are running but cannot reach their store, the live connections carry on:
 you can still follow, answer and start agents. What cannot happen is anything the control
-plane must remember. Pairing or forgetting a client, adding a host or removing one is
+plane must remember. Pairing or forgetting a client, adding a machine or removing one is
 refused, and the window says the control plane can't reach where it keeps its records, so
 nothing was changed. Nothing is ever half done.
 
 When two copies change the same record at the same moment, for instance two windows
-changing one host's settings, one change goes through and the other is refused and asked to
+changing one machine's settings, one change goes through and the other is refused and asked to
 try again. Neither is lost without a word.
 
 ## Why it is built this way
 
 Before the control plane, the Mac window was special. It started the daemon on this Mac,
 reached each server itself over ssh, and was the only thing allowed to do everything. The
-phone reached only the Mac, through a separate bridge, and saw only the Mac's projects.
+phone reached only the Mac, through a separate bridge, and saw only the Mac's folders.
 What you could reach depended on which screen you held, and pairing, permissions and
 routing lived in three places.
 
@@ -387,13 +387,13 @@ sandbox: it may not start helpers of its own, keep programs running in the backg
 ssh or git, or read folders you did not hand it. The Mac window did all of those.
 
 Putting one service in the middle fixes both. The apps become screens and nothing else, so
-they fit in the sandbox. Everything that needs a real machine happens on a host: agents,
-terminals, files, git, installing runtimes, signing them in. And because hosts connect out
+they fit in the sandbox. Everything that needs a real machine happens on a machine: agents,
+terminals, files, git, installing runtimes, signing them in. And because machines connect out
 and clients connect in, a server behind a home router or a firewall joins without any port
 being opened to it.
 
 The control plane speaks ordinary HTTPS and WebSockets, so any load balancer or TLS proxy
-can sit in front of it. Clients and hosts prove who they are by signing with keys of their
+can sit in front of it. Clients and machines prove who they are by signing with keys of their
 own when they connect. Its store is a folder or a bucket, because those are what anyone can
 run, and a bucket is what lets several copies share one memory without one of them being
 special.
@@ -403,7 +403,7 @@ special.
 - [Set up Agents on this Mac](../how-to/set-up-on-this-mac.md).
 - [Run the control plane as several copies](../how-to/run-several-copies.md).
 - [Connect a window or phone](../how-to/connect-a-window-or-phone.md).
-- [The window and the host](window-and-daemon.md).
+- [The window and the machine](window-and-daemon.md).
 - [How the phone and iPad reach your agents](phone-and-ipad.md).
 - [Use Agents in a browser](../how-to/use-agents-in-a-browser.md).
-- [Workspace providers](../reference/workspace-providers.md).
+- [Machine providers](../reference/machine-providers.md).

@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac, iphone, ipad, web]
-description: Connect GitLab with the gitlab.com sign-in or an access token, set up a project's Tasks, Code review and CI from it, and work with merge requests, issues and pipelines on their pages.
+description: Connect GitLab with the gitlab.com sign-in or an access token, set up a folder's Tasks, Code review and CI from it, and work with merge requests, issues and pipelines on their pages.
 ---
 
 # Use GitLab
@@ -18,14 +18,14 @@ the same set-up and the same pages, because the host keeps the state.
 ## Before you start
 
 - A GitLab account, on gitlab.com or on your own GitLab.
-- A project whose folder has a GitLab remote.
+- A folder whose folder has a GitLab remote.
 
 ## Connect GitLab
 
-You connect once, and the connection is for every project on that host. There are two
+You connect once, and the connection is for every folder on that host. There are two
 ways in. The sheet has a picker for them, **gitlab.com** and **Access token**.
 
-Open the sheet from a project's **Connectors** page with **Connect GitLab…**, or from
+Open the sheet from a folder's **Connectors** page with **Connect GitLab…**, or from
 **Connectors** (under Activity in the sidebar). On the Mac, choose
 **Connect… ▸ GitLab** there. On the Remote and the web page, choose **Connect GitLab…**.
 
@@ -64,12 +64,12 @@ sends it only to the GitLab where you made the connection, so a token for one Gi
 goes to another.
 
 **Disconnect** on **Connectors ▸ Connections** deletes the host's token. Before it
-does, it says which projects lose which slots. To revoke the token on GitLab too, go to
+does, it says which folders lose which slots. To revoke the token on GitLab too, go to
 GitLab ▸ Preferences ▸ Applications or Access tokens.
 
-## Set up a project's tools
+## Set up a folder's tools
 
-A project's **Connectors** page starts with its set-up, as for GitHub. The project's git
+A folder's **Connectors** page starts with its set-up, as for GitHub. The folder's git
 remote picks the forge. A GitHub remote picks GitHub. With no GitHub remote, a GitLab remote
 picks GitLab: one on the GitLab you connected, on gitlab.com, or on a host named `gitlab`.
 
@@ -82,13 +82,13 @@ know that it works:
 
 **Skip**, **Set Up**, **Change…** and **Try Again** work as they do for GitHub. When GitLab
 refuses a read, the slot says why, such as "GitLab refused: Agents can't see pipelines in
-group/app.", and **Open on ‹your GitLab›** opens the project on GitLab, where you can ask
+group/app.", and **Open on ‹your GitLab›** opens the folder on GitLab, where you can ask
 for access.
 
-When the first slot has read, the page adds the `gitlab` connector to the project's
-`.agents/mcp.json`, approved, once. Its events then reach the project.
+When the first slot has read, the page adds the `gitlab` connector to the folder's
+`.agents/mcp.json`, approved, once. Its events then reach the folder.
 
-To add it by hand, add **GitLab** from **Made by Agents** in the catalogue on the Mac, or
+To add it by hand, add **GitLab** from the **Agents** marketplace in the catalogue on the Mac, or
 write the entry:
 
 ```json
@@ -98,7 +98,7 @@ write the entry:
 It reads the GitLab connection. Instead, you can set `GITLAB_TOKEN` (an access token with
 the `api` scope) and `GITLAB_URL` (your GitLab) in the entry's `env`. When `GITLAB_TOKEN`
 is set, it goes first. Keep the token in your own `~/.agents-secrets/secrets.env` and name
-it in the entry as `${GITLAB_TOKEN}`, so that it is never in the project.
+it in the entry as `${GITLAB_TOKEN}`, so that it is never in the folder.
 
 ## See merge requests, issues and pipelines
 
@@ -110,12 +110,12 @@ open merge requests".
   has **Retry**, which runs its failed jobs again. Click a title to open its page in the
   same view.
 - **Issues** (`show_issues`): each open issue with its labels, its assignees and its
-  comment count. Click a label to show only those issues. **Start Agent** opens the
-  new-agent form for the issue, with its number as the label and a new worktree. Nothing
-  starts until you press Start.
+  comment count. Click a row to expand its rich-text description. Click a label to show only
+  those issues. **Start Agent** opens the new-agent form for the issue, with its number as the
+  label and a new worktree. Nothing starts until you press Start.
 
-To keep a page, choose **Pin to Project** in the view's menu. See
-[Pin a page to a project](pin-a-page-to-a-project.md).
+To keep a page, choose **Pin to Folder** in the view's menu. See
+[Pin a page to a folder](pin-a-page-to-a-folder.md).
 
 ## Work on a merge request
 
@@ -145,7 +145,7 @@ commit, nothing happens: open the page again.
 
 ## Let agents work the dev loop
 
-A project that pushes to GitLab lists the same three ready-made workflows as GitHub, off,
+A folder that pushes to GitLab lists the same three ready-made workflows as GitHub, off,
 on its **Workflows** page. One workflow serves both forges, and its agent uses the tools of
 the server that the event came from. Open one and turn on its **Enabled** switch.
 

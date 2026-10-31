@@ -37,7 +37,7 @@
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>To find and reach your agents' control plane on this network.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>So you can say what you want done instead of typing it.</string>
+	<string>So you can say what you want done instead of typing it, and talk to your agents in voice mode. No audio is kept.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>So what you say becomes the words in the prompt. It is recognised on this Mac where this Mac can do it.</string>
 </dict>

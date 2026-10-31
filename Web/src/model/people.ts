@@ -1,8 +1,9 @@
 // Settings ▸ People's words and a machine's ask to join (#994, Team T1), as the window and the
 // Remote have them: each client belongs to a person, each machine to one person. With one person,
 // the local owner, nothing changes.
-import type { ClientKind, JoinRequest, PersonClient, PersonInvited, PersonMachine, PersonRemovePreview, PersonRow, UnpushedWork, UserRole } from "../protocol/generated";
+import type { ClientKind, Group, JoinRequest, PersonClient, PersonInvited, PersonMachine, PersonRemovePreview, PersonRow, UnpushedWork, UserRole } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
+import { managedBy, orgName, setBy, suspendedBy, waitingFirstSignIn } from "./signIn";
 
 /** The roles, in the order the menu shows them. */
 export const roles: UserRole[] = ["admin", "member"];
@@ -117,6 +118,12 @@ export function askingLine(name: string): string {
   return `Asking ${name}’s machines what work on them is not pushed…`;
 }
 
+/** Remove's check failed (#2193), as PeopleWords.checkFailed: `why` is a sentence. Remove stays off until it works. */
+export function checkFailedLine(name: string, why: string): string {
+  return `Could not check what ${name}’s machines would lose. ${why} Removing ${name} stops and deletes `
+    + `the machines ${name} started, with any work on them not pushed, so Remove stays off until the check works.`;
+}
+
 /** The title of the Remove confirmation. */
 export function removeTitle(name: string): string {
   return `Remove ${name}?`;
@@ -168,6 +175,8 @@ export function ordered(people: readonly PersonRow[]): PersonRow[] {
  */
 export function canSetRole(person: PersonRow, people: readonly PersonRow[], admin: boolean): boolean {
   if (!admin) return false;
+  // A role a provider's SCIM group gives is the provider's to change (#1002, FR-020): managedByProvider.
+  if ((person.roleFrom?.length ?? 0) > 0) return false;
   const admins = people.filter((p) => p.role === "admin").length;
   return !(person.role === "admin" && admins <= 1);
 }
@@ -175,4 +184,33 @@ export function canSetRole(person: PersonRow, people: readonly PersonRow[], admi
 /** Whether Remove is offered: an admin, for anyone but themselves and the local owner. */
 export function canRemove(person: PersonRow, admin: boolean): boolean {
   return admin && !person.you && !person.localOwner;
+}
+
+/**
+ * The org provider lines under a person (#1002, FR-028), with `names` giving a provider's name by
+ * its id: Managed by, Waiting for first sign-in, Suspended by.
+ */
+export function orgLines(person: Pick<PersonRow, "scim" | "provisioned" | "suspended">, names: Readonly<Record<string, string>>): string[] {
+  const lines: string[] = [];
+  if (person.scim) lines.push(managedBy(orgName(person.scim.provider, names)));
+  if (person.provisioned) lines.push(waitingFirstSignIn);
+  if (person.suspended) lines.push(suspendedBy(orgName(person.suspended.provider, names)));
+  return lines;
+}
+
+/**
+ * "Set by Okta" on a role a provider's SCIM group gives (FR-020, FR-028): the provider of the first
+ * of `roleFrom` that the groups know, else the person's own SCIM provider. Null for a role set by hand.
+ */
+export function roleSetBy(person: Pick<PersonRow, "roleFrom" | "scim">, groups: readonly Group[], names: Readonly<Record<string, string>>): string | null {
+  const from = person.roleFrom ?? [];
+  if (from.length === 0) return null;
+  const provider = from.map((id) => groups.find((g) => g.id === id)?.source?.scim).find((p) => p !== undefined)
+    ?? person.scim?.provider ?? from[0]!;
+  return setBy(orgName(provider, names));
+}
+
+/** Whether a person has anything an org provider controls: an admin is offered Edit in Console for it. */
+export function providerManaged(person: Pick<PersonRow, "scim" | "provisioned" | "suspended" | "roleFrom">): boolean {
+  return person.scim !== undefined || person.provisioned === true || person.suspended !== undefined || (person.roleFrom?.length ?? 0) > 0;
 }

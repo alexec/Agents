@@ -231,5 +231,15 @@ func TestEventsListOffersTheFour(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	same(t, names, []string{"issue.opened", "issue.labelled", "issue.commented", "issue.closed"})
+	same(t, names, []string{"issue.opened", "issue.labelled", "issue.commented", "issue.closed", "issue.assigned"})
+}
+
+// issue.assigned (#2034) is the person's own: a guest or an app assigning it counts.
+func TestAssignedToMeIsRaisedWhoeverAssignedIt(t *testing.T) {
+	f := &fakeLinear{}
+	p := newPoller(t, f, "issue.assigned", nil)
+	p.poll(0)
+	f.add(Activity{ID: "h9", At: at(1), Issue: issue("ENG-9", "ENG"), Kind: Assigned, By: bot})
+	ids, _ := p.poll(0)
+	same(t, ids, []string{"issue.assigned:h9"})
 }

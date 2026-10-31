@@ -13,11 +13,15 @@ import (
 )
 
 // The three endings name the runtime's own question tool where the app knows it, and
-// ask_form always.
+// ask_question always.
 func TestTheEndingBriefNamesTheThreeEndings(t *testing.T) {
-	for runtimeID, ask := range map[string]string{"claude": "AskUserQuestion (or ask_form if you lack it)", "grok": "ask_form,"} {
+	for runtimeID, ask := range map[string]string{"claude": "AskUserQuestion (or ask_question if you lack it)", "grok": "with ask_question."} {
 		got := endingBrief(runtimeID)
-		for _, want := range []string{ask, "show_file on it once", "do not archive", "suggest_next_prompt with it", "archive_session with no id"} {
+		// Only a question needs the person (#1916): no stuck or blocked ending.
+		if strings.Contains(got, "stuck") {
+			t.Fatalf("%s: %q", runtimeID, got)
+		}
+		for _, want := range []string{ask, "as a question", "before your last paragraph", "show_file on it once", "do not archive", "suggest_next_prompt with it", "archive_session with no id"} {
 			if !strings.Contains(got, want) {
 				t.Fatalf("%s: %q has no %q", runtimeID, got, want)
 			}
@@ -36,8 +40,8 @@ func TestTheLeaseBriefSaysWhatWasDeclared(t *testing.T) {
 	}
 }
 
-// Claude's is _meta.systemPrompt.append, Grok's goes before its rules, and a runtime with
-// no system prompt has its _meta as it was.
+// Claude's is _meta.systemPrompt.append, Grok's goes before its rules, Codex's uses AIR
+// custom instructions, and a runtime with no system prompt has its _meta as it was.
 func TestTheBriefGoesWhereTheRuntimeTakesASystemPrompt(t *testing.T) {
 	claude := withSystemPrompt(sessionMeta("claude"), "claude", "words")
 	if systemPromptOf(claude) != "words" || claude["claudeCode"] == nil {
@@ -46,6 +50,11 @@ func TestTheBriefGoesWhereTheRuntimeTakesASystemPrompt(t *testing.T) {
 	grok := withSystemPrompt(map[string]any{"rules": "cards"}, "grok", "words")
 	if systemPromptOf(grok) != "words\n\ncards" {
 		t.Fatalf("%v", grok)
+	}
+	codex := withSystemPrompt(map[string]any{"jetbrains": map[string]any{"air": map[string]any{"version": 1, "capabilities": []string{"sessionFailure"}}}}, "codex", "words")
+	air := codex["jetbrains"].(map[string]any)["air"].(map[string]any)
+	if air["customInstructions"] != "words" || len(air["capabilities"].([]string)) != 1 || systemPromptOf(codex) != "words" {
+		t.Fatalf("%v", codex)
 	}
 	if m := withSystemPrompt(nil, "cursor", "words"); m != nil {
 		t.Fatalf("%v", m)
@@ -64,7 +73,7 @@ func agentMessages(d *Daemon, id wire.UUID) string {
 }
 
 // Each runtime has the brief the way it takes one: Claude as _meta.systemPrompt.append,
-// Grok as _meta.rules before the app's tool cards, the rest before the words of the first
+// Grok as _meta.rules, Codex as session custom instructions, and the rest before the first
 // prompt. The transcript records only the person's words.
 func TestEachRuntimeHasTheBriefTheWayItTakesIt(t *testing.T) {
 	fakeRuntimes(t)
@@ -86,6 +95,8 @@ func TestEachRuntimeHasTheBriefTheWayItTakesIt(t *testing.T) {
 				system, before = brief, ""
 			case "grok":
 				system, before = brief+"\n\n"+grokRules(), ""
+			case "codex":
+				system, before = brief, ""
 			}
 			if said := agentMessages(d, id); said != "System: "+system+"\nBefore: "+before {
 				t.Fatalf("said %q", said)
@@ -161,11 +172,16 @@ func TestTheBriefSaysWhoIsWho(t *testing.T) {
 // Asking names the runtime's own question tool where the app keeps one, and says what is
 // decided and told (#601, #1083).
 func TestTheBriefSaysWhatToAskAndWhatToDecide(t *testing.T) {
-	if got := escalationBrief("cursor"); !strings.Contains(got, "ask me with AskQuestion (or ask_form if you lack it) rather than guessing") ||
+	if got := escalationBrief("cursor"); !strings.Contains(got, "ask me with AskQuestion (or ask_question if you lack it) rather than guessing") ||
 		!strings.Contains(got, "write `Decided: <what>, because <why>.`") {
 		t.Fatal(got)
 	}
-	if got := escalationBrief("gemini"); !strings.Contains(got, "ask me with ask_form rather than guessing") {
+	// Antigravity's own tool has the app's name (#2298): said by whose it is.
+	if got := escalationBrief("antigravity"); !strings.Contains(got, "ask me with your runtime's own ask_question (or the app's ask_question, from the agents server, if yours is missing) rather than guessing") {
+		t.Fatal(got)
+	}
+	if got := escalationBrief("gemini"); !strings.Contains(got, "ask me with ask_question rather than guessing") ||
+		!strings.Contains(got, "Ask for a missing secret (an API key, a token) with ask_secret") {
 		t.Fatal(got)
 	}
 }
@@ -201,21 +217,21 @@ func TestTheBriefSaysTheRestWhereItApplies(t *testing.T) {
 	}
 }
 
-// The persona's prompt follows the brief: the project's before the person's, its front
+// The persona's prompt follows the brief: the folder's before the person's, its front
 // matter left out, none for a persona that is not there or an id that is a path (#760).
 func TestThePersonasPromptFollowsTheBrief(t *testing.T) {
-	project, home := t.TempDir(), t.TempDir()
+	folder, home := t.TempDir(), t.TempDir()
 	t.Setenv("AGENTS_PERSONAL_HOME", home)
 	write := func(base, id, text string) {
 		os.MkdirAll(filepath.Join(base, ".agents", "personas"), 0o755)
 		os.WriteFile(filepath.Join(base, ".agents", "personas", id+".md"), []byte(text), 0o644)
 	}
-	write(project, "reviewer", "---\nname: Reviewer\nmodel: x\n---\n\nReview as a sceptic.\n")
+	write(folder, "reviewer", "---\nname: Reviewer\nmodel: x\n---\n\nReview as a sceptic.\n")
 	write(home, "reviewer", "The person's own.")
 	write(home, "writer", "Write plainly.")
-	write(project, "broken", "---\nname: Broken\n")
+	write(folder, "broken", "---\nname: Broken\n")
 	persona := func(id string) string {
-		return personaPrompt(&wire.Agent{Cwd: store.FolderURL(project), Persona: &id})
+		return personaPrompt(&wire.Agent{Cwd: store.FolderURL(folder), Persona: &id})
 	}
 	if persona("reviewer") != "Review as a sceptic." || persona("writer") != "Write plainly." ||
 		persona("broken") != "" || persona("nobody") != "" || persona("../reviewer") != "" {
@@ -224,7 +240,7 @@ func TestThePersonasPromptFollowsTheBrief(t *testing.T) {
 	d, _ := start(t, t.TempDir())
 	defer d.Shutdown()
 	id := "reviewer"
-	if got := d.brief(&wire.Agent{RuntimeID: "claude", Cwd: store.FolderURL(project), Persona: &id}); !strings.HasSuffix(got, "\n\nReview as a sceptic.") {
+	if got := d.brief(&wire.Agent{RuntimeID: "claude", Cwd: store.FolderURL(folder), Persona: &id}); !strings.HasSuffix(got, "\n\nReview as a sceptic.") {
 		t.Fatal(got)
 	}
 }
@@ -234,7 +250,7 @@ func TestThePersonasPromptFollowsTheBrief(t *testing.T) {
 func TestGroksRulesWriteOutTheAppsTools(t *testing.T) {
 	rules := grokRules()
 	if !strings.HasPrefix(rules, "These tools are fully specified.") || !strings.Contains(rules, "agents__show_file — ") ||
-		!strings.Contains(rules, "agents__ask_form — ") || strings.Contains(rules, "agents__move_worktree") {
+		!strings.Contains(rules, "agents__ask_question — ") || strings.Contains(rules, "agents__move_worktree") {
 		t.Fatal(rules)
 	}
 	if m := sessionMeta("grok"); m["rules"] != rules {
@@ -263,6 +279,30 @@ func TestASessionStartedAsAPersonaHasItsPrompt(t *testing.T) {
 		t.Fatalf("%v", a.Persona)
 	}
 	if said := agentMessages(d, id); !strings.HasSuffix(said, "\n\nSay ARRR.\nBefore: ") {
+		t.Fatalf("said %q", said)
+	}
+}
+
+// Words sent from voice mode have the voice-mode text before them, and the next words
+// sent without the flag do not (#2322).
+func TestVoiceModeTextGoesBeforeTheWords(t *testing.T) {
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	id := startAgent(t, c, 1, t.TempDir(), "hi")
+	c.until(t, "the first end", ended(id, wire.AgentStateFinished))
+	c.call(t, 2, "agents/prompt", map[string]any{"agentID": id, "text": "say your brief", "from": "person", "voice": true})
+	waitFor(t, "the answer", func() bool { return strings.Count(agentMessages(d, id), "Before: ") == 1 })
+	if said := agentMessages(d, id); !strings.HasSuffix(said, "Before: "+voicePreface) {
+		t.Fatalf("said %q", said)
+	}
+	if u := userMessages(d, id); u[len(u)-1] != "say your brief" {
+		t.Fatalf("the person's words %q", u)
+	}
+	c.until(t, "the second end", ended(id, wire.AgentStateFinished))
+	c.call(t, 3, "agents/prompt", map[string]any{"agentID": id, "text": "say your brief", "from": "person"})
+	waitFor(t, "the second answer", func() bool { return strings.Count(agentMessages(d, id), "Before: ") == 2 })
+	if said := agentMessages(d, id); !strings.HasSuffix(said, "Before: ") {
 		t.Fatalf("said %q", said)
 	}
 }

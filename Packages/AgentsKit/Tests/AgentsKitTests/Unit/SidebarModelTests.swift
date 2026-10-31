@@ -3,18 +3,18 @@ import Testing
 @testable import AgentsKitCore
 
 /// The sidebar's rules, which the Mac's window and the Remote both draw (#226): what goes
-/// under which heading of a project's fold, in what order, what a search leaves, and
+/// under which heading of a folder's fold, in what order, what a search leaves, and
 /// which folds start open.
 @MainActor
 @Suite("The sidebar's model")
 struct SidebarModelTests {
     private let api = URL(filePath: "/tmp/work/api")
     private let web = URL(filePath: "/tmp/work/web")
-    private let devbox = HostID(rawValue: "devbox01")
+    private let devbox = MachineRef(rawValue: "devbox01")
     private let t0 = Date(timeIntervalSince1970: 1_800_000_000)
 
     private func agent(_ folder: URL, _ state: AgentState, _ title: String, at offset: Double,
-                       host: HostID = .mac) -> Agent {
+                       host: MachineRef = .mac) -> Agent {
         var agent = Agent(runtimeID: "claude", cwd: folder, title: title, state: state,
                           lastActivityAt: t0.addingTimeInterval(offset))
         agent.host = host
@@ -22,34 +22,63 @@ struct SidebarModelTests {
         return agent
     }
 
-    private func summary(_ folder: URL, host: HostID = .mac, archived: Int = 0) -> DaemonAPI.ProjectSummary {
-        var summary = DaemonAPI.ProjectSummary(project: Project(folder: folder), name: folder.lastPathComponent,
+    private func summary(_ folder: URL, host: MachineRef = .mac, archived: Int = 0) -> DaemonAPI.FolderSummary {
+        var summary = DaemonAPI.FolderSummary(folder: Folder(folder: folder), name: folder.lastPathComponent,
                                                exists: true, lastActivityAt: t0,
                                                counts: archived > 0 ? [.archived: archived] : [:])
         summary.host = host
         return summary
     }
 
-    private var key: ProjectKey { ProjectKey(host: .mac, folder: api) }
+    private var key: FolderKey { FolderKey(host: .mac, folder: api) }
 
-    @Test func aFoldedProjectFilesNothingButIsStillShown() {
+    @Test func aFoldedFolderFilesNothingButIsStillShown() {
         let model = AgentsModel()
         model.replaceAgents([agent(api, .running, "build", at: 1)])
-        let fold = SidebarProjectFold(key, label: "api", in: model, isOpen: false)
+        let fold = SidebarFolderFold(key, label: "api", in: model, isOpen: false)
         #expect(fold.isShown)
         #expect(fold.groups.isEmpty)
         #expect(fold.pinned.isEmpty)
     }
 
-    /// A folded project holds no rows of any kind (#356): an Archived fold, pinned pages or
+    /// A folded folder holds no rows of any kind (#356): an Archived fold, pinned pages or
     /// "No sessions yet" coming and going under it left NSOutlineView's count of its
     /// children apart from SwiftUI's, and Apple Intelligence reading the list crashed.
-    @Test func aFoldedProjectHasNothingUnderItsRow() {
+    /// #2032: a server's list views come with the pins, apart from them, and a Hide is
+    /// shown at once; a selected row finds a view as it finds a pin.
+    @Test func aServersListViewsAreHeldApartFromThePins() {
+        let model = AgentsModel()
+        let server = PinnerView(kind: .server, id: "github", name: "GitHub")
+        let pulls = PinView(path: "ui://github/pulls", title: "GitHub · Pull requests", kind: .view, missing: false,
+                            pinnedBy: server, view: ViewPin(server: "github", uri: "ui://github/pulls", tool: "show_pull_requests"))
+        let issues = PinView(path: "ui://github/issues", title: "GitHub · Issues", kind: .view, missing: false,
+                             pinnedBy: server, view: ViewPin(server: "github", uri: "ui://github/issues", tool: "show_issues"),
+                             hidden: true)
+        model.replacePins([FolderPins(folder: api, pins: [], views: [pulls, issues])])
+        #expect(model.pins(in: api).isEmpty)
+        #expect(model.serverViews(in: api).map(\.title) == ["GitHub · Pull requests", "GitHub · Issues"])
+        #expect(model.pinOrView("ui://github/pulls", in: api)?.isServerView == true)
+        model.setViewHidden("ui://github/pulls", true, in: api)
+        model.setViewHidden("ui://github/issues", false, in: api)
+        #expect(model.serverViews(in: api).map(\.hidden) == [true, nil])
+    }
+
+    /// #2033: a view row's count and when it was read, decoded from the host's answer.
+    @Test func aViewRowsCountIsDecodedWithItsTime() throws {
+        let json = #"{"path":"ui://github/issues","title":"GitHub · Issues","kind":"view","missing":false,"#
+            + #""pinnedBy":{"kind":"server","id":"github","name":"GitHub"},"count":23,"attention":1,"#
+            + #""countAt":800000000,"countStale":true}"#
+        let view = try JSONDecoder().decode(PinView.self, from: Data(json.utf8))
+        #expect(view.count == 23 && view.attention == 1 && view.countStale == true)
+        #expect(view.countHelp?.contains("did not answer") == true)
+    }
+
+    @Test func aFoldedFolderHasNothingUnderItsRow() {
         let model = AgentsModel()
         model.replaceAgents([agent(api, .archived, "old", at: 1)])
-        model.replacePins([ProjectPins(folder: api, pins: [], sessions: [])])
+        model.replacePins([FolderPins(folder: api, pins: [], sessions: [])])
         let held = summary(api, archived: 12)
-        let folded = SidebarProjectFold(key, label: "api", in: model, isOpen: false)
+        let folded = SidebarFolderFold(key, label: "api", in: model, isOpen: false)
         #expect(!folded.isUnfolded)
         #expect(!folded.showsArchivedFold(held))
         #expect(!folded.showsPinnedPages)
@@ -57,14 +86,14 @@ struct SidebarModelTests {
         #expect(folded.groups.isEmpty && folded.pinned.isEmpty && folded.archived.isEmpty)
         #expect(folded.workflows.isEmpty && folded.archivedWorkflows.isEmpty)
 
-        let open = SidebarProjectFold(key, label: "api", in: model, isOpen: true)
+        let open = SidebarFolderFold(key, label: "api", in: model, isOpen: true)
         #expect(open.isUnfolded)
         #expect(open.showsArchivedFold(held))
         #expect(open.showsPinnedPages)
         #expect(open.showsNoSessions)
 
         // A search unfolds it, and the search is for sessions, not pages.
-        let searched = SidebarProjectFold(key, label: "api", in: model, query: "old", isOpen: false)
+        let searched = SidebarFolderFold(key, label: "api", in: model, query: "old", isOpen: false)
         #expect(searched.isUnfolded)
         #expect(!searched.showsPinnedPages)
         #expect(!searched.showsNoSessions)
@@ -79,9 +108,9 @@ struct SidebarModelTests {
         let gone = agent(api, .archived, "gone", at: 5)
         let elsewhere = agent(api, .running, "elsewhere", at: 6, host: devbox)
         model.replaceAgents([working, done, other, asking, gone, elsewhere])
-        model.replacePins([ProjectPins(folder: api, pins: [], sessions: [done.id, gone.id, working.id, elsewhere.id])])
+        model.replacePins([FolderPins(folder: api, pins: [], sessions: [done.id, gone.id, working.id, elsewhere.id])])
 
-        let fold = SidebarProjectFold(key, label: "api", in: model, isOpen: true)
+        let fold = SidebarFolderFold(key, label: "api", in: model, isOpen: true)
         // In the order they were put in; never an archived one, nor another host's.
         #expect(fold.pinned.map(\.id) == [done.id, working.id])
         #expect(fold.groups.map(\.group) == [.needsAttention, .finished])
@@ -98,27 +127,27 @@ struct SidebarModelTests {
         asking.archiveRequest = .requested(at: t0)
         model.replaceAgents([asking, unread, agent(api, .running, "working", at: 3),
                              agent(api, .waitingOnUser, "asking", at: 4)])
-        let fold = SidebarProjectFold(key, label: "api", in: model, isOpen: true)
+        let fold = SidebarFolderFold(key, label: "api", in: model, isOpen: true)
         #expect(fold.groups.map(\.group) == AgentGroup.live.filter { [.needsAttention, .running, .finished].contains($0) })
         #expect(fold.groups.first { $0.group == .finished }?.unread == 1)
     }
 
-    @Test func aSearchKeepsWhatMatchesAndHidesAProjectWithNothing() {
+    @Test func aSearchKeepsWhatMatchesAndHidesAFolderWithNothing() {
         let model = AgentsModel()
         let match = agent(api, .running, "fix the login page", at: 1)
         model.replaceAgents([match, agent(api, .finished, "write docs", at: 2), agent(web, .running, "deploy", at: 3)])
-        let found = SidebarProjectFold(key, label: "api", in: model, query: " login ", isOpen: false)
+        let found = SidebarFolderFold(key, label: "api", in: model, query: " login ", isOpen: false)
         #expect(found.isSearching)
         #expect(found.query == "login")
         #expect(found.groups.flatMap(\.agents).map(\.id) == [match.id])
         #expect(found.isShown)
 
-        let none = SidebarProjectFold(ProjectKey(host: .mac, folder: web), label: "web", in: model,
+        let none = SidebarFolderFold(FolderKey(host: .mac, folder: web), label: "web", in: model,
                                       query: "login", isOpen: true)
         #expect(!none.isShown)
-        let byName = SidebarProjectFold(ProjectKey(host: .mac, folder: web), label: "web", in: model,
+        let byName = SidebarFolderFold(FolderKey(host: .mac, folder: web), label: "web", in: model,
                                         query: "WE", isOpen: false)
-        #expect(byName.isShown, "the project's own name matches")
+        #expect(byName.isShown, "the folder's own name matches")
     }
 
     @Test func theArchivedFoldCountsWhatTheHostSaysUntilASearch() {
@@ -126,103 +155,135 @@ struct SidebarModelTests {
         let gone = agent(api, .archived, "old login work", at: 1)
         model.replaceAgents([gone])
         let held = summary(api, archived: 12)
-        let fold = SidebarProjectFold(key, label: "api", in: model, isOpen: true)
+        let fold = SidebarFolderFold(key, label: "api", in: model, isOpen: true)
         #expect(fold.archivedCount(held) == 12)
         #expect(fold.showsArchivedFold(held))
         #expect(fold.showsArchivedFold(summary(api)), "one is held, so there is a fold")
 
-        let empty = SidebarProjectFold(ProjectKey(host: .mac, folder: web), label: "web", in: model, isOpen: true)
+        let empty = SidebarFolderFold(FolderKey(host: .mac, folder: web), label: "web", in: model, isOpen: true)
         #expect(!empty.showsArchivedFold(summary(web)))
         // The host's count may not have arrived (#227): what is held still shows the fold.
         #expect(empty.archivedCount(nil) == 0)
 
-        let searched = SidebarProjectFold(key, label: "api", in: model, query: "login", isOpen: false)
+        let searched = SidebarFolderFold(key, label: "api", in: model, query: "login", isOpen: false)
         #expect(searched.archivedCount(held) == 1)
     }
 
     @Test func archivedMatchesShowAFewUntilShowAll() {
         let model = AgentsModel()
         model.replaceAgents((0..<15).map { agent(api, .archived, "login \($0)", at: Double($0)) })
-        let searched = SidebarProjectFold(key, label: "api", in: model, query: "login", isOpen: false)
-        #expect(searched.archivedShown(showingAll: false).count == SidebarProjectFold.matchesShown)
+        let searched = SidebarFolderFold(key, label: "api", in: model, query: "login", isOpen: false)
+        #expect(searched.archivedShown(showingAll: false).count == SidebarFolderFold.matchesShown)
         #expect(searched.archivedShown(showingAll: true).count == 15)
-        let open = SidebarProjectFold(key, label: "api", in: model, isOpen: true)
+        let open = SidebarFolderFold(key, label: "api", in: model, isOpen: true)
         #expect(open.archivedShown(showingAll: false).count == 15)
     }
 
-    @Test func projectsAreThisMacsThenEachServersInHostOrder() {
-        let gpu = HostID(rawValue: "gpu00001")
-        let stray = HostID(rawValue: "stray001")
+    @Test func sessionsFoldKeepsTheThreeNewestArchivedSessions() {
+        let model = AgentsModel()
+        let archived = (0..<5).map { agent(api, .archived, "archived \($0)", at: Double($0)) }
+        model.replaceAgents(archived + [agent(api, .running, "live", at: 10)])
+        let fold = SidebarFolderFold(key, label: "api", in: model, isOpen: true)
+        #expect(fold.recentArchived(now: t0).map(\.id) == archived.suffix(3).reversed().map(\.id))
+
+        let empty = SidebarFolderFold(FolderKey(host: .mac, folder: web), label: "web", in: model, isOpen: true)
+        #expect(empty.recentArchived.isEmpty)
+    }
+
+    @Test func recentlyArchivedHoldsOnlyTheLastDaysArchived() {
+        let model = AgentsModel()
+        let day = SidebarFolderFold.recentArchivedWithin
+        let archived = [-day - 60, -day + 60, -10].map { agent(api, .archived, "archived \($0)", at: $0) }
+        model.replaceAgents(archived)
+        let fold = SidebarFolderFold(key, label: "api", in: model, isOpen: true)
+        #expect(fold.recentArchived(now: t0).map(\.id) == [archived[2].id, archived[1].id])
+        #expect(fold.recentArchived(now: t0.addingTimeInterval(day)).isEmpty)
+    }
+
+    @Test func aSearchListsArchivedMatchesOnceNotInTheRecentFold() {
+        let model = AgentsModel()
+        model.replaceAgents((0..<5).map { agent(api, .archived, "login \($0)", at: Double($0)) })
+        let searched = SidebarFolderFold(key, label: "api", in: model, query: "login", isOpen: false)
+        #expect(searched.recentArchived.isEmpty)
+        #expect(searched.archivedShown(showingAll: false).count == 5)
+    }
+
+    @Test func foldersAreThisMacsThenEachServersInHostOrder() {
+        let gpu = MachineRef(rawValue: "gpu00001")
+        let stray = MachineRef(rawValue: "stray001")
         let listed = [summary(api, host: gpu), summary(web), summary(api, host: devbox), summary(api),
                       summary(web, host: stray)]
-        let ordered = SidebarOrder.projects(listed, servers: [devbox, gpu])
-        #expect(ordered.map(\.key) == [ProjectKey(host: .mac, folder: web), ProjectKey(host: .mac, folder: api),
-                                       ProjectKey(host: devbox, folder: api), ProjectKey(host: gpu, folder: api)])
+        let ordered = SidebarOrder.folders(listed, servers: [devbox, gpu])
+        #expect(ordered.map(\.key) == [FolderKey(host: .mac, folder: web), FolderKey(host: .mac, folder: api),
+                                       FolderKey(host: devbox, folder: api), FolderKey(host: gpu, folder: api)])
         #expect(SidebarOrder.label(summary(api, host: devbox)) { $0 == devbox ? "devbox" : "?" } == "devbox:api")
         #expect(SidebarOrder.label(summary(api)) { _ in "?" } == "api")
     }
 
-    @Test func pinnedProjectsComeFirstFromEveryHost() {
-        func pinned(_ summary: DaemonAPI.ProjectSummary) -> DaemonAPI.ProjectSummary {
+    @Test func pinnedFoldersComeFirstFromEveryHost() {
+        func pinned(_ summary: DaemonAPI.FolderSummary) -> DaemonAPI.FolderSummary {
             var summary = summary
-            summary.project.pinned = true
+            summary.folder.pinned = true
             return summary
         }
         let listed = [summary(api), pinned(summary(api, host: devbox)), pinned(summary(web))]
-        let ordered = SidebarOrder.projects(listed, servers: [devbox])
-        #expect(ordered.map(\.key) == [ProjectKey(host: .mac, folder: web), ProjectKey(host: devbox, folder: api),
-                                       ProjectKey(host: .mac, folder: api)])
+        let ordered = SidebarOrder.folders(listed, servers: [devbox])
+        #expect(ordered.map(\.key) == [FolderKey(host: .mac, folder: web), FolderKey(host: devbox, folder: api),
+                                       FolderKey(host: .mac, folder: api)])
     }
 
-    @Test func projectsStayInTheOrderTheyWereAddedHoweverBusy() {
+    @Test func foldersStayInTheOrderTheyWereAddedHoweverBusy() {
         let docs = URL(filePath: "/tmp/work/docs")
-        func added(_ folder: URL, at offset: Double, active: Double = 0, host: HostID = .mac) -> DaemonAPI.ProjectSummary {
-            var summary = DaemonAPI.ProjectSummary(
-                project: Project(folder: folder, addedAt: t0.addingTimeInterval(offset)),
+        func added(_ folder: URL, at offset: Double, active: Double = 0, host: MachineRef = .mac) -> DaemonAPI.FolderSummary {
+            var summary = DaemonAPI.FolderSummary(
+                folder: Folder(folder: folder, addedAt: t0.addingTimeInterval(offset)),
                 name: folder.lastPathComponent, exists: true, lastActivityAt: t0.addingTimeInterval(active), counts: [:])
             summary.host = host
             return summary
         }
         let model = AgentsModel()
-        model.replaceProjects([added(web, at: 20), added(api, at: 10)])
-        #expect(model.projects.map(\.folder) == [api, web], "oldest added first")
+        model.replaceFolders([added(web, at: 20), added(api, at: 10)])
+        #expect(model.folders.map(\.folder.folder) == [api, web], "oldest added first")
 
-        // Activity on the newer project leaves it where it is (#357).
+        // Activity on the newer folder leaves it where it is (#357).
         model.upsert(added(web, at: 20, active: 999))
-        #expect(model.projects.map(\.folder) == [api, web])
+        #expect(model.folders.map(\.folder.folder) == [api, web])
 
         model.upsert(added(docs, at: 30))
-        #expect(model.projects.map(\.folder) == [api, web, docs], "a new project lands at the end")
+        #expect(model.folders.map(\.folder.folder) == [api, web, docs], "a new folder lands at the end")
 
         // A server re-listing keeps the same rule, and the same moment falls back to the folder.
-        model.replaceProjects([added(web, at: 5, host: devbox), added(api, at: 5, host: devbox)], from: devbox)
-        #expect(model.projects.filter { $0.host == devbox }.map(\.folder) == [api, web])
-        #expect(SidebarOrder.projects(model.liveProjects, servers: [devbox]).map(\.key)
-                == [api, web, docs].map { ProjectKey(host: .mac, folder: $0) }
-                + [api, web].map { ProjectKey(host: devbox, folder: $0) })
+        model.replaceFolders([added(web, at: 5, host: devbox), added(api, at: 5, host: devbox)], from: devbox)
+        #expect(model.folders.filter { $0.host == devbox }.map(\.folder.folder) == [api, web])
+        #expect(SidebarOrder.folders(model.liveFolders, servers: [devbox]).map(\.key)
+                == [api, web, docs].map { FolderKey(host: .mac, folder: $0) }
+                + [api, web].map { FolderKey(host: devbox, folder: $0) })
     }
 
     @Test func foldsStartAsTheMacsDidAndAreKeptPerScope() throws {
         let defaults = MemoryDefaults()
         let folds = SidebarFolds(defaults: defaults, scope: "")
-        #expect(!folds.isOpen(key), "a project starts folded")
+        #expect(!folds.isOpen(key), "a folder starts folded")
         #expect(!folds.isOpen(key, .archivedSessions))
         #expect(folds.isOpen(key, .group(.running)), "a group starts open")
         #expect(folds.isOpen(key, .pinned))
-        #expect(!folds.isOpen(key, .workflows), "a project's Workflows starts folded (#885)")
+        #expect(!folds.isOpen(key, .workflows), "a folder's Workflows starts folded (#885)")
+        #expect(folds.isOpen(key, .sessions), "a folder's Sessions starts open (#2312)")
 
         folds.set(key, open: true)
         folds.set(key, .archivedSessions, open: true)
         folds.set(key, .group(.finished), open: false)
         folds.set(key, .workflows, open: true)
+        folds.set(key, .sessions, open: false)
         let again = SidebarFolds(defaults: defaults, scope: "")
         #expect(again.isOpen(key))
         #expect(!again.isOpen(key, .group(.finished)))
-        #expect(again.isOpen(key, .workflows), "each project's Workflows fold is kept")
+        #expect(again.isOpen(key, .workflows), "each folder's Workflows fold is kept")
+        #expect(!again.isOpen(key, .sessions), "each folder's Sessions fold is kept")
         #expect(again.openArchivedFolds == [key])
         // The keys the Mac has always kept them under, so nobody's folds are lost.
         #expect(defaults.stringArray(forKey: "sidebar.folds")?.contains(key.stored) == true)
-        #expect(defaults.stringArray(forKey: "sidebar.folded") == ["group.finished:\(key.stored)"])
+        #expect(defaults.stringArray(forKey: "sidebar.folded") == ["group.finished:\(key.stored)", "sessions:\(key.stored)"])
 
         let walk = SidebarFolds(defaults: defaults, scope: ".walk:w1")
         #expect(!walk.isOpen(key), "another scope's folds are its own")
@@ -237,9 +298,9 @@ struct SidebarModelTests {
         return made
     }
 
-    /// A project folds open straight onto its sessions (#495): every live one no smart
+    /// A folder folds open straight onto its sessions (#495): every live one no smart
     /// group lists (#587), newest started first, whatever its state.
-    @Test func aProjectsSessionsAreOneListNewestStartedFirst() {
+    @Test func aFoldersSessionsAreOneListNewestStartedFirst() {
         let model = AgentsModel()
         let asking = started(api, .waitingOnUser, "asking", at: 1)
         let working = started(api, .running, "working", at: 3)
@@ -247,17 +308,16 @@ struct SidebarModelTests {
         let pinned = started(api, .finished, "pinned", at: 4)
         let gone = started(api, .archived, "gone", at: 5)
         model.replaceAgents([asking, working, done, pinned, gone])
-        model.replacePins([ProjectPins(folder: api, pins: [], sessions: [pinned.id])])
+        model.replacePins([FolderPins(folder: api, pins: [], sessions: [pinned.id])])
 
-        let fold = SidebarProjectFold(key, label: "api", in: model, isOpen: true)
+        let fold = SidebarFolderFold(key, label: "api", in: model, isOpen: true)
         #expect(fold.sessions.map(\.id) == [done.id])
-        #expect(SidebarProjectFold.ownCount(key, in: model) == 1)
         #expect(fold.pinned.map(\.id) == [pinned.id])
-        #expect(SidebarProjectFold(key, label: "api", in: model, isOpen: false).sessions.isEmpty)
+        #expect(SidebarFolderFold(key, label: "api", in: model, isOpen: false).sessions.isEmpty)
     }
 
-    /// The smart rows gather across every project (#495), by what each session wants.
-    @Test func smartRowsGatherAcrossProjects() {
+    /// The smart rows gather across every folder (#495), by what each session wants.
+    @Test func smartRowsGatherAcrossFolders() {
         let model = AgentsModel()
         let askingAPI = started(api, .waitingOnUser, "asking api", at: 1)
         let askingWeb = started(web, .waitingOnUser, "asking web", at: 2)
@@ -265,13 +325,13 @@ struct SidebarModelTests {
         let unread = started(api, .finished, "unread", at: 4, unread: true)
         let read = started(api, .finished, "read", at: 5)
         model.replaceAgents([askingAPI, askingWeb, working, unread, read])
-        let projects = [key, ProjectKey(host: .mac, folder: web)]
+        let folders = [key, FolderKey(host: .mac, folder: web)]
 
-        #expect(SidebarSmartRow.needsYou.count(in: model, projects: projects) == 2)
-        #expect(SidebarSmartRow.needsYou.agents(in: model, projects: projects).map(\.id) == [askingWeb.id, askingAPI.id])
-        #expect(SidebarSmartRow.working.agents(in: model, projects: projects).map(\.id) == [working.id])
-        #expect(SidebarSmartRow.unread.agents(in: model, projects: projects).map(\.id) == [unread.id])
-        #expect(SidebarSmartRow.needsYou.agents(in: model, projects: projects, query: "web").map(\.id) == [askingWeb.id])
+        #expect(SidebarSmartRow.needsYou.count(in: model, folders: folders) == 2)
+        #expect(SidebarSmartRow.needsYou.agents(in: model, folders: folders).map(\.id) == [askingWeb.id, askingAPI.id])
+        #expect(SidebarSmartRow.working.agents(in: model, folders: folders).map(\.id) == [working.id])
+        #expect(SidebarSmartRow.unread.agents(in: model, folders: folders).map(\.id) == [unread.id])
+        #expect(SidebarSmartRow.needsYou.agents(in: model, folders: folders, query: "web").map(\.id) == [askingWeb.id])
     }
 
     /// Needs You holds everything waiting for an OK (#773): a session asking to be archived
@@ -292,19 +352,19 @@ struct SidebarModelTests {
             Approval(kind: .archive, key: done.id.uuidString, title: "done", digest: nil, line: "Asks to be archived",
                      actions: [.approve, .deny], agentID: done.id),
         ]
-        model.replaceProjects([api, summary(web)])
-        let projects = [key, ProjectKey(host: .mac, folder: web)]
+        model.replaceFolders([api, summary(web)])
+        let folders = [key, FolderKey(host: .mac, folder: web)]
 
         #expect(!SidebarSmartRow.allCases.map(\.title).contains("Approve Archiving"))
         #expect(SidebarSmartRow.home(of: done, in: model.group(of: done), isPinned: false) == .needsYou)
-        #expect(Set(SidebarSmartRow.needsYou.agents(in: model, projects: projects).map(\.id)) == [asking.id, done.id])
+        #expect(Set(SidebarSmartRow.needsYou.agents(in: model, folders: folders).map(\.id)) == [asking.id, done.id])
         // The archive request is the session's row, not one of its own; oldest first.
-        #expect(SidebarSmartRow.needsYou.approvals(in: model, projects: projects).map(\.approval.key) == ["nightly", "ci"])
-        #expect(SidebarSmartRow.needsYou.count(in: model, projects: projects) == 4)
-        #expect(SidebarSmartRow.working.approvals(in: model, projects: projects).isEmpty)
-        #expect(SidebarSmartRow.needsYou.approvals(in: model, projects: projects, query: "mcp").map(\.approval.key) == ["ci"])
-        #expect(SidebarSmartRow.needsYou.isShown(in: model, projects: projects, query: "pull"))
-        #expect(SidebarSmartRow.unread.agents(in: model, projects: projects).isEmpty)
+        #expect(SidebarSmartRow.needsYou.approvals(in: model, folders: folders).map(\.approval.key) == ["nightly", "ci"])
+        #expect(SidebarSmartRow.needsYou.count(in: model, folders: folders) == 4)
+        #expect(SidebarSmartRow.working.approvals(in: model, folders: folders).isEmpty)
+        #expect(SidebarSmartRow.needsYou.approvals(in: model, folders: folders, query: "mcp").map(\.approval.key) == ["ci"])
+        #expect(SidebarSmartRow.needsYou.isShown(in: model, folders: folders, query: "pull"))
+        #expect(SidebarSmartRow.unread.agents(in: model, folders: folders).isEmpty)
     }
 
     /// A failed workflow is a row of Needs You (#989), and its run's agent is that row, not a
@@ -312,40 +372,40 @@ struct SidebarModelTests {
     @Test func aFailedWorkflowStandsForItsRunsAgent() {
         let model = AgentsModel()
         let asking = started(api, .waitingOnUser, "asking", at: 1)
-        var failed = started(api, .finished, "nightly run", at: 2)
-        failed.report = WorkReport(outcome: .stuck, message: "No network", at: t0)
+        var failed = started(api, .stopped, "nightly run", at: 2)
+        failed.endedReason = .runtimeError
         model.replaceAgents([asking, failed])
         var api = summary(self.api)
         api.approvals = [Approval(kind: .workflowFailed, key: "nightly", title: "Nightly", digest: "ran:x",
                                   line: "Run failed — No network", since: t0, actions: [.dismiss], agentID: failed.id)]
-        model.replaceProjects([api])
-        let projects = [key]
+        model.replaceFolders([api])
+        let folders = [key]
 
-        #expect(SidebarSmartRow.needsYou.agents(in: model, projects: projects).map(\.id) == [asking.id])
-        #expect(SidebarSmartRow.needsYou.approvals(in: model, projects: projects).map(\.approval.key) == ["nightly"])
-        #expect(SidebarSmartRow.needsYou.count(in: model, projects: projects) == 2)
+        #expect(SidebarSmartRow.needsYou.agents(in: model, folders: folders).map(\.id) == [asking.id])
+        #expect(SidebarSmartRow.needsYou.approvals(in: model, folders: folders).map(\.approval.key) == ["nightly"])
+        #expect(SidebarSmartRow.needsYou.count(in: model, folders: folders) == 2)
         #expect(api.hasFailedWorkflow)
         // With Working off, the pass over every session leaves it out the same way (#846).
         let on = SidebarSmartRow.all.subtracting([.working])
-        #expect(SidebarSmartRow.needsYou.count(in: model, projects: projects, on: on) == 2)
+        #expect(SidebarSmartRow.needsYou.count(in: model, folders: folders, on: on) == 2)
     }
 
-    /// Pinned gathers every project's pinned sessions in pin order, never an archived one
-    /// (#495), and they are not among their project's own sessions.
-    @Test func pinnedGathersEveryProjectsPinsInTheirOrder() {
+    /// Pinned gathers every folder's pinned sessions in pin order, never an archived one
+    /// (#495), and they are not among their folder's own sessions.
+    @Test func pinnedGathersEveryFoldersPinsInTheirOrder() {
         let model = AgentsModel()
         let first = started(api, .finished, "first", at: 1)
         let second = started(api, .running, "second", at: 2)
         let other = started(web, .finished, "other", at: 3)
         let gone = started(web, .archived, "gone", at: 4)
         model.replaceAgents([first, second, other, gone])
-        model.replacePins([ProjectPins(folder: api, pins: [], sessions: [second.id, first.id]),
-                           ProjectPins(folder: web, pins: [], sessions: [gone.id, other.id])])
-        let projects = [key, ProjectKey(host: .mac, folder: web)]
+        model.replacePins([FolderPins(folder: api, pins: [], sessions: [second.id, first.id]),
+                           FolderPins(folder: web, pins: [], sessions: [gone.id, other.id])])
+        let folders = [key, FolderKey(host: .mac, folder: web)]
 
-        #expect(SidebarSmartRow.pinned.agents(in: model, projects: projects).map(\.id) == [second.id, first.id, other.id])
-        #expect(SidebarSmartRow.pinned.count(in: model, projects: projects) == 3)
-        #expect(SidebarProjectFold(key, label: "api", in: model, isOpen: true).sessions.isEmpty)
+        #expect(SidebarSmartRow.pinned.agents(in: model, folders: folders).map(\.id) == [second.id, first.id, other.id])
+        #expect(SidebarSmartRow.pinned.count(in: model, folders: folders) == 3)
+        #expect(SidebarFolderFold(key, label: "api", in: model, isOpen: true).sessions.isEmpty)
     }
 
     /// A smart row with nothing in it is not drawn, nor one a search finds nothing in
@@ -354,18 +414,18 @@ struct SidebarModelTests {
         let model = AgentsModel()
         let asking = started(api, .waitingOnUser, "asking api", at: 1)
         model.replaceAgents([asking])
-        let projects = [key, ProjectKey(host: .mac, folder: web)]
+        let folders = [key, FolderKey(host: .mac, folder: web)]
 
-        #expect(SidebarSmartRow.needsYou.isShown(in: model, projects: projects))
-        #expect(!SidebarSmartRow.working.isShown(in: model, projects: projects))
-        #expect(!SidebarSmartRow.unread.isShown(in: model, projects: projects))
-        #expect(!SidebarSmartRow.pinned.isShown(in: model, projects: projects))
-        #expect(SidebarSmartRow.needsYou.isShown(in: model, projects: projects, query: "asking"))
-        #expect(!SidebarSmartRow.needsYou.isShown(in: model, projects: projects, query: "nothing like it"))
+        #expect(SidebarSmartRow.needsYou.isShown(in: model, folders: folders))
+        #expect(!SidebarSmartRow.working.isShown(in: model, folders: folders))
+        #expect(!SidebarSmartRow.unread.isShown(in: model, folders: folders))
+        #expect(!SidebarSmartRow.pinned.isShown(in: model, folders: folders))
+        #expect(SidebarSmartRow.needsYou.isShown(in: model, folders: folders, query: "asking"))
+        #expect(!SidebarSmartRow.needsYou.isShown(in: model, folders: folders, query: "nothing like it"))
     }
 
     /// Each live session is listed once (#587): in Pinned, else Needs You, else Working,
-    /// else Unread, else under its project; and every count says what its group lists.
+    /// else Unread, else under its folder; and every count says what its group lists.
     @Test func aSessionIsListedOnceInItsFirstGroup() {
         let model = AgentsModel()
         let pinnedAsking = started(api, .waitingOnUser, "pinned asking", at: 1)
@@ -376,48 +436,44 @@ struct SidebarModelTests {
         let unread = started(api, .finished, "unread", at: 6, unread: true)
         let read = started(api, .finished, "read", at: 7)
         model.replaceAgents([pinnedAsking, asking, pinnedWorking, working, pinnedUnread, unread, read])
-        model.replacePins([ProjectPins(folder: api, pins: [],
+        model.replacePins([FolderPins(folder: api, pins: [],
                                        sessions: [pinnedAsking.id, pinnedWorking.id, pinnedUnread.id])])
-        let projects = [key]
+        let folders = [key]
 
         let listed: [SidebarSmartRow: [UUID]] = Dictionary(uniqueKeysWithValues: SidebarSmartRow.allCases.map {
-            ($0, $0.agents(in: model, projects: projects).map(\.id))
+            ($0, $0.agents(in: model, folders: folders).map(\.id))
         })
         #expect(listed[.pinned] == [pinnedAsking.id, pinnedWorking.id, pinnedUnread.id])
         #expect(listed[.needsYou] == [asking.id])
         #expect(listed[.working] == [working.id])
         #expect(listed[.unread] == [unread.id])
-        let fold = SidebarProjectFold(key, label: "api", in: model, isOpen: true)
+        let fold = SidebarFolderFold(key, label: "api", in: model, isOpen: true)
         #expect(fold.sessions.map(\.id) == [read.id])
 
         for row in SidebarSmartRow.allCases {
-            #expect(row.count(in: model, projects: projects) == listed[row]?.count, "\(row)")
+            #expect(row.count(in: model, folders: folders) == listed[row]?.count, "\(row)")
         }
-        #expect(SidebarProjectFold.ownCount(key, in: model) == 1)
         let everyRow = listed.values.flatMap { $0 } + fold.sessions.map(\.id)
         #expect(everyRow.count == Set(everyRow).count, "nothing is listed twice")
         #expect(Set(everyRow).count == 7, "nothing is left out")
     }
 
     /// The session opened from Unread, read now, stays in Unread alone until another is
-    /// opened (#689): not under its project too, nor in its count.
-    @Test func theSessionUnreadKeepsIsNotUnderItsProjectToo() {
+    /// opened (#689): not under its folder too.
+    @Test func theSessionUnreadKeepsIsNotUnderItsFolderToo() {
         let model = AgentsModel()
         let opened = started(api, .finished, "opened", at: 2)
         let read = started(api, .finished, "read", at: 1)
         let working = started(api, .running, "working", at: 3)
         let pinned = started(api, .finished, "pinned", at: 4)
         model.replaceAgents([opened, read, working, pinned])
-        model.replacePins([ProjectPins(folder: api, pins: [], sessions: [pinned.id])])
+        model.replacePins([FolderPins(folder: api, pins: [], sessions: [pinned.id])])
 
         #expect(SidebarSmartRow.keptInUnread(opened.id, in: model)?.id == opened.id)
-        let fold = SidebarProjectFold(key, label: "api", in: model, isOpen: true, keptInUnread: opened.id)
+        let fold = SidebarFolderFold(key, label: "api", in: model, isOpen: true, keptInUnread: opened.id)
         #expect(fold.sessions.map(\.id) == [read.id])
-        #expect(SidebarProjectFold.ownCount(key, in: model, keptInUnread: opened.id) == 1)
-        #expect(SidebarProjectFold.ownCount(ProjectKey(host: .mac, folder: web), in: model, keptInUnread: opened.id) == 0)
-        // Let go, it is under its project.
-        #expect(SidebarProjectFold(key, label: "api", in: model, isOpen: true).sessions.map(\.id) == [opened.id, read.id])
-        #expect(SidebarProjectFold.ownCount(key, in: model) == 2)
+        // Let go, it is under its folder.
+        #expect(SidebarFolderFold(key, label: "api", in: model, isOpen: true).sessions.map(\.id) == [opened.id, read.id])
         // A search, or a home elsewhere, lets it go too.
         #expect(SidebarSmartRow.keptInUnread(opened.id, in: model, query: "opened") == nil)
         #expect(SidebarSmartRow.keptInUnread(working.id, in: model) == nil)
@@ -425,7 +481,7 @@ struct SidebarModelTests {
     }
 
     /// A smart group turned off (#846) is not drawn, and its sessions go to the next group
-    /// they fit, or under their project: still listed once, none left out.
+    /// they fit, or under their folder: still listed once, none left out.
     @Test func aGroupTurnedOffPassesItsSessionsOn() {
         let model = AgentsModel()
         let pinnedAsking = started(api, .waitingOnUser, "pinned asking", at: 1)
@@ -438,25 +494,24 @@ struct SidebarModelTests {
         var readArchiving = started(api, .finished, "read archiving", at: 7)
         readArchiving.archiveRequest = .requested(at: t0)
         model.replaceAgents([pinnedAsking, asking, working, archiving, unread, read, readArchiving])
-        model.replacePins([ProjectPins(folder: api, pins: [], sessions: [pinnedAsking.id])])
-        let projects = [key]
+        model.replacePins([FolderPins(folder: api, pins: [], sessions: [pinnedAsking.id])])
+        let folders = [key]
 
         func listing(_ on: Set<SidebarSmartRow>) -> (rows: [SidebarSmartRow: [UUID]], own: [UUID]) {
             let rows = Dictionary(uniqueKeysWithValues: SidebarSmartRow.allCases.map {
-                ($0, $0.agents(in: model, projects: projects, on: on).map(\.id))
+                ($0, $0.agents(in: model, folders: folders, on: on).map(\.id))
             })
             for row in SidebarSmartRow.allCases where on.contains(row) {
-                #expect(row.count(in: model, projects: projects, on: on) == rows[row]?.count, "\(row) \(on)")
+                #expect(row.count(in: model, folders: folders, on: on) == rows[row]?.count, "\(row) \(on)")
             }
-            let own = SidebarProjectFold(key, label: "api", in: model, isOpen: true, on: on).sessions.map(\.id)
-            #expect(SidebarProjectFold.ownCount(key, in: model, on: on) == own.count, "\(on)")
+            let own = SidebarFolderFold(key, label: "api", in: model, isOpen: true, on: on).sessions.map(\.id)
             let every = rows.values.flatMap { $0 } + own
             #expect(every.count == Set(every).count && Set(every).count == 7, "\(on): once each, none left out")
             return (rows, own)
         }
 
         // All on: those asking to be archived are in Needs You, not counted under their
-        // project too (#937).
+        // folder too (#937).
         let all = listing(SidebarSmartRow.all)
         #expect(all.own == [read.id])
 
@@ -464,19 +519,19 @@ struct SidebarModelTests {
         let noPins = listing(SidebarSmartRow.all.subtracting([.pinned]))
         #expect(noPins.rows[.pinned] == [])
         #expect(Set(noPins.rows[.needsYou] ?? []) == [pinnedAsking.id, asking.id, archiving.id, readArchiving.id])
-        #expect(!SidebarSmartRow.pinned.isShown(in: model, projects: projects, on: SidebarSmartRow.all.subtracting([.pinned])))
+        #expect(!SidebarSmartRow.pinned.isShown(in: model, folders: folders, on: SidebarSmartRow.all.subtracting([.pinned])))
 
         // Needs You off: the unread one asking to be archived goes to Unread, the one
-        // asking a question under its project.
+        // asking a question under its folder.
         let noNeeds = listing(SidebarSmartRow.all.subtracting([.needsYou]))
         #expect(Set(noNeeds.rows[.unread] ?? []) == [archiving.id, unread.id])
         #expect(noNeeds.own.contains(asking.id))
 
-        // Working off: the working session goes under its project.
+        // Working off: the working session goes under its folder.
         let noWorking = listing(SidebarSmartRow.all.subtracting([.working]))
         #expect(noWorking.own.contains(working.id))
 
-        // Every group off: all seven under the project, the pinned one too.
+        // Every group off: all seven under the folder, the pinned one too.
         let none = listing([])
         #expect(Set(none.own) == Set([pinnedAsking, asking, working, archiving, unread, read, readArchiving].map(\.id)))
         #expect(SidebarSmartRow.keptInUnread(read.id, in: model, on: []) == nil)

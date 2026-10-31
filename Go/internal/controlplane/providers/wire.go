@@ -1,4 +1,4 @@
-// Package providers is workspace providers on the control plane (#691, #858): MCP servers
+// Package providers is machine providers on the control plane (#691, #858): MCP servers
 // that start and stop the machines hosts run on, the prompts kept for a stopped one, and
 // Write It for Me. It ports ControlPlaneKit/Providers and the wire types in
 // AgentsKitCore/Control (Workspaces.swift, WorkspaceTools.swift, KeptWire.swift,
@@ -121,22 +121,34 @@ const (
 	MethodDraftAnswer       = "providers/draftAnswer"
 	MethodHostsLink         = "hosts/link"
 	MethodHostsUnlink       = "hosts/unlink"
-	MethodHostsSetOptions   = "hosts/setWorkspaceOptions"
+	MethodHostsSetOptions   = "hosts/setMachineOptions"
 	MethodHostsStart        = "hosts/start"
 	MethodHostsStop         = "hosts/stop"
-	MethodHostsDelete       = "hosts/deleteWorkspace"
+	MethodHostsDelete       = "hosts/deleteMachine"
 	MethodHostsKeep         = "hosts/keep"
 	MethodHostsListKept     = "hosts/listKept"
 	MethodHostsDropKept     = "hosts/dropKept"
 	MethodHostsRetryKept    = "hosts/retryKept"
-	MethodWorkspacesAgent   = "workspaces/forAgent"
-	MethodHostWorkspaces    = "host/workspaces"
+	MethodWorkspacesAgent   = "machines/forAgent"
+	MethodSessionOnMachine  = "machines/startSession"
+	MethodSessionCall       = "machines/sessionCall"
+	MethodSessionEnded      = "machines/sessionEnded"
+	MethodSendFolder        = "machines/sendFolder"
+	MethodHostMachines      = "host/machines"
 	MethodHostProviderDraft = "host/providerDraft"
 	MethodHostStatus        = "host/status"
 	MethodAgentsPrompt      = "agents/prompt"
 	MethodAgentsStart       = "agents/start"
 	MethodAgentsStop        = "agents/stop"
-	MethodProjectsClone     = "projects/clone"
+	MethodAgentsFromStarter = "agents/fromStarter"
+	MethodAgentsEndedThere  = "agents/endedElsewhere"
+	MethodFoldersClone      = "folders/clone"
+	MethodReceiveState      = "folders/receiveState"
+	MethodReceiveUpload     = "folders/receiveUpload"
+	MethodReceive           = "folders/receive"
+	MethodSendFacts         = "folders/sendFacts"
+	MethodSendPack          = "folders/sendPack"
+	MethodSendRead          = "folders/sendRead"
 )
 
 // Notification names (DaemonAPI.Notification).
@@ -158,10 +170,11 @@ var WorkspaceMethods = map[string]bool{
 }
 
 // AgentWorkspaceMethods is DaemonAPI.Method.agentWorkspaceMethods: what an agent may ask
-// through host/workspaces.
+// through host/machines.
 var AgentWorkspaceMethods = map[string]bool{
 	MethodWorkspacesAgent: true, MethodHostsStart: true, MethodHostsStop: true, MethodProvidersOptions: true,
-	MethodProvidersCreate: true, MethodHostsDelete: true,
+	MethodProvidersCreate: true, MethodHostsDelete: true, MethodSessionOnMachine: true, MethodSessionCall: true,
+	MethodSessionEnded: true, MethodSendFolder: true,
 }
 
 // KeptMethods is DaemonAPI.Method.keptMethods: the only requests that are kept.
@@ -200,14 +213,14 @@ func MakeProviderID(name string) string {
 	return head + "-" + string(b)
 }
 
-// WorkspaceInfo is DaemonAPI.WorkspaceInfo: one workspace, as its provider last listed it.
+// MachineInfo is DaemonAPI.MachineInfo: one workspace, as its provider last listed it.
 // State is running, starting, stopping, stopped or unknown; Host, in providers/list, the
 // host it is linked to.
-type WorkspaceInfo = wire.WorkspaceInfo
+type MachineInfo = wire.MachineInfo
 
-// MayBe is WorkspaceInfo.mayBe(hostNamed:) (#976): whether a host added by hand may be
+// MayBe is MachineInfo.mayBe(hostNamed:) (#976): whether a host added by hand may be
 // this workspace.
-func MayBe(w WorkspaceInfo, hostName string) bool {
+func MayBe(w MachineInfo, hostName string) bool {
 	host := strings.ToLower(hostName)
 	if w.SSH != nil && *w.SSH != "" && strings.ToLower(*w.SSH) == host {
 		return true
@@ -226,17 +239,17 @@ func MayBe(w WorkspaceInfo, hostName string) bool {
 // its commands, headers or secrets' values.
 type ProviderSummary = wire.ProviderSummary
 
-// HostWorkspace is DaemonAPI.HostWorkspace: a linked host's workspace, on its hosts/list
+// MachineWorkspace is DaemonAPI.MachineWorkspace: a linked host's workspace, on its hosts/list
 // row and in control/hostChanged. HostState is stopped, starting or stopping: shown over
 // the uplink's own state while it is not online, and stopping always. Phase, while
 // starting, is provider, connecting or sshStart.
-type HostWorkspace = wire.HostWorkspace
+type MachineWorkspace = wire.MachineWorkspace
 
 // Overlay is ControlRouter.described's part for workspaces: a host's description as
 // hosts/list and control/hostChanged say it, with its workspace laid over it. The
 // workspace's hostState names the state while the host is not online, and stopping
 // whatever it is.
-func Overlay(described map[string]any, online bool, ws *HostWorkspace) map[string]any {
+func Overlay(described map[string]any, online bool, ws *MachineWorkspace) map[string]any {
 	if ws == nil {
 		return described
 	}
@@ -253,7 +266,7 @@ func Overlay(described map[string]any, online bool, ws *HostWorkspace) map[strin
 
 // OfflineRefusal is ControlRouter.offlineRefusal: what a request for a host that is not
 // up is answered with. A host whose workspace is stopped says so (FR-022).
-func OfflineRefusal(ws *HostWorkspace) *Failure {
+func OfflineRefusal(ws *MachineWorkspace) *Failure {
 	if ws != nil && deref(ws.HostState) == "stopped" {
 		return fail(CodeHostOffline, "That machine is stopped. Start it to reach it.")
 	}
@@ -268,15 +281,15 @@ type ProviderAdd = wire.ProviderAdd
 
 type providerRequest = wire.ProviderRequest
 
-type hostRequest = wire.HostRequest
+type hostRequest = wire.MachineRequest
 
-// HostLink is DaemonAPI.HostLink: hosts/link.
-type HostLink = wire.HostLink
+// MachineLink is DaemonAPI.MachineLink: hosts/link.
+type MachineLink = wire.MachineLink
 
-// HostWorkspaceOptions is DaemonAPI.HostWorkspaceOptions. stopWhenIdleMinutes 0 turns it off.
-type HostWorkspaceOptions = wire.HostWorkspaceOptions
+// MachineOptions is DaemonAPI.MachineOptions. stopWhenIdleMinutes 0 turns it off.
+type MachineOptions = wire.MachineOptions
 
-// ProviderOptions is DaemonAPI.ProviderOptions: the New Workspace form, a JSON Schema.
+// ProviderOptions is DaemonAPI.ProviderOptions: the New Machine form, a JSON Schema.
 type ProviderOptions = wire.ProviderOptions
 
 // ProviderCreate is DaemonAPI.ProviderCreate: providers/create.
@@ -285,31 +298,34 @@ type ProviderCreate = wire.ProviderCreate
 // ProviderCreated is DaemonAPI.ProviderCreated: what providers/create made.
 type ProviderCreated = wire.ProviderCreated
 
-// HostStop is DaemonAPI.HostStop: hosts/stop.
-type HostStop = wire.HostStop
+// MachineStop is DaemonAPI.MachineStop: hosts/stop.
+type MachineStop = wire.MachineStop
 
-// HostWorkspaceCall is DaemonAPI.HostWorkspaceCall: host/workspaces, for an agent there.
+// MachineWorkspaceCall is DaemonAPI.MachineWorkspaceCall: host/machines, for an agent there.
 // Agent is who asked, for the log: "Claude (fix-login)".
-type HostWorkspaceCall = wire.HostWorkspaceCall
+type MachineWorkspaceCall = wire.MachineWorkspaceCall
 
-// AgentWorkspaces is DaemonAPI.AgentWorkspaces: what list_workspaces shows an agent.
-type AgentWorkspaces = wire.AgentWorkspaces
+// AgentMachines is DaemonAPI.AgentMachines: what list_machines shows an agent.
+type AgentMachines = wire.AgentMachines
 
-// AgentProvider is DaemonAPI.AgentWorkspaces.Provider.
-type AgentProvider = wire.AgentWorkspacesProvider
+// AgentProvider is DaemonAPI.AgentMachines.Provider.
+type AgentProvider = wire.AgentMachinesProvider
 
-// AgentWorkspace is DaemonAPI.AgentWorkspaces.Workspace.
-type AgentWorkspace = wire.AgentWorkspacesWorkspace
+// AgentWorkspace is DaemonAPI.AgentMachines.Workspace.
+type AgentWorkspace = wire.AgentMachinesMachine
 
-// HostStatus is DaemonAPI.HostStatus: host/status on channel 0 (#691 US4). Running is
+// AgentHost is AgentMachinesHost: one of the person's machines, for start_session (#2887).
+type AgentHost = wire.AgentMachinesHost
+
+// MachineStatus is DaemonAPI.MachineStatus: host/status on channel 0 (#691 US4). Running is
 // "Claude (fix-login)" for each agent working or waiting on a person; Schedule is nil from
 // a host from before #1004, and empty when nothing is scheduled.
-type HostStatus = wire.HostStatus
+type MachineStatus = wire.MachineStatus
 
-// HostSchedule is DaemonAPI.HostSchedule: a host's next scheduled workflow (#1004).
-type HostSchedule = wire.HostSchedule
+// MachineSchedule is DaemonAPI.MachineSchedule: a host's next scheduled workflow (#1004).
+type MachineSchedule = wire.MachineSchedule
 
-func schedule(s *HostSchedule) *Schedule {
+func schedule(s *MachineSchedule) *Schedule {
 	if s == nil {
 		return nil
 	}

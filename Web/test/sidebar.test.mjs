@@ -1,5 +1,5 @@
 // The one sidebar (#151, #499): folds kept in localStorage by host and folder, the smart groups and
-// what they gather, Activity pages and a project's archive in the address, and what the Activity
+// what they gather, Activity pages and a folder's archive in the address, and what the Activity
 // rows say at a glance.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -37,12 +37,12 @@ test("Pinned and Needs You start open, Working and Unread folded, and a fold of 
   assert.equal(next.isSmartOpen("needsYou"), false, "kept folded");
   assert.equal(next.isSmartOpen("pinned"), true, "only that group");
   assert.equal(next.isSmartOpen("working"), true, "kept open");
-  assert.equal(next.isOpen("mac", "file:///w/a"), false, "no project's fold is touched");
+  assert.equal(next.isOpen("mac", "file:///w/a"), false, "no folder's fold is touched");
   assert.deepEqual(JSON.parse(storage.getItem("agents.sidebar.folded")), ["smart:needsYou"]);
   assert.deepEqual(JSON.parse(storage.getItem("agents.sidebar.folds")), ["smart:working"]);
 });
 
-test("a project's Workflows fold starts folded and is kept per project (#885)", async () => {
+test("a folder's Workflows fold starts folded and is kept per folder (#885)", async () => {
   const { Folds } = await load("src/model/folds.ts");
   const storage = new Memory();
   const first = new Folds(storage);
@@ -50,9 +50,24 @@ test("a project's Workflows fold starts folded and is kept per project (#885)", 
   first.setWorkflows("mac", "file:///w/a", true);
   const next = new Folds(storage);
   assert.equal(next.isWorkflowsOpen("mac", "file:///w/a/"), true, "kept open");
-  assert.equal(next.isWorkflowsOpen("mac", "file:///w/b"), false, "only that project");
+  assert.equal(next.isWorkflowsOpen("mac", "file:///w/b"), false, "only that folder");
   assert.equal(next.isWorkflowsOpen("box", "file:///w/a"), false, "the same folder on another host folds apart");
-  assert.equal(next.isOpen("mac", "file:///w/a"), false, "the project's own fold is not touched");
+  assert.equal(next.isOpen("mac", "file:///w/a"), false, "the folder's own fold is not touched");
+});
+
+test("a folder's Sessions fold starts open and is kept per folder (#2312)", async () => {
+  const { Folds } = await load("src/model/folds.ts");
+  const storage = new Memory();
+  const first = new Folds(storage);
+  assert.equal(first.isSessionsOpen("mac", "file:///w/a"), true, "open until folded");
+  first.setSessions("mac", "file:///w/a", false);
+  const next = new Folds(storage);
+  assert.equal(next.isSessionsOpen("mac", "file:///w/a/"), false, "kept folded");
+  assert.equal(next.isSessionsOpen("mac", "file:///w/b"), true, "only that folder");
+  assert.equal(next.isSessionsOpen("box", "file:///w/a"), true, "the same folder on another host folds apart");
+  assert.equal(next.isWorkflowsOpen("mac", "file:///w/a"), false, "the Workflows fold is not touched");
+  next.setSessions("mac", "file:///w/a", true);
+  assert.deepEqual(JSON.parse(storage.getItem("agents.sidebar.folded")), [], "open again is the first state");
 });
 
 const agent = (id, createdAt, fields = {}) => ({ id, createdAt, lastActivityAt: createdAt, state: "finished",
@@ -104,46 +119,46 @@ test("Needs You gathers what an agent asked to have archived, each listed once (
   const asked = { requested: { at: 1 } };
   const live = [
     agent("done", 1, { archiveRequest: asked }),
-    agent("partly", 2, { archiveRequest: asked, report: { outcome: "partly_done", message: "m", at: 1 } }),
+    agent("partly", 2, { archiveRequest: asked, report: { outcome: "nothing_to_do", message: "m", at: 1 } }),
     agent("later", 3, { state: "running", archiveRequest: { whenTurnEnds: { since: 1 } } }),
     agent("asked-unread", 4, { archiveRequest: asked, isUnread: true }),
     agent("none", 5),
   ];
   assert.deepEqual(smartAgents("needsYou", live).map((a) => a.id), ["asked-unread", "partly", "done"],
-    "asked, and partly done, once each; not set to ask");
+    "asked, and nothing to do, once each; not set to ask");
   assert.deepEqual(smartAgents("unread", live).map((a) => a.id), [], "asking unread is in Needs You alone");
   assert.deepEqual(smartAgents("working", live).map((a) => a.id), ["later"]);
   assert.deepEqual(live.map((a) => home(a, false)), ["needsYou", "needsYou", "working", "needsYou", null]);
   assert.deepEqual(smartRows, ["pinned", "needsYou", "working", "unread"], "no Approve Archiving");
   assert.deepEqual(Object.keys(smartTitles), ["pinned", "needsYou", "working", "unread"]);
-  assert.deepEqual(live.map(sessionMark), ["asksToArchive", "needsYou", "working", "asksToArchive", "done"], "partly done still needs you");
+  assert.deepEqual(live.map(sessionMark), ["asksToArchive", "asksToArchive", "working", "asksToArchive", "done"], "nothing to do asks too (#1916)");
 });
 
 const approval = (kind, key, fields = {}) => ({ kind, key, title: key, line: "New with the last pull",
   actions: ["approve", "deny"], ...fields });
 
-test("Needs You lists every project's approvals, oldest first, but a session's archive request (#773)", async () => {
+test("Needs You lists every folder's approvals, oldest first, but a session's archive request (#773)", async () => {
   const { smartApprovals } = await load("src/model/sidebar.ts");
-  const projects = [
-    { project: "a", approvals: [approval("workflow", "nightly", { since: 30 }), approval("archive", "s1", { since: 1 })] },
-    { project: "b", approvals: [approval("mcpServer", "github", { since: 10 }), approval("plugin", "lint")] },
-    { project: "c" },
-    { project: "d", approvals: [approval("file", ".agents/pins.json", { since: 20, line: "Changed by Claude" })] },
+  const folders = [
+    { folder: "a", approvals: [approval("workflow", "nightly", { since: 30 }), approval("archive", "s1", { since: 1 })] },
+    { folder: "b", approvals: [approval("mcpServer", "github", { since: 10 }), approval("plugin", "lint")] },
+    { folder: "c" },
+    { folder: "d", approvals: [approval("file", ".agents/pins.json", { since: 20, line: "Changed by Claude" })] },
   ];
-  const listed = smartApprovals(projects);
-  assert.deepEqual(listed.map(({ project, approval }) => `${project}:${approval.key}`),
+  const listed = smartApprovals(folders);
+  assert.deepEqual(listed.map(({ folder, approval }) => `${folder}:${approval.key}`),
     ["b:lint", "b:github", "d:.agents/pins.json", "a:nightly"], "no time first, then oldest; the archive request is its session's row");
-  assert.equal(smartApprovals([{ project: "c" }]).length, 0);
+  assert.equal(smartApprovals([{ folder: "c" }]).length, 0);
 });
 
 test("a search matches an approval's title, kind and grey line (#773)", async () => {
   const { smartApprovals } = await load("src/model/sidebar.ts");
-  const projects = [{ project: "a", approvals: [
+  const folders = [{ folder: "a", approvals: [
     approval("mcpServer", "github"),
     approval("workflow", "nightly", { line: "Changed since you approved it" }),
     approval("archive", "s1"),
   ] }];
-  const keys = (query) => smartApprovals(projects, query).map(({ approval }) => approval.key);
+  const keys = (query) => smartApprovals(folders, query).map(({ approval }) => approval.key);
   assert.deepEqual(keys("GitHub"), ["github"], "the title, in any case");
   assert.deepEqual(keys("connector"), ["github"], "the kind in words");
   assert.deepEqual(keys(" since you "), ["nightly"], "the grey line, trimmed");
@@ -167,19 +182,19 @@ test("an approval's words are the window's, per kind (#773)", async () => {
   assert.ok(explanations.mcpServer.endsWith(".agents/mcp.json changes again."));
 });
 
-test("a project's sessions are one list, the pinned out of it; Pinned keeps pin order (#495)", async () => {
-  const { projectSessions, pinnedSessions, pinnedWorkflows } = await load("src/model/sidebar.ts");
+test("a folder's sessions are one list, the pinned out of it; Pinned keeps pin order (#495)", async () => {
+  const { folderSessions, pinnedSessions, pinnedWorkflows } = await load("src/model/sidebar.ts");
   const live = [agent("a", 1), agent("b", 3), agent("c", 2)];
-  assert.deepEqual(projectSessions(live, []).map((a) => a.id), ["b", "c", "a"], "newest started first, no headings");
-  assert.deepEqual(projectSessions(live, ["b"]).map((a) => a.id), ["c", "a"]);
+  assert.deepEqual(folderSessions(live, []).map((a) => a.id), ["b", "c", "a"], "newest started first, no headings");
+  assert.deepEqual(folderSessions(live, ["b"]).map((a) => a.id), ["c", "a"]);
   assert.deepEqual(pinnedSessions(live, ["a", "gone", "b"]).map((a) => a.id), ["a", "b"], "pin order, held only");
   const flow = (workflowID, isArchived = false) => ({ workflow: { workflowID }, isArchived });
   assert.deepEqual(pinnedWorkflows([flow("x"), flow("y", true), flow("z")], ["z", "y", "x"]).map((w) => w.workflow.workflowID),
     ["z", "x"], "an archived one only under Archived");
 });
 
-test("a session is listed once, in its first group: Pinned, Needs You, Working, Unread, else its project (#587)", async () => {
-  const { home, smartAgents, projectSessions, ownCount } = await load("src/model/sidebar.ts");
+test("a session is listed once, in its first group: Pinned, Needs You, Working, Unread, else its folder (#587)", async () => {
+  const { home, smartAgents, folderSessions } = await load("src/model/sidebar.ts");
   const live = [
     agent("pinned-asking", 1, { state: "waitingOnUser" }),
     agent("asking-unread", 2, { state: "waitingOnUser", isUnread: true }),
@@ -192,8 +207,7 @@ test("a session is listed once, in its first group: Pinned, Needs You, Working, 
   assert.deepEqual(smartAgents("needsYou", live, undefined, pins).map((a) => a.id), ["asking-unread"], "the pinned only in Pinned");
   assert.deepEqual(smartAgents("working", live, undefined, pins).map((a) => a.id), ["working-unread"]);
   assert.deepEqual(smartAgents("unread", live, undefined, pins).map((a) => a.id), ["unread"], "not those busy");
-  assert.deepEqual(projectSessions(live, pins).map((a) => a.id), ["read"], "its project has the rest");
-  assert.equal(ownCount(live, pins), 1);
+  assert.deepEqual(folderSessions(live, pins).map((a) => a.id), ["read"], "its folder has the rest");
 });
 
 test("Unread keeps the session opened from it in its place (#495)", async () => {
@@ -205,20 +219,19 @@ test("Unread keeps the session opened from it in its place (#495)", async () => 
   assert.deepEqual(withKept(shown, undefined).map((a) => a.id), ["new", "old"]);
 });
 
-test("the session Unread keeps is not under its project too, until another is opened (#689)", async () => {
-  const { keepsInUnread, projectSessions, ownCount } = await load("src/model/sidebar.ts");
+test("the session Unread keeps is not under its folder too, until another is opened (#689)", async () => {
+  const { keepsInUnread, folderSessions } = await load("src/model/sidebar.ts");
   const live = [agent("opened", 2), agent("read", 1), agent("working", 3, { state: "running" })];
   assert.equal(keepsInUnread(live[0], []), true, "read now, still kept");
-  assert.deepEqual(projectSessions(live, [], undefined, "opened").map((a) => a.id), ["read"]);
-  assert.equal(ownCount(live, [], "opened"), 1);
-  assert.deepEqual(projectSessions(live, []).map((a) => a.id), ["opened", "read"], "under its project once let go");
+  assert.deepEqual(folderSessions(live, [], undefined, "opened").map((a) => a.id), ["read"]);
+  assert.deepEqual(folderSessions(live, []).map((a) => a.id), ["opened", "read"], "under its folder once let go");
   assert.equal(keepsInUnread(live[0], ["opened"]), false, "pinned, it is in Pinned");
   assert.equal(keepsInUnread(live[2], []), false, "working, it is in Working");
   assert.equal(keepsInUnread(agent("gone", 4, { state: "archived" }), []), false);
 });
 
-test("a group turned off is not drawn, and its sessions go to the next group they fit, or under their project (#846)", async () => {
-  const { smartAgents, smartRows, projectSessions, ownCount, keepsInUnread, pinnedSessions } = await load("src/model/sidebar.ts");
+test("a group turned off is not drawn, and its sessions go to the next group they fit, or under their folder (#846)", async () => {
+  const { smartAgents, smartRows, folderSessions, keepsInUnread, pinnedSessions } = await load("src/model/sidebar.ts");
   const live = [
     agent("pinned-asking", 1, { state: "waitingOnUser" }),
     agent("asking", 2, { state: "waitingOnUser" }),
@@ -235,8 +248,7 @@ test("a group turned off is not drawn, and its sessions go to the next group the
     const rows = Object.fromEntries(smartRows.map((row) => [row, !on.has(row) ? []
       : row === "pinned" ? pinnedSessions(live, pins).map((a) => a.id)
       : smartAgents(row, live, undefined, pins, on).map((a) => a.id)]));
-    const own = projectSessions(live, pins, undefined, undefined, on).map((a) => a.id);
-    assert.equal(ownCount(live, pins, undefined, on), own.length, "the project's count is what it lists");
+    const own = folderSessions(live, pins, undefined, undefined, on).map((a) => a.id);
     const every = [...Object.values(rows).flat(), ...own];
     assert.equal(new Set(every).size, every.length, "once each");
     assert.equal(every.length, live.length, "none left out");
@@ -248,13 +260,13 @@ test("a group turned off is not drawn, and its sessions go to the next group the
   const noPins = listing(without("pinned"));
   assert.deepEqual(noPins.rows.pinned, []);
   assert.deepEqual(new Set(noPins.rows.needsYou), new Set(["pinned-asking", "asking", "archiving"]));
-  // Needs You off: the unread one asking to be archived goes to Unread, the one asking under its project.
+  // Needs You off: the unread one asking to be archived goes to Unread, the one asking under its folder.
   const noNeeds = listing(without("needsYou"));
   assert.deepEqual(new Set(noNeeds.rows.unread), new Set(["archiving", "unread"]));
   assert.ok(noNeeds.own.includes("asking"));
-  // Working off: the working session goes under its project.
+  // Working off: the working session goes under its folder.
   assert.ok(listing(without("working")).own.includes("working"));
-  // Every group off: all six under the project, the pinned one too, and Unread keeps nothing.
+  // Every group off: all six under the folder, the pinned one too, and Unread keeps nothing.
   const none = listing(new Set());
   assert.deepEqual(new Set(none.own), new Set(live.map((a) => a.id)));
   assert.equal(keepsInUnread(live[5], [], new Set()), false, "Unread off keeps nothing");
@@ -275,44 +287,44 @@ test("the groups on round-trip through what this browser keeps: the groups off (
   }
 });
 
-test("Settings is in the address on its own (#846)", async () => {
+test("Settings is a section in the address on its own (#846, #2141)", async () => {
   globalThis.location = { hash: "" };
   globalThis.addEventListener = () => {};
   try {
     const { parseRoute, routeHash } = await load("src/route.ts");
-    assert.equal(routeHash({ settings: true, host: "mac", project: "file:///w/a" }), "#/settings");
-    assert.deepEqual(parseRoute("#/settings"), { settings: true });
-    assert.deepEqual(parseRoute("#/a/settings"), {}, "not an Activity page");
+    assert.equal(routeHash({ nav: "settings", host: "mac", folder: "file:///w/a" }), "#/settings");
+    assert.deepEqual(parseRoute("#/settings"), { nav: "settings" });
+    assert.deepEqual(parseRoute("#/a/settings"), {}, "not an Activity page: the Overview");
   } finally {
     delete globalThis.location;
     delete globalThis.addEventListener;
   }
 });
 
-test("New Session starts in the project last started in, while it is live (#495)", async () => {
-  const { newSessionProject, rememberedProject, rememberProject } = await load("src/model/sidebar.ts");
+test("New Session starts in the folder last started in, while it is live (#495)", async () => {
+  const { newSessionFolder, rememberedFolder, rememberFolder } = await load("src/model/sidebar.ts");
   const live = [{ host: "mac", folder: "file:///w/a/" }, { host: "box", folder: "file:///w/b" }];
-  assert.deepEqual(newSessionProject(live, { host: "box", folder: "file:///w/b/" }, undefined), live[1]);
-  assert.deepEqual(newSessionProject(live, { host: "mac", folder: "file:///w/gone" }, live[1]), live[1], "else the one open");
-  assert.deepEqual(newSessionProject(live, undefined, undefined), live[0], "else the first");
-  assert.equal(newSessionProject([], undefined, undefined), undefined);
+  assert.deepEqual(newSessionFolder(live, { host: "box", folder: "file:///w/b/" }, undefined), live[1]);
+  assert.deepEqual(newSessionFolder(live, { host: "mac", folder: "file:///w/gone" }, live[1]), live[1], "else the one open");
+  assert.deepEqual(newSessionFolder(live, undefined, undefined), live[0], "else the first");
+  assert.equal(newSessionFolder([], undefined, undefined), undefined);
   const storage = new Memory();
-  assert.equal(rememberedProject(storage), undefined);
-  rememberProject(storage, live[1]);
-  assert.deepEqual(rememberedProject(storage), live[1]);
-  storage.setItem("agents.sidebar.newSessionProject", "{bad");
-  assert.equal(rememberedProject(storage), undefined, "stored badly, none");
+  assert.equal(rememberedFolder(storage), undefined);
+  rememberFolder(storage, live[1]);
+  assert.deepEqual(rememberedFolder(storage), live[1]);
+  storage.setItem("agents.sidebar.newSessionFolder", "{bad");
+  assert.equal(rememberedFolder(storage), undefined, "stored badly, none");
 });
 
-test("a project's archive is in the address (#499)", async () => {
+test("a folder's archive is in the address (#499)", async () => {
   globalThis.location = { hash: "" };
   globalThis.addEventListener = () => {};
   try {
     const { parseRoute, routeHash } = await load("src/route.ts");
-    const hash = routeHash({ host: "mac", project: "file:///w/a", archive: true });
+    const hash = routeHash({ host: "mac", folder: "file:///w/a", archive: true });
     assert.equal(hash, "#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/ar/1");
-    assert.deepEqual(parseRoute(hash), { host: "mac", project: "file:///w/a", archive: true });
-    assert.equal(routeHash({ host: "mac", project: "file:///w/a", session: "s", archive: true }),
+    assert.deepEqual(parseRoute(hash), { host: "mac", folder: "file:///w/a", archive: true });
+    assert.equal(routeHash({ host: "mac", folder: "file:///w/a", session: "s", archive: true }),
       "#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/s/s", "a session opened from it is a page of its own");
   } finally {
     delete globalThis.location;
@@ -332,19 +344,19 @@ test("folds stored badly, or a storage that refuses, leave everything folded", a
   assert.equal(held.isOpen("mac", "file:///w/a"), true, "held for this visit");
 });
 
-test("an Activity page is in the address on its own, and an unknown one is ignored", async () => {
+test("an Activity page is a page of Machines or Reports (#2141), and an unknown one is ignored", async () => {
   globalThis.location = { hash: "" };
   globalThis.addEventListener = () => {};
   try {
     const { parseRoute, routeHash } = await load("src/route.ts");
-    assert.equal(routeHash({ activity: "events", host: "mac", project: "file:///w/a" }), "#/a/events");
-    assert.deepEqual(parseRoute("#/a/spending"), { activity: "spending" });
-    assert.deepEqual(parseRoute("#/a/time"), { activity: "time" });
-    assert.deepEqual(parseRoute("#/a/milestones"), { activity: "milestones" });
-    assert.deepEqual(parseRoute("#/a/mcp"), { activity: "mcp" }, "Connectors has a page of its own (#589)");
-    assert.deepEqual(parseRoute("#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/m/1"), { host: "mac", project: "file:///w/a", mcp: true },
-      "a project's Connectors has a page of its own (#753)");
-    assert.equal(routeHash({ host: "mac", project: "file:///w/a", mcp: true }), "#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/m/1");
+    assert.equal(routeHash({ nav: "reports", section: "events", host: "mac", folder: "file:///w/a" }), "#/reports/events");
+    assert.deepEqual(parseRoute("#/a/spending"), { nav: "reports", section: "usage" });
+    assert.deepEqual(parseRoute("#/a/time"), { nav: "reports", section: "usage" });
+    assert.deepEqual(parseRoute("#/a/milestones"), { nav: "reports", section: "milestones" });
+    assert.deepEqual(parseRoute("#/a/mcp"), { nav: "machines", section: "mcp" }, "Connectors has a page of its own (#589)");
+    assert.deepEqual(parseRoute("#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/m/1"), { host: "mac", folder: "file:///w/a", mcp: true },
+      "a folder's Connectors has a page of its own (#753)");
+    assert.equal(routeHash({ host: "mac", folder: "file:///w/a", mcp: true }), "#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/m/1");
     assert.deepEqual(parseRoute("#/a/settings"), {});
   } finally {
     delete globalThis.location;
@@ -360,21 +372,21 @@ test("the Connectors row: none hosted says nothing, one stopped in use is the co
   assert.deepEqual(hostedTally([server("gh", "running"), server("ci", "restarting")]), { words: "1 stopped", stopped: true });
 });
 
-test("Connectors: every connector's health, the person's and each project's, in the words the Mac has (#753)", async () => {
-  const { healthTally, healthLine, healthKind, healthLastError, healthTone, personalServers, projectServers, fileProblem } =
+test("Connectors: every connector's health, the person's and each folder's, in the words the Mac has (#753)", async () => {
+  const { healthTally, healthLine, healthKind, healthLastError, healthTone, personalServers, folderServers, fileProblem } =
     await load("src/model/hostedMCP.ts");
   const snapshot = {
     at: 0,
-    problems: [{ project: "/w/b", message: "mcp.json is not valid JSON. (line 3)" }],
+    problems: [{ folder: "/w/b", message: "mcp.json is not valid JSON. (line 3)" }],
     servers: [
       { name: "github", transport: "http", hosted: false, check: "answered", tools: 3, checkedAt: 0 },
       { name: "local", transport: "stdio", hosted: false, check: "failed", lastError: "The command was not found.", checkedAt: 0 },
       { name: "shared", transport: "stdio", hosted: true, check: "unchecked" },
-      { name: "tools", project: "/w/a", transport: "stdio", hosted: false, check: "waiting" },
+      { name: "tools", folder: "/w/a", transport: "stdio", hosted: false, check: "waiting" },
     ],
   };
   assert.deepEqual(personalServers(snapshot).map((s) => s.name), ["github", "local", "shared"]);
-  assert.deepEqual(projectServers(snapshot, "file:///w/a/").map((s) => s.name), ["tools"], "a folder URL finds the path");
+  assert.deepEqual(folderServers(snapshot, "file:///w/a/").map((s) => s.name), ["tools"], "a folder URL finds the path");
   assert.equal(fileProblem(snapshot, "file:///w/b"), "mcp.json is not valid JSON. (line 3)");
   assert.equal(fileProblem(snapshot), undefined);
   const [github, local, shared, tools] = snapshot.servers;
@@ -385,7 +397,7 @@ test("Connectors: every connector's health, the person's and each project's, in 
   assert.equal(healthLine(shared), "Hosted · starts on the first call");
   assert.equal(healthKind(local), "stdio · run in each session");
   assert.equal(healthKind(shared), "stdio · hosted");
-  assert.equal(healthLine(tools), "Waiting for approval in this project's settings, so it is not started");
+  assert.equal(healthLine(tools), "Waiting for approval in this folder's settings, so it is not started");
   assert.equal(healthTone(local), "failing");
   assert.equal(healthTone(shared), "quiet");
   assert.equal(healthTally([]), null);
@@ -394,7 +406,7 @@ test("Connectors: every connector's health, the person's and each project's, in 
 });
 
 test("Connectors: each shows its five levels, from what it declares, in the words the Mac has (#1428)", async () => {
-  const { connectorLevels, levelsSentence, madeByAgents } = await load("src/model/hostedMCP.ts");
+  const { connectorLevels, levelsSentence } = await load("src/model/hostedMCP.ts");
   const github = { tools: true, events: true, views: false, workflows: false, tested: false };
   assert.deepEqual(connectorLevels(github).map((l) => l.name), ["Tools", "Events", "Views", "Workflows", "Tested"]);
   assert.deepEqual(connectorLevels(github).filter((l) => l.reached).map((l) => l.name), ["Tools", "Events"]);
@@ -404,7 +416,6 @@ test("Connectors: each shows its five levels, from what it declares, in the word
   assert.equal(levelsSentence({ tools: false, events: false, views: false, workflows: false, tested: false }),
     "Reaches none of the five levels yet.");
   assert.equal(levelsSentence({ tools: true, events: true, views: true, workflows: true, tested: true }), "Reaches all five levels.");
-  assert.equal(madeByAgents, "Made by Agents");
 });
 
 test("Activity rows: spending added up by currency, headroom, out of the pool", async () => {
@@ -435,13 +446,13 @@ test("Events: where an event is, and everything it carries (#541)", async () => 
   const { eventIsIn, eventDetailRows } = await load("src/views/Activity.tsx");
   const event = (scope, fields = {}) => ({ position: 7, name: "agent.finished", at: 0, count: 1, scope, sentence: "x",
     details: {}, chainDepth: 0, consequences: [], ...fields });
-  const inProject = event({ project: { _0: "file:///w/api/" } });
+  const inFolder = event({ folder: { _0: "file:///w/api/" } });
   const onMac = event({ mac: {} });
-  assert.equal(eventIsIn("all", "mac", inProject), true);
+  assert.equal(eventIsIn("all", "mac", inFolder), true);
   assert.equal(eventIsIn("mac", "mac", onMac), true);
-  assert.equal(eventIsIn("mac", "mac", inProject), false);
-  assert.equal(eventIsIn("mac|file:///w/api", "mac", inProject), true, "a trailing slash is the same folder");
-  assert.equal(eventIsIn("box|file:///w/api", "mac", inProject), false, "the same folder on another host is apart");
+  assert.equal(eventIsIn("mac", "mac", inFolder), false);
+  assert.equal(eventIsIn("mac|file:///w/api", "mac", inFolder), true, "a trailing slash is the same folder");
+  assert.equal(eventIsIn("box|file:///w/api", "mac", inFolder), false, "the same folder on another host is apart");
   assert.equal(eventIsIn("mac|file:///w/api", "mac", onMac), false);
   const rows = eventDetailRows(event({ mac: {} }, {
     count: 3, lastAt: 60_000, publisher: { agentID: "a", title: "Fix it" }, message: "done", details: { b: "2", a: "1" },
@@ -455,43 +466,43 @@ test("Events: where an event is, and everything it carries (#541)", async () => 
   assert.deepEqual(byAna[2], ["By", "Ana · Ana's iPhone"], "a person's call names them (#1751)");
 });
 
-test("Archived projects: every host's, the latest worked on first, apart from the live ones (#343)", async () => {
+test("Archived folders: every host's, the latest worked on first, apart from the live ones (#343)", async () => {
   globalThis.location = { hash: "" };
   globalThis.addEventListener = () => {};
   try {
-    const { archivedProjects } = await load("src/views/Sidebar.tsx");
-    const project = (name, lastActivityAt, archivedAt) => ({ name, lastActivityAt,
-      project: { folder: `file:///w/${name}/`, addedAt: 0, ...(archivedAt === undefined ? {} : { archivedAt }) } });
+    const { archivedFolders } = await load("src/views/Sidebar.tsx");
+    const folder = (name, lastActivityAt, archivedAt) => ({ name, lastActivityAt,
+      folder: { folder: `file:///w/${name}/`, addedAt: 0, ...(archivedAt === undefined ? {} : { archivedAt }) } });
     const hosts = [{ id: "mac", name: "This Mac" }, { id: "box", name: "box" }];
-    const shown = archivedProjects(hosts, {
-      mac: [project("live", 50), project("old", 10, 20)],
-      box: [project("newer", 30, 40)],
+    const shown = archivedFolders(hosts, {
+      mac: [folder("live", 50), folder("old", 10, 20)],
+      box: [folder("newer", 30, 40)],
     });
-    assert.deepEqual(shown.map(({ host, project }) => `${host.id}:${project.name}`), ["box:newer", "mac:old"]);
-    assert.deepEqual(archivedProjects(hosts, { mac: [project("live", 50)] }), [], "none archived, no fold");
+    assert.deepEqual(shown.map(({ host, folder }) => `${host.id}:${folder.name}`), ["box:newer", "mac:old"]);
+    assert.deepEqual(archivedFolders(hosts, { mac: [folder("live", 50)] }), [], "none archived, no fold");
   } finally {
     delete globalThis.location;
     delete globalThis.addEventListener;
   }
 });
 
-test("Projects: this Mac's then each server's, oldest added first, however busy (#357)", async () => {
+test("Folders: this Mac's then each server's, oldest added first, however busy (#357)", async () => {
   globalThis.location = { hash: "" };
   globalThis.addEventListener = () => {};
   try {
-    const { orderedProjects } = await load("src/views/Sidebar.tsx");
-    const project = (name, addedAt, lastActivityAt = 0, archivedAt) => ({ name, lastActivityAt,
-      project: { folder: `file:///w/${name}/`, addedAt, ...(archivedAt === undefined ? {} : { archivedAt }) } });
+    const { orderedFolders } = await load("src/views/Sidebar.tsx");
+    const folder = (name, addedAt, lastActivityAt = 0, archivedAt) => ({ name, lastActivityAt,
+      folder: { folder: `file:///w/${name}/`, addedAt, ...(archivedAt === undefined ? {} : { archivedAt }) } });
     const hosts = [{ id: "box", name: "box" }, { id: "mac", name: "This Mac" }];
-    const names = (projects) => orderedProjects(hosts, projects).map(({ host, project }) => `${host.id}:${project.name}`);
-    const listed = { mac: [project("busy", 20, 999), project("first", 10), project("gone", 5, 0, 30)],
-                     box: [project("api", 1)] };
+    const names = (folders) => orderedFolders(hosts, folders).map(({ host, folder }) => `${host.id}:${folder.name}`);
+    const listed = { mac: [folder("busy", 20, 999), folder("first", 10), folder("gone", 5, 0, 30)],
+                     box: [folder("api", 1)] };
     assert.deepEqual(names(listed), ["mac:first", "mac:busy", "box:api"], "activity does not move a row");
-    listed.mac.push(project("new", 40));
-    assert.deepEqual(names(listed), ["mac:first", "mac:busy", "mac:new", "box:api"], "a new project lands at the end");
-    assert.deepEqual(names({ mac: [project("b", 10), project("a", 10)] }), ["mac:a", "mac:b"], "same moment: by folder");
-    const pinned = (p) => ({ ...p, project: { ...p.project, pinned: true } });
-    assert.deepEqual(names({ mac: [project("a", 1), pinned(project("chat", 2))], box: [pinned(project("api", 3))] }),
+    listed.mac.push(folder("new", 40));
+    assert.deepEqual(names(listed), ["mac:first", "mac:busy", "mac:new", "box:api"], "a new folder lands at the end");
+    assert.deepEqual(names({ mac: [folder("b", 10), folder("a", 10)] }), ["mac:a", "mac:b"], "same moment: by folder");
+    const pinned = (p) => ({ ...p, folder: { ...p.folder, pinned: true } });
+    assert.deepEqual(names({ mac: [folder("a", 1), pinned(folder("chat", 2))], box: [pinned(folder("api", 3))] }),
       ["mac:chat", "box:api", "mac:a"], "the pinned first, from every host");
   } finally {
     delete globalThis.location;
@@ -499,20 +510,20 @@ test("Projects: this Mac's then each server's, oldest added first, however busy 
   }
 });
 
-test("Status and Usage are open until folded, and Archived projects closed until opened (#915, #343)", async () => {
+test("Status and Usage are open until folded, and Archived folders closed until opened (#915, #343)", async () => {
   const m = await load("test/preferences-entry.ts");
   const sent = [];
   m.sendPreferencesWith((changes) => sent.push(changes));
   const folds = new m.Folds(new Memory());
   assert.equal(folds.showsStatus.value, true, "open by default");
   assert.equal(folds.showsUsage.value, true, "open by default");
-  assert.equal(folds.showsArchivedProjects.value, false, "closed by default");
+  assert.equal(folds.showsArchivedFolders.value, false, "closed by default");
   folds.setShowsStatus(false);
-  folds.setShowsArchivedProjects(true);
+  folds.setShowsArchivedFolders(true);
   assert.equal(folds.showsStatus.value, false);
   assert.equal(folds.showsUsage.value, true, "folding Status leaves Usage open");
-  assert.equal(folds.showsArchivedProjects.value, true);
-  assert.deepEqual(sent, [{ showsActivity: false }, { showsArchivedProjects: true }], "sent to the Mac, by the window's names");
+  assert.equal(folds.showsArchivedFolders.value, true);
+  assert.deepEqual(sent, [{ showsActivity: false }, { showsArchivedFolders: true }], "sent to the Mac, by the window's names");
   folds.setShowsStatus(false);
   assert.equal(sent.length, 2, "no change, nothing sent");
 });
@@ -520,42 +531,51 @@ test("Status and Usage are open until folded, and Archived projects closed until
 test("the sidebar follows what the Mac says (#1033)", async () => {
   const m = await load("test/preferences-entry.ts");
   const folds = new m.Folds(new Memory());
-  m.preferencesSaid({ showsActivity: false, showsUsage: false, showsArchivedProjects: true, sidebarSmartGroupsOff: "" });
+  m.preferencesSaid({ showsActivity: false, showsUsage: false, showsArchivedFolders: true, sidebarSmartGroupsOff: "" });
   assert.equal(folds.showsStatus.value, false);
   assert.equal(folds.showsUsage.value, false);
-  assert.equal(folds.showsArchivedProjects.value, true);
+  assert.equal(folds.showsArchivedFolders.value, true);
   assert.equal(m.smartGroupsOn.value.size, 4, "every group on is a choice too");
   m.preferencesSaid({});
   assert.equal(folds.showsStatus.value, true, "nothing said is the default");
   assert.equal(m.smartGroupsOn.value.has("working"), false, "Working is off at first (#979)");
 });
 
-test("a tab holding one project alone keeps it in every address in it, until ‹ All (#1089)", async () => {
+test("a tab holding one folder alone keeps it in every address in it, until ‹ All (#1089)", async () => {
   globalThis.location = { hash: "#/o/1/h/mac/p/file%3A%2F%2F%2Fw%2Fa/n/1", pathname: "/", search: "" };
   globalThis.addEventListener = () => {};
   const went = [];
   try {
     const { alone, aloneURL, parseRoute, route, routeHash, showAll } = await load("src/route.ts");
-    assert.deepEqual(parseRoute(location.hash), { alone: true, host: "mac", project: "file:///w/a", compose: true });
-    assert.deepEqual(alone.value, { host: "mac", folder: "file:///w/a" }, "opened alone, it holds the project");
+    assert.deepEqual(parseRoute(location.hash), { alone: true, host: "mac", folder: "file:///w/a", compose: true });
+    assert.deepEqual(alone.value, { host: "mac", folder: "file:///w/a" }, "opened alone, it holds the folder");
     assert.equal(route.value.compose, true);
-    assert.equal(routeHash({ host: "mac", project: "file:///w/a/", session: "s" }),
+    assert.equal(routeHash({ host: "mac", folder: "file:///w/a/", session: "s" }),
       "#/o/1/h/mac/p/file%3A%2F%2F%2Fw%2Fa%2F/s/s", "a session in it stays alone");
-    assert.equal(routeHash({ host: "mac", project: "file:///w/b", session: "t" }),
-      "#/h/mac/p/file%3A%2F%2F%2Fw%2Fb/s/t", "another project's is not");
+    assert.equal(routeHash({ host: "mac", folder: "file:///w/b", session: "t" }),
+      "#/h/mac/p/file%3A%2F%2F%2Fw%2Fb/s/t", "another folder's is not");
     assert.equal(aloneURL("box", "file:///w/c"), "/#/o/1/h/box/p/file%3A%2F%2F%2Fw%2Fc/n/1", "Open in New Tab");
     Object.defineProperty(globalThis.location, "hash", { get: () => "", set: (h) => went.push(h), configurable: true });
     showAll();
     assert.equal(alone.value, undefined);
-    assert.deepEqual(went, ["#/h/mac/p/file%3A%2F%2F%2Fw%2Fa"], "‹ All goes to the project among every project");
+    assert.deepEqual(went, ["#/h/mac/p/file%3A%2F%2F%2Fw%2Fa"], "‹ All goes to the folder among every folder");
   } finally {
     delete globalThis.location;
     delete globalThis.addEventListener;
   }
 });
 
-test("a tab holding one project is titled with its name (#1089)", async () => {
+test("a tab holding one folder is titled with its name (#1089)", async () => {
   const { titleFor } = await load("src/presence.ts");
   assert.equal(titleFor(0), "Agents");
   assert.equal(titleFor(2, "alpha"), "(2) alpha");
+});
+
+test("Remove…'s words name a server and say a refusal as a removal (#2266)", async () => {
+  const { removesWords, notRemoved, notRemovedOffline } = await load("src/model/hostedMCP.ts");
+  assert.equal(removesWords("github", true, "devbox"),
+    "This removes the github entry from .agents/mcp.json on devbox. Agents started after that won't have it.");
+  assert.equal(removesWords("github", false), "This removes the github entry from ~/.agents/mcp.json. Agents started after that won't have it. A copy of the entry is kept in ~/.agents/mcp.removed.json.");
+  assert.equal(notRemovedOffline("github", "devbox"), "github was not removed: devbox is offline.");
+  assert.equal(notRemoved("github", "That machine is offline."), "github was not removed. That machine is offline.");
 });

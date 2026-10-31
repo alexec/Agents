@@ -33,9 +33,9 @@ type SidecarRecord struct {
 	FolderHash *string `json:"folderHash,omitempty"`
 }
 
-// SidecarKey is personal/<name>, or <project folder>/<name>.
+// SidecarKey is personal/<name>, or <folder>/<name>.
 func SidecarKey(d wire.SkillDestination, name string) string {
-	if d.Kind == wire.SkillDestinationKindProject && d.Folder != nil {
+	if d.Kind == wire.SkillDestinationKindFolder && d.Folder != nil {
 		return filepath.Clean(*d.Folder) + "/" + name
 	}
 	return "personal/" + name
@@ -52,6 +52,7 @@ func LoadSidecar(path string) Sidecar {
 	if json.Unmarshal(b, &s) != nil {
 		aside := fmt.Sprintf("%s.unreadable-%d", path, time.Now().Unix())
 		os.Rename(path, aside)
+		store.TrimSetAsides(path)
 		log.Printf("%s: unreadable; kept as %s; skills added from the catalogue show without where they were taken from",
 			filepath.Base(path), filepath.Base(aside))
 		return empty

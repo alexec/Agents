@@ -14,7 +14,7 @@ import (
 )
 
 // manage_workflows, and the words a workflow is listed in, as DaemonCore+AppTools and
-// Workflow.summary say them on the Swift host. An agent works on its own project's
+// Workflow.summary say them on the Swift host. An agent works on its own folder's
 // workflows; what it writes starts off, and waits for the person's OK.
 
 func clock12(hour, minute int64) string {
@@ -275,7 +275,7 @@ func notInFolder(id string) error {
 	if id == "" {
 		id = "that"
 	}
-	return &Error{Code: wire.FailureNotInWorkflowFolder, Message: "Workflows can only be read and written inside this project's .agents/workflows, and " +
+	return &Error{Code: wire.FailureNotInWorkflowFolder, Message: "Workflows can only be read and written inside this folder's .agents/workflows, and " +
 		id + " is not a name in it."}
 }
 
@@ -285,13 +285,13 @@ func (d *Daemon) manageWorkflows(caller wire.UUID, args map[string]json.RawMessa
 	if a == nil {
 		return "", &Error{Code: CodeNoSuchAgent, Message: "That conversation is not open any more, so nothing was changed."}
 	}
-	project := projectFolder(a)
+	folder := folderPath(a)
 	id := argString(args, "id")
 	switch action := argString(args, "action"); action {
 	case "list":
-		list := d.workflowSummaries(project)
+		list := d.workflowSummaries(folder)
 		if len(list) == 0 {
-			return "This project has no workflows yet. They live in .agents/workflows, one Markdown file each.", nil
+			return "This folder has no workflows yet. They live in .agents/workflows, one Markdown file each.", nil
 		}
 		lines := []string{fmt.Sprintf("%d workflows:", len(list))}
 		if len(list) == 1 {
@@ -325,40 +325,64 @@ func (d *Daemon) manageWorkflows(caller wire.UUID, args map[string]json.RawMessa
 		}
 		return strings.Join(lines, "\n"), nil
 	case "read":
-		path, ok := workflowPath(project, id)
-		if !ok {
-			return "", notInFolder(id)
-		}
-		text, _, why := readWorkflowFile(path)
-		if why != "" {
-			d.workflowMu.Lock()
-			f := d.fileLocked(project, id)
+		d.workflowMu.Lock()
+		d.scanLocked()
+		f := d.fileLocked(folder, id)
+		if f == nil {
+			path, ok := workflowPath(folder, id)
 			d.workflowMu.Unlock()
-			if f != nil && f.readyMade {
-				return f.text, nil // ready-made, with no file yet (#1342)
+			if !ok {
+				return "", notInFolder(id)
+			}
+			if _, _, why := readWorkflowFile(path); why != "" {
+				return "", &Error{Code: wire.FailureWorkflowUnreadable, Message: id + ".md could not be read."}
 			}
 			return "", noSuchWorkflow(id)
 		}
+		if f.scope == "user" {
+			d.workflowMu.Unlock()
+			return "", &Error{Code: wire.FailureNotAllowed, Message: "This workflow belongs to your workflows. Open it in Settings ▸ Agent Configuration ▸ Workflows."}
+		}
+		if f.wf.Problem != nil && f.wf.Problem.Unreadable != nil {
+			d.workflowMu.Unlock()
+			return "", &Error{Code: wire.FailureWorkflowUnreadable, Message: id + ".md could not be read."}
+		}
+		text := f.text
+		d.workflowMu.Unlock()
 		return text, nil
 	case "write":
-		return d.writeWorkflow(project, id, argString(args, "content"))
+		d.workflowMu.Lock()
+		d.scanLocked()
+		existing := d.fileLocked(folder, id)
+		d.workflowMu.Unlock()
+		if existing != nil && existing.scope == "user" {
+			return "", &Error{Code: wire.FailureNotAllowed, Message: "This workflow belongs to your workflows. Edit it in Settings ▸ Agent Configuration ▸ Workflows."}
+		}
+		return d.writeWorkflow(folder, id, argString(args, "content"))
 	case "remove":
-		path, ok := workflowPath(project, id)
+		d.workflowMu.Lock()
+		d.scanLocked()
+		existing := d.fileLocked(folder, id)
+		d.workflowMu.Unlock()
+		if existing != nil && existing.scope == "user" {
+			return "", &Error{Code: wire.FailureNotAllowed, Message: "This workflow belongs to your workflows. Remove it in Settings ▸ Agent Configuration ▸ Workflows."}
+		}
+		path, ok := workflowPath(folder, id)
 		if !ok {
 			return "", notInFolder(id)
 		}
 		if _, err := os.Stat(path); err != nil {
 			return "", noSuchWorkflow(id)
 		}
-		if err := d.deleteWorkflow(wire.WorkflowRequest{Folder: store.FolderURL(project), WorkflowID: id}); err != nil {
+		if err := d.deleteWorkflow(wire.WorkflowRequest{Folder: store.FolderURL(folder), WorkflowID: id}); err != nil {
 			return "", err
 		}
 		return id + " is gone. It will not run again.", nil
 	case "enable", "disable":
-		if _, ok := workflowPath(project, id); !ok {
+		if _, ok := workflowPath(folder, id); !ok {
 			return "", notInFolder(id)
 		}
-		s, err := d.oneWorkflow(project, id)
+		s, err := d.oneWorkflow(folder, id)
 		if err != nil {
 			return "", err
 		}
@@ -372,19 +396,19 @@ func (d *Daemon) manageWorkflows(caller wire.UUID, args map[string]json.RawMessa
 		if on && s.OffReason != nil {
 			switch *s.OffReason {
 			case wire.WorkflowOffReasonFile:
-				return "", &Error{Code: wire.FailureWorkflowTurnedOffByPerson, Message: "Nothing was changed: " + id + "'s file says `enabled: false`, so it stays off until the person turns it on from the project page. Ask them to if it should run."}
+				return "", &Error{Code: wire.FailureWorkflowTurnedOffByPerson, Message: "Nothing was changed: " + id + "'s file says `enabled: false`, so it stays off until the person turns it on from the folder page. Ask them to if it should run."}
 			case wire.WorkflowOffReasonWrittenByAgent:
 				return "", &Error{Code: wire.FailureWorkflowTurnedOffByPerson, Message: "Nothing was changed: " + id + " was written by an agent, so it starts off until the person turns it on from its page. Ask them to if it should run."}
 			case wire.WorkflowOffReasonPerson:
-				return "", &Error{Code: wire.FailureWorkflowTurnedOffByPerson, Message: "Nothing was changed: " + id + " was turned off by the person, so only they can turn it back on, from the project page. Ask them to if it should run again."}
+				return "", &Error{Code: wire.FailureWorkflowTurnedOffByPerson, Message: "Nothing was changed: " + id + " was turned off by the person, so only they can turn it back on, from the folder page. Ask them to if it should run again."}
 			}
 		}
-		got, err := d.enableWorkflow(wire.WorkflowEnableRequest{Folder: store.FolderURL(project), WorkflowID: id, Enabled: on}, "agent")
+		got, err := d.enableWorkflow(wire.WorkflowEnableRequest{Folder: store.FolderURL(folder), WorkflowID: id, Enabled: on}, "agent")
 		if err != nil {
 			return "", err
 		}
 		if !on {
-			return "Turned off " + id + ". None of its triggers will run it until it is turned back on; it stays on the project page, marked off, " +
+			return "Turned off " + id + ". None of its triggers will run it until it is turned back on; it stays on the folder page, marked off, " +
 				"where Run now still runs it. Tell them you turned it off and why.", nil
 		}
 		note := "Turned " + id + " back on. Its triggers run it again."
@@ -393,29 +417,29 @@ func (d *Daemon) manageWorkflows(caller wire.UUID, args map[string]json.RawMessa
 		}
 		return note, nil
 	case "run":
-		return d.runWorkflowForAgent(a, project, id)
+		return d.runWorkflowForAgent(a, folder, id)
 	}
 	return "", Invalid("Nothing was done: `action` has to be one of list, read, write, remove, enable, disable or run.")
 }
 
 // runWorkflowForAgent is manage_workflows' run (#1524): Run now, as the person's, but never
 // one that is turned off, and at the caller's chain depth, so runs cannot loop.
-func (d *Daemon) runWorkflowForAgent(a *wire.Agent, project, id string) (string, error) {
-	if _, ok := workflowPath(project, id); !ok {
+func (d *Daemon) runWorkflowForAgent(a *wire.Agent, folder, id string) (string, error) {
+	if _, ok := workflowPath(folder, id); !ok {
 		return "", notInFolder(id)
 	}
 	d.workflowMu.Lock()
 	d.scanLocked()
 	d.workflowMu.Unlock()
-	s, err := d.oneWorkflow(project, id)
+	s, err := d.oneWorkflow(folder, id)
 	if err != nil {
 		return "", err
 	}
 	if s.IsArchived {
-		return "", &Error{Code: wire.FailureWorkflowTurnedOffByPerson, Message: "Nothing was run: " + id + " is archived. Ask the person to bring it back from the project page if it should run."}
+		return "", &Error{Code: wire.FailureWorkflowTurnedOffByPerson, Message: "Nothing was run: " + id + " is archived. Ask the person to bring it back from the folder page if it should run."}
 	}
 	if s.AwaitingApproval != nil {
-		return "", &Error{Code: wire.FailureWorkflowTurnedOffByPerson, Message: "Nothing was run: " + id + " is waiting for the person's OK on the project page. Ask them to approve it if it should run."}
+		return "", &Error{Code: wire.FailureWorkflowTurnedOffByPerson, Message: "Nothing was run: " + id + " is waiting for the person's OK on the folder page. Ask them to approve it if it should run."}
 	}
 	if !s.IsEnabled {
 		return "", &Error{Code: wire.FailureWorkflowTurnedOffByPerson, Message: "Nothing was run: " + id + " is turned off, so only the person runs it, with Run now on its page. Ask them to if it should run."}
@@ -427,8 +451,8 @@ func (d *Daemon) runWorkflowForAgent(a *wire.Agent, project, id string) (string,
 	if a.ChainDepth != nil {
 		depth = *a.ChainDepth
 	}
-	d.fire(fireRequest{folder: project, id: id, byHand: true, byAgent: &a.ID, trigger: byHandTrigger(), depth: depth})
-	after, err := d.oneWorkflow(project, id)
+	d.fire(fireRequest{folder: folder, id: id, byHand: true, byAgent: &a.ID, trigger: byHandTrigger(), depth: depth})
+	after, err := d.oneWorkflow(folder, id)
 	if err != nil {
 		return "", err
 	}
@@ -437,21 +461,21 @@ func (d *Daemon) runWorkflowForAgent(a *wire.Agent, project, id string) (string,
 	case o == nil:
 		return "", &Error{Code: wire.FailureNoSuchWorkflow, Message: "Nothing was run: " + id + " does not run on this computer."}
 	case o.Ran != nil:
-		return "Ran " + id + ": it started agent " + string(o.Ran.AgentID) + ". Use wait_for_event with that id to wait for it to finish, or read_session to see it.", nil
+		return "Ran " + id + ": it started agent " + string(o.Ran.AgentID) + ". Use wait_for_agents with that id to wait for it to finish, or read_session to see it.", nil
 	}
 	return "", &Error{Code: wire.FailureNotAllowed, Message: "Nothing was run: " + id + " did not run, as " + refusalWords(o.Refused.Value) + "."}
 }
 
 // writeWorkflow is manage_workflows' write: the whole file, checked, and a new one off.
-func (d *Daemon) writeWorkflow(project, id, content string) (string, error) {
-	path, ok := workflowPath(project, id)
+func (d *Daemon) writeWorkflow(folder, id, content string) (string, error) {
+	path, ok := workflowPath(folder, id)
 	if !ok {
 		return "", notInFolder(id)
 	}
 	if content == "" {
 		return "", Invalid("Nothing was written: `content` has to be the whole file.")
 	}
-	parsed := parseWorkflow(content, id, project)
+	parsed := parseWorkflow(content, id, folder)
 	if p := parsed.Problem; p != nil && p.Unreadable != nil {
 		return "", &Error{Code: wire.FailureWorkflowUnreadable, Message: "That front matter could not be read: " + p.Unreadable.Value + ". Nothing was written."}
 	}
@@ -467,25 +491,8 @@ func (d *Daemon) writeWorkflow(project, id, content string) (string, error) {
 	}
 	d.workflowMu.Lock()
 	d.scanLocked()
-	existing := d.fileLocked(project, id)
+	existing := d.fileLocked(folder, id)
 	archived := existing != nil && isArchived(existing.wf)
-	var waiting []string
-	for wid, f := range d.workflowFiles[project] {
-		if a, _ := d.approvalOf(project, wid, f); a != nil && !isArchived(f.wf) {
-			waiting = append(waiting, wid)
-		}
-	}
-	sortStrings(waiting)
-	isWaiting := false
-	for _, w := range waiting {
-		isWaiting = isWaiting || w == id
-	}
-	if !archived && !isWaiting && len(waiting) >= workflowsWaitingPerProject {
-		d.workflowMu.Unlock()
-		return "", &Error{Code: wire.FailureWorkflowLimitReached, Message: fmt.Sprintf("Approve or remove one of the %d workflows waiting for approval first. "+
-			"Nothing was written: %s are waiting for their OK in this project. Change one of those instead, or ask them to approve or remove one to make room.",
-			workflowsWaitingPerProject, strings.Join(waiting[:workflowsWaitingPerProject], ", "))}
-	}
 	text := content
 	var err error
 	off := existing == nil || isOff(existing.wf)
@@ -507,13 +514,13 @@ func (d *Daemon) writeWorkflow(project, id, content string) (string, error) {
 		d.workflowMu.Unlock()
 		return "", &Error{Code: wire.FailureWorkflowUnreadable, Message: "Nothing was written: " + err.Error() + "."}
 	}
-	os.MkdirAll(workflowsFolder(project), 0o755)
-	if _, ok := workflowPath(project, id); !ok {
+	os.MkdirAll(workflowsFolder(folder), 0o755)
+	if _, ok := workflowPath(folder, id); !ok {
 		d.workflowMu.Unlock()
 		return "", notInFolder(id)
 	}
 	digest := sha256Hex(text)
-	st := d.stateLocked(project, id, true)
+	st := d.stateLocked(folder, id, true)
 	if existing == nil {
 		st.OffBy, st.OffDigest, st.HeldFire = strPtr("writtenByAgent"), &digest, nil
 	} else if st.OffDigest != nil && *st.OffDigest == existing.digest {
@@ -525,10 +532,10 @@ func (d *Daemon) writeWorkflow(project, id, content string) (string, error) {
 		return "", &Error{Code: wire.FailureCouldNotSave, Message: "Nothing was written: " + err.Error()}
 	}
 	d.scanLocked()
-	f := d.fileLocked(project, id)
-	awaiting, _ := d.approvalOf(project, id, f)
+	f := d.fileLocked(folder, id)
+	awaiting, _ := d.approvalOf(folder, id, f)
 	d.workflowMu.Unlock()
-	d.tellWorkflow(project, id)
+	d.tellWorkflow(folder, id)
 	verb := "Changed"
 	if existing == nil {
 		verb = "Created"
@@ -540,19 +547,19 @@ func (d *Daemon) writeWorkflow(project, id, content string) (string, error) {
 	summary := workflowSummaryWords(parsed)
 	switch {
 	case archived:
-		return verb + " " + id + ". " + summary + ". It is archived, though, so it will not run until they bring it back from the project page. Tell them it is there." + warning, nil
+		return verb + " " + id + ". " + summary + ". It is archived, though, so it will not run until they bring it back from the folder page. Tell them it is there." + warning, nil
 	case awaiting != nil:
 		startsOff := ""
 		if existing == nil {
 			startsOff = " It starts turned off (the app wrote `enabled: false` into it): once they have approved it, they turn it on from its page when they are ready, and you cannot."
 		}
-		return verb + " " + id + ". " + summary + ". It will not run until they approve it on the project page, so tell them it is waiting for their OK and what it does." +
+		return verb + " " + id + ". " + summary + ". It will not run until they approve it on the folder page, so tell them it is waiting for their OK and what it does." +
 			startsOff + warning, nil
 	case existing == nil:
 		return "Created " + id + ". " + summary + ". It is turned off (the app wrote `enabled: false` into it), so none of its triggers run it until they turn it on " +
-			"from the project page, where they can also run it, or archive it if it is not what they wanted. Tell them it is there and what it does." + warning, nil
+			"from the folder page, where they can also run it, or archive it if it is not what they wanted. Tell them it is there and what it does." + warning, nil
 	}
-	return verb + " " + id + ". " + summary + ". It is live now; it shows on the project page, where they can run it, or archive it if it is not what they wanted." + warning, nil
+	return verb + " " + id + ". " + summary + ". It is live now; it shows on the folder page, where they can run it, or archive it if it is not what they wanted." + warning, nil
 }
 
 func sortStrings(s []string) { sort.Strings(s) }

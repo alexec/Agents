@@ -209,7 +209,7 @@ test("a file is inside the agent's folders, or it is not, and a cut-short listin
   assert.equal(insideScope("/proj/a.md", ["/proj"]), true);
   assert.equal(insideScope("/proj", ["/proj"]), true);
   assert.equal(insideScope("/proj-secret/a.md", ["/proj"]), false);
-  assert.equal(insideScope("/project/a.md", ["/proj"]), false);
+  assert.equal(insideScope("/folder/a.md", ["/proj"]), false);
   assert.equal(insideScope("/tmp/a", ["/"]), true);
   assert.equal(insideScope("/proj/a.md", ["/proj/"]), true);
   assert.equal(insideScope("/tmp/a", []), false);

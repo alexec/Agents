@@ -1,7 +1,8 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>Linear issues</title>
 <!-- The linear server's Issues (ui://linear/issues, #1343): show_issues's result, the same
-     shape as the github server's Issues page. A team, a state or a label narrows it. Start
+     shape as the github server's Issues page, in sections by how each relates to the viewer
+     (#2453). A team, a state or a label narrows it. Start
      Agent opens the app's new-agent form filled in for the issue (agents/start-agent, #834).
      It has no network: it speaks only the MCP Apps bridge. -->
 <style>
@@ -9,22 +10,40 @@
 .start { grid-column: 3; grid-row: 1 / span 2; white-space: nowrap; }
 .meta { grid-column: 2; }
 select { font: inherit; }
+.issue-details { grid-column: 1 / -1; min-width: 0; padding: 8px 10px; border-radius: var(--border-radius-sm);
+  background: var(--color-background-secondary); }
+.issue-details[hidden] { display: none; }
+.issue-body { margin-top: 6px; overflow-wrap: anywhere; }
+.issue-body > :first-child { margin-top: 0; }
+.issue-body > :last-child { margin-bottom: 0; }
+.issue-body pre { overflow-x: auto; padding: 8px; background: var(--color-background-tertiary); border-radius: var(--border-radius-sm); }
+.issue-row { cursor: pointer; }
+.issue-row:hover { background: var(--color-background-secondary); }
+.issue-row:focus-visible { outline: 2px solid var(--color-text-info); outline-offset: -2px; }
+.label-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0; }
+.label-filters input { min-width: 12em; }
 </style></head>
 <body><main>
   <header><h1>Linear issues</h1>
     <select id="team" title="Team" disabled><option value="">Every team</option></select>
     <select id="state" title="State" disabled><option value="">Every open state</option></select>
-    <span id="label"></span><span class="grow"></span>
+    <span class="grow"></span>
     <button id="refresh" type="button" disabled>Refresh</button></header>
+  <div class="label-filters" role="group" aria-label="Filter issues by labels">
+    <span class="muted">Labels</span><span id="label-tags"></span>
+    <input id="label-input" type="text" aria-label="Add a label filter" placeholder="Add label filter" list="label-options" autocomplete="off">
+    <datalist id="label-options"></datalist>
+  </div>
   <div id="state-line" class="muted">Waiting for the host…</div>
   <ul id="issues"></ul>
 </main>
 <script>
 /*bridge.js*/
+/*lineage.js*/
 (() => {
-  let team = "", state = "", label = "";
+  let team = "", state = "", activeLabels = [];
   const ui = bridge("linear-issues", {
-    input: (args) => { team = args.team || ""; state = args.state || ""; label = args.label || ""; say("Listing…"); },
+    input: (args) => { team = args.team || ""; state = args.state || ""; activeLabels = args.label ? [args.label] : []; drawLabel(); say("Listing…"); },
     result: (result) => draw(result),
     cancelled: (why) => say("Cancelled: " + why, true),
     started: () => say("Waiting for the issues…"),
@@ -41,51 +60,103 @@ select { font: inherit; }
   };
 
   const drawLabel = () => {
-    if (!label) { $("label").replaceChildren(); return; }
-    $("label").replaceChildren(button(label + " ✕", () => choose({ label: "" }), { className: "pill chosen", title: "Show every label" }));
+    $("label-tags").replaceChildren(...activeLabels.map((name) => button(name + " ✕", () => choose({ removeLabel: name }),
+      { className: "pill chosen", title: `Remove ${name} label filter` })));
   };
 
   const draw = (result) => {
     const found = ui.data(result);
     if (!found) { say("Couldn't list Linear issues: " + ui.errorText(result), true); $("refresh").disabled = false; return; }
     const issues = Array.isArray(found.issues) ? found.issues : [];
+    const options = [...new Set(issues.flatMap((issue) => issue.labels || []))].filter((name) => !activeLabels.includes(name));
+    $("label-options").replaceChildren(...options.map((name) => el("option", { value: name })));
     fill($("team"), "Every team", (found.teams || []).map((t) => [t.key, `${t.name} (${t.key})`]), team);
     fill($("state"), "Every open state", (found.states || []).map((s) => [s, stateWords[s] || s]), state);
-    $("issues").replaceChildren(...issues.map(row));
+    $("issues").replaceChildren(...ui.sections(issues, row));
     drawLabel();
     const started = issues.filter((issue) => issue.stateType === "started").length;
     say(issues.length ? `${issues.length} open · ${started} in progress · as of ${new Date().toLocaleTimeString()}`
-      : label ? `No open issues labelled ${label}.` : "No open issues.");
+      : activeLabels.length ? `No open issues labelled ${activeLabels.join(" and ")}.` : "No open issues.");
     $("refresh").disabled = false;
   };
 
   const row = (issue) => {
-    const labels = (issue.labels || []).map((name) => button(name, () => choose({ label: name === label ? "" : name }),
-      { className: name === label ? "pill chosen" : "pill", title: "Only issues labelled " + name }));
+    const issueLabels = (issue.labels || []).map((name) => button(name, () => choose({ addLabel: name }),
+      { className: activeLabels.includes(name) ? "pill chosen" : "pill", title: "Filter by label " + name }));
     const assignee = issue.assignee
       ? el("span", { className: "pill assigned", textContent: issue.assignee, title: "Assigned to " + issue.assignee }) : null;
-    const comments = issue.comments ? ` · ${issue.comments} comment${issue.comments === 1 ? "" : "s"}` : "";
-    const priority = issue.priority ? ` · ${issue.priority}` : "";
+    const comments = issue.comments ? `${issue.comments} comment${issue.comments === 1 ? "" : "s"}` : "";
     const start = button("Start Agent", () => startAgent(issue),
       { className: "start", title: `A new agent for ${issue.identifier}, in a worktree of its own` });
-    return el("li", {}, [
+    const details = el("div", { className: "issue-details", hidden: true });
+    details.id = `issue-details-${issue.identifier}`;
+    const item = el("li", { className: "issue-row" }, [
       link(issue.identifier, issue.url),
       el("span", { className: "title", textContent: issue.title, title: issue.title }),
       start,
       el("span", { className: "meta" }, [
         el("span", { className: "pill", textContent: issue.state || stateWords[issue.stateType] || "" }),
         assignee,
-        el("span", { textContent: `${issue.author || "someone"}${priority}${comments}${issue.updatedAt ? " · " + ui.ago(issue.updatedAt) : ""}` }),
-        ...labels,
+        ...ui.who(issue.author, issue.authorBot),
+        el("span", { textContent: [issue.priority, comments, issue.updatedAt ? ui.ago(issue.updatedAt) : ""].filter(Boolean).join(" · ") }),
+        ...issueLabels,
       ]),
+      details,
     ]);
+    item.tabIndex = 0;
+    item.setAttribute("aria-label", `Issue ${issue.identifier}: ${issue.title}`);
+    item.setAttribute("aria-expanded", "false");
+    item.setAttribute("aria-controls", details.id);
+    item.addEventListener("click", (event) => {
+      if (event.target.closest("a, button, select, .issue-details")) return;
+      toggleDetails(issue, item, details);
+    });
+    item.addEventListener("keydown", (event) => {
+      if (event.target !== item || (event.key !== "Enter" && event.key !== " ")) return;
+      event.preventDefault(); toggleDetails(issue, item, details);
+    });
+    return item;
+  };
+
+  const toggleDetails = async (issue, item, target) => {
+    const expanded = item.getAttribute("aria-expanded") === "true";
+    item.setAttribute("aria-expanded", String(!expanded));
+    target.hidden = expanded;
+    if (expanded || target.dataset.loaded || target.dataset.loading) return;
+    target.dataset.loading = "true";
+    target.replaceChildren(el("span", { className: "muted", textContent: "Loading issue description…" }));
+    try {
+      const details = await ui.call("show_issue_details", { identifier: issue.identifier });
+      const description = el("div", { className: "issue-body" });
+      if (details.description) renderMarkdown(description, details.descriptionHTML || "", issue.url);
+      else description.textContent = "No description.";
+      target.replaceChildren(el("span", { className: "muted", textContent: "Description" }), description,
+        lineageSection(ui, issue.url));
+      target.dataset.loaded = "true";
+    } catch (e) {
+      target.replaceChildren(el("span", { className: "error", textContent: "Couldn't load issue description: " + e.message }));
+    } finally {
+      delete target.dataset.loading;
+    }
+  };
+
+  const renderMarkdown = (target, html, base) => {
+    target.innerHTML = html;
+    for (const anchor of target.querySelectorAll("a")) {
+      try {
+        const url = new URL(anchor.getAttribute("href"), base);
+        if (!["http:", "https:", "mailto:"].includes(url.protocol)) { anchor.removeAttribute("href"); continue; }
+        anchor.href = url.href;
+        anchor.onclick = (event) => { event.preventDefault(); ui.openLink(url.href); };
+      } catch { anchor.removeAttribute("href"); }
+    }
   };
 
   // The app's new-agent form, filled in for this issue (#834). The person starts it, or not.
   // The identifier in the branch and the pull request's title is how Linear links them.
   const startAgent = async (issue) => {
     const id = issue.identifier;
-    const prompt = `Work on Linear issue ${id}: ${issue.title}\n${issue.url}\n\n`
+    const prompt = `${id}: ${issue.title}\n\nWork on this Linear issue: ${issue.url}\n\n`
       + `Read it with Linear's MCP server (mcp.linear.app). First assign it to yourself and move it to In Progress. `
       + `Put ${id} in the branch name and in the pull request's title, so Linear links the pull request to the issue.`;
     try {
@@ -99,16 +170,29 @@ select { font: inherit; }
     const args = {};
     if (team) args.team = team;
     if (state) args.state = state;
-    if (label) args.label = label;
-    try { draw(await ui.request("tools/call", { name: "show_issues", arguments: args })); }
+    try {
+      const results = await Promise.all((activeLabels.length ? activeLabels : [""]).map((name) => ui.call("show_issues", name ? { ...args, label: name } : args)));
+      const first = results[0];
+      const common = activeLabels.length > 1 ? results.slice(1).reduce((items, result) => {
+        const ids = new Set((result.issues || []).map((issue) => issue.identifier));
+        return items.filter((issue) => ids.has(issue.identifier));
+      }, first.issues || []) : first.issues || [];
+      draw({ structuredContent: { ...first, issues: common } });
+    }
     catch (e) { say("Couldn't list Linear issues: " + e.message, true); $("refresh").disabled = false; }
   };
   const choose = (change) => {
     if ("team" in change) team = change.team;
     if ("state" in change) state = change.state;
-    if ("label" in change) label = change.label;
+    if ("addLabel" in change && change.addLabel && !activeLabels.includes(change.addLabel)) activeLabels = [...activeLabels, change.addLabel];
+    if ("removeLabel" in change) activeLabels = activeLabels.filter((item) => item !== change.removeLabel);
     drawLabel(); say("Listing…"); list();
   };
+  const labelInput = $("label-input");
+  const addTypedLabel = () => { const name = labelInput.value.trim().replace(/,$/, ""); if (name) { labelInput.value = ""; choose({ addLabel: name }); } };
+  labelInput.onkeydown = (event) => { if (event.key === "Enter" || event.key === ",") { event.preventDefault(); addTypedLabel(); } };
+  labelInput.onchange = addTypedLabel;
+  labelInput.onblur = addTypedLabel;
   $("team").onchange = () => choose({ team: $("team").value });
   $("state").onchange = () => choose({ state: $("state").value });
   $("refresh").onclick = list;

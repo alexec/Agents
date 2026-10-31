@@ -5,7 +5,7 @@ import Foundation
 /// The line between these two is the whole care of it. A file we cannot read is broken
 /// and somebody has to fix it. A file we can read but cannot act on is a file from the
 /// future, and the right response is to leave it alone. They get different rows on the
-/// project page and different words, because they ask different things of the reader.
+/// folder page and different words, because they ask different things of the reader.
 public enum WorkflowProblem: Codable, Hashable, Sendable {
     /// The front matter, or the body, could not be read. Says where.
     case unreadable(String)
@@ -34,15 +34,15 @@ public enum WorkflowProblem: Codable, Hashable, Sendable {
 
 /// One workflow: a prompt that runs itself.
 ///
-/// The file in the project is the whole of the definition, which is what lets a
-/// project's standing arrangements travel with its code, be reviewed in a pull request
+/// The file in the folder is the whole of the definition, which is what lets a
+/// folder's standing arrangements travel with its code, be reviewed in a pull request
 /// and be edited by anyone with an editor. Nothing about running it is written back.
 public struct Workflow: Codable, Hashable, Sendable, Identifiable {
     /// The file name without its extension. Identity, which is why renaming a workflow
     /// is deletion and creation rather than a rename: the pause and the standing agent
     /// belong to the name.
     public var workflowID: String
-    /// The project it is in, standardised the way every other folder in the app is.
+    /// The folder it is in, standardised the way every other folder in the app is.
     public var folder: URL
     /// What to call it. The file may say; otherwise the file name does.
     public var name: String
@@ -71,7 +71,7 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
     public var cooldown: TimeInterval?
     /// The Enabled switch, from the file's `enabled:` (#42, #125): `false` is off,
     /// `nil` or `true` is on. The switch writes this line, so the choice travels with
-    /// the project to every clone and host.
+    /// the folder to every clone and host.
     public var enabled: Bool?
     /// Archived, from the file's `archived: true` (#125). Archive writes the line and
     /// Unarchive takes it out; `nil` is a file that does not say, which is not archived.
@@ -108,7 +108,7 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
     /// Whether its switch is off.
     public var isOff: Bool { enabled == false }
 
-    /// Unique across projects, so one window showing two of them cannot collide.
+    /// Unique across folders, so one window showing two of them cannot collide.
     public var id: String { folder.path + "/" + workflowID }
 
     public init(workflowID: String, folder: URL, name: String? = nil,
@@ -127,7 +127,7 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
         self.enabled = enabled
         self.archived = archived
         self.workflowID = workflowID
-        self.folder = Project.standardize(folder)
+        self.folder = Folder.standardize(folder)
         self.name = name ?? Self.defaultName(for: workflowID)
         self.triggers = triggers
         self.mode = mode
@@ -164,7 +164,7 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
     }
 
     /// What Runs on means, on every client (#2064).
-    public static let runsOnSentence = "Every machine with this project runs it, or each machine turned on here. The file stores each machine's id, so renaming one does not unpin it."
+    public static let runsOnSentence = "Every machine with this folder runs it, or each machine turned on here. The file stores each machine's id, so renaming one does not unpin it."
 
     /// A `runs-on:` list as the Runs on section shows it (#2064): the machines it names, any
     /// one of which runs it, and the labels every one of them also needs (a bot, an os, a
@@ -201,7 +201,7 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
 
     /// What it is, in one line, in the words a person would use.
     ///
-    /// One renderer, read by the project-page row and by what an agent's write is told
+    /// One renderer, read by the folder-page row and by what an agent's write is told
     /// it made. Two would drift, and what the agent reports would stop being what the
     /// person later sees.
     public var summary: String {
@@ -243,11 +243,15 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
 
 /// A workflow, plus what the app knows about it that its file cannot say.
 ///
-/// Resolved by the daemon and sent whole, for the reason `ProjectSummary` is: two
+/// Resolved by the daemon and sent whole, for the reason `FolderSummary` is: two
 /// windows cannot then disagree, and one that missed a notification is put right by the
 /// next rather than drifting.
 public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     public var workflow: Workflow
+    /// Whether this file belongs to the folder or to the person.
+    public var scope: String
+    /// The complete file text. The daemon sends it for the user's Settings list.
+    public var content: String?
     /// Put away by the person. Archived workflows are still listed — under their own
     /// heading, where they can be brought back — and never run.
     public var isArchived: Bool
@@ -257,9 +261,9 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     /// fire, and Run now still runs it.
     public var isEnabled: Bool
     /// Which ceiling this one is past, if any: listed, and inert until something else
-    /// is approved, archived or removed — `.project` for a waiting one past the three
-    /// a project may have waiting (#132), `.total` for an approved one turned on past the
-    /// total. Resolved by the daemon because it is a fact about every project at
+    /// is approved, archived or removed — `.folder` for a waiting one past the three
+    /// a folder may have waiting (#132), `.total` for an approved one turned on past the
+    /// total. Resolved by the daemon because it is a fact about every folder at
     /// once rather than about this workflow, and two windows must not count differently.
     public var overLimit: WorkflowLimit?
     /// The total in force on its host (#506), which the person sets: what the row's
@@ -323,7 +327,8 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     public var folder: URL { workflow.folder }
     public var workflowID: String { workflow.workflowID }
 
-    public init(workflow: Workflow, isArchived: Bool = false, isEnabled: Bool = true,
+    public init(workflow: Workflow, scope: String = "folder", content: String? = nil,
+                isArchived: Bool = false, isEnabled: Bool = true,
                 overLimit: WorkflowLimit? = nil, totalLimit: Int? = nil, nextFireAt: Date? = nil,
                 lastOutcome: WorkflowOutcome? = nil, isRunning: Bool = false,
                 causingEvent: EventPosition? = nil, causingEventName: String? = nil,
@@ -350,6 +355,8 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
         self.causingEvent = causingEvent
         self.causingEventName = causingEventName
         self.workflow = workflow
+        self.scope = scope
+        self.content = content
         self.isArchived = isArchived
         self.overLimit = overLimit
         self.totalLimit = totalLimit
@@ -367,16 +374,12 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
         }
     }
 
-    /// Waiting for approval behind the three a project may have waiting (#132): listed
-    /// and inert, with no Approve until one ahead of it is approved or removed.
-    public var waitsItsTurn: Bool { awaitingApproval != nil && overLimit == .project }
+    /// Whether Approve is offered: waiting for an OK, or denied on this host, where
+    /// Approve takes the denial back (#391).
+    public var canBeApproved: Bool { awaitingApproval != nil || deniedHere != nil }
 
-    /// Whether Approve is offered: waiting, and one of the ones allowed to wait, or
-    /// denied on this host, where Approve takes the denial back (#391).
-    public var canBeApproved: Bool { (awaitingApproval != nil && !waitsItsTurn) || deniedHere != nil }
-
-    /// Whether Deny is offered (#391): waiting for an OK, even behind the ones allowed
-    /// to wait, since denying runs nothing and only takes it out of the queue here.
+    /// Whether Deny is offered (#391): waiting for an OK, since denying runs nothing and
+    /// only takes it out of the queue here.
     public var canBeDenied: Bool { awaitingApproval != nil && !isArchived }
 
     /// Waiting for an OK, or denied on this host: either way it runs nothing here until
@@ -436,19 +439,35 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     }
 
     /// What the page says under Enabled and Archive (#125): they are lines in the
-    /// workflow's own file, so moving them is a change in the project. The Remote and
+    /// workflow's own file, so moving them is a change in the folder. The Remote and
     /// the web page say the same words.
     public var switchesSentence: String {
         "Enabled and Archive are saved in \(WorkflowPaths.folderName)/\(workflow.workflowID).\(WorkflowPaths.fileExtension), "
-            + "a file in this project you may commit"
+            + "a file in this folder you may commit"
+    }
+
+    /// What a user workflow's page says, and its row's help and VoiceOver value (#2759): it
+    /// is in every folder, not only this one. Nil for a folder's own. The Remote and the web
+    /// page say the same words.
+    public static let userScopeSentence = "Your workflow: in every folder"
+    public var scopeSentence: String? { scope == "user" ? Self.userScopeSentence : nil }
+
+    /// A row's tooltip: what it does, led by Turned off when it is, and then where it is
+    /// (#2759). The Remote's row says where it is to VoiceOver.
+    public var rowHelp: String {
+        let what = !isEnabled && !isArchived ? "Turned off. \(workflow.summary)" : workflow.summary
+        guard let scopeSentence else { return what }
+        return "\(what)\n\(scopeSentence)"
     }
 
     /// Read leniently: a daemon from before #100 sends no `isEnabled`, and an outcome
     /// this version does not know (a refusal added later) costs the outcome rather than
-    /// the whole project's list.
+    /// the whole folder's list.
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         workflow = try c.decode(Workflow.self, forKey: .workflow)
+        scope = try c.decodeIfPresent(String.self, forKey: .scope) ?? "folder"
+        content = try c.decodeIfPresent(String.self, forKey: .content)
         isArchived = try c.decodeIfPresent(Bool.self, forKey: .isArchived) ?? false
         isEnabled = try c.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
         overLimit = try? c.decodeIfPresent(WorkflowLimit.self, forKey: .overLimit)

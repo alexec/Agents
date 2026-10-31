@@ -1,4 +1,4 @@
-// A queued helper's place in its project's queue (#362), as AgentsModel.queuedLine says it.
+// A queued helper's place in its folder's queue (#362), as AgentsModel.queuedLine says it.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "./load.mjs";

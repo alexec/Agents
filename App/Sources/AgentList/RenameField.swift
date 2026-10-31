@@ -13,8 +13,8 @@ struct Renaming: Equatable {
         case row
         /// The main window's toolbar, over its chat.
         case mainWindow
-        /// A project's own window's toolbar (#1089).
-        case projectWindow(ProjectKey)
+        /// A folder's own window's toolbar (#1089).
+        case folderWindow(FolderKey)
         /// The session's own window's toolbar (#826).
         case ownWindow
     }
@@ -55,7 +55,7 @@ struct RenameField: View {
 }
 
 /// A toolbar's Rename button, with the title's field in a popover under it (#751): the
-/// main window's, a project's own window's and a session's own window's, each with its
+/// main window's, a folder's own window's and a session's own window's, each with its
 /// own place, so Session ▸ Rename… opens it in the window in front (#1452).
 struct RenameButton: View {
     @Environment(AppModel.self) private var model

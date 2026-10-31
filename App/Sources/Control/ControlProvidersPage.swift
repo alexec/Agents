@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Settings ▸ Workspace Providers (#691, layouts.md L3): each workspace provider as a
+/// Settings ▸ Machine Providers (#691, layouts.md L3): each machine provider as a
 /// card of its workspaces, which are hosts already or can be added as one. A provider runs on
 /// the control plane, so it can start a machine that is down.
 struct ControlProvidersPage: View {
@@ -9,7 +9,7 @@ struct ControlProvidersPage: View {
     @State private var adding = false
     @State private var removing: DaemonAPI.ProviderSummary?
     @State private var addingHost: ControlAddServerSheet.Prefill?
-    /// New Machine… (US5, L9; was New Workspace…).
+    /// New Machine… (US5, L9; was New Machine…).
     @State private var making: DaemonAPI.ProviderSummary?
     /// Write the Map Again… (#858 US4, L10f).
     @State private var rewriting: DaemonAPI.ProviderSummary?
@@ -21,7 +21,7 @@ struct ControlProvidersPage: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             if !control.providersHere {
-                Text("Workspace providers need a control plane with one copy, such as the one on your Mac. This one has several.")
+                Text("Machine providers need a control plane with one copy, such as the one on your Mac. This one has several.")
                     .appText(.supporting).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
@@ -44,7 +44,7 @@ struct ControlProvidersPage: View {
             }
         }
         // Lists every provider again when the page opens (FR-004).
-        .task { await control.listWorkspacesAgain() }
+        .task { await control.listMachinesAgain() }
         .sheet(isPresented: $adding) { AddProviderSheet(control: control).paperSheet() }
         .sheet(isPresented: $startingMachine) {
             MachineFromRepositorySheet(calls: control.machineCalls, close: { startingMachine = false },
@@ -54,12 +54,9 @@ struct ControlProvidersPage: View {
         .sheet(item: $rewriting) { provider in AddProviderSheet(control: control, editing: provider).paperSheet() }
         .sheet(item: $editing) { provider in EditProviderSheet(control: control, provider: provider).paperSheet() }
         .sheet(item: $addingHost) { prefill in ControlAddServerSheet(control: control, prefill: prefill).paperSheet() }
+        // The same sheet as Settings ▸ Machines' Add a Machine…, at this provider (#2131).
         .sheet(item: $making) { provider in
-            NewWorkspaceSheet(control: control, provider: provider) { prefill in
-                // After this sheet has gone, so the next can come up.
-                Task { @MainActor in addingHost = prefill }
-            }
-            .paperSheet()
+            AddMachineSheet(control: control, start: .provider(provider.id)).paperSheet()
         }
         .confirmationDialog(removing.map { "Remove \($0.name)?" } ?? "",
                             isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
@@ -93,7 +90,7 @@ struct ControlProvidersPage: View {
                     if control.isAdmin, provider.preset != nil {
                         Button("Edit…") { editing = provider }
                     }
-                    Button("List Again") { Task { await control.listWorkspacesAgain(provider.id) } }
+                    Button("List Again") { Task { await control.listMachinesAgain(provider.id) } }
                     // An agent writes its map or commands again, from the ones it has (#858 US4).
                     if control.isAdmin, provider.kind == "commands" ? provider.preset == nil : provider.mapped {
                         Button(provider.kind == "commands" ? "Write the Commands Again…" : "Write the Map Again…") {
@@ -147,7 +144,7 @@ struct ControlProvidersPage: View {
     /// Link to existing host (#976): a host added by hand under the workspace's ssh alias,
     /// such as `cws.devstack-d7539e59`, is linked to it rather than installed again.
     @ViewBuilder
-    private func linkToExistingHost(_ workspace: DaemonAPI.WorkspaceInfo, of provider: DaemonAPI.ProviderSummary) -> some View {
+    private func linkToExistingHost(_ workspace: DaemonAPI.MachineInfo, of provider: DaemonAPI.ProviderSummary) -> some View {
         let hosts = control.hostsThatMayBe(workspace)
         if hosts.count == 1, let host = hosts.first {
             Button("Link to \(host.name)") {
@@ -200,7 +197,7 @@ struct ControlProvidersPage: View {
         return parts.joined(separator: " · ")
     }
 
-    private func dot(_ workspace: DaemonAPI.WorkspaceInfo) -> ControlDot {
+    private func dot(_ workspace: DaemonAPI.MachineInfo) -> ControlDot {
         switch workspace.state {
         case "running": .online
         case "unknown": .attention
@@ -208,7 +205,7 @@ struct ControlProvidersPage: View {
         }
     }
 
-    private func workspaceLine(_ workspace: DaemonAPI.WorkspaceInfo, of provider: DaemonAPI.ProviderSummary) -> String {
+    private func workspaceLine(_ workspace: DaemonAPI.MachineInfo, of provider: DaemonAPI.ProviderSummary) -> String {
         var parts = [workspace.state.capitalized]
         if let host = workspace.host {
             parts.append("linked to \(control.hosts.first { $0.id == host }?.name ?? "a machine")")
@@ -231,6 +228,8 @@ struct AddProviderSheet: View {
     @Environment(\.dismiss) private var dismiss
     let control: ControlSettingsModel
     var editing: DaemonAPI.ProviderSummary?
+    /// Inside Add a Machine (#2131): the provider added, to go on with, in place of closing.
+    var onAdded: ((ProviderID?) -> Void)?
 
     enum Kind: String, CaseIterable, Identifiable {
         case docker, digitalOcean, codespaces, coder, workstations, compute, aws, commands, mcp
@@ -353,7 +352,7 @@ struct AddProviderSheet: View {
     @State private var deployment = ""
     @State private var accessKey = ""
     @State private var secretKey = ""
-    @State private var project = ""
+    @State private var folder = ""
     @State private var sshKey = ""
     @State private var serviceKey = ""
     @State private var serviceAccount = ""
@@ -509,10 +508,10 @@ struct AddProviderSheet: View {
                 TextField("Cluster", text: $cluster)
                 TextField("Configuration", text: $config)
                 TextField("Region", text: $region)
-                TextField("Project", text: $project, prompt: Text("gcloud’s default"))
+                TextField("Project", text: $folder, prompt: Text("gcloud’s default"))
                 TextField("ssh", text: $ssh, prompt: Text("A host in your ssh config"))
             case .compute:
-                TextField("Project", text: $project)
+                TextField("Project", text: $folder)
                 TextField("Zone", text: $region, prompt: Text("us-west1-b"))
                 TextField("VMs labelled", text: $tag)
                 TextField("ssh as", text: $user)
@@ -578,7 +577,7 @@ struct AddProviderSheet: View {
                 .disabled(working || writing || name.trimmingCharacters(in: .whitespaces).isEmpty
                           || (editing != nil && written == nil) || (kind.hasAPI && !byCLI && token.isEmpty)
                           || (kind == .aws && (trimmed(accessKey).isEmpty || secretKey.isEmpty || trimmed(region).isEmpty))
-                          || (kind == .compute && (serviceKey.isEmpty || trimmed(project).isEmpty || trimmed(region).isEmpty)))
+                          || (kind == .compute && (serviceKey.isEmpty || trimmed(folder).isEmpty || trimmed(region).isEmpty)))
         }
     }
 
@@ -851,9 +850,9 @@ struct AddProviderSheet: View {
         return (try? commandsJSON()) != written
     }
 
-    /// "It isn't a workspace provider: it has no …", or a map tool it lacks: a map would fix it.
+    /// "It isn't a machine provider: it has no …", or a map tool it lacks: a map would fix it.
     static func mapWouldFix(_ refusal: String) -> Bool {
-        refusal.hasPrefix("It isn’t a workspace provider") || refusal.hasPrefix("The tool map names")
+        refusal.hasPrefix("It isn’t a machine provider") || refusal.hasPrefix("The tool map names")
     }
 
     static func pretty(_ json: JSONValue) -> String {
@@ -874,6 +873,7 @@ struct AddProviderSheet: View {
         }
         working = true
         problem = nil
+        let before = Set(control.providers.map(\.id))
         Task {
             let refused = await control.addProvider(request)
             working = false
@@ -882,7 +882,11 @@ struct AddProviderSheet: View {
             } else {
                 if let draftID { control.forgetDraft(draftID) }
                 draftID = nil
-                dismiss()
+                if let onAdded {
+                    onAdded(control.providers.first { !before.contains($0.id) }?.id)
+                } else {
+                    dismiss()
+                }
             }
         }
     }
@@ -968,7 +972,7 @@ struct AddProviderSheet: View {
                                          secrets: ["AWS_ACCESS_KEY_ID": trimmed(accessKey), "AWS_SECRET_ACCESS_KEY": secretKey])
         case .compute:
             // The key goes in only as the provider's secret, never in its configuration.
-            commands = ["preset": "gcp-compute-api", "project": .string(trimmed(project)), "zone": .string(trimmed(region)),
+            commands = ["preset": "gcp-compute-api", "project": .string(trimmed(folder)), "zone": .string(trimmed(region)),
                         "label": .string(trimmed(tag).isEmpty ? "agents" : trimmed(tag)),
                         "user": .string(trimmed(user).isEmpty ? "agents" : trimmed(user))]
             if !trimmed(sshKey).isEmpty { commands["sshKeys"] = [.string(trimmed(sshKey))] }
@@ -977,7 +981,7 @@ struct AddProviderSheet: View {
         case .workstations:
             commands = ["preset": "gcloud-workstations", "cluster": .string(trimmed(cluster)),
                         "config": .string(trimmed(config)), "region": .string(trimmed(region))]
-            if !trimmed(project).isEmpty { commands["project"] = .string(trimmed(project)) }
+            if !trimmed(folder).isEmpty { commands["project"] = .string(trimmed(folder)) }
             if !trimmed(ssh).isEmpty { commands["ssh"] = .string(trimmed(ssh)) }
         case .commands:
             return DaemonAPI.ProviderAdd(name: name, kind: .commands, commands: try commandsJSON(), secrets: given)
@@ -1127,12 +1131,12 @@ struct EditProviderSheet: View {
     }
 }
 
-/// Link to Workspace… (#691, layouts.md L5): a provider's workspace for a host that is already
+/// Link to Machine… (#691, layouts.md L5): a provider's workspace for a host that is already
 /// one. A workspace another host has is shown, greyed, as that host's.
 struct LinkWorkspaceSheet: View {
     @Environment(\.dismiss) private var dismiss
     let control: ControlSettingsModel
-    let host: DaemonAPI.ControlHost
+    let host: DaemonAPI.ControlMachine
 
     @State private var chosen: String?
     @State private var startWhenUsed = true
@@ -1174,11 +1178,11 @@ struct LinkWorkspaceSheet: View {
         .frame(width: 460)
     }
 
-    private func key(_ provider: DaemonAPI.ProviderSummary, _ workspace: DaemonAPI.WorkspaceInfo) -> String {
+    private func key(_ provider: DaemonAPI.ProviderSummary, _ workspace: DaemonAPI.MachineInfo) -> String {
         "\(provider.id.rawValue)/\(workspace.id)"
     }
 
-    private func row(_ provider: DaemonAPI.ProviderSummary, _ workspace: DaemonAPI.WorkspaceInfo) -> some View {
+    private func row(_ provider: DaemonAPI.ProviderSummary, _ workspace: DaemonAPI.MachineInfo) -> some View {
         let other = workspace.host.flatMap { id in control.hosts.first { $0.id == id }?.name }
         let selected = chosen == key(provider, workspace)
         return Button {

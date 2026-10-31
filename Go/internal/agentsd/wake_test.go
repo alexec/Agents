@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -52,15 +53,62 @@ func newWaker(t *testing.T, m *fakeMac) *waker {
 	}
 }
 
-func atTime(t *testing.T, at *time.Time) {
-	old := nowFunc
-	nowFunc = func() time.Time { return *at }
-	t.Cleanup(func() { nowFunc = old })
+// testClock is the time nowFunc gives while a test holds it. A daemon's
+// background loops (its own or another test's) read it while the test moves
+// it, so it is read and written under a lock (#2846).
+type testClock struct {
+	mu sync.Mutex
+	at time.Time
+}
+
+func (c *testClock) now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.at
+}
+
+func (c *testClock) set(at time.Time) {
+	c.mu.Lock()
+	c.at = at
+	c.mu.Unlock()
+}
+
+func (c *testClock) add(d time.Duration) { c.set(c.now().Add(d)) }
+
+// atTime sets nowFunc to a clock that starts at start until the test ends.
+func atTime(t *testing.T, start time.Time) *testClock {
+	c := &testClock{at: start}
+	old := setNowFunc(c.now)
+	t.Cleanup(func() { setNowFunc(old) })
+	return c
+}
+
+func TestNowFuncSwapDoesNotRace(t *testing.T) {
+	stop := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				_ = nowFunc()
+			}
+		}
+	}()
+	old := setNowFunc(func() time.Time { return time.Unix(1, 0).UTC() })
+	if got := nowFunc(); !got.Equal(time.Unix(1, 0).UTC()) {
+		t.Fatalf("swapped clock: got %v", got)
+	}
+	setNowFunc(old)
+	close(stop)
+	wg.Wait()
 }
 
 func TestWakeHoldsForWorkThenTheGrace(t *testing.T) {
-	clock := time.Date(2026, 10, 16, 20, 0, 0, 0, time.UTC)
-	atTime(t, &clock)
+	clock := atTime(t, time.Date(2026, 10, 16, 20, 0, 0, 0, time.UTC))
 	m := &fakeMac{power: mac.Power{BatteryPercent: percent(80)}}
 	w := newWaker(t, m)
 
@@ -86,10 +134,10 @@ func TestWakeHoldsForWorkThenTheGrace(t *testing.T) {
 	// The work stops: the grace holds for an hour from now.
 	w.Revise(0, false)
 	s := w.State()
-	if !m.holding || s.GraceUntil == nil || s.GraceUntil.Time().Sub(clock) != time.Hour {
+	if !m.holding || s.GraceUntil == nil || s.GraceUntil.Time().Sub(clock.now()) != time.Hour {
 		t.Fatalf("grace: %+v", s)
 	}
-	clock = clock.Add(61 * time.Minute)
+	clock.add(61 * time.Minute)
 	w.Revise(0, true)
 	if m.holding || w.State().IsHolding {
 		t.Fatalf("after the grace: %+v", w.State())

@@ -10,11 +10,11 @@ import Testing
 @Suite("Redraw cost over a large model",
        .enabled(if: ProcessInfo.processInfo.environment["AGENTS_BENCH"] == "1", "set AGENTS_BENCH=1 to time"))
 struct RedrawCostBenchmarks {
-    static let folders = (0..<10).map { URL(filePath: "/Users/bench/src/project\($0)") }
-    static let key = ProjectKey(host: .mac, folder: folders[0])
+    static let folders = (0..<10).map { URL(filePath: "/Users/bench/src/folder\($0)") }
+    static let key = FolderKey(host: .mac, folder: folders[0])
 
-    /// 2,000 agents: the selected project has 1,000 archived, 5 working and 45 finished;
-    /// the other 950 are spread over nine more projects.
+    /// 2,000 agents: the selected folder has 1,000 archived, 5 working and 45 finished;
+    /// the other 950 are spread over nine more folders.
     static func agents() -> [Agent] {
         let now = Date()
         var agents: [Agent] = []
@@ -96,7 +96,7 @@ struct RedrawCostBenchmarks {
         return (1...1_000).reversed().map { position in
             let folder = folders[position % 3]
             return Event(EventDraft(name: "agent.finished", at: start.addingTimeInterval(Double(position) * 1_200),
-                                    scope: .project(folder: Project.standardize(folder)),
+                                    scope: .folder(folder: Folder.standardize(folder)),
                                     sentence: "finished", details: [:]),
                          position: EventPosition(position))
         }
@@ -121,7 +121,7 @@ struct RedrawCostBenchmarks {
     @Test func eventsRedraw() {
         let model = AgentsModel()
         model.takeEvents(DaemonAPI.EventsPage(events: Self.events(), waiting: [], hasMore: false))
-        let filter = EventFilter(scope: .project(folder: Project.standardize(Self.folders[0])))
+        let filter = EventFilter(scope: .folder(folder: Folder.standardize(Self.folders[0])))
         let before = Self.median { for _ in 0..<10 { _ = Self.eventsViewBeforeCalls(model, filter) } }
         // Since #137: one memoised read, then the unseen count over what it returns.
         let after = Self.median {

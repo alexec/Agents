@@ -1,46 +1,46 @@
-AgentWorkspaces full
+AgentMachines full
 {"providers":[{"id":"ID","name":"NAME","canMake":true,"canDelete":true,"options":{"k":"v"},"workspaces":[{"id":"ID","name":"NAME","state":"STATE","host":"HOST","hostState":"HOSTSTATE","cost":"COST"}]}]}
-AgentWorkspaces zero
+AgentMachines zero
 {"providers":null}
 DraftUpdate full
 {"draft":"DRAFT","state":"STATE","runtimeName":"RUNTIMENAME","steps":[{"at":813922215.25,"kind":"KIND","text":"TEXT"}],"cost":"COST","draftJSON":{"k":"v"},"check":{"passed":true,"workspaces":[{"id":"ID","name":"NAME","state":"STATE","ssh":"SSH","tunnel":true,"cost":"COST","host":"HOST"}],"problem":"PROBLEM","ssh":"SSH","noSSH":true},"question":{"id":"ID","kind":"KIND","workspace":"WORKSPACE","cost":"COST","text":"TEXT","yes":"YES"},"note":"NOTE"}
 DraftUpdate zero
 {"draft":"","state":"","runtimeName":"","steps":null}
-HostLink full
+MachineLink full
 {"host":"HOST","provider":"PROVIDER","workspace":"WORKSPACE","startWhenUsed":true,"stopWhenIdleMinutes":7}
-HostLink zero
+MachineLink zero
 {"host":"","provider":"","workspace":""}
-HostProviderDraftCall full
+MachineProviderDraftCall full
 {"agentID":"AGENTID","draft":"DRAFT","tool":"TOOL","arguments":{"k":"v"}}
-HostProviderDraftCall zero
+MachineProviderDraftCall zero
 {"agentID":"","draft":"","tool":""}
-HostRequest full
+MachineRequest full
 {"host":"HOST"}
-HostRequest zero
+MachineRequest zero
 {"host":""}
-HostSchedule full
+MachineSchedule full
 {"at":813922215.25,"workflow":"WORKFLOW"}
-HostSchedule zero
+MachineSchedule zero
 {}
-HostStatus full
+MachineStatus full
 {"idle":true,"running":["RUNNING"],"schedule":{"at":813922215.25,"workflow":"WORKFLOW"}}
-HostStatus zero
+MachineStatus zero
 {"idle":false,"running":null}
-HostStop full
+MachineStop full
 {"host":"HOST","confirmRunning":true}
-HostStop zero
+MachineStop zero
 {"host":""}
-HostWorkspace full
+MachineWorkspace full
 {"provider":"PROVIDER","providerName":"PROVIDERNAME","workspace":"WORKSPACE","workspaceName":"WORKSPACENAME","workspaceState":"WORKSPACESTATE","hostState":"HOSTSTATE","phase":"PHASE","since":813922215.25,"problem":"PROBLEM","stoppedBy":"STOPPEDBY","canStart":true,"canStop":true,"startWhenUsed":true,"stopWhenIdleMinutes":7,"cost":"COST","current":true,"startForSchedules":true,"tellsSchedule":true,"nextWorkflow":"NEXTWORKFLOW","nextWorkflowAt":813922215.25,"wakeAt":813922215.25}
-HostWorkspace zero
+MachineWorkspace zero
 {"provider":"","providerName":"","workspace":"","workspaceName":"","workspaceState":"","canStart":false,"canStop":false,"startWhenUsed":false,"current":false}
-HostWorkspaceCall full
+MachineWorkspaceCall full
 {"agent":"AGENT","method":"METHOD","params":{"k":"v"}}
-HostWorkspaceCall zero
+MachineWorkspaceCall zero
 {"agent":"","method":"","params":null}
-HostWorkspaceOptions full
+MachineOptions full
 {"host":"HOST","startWhenUsed":true,"stopWhenIdleMinutes":7,"startForSchedules":true}
-HostWorkspaceOptions zero
+MachineOptions zero
 {"host":""}
 KeepRequest full
 {"host":"HOST","method":"METHOD","params":{"k":"v"}}
@@ -106,7 +106,7 @@ ProviderSummary full
 {"id":"ID","name":"NAME","kind":"KIND","secrets":{"KEY":true},"capabilities":["CAPABILITIES"],"contract":7,"mapped":true,"preset":"PRESET","workspaces":[{"id":"ID","name":"NAME","state":"STATE","ssh":"SSH","tunnel":true,"cost":"COST","host":"HOST"}],"listedAt":813922215.25,"current":true,"problem":"PROBLEM"}
 ProviderSummary zero
 {"id":"","name":"","kind":"","secrets":null,"capabilities":null,"contract":0,"mapped":false,"workspaces":null,"current":false}
-WorkspaceInfo full
+MachineInfo full
 {"id":"ID","name":"NAME","state":"STATE","ssh":"SSH","tunnel":true,"cost":"COST","host":"HOST"}
-WorkspaceInfo zero
+MachineInfo zero
 {"id":"","name":"","state":""}

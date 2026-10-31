@@ -1,6 +1,6 @@
 // A workflow's row under the sessions: Workflow.summary and canFire (Model/Workflow.swift and
 // its trigger, schedule and settings words), WorkflowSummary.needsAPerson, and the window's
-// status icon (WorkflowRow.swift), ported by hand and held to Fixtures/web/workflows.
+// status icon (WorkflowStatusIcon.swift), ported by hand and held to Fixtures/web/workflows.
 //
 // An event trigger (042) arrives as `unrecognised` with a dotted name, which Swift reads back as
 // an event and describes from its catalogue. The page has no catalogue, so it says the event's
@@ -12,8 +12,8 @@ import type {
 } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 
-/** `RuntimeCatalog.builtIn[0]`: left unsaid in a row. */
-export const defaultRuntime = "claude";
+/** What a workflow with no `runtime:` runs on (#2873): Auto, left unsaid in a row. */
+export const defaultRuntime = "auto";
 
 const allWeekdays: Weekday[] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 const workweek: Weekday[] = ["mon", "tue", "wed", "thu", "fri"];
@@ -53,27 +53,27 @@ function isEvent(trigger: WorkflowTriggerStored): boolean {
 
 // EventCatalogue's catalogue meaning, kept in sync with EventPattern.summary.
 const eventMeanings: Record<string, string> = {
-  "agent.started": "An agent in this project started working",
-  "agent.finished": "An agent in this project ended a turn having done its work",
-  "agent.asked_permission": "An agent in this project is asking for permission",
-  "agent.asked_form": "An agent in this project raised a form to fill in",
-  "agent.blocked": "An agent in this project ended its turn waiting on something",
-  "agent.stopped": "An agent in this project was stopped before finishing",
-  "agent.failed": "An agent in this project ended in an error",
-  "agent.archive_requested": "An agent in this project archived itself, and waits for the person to approve it",
-  "agent.messaged": "An agent in this project was sent a message by another, with message_session",
-  "agent.archived": "An agent in this project was archived",
+  "agent.started": "An agent in this folder started working",
+  "agent.finished": "An agent in this folder ended a turn having done its work",
+  "agent.asked_permission": "An agent in this folder is asking for permission",
+  "agent.asked_form": "An agent in this folder raised a form to fill in",
+  "agent.waiting": "An agent in this folder ended its turn waiting on something",
+  "agent.stopped": "An agent in this folder was stopped before finishing",
+  "agent.failed": "An agent in this folder ended in an error",
+  "agent.archive_requested": "An agent in this folder archived itself, and waits for the person to approve it",
+  "agent.messaged": "An agent in this folder was sent a message by another, with message_session",
+  "agent.archived": "An agent in this folder was archived",
   "agent.deleted": "An archived agent was deleted with its conversation",
-  "project.idle": "Every agent in this project has stopped working",
-  "workflow.ran": "A workflow in this project started an agent",
-  "workflow.completed": "A workflow's run in this project finished",
-  "workflow.refused": "A workflow in this project did not run, and why",
+  "folder.idle": "Every agent in this folder has stopped working",
+  "workflow.ran": "A workflow in this folder started an agent",
+  "workflow.completed": "A workflow's run in this folder finished",
+  "workflow.refused": "A workflow in this folder did not run, and why",
   "branch.moved": "A branch an agent works on moved; never the default branch",
   "lease.granted": "An agent was given a lease",
   "lease.released": "A lease was given back, ended or ran out",
   "mac.sleep": "This Mac is going to sleep",
   "mac.wake": "This Mac woke up",
-  "machine.disk_low": "Free space on a volume holding the Agents root, a project or a worktree fell below its low or critical threshold",
+  "machine.disk_low": "Free space on a volume holding the Agents root, a folder or a worktree fell below its low or critical threshold",
   "machine.disk_ok": "Free space on a volume that was low climbed back above its threshold",
   "person.away": "You locked the screen or stepped away for 5 minutes",
   "person.back": "You unlocked the screen or came back",
@@ -86,7 +86,7 @@ const eventMeanings: Record<string, string> = {
 };
 
 // EventCatalogue.reservedNouns: the app's own subjects, and `custom` (#639), which no server's event may use.
-const reservedNouns = new Set(["agent", "project", "workflow", "branch", "lease", "mac", "machine", "person", "cost", "server", "system", "custom"]);
+const reservedNouns = new Set(["agent", "folder", "workflow", "branch", "lease", "mac", "machine", "person", "cost", "server", "system", "custom"]);
 
 /** EventCatalogue.isServerEventName: `noun.verbed`, about none of the app's own subjects. */
 function isServerEventName(name: string): boolean {
@@ -129,6 +129,12 @@ function scalar(value: JSONValue): string | null {
   return typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? String(value) : null;
 }
 
+/** EventPattern.meaning: the catalogue's meaning, "Anything about agents" for `agent.*`, else the name. */
+export function eventMeaning(name: string): string {
+  const subject = name.endsWith(".*") ? name.slice(0, -2) : null;
+  return subject ? `Anything about ${subject}s` : eventMeanings[name] ?? name;
+}
+
 /** WorkflowTrigger.summary, with an event said by its catalogue meaning and filters in words. */
 export function triggerSummary(trigger: WorkflowTriggerStored): string {
   if ("schedule" in trigger) return scheduleSummary(trigger.schedule._0);
@@ -137,8 +143,7 @@ export function triggerSummary(trigger: WorkflowTriggerStored): string {
   if (server) return serverEventSummary(server);
   if (isEvent(trigger)) {
     const filters = eventFilters(trigger).map(([k, values]) => filterWords(k, values)).join(", ");
-    const subject = name.endsWith(".*") ? name.slice(0, -2) : null;
-    const meaning = subject ? `Anything about ${subject}s` : eventMeanings[name] ?? name;
+    const meaning = eventMeaning(name);
     return filters ? `${meaning} (${filters})` : meaning;
   }
   return `Waits for "${name}", which this version does not know about yet${guess(name)}`;
@@ -274,7 +279,6 @@ export function isOn(s: WorkflowSummary): boolean {
 export function workflowStatus(s: WorkflowSummary): { mark: string; words: string; tinted: boolean } {
   const tinted = workflowNeedsAPerson(s);
   if (s.isArchived) return { mark: "▣", words: "Archived", tinted };
-  if (waitsItsTurn(s)) return { mark: "✋", words: "Over the limit", tinted };
   // A shield, not a hand (#587): the hand is a session's Needs You mark, and a workflow waiting
   // for an OK beside it read as one more session asking.
   if (s.awaitingApproval) return { mark: "🛡\uFE0E", words: "Waiting for your OK", tinted };
@@ -301,26 +305,26 @@ export function workflowStatus(s: WorkflowSummary): { mark: string; words: strin
 /** What every agent event carries about its agent (073). */
 const context = ["labels", "runtime", "started_by"];
 
-const catalogue: Record<string, { scope: "mac" | "project" | "either"; details: string[] }> = {
-  "agent.started": { scope: "project", details: ["agent", ...context] },
-  "agent.finished": { scope: "project", details: ["agent", "outcome", "afterwards", ...context] },
-  "agent.asked_permission": { scope: "project", details: ["agent", ...context] },
-  "agent.asked_form": { scope: "project", details: ["agent", ...context] },
-  "agent.blocked": { scope: "project", details: ["agent", "waiting_on", ...context] },
-  "agent.stopped": { scope: "project", details: ["agent", "by", ...context] },
-  "agent.failed": { scope: "project", details: ["agent", "reason", ...context] },
-  "agent.archive_requested": { scope: "project", details: ["agent", "outcome", ...context] },
-  "agent.messaged": { scope: "project", details: ["agent", "from", "from_title", ...context] },
-  "agent.archived": { scope: "project", details: ["agent", "by", "outcome", ...context] },
-  "agent.deleted": { scope: "project", details: ["agent", "because", ...context] },
-  "project.idle": {
-    scope: "project",
-    details: ["agents", "finished", "blocked", "waiting_on_you", "stopped", "failed", "since", "ids"],
+const catalogue: Record<string, { scope: "mac" | "folder" | "either"; details: string[] }> = {
+  "agent.started": { scope: "folder", details: ["agent", ...context] },
+  "agent.finished": { scope: "folder", details: ["agent", "outcome", "afterwards", ...context] },
+  "agent.asked_permission": { scope: "folder", details: ["agent", ...context] },
+  "agent.asked_form": { scope: "folder", details: ["agent", ...context] },
+  "agent.waiting": { scope: "folder", details: ["agent", "waiting_on", ...context] },
+  "agent.stopped": { scope: "folder", details: ["agent", "by", ...context] },
+  "agent.failed": { scope: "folder", details: ["agent", "reason", ...context] },
+  "agent.archive_requested": { scope: "folder", details: ["agent", "outcome", ...context] },
+  "agent.messaged": { scope: "folder", details: ["agent", "from", "from_title", ...context] },
+  "agent.archived": { scope: "folder", details: ["agent", "by", "outcome", ...context] },
+  "agent.deleted": { scope: "folder", details: ["agent", "because", ...context] },
+  "folder.idle": {
+    scope: "folder",
+    details: ["agents", "finished", "waiting", "waiting_on_you", "stopped", "failed", "since", "ids"],
   },
-  "workflow.ran": { scope: "project", details: ["workflow", "agent"] },
-  "workflow.completed": { scope: "project", details: ["workflow", "agent", "outcome"] },
-  "workflow.refused": { scope: "project", details: ["workflow", "reason"] },
-  "branch.moved": { scope: "project", details: ["branch", "from", "to"] },
+  "workflow.ran": { scope: "folder", details: ["workflow", "agent"] },
+  "workflow.completed": { scope: "folder", details: ["workflow", "agent", "outcome"] },
+  "workflow.refused": { scope: "folder", details: ["workflow", "reason"] },
+  "branch.moved": { scope: "folder", details: ["branch", "from", "to"] },
   "lease.granted": { scope: "mac", details: ["resource", "agent"] },
   "lease.released": { scope: "mac", details: ["resource", "how"] },
   "mac.sleep": { scope: "mac", details: [] },
@@ -387,12 +391,12 @@ function filterWords(key: string, values: string[]): string {
 }
 
 /** WorkflowTrigger.listensIn. */
-export function listensIn(trigger: WorkflowTriggerStored): "mac" | "project" | "either" | null {
+export function listensIn(trigger: WorkflowTriggerStored): "mac" | "folder" | "either" | null {
   if ("schedule" in trigger) return null;
-  if (!("unrecognised" in trigger)) return "project";
+  if (!("unrecognised" in trigger)) return "folder";
   if (!isEvent(trigger)) return null;
-  // A server's events are the project's: its servers are found by its folder.
-  if (serverEvent(trigger)) return "project";
+  // A server's events are the folder's: its servers are found by its folder.
+  if (serverEvent(trigger)) return "folder";
   const name = trigger.unrecognised.name;
   const subject = wholeSubject(name);
   if (subject) {
@@ -403,12 +407,12 @@ export function listensIn(trigger: WorkflowTriggerStored): "mac" | "project" | "
 }
 
 /** "In work, on this Mac", as the window's scopeLine says it; null for nothing to say. */
-export function scopeLine(trigger: WorkflowTriggerStored, project: string, host: string): string | null {
+export function scopeLine(trigger: WorkflowTriggerStored, folder: string, host: string): string | null {
   if ("schedule" in trigger) return `By the clock on ${host}`;
   switch (listensIn(trigger)) {
-    case "project": return `In ${project}, on ${host}`;
-    case "mac": return `Anywhere on ${host}, so it runs in every project`;
-    case "either": return `In ${project}, or anywhere on ${host}`;
+    case "folder": return `In ${folder}, on ${host}`;
+    case "mac": return `Anywhere on ${host}, so it runs in every folder`;
+    case "either": return `In ${folder}, or anywhere on ${host}`;
     default: return null;
   }
 }
@@ -433,7 +437,7 @@ export function triggerGlyph(trigger: WorkflowTriggerStored): string {
   if (!("unrecognised" in trigger)) return "●";
   if (!isEvent(trigger)) return "?";
   const subject = trigger.unrecognised.name.split(".")[0];
-  return subject === "agent" || subject === "project" ? "●" : subject === "workflow" ? "⟳" : subject === "branch" ? "⎇" : "⌘";
+  return subject === "agent" || subject === "folder" ? "●" : subject === "workflow" ? "⟳" : subject === "branch" ? "⎇" : "⌘";
 }
 
 const named = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
@@ -486,18 +490,12 @@ export function lastRanLine(summary: WorkflowSummary, now = new Date()): string 
   return summary.lastFiredBy ? `${when}, ${causePhrase(summary.lastFiredBy)}` : when;
 }
 
-/** WorkflowLimit.projectAllowed and .defaultTotal: the total is the person's (#506), sent as WorkflowSummary.totalLimit. */
-const projectAllowed = 3;
-const defaultTotal = 10;
+/** The person's workflow limit is applied separately in each folder (#506). */
+const defaultTotal = 20;
 
-/** WorkflowSummary.limitTotal: the total in force on its host, or ten from a host before #506. */
+/** WorkflowSummary.limitTotal: the per-folder limit in force on its host. */
 export function limitTotal(s: WorkflowSummary): number {
   return s.totalLimit ?? defaultTotal;
-}
-
-/** WorkflowSummary.waitsItsTurn (#132): waiting behind the three a project may have waiting. */
-export function waitsItsTurn(s: WorkflowSummary): boolean {
-  return !!s.awaitingApproval && s.overLimit === "project";
 }
 
 /** WorkflowSummary.isUnapproved (#391): waiting for an OK, or denied on this host. */
@@ -525,7 +523,7 @@ export function approveDetail(s: WorkflowSummary): string {
 
 /** WorkflowSummary.canBeApproved: waiting and allowed to, or denied here, where Approve takes it back. */
 export function canBeApproved(s: WorkflowSummary): boolean {
-  return (!!s.awaitingApproval && !waitsItsTurn(s)) || !!s.deniedHere;
+  return !!s.awaitingApproval || !!s.deniedHere;
 }
 
 /** WorkflowSummary.canBeDenied (#391): waiting, even behind the ones allowed to. */
@@ -549,7 +547,12 @@ export function offReasonSentence(s: WorkflowSummary): string | null {
 
 /** WorkflowSummary.switchesSentence (#125): the switch is a line in the workflow's file. */
 export function switchesSentence(s: WorkflowSummary): string {
-  return `Enabled and Archive are saved in .agents/workflows/${s.workflow.workflowID}.md, a file in this project you may commit`;
+  return `Enabled and Archive are saved in .agents/workflows/${s.workflow.workflowID}.md, a file in this folder you may commit`;
+}
+
+/** WorkflowSummary.scopeSentence (#2759): a user workflow is in every folder; null for a folder's own. */
+export function scopeSentence(s: WorkflowSummary): string | null {
+  return s.scope === "user" ? "Your workflow: in every folder" : null;
 }
 
 /** The instance WorkflowSummary.turnedOffSentence: led by why, when there is a why. */
@@ -560,14 +563,12 @@ export function turnedOffSentenceFor(s: WorkflowSummary): string {
     + "It doesn't count towards the workflows running, and Run now still runs it";
 }
 
-function limitSentence(limit: WorkflowLimit, total: number): string {
-  return limit === "project" ? `This project already has ${projectAllowed} workflows waiting for approval`
-    : `${total} workflows are already running, across every project`;
+function limitSentence(_limit: WorkflowLimit, total: number): string {
+  return `This folder already has ${total} workflows running`;
 }
 
-function limitRemedy(limit: WorkflowLimit): string {
-  return limit === "project" ? `Approve or remove one of the ${projectAllowed} workflows waiting for approval first`
-    : "Turn one off or archive one, in any project, to let it run";
+function limitRemedy(_limit: WorkflowLimit): string {
+  return "Turn one off or archive one in this folder to let it run";
 }
 
 /** WorkflowSummary.queued, read leniently: a host from before #422 sends none, and has none. */
@@ -590,15 +591,14 @@ export function refusalMessage(refusal: WorkflowRefusal): string {
   if ("disabled" in refusal) return "it is turned off";
   if ("overLimit" in refusal) {
     const over = refusal.overLimit;
-    return over._0 === "project" ? `this project already has ${projectAllowed} workflows waiting for approval`
-      : `${over.allowed ?? defaultTotal} workflows are already running, across every project`;
+    return `this folder already has ${over.allowed ?? defaultTotal} workflows running`;
   }
   if ("unreadable" in refusal) return refusal.unreadable._0;
   if ("triggerNotSupported" in refusal) return `"${refusal.triggerNotSupported.name}" is not something this version can watch for`;
   if ("agentUnavailable" in refusal) return "the agent it would have resumed is gone";
   if ("noTriggeringAgent" in refusal) return "nothing triggered it, so there was no agent to resume";
   if ("missedWhileClosed" in refusal) return "the app was closed";
-  if ("folderGone" in refusal) return "the project folder is not there";
+  if ("folderGone" in refusal) return "the folder is not there";
   if ("dayLimitReached" in refusal) return "the day's spending limit has been reached";
   if ("settingRefused" in refusal) return refusal.settingRefused.detail;
   if ("deniedHere" in refusal) return "it is denied on this machine";
@@ -631,9 +631,7 @@ function refusedSummary(outcome: Extract<WorkflowOutcome, { refused: unknown }>)
 export function happening(summary: WorkflowSummary, now = new Date()): string | null {
   const parts: string[] = [];
   if (summary.isArchived) parts.push("Archived — it will not run until it is restored");
-  else if (waitsItsTurn(summary) && summary.overLimit) {
-    return `${limitSentence(summary.overLimit, limitTotal(summary))}. ${limitRemedy(summary.overLimit)}`;
-  } else if (summary.awaitingApproval) {
+  else if (summary.awaitingApproval) {
     const waiting = summary.awaitingApproval.note !== undefined
       ? `Waiting for your OK — ${summary.awaitingApproval.note}`
       : (summary.awaitingApproval.isNew ? "New" : "Changed since you approved it") + " — approve it on its page to let it run";
@@ -683,9 +681,7 @@ export function workflowStatusLines(s: WorkflowSummary, now = new Date()): Statu
       detail: needs ? "Fix its file to let it run" : "Left alone until this version knows it", tint: needs ? "failure" : undefined });
   }
   lines.push(...mcpArgumentLines(s));
-  if (waitsItsTurn(s) && s.overLimit) {
-    lines.push({ glyph: "⧗", text: `Waiting its turn: ${limitSentence(s.overLimit, limitTotal(s))}`, detail: limitRemedy(s.overLimit), tint: "attention" });
-  } else if (s.awaitingApproval) {
+  if (s.awaitingApproval) {
     const note = s.awaitingApproval.note;
     lines.push({ glyph: "✋", text: note !== undefined ? `Waiting for your OK — ${note}`
       : s.awaitingApproval.isNew ? "New — waiting for your OK" : "Changed since you approved it — waiting for your OK",
@@ -695,7 +691,7 @@ export function workflowStatusLines(s: WorkflowSummary, now = new Date()): Statu
       detail: "Other machines still see it waiting. Approve to let it run here" });
   }
   if (!s.isArchived) lines.push(enabledLine(s));
-  if (s.overLimit && !waitsItsTurn(s)) {
+  if (s.overLimit) {
     lines.push({ glyph: "⚠︎", text: `Over the limit: ${limitSentence(s.overLimit, limitTotal(s))}`, detail: limitRemedy(s.overLimit), tint: "attention" });
   }
   if (s.isRunning) {
@@ -807,7 +803,7 @@ export function workflowRunsOn(runsOn: readonly string[] | undefined, machineID:
 
 /** What Runs on means, on every client (#2064). */
 export const workflowRunsOnSentence =
-  "Every machine with this project runs it, or each machine turned on here. The file stores each machine's id, so renaming one does not unpin it.";
+  "Every machine with this folder runs it, or each machine turned on here. The file stores each machine's id, so renaming one does not unpin it.";
 
 /**
  * A runs-on: list as the Runs on section shows it (#2064): the machines it names, any one of

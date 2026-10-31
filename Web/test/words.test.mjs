@@ -60,6 +60,18 @@ for (const { name, input, expected } of cases("labels/query.json")) {
   });
 }
 
+for (const { name, input, expected } of cases("labels/kind.json")) {
+  test(`label kind: ${name}`, () => {
+    assert.equal(labels.labelKind(input), expected);
+  });
+}
+
+// One the agent added is outlined, not filled (#2997), as LabelChip draws it.
+test("label class: the agent's chip is marked, the person's is not", () => {
+  assert.equal(labels.labelClass({ value: "#12", owner: "agent" }), "chip label issue agent");
+  assert.equal(labels.labelClass({ value: "#12", owner: "person" }), "chip label issue");
+});
+
 // Who is asking at the head of a card (#121), as AgentsModel.askerLine says it.
 const asker = await load("src/model/asker.ts");
 

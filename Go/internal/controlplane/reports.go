@@ -16,7 +16,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Reports (#1811): usage, cost and time by person, project, machine and runtime, added up
+// Reports (#1811): usage, cost and time by person, folder, machine and runtime, added up
 // here from what each machine sends each hour (usage/rollup). One object per machine and
 // UTC hour, under v1/usage/hours/<hour>/<host>.json, kept 7 days; and per machine and UTC
 // day, under v1/usage/days/<day>/<host>.json, kept 90. A machine sends the whole of a
@@ -31,7 +31,7 @@ const (
 	usageDaysKept    = 90 * 24 * time.Hour
 	usageHourLayout  = "2006-01-02T15"
 	usageDayLayout   = "2006-01-02"
-	// mostRollupRows bounds one period of one machine: projects × runtimes.
+	// mostRollupRows bounds one period of one machine: folders × runtimes.
 	mostRollupRows = 1000
 	// mostRollupPeriods bounds one send.
 	mostRollupPeriods = 200
@@ -55,6 +55,9 @@ func (s *Service) keepRollup(ctx context.Context, host string, rollup wire.Usage
 	if len(rollup.Hours)+len(rollup.Days) > mostRollupPeriods {
 		return fail(invalidParams, "Send at most %d hours and days at a time.", mostRollupPeriods)
 	}
+	if err := s.keepWork(ctx, host, rollup.Work, now); err != nil {
+		return err
+	}
 	type period struct {
 		prefix, layout string
 		kept           time.Duration
@@ -71,7 +74,7 @@ func (s *Service) keepRollup(ctx context.Context, host string, rollup wire.Usage
 				continue
 			}
 			if len(at.Rows) > mostRollupRows {
-				return fail(invalidParams, "At most %d projects and runtimes in one period.", mostRollupRows)
+				return fail(invalidParams, "At most %d folders and runtimes in one period.", mostRollupRows)
 			}
 			data, err := records.Encode(storedUsage{Rows: at.Rows, At: records.At(now)})
 			if err != nil {
@@ -160,7 +163,7 @@ func (s *Service) reportFrom(ctx context.Context, prefix, first string, keep fun
 	if err != nil {
 		return nil, fail(storeUnavailable, "The reports could not be read: %v", err)
 	}
-	hosts := map[string]records.HostRecord{}
+	hosts := map[string]records.MachineRecord{}
 	for _, h := range s.records.Hosts() {
 		hosts[strings.ToLower(h.ID)] = h
 	}
@@ -168,7 +171,7 @@ func (s *Service) reportFrom(ctx context.Context, prefix, first string, keep fun
 	type wanted struct {
 		at     string
 		person string
-		host   records.HostRecord
+		host   records.MachineRecord
 	}
 	var read []store.Key
 	var meta []wanted
@@ -181,7 +184,7 @@ func (s *Service) reportFrom(ctx context.Context, prefix, first string, keep fun
 		host, known := hosts[hostKey]
 		if !known {
 			// A machine removed since: its person is not known, so only an admin sees it.
-			host = records.HostRecord{ID: strings.ToUpper(hostKey), Name: strings.ToUpper(hostKey)}
+			host = records.MachineRecord{ID: strings.ToUpper(hostKey), Name: strings.ToUpper(hostKey)}
 		}
 		person := ""
 		if known {
@@ -197,6 +200,7 @@ func (s *Service) reportFrom(ctx context.Context, prefix, first string, keep fun
 	if err != nil {
 		return nil, fail(storeUnavailable, "The reports could not be read: %v", err)
 	}
+	projectOf := s.reportProjects(ctx)
 	out := []wire.ReportRow{}
 	for i, data := range objects {
 		at, person, host := meta[i].at, meta[i].person, meta[i].host
@@ -217,11 +221,15 @@ func (s *Service) reportFrom(ctx context.Context, prefix, first string, keep fun
 			if cost == nil {
 				cost = map[string]float64{}
 			}
-			out = append(out, wire.ReportRow{At: at, Person: person, PersonName: name, Host: wire.HostID(host.ID),
-				HostName: host.Name, Project: row.Project, Runtime: row.Runtime, Cost: cost,
+			out = append(out, wire.ReportRow{At: at, Person: person, PersonName: name, Host: wire.MachineRef(host.ID),
+				HostName: host.Name, Folder: row.Folder, Runtime: row.Runtime, Cost: cost,
 				InputTokens: row.InputTokens, OutputTokens: row.OutputTokens, ThoughtTokens: row.ThoughtTokens,
 				CachedReadTokens: row.CachedReadTokens, CachedWriteTokens: row.CachedWriteTokens, Turns: row.Turns,
-				UnpricedTurns: row.UnpricedTurns, WorkingSeconds: row.WorkingSeconds, WaitingSeconds: row.WaitingSeconds})
+				UnpricedTurns: row.UnpricedTurns, WorkingSeconds: row.WorkingSeconds, WaitingSeconds: row.WaitingSeconds,
+				Workflow: row.Workflow, Counts: row.Counts})
+			if p := projectOf[strings.ToLower(host.ID)][row.Folder]; p != nil {
+				out[len(out)-1].Project, out[len(out)-1].ProjectName = &p.ID, &p.Name
+			}
 		}
 	}
 	sort.SliceStable(out, func(i, j int) bool {
@@ -232,22 +240,54 @@ func (s *Service) reportFrom(ctx context.Context, prefix, first string, keep fun
 		if a.HostName != b.HostName {
 			return a.HostName < b.HostName
 		}
-		if a.Project != b.Project {
-			return a.Project < b.Project
+		if a.Folder != b.Folder {
+			return a.Folder < b.Folder
 		}
 		return a.Runtime < b.Runtime
 	})
 	return out, nil
 }
 
-// reportMethod answers reports/usage and reports/export for a scope (#1804), and the
-// scopes and their policy. With no scope, a member sees their own machines and an admin
-// every person's.
+// reportProjects is each machine's folders' projects, by machine and folder name, as the
+// machines last reported them (projects/joined, #2670): a report row names its folder by
+// its name. Two folders of one name on one machine in different projects name neither.
+// Nothing when the store cannot say: the rows still add up, in no project.
+func (s *Service) reportProjects(ctx context.Context) map[string]map[string]*records.Project {
+	joined, err := s.joinedFolders(ctx)
+	if err != nil {
+		return nil
+	}
+	out := map[string]map[string]*records.Project{}
+	for host, folders := range joined {
+		ids := map[string]string{}
+		for _, f := range folders {
+			if id, seen := ids[f.Name]; !seen {
+				ids[f.Name] = f.Project
+			} else if id != f.Project {
+				ids[f.Name] = ""
+			}
+		}
+		names := map[string]*records.Project{}
+		for name, id := range ids {
+			if p := s.records.Project(id); id != "" && p != nil {
+				names[name] = p
+			}
+		}
+		out[strings.ToLower(host)] = names
+	}
+	return out
+}
+
+// reportMethod answers reports/usage, reports/export and reports/value (#2351) for a scope
+// (#1804), and the scopes and their policy. With no scope, a member sees their own machines
+// and an admin every person's.
 func (m *Methods) reportMethod(ctx context.Context, method string, params json.RawMessage, from Caller) (any, error) {
 	user := m.s.actorFor(from.Client).User
 	switch method {
 	case "reports/scopes":
 		return m.s.reportScopes(ctx, user)
+	case "reports/views", "reports/saveView", "reports/deleteView":
+		return m.viewMethod(ctx, method, params, user)
 	case "reports/policy", "reports/setPolicy":
 		if !m.s.isAdmin(user) {
 			return nil, fail(notPermitted, "Only an admin can see or change the report policy.")
@@ -264,6 +304,9 @@ func (m *Methods) reportMethod(ctx context.Context, method string, params json.R
 	request, err := require[wire.ReportQuery](params, "ReportQuery")
 	if err != nil {
 		return nil, err
+	}
+	if method == "reports/value" {
+		return m.s.valueReport(ctx, request.Range, request.Scope, user, time.Now())
 	}
 	report, err := m.s.scopedReport(ctx, request.Range, request.Scope, user)
 	if err != nil {
@@ -309,24 +352,42 @@ func reportCSV(rows []wire.ReportRow, groupNames map[string]string) string {
 		codes = append(codes, c)
 	}
 	sort.Strings(codes)
-	header := []string{"at", "person", "personName", "host", "hostName", "project", "runtime"}
+	header := []string{"at", "person", "personName", "host", "hostName", "folder", "project", "projectName", "runtime"}
 	for _, c := range codes {
 		header = append(header, "cost"+c)
 	}
 	header = append(header, "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens",
-		"cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds", "groups")
+		"cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds",
+		"workflow", "sessions", "failedSessions", "prsOpened", "prsMerged", "prsReverted", "mergeSeconds", "waits",
+		"workflowRuns", "workflowFailures", "groups")
 	var b bytes.Buffer
 	w := csv.NewWriter(&b)
 	w.Write(header)
 	i := func(n int64) string { return strconv.FormatInt(n, 10) }
 	f := func(n float64) string { return strconv.FormatFloat(n, 'f', -1, 64) }
 	for _, r := range rows {
-		line := []string{r.At, r.Person, r.PersonName, string(r.Host), r.HostName, r.Project, r.Runtime}
+		project, projectName := "", ""
+		if r.Project != nil && r.ProjectName != nil {
+			project, projectName = *r.Project, *r.ProjectName
+		}
+		line := []string{r.At, r.Person, r.PersonName, string(r.Host), r.HostName, r.Folder, project, projectName, r.Runtime}
 		for _, c := range codes {
 			line = append(line, f(r.Cost[c]))
 		}
 		line = append(line, i(r.InputTokens), i(r.OutputTokens), i(r.ThoughtTokens), i(r.CachedReadTokens),
 			i(r.CachedWriteTokens), i(r.Turns), i(r.UnpricedTurns), f(r.WorkingSeconds), f(r.WaitingSeconds))
+		// What the agents did (#2019), blank from a machine before it.
+		workflow := ""
+		if r.Workflow != nil {
+			workflow = *r.Workflow
+		}
+		line = append(line, workflow)
+		if c := r.Counts; c != nil {
+			line = append(line, i(c.Sessions), i(c.FailedSessions), i(c.PrsOpened), i(c.PrsMerged), i(c.PrsReverted),
+				f(c.MergeSeconds), i(c.Waits), i(c.WorkflowRuns), i(c.WorkflowFailures))
+		} else {
+			line = append(line, "", "", "", "", "", "", "", "", "")
+		}
 		var groups []string
 		for _, id := range r.Groups {
 			groups = append(groups, groupNames[id])

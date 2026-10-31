@@ -1,4 +1,4 @@
-// A project's pinned pages (#159), as the window has them: rows first in the project's fold,
+// A folder's pinned pages (#159), as the window has them: rows first in the folder's fold,
 // dragged among themselves to re-order, and a page in the chat's place, live as the file
 // changes. Markdown is the live page an agent's show_file opens. HTML is shown as its source,
 // as the files pane shows it here: the page allows no frames and no HTML of its own making
@@ -12,6 +12,7 @@ import { folderKey } from "../model/groups";
 import { describe } from "../model/errors";
 import type { FileStamp, PinView } from "../protocol/generated";
 import { go } from "../route";
+import { fromWireDate } from "../protocol/dates";
 import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
 import { LiveDocument, type PageSource } from "./LiveDocument";
 import { BackToList } from "./BackToList";
@@ -39,7 +40,7 @@ export function PinnedPageRows({ store, host, folder, chosen, down }: {
     arrange(next);
   };
   const menu = (pin: PinView): MenuItem[] => [
-    { label: "Open", run: () => go({ host, project: folder, page: pin.path }) },
+    { label: "Open", run: () => go({ host, folder: folder, page: pin.path }) },
     { label: "Move Up", disabled: down || paths[0] === pin.path, run: () => step(pin.path, -1) },
     { label: "Move Down", disabled: down || paths[paths.length - 1] === pin.path, run: () => step(pin.path, 1) },
     { label: "Unpin", disabled: down, run: () => void store.unpin(host, folder, pin.path) },
@@ -71,7 +72,7 @@ export function PinnedPageRows({ store, host, folder, chosen, down }: {
             <button class="pick" aria-current={chosen === pin.path}
               title={pin.missing ? `Missing: ${pin.path}${pin.missingReason ? `: ${pin.missingReason}` : ""}` : pin.path}
               aria-description={pin.missing ? "missing" : undefined}
-              onClick={() => go({ host, project: folder, page: pin.path })}>
+              onClick={() => go({ host, folder: folder, page: pin.path })}>
               <span class="pin-mark" aria-hidden="true">{pinMark(pin)}</span>
               {/* Nothing at its end, which is only a session's (#587): missing is the grey title and the tooltip. */}
               <span class="title">{pin.title}</span>
@@ -81,6 +82,54 @@ export function PinnedPageRows({ store, host, folder, chosen, down }: {
       ))}
     </div>
   );
+}
+
+/** A connected server's list views (#2032), after the folder's pins: a row each, named by the service
+ *  ("GitHub · Issues"), without a pin. Its menu hides one; the folder's menu shows them again. */
+export function ServerViewRows({ store, host, folder, chosen, down }: {
+  store: Store; host: string; folder: string; chosen: string | undefined; down: boolean;
+}) {
+  const views = store.serverViewsIn(host, folder).filter((v) => !v.hidden);
+  if (views.length === 0) return null;
+  const menu = (view: PinView): MenuItem[] => [
+    { label: "Open", run: () => go({ host, folder: folder, page: view.path }) },
+    { label: "Hide", disabled: down, help: "Take this view out of the sidebar; the folder's menu shows it again",
+      run: () => void store.setViewHidden(host, folder, view.path, true) },
+  ];
+  return (
+    <div class="group pins server-views" role="group" aria-label="Server views">
+      {views.map((view) => (
+        <div class="nav-item" key={view.path}
+          onContextMenu={(e) => openContextMenu(e, menu(view))}
+          onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu(view)); }} {...holdForMenu(() => menu(view))}>
+          <div class={`row pin${chosen === view.path ? " chosen" : ""}`}>
+            <button class="pick" aria-current={chosen === view.path} title={countTitle(view)}
+              onClick={() => go({ host, folder: folder, page: view.path })}>
+              <span class="pin-mark" aria-hidden="true">{pinMark(view)}</span>
+              <span class="title">{view.title}</span>
+              {/* Its server's count (#2033), grey as a fold's count. */}
+              {view.count !== undefined && <span class="count">{view.count}</span>}
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** A view row's tooltip: its address, and when its count was read (#2033). */
+function countTitle(view: PinView): string {
+  if (view.count === undefined || view.countAt === undefined) return view.path;
+  const when = fromWireDate(view.countAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return `${view.path}\n${view.countStale ? `As of ${when}: the server did not answer since.` : `As of ${when}.`}`;
+}
+
+/** The folder menu's Show Hidden Views (#2032), or nothing when none is hidden. */
+export function showHiddenViewsItem(store: Store, host: string, folder: string, down: boolean): MenuItem[] {
+  const hidden = store.serverViewsIn(host, folder).filter((v) => v.hidden);
+  if (hidden.length === 0) return [];
+  return [{ label: `Show Hidden Views (${hidden.length})`, disabled: down, help: "Put this folder's hidden server views back in the sidebar",
+    run: () => { for (const v of hidden) void store.setViewHidden(host, folder, v.path, false); } }];
 }
 
 function pinMark(pin: PinView): string {
@@ -95,7 +144,7 @@ type Shown =
 export function PinnedPage({ store, host, folder, path, down }: {
   store: Store; host: string; folder: string; path: string; down: boolean;
 }) {
-  const pin = store.pinsIn(host, folder).find((p) => p.path === path);
+  const pin = store.pinOrViewIn(host, folder, path);
   if (pin?.view || path.startsWith("ui://")) {
     return <PinnedViewPage store={store} host={host} folder={folder} path={path} pin={pin} down={down} />;
   }
@@ -148,9 +197,9 @@ function PinnedFilePage({ store, host, folder, path, down }: {
           <span class="small quiet">{path}</span>
         </div>
         {pin
-          ? <button disabled={down} onClick={() => { void store.unpin(host, folder, path); go({ host, project: folder, compose: true }); }}>Unpin</button>
+          ? <button disabled={down} onClick={() => { void store.unpin(host, folder, path); go({ host, folder: folder, compose: true }); }}>Unpin</button>
           : <button disabled={down || store.pinsIn(host, folder).length >= 10} onClick={() => void store.pin(host, folder, path)}
-              title="Pin this page under the project">Pin to Project</button>}
+              title="Pin this page under the folder">Pin to Folder</button>}
       </header>
       {pin?.missing ? (
         <p class="hint">{missingWords(path, "")}</p>
@@ -172,6 +221,6 @@ function PinnedFilePage({ store, host, folder, path, down }: {
 
 function missingWords(path: string, why: string): string {
   return /is gone|isn't in|not there/.test(why) || why === ""
-    ? `${path} isn't in the project folder. It may have been moved or deleted, or be on a branch that hasn't landed.`
+    ? `${path} isn't in the folder. It may have been moved or deleted, or be on a branch that hasn't landed.`
     : `${path} can't be read: ${why}`;
 }

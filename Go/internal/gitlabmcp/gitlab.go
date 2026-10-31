@@ -18,10 +18,42 @@ type MR struct {
 	Title  string
 	Branch string
 	URL    string
+	// Fixes is the issues its description says it closes (#2349), where the list read it.
+	Fixes []string
 }
 
 func (m MR) json() map[string]any {
-	return map[string]any{"number": m.Number, "title": m.Title, "branch": m.Branch, "url": m.URL}
+	j := map[string]any{"number": m.Number, "title": m.Title, "branch": m.Branch, "url": m.URL}
+	if len(m.Fixes) > 0 {
+		j["fixes"] = m.Fixes
+	}
+	return j
+}
+
+// closingPattern is GitLab's words that close an issue when the merge request merges, then
+// the issue: #12 in its own project, or group/project#12.
+var closingPattern = regexp.MustCompile(`(?i)\b(?:close[sd]?|closing|fix(?:e[sd]|ing)?|resolve[sd]?|resolving|implement(?:s|ed|ing)?):?\s+([A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+)?#([0-9]{1,9})\b`)
+
+// mostFixes bounds the issues read from one description.
+const mostFixes = 20
+
+// closingRefs is the issues a description closes, each once, in order: "#12", or
+// "group/project#12" for another project's.
+func closingRefs(body string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, m := range closingPattern.FindAllStringSubmatch(body, -1) {
+		ref := m[1] + "#" + strings.TrimLeft(m[2], "0")
+		if strings.HasSuffix(ref, "#") || seen[strings.ToLower(ref)] {
+			continue
+		}
+		seen[strings.ToLower(ref)] = true
+		out = append(out, ref)
+		if len(out) == mostFixes {
+			break
+		}
+	}
+	return out
 }
 
 // OpenMR is an open merge request, drafts too, as pr.opened and pr.conflicted see it.
@@ -200,6 +232,26 @@ type GitLab interface {
 	IssueActivity(ctx context.Context, project string, kind IssueKind, since string) (items []IssueActivity, listed Listed, err error)
 	// ReviewComments are the comments on merge requests' diffs made at or after since.
 	ReviewComments(ctx context.Context, project, since string) (comments []ReviewComment, listed Listed, err error)
+	// Yours is what the connection's owner has in the project (#2034).
+	Yours(ctx context.Context, project string) (Yours, error)
+}
+
+// Yours is what the connection's owner has in a project (#2034): their username, their open
+// merge requests, the open ones they are a reviewer of, and the open issues assigned to them.
+type Yours struct {
+	Login    string
+	MRs      []int
+	Reviews  []OpenMR
+	Assigned []Issue
+}
+
+func (y Yours) owns(mr int) bool {
+	for _, n := range y.MRs {
+		if n == mr {
+			return true
+		}
+	}
+	return false
 }
 
 // ErrorKind is why a GitLab call failed.

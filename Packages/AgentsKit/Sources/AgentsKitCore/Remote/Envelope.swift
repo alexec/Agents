@@ -6,7 +6,7 @@ import Foundation
 /// Something sealed to one device, and to nobody else.
 ///
 /// HPKE to the device's P256 public key, with the banner's `Headline` inside. Nothing
-/// legible goes to a device that is not `to` (FR-022): the project's name, the agent's
+/// legible goes to a device that is not `to` (FR-022): the folder's name, the agent's
 /// name and what is wanted travel only as ciphertext, and a withdrawal carries no
 /// envelope at all — it names the need's id, which identifies nothing about the work.
 ///

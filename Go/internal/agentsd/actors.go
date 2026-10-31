@@ -26,6 +26,33 @@ func actorOf(conn any) *wire.AuditActor {
 type actorBook struct {
 	actorMu sync.Mutex
 	actedBy map[wire.UUID]*wire.AuditActor
+	// adminStops are the agents an admin stopped from the Console (#2435), until the
+	// turn's ending takes it.
+	adminStops map[wire.UUID]bool
+}
+
+// noteAdminStop notes whether a stop was an admin's from the Console; a stop that is not
+// clears an older one, so the owner's own stop never reads as an admin's.
+func (d *Daemon) noteAdminStop(id wire.UUID, byAdmin bool) {
+	d.actorMu.Lock()
+	defer d.actorMu.Unlock()
+	if !byAdmin {
+		delete(d.adminStops, id)
+		return
+	}
+	if d.adminStops == nil {
+		d.adminStops = map[wire.UUID]bool{}
+	}
+	d.adminStops[id] = true
+}
+
+// takeAdminStop is whether an admin stopped the agent, once.
+func (d *Daemon) takeAdminStop(id wire.UUID) bool {
+	d.actorMu.Lock()
+	defer d.actorMu.Unlock()
+	byAdmin := d.adminStops[id]
+	delete(d.adminStops, id)
+	return byAdmin
 }
 
 // actedOn notes that a person's call acted on an agent; a nil actor clears an older one.

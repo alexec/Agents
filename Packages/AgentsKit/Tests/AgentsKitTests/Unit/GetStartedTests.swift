@@ -5,7 +5,7 @@ import Testing
 /// The Get started card's rules (#982): ticked from facts, gone for good once gone.
 @Suite("Get started")
 struct GetStartedTests {
-    private let setUp = GetStarted.Facts(paired: true, runtimeReady: true, hasProject: true, ranAgent: true)
+    private let setUp = GetStarted.Facts(paired: true, runtimeReady: true, hasFolder: true, ranAgent: true)
 
     @Test func aPersonAlreadySetUpNeverSeesTheCard() {
         #expect(GetStarted.card(kept: nil, facts: setUp) == .gone)
@@ -33,7 +33,7 @@ struct GetStartedTests {
 
     @Test func aTurnHasRunOnlyOnceOneHasEnded() {
         let start = Date(timeIntervalSince1970: 1000)
-        let cwd = URL(filePath: "/tmp/project")
+        let cwd = URL(filePath: "/tmp/folder")
         let fresh = Agent(runtimeID: "claude", cwd: cwd, state: .starting, createdAt: start, lastActivityAt: start)
         let running = Agent(runtimeID: "claude", cwd: cwd, state: .running, createdAt: start, lastActivityAt: start + 5)
         let queued = Agent(runtimeID: "claude", cwd: cwd, state: .queued, createdAt: start, lastActivityAt: start + 5)

@@ -1,9 +1,9 @@
-// What waits for the person's OK in a project (#773), as its host lists it on the project's summary:
-// a project MCP server, a workflow, a plugin, a guarded `.agents` file, or a session asking to be
+// What waits for the person's OK in a folder (#773), as its host lists it on the folder's summary:
+// a folder MCP server, a workflow, a plugin, a guarded `.agents` file, or a session asking to be
 // archived; and a workflow that failed (#989), to fix or dismiss. The words are the window's and the Remote's, Approval (AgentsKitCore/Model/Approval.swift).
 import type { Approval, ApprovalAction, ApprovalKind } from "../protocol/generated";
 
-/** Approval.id: one item within its project. */
+/** Approval.id: one item within its folder. */
 export function approvalID(approval: Approval): string {
   return `${approval.kind}:${approval.key}`;
 }
@@ -61,7 +61,7 @@ export function opensItsSubject(approval: Approval): boolean {
 }
 
 /**
- * SidebarSmartRow.failedRuns: the agents of a project's failed workflow runs (#989). Needs You
+ * SidebarSmartRow.failedRuns: the agents of a folder's failed workflow runs (#989). Needs You
  * lists each as its workflow's row, which opens it, and not as a session too.
  */
 export function failedRuns(approvals: readonly Approval[] | undefined): Set<string> {

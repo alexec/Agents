@@ -1,7 +1,7 @@
 import Foundation
 
 /// Groups (#1761, spec 736 FR-027, FR-028): everyone, or named users. A group owns
-/// workspace providers: only its users see them and start machines from them. A provider
+/// machine providers: only its users see them and start machines from them. A provider
 /// with no group is the admins' alone.
 public extension DaemonAPI {
     /// A group, in `groups/list` and as `groups/set` answers.
@@ -12,17 +12,40 @@ public extension DaemonAPI {
         public var members: [String]
         /// Caps for the group's bots together (#1761, FR-033).
         public var caps: SpendCaps?
+        /// A SCIM group's provider (#1002, FR-019). Nil for a group an admin made.
+        public var source: GroupSource?
+        /// "admin": the group gives its people the admin role (#1002, FR-020).
+        public var role: String?
 
-        public init(id: String, name: String, everyone: Bool = false, members: [String] = [], caps: SpendCaps? = nil) {
+        public init(id: String, name: String, everyone: Bool = false, members: [String] = [], caps: SpendCaps? = nil,
+                    source: GroupSource? = nil, role: String? = nil) {
             self.caps = caps
+            self.source = source
+            self.role = role
             self.id = id
             self.name = name
             self.everyone = everyone
             self.members = members
         }
 
+        /// Whether it gives its people the admin role (FR-020).
+        public var givesAdmin: Bool { role == "admin" }
+
         /// Says a user is in it.
         public func has(_ user: String) -> Bool { everyone || members.contains(user) }
+    }
+
+    /// Where a group comes from (#1002, FR-019): an org provider's SCIM, which alone changes its members.
+    struct GroupSource: Codable, Sendable, Hashable {
+        public var scim: String
+        public var externalId: String?
+        public var displayName: String
+
+        public init(scim: String, externalId: String? = nil, displayName: String) {
+            self.scim = scim
+            self.externalId = externalId
+            self.displayName = displayName
+        }
     }
 
     /// `groups/list`: every group for an admin; for a member, the groups they are in.
@@ -51,7 +74,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// `groups/remove`. Refused while a workspace provider or a bot has the group.
+    /// `groups/remove`. Refused while a machine provider or a bot has the group.
     struct GroupRequest: Codable, Sendable, Hashable {
         public var id: String
 
@@ -112,17 +135,17 @@ public extension DaemonAPI {
 
     /// `bots/stopRun` (FR-031): an admin stops an agent on a bot's machine.
     struct BotStopRun: Codable, Sendable, Hashable {
-        public var host: HostID
+        public var host: MachineRef
         public var agent: UUID
 
-        public init(host: HostID, agent: UUID) {
+        public init(host: MachineRef, agent: UUID) {
             self.host = host
             self.agent = agent
         }
     }
 
     /// `hosts/startEnroll` with `as`: a code for a bot's machine, an admin's only (#1761).
-    struct HostEnroll: Codable, Sendable, Hashable {
+    struct MachineEnroll: Codable, Sendable, Hashable {
         public var `as`: String?
 
         public init(as bot: String? = nil) { self.as = bot }
@@ -187,6 +210,11 @@ public extension DaemonAPI.Notification {
 /// the Remote (the web page's are in `Web/src/model/teamGroups.ts`).
 public enum GroupWords {
     public static let title = "Groups"
+    public static let givesAdmin = "Gives the admin role"
+    /// A SCIM group's line (#1002, FR-031): "From Acme Okta", with " · Gives the admin role" when it does.
+    public static func orgLine(_ group: DaemonAPI.Group, provider: String) -> String {
+        group.givesAdmin ? "\(PeopleWords.fromProvider(provider)) · \(givesAdmin)" : PeopleWords.fromProvider(provider)
+    }
     /// A provider with no group.
     public static let adminsOnly = "Admins only"
 
@@ -196,6 +224,12 @@ public enum GroupWords {
         guard !group.members.isEmpty else { return "No one" }
         return group.members.map { id in people.first { $0.id == id }?.name ?? "Someone removed" }
             .joined(separator: ", ")
+    }
+
+    /// The bots in a group (#2132), which a bot names itself: "review-bot, nightly-bot", or "None".
+    public static func bots(_ group: DaemonAPI.Group, people: [DaemonAPI.PersonRow]) -> String {
+        let names = people.filter { $0.kind == .bot && $0.group == group.id }.map(\.name)
+        return names.isEmpty ? "None" : names.joined(separator: ", ")
     }
 
     /// "DigitalOcean, Docker", or nil with none.
@@ -228,8 +262,8 @@ public enum GroupWords {
 
     public static func foot(admin: Bool) -> String {
         admin
-            ? "A group is everyone, or the people you name. Give a workspace provider to a group, and only its people see it and start machines from it. A provider with no group is for admins only."
-            : "The groups you are in. Their workspace providers are the ones you can start machines from."
+            ? "A group is everyone, or the people you name. Give a machine provider to a group, and only its people see it and start machines from it. A provider with no group is for admins only."
+            : "The groups you are in. Their machine providers are the ones you can start machines from."
     }
 
     public static func removeTitle(_ group: DaemonAPI.Group) -> String { "Remove \(group.name)?" }
@@ -252,6 +286,9 @@ public enum GroupWords {
 /// The words a bot is shown in, in Settings ▸ People (#1761), the same on the Mac and the
 /// Remote (the web page's are in `Web/src/model/teamGroups.ts`).
 public enum BotWords {
+    /// Settings ▸ Control plane ▸ Bots (#2132), a pane of its own next to People.
+    public static let title = "Bots"
+    public static let empty = "No bots yet. A bot runs workflows as its own user, in one group, with a daily cap."
     public static let make = "Make a Bot…"
     public static let addMachine = "Add a Machine…"
     public static let setCap = "Group and Cap…"

@@ -1,25 +1,56 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>Issues</title>
-<!-- The github server's Issues (ui://github/issues, #1341): show_issues's result; a label
-     narrows it. Start Agent opens the app's new-agent form filled in for the issue
+<!-- The github server's Issues (ui://github/issues, #1341): show_issues's result, in sections by
+     how each relates to the viewer (#2453); labels
+     and a search narrow it, in one call (#2686). Start Agent opens the app's new-agent form filled in for the issue
      (agents/start-agent, #834). It has no network: it speaks only the MCP Apps bridge. -->
 <style>
 /*common.css*/
 .start { grid-column: 3; grid-row: 1 / span 2; white-space: nowrap; }
 .meta { grid-column: 2; }
+.issue-details { grid-column: 1 / -1; min-width: 0; padding: 8px 10px; border-radius: var(--border-radius-sm);
+  background: var(--color-background-secondary); }
+.issue-details[hidden] { display: none; }
+.issue-body { margin-top: 6px; overflow-wrap: anywhere; }
+.issue-body > :first-child { margin-top: 0; }
+.issue-body > :last-child { margin-bottom: 0; }
+.issue-body pre { overflow-x: auto; padding: 8px; background: var(--color-background-tertiary); border-radius: var(--border-radius-sm); }
+.issue-row { cursor: pointer; }
+.issue-row:hover { background: var(--color-background-secondary); }
+.issue-row:focus-visible { outline: 2px solid var(--color-text-info); outline-offset: -2px; }
+.linked-prs { display: grid; gap: 4px; margin-top: 8px; }
+.linked-pr { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+.label-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0; }
+.label-filters input { min-width: 12em; }
+.search { display: flex; margin: 8px 0; }
+.search input { flex: 1; min-width: 0; }
+/* A label in its GitHub colour (#2686): a chosen one keeps it and gets a ring. */
+.pill.colored.chosen { outline: 2px solid var(--color-text-primary); outline-offset: 1px; }
+button.pill.colored:hover { filter: brightness(0.9); }
 </style></head>
 <body><main>
-  <header><h1>Issues</h1><span id="repo" class="muted"></span><span id="label"></span><span class="grow"></span>
+  <header><h1>Issues</h1><span id="repo" class="muted"></span><span class="grow"></span>
     <button id="refresh" type="button" disabled>Refresh</button></header>
+  <div class="search"><input id="search" type="search" aria-label="Search issues" placeholder="Search issues" autocomplete="off"></div>
+  <div class="label-filters" role="group" aria-label="Filter issues by labels">
+    <span class="muted">Labels</span><span id="label-tags"></span>
+    <input id="label-input" type="text" aria-label="Add a label filter" placeholder="Add label filter" list="label-options" autocomplete="off">
+    <datalist id="label-options"></datalist>
+  </div>
   <div id="state" class="muted">Waiting for the host…</div>
   <ul id="issues"></ul>
 </main>
 <script>
 /*bridge.js*/
+/*labels.js*/
+/*lineage.js*/
 (() => {
-  let repo = "", label = "";
+  let repo = "", activeLabels = [], query = "", searchTimer = 0;
+  const labelColors = {};
   const ui = bridge("github-issues", {
-    input: (args) => { repo = args.repo || ""; label = args.label || ""; ui.$("repo").textContent = repo; say("Listing…"); },
+    input: (args) => {
+      repo = args.repo || ""; query = typeof args.query === "string" ? args.query.trim() : ""; ui.$("search").value = query;
+      activeLabels = [...new Set([args.label, ...(Array.isArray(args.labels) ? args.labels : [])].filter(Boolean))]; drawLabel(); ui.$("repo").textContent = repo; say("Listing…"); },
     result: (result) => draw(result),
     cancelled: (why) => say("Cancelled: " + why, true),
     started: () => say("Waiting for the issues…"),
@@ -27,51 +58,133 @@
   const { $, el, link, button } = ui;
   const say = (text, isError) => { $("state").textContent = text; $("state").className = isError ? "error" : "muted"; ui.size(); };
 
-  // The label the list is narrowed to, with a way back to every open issue.
+  const filterPill = (text, name, onClick, chosen, title) =>
+    labelPill(ui, text, labelColors[name], onClick, { className: chosen ? "chosen" : "", title });
+
   const drawLabel = () => {
-    if (!label) { $("label").replaceChildren(); return; }
-    $("label").replaceChildren(button(label + " ✕", () => choose(""), { className: "pill chosen", title: "Show every open issue" }));
+    $("label-tags").replaceChildren(...activeLabels.map((name) => filterPill(name + " ✕", name, () => removeLabel(name),
+      true, `Remove ${name} label filter`)));
   };
 
   const draw = (result) => {
     const found = ui.data(result);
     if (!found) { say("Couldn't list issues: " + ui.errorText(result), true); $("refresh").disabled = !repo; return; }
     if (found.repo) { repo = found.repo; $("repo").textContent = repo; }
+    if (found.labelColors && typeof found.labelColors === "object") Object.assign(labelColors, found.labelColors);
     const issues = Array.isArray(found.issues) ? found.issues : [];
-    $("issues").replaceChildren(...issues.map(row));
+    const options = [...new Set(issues.flatMap((issue) => issue.labels || []))].filter((name) => !activeLabels.includes(name));
+    $("label-options").replaceChildren(...options.map((name) => el("option", { value: name })));
+    $("issues").replaceChildren(...ui.sections(issues, row));
     drawLabel();
     const assigned = issues.filter((issue) => (issue.assignees || []).length).length;
     say(issues.length ? `${issues.length} open · ${assigned} assigned · as of ${new Date().toLocaleTimeString()}`
-      : label ? `No open issues labelled ${label}.` : "No open issues.");
+      : query ? `No open issues match ${query}${activeLabels.length ? " labelled " + activeLabels.join(" and ") : ""}.`
+      : activeLabels.length ? `No open issues labelled ${activeLabels.join(" and ")}.` : "No open issues.");
     $("refresh").disabled = !repo;
   };
 
   const row = (issue) => {
-    const labels = (issue.labels || []).map((name) => button(name, () => choose(name === label ? "" : name),
-      { className: name === label ? "pill chosen" : "pill", title: "Only issues labelled " + name }));
+    const issueLabels = (issue.labels || []).map((name) => filterPill(name, name, () => addLabel(name),
+      activeLabels.includes(name), "Filter by label " + name));
     // Who works on it (#905): an issue is taken by assigning it.
     const assignees = (issue.assignees || []).map((login) =>
       el("span", { className: "pill assigned", textContent: "@" + login, title: "Assigned to " + login }));
-    const comments = issue.comments ? ` · ${issue.comments} comment${issue.comments === 1 ? "" : "s"}` : "";
+    const comments = issue.comments ? `${issue.comments} comment${issue.comments === 1 ? "" : "s"}` : "";
     const start = button("Start Agent", () => startAgent(issue),
       { className: "start", title: `A new agent for #${issue.number}, in a worktree of its own` });
-    return el("li", {}, [
+    const details = el("div", { className: "issue-details", hidden: true });
+    details.id = `issue-details-${issue.number}`;
+    const item = el("li", { className: "issue-row" }, [
       link(`#${issue.number}`, issue.url),
       el("span", { className: "title", textContent: issue.title, title: issue.title }),
       start,
       el("span", { className: "meta" }, [
         ...assignees,
-        el("span", { textContent: `${issue.author || "someone"}${comments}${issue.updatedAt ? " · " + ui.ago(issue.updatedAt) : ""}` }),
-        ...labels,
+        ...ui.who(issue.author, issue.authorBot),
+        el("span", { textContent: [comments, issue.updatedAt ? ui.ago(issue.updatedAt) : ""].filter(Boolean).join(" · ") }),
+        issue.milestone ? el("span", { className: "pill", textContent: issue.milestone, title: "Milestone" }) : null,
+        ...issueLabels,
       ]),
+      details,
     ]);
+    item.tabIndex = 0;
+    item.setAttribute("aria-label", `Issue #${issue.number}: ${issue.title}`);
+    item.setAttribute("aria-expanded", "false");
+    item.setAttribute("aria-controls", details.id);
+    const toggle = () => toggleDetails(issue, item, details);
+    item.addEventListener("click", (event) => {
+      if (event.target.closest("a, button, select, .issue-details")) return;
+      toggle();
+    });
+    item.addEventListener("keydown", (event) => {
+      if (event.target !== item || (event.key !== "Enter" && event.key !== " ")) return;
+      event.preventDefault(); toggle();
+    });
+    return item;
+  };
+
+  const toggleDetails = async (issue, item, target) => {
+    const expanded = item.getAttribute("aria-expanded") === "true";
+    item.setAttribute("aria-expanded", String(!expanded));
+    target.hidden = expanded;
+    if (expanded || target.dataset.loaded || target.dataset.loading) return;
+    target.dataset.loading = "true";
+    target.replaceChildren(el("span", { className: "muted", textContent: "Loading issue details…" }));
+    try {
+      const details = await ui.call("show_issue_details", { repo, number: issue.number });
+      drawDetails(target, details, issue);
+      target.dataset.loaded = "true";
+    } catch (e) {
+      target.replaceChildren(el("span", { className: "error", textContent: "Couldn't load issue details: " + e.message }));
+    } finally {
+      delete target.dataset.loading;
+    }
+  };
+
+  const drawDetails = (target, details, issue) => {
+    const body = typeof details.body === "string" && details.body.trim() ? details.body : "No description.";
+    const closing = details.closed_by_pull_requests;
+    const refs = closing && Array.isArray(closing.references) ? closing.references : [];
+    const total = closing ? Number(closing.total_count) || refs.length : 0;
+    const linked = el("div", { className: "linked-prs" });
+    if (!closing) {
+      linked.append(el("span", { className: "muted", textContent: "Linked pull requests are unavailable." }));
+    } else {
+      linked.append(el("span", { className: "muted", textContent: refs.length ? "Linked pull requests" : "No linked pull requests." }));
+    }
+    for (const pr of refs) {
+      const repoName = pr.repository && pr.repository !== repo ? pr.repository + " · " : "";
+      linked.append(el("div", { className: "linked-pr" }, [
+        link(`#${pr.number}`, pr.url),
+        el("span", { textContent: repoName + (pr.title || "Pull request") }),
+        pr.state ? el("span", { className: "pill", textContent: pr.state.toLowerCase() }) : null,
+      ]));
+    }
+    if (total > refs.length) linked.append(el("span", { className: "muted", textContent: `Showing ${refs.length} of ${total} linked pull requests.` }));
+    const description = el("div", { className: "issue-body" });
+    if (body === "No description.") description.textContent = body;
+    else renderMarkdown(description, details.bodyHTML || "", issue.url);
+    target.replaceChildren(el("span", { className: "muted", textContent: "Description" }), description, linked,
+      lineageSection(ui, issue.url));
+  };
+
+  const renderMarkdown = (target, html, base) => {
+    target.innerHTML = html;
+    for (const anchor of target.querySelectorAll("a")) {
+      try {
+        const url = new URL(anchor.getAttribute("href"), base);
+        if (!["http:", "https:", "mailto:"].includes(url.protocol)) { anchor.removeAttribute("href"); continue; }
+        anchor.href = url.href;
+        anchor.onclick = (event) => { event.preventDefault(); ui.openLink(url.href); };
+      } catch { anchor.removeAttribute("href"); }
+    }
   };
 
   // The app's new-agent form, filled in for this issue (#834). The person starts it, or not;
   // the agent assigns the issue to the signed-in person once it does.
   const startAgent = async (issue) => {
     const n = issue.number, on = repo ? ` --repo ${repo}` : "";
-    const prompt = `Work on GitHub issue #${n} (\`gh issue view ${n}${on}\`): ${issue.title}\n\n`
+    const prompt = `#${n}: ${issue.title}\n\nWork on this GitHub issue (\`gh issue view ${n}${on}\`).\n\n`
       + `First assign it to yourself: \`gh issue edit ${n}${on} --add-assignee @me\`.`;
     try {
       await ui.request("agents/start-agent", { prompt, labels: ["#" + n], worktree: `${n} ${issue.title}` });
@@ -79,13 +192,34 @@
     } catch (e) { say("Couldn't open a new agent: " + e.message, true); ui.log("start-agent refused: " + e.message, "warning"); }
   };
 
+  // One call for the labels and the search (#2686); a later call's answer wins.
+  let asked = 0;
   const list = async () => {
     $("refresh").disabled = true;
-    const args = label ? { repo, label } : { repo };
-    try { draw(await ui.request("tools/call", { name: "show_issues", arguments: args })); }
-    catch (e) { say("Couldn't list issues: " + e.message, true); $("refresh").disabled = false; }
+    const args = { repo };
+    if (activeLabels.length) args.labels = activeLabels;
+    if (query) args.query = query;
+    const mine = ++asked;
+    try {
+      const found = await ui.call("show_issues", args);
+      if (mine === asked) draw({ structuredContent: found });
+    }
+    catch (e) { if (mine === asked) { say("Couldn't list issues: " + e.message, true); $("refresh").disabled = false; } }
   };
-  const choose = (name) => { label = name; drawLabel(); say("Listing…"); list(); };
+  const search = () => {
+    clearTimeout(searchTimer);
+    const text = $("search").value.trim();
+    if (text === query) return;
+    query = text; say(query ? "Searching…" : "Listing…"); list();
+  };
+  $("search").onkeydown = (event) => { if (event.key === "Enter") { event.preventDefault(); search(); } };
+  $("search").oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(search, 400); };
+  const addLabel = (name) => { if (name && !activeLabels.includes(name)) { activeLabels = [...activeLabels, name]; $("label-input").value = ""; drawLabel(); say("Listing…"); list(); } };
+  const removeLabel = (name) => { activeLabels = activeLabels.filter((item) => item !== name); drawLabel(); say("Listing…"); list(); };
+  const labelInput = $("label-input");
+  labelInput.onkeydown = (event) => { if (event.key === "Enter" || event.key === ",") { event.preventDefault(); addLabel(labelInput.value.trim().replace(/,$/, "")); } };
+  labelInput.onchange = () => addLabel(labelInput.value.trim());
+  labelInput.onblur = () => { if (labelInput.value.trim()) addLabel(labelInput.value.trim()); };
   $("refresh").onclick = list;
   ui.start();
 })();

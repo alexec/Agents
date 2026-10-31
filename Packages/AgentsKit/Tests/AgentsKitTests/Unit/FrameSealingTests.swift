@@ -52,7 +52,7 @@ struct FrameSealingTests {
     }
 
     @Test func nothingInTheSealedBytesIsLegible() throws {
-        let words = ["Low temperature in Celsius", "git commit -m", "/Users/alex/Projects/weather"]
+        let words = ["Low temperature in Celsius", "git commit -m", "/Users/alex/Folders/weather"]
         let sealed = try frame(words.map { #"{"text":"\#($0)"}"# }).seal(to: mac.publicKey, from: phone)
         for word in words {
             #expect(sealed.range(of: Data(word.utf8)) == nil)

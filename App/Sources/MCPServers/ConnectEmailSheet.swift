@@ -8,7 +8,7 @@ struct ConnectEmailSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
 
-    var host: HostID
+    var host: MachineRef
     var onConnected: () -> Void = {}
 
     private enum Step: Equatable {

@@ -16,9 +16,6 @@ extension EnvironmentValues {
     /// Whether text takes the width it is offered or only the width it needs. The
     /// person's own message hugs its words, at the right of the chat.
     @Entry var textFillsWidth = true
-    /// Whether a long text may lay out only the blocks on screen. Set by the chat, whose
-    /// rows sit in one scroll view with nothing to keep a place by but the scroll (#90).
-    @Entry var textIsLazy = false
     /// Whether a shell's code block offers Run (#1533): set on an agent's reply only.
     @Entry var codeRuns = false
 }
@@ -26,7 +23,6 @@ extension EnvironmentValues {
 struct MarkdownText: View {
     @Environment(\.textFillsWidth) private var fillsWidth
     @Environment(\.codeRuns) private var codeRuns
-    @Environment(\.textIsLazy) private var isLazy
     /// A page's zoom (#1419), which headings take as the steps do.
     @Environment(\.textZoom) private var zoom
     @Environment(\.dynamicTypeSize) private var dynamicType
@@ -39,6 +35,9 @@ struct MarkdownText: View {
     /// a live page passes one, for the passage an agent is typing into; everywhere else
     /// this is nil and the text is drawn as it always was.
     var caret: CursorFlag?
+    /// Only these of its blocks: the chat draws a long reply as rows of a few blocks each,
+    /// so only those near the screen are laid out (P20261022-18).
+    var range: Range<Int>?
 
     var body: some View {
         if caret != nil {
@@ -54,21 +53,12 @@ struct MarkdownText: View {
         // A passage whose first characters have not arrived yet — nothing, or a `#` that
         // is not a heading until its text follows — is still somewhere the caret is.
         if parsed.isEmpty, let caret { return AnyView(caret.caret) }
-        // A long reply is one row of the chat, and a row lays out whole. Its blocks in a
-        // lazy stack lay out as they come on screen; the look is the same stack (#90).
-        if isLazy, fillsWidth, caret == nil, parsed.count > Self.lazyFrom {
-            return AnyView(LazyVStack(alignment: .leading, spacing: 10) {
-                ForEach(Array(parsed.enumerated()), id: \.offset) { _, block in
-                    view(for: block, caret: nil)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading))
+        if let range {
+            let shown = range.clamped(to: parsed.indices)
+            return blocks(Array(parsed[shown]), caret: shown.upperBound == parsed.count ? caret : nil)
         }
         return blocks(parsed, caret: caret)
     }
-
-    /// How many blocks make a text long enough to lay out lazily: about two screens.
-    private static let lazyFrom = 24
 
     /// Erased on purpose, and this is the only place it is.
     ///

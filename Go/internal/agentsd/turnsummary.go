@@ -99,7 +99,7 @@ func (it item) isOutcome() bool {
 	switch {
 	case it.isRun():
 		return false
-	case k.ElicitationAnswered != nil, k.WorkReported != nil, k.SandboxFailure != nil, k.AppView != nil, k.FileShown != nil:
+	case k.ElicitationAnswered != nil, k.WorkReported != nil, k.SandboxFailure != nil, k.AppView != nil, k.FileShown != nil, k.Notified != nil:
 		return true
 	case k.StateChanged != nil:
 		return k.StateChanged.Value == wire.AgentStateStopped
@@ -178,7 +178,7 @@ func entryIsPassing(e *wire.TranscriptEntry) bool {
 
 func carriesOn(k *wire.TranscriptEntryKind) bool {
 	return k.AgentMessage != nil || k.AgentThought != nil || k.ToolCall != nil || k.ToolCallUpdate != nil ||
-		k.AppView != nil || k.FileShown != nil || k.PlanUpdated != nil || k.PermissionAsked != nil || k.ElicitationAsked != nil
+		k.AppView != nil || k.FileShown != nil || k.Notified != nil || k.PlanUpdated != nil || k.PermissionAsked != nil || k.ElicitationAsked != nil
 }
 
 func endsTheWork(k *wire.TranscriptEntryKind) bool {
@@ -307,7 +307,7 @@ func totalUsage(entries []wire.TranscriptEntry) *wire.TurnUsage {
 
 // display is TranscriptEntry.display, for the agent's own entries (no subagent's).
 func display(entries []wire.TranscriptEntry) []item {
-	b := &displayBuilder{suppressed: map[string]bool{}, closedRunAt: map[string]int{}, viewAt: map[wire.UUID]int{}}
+	b := &displayBuilder{suppressed: map[string]bool{}, closedRunAt: map[string]int{}, viewAt: map[wire.UUID]int{}, noticeAt: map[wire.UUID]int{}}
 	for i := range entries {
 		b.add(entries[i])
 	}
@@ -324,6 +324,8 @@ type displayBuilder struct {
 	viewAt      map[wire.UUID]int
 	last        *wire.TranscriptEntry
 	settled     int
+	// noticeAt is where each notice's line is (#2860): where it went is said on it.
+	noticeAt map[wire.UUID]int
 }
 
 func (b *displayBuilder) add(e wire.TranscriptEntry) {
@@ -395,11 +397,27 @@ func (b *displayBuilder) add(e wire.TranscriptEntry) {
 		b.resolveIntermittentErrors()
 		b.viewAt[id] = len(b.drawn)
 		b.drawn = append(b.drawn, item{entry: &e})
-	case k.FileShown != nil:
-		// The card stands on its own, after the run that called it (#836).
+	case k.FileShown != nil, k.Notified != nil:
+		// The card stands on its own, after the run that called it (#836); so does what
+		// the agent told the person (#2805).
 		b.closeRun()
 		b.resolveIntermittentErrors()
+		if k.Notified != nil {
+			b.noticeAt[e.ID] = len(b.drawn)
+		}
 		b.drawn = append(b.drawn, item{entry: &e})
+	case k.NoticeDelivered != nil:
+		// Said on the notice's line (#2860), never a line of its own.
+		if at, ok := b.noticeAt[k.NoticeDelivered.Value.Notice]; ok && at < len(b.drawn) && b.drawn[at].entry != nil {
+			line := *b.drawn[at].entry
+			if line.Kind.Notified != nil {
+				notice := line.Kind.Notified.Value
+				to := k.NoticeDelivered.Value.To
+				notice.To = &to
+				line.Kind = wire.TranscriptEntryKind{Notified: &wire.TranscriptEntryKindNotified{Value: notice}}
+				b.drawn[at] = item{entry: &line}
+			}
+		}
 	case k.Compaction != nil:
 		if at := b.compactionAt(k.Compaction.ID); at >= 0 {
 			if merged := mergeCompaction(e, *b.drawn[at].entry); merged != nil {

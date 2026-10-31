@@ -15,7 +15,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000001",
         "lastActivityAt" : 812500000,
         "runtimeID" : "claude",
@@ -50,7 +50,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000002",
         "lastActivityAt" : 812500000,
         "runtimeID" : "claude",
@@ -85,7 +85,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000003",
         "lastActivityAt" : 812500000,
         "runtimeID" : "claude",
@@ -120,7 +120,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000005",
         "lastActivityAt" : 812500000,
         "outcomeAsked" : true,
@@ -156,7 +156,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000006",
         "lastActivityAt" : 812500000,
         "outcomeAsked" : true,
@@ -184,7 +184,7 @@
   {
     "expected" : {
       "shape" : "done",
-      "symbol" : "checkmark.circle",
+      "symbol" : "checkmark",
       "tinted" : false,
       "words" : "Finished"
     },
@@ -197,7 +197,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "endedReason" : "endTurn",
         "id" : "00000000-0000-0000-0000-000000000007",
         "lastActivityAt" : 812500000,
@@ -220,7 +220,7 @@
   {
     "expected" : {
       "shape" : "done",
-      "symbol" : "checkmark.circle",
+      "symbol" : "checkmark",
       "tinted" : false,
       "words" : "Unread · Finished"
     },
@@ -233,7 +233,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "endedReason" : "endTurn",
         "id" : "00000000-0000-0000-0000-000000000008",
         "isUnread" : true,
@@ -270,7 +270,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000009",
         "lastActivityAt" : 812500000,
         "report" : {
@@ -296,88 +296,8 @@
   },
   {
     "expected" : {
-      "shape" : "needsYou",
-      "symbol" : "exclamationmark.circle.fill",
-      "tinted" : true,
-      "words" : "Partly done"
-    },
-    "input" : {
-      "agent" : {
-        "advertisedOptions" : [
-
-        ],
-        "availableCommands" : [
-
-        ],
-        "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
-        "id" : "00000000-0000-0000-0000-000000000010",
-        "lastActivityAt" : 812500000,
-        "report" : {
-          "at" : 812500060,
-          "message" : "It went.",
-          "outcome" : "partly_done"
-        },
-        "runtimeID" : "claude",
-        "startOptions" : {
-          "extraArguments" : [
-
-          ],
-          "values" : {
-
-          }
-        },
-        "state" : "finished",
-        "title" : "Session 10"
-      },
-      "isComingBack" : false
-    },
-    "name" : "finished, partly done"
-  },
-  {
-    "expected" : {
-      "shape" : "needsYou",
-      "symbol" : "exclamationmark.circle.fill",
-      "tinted" : true,
-      "words" : "Stuck"
-    },
-    "input" : {
-      "agent" : {
-        "advertisedOptions" : [
-
-        ],
-        "availableCommands" : [
-
-        ],
-        "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
-        "id" : "00000000-0000-0000-0000-000000000011",
-        "lastActivityAt" : 812500000,
-        "report" : {
-          "at" : 812500060,
-          "message" : "It went.",
-          "outcome" : "stuck"
-        },
-        "runtimeID" : "claude",
-        "startOptions" : {
-          "extraArguments" : [
-
-          ],
-          "values" : {
-
-          }
-        },
-        "state" : "finished",
-        "title" : "Session 11"
-      },
-      "isComingBack" : false
-    },
-    "name" : "finished, stuck"
-  },
-  {
-    "expected" : {
       "shape" : "waiting",
-      "symbol" : "zzz",
+      "symbol" : "dot.radiowaves.left.and.right",
       "tinted" : false,
       "words" : "Waiting"
     },
@@ -390,7 +310,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000012",
         "lastActivityAt" : 812500000,
         "report" : {
@@ -404,7 +324,7 @@
             ]
           },
           "message" : "It went.",
-          "outcome" : "blocked"
+          "outcome" : "waiting"
         },
         "runtimeID" : "claude",
         "startOptions" : {
@@ -425,7 +345,7 @@
   {
     "expected" : {
       "shape" : "waiting",
-      "symbol" : "zzz",
+      "symbol" : "dot.radiowaves.left.and.right",
       "tinted" : false,
       "words" : "Waiting"
     },
@@ -438,7 +358,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000013",
         "lastActivityAt" : 812500000,
         "report" : {
@@ -450,7 +370,7 @@
             ]
           },
           "message" : "It went.",
-          "outcome" : "blocked"
+          "outcome" : "waiting"
         },
         "runtimeID" : "claude",
         "startOptions" : {
@@ -470,10 +390,10 @@
   },
   {
     "expected" : {
-      "shape" : "needsYou",
-      "symbol" : "exclamationmark.circle.fill",
-      "tinted" : true,
-      "words" : "Blocked"
+      "shape" : "done",
+      "symbol" : "checkmark",
+      "tinted" : false,
+      "words" : "Waiting"
     },
     "input" : {
       "agent" : {
@@ -484,13 +404,13 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000014",
         "lastActivityAt" : 812500000,
         "report" : {
           "at" : 812500060,
           "message" : "It went.",
-          "outcome" : "blocked"
+          "outcome" : "waiting"
         },
         "runtimeID" : "claude",
         "startOptions" : {
@@ -510,10 +430,10 @@
   },
   {
     "expected" : {
-      "shape" : "needsYou",
-      "symbol" : "exclamationmark.circle.fill",
-      "tinted" : true,
-      "words" : "Blocked"
+      "shape" : "done",
+      "symbol" : "checkmark",
+      "tinted" : false,
+      "words" : "Waiting"
     },
     "input" : {
       "agent" : {
@@ -524,7 +444,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000015",
         "lastActivityAt" : 812500000,
         "report" : {
@@ -540,7 +460,7 @@
             ]
           },
           "message" : "It went.",
-          "outcome" : "blocked"
+          "outcome" : "waiting"
         },
         "runtimeID" : "claude",
         "startOptions" : {
@@ -561,7 +481,7 @@
   {
     "expected" : {
       "shape" : "waiting",
-      "symbol" : "zzz",
+      "symbol" : "dot.radiowaves.left.and.right",
       "tinted" : false,
       "words" : "Waiting"
     },
@@ -574,7 +494,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "endedReason" : "endTurn",
         "eventWait" : {
           "from" : 4,
@@ -610,7 +530,7 @@
   {
     "expected" : {
       "shape" : "done",
-      "symbol" : "checkmark.circle",
+      "symbol" : "checkmark",
       "tinted" : false,
       "words" : "Finished"
     },
@@ -623,7 +543,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "endedReason" : "endTurn",
         "eventWait" : {
           "ending" : {
@@ -677,7 +597,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "endedReason" : "endTurn",
         "id" : "00000000-0000-0000-0000-000000000018",
         "lastActivityAt" : 812500000,
@@ -701,7 +621,7 @@
   {
     "expected" : {
       "shape" : "done",
-      "symbol" : "checkmark.circle",
+      "symbol" : "checkmark",
       "tinted" : false,
       "words" : "Complete"
     },
@@ -714,7 +634,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "endedReason" : "endTurn",
         "id" : "00000000-0000-0000-0000-000000000019",
         "lastActivityAt" : 812500000,
@@ -742,7 +662,7 @@
   {
     "expected" : {
       "shape" : "done",
-      "symbol" : "checkmark.circle",
+      "symbol" : "checkmark",
       "tinted" : false,
       "words" : "Nothing to do"
     },
@@ -755,7 +675,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000020",
         "lastActivityAt" : 812500000,
         "report" : {
@@ -782,7 +702,7 @@
   {
     "expected" : {
       "shape" : "done",
-      "symbol" : "checkmark.circle",
+      "symbol" : "checkmark",
       "tinted" : false,
       "words" : "Unread · Complete"
     },
@@ -795,7 +715,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000021",
         "isUnread" : true,
         "lastActivityAt" : 812500000,
@@ -823,7 +743,7 @@
   {
     "expected" : {
       "shape" : "waiting",
-      "symbol" : "zzz",
+      "symbol" : "dot.radiowaves.left.and.right",
       "tinted" : false,
       "words" : "Waiting"
     },
@@ -836,7 +756,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "eventWait" : {
           "from" : 4,
           "id" : "00000000-0000-0000-0000-000000000900",
@@ -889,7 +809,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "endedReason" : "cancelled",
         "id" : "00000000-0000-0000-0000-000000000024",
         "lastActivityAt" : 812500000,
@@ -925,7 +845,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "endedReason" : "stoppedByAgent",
         "id" : "00000000-0000-0000-0000-000000000025",
         "lastActivityAt" : 812500000,
@@ -947,9 +867,9 @@
   },
   {
     "expected" : {
-      "shape" : "stopped",
-      "symbol" : "stop.circle",
-      "tinted" : false,
+      "shape" : "needsYou",
+      "symbol" : "exclamationmark.circle.fill",
+      "tinted" : true,
       "words" : "Its allowance ran out"
     },
     "input" : {
@@ -961,7 +881,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "endedReason" : "allowanceSpent",
         "id" : "00000000-0000-0000-0000-000000000026",
         "lastActivityAt" : 812500000,
@@ -997,7 +917,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "endedReason" : "processDied",
         "id" : "00000000-0000-0000-0000-000000000027",
         "lastActivityAt" : 812500000,
@@ -1033,7 +953,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "endedReason" : "daemonGone",
         "id" : "00000000-0000-0000-0000-000000000028",
         "lastActivityAt" : 812500000,
@@ -1069,7 +989,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000029",
         "lastActivityAt" : 812500000,
         "runtimeID" : "claude",
@@ -1104,7 +1024,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "endedReason" : "cancelled",
         "id" : "00000000-0000-0000-0000-000000000030",
         "lastActivityAt" : 812500000,
@@ -1132,7 +1052,7 @@
   {
     "expected" : {
       "shape" : "done",
-      "symbol" : "checkmark.circle",
+      "symbol" : "checkmark",
       "tinted" : false,
       "words" : "Complete"
     },
@@ -1150,7 +1070,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000031",
         "lastActivityAt" : 812500000,
         "report" : {
@@ -1176,10 +1096,10 @@
   },
   {
     "expected" : {
-      "shape" : "needsYou",
-      "symbol" : "exclamationmark.circle.fill",
-      "tinted" : true,
-      "words" : "Unread · Partly done"
+      "shape" : "done",
+      "symbol" : "checkmark",
+      "tinted" : false,
+      "words" : "Unread · Nothing to do"
     },
     "input" : {
       "agent" : {
@@ -1195,14 +1115,14 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000032",
         "isUnread" : true,
         "lastActivityAt" : 812500000,
         "report" : {
           "at" : 812500060,
           "message" : "It went.",
-          "outcome" : "partly_done"
+          "outcome" : "nothing_to_do"
         },
         "runtimeID" : "claude",
         "startOptions" : {
@@ -1218,7 +1138,7 @@
       },
       "isComingBack" : false
     },
-    "name" : "asks to archive, partly done, unread"
+    "name" : "asks to archive, nothing to do, unread"
   },
   {
     "expected" : {
@@ -1241,7 +1161,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "endedReason" : "cancelled",
         "id" : "00000000-0000-0000-0000-000000000033",
         "lastActivityAt" : 812500000,
@@ -1282,7 +1202,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000034",
         "lastActivityAt" : 812500000,
         "runtimeID" : "claude",
@@ -1317,7 +1237,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000035",
         "lastActivityAt" : 812500000,
         "runtimeID" : "claude",
@@ -1357,7 +1277,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000036",
         "lastActivityAt" : 812500000,
         "runtimeID" : "claude",
@@ -1379,7 +1299,7 @@
   {
     "expected" : {
       "shape" : "waiting",
-      "symbol" : "zzz",
+      "symbol" : "dot.radiowaves.left.and.right",
       "tinted" : false,
       "words" : "Queued"
     },
@@ -1392,7 +1312,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000037",
         "lastActivityAt" : 812500000,
         "runtimeID" : "claude",
@@ -1427,7 +1347,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "endedReason" : "daemonGone",
         "id" : "00000000-0000-0000-0000-000000000040",
         "lastActivityAt" : 812500000,
@@ -1446,5 +1366,41 @@
       "isComingBack" : true
     },
     "name" : "coming back after a restart"
+  },
+  {
+    "expected" : {
+      "shape" : "working",
+      "symbol" : null,
+      "tinted" : false,
+      "words" : "Running: swift test"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/folder/",
+        "id" : "00000000-0000-0000-0000-000000000041",
+        "lastActivityAt" : 812500000,
+        "runningTool" : "swift test",
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "running",
+        "title" : "Session 41"
+      },
+      "isComingBack" : false
+    },
+    "name" : "running a tool"
   }
 ]

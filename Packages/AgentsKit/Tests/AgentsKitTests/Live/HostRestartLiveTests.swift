@@ -33,7 +33,7 @@ struct HostRestartLiveTests {
                                                  dial: FakeDeviceLiveTests.dial)
         let phone = DaemonClient(link: FakeDeviceLiveTests.FixedLink(make: dial))
         try await phone.connect(startIfNeeded: false)
-        _ = try await phone.call(DaemonAPI.Method.projectsList, DaemonAPI.ProjectsListRequest(includeArchived: false))
+        _ = try await phone.call(DaemonAPI.Method.foldersList, DaemonAPI.FoldersListRequest(includeArchived: false))
         print("restart: connected on the bare wire")
 
         // The host goes.
@@ -64,7 +64,7 @@ struct HostRestartLiveTests {
         while ContinuousClock.now - back < .seconds(60), !answered {
             if (try? await phone.connect(startIfNeeded: false)) != nil,
                (try? await DaemonClient.$patience.withValue(.seconds(5)) {
-                   try await phone.call(DaemonAPI.Method.projectsList, DaemonAPI.ProjectsListRequest(includeArchived: false))
+                   try await phone.call(DaemonAPI.Method.foldersList, DaemonAPI.FoldersListRequest(includeArchived: false))
                }) != nil {
                 answered = true
             } else {

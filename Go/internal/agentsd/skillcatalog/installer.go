@@ -89,7 +89,7 @@ func (in Installer) List(place Place) []wire.ListedSkill {
 }
 
 // Edited is whether the folder no longer hashes to what was written there: the sidecar's
-// hash of the folder as added, or for a project the lock's computedHash. A personal skill
+// hash of the folder as added, or for a folder the lock's computedHash. A personal skill
 // the CLI added has only a tree SHA, which a folder with a followed link never matches, so
 // it is never called edited.
 func Edited(folder string, e Entry, kind LockKind, record *SidecarRecord) bool {
@@ -97,7 +97,7 @@ func Edited(folder string, e Entry, kind LockKind, record *SidecarRecord) bool {
 	switch {
 	case record != nil && record.FolderHash != nil:
 		written = *record.FolderHash
-	case kind == Project:
+	case kind == FolderScope:
 		written = e.ComputedHash
 	}
 	if written == "" {
@@ -238,7 +238,7 @@ func (in Installer) Recover() string {
 	if json.Unmarshal(b, &p) != nil {
 		return ""
 	}
-	kind := Project
+	kind := FolderScope
 	if p.Personal {
 		kind = Personal
 	}
@@ -339,7 +339,7 @@ func (in Installer) Add(st Staged, place Place, replace bool, now time.Time) (wi
 		return wire.ManagedSkill{}, Failed("could not write " + filepath.Base(place.Lock))
 	}
 	os.Remove(in.journal())
-	// 4. The project's Claude link, if it has none.
+	// 4. The folder's Claude link, if it has none.
 	if place.Folder != "" {
 		linkClaudeSkills(place.Folder)
 	}

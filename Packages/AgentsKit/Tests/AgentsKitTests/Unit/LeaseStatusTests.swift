@@ -33,7 +33,7 @@ struct LeaseStatusTests {
 
     @Test func holdingIsCountedFromTheDaemonsClock() throws {
         let status = try #require(LeaseStatus.of(walker, in: snapshot, titles: titles))
-        #expect(status.capsules == ["\u{25A3} Screen \u{00B7} 18 min", "\u{25A3} iPhone 17 Pro \u{00B7} 4 min left"])
+        #expect(status.lines == ["\u{25A3} Screen \u{00B7} 18 min", "\u{25A3} iPhone 17 Pro \u{00B7} 4 min left"])
         #expect(status.mark == "Holds Screen \u{00B7} 18 min")
         #expect(status.markSymbol == LeaseStatus.holdingSymbol)
         #expect(status.moreCount == 1)
@@ -41,7 +41,7 @@ struct LeaseStatusTests {
 
     @Test func waitingSaysWhoHoldsItAndThePlace() throws {
         let status = try #require(LeaseStatus.of(idle, in: snapshot, titles: titles))
-        #expect(status.capsules == ["\u{25F7} Waiting for Screen \u{00B7} held by \u{201C}Walk the phone\u{201D} "
+        #expect(status.lines == ["\u{25F7} Waiting for Screen \u{00B7} held by \u{201C}Walk the phone\u{201D} "
                                     + "until \(LeaseWords.clock(minutes(18))) \u{00B7} 2nd"])
         #expect(status.mark == "Waiting for Screen \u{00B7} 2nd in line")
         #expect(status.markSymbol == LeaseStatus.waitingSymbol)

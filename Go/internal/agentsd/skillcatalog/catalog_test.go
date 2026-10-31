@@ -94,16 +94,16 @@ func TestThePersonalLockComesOutAsTheCLIWritesIt(t *testing.T) {
 	}
 }
 
-func TestTheProjectLockComesOutAsTheCLIWritesIt(t *testing.T) {
+func TestTheFolderLockComesOutAsTheCLIWritesIt(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "skills-lock.json")
-	copyLock(t, "project-before.json", path)
-	lock, err := LoadLock(Project, path)
+	copyLock(t, "folder-before.json", path)
+	lock, err := LoadLock(FolderScope, path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	lock.Upsert("nested", "fixture-owner/fixture-skills", "skills/nested/SKILL.md", "43d79cc2b2a7065d4f3f4cc5ae35447d31c5b22469dcee4c35395c2c09d0ac0e", lockNow)
 	lock.Write()
-	want, _ := os.ReadFile(filepath.Join(fixtures, "locks", "project-after.json"))
+	want, _ := os.ReadFile(filepath.Join(fixtures, "locks", "folder-after.json"))
 	if got, _ := os.ReadFile(path); string(got) != string(want) {
 		t.Fatalf("got\n%s\nwant\n%s", got, want)
 	}

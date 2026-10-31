@@ -24,50 +24,30 @@ public enum ConnectionRole: String, Sendable, Hashable {
     /// is and nothing more. Once it has, it hangs up and comes back as a device.
     case pairing
     /// Agents Host's window, as its code signature says: whether this Mac's host is
-    /// there and how much it holds, its projects and its agents, and nothing more (#168).
+    /// there and how much it holds, its folders and its agents, and nothing more (#168).
     /// It starts and stops the host through launchd, never over the socket.
     case hostApp
     /// Anything else of this account: whether the daemon is there, and no more.
     case stranger
 
-    /// What a helper relays, one per app tool, and nothing a window does. Not
-    /// `projects/setHelperLimits`: an agent reads its project's helper limits in its
-    /// tools' results and never sets them (#64).
+    /// What an agent's connection may call on the socket, and nothing a window does: the
+    /// app tools are served over MCP, so only those the host serves on the socket too (#2172),
+    /// as the Go host's `agentMethods`. Not `folders/setHelperLimits`: an agent reads its
+    /// folder's helper limits in its tools' results and never sets them (#64).
     public static let agentMethods: Set<String> = Set<String>([
-        DaemonAPI.Method.agentsFinishTurn,
-        DaemonAPI.Method.agentsAfterTurn,
-        DaemonAPI.Method.agentsSetOwnLabels,
-        DaemonAPI.Method.agentsWaitOn,
-        DaemonAPI.Method.agentsSuggestPrompts,
-        DaemonAPI.Method.agentsReportOutcome,
-        DaemonAPI.Method.agentsShowFile,
-        DaemonAPI.Method.agentsAskForm,
-        DaemonAPI.Method.agentsManageWorkflows,
-        DaemonAPI.Method.agentsStartHelper,
-        DaemonAPI.Method.agentsStopHelper,
-        DaemonAPI.Method.agentsRequestArchiveHelper,
-        DaemonAPI.Method.agentsListHelpers,
-        DaemonAPI.Method.agentsListSessions,
-        DaemonAPI.Method.agentsReadSession,
-        DaemonAPI.Method.agentsMessageAgent,
-        DaemonAPI.Method.leasesLease,
-        DaemonAPI.Method.leasesRelease,
-        DaemonAPI.Method.leasesList,
-        DaemonAPI.Method.eventsWait,
-        DaemonAPI.Method.eventsCancel,
-        DaemonAPI.Method.agentsMoveSelf,
+        DaemonAPI.Method.resourcesLease,
+        DaemonAPI.Method.resourcesRelease,
+        DaemonAPI.Method.resourcesList,
         DaemonAPI.Method.viewsToolCall,
-        DaemonAPI.Method.agentsWorkspaces,
-        DaemonAPI.Method.agentsProviderDraft,
     ]).union(strangerMethods)
 
     /// Announcing, and finding out a daemon is answering.
     public static let pairingMethods: Set<String> = Set<String>([DaemonAPI.Method.devicesAnnounce])
         .union(strangerMethods)
 
-    /// Reading what Agents Host's window counts: projects, and agents working.
+    /// Reading what Agents Host's window counts: folders, and agents working.
     public static let hostAppMethods: Set<String> = Set<String>([
-        DaemonAPI.Method.projectsList,
+        DaemonAPI.Method.foldersList,
         DaemonAPI.Method.agentsList,
     ]).union(strangerMethods)
 

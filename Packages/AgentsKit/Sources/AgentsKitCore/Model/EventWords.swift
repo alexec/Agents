@@ -34,7 +34,7 @@ public enum EventWords {
         "Replaced your earlier wait on \(previous.label). "
     }
 
-    public static let otherProject = "You can only wait on this project's events and this Mac's."
+    public static let otherFolder = "You can only wait on this folder's events and this Mac's."
 
     public static func badDeadline() -> String {
         "until_minutes has to be from \(EventWait.deadlineMinutes.lowerBound) to \(EventWait.deadlineMinutes.upperBound)."
@@ -77,7 +77,7 @@ public enum EventWords {
         for (server, names) in offers.sorted(by: { $0.key < $1.key }) {
             words += names.isEmpty ? " \(server) offers no events." : " \(server) offers \(names.joined(separator: ", "))."
         }
-        if offers.isEmpty { words += " This project has no MCP server that offers events." }
+        if offers.isEmpty { words += " This folder has no MCP server that offers events." }
         if let guess = EventPatternProblem.closest(to: name) { words += " Did you mean \(guess)?" }
         return words
     }
@@ -90,21 +90,7 @@ public enum EventWords {
     }
 
     public static let nothingNamed = "Say what to wait for in events, e.g. [\"agent.finished\"]. "
-        + "wait_for_event with action \"list\" gives every name."
-
-    /// One line of `action: recent`.
-    public static func recentLine(_ event: Event) -> String {
-        let details = detailsLine(event)
-        let count = event.count > 1 ? " ×\(event.count)" : ""
-        return "\(event.position) · \(clock(event.at)) · \(event.name)\(count) · \(event.sentence)"
-            + (details.isEmpty ? "" : " · \(details)")
-    }
-
-    public static func recentFooter(head: EventPosition) -> String {
-        "Head: \(head) — wait with from: \(head) to catch anything after this."
-    }
-
-    public static let noRecent = "Nothing has happened in this project or on this Mac yet."
+        + "Unknown events and filters say what is offered."
 
     // MARK: The wake prompt
 
@@ -118,8 +104,7 @@ public enum EventWords {
         if let message = event.message { lines.append("message: \(message)") }
         if extraMatches > 0 {
             let more = extraMatches == 1 ? "1 more match arrived" : "\(extraMatches) more matches arrived"
-            lines += ["", "\(more) before you resumed; wait_for_event with action \"recent\" to see "
-                      + (extraMatches == 1 ? "it." : "them.")]
+            lines += ["", "\(more) before you resumed; they are in this folder's events."]
         }
         return lines.joined(separator: "\n")
     }
@@ -155,8 +140,7 @@ public enum EventWords {
         if missing.isEmpty {
             lines.append("What you wait on was caught up after it: \(names.joined(separator: ", ")).")
         } else {
-            lines.append("Events in that time may be missing: \(missing.joined(separator: ", ")). Check with "
-                         + "wait_for_event action \"recent\", and check the state yourself (for example the branch or the PR).")
+            lines.append("Events in that time may be missing: \(missing.joined(separator: ", ")). Check the state yourself (for example the branch or the PR).")
         }
         return "\n" + lines.joined(separator: "\n")
     }
@@ -194,7 +178,7 @@ public enum EventWords {
     public static func ended(_ wait: EventWait, by canceller: EventWaitEnding.Canceller) -> String {
         switch canceller {
         case .agent: return stoppedWaiting(wait)
-        case .person: return "The person cancelled your wait for \(wait.label)."
+        case .person: return "The person cancelled your wait for \(wait.label). Check whether \(wait.label) happened anyway before you stop: the person may only be telling you to carry on without waiting, not that it did not happen."
         case .prompt: return "The person sent you a message, which cancelled your wait for \(wait.label)."
         case .stopped: return "You were stopped, which ended your wait for \(wait.label)."
         case .archived: return "You were archived, which ended your wait for \(wait.label)."

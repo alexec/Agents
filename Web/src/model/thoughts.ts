@@ -9,7 +9,7 @@ const key = "showsThoughts";
 // Through window, so a test without a page reads nothing (Node warns on a bare localStorage).
 const storage = globalThis.window?.localStorage;
 
-/** Settings ▸ Appearance ▸ Show thoughts. */
+/** Show Thoughts, in the chat's ··· menu (#2383), as View ▸ Show Thoughts on the Mac. */
 export const showsThoughts = signal(storage?.getItem(key) === "true");
 
 export function setShowsThoughts(on: boolean): void {
@@ -30,5 +30,10 @@ export function shownItems(items: readonly Item[], shows: boolean = showsThought
   return shown;
 }
 
-/** The words under the switch, as the window's and the Remote's. */
-export const thoughtsFooter = "On, the chat shows each of the agent's thoughts as one folded line. Off, they are not shown.";
+/** The chat menu's item (#2383), in ChatThoughts.menuTitle's and menuHelp's words. */
+export function thoughtsItem(shows: boolean): { label: string; title: string } {
+  return {
+    label: shows ? "Hide Thoughts" : "Show Thoughts",
+    title: "Show each of the agent's thoughts as one folded line in the chat, or leave them out",
+  };
+}

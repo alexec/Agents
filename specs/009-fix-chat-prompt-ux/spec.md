@@ -218,6 +218,16 @@ choice should answer it outright, with no second click.
 - **FR-005**: Changing folder or runtime on a new chat MUST cause the controls to be fetched again, and a result arriving for a folder or runtime the person has since moved away from MUST NOT be displayed.
 - **FR-006**: All controls MUST remain reachable at every window width the app supports, with no control clipped or pushed out of view.
 
+#### One growing composer (#2621)
+
+- **FR-060**: The prompt text, attachment chips, and prompt-entry actions MUST appear inside one outlined box on Mac, Remote, and web.
+- **FR-061**: Attachment chips MUST appear above the text. The text MUST appear above a bottom action row.
+- **FR-062**: Each client MUST keep its existing prompt-entry actions in the bottom row. The row MUST stay visible while the text grows.
+- **FR-063**: The box MUST start at the height of two text lines and one action row. It MUST grow with wrapped and explicit lines. Attachments MUST add height above the text.
+- **FR-064**: When the composer reaches the space available in the chat pane, the text MUST scroll inside the box and the action row MUST stay visible.
+- **FR-065**: Session and run-setting controls MUST stay outside the box. Worktree and labels stay at the top left; runtime stays at the top right; permission and sandbox stay below on the left; model and context stay below on the right.
+- **FR-066**: At phone width, the Remote MUST keep the actions reachable in a compact row. Each client MUST keep its current attachment, dictation, voice, send, stop, and queue behavior. A client MUST NOT gain a new action.
+
 #### Getting back to a project
 
 - **FR-021**: Clicking a project in the sidebar MUST show that project's page, whether or not that project was already the selected one.

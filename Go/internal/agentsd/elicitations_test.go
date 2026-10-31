@@ -128,7 +128,8 @@ func TestAFormIsHeldAndAnswered(t *testing.T) {
 		len(answered.Answers) != 1 || answered.Answers[0] != (wire.ElicitationAnswer{Question: "Which colour?", Answer: "blue"}) {
 		t.Fatalf("%+v", answered)
 	}
-	want := "runtimeNote userMessage stateChanged elicitationAsked stateChanged elicitationAnswered stateChanged agentMessage stateChanged"
+	// "You chose " now, "blue." held for a token's sake until the turn ends (#1001).
+	want := "runtimeNote userMessage stateChanged elicitationAsked stateChanged elicitationAnswered stateChanged agentMessage agentMessage stateChanged"
 	if got := strings.Join(kinds(d, id), " "); got != want {
 		t.Fatalf("transcript\n got %s\nwant %s", got, want)
 	}
@@ -260,8 +261,8 @@ func TestAFormIsReadAsSwiftReadsIt(t *testing.T) {
 		`{"question":"tags","answer":"Ex"}]` {
 		t.Fatal(string(b))
 	}
-	if askFormNote(wire.AnswerElicitationRequestActionAccept, said[:1]) != "They answered:\n- Which?: Banana, ripe" {
-		t.Fatal(askFormNote(wire.AnswerElicitationRequestActionAccept, said[:1]))
+	if askQuestionNote(wire.AnswerElicitationRequestActionAccept, said[:1]) != "They answered:\n- Which?: Banana, ripe" {
+		t.Fatal(askQuestionNote(wire.AnswerElicitationRequestActionAccept, said[:1]))
 	}
 	// A lone untitled question takes the message as its question; with no order, by name.
 	one, _ := parseElicitation(json.RawMessage(`{"message":"Go ahead?","requestedSchema":{"properties":{"b":{"type":"boolean"},"a":{"type":"number","maximum":2}}}}`), "A")

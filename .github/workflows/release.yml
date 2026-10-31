@@ -9,6 +9,8 @@
 #                                          servers Agents ships (#700)
 #   SHA256SUMS
 #
+# and the control plane's image, ghcr.io/alexec/agents-control:<version> (#2140), signed.
+#
 # Beside it, the testflight job (#914) uploads the Universal app to TestFlight: the Mac window
 # as a .pkg and the Remote as an .ipa, version <tag> and build <run number>, and waits until App
 # Store Connect has processed both. Nothing is submitted to App Review.
@@ -85,8 +87,72 @@ jobs:
           path: App/Resources/servers
           retention-days: 3
 
+  # The control plane's image (#2140): deploy/Containerfile for linux/amd64 and linux/arm64,
+  # pushed to ghcr.io/alexec/agents-control as <version>, and for a release X.Y.Z also as X.Y
+  # and latest. It carries an SBOM and provenance (BuildKit's attestations), and a keyless
+  # cosign signature made with this run's OIDC identity: docs/how-to/run-the-control-plane-in-the-cloud.md
+  # says how to check it. GITHUB_TOKEN pushes it: no account or secret of our own.
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    env:
+      IMAGE: ghcr.io/alexec/agents-control
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: The tag is on main
+        run: |
+          git fetch --quiet origin main
+          git merge-base --is-ancestor HEAD origin/main || {
+            echo "::error::$TAG is not on main"; exit 1; }
+
+      # Go and the web page build on the runner's own platform (the Containerfile's
+      # BUILDPLATFORM stages); only the Alpine stage's apk and adduser run as arm64, under QEMU.
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: sigstore/cosign-installer@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build and push
+        id: push
+        run: |
+          version="${TAG#v}"
+          tags=(--tag "$IMAGE:$version")
+          if [[ $version =~ ^([0-9]+)\.([0-9]+)\.[0-9]+$ ]]; then
+            tags+=(--tag "$IMAGE:${BASH_REMATCH[1]}.${BASH_REMATCH[2]}" --tag "$IMAGE:latest")
+          fi
+          docker buildx build --platform linux/amd64,linux/arm64 \
+            --file deploy/Containerfile --build-arg "VERSION=$version" \
+            --label org.opencontainers.image.source="https://github.com/$GITHUB_REPOSITORY" \
+            --label org.opencontainers.image.version="$version" \
+            --label org.opencontainers.image.revision="$(git rev-parse HEAD)" \
+            --sbom=true --provenance=mode=max \
+            "${tags[@]}" --metadata-file "$RUNNER_TEMP/metadata.json" --push .
+          digest=$(jq -r '."containerimage.digest"' "$RUNNER_TEMP/metadata.json")
+          [[ $digest == sha256:* ]] || { echo "::error::buildx gave no digest"; exit 1; }
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "$IMAGE@$digest: ${tags[*]}" >> "$GITHUB_STEP_SUMMARY"
+
+      # The signature is on the digest, so every tag of it is signed.
+      - name: Sign
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: cosign sign --yes "$IMAGE@$DIGEST"
+
+  # The image job is required too: a release whose image did not push does not ship (#2140).
   mac:
-    needs: linux
+    needs: [linux, image]
     runs-on: xcode-27
     timeout-minutes: 75
     environment: release
@@ -276,6 +342,17 @@ jobs:
             echo "::error::APPLE_DISTRIBUTION_P12 holds no Apple Distribution identity, or its password is wrong"; exit 1; }
           security find-identity -v "$keychain" | grep -q "3rd Party Mac Developer Installer" || {
             echo "::error::MAC_INSTALLER_P12 holds no 3rd Party Mac Developer Installer identity, or its password is wrong"; exit 1; }
+
+      # Before the archive, so a profile made before an entitlement was added (v0.12.1, #2781)
+      # names the entitlement and the secret rather than failing the archive.
+      - name: The App Store profiles allow every entitlement
+        run: |
+          profiles="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+          python3 scripts/check-store-profiles.py \
+            "PROFILE_UNIVERSAL_MAC=$profiles/agents-universal-mac.provisionprofile" \
+            "PROFILE_REMOTE=$profiles/agents-remote.mobileprovision" \
+            "PROFILE_REMOTE_NOTIFY=$profiles/agents-remote-notify.mobileprovision" \
+            "PROFILE_REMOTE_WIDGET=$profiles/agents-remote-widget.mobileprovision"
 
       - name: Archive, check, export and upload
         env:

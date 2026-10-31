@@ -33,12 +33,12 @@ export function PinnedViewPage({ store, host, folder, path, pin, down }: {
   const attempt = useSignal(0);
   const actions = useMemo<ViewActions>(() => ({
     agentID: id,
-    project: folder,
+    folder: folder,
     call: (method, params) => store.link.call(method, params as never, host) as Promise<unknown>,
     send: async () => false,
-    // Its agents/start-agent opens the form in this project, as it would from a chat (#834).
+    // Its agents/start-agent opens the form in this folder, as it would from a chat (#834).
     startAgent: (start) => offerStart(store, host, folder, start),
-    // Its agents/message-agent goes to the session on the branch, in this project (#837).
+    // Its agents/message-agent goes to the session on the branch, in this folder (#837).
     recipient: (message) => recipient(store.agents.value[host] ?? [], message, folder),
     sendTo: (agent, text) => store.prompt(host, agent, text, []),
   }), [id, host, folder, store]);
@@ -88,10 +88,14 @@ export function PinnedViewPage({ store, host, folder, path, pin, down }: {
           <h1>{title}</h1>
           <span class="small quiet">{path}</span>
         </div>
-        {pin && <button disabled={down} onClick={() => { void store.unpin(host, folder, path); go({ host, project: folder, compose: true }); }}>Unpin</button>}
+        {/* A server's list view (#2032) is hidden, not unpinned. */}
+        {pin && <button disabled={down} onClick={() => {
+          void (pin.pinnedBy.kind === "server" ? store.setViewHidden(host, folder, path, true) : store.unpin(host, folder, path));
+          go({ host, folder: folder, compose: true });
+        }}>{pin.pinnedBy.kind === "server" ? "Hide" : "Unpin"}</button>}
       </header>
       {!pin ? (
-        <p class="hint">{path} isn't pinned in this project.</p>
+        <p class="hint">{path} isn't pinned in this folder.</p>
       ) : pin.missing || !view ? (
         <p class="hint">{missingWords(pin)}</p>
       ) : now.kind === "failed" ? (

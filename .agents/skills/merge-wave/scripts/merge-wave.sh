@@ -162,6 +162,7 @@ plan() {
 		read -r name sha <<<"$arg"
 		if [ "$name" = "$ff" ]; then
 			echo "  $name ${sha:0:10}: fast-forwards from main; verified at its tip, so no build"
+			lane_checks "$sha"
 			continue
 		fi
 		git merge-base --is-ancestor "$main" "$sha" || echo "  note: $name is not rebased onto current main"
@@ -197,6 +198,32 @@ plan() {
 	local all
 	all=$(git diff --name-only "$main" "$tip")
 	echo "mac install: no (product code changed: $(echo "$all" | shippable))"
+}
+
+# What a lane runs to verify its own branch (#2685): the builds and tests for the paths it
+# changes since it left main, and no more. An App/ or Host/ change builds only the Mac
+# schemes, a Remote/ change only the Remote (for the simulator), and a change to Shared/,
+# Packages/ or project.yml both. The wave builds what the merged branches need on the
+# combined tip, and CI builds its own jobs on every pull request, as before.
+lane_checks() { # sha
+	local sha=$1 base top here='' checks name filter
+	base=$(git merge-base "$(git rev-parse -q --verify origin/main || git rev-parse main)" "$sha")
+	checks=$(git diff --name-only "$base" "$sha" | builds_for_paths)
+	# The tests come from select-test-suites.sh, which reads the tree it runs in: only when
+	# that tree is this branch's tip.
+	top=$(git rev-parse --show-toplevel 2>/dev/null || true)
+	[ -n "$top" ] && [ "$(git -C "$top" rev-parse HEAD)" = "$sha" ] && here=1
+	[ -z "$here" ] || checks+=$'\n'$(tests_since "$top" "$base")
+	checks=$(echo "$checks" | sed '/^$/d')
+	if [ -z "$checks" ]; then
+		echo "    its lane builds nothing"
+	else
+		echo "    its lane verifies, for the paths it changes since ${base:0:10}:"
+		echo "$checks" | while read -r name filter; do
+			echo "      $name: $(check_command "$name" "$filter")"
+		done
+	fi
+	[ -n "$here" ] || echo "    and the tests scripts/select-test-suites.sh ${base:0:10} picks in its worktree"
 }
 
 # --- the wave's state -------------------------------------------------------------------

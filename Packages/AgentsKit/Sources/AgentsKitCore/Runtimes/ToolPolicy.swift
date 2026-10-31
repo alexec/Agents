@@ -32,7 +32,7 @@ public enum RemitCategory: String, Codable, Hashable, Sendable, CaseIterable {
     case escalation
     /// Creating, starting, messaging, inspecting or stopping other agents.
     case agents
-    /// Storing work outside the project: document stores, drives, session databases.
+    /// Storing work outside the folder: document stores, drives, session databases.
     case artefacts
     /// Offering the person a follow-up prompt.
     case suggestions
@@ -57,7 +57,7 @@ public enum RemitCategory: String, Codable, Hashable, Sendable, CaseIterable {
         case .agents:
             "This app starts and stops agents; ask me rather than starting one."
         case .artefacts:
-            "Put it in the conversation or in a file in this project."
+            "Put it in the conversation or in a file in this folder."
         case .suggestions:
             "If you suggest a next step, say it in your reply."
         case .workingFolder:

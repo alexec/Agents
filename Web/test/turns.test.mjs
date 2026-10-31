@@ -48,4 +48,3 @@ test("copy takes the whole message as written (#519)", () => {
   assert.equal(turns.copiedText(agent("")), undefined);
   assert.equal(turns.copiedText({ id: "n", at: "", kind: { runtimeNote: { _0: "note" } } }), undefined);
 });
-

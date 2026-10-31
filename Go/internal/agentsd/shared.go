@@ -18,7 +18,7 @@ import (
 )
 
 // personal/shared (054, DaemonAPI+Shared.swift): Settings ▸ Agent Configuration's read of
-// the person's ~/.agents, and with a folder, Project Settings' read of that project's
+// the person's ~/.agents, and with a folder, Folder Settings' read of that folder's
 // .agents (#754). Worked out from disk on every call, as PersonalDotAgents.snapshot does:
 // the rule table and what R9 measured, plus the links, the layout record and the names in
 // each runtime's own config. Nothing returned is a value from mcp.json: env and headers go
@@ -29,10 +29,10 @@ func (d *Daemon) registerShared() {
 	On(d, wire.CallPersonalShared, func(ctx context.Context, c *Client, r wire.SharedRequest) (wire.SharedSnapshot, error) {
 		if r.Folder != nil {
 			folder := filepath.Clean(*r.Folder)
-			if !d.isProjectFolder(folder) {
-				return wire.SharedSnapshot{}, Invalid("%s is not a project here.", *r.Folder)
+			if !d.isFolderPath(folder) {
+				return wire.SharedSnapshot{}, Invalid("%s is not a folder here.", *r.Folder)
 			}
-			return projectSharedSnapshot(folder), nil
+			return folderSharedSnapshot(folder), nil
 		}
 		return d.withManagedSkills(d.sharedSnapshot()), nil
 	})
@@ -78,8 +78,8 @@ var (
 	}
 	// managedSkillNames: names another tool owns inside a runtime's skills folder (FR-007).
 	managedSkillNames = map[string]bool{"synced": true}
-	// projectAppFiles: what the app keeps in a project's .agents.
-	projectAppFiles = map[string]bool{"project.json": true, "pins.json": true, "workflows": true, "worktrees": true,
+	// folderAppFiles: what the app keeps in a folder's .agents.
+	folderAppFiles = map[string]bool{"folder.json": true, "pins.json": true, "workflows": true, "worktrees": true,
 		"dropbox": true, "attachments": true, "chat": true}
 )
 
@@ -207,32 +207,32 @@ func personalSnapshot(home string, present []sharedRule, record layoutRecord, ap
 	return s
 }
 
-// projectSharedSnapshot is PersonalDotAgents.projectSnapshot: what a project's .agents
-// holds, with no runtimes, so no reach. Its instructions are the project's own AGENTS.md.
-func projectSharedSnapshot(project string) wire.SharedSnapshot {
-	shared := filepath.Join(project, ".agents")
+// folderSharedSnapshot is PersonalDotAgents.folderSnapshot: what a folder's .agents
+// holds, with no runtimes, so no reach. Its instructions are the folder's own AGENTS.md.
+func folderSharedSnapshot(folder string) wire.SharedSnapshot {
+	shared := filepath.Join(folder, ".agents")
 	s := emptySnapshot(shared, true)
-	router := filepath.Join(project, "AGENTS.md")
+	router := filepath.Join(folder, "AGENTS.md")
 	s.Instructions = &wire.SharedInstructions{Path: router, Exists: lexists(router), Reach: map[string]wire.SharedReach{}}
 	var looks []wire.SharedLook
 	plugins := pluginFoldersIn(filepath.Join(shared, "plugins"))
-	record := layoutRecord{Home: project}
-	s.Skills = sharedSkills(project, nil, plugins, record, nil, &looks)
+	record := layoutRecord{Home: folder}
+	s.Skills = sharedSkills(folder, nil, plugins, record, nil, &looks)
 	file := filepath.Join(shared, "mcp.json")
 	s.MCP.File = file
 	entries, problem := readMCPFile(file)
 	if problem != "" {
 		s.MCP.Problem = &wire.SharedProblem{Message: problem}
 		looks = append(looks, wire.SharedLook{Kind: wire.SharedLookKindProblem, Page: wire.SharedLookPageMCP, Item: "mcp.json",
-			Text: problem + " Agents here start without the project's servers until it is fixed."})
+			Text: problem + " Agents here start without the folder's servers until it is fixed."})
 	}
 	for _, e := range entries {
 		s.MCP.Servers = append(s.MCP.Servers, serverRow(e, map[string]string{}, map[string]wire.SharedReach{}))
 	}
 	for _, p := range plugins {
-		s.Plugins = append(s.Plugins, sharedPlugin(project, p, nil, record))
+		s.Plugins = append(s.Plugins, sharedPlugin(folder, p, nil, record))
 	}
-	s.OtherFiles = sharedOtherFiles(shared, projectAppFiles)
+	s.OtherFiles = sharedOtherFiles(shared, folderAppFiles)
 	if looks != nil {
 		s.NeedsALook = looks
 	}
@@ -293,11 +293,6 @@ func linksTo(path, target string) bool {
 		dest = filepath.Join(filepath.Dir(path), dest)
 	}
 	return filepath.Clean(dest) == filepath.Clean(target)
-}
-
-func isLink(path string) bool {
-	_, err := os.Readlink(path)
-	return err == nil
 }
 
 // visibleNames is a folder's entries that are not hidden, sorted.
@@ -481,7 +476,7 @@ func sharedMCP(home string, present []sharedRule, secrets map[string]string, loo
 			appReach[r.id] = gets("through the bridge")
 		}
 	}
-	result.App = []wire.SharedServer{{Name: appName, Transport: "stdio", Summary: "show_file, ask_form and the rest",
+	result.App = []wire.SharedServer{{Name: appName, Transport: "stdio", Summary: "show_file, ask_question and the rest",
 		EnvNames: []string{}, HeaderNames: []string{}, Clash: map[string]string{}, Reach: appReach}}
 	seen := map[string]bool{appName: true}
 	sseLeftOut := map[string][]string{}

@@ -206,7 +206,7 @@ case "select":
     exit(1)
 
 case "unfold", "fold":
-    // An outline row (a project in the sidebar, a disclosure group) folded or unfolded
+    // An outline row (a folder in the sidebar, a disclosure group) folded or unfolded
     // by AXDisclosing on the nearest row above the first matching label. No click.
     guard arguments.count > 3 else { print("need text to match"); exit(2) }
     let wanted = arguments[3].lowercased()

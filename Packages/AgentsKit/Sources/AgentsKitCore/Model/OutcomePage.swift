@@ -76,7 +76,8 @@ public struct TurnParts: Hashable, Sendable {
     /// `items` is everything drawn after the ask. `isLive` is whether the turn is still
     /// going: its reply is only a reply once nothing follows it.
     public init(_ items: [TranscriptItem], isLive: Bool) {
-        let shown = Self.drawn(items, isLive: isLive).filter { !$0.isThought }
+        let drawn = Self.drawn(items, isLive: isLive)
+        let shown = drawn.filter { !$0.isThought }
         let reply = Self.reply(in: shown, isLive: isLive)
         var outcome: [TranscriptItem] = []
         var reports: [TranscriptItem] = []
@@ -97,6 +98,16 @@ public struct TurnParts: Hashable, Sendable {
         self.outcome = outcome + reports
         self.stepCount = steps
         self.live = isLive && reply.isEmpty ? shown.last(where: { !$0.isOutcome }) : nil
+    }
+
+    /// The reply's words, its messages joined: what voice mode speaks (#2322). Never the
+    /// thoughts, the steps or the report. Empty when the turn said nothing at the end.
+    public var replyText: String {
+        outcome.compactMap { item -> String? in
+            guard case .entry(let entry) = item, case .agentMessage(_, let text, _) = entry.kind else { return nil }
+            return text
+        }
+        .joined(separator: "\n\n")
     }
 
     /// What a turn draws of its items, thinking aside. A passing line — "Picked the
@@ -177,16 +188,22 @@ public struct TurnSummary: Codable, Hashable, Sendable, Identifiable {
     public static func split(_ entries: [TranscriptEntry], start: Int) -> (closed: [TurnSummary], openStart: Int) {
         var closed: [TurnSummary] = []
         var turnStart = 0
-        for (offset, entry) in entries.enumerated() where offset > turnStart && TranscriptItem.entry(entry).isPersonsAsk {
-            closed.append(of(Array(entries[turnStart..<offset]), start: start + turnStart))
-            turnStart = offset
+        var before: TranscriptItem?
+        for (offset, entry) in entries.enumerated() {
+            let item = TranscriptItem.entry(entry)
+            if offset > turnStart, item.startsTurn(after: before) {
+                closed.append(of(Array(entries[turnStart..<offset]), start: start + turnStart))
+                turnStart = offset
+            }
+            if !item.isAside { before = item }
         }
         return (closed, start + turnStart)
     }
 }
 
 extension Array where Element == TranscriptItem {
-    /// The page cut into turns. A turn starts at each thing the person typed.
+    /// The page cut into turns. A turn starts at each thing the person typed, and at the
+    /// prompt that brings a late answer to a form (`startsTurn(after:)`).
     public func turns() -> [ChatTurn] {
         turns(reusing: [])
     }
@@ -213,13 +230,15 @@ extension Array where Element == TranscriptItem {
             }
             current = []
         }
+        var before: TranscriptItem?
         for item in self {
-            if item.isPersonsAsk {
+            if item.startsTurn(after: before) {
                 close()
                 current = [item]
             } else {
                 current.append(item)
             }
+            if !item.isAside { before = item }
         }
         close()
         return turns
@@ -282,6 +301,25 @@ extension TranscriptItem {
         return false
     }
 
+    /// Whether a turn starts here, `before` being the last item ahead of it that is not
+    /// aside. The person's ask starts one. So does the app's prompt that brings the
+    /// answer to a form left open (#1641): the turn that asked is over, and the answer is
+    /// drawn at its end, not after the steps of the turn the prompt starts (#2934). That
+    /// turn has no ask: the app's words are its first step.
+    public func startsTurn(after before: TranscriptItem?) -> Bool {
+        if isPersonsAsk { return true }
+        guard case .entry(let entry) = self, case .userMessage(_, _, .app) = entry.kind,
+              case .entry(let previous) = before, case .elicitationAnswered = previous.kind else { return false }
+        return true
+    }
+
+    /// A state change or a passing line ("Starting Claude…"): what lies between a form's
+    /// answer and the prompt that brings it when the agent starts again.
+    var isAside: Bool {
+        if case .entry(let entry) = self, case .stateChanged = entry.kind { return true }
+        return isPassing
+    }
+
     var isAgentMessage: Bool {
         if case .entry(let entry) = self, case .agentMessage = entry.kind { return true }
         return false
@@ -301,6 +339,9 @@ extension TranscriptItem {
             return true
         // So is a file shown (#836): the chart or the page is what the work made.
         case .fileShown:
+            return true
+        // And what the agent told the person (#2805): why a notification opened this chat.
+        case .notified:
             return true
         case .stateChanged(let state, _):
             return state == .stopped

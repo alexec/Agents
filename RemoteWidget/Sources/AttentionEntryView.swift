@@ -6,10 +6,10 @@ import WidgetKit
 /// and more of them, with more of each, on a large one (#192). All read the same entry and
 /// nothing else (FR-002).
 ///
-/// The words are the app's own. "Needs you" is the heading the projects page files these
+/// The words are the app's own. "Needs you" is the heading the folders page files these
 /// sessions under (`AgentGroup.needsAttention`), and a row's second line is the `Headline`
 /// the push banner carries, so the same agent says the same thing in the notification, on
-/// the project page, and here.
+/// the folder page, and here.
 struct AttentionEntryView: View {
     @Environment(\.widgetFamily) private var family
     let entry: AttentionEntry
@@ -225,7 +225,7 @@ private struct Large: View {
     }
 }
 
-/// One session with room: its title and how long it has waited, then the project and what
+/// One session with room: its title and how long it has waited, then the folder and what
 /// it is asking for, the asking allowed a second line before it truncates.
 private struct LargeRow: View {
     let session: AttentionSnapshotSession
@@ -271,10 +271,12 @@ private struct LargeRow: View {
         case .elicitation: "asks a question"
         case .report: "has a report"
         case .guardedChange: "asks to keep a change"
+        // A notice (#2805) is never a row; the widget reads what an older file says.
+        case .notice: "told you something"
         case nil: "finished, unread"
         }
         let waited = session.since.formatted(.relative(presentation: .named, unitsStyle: .wide))
-        return [session.title, session.project, state, session.wanted, "since \(waited)"]
+        return [session.title, session.folder, state, session.wanted, "since \(waited)"]
             .compactMap { $0 }
             .joined(separator: ", ")
     }
@@ -310,14 +312,14 @@ private struct SessionRow: View {
         .accessibilityLabel(accessibilityLabel)
     }
 
-    /// The project's name, and what is being asked for where something is being asked.
+    /// The folder's name, and what is being asked for where something is being asked.
     static func subtitle(for session: AttentionSnapshotSession) -> String {
-        guard let wanted = session.wanted, !wanted.isEmpty else { return session.project }
-        return "\(session.project) · \(wanted)"
+        guard let wanted = session.wanted, !wanted.isEmpty else { return session.folder }
+        return "\(session.folder) · \(wanted)"
     }
 
     private var accessibilityLabel: String {
-        [session.title, session.project, session.wanted]
+        [session.title, session.folder, session.wanted]
             .compactMap { $0 }
             .joined(separator: ", ")
     }
@@ -330,6 +332,7 @@ private struct SessionRow: View {
         case .elicitation: "questionmark.circle.fill"
         case .report: "exclamationmark.bubble.fill"
         case .guardedChange: "exclamationmark.shield.fill"
+        case .notice: "bell.fill"
         case nil: nil
         }
     }

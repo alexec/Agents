@@ -47,8 +47,8 @@ func SecretStillInUse(name string) *Error {
 func PreviewExpired() *Error  { return &Error{wire.MCPCatalogError{PreviewExpired: &struct{}{}}} }
 func NoRunnableWay() *Error   { return &Error{wire.MCPCatalogError{NoRunnableWay: &struct{}{}}} }
 func ReplaceMismatch() *Error { return &Error{wire.MCPCatalogError{ReplaceMismatch: &struct{}{}}} }
-func NotAProject(path string) *Error {
-	return &Error{wire.MCPCatalogError{NotAProject: &wire.MCPCatalogErrorNotAProject{Path: path}}}
+func NotAFolder(path string) *Error {
+	return &Error{wire.MCPCatalogError{NotAFolder: &wire.MCPCatalogErrorNotAFolder{Path: path}}}
 }
 func Failed(why string) *Error {
 	return &Error{wire.MCPCatalogError{Failed: &wire.MCPCatalogErrorFailed{Value: why}}}
@@ -79,8 +79,8 @@ func Sentence(e wire.MCPCatalogError) string {
 		return "There is no way to run this server on this Mac."
 	case e.ReplaceMismatch != nil:
 		return "The server there has changed. Open it again."
-	case e.NotAProject != nil:
-		return e.NotAProject.Path + " is not a project on this Mac."
+	case e.NotAFolder != nil:
+		return e.NotAFolder.Path + " is not a folder on this Mac."
 	case e.NameTaken != nil:
 		return "There is already a server called " + e.NameTaken.Name + " there."
 	case e.Invalid != nil:

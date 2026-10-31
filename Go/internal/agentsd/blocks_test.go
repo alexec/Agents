@@ -24,18 +24,18 @@ func TestALeadWaitsOnItsHelper(t *testing.T) {
 	})
 	m := appClient(t, d, lead.ID)
 	m.post("initialize", map[string]any{}, 1)
-	if text, isErr := m.tool(2, "wait_for_event", map[string]any{"agents": []string{"Nobody"}, "until_minutes": 30}); !isErr ||
-		!strings.HasPrefix(text, "Nothing was recorded: no agent in this project is called “Nobody”. The agents here are: ") {
+	if text, isErr := m.tool(2, "wait_for_agents", map[string]any{"agents": []string{"Nobody"}, "until_minutes": 30}); !isErr ||
+		!strings.HasPrefix(text, "Nothing was recorded: no agent in this folder is called “Nobody”. The agents here are: ") {
 		t.Fatal(text)
 	}
-	if text, isErr := m.tool(3, "wait_for_event", map[string]any{"agents": []string{"Done one"}, "until_minutes": 30}); !isErr ||
+	if text, isErr := m.tool(3, "wait_for_agents", map[string]any{"agents": []string{"Done one"}, "until_minutes": 30}); !isErr ||
 		text != "Nothing was recorded: “Done one” has already ended (complete — All good.). Use what it said rather than waiting on it." {
 		t.Fatal(text)
 	}
-	if text, isErr := m.tool(4, "wait_for_event", map[string]any{"agents": []string{"Helper"}}); !isErr || !strings.HasPrefix(text, "Nothing is waited for: until_minutes is required") {
+	if text, isErr := m.tool(4, "wait_for_agents", map[string]any{"agents": []string{"Helper"}}); !isErr || !strings.HasPrefix(text, "Nothing is waited for: until_minutes is required") {
 		t.Fatal(text)
 	}
-	text, _ := m.tool(5, "wait_for_event", map[string]any{"agents": []string{"helper"}, "until_minutes": 30, "message": "Waiting for the tests."})
+	text, _ := m.tool(5, "wait_for_agents", map[string]any{"agents": []string{"helper"}, "until_minutes": 30, "message": "Waiting for the tests."})
 	if text != "Recorded. The person will see this conversation under \"Waiting\". You will be resumed when “Helper” has finished, or in 30 minutes, whichever comes first." {
 		t.Fatal(text)
 	}
@@ -52,7 +52,7 @@ func TestALeadWaitsOnItsHelper(t *testing.T) {
 	d.closeWaits(helper.ID, *waitEndingHow(d.Store.Agent(helper.ID)))
 	waitFor(t, "the lead started again", func() bool {
 		for _, u := range userMessages(d, lead.ID) {
-			if strings.HasPrefix(u, "The block you reported has cleared: the agent you were waiting on has finished.\n\n- “Helper” (id ") &&
+			if strings.HasPrefix(u, "The wait you reported has cleared: the agent you were waiting on has finished.\n\n- “Helper” (id ") &&
 				strings.Contains(u, "): finished: complete — Tests pass.\n\nYou said you were waiting on: Waiting for the tests.\nCarry on from here.") {
 				return true
 			}
@@ -75,12 +75,12 @@ func TestABlockOutlivesACardInTheSameTurn(t *testing.T) {
 	fakeRuntimes(t)
 	d, _ := start(t, t.TempDir())
 	defer d.Shutdown()
-	blocked := &wire.WorkReport{Outcome: wire.WorkOutcomeBlocked, Message: "Waiting on the helper.", At: now(),
+	waiting := &wire.WorkReport{Outcome: wire.WorkOutcomeWaiting, Message: "Waiting on the helper.", At: now(),
 		Block: &wire.Block{Waits: []wire.Wait{}, CheckAgainAt: new(now())}}
-	a := seeded(t, d, t.TempDir(), func(a *wire.Agent) { a.State, a.EndedReason, a.Report = wire.AgentStateRunning, nil, blocked })
+	a := seeded(t, d, t.TempDir(), func(a *wire.Agent) { a.State, a.EndedReason, a.Report = wire.AgentStateRunning, nil, waiting })
 	d.setState(a.ID, wire.AgentStateWaitingOnUser)
 	d.setState(a.ID, wire.AgentStateRunning)
-	if r := d.Store.Agent(a.ID).Report; r == nil || r.Outcome != wire.WorkOutcomeBlocked {
+	if r := d.Store.Agent(a.ID).Report; r == nil || r.Outcome != wire.WorkOutcomeWaiting {
 		t.Fatalf("after the card: %+v", r)
 	}
 	// A new turn clears it, as before.
@@ -91,5 +91,30 @@ func TestABlockOutlivesACardInTheSameTurn(t *testing.T) {
 	d.setState(a.ID, wire.AgentStateRunning)
 	if r := d.Store.Agent(a.ID).Report; r != nil {
 		t.Fatalf("a new turn kept %+v", r)
+	}
+}
+
+func TestCheckAgainNeedsInMinutes(t *testing.T) {
+	fakeRuntimes(t)
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	title := func(s string) *string { return &s }
+	lead := seeded(t, d, t.TempDir(), func(a *wire.Agent) { a.Title, a.State, a.EndedReason = title("Lead"), wire.AgentStateRunning, nil })
+	m := appClient(t, d, lead.ID)
+	m.post("initialize", map[string]any{}, 1)
+	if text, isErr := m.tool(2, "check_again", map[string]any{}); !isErr ||
+		!strings.HasPrefix(text, "Nothing is waited for: in_minutes is required") {
+		t.Fatal(text)
+	}
+	if text, isErr := m.tool(3, "check_again", map[string]any{"in_minutes": 0}); !isErr ||
+		!strings.Contains(text, "in_minutes has to be a whole number from") {
+		t.Fatal(text)
+	}
+	text, _ := m.tool(4, "check_again", map[string]any{"in_minutes": 30, "message": "Waiting for CI."})
+	if !strings.Contains(text, "Recorded.") || !strings.Contains(text, "Waiting") {
+		t.Fatal(text)
+	}
+	if r := d.Store.Agent(lead.ID).Report; r == nil || r.Outcome != wire.WorkOutcomeWaiting {
+		t.Fatalf("%+v", r)
 	}
 }

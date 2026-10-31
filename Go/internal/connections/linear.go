@@ -27,7 +27,7 @@ const (
 	// HandBackURL is the static page that holds nothing (#1335, S1 Q1c option 4): it sends the
 	// code and the state back to the client that opened the browser. deploy/site/oauth.
 	HandBackURL = "https://agentloops.dev/oauth/callback"
-	// LinearScopes: read and write issues, projects and cycles; comment as the person.
+	// LinearScopes: read and write issues, folders and cycles; comment as the person.
 	LinearScopes = "read,write"
 )
 

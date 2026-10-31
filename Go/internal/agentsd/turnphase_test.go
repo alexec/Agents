@@ -1,6 +1,7 @@
 package agentsd
 
 import (
+	"encoding/json"
 	"sync"
 	"testing"
 	"time"
@@ -42,9 +43,8 @@ func TestATurnsPhaseIsWhatItsActivitySays(t *testing.T) {
 		{agent(wire.AgentStateFinished, reason(wire.EndedReasonEndTurn)), nil, wire.TurnPhaseDone},
 		{agent(wire.AgentStateFinished, reason(wire.EndedReasonProcessDied)), nil, wire.TurnPhaseFailed},
 		{reported(wire.WorkOutcomeDone, nil), nil, wire.TurnPhaseDone},
-		{reported(wire.WorkOutcomePartlyDone, nil), nil, wire.TurnPhaseNeedsYou},
-		{reported(wire.WorkOutcomeStuck, nil), nil, wire.TurnPhaseNeedsYou},
-		{reported(wire.WorkOutcomeBlocked, &wire.Block{}), nil, wire.TurnPhaseNeedsYou},
+		// Only a question needs the person (#1916): a block with nothing to wait on is done.
+		{reported(wire.WorkOutcomeWaiting, &wire.Block{}), nil, wire.TurnPhaseDone},
 		{reported(wire.WorkOutcomeNeedsAnswer, nil), nil, wire.TurnPhaseNeedsYou},
 		{unknown, nil, wire.TurnPhaseNeedsYou},
 		{agent(wire.AgentStateStopped, nil), nil, wire.TurnPhaseFailed},
@@ -119,5 +119,20 @@ func TestAHostTellsItsControlPlaneEachMoveOfATurn(t *testing.T) {
 	d.reconsider()
 	if got := control.of(recent.ID); len(got) != 3 || got[2] != wire.TurnPhaseGone {
 		t.Fatal(got)
+	}
+}
+
+// #1916: an old record's stuck or partly_done (finish_turn's) reads as done, so it shows as
+// Complete, not Needs you. #2981: so does an old blocked, through the x-fallback.
+func TestAnOldStuckOrPartlyDoneReadsAsDone(t *testing.T) {
+	for _, old := range []string{"stuck", "partly_done", "blocked"} {
+		var a wire.Agent
+		b := []byte(`{"id":"A","runtimeID":"claude","cwd":"file:///w/","state":"finished","report":{"outcome":"` + old + `","message":"m","at":1}}`)
+		if err := json.Unmarshal(b, &a); err != nil {
+			t.Fatal(err)
+		}
+		if a.Report == nil || a.Report.Outcome != wire.WorkOutcomeDone || Group(&a) == "needsAttention" {
+			t.Fatalf("%s: %+v", old, a.Report)
+		}
 	}
 }

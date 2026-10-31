@@ -17,6 +17,10 @@ import (
 
 func (d *Daemon) registerRuntimeAuth() {
 	On(d, wire.CallRuntimesAuthenticate, func(ctx context.Context, c *Client, r wire.AuthenticateRequest) (wire.RuntimeAccount, error) {
+		// Antigravity under its terms refused is not signed in either (#999, FR-017).
+		if err := noticeRefusal(d.orgPolicy(), r.RuntimeID); err != nil {
+			return wire.RuntimeAccount{}, err
+		}
 		if r.AccountID != nil && *r.AccountID != "" {
 			return d.authenticateAccount(ctx, r.RuntimeID, *r.AccountID, r.MethodID)
 		}

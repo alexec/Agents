@@ -9,12 +9,12 @@ it out:
 
 | File | What it is |
 |---|---|
-| `Containerfile` | Static `agents-control` and `workspace-commands`, built in the image from `Go/` (with the web remote from `Web/`, served at the domain by `compose.public.yaml`, #1459), on Alpine, a user of their own. Built from the repository's root. |
+| `Containerfile` | Static `agents-control` and `workspace-commands`, built in the image from `Go/` (with the web remote from `Web/`, served at the domain by `compose.public.yaml`, #1459), on Alpine, a user of their own. Built from the repository's root. It carries the Linux host for servers that join (`/servers`), the runtimes' toolsets and the deploy files too. Each release publishes it as `ghcr.io/alexec/agents-control:<version>` (#2140), for amd64 and arm64, signed with cosign, with an SBOM and provenance. |
 | `compose.yaml` | MinIO (the bucket), three copies, and Caddy in front of them. |
 | `Caddyfile` | TLS, round robin, and `/readyz` health checks, so a copy that can't reach the store gets no new connections. |
 | `make-secrets.sh` | The control plane's key, shared by every copy, plus Caddy's certificate and its pin. With `--public`, no key file: the Cloud KMS key's name and the service account file. |
-| `compose.public.yaml`, `Caddyfile.public` | One copy at a real domain, with a certificate from Let's Encrypt and no pin (#61). |
-| `gcp/up.sh`, `gcp/down.sh` | The machine on Google Cloud (#1461): a VM, its firewall and address, and the Cloud KMS key, then the image and `compose.public.yaml` on it. `--dry-run` prints the commands only. |
+| `compose.public.yaml`, `Caddyfile.public` | One copy at a real domain, with a certificate from Let's Encrypt and no pin (#61). It pulls the release's image, `AGENTS_VERSION`; `--build` builds this checkout. |
+| `gcp/up.sh`, `gcp/down.sh` | The machine on Google Cloud (#1461): a VM, its firewall and address, and the Cloud KMS key, then `compose.public.yaml` on it, and the release's image pulled there (`--build` builds this checkout instead). `--dry-run` prints the commands only. |
 | `cloudflare/dns.sh` | The A records for both names at Cloudflare, with the token from the Keychain. `--names @` is the zone itself (agentloops.dev). |
 | `site/`, `gcp/site.sh` | The hand-back page for sign-ins at `https://agentloops.dev/oauth/callback` (#1343), served by the same Caddy. See below. |
 | `compose.pebble.yaml`, `pebble/` | The same with Pebble, Let's Encrypt's test CA, standing in: no domain and no real CA. A local keeper stands in for Cloud KMS. |
@@ -51,12 +51,18 @@ certificate from Let's Encrypt (`auto_https` on) for `AGENTS_DOMAIN` and for
 `AGENTS_VIEWS_DOMAIN`, the second name the web page's MCP Apps views are drawn at (#1484):
 
 ```sh
-scripts/build-linux-agentsd.sh               # the host that joining servers download
 deploy/make-secrets.sh --public --kms projects/P/locations/L/keyRings/R/cryptoKeys/K \
     --service-account sa.json
-AGENTS_DOMAIN=agents.example.com AGENTS_VIEWS_DOMAIN=views.example.com \
-    ACME_EMAIL=you@example.com docker compose -f deploy/compose.public.yaml up -d --build
+export AGENTS_DOMAIN=agents.example.com AGENTS_VIEWS_DOMAIN=views.example.com \
+    ACME_EMAIL=you@example.com AGENTS_VERSION=0.11.0
+docker compose -f deploy/compose.public.yaml pull
+docker compose -f deploy/compose.public.yaml up -d
 ```
+
+The image is the release's (#2140). It carries the Linux host that joining servers download
+(`/servers`), the runtimes' toolsets (`/toolsets`) and these deploy files (`/deploy`, which
+`docker cp` takes out), so docs/how-to/run-the-control-plane-in-the-cloud.md needs no clone
+of the repository. To run this checkout instead, `up -d --build`.
 
 Both names must point at the machine, with ports 80 and 443 open. At the views name the copy
 serves only the sandbox proxy (`/sandbox.html`, `/sandbox.js`), with the loopback proxy's
@@ -143,6 +149,21 @@ To count pushes with no relay host (#1460), give the control plane a fake APNs k
 the compose network whose certificate chains to the control plane's `AGENTS_TEST_TRUST_ROOT`.
 Nothing then goes to Apple. `agentsctl pair -kind iPhone` and `agentsctl device` stand in for a
 phone. See `specs/058-control-plane/walks/1507.md`.
+
+## Metrics and logs
+
+Each copy can serve Prometheus `/metrics` on a port of its own (#2176):
+`AGENTS_CONTROL_METRICS=0.0.0.0:9791` with `AGENTS_CONTROL_METRICS_TOKEN` (a token is necessary
+on any address but loopback), never on the port clients use. `AGENTS_CONTROL_LOG_FORMAT=json`
+writes JSON log lines (`log/slog`), and `AGENTS_CONTROL_LOG_LEVEL=debug` adds a line for each
+request. `compose.yaml` turns both on, with the token `walk-metrics`:
+
+```sh
+docker compose -f deploy/compose.yaml exec cp1 wget -qO- --header 'Authorization: Bearer walk-metrics' http://127.0.0.1:9791/metrics
+```
+
+`compose.public.yaml` has them off; docs/how-to/run-the-control-plane-in-the-cloud.md says how
+to turn them on, what each metric counts and how Prometheus scrapes them.
 
 ## Beyond one machine
 

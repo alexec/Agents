@@ -1,7 +1,7 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>Pull requests</title>
 <!-- The github server's Pull requests (ui://github/pulls, #1341): show_pull_requests's result,
-     each with its checks, review, conflict and auto-merge, and Rerun on a failing one. A pull
+     in sections by how each relates to the viewer (#2453), each with its checks, review, conflict and auto-merge, and Rerun on a failing one. A pull
      request's title opens its page (show_pull_request) in place, with a way back to the list.
      It has no network: it speaks only the MCP Apps bridge. -->
 <style>
@@ -18,9 +18,11 @@
 </div><div id="page" hidden></div></main>
 <script>
 /*bridge.js*/
+/*labels.js*/
+/*lineage.js*/
 /*prpage.js*/
 (() => {
-  let repo = "";
+  let repo = "", viewer = "", labelColors = {};
   const ui = bridge("github-pulls", {
     input: (args) => { repo = args.repo || ""; ui.$("repo").textContent = repo; say("Listing…"); },
     result: (result) => draw(result),
@@ -34,8 +36,10 @@
     const found = ui.data(result);
     if (!found) { say("Couldn't list pull requests: " + ui.errorText(result), true); $("refresh").disabled = !repo; return; }
     if (found.repo) { repo = found.repo; $("repo").textContent = repo; }
+    viewer = found.viewer || "";
+    labelColors = found.labelColors && typeof found.labelColors === "object" ? found.labelColors : {};
     const prs = Array.isArray(found.prs) ? found.prs : [];
-    $("prs").replaceChildren(...prs.map(row));
+    $("prs").replaceChildren(...ui.sections(prs, row));
     say(prs.length ? `${prs.length} open · as of ${new Date().toLocaleTimeString()}` : "No open pull requests.");
     $("refresh").disabled = !repo;
   };
@@ -49,14 +53,20 @@
     return el("li", {}, [
       link(`#${pr.number}`, pr.url),
       title,
-      el("span", { className: "pills" }, [...prPills(ui, pr), rerun]),
+      el("span", { className: "pills" }, [yourReview(pr), ...prPills(ui, pr), rerun]),
       el("span", { className: "meta" }, [
         el("span", { className: "branch", textContent: pr.branch, title: `${pr.branch} → ${pr.base}` }),
-        el("span", { textContent: `${pr.author || "someone"}${pr.updatedAt ? " · " + ui.ago(pr.updatedAt) : ""}` }),
+        ...ui.who(pr.author, pr.authorBot),
+        pr.updatedAt ? el("span", { textContent: ui.ago(pr.updatedAt) }) : null,
+        ...prLabels(ui, pr, labelColors),
       ]),
       action,
     ]);
   };
+
+  // In Needs you and not the viewer's own: a review is asked of them (#2453).
+  const yourReview = (pr) => pr.section === "needs_you" && viewer && (pr.author || "").toLowerCase() !== viewer.toLowerCase()
+    ? el("span", { className: "pill review_required", textContent: "Your review", title: "A review is asked of you" }) : null;
 
   const page = prPage(ui, () => repo, () => back());
   const open = (number) => { $("list").hidden = true; $("page").hidden = false; page.show(number); };

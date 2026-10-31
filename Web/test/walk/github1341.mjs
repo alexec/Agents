@@ -1,11 +1,11 @@
-// The #1341 walk: the github server's views on the web page. Pairs, opens the project's pinned
+// The #1341 walk: the github server's views on the web page. Pairs, opens the folder's pinned
 // Pull requests, opens a pull request's page in the view, its tabs, and its diff in the page's own
 // diff (agents/open-diff); then the pinned Issues and Start Agent. Reaches into the views' frames
 // as CDP targets: each is a frame of its own origin. Merges, approves and comments nothing.
 //
-//   node Web/test/walk/github1341.mjs <WEB_URL> <browser code> <project name> <pr number> <out dir>
+//   node Web/test/walk/github1341.mjs <WEB_URL> <browser code> <folder name> <pr number> <out dir>
 //
-// Expects the project's .agents/pins.json to pin ui://github/pulls and ui://github/issues, and
+// Expects the folder's .agents/pins.json to pin ui://github/pulls and ui://github/issues, and
 // its github server approved and its views shown.
 
 import { setTimeout as sleep } from "node:timers/promises";
@@ -58,14 +58,14 @@ try {
   await page.focus("textarea");
   await page.type(code);
   await page.press("Connect");
-  await page.waitFor(`document.querySelectorAll(".sidebar .row.project").length >= 1`, 20_000);
+  await page.waitFor(`document.querySelectorAll(".sidebar .row.folder").length >= 1`, 20_000);
   await page.eval(`(() => {
-    const b = [...document.querySelectorAll(".sidebar .row.project .disclosure")].find((d) => d.getAttribute("aria-label").endsWith(" " + ${js(name)}));
+    const b = [...document.querySelectorAll(".sidebar .row.folder .disclosure")].find((d) => d.getAttribute("aria-label").endsWith(" " + ${js(name)}));
     if (b && b.getAttribute("aria-expanded") !== "true") b.click();
   })()`);
   await page.waitFor(`document.querySelectorAll(".sidebar .row.pin").length >= 2`, 10_000);
   const titles = await page.eval(`[...document.querySelectorAll(".sidebar .row.pin .title")].map((t) => t.textContent)`);
-  check(titles.includes("Pull requests") && titles.includes("Issues"), `the two pins under the project: ${js(titles)}`);
+  check(titles.includes("Pull requests") && titles.includes("Issues"), `the two pins under the folder: ${js(titles)}`);
 
   // Pull requests.
   await page.eval(`[...document.querySelectorAll(".sidebar .row.pin")].find((r) => r.querySelector(".title").textContent === "Pull requests").querySelector(".pick").click()`);

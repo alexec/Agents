@@ -46,23 +46,23 @@ public enum DeletionWords {
 
     public static let notArchived = "Only an archived session can be deleted. Archive it first."
 
-    // MARK: Delete a project (#677)
+    // MARK: Delete a folder (#677)
 
-    /// "Delete “Agents”?": the project's name as its row shows it, host and all.
-    public static func projectConfirmTitle(_ label: String) -> String {
+    /// "Delete “Agents”?": the folder's name as its row shows it, host and all.
+    public static func folderConfirmTitle(_ label: String) -> String {
         "Delete \u{201C}\(label)\u{201D}?"
     }
 
-    public static let projectConfirmMessage = "Every session in it is deleted, with its conversation and record, "
-        + "and the project leaves the list. Its folder and files are not touched. This cannot be undone."
+    public static let folderConfirmMessage = "Every session in it is deleted, with its conversation and record, "
+        + "and the folder leaves the list. Its folder and files are not touched. This cannot be undone."
 
-    public static let projectNotArchived = "Only an archived project can be deleted. Archive it first."
+    public static let folderNotArchived = "Only an archived folder can be deleted. Archive it first."
 
-    /// A session in it is still going: what stops the whole project being deleted.
-    public static let projectLive = "It is still working. Stop it first."
+    /// A session in it is still going: what stops the whole folder being deleted.
+    public static let folderLive = "It is still working. Stop it first."
 
-    /// Why a project's Delete is refused: the sessions that hold it, and why.
-    public static func projectRefusal(_ titles: [String?], because: String) -> String {
+    /// Why a folder's Delete is refused: the sessions that hold it, and why.
+    public static func folderRefusal(_ titles: [String?], because: String) -> String {
         let named = titles.map { title -> String in
             guard let title = title?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty else {
                 return "a session"
@@ -92,14 +92,14 @@ public enum DeletionWords {
     }
 }
 
-/// Archive… on a project's menu, asked first on the phone and the page (#668). The page's
+/// Archive… on a folder's menu, asked first on the phone and the page (#668). The page's
 /// copy is in `Web/src/views/Sidebar.tsx`.
-public enum ProjectArchiveWords {
+public enum FolderArchiveWords {
     /// "Archive “devbox:Agents”?".
     public static func confirmTitle(_ label: String) -> String {
         "Archive \u{201C}\(label)\u{201D}?"
     }
 
-    public static let confirmMessage = "It moves to Archived projects with its sessions, and its workflows stop. "
+    public static let confirmMessage = "It moves to Archived folders with its sessions, and its workflows stop. "
         + "Unarchive returns it. Its folder and files are not touched."
 }

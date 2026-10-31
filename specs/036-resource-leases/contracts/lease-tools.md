@@ -19,9 +19,9 @@ Times are local wall-clock `HH:mm`. Durations are whole minutes.
 Take a turn with something on this Mac that only one agent should use at a time: a simulator, a
 browser, the screen (mouse, keyboard, front window), or anything you name, such as a port. Lease
 it before you use it, and release it as soon as you are done. If you already hold it, this
-extends your lease. If someone else holds it, this waits for up to 45 seconds. If it is still not
-yours after that, you keep your place in line. You can call this again to go on waiting, or end
-your turn, and you will be started again when it is yours. Take several resources in the same
+extends your lease. If someone else holds it, you join its line and are told your place at once;
+you will get a lease.granted event when it is yours. End your turn, and you will be started again
+with it. Stop Waiting or cancel_wait leaves the line (#2361). Take several resources in the same
 order every time. Use `list_resources` to see the names.
 
 **Input**:
@@ -37,10 +37,10 @@ order every time. Use `list_resources` to see the names.
 | Case | Text |
 |---|---|
 | Granted | `You hold {display} until {HH:mm} ({n} minutes). Release it with release_resource when you are done.` |
-| Granted after waiting | `{display} is yours now, until {HH:mm} ({n} minutes). You waited {s} seconds.` |
 | Extended | `You still hold {display}, now until {HH:mm}.` |
 | Capped | Adds `That is the longest a lease can run; extend it again before then if you need more.` |
-| Still in line (limit reached) | `{display} is held by {holder} until {HH:mm}. You are {ordinal} in line and keep your place. Call lease_resource again to go on waiting, or end your turn — you will be started again when it is yours.` |
+| In line (#2361) | `{display} is held by {holder} until {HH:mm}. You are {ordinal} in line. You will get a lease.granted event when it is yours. End your turn, and you will be started again with it.` |
+| Already in line (wait false) | `{display} is held by {holder} until {HH:mm}. You are {ordinal} in line.` |
 | Refused (wait false) | `{display} is held by {holder} until {HH:mm}. You are not in line.` |
 | Stopped while waiting | `You were stopped, so you left the line for {display}.` (error) |
 | Empty name | `Nothing was leased: say which resource.` (error) |
@@ -90,12 +90,14 @@ On this Mac:
 
 ## Wake prompt (sent by the app, not a tool)
 
-This is queued on the agent `from: .app` when a lease reaches it after its call has closed
-(research R4):
+Since #2361 the agent's wait on `lease.granted` wakes it, with the event-wait wake. One whose
+turn came while nothing waited for it (its wait replaced by another, or lost over a restart)
+is queued `from: .app`:
 
-> {display} is yours now. You hold it until {HH:mm} ({n} minutes). You asked for it at {HH:mm}
-> and were waiting in line. Carry on with what you needed it for, and release it with
-> release_resource when you are done.
+> The event you were waiting for happened. … lease.granted … resource: {name}
+>
+> You hold {display} until {HH:mm} ({n} minutes). Carry on with what you needed it for, and
+> release it with release_resource when you are done.
 
 ## Briefing paragraph (FR-015)
 

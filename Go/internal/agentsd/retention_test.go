@@ -11,16 +11,15 @@ import (
 )
 
 func TestRetentionDeletesOldArchivedAgents(t *testing.T) {
-	clock := time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC)
-	atTime(t, &clock)
+	clock := atTime(t, time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC))
 	root := t.TempDir()
 	d, c := start(t, root)
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	byUser := wire.AgentArchivedReasonByUser
 	archived := func(ago time.Duration) wire.Agent {
 		return seeded(t, d, dir, func(a *wire.Agent) {
-			at := wire.DateOf(clock.Add(-ago))
+			at := wire.DateOf(clock.now().Add(-ago))
 			a.State, a.ArchivedAt, a.ArchivedReason = wire.AgentStateArchived, &at, &byUser
 		})
 	}
@@ -30,13 +29,13 @@ func TestRetentionDeletesOldArchivedAgents(t *testing.T) {
 		a.State, a.ArchivedReason = wire.AgentStateArchived, &byUser
 	})
 	live := seeded(t, d, dir, func(a *wire.Agent) {
-		at := wire.DateOf(clock.Add(-100 * 24 * time.Hour))
+		at := wire.DateOf(clock.now().Add(-100 * 24 * time.Hour))
 		a.ArchivedAt = &at // not archived: a stale time is not enough
 	})
 	// A pin made while it was finished, then archived outside the app: kept.
 	pinned := seeded(t, d, dir, nil)
 	c.call(t, 2, "pins/pinSession", map[string]any{"folder": store.FolderURL(dir), "agentID": pinned.ID})
-	at := wire.DateOf(clock.Add(-60 * 24 * time.Hour))
+	at := wire.DateOf(clock.now().Add(-60 * 24 * time.Hour))
 	pinned.State, pinned.ArchivedAt, pinned.ArchivedReason = wire.AgentStateArchived, &at, &byUser
 	if err := d.Store.Save(pinned); err != nil {
 		t.Fatal(err)
@@ -55,21 +54,21 @@ func TestRetentionDeletesOldArchivedAgents(t *testing.T) {
 		}
 	}
 
-	if a := d.Store.Agent(noTime.ID); a.ArchivedAt == nil || *a.ArchivedAt != wire.DateOf(clock) {
+	if a := d.Store.Agent(noTime.ID); a.ArchivedAt == nil || *a.ArchivedAt != wire.DateOf(clock.now()) {
 		t.Fatalf("no archive time stamped: %+v", a.ArchivedAt)
 	}
 
 	// Forever deletes nothing, however old.
 	os.MkdirAll(d.SettingsDir, 0o700)
 	os.WriteFile(filepath.Join(d.SettingsDir, "retention.json"), []byte(`{"keepFor":"forever"}`), 0o600)
-	clock = clock.Add(365 * 24 * time.Hour)
+	clock.add(365 * 24 * time.Hour)
 	if n := d.sweepArchived(); n != 0 || d.Store.Agent(recent.ID) == nil {
 		t.Fatalf("forever deleted %d", n)
 	}
 
 	// Seven days: the recent one goes too; a value this build cannot read is 30 days.
 	os.WriteFile(filepath.Join(d.SettingsDir, "retention.json"), []byte(`{"keepFor":"days7"}`), 0o600)
-	clock = time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC)
+	clock.set(time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC))
 	if n := d.sweepArchived(); n != 1 || d.Store.Agent(recent.ID) != nil || d.Store.Agent(pinned.ID) == nil || d.Store.Agent(noTime.ID) == nil {
 		t.Fatalf("days7 deleted %d", n)
 	}

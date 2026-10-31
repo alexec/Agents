@@ -4,7 +4,8 @@
 import { useSignal } from "@preact/signals";
 import type { UsageHistory } from "../protocol/generated";
 import { type UsageBar, type UsageMetric, type UsageRange, unattributed, usageChart, usageHeadline,
-  usageRanges, usageWords, tokenWords } from "../model/usage";
+  usageRanges, usageRangeWords, usageWords, tokenWords } from "../model/usage";
+import { Choice } from "./Choice";
 
 const width = 600;
 const height = 200;
@@ -27,12 +28,7 @@ export function UsageCharts({ metric, history, runtimeName }: {
 
   return (
     <section class="usage-charts">
-      <div class="segmented" role="radiogroup" aria-label="Range">
-        {usageRanges.map((r) => (
-          <button key={r} role="radio" aria-checked={range.value === r} class={range.value === r ? "on" : ""}
-            onClick={() => choose(range, r)}>{r}</button>
-        ))}
-      </div>
+      <Choice label="Range" value={range.value} options={usageRanges.map((r) => [r, usageRangeWords[r]] as const)} onPick={(r) => choose(range, r)} />
       <div class="usage-headline">
         <p class="quiet small strong">{(bar ? "Total" : usageHeadline(chart)).toUpperCase()}</p>
         <p class="usage-figure">{usageWords(chart, bar?.value ?? chart.average)}</p>

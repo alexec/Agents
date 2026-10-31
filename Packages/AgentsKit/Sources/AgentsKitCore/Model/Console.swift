@@ -6,14 +6,14 @@ public extension DaemonAPI {
     /// One machine on Console ▸ Machines: its `hosts/list` row, whose it is, and how many of
     /// its agents were running when it last listed them. Numbers only.
     struct FleetMachine: Codable, Sendable, Hashable {
-        public var host: ControlHost
+        public var host: ControlMachine
         /// Its person's or bot's name; empty when nobody owns it.
         public var ownerName: String
         public var bot: Bool
         public var running: Int?
         public var heardAt: Date?
 
-        public init(host: ControlHost, ownerName: String, bot: Bool, running: Int? = nil, heardAt: Date? = nil) {
+        public init(host: ControlMachine, ownerName: String, bot: Bool, running: Int? = nil, heardAt: Date? = nil) {
             self.host = host
             self.ownerName = ownerName
             self.bot = bot
@@ -60,6 +60,65 @@ public extension DaemonAPI {
             self.agent = agent
             self.workflow = workflow
             self.since = since
+        }
+    }
+
+    /// One agent on Console ▸ Live Now (#2019, M9): whose machine, which runtime, its state,
+    /// since when and its cost so far. No title and nothing it said.
+    struct LiveAgent: Codable, Sendable, Hashable {
+        public var host: String
+        public var hostName: String
+        public var owner: String
+        public var ownerName: String
+        public var bot: Bool
+        public var agent: UUID
+        public var runtime: String
+        public var state: AgentState
+        /// It waits for an event or another agent, not for its person.
+        public var waitsOnOthers: Bool?
+        public var workflow: String?
+        public var since: Date?
+        /// Its cost so far, by currency.
+        public var costToDate: [String: Double]?
+        /// When the machine last listed its agents.
+        public var heardAt: Date?
+
+        public init(host: String, hostName: String, owner: String, ownerName: String, bot: Bool, agent: UUID,
+                    runtime: String, state: AgentState, waitsOnOthers: Bool? = nil, workflow: String? = nil,
+                    since: Date? = nil, costToDate: [String: Double]? = nil, heardAt: Date? = nil) {
+            self.host = host
+            self.hostName = hostName
+            self.owner = owner
+            self.ownerName = ownerName
+            self.bot = bot
+            self.agent = agent
+            self.runtime = runtime
+            self.state = state
+            self.waitsOnOthers = waitsOnOthers
+            self.workflow = workflow
+            self.since = since
+            self.costToDate = costToDate
+            self.heardAt = heardAt
+        }
+    }
+
+    /// `console/live`'s answer (#2019, M9): every agent running now, the most costly first.
+    struct LiveBoard: Codable, Sendable, Hashable {
+        public var agents: [LiveAgent]
+
+        public init(agents: [LiveAgent]) {
+            self.agents = agents
+        }
+    }
+
+    /// `console/stopAgent` (#2019, M9): an admin stops one agent on any machine.
+    struct ConsoleStopAgent: Codable, Sendable, Hashable {
+        public var host: MachineRef
+        public var agent: UUID
+
+        public init(host: MachineRef, agent: UUID) {
+            self.host = host
+            self.agent = agent
         }
     }
 
@@ -110,4 +169,8 @@ public extension DaemonAPI.Method {
     static let consoleFleet = "console/fleet"
     /// `Empty` → `TeamWorkflows` (#1804, M6). Admins only.
     static let consoleTeamWorkflows = "console/teamWorkflows"
+    /// `Empty` → `LiveBoard` (#2019, M9). Admins only.
+    static let consoleLive = "console/live"
+    /// `ConsoleStopAgent` → `Empty` (#2019, M9). Admins only.
+    static let consoleStopAgent = "console/stopAgent"
 }

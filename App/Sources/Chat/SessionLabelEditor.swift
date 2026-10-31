@@ -9,18 +9,18 @@ struct SessionLabelEditor: View {
 
     var body: some View {
         LabelTagField(labels: agent.labels,
-                      suggestions: model.labelSuggestions(in: agent.projectFolder, on: agent.host),
+                      suggestions: model.labelSuggestions(in: agent.folderPath, on: agent.host),
                       add: { values in Task { await model.setLabels(on: agent.id, add: values) } },
                       remove: { value in Task { await model.setLabels(on: agent.id, remove: [value]) } })
             // Read again when this session's labels change, whoever changed them.
-            .task(id: Ask(project: ProjectKey(host: agent.host, folder: agent.projectFolder),
+            .task(id: Ask(folder: FolderKey(host: agent.host, folder: agent.folderPath),
                           labels: agent.labels.map(\.value))) {
-                await model.loadLabelVocabulary(in: agent.projectFolder, on: agent.host)
+                await model.loadLabelVocabulary(in: agent.folderPath, on: agent.host)
             }
     }
 
     private struct Ask: Hashable {
-        var project: ProjectKey
+        var folder: FolderKey
         var labels: [String]
     }
 }

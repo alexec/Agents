@@ -66,12 +66,14 @@
 
 **Goal**: an admin manages routes and the two rules on the web page; everyone reads them. Runs beside Phase 2.
 
-- [ ] T029 [US2] Add the words of the org account (**From your organisation**, **Organisation · No plan limit**, the refusals of the contract) to `Packages/AgentsKit/Sources/AgentsKitCore/Runtimes/OrgAccountWords.swift` (new) with `OrgAccountWordsTests`, and to `Web/src/model/orgAccounts.ts` (new) with `Web/test/orgAccounts.test.mjs`.
-- [ ] T030 [US2] Web: `Web/src/views/ConsoleModelAccess.tsx` and a `modelAccess` section in `Web/src/model/console.ts` (group "Rules", after Policy): the routes, **Add Route** per kind with write-only secret fields, model map, groups, default for, **Check**, **Replace Key**, **Remove** with a question, machines that hold each route, tokens this month. Tests in `Web/test/console.test.mjs`.
-- [ ] T031 [US3] Console ▸ Policy (T5): **Reaches the model by** per runtime and **Antigravity's terms**, with the preview (FR-028).
+- [x] T029 [US2] Add the words of the org account (**From your organisation**, **Organisation · No plan limit**, the refusals of the contract) to `Packages/AgentsKit/Sources/AgentsKitCore/Runtimes/OrgAccountWords.swift` (new) with `OrgAccountWordsTests`, and to `Web/src/model/orgAccounts.ts` (new) with `Web/test/orgAccounts.test.mjs`.
+- [x] T030 [US2] Web: `Web/src/views/ConsoleModelAccess.tsx` and a `modelAccess` section in `Web/src/model/console.ts` (group "Rules", after Policy): the routes, **Add Route** per kind with write-only secret fields, model map, groups, default for, **Check**, **Replace Key**, **Remove** with a question, machines that hold each route, tokens this month. Tests in `Web/test/console.test.mjs`.
+- [x] T031 [US3] Console ▸ Policy (T5): **Reaches the model by** per runtime and **Antigravity's terms**, with the preview (FR-028).
 - [ ] T032 [US5] Console ▸ Reports: tokens by route, person and day (FR-021).
-- [ ] T033 [P] [US3] The read-only Policy pane (T5, `Shared/UI/OrgPolicyPane.swift`, `Web/src/views/settings/Policy.tsx`): the routes the person may use, and the Antigravity line (FR-029).
-- [ ] T034 [P] Docs: `docs/how-to/add-an-org-key-or-gateway.md`, `docs/reference/policy.md` (the two rules).
+- [x] T033 [P] [US3] The read-only Policy pane (T5, `Shared/UI/OrgPolicyPane.swift`, `Web/src/views/settings/Policy.tsx`): the routes the person may use, and the Antigravity line (FR-029).
+- [x] T034 [P] Docs: `docs/how-to/add-an-org-key-or-gateway.md`, `docs/reference/policy.md` (the two rules).
+
+**Built in the slice-4 lane (#999, Decided):** T029, T030, T031, T033, T034. The words are in `Runtimes/OrgAccountWords.swift` and `Web/src/model/orgAccounts.ts`; the hand-written Swift types of `orgRoutes/*` are in `Runtimes/OrgAccount.swift`, for WebSignatures. **Left:** T032 (Console ▸ Reports by route) and Model Access's "tokens this month": both need `route` on each usage roll-up row, which slice 2's T027 (hosts) adds, and the control plane's sum by route; the preview's "4 people use their own Claude sign-in" needs T5 slice 1b's `policy/preview`.
 
 **Checkpoint**: quickstart step 4.
 
@@ -79,12 +81,12 @@
 
 **Goal**: US2, US3 and US5 on the Mac, the Remote and the web page. One PR per area when those areas are busy.
 
-- [ ] T035 [US2] Runtimes area: `AccountProfile` decodes the new reaches and `source` (`AccountProfile.swift`, `AccountProfileTests`, `Web/src/model/runtimes.ts`); org rows on the Runtimes page (Mac `App/Sources/Runtimes/`, Remote `RuntimesView.swift`, web `Activity.tsx` rows) with **From your organisation**; **Reaches the Model By** in the runtime's sign-in sheet (Mac) and its row (Remote, web); refused choices dimmed with T5's line (FR-023, FR-024).
-- [ ] T036 [US2] Chat area: the account picker shows org accounts, and shows when a runtime has one (Mac `PromptBar.swift`, Remote `StartAgent/ChoiceRows.swift`, web `NewAgent.tsx`); the chat lines for `orgRouteRemoved`, `orgRouteMissing`, `orgRouteExpired` and a refused turn, with **Continue in New**.
-- [ ] T037 [US5] Usage area: the allowance row **Organisation · No plan limit**, today's tokens, "Out until …"; a reported cost says "list price, as <runtime> reports it" (FR-025).
-- [ ] T038 [US6] Runtimes area: the Antigravity sign-in sheet on all three draws no notice under `accepted` and the line in its place (FR-017).
-- [ ] T039 Add rows for FR-023 to FR-025 and FR-029 to `specs/071-web-remote/walks/parity/` and run `scripts/parity-counts.py`.
-- [ ] T040 [P] Docs: `docs/how-to/limit-spending.md` (tokens on an org account).
+- [x] T035 [US2] Runtimes area: `AccountProfile` decodes the new reaches and `source` (`AccountProfile.swift`, `AccountProfileTests`, `Web/src/model/runtimes.ts`); org rows on the Runtimes page (Mac `App/Sources/Runtimes/`, Remote `RuntimesView.swift`, web `Activity.tsx` rows) with **From your organisation**; **Reaches the Model By** in the runtime's sign-in sheet (Mac) and its row (Remote, web); refused choices dimmed with T5's line (FR-023, FR-024).
+- [x] T036 [US2] Chat area: the account picker shows org accounts, and shows when a runtime has one (Mac `PromptBar.swift`, Remote `StartAgent/ChoiceRows.swift`, web `NewAgent.tsx`); the chat lines for `orgRouteRemoved`, `orgRouteMissing`, `orgRouteExpired` and a refused turn, with **Continue in New**.
+- [x] T037 [US5] Usage area: the allowance row **Organisation · No plan limit**, today's tokens, "Out until …"; a reported cost says "list price, as <runtime> reports it" (FR-025).
+- [x] T038 [US6] Runtimes area: the Antigravity sign-in sheet on all three draws no notice under `accepted` and the line in its place (FR-017).
+- [x] T039 Add rows for FR-023 to FR-025 and FR-029 to `specs/071-web-remote/walks/parity/` and run `scripts/parity-counts.py`.
+- [x] T040 [P] Docs: `docs/how-to/limit-spending.md` (tokens on an org account).
 
 **Checkpoint**: quickstart step 3 on all three clients (SC-007 for the fake provider). Close each scratch app.
 

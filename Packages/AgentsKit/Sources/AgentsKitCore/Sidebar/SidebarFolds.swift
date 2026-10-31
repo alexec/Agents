@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-/// Which projects in the sidebar are unfolded, which of their Archived folds are open
+/// Which folders in the sidebar are unfolded, which of their Archived folds are open
 /// (#145), and which of their session groups and Workflows are folded (#181), kept
 /// across launches.
 ///
@@ -14,11 +14,11 @@ import Observation
 @MainActor
 @Observable
 public final class SidebarFolds {
-    /// The folds that start closed and have been opened: projects, the Archived folds, a
-    /// project's Workflows (#885).
+    /// The folds that start closed and have been opened: folders, the Archived folds, a
+    /// folder's Workflows (#885).
     public private(set) var open: Set<String>
     /// The folds that start open and have been closed: the groups (#181).
-    /// Kept apart so that a project nobody has touched shows its groups as it always has.
+    /// Kept apart so that a folder nobody has touched shows its groups as it always has.
     public private(set) var closed: Set<String>
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let key: String
@@ -53,34 +53,36 @@ public final class SidebarFolds {
         defaults.set(openSessions.map(\.uuidString), forKey: sessionsKey)
     }
 
-    /// What can be folded: a project; one of its Archived folds; one of its session
-    /// groups, its pinned sessions or its Workflows.
+    /// What can be folded: a folder; one of its Archived folds; one of its session
+    /// groups, its Recently archived sessions group, its pinned sessions or its Workflows.
     public enum Fold: Hashable, Sendable {
-        case project, archivedSessions, archivedWorkflows
+        case folder, archivedSessions, archivedWorkflows, recentArchivedSessions
         case group(AgentGroup)
         /// The pinned sessions (#180).
         case pinned
         case workflows
-        /// A project's flat list of sessions (#495), the rows' fold in their ids.
+        /// A folder's sessions (#495): the rows' fold in their ids, and the Sessions row's
+        /// fold (#2312), open until closed.
         case sessions
-        /// One of the smart rows at the sidebar's top (#495), across every project.
+        /// One of the smart rows at the sidebar's top (#495), across every folder.
         case smart(SidebarSmartRow)
 
-        /// A project, the Archived folds and a project's Workflows (Alex, #885) start
+        /// A folder, the Archived folds and a folder's Workflows (Alex, #885) start
         /// folded; the rest start open.
         public var startsOpen: Bool {
             switch self {
-            case .project, .archivedSessions, .archivedWorkflows, .workflows: false
-            case .group, .pinned, .sessions: true
+            case .folder, .archivedSessions, .archivedWorkflows, .workflows: false
+            case .group, .pinned, .sessions, .recentArchivedSessions: true
             case .smart(let row): row.startsOpen
             }
         }
 
         var name: String {
             switch self {
-            case .project: "project"
+            case .folder: "folder"
             case .archivedSessions: "archivedSessions"
             case .archivedWorkflows: "archivedWorkflows"
+            case .recentArchivedSessions: "recentArchivedSessions"
             case .group(let group): "group.\(group.rawValue)"
             case .pinned: "pinned"
             case .workflows: "workflows"
@@ -90,13 +92,13 @@ public final class SidebarFolds {
         }
     }
 
-    public func isOpen(_ project: ProjectKey, _ fold: Fold = .project) -> Bool {
-        let name = Self.name(project, fold)
+    public func isOpen(_ folder: FolderKey, _ fold: Fold = .folder) -> Bool {
+        let name = Self.name(folder, fold)
         return fold.startsOpen ? !closed.contains(name) : open.contains(name)
     }
 
-    public func set(_ project: ProjectKey, _ fold: Fold = .project, open isOpen: Bool) {
-        let name = Self.name(project, fold)
+    public func set(_ folder: FolderKey, _ fold: Fold = .folder, open isOpen: Bool) {
+        let name = Self.name(folder, fold)
         if fold.startsOpen {
             guard closed.contains(name) == isOpen else { return }
             if isOpen { closed.remove(name) } else { closed.insert(name) }
@@ -108,7 +110,7 @@ public final class SidebarFolds {
         }
     }
 
-    /// Whether one of the smart rows (#495) is open: not a project's, so kept by name alone.
+    /// Whether one of the smart rows (#495) is open: not a folder's, so kept by name alone.
     public func isOpen(_ row: SidebarSmartRow) -> Bool {
         let name = Fold.smart(row).name
         return row.startsOpen ? !closed.contains(name) : open.contains(name)
@@ -127,19 +129,19 @@ public final class SidebarFolds {
         }
     }
 
-    /// The projects whose Archived fold is open: the ones a client holds a page of
+    /// The folders whose Archived fold is open: the ones a client holds a page of
     /// archived sessions for (#165).
-    public var openArchivedFolds: Set<ProjectKey> {
+    public var openArchivedFolds: Set<FolderKey> {
         let prefix = Fold.archivedSessions.name + ":"
-        return Set(open.compactMap { $0.hasPrefix(prefix) ? ProjectKey(stored: String($0.dropFirst(prefix.count))) : nil })
+        return Set(open.compactMap { $0.hasPrefix(prefix) ? FolderKey(stored: String($0.dropFirst(prefix.count))) : nil })
     }
 
-    private static func name(_ project: ProjectKey, _ fold: Fold) -> String {
-        fold == .project ? project.stored : "\(fold.name):\(project.stored)"
+    private static func name(_ folder: FolderKey, _ fold: Fold) -> String {
+        fold == .folder ? folder.stored : "\(fold.name):\(folder.stored)"
     }
 }
 
-/// A row under one of a project's folds, known by the fold as well as by what it shows
+/// A row under one of a folder's folds, known by the fold as well as by what it shows
 /// (#237).
 ///
 /// A session that moves from one fold to another (Done to Paused, to Archived) used to
@@ -150,7 +152,7 @@ public final class SidebarFolds {
 /// and the window looks hung. With the fold in its id, a move is one row
 /// taken out of a fold and a new one put into another.
 ///
-/// A closed fold is given no rows at all, as a folded project already is. `NSOutlineView`
+/// A closed fold is given no rows at all, as a folded folder already is. `NSOutlineView`
 /// does not follow the children of an item it has not expanded, so rows that came and
 /// went under a closed fold left the two counts apart the same way.
 public struct FoldedRow<Item: Identifiable>: Identifiable {

@@ -13,7 +13,7 @@ struct EventAuditTests {
         let list = try JSONDecoder().decode(DaemonAPI.AuditList.self, from: Data(line.utf8))
         let entry = try #require(list.entries.first)
         #expect(list.admin && list.days == 90 && !list.more)
-        #expect(entry.host == HostID(rawValue: "box12345"))
+        #expect(entry.host == MachineRef(rawValue: "box12345"))
         #expect(AuditWords.who(entry.actor) == "Local owner · MacBook Pro")
         #expect(AuditWords.place(entry) { _ in "box" } == "on box")
         #expect(AuditWords.call(entry) == "agents/stop · A1")
@@ -30,10 +30,10 @@ struct EventAuditTests {
     }
 
     @Test func theControlPlanesOwnAndABotsAreSaidSo() {
-        var entry = DaemonAPI.AuditEntry(id: "x", at: .now, action: "Changed project detection",
-                                         method: "control/setProjectDetection", actor: .init(user: "u"))
+        var entry = DaemonAPI.AuditEntry(id: "x", at: .now, action: "Changed folder detection",
+                                         method: "control/setFolderDetection", actor: .init(user: "u"))
         #expect(AuditWords.place(entry) { $0.rawValue } == "on the control plane")
-        #expect(AuditWords.call(entry) == "control/setProjectDetection")
+        #expect(AuditWords.call(entry) == "control/setFolderDetection")
         #expect(AuditWords.who(entry.actor) == "Someone")
         entry.actor = .init(user: "b", userName: "Nightly", event: .init(kind: "pr.merged", id: "42"))
         #expect(AuditWords.who(entry.actor) == "Nightly · for pr.merged")
@@ -64,9 +64,9 @@ struct EventAuditTests {
         #expect(AuditWords.older(list, than: 30, now: now) == nil)
         #expect(AuditWords.shorterTitle(30) == "Keep the audit for 30 days?")
         #expect(AuditWords.shorterMessage(from: 365, to: 30, older: 2)
-            == "Entries older than 30 days are deleted in a day (up to 335 days of them, 2 entries now). To keep them, choose 365 days again before then.")
+            == "Everyone's entries older than 30 days are deleted in a day (up to 335 days of them, 2 entries now). To keep them, choose 365 days again before then.")
         #expect(AuditWords.shorterMessage(from: 2, to: 1, older: nil)
-            == "Entries older than 1 day are deleted in a day (up to 1 day of them). To keep them, choose 2 days again before then.")
+            == "Everyone's entries older than 1 day are deleted in a day (up to 1 day of them). To keep them, choose 2 days again before then.")
         #expect(AuditWords.choices(with: 90) == [30, 90, 180, 365])
         #expect(AuditWords.choices(with: 7) == [7, 30, 90, 180, 365])
     }

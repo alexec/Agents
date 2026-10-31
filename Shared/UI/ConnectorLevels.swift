@@ -25,16 +25,3 @@ struct ConnectorLevels: View {
         .help(MCPHealthWords.levelsSentence(levels))
     }
 }
-
-/// The mark on the connectors that Agents makes (#1428): who made it, never a level.
-struct MadeByAgentsBadge: View {
-    var body: some View {
-        Text(MCPHealthWords.madeByAgents)
-            .appText(.fine)
-            .fontWeight(.semibold)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 1)
-            .foregroundStyle(.white)
-            .background(Paper.accent, in: Capsule())
-    }
-}

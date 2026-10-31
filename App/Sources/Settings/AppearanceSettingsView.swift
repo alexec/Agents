@@ -55,29 +55,29 @@ enum Appearance: String, CaseIterable, Identifiable {
     }
 }
 
-/// Settings ▸ Account (#846): what agents call you, and the chat project.
+/// Settings ▸ Account (#846): what agents call you.
 struct AccountSettingsView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
         Form {
             PersonSettingsSection()
-            // How this person signs in on their other clients is You ▸ Sign-ins (#2197).
-            ChatProjectSettingsSection()
+            // How this person signs in on their other clients is Control plane ▸ Sign-ins (#2197).
         }
         .paperForm()
         .task { await model.refreshPerson() }
     }
 }
 
-/// Settings ▸ Machines ▸ This Mac (#846): whether this Mac stays awake, how long archived agents are kept,
-/// and its backups (#1810).
+/// Settings ▸ Machines ▸ This Mac (#846): whether this Mac stays awake, whether Agents Host updates
+/// itself (#2178), how long archived agents are kept, and its backups (#1810).
 struct MacSettingsView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
         Form {
             WakeSettingsSection()
+            SelfUpdateSection()
             ArchiveSettingsSection()
             if let backups = model.work.backupState {
                 BackupsSection(state: backups, configure: model.configureBackups, make: model.makeBackup,
@@ -87,6 +87,7 @@ struct MacSettingsView: View {
         .paperForm()
         .task {
             await model.refreshWakeSettings()
+            await model.refreshSelfUpdate()
             await model.refreshRetentionState()
             await model.refreshBackupState()
         }
@@ -107,7 +108,8 @@ struct MacSettingsView: View {
     }
 }
 
-/// Settings ▸ Appearance: the theme, and whether the chat shows the agent's thoughts (#1725).
+/// Settings ▸ Appearance: the theme, kept on this Mac only. Voice mode has its own pane. Show
+/// Thoughts (#1725) is in the View menu, next to the chat (#2383).
 /// The Dock icon always shows the agents' mood (#2156).
 struct AppearanceSettingsView: View {
     @AppStorage(Appearance.defaultsKey, store: WindowDefaults.store) private var appearance = Appearance.system
@@ -124,6 +126,5 @@ struct AppearanceSettingsView: View {
                 .foregroundStyle(.secondary)
         }
         .paperListRow()
-        ThoughtsSettingsSection()
     }
 }

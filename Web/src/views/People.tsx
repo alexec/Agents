@@ -1,7 +1,10 @@
 // Settings ▸ People (#994, Team T1), as the window's and the Remote's People pane: each person with
 // their role, their machines (name and state, nothing inside them) and their clients. An admin
 // changes roles, invites a person with a one-use code, and removes a person; a member sees only
-// themselves, read only. Machines waiting to join are at the top.
+// themselves, read only. Machines waiting to join are at the top. Settings ▸ Bots (#2132) is the same list of the
+// bots alone, with Make a Bot… and the bots stopped at a cap. What an organisation's provider controls
+// (#1002, FR-028) is said under each person in grey: Managed by, Waiting for first sign-in, Suspended
+// by, and Set by on a role, which only the provider changes then.
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
@@ -9,7 +12,9 @@ import type { ControlCodeShown, Group, PeopleList, PersonInvited, PersonRemovePr
 import { botLine, botWords, capReachedWords, dollars, readCap } from "../model/teamGroups";
 import { CallFailed } from "../wire/link";
 import { describe, methodNotFound } from "../model/errors";
-import { askingLine, badges, canRemove, joinCommandNote, joinCommandTitle, canSetRole, clientLine, inviteNote, machineLine, memberNote, noPeople, ordered, removeLines,
+import { editInPeople } from "../model/orgPolicy";
+import { go, route } from "../route";
+import { askingLine, badges, checkFailedLine, canRemove, orgLines, providerManaged, roleSetBy, joinCommandNote, joinCommandTitle, canSetRole, clientLine, inviteNote, machineLine, memberNote, noPeople, ordered, removeLines,
   removeTitle, roleNote, roleWord, roles, rotateFoot, rotateMessage, rotateTitle, rotated } from "../model/people";
 import { JoinRequests } from "./JoinRequest";
 import { Modal } from "./Modal";
@@ -76,22 +81,29 @@ function InviteSheet({ store, close }: { store: Store; close: () => void }) {
   );
 }
 
-function RemoveSheet({ store, person, close }: { store: Store; person: PersonRow; close: () => void }) {
+export function RemoveSheet({ store, person, close }: { store: Store; person: PersonRow; close: () => void }) {
   const problem = useSignal<string | null>(null);
   const busy = useSignal(false);
   // What Remove would take (#1763), asked first; null from a control plane from before it.
   const preview = useSignal<PersonRemovePreview | null>(null);
   const asking = useSignal(true);
+  // A check that failed, but for a control plane from before it, keeps Remove off (#2193).
+  const checkProblem = useSignal<string | null>(null);
+  const tries = useSignal(0);
   useEffect(() => {
     let live = true;
+    asking.value = true;
+    checkProblem.value = null;
     store.link.call("people/removePreview", { user: person.id })
       .then((answer) => { if (live) preview.value = answer; })
       .catch((error) => {
-        if (live && !(error instanceof CallFailed && error.code === methodNotFound)) problem.value = sentence(error);
+        if (live && !(error instanceof CallFailed && error.code === methodNotFound)) {
+          checkProblem.value = checkFailedLine(person.name, sentence(error));
+        }
       })
       .finally(() => { if (live) asking.value = false; });
     return () => { live = false; };
-  }, [person.id]);
+  }, [person.id, tries.value]);
   const remove = async () => {
     busy.value = true;
     try {
@@ -110,10 +122,16 @@ function RemoveSheet({ store, person, close }: { store: Store; person: PersonRow
         {asking.value
           ? <p class="sheet-note" role="status">{askingLine(person.name)}</p>
           : <ul class="sheet-note remove-lines">{removeLines(person, preview.value).map((line) => <li key={line}>{line}</li>)}</ul>}
+        {checkProblem.value && !asking.value && (
+          <p class="sheet-note failure" role="alert">
+            {checkProblem.value} <button type="button" class="link" onClick={() => { tries.value++; }}>Try Again</button>
+          </p>
+        )}
         {problem.value && <p class="sheet-note failure" role="alert">{problem.value}</p>}
         <div class="sheet-actions">
           <button type="button" onClick={close}>Cancel</button>
-          <button type="button" class="prominent destructive" disabled={busy.value || asking.value} onClick={() => void remove()}>Remove</button>
+          <button type="button" class="prominent destructive" disabled={busy.value || asking.value || checkProblem.value !== null}
+            onClick={() => void remove()}>Remove</button>
         </div>
       </div>
     </Modal>
@@ -248,12 +266,16 @@ function JoinCommand({ command }: { command: string }) {
   );
 }
 
-function PersonItem({ person, list, groups, joinCommand, setRole, askRemove, setCap, addMachine }: {
-  person: PersonRow; list: PeopleList; groups: readonly Group[]; joinCommand: string | null; setRole: (role: UserRole) => void;
-  askRemove: () => void; setCap: () => void; addMachine: () => void;
+function PersonItem({ person, list, groups, names, joinCommand, setRole, askRemove, setCap, addMachine }: {
+  person: PersonRow; list: PeopleList; groups: readonly Group[]; names: Readonly<Record<string, string>>; joinCommand: string | null;
+  setRole: (role: UserRole) => void; askRemove: () => void; setCap: () => void; addMachine: () => void;
 }) {
   const bot = person.kind === "bot";
   const marks = badges(person);
+  const lines = orgLines(person, names);
+  const setBy = roleSetBy(person, groups, names);
+  // In People ▸ People and Groups it is open already.
+  const editHere = list.admin && providerManaged(person) && route.value.nav !== "people";
   return (
     <li class="person">
       <div class="setting">
@@ -261,13 +283,22 @@ function PersonItem({ person, list, groups, joinCommand, setRole, askRemove, set
           {person.name}
           {marks.map((mark) => <span key={mark} class="badge">{mark}</span>)}
         </span>
+        {/* A role a provider's group gives is read only, and says so (FR-020). */}
         {bot ? null : canSetRole(person, list.people, list.admin) ? (
           <select aria-label={`${person.name}’s role`} value={person.role}
             onChange={(e) => setRole((e.currentTarget as HTMLSelectElement).value as UserRole)}>
             {roles.map((r) => <option key={r} value={r}>{roleWord(r)}</option>)}
           </select>
-        ) : <span class="quiet small">{roleWord(person.role)}</span>}
+        ) : <span class="quiet small">{setBy ? `${roleWord(person.role)} · ${setBy}` : roleWord(person.role)}</span>}
       </div>
+      {(lines.length > 0 || editHere) && (
+        <div class="person-org">
+          {lines.map((line) => <span key={line} class="quiet small">{line}</span>)}
+          {editHere && (
+            <button type="button" class="link" onClick={() => go({ nav: "people", section: "people" })}>{editInPeople}</button>
+          )}
+        </div>
+      )}
       <div class="person-things">
         <span class="faint small">Machines</span>
         {person.machines.length === 0 ? <span class="quiet small">None</span>
@@ -300,7 +331,17 @@ function PersonItem({ person, list, groups, joinCommand, setRole, askRemove, set
   );
 }
 
+/** Settings ▸ People: the people alone (#2132). */
 export function PeopleSection({ store, down }: { store: Store; down: boolean }) {
+  return <PeopleOrBots store={store} down={down} kind="person" />;
+}
+
+/** Settings ▸ Bots (#2132): the bots alone, an admin's. */
+export function BotsSection({ store, down }: { store: Store; down: boolean }) {
+  return <PeopleOrBots store={store} down={down} kind="bot" />;
+}
+
+function PeopleOrBots({ store, down, kind }: { store: Store; down: boolean; kind: "person" | "bot" }) {
   const problem = useSignal<string | null>(null);
   const inviting = useSignal(false);
   const removing = useSignal<PersonRow | null>(null);
@@ -323,36 +364,41 @@ export function PeopleSection({ store, down }: { store: Store; down: boolean }) 
     }
   };
   const shown = store.people.value;
+  const bots = kind === "bot";
+  const rows = (shown?.people ?? []).filter((person) => (person.kind === "bot") === bots);
+  const headId = bots ? "settings-bots" : "settings-people";
   return (
-    <section aria-labelledby="settings-people">
-      <h3 class="section-head" id="settings-people">People</h3>
-      <JoinRequests store={store} down={down} explained />
+    <section aria-labelledby={headId}>
+      <h3 class="section-head" id={headId}>{bots ? botWords.title : "People"}</h3>
+      {!bots && <JoinRequests store={store} down={down} explained />}
       {said && <p class="hint">{said}</p>}
       {/* Each bot stopped at a cap, while it is true (#2073). */}
-      {shown?.admin && store.capped.value.map((reached) => (
+      {bots && shown?.admin && store.capped.value.map((reached) => (
         <p key={reached.user} class="hint attention" role="status">{capReachedWords(reached)}</p>
       ))}
       {!shown && !said && <p class="hint">Loading…</p>}
       {shown && (
         <>
-          {shown.people.length === 0 && <p class="hint">{noPeople}</p>}
+          {rows.length === 0 && <p class="hint">{bots ? botWords.empty : noPeople}</p>}
           <ul class="people-list">
-            {ordered(shown.people).map((person) => (
-              <PersonItem key={person.id} person={person} list={shown} groups={groups} joinCommand={store.joinCommand.value}
+            {ordered(rows).map((person) => (
+              <PersonItem key={person.id} person={person} list={shown} groups={groups} names={store.orgProviderNames.value} joinCommand={store.joinCommand.value}
                 setRole={(role) => void setRole(person, role)} askRemove={() => { removing.value = person; }}
                 setCap={() => { botSheet.value = { bot: person }; }} addMachine={() => { machineFor.value = person; }} />
             ))}
           </ul>
-          {shown.admin
-            ? (
+          {bots
+            // A bot runs the team's workflows (#1761).
+            ? shown.admin && (
               <>
-                <button type="button" class="invite" disabled={down} onClick={() => { inviting.value = true; }}>Invite a Person…</button>
-                {/* A bot runs the team's workflows (#1761). */}
                 <button type="button" class="invite" disabled={down} onClick={() => { botSheet.value = { bot: null }; }}>{botWords.make}</button>
+                <p class="hint">{botWords.foot}</p>
               </>
             )
-            : <p class="hint">{memberNote}</p>}
-          {shown.admin && (
+            : shown.admin
+              ? <button type="button" class="invite" disabled={down} onClick={() => { inviting.value = true; }}>Invite a Person…</button>
+              : <p class="hint">{memberNote}</p>}
+          {!bots && shown.admin && (
             <div class="rotate-key">
               <button type="button" disabled={down} onClick={() => { rotating.value = true; }}>Rotate Control Key…</button>
               {wasRotated.value && <p class="hint" role="status">{rotated}</p>}

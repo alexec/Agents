@@ -15,6 +15,7 @@ import (
 // when the policy says so; the organisation and the policy are an admin's; a member who
 // leads nothing sees only Me.
 func TestReportScopesAndTheGroupLead(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	p.host("OWNERS-MAC")
 	_, admin := p.client("Owner's window")
@@ -27,7 +28,7 @@ func TestReportScopesAndTheGroupLead(t *testing.T) {
 
 	day := time.Now().UTC().Format(usageDayLayout)
 	for _, h := range []*fakeHost{beas, cys, dees} {
-		r := wire.UsageRollup{Days: []wire.UsageRollupPeriod{{At: day, Rows: []wire.UsageRollupRow{{Project: "shop", Runtime: "claude",
+		r := wire.UsageRollup{Days: []wire.UsageRollupPeriod{{At: day, Rows: []wire.UsageRollupRow{{Folder: "shop", Runtime: "claude",
 			Cost: map[string]float64{"USD": 2}, Turns: 1, WorkingSeconds: 60}}}}}
 		params, _ := json.Marshal(r)
 		if _, err := p.s.methods.HostSaid(h.member.Host, "usage/rollup", params); err != nil {
@@ -124,6 +125,7 @@ func TestReportScopesAndTheGroupLead(t *testing.T) {
 // The scopes' methods are their own list, naming no machine (as TestEveryClientMethodChecksTheOwner
 // has it for the others).
 func TestReportScopeMethodsNameNoMachine(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	for method := range scopeMethods {
 		if own[method] || workspaceMethods[method] || hostNamingMethods[method] || consoleMethods[method] || !p.s.methods.Handles(method) {

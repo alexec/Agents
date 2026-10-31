@@ -64,7 +64,7 @@ func (d *policiesTold) version(host string) int64 {
 }
 
 // policyHello is a machine that keeps and follows the policy.
-func policyHello(name string) controllink.HostHello {
+func policyHello(name string) controllink.MachineHello {
 	hello := fakeHello(name)
 	hello.Capabilities = append(slices.Clone(hello.Capabilities), CapHostPolicy)
 	return hello
@@ -86,6 +86,7 @@ func getPolicy(t *testing.T, s *controllink.Session) wire.PolicyKept {
 
 // SC-001, US1: a control plane with no policy sends "no policy" and nothing else changes.
 func TestNoPolicySendsNoneAndChangesNothing(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	told := newPoliciesTold()
 	p.told = told.heard
@@ -121,6 +122,7 @@ func TestNoPolicySendsNoneAndChangesNothing(t *testing.T) {
 // FR-002 to FR-005, US2: an admin's save is bounded, one version higher, signed by the
 // control key, conditional on the rev read, audited and kept as it was; a member is refused.
 func TestAnAdminSavesASignedPolicy(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	told := newPoliciesTold()
 	p.told = told.heard
@@ -238,6 +240,7 @@ func TestAnAdminSavesASignedPolicy(t *testing.T) {
 // three within 5 seconds; a machine that does not say host.policy/1 gets nothing; a
 // machine that connects later gets the newest.
 func TestAPolicyReachesEveryMachineOnEveryCopy(t *testing.T) {
+	// Not parallel (#2512): it holds a wall-clock limit, which other tests running beside it would make flaky.
 	a, b := twoCopies(t)
 	told := newPoliciesTold()
 	a.told, b.told = told.heard, told.heard
@@ -273,6 +276,7 @@ func TestAPolicyReachesEveryMachineOnEveryCopy(t *testing.T) {
 // US5, FR-015: the kill switch is audited and pushed, and control/stopAll reaches every
 // person's clients, on and off.
 func TestTheKillSwitchReachesEveryone(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	told := newPoliciesTold()
 	p.told = told.heard
@@ -326,6 +330,7 @@ func TestTheKillSwitchReachesEveryone(t *testing.T) {
 
 // FR-019: a raise is for one person and today; a person sees only their own.
 func TestARaiseIsForOnePersonAndToday(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, window := p.client("Alex's Mac")
 	sam := p.invite(window, "Sam", wire.UserRoleMember)
@@ -365,6 +370,7 @@ func TestARaiseIsForOnePersonAndToday(t *testing.T) {
 // Edge case "a machine of an older version": with requireFollowing, a machine that has not
 // applied the current version starts no work, and does once it says it has.
 func TestRequireFollowingRefusesAMachineBehind(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	told := newPoliciesTold()
 	p.told = told.heard
@@ -400,6 +406,7 @@ func TestRequireFollowingRefusesAMachineBehind(t *testing.T) {
 
 // T012: at a rotation the policy is signed again with the new key, at the same version.
 func TestARotationSignsThePolicyAgain(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	keeper := kms.File{Path: filepath.Join(root, "control-key")}
 	key, err := keeper.ControlKey(context.Background())

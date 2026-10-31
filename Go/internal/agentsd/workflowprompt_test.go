@@ -43,7 +43,7 @@ func TestEveryRunSaysWhyItStarted(t *testing.T) {
 		{"an agent's run", fireRequest{byHand: true, byAgent: &a.ID, trigger: byHandTrigger()},
 			`because the agent “Fix the build” (id ` + string(a.ID) + `) ran it.)`},
 	} {
-		want := "Review it.\n\n(You were started by the workflow \"Review\" " + c.want
+		want := "(You were started by the workflow \"Review\" " + c.want + "\n\nReview it."
 		if got := d.runPrompt(w, c.fr); got != want {
 			t.Errorf("%s:\n got %q\nwant %q", c.name, got, want)
 		}
@@ -55,7 +55,7 @@ func TestAQueuedRunSaysWhyItStarted(t *testing.T) {
 	fakeRuntimes(t)
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "slow.md"), []byte("---\nname: Slow\non: manual\n---\nwait for me\n"), 0o644)
@@ -64,7 +64,7 @@ func TestAQueuedRunSaysWhyItStarted(t *testing.T) {
 	json.Unmarshal(c.call(t, 2, "workflows/run", map[string]any{"folder": folder, "workflowID": "slow"}), &s)
 	first := s.LastOutcome.Ran.AgentID
 	waitFor(t, "it working", func() bool { return d.Store.Agent(first).State == wire.AgentStateRunning })
-	if u := userMessages(d, first); len(u) != 1 || !strings.HasSuffix(u[0], "because the person ran it by hand, with Run now.)") {
+	if u := userMessages(d, first); len(u) != 1 || !strings.HasPrefix(u[0], "(You were started by the workflow \"Slow\" because the person ran it by hand, with Run now.)\n\n") {
 		t.Fatalf("%q", u)
 	}
 	due := time.Date(2026, 10, 19, 9, 0, 0, 0, time.Local)
@@ -89,7 +89,7 @@ func TestAQueuedRunSaysWhyItStarted(t *testing.T) {
 		return false
 	})
 	waitFor(t, "its prompt", func() bool { return len(userMessages(d, second)) == 1 })
-	if u := userMessages(d, second); !strings.HasSuffix(u[0], "because of its schedule: the 09:00 run.)") {
+	if u := userMessages(d, second); !strings.HasPrefix(u[0], "(You were started by the workflow \"Slow\" because of its schedule: the 09:00 run.)\n\n") {
 		t.Fatalf("%q", u)
 	}
 	c.call(t, 5, "agents/stop", map[string]any{"agentID": second})

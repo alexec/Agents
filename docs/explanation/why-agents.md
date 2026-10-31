@@ -77,7 +77,7 @@ Each part can be used on its own:
   or on an event, such as an agent finishing or a branch moving. It is a file beside your
   code, reviewed like code.
   See [Set up a workflow](../how-to/set-up-a-workflow.md).
-- **Agents that manage agents.** An agent can start others (three running and five kept at once, unless you change it per project), brief them, wait
+- **Agents that manage agents.** An agent can start others (three running and five kept at once, unless you change it per folder), brief them, wait
   for them and stop them. Each can work in a [worktree](../how-to/start-in-a-worktree.md)
   of its own, so they never edit the same files.
   See [Tools the app gives agents](../reference/agent-tools.md).
@@ -100,7 +100,7 @@ last gets a notification. See [How the phone and iPad reach your agents](phone-a
 ## Your machines, one figure
 
 The work happens on your Mac, or on a Linux server of your own. There is no service of
-ours in between. See [Add a server](../how-to/add-a-server.md).
+ours in between. See [Add a machine](../how-to/add-a-machine.md).
 
 What every agent spends, on every runtime and server, adds up to one figure for today.
 You can set a limit per agent and per day. See [Settings](../reference/settings.md).

@@ -3,8 +3,8 @@ import SwiftUI
 
 /// Add a skill (059, look/ frames B, C and E): search a marketplace (skills.sh unless the
 /// person chose another, #687), look at one skill as its agent will read it, and add it
-/// where the sheet was opened (#688): Settings adds to the person's `~/.agents`, Project
-/// Settings to that project's `.agents`.
+/// where the sheet was opened (#688): Settings adds to the person's `~/.agents`, Folder
+/// Settings to that folder's `.agents`.
 ///
 /// Nothing is added from the list. Choosing a row fetches that skill at its repository's
 /// current commit and shows every file; Add then puts exactly those files in place.
@@ -31,6 +31,8 @@ struct AddSkillSheet: View {
     @State private var opening: DaemonAPI.CatalogResult?
     @State private var preview: DaemonAPI.SkillPreview?
     @State private var previewError: DaemonAPI.CatalogError?
+    /// The result whose preview was refused, for Ask an Admin (#2355).
+    @State private var refused: DaemonAPI.CatalogResult?
     @State private var marketplaces: [DaemonAPI.Marketplace] = []
     @State private var managing = false
     /// The marketplace last searched, kept across sheets (#687).
@@ -46,7 +48,7 @@ struct AddSkillSheet: View {
                     Task { await loadMarketplaces() }
                 })
             } else if let preview {
-                SkillPreviewView(preview: preview, addTo: destination, projectName: projectName, runtimes: runtimes,
+                SkillPreviewView(preview: preview, addTo: destination, folderName: folderName, runtimes: runtimes,
                                  back: { self.preview = nil },
                                  added: { skill in
                                      self.added.insert(skill.name)
@@ -70,7 +72,7 @@ struct AddSkillSheet: View {
                 Text("Add a skill").appText(.title)
                 Spacer()
                 MarketplaceMenu(marketplaces: marketplaces, chosen: $chosen, manage: { managing = true })
-                Text(projectName.map { "Adds to \($0)" } ?? "Adds to ~/.agents").appText(.fine).foregroundStyle(.secondary)
+                Text(folderName.map { "Adds to \($0)" } ?? "Adds to ~/.agents").appText(.fine).foregroundStyle(.secondary)
             }
             TextField("Search \(marketplace?.name ?? "skills")", text: $query)
                 .textFieldStyle(.roundedBorder)
@@ -83,7 +85,7 @@ struct AddSkillSheet: View {
                     } else if let searchError {
                         CatalogProblemView(error: searchError, retry: { Task { await search(query) } })
                     } else if let previewError {
-                        CatalogProblemView(error: previewError, retry: nil)
+                        CatalogProblemView(error: previewError, retry: nil, refused: refused)
                     } else if results.isEmpty && searched {
                         Text("No skills match.").appText(.fine).foregroundStyle(.secondary).padding(.top, 8)
                     }
@@ -163,8 +165,10 @@ struct AddSkillSheet: View {
         opening = nil
         if let fresh = answer.preview {
             preview = fresh
+            refused = nil
         } else {
             previewError = answer.error ?? .failed("no answer")
+            refused = result
         }
     }
 
@@ -178,10 +182,10 @@ struct AddSkillSheet: View {
 
     // MARK: Words
 
-    /// The project's name when the sheet adds to a project.
-    private var projectName: String? {
-        guard case .project(let folder) = destination else { return nil }
-        return model.liveProjects.first { $0.project.folder.path == folder }?.name ?? URL(filePath: folder).lastPathComponent
+    /// The folder's name when the sheet adds to a folder.
+    private var folderName: String? {
+        guard case .folder(let folder) = destination else { return nil }
+        return model.liveFolders.first { $0.folder.folder.path == folder }?.name ?? URL(filePath: folder).lastPathComponent
     }
 
     /// 32978 → "33k", 9188 → "9.2k", 951 → "951", as frame B has them.
@@ -196,12 +200,17 @@ struct AddSkillSheet: View {
 struct CatalogProblemView: View {
     let error: DaemonAPI.CatalogError
     let retry: (() -> Void)?
+    /// The skill whose preview the organisation's policy refused: Ask an Admin for it (#2355).
+    var refused: DaemonAPI.CatalogResult?
 
     var body: some View {
         VStack(spacing: 8) {
             Text(title).appText(.reading).fontWeight(.semibold)
             Text(detail).appText(.supporting).foregroundStyle(.secondary).multilineTextAlignment(.center)
             if let retry { Button("Try again", action: retry).buttonStyle(.paper) }
+            if error.policyWords != nil, let refused {
+                AskAdminButton(kind: .skills, name: refused.name, source: refused.source)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 60)
@@ -212,6 +221,7 @@ struct CatalogProblemView: View {
         switch error {
         case .unreachable(let host): "Can't reach \(host)"
         case .rateLimited: "GitHub is limiting requests"
+        case _ where error.policyWords != nil: "Your organisation does not allow this skill"
         default: "This skill can't be shown"
         }
     }
@@ -231,14 +241,16 @@ struct CatalogProblemView: View {
 /// A catalogue refusal in the window's words.
 enum CatalogErrorWords {
     static func sentence(_ error: DaemonAPI.CatalogError) -> String {
-        switch error {
+        // The organisation's policy says its own words, whole (#2355).
+        if let words = error.policyWords { return words }
+        return switch error {
         case .unreachable(let host): "Can't reach \(host)."
         case .rateLimited: "GitHub is limiting requests. Try again in a few minutes."
         case .unmanaged(let path): "You already have a skill at \((path as NSString).abbreviatingWithTildeInPath). You made it, so the app won't replace it."
         case .lockUnreadable(let path): "\((path as NSString).abbreviatingWithTildeInPath) could not be read, so nothing was changed."
         case .noPersonalHome: "This copy of the app has no ~/.agents of its own."
         case .previewExpired: "That preview has expired. Open the skill again."
-        case .notAProject(let path): "\((path as NSString).abbreviatingWithTildeInPath) is not a project on this Mac."
+        case .notAFolder(let path): "\((path as NSString).abbreviatingWithTildeInPath) is not a folder on this Mac."
         case .replaceMismatch: "The skill there has changed since this was opened. Open it again."
         case .cannotAdd: "This skill can't be added."
         case .notManaged(let name): "\(name) wasn't added by the app or the skills tool."

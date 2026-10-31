@@ -13,7 +13,7 @@ import (
 
 // Send to ‹host›… (#1123): a Mac sends its repository here as a git bundle of the branches
 // it chose, plus a patch of its uncommitted changes, in parts of at most 16 MB
-// (projects/receiveUpload). projects/receive then makes the copy, or brings it up to date.
+// (folders/receiveUpload). folders/receive then makes the copy, or brings it up to date.
 // It never overwrites work done here: changes or commits of the host's own stop it before
 // anything is changed. Changes that the last send put here are not the host's own: a
 // fingerprint of them is kept in .git/agents-sent, and the next send replaces them.
@@ -172,7 +172,7 @@ func validBranch(name string) bool {
 	return err == nil
 }
 
-func (d *Daemon) receive(r wire.ReceiveRequest) (summary wire.ProjectSummary, err error) {
+func (d *Daemon) receive(r wire.ReceiveRequest) (summary wire.FolderSummary, err error) {
 	// The uploads go whatever the answer, also when a check below refuses (#1531).
 	var bundle, patch string
 	if r.Bundle != nil {
@@ -308,7 +308,9 @@ func (d *Daemon) receive(r wire.ReceiveRequest) (summary wire.ProjectSummary, er
 		return summary, err
 	}
 	if r.Origin != nil && *r.Origin != "" {
-		if _, err := git(path, "remote", "get-url", "origin"); err == nil {
+		// err is the named result. := here would hide it, and the check below would
+		// not see a failed set-url or add.
+		if _, err = git(path, "remote", "get-url", "origin"); err == nil {
 			_, err = git(path, "remote", "set-url", "origin", *r.Origin)
 		} else {
 			_, err = git(path, "remote", "add", "origin", *r.Origin)
@@ -328,18 +330,18 @@ func (d *Daemon) receive(r wire.ReceiveRequest) (summary wire.ProjectSummary, er
 			}
 		}
 	}
-	return d.addProject(store.FolderURL(path))
+	return d.addFolderOf(store.FolderURL(path), false, "")
 }
 
 func (d *Daemon) registerReceive() {
 	os.RemoveAll(d.incomingFolder())
-	On(d, wire.CallProjectsReceiveUpload, func(ctx context.Context, c *Client, r wire.ReceiveUploadRequest) (wire.Empty, error) {
+	On(d, wire.CallFoldersReceiveUpload, func(ctx context.Context, c *Client, r wire.ReceiveUploadRequest) (wire.Empty, error) {
 		return wire.Empty{}, d.receiveUpload(r)
 	})
-	On(d, wire.CallProjectsReceiveState, func(ctx context.Context, c *Client, r wire.ReceiveStateRequest) (wire.ReceiveState, error) {
+	On(d, wire.CallFoldersReceiveState, func(ctx context.Context, c *Client, r wire.ReceiveStateRequest) (wire.ReceiveState, error) {
 		return d.receiveState(r)
 	})
-	On(d, wire.CallProjectsReceive, func(ctx context.Context, c *Client, r wire.ReceiveRequest) (wire.ProjectSummary, error) {
+	On(d, wire.CallFoldersReceive, func(ctx context.Context, c *Client, r wire.ReceiveRequest) (wire.FolderSummary, error) {
 		return d.receive(r)
 	})
 }

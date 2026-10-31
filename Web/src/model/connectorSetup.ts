@@ -1,4 +1,4 @@
-// The words of a project's Connectors set-up and the one Connect sheet (#1336), ported from
+// The words of a folder's Connectors set-up and the one Connect sheet (#1336), ported from
 // ConnectorSetupWords in AgentsKitCore so the Mac, the Remote and the page say the same.
 import type {
   Connection, ConnectionProvider, ConnectionSignIn, ConnectionSignInCompleteRequest, UUID, ConnectorEvents, ConnectorProof, ConnectorSetup, ConnectorSlot, ConnectorSlotKind,
@@ -6,26 +6,25 @@ import type {
 import { fromWireDate } from "../protocol/dates";
 
 export const connectTitle = "Connect GitHub once: issues, pull requests and Actions.";
-export const connectNote = "Your connection, for every project. You choose on github.com which repositories Agents can see.";
-export const connectButton = "Connect GitHub…";
+export const connectNote = "Your connection, for every folder. You choose on github.com which repositories Agents can see.";
 export const abilities = [
   "Read and write issues",
   "Read and write pull requests and reviews",
   "Read checks and Actions runs",
   "Read and push code",
 ];
-export const sheetSubtitle = "For you, in every project. Agents talks to GitHub's API directly.";
+export const sheetSubtitle = "For you, in every folder. Agents talks to GitHub's API directly.";
 export const sheetChoose = "On github.com you choose which repositories. You can take it back there, or with Disconnect on Connectors.";
 export const sheetFoot = "The token is kept by the machine, never in a log.";
 export const continueButton = "Continue on github.com";
 /** Where the person sees and changes which repositories the App reaches, as the Mac's (#1685). */
 export const installationsURL = "https://github.com/settings/installations";
 export const otherProvidersElsewhere = "Other providers are set up on the Mac.";
-export const disconnectNote = "Disconnect deletes the machine's tokens. Every project's GitHub slots wait for a connection again. To revoke the App too, go to github.com ▸ Settings ▸ Applications.";
+export const disconnectNote = "Disconnect deletes the machine's tokens. Every folder's GitHub slots wait for a connection again. To revoke the App too, go to github.com ▸ Settings ▸ Applications.";
 
-export function intro(project: string, repository: string | undefined, site = "github.com"): string {
-  if (!repository) return `What agents in ${project} can reach. It has no GitHub or GitLab remote.`;
-  return `What agents in ${project} can reach. Repository ${site}/${repository}, from its git remote.`;
+export function intro(folder: string, repository: string | undefined, site = "github.com"): string {
+  if (!repository) return `What agents in ${folder} can reach. It has no GitHub or GitLab remote.`;
+  return `What agents in ${folder} can reach. Repository ${site}/${repository}, from its git remote.`;
 }
 
 // The forge (#1632): GitHub or GitLab fills Tasks, Code review and CI, as the Mac's words.
@@ -40,7 +39,7 @@ export function connectTitleFor(forge: ConnectionProvider): string {
 }
 
 export function connectNoteFor(forge: ConnectionProvider): string {
-  return forge === "gitlab" ? "Your connection, for every project. It reaches what your GitLab account can see." : connectNote;
+  return forge === "gitlab" ? "Your connection, for every folder. It reaches what your GitLab account can see." : connectNote;
 }
 
 export function connectAgain(forge: ConnectionProvider): string {
@@ -53,7 +52,7 @@ export function comesWith(forge: ConnectionProvider): string {
 
 export const noRemote = "No GitHub or GitLab remote";
 
-/** The button on a refused slot, and where it goes: the App's install on GitHub, the project on GitLab. */
+/** The button on a refused slot, and where it goes: the App's install on GitHub, the folder on GitLab. */
 export function grantButton(setup: ConnectorSetup): string {
   return forgeOf(setup) === "gitlab" ? `Open on ${setup.site ?? "gitlab.com"}` : "Grant on github.com";
 }
@@ -67,7 +66,7 @@ export function connected(c: Connection): string {
 }
 
 export function connectedNote(setup: ConnectorSetup): string {
-  const parts = ["Your connection, for every project"];
+  const parts = ["Your connection, for every folder"];
   if (setup.repositories != null) parts.push(setup.repositories === 1 ? "sees 1 repository" : `sees ${setup.repositories} repositories`);
   return parts.join(" · ");
 }
@@ -90,9 +89,9 @@ export function title(slot: ConnectorSlot): string {
   return slot.choice;
 }
 
-export function line(slot: ConnectorSlot, project: string, repository: string | undefined, onMac: boolean,
+export function line(slot: ConnectorSlot, folder: string, repository: string | undefined, onMac: boolean,
   forge: ConnectionProvider = "github"): string {
-  const repo = repository ?? project;
+  const repo = repository ?? folder;
   const gitlab = forge === "gitlab";
   switch (slot.state) {
     case "skipped":
@@ -103,7 +102,7 @@ export function line(slot: ConnectorSlot, project: string, repository: string | 
         workspace: "Agents run on this Mac.",
       }[slot.slot];
     case "noRemote":
-      return `${project} has no GitHub or GitLab remote, so ${slot.choice} can't be read for it.`;
+      return `${folder} has no GitHub or GitLab remote, so ${slot.choice} can't be read for it.`;
     case "failed":
     case "refused":
       return slot.message ?? "The read didn't work.";
@@ -235,8 +234,8 @@ export function tokenEnds(at: Date, now: Date = new Date()): string {
 /** A provider with no connection yet, on Connectors. */
 export function notConnectedNote(p: ConnectionProvider): string {
   return {
-    github: "Issues, pull requests and Actions in every project.",
-    linear: "Linear issues in every project, and their events.",
+    github: "Issues, pull requests and Actions in every folder.",
+    linear: "Linear issues in every folder, and their events.",
     gitlab: "Merge requests, pipelines and issues on gitlab.com or your own GitLab.",
     email: "One mailbox for agents: they wait for mail, such as a sign-up code, and read it.",
   }[p];
@@ -254,20 +253,14 @@ export function disconnectNoteFor(p: ConnectionProvider): string {
   return "Disconnect deletes the machine's tokens. Linear's events stop until you connect again or set LINEAR_API_KEY. To revoke Agents too, go to linear.app ▸ Settings ▸ Security & access.";
 }
 
-export function projectLine(setup: ConnectorSetup): string {
-  if (!setup.repository) return noRemote;
-  const used = setup.slots.filter((s) => s.state === "read").map((s) => s.choice);
-  return used.length === 0 ? "Not set up" : used.join(", ");
-}
-
 /** Connect Linear (#1343, frame H): the same sheet, its own list. */
 export const linear = {
   abilities: [
     "Read and write issues",
-    "Read projects and cycles",
+    "Read folders and cycles",
     "Comment as you",
   ],
-  subtitle: "For you, in every project. Agents talks to Linear's API directly.",
+  subtitle: "For you, in every folder. Agents talks to Linear's API directly.",
   choose: "On linear.app you choose the workspace. You can take it back there, or with Disconnect on Connectors.",
   continueButton: "Continue on linear.app",
   waiting: "Waiting for linear.app… Approve there, and Agents comes back by itself.",
@@ -284,7 +277,7 @@ export const gitlab = {
     "Read pipelines and jobs",
     "Read and write issues",
   ],
-  subtitle: "For you, in every project. Agents talks to GitLab's API directly.",
+  subtitle: "For you, in every folder. Agents talks to GitLab's API directly.",
   choose: "GitLab asks for the api scope. You can take it back on GitLab ▸ Preferences ▸ Applications, or with Disconnect on Connectors.",
   continueButton: "Continue on gitlab.com",
   signInWay: "gitlab.com",
@@ -296,7 +289,7 @@ export const gitlab = {
   tokenPrompt: "glpat-…",
   tokenButton: "Connect",
   checking: "Checking the token with GitLab…",
-  disconnectNote: "Disconnect deletes the machine's token. Every project's GitLab slots wait for a connection again. GitLab's events stop until you connect again or set GITLAB_TOKEN. To revoke it too, go to GitLab ▸ Preferences ▸ Applications or Access tokens.",
+  disconnectNote: "Disconnect deletes the machine's token. Every folder's GitLab slots wait for a connection again. GitLab's events stop until you connect again or set GITLAB_TOKEN. To revoke it too, go to GitLab ▸ Preferences ▸ Applications or Access tokens.",
 };
 
 /**
@@ -332,7 +325,7 @@ export const email = {
     "List, search and read messages",
     "Mark messages read and move them to another folder",
   ],
-  subtitle: "For you, in every project. Agents reads the mailbox over IMAP and never sends mail.",
+  subtitle: "For you, in every folder. Agents reads the mailbox over IMAP and never sends mail.",
   intro: "Use a mailbox made for agents, not your own. Make an app password for Agents at your mail provider, and give its IMAP server.",
   serverLabel: "IMAP server",
   serverPrompt: "imap.fastmail.com",
@@ -414,8 +407,4 @@ export function authorizeState(verificationURL: string): string | undefined {
   } catch {
     return undefined;
   }
-}
-
-export function isDone(slot: ConnectorSlot): boolean {
-  return slot.state === "read" || slot.state === "skipped";
 }

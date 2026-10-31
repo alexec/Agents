@@ -185,7 +185,7 @@ struct BotMachineSheet: View {
             return
         }
         do {
-            shown = try await control.call(DaemonAPI.Method.hostsStartEnroll, DaemonAPI.HostEnroll(as: bot.id),
+            shown = try await control.call(DaemonAPI.Method.hostsStartEnroll, DaemonAPI.MachineEnroll(as: bot.id),
                                            returning: DaemonAPI.ControlCodeShown.self)
         } catch {
             problem = PeopleWords.refusal(error)

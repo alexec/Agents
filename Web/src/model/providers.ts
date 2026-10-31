@@ -1,13 +1,13 @@
-// The control plane's workspace providers as this page holds them (#1808), as the window's
+// The control plane's machine providers as this page holds them (#1808), as the window's
 // ControlSettingsModel: listed when Settings opens, kept by control/providersChanged, and each
 // change sent to the control plane. Secrets pass through in a request and are not kept here.
 import { signal } from "@preact/signals";
-import type { Group, HostID, ProviderAdd, ProviderID, ProviderSummary } from "../protocol/generated";
+import type { Group, MachineRef, ProviderAdd, ProviderID, ProviderSummary } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import type { Caller } from "../protocol/methods";
 import { CallFailed } from "../wire/link";
 import { describe } from "./errors";
-import { providerWords } from "./workspaceProviders";
+import { providerWords } from "./machineProviders";
 
 /** A Stop that agents at work hold back: what to ask before stopping anyway (US4 AS4). */
 export interface StopAsk {
@@ -87,10 +87,10 @@ export class Providers {
     }
   }
 
-  /** Link to Workspace: `host` runs on `workspace` of `provider`. */
+  /** Link to Machine: `host` runs on `workspace` of `provider`. */
   async link(host: string, provider: string, workspace: string, startWhenUsed: boolean, stopWhenIdleMinutes: number): Promise<string | null> {
     try {
-      await this.caller.call("hosts/link", { host: host as HostID, provider: provider as ProviderID, workspace, startWhenUsed, stopWhenIdleMinutes });
+      await this.caller.call("hosts/link", { host: host as MachineRef, provider: provider as ProviderID, workspace, startWhenUsed, stopWhenIdleMinutes });
       return null;
     } catch (error) {
       return describe(error);
@@ -99,7 +99,7 @@ export class Providers {
 
   async unlink(host: string): Promise<string | null> {
     try {
-      await this.caller.call("hosts/unlink", { host: host as HostID });
+      await this.caller.call("hosts/unlink", { host: host as MachineRef });
       return null;
     } catch (error) {
       return describe(error);
@@ -112,7 +112,7 @@ export class Providers {
    */
   async stop(host: string, confirmed = false): Promise<StopAsk | string | null> {
     try {
-      await this.caller.call("hosts/stop", confirmed ? { host: host as HostID, confirmRunning: true } : { host: host as HostID });
+      await this.caller.call("hosts/stop", confirmed ? { host: host as MachineRef, confirmRunning: true } : { host: host as MachineRef });
       return null;
     } catch (error) {
       if (!confirmed && error instanceof CallFailed && error.code === Failure.agentsWorking) return { host, question: error.message };

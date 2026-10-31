@@ -244,7 +244,7 @@ final class MachineMove {
         for _ in 0..<60 {
             let there = await handover(["status", "--at", place, "--json"])
             if there.ok, let status = try? JSONDecoder().decode(HandoverStatus.self, from: Data(there.output.utf8)),
-               status.members.contains(where: { $0.id == HostID.mac.rawValue && $0.online == true }) { break }
+               status.members.contains(where: { $0.id == MachineRef.mac.rawValue && $0.online == true }) { break }
             try? await Task.sleep(for: .milliseconds(500))
         }
         stages[3] = .done
@@ -467,7 +467,7 @@ struct MachineMoveSheet: View {
                 ForEach(status.members) { member in
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(member.id == HostID.mac.rawValue ? "This Mac" : member.name)
+                            Text(member.id == MachineRef.mac.rawValue ? "This Mac" : member.name)
                             Text(Self.kind(member)).font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
@@ -502,7 +502,7 @@ struct MachineMoveSheet: View {
         case "iPhone": ["phone"]
         case "iPad": ["iPad"]
         case "relay": ["relay"]
-        default: [member.id == HostID.mac.rawValue ? "host" : "server"]
+        default: [member.id == MachineRef.mac.rawValue ? "host" : "server"]
         }
         if member.online != true, let seen = member.lastSeen {
             parts.append("last connected \(seen.formatted(.relative(presentation: .named)))")

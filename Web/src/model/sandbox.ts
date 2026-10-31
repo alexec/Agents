@@ -2,7 +2,8 @@
 // and states and SandboxWords' menu words (Runtimes/SandboxCatalog.swift, SandboxWords.swift),
 // ported by hand and held to Fixtures/web/sandbox. A runtime the catalog has no route for has no
 // choice: its state is said, with why.
-import type { SandboxChoice, SandboxState } from "../protocol/generated";
+import type { PolicySetBy, SandboxChoice, SandboxState } from "../protocol/generated";
+import { levelWords } from "./levels";
 
 type Route = "choices" | "offOnly" | "codexMode" | { fixed: SandboxState };
 
@@ -10,7 +11,7 @@ type Route = "choices" | "offOnly" | "codexMode" | { fixed: SandboxState };
 const catalog: Record<string, { route: Route; why?: string }> = {
   claude: { route: "choices" },
   codex: { route: "codexMode" },
-  grok: { route: "choices" },
+  grok: { route: { fixed: "runtimeControlled" }, why: "Grok 1.0.67 does not accept --sandbox with agent stdio. The app cannot change Grok’s sandbox." },
   gemini: { route: "offOnly", why: "Gemini’s own sandbox cannot start when the app runs it, so On is not offered." },
   cursor: { route: { fixed: "runtimeControlled" }, why: "Cursor’s own sandbox setting decides. The app cannot change it." },
   copilot: { route: { fixed: "runtimeControlled" }, why: "Copilot’s own sandbox setting decides. The app cannot change it yet." },
@@ -42,16 +43,20 @@ export function sandboxState(runtimeID: string, choice: SandboxChoice, codexMode
   return choice === "on" ? "on" : choice === "off" ? "off" : "runtimeControlled";
 }
 
-export function sandboxChoiceWords(choice: SandboxChoice, runtimeID: string): string {
-  const codex = runtimeID === "codex";
-  if (choice === "runtime") return "As configured by runtime";
-  if (choice === "on") return codex ? "On (Ask or Approve for me)" : "On";
-  return codex ? "Off (Full access)" : "Off";
+/** A choice, in the words every runtime shares (#2658). */
+export function sandboxChoiceWords(choice: SandboxChoice, _runtimeID: string): string {
+  return levelWords("sandbox", choice);
 }
 
-/** One agent's menu, where no choice follows the runtime's default. */
+/** One agent's pill: its own choice, else the one Settings gives, which its menu marks
+ *  **follows Settings**. */
 export function sandboxOverrideWords(choice: SandboxChoice | undefined, runtimeDefault: SandboxChoice, runtimeID: string): string {
-  return choice ? sandboxChoiceWords(choice, runtimeID) : `Use runtime default (${sandboxChoiceWords(runtimeDefault, runtimeID)})`;
+  return sandboxChoiceWords(choice ?? runtimeDefault, runtimeID);
+}
+
+/** A runtime that cannot change its sandbox: its fixed value. */
+export function fixedSandbox(runtimeID: string): SandboxChoice {
+  return sandboxState(runtimeID, "runtime", undefined) === "none" ? "off" : "runtime";
 }
 
 export function sandboxStateWords(state: SandboxState): string {
@@ -69,11 +74,11 @@ export function sandboxExplanation(choice: SandboxChoice, runtimeID: string, nam
     return codex ? "The mode decides: Full access has no sandbox, the other modes do." : `${name}’s own settings decide. The app adds nothing.`;
   }
   if (choice === "on") {
-    if (codex) return "Commands can write only in the project and cannot reach the network. The mode still decides when Codex asks.";
+    if (codex) return "Commands can write only in the folder and cannot reach the network. The mode still decides when Codex asks.";
     if (runtimeID === "claude") {
-      return "Commands can write only in the project, and Claude asks before they reach a new website. Its permission mode is a separate choice.";
+      return "Commands can write only in the folder, and Claude asks before they reach a new website. Its permission mode is a separate choice.";
     }
-    return `Commands can write only in the project, its temporary folders and ${name}’s own folder. Its permission mode is a separate choice.`;
+    return `Commands can write only in the folder, its temporary folders and ${name}’s own folder. Its permission mode is a separate choice.`;
   }
   return codex
     ? "Full access: commands run with your own access, and Codex stops asking for approval."
@@ -86,4 +91,10 @@ export const startWithout = "Start without sandbox";
 /** SandboxWords.cardTitle. */
 export function sandboxCardTitle(name: string): string {
   return `${name}’s sandbox could not start`;
+}
+
+/** The organisation's mark on a sandbox choice its policy refuses (#998): while it requires the
+ *  sandbox, every choice but On. Undefined for a choice that can be chosen. */
+export function sandboxRefusedBy(choice: SandboxChoice | undefined, setBy: PolicySetBy | undefined): PolicySetBy | undefined {
+  return choice === "on" ? undefined : setBy;
 }

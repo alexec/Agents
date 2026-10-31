@@ -47,7 +47,7 @@ public final class ControlRelay: @unchecked Sendable {
     private var tasks: [Task<Void, Never>] = []
     private var uplink: (any LineTransport)?
     private let stopped = ManagedAtomicFlag()
-    private let hello: DaemonAPI.HostHello
+    private let hello: DaemonAPI.MachineHello
     private var mailboxReady = false
     private var carrying: [UUID: Data]?
     /// The uplink's waits between dials, jittered and cut short by a wake or a network
@@ -131,8 +131,8 @@ public final class ControlRelay: @unchecked Sendable {
         }
     }
 
-    static func hello(name: String) -> DaemonAPI.HostHello {
-        DaemonAPI.HostHello(version: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev", platform: "macOS relay",
+    static func hello(name: String) -> DaemonAPI.MachineHello {
+        DaemonAPI.MachineHello(version: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev", platform: "macOS relay",
                             machineID: MachineID.current, name: name, relay: true)
     }
 

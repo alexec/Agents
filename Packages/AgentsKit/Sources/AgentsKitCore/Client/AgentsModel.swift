@@ -5,7 +5,7 @@ import Observation
 /// a train.
 ///
 /// Neither of them owns any of this. The daemon does. This is the view of it a client
-/// keeps in hand — the agents, the projects, the questions waiting, and the page of
+/// keeps in hand — the agents, the folders, the questions waiting, and the page of
 /// transcript being read — together with what each notification means, which is the
 /// part that must not be written twice. Two clients that disagreed about what
 /// `agent/permission` with a nil request means would be two clients that disagree
@@ -18,16 +18,20 @@ import Observation
 @Observable
 public final class AgentsModel {
     /// Every agent held, newest activity first. Read by pages about all the work; a
-    /// sidebar fold or a row reads its project's `shelf` or its agent instead, so one
+    /// sidebar fold or a row reads its folder's `shelf` or its agent instead, so one
     /// agent changing does not redraw them all (#165).
     public private(set) var agents: [Agent] = []
     /// How many agents are held: moves only when one comes or goes, for a view that
     /// wants to know that and not every change to every one of them.
     public private(set) var agentCount = 0
+    /// The runtime of the most recently active agent on each machine: what a page that
+    /// offers a runtime reads, rather than `agents`, so it draws again only when this
+    /// moves (#2732). A machine with no agent held is absent.
+    public private(set) var lastRuntimes: [MachineRef: String] = [:]
     /// Moves each time an agent held here becomes archived: what lets the window let go
     /// of that agent's draft without looking at everything (#176).
     public private(set) var archivals = 0
-    public private(set) var projects: [DaemonAPI.ProjectSummary] = []
+    public private(set) var folders: [DaemonAPI.FolderSummary] = []
     public private(set) var permissions: [PermissionRequest] = []
     public private(set) var elicitations: [ElicitationRequest] = []
     /// What wants a person and where each is showing, as the daemon last said (021).
@@ -35,28 +39,36 @@ public final class AgentsModel {
     public private(set) var needs: [NeedID: Need] = [:]
     public private(set) var deliveries: [NeedID: Surface] = [:]
 
-    /// Every project's workflows, newest state winning. Here rather than in the Mac's
+    /// Every folder's workflows, newest state winning. Here rather than in the Mac's
     /// own model because a workflow is about the work, and the phone will want them.
-    /// Not observed: a fold reads its project's shelf, so one workflow changing does
-    /// not redraw every other project's (#285). The array stays, for a one-off read.
+    /// Not observed: a fold reads its folder's shelf, so one workflow changing does
+    /// not redraw every other folder's (#285). The array stays, for a one-off read.
     @ObservationIgnored public private(set) var workflows: [WorkflowSummary] = []
 
-    /// Each project's pinned pages (#159), by its standardized folder: kept current by
-    /// `pins/changed`, which carries them. A project with none is absent. Not observed:
-    /// a project reads its own shelf (#285).
+    /// User workflows shown in Settings, separate from folder copies merged into forge folders.
+    public var userWorkflows: [WorkflowSummary] {
+        workflows.filter { $0.scope == "user" && $0.content != nil }
+    }
+
+    /// Each folder's pinned pages (#159), by its standardized folder: kept current by
+    /// `pins/changed`, which carries them. A folder with none is absent. Not observed:
+    /// a folder reads its own shelf (#285).
     @ObservationIgnored public private(set) var pins: [URL: [PinView]] = [:]
-    /// Each project's pinned sessions (#180), by its standardized folder, in their order:
-    /// kept current by `pins/changed` as the pages are. A project with none is absent.
+    /// Each folder's pinned sessions (#180), by its standardized folder, in their order:
+    /// kept current by `pins/changed` as the pages are. A folder with none is absent.
     @ObservationIgnored public private(set) var sessionPins: [URL: [UUID]] = [:]
-    /// Each project's pinned workflows' ids (#432), likewise.
+    /// Each folder's pinned workflows' ids (#432), likewise.
     @ObservationIgnored public private(set) var workflowPins: [URL: [String]] = [:]
+    /// Each folder's servers' list views (#2032), the hidden ones marked, kept current by
+    /// `pins/changed`. A folder with none is absent.
+    @ObservationIgnored public private(set) var serverViews: [URL: [PinView]] = [:]
     /// Bumped by `pages/changed`: a page a screen may be showing changed on disk. Whoever
     /// shows one reads it again, with its stamp, so an unchanged file costs nothing.
     public private(set) var pageRevisions: [URL: [String: Int]] = [:]
 
-    /// Each project's plugins, by its standardized folder, as the daemon last listed them:
+    /// Each folder's plugins, by its standardized folder, as the daemon last listed them:
     /// which are waiting for the person's OK (security review, S2).
-    public private(set) var plugins: [URL: [ProjectPlugin]] = [:]
+    public private(set) var plugins: [URL: [FolderPlugin]] = [:]
 
     /// The transcript of the agent being read, and only that one. A client holds one
     /// page of one conversation, because an hour of transcript is not something to
@@ -131,15 +143,17 @@ public final class AgentsModel {
     @ObservationIgnored private var fileIndex = TranscriptFileIndex()
     /// Every entry in hand, by id, so one that reaches us twice is kept once.
     @ObservationIgnored private var entryIDs: Set<UUID> = []
-    /// Entries heard as they happened since the last page arrived.
+    /// Entries heard as they happened while a page is on its way; nil when none is.
     ///
     /// A page and the entries streaming past it come by two different doors — a reply
     /// and a notification — and nothing orders one against the other. An entry written
     /// after the daemon read the page can be applied before the page lands, and the
     /// page would then replace it: a chunk of a reply gone from the middle of the chat
-    /// until it was next opened. These are laid back on top of the page. Bounded,
-    /// because a chat watched for hours hears thousands between pages.
-    @ObservationIgnored private var heardSincePage: [TranscriptEntry] = []
+    /// until it was next opened. These are laid back on top of the page. Only from when
+    /// the page was asked for: what was heard before it is on the page or before it, and
+    /// laid after a catch-up page that starts in the turn's reply, the turn's ask and
+    /// first steps were drawn below that reply (#2807). Bounded, as the web's is.
+    @ObservationIgnored private var heardSincePage: [TranscriptEntry]? = []
     private static let heardSincePageLimit = 1_000
 
     /// Why the open chat's history did not load, or only partly, until a page lands or
@@ -190,17 +204,17 @@ public final class AgentsModel {
     @ObservationIgnored private var nextTrimAt = entriesTrimmedAt
     /// Each agent by id, and where it was filed: its folder and group as they were.
     @ObservationIgnored private var byID: [UUID: Agent] = [:]
-    @ObservationIgnored private var filedAs: [UUID: (folder: URL, host: HostID, group: AgentGroup)] = [:]
+    @ObservationIgnored private var filedAs: [UUID: (folder: URL, host: MachineRef, group: AgentGroup)] = [:]
     /// The held sessions each session started (#835), by the starter's id.
     @ObservationIgnored private var started: [UUID: Set<UUID>] = [:]
-    /// Each project's agents, by folder and host, and again by folder alone (#165).
-    @ObservationIgnored private var shelves: [ShelfKey: ProjectShelf] = [:]
-    @ObservationIgnored private var folderShelves: [URL: ProjectShelf] = [:]
+    /// Each folder's agents, by folder and host, and again by folder alone (#165).
+    @ObservationIgnored private var shelves: [ShelfKey: FolderShelf] = [:]
+    @ObservationIgnored private var folderShelves: [URL: FolderShelf] = [:]
     /// One per agent a view has looked up by id. Let go when the agent is (#285).
     @ObservationIgnored private var cells: [UUID: AgentCell] = [:]
     /// How many cells are held. A forgotten agent must not leave one behind (#285).
     var heldCellCount: Int { cells.count }
-    /// Workflows and pins per project, made when a fold first asks (#285).
+    /// Workflows and pins per folder, made when a fold first asks (#285).
     @ObservationIgnored private var workflowShelves: [URL: WorkflowShelf] = [:]
     @ObservationIgnored private var workflowRunShelves: [String: WorkflowRunShelf] = [:]
     @ObservationIgnored private var pinShelves: [URL: PinShelf] = [:]
@@ -273,7 +287,7 @@ public final class AgentsModel {
     /// What the reader will allow, what today has cost, and which local day that is.
     ///
     /// Seeded by `cost/state` on connect and kept current by `cost/changed`, the way
-    /// projects are seeded by `projects/list` and kept current by `project/changed`.
+    /// folders are seeded by `folders/list` and kept current by `folder/changed`.
     /// Nil until the daemon has said, so a window shows nothing rather than a zero
     /// it invented. Everything derived from it — whether the day's limit is reached,
     /// what is left, whether it is close — is computed on `CostState` and never sent.
@@ -292,7 +306,7 @@ public final class AgentsModel {
     /// from a host too old to keep backups, which leaves the section out.
     public private(set) var backupState: DaemonAPI.BackupState?
     /// Every resource an agent can lease, who holds it and who is waiting (036), as
-    /// the daemon last said. Replaced whole by each `leases/changed`, never merged. Nil
+    /// the daemon last said. Replaced whole by each `resources/changed`, never merged. Nil
     /// from a daemon too old to have leases, which draws nothing.
     public private(set) var leases: DaemonAPI.LeaseSnapshot?
     /// The MCP servers the host runs for every agent (#488), as the daemon last said.
@@ -300,16 +314,16 @@ public final class AgentsModel {
     public private(set) var hostedMCP: DaemonAPI.HostedMCPSnapshot?
     /// Every MCP server each host's `mcp.json` files name, and how each is doing (#753), by
     /// host. Replaced whole by each `mcp/healthChanged`. Empty for a daemon too old to say.
-    public private(set) var mcpHealth: [HostID: DaemonAPI.MCPHealthSnapshot] = [:]
+    public private(set) var mcpHealth: [MachineRef: DaemonAPI.MCPHealthSnapshot] = [:]
     /// Every volume that is low on space (#195), as the daemon last said. Replaced whole
     /// by each `disk/changed`. Empty from a daemon too old to say, which draws nothing.
     public private(set) var disk = DiskState()
-    /// Every project's worktrees on each host (#790), for Activity ▸ Worktrees, as last
+    /// Every folder's worktrees on each host (#790), for Activity ▸ Worktrees, as last
     /// asked: a list, not kept up by the host, so asked again when the page is shown.
-    public private(set) var worktrees: [HostID: [DaemonAPI.ProjectWorktrees]] = [:]
+    public private(set) var worktrees: [MachineRef: [DaemonAPI.FolderWorktrees]] = [:]
     /// Each worktree's size as `worktrees/sized` last said, by host and root, newer than
     /// any list: a chooser or a page already drawn fills in from here.
-    public private(set) var worktreeSizes: [HostID: [URL: DaemonAPI.WorktreeSize]] = [:]
+    public private(set) var worktreeSizes: [MachineRef: [URL: DaemonAPI.WorktreeSize]] = [:]
     /// The newest events (042), newest first, as far back as has been paged in. A new
     /// or changed event from `events/changed` is put in by its position. Empty until a
     /// page has been asked for, and on a daemon too old to have events.
@@ -415,9 +429,9 @@ public final class AgentsModel {
     /// is still written once, in `apply`.
     public enum Update: Sendable {
         case agentChanged(Agent)
-        case projectChanged(DaemonAPI.ProjectSummary)
-        /// Deleted (#677): its host stamped as `projectChanged`'s is.
-        case projectRemoved(ProjectKey)
+        case folderChanged(DaemonAPI.FolderSummary)
+        /// Deleted (#677): its host stamped as `folderChanged`'s is.
+        case folderRemoved(FolderKey)
         case entry(DaemonAPI.EntryNotification)
         case permission(DaemonAPI.PermissionNotification)
         case elicitation(DaemonAPI.ElicitationNotification)
@@ -436,10 +450,10 @@ public final class AgentsModel {
         case leasesChanged(DaemonAPI.LeaseSnapshot)
         case hostedMCPChanged(DaemonAPI.HostedMCPSnapshot)
         /// From the Mac until `stamp` says which host.
-        case mcpHealthChanged(DaemonAPI.MCPHealthSnapshot, host: HostID)
+        case mcpHealthChanged(DaemonAPI.MCPHealthSnapshot, host: MachineRef)
         case diskChanged(DiskState)
         /// From the Mac until `stamp` says which host.
-        case worktreesSized(DaemonAPI.WorktreesSized, host: HostID)
+        case worktreesSized(DaemonAPI.WorktreesSized, host: MachineRef)
         case eventsChanged(DaemonAPI.EventsChange)
         case modesChanged(DaemonAPI.RememberedModes)
         case wakeChanged(DaemonAPI.WakeState)
@@ -473,9 +487,9 @@ public final class AgentsModel {
         }
         switch method {
         case DaemonAPI.Notification.agentChanged: return decode(Agent.self, Update.agentChanged)
-        case DaemonAPI.Notification.projectChanged: return decode(DaemonAPI.ProjectSummary.self, Update.projectChanged)
-        case DaemonAPI.Notification.projectRemoved:
-            return decode(DaemonAPI.ProjectRemovedNotification.self) { .projectRemoved(ProjectKey(folder: $0.folder)) }
+        case DaemonAPI.Notification.folderChanged: return decode(DaemonAPI.FolderSummary.self, Update.folderChanged)
+        case DaemonAPI.Notification.folderRemoved:
+            return decode(DaemonAPI.FolderRemovedNotification.self) { .folderRemoved(FolderKey(folder: $0.folder)) }
         case DaemonAPI.Notification.agentEntry: return decode(DaemonAPI.EntryNotification.self, Update.entry)
         case DaemonAPI.Notification.agentPermission: return decode(DaemonAPI.PermissionNotification.self, Update.permission)
         case DaemonAPI.Notification.agentElicitation: return decode(DaemonAPI.ElicitationNotification.self, Update.elicitation)
@@ -492,7 +506,7 @@ public final class AgentsModel {
         case DaemonAPI.Notification.runtimesAllowancesChanged:
             return decode(RuntimeAllowances.self, Update.runtimeAllowancesChanged)
         case DaemonAPI.Notification.agentRemoved: return decode(DaemonAPI.AgentRemovedNotification.self, Update.agentRemoved)
-        case DaemonAPI.Notification.leasesChanged: return decode(DaemonAPI.LeaseSnapshot.self, Update.leasesChanged)
+        case DaemonAPI.Notification.resourcesChanged: return decode(DaemonAPI.LeaseSnapshot.self, Update.leasesChanged)
         case DaemonAPI.Notification.mcpHostedChanged:
             return decode(DaemonAPI.HostedMCPSnapshot.self, Update.hostedMCPChanged)
         case DaemonAPI.Notification.mcpHealthChanged:
@@ -526,38 +540,38 @@ public final class AgentsModel {
 
     /// Apply one notification from one of several daemons (037). What it carries is
     /// stamped with the host it came from before it is filed, so a window holding a
-    /// server's projects beside the Mac's never mistakes one for the other.
+    /// server's folders beside the Mac's never mistakes one for the other.
     @discardableResult
-    public func apply(_ method: String, _ params: JSONValue?, from host: HostID) -> Bool {
+    public func apply(_ method: String, _ params: JSONValue?, from host: MachineRef) -> Bool {
         guard let update = Self.read(method, params) else { return false }
         apply(Self.stamp(update, host: host))
         return true
     }
 
-    /// Whether this update brings a project the model does not hold yet (#1798). A project
+    /// Whether this update brings a folder the model does not hold yet (#1798). A folder
     /// added comes with its ready-made workflows but no `workflow/changed` for them, so a
     /// client that listed the workflows at connect lists them again.
-    public func addsProject(_ update: Update, from host: HostID? = nil) -> Bool {
-        guard case .projectChanged(let summary) = host.map({ Self.stamp(update, host: $0) }) ?? update else { return false }
-        return !projects.contains { $0.folder == summary.folder && $0.host == summary.host }
+    public func addsFolder(_ update: Update, from host: MachineRef? = nil) -> Bool {
+        guard case .folderChanged(let summary) = host.map({ Self.stamp(update, host: $0) }) ?? update else { return false }
+        return !folders.contains { $0.folder.folder == summary.folder.folder && $0.host == summary.host }
     }
 
     /// Apply one notification from one of several daemons, already read off the main actor.
-    public func apply(_ update: Update, from host: HostID) {
+    public func apply(_ update: Update, from host: MachineRef) {
         apply(Self.stamp(update, host: host))
     }
 
-    public nonisolated static func stamp(_ update: Update, host: HostID) -> Update {
+    public nonisolated static func stamp(_ update: Update, host: MachineRef) -> Update {
         switch update {
         case .agentChanged(var agent):
             agent.host = host
             return .agentChanged(agent)
-        case .projectChanged(var summary):
+        case .folderChanged(var summary):
             summary.host = host
-            return .projectChanged(summary)
-        case .projectRemoved(var key):
+            return .folderChanged(summary)
+        case .folderRemoved(var key):
             key.host = host
-            return .projectRemoved(key)
+            return .folderRemoved(key)
         case .mcpHealthChanged(let snapshot, _):
             return .mcpHealthChanged(snapshot, host: host)
         case .worktreesSized(let sized, _):
@@ -578,23 +592,23 @@ public final class AgentsModel {
             // Lean unless its lists moved and this client shows it (#203).
             file(agent.keepingLists(of: held))
 
-        case .projectChanged(let summary):
+        case .folderChanged(let summary):
             upsert(summary)
 
-        case .projectRemoved(let key):
-            removeProject(key)
+        case .folderRemoved(let key):
+            removeFolder(key)
 
         case .entry(let notification):
             guard notification.agentID == watching else { return }
             if notification.oversized != nil {
                 onOversized(notification.agentID, notification.entry.id, notification.index)
             }
-            if let heard = heardSincePage.firstIndex(where: { $0.id == notification.entry.id }) {
-                heardSincePage[heard] = notification.entry
-            } else {
-                heardSincePage.append(notification.entry)
-                if heardSincePage.count > Self.heardSincePageLimit {
-                    heardSincePage.removeFirst(heardSincePage.count - Self.heardSincePageLimit)
+            if let heard = heardSincePage?.firstIndex(where: { $0.id == notification.entry.id }) {
+                heardSincePage?[heard] = notification.entry
+            } else if heardSincePage != nil {
+                heardSincePage?.append(notification.entry)
+                if let count = heardSincePage?.count, count > Self.heardSincePageLimit {
+                    heardSincePage?.removeFirst(count - Self.heardSincePageLimit)
                 }
             }
             // Catch-up can repeat an id with newer contents. Replace the held copy in place.
@@ -616,13 +630,7 @@ public final class AgentsModel {
             }
 
         case .permission(let notification):
-            if let id = notification.requestID ?? notification.request?.id {
-                permissions.removeAll { $0.agentID == notification.agentID && $0.id == id }
-            } else {
-                // Every question at once: a daemon from before 09-27 withdraws this way
-                // (kept, #58; see `PermissionNotification.requestID`).
-                permissions.removeAll { $0.agentID == notification.agentID }
-            }
+            permissions.removeAll { $0.agentID == notification.agentID && $0.id == notification.requestID }
             if let request = notification.request { permissions.append(request) }
             permissions.sort { $0.askedAt < $1.askedAt }
 
@@ -649,27 +657,30 @@ public final class AgentsModel {
             upsert(summary)
 
         case .workflowRemoved(let notification):
-            let folder = Project.standardize(notification.folder)
+            let folder = Folder.standardize(notification.folder)
             workflows.removeAll {
                 $0.folder == folder && $0.workflowID == notification.workflowID
             }
             refillWorkflowShelf(folder)
 
         case .pinsChanged(let notification):
-            let folder = Project.standardize(notification.folder)
+            let folder = Folder.standardize(notification.folder)
             let sessions = notification.sessions ?? []
             pins[folder] = notification.pins.isEmpty ? nil : notification.pins
             sessionPins[folder] = sessions.isEmpty ? nil : sessions
             let flows = notification.workflows ?? []
             workflowPins[folder] = flows.isEmpty ? nil : flows
+            let views = notification.views ?? []
+            serverViews[folder] = views.isEmpty ? nil : views
+            pinShelves[folder]?.setViews(views)
             pinShelves[folder]?.setPins(notification.pins)
             pinShelves[folder]?.setSessions(sessions)
             pinShelves[folder]?.setWorkflows(flows)
 
         case .pagesChanged(let notification):
-            let project = Project.standardize(notification.folder)
-            for folder in notification.folders {
-                pageRevisions[project, default: [:]][folder, default: 0] += 1
+            let folder = Folder.standardize(notification.folder)
+            for path in notification.folders {
+                pageRevisions[folder, default: [:]][path, default: 0] += 1
             }
 
         case .pluginsChanged(let list):
@@ -762,7 +773,7 @@ public final class AgentsModel {
     /// One whose stub has gone with the page, or a chat that has changed, is let go.
     public func fillOversized(_ entry: TranscriptEntry, for agentID: UUID) {
         guard agentID == watching else { return }
-        if let at = heardSincePage.firstIndex(where: { $0.id == entry.id }) { heardSincePage[at] = entry }
+        if let at = heardSincePage?.firstIndex(where: { $0.id == entry.id }) { heardSincePage?[at] = entry }
         guard let at = entries.firstIndex(where: { $0.id == entry.id }) else { return }
         entries[at] = entry
         refold()
@@ -771,7 +782,7 @@ public final class AgentsModel {
     // MARK: Filing what arrives
 
     /// One agent, new or changed, moved to where it now goes: in `agents`, in its
-    /// project's shelf, in its own cell. Nothing else is filed again (#165). A record that
+    /// folder's shelf, in its own cell. Nothing else is filed again (#165). A record that
     /// left its lists out keeps the ones held (#203).
     public func upsert(_ agent: Agent) {
         file(agent.keepingLists(of: byID[agent.id]))
@@ -791,7 +802,7 @@ public final class AgentsModel {
     /// to other computers is answered with the workflow, and putting that answer back
     /// would show a row this host does not run.
     public func removeWorkflow(_ workflowID: String, in folder: URL) {
-        let key = Project.standardize(folder)
+        let key = Folder.standardize(folder)
         guard workflows.contains(where: { $0.folder == key && $0.workflowID == workflowID }) else { return }
         workflows.removeAll { $0.folder == key && $0.workflowID == workflowID }
         refillWorkflowShelf(key)
@@ -803,95 +814,126 @@ public final class AgentsModel {
         for folder in folders { refillWorkflowShelf(folder) }
     }
 
+    /// Replace the user's Settings list without dropping folder workflows from other shelves.
+    public func replaceUserWorkflows(_ summaries: [WorkflowSummary]) {
+        replaceWorkflows(workflows.filter { !($0.scope == "user" && $0.content != nil) } + summaries)
+    }
+
     private static func workflowName(_ a: WorkflowSummary, _ b: WorkflowSummary) -> Bool {
         a.workflow.name.localizedCaseInsensitiveCompare(b.workflow.name) == .orderedAscending
     }
 
     /// The shelf a fold already holds, filled from the array. One that nobody has
-    /// opened is left unmade, so a change does not build a shelf for every project.
+    /// opened is left unmade, so a change does not build a shelf for every folder.
     private func refillWorkflowShelf(_ folder: URL) {
-        let key = Project.standardize(folder)
+        let key = Folder.standardize(folder)
         guard let shelf = workflowShelves[key] else { return }
         shelf.replace(workflows.filter { $0.folder == key })
     }
 
     public func replacePlugins(_ list: DaemonAPI.PluginsList) {
-        plugins[Project.standardize(list.folder)] = list.plugins.sorted {
+        plugins[Folder.standardize(list.folder)] = list.plugins.sorted {
             $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
         }
     }
 
-    /// The plugins of one project, which is what a project page shows.
-    public func plugins(in folder: URL?) -> [ProjectPlugin] {
+    /// The plugins of one folder, which is what a folder page shows.
+    public func plugins(in folder: URL?) -> [FolderPlugin] {
         guard let folder else { return [] }
-        return plugins[Project.standardize(folder)] ?? []
+        return plugins[Folder.standardize(folder)] ?? []
     }
 
-    /// One project's pinned pages, in their order. Read from that project's shelf.
+    /// One folder's pinned pages, in their order. Read from that folder's shelf.
     public func pins(in folder: URL?) -> [PinView] {
         guard let folder else { return [] }
         return pinShelf(folder).pins
     }
 
-    public func replacePins(_ listed: [ProjectPins]) {
-        pins = Dictionary(listed.compactMap { $0.pins.isEmpty ? nil : (Project.standardize($0.folder), $0.pins) },
+    /// One folder's servers' list views (#2032), the hidden ones too, in the servers' order.
+    public func serverViews(in folder: URL?) -> [PinView] {
+        guard let folder else { return [] }
+        return pinShelf(folder).views
+    }
+
+    /// A pin or a server's list view at this path: what a selected sidebar row opens.
+    public func pinOrView(_ path: String, in folder: URL?) -> PinView? {
+        pins(in: folder).first { $0.path == path } ?? serverViews(in: folder).first { $0.path == path }
+    }
+
+    /// A server view hidden or shown as a screen left it, before the host says so.
+    public func setViewHidden(_ uri: String, _ hidden: Bool, in folder: URL) {
+        let key = Folder.standardize(folder)
+        guard var views = serverViews[key], let at = views.firstIndex(where: { $0.path == uri }) else { return }
+        views[at].hidden = hidden ? true : nil
+        serverViews[key] = views
+        pinShelves[key]?.setViews(views)
+    }
+
+    public func replacePins(_ listed: [FolderPins]) {
+        pins = Dictionary(listed.compactMap { $0.pins.isEmpty ? nil : (Folder.standardize($0.folder), $0.pins) },
                           uniquingKeysWith: { $1 })
         let sessions = Dictionary(listed.compactMap { listed in
-            listed.sessions.map { (Project.standardize(listed.folder), $0) }
+            listed.sessions.map { (Folder.standardize(listed.folder), $0) }
         }, uniquingKeysWith: { $1 })
         if sessionPins != sessions { sessionPins = sessions }
         let flows = Dictionary(listed.compactMap { listed in
-            listed.workflows.map { (Project.standardize(listed.folder), $0) }
+            listed.workflows.map { (Folder.standardize(listed.folder), $0) }
         }, uniquingKeysWith: { $1 })
         if workflowPins != flows { workflowPins = flows }
+        let views = Dictionary(listed.compactMap { listed in
+            listed.views.flatMap { $0.isEmpty ? nil : (Folder.standardize(listed.folder), $0) }
+        }, uniquingKeysWith: { $1 })
+        if serverViews != views { serverViews = views }
         for (folder, shelf) in pinShelves {
+            shelf.setViews(serverViews[folder] ?? [])
             shelf.setPins(pins[folder] ?? [])
             shelf.setSessions(sessionPins[folder] ?? [])
             shelf.setWorkflows(workflowPins[folder] ?? [])
         }
     }
 
-    /// One project's pinned workflows' ids (#432), in their order, whether or not this
+    /// One folder's pinned workflows' ids (#432), in their order, whether or not this
     /// client holds them.
     public func pinnedWorkflows(in folder: URL?) -> [String] {
         guard let folder else { return [] }
         return pinShelf(folder).workflows
     }
 
-    /// A project's pinned workflows as a screen left them, before the host says so.
+    /// A folder's pinned workflows as a screen left them, before the host says so.
     public func setWorkflowPins(_ ids: [String], in folder: URL) {
-        let key = Project.standardize(folder)
+        let key = Folder.standardize(folder)
         workflowPins[key] = ids.isEmpty ? nil : ids
         pinShelves[key]?.setWorkflows(ids)
     }
 
-    /// One project's pinned sessions (#180), in their order: ids, whether or not this
+    /// One folder's pinned sessions (#180), in their order: ids, whether or not this
     /// client holds them.
     public func pinnedSessions(in folder: URL?) -> [UUID] {
         guard let folder else { return [] }
         return pinShelf(folder).sessions
     }
 
-    /// A project's pinned sessions as a screen left them, before the host says so.
+    /// A folder's pinned sessions as a screen left them, before the host says so.
     public func setSessionPins(_ ids: [UUID], in folder: URL) {
-        let key = Project.standardize(folder)
+        let key = Folder.standardize(folder)
         sessionPins[key] = ids.isEmpty ? nil : ids
         pinShelves[key]?.setSessions(ids)
     }
 
-    /// A project's pins as a screen left them, before the host says so: a drop, an Unpin.
+    /// A folder's pins as a screen left them, before the host says so: a drop, an Unpin.
     public func setPins(_ list: [PinView], in folder: URL) {
-        let key = Project.standardize(folder)
+        let key = Folder.standardize(folder)
         pins[key] = list.isEmpty ? nil : list
         pinShelves[key]?.setPins(list)
     }
 
-    /// The shelf for a project, filled from what is already held the first time a
+    /// The shelf for a folder, filled from what is already held the first time a
     /// screen asks. A later change updates it in place.
     private func pinShelf(_ folder: URL) -> PinShelf {
-        let key = Project.standardize(folder)
+        let key = Folder.standardize(folder)
         if let shelf = pinShelves[key] { return shelf }
         let shelf = PinShelf()
+        shelf.setViews(serverViews[key] ?? [])
         shelf.setPins(pins[key] ?? [])
         shelf.setSessions(sessionPins[key] ?? [])
         shelf.setWorkflows(workflowPins[key] ?? [])
@@ -901,7 +943,7 @@ public final class AgentsModel {
 
     public func pageRevision(in folder: URL?, path: String? = nil, includesDescendants: Bool = false) -> Int {
         guard let folder else { return 0 }
-        let revisions = pageRevisions[Project.standardize(folder)] ?? [:]
+        let revisions = pageRevisions[Folder.standardize(folder)] ?? [:]
         guard let path else { return revisions.values.reduce(0, +) }
         let parent = (path as NSString).deletingLastPathComponent
         return revisions.reduce(0) { total, event in
@@ -912,11 +954,11 @@ public final class AgentsModel {
         }
     }
 
-    /// The workflows of one project, which is what a project page shows. The first
+    /// The workflows of one folder, which is what a folder page shows. The first
     /// ask makes the shelf; later changes write that shelf and no other (#285).
     public func workflows(in folder: URL?) -> [WorkflowSummary] {
         guard let folder else { return [] }
-        let key = Project.standardize(folder)
+        let key = Folder.standardize(folder)
         if let shelf = workflowShelves[key] { return shelf.summaries }
         let shelf = WorkflowShelf()
         shelf.replace(workflows.filter { $0.folder == key })
@@ -928,29 +970,29 @@ public final class AgentsModel {
     /// updates to unrelated agents do not refilter the global agent list (#215).
     public func workflowRuns(_ workflowID: String, in folder: URL?) -> [Agent] {
         guard let folder else { return [] }
-        let projectFolder = Project.standardize(folder)
-        let key = projectFolder.path + "\n" + workflowID
+        let folderPath = Folder.standardize(folder)
+        let key = folderPath.path + "\n" + workflowID
         if let shelf = workflowRunShelves[key] { return shelf.agents }
         let shelf = WorkflowRunShelf()
-        shelf.replace(agents(inFolder: projectFolder).filter { $0.startedByWorkflow == workflowID })
+        shelf.replace(agents(inFolder: folderPath).filter { $0.startedByWorkflow == workflowID })
         workflowRunShelves[key] = shelf
         return shelf.agents
     }
 
-    public func upsert(_ summary: DaemonAPI.ProjectSummary) {
-        if let index = projects.firstIndex(where: { $0.folder == summary.folder && $0.host == summary.host }) {
-            projects[index] = summary
+    public func upsert(_ summary: DaemonAPI.FolderSummary) {
+        if let index = folders.firstIndex(where: { $0.folder.folder == summary.folder.folder && $0.host == summary.host }) {
+            folders[index] = summary
         } else {
-            projects.append(summary)
+            folders.append(summary)
         }
-        projects.sort(by: SidebarOrder.byAdded)
+        folders.sort(by: SidebarOrder.byAdded)
     }
 
     public func replaceAgents(_ listed: [Agent]) {
         refile(listed.map { $0.keepingLists(of: byID[$0.id]) })
     }
 
-    /// Agents from a list that is not all of them (a project's archived ones, a workflow's
+    /// Agents from a list that is not all of them (a folder's archived ones, a workflow's
     /// runs, the open chat's record), filed beside the rest. A lean one keeps the lists
     /// held for it (#107), as a lean `agent/changed` does (#203).
     ///
@@ -964,37 +1006,37 @@ public final class AgentsModel {
 
     /// Deleted (#677): out of the list. Its sessions went before it, each by its own
     /// `agent/removed`.
-    public func removeProject(_ key: ProjectKey) {
-        projects.removeAll { $0.key == key }
+    public func removeFolder(_ key: FolderKey) {
+        folders.removeAll { $0.key == key }
     }
 
-    public func replaceProjects(_ listed: [DaemonAPI.ProjectSummary]) {
-        projects = listed.sorted(by: SidebarOrder.byAdded)
+    public func replaceFolders(_ listed: [DaemonAPI.FolderSummary]) {
+        folders = listed.sorted(by: SidebarOrder.byAdded)
     }
 
     /// One host's agents, as it just listed them. Every other host's are left alone:
     /// a server re-listing after a reconnect must not take the Mac's away (037).
-    public func replaceAgents(_ listed: [Agent], from host: HostID) {
+    public func replaceAgents(_ listed: [Agent], from host: MachineRef) {
         // A lean list (#107) keeps the lists already held for an agent: the open chat's menus.
         let held = byID.filter { $0.value.host == host }
         let stamped = listed.map { var agent = $0.keepingLists(of: held[$0.id]); agent.host = host; return agent }
         refile(byID.values.filter { $0.host != host } + stamped)
     }
 
-    public func replaceProjects(_ listed: [DaemonAPI.ProjectSummary], from host: HostID) {
+    public func replaceFolders(_ listed: [DaemonAPI.FolderSummary], from host: MachineRef) {
         let stamped = listed.map { var summary = $0; summary.host = host; return summary }
-        projects = (projects.filter { $0.host != host } + stamped).sorted(by: SidebarOrder.byAdded)
+        folders = (folders.filter { $0.host != host } + stamped).sorted(by: SidebarOrder.byAdded)
     }
 
     /// What an offline host last listed (#962), for a client that started while it was down:
     /// taken only when nothing of that host is held, so a live list always wins.
-    public func takeLastHeard(_ heard: DaemonAPI.HostLastHeard) {
-        guard !holdsProjects(of: heard.host) else { return }
+    public func takeLastHeard(_ heard: DaemonAPI.MachineLastHeard) {
+        guard !holdsFolders(of: heard.host) else { return }
         if let agents = heard.agents { replaceAgents(agents, from: heard.host) }
-        if let projects = heard.projects { replaceProjects(projects, from: heard.host) }
+        if let folders = heard.folders { replaceFolders(folders, from: heard.host) }
     }
 
-    public func holdsProjects(of host: HostID) -> Bool { projects.contains { $0.host == host } }
+    public func holdsFolders(of host: MachineRef) -> Bool { folders.contains { $0.host == host } }
 
     /// Down to the budget, never taking the terminal just written to.
     private func dropOldTerminalOutput() {
@@ -1013,38 +1055,38 @@ public final class AgentsModel {
     public func replaceBackupState(_ state: DaemonAPI.BackupState) { backupState = state }
     public func replaceRuntimeAllowances(_ allowances: RuntimeAllowances) { runtimeAllowances = allowances }
     public func replaceHostedMCP(_ snapshot: DaemonAPI.HostedMCPSnapshot) { hostedMCP = snapshot }
-    public func replaceMCPHealth(_ snapshot: DaemonAPI.MCPHealthSnapshot, from host: HostID = .mac) {
+    public func replaceMCPHealth(_ snapshot: DaemonAPI.MCPHealthSnapshot, from host: MachineRef = .mac) {
         mcpHealth[host] = snapshot
     }
 
     /// A host's MCP servers (#753); from a Mac too old to say, its hosted servers alone, as
     /// the page showed them before.
-    public func mcpHealthSnapshot(_ host: HostID = .mac) -> DaemonAPI.MCPHealthSnapshot? {
+    public func mcpHealthSnapshot(_ host: MachineRef = .mac) -> DaemonAPI.MCPHealthSnapshot? {
         if let snapshot = mcpHealth[host] { return snapshot }
         guard host == .mac, let hosted = hostedMCP else { return nil }
         return .init(servers: hosted.servers.map {
-            .init(name: $0.name, project: $0.project, transport: .stdio, hosted: true, live: $0)
+            .init(name: $0.name, folder: $0.folder, transport: .stdio, hosted: true, live: $0)
         }, at: hosted.at)
     }
 
     /// A host's worktrees as `worktrees/all` answered (#790). The sizes heard since are
     /// kept apart, and win: `size(of:on:)`.
-    public func replaceWorktrees(_ listed: [DaemonAPI.ProjectWorktrees], from host: HostID = .mac) {
+    public func replaceWorktrees(_ listed: [DaemonAPI.FolderWorktrees], from host: MachineRef = .mac) {
         worktrees[host] = listed
         // What the list now says is as new as anything heard before it.
         worktreeSizes[host] = nil
     }
 
     /// A worktree's size, the newest heard: from `worktrees/sized`, else its list's.
-    public func size(of worktree: DaemonAPI.WorktreeSummary, on host: HostID = .mac) -> DaemonAPI.WorktreeSize? {
+    public func size(of worktree: DaemonAPI.WorktreeSummary, on host: MachineRef = .mac) -> DaemonAPI.WorktreeSize? {
         worktreeSizes[host]?[worktree.root] ?? worktree.size
     }
 
-    /// A host's worktrees with the sizes heard since filled in, each project's in
-    /// `cleanupOrder`, the projects holding the most idle first.
-    public func worktreesForCleanup(on host: HostID = .mac) -> [DaemonAPI.ProjectWorktrees] {
+    /// A host's worktrees with the sizes heard since filled in, each folder's in
+    /// `cleanupOrder`, the folders holding the most idle first.
+    public func worktreesForCleanup(on host: MachineRef = .mac) -> [DaemonAPI.FolderWorktrees] {
         let sized = (worktrees[host] ?? []).map { group in
-            DaemonAPI.ProjectWorktrees(project: group.project, worktrees: group.worktrees.map { worktree in
+            DaemonAPI.FolderWorktrees(folder: group.folder, worktrees: group.worktrees.map { worktree in
                 var worktree = worktree
                 worktree.size = size(of: worktree, on: host)
                 return worktree
@@ -1056,9 +1098,9 @@ public final class AgentsModel {
         }.map(\.element)
     }
 
-    /// One project's MCP servers (#753), from its host's snapshot.
-    public func mcpServers(in project: ProjectKey) -> [DaemonAPI.MCPServerHealth] {
-        mcpHealthSnapshot(project.host)?.servers(in: project.folder.path) ?? []
+    /// One folder's MCP servers (#753), from its host's snapshot.
+    public func mcpServers(in folder: FolderKey) -> [DaemonAPI.MCPServerHealth] {
+        mcpHealthSnapshot(folder.host)?.servers(in: folder.folder.path) ?? []
     }
     public func replaceLeases(_ snapshot: DaemonAPI.LeaseSnapshot) {
         leases = snapshot
@@ -1150,7 +1192,13 @@ public final class AgentsModel {
 
     /// What an agent is waiting on, in the words its row, card and capsule use.
     public func waitStatus(of agent: Agent) -> WaitStatus? {
-        WaitStatus.of(agent, names: { self.agentTitles[$0] })
+        WaitStatus.of(agent, names: { self.agentTitles[$0] }, lease: leaseStatus(of: agent.id))
+    }
+
+    /// The wait card's lines (#2747): its events in words, sessions by their titles.
+    public func waitEventLines(of agent: Agent) -> [WaitEventLine] {
+        guard let wait = agent.eventWait else { return [] }
+        return WaitEventLine.lines(for: wait, names: { self.agentTitles[$0] })
     }
 
     /// What an agent holds and waits for, in the words the row, the card and the chat
@@ -1291,6 +1339,10 @@ public final class AgentsModel {
     /// A load of the open chat's first page begins: the token its answer is put on
     /// screen with, by `isLatestTranscriptLoad`.
     public func beginTranscriptLoad() -> Int {
+        // A page on its way: only what is heard from now is laid over it. Its page is read
+        // after this, and only the latest load's page is put on screen; one that failed
+        // leaves nothing heard to lay over the next (#2807).
+        heardSincePage = []
         transcriptLoads += 1
         return transcriptLoads
     }
@@ -1307,8 +1359,8 @@ public final class AgentsModel {
     public func replaceTranscript(with page: TranscriptPage) {
         // What was heard was written after the page was read. When an id overlaps, its
         // notification is the newer copy of that entry.
-        entries = Self.entriesKeepingLatest(page.entries + heardSincePage)
-        heardSincePage = []
+        entries = Self.entriesKeepingLatest(page.entries + (heardSincePage ?? []))
+        heardSincePage = nil
         firstEntryIndex = page.firstIndex
         hasMoreBefore = page.firstIndex > openTurnStart
         transcriptLoadFailure = nil
@@ -1342,6 +1394,7 @@ public final class AgentsModel {
 
     public func clearTranscript() {
         entries = []
+        // A chat chosen is a page on its way.
         heardSincePage = []
         transcriptLoadFailure = nil
         firstEntryIndex = 0
@@ -1468,7 +1521,7 @@ public final class AgentsModel {
     }
 
     /// The words, apart from looking anything up: "Asked by “#116 helper” (Claude),
-    /// started by “Project lead”". An untitled agent is named by its runtime alone.
+    /// started by “Folder lead”". An untitled agent is named by its runtime alone.
     public static func askerLine(title: String?, runtime: String, startedBy: String? = nil,
                                  subagent: String? = nil) -> String {
         let title = title?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1484,7 +1537,9 @@ public final class AgentsModel {
     /// was `blocked` and has not cleared. Nil for a running agent even when its report
     /// still says blocked — that is the resumed turn, and it is working.
     public func openBlock(_ agent: Agent) -> (report: WorkReport, block: Block)? {
-        guard agent.state == .finished, let report = agent.report, report.isOpenBlock
+        // Only a wait the app clears by itself (#1916): an old record's block with nothing to
+        // wait on is done, and has no Carry on.
+        guard agent.state == .finished, let report = agent.report, report.isOpenBlock, agent.isWaiting
         else { return nil }
         return (report, report.block ?? Block())
     }
@@ -1518,11 +1573,13 @@ public final class AgentsModel {
             things += (working.isEmpty ? block.waits : working).map { "\u{201C}\(waitName($0))\u{201D}" }
             detail += blockLines(agent)
         }
+        let leases = leaseStatus(of: agent.id)
         if let wait = agent.eventWait, wait.isOpen {
-            things += WaitStatus.things(wait.patterns, names: { self.agentTitles[$0] })
+            things += WaitStatus.things(wait, names: { self.agentTitles[$0] }, lease: leases)
             if let status = waitStatus(of: agent) { detail.append(status.line) }
         }
-        if let lease = leaseStatus(of: agent.id) {
+        // A place in line the wait above says already is not said twice (#2361).
+        if let lease = leases?.without(agent.eventWait) {
             things += lease.waiting.map(\.shortName)
             detail += lease.waitingLines
         }
@@ -1532,22 +1589,20 @@ public final class AgentsModel {
     }
 
     /// What a queued helper's row says in its report's place (#362): "Queued, 2nd", its
-    /// place in its project's queue. Nil for any other agent. Queued agents are under
+    /// place in its folder's queue. Nil for any other agent. Queued agents are under
     /// Waiting, so only that group is counted.
     public func queuedLine(_ agent: Agent) -> String? {
         guard agent.state == .queued else { return nil }
-        let position = HelperLimit.queuePosition(of: agent, among: agents(in: agent.projectFolder, group: .waiting))
+        let position = HelperLimit.queuePosition(of: agent, among: agents(in: agent.folderPath, group: .waiting))
         return HelperLimit.queuedLabel(position: position)
     }
 
     /// The name of the button that ends a block by hand.
     public static let carryOnLabel = "Carry on"
 
-    /// Help for Carry on: Waiting (the app would resume itself) vs Blocked (only the person).
+    /// Help for Carry on, which only a wait has (#1916).
     public static func carryOnHelp(for agent: Agent) -> String {
-        agent.isWaiting
-            ? "Stop waiting and carry on now"
-            : "Tell it the block has cleared, and let it carry on"
+        "Stop waiting and carry on now"
     }
 
     /// Whether a client should offer Stop for this chat: the daemon holds a runtime for
@@ -1589,72 +1644,72 @@ public final class AgentsModel {
         return cell
     }
 
-    /// Which runtime a new agent gets when nobody has said: `RuntimeCatalog.newSessionRuntime`,
-    /// so the Mac, a phone and the page cannot offer different ones (029, #264). Not the
-    /// last agent's runtime any more: a helper an agent started is not the person's choice.
+    /// Which runtime a new agent gets when nobody has said: the most recently active agent's
+    /// runtime on this host, if it can start, then the kept choice, then the first available.
     ///
     /// - Parameters:
     ///   - available: the runtimes that can be started now, in the host's order.
     ///   - kept: the runtime the client's start form was last left on.
-    public func defaultRuntimeID(available: [String], kept: String?) -> String? {
-        RuntimeCatalog.newSessionRuntime(kept: kept, available: available)
+    ///   - host: the machine that will start the new agent.
+    public func defaultRuntimeID(available: [String], kept: String?, host: MachineRef = .mac) -> String? {
+        RuntimeCatalog.newSessionRuntime(lastUsed: lastRuntimes[host], kept: kept, available: available)
     }
 
-    /// The projects worth showing, oldest added first (`SidebarOrder.byAdded`, #357).
-    public var liveProjects: [DaemonAPI.ProjectSummary] {
-        projects.filter { !$0.project.isArchived }
+    /// The folders worth showing, oldest added first (`SidebarOrder.byAdded`, #357).
+    public var liveFolders: [DaemonAPI.FolderSummary] {
+        folders.filter { !$0.folder.isArchived }
     }
 
     /// The archived ones, latest archived first, as the web's (#2153).
-    public var archivedProjects: [DaemonAPI.ProjectSummary] {
-        projects.filter(\.project.isArchived).sorted(by: DaemonAPI.ProjectSummary.byArchived)
+    public var archivedFolders: [DaemonAPI.FolderSummary] {
+        folders.filter(\.folder.isArchived).sorted(by: DaemonAPI.FolderSummary.byArchived)
     }
 
-    public func project(_ key: ProjectKey?) -> DaemonAPI.ProjectSummary? {
+    public func folder(_ key: FolderKey?) -> DaemonAPI.FolderSummary? {
         guard let key else { return nil }
-        return projects.first { $0.host == key.host && $0.folder == key.folder }
+        return folders.first { $0.host == key.host && $0.folder.folder == key.folder }
     }
 
-    /// A project's shelf on one host: its agents by group, and its numbers (#165). A fold
-    /// that reads it is redrawn by its own project's changes only.
-    public func shelf(_ key: ProjectKey?) -> ProjectShelf {
-        guard let key else { return ProjectShelf() }
-        let wanted = ShelfKey(folder: Project.standardize(key.folder), host: key.host)
+    /// A folder's shelf on one host: its agents by group, and its numbers (#165). A fold
+    /// that reads it is redrawn by its own folder's changes only.
+    public func shelf(_ key: FolderKey?) -> FolderShelf {
+        guard let key else { return FolderShelf() }
+        let wanted = ShelfKey(folder: Folder.standardize(key.folder), host: key.host)
         if let shelf = shelves[wanted] { return shelf }
-        let shelf = ProjectShelf()
+        let shelf = FolderShelf()
         shelves[wanted] = shelf
         return shelf
     }
 
     /// The same by folder alone, whichever host it is on: what the phone asks.
-    public func shelf(_ folder: URL?) -> ProjectShelf {
-        guard let folder else { return ProjectShelf() }
-        let wanted = Project.standardize(folder)
+    public func shelf(_ folder: URL?) -> FolderShelf {
+        guard let folder else { return FolderShelf() }
+        let wanted = Folder.standardize(folder)
         if let shelf = folderShelves[wanted] { return shelf }
-        let shelf = ProjectShelf()
+        let shelf = FolderShelf()
         folderShelves[wanted] = shelf
         return shelf
     }
 
-    public func agents(in key: ProjectKey?, group: AgentGroup) -> [Agent] {
+    public func agents(in key: FolderKey?, group: AgentGroup) -> [Agent] {
         guard key != nil else { return [] }
         return shelf(key).groups[group] ?? []
     }
 
-    public func counts(in key: ProjectKey?) -> [AgentGroup: Int] {
+    public func counts(in key: FolderKey?) -> [AgentGroup: Int] {
         guard key != nil else { return [:] }
         return shelf(key).counts
     }
 
-    public func unreadCount(in key: ProjectKey?) -> Int {
+    public func unreadCount(in key: FolderKey?) -> Int {
         guard key != nil else { return 0 }
         return shelf(key).unread
     }
 
-    /// What the Dock badge counts for one project: every session under Needs you or
+    /// What the Dock badge counts for one folder: every session under Needs you or
     /// Blocked. An unread finish does not need the person, so it is not counted (#1565);
     /// it is a mark on the row and in the Unread group.
-    public func attentionCount(in key: ProjectKey?) -> Int {
+    public func attentionCount(in key: FolderKey?) -> Int {
         guard key != nil else { return 0 }
         return shelf(key).attention
     }
@@ -1668,28 +1723,28 @@ public final class AgentsModel {
 
     /// By folder alone, whichever host it is on: what the phone asks, which only ever
     /// holds the Mac's (037 keeps servers off the phone in its first version).
-    public func project(_ folder: URL?) -> DaemonAPI.ProjectSummary? {
+    public func folder(_ folder: URL?) -> DaemonAPI.FolderSummary? {
         guard let folder else { return nil }
-        return projects.first { $0.folder == folder }
+        return folders.first { $0.folder.folder == folder }
     }
 
-    /// The agents of one project, in one group, newest started first (#182).
+    /// The agents of one folder, in one group, newest started first (#182).
     ///
     /// Grouped by `AgentGroup(for:)`, so no client can put an agent under a heading
     /// another client would not.
     ///
     /// The folder is standardised on the way in, because an agent's `cwd` is whatever
-    /// it was started with and a project's folder is the resolved form. Comparing them
-    /// raw is how a project ends up looking empty while its agents are plainly running.
+    /// it was started with and a folder is the resolved form. Comparing them
+    /// raw is how a folder ends up looking empty while its agents are plainly running.
     public func agents(in folder: URL?, group: AgentGroup) -> [Agent] {
         guard folder != nil else { return [] }
         return shelf(folder).groups[group] ?? []
     }
 
-    /// Every agent of one project held, whatever its group.
-    public func agents(inFolder folder: URL?) -> [Agent] {
-        guard folder != nil else { return [] }
-        return shelf(folder).groups.values.flatMap { $0 }
+    /// Every agent of one folder held, whatever its group.
+    public func agents(inFolder: URL?) -> [Agent] {
+        guard let inFolder else { return [] }
+        return shelf(inFolder).groups.values.flatMap { $0 }
     }
 
     // MARK: Filing (#165)
@@ -1698,12 +1753,12 @@ public final class AgentsModel {
     private func file(_ agent: Agent) {
         let old = byID[agent.id]
         if let old, let workflowID = old.startedByWorkflow {
-            workflowRunShelves[Project.standardize(old.projectFolder).path + "\n" + workflowID]?.remove(old.id)
+            workflowRunShelves[Folder.standardize(old.folderPath).path + "\n" + workflowID]?.remove(old.id)
         }
         if let workflowID = agent.startedByWorkflow {
-            workflowRunShelves[Project.standardize(agent.projectFolder).path + "\n" + workflowID]?.upsert(agent)
+            workflowRunShelves[Folder.standardize(agent.folderPath).path + "\n" + workflowID]?.upsert(agent)
         }
-        let folder = agent.projectFolder
+        let folder = agent.folderPath
         let group = group(of: agent)
         byID[agent.id] = agent
         if let starter = agent.startedByAgent { started[starter, default: []].insert(agent.id) }
@@ -1711,6 +1766,8 @@ public final class AgentsModel {
         // copy taken to change was every agent held copied for each change (#213).
         Self.move(agent, from: old, in: &agents)
         if old == nil { agentCount = byID.count }
+        noteLastRuntime(on: agent.host)
+        if let old, old.host != agent.host { noteLastRuntime(on: old.host) }
         if let old, old.state != .archived, agent.state == .archived { archivals &+= 1 }
         // Its shelves: in place when it stays where it was, moved when not.
         let was = filedAs[agent.id]
@@ -1726,7 +1783,7 @@ public final class AgentsModel {
                 shelves[ShelfKey(folder: was.folder, host: was.host)]?.remove(old, from: was.group)
                 folderShelves[was.folder]?.remove(old, from: was.group)
             }
-            shelf(ProjectKey(host: agent.host, folder: folder)).insert(agent, in: group)
+            shelf(FolderKey(host: agent.host, folder: folder)).insert(agent, in: group)
             shelf(folder).insert(agent, in: group)
         }
         filedAs[agent.id] = (folder, agent.host, group)
@@ -1743,12 +1800,32 @@ public final class AgentsModel {
     /// one change to the array and one redraw of its readers, and no copy of it.
     private static func move(_ agent: Agent, from old: Agent?, in all: inout [Agent]) {
         if let old { remove(old, from: &all) }
-        all.insert(agent, at: ProjectShelf.place(of: agent, in: all, by: ProjectShelf.byActivity))
+        all.insert(agent, at: FolderShelf.place(of: agent, in: all, by: FolderShelf.byActivity))
     }
 
     private static func remove(_ old: Agent, from all: inout [Agent]) {
-        let at = ProjectShelf.place(of: old, in: all, by: ProjectShelf.byActivity)
+        let at = FolderShelf.place(of: old, in: all, by: FolderShelf.byActivity)
         if at < all.count, all[at].id == old.id { all.remove(at: at) } else { all.removeAll { $0.id == old.id } }
+    }
+
+    /// One machine's last runtime again, from the front of the list: it stops at that
+    /// machine's newest agent. Set only when it moves, so its readers draw only then.
+    private func noteLastRuntime(on host: MachineRef) {
+        let runtimeID = agents.first { $0.host == host }.map(Self.chosenRuntime)
+        if lastRuntimes[host] != runtimeID { lastRuntimes[host] = runtimeID }
+    }
+
+    /// Every machine's last runtime again, in one pass of the list.
+    private func noteLastRuntimes() {
+        var latest: [MachineRef: String] = [:]
+        for agent in agents where latest[agent.host] == nil { latest[agent.host] = Self.chosenRuntime(agent) }
+        if latest != lastRuntimes { lastRuntimes = latest }
+    }
+
+    /// The runtime the person chose for an agent: Auto for one Auto picked a runtime for
+    /// (#2658), so the next session opens on Auto too.
+    private static func chosenRuntime(_ agent: Agent) -> String {
+        agent.auto == nil ? agent.runtimeID : LevelWords.autoID
     }
 
     /// Agents let go of without being gone: an Archived fold closed, a search ended
@@ -1770,6 +1847,7 @@ public final class AgentsModel {
         guard !removed.isEmpty else { return }
         agents.removeAll { gone.contains($0.id) }
         agentCount = byID.count
+        noteLastRuntimes()
         var titlesChanged = false
         for old in removed { detach(old, titlesChanged: &titlesChanged) }
         if titlesChanged { noteTitlesChanged() }
@@ -1779,10 +1857,11 @@ public final class AgentsModel {
     private func unfile(_ id: UUID) {
         guard let old = byID.removeValue(forKey: id) else { return }
         if let workflowID = old.startedByWorkflow {
-            workflowRunShelves[Project.standardize(old.projectFolder).path + "\n" + workflowID]?.remove(old.id)
+            workflowRunShelves[Folder.standardize(old.folderPath).path + "\n" + workflowID]?.remove(old.id)
         }
         Self.remove(old, from: &agents)
         agentCount = byID.count
+        noteLastRuntime(on: old.host)
         var titlesChanged = false
         detach(old, titlesChanged: &titlesChanged)
         if titlesChanged { noteTitlesChanged() }
@@ -1822,13 +1901,14 @@ public final class AgentsModel {
         for agent in unique.values {
             if let starter = agent.startedByAgent { started[starter, default: []].insert(agent.id) }
         }
-        agents = unique.values.sorted(by: ProjectShelf.byActivity)
+        agents = unique.values.sorted(by: FolderShelf.byActivity)
         agentCount = unique.count
+        noteLastRuntimes()
         filedAs = [:]
         var byKey: [ShelfKey: [AgentGroup: [Agent]]] = [:]
         var byFolder: [URL: [AgentGroup: [Agent]]] = [:]
         for agent in agents {
-            let folder = agent.projectFolder
+            let folder = agent.folderPath
             let group = group(of: agent)
             filedAs[agent.id] = (folder, agent.host, group)
             byKey[ShelfKey(folder: folder, host: agent.host), default: [:]][group, default: []].append(agent)
@@ -1837,7 +1917,7 @@ public final class AgentsModel {
         for (key, groups) in byKey { byKey[key] = groups.sortedInGroupOrder() }
         for (folder, groups) in byFolder { byFolder[folder] = groups.sortedInGroupOrder() }
         for (key, shelf) in shelves where byKey[key] == nil { shelf.replaceAll([:]) }
-        for (key, groups) in byKey { shelf(ProjectKey(host: key.host, folder: key.folder)).replaceAll(groups) }
+        for (key, groups) in byKey { shelf(FolderKey(host: key.host, folder: key.folder)).replaceAll(groups) }
         for (folder, shelf) in folderShelves where byFolder[folder] == nil { shelf.replaceAll([:]) }
         for (folder, groups) in byFolder { shelf(folder).replaceAll(groups) }
         let titles = unique.compactMapValues(\.title)
@@ -1865,13 +1945,13 @@ public final class AgentsModel {
         agent.group()
     }
 
-    /// How many agents of one project are in each group, by this window's own grouping.
+    /// How many agents of one folder are in each group, by this window's own grouping.
     ///
     /// This is what FR-009 means by a count being completed by something that knows.
-    /// The daemon's `ProjectSummary.counts` are computed without knowing whether an
+    /// The daemon's `FolderSummary.counts` are computed without knowing whether an
     /// agent asked to be looked at, because the daemon has no window; this one does,
     /// and the same `group(of:)` that files an agent under a heading counts it here —
-    /// so the number on a project row is the number of rows under the heading, at the
+    /// so the number on a folder row is the number of rows under the heading, at the
     /// same moment, by construction (FR-006, FR-007). "Wants a person" is then
     /// `counts[.needsAttention] > 0` and nothing else, which consults the agent's state
     /// the way the check it replaced never did: a stopped agent that once asked to be
@@ -1881,8 +1961,8 @@ public final class AgentsModel {
         return shelf(folder).counts
     }
 
-    /// How many finished conversations in this project nobody has looked at since,
-    /// whichever group they are under. The number a project row shows in place of
+    /// How many finished conversations in this folder nobody has looked at since,
+    /// whichever group they are under. The number a folder row shows in place of
     /// "complete": a complete chat that has been read is not news.
     public func unreadCount(in folder: URL?) -> Int {
         guard folder != nil else { return 0 }
@@ -1911,18 +1991,18 @@ public final class AgentsModel {
         return elicitations.first { $0.agentID == agentID }
     }
 
-    /// The changes to its project's own files asked in this session (#531): the ones its
-    /// agent made, from the project's summary.
+    /// The changes to its folder's own files asked in this session (#531): the ones its
+    /// agent made, from the folder's summary.
     public func guardedChanges(askedIn agentID: UUID?) -> [GuardedChange] {
         guard let agentID, let agent = agent(agentID) else { return [] }
-        let key = ProjectKey(host: agent.host, folder: agent.projectFolder)
-        return (project(key)?.guardedChanges ?? []).filter { $0.askedIn == agentID }
+        let key = FolderKey(host: agent.host, folder: agent.folderPath)
+        return (folder(key)?.guardedChanges ?? []).filter { $0.askedIn == agentID }
     }
 
-    /// The changes asked of the project itself, on its page (#531): no session to ask them
+    /// The changes asked of the folder itself, on its page (#531): no session to ask them
     /// in, because git brought them or their agents are gone.
-    public func guardedChanges(ofProject key: ProjectKey?) -> [GuardedChange] {
-        (project(key)?.guardedChanges ?? []).filter { $0.askedIn == nil }
+    public func guardedChanges(ofFolder key: FolderKey?) -> [GuardedChange] {
+        (folder(key)?.guardedChanges ?? []).filter { $0.askedIn == nil }
     }
 }
 
@@ -1939,16 +2019,16 @@ public final class WorkflowRunShelf {
 
     func upsert(_ agent: Agent) {
         agents.removeAll { $0.id == agent.id }
-        agents.insert(agent, at: ProjectShelf.place(of: agent, in: agents, by: { $0.createdAt > $1.createdAt }))
+        agents.insert(agent, at: FolderShelf.place(of: agent, in: agents, by: { $0.createdAt > $1.createdAt }))
     }
 
     func remove(_ id: UUID) { agents.removeAll { $0.id == id } }
 }
 
-/// Where a project's shelf is kept: its folder, standardized, and its host.
+/// Where a folder's shelf is kept: its folder, standardized, and its host.
 private struct ShelfKey: Hashable {
     var folder: URL
-    var host: HostID
+    var host: MachineRef
 }
 
 private extension Dictionary where Key == AgentGroup, Value == [Agent] {
@@ -1957,7 +2037,7 @@ private extension Dictionary where Key == AgentGroup, Value == [Agent] {
     func sortedInGroupOrder() -> Self {
         var sorted = self
         for (group, agents) in sorted {
-            sorted[group] = agents.sorted(by: ProjectShelf.order(group))
+            sorted[group] = agents.sorted(by: FolderShelf.order(group))
         }
         return sorted
     }

@@ -4,7 +4,7 @@
 //
 //   node Web/test/walk/accounts840.mjs <WEB_URL> <browser code> <out dir>
 //
-// Expects the host to have one Claude account called Work, and a project, as the run-app walk
+// Expects the host to have one Claude account called Work, and a folder, as the run-app walk
 // leaves them (`rpc.py $ROOT call runtimes/addAccount '{"runtimeID":"claude","name":"Work"}'`).
 
 import { setTimeout as sleep } from "node:timers/promises";
@@ -21,7 +21,7 @@ try {
   await page.focus("textarea");
   await page.type(code);
   await page.press("Connect");
-  await page.waitFor(`document.querySelectorAll(".sidebar .row.project").length >= 1`, 20_000);
+  await page.waitFor(`document.querySelectorAll(".sidebar .row.folder").length >= 1`, 20_000);
 
   await page.eval(`location.hash = "#/a/runtimes"`);
   const rows = () => page.eval(`[...document.querySelectorAll(".runtime-list li .strong")].map((s) => s.textContent)`);
@@ -43,11 +43,13 @@ try {
   check(true, `added: ${JSON.stringify(await rows())}`);
 
   // Remove it again, saying yes to the question.
-  await page.eval(`window.confirm = () => true`);
+  await page.eval(`window.confirm = (m) => { window.asked = m; return true; }`);
   await page.eval(`[...document.querySelectorAll(".runtime-list li")].find((li) => li.querySelector(".strong")?.textContent === "Claude · Personal")
     .querySelector("button:last-of-type").click()`);
   await page.waitFor(`![...document.querySelectorAll(".runtime-list li .strong")].some((s) => s.textContent === "Claude · Personal")`, 60_000);
   check(true, `removed: ${JSON.stringify(await rows())}`);
+  const asked = await page.eval(`window.asked`);
+  check(/^Remove Personal\? Nothing is running on it\. .* This can’t be undone\.$/.test(asked), `asked first: ${asked}`);
 
   // A new session on Claude offers the account.
   await page.eval(`[...document.querySelectorAll(".sidebar a, .sidebar button")].find((e) => e.textContent.trim().endsWith("New Session")).click()`);
@@ -55,7 +57,7 @@ try {
   await page.eval(`(() => { const s = document.querySelector("select[aria-label=Runtime]"); s.value = "claude"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
   await page.waitFor(`document.querySelector("select[aria-label=Account]")`, 10_000);
   const choices = await page.eval(`[...document.querySelector("select[aria-label=Account]").options].map((o) => o.textContent)`);
-  check(JSON.stringify(choices) === JSON.stringify(["Default account", "Work (not signed in)"]), `the Account choices: ${JSON.stringify(choices)}`);
+  check(JSON.stringify(choices) === JSON.stringify(["Your Own Sign-In", "Work · Not signed in"]), `the Account choices: ${JSON.stringify(choices)}`);
   await page.shot(`${out}/web-3-new-session.png`);
   const errors = page.errors ?? [];
   check(errors.length === 0, `no errors on the page: ${JSON.stringify(errors)}`);

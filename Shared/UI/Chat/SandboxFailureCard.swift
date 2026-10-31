@@ -8,6 +8,7 @@ import SwiftUI
 struct SandboxFailureCard: View {
     let record: SandboxFailureRecord
     @Environment(\.chatActions) private var actions
+    @Environment(\.orgSandboxSetBy) private var setBy
     @State private var showsDetail = false
     @State private var isSending = false
 
@@ -43,6 +44,8 @@ struct SandboxFailureCard: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            // Continue without sandbox is not offered: the organisation requires it (#998).
+            if let setBy { OrgPolicyLine(mark: setBy) }
             if isWaiting { answers }
         }
         .padding(14)
@@ -57,7 +60,7 @@ struct SandboxFailureCard: View {
             if let keepStopped = actions.keepStopped {
                 Button(SandboxWords.keepStopped) { Task { await keepStopped() } }
             }
-            if record.recoveryOffered, let go = actions.continueWithoutSandbox {
+            if record.recoveryOffered, setBy == nil, let go = actions.continueWithoutSandbox {
                 Button(SandboxWords.continueWithout) {
                     isSending = true
                     Task { await go(); isSending = false }

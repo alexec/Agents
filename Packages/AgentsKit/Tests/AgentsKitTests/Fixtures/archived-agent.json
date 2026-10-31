@@ -391,7 +391,7 @@
   },
   "startingPoint": {
     "commit": "6bdac5a085c9f11bb361059a5917e9a3ad4bc90b",
-    "repository": "file:///private/fixture/project/"
+    "repository": "file:///private/fixture/folder/"
   },
   "state": "archived",
   "title": "Fixture archived agent",

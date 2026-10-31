@@ -1,6 +1,6 @@
 ---
 name: test-servers
-description: Test agents on servers (037 cloud agents, 058 hosts) end to end — a real Linux box (the agents-devbox Docker container on 127.0.0.1:2222) joining a scratch control plane, or the fake ssh for install failures — by driving a scratch set-up through Add a Server, a server project, a turn, offline and remove. Use whenever a change touches Hosts/, ServerInstaller, HostInstall, the Linux agentsd, files/browse or files/write, the offline strip, Settings ▸ Machines, or anything that says "server" or "host", or when asked to walk, test or prove servers or cloud agents.
+description: Test agents on servers (037 cloud agents, 058 hosts) end to end — a real Linux box (the agents-devbox Docker container on 127.0.0.1:2222) joining a scratch control plane, or the fake ssh for install failures — by driving a scratch set-up through Add a Machine, a server folder, a turn, offline and remove. Use whenever a change touches Hosts/, ServerInstaller, HostInstall, the Linux agentsd, files/browse or files/write, the offline strip, Settings ▸ Machines, or anything that says "server" or "host", or when asked to walk, test or prove servers or cloud agents.
 ---
 
 # Test agents on servers
@@ -29,11 +29,11 @@ own, nothing of this session leaked into what you start, launched behind, never 
 and always stop what you started.
 
 **Never seed from the real root** (`~/Library/Application Support/Agents`) (#228): no copied
-agent records, projects or workflows, on this Mac or copied into the box. A copy carries real
+agent records, folders or workflows, on this Mac or copied into the box. A copy carries real
 runtime sessions and folders, and a scratch host once resumed copies of live agents in the real
 repo. Seed synthetic agents (`.agents/reviews/robustness-performance/tools/rp-seed.py`,
 `scripts/seed-archived.swift`) under the scratch root; `launch.sh` refuses a root holding real
-copies. Projects for this Mac's scratch host go under `$ROOT` (it refuses folders outside it);
+copies. Folders for this Mac's scratch host go under `$ROOT` (it refuses folders outside it);
 a server's `--serve` daemon is not confined.
 
 ```sh
@@ -106,7 +106,7 @@ the control plane at `App/Resources/servers` by itself.
 
 ## 3. The box joins
 
-The command, as Add a Server shows it (frame M), and run on the box:
+The command, as Add a Machine shows it (frame M), and run on the box:
 
 ```sh
 LINE="$("$CONTROL" code --host --command --home $ROOT/control | sed -n 's/^command\t//p')"
@@ -118,7 +118,7 @@ The devbox has no systemd, so the script starts the host detached; `devbox.sh st
 The window lists the box under its own heading. `devbox.sh logs` has the server's side (an
 `uplink:` line says it joined); `$ROOT/control/control.log` has the control plane's.
 
-Install over ssh instead (FR-018a), from the window's Add a Server ▸ Over ssh, or over
+Install over ssh instead (FR-018a), from the window's Add a Machine ▸ Over ssh, or over
 the control plane's socket: when the box's key is not in the known_hosts ssh reads, the first
 `hosts/install` answers `needsTrust` with its fingerprint, and the second, with the fingerprint,
 installs; a key already there goes straight on (#610). `Walk610LiveTests` drives the whole of
@@ -127,12 +127,12 @@ tunnel) against a scratch control plane started with `--control-env AGENTS_SSH_C
 `specs/037-cloud-agents/walk/ssh-options.sh` checks the common ssh options. Check afterwards that no ssh
 process is left on this Mac and that the key is in no file under `$ROOT/control`.
 
-A project and a turn. The prompt box can't be typed into over AX (setting its value does not
+A folder and a turn. The prompt box can't be typed into over AX (setting its value does not
 reach the SwiftUI binding), so send the turn to the server's daemon directly. It is the same
 `agents/start` the window's Send makes, and the window shows the agent live:
 
 ```sh
-$T/server-rpc.sh $ROOT call projects/add '{"folder":"file:///home/agents/src/hello"}'
+$T/server-rpc.sh $ROOT call folders/add '{"folder":"file:///home/agents/src/hello"}'
 $T/server-rpc.sh $ROOT start claude file:///home/agents/src/hello "Read README.md and say what it is, then run uname -a." 120
 $T/server-rpc.sh $ROOT call agents/transcript '{"agentID":"…"}'
 ```
@@ -199,7 +199,7 @@ else is using it.
 
 ## Known gaps (as of 2026-09-30)
 
-- Browser pane and workflows list do not work for server projects yet.
+- Browser pane and workflows list do not work for server folders yet.
 - A Mac file attached to a *new* server agent's first prompt isn't carried over.
 - ~~The window says "Claude stopped answering" for a runtime that isn't signed in on the server.~~
   043: a refused sign-in says so; no sign-in at all asks for a token before starting.

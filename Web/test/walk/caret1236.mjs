@@ -1,9 +1,9 @@
 // The #1236 walk: the agent's caret on a live page on the web, as the window has it. Pairs, opens
-// a project's pinned Markdown page, appends two passages to its file, and reads the page while
+// a folder's pinned Markdown page, appends two passages to its file, and reads the page while
 // the caret types them: a part of the first with the caret after it, the second not there yet,
 // then both whole and no caret. Fails on any error the page throws.
 //
-//   node Web/test/walk/caret1236.mjs <WEB_URL> <browser code> <project folder> <project name> <pin title> <out dir>
+//   node Web/test/walk/caret1236.mjs <WEB_URL> <browser code> <folder> <folder name> <pin title> <out dir>
 
 import { appendFileSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -24,9 +24,9 @@ try {
   await page.focus("textarea");
   await page.type(code);
   await page.press("Connect");
-  await page.waitFor(`document.querySelectorAll(".sidebar .row.project").length >= 1`, 20_000);
+  await page.waitFor(`document.querySelectorAll(".sidebar .row.folder").length >= 1`, 20_000);
   await page.eval(`(() => {
-    const b = [...document.querySelectorAll(".sidebar .row.project .disclosure")].find((d) => d.getAttribute("aria-label").endsWith(" " + ${js(name)}));
+    const b = [...document.querySelectorAll(".sidebar .row.folder .disclosure")].find((d) => d.getAttribute("aria-label").endsWith(" " + ${js(name)}));
     if (b && b.getAttribute("aria-expanded") !== "true") b.click();
   })()`);
   await page.waitFor(`document.querySelectorAll(".sidebar .row.pin").length >= 1`, 10_000);

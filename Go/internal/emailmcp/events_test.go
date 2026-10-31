@@ -246,3 +246,31 @@ func TestReceivedAuthenticatedOnly(t *testing.T) {
 		t.Fatal("authenticated takes true or false")
 	}
 }
+
+// A mail with no From, or with two, still has a sender, one that names no one and passes no
+// DKIM, so its link check refuses it; a from filter hears only a mail with one From.
+func TestAMailWithoutOneFromNamesNoOne(t *testing.T) {
+	f := newFakeMail(t, nil)
+	s := &Events{Mailbox: f.mailbox()}
+	_, cursor := mustPoll(t, s, map[string]any{}, "")
+	_, fromCursor := mustPoll(t, s, map[string]any{"from": "noreply@github.com"}, "")
+
+	signed := "Authentication-Results: mx.example.com; dkim=pass header.d=github.com; dmarc=pass header.from=github.com\n"
+	f.deliver("INBOX", signed+plain("noreply@github.com, x@example.net", fakeUser, "Two", "two"))
+	f.deliver("INBOX", signed+plain("undisclosed:;", fakeUser, "None", "none"))
+
+	events, _ := mustPoll(t, s, map[string]any{}, cursor)
+	if len(events) != 2 {
+		t.Fatalf("events: %v", events)
+	}
+	for _, e := range events {
+		sender, ok := e.(map[string]any)["sender"].(map[string]any)
+		if !ok || sender["channel"] != "email" || sender["identity"] != "" ||
+			sender["dkim"].(map[string]any)["result"] != "none" {
+			t.Fatalf("sender: %v", e)
+		}
+	}
+	if events, _ := mustPoll(t, s, map[string]any{"from": "noreply@github.com"}, fromCursor); len(events) != 0 {
+		t.Fatalf("from filter: %v", events)
+	}
+}

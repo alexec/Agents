@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Which computers run this workflow (#317).
 ///
-/// An empty list is every host that has the project. Choosing a computer writes that
+/// An empty list is every host that has the folder. Choosing a computer writes that
 /// computer's id into the file, and each computer chosen runs it (#2064). Turning the last
 /// one off, or turning Every host on, takes the ids out, which is every host again. A
 /// computer the control plane does not know still shows, as its id, so a save does not drop

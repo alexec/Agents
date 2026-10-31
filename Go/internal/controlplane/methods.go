@@ -1,7 +1,9 @@
 package controlplane
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"os"
@@ -18,6 +20,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 	"github.com/alexec/agents/Go/internal/controlplane/web"
+	"github.com/alexec/agents/Go/internal/controlplane/webpush"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -58,6 +61,8 @@ func newMethods(s *Service) *Methods {
 var own = methodSet(
 	"audit/export",
 	"audit/list",
+	"audit/setSinks",
+	"audit/sinks",
 	"bots/make",
 	"bots/setCaps",
 	"bots/stopRun",
@@ -68,20 +73,29 @@ var own = methodSet(
 	"clients/setActivityToken",
 	"clients/setGrant",
 	"clients/setPushToken",
+	"clients/setWebPush",
 	"clients/startPairing",
 	"clients/stopPairing",
+	"clients/webPushKey",
 	"control/rotate",
 	"control/setAuditDays",
-	"control/setProjectDetection",
+	"control/setFolderDetection",
 	"control/status",
 	"daemon/ping",
 	"devices/forget",
 	"devices/list",
 	"devices/startPairing",
 	"devices/stopPairing",
+	"governance/approvals",
+	"governance/decide",
+	"governance/request",
+	"governance/requests",
+	"governance/revoke",
+	"governance/usage",
 	"groups/list",
 	"groups/remove",
 	"groups/set",
+	"groups/setRole",
 	"hosts/approveJoin",
 	"hosts/checkAgain",
 	"hosts/denyJoin",
@@ -102,29 +116,62 @@ var own = methodSet(
 	"links/list",
 	"links/remove",
 	"links/requests",
+	"orgRoutes/check",
+	"orgRoutes/list",
+	"orgRoutes/mine",
+	"orgRoutes/remove",
+	"orgRoutes/replaceKey",
+	"orgRoutes/set",
 	"people/invite",
 	"people/list",
 	"people/remove",
 	"people/removePreview",
+	"people/removeRequests",
 	"people/setRole",
 	"policy/get",
 	"policy/mine",
 	"policy/raise",
 	"policy/set",
 	"policy/stopAll",
+	"projects/list",
+	"projects/remove",
+	"projects/set",
+	"projects/setSlot",
 	"providers/setGroup",
+	"readApi/list",
+	"readApi/make",
+	"readApi/revoke",
 	"reports/export",
 	"reports/usage",
+	"reports/value",
+	"scim/set",
+	"scim/tokens/list",
+	"scim/tokens/make",
+	"scim/tokens/revoke",
 	"signIn/addToMe",
 	"signIn/approve",
 	"signIn/configure",
 	"signIn/deny",
+	"signIn/discover",
+	"signIn/domains/check",
+	"signIn/domains/claim",
+	"signIn/domains/list",
+	"signIn/domains/preview",
+	"signIn/domains/remove",
+	"signIn/domains/set",
+	"signIn/orgProviders/check",
+	"signIn/orgProviders/list",
+	"signIn/orgProviders/remove",
+	"signIn/orgProviders/set",
+	"signIn/orgStart",
 	"signIn/pair",
 	"signIn/providers",
 	"signIn/removeFromMe",
 	"signIn/requests",
+	"signIn/ticket",
 	"user/removeSecret",
 	"user/secretNames",
+	"user/setAgentConfigFile",
 	"user/setSecret",
 	"user/setSettings",
 	"user/settings",
@@ -156,19 +203,25 @@ func (m *Methods) setFrozen(frozen bool) {
 // writes is ControlMethods.writes: what changes records, refused while frozen. One a
 // line, sorted (#2020).
 var writes = methodSet(
+	"audit/setSinks",
 	"bots/make",
 	"bots/setCaps",
 	"clients/forget",
 	"clients/setActivityToken",
 	"clients/setPushToken",
+	"clients/setWebPush",
 	"clients/startPairing",
 	"control/rotate",
 	"control/setAuditDays",
-	"control/setProjectDetection",
+	"control/setFolderDetection",
 	"devices/forget",
 	"devices/startPairing",
+	"governance/decide",
+	"governance/request",
+	"governance/revoke",
 	"groups/remove",
 	"groups/set",
+	"groups/setRole",
 	"hosts/approveJoin",
 	"hosts/denyJoin",
 	"hosts/detect",
@@ -182,20 +235,40 @@ var writes = methodSet(
 	"links/approve",
 	"links/deny",
 	"links/remove",
+	"orgRoutes/remove",
+	"orgRoutes/replaceKey",
+	"orgRoutes/set",
 	"people/invite",
 	"people/remove",
 	"people/setRole",
 	"policy/raise",
 	"policy/set",
 	"policy/stopAll",
+	"projects/remove",
+	"projects/set",
+	"projects/setSlot",
 	"providers/setGroup",
+	"readApi/make",
+	"readApi/revoke",
 	"reports/setPolicy",
+	"scim/set",
+	"scim/tokens/make",
+	"scim/tokens/revoke",
 	"signIn/addToMe",
 	"signIn/approve",
 	"signIn/configure",
 	"signIn/deny",
+	"signIn/domains/check",
+	"signIn/domains/claim",
+	"signIn/domains/remove",
+	"signIn/domains/set",
+	"signIn/orgProviders/remove",
+	"signIn/orgProviders/set",
+	"signIn/orgStart",
 	"signIn/removeFromMe",
+	"signIn/ticket",
 	"user/removeSecret",
+	"user/setAgentConfigFile",
 	"user/setSecret",
 	"user/setSettings",
 )
@@ -213,8 +286,8 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return nil, noSSHHere
 	}
 	// Another user's machine is not there (#994, FR-018); bots/stopRun names a bot's, an
-	// admin's to stop (#1761).
-	if method != "bots/stopRun" {
+	// admin's to stop (#1761), and console/stopAgent anyone's, an admin's to stop (#2019, M9).
+	if method != "bots/stopRun" && method != "console/stopAgent" {
 		if err := m.refuseOthersHosts(params, from); err != nil {
 			return nil, err
 		}
@@ -246,22 +319,31 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 			}
 		}
 		return out, nil
-	case "people/list", "people/invite", "people/setRole", "people/remove", "people/removePreview":
+	case "people/list", "people/invite", "people/setRole", "people/remove", "people/removePreview", "people/removeRequests":
 		return m.peopleMethod(ctx, method, params, from)
-	case "groups/list", "groups/set", "groups/remove", "providers/setGroup":
+	case "groups/list", "groups/set", "groups/remove", "groups/setRole", "providers/setGroup":
 		return m.groupsMethod(ctx, method, params, from)
+	case "projects/list", "projects/set", "projects/remove", "projects/setSlot":
+		return m.projectsMethod(ctx, method, params, from)
+	case "scim/set", "scim/tokens/list", "scim/tokens/make", "scim/tokens/revoke":
+		return m.scimMethod(ctx, method, params, from)
 	case "bots/make", "bots/setCaps", "bots/stopRun":
 		return m.botsMethod(ctx, method, params, from)
 	case "policy/get", "policy/mine", "policy/set", "policy/stopAll", "policy/raise":
 		return m.policyMethod(ctx, method, params, from)
+	case "orgRoutes/mine", "orgRoutes/list", "orgRoutes/set", "orgRoutes/replaceKey", "orgRoutes/check", "orgRoutes/remove":
+		return m.orgRoutesMethod(ctx, method, params, from)
 	case "links/list", "links/requests", "links/approve", "links/deny", "links/remove":
 		return m.linksMethod(ctx, method, params, from)
 	case "signIn/providers", "signIn/pair", "signIn/addToMe", "signIn/removeFromMe", "signIn/configure",
-		"signIn/requests", "signIn/approve", "signIn/deny":
+		"signIn/requests", "signIn/approve", "signIn/deny", "signIn/discover", "signIn/orgStart", "signIn/ticket",
+		"signIn/orgProviders/check", "signIn/orgProviders/list", "signIn/orgProviders/remove", "signIn/orgProviders/set",
+		"signIn/domains/check", "signIn/domains/claim", "signIn/domains/list", "signIn/domains/preview",
+		"signIn/domains/remove", "signIn/domains/set":
 		return m.signInMethod(ctx, method, params, from)
-	case "reports/usage", "reports/export":
+	case "reports/usage", "reports/export", "reports/value":
 		return m.reportMethod(ctx, method, params, from)
-	case "user/settings", "user/setSettings", "user/setSecret", "user/removeSecret", "user/secretNames":
+	case "user/settings", "user/setAgentConfigFile", "user/setSettings", "user/setSecret", "user/removeSecret", "user/secretNames":
 		return m.userMethod(ctx, method, params, from)
 	case "hosts/joinRequests":
 		return m.s.joins.list(ctx, m.callerPerson(from))
@@ -350,6 +432,22 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 			return nil, err
 		}
 		return map[string]any{}, nil
+	case "clients/setWebPush":
+		request, err := require[wire.WebPushSubscription](params, "WebPushSubscription")
+		if err != nil {
+			return nil, err
+		}
+		if err := m.setWebPush(ctx, from.Client, request); err != nil {
+			return nil, err
+		}
+		return map[string]any{}, nil
+	case "clients/webPushKey":
+		key := wire.WebPushKey{}
+		if m.s.webPush != nil {
+			public := m.s.webPush.sender.PublicKey()
+			key.PublicKey = &public
+		}
+		return key, nil
 	case "clients/setActivityToken":
 		request, err := require[wire.ActivityToken](params, "ActivityToken")
 		if err != nil {
@@ -361,7 +459,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return map[string]any{}, nil
 	case "hosts/startEnroll":
 		// With as, a machine for a bot, which an admin enrols (#1761, FR-030).
-		var enroll wire.HostEnroll
+		var enroll wire.MachineEnroll
 		json.Unmarshal(params, &enroll)
 		if bot := deref(enroll.As); bot != "" {
 			if !m.s.isAdmin(m.callerPerson(from)) {
@@ -382,7 +480,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		json.Unmarshal(params, &p)
 		return m.s.installer.SSHHosts(ctx, strings.TrimSpace(deref(p.Destination)))
 	case "hosts/update":
-		request, err := require[wire.HostUpdate](params, "HostUpdate")
+		request, err := require[wire.MachineUpdate](params, "MachineUpdate")
 		if err != nil {
 			return nil, err
 		}
@@ -392,17 +490,23 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		}
 		return m.s.installer.Update(ctx, request, h.Name)
 	case "hosts/checkAgain":
-		request, err := require[wire.HostRequest](params, "HostRequest")
+		request, err := require[wire.MachineRequest](params, "MachineRequest")
 		if err != nil {
 			return nil, err
 		}
 		return map[string]any{}, m.s.installer.CheckAgain(ctx, string(request.Host))
 	case "audit/list", "audit/export", "control/setAuditDays":
 		return m.auditMethod(ctx, method, params, from)
+	case "audit/sinks", "audit/setSinks":
+		return m.auditSinksMethod(ctx, method, params, from)
+	case "governance/usage", "governance/request", "governance/requests", "governance/decide", "governance/approvals", "governance/revoke":
+		return m.governanceMethod(ctx, method, params, from)
+	case "readApi/list", "readApi/make", "readApi/revoke":
+		return m.readAPIMethod(ctx, method, params, from)
 	case "control/rotate":
 		return wire.Empty{}, m.s.rotate(ctx, from)
-	case "control/setProjectDetection":
-		request, err := require[wire.ProjectDetection](params, "ProjectDetection")
+	case "control/setFolderDetection":
+		request, err := require[wire.FolderDetection](params, "FolderDetection")
 		if err != nil {
 			return nil, err
 		}
@@ -414,7 +518,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		}
 		request.Paths = paths
 		raw, _ := json.Marshal(request)
-		if _, err := m.records.ChangeSettings(ctx, func(s *records.Settings) { s.ProjectDetection = raw }); err != nil {
+		if _, err := m.records.ChangeSettings(ctx, func(s *records.Settings) { s.FolderDetection = raw }); err != nil {
 			return nil, err
 		}
 		return request, nil
@@ -456,7 +560,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		m.s.announce("hostEnrolled", string(request.Host), from.Client)
 		return map[string]any{}, nil
 	case "hosts/setRelay":
-		request, err := require[wire.HostRelayRequest](params, "HostRelayRequest")
+		request, err := require[wire.MachineRelayRequest](params, "MachineRelayRequest")
 		if err != nil {
 			return nil, err
 		}
@@ -466,7 +570,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		m.s.announce("hostEnrolled", string(request.Host), from.Client)
 		return map[string]any{}, nil
 	case "hosts/remove":
-		request, err := require[wire.HostRequest](params, "HostRequest")
+		request, err := require[wire.MachineRequest](params, "MachineRequest")
 		if err != nil {
 			return nil, err
 		}
@@ -480,7 +584,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		}
 		return map[string]any{}, nil
 	case "hosts/lastHeard":
-		request, err := require[wire.HostRequest](params, "HostRequest")
+		request, err := require[wire.MachineRequest](params, "MachineRequest")
 		if err != nil {
 			return nil, err
 		}
@@ -492,14 +596,14 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 	}
 	if workspaceMethods[method] {
 		if m.s.providers == nil {
-			return nil, fail(providersNeedOneCopy, "Workspace providers need a control plane with one copy, for now.")
+			return nil, fail(providersNeedOneCopy, "Machine providers need a control plane with one copy, for now.")
 		}
 		return m.s.providers.Answer(method, params, providersCaller(from))
 	}
 	return nil, notFound(method)
 }
 
-// workspaceMethods is DaemonAPI.Method.workspaceMethods: workspace providers (#691).
+// workspaceMethods is DaemonAPI.Method.workspaceMethods: machine providers (#691).
 var workspaceMethods = providers.WorkspaceMethods
 
 func (m *Methods) status(from Caller) wire.ControlStatus {
@@ -507,7 +611,7 @@ func (m *Methods) status(from Caller) wire.ControlStatus {
 	if settings == nil {
 		settings = &records.Settings{Name: m.s.cfg.Name, MachineID: m.s.cfg.MachineID}
 	}
-	status := wire.ControlStatus{Name: settings.Name, Version: m.s.cfg.Version, HomeHost: (*wire.HostID)(settings.HomeHost),
+	status := wire.ControlStatus{Name: settings.Name, Version: m.s.cfg.Version, HomeHost: (*wire.MachineRef)(settings.HomeHost),
 		MachineID: settings.MachineID, StartedAt: new(dateOf(m.s.started)), Port: new(int64(m.s.cfg.Port)),
 		You: optional(wire.UUID(from.Client)), Person: m.me(from)}
 	if command := m.s.joinCommand(m.callerPerson(from)); command != "" {
@@ -532,13 +636,13 @@ func (m *Methods) status(from Caller) wire.ControlStatus {
 	// As control.json has it, read as Swift's ControlStatus reads it; the standard where
 	// it has none.
 	detection := standardDetection
-	if len(settings.ProjectDetection) > 0 {
-		var kept wire.ProjectDetection
-		if json.Unmarshal(settings.ProjectDetection, &kept) == nil {
+	if len(settings.FolderDetection) > 0 {
+		var kept wire.FolderDetection
+		if json.Unmarshal(settings.FolderDetection, &kept) == nil {
 			detection = kept
 		}
 	}
-	status.ProjectDetection = &detection
+	status.FolderDetection = &detection
 	needed := requiredNow(m.router.Team())
 	status.Capabilities, status.Required = capabilities(), &needed
 	away := false
@@ -563,8 +667,8 @@ func (m *Methods) SetWeb(status *web.Status) {
 
 // hostList is the caller's own machines (#994): another's are in People, by name and
 // state only.
-func (m *Methods) hostList(from Caller) []wire.ControlHost {
-	out := []wire.ControlHost{}
+func (m *Methods) hostList(from Caller) []wire.ControlMachine {
+	out := []wire.ControlMachine{}
 	for _, h := range m.records.Hosts() {
 		if m.owns(from, h.ID) {
 			out = append(out, m.hostRow(h))
@@ -576,17 +680,25 @@ func (m *Methods) hostList(from Caller) []wire.ControlHost {
 // removeHost takes a machine off the control plane: hosts/remove, or with its person.
 func (m *Methods) removeHost(ctx context.Context, host string, from Caller) (bool, error) {
 	owner, name := m.s.ownerOf(host), host
-	if h := m.records.Host(host); h != nil && h.Name != "" {
-		name = h.Name
+	var held []wire.OrgRouteVersion
+	if h := m.records.Host(host); h != nil {
+		if h.Name != "" {
+			name = h.Name
+		}
+		held = appliedOrgRoutes(*h)
 	}
 	gone, err := m.records.RemoveHost(ctx, host)
 	if err != nil || !gone {
 		return gone, err
 	}
-	// No more secrets go to it, and its person hears which it had (FR-026).
+	// No more secrets go to it, and its person hears which it had (FR-026); its person
+	// and the admins hear which org routes it held (#999).
 	defer m.s.machineLeft(host, owner, name)
+	defer m.s.orgRoutesLeft(host, owner, name, held)
 	m.router.ForgetHost(host)
 	m.s.copies.forget(host)
+	// What it said it had from a catalogue (#2019, M5).
+	_ = m.s.cfg.Store.Delete(ctx, governanceHostKey(host))
 	if m.s.providers != nil && m.s.providers.Kept() != nil {
 		m.s.providers.Kept().Forget(host)
 	}
@@ -596,9 +708,9 @@ func (m *Methods) removeHost(ctx context.Context, host string, from Caller) (boo
 }
 
 // hostRow is one hosts/list row, as it stands now.
-func (m *Methods) hostRow(h records.HostRecord) wire.ControlHost {
+func (m *Methods) hostRow(h records.MachineRecord) wire.ControlMachine {
 	state, _ := m.router.Described(h.ID)["state"].(string)
-	row := wire.ControlHost{ID: wire.HostID(h.ID), Name: h.Name, Platform: h.Platform, Version: h.Version, State: state,
+	row := wire.ControlMachine{ID: wire.MachineRef(h.ID), Name: h.Name, Platform: h.Platform, Version: h.Version, State: state,
 		Reach: "dialOut", MachineID: h.MachineID, Relay: h.Relay, SignInFrom: hostIDs(m.sameUsers(h.ID, h.SignInFrom)),
 		GitFrom: hostIDs(m.sameUsers(h.ID, h.GitFrom)),
 		Owner:   optional(m.s.ownerOf(h.ID))}
@@ -614,7 +726,7 @@ func (m *Methods) hostRow(h records.HostRecord) wire.ControlHost {
 	}
 	m.mu.Lock()
 	for server, ask := range m.gitAsks[h.ID] {
-		row.GitAsks = append(row.GitAsks, wire.GitAsk{Server: server, From: wire.HostID(ask.from)})
+		row.GitAsks = append(row.GitAsks, wire.GitAsk{Server: server, From: wire.MachineRef(ask.from)})
 	}
 	m.mu.Unlock()
 	sort.Slice(row.GitAsks, func(i, j int) bool { return row.GitAsks[i].Server < row.GitAsks[j].Server })
@@ -704,7 +816,7 @@ func (m *Methods) NoteEpoch(ctx context.Context, id controllink.Identity, epoch 
 			return true
 		})
 	case 'h':
-		m.records.ChangeHost(ctx, id.ID, func(h *records.HostRecord) bool {
+		m.records.ChangeHost(ctx, id.ID, func(h *records.MachineRecord) bool {
 			if h.KnownEpoch != nil && *h.KnownEpoch == epoch {
 				return false
 			}
@@ -829,6 +941,63 @@ func withActivityToken(list []records.ActivityToken, agent string, token *record
 	return out
 }
 
+// setWebPush is clients/setWebPush (#1486): a browser's own Web Push subscription, kept
+// in its own record, as setPushToken keeps a device's APNs token. Only the browser itself
+// sets it, over its own session.
+func (m *Methods) setWebPush(ctx context.Context, client string, request wire.WebPushSubscription) error {
+	var subscription *records.WebPushSubscription
+	if request.Endpoint != nil && *request.Endpoint != "" {
+		if m.s.webPush == nil {
+			return fail(notSupported, "This control plane sends no Web Push: it has no VAPID key.")
+		}
+		if len(*request.Endpoint) > 2048 || !webpush.KnownService(*request.Endpoint) {
+			return fail(invalidParams, "A push endpoint is an https address at a browser's push service.")
+		}
+		var p256dh, auth []byte
+		if request.P256dh != nil {
+			p256dh, _ = base64.RawURLEncoding.DecodeString(strings.TrimRight(*request.P256dh, "="))
+		}
+		if request.Auth != nil {
+			auth, _ = base64.RawURLEncoding.DecodeString(strings.TrimRight(*request.Auth, "="))
+		}
+		subscription = &records.WebPushSubscription{Endpoint: *request.Endpoint, P256dh: p256dh, Auth: auth}
+		if _, err := webpush.Seal(webPushOf(subscription), nil); err != nil {
+			return fail(invalidParams, "Those are not a browser's push keys.")
+		}
+	}
+	for try := 0; ; try++ {
+		record := m.records.Client(client)
+		if record == nil {
+			return fail(invalidParams, "This client is not paired.")
+		}
+		if record.Kind != records.KindBrowser {
+			return fail(notSupported, "Only a browser gets Web Push.")
+		}
+		if sameWebPush(record.WebPush, subscription) {
+			return nil
+		}
+		err := m.records.ChangeClient(ctx, client, func(c *records.ClientRecord) bool {
+			c.WebPush = subscription
+			return true
+		})
+		var conflict *store.ConflictError
+		if !errors.As(err, &conflict) || try > 0 {
+			return err
+		}
+		// Another copy wrote it first: read it again and try once more.
+		if err := m.records.Load(ctx); err != nil {
+			return err
+		}
+	}
+}
+
+func sameWebPush(a, b *records.WebPushSubscription) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.Endpoint == b.Endpoint && bytes.Equal(a.P256dh, b.P256dh) && bytes.Equal(a.Auth, b.Auth)
+}
+
 func samePushToken(a, b *records.PushToken) bool {
 	if a == nil || b == nil {
 		return a == b
@@ -838,7 +1007,7 @@ func samePushToken(a, b *records.PushToken) bool {
 
 // setRelay is hosts/setRelay or relay/switch (#824): a relay switched on or off, keeping
 // its enrolment.
-func (m *Methods) setRelay(ctx context.Context, request wire.HostRelayRequest) error {
+func (m *Methods) setRelay(ctx context.Context, request wire.MachineRelayRequest) error {
 	host := string(request.Host)
 	record := m.records.Host(host)
 	if record == nil {
@@ -860,21 +1029,39 @@ func (m *Methods) setRelay(ctx context.Context, request wire.HostRelayRequest) e
 	return nil
 }
 
+// startsWork is what a machine says that starts work or uses its person's access, refused
+// while its person is suspended (D13). What it says to stop their work still goes. One a
+// line, sorted (#2020).
+var startsWork = methodSet(
+	"backups/commit",
+	"backups/upload",
+	"git/credential",
+	"links/check",
+	"tunnel/open",
+	"workflows/claimRun",
+	"workflows/trigger",
+)
+
 func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, error) {
 	ctx := context.Background()
+	if startsWork[method] && m.s.suspended(m.s.ownerOf(host)) {
+		return nil, fail(personSuspended, "This machine's person was suspended by their organisation.")
+	}
 	switch method {
 	case "control/ping":
 		return map[string]any{}, nil
+	case "user/setAgentConfigFile":
+		return nil, agentConfigFileRefused()
 	case "host/hello":
-		hello, err := require[wire.HostHello](params, "HostHello")
+		hello, err := require[wire.MachineHello](params, "MachineHello")
 		if err != nil {
 			return nil, err
 		}
 		return map[string]any{}, m.hello(ctx, host, hello)
-	case "projects/detected":
-		// Once: from now on its projects are the person's to add and remove (#429).
-		if record := m.records.Host(host); record != nil && record.DetectProjects != nil && *record.DetectProjects {
-			record.DetectProjects = nil
+	case "folders/detected":
+		// Once: from now on its folders are the person's to add and remove (#429).
+		if record := m.records.Host(host); record != nil && record.DetectFolders != nil && *record.DetectFolders {
+			record.DetectFolders = nil
 			if err := m.records.SaveHost(ctx, *record); err != nil {
 				return nil, err
 			}
@@ -886,7 +1073,7 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 		if err != nil {
 			return nil, err
 		}
-		if err := m.setRelay(ctx, wire.HostRelayRequest{Host: wire.HostID(host), Relay: request.Relay}); err != nil {
+		if err := m.setRelay(ctx, wire.MachineRelayRequest{Host: wire.MachineRef(host), Relay: request.Relay}); err != nil {
 			return nil, err
 		}
 		m.s.announce("hostEnrolled", host, host)
@@ -894,12 +1081,50 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 	case "attention/need":
 		m.s.heard(host, params)
 		return map[string]any{}, nil
+	case "notices/take":
+		// The person's one bucket of notices, for every machine of theirs (#2859).
+		limits, err := require[wire.NoticeLimits](params, "NoticeLimits")
+		if err != nil {
+			return nil, err
+		}
+		if m.s.users == nil {
+			return nil, fail(notSupported, "This control plane keeps no user settings.")
+		}
+		return m.s.users.TakeNotice(ctx, m.s.ownerOf(host), limits)
+	case "user/setNoticeLimits":
+		// The one part a machine may set (#2859): its person's Burst and Cool-down, which
+		// run nothing on the person's other machines.
+		limits, err := require[wire.NoticeLimits](params, "NoticeLimits")
+		if err != nil {
+			return nil, err
+		}
+		if m.s.users == nil {
+			return nil, fail(notSupported, "This control plane keeps no user settings.")
+		}
+		user := m.s.ownerOf(host)
+		changed, err := m.s.users.SetNoticeLimits(ctx, user, limits)
+		if err != nil {
+			return nil, userFailure(err)
+		}
+		if changed {
+			m.s.userChanged(user, []wire.UserSettingsPartName{wire.UserSettingsPartNameNotifications}, false, host)
+		}
+		return map[string]any{}, nil
 	case "host/policyApplied":
 		applied, err := require[wire.PolicyApplied](params, "PolicyApplied")
 		if err != nil {
 			return nil, err
 		}
 		return map[string]any{}, m.s.policyApplied(ctx, host, applied)
+	case "host/orgRoutesApplied":
+		applied, err := require[wire.OrgRoutesApplied](params, "OrgRoutesApplied")
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{}, m.s.orgRoutesApplied(ctx, host, applied)
+	case "host/orgRoutesAgain":
+		m.s.orgRoutesAgain(host)
+		return map[string]any{}, nil
 	case "attention/turn":
 		turn, err := require[wire.AttentionTurn](params, "AttentionTurn")
 		if err != nil {
@@ -907,6 +1132,18 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 		}
 		m.s.turnMoved(turn)
 		return map[string]any{}, nil
+	case "governance/report":
+		report, err := require[wire.MachineCatalog](params, "MachineCatalog")
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{}, m.s.keepGovernanceReport(ctx, host, report, time.Now())
+	case "projects/joined":
+		joined, err := require[wire.ProjectsJoined](params, "ProjectsJoined")
+		if err != nil {
+			return nil, err
+		}
+		return m.s.keepJoined(ctx, host, joined)
 	case "usage/rollup":
 		rollup, err := require[wire.UsageRollup](params, "UsageRollup")
 		if err != nil {
@@ -943,12 +1180,12 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 			return nil, err
 		}
 		return m.s.links.check(ctx, sender)
-	case "host/workspaces", "host/providerDraft", "host/status":
+	case "host/machines", "host/providerDraft", "host/status":
 		if m.s.providers == nil {
 			if method == "host/status" {
 				return map[string]any{}, nil
 			}
-			return nil, fail(providersNeedOneCopy, "Workspace providers need a control plane with one copy, for now.")
+			return nil, fail(providersNeedOneCopy, "Machine providers need a control plane with one copy, for now.")
 		}
 		return m.s.providers.HostSaid(host, method, params)
 	case "backups/stored", "backups/upload", "backups/commit", "backups/download":
@@ -988,9 +1225,9 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 
 // hello is host/hello: what the host says it is now, written only when it changed
 // something, and the home host settled.
-func (m *Methods) hello(ctx context.Context, host string, hello wire.HostHello) error {
+func (m *Methods) hello(ctx context.Context, host string, hello wire.MachineHello) error {
 	known := m.records.Host(host)
-	said := func(record *records.HostRecord) {
+	said := func(record *records.MachineRecord) {
 		record.Version = hello.Version
 		record.Platform = hello.Platform
 		mid := hello.MachineID
@@ -1023,7 +1260,7 @@ func (m *Methods) hello(ctx context.Context, host string, hello wire.HostHello) 
 	// (hosts/setRelay). A host's own hello never makes it a relay (T102).
 	changed := known == nil
 	if known == nil {
-		record := records.HostRecord{ID: host, Name: host}
+		record := records.MachineRecord{ID: host, Name: host}
 		said(&record)
 		if err := m.records.SaveHost(ctx, record); err != nil {
 			return err
@@ -1031,7 +1268,7 @@ func (m *Methods) hello(ctx context.Context, host string, hello wire.HostHello) 
 	} else {
 		// Changed on the record as it is when written: a connect noting its epoch at the
 		// same moment is kept (#1763).
-		err := m.records.ChangeHost(ctx, host, func(record *records.HostRecord) bool {
+		err := m.records.ChangeHost(ctx, host, func(record *records.MachineRecord) bool {
 			before := *record
 			said(record)
 			changed = !sameHost(before, *record)
@@ -1063,6 +1300,10 @@ func (m *Methods) hello(ctx context.Context, host string, hello wire.HostHello) 
 			}
 		}
 	}
+	// A suspended person's machine that cannot stop their work is refused (#1002, FR-018).
+	if err := m.s.refuseSuspendedHost(host, hello.Capabilities); err != nil {
+		return err
+	}
 	m.noteCapabilities(host, hello.Capabilities, hello.Version)
 	if changed {
 		m.router.BroadcastHost(host, "control/hostChanged", m.router.Described(host))
@@ -1072,10 +1313,16 @@ func (m *Methods) hello(ctx context.Context, host string, hello wire.HostHello) 
 	} else {
 		m.s.tellHostClients(host)
 	}
+	// Whether its person is suspended, before anything they set (#1002, FR-018).
+	m.s.sendUserSuspended(host)
 	// Its person's settings and secrets, at every join (#1760, FR-024).
 	go m.s.sendUserSettings(host, true)
 	// The organisation's policy, or none, at every join (#998, FR-006).
 	go m.s.sendPolicy(host, true)
+	// The organisation's routes it may use, or none, at every join (#999, FR-005).
+	go m.s.sendOrgRoutes(host, true)
+	// The release it names, for a Mac's Agents Host to update itself to (#2178).
+	go m.s.sendRelease(host)
 	// Its user, their kind and labels (#1761); a bot's cap is weighed again.
 	go func() {
 		m.s.sendHostUser(host)
@@ -1085,18 +1332,18 @@ func (m *Methods) hello(ctx context.Context, host string, hello wire.HostHello) 
 			m.s.botMachineJoined(host)
 		}
 	}()
-	// A host marked before #656 to add the projects it found: the mark goes, unsaid.
-	m.records.ChangeHost(ctx, host, func(r *records.HostRecord) bool {
-		if r.DetectProjects == nil || !*r.DetectProjects {
+	// A host marked before #656 to add the folders it found: the mark goes, unsaid.
+	m.records.ChangeHost(ctx, host, func(r *records.MachineRecord) bool {
+		if r.DetectFolders == nil || !*r.DetectFolders {
 			return false
 		}
-		r.DetectProjects = nil
+		r.DetectFolders = nil
 		return true
 	})
 	return nil
 }
 
-func sameHost(a, b records.HostRecord) bool {
+func sameHost(a, b records.MachineRecord) bool {
 	x, _ := records.Encode(a)
 	y, _ := records.Encode(b)
 	return string(x) == string(y)
@@ -1315,7 +1562,7 @@ func (m *Methods) sayHostChanged(host string) {
 
 // readJoinFile is HostJoinFile.read: how this Mac's host's join stands, from its root's
 // control-join.json, while the process that wrote it lives.
-func readJoinFile(file string) *HostJoinStatus {
+func readJoinFile(file string) *MachineJoinStatus {
 	data, err := os.ReadFile(file)
 	if err != nil {
 		return nil
@@ -1335,6 +1582,6 @@ func readJoinFile(file string) *HostJoinStatus {
 	if err := syscall.Kill(read.PID, 0); err != nil && err != syscall.EPERM {
 		return nil
 	}
-	return &HostJoinStatus{Member: read.Status.Member, Connected: read.Status.Connected, Problem: read.Status.Problem,
+	return &MachineJoinStatus{Member: read.Status.Member, Connected: read.Status.Connected, Problem: read.Status.Problem,
 		At: dateOf(read.Status.At)}
 }

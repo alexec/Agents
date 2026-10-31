@@ -1,9 +1,9 @@
 import Foundation
 
-/// The workspace providers a phone or a browser can add (#1808, #1819): those that work
+/// The machine providers a phone or a browser can add (#1808, #1819): those that work
 /// through their API with a token (#1119). A CLI preset needs its CLI signed in where the
 /// control plane runs, and somebody who starts on a phone has no shell there. The web page
-/// says the same in `Web/src/model/workspaceProviders.ts`; the window's `AddProviderSheet`
+/// says the same in `Web/src/model/machineProviders.ts`; the window's `AddProviderSheet`
 /// offers these and more.
 public enum APIProviderKind: String, CaseIterable, Identifiable, Sendable {
     case digitalOcean, codespaces, coder, aws, compute
@@ -79,7 +79,7 @@ public enum APIProviderKind: String, CaseIterable, Identifiable, Sendable {
              Field(id: "user", label: "ssh user", value: "ec2-user")]
         case .compute:
             [Field(id: "serviceKey", label: "Service account key (JSON)", isSecret: true, isLong: true),
-             Field(id: "project", label: "Project"),
+             Field(id: "folder", label: "Folder"),
              Field(id: "zone", label: "Zone", prompt: "europe-west2-a"),
              Field(id: "label", label: "Label", value: "agents"),
              Field(id: "user", label: "ssh user", value: "agents"),
@@ -153,24 +153,24 @@ public enum APIProviderKind: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// Settings ▸ Workspace providers' words on a phone and on the web (#1808, #1819).
-public enum WorkspaceProviderWords {
-    public static let heading = "Workspace providers"
+/// Settings ▸ Machine providers' words on a phone and on the web (#1808, #1819).
+public enum MachineProviderWords {
+    public static let heading = "Machine providers"
     public static let footer = "A provider starts and stops your machines: DigitalOcean Droplets, GitHub Codespaces, Coder workspaces, "
         + "Google Compute Engine VMs or AWS EC2 instances, through their API. It runs on the control plane, so it can start a machine that is down. "
         + "Docker, Cloud Workstations, your own commands and MCP servers are added in the Mac app."
-    public static let oneCopy = "Workspace providers need a control plane with one copy, such as the one on your Mac. This one has several."
+    public static let oneCopy = "Machine providers need a control plane with one copy, such as the one on your Mac. This one has several."
     public static let add = "Add Provider…"
     public static let secretsFoot = "Tokens and keys go to the control plane and are never shown again. This device does not keep them."
     public static let editSecret = "Leave empty to keep the one it has."
     public static func removeTitle(_ name: String) -> String { "Remove \(name)?" }
     public static let removeNote = "Its machines stay as they are, unlinked: nothing here can start or stop them any more."
     public static let noHosts = "No machine to link: add one in the Mac app, or start one from a repository."
-    public static let notAHostYet = "Not joined yet: add it as a machine in the Mac app, in Settings ▸ Workspace Providers."
+    public static let notAHostYet = "Not joined yet: add it as a machine in the Mac app, in Settings ▸ Machine Providers."
 
     /// What a workspace with no host says when no host is free to link to it (#1931): this
     /// device can't install Agents on it, so the person is told where to (the Mac's Add as Host…).
-    public static func noHostLine(_ workspace: DaemonAPI.WorkspaceInfo, hosts: [DaemonAPI.ControlHost]) -> String? {
+    public static func noHostLine(_ workspace: DaemonAPI.MachineInfo, hosts: [DaemonAPI.ControlMachine]) -> String? {
         workspace.host == nil && linkableHosts(workspace, hosts: hosts).isEmpty ? notAHostYet : nil
     }
 
@@ -197,7 +197,7 @@ public enum WorkspaceProviderWords {
     }
 
     /// The grey line under a workspace.
-    public static func workspaceLine(_ workspace: DaemonAPI.WorkspaceInfo, hosts: [DaemonAPI.ControlHost]) -> String {
+    public static func workspaceLine(_ workspace: DaemonAPI.MachineInfo, hosts: [DaemonAPI.ControlMachine]) -> String {
         var parts = [workspace.state.prefix(1).uppercased() + workspace.state.dropFirst()]
         if let host = workspace.host {
             parts.append("linked to \(hosts.first { $0.id == host }?.name ?? "a machine")")
@@ -208,8 +208,8 @@ public enum WorkspaceProviderWords {
         return parts.joined(separator: " · ")
     }
 
-    /// Whether a host named `hostName` may be this workspace (WorkspaceInfo.mayBe, #976).
-    public static func mayBe(_ workspace: DaemonAPI.WorkspaceInfo, hostName: String) -> Bool {
+    /// Whether a host named `hostName` may be this workspace (MachineInfo.mayBe, #976).
+    public static func mayBe(_ workspace: DaemonAPI.MachineInfo, hostName: String) -> Bool {
         let host = hostName.lowercased()
         if let ssh = workspace.ssh, ssh.lowercased() == host { return true }
         let name = workspace.name.lowercased()
@@ -219,7 +219,7 @@ public enum WorkspaceProviderWords {
 
     /// The hosts Link to Host can offer for a workspace no host has: those that run agents
     /// and are linked to none, the ones that may be it by name first.
-    public static func linkableHosts(_ workspace: DaemonAPI.WorkspaceInfo, hosts: [DaemonAPI.ControlHost]) -> [DaemonAPI.ControlHost] {
+    public static func linkableHosts(_ workspace: DaemonAPI.MachineInfo, hosts: [DaemonAPI.ControlMachine]) -> [DaemonAPI.ControlMachine] {
         if workspace.host != nil { return [] }
         let free = hosts.filter { $0.relay == nil && $0.workspace == nil }
         return free.filter { mayBe(workspace, hostName: $0.name) } + free.filter { !mayBe(workspace, hostName: $0.name) }

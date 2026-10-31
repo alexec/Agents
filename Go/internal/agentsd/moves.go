@@ -1,6 +1,7 @@
 package agentsd
 
 import (
+	"context"
 	"encoding/json"
 	"path/filepath"
 	"strconv"
@@ -11,7 +12,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Moving an agent into a worktree, or back to its project folder, during its life (053),
+// Moving an agent into a worktree, or back to its folder, during its life (053),
 // as DaemonCore+Moves did (#617, #1821). move_worktree asks for it; the move waits on the
 // record, as pendingMove, for the turn to end, since a runtime cannot change folder while
 // it works. Then the runtime is let go, the agent's folder is written, and the next turn
@@ -33,8 +34,8 @@ func whyCannotMove(id string) string {
 	return name + " can't carry its conversation into another folder, so this agent stays where it is. Start a new one in a worktree instead."
 }
 
-// carryOn is what the app says to an agent it has just moved, as the prompt that starts it
-// again.
+// carryOn ends what the app says to an agent it has just moved, as the prompt that starts it
+// again, after the move's preface (#2407).
 const carryOn = "Carry on with what you were doing."
 
 // moveWorktree is move_worktree: a move asked for now, made when this turn ends. Neither
@@ -76,7 +77,7 @@ func moveCall(args map[string]json.RawMessage) (*wire.PendingMove, error) {
 	onlyRemove := Invalid("Nothing was recorded: discard_changes only goes with leave_worktree remove.")
 	switch {
 	case worktree != "" && leaving != "":
-		return nil, Invalid("Nothing was recorded: give worktree to move into one, or leave_worktree to go back to the project folder, not both.")
+		return nil, Invalid("Nothing was recorded: give worktree to move into one, or leave_worktree to go back to the folder, not both.")
 	case worktree != "":
 		if discard {
 			return nil, onlyRemove
@@ -96,11 +97,52 @@ func moveCall(args map[string]json.RawMessage) (*wire.PendingMove, error) {
 		if discard {
 			return nil, onlyRemove
 		}
-		return &wire.PendingMove{Target: wire.MoveTarget{ProjectFolder: &struct{}{}}}, nil
+		return &wire.PendingMove{Target: wire.MoveTarget{FolderPath: &struct{}{}}}, nil
 	case "remove":
-		return &wire.PendingMove{Target: wire.MoveTarget{ProjectFolder: &struct{}{}}, RemoveLeft: true, DiscardChanges: discard}, nil
+		return &wire.PendingMove{Target: wire.MoveTarget{FolderPath: &struct{}{}}, RemoveLeft: true, DiscardChanges: discard}, nil
 	}
 	return nil, Invalid("Nothing was recorded: leave_worktree has to be keep or remove.")
+}
+
+// registerMoves serves agents/move: a person moving an agent (053). The agent's own
+// move_worktree tool is separate, and a person taking the move back does not cancel that.
+func (d *Daemon) registerMoves() {
+	On(d, wire.CallAgentsMove, func(_ context.Context, _ *Client, r wire.MoveRequest) (wire.MoveAnswer, error) {
+		return d.moveAgent(r)
+	})
+}
+
+// moveAgent is agents/move. No target takes back a move the person asked for.
+func (d *Daemon) moveAgent(r wire.MoveRequest) (wire.MoveAnswer, error) {
+	if r.Target == nil {
+		a := d.Store.Agent(r.AgentID)
+		if a == nil {
+			return wire.MoveAnswer{}, &Error{Code: CodeNoSuchAgent, Message: "That conversation is not open any more, so nothing was moved."}
+		}
+		if a.PendingMove == nil || a.PendingMove.AskedBy != wire.MoveAskerPerson {
+			return wire.MoveAnswer{When: wire.MoveWhenNothing, Message: "No move was waiting."}, nil
+		}
+		d.change(r.AgentID, func(a *wire.Agent) { a.PendingMove = nil })
+		d.record(r.AgentID, runtimeNote("Move cancelled."))
+		return wire.MoveAnswer{When: wire.MoveWhenNothing, Message: "Move cancelled."}, nil
+	}
+	msg, err := d.askMove(r.AgentID, wire.PendingMove{Target: *r.Target, RemoveLeft: r.RemoveLeft,
+		DiscardChanges: r.DiscardChanges, AskedBy: wire.MoveAskerPerson, AskedAt: now()})
+	if err != nil {
+		return wire.MoveAnswer{}, err
+	}
+	when := wire.MoveWhenNow
+	switch {
+	case strings.HasPrefix(msg, "You are not in a worktree"), strings.HasPrefix(msg, "Already working"):
+		when = wire.MoveWhenNothing
+	case strings.HasPrefix(msg, "Moving to "):
+		when = wire.MoveWhenAfterTurn
+	}
+	answer := wire.MoveAnswer{When: when, Message: msg}
+	if when == wire.MoveWhenNow {
+		answer.Agent = d.Store.Agent(r.AgentID)
+	}
+	return answer, nil
 }
 
 // askMove checks a move now, in words, and keeps it for when the turn ends, or makes it now
@@ -114,17 +156,17 @@ func (d *Daemon) askMove(id wire.UUID, move wire.PendingMove) (string, error) {
 	if !runtimeCanMove(a.RuntimeID) {
 		return "", worktreeFailed(whyCannotMove(a.RuntimeID))
 	}
-	project := projectFolder(a)
-	repo, ok := repositoryOf(project)
+	folder := folderPath(a)
+	repo, ok := repositoryOf(folder)
 	if !ok {
-		return "", worktreeFailed("Moving needs a git repository, and " + filepath.Base(project) + " is not in one.")
+		return "", worktreeFailed("Moving needs a git repository, and " + filepath.Base(folder) + " is not in one.")
 	}
 	cwd := store.FolderPath(a.Cwd)
 	if e := move.Target.Existing; e != nil && canonical(store.FolderPath(e.Value)) == canonical(repo.toplevel) {
-		move.Target = wire.MoveTarget{ProjectFolder: &struct{}{}}
+		move.Target = wire.MoveTarget{FolderPath: &struct{}{}}
 	}
 	switch t := move.Target; {
-	case t.ProjectFolder != nil:
+	case t.FolderPath != nil:
 		if a.Worktree == nil {
 			return "You are not in a worktree; nothing to do.", nil
 		}
@@ -134,7 +176,7 @@ func (d *Daemon) askMove(id wire.UUID, move wire.PendingMove) (string, error) {
 			return "Already working in " + filepath.Base(root) + "; nothing to do.", nil
 		}
 		found := false
-		list, _ := worktreeList(project)
+		list, _ := worktreeList(folder)
 		for _, e := range list {
 			if canonical(e.root) != root {
 				continue
@@ -145,7 +187,7 @@ func (d *Daemon) askMove(id wire.UUID, move wire.PendingMove) (string, error) {
 			}
 		}
 		if !found {
-			return "", &Error{Code: wire.FailureNotAWorktree, Message: root + " is not a worktree of " + filepath.Base(project) + "'s repository."}
+			return "", &Error{Code: wire.FailureNotAWorktree, Message: root + " is not a worktree of " + filepath.Base(folder) + "'s repository."}
 		}
 	case t.NewWorktree != nil:
 		if _, err := git(cwd, "rev-parse", "--verify", "-q", "HEAD"); err != nil {
@@ -162,8 +204,8 @@ func (d *Daemon) askMove(id wire.UUID, move wire.PendingMove) (string, error) {
 	}
 	removing := ""
 	if move.RemoveLeft {
-		if a.Worktree == nil || move.Target.ProjectFolder == nil {
-			return "", Invalid("Only a move back to the project folder can remove the worktree left.")
+		if a.Worktree == nil || move.Target.FolderPath == nil {
+			return "", Invalid("Only a move back to the folder can remove the worktree left.")
 		}
 		if err := d.whyNotRemoveLeft(*a.Worktree, id, move.DiscardChanges); err != nil {
 			return "", err
@@ -229,7 +271,7 @@ func destinationWords(t wire.MoveTarget) string {
 	case t.NewWorktree != nil && t.NewWorktree.Name != nil:
 		return "a new worktree like " + *t.NewWorktree.Name
 	}
-	return "the project folder"
+	return "the folder"
 }
 
 func movedMessage(a *wire.Agent) string {
@@ -243,12 +285,12 @@ func movedMessage(a *wire.Agent) string {
 		}
 		return "Moved. Now working in the worktree " + wt.Name + on + ", at " + store.FolderPath(a.Cwd) + "."
 	}
-	return "Moved. Now working in the project folder, " + store.FolderPath(a.Cwd) + "."
+	return "Moved. Now working in the folder, " + store.FolderPath(a.Cwd) + "."
 }
 
 func placeName(wt *wire.AgentWorktree) string {
 	if wt == nil {
-		return "the project folder"
+		return "the folder"
 	}
 	return "worktree " + wt.Name
 }
@@ -273,16 +315,16 @@ func (d *Daemon) applyPendingMove(id wire.UUID) bool {
 	old := store.FolderPath(a.Cwd)
 	leaving := a.Worktree
 	leftBehind := porcelainCount(old)
-	project := projectFolder(a)
+	folder := folderPath(a)
 	var wt *wire.AgentWorktree
-	cwd := project
+	cwd := folder
 	var err error
 	switch t := move.Target; {
 	case t.NewWorktree != nil:
 		name := moveName(deref(t.NewWorktree.Name), a)
-		wt, cwd, err = d.prepareWorktreeFrom(project, old, wire.WorktreeChoice{Named: &wire.WorktreeChoiceNamed{Value: name}}, "")
+		wt, cwd, err = d.prepareWorktreeFrom(folder, old, wire.WorktreeChoice{Named: &wire.WorktreeChoiceNamed{Value: name}}, "")
 	case t.Existing != nil:
-		wt, cwd, err = d.prepareWorktree(project, wire.WorktreeChoice{Existing: &wire.WorktreeChoiceExisting{Value: t.Existing.Value}}, "")
+		wt, cwd, err = d.prepareWorktree(folder, wire.WorktreeChoice{Existing: &wire.WorktreeChoiceExisting{Value: t.Existing.Value}}, "")
 	}
 	if err != nil {
 		msg := err.Error()
@@ -311,7 +353,7 @@ func (d *Daemon) applyPendingMove(id wire.UUID) bool {
 		}
 		note += "."
 	} else {
-		note += "the project folder."
+		note += "the folder."
 	}
 	if leftBehind > 0 {
 		changes := " uncommitted changes stayed in "
@@ -332,7 +374,7 @@ func (d *Daemon) applyPendingMove(id wire.UUID) bool {
 		}
 	}
 	d.record(id, runtimeNote(note))
-	d.projectChanged(project)
+	d.folderChanged(folder)
 	return true
 }
 
@@ -342,6 +384,9 @@ func (d *Daemon) releaseRuntime(id wire.UUID) {
 	l.mu.Lock()
 	s := l.session
 	l.session = nil
+	if s != nil {
+		d.dropStandIn(id)
+	}
 	l.mu.Unlock()
 	if s != nil {
 		s.Stop()
@@ -379,7 +424,7 @@ func movePreface(a *wire.Agent, old string, leftBehind bool) string {
 			text += ", detached."
 		}
 	} else {
-		text = "You have moved back to the project folder, " + store.FolderPath(a.Cwd) + "."
+		text = "You have moved back to the folder, " + store.FolderPath(a.Cwd) + "."
 	}
 	if leftBehind {
 		text += " What was uncommitted in " + old + " stayed there."
@@ -390,21 +435,22 @@ func movePreface(a *wire.Agent, old string, leftBehind bool) string {
 // afterTurnMove makes a move asked for in the turn that has just ended, and starts the
 // agent again in the new folder when it moved itself and the turn finished: with the
 // person's queued words when there are some, else the app's carry-on. Not when it asked to
-// be archived: it stays there, waiting for approval.
-func (d *Daemon) afterTurnMove(id wire.UUID, s wire.AgentState, archiving bool) {
+// be archived: it stays there, waiting for approval. It says whether the agent goes on: then
+// the turn that ended is not its finish (#1955).
+func (d *Daemon) afterTurnMove(id wire.UUID, s wire.AgentState, archiving bool) bool {
 	a := d.Store.Agent(id)
 	if a == nil || a.PendingMove == nil {
-		return
+		return false
 	}
 	askedBy := a.PendingMove.AskedBy
 	old := store.FolderPath(a.Cwd)
 	leftBehind := porcelainCount(old) > 0
 	if !d.applyPendingMove(id) || askedBy != wire.MoveAskerAgent || s != wire.AgentStateFinished {
-		return
+		return false
 	}
 	moved := d.Store.Agent(id)
 	if moved == nil || archiving || moved.ArchiveRequest != nil || moved.State == wire.AgentStateArchived {
-		return
+		return false
 	}
 	preface := movePreface(moved, old, leftBehind)
 	if len(moved.QueuedPrompts) > 0 {
@@ -418,11 +464,13 @@ func (d *Daemon) afterTurnMove(id wire.UUID, s wire.AgentState, archiving bool) 
 			}
 			q.Preface = &preface
 		})
-		return
+		return true
 	}
-	if err := d.enqueue(id, wire.QueuedPrompt{ID: store.NewUUID(), Text: carryOn, QueuedAt: now(), From: wire.PromptOriginApp, Preface: &preface}, false); err != nil {
+	if err := d.enqueue(id, wire.QueuedPrompt{ID: store.NewUUID(), Text: preface + " " + carryOn, QueuedAt: now(), From: wire.PromptOriginApp}, false); err != nil {
 		d.record(id, runtimeNote("Could not start again after the move: "+err.Error()))
+		return false
 	}
+	return true
 }
 
 // whyNotRemoveLeft is why an agent leaving a worktree with remove may not take it away, or
@@ -431,7 +479,7 @@ func (d *Daemon) afterTurnMove(id wire.UUID, s wire.AgentState, archiving bool) 
 // not pushed: removing is for when the work is pushed. id is the agent leaving, so it does
 // not count as working there.
 func (d *Daemon) whyNotRemoveLeft(wt wire.AgentWorktree, id wire.UUID, discard bool) error {
-	f, err := d.removalFacts(wire.WorktreeRemovalRequest{Project: wt.Project, Root: wt.Root})
+	f, err := d.removalFacts(wire.WorktreeRemovalRequest{Folder: wt.Folder, Root: wt.Root})
 	if err != nil {
 		return err
 	}
@@ -460,8 +508,8 @@ func (d *Daemon) whyNotRemoveLeft(wt wire.AgentWorktree, id wire.UUID, discard b
 		}
 		return &Error{Code: wire.FailureWorktreeInUse, Message: name + " is still in use by " + strings.Join(names, ", ") + ", so it cannot be removed. Use keep."}
 	}
-	project := store.FolderPath(wt.Project)
-	if _, err := git(project, "show-ref", "--verify", "-q", "refs/heads/"+branch); err != nil {
+	folder := store.FolderPath(wt.Folder)
+	if _, err := git(folder, "show-ref", "--verify", "-q", "refs/heads/"+branch); err != nil {
 		return worktreeFailed(name + "'s branch " + branch + " is not there any more, so removing it would leave its commits on no branch. Make the branch again, or use keep.")
 	}
 	if f.uncommitted > 0 && !discard {
@@ -469,7 +517,7 @@ func (d *Daemon) whyNotRemoveLeft(wt wire.AgentWorktree, id wire.UUID, discard b
 		return worktreeFailed("Removing " + name + " would lose " + uncommittedWords(strings.Split(lines, "\n"), f.uncommitted) +
 			". Commit and push them, use keep, or ask the person before calling again with discard_changes.")
 	}
-	if n := unpushed(project, branch); n > 0 && f.unmerged {
+	if n := unpushed(folder, branch); n > 0 && f.unmerged {
 		commits := " commits"
 		if n == 1 {
 			commits = " commit"
@@ -480,8 +528,8 @@ func (d *Daemon) whyNotRemoveLeft(wt wire.AgentWorktree, id wire.UUID, discard b
 }
 
 // unpushed is how many commits on branch no remote-tracking branch has.
-func unpushed(project, branch string) int {
-	out, err := git(project, "rev-list", "--count", "refs/heads/"+branch, "--not", "--remotes")
+func unpushed(folder, branch string) int {
+	out, err := git(folder, "rev-list", "--count", "refs/heads/"+branch, "--not", "--remotes")
 	if err != nil {
 		return 0
 	}
@@ -496,20 +544,20 @@ func (d *Daemon) removeLeftWorktree(wt wire.AgentWorktree, id wire.UUID, discard
 	if err := d.whyNotRemoveLeft(wt, id, discard); err != nil {
 		return "", err
 	}
-	f, err := d.removalFacts(wire.WorktreeRemovalRequest{Project: wt.Project, Root: wt.Root})
+	f, err := d.removalFacts(wire.WorktreeRemovalRequest{Folder: wt.Folder, Root: wt.Root})
 	if err != nil {
 		return "", err
 	}
-	project := store.FolderPath(wt.Project)
+	folder := store.FolderPath(wt.Folder)
 	if isDir(f.root) && !f.entry.prunable {
 		args := []string{"worktree", "remove"}
 		if f.uncommitted > 0 {
 			args = append(args, "--force")
 		}
-		if _, err := git(project, append(args, f.root)...); err != nil {
+		if _, err := git(folder, append(args, f.root)...); err != nil {
 			return "", worktreeFailed("Could not remove " + wt.Name + ": " + err.Error())
 		}
-	} else if _, err := git(project, "worktree", "prune"); err != nil {
+	} else if _, err := git(folder, "worktree", "prune"); err != nil {
 		return "", worktreeFailed("Could not remove " + wt.Name + ": " + err.Error())
 	}
 	d.sizeMu.Lock()
@@ -518,7 +566,7 @@ func (d *Daemon) removeLeftWorktree(wt wire.AgentWorktree, id wire.UUID, discard
 	d.noteFolders()
 	branch := f.entry.branch
 	if strings.HasPrefix(branch, branchPrefix) && !f.unmerged {
-		if _, err := git(project, "branch", "-d", branch); err == nil {
+		if _, err := git(folder, "branch", "-d", branch); err == nil {
 			return "Removed the worktree " + wt.Name + " and its branch.", nil
 		}
 	}

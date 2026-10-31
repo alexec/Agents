@@ -14,6 +14,11 @@ there: the agents come back archived, so you can read them, search them and brin
 back to the sidebar. An agent from another machine is shown, but never run, because its
 conversation and its folder belong to the machine that made it.
 
+Agent instructions, personas, skills, MCP server settings and plugin files sync across
+your machines when they connect to the same control plane. This keeps the files available
+on those machines. It is not a backup: it does not keep earlier versions or protect the
+files if they are deleted everywhere. Keep a separate backup of configuration you need.
+
 ## Where to find it
 
 - **Mac:** Settings ▸ Machines ▸ This Mac ▸ **Backups**.
@@ -26,8 +31,8 @@ choose the folder, because the folder is on the Mac's disk.
 A server's backups are on its own page:
 
 - **Mac:** Settings ▸ Machines, the server's **⋯** menu ▸ **Backups…**.
-- **iPhone and iPad:** Settings ▸ **Servers' Backups** ▸ the server.
-- **Browser:** Settings ▸ **Servers' Backups** ▸ **Backups…** beside the server.
+- **iPhone and iPad:** Settings ▸ **Machines' Backups** ▸ the server.
+- **Browser:** Settings ▸ **Machines' Backups** ▸ **Backups…** beside the server.
 
 A server's page has the same settings, **Back Up Now** and **Restore…**, sent to that
 server. A server is listed while it is online.

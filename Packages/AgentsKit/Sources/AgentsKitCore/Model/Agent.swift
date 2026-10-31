@@ -47,7 +47,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// Kept in memory only and out of `CodingKeys` for the same reason as `rawState`:
     /// the daemon that owns the record does not know it has a name elsewhere, and the
     /// window stamps it on arrival. A record read without it is this Mac's.
-    public var host: HostID = .mac
+    public var host: MachineRef = .mac
     public var runtimeSessionID: String?
     public var startOptions: StartOptions
 
@@ -173,7 +173,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     public var startedByRun: UUID?
     /// The agent whose `start_session` call made this one, if one did (028). Set once,
     /// never changed. It is what lets that agent stop and archive this one, what keeps
-    /// the tools from this one, and what counts it against its project's three.
+    /// the tools from this one, and what counts it against its folder's three.
     public var startedByAgent: UUID?
     /// How deep a workflow fire caused by this agent is, when the agent that started it
     /// was part of a workflow chain (028). Taken when this agent is made, because the
@@ -184,7 +184,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// and kept here, not on the report, so whatever the turn then reports leaves it be.
     public var eventWait: EventWait?
     /// The worktree this agent works in, if it does: the one it was started in (030) or
-    /// moved into (053). Its project is the worktree's project, not its `cwd`.
+    /// moved into (053). Its folder is the worktree's folder, not its `cwd`.
     public var worktree: AgentWorktree?
     /// A move asked for and not yet made (053). Applied when the turn ends, or at once
     /// when none is running. Cleared when applied, cancelled, archived or deleted.
@@ -204,6 +204,16 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// The added account its runtime runs with (#840), by id. Nil for the runtime's own
     /// sign-in, which is most agents.
     public var accountID: String?
+    /// When the agent last ended voice mode with hang_up (#2375): the person said they
+    /// were done talking. Voice mode on this chat says the reply, then turns off.
+    public var voiceHungUpAt: Date?
+    /// Set when the agent started on Auto (#2658): the runtime picked and what it was given.
+    public var auto: AutoPick?
+    /// The agent's own answer to permission requests (#2658); nil follows Settings.
+    public var clientPermission: ClientPermissionMode?
+    /// The shared values it runs with now, where its own settings match one; a field that is
+    /// nil shows Custom (#2658).
+    public var levels: Levels?
 
     /// How many times in a row this chat has been picked back up after the daemon
     /// went, without a turn since reaching its own end. On the record and not in
@@ -249,6 +259,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// While a turn runs, the title of the tool it is running now (#1902); nil while it
     /// thinks or replies. The daemon changes it only once a new value has held a second.
     public var runningTool: String?
+    /// The goal its runtime keeps working towards over many turns (#2742), the card over
+    /// the plan's; nil when the runtime reports none or cleared it.
+    public var goal: Goal?
     /// Paused by a spent allowance, and asked to carry on when it is back (#1859): the
     /// daemon sends "continue" in this chat at `at`, or sooner when the runtime is back.
     public var continueWhenBack: ContinueWhenBack?
@@ -271,9 +284,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     public var unknownFields: [String: JSONValue]
 
     /// Everywhere this agent may read and write: its folder, and any it was given.
-    /// The project this agent belongs to, as projects compare folders. Its `cwd` is
+    /// The folder this agent belongs to, as folders compare folders. Its `cwd` is
     /// where it works; in a worktree those are two different folders (030).
-    public var projectFolder: URL { Project.standardize(worktree?.project ?? cwd) }
+    public var folderPath: URL { Folder.standardize(worktree?.folder ?? cwd) }
 
     public var folderScope: FolderScope { FolderScope(folders: [cwd] + additionalDirectories) }
 
@@ -372,13 +385,17 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         startedByAgent = try c.decodeIfPresent(UUID.self, forKey: .startedByAgent)
         chainDepth = try c.decodeIfPresent(Int.self, forKey: .chainDepth)
         eventWait = try c.decodeIfPresent(EventWait.self, forKey: .eventWait)
-        // Optional: an agent outside a worktree works in its project folder.
+        // Optional: an agent outside a worktree works in its folder.
         worktree = try c.decodeIfPresent(AgentWorktree.self, forKey: .worktree)
         pendingMove = (try? c.decodeIfPresent(PendingMove.self, forKey: .pendingMove)) ?? nil
         startingPoint = try c.decodeIfPresent(StartingPoint.self, forKey: .startingPoint)
         startRequestID = try c.decodeIfPresent(UUID.self, forKey: .startRequestID)
         persona = try c.decodeIfPresent(String.self, forKey: .persona)
         accountID = try c.decodeIfPresent(String.self, forKey: .accountID)
+        voiceHungUpAt = try c.decodeIfPresent(Date.self, forKey: .voiceHungUpAt)
+        auto = try? c.decodeIfPresent(AutoPick.self, forKey: .auto)
+        clientPermission = try? c.decodeIfPresent(ClientPermissionMode.self, forKey: .clientPermission)
+        levels = try? c.decodeIfPresent(Levels.self, forKey: .levels)
         // New in 011, and counted from nothing, so every record written before the
         // restart guard existed opens as a chat that has never been picked back up.
         restartPickUps = try c.decodeIfPresent(Int.self, forKey: .restartPickUps) ?? 0
@@ -426,6 +443,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         branchedFrom = (try? c.decodeIfPresent(UUID.self, forKey: .branchedFrom)) ?? nil
         fileToSee = (try? c.decodeIfPresent(ShownFile.self, forKey: .fileToSee)) ?? nil
         runningTool = (try? c.decodeIfPresent(String.self, forKey: .runningTool)) ?? nil
+        goal = (try? c.decodeIfPresent(Goal.self, forKey: .goal)) ?? nil
         continueWhenBack = (try? c.decodeIfPresent(ContinueWhenBack.self, forKey: .continueWhenBack)) ?? nil
         // Only the keys this build does not know are read as open-ended values.
         // Reading the whole record that way too — which is what this did — decoded
@@ -488,6 +506,10 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(startRequestID, forKey: .startRequestID)
         try c.encodeIfPresent(persona, forKey: .persona)
         try c.encodeIfPresent(accountID, forKey: .accountID)
+        try c.encodeIfPresent(voiceHungUpAt, forKey: .voiceHungUpAt)
+        try c.encodeIfPresent(auto, forKey: .auto)
+        try c.encodeIfPresent(clientPermission, forKey: .clientPermission)
+        try c.encodeIfPresent(levels, forKey: .levels)
         if restartPickUps != 0 { try c.encode(restartPickUps, forKey: .restartPickUps) }
         try c.encodeIfPresent(report, forKey: .report)
         if outcomeAsked { try c.encode(outcomeAsked, forKey: .outcomeAsked) }
@@ -509,6 +531,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(branchedFrom, forKey: .branchedFrom)
         try c.encodeIfPresent(fileToSee, forKey: .fileToSee)
         try c.encodeIfPresent(runningTool, forKey: .runningTool)
+        try c.encodeIfPresent(goal, forKey: .goal)
         try c.encodeIfPresent(continueWhenBack, forKey: .continueWhenBack)
         // Whatever a newer version wrote, written back out beside our own fields.
         if !unknownFields.isEmpty {
@@ -529,6 +552,10 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case purpose
         case persona
         case accountID
+        case voiceHungUpAt
+        case auto
+        case clientPermission
+        case levels
         case worktree
         case pendingMove
         case startingPoint
@@ -554,6 +581,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case branchedFrom
         case fileToSee
         case runningTool
+        case goal
         case continueWhenBack
     }
 

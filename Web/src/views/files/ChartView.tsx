@@ -194,9 +194,9 @@ export function ChartPage({ text, path, hint, line, readText }: {
     <div class="chart-page">
       <div class="chart-head">
         <span class="quiet small">{r === null ? "" : "spec" in r ? summary(r.spec) : "Not drawn"}</span>
-        <div class="segmented" role="radiogroup" aria-label="Show">
+        <div class="tabs" role="tablist" aria-label="Show">
           {([false, true] as const).map((source) => (
-            <button key={String(source)} role="radio" aria-checked={showsSource.value === source}
+            <button key={String(source)} role="tab" aria-selected={showsSource.value === source}
               class={showsSource.value === source ? "on" : ""} onClick={() => (showsSource.value = source)}>
               {source ? "Source" : "Chart"}
             </button>

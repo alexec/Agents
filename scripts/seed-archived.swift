@@ -2,7 +2,7 @@
 // Fill a scratch store with agents for 051's walks and measures.
 //
 //   scripts/seed-archived.swift --root /tmp/run-051 --count 3 --archived-days-ago 31 \
-//       --transcript-bytes 2000000 [--live] [--project /tmp/run-051/project]
+//       --transcript-bytes 2000000 [--live] [--folder /tmp/run-051/folder]
 //
 // Each agent is the real-sized fixture record (`archived-agent.json`, whose option and
 // command lists are what make an archived record 24 KB) with a fresh id and dates, and a
@@ -29,7 +29,7 @@ var count = 1
 var daysAgo = 31.0
 var transcriptBytes = 20_000
 var live = false
-var project: String?
+var folder: String?
 
 var arguments = CommandLine.arguments.dropFirst().makeIterator()
 while let argument = arguments.next() {
@@ -40,7 +40,7 @@ while let argument = arguments.next() {
     case "--archived-days-ago": daysAgo = need(Double(value()), "--archived-days-ago wants a number")
     case "--transcript-bytes": transcriptBytes = need(Int(value()), "--transcript-bytes wants a number")
     case "--live": live = true
-    case "--project": project = value()
+    case "--folder": folder = value()
     default: fail("unknown argument \(argument)")
     }
 }
@@ -62,8 +62,8 @@ let stamp: ISO8601DateFormatter = {
     return f
 }()
 
-let projectFolder = URL(filePath: project ?? rootURL.appending(path: "project").path)
-try? FileManager.default.createDirectory(at: projectFolder, withIntermediateDirectories: true)
+let folderPath = URL(filePath: folder ?? rootURL.appending(path: "folder").path)
+try? FileManager.default.createDirectory(at: folderPath, withIntermediateDirectories: true)
 
 let now = Date()
 for index in 0 ..< count {
@@ -72,7 +72,7 @@ for index in 0 ..< count {
     var record = template
     record["id"] = id.uuidString
     record["title"] = live ? "Seeded live agent \(index + 1)" : "Seeded archived agent \(index + 1)"
-    record["cwd"] = projectFolder.absoluteString
+    record["cwd"] = folderPath.absoluteString
     record["createdAt"] = stamp.string(from: archivedAt.addingTimeInterval(-3_600))
     record["lastActivityAt"] = stamp.string(from: live ? now : archivedAt)
     if live {

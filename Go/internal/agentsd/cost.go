@@ -117,6 +117,7 @@ func readStore(path string, v any, meaning string) string {
 	}
 	aside := fmt.Sprintf("%s.unreadable-%d", path, time.Now().Unix())
 	os.Rename(path, aside)
+	store.TrimSetAsides(path)
 	log.Printf("%s: unreadable, %s; kept as %s", filepath.Base(path), meaning, filepath.Base(aside))
 	return filepath.Base(path) + " could not be read, so it was set aside as " + filepath.Base(aside) + "."
 }
@@ -257,6 +258,11 @@ func (d *Daemon) costStateLocked() wire.CostState {
 		spent[c] = v
 	}
 	st := wire.CostState{Limits: limits, Today: spent, Day: today, TokensToday: s.Tokens[today]}
+	// The organisation's budgets over the person's own limits (#998, FR-016).
+	if org := d.orgBudgets(d.orgPolicy()); org != nil {
+		st.Organisation = org
+		st.SetBy = setBy("budgets", budgetWords(*org))
+	}
 	var notes []string
 	for _, n := range []string{d.limitsNote, d.spendNote} {
 		if n != "" {
@@ -316,6 +322,8 @@ func (d *Daemon) bankSessionCost(id wire.UUID, c wire.Cost) {
 	d.recordUsageLocked(runtime, wire.UsageBucket{Cost: map[string]float64{c.Currency: added}})
 	d.addReport(a, runtime, time.Now(), wire.UsageRollupRow{Cost: map[string]float64{c.Currency: added}})
 	d.costMu.Unlock()
+	// On the work the session is on now (#2350).
+	d.bankWork(a, wire.LineageCost{Cost: map[string]float64{c.Currency: added}})
 	d.change(id, func(a *wire.Agent) {
 		to := map[string]float64{}
 		for k, v := range a.CostToDate {
@@ -328,7 +336,11 @@ func (d *Daemon) bankSessionCost(id wire.UUID, c wire.Cost) {
 }
 
 // limitTokens is TurnUsage.limitTokens: fresh input and output, no cache reads or thoughts.
+// On an org account it is the relay's count of the provider's answers (#999, FR-022).
 func limitTokens(u wire.TurnUsage) int64 {
+	if t := u.RelayTokens; t != nil {
+		return max(0, t.Input+t.CacheWrite+t.Output)
+	}
 	read, write, thought := int64(0), int64(0), int64(0)
 	if u.CachedReadTokens != nil {
 		read = *u.CachedReadTokens
@@ -375,10 +387,12 @@ func (d *Daemon) bankTurnUsage(id wire.UUID, u wire.TurnUsage) {
 		b.UnpricedTurns = 1
 	}
 	d.recordUsageLocked(a.RuntimeID, b)
-	d.addReport(a, a.RuntimeID, time.Now(), wire.UsageRollupRow{Cost: b.Cost, InputTokens: b.InputTokens,
+	d.addReport(a, a.RuntimeID, time.Now(), wire.UsageRollupRow{Route: u.Route, Cost: b.Cost, InputTokens: b.InputTokens,
 		OutputTokens: b.OutputTokens, ThoughtTokens: b.ThoughtTokens, CachedReadTokens: b.CachedReadTokens,
-		CachedWriteTokens: b.CachedWriteTokens, Turns: b.Turns, UnpricedTurns: b.UnpricedTurns})
+		CachedWriteTokens: b.CachedWriteTokens, Turns: b.Turns, UnpricedTurns: b.UnpricedTurns, LimitTokens: &counted})
 	d.costMu.Unlock()
+	d.bankWork(a, wire.LineageCost{Cost: map[string]float64{}, InputTokens: b.InputTokens, OutputTokens: b.OutputTokens,
+		LimitTokens: &counted, Turns: 1})
 	d.change(id, func(a *wire.Agent) {
 		a.LastTurnUsage = &u
 		if counted > 0 {
@@ -391,6 +405,10 @@ func (d *Daemon) bankTurnUsage(id wire.UUID, u wire.TurnUsage) {
 	})
 	if counted > 0 {
 		d.tellCost()
+		// An org account's row says its tokens today (#999, FR-025).
+		if reportRoute(a) != "" {
+			d.tellAllowances()
+		}
 	}
 }
 

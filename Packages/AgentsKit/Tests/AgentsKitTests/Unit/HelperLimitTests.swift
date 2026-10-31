@@ -2,25 +2,25 @@ import Foundation
 import Testing
 @testable import AgentsKitCore
 
-/// What counts against a project's two helper limits (028, #64).
+/// What counts against a folder's two helper limits (028, #64).
 @Suite("The limit on agents started by agents")
 struct HelperLimitTests {
-    private let project = URL(filePath: "/tmp/helper-limit-project")
+    private let folder = URL(filePath: "/tmp/helper-limit-folder")
 
     private func helper(_ state: AgentState, in folder: URL? = nil) -> Agent {
-        var agent = Agent(runtimeID: "claude", cwd: folder ?? project)
+        var agent = Agent(runtimeID: "claude", cwd: folder ?? self.folder)
         agent.state = state
         agent.startedByAgent = UUID()
         return agent
     }
 
-    /// A helper working in a worktree still takes one of its project's places (030).
-    @Test func aHelperInAWorktreeCountsInItsProject() {
-        let root = project.appending(path: ".agents/worktrees/x")
+    /// A helper working in a worktree still takes one of its folder's places (030).
+    @Test func aHelperInAWorktreeCountsInItsFolder() {
+        let root = folder.appending(path: ".agents/worktrees/x")
         var inWorktree = helper(.running, in: root)
         inWorktree.worktree = AgentWorktree(name: "x", root: root, branch: "agents/x",
-                                            project: project, base: "main", madeByApp: true)
-        #expect(HelperLimit.placesInUse(in: project, agents: [inWorktree]) == 1)
+                                            folder: folder, base: "main", madeByApp: true)
+        #expect(HelperLimit.placesInUse(in: folder, agents: [inWorktree]) == 1)
         #expect(HelperLimit.placesInUse(in: root, agents: [inWorktree]) == 0)
     }
 
@@ -43,7 +43,7 @@ struct HelperLimitTests {
         for state in [AgentState.finished, .stopped, .archived] {
             #expect(!HelperLimit.isRunning(helper(state)), "\(state)")
         }
-        #expect(HelperLimit.running(in: project, agents: [helper(.finished), helper(.stopped),
+        #expect(HelperLimit.running(in: folder, agents: [helper(.finished), helper(.stopped),
                                                           helper(.archived), helper(.running)]) == 1)
     }
 
@@ -60,7 +60,7 @@ struct HelperLimitTests {
     /// carries it on by itself, so it holds a running place.
     @Test func aHelperTheAppWillResumeIsRunning() {
         var blocked = helper(.finished)
-        blocked.report = WorkReport(outcome: .blocked, message: "Waiting on the build", at: Date(),
+        blocked.report = WorkReport(outcome: .waiting, message: "Waiting on the build", at: Date(),
                                     block: Block(checkAgainAt: Date().addingTimeInterval(600)))
         #expect(HelperLimit.isRunning(blocked))
 
@@ -81,12 +81,12 @@ struct HelperLimitTests {
     /// A block that named nothing waits for the person, not the app.
     @Test func aHelperOnlyThePersonCanCarryOnIsNotRunning() {
         var blocked = helper(.finished)
-        blocked.report = WorkReport(outcome: .blocked, message: "Needs a key", at: Date(), block: Block())
+        blocked.report = WorkReport(outcome: .waiting, message: "Needs a key", at: Date(), block: Block())
         #expect(!HelperLimit.isRunning(blocked))
     }
 
     @Test func aStartUnderWayHoldsARunningPlace() {
-        #expect(HelperLimit.running(in: project, agents: [helper(.running)], reserved: 2) == 3)
+        #expect(HelperLimit.running(in: folder, agents: [helper(.running)], reserved: 2) == 3)
     }
 
     // MARK: The person's setting (#64)
@@ -104,47 +104,56 @@ struct HelperLimitTests {
         #expect(edited.notArchived == HelperLimit.maximumNotArchived)
     }
 
-    @Test func aProjectKeepsItsSettingAndOneWithoutReadsAsBefore() throws {
-        let set = Project(folder: project, addedAt: Date(timeIntervalSince1970: 0),
+    @Test func aFolderKeepsItsSettingAndOneWithoutReadsAsBefore() throws {
+        let set = Folder(folder: folder, addedAt: Date(timeIntervalSince1970: 0),
                           helperLimits: HelperLimits(running: 2, notArchived: 8))
-        let read = try JSONDecoder().decode(Project.self, from: JSONEncoder().encode(set))
+        let read = try JSONDecoder().decode(Folder.self, from: JSONEncoder().encode(set))
         #expect(read.helperLimits == HelperLimits(running: 2, notArchived: 8))
 
-        let old = #"{"folder":"file:///tmp/helper-limit-project","addedAt":0}"#
-        let before = try JSONDecoder().decode(Project.self, from: Data(old.utf8))
+        let old = #"{"folder":"file:///tmp/helper-limit-folder","addedAt":0}"#
+        let before = try JSONDecoder().decode(Folder.self, from: Data(old.utf8))
         #expect(before.helperLimits == nil)
         #expect(before.unknownFields.isEmpty)
     }
 
+    /// #2886: on by default; off is a choice the file keeps, and on again is none.
+    @Test func archivingWhenMergedIsOnUnlessThePersonSaidNot() {
+        #expect(HelperLimits().archivesWhenMerged)
+        #expect(HelperLimits(archiveWhenMerged: true).orNilIfDefault == nil)
+        let off = HelperLimits(archiveWhenMerged: false)
+        #expect(!off.archivesWhenMerged)
+        #expect(off.orNilIfDefault == off)
+    }
+
     @Test func stoppedAndFinishedHelpersStillHoldTheirPlace() {
         let agents = [helper(.running), helper(.stopped), helper(.finished)]
-        #expect(HelperLimit.placesInUse(in: project, agents: agents) == 3)
+        #expect(HelperLimit.placesInUse(in: folder, agents: agents) == 3)
     }
 
     @Test func onlyArchivingGivesAPlaceBack() {
         let agents = [helper(.running), helper(.archived)]
-        #expect(HelperLimit.placesInUse(in: project, agents: agents) == 1)
+        #expect(HelperLimit.placesInUse(in: folder, agents: agents) == 1)
     }
 
     @Test func thePersonsOwnAgentsNeverCount() {
-        let persons = Agent(runtimeID: "claude", cwd: project)
-        var workflows = Agent(runtimeID: "claude", cwd: project)
+        let persons = Agent(runtimeID: "claude", cwd: folder)
+        var workflows = Agent(runtimeID: "claude", cwd: folder)
         workflows.startedByWorkflow = "nightly"
-        #expect(HelperLimit.placesInUse(in: project, agents: [persons, workflows]) == 0)
+        #expect(HelperLimit.placesInUse(in: folder, agents: [persons, workflows]) == 0)
     }
 
-    @Test func anotherProjectsHelpersDoNotCount() {
+    @Test func anotherFoldersHelpersDoNotCount() {
         let elsewhere = helper(.running, in: URL(filePath: "/tmp/somewhere-else"))
-        #expect(HelperLimit.placesInUse(in: project, agents: [elsewhere]) == 0)
+        #expect(HelperLimit.placesInUse(in: folder, agents: [elsewhere]) == 0)
     }
 
-    @Test func theSameFolderSpelledDifferentlyIsTheSameProject() {
-        let spelled = helper(.running, in: URL(filePath: "/tmp/helper-limit-project/"))
-        #expect(HelperLimit.placesInUse(in: project, agents: [spelled]) == 1)
+    @Test func theSameFolderSpelledDifferentlyIsTheSameFolder() {
+        let spelled = helper(.running, in: URL(filePath: "/tmp/helper-limit-folder/"))
+        #expect(HelperLimit.placesInUse(in: folder, agents: [spelled]) == 1)
     }
 
     @Test func aStartUnderWayHoldsItsPlace() {
-        #expect(HelperLimit.placesInUse(in: project, agents: [helper(.running)], reserved: 2) == 3)
+        #expect(HelperLimit.placesInUse(in: folder, agents: [helper(.running)], reserved: 2) == 3)
     }
 
     // MARK: The queue (#362)
@@ -152,21 +161,21 @@ struct HelperLimitTests {
     @Test func aQueuedHelperHoldsNoPlaceAndIsNotRunning() {
         let queued = helper(.queued)
         #expect(!HelperLimit.isRunning(queued))
-        #expect(HelperLimit.placesInUse(in: project, agents: [queued, helper(.running)]) == 1)
-        #expect(HelperLimit.running(in: project, agents: [queued]) == 0)
+        #expect(HelperLimit.placesInUse(in: folder, agents: [queued, helper(.running)]) == 1)
+        #expect(HelperLimit.running(in: folder, agents: [queued]) == 0)
         #expect(queued.group() == .waiting)
         #expect(StatusShape(row: queued, isComingBack: false) == .waiting)
         #expect(StatusShape.words(row: queued, isComingBack: false) == "Queued")
     }
 
-    @Test func theQueueIsFirstInFirstOutWithinAProject() {
+    @Test func theQueueIsFirstInFirstOutWithinAFolder() {
         var older = helper(.queued)
         older.createdAt = Date(timeIntervalSince1970: 100)
         var newer = helper(.queued)
         newer.createdAt = Date(timeIntervalSince1970: 200)
         let elsewhere = helper(.queued, in: URL(filePath: "/tmp/somewhere-else"))
         let agents = [newer, elsewhere, older, helper(.running)]
-        #expect(HelperLimit.queue(in: project, agents: agents).map(\.id) == [older.id, newer.id])
+        #expect(HelperLimit.queue(in: folder, agents: agents).map(\.id) == [older.id, newer.id])
         #expect(HelperLimit.queuePosition(of: older, among: agents) == 1)
         #expect(HelperLimit.queuePosition(of: newer, among: agents) == 2)
         #expect(HelperLimit.queuePosition(of: helper(.running), among: agents) == nil)

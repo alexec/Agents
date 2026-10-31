@@ -10,6 +10,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controlplane/hostinstall"
 	"github.com/alexec/agents/Go/internal/controlplane/providers"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // JSON-RPC as the daemon speaks it, enough for the control plane: it reads a request's
@@ -52,11 +53,8 @@ func notFound(method string) *RPCError {
 	return &RPCError{Code: methodNotFound, Message: "Method not found", Data: data}
 }
 
-// notHere is ControlMethods.notHere.
-var notHere = fail(notSupported, "This control plane cannot do that yet.")
-
 // noSSHHere is a hosted copy's answer to a method that reaches a machine over ssh (#1807).
-var noSSHHere = fail(notSupported, "This control plane runs on our servers, which have no ssh of yours. Add a machine with its join command or a code, or from a workspace provider.")
+var noSSHHere = fail(notSupported, "This control plane runs on our servers, which have no ssh of yours. Add a machine with its join command or a code, or from a machine provider.")
 
 // overSSH are the methods that reach a machine over this machine's ssh.
 var overSSH = map[string]bool{"hosts/install": true, "hosts/detect": true, "hosts/sshHosts": true}
@@ -107,11 +105,13 @@ type message struct {
 	Error  json.RawMessage `json:"error,omitempty"`
 }
 
+// decode reads a line, with a machine/* or machines/* method under its old name (#2653).
 func decode(line string) (*message, bool) {
 	var m message
 	if json.Unmarshal([]byte(line), &m) != nil {
 		return nil, false
 	}
+	m.Method = wire.OldMethodName(m.Method)
 	return &m, true
 }
 

@@ -4,19 +4,19 @@ import Foundation
 /// agent can say "anything after this one" and mean exactly that (042 R6).
 public typealias EventPosition = Int64
 
-/// Whose an event is: this Mac's, or one project's.
+/// Whose an event is: this Mac's, or one folder's.
 ///
-/// An agent sees the Mac's events and its own project's, and nothing else (042 FR-015).
+/// An agent sees the Mac's events and its own folder's, and nothing else (042 FR-015).
 /// The folder is kept standardised the way every other folder in the app is, so two
-/// spellings of one project are one scope.
+/// spellings of one folder are one scope.
 public enum EventScope: Codable, Hashable, Sendable {
     case mac
-    case project(URL)
+    case folder(URL)
 
-    public static func project(folder: URL) -> EventScope { .project(Project.standardize(folder)) }
+    public static func folder(folder: URL) -> EventScope { .folder(Folder.standardize(folder)) }
 
     public var folder: URL? {
-        if case .project(let folder) = self { return folder }
+        if case .folder(let folder) = self { return folder }
         return nil
     }
 }

@@ -1,71 +1,71 @@
 [
   {
-    "description" : "Open a file in the app's files pane, beside the conversation, at the line you name. Use it when the person needs to be looking at something to follow what you are saying: the function you are about to change, the config that explains the failure, the test that is wrong.\n\nA Markdown file opens as a page the person reads and can type on, and the page follows your edits: each time you change the file, the page shows what changed and goes there. So when you begin writing a document, show it once, at the start, and then just write — a Markdown file does not have to exist yet; the page opens empty and fills as you write it. A line you name on a Markdown file takes them to the part of the page that holds it. For a flowchart or a sequence diagram, write it as Mermaid: a ```mermaid fence in the document, or a file named *.mmd shown here (graph/flowchart with its node shapes and links, no subgraphs; sequenceDiagram with participants, messages, notes, loop/alt/opt). For any other diagram, write an SVG file beside the document and reference it as an image.\n\nFor a chart, show a Vega-Lite spec (a file named *.vl.json: one mark of bar, line, point or area; encoding x, y and an optional color field; data.values inline or data.url naming a CSV beside it), or show a CSV with `chart` saying how to draw it. Either is drawn as a chart, and the conversation shows a card for every file shown here, with a preview of a chart, a diagram or a picture.\n\nIt shows; it does not edit, select or run anything. Any other file has to exist, and every file has to be inside the folders this agent was given.\n\nNot for every file you touch. Files you changed are already marked in that pane, and every edit you make is already in the conversation, so calling this on each one takes the person's window away from them for nothing. One file, when there is one worth looking at.",
-    "inputSchema" : {
-      "properties" : {
-        "chart" : {
-          "description" : "For a CSV file: draw it as a chart of column y against column x.",
-          "properties" : {
-            "color" : {
-              "description" : "A column that splits the rows into series.",
-              "type" : "string"
+    "description": "Open a file in the app's files pane, beside the conversation, at the line you name. Use it when the person needs to be looking at something to follow what you are saying: the function you are about to change, the config that explains the failure, the test that is wrong.\n\nA Markdown file opens as a page the person reads and can type on, and the page follows your edits: each time you change the file, the page shows what changed and goes there. So when you begin writing a document, show it once, at the start, and then just write — a Markdown file does not have to exist yet; the page opens empty and fills as you write it. A line you name on a Markdown file takes them to the part of the page that holds it. For a flowchart or a sequence diagram, write it as Mermaid: a ```mermaid fence in the document, or a file named *.mmd shown here (graph/flowchart with its node shapes and links, no subgraphs; sequenceDiagram with participants, messages, notes, loop/alt/opt). For any other diagram, write an SVG file beside the document and reference it as an image.\n\nFor a chart, show a Vega-Lite spec (a file named *.vl.json: one mark of bar, line, point or area; encoding x, y and an optional color field; data.values inline or data.url naming a CSV beside it), or show a CSV with `chart` saying how to draw it. Either is drawn as a chart, and the conversation shows a card for every file shown here, with a preview of a chart, a diagram or a picture.\n\nIt shows; it does not edit, select or run anything. Any other file has to exist, and every file has to be inside the folders this agent was given.\n\nNot for every file you touch. Files you changed are already marked in that pane, and every edit you make is already in the conversation, so calling this on each one takes the person's window away from them for nothing. One file, when there is one worth looking at.",
+    "inputSchema": {
+      "properties": {
+        "chart": {
+          "description": "For a CSV file: draw it as a chart of column y against column x.",
+          "properties": {
+            "color": {
+              "description": "A column that splits the rows into series.",
+              "type": "string"
             },
-            "mark" : {
-              "enum" : [
+            "mark": {
+              "enum": [
                 "bar",
                 "line",
                 "point",
                 "area"
               ],
-              "type" : "string"
+              "type": "string"
             },
-            "title" : {
-              "type" : "string"
+            "title": {
+              "type": "string"
             },
-            "x" : {
-              "description" : "The column along the bottom.",
-              "type" : "string"
+            "x": {
+              "description": "The column along the bottom.",
+              "type": "string"
             },
-            "y" : {
-              "description" : "The column of numbers.",
-              "type" : "string"
+            "y": {
+              "description": "The column of numbers.",
+              "type": "string"
             }
           },
-          "required" : [
+          "required": [
             "x",
             "y"
           ],
-          "type" : "object"
+          "type": "object"
         },
-        "description" : {
-          "description" : "Why you are making this call, in one short sentence for the person.",
-          "type" : "string"
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
         },
-        "line" : {
-          "description" : "The line to put them on, counted from one. Leave it out for the top of the file.",
-          "minimum" : 1,
-          "type" : "integer"
+        "line": {
+          "description": "The line to put them on, counted from one. Leave it out for the top of the file.",
+          "minimum": 1,
+          "type": "integer"
         },
-        "path" : {
-          "description" : "The absolute path of the file to open.",
-          "type" : "string"
+        "path": {
+          "description": "The absolute path of the file to open.",
+          "type": "string"
         }
       },
-      "required" : [
+      "required": [
         "path"
       ],
-      "type" : "object"
+      "type": "object"
     },
-    "name" : "show_file",
-    "title" : "Show the person a file"
+    "name": "show_file",
+    "title": "Show the person a file"
   },
   {
-    "description" : "List, read, create, change, remove and run this project's agentic workflows. A workflow is a prompt that runs itself when something happens — on a schedule, or when an agent finishes, asks for permission, raises a form, or stops, or on any event below.\n\nA workflow is a Markdown file with YAML front matter. The front matter says what makes it run (`on:`) and which agent runs it (`agent:` — `new`, `standing`, or `triggering`); everything under the front matter is the prompt, sent verbatim.\n\nA workflow meant only to be run by hand, with Run now on its page, says `on: manual` (or leaves `on:` out). Nothing else runs it.\n\nA workflow may also say how its agent runs: `permission-mode:` (the runtime's own mode, e.g. a read-only or plan mode), `runtime:`, `model:`, `effort:` (how hard it thinks, e.g. `low` or `high`), and under `options:` any other option the runtime offers, by its own id — for example `fast: true` for fast mode. Leave them out and it runs on the default runtime with that runtime's own defaults. Set `permission-mode:` when the person says the workflow must not change anything — a workflow runs unattended, so this is the only chance to say so. A value the runtime does not offer stops the workflow running rather than falling back.\n\n`cooldown:` (e.g. `15m`, `2h`, `1d`) is the least time from the start of one run to the start of the next. Triggers that arrive sooner, or while a run is going, are held and run once, with the latest of them, when it ends. Set one for a workflow on a busy event such as `agent.finished`.\n\n`hosts:` names the computers that run it, by machine id: a Mac's hardware UUID, or on Linux the contents of `/etc/machine-id`. Leave it out and every host that has the project runs it and lists it. Name ids and only those hosts run it and list it, on a schedule, on an event, or by hand. The id is the computer's, not its name. The workflow page writes it from the hosts the control plane knows; do not invent an id.\n\n`when-done:` says what a run may do with its session once it is done: `keep` (the default) keeps every run in the list; `archive-allowed` lets a run that finishes done or nothing_to_do archive itself; `archive` archives every run that finishes so. Leave it out unless the person asks for runs to be put away.\n\nOnce its runtime has been used in this project, reading a workflow also lists what that runtime offers for each of these, in the words the file takes. To change how an existing workflow runs, read it, then write it back whole with the settings changed.\n\nNothing here asks the person, but a workflow you write or change does not run until they approve it on the project page; removing one takes effect at once. A new workflow you write also starts turned off, whatever its file says: after approving it, the person turns it on from its page when they are ready. Changing one that exists leaves it on or off as it was. So write one only when they asked for it, and say in your reply what you set up, that it is waiting for their OK, and that they turn it on once approved.\n\nA project may have at most 3 workflows waiting for approval; a write that would make another is refused until the person approves or removes one. Approved workflows do not count towards that. Those turned on count towards how many may run across every project, which only the person sets (10 unless they changed it); turning one on past it is refused until they turn one off or archive one.\n\n`run` runs a workflow once, now, as Run now on its page does: it starts the agent the workflow says and tells you its id, or says why it did not run. It is refused while the workflow waits for the person's OK, is archived or turned off, has a run going, or says `agent: triggering`; and in a run three workflows deep, so workflows cannot run each other in a loop. Run one only when the person asked for it or it is plainly the next step.\n\n`disable` turns a workflow off without touching its file: it stays listed, marked off, and none of its triggers run it; `list` says which are off and why. `enable` turns one back on, but only one an agent turned off: one the person turned off, one an agent wrote and nobody has turned on yet, and one whose file says `enabled: false` are theirs to turn on.\n\nUnder on:, besides schedule, any event name works, narrowed by what its inputSchema below takes written under it, e.g. `- branch.moved:` with `branch: main` under it. The project's MCP servers' events are listed by wait_for_event with action list.\nEvents (the same names work in wait_for_event and as workflow triggers under on:), one per line as MCP events/list describes them, each with its source: app, or the MCP server that offers it.\ninputSchema is what where (or the keys under a trigger) may narrow it by; payloadSchema is the details it carries when it happens, as a woken agent is told them.\n{\"name\":\"agent.started\",\"source\":\"app\",\"description\":\"An agent in this project started working.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.finished\",\"source\":\"app\",\"description\":\"An agent in this project ended a turn having done its work.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"afterwards\":{\"enum\":[\"archive_requested\",\"archived\",\"stay\"],\"type\":\"string\"},\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"outcome\":{\"enum\":[\"done\",\"nothing_to_do\",\"needs_answer\",\"partly_done\",\"stuck\",\"blocked\"],\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.asked_permission\",\"source\":\"app\",\"description\":\"An agent in this project is asking for permission.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.asked_form\",\"source\":\"app\",\"description\":\"An agent in this project raised a form to fill in.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.blocked\",\"source\":\"app\",\"description\":\"An agent in this project ended its turn waiting on something.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"},\"waiting_on\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.stopped\",\"source\":\"app\",\"description\":\"An agent in this project was stopped before finishing.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"by\":{\"enum\":[\"you\",\"cost_limit\",\"unknown\"],\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.failed\",\"source\":\"app\",\"description\":\"An agent in this project ended in an error.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"reason\":{\"enum\":[\"end_turn\",\"max_tokens\",\"max_turn_requests\",\"refusal\",\"cancelled\",\"process_died\",\"daemon_gone\",\"cost_limit\",\"unrecognised\",\"stopped_by_agent\",\"sign_in_refused\",\"runtime_error\",\"allowance_spent\",\"rate_limited\",\"sandbox_failed\",\"imported\"],\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.archive_requested\",\"source\":\"app\",\"description\":\"An agent in this project archived itself, and waits for the person to approve it.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"outcome\":{\"enum\":[\"done\",\"nothing_to_do\",\"needs_answer\",\"partly_done\",\"stuck\",\"blocked\"],\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.messaged\",\"source\":\"app\",\"description\":\"An agent in this project was sent a message by another, with message_session.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"from\":{\"type\":\"string\"},\"from_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.archived\",\"source\":\"app\",\"description\":\"An agent in this project was archived.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"by\":{\"enum\":[\"agent\",\"you\"],\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"outcome\":{\"enum\":[\"done\",\"nothing_to_do\",\"needs_answer\",\"partly_done\",\"stuck\",\"blocked\"],\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.deleted\",\"source\":\"app\",\"description\":\"An archived agent was deleted with its conversation.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"because\":{\"enum\":[\"age\",\"person\"],\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"project.idle\",\"source\":\"app\",\"description\":\"Every agent in this project has stopped working.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agents\":{\"type\":\"string\"},\"blocked\":{\"type\":\"string\"},\"failed\":{\"type\":\"string\"},\"finished\":{\"type\":\"string\"},\"ids\":{\"type\":\"string\"},\"since\":{\"type\":\"string\"},\"stopped\":{\"type\":\"string\"},\"waiting_on_you\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"workflow.ran\",\"source\":\"app\",\"description\":\"A workflow in this project started an agent.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"workflow\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"workflow.completed\",\"source\":\"app\",\"description\":\"A workflow's run in this project finished.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"outcome\":{\"enum\":[\"done\",\"nothing_to_do\",\"needs_answer\",\"partly_done\",\"stuck\",\"blocked\"],\"type\":\"string\"},\"workflow\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"workflow.refused\",\"source\":\"app\",\"description\":\"A workflow in this project did not run, and why.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"reason\":{\"enum\":[\"chain_too_deep\",\"run_in_flight\",\"queued\",\"queue_full\",\"archived\",\"disabled\",\"over_limit\",\"unreadable\",\"trigger_not_supported\",\"agent_unavailable\",\"no_triggering_agent\",\"missed_while_closed\",\"folder_gone\",\"day_limit_reached\",\"setting_refused\",\"awaiting_approval\",\"denied_here\",\"cooling_down\"],\"type\":\"string\"},\"workflow\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"branch.moved\",\"source\":\"app\",\"description\":\"A branch an agent works on moved; never the default branch.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{\"branch\":{\"type\":\"string\"}},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"branch\":{\"type\":\"string\"},\"from\":{\"type\":\"string\"},\"to\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"dropbox.file_added\",\"source\":\"app\",\"description\":\"A file arrived in this project's drop box, .agents/dropbox/, or a folder in it.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"extension\":{\"type\":\"string\"},\"folder\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"path\":{\"type\":\"string\"},\"size\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"lease.granted\",\"source\":\"app\",\"description\":\"An agent was given a lease.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"resource\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"lease.released\",\"source\":\"app\",\"description\":\"A lease was given back, ended or ran out.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"how\":{\"enum\":[\"expired\",\"ended\",\"released\"],\"type\":\"string\"},\"resource\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"mac.sleep\",\"source\":\"app\",\"description\":\"This Mac is going to sleep. Only a Mac raises it, never a Linux server.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{},\"type\":\"object\"}}\n{\"name\":\"mac.wake\",\"source\":\"app\",\"description\":\"This Mac woke up. Only a Mac raises it, never a Linux server.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{},\"type\":\"object\"}}\n{\"name\":\"machine.disk_low\",\"source\":\"app\",\"description\":\"Free space on a volume holding the Agents root, a project or a worktree fell below its low or critical threshold.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"free_bytes\":{\"type\":\"string\"},\"free_percent\":{\"type\":\"string\"},\"level\":{\"enum\":[\"low\",\"critical\"],\"type\":\"string\"},\"threshold\":{\"type\":\"string\"},\"volume\":{\"type\":\"string\"},\"worktrees\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"machine.disk_ok\",\"source\":\"app\",\"description\":\"Free space on a volume that was low climbed back above its threshold.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"free_bytes\":{\"type\":\"string\"},\"free_percent\":{\"type\":\"string\"},\"threshold\":{\"type\":\"string\"},\"volume\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"person.away\",\"source\":\"app\",\"description\":\"You locked the screen or stepped away for 5 minutes. Only a Mac raises it, never a Linux server.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{\"why\":{\"enum\":[\"locked\",\"idle\"],\"type\":\"string\"}},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"why\":{\"enum\":[\"locked\",\"idle\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"person.back\",\"source\":\"app\",\"description\":\"You unlocked the screen or came back. Only a Mac raises it, never a Linux server.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{\"why\":{\"enum\":[\"locked\",\"idle\"],\"type\":\"string\"}},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"why\":{\"enum\":[\"locked\",\"idle\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"cost.limit_reached\",\"source\":\"app\",\"description\":\"A spending limit was reached.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"limit\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"cost.allowance_out\",\"source\":\"app\",\"description\":\"A runtime's allowance ran out.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"reason\":{\"enum\":[\"allowance spent\",\"credit used up\",\"paid extra usage began\",\"still rate limited\",\"runtime failed\",\"learned from another host\"],\"type\":\"string\"},\"retry_after\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"until\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"cost.allowance_back\",\"source\":\"app\",\"description\":\"A runtime's allowance came back.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"how\":{\"enum\":[\"worked\",\"answering\",\"another host\",\"person\",\"time\",\"check\"],\"type\":\"string\"},\"runtime\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"server.offline\",\"source\":\"app\",\"description\":\"A server went offline.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"server\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"server.online\",\"source\":\"app\",\"description\":\"A server came back.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"server\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"system.restarted\",\"source\":\"app\",\"description\":\"Agents started again, after a stop or a crash.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"down_for\":{\"type\":\"string\"},\"down_for_text\":{\"type\":\"string\"},\"down_since\":{\"type\":\"string\"},\"reason\":{\"enum\":[\"stopped\",\"crashed\",\"first_start\"],\"type\":\"string\"}},\"type\":\"object\"}}\nA subject with .* matches all of its events, e.g. agent.*; for an MCP server's noun, all of that noun's events. A list in where matches any of its values, e.g. why: [locked, idle]. To wait for particular agents, use wait_for_event with agents.",
-    "inputSchema" : {
-      "properties" : {
-        "action" : {
-          "description" : "What to do.",
-          "enum" : [
+    "description": "List, read, create, change, remove and run this folder's agentic workflows. A workflow is a prompt that runs itself when something happens — on a schedule, or when an agent finishes, asks for permission, raises a form, or stops, or on any event below.\n\nA workflow is a Markdown file with YAML front matter. The front matter says what makes it run (`on:`) and which agent runs it (`agent:` — `new`, `standing`, or `triggering`); everything under the front matter is the prompt, sent verbatim.\n\nA workflow meant only to be run by hand, with Run now on its page, says `on: manual` (or leaves `on:` out). Nothing else runs it.\n\nA workflow may also say how its agent runs: `permission-mode:` (the runtime's own mode, e.g. a read-only or plan mode), `runtime:`, `model:`, `effort:` (how hard it thinks, e.g. `low` or `high`), and under `options:` any other option the runtime offers, by its own id — for example `fast: true` for fast mode. Leave them out and it runs on the default runtime with that runtime's own defaults. Set `permission-mode:` when the person says the workflow must not change anything — a workflow runs unattended, so this is the only chance to say so. A value the runtime does not offer stops the workflow running rather than falling back.\n\n`cooldown:` (e.g. `15m`, `2h`, `1d`) is the least time from the start of one run to the start of the next. Triggers that arrive sooner, or while a run is going, are held and run once, with the latest of them, when it ends. Set one for a workflow on a busy event such as `agent.finished`.\n\n`hosts:` names the computers that run it, by machine id: a Mac's hardware UUID, or on Linux the contents of `/etc/machine-id`. Leave it out and every host that has the folder runs it and lists it. Name ids and only those hosts run it and list it, on a schedule, on an event, or by hand. The id is the computer's, not its name. The workflow page writes it from the hosts the control plane knows; do not invent an id.\n\n`when-done:` says what a run may do with its session once it is done: `keep` (the default) keeps every run in the list; `archive-allowed` lets a run that finishes done or nothing_to_do archive itself; `archive` archives every run that finishes so. Leave it out unless the person asks for runs to be put away.\n\nOnce its runtime has been used in this folder, reading a workflow also lists what that runtime offers for each of these, in the words the file takes. To change how an existing workflow runs, read it, then write it back whole with the settings changed.\n\nNothing here asks the person, but a workflow you write or change does not run until they approve it on the folder page; removing one takes effect at once. A new workflow you write also starts turned off, whatever its file says: after approving it, the person turns it on from its page when they are ready. Changing one that exists leaves it on or off as it was. So write one only when they asked for it, and say in your reply what you set up, that it is waiting for their OK, and that they turn it on once approved.\n\nThere is no limit on workflows waiting for approval. Up to 20 approved workflows may be on in each folder by default; the person can set the limit from 1 to 100 in Settings ▸ Cost. Turning one on past the limit is refused until you turn one off or archive one in that folder.\n\n`run` runs a workflow once, now, as Run now on its page does: it starts the agent the workflow says and tells you its id, or says why it did not run. It is refused while the workflow waits for the person's OK, is archived or turned off, has a run going, or says `agent: triggering`; and in a run three workflows deep, so workflows cannot run each other in a loop. Run one only when the person asked for it or it is plainly the next step.\n\n`disable` turns a workflow off without touching its file: it stays listed, marked off, and none of its triggers run it; `list` says which are off and why. `enable` turns one back on, but only one an agent turned off: one the person turned off, one an agent wrote and nobody has turned on yet, and one whose file says `enabled: false` are theirs to turn on.\n\nUnder on:, besides schedule, any event name works, narrowed by what its inputSchema below takes written under it, e.g. `- branch.moved:` with `branch: main` under it. The folder's MCP servers' events are listed by wait_for_event with action list.\nEvents (the same names work in wait_for_event and as workflow triggers under on:), one per line as MCP events/list describes them, each with its source: app, or the MCP server that offers it.\ninputSchema is what where (or the keys under a trigger) may narrow it by; payloadSchema is the details it carries when it happens, as a woken agent is told them.\n{\"name\":\"agent.started\",\"source\":\"app\",\"description\":\"An agent in this folder started working.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.finished\",\"source\":\"app\",\"description\":\"An agent in this folder ended a turn having done its work.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"afterwards\":{\"enum\":[\"archive_requested\",\"archived\",\"stay\"],\"type\":\"string\"},\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"outcome\":{\"enum\":[\"done\",\"nothing_to_do\",\"needs_answer\",\"blocked\"],\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.asked_permission\",\"source\":\"app\",\"description\":\"An agent in this folder is asking for permission.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.asked_form\",\"source\":\"app\",\"description\":\"An agent in this folder raised a form to fill in.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.blocked\",\"source\":\"app\",\"description\":\"An agent in this folder ended its turn waiting on something.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"},\"waiting_on\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.stopped\",\"source\":\"app\",\"description\":\"An agent in this folder was stopped before finishing.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"by\":{\"enum\":[\"you\",\"cost_limit\",\"unknown\"],\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.failed\",\"source\":\"app\",\"description\":\"An agent in this folder ended in an error.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"reason\":{\"enum\":[\"end_turn\",\"max_tokens\",\"max_turn_requests\",\"refusal\",\"cancelled\",\"process_died\",\"daemon_gone\",\"cost_limit\",\"unrecognised\",\"stopped_by_agent\",\"sign_in_refused\",\"runtime_error\",\"allowance_spent\",\"rate_limited\",\"sandbox_failed\",\"imported\"],\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.archive_requested\",\"source\":\"app\",\"description\":\"An agent in this folder archived itself, and waits for the person to approve it.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"outcome\":{\"enum\":[\"done\",\"nothing_to_do\",\"needs_answer\",\"blocked\"],\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.messaged\",\"source\":\"app\",\"description\":\"An agent in this folder was sent a message by another, with message_session.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"from\":{\"type\":\"string\"},\"from_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.archived\",\"source\":\"app\",\"description\":\"An agent in this folder was archived.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"by\":{\"enum\":[\"agent\",\"you\"],\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"outcome\":{\"enum\":[\"done\",\"nothing_to_do\",\"needs_answer\",\"blocked\"],\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"agent.deleted\",\"source\":\"app\",\"description\":\"An archived agent was deleted with its conversation.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"because\":{\"enum\":[\"age\",\"person\"],\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"folder.idle\",\"source\":\"app\",\"description\":\"Every agent in this folder has stopped working.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agents\":{\"type\":\"string\"},\"blocked\":{\"type\":\"string\"},\"failed\":{\"type\":\"string\"},\"finished\":{\"type\":\"string\"},\"ids\":{\"type\":\"string\"},\"since\":{\"type\":\"string\"},\"stopped\":{\"type\":\"string\"},\"waiting_on_you\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"workflow.ran\",\"source\":\"app\",\"description\":\"A workflow in this folder started an agent.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"workflow\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"workflow.completed\",\"source\":\"app\",\"description\":\"A workflow's run in this folder finished.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"outcome\":{\"enum\":[\"done\",\"nothing_to_do\",\"needs_answer\",\"blocked\"],\"type\":\"string\"},\"workflow\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"workflow.refused\",\"source\":\"app\",\"description\":\"A workflow in this folder did not run, and why.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"reason\":{\"enum\":[\"chain_too_deep\",\"run_in_flight\",\"queued\",\"queue_full\",\"archived\",\"disabled\",\"over_limit\",\"unreadable\",\"trigger_not_supported\",\"agent_unavailable\",\"no_triggering_agent\",\"missed_while_closed\",\"folder_gone\",\"day_limit_reached\",\"setting_refused\",\"awaiting_approval\",\"denied_here\",\"cooling_down\"],\"type\":\"string\"},\"workflow\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"branch.moved\",\"source\":\"app\",\"description\":\"A branch an agent works on moved; never the default branch.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{\"branch\":{\"type\":\"string\"}},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"branch\":{\"type\":\"string\"},\"from\":{\"type\":\"string\"},\"to\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"dropbox.file_added\",\"source\":\"app\",\"description\":\"A file arrived in this folder's drop box, .agents/dropbox/, or a folder in it.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"extension\":{\"type\":\"string\"},\"folder\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"path\":{\"type\":\"string\"},\"size\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"lease.granted\",\"source\":\"app\",\"description\":\"An agent was given a lease.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"resource\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"lease.released\",\"source\":\"app\",\"description\":\"A lease was given back, ended or ran out.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"how\":{\"enum\":[\"expired\",\"ended\",\"released\"],\"type\":\"string\"},\"resource\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"mac.sleep\",\"source\":\"app\",\"description\":\"This Mac is going to sleep. Only a Mac raises it, never a Linux server.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{},\"type\":\"object\"}}\n{\"name\":\"mac.wake\",\"source\":\"app\",\"description\":\"This Mac woke up. Only a Mac raises it, never a Linux server.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{},\"type\":\"object\"}}\n{\"name\":\"machine.disk_low\",\"source\":\"app\",\"description\":\"Free space on a volume holding the Agents root, a folder or a worktree fell below its low or critical threshold.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"free_bytes\":{\"type\":\"string\"},\"free_percent\":{\"type\":\"string\"},\"level\":{\"enum\":[\"low\",\"critical\"],\"type\":\"string\"},\"threshold\":{\"type\":\"string\"},\"volume\":{\"type\":\"string\"},\"worktrees\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"machine.disk_ok\",\"source\":\"app\",\"description\":\"Free space on a volume that was low climbed back above its threshold.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"free_bytes\":{\"type\":\"string\"},\"free_percent\":{\"type\":\"string\"},\"threshold\":{\"type\":\"string\"},\"volume\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"person.away\",\"source\":\"app\",\"description\":\"You locked the screen or stepped away for 5 minutes. Only a Mac raises it, never a Linux server.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{\"why\":{\"enum\":[\"locked\",\"idle\"],\"type\":\"string\"}},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"why\":{\"enum\":[\"locked\",\"idle\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"person.back\",\"source\":\"app\",\"description\":\"You unlocked the screen or came back. Only a Mac raises it, never a Linux server.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{\"why\":{\"enum\":[\"locked\",\"idle\"],\"type\":\"string\"}},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"why\":{\"enum\":[\"locked\",\"idle\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"cost.limit_reached\",\"source\":\"app\",\"description\":\"A spending limit was reached.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"agent\":{\"type\":\"string\"},\"agent_title\":{\"type\":\"string\"},\"labels\":{\"type\":\"string\"},\"limit\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"started_by\":{\"enum\":[\"agent\",\"workflow\",\"person\"],\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"cost.allowance_out\",\"source\":\"app\",\"description\":\"A runtime's allowance ran out.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"reason\":{\"enum\":[\"allowance spent\",\"credit used up\",\"paid extra usage began\",\"still rate limited\",\"runtime failed\",\"learned from another host\"],\"type\":\"string\"},\"retry_after\":{\"type\":\"string\"},\"runtime\":{\"type\":\"string\"},\"until\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"cost.allowance_back\",\"source\":\"app\",\"description\":\"A runtime's allowance came back.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"how\":{\"enum\":[\"worked\",\"answering\",\"another host\",\"person\",\"time\",\"check\"],\"type\":\"string\"},\"runtime\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"server.offline\",\"source\":\"app\",\"description\":\"A server went offline.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"server\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"server.online\",\"source\":\"app\",\"description\":\"A server came back.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"server\":{\"type\":\"string\"}},\"type\":\"object\"}}\n{\"name\":\"system.restarted\",\"source\":\"app\",\"description\":\"Agents started again, after a stop or a crash.\",\"inputSchema\":{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"},\"payloadSchema\":{\"properties\":{\"down_for\":{\"type\":\"string\"},\"down_for_text\":{\"type\":\"string\"},\"down_since\":{\"type\":\"string\"},\"reason\":{\"enum\":[\"stopped\",\"crashed\",\"first_start\"],\"type\":\"string\"}},\"type\":\"object\"}}\nA subject with .* matches all of its events, e.g. agent.*; for an MCP server's noun, all of that noun's events. A list in where matches any of its values, e.g. why: [locked, idle]. To wait for particular agents, use wait_for_event with agents.",
+    "inputSchema": {
+      "properties": {
+        "action": {
+          "description": "What to do.",
+          "enum": [
             "list",
             "read",
             "write",
@@ -74,593 +74,773 @@
             "disable",
             "run"
           ],
-          "type" : "string"
+          "type": "string"
         },
-        "content" : {
-          "description" : "The whole file, front matter and prompt. Required for write. For example:\n\n---\non:\n  - schedule:\n      at: [\":00\"]\n      between: \"09:00-09:00\"\n      days: [mon, tue, wed, thu, fri]\nagent: new\npermission-mode: plan\n---\n\nCheck the build and say whether it is green.",
-          "type" : "string"
+        "content": {
+          "description": "The whole file, front matter and prompt. Required for write. For example:\n\n---\non:\n  - schedule:\n      at: [\":00\"]\n      between: \"09:00-09:00\"\n      days: [mon, tue, wed, thu, fri]\nagent: new\npermission-mode: plan\n---\n\nCheck the build and say whether it is green.",
+          "type": "string"
         },
-        "description" : {
-          "description" : "Why you are making this call, in one short sentence for the person.",
-          "type" : "string"
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
         },
-        "id" : {
-          "description" : "The workflow's file name without its extension, e.g. `morning-build-check`. Required for read, write, remove, enable, disable and run.",
-          "type" : "string"
+        "id": {
+          "description": "The workflow's file name without its extension, e.g. `morning-build-check`. Required for read, write, remove, enable, disable and run.",
+          "type": "string"
         }
       },
-      "required" : [
+      "required": [
         "action"
       ],
-      "type" : "object"
+      "type": "object"
     },
-    "name" : "manage_workflows",
-    "title" : "Manage this project's workflows"
+    "name": "manage_workflows",
+    "title": "Manage this folder's workflows"
   },
   {
-    "description" : "Ask me a question or a short form and wait for my answer. Use this when something is mine to decide — anything hard to undo, spending money or making an outside account, a restart or an install, a missing credential, a choice with no clear best answer — rather than guessing or ending the turn with the question in your reply. When you would mark one answer recommended and it is easy to undo, do not ask: take it, and write `Decided: <what>, because <why>.` where I will see it.\n\nYour question reaches me wherever I am, including on my phone. The call waits up to 45 seconds for my answer; if I have not answered by then, it says the form is still open and keeps your place: end your turn, and you are started again with my answer when I answer, skip or cancel. Do not ask again. Prefer your runtime's own question tool when you have one; use this when you do not, or when that tool is not in your catalogue.\n\nEach question may offer options to pick, or leave options out for free text. Set allow_multiple when more than one option may be chosen.",
-    "inputSchema" : {
-      "properties" : {
-        "description" : {
-          "description" : "Why you are making this call, in one short sentence for the person.",
-          "type" : "string"
+    "description": "Ask me a question or a short form and wait for my answer. Use this when something is mine to decide — anything hard to undo, spending money or making an outside account, a restart or an install, a missing credential, a choice with no clear best answer — rather than guessing or ending the turn with the question in your reply. When you would mark one answer recommended and it is easy to undo, do not ask: take it, and write `Decided: <what>, because <why>.` where I will see it.\n\nYour question reaches me wherever I am, including on my phone. The call waits up to 45 seconds for my answer; if I have not answered by then, it says the form is still open and keeps your place: end your turn, and you are started again with my answer when I answer, skip or cancel. Do not ask again. Prefer your runtime's own question tool when you have one; use this when you do not, or when that tool is not in your catalogue.\n\nEach question may offer options to pick, or leave options out for free text. Set allow_multiple when more than one option may be chosen. To ask for a secret (an API key, a token), use ask_secret, never this.",
+    "inputSchema": {
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
         },
-        "questions" : {
-          "description" : "One or more questions. Keep it short.",
-          "items" : {
-            "properties" : {
-              "allow_multiple" : {
-                "description" : "True when more than one option may be chosen.",
-                "type" : "boolean"
+        "questions": {
+          "description": "One or more questions. Keep it short.",
+          "items": {
+            "properties": {
+              "allow_multiple": {
+                "description": "True when more than one option may be chosen.",
+                "type": "boolean"
               },
-              "id" : {
-                "description" : "A short stable id for this question.",
-                "type" : "string"
+              "id": {
+                "description": "A short stable id for this question.",
+                "type": "string"
               },
-              "options" : {
-                "description" : "Choices to pick from. Leave out, or pass an empty list, for a free-text answer.",
-                "items" : {
-                  "properties" : {
-                    "id" : {
-                      "type" : "string"
+              "options": {
+                "description": "Choices to pick from. Leave out, or pass an empty list, for a free-text answer.",
+                "items": {
+                  "properties": {
+                    "id": {
+                      "type": "string"
                     },
-                    "label" : {
-                      "type" : "string"
+                    "label": {
+                      "type": "string"
                     }
                   },
-                  "required" : [
+                  "required": [
                     "id"
                   ],
-                  "type" : "object"
+                  "type": "object"
                 },
-                "type" : "array"
+                "type": "array"
               },
-              "prompt" : {
-                "description" : "The question in your own words.",
-                "type" : "string"
+              "prompt": {
+                "description": "The question in your own words.",
+                "type": "string"
               }
             },
-            "required" : [
+            "required": [
               "id",
               "prompt"
             ],
-            "type" : "object"
+            "type": "object"
           },
-          "minItems" : 1,
-          "type" : "array"
+          "minItems": 1,
+          "type": "array"
         },
-        "title" : {
-          "description" : "Optional heading for the form as a whole.",
-          "type" : "string"
+        "title": {
+          "description": "Optional heading for the form as a whole.",
+          "type": "string"
         }
       },
-      "required" : [
+      "required": [
         "questions"
       ],
-      "type" : "object"
+      "type": "object"
     },
-    "name" : "ask_form",
-    "title" : "Ask the person a question"
+    "name": "ask_question",
+    "title": "Ask the person a question"
   },
   {
-    "description" : "When your turn ends with a report or a done reply and leaves one clear next step for the person, offer it as a prompt before you end the turn; not with a question waiting, nor when you archive. Call at most once; a later call replaces it. Use a 2–5 word label and the full prompt text.",
-    "inputSchema" : {
-      "properties" : {
-        "description" : {
-          "description" : "Why you are making this call, in one short sentence for the person.",
-          "type" : "string"
+    "description": "Ask me for one secret, such as an API key or a token, when you need it and it is not set. I type it into a masked field; it is saved to my secrets file on this machine, and you get its name and where it is, never the value. Never ask for a secret with ask_question or in your reply: what is typed there goes into the chat.\n\nThe call waits up to 45 seconds, as ask_question does; if I have not answered by then, end your turn, and you are started again when I save it or say no. Do not ask again.\n\nUse the secret without printing it: never echo, cat or log it, and never write it into a file in the folder.",
+    "inputSchema": {
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
         },
-        "label" : {
-          "description" : "A 2–5 word chip label.",
-          "type" : "string"
+        "name": {
+          "description": "The secret's name, as an environment variable: capital letters, digits and underscores, e.g. OPENAI_API_KEY.",
+          "type": "string"
         },
-        "prompt" : {
-          "description" : "The prompt sent when the person taps the chip.",
-          "type" : "string"
+        "reason": {
+          "description": "What you need it for, in one sentence.",
+          "type": "string"
+        },
+        "url": {
+          "description": "Where to get it, if you know: the page that makes or shows the key.",
+          "type": "string"
         }
       },
-      "required" : [
+      "required": [
+        "name",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "name": "ask_secret",
+    "title": "Ask the person for a secret"
+  },
+  {
+    "description": "When your turn ends with a report or a done reply and leaves one clear next step for the person, offer it as a prompt before you end the turn; not with a question waiting, nor when you archive. Call at most once; a later call replaces it. Use a 2–5 word label and the full prompt text.",
+    "inputSchema": {
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
+        },
+        "label": {
+          "description": "A 2–5 word chip label.",
+          "type": "string"
+        },
+        "prompt": {
+          "description": "The prompt sent when the person taps the chip.",
+          "type": "string"
+        }
+      },
+      "required": [
         "label",
         "prompt"
       ],
-      "type" : "object"
+      "type": "object"
     },
-    "name" : "suggest_next_prompt",
-    "title" : "Suggest the next prompt"
+    "name": "suggest_next_prompt",
+    "title": "Suggest the next prompt"
   },
   {
-    "description" : "Start another session in this project, with a prompt of its own, to do a part of the work that can run alongside the rest. It starts in this project's folder — there is no way to start one anywhere else — and appears in the person's list of sessions, marked as started by you. The person can open it, talk to it, stop it or archive it at any time.\n\nThis project has two limits on sessions started by sessions, counting every one here, which only the person sets (in Project Settings): how many may be running — working, waiting on a question, or waiting to carry on by itself — and how many may exist not yet archived, where stopped, finished and asking-to-be-archived ones still count. A start that would break either is queued instead, saying which: nothing runs yet, and it starts by itself, oldest first, once a running place and a not-archived place are both free, behind the working and waiting ones. So you can queue work up front rather than wait and try again; wait for a queued session with wait_for_event as for any other. A third limit says how many may be queued; past it a start is refused. Use list_sessions with started_by me to see yours and how many places of each are in use. Stop one with stop_session when its part is no longer wanted: that frees its running place, and it keeps its other place until it is archived. Once its work is merged or abandoned, call archive_session on it to free that place too (at once where the person allows it, otherwise by asking them); archive a finished session rather than removing its worktree under it.\n\nStart one only when part of the work can genuinely run alongside the rest. Do not start one for work you could simply do yourself. The session you start cannot start sessions of its own.\n\nReturns the new session's id, which stop_session and archive_session take.",
-    "inputSchema" : {
-      "properties" : {
-        "description" : {
-          "description" : "Why you are making this call, in one short sentence for the person.",
-          "type" : "string"
+    "description": "Tell the person that something happened, with a notification, when nothing is to be answered: a deploy finished, a long test passed, a run you were asked to watch failed. It goes to the device the person is at, and a tap opens this conversation. It asks nothing, puts nothing in Needs you, and does not end your turn; to ask, use ask_question.\n\nThe person's attention is limited, so every agent shares a few notices: a short burst, then one comes back each cool-down. When none is left, nothing is sent and you are told when the next can go; nothing is queued, so decide whether it is still worth telling then. A notice is not sent while the person is looking at this conversation, nor when they muted it. Keep the title short, and say what happened, not what you will do.",
+    "inputSchema": {
+      "properties": {
+        "body": {
+          "description": "One or two sentences under the title, if the title is not enough.",
+          "type": "string"
         },
-        "labels" : {
-          "description" : "Labels for the new session, owned by that session.",
-          "items" : {
-            "type" : "string"
-          },
-          "type" : "array"
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
         },
-        "model" : {
-          "description" : "Optional. The model, as a workflow's `model:`. One the runtime does not offer is refused, naming the ones it does.",
-          "type" : "string"
-        },
-        "permission_mode" : {
-          "description" : "Optional. The runtime's own permission mode, as a workflow's `permission-mode:` — e.g. a read-only or plan mode. Leave out to start it in the mode you are in now, when it runs on your runtime.",
-          "type" : "string"
-        },
-        "prompt" : {
-          "description" : "What the new session is to do. Sent to it as its first message.",
-          "type" : "string"
-        },
-        "runtime" : {
-          "description" : "Optional. The runtime to run it on, by id, as a workflow's `runtime:`; leave out for the default. list_sessions with started_by me ends with the ones available here and each one's model. One that is not available (not installed, not signed in, out of the pool) is refused before anything starts, naming the ones that are.",
-          "type" : "string"
-        },
-        "worktree" : {
-          "description" : "Optional. Where the new session works. Leave out to work in the project folder. \"new\" makes a fresh git worktree, on its own branch, named from the prompt — for parallel work that should not touch the same files. Or the name of a worktree of this repository that is already there, as `git worktree list` shows it. Or the name of a branch not checked out anywhere, local or on a remote, to make a fresh worktree on that branch.",
-          "type" : "string"
+        "title": {
+          "description": "What happened, in a few words, e.g. \"The deploy finished\".",
+          "type": "string"
         }
       },
-      "required" : [
+      "required": [
+        "title"
+      ],
+      "type": "object"
+    },
+    "name": "notify",
+    "title": "Tell the person something happened"
+  },
+  {
+    "description": "In voice mode, when the person says they are done talking (\"that's all\", \"bye\", \"thanks, I'm done\"), say a short goodbye in your reply and call this: voice mode ends once the goodbye is said. Only in voice mode, and only when the person is done.",
+    "inputSchema": {
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "hang_up",
+    "title": "Hang up voice mode"
+  },
+  {
+    "description": "Start another session in this folder, with a prompt of its own, to do a part of the work that can run alongside the rest. It starts in this folder, or, with machine and folder, on another of the person's machines, and appears in the person's list of sessions, marked as started by you. The person can open it, talk to it, stop it or archive it at any time.\n\nThis folder has two limits on sessions started by sessions, counting every one here, which only the person sets (in Folder Settings): how many may be running — working, waiting on a question, or waiting to carry on by itself — and how many may exist not yet archived, where stopped, finished and asking-to-be-archived ones still count. A start that would break either is queued instead, saying which: nothing runs yet, and it starts by itself, oldest first, once a running place and a not-archived place are both free, behind the working and waiting ones. So you can queue work up front rather than wait and try again; wait for a queued session with wait_for_agents as for any other. A third limit says how many may be queued; past it a start is refused. Use list_sessions with started_by me to see yours and how many places of each are in use. Stop one with stop_session when its part is no longer wanted: that frees its running place, and it keeps its other place until it is archived. Once its work is merged or abandoned, call archive_session on it to free that place too (at once where the person allows it, otherwise by asking them); archive a finished session rather than removing its worktree under it.\n\nOn another machine (list_machines names them), for work that has to run there, such as a bug only that machine shows: the person is asked first, on your question card, and nothing starts without their yes. folder is a path on that machine. It has the code already, or, with send, the branch you are on goes there first, with its uncommitted changes, as the person's Send to ‹machine›… does: the folder is made if it is not there, and a folder there with work of its own is never overwritten. A stopped machine is started, and the session starts when it connects. This folder's limits count it, and a start past them is refused there rather than queued. list_sessions with started_by me, read_session, message_session, wait_for_agents, stop_session and archive_session reach it by its id, through the control plane, and only you can; its end comes back to wait_for_agents. One started while its machine was stopped has no id yet, so they don't reach it. Say in its prompt what to do with its result, such as push a branch or open a pull request; the person sees it under that machine.\n\nStart one only when part of the work can genuinely run alongside the rest. Do not start one for work you could simply do yourself. The session you start cannot start sessions of its own.\n\nReturns the new session's id, which stop_session and archive_session take.",
+    "inputSchema": {
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
+        },
+        "folder": {
+          "description": "With machine: the folder to work in on that machine, as an absolute path.",
+          "type": "string"
+        },
+        "labels": {
+          "description": "Labels for the new session, owned by that session.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "machine": {
+          "description": "Optional. Another of the person's machines, by name, as list_machines shows it, to start the session there instead of here. Needs folder.",
+          "type": "string"
+        },
+        "model": {
+          "description": "Optional. The model, as a workflow's `model:`. One the runtime does not offer is refused, naming the ones it does.",
+          "type": "string"
+        },
+        "permission_mode": {
+          "description": "Optional. The runtime's own permission mode, as a workflow's `permission-mode:` — e.g. a read-only or plan mode. Leave out to start it in the mode you are in now, when it runs on your runtime.",
+          "type": "string"
+        },
+        "prompt": {
+          "description": "What the new session is to do. Sent to it as its first message.",
+          "type": "string"
+        },
+        "runtime": {
+          "description": "Optional. The runtime to run it on, by id, as a workflow's `runtime:`; leave it out to use the most recently active runtime on the host that runs the workflow. list_sessions with started_by me ends with the ones available here and each one's model. One that is not available (not installed, not signed in, out of the pool) is refused before anything starts, naming the ones that are.",
+          "type": "string"
+        },
+        "send": {
+          "description": "Optional, with machine. true sends the branch you are on, with its uncommitted changes, to folder on that machine before the session starts there. The machine has to be running.",
+          "type": "boolean"
+        },
+        "worktree": {
+          "description": "Optional. Where the new session works. Leave out to work in the folder. \"new\" makes a fresh git worktree, on its own branch, named from the prompt — for parallel work that should not touch the same files. Or the name of a worktree of this repository that is already there, as `git worktree list` shows it. Or the name of a branch not checked out anywhere, local or on a remote, to make a fresh worktree on that branch. On another machine, \"new\" or a branch name.",
+          "type": "string"
+        }
+      },
+      "required": [
         "prompt"
       ],
-      "type" : "object"
+      "type": "object"
     },
-    "name" : "start_session",
-    "title" : "Start a session in this project"
+    "name": "start_session",
+    "title": "Start a session"
   },
   {
-    "description" : "Stop a session you started with start_session, as the person's own Stop would. It stays in the list with its conversation. Stopping frees its running place; it keeps its not-archived place until it is archived. Stopping a queued one takes it off the queue, and it never starts. Only sessions you started, and the ones they started, can be stopped this way; not yourself, and not anyone else's.",
-    "inputSchema" : {
-      "properties" : {
-        "description" : {
-          "description" : "Why you are making this call, in one short sentence for the person.",
-          "type" : "string"
+    "description": "Stop a session you started with start_session, as the person's own Stop would. It stays in the list with its conversation. Stopping frees its running place; it keeps its not-archived place until it is archived. Stopping a queued one takes it off the queue, and it never starts. Only sessions you started, and the ones they started, can be stopped this way; not yourself, and not anyone else's.",
+    "inputSchema": {
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
         },
-        "id" : {
-          "description" : "The id start_session or list_sessions gave.",
-          "type" : "string"
+        "id": {
+          "description": "The id start_session or list_sessions gave.",
+          "type": "string"
         }
       },
-      "required" : [
+      "required": [
         "id"
       ],
-      "type" : "object"
+      "type": "object"
     },
-    "name" : "stop_session",
-    "title" : "Stop a session you started"
+    "name": "stop_session",
+    "title": "Stop a session you started"
   },
   {
-    "description" : "With no id: call it when your work is done, you have cleaned up, and nothing is left for the person to see. It archives this session once this turn ends. Do not call it when you showed the person a file with show_file, asked them a question, or have a report for them: end the turn instead. It holds only if the turn ends done, nothing_to_do or partly_done; anything the person sends first drops it. Where nobody needs to approve it — your workflow lets its run archive itself, the session that started you may archive you, or the person lets agents archive the chats they start (a setting, on unless they turn it off) — it is archived, if the turn ends done or nothing_to_do and, for the person's own chat, showed no file. Otherwise the person approves archiving it from your row, or leaves it. Goes with move_worktree: you move, and stay there waiting for approval.\n\nWith an id: the same for a session you started with start_session, or one it started, once its work is merged or abandoned. Where this project lets you archive the sessions you started (a Project Settings switch) it is archived now, or once its turn ends; otherwise the person approves it. Either way its running place is freed once it is done; it keeps its not-archived place until it is archived. Archive a finished session rather than removing its worktree under it. Never the person's own sessions or another session's.",
-    "inputSchema" : {
-      "properties" : {
-        "description" : {
-          "description" : "Why you are making this call, in one short sentence for the person.",
-          "type" : "string"
+    "description": "With no id: call it when your work is done, you have cleaned up, and nothing is left for the person to see. It archives this session once this turn ends. Do not call it when you showed the person a file with show_file, asked them a question, or have a report for them: end the turn instead. It holds only if the turn ends done or nothing_to_do; anything the person sends first drops it. Where nobody needs to approve it — your workflow lets its run archive itself, the session that started you may archive you, or the person lets agents archive the chats they start (a setting, on unless they turn it off) — it is archived, if the turn ends done or nothing_to_do and, for the person's own chat, showed no file. Otherwise the person approves archiving it from your row, or leaves it. Goes with move_worktree: you move, and stay there waiting for approval.\n\nWith an id: the same for a session you started with start_session, or one it started, once its work is merged or abandoned. Where this folder lets you archive the sessions you started (a Folder Settings switch) it is archived now, or once its turn ends; otherwise the person approves it. Either way its running place is freed once it is done; it keeps its not-archived place until it is archived. Archive a finished session rather than removing its worktree under it. Never the person's own sessions or another session's.",
+    "inputSchema": {
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
         },
-        "id" : {
-          "description" : "The id start_session or list_sessions gave. Leave out for yourself.",
-          "type" : "string"
+        "id": {
+          "description": "The id start_session or list_sessions gave. Leave out for yourself.",
+          "type": "string"
         }
       },
-      "type" : "object"
+      "type": "object"
     },
-    "name" : "archive_session",
-    "title" : "Archive this session or one you started"
+    "name": "archive_session",
+    "title": "Archive this session or one you started"
   },
   {
-    "description" : "Add or remove your own labels on this session. The person's labels are theirs.",
-    "inputSchema" : {
-      "properties" : {
-        "add" : {
-          "items" : {
-            "type" : "string"
+    "description": "Add or remove your own labels on this session. The person's labels are theirs. A label #n or P#n (or a Linear key, such as ENG-4) also links this session to that issue or pull request; removing the label ends the link.",
+    "inputSchema": {
+      "properties": {
+        "add": {
+          "items": {
+            "type": "string"
           },
-          "type" : "array"
+          "type": "array"
         },
-        "description" : {
-          "description" : "Why you are making this call, in one short sentence for the person.",
-          "type" : "string"
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
         },
-        "remove" : {
-          "items" : {
-            "type" : "string"
+        "remove": {
+          "items": {
+            "type": "string"
           },
-          "type" : "array"
+          "type": "array"
         }
       },
-      "type" : "object"
+      "type": "object"
     },
-    "name" : "set_session_labels",
-    "title" : "Label this session"
+    "name": "set_session_labels",
+    "title": "Label this session"
   },
   {
-    "description" : "Move once this turn ends: into a git worktree of this project, or back to the project folder. Do it when the work turns into a change that should be on its own branch, or when asked. You are started again there to carry on, or stay there if you asked to be archived. Nothing uncommitted comes with you, and a new worktree starts from the commit you have checked out: commit first. Give neither argument to take back a move you asked for. Not with a wait.",
-    "inputSchema" : {
-      "properties" : {
-        "description" : {
-          "description" : "Why you are making this call, in one short sentence for the person.",
-          "type" : "string"
+    "description": "Move once this turn ends: into a git worktree of this folder, or back to the folder. Do it when the work turns into a change that should be on its own branch, or when asked. You are started again there to carry on, or stay there if you asked to be archived. Nothing uncommitted comes with you, and a new worktree starts from the commit you have checked out: commit first. Give neither argument to take back a move you asked for. Not with a wait.",
+    "inputSchema": {
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
         },
-        "discard_changes" : {
-          "description" : "Only with remove: remove even with uncommitted changes. Ask the person first.",
-          "type" : "boolean"
+        "discard_changes": {
+          "description": "Only with remove: remove even with uncommitted changes. Ask the person first.",
+          "type": "boolean"
         },
-        "leave_worktree" : {
-          "description" : "Back to the project folder. remove takes the worktree away, and its branch if the app made it and it is merged; refused if anything is uncommitted, or another agent works there.",
-          "enum" : [
+        "leave_worktree": {
+          "description": "Back to the folder. remove takes the worktree away, and its branch if the app made it and it is merged; refused if anything is uncommitted, or another agent works there.",
+          "enum": [
             "keep",
             "remove"
           ],
-          "type" : "string"
+          "type": "string"
         },
-        "worktree" : {
-          "description" : "A name for a new worktree, or the absolute path of one already there.",
-          "type" : "string"
+        "worktree": {
+          "description": "A name for a new worktree, or the absolute path of one already there.",
+          "type": "string"
         }
       },
-      "type" : "object"
+      "type": "object"
     },
-    "name" : "move_worktree",
-    "title" : "Move to a worktree or back"
+    "name": "move_worktree",
+    "title": "Move to a worktree or back"
   },
   {
-    "description" : "The sessions in this project, a page at a time: the ones not archived first, then the archived, each most recent first, yours included. Each one's id, title, runtime, status, worktree and branch, the resources it holds, labels with owners, and what it last said. The page ends by saying how many more there are and what to pass as `after` for the next. Use it to find a session the person asks you to continue, then read it with read_session.\n\nWith started_by me: only the sessions you started with start_session, and the ones they started, that have not been archived, each one's id, what it is doing, what it last said, and its labels with owners; first, how many of this project's running and not-archived places are in use out of the limits the person set, and which of yours are queued and where; last, which runtimes start_session can start one on here, as of now, with the model each starts on where known, and why the others cannot. Archive the finished ones whose work is merged or abandoned with archive_session, so their places are free for the next.",
-    "inputSchema" : {
-      "properties" : {
-        "after" : {
-          "description" : "The id of the last session the previous page listed, for the next page.",
-          "type" : "string"
+    "description": "The sessions in this folder, a page at a time: the ones not archived first, then the archived, each most recent first, yours included. Each one's id, title, runtime, status, worktree and branch, the resources it holds, labels with owners, and what it last said. For a session you have a message waiting for, the line says so with its text. The page ends by saying how many more there are and what to pass as `after` for the next. Use it to find a session the person asks you to continue, then read it with read_session.\n\nWith started_by me: only the sessions you started with start_session, and the ones they started, that have not been archived, each one's id, what it is doing, what it last said, and its labels with owners; first, how many of this folder's running and not-archived places are in use out of the limits the person set, and which of yours are queued and where; last, which runtimes start_session can start one on here, as of now, with the model each starts on where known, and why the others cannot. Archive the finished ones whose work is merged or abandoned with archive_session, so their places are free for the next.",
+    "inputSchema": {
+      "properties": {
+        "after": {
+          "description": "The id of the last session the previous page listed, for the next page.",
+          "type": "string"
         },
-        "description" : {
-          "description" : "Why you are making this call, in one short sentence for the person.",
-          "type" : "string"
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
         },
-        "limit" : {
-          "description" : "How many sessions to list, at most 100. 30 when left out.",
-          "type" : "integer"
+        "limit": {
+          "description": "How many sessions to list, at most 100. 30 when left out.",
+          "type": "integer"
         },
-        "started_by" : {
-          "description" : "me: only the sessions you started, with the limits and runtimes.",
-          "enum" : [
+        "started_by": {
+          "description": "me: only the sessions you started, with the limits and runtimes.",
+          "enum": [
             "me"
           ],
-          "type" : "string"
+          "type": "string"
         }
       },
-      "type" : "object"
+      "type": "object"
     },
-    "name" : "list_sessions",
-    "title" : "List the sessions in this project"
+    "name": "list_sessions",
+    "title": "List the sessions in this folder"
   },
   {
-    "description" : "The app's record of one session in this project: what the person asked, what the agent said, the tools it ran and the files they touched, and its plan as it last stood. Use it when asked to continue another session's work. Reading it does not change that session. A long one keeps the first request and the latest turns and says how many were left out.",
-    "inputSchema" : {
-      "properties" : {
-        "description" : {
-          "description" : "Why you are making this call, in one short sentence for the person.",
-          "type" : "string"
+    "description": "The app's record of one session in this folder: what the person asked, what the agent said, the tools it ran and the files they touched, and its plan as it last stood. Use it when asked to continue another session's work. Reading it does not change that session. A long one keeps the first request and the latest turns and says how many were left out. If you have a message waiting for that session, the header says so with its text.",
+    "inputSchema": {
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
         },
-        "session" : {
-          "description" : "The session's id, as list_sessions gave it, or its exact title.",
-          "type" : "string"
+        "session": {
+          "description": "The session's id, as list_sessions gave it, or its exact title.",
+          "type": "string"
         }
       },
-      "required" : [
+      "required": [
         "session"
       ],
-      "type" : "object"
+      "type": "object"
     },
-    "name" : "read_session",
-    "title" : "Read another session's history"
+    "name": "read_session",
+    "title": "Read another session's history"
   },
   {
-    "description" : "Say something to another session in this project, which it reads as a prompt marked as yours, not the person's; the person sees it in that chat too. A session that is working gets it after its turn; one that is done or asking to be archived is woken by it, within the project's running limit for sessions started by sessions; one that is stopped waits until it is next started. It never answers a question that session is waiting on. A session that another session started takes messages only from that session: send to its starter instead. A reply comes back the same way, as a message to you. Limits: 4000 characters, 30 an hour, and at most 3 messages between sessions in a row with no prompt from the person.",
-    "inputSchema" : {
-      "properties" : {
-        "description" : {
-          "description" : "Why you are making this call, in one short sentence for the person.",
-          "type" : "string"
+    "description": "Say something to another session in this folder, which it reads as a prompt marked as yours, not the person's; the person sees it in that chat too. A session that is working gets it after its turn; one that is done or asking to be archived is woken by it, within the folder's running limit for sessions started by sessions; one that is stopped waits until it is next started. It never answers a question that session is waiting on. A session that another session started takes messages only from that session: send to its starter instead. A reply comes back the same way, as a message to you. You may have one message waiting for a given session at a time. While it is queued, a second send is refused; pass replace: true to swap the waiting text and keep its place, or take it back with cancel_message. list_sessions and read_session say when your message waits, with its text. Limits: 4000 characters and 30 new messages an hour. Replace and cancel do not count towards the hour.",
+    "inputSchema": {
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
         },
-        "message" : {
-          "description" : "What to tell it.",
-          "type" : "string"
+        "message": {
+          "description": "What to tell it.",
+          "type": "string"
         },
-        "to" : {
-          "description" : "The session's id, as list_sessions gave it, or its exact title.",
-          "type" : "string"
+        "replace": {
+          "description": "When true, swap the text of the message you already have waiting for that session, and keep its place. Refused when nothing is waiting.",
+          "type": "boolean"
+        },
+        "to": {
+          "description": "The session's id, as list_sessions gave it, or its exact title.",
+          "type": "string"
         }
       },
-      "required" : [
+      "required": [
         "to",
         "message"
       ],
-      "type" : "object"
+      "type": "object"
     },
-    "name" : "message_session",
-    "title" : "Tell another session something"
+    "name": "message_session",
+    "title": "Tell another session something"
   },
   {
-    "description" : "Take a turn with something on this Mac that only one agent should use at a time: a simulator, a browser, the screen (mouse, keyboard, front window), or anything you name, such as a port. Lease it before you use it, and release it as soon as you are done. If you already hold it, this extends your lease. If someone else holds it, this waits for up to 45 seconds. If it is still not yours after that, you keep your place in line. You can call this again to go on waiting, or end your turn, and you will be started again when it is yours. Take several resources in the same order every time. Use list_resources to see the names. The person may have declared resources, such as \"build\", each with a description of when to take it and how many agents may hold it at once: lease a declared resource whenever its description applies to what you are about to do.",
-    "inputSchema" : {
-      "properties" : {
-        "description" : {
-          "description" : "Why you are making this call, in one short sentence for the person.",
-          "type" : "string"
+    "description": "Take a turn with something on this Mac that only one agent should use at a time: a simulator, a browser, the screen (mouse, keyboard, front window), or anything you name, such as a port. Lease it before you use it, and release it as soon as you are done. If you already hold it, this extends your lease. If someone else holds it, you join its line and are told your place at once; you will get a lease.granted event when it is yours. End your turn, and you will be started again with it. Stop Waiting or cancel_wait leaves the line. Take several resources in the same order every time. Use list_resources to see the names. The person may have declared resources, such as \"build\", each with a description of when to take it and how many agents may hold it at once: lease a declared resource whenever its description applies to what you are about to do.",
+    "inputSchema": {
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
         },
-        "minutes" : {
-          "description" : "How long. Default 30, at most 240, unless the resource was declared with its own.",
-          "type" : "integer"
+        "minutes": {
+          "description": "How long. Default 30, at most 240, unless the resource was declared with its own.",
+          "type": "integer"
         },
-        "name" : {
-          "description" : "A name from list_resources, a simulator's UDID, a browser's name, or any name of your own. Case and surrounding spaces don't matter.",
-          "type" : "string"
+        "name": {
+          "description": "A name from list_resources, a simulator's UDID, a browser's name, or any name of your own. Case and surrounding spaces don't matter.",
+          "type": "string"
         },
-        "wait" : {
-          "description" : "Default true. With false, you are told at once whether you got it, and you don't join the line.",
-          "type" : "boolean"
+        "wait": {
+          "description": "Default true. With false, you are told at once whether you got it, and you don't join the line.",
+          "type": "boolean"
         }
       },
-      "required" : [
+      "required": [
         "name"
       ],
-      "type" : "object"
+      "type": "object"
     },
-    "name" : "lease_resource",
-    "title" : "Take a turn with a shared resource"
+    "name": "lease_resource",
+    "title": "Take a turn with a shared resource"
   },
   {
-    "description" : "Give back a lease you hold, or leave the line for a resource you are waiting for. Do this as soon as you are done with it, so the next agent can have it.",
-    "inputSchema" : {
-      "properties" : {
-        "description" : {
-          "description" : "Why you are making this call, in one short sentence for the person.",
-          "type" : "string"
+    "description": "Give back a lease you hold, or leave the line for a resource you are waiting for. Do this as soon as you are done with it, so the next agent can have it.",
+    "inputSchema": {
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
         },
-        "name" : {
-          "description" : "The resource, as you leased it.",
-          "type" : "string"
+        "name": {
+          "description": "The resource, as you leased it.",
+          "type": "string"
         }
       },
-      "required" : [
+      "required": [
         "name"
       ],
-      "type" : "object"
+      "type": "object"
     },
-    "name" : "release_resource",
-    "title" : "Give back a shared resource"
+    "name": "release_resource",
+    "title": "Give back a shared resource"
   },
   {
-    "description" : "List what can be leased on this Mac and who holds what, with your own leases and waits first. Resources the person declared come next, with a description of when to lease each: whenever one applies to what you are about to do, lease it with lease_resource first.",
-    "inputSchema" : {
-      "properties" : {
-        "description" : {
-          "description" : "Why you are making this call, in one short sentence for the person.",
-          "type" : "string"
+    "description": "List what can be leased on this Mac and who holds what, with your own leases and waits first. Resources the person declared come next, with a description of when to lease each: whenever one applies to what you are about to do, lease it with lease_resource first.",
+    "inputSchema": {
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
         }
       },
-      "type" : "object"
+      "type": "object"
     },
-    "name" : "list_resources",
-    "title" : "List shared resources"
+    "name": "list_resources",
+    "title": "List shared resources"
   },
   {
-    "description" : "Wait until something happens: an event in this project or on this Mac, such as agent.finished, workflow.completed, mac.wake or branch.moved. Your turn can end while you wait, and it costs nothing: when the event happens you are started again with it. The call itself waits up to 45 seconds; if nothing has happened by then it says you are still waiting and keeps your place. Use this instead of polling. Also lists recent events (action \"recent\") and every event you can wait on (action \"list\"). The same names work as workflow triggers. An MCP server's event (such as pr.merged) is checked against what the project's servers offer, and the wait subscribes to it until it ends.\n\nTo wait for agents, name them in agents instead of events: your turn ends at once, and you are resumed with how each ended when all have finished (or the first, with wake_on any). until_minutes, with agents or alone, resumes you then anyway, to check on something the app can't see, like CI; say what in message. Anything you started in the background stops when the turn ends.\n\nEvery wait needs until_minutes, so none can last for ever: when it runs out you are started again, and can wait again.",
-    "inputSchema" : {
-      "properties" : {
-        "action" : {
-          "description" : "wait (the default), recent, or list.",
-          "enum" : [
-            "wait",
-            "recent",
-            "list"
-          ],
-          "type" : "string"
-        },
-        "agents" : {
-          "description" : "Agents in this project to wait for, by id or exact title.",
-          "items" : {
-            "type" : "string"
+    "name": "wait_for_event",
+    "title": "Wait for an event",
+    "description": "Wait for an event in this folder or on this Mac, such as agent.finished, workflow.completed, mac.wake or branch.moved. The call stays open for up to 45 seconds. If no event happens, it keeps your place and your turn can end. You are started again when one happens. Use this instead of polling. The same names work as workflow triggers. Unknown events and filters say what is offered.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "string"
           },
-          "type" : "array"
+          "description": "Events to wait for. Any one will do."
         },
-        "description" : {
-          "description" : "Why you are making this call, in one short sentence for the person.",
-          "type" : "string"
+        "where": {
+          "type": "object",
+          "description": "Narrow them: branch on branch.moved, why on person.away and person.back. A list means any. For an MCP event, its own keys."
         },
-        "events" : {
-          "description" : "What to wait for; any one will do. A name, or a subject with .* such as agent.*.",
-          "items" : {
-            "type" : "string"
+        "until_minutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1440,
+          "description": "Required. Resume after this many minutes if no event happens."
+        },
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "events",
+        "until_minutes"
+      ]
+    }
+  },
+  {
+    "name": "wait_for_agents",
+    "title": "Wait for agents",
+    "description": "Wait for sessions in this folder by id or exact title. Your turn ends at once. Resume with how each session ended. Wake when all finish by default, or when any finishes. until_minutes is required. Anything you started in the background stops when the turn ends.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "agents": {
+          "type": "array",
+          "items": {
+            "type": "string"
           },
-          "type" : "array"
+          "description": "Sessions to wait for, by id or exact title."
         },
-        "from" : {
-          "description" : "Only events after this position count. Take it from recent, so that nothing between checking and waiting is missed.",
-          "type" : "integer"
-        },
-        "limit" : {
-          "description" : "For recent: how many, 1 to 50. Default 20.",
-          "type" : "integer"
-        },
-        "message" : {
-          "description" : "With agents or until_minutes alone: what you are waiting for, for the person's row.",
-          "type" : "string"
-        },
-        "until_minutes" : {
-          "description" : "Required to wait: give up after this many minutes, 1 to 1440. You are started again either way, and can wait again.",
-          "type" : "integer"
-        },
-        "wake_on" : {
-          "description" : "With agents: all (the default) or any.",
-          "enum" : [
-            "any",
-            "all"
+        "wake_on": {
+          "type": "string",
+          "enum": [
+            "all",
+            "any"
           ],
-          "type" : "string"
+          "description": "Wake when all finish (default) or when any finishes."
         },
-        "where" : {
-          "description" : "Narrow them by what each event's inputSchema takes in action list: branch on branch.moved, e.g. {\"branch\": \"agents/fix-640\"}, or why on person.away and person.back. A list means any of them, e.g. {\"why\": [\"locked\", \"idle\"]}. For an MCP server's event, such as pr.merged, these are its own, sent to it, e.g. {\"pr\": 640}; server narrows which servers. Nothing else narrows an event.",
-          "type" : "object"
-        }
-      },
-      "type" : "object"
-    },
-    "name" : "wait_for_event",
-    "title" : "Wait for something to happen"
-  },
-  {
-    "description" : "Stop waiting. Nothing will start you again for the wait you had.",
-    "inputSchema" : {
-      "properties" : {
-        "description" : {
-          "description" : "Why you are making this call, in one short sentence for the person.",
-          "type" : "string"
-        }
-      },
-      "type" : "object"
-    },
-    "name" : "cancel_wait",
-    "title" : "Stop waiting"
-  },
-  {
-    "annotations" : {
-      "readOnlyHint" : true
-    },
-    "description" : "The machines this control plane's hosts run on, from every workspace provider:             each workspace's state, the host it is linked to and that host's state, and, for             a provider that can make workspaces, the choices a new one takes.",
-    "inputSchema" : {
-      "properties" : {
-        "description" : {
-          "description" : "Why you are making this call, in one short sentence for the person.",
-          "type" : "string"
-        }
-      },
-      "type" : "object"
-    },
-    "name" : "list_workspaces",
-    "title" : "List workspaces"
-  },
-  {
-    "description" : "Start the workspace a stopped host runs on. It answers at once; the host is up             when it connects, which you can wait for with wait_for_event on server.online.             Then you can start a session in a project there.",
-    "inputSchema" : {
-      "properties" : {
-        "description" : {
-          "description" : "Why you are making this call, in one short sentence for the person.",
-          "type" : "string"
+        "until_minutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1440,
+          "description": "Required maximum wait."
         },
-        "host" : {
-          "description" : "The host, by its name as list_workspaces gives it.",
-          "type" : "string"
+        "message": {
+          "type": "string",
+          "description": "What you are waiting for, for the person's row."
+        },
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
         }
       },
-      "required" : [
+      "required": [
+        "agents",
+        "until_minutes"
+      ]
+    }
+  },
+  {
+    "name": "check_again",
+    "title": "Check again",
+    "description": "Resume after a set time. Your turn ends at once. The message is shown in your row.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "in_minutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1440,
+          "description": "When to resume."
+        },
+        "message": {
+          "type": "string",
+          "description": "What you will check, for the person's row."
+        },
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "in_minutes"
+      ]
+    }
+  },
+  {
+    "description": "Stop waiting. Nothing will start you again for the wait you had.",
+    "inputSchema": {
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "cancel_wait",
+    "title": "Stop waiting"
+  },
+  {
+    "annotations": {
+      "readOnlyHint": true
+    },
+    "description": "The machines this control plane's hosts run on, from every machine provider: each machine's state, the host it is linked to and that host's state, and, for a provider that can make machines, the choices a new one takes. Then every machine of the person's by name and state, made by a provider or not, where start_session with machine can start a session.",
+    "inputSchema": {
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "list_machines",
+    "title": "List workspaces"
+  },
+  {
+    "description": "Start the machine a stopped host runs on. It answers at once; the host is up             when it connects, which you can wait for with wait_for_event on server.online.             Then you can start a session in a folder there.",
+    "inputSchema": {
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
+        },
+        "host": {
+          "description": "The host, by its name as list_machines gives it.",
+          "type": "string"
+        }
+      },
+      "required": [
         "host"
       ],
-      "type" : "object"
+      "type": "object"
     },
-    "name" : "start_workspace",
-    "title" : "Start a workspace"
+    "name": "start_machine",
+    "title": "Start a workspace"
   },
   {
-    "description" : "Stop the workspace a host runs on. Every agent there stops with it. While agents             are working there it is refused, naming them, unless confirm_running is true.",
-    "inputSchema" : {
-      "properties" : {
-        "confirm_running" : {
-          "description" : "Stop it even though agents are working there.",
-          "type" : "boolean"
+    "description": "Stop the machine a host runs on. Every agent there stops with it. While agents             are working there it is refused, naming them, unless confirm_running is true.",
+    "inputSchema": {
+      "properties": {
+        "confirm_running": {
+          "description": "Stop it even though agents are working there.",
+          "type": "boolean"
         },
-        "description" : {
-          "description" : "Why you are making this call, in one short sentence for the person.",
-          "type" : "string"
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
         },
-        "host" : {
-          "description" : "The host, by its name as list_workspaces gives it.",
-          "type" : "string"
+        "host": {
+          "description": "The host, by its name as list_machines gives it.",
+          "type": "string"
         }
       },
-      "required" : [
+      "required": [
         "host"
       ],
-      "type" : "object"
+      "type": "object"
     },
-    "name" : "stop_workspace",
-    "title" : "Stop a workspace"
+    "name": "stop_machine",
+    "title": "Stop a workspace"
   },
   {
-    "description" : "Make a new workspace at a provider that can (see list_workspaces), which joins as             a host of the same name. The person is asked first, on the question card, and             nothing is made without their yes. It may cost money while it runs.",
-    "inputSchema" : {
-      "properties" : {
-        "description" : {
-          "description" : "Why you are making this call, in one short sentence for the person.",
-          "type" : "string"
+    "description": "Make a new machine at a provider that can (see list_machines), which joins as             a host of the same name. The person is asked first, on the question card, and             nothing is made without their yes. It may cost money while it runs.",
+    "inputSchema": {
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
         },
-        "name" : {
-          "description" : "The new workspace's and host's name: letters, digits and dashes.",
-          "type" : "string"
+        "name": {
+          "description": "The new machine's and host's name: letters, digits and dashes.",
+          "type": "string"
         },
-        "options" : {
-          "description" : "Its choices, as the provider's options in list_workspaces describe them.",
-          "type" : "object"
+        "options": {
+          "description": "Its choices, as the provider's options in list_machines describe them.",
+          "type": "object"
         },
-        "provider" : {
-          "description" : "The provider, by its name or id from list_workspaces.",
-          "type" : "string"
+        "provider": {
+          "description": "The provider, by its name or id from list_machines.",
+          "type": "string"
         }
       },
-      "required" : [
+      "required": [
         "provider",
         "name"
       ],
-      "type" : "object"
+      "type": "object"
     },
-    "name" : "make_workspace",
-    "title" : "Make a workspace"
+    "name": "make_machine",
+    "title": "Make a workspace"
   },
   {
-    "annotations" : {
-      "destructiveHint" : true
+    "annotations": {
+      "destructiveHint": true
     },
-    "description" : "Delete the workspace a host runs on, with everything on its disk, and remove the             host and its agents. The person is asked first, on the question card, and nothing             is deleted without their yes.",
-    "inputSchema" : {
-      "properties" : {
-        "description" : {
-          "description" : "Why you are making this call, in one short sentence for the person.",
-          "type" : "string"
+    "description": "Delete the machine a host runs on, with everything on its disk, and remove the             host and its agents. The person is asked first, on the question card, and nothing             is deleted without their yes.",
+    "inputSchema": {
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
         },
-        "host" : {
-          "description" : "The host, by its name as list_workspaces gives it.",
-          "type" : "string"
+        "host": {
+          "description": "The host, by its name as list_machines gives it.",
+          "type": "string"
         }
       },
-      "required" : [
+      "required": [
         "host"
       ],
-      "type" : "object"
+      "type": "object"
     },
-    "name" : "delete_workspace",
-    "title" : "Delete a workspace"
+    "name": "delete_machine",
+    "title": "Delete a workspace"
+  },
+  {
+    "description": "Bring a branch back from a folder on another of the person's machines (list_machines names them) into the repository you work in here, as the person's Bring Back from ‹machine›… does. Use it when a session you started there with start_session has done its work, or when the person asks for it. The person is asked first, on your question card, and nothing comes back without their yes.\n\nThe branch moves forward only, also where a worktree here has it checked out. It never overwrites work done here: a branch with commits of its own here, or a worktree with uncommitted changes where the branch moves, stops it before anything changes. With changes, the uncommitted changes there come too, as a patch: only when this folder has that branch checked out and has no uncommitted changes. The machine has to be running; start it with start_machine first.",
+    "inputSchema": {
+      "properties": {
+        "branch": {
+          "description": "Optional. The branch to bring back. Leave it out to bring back the branch that is checked out there.",
+          "type": "string"
+        },
+        "changes": {
+          "description": "Optional. true brings the uncommitted changes there too, as a patch on the branch.",
+          "type": "boolean"
+        },
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
+        },
+        "folder": {
+          "description": "The folder on that machine, as an absolute path, such as /home/me/project.",
+          "type": "string"
+        },
+        "machine": {
+          "description": "The machine, by its name as list_machines gives it.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "machine",
+        "folder"
+      ],
+      "type": "object"
+    },
+    "name": "bring_back",
+    "title": "Bring a branch back"
+  },
+  {
+    "description": "Take back the one message you have waiting for another session in this folder, by its id or exact title. It says when nothing is waiting: already read, or nothing was sent. Only your own queued message is removed.",
+    "inputSchema": {
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
+        },
+        "session": {
+          "description": "The session's id, as list_sessions gave it, or its exact title.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "type": "object"
+    },
+    "name": "cancel_message",
+    "title": "Take back a waiting message"
   }
 ]

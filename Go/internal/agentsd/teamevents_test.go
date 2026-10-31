@@ -24,7 +24,7 @@ func TestABotsMachineSendsTeamEventsAndKeepsItsOwn(t *testing.T) {
 	fakeRuntimes(t)
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	told, _ := json.Marshal(wire.HostUser{User: "b1", Kind: "bot", Name: "review-bot", Labels: []string{}})
+	told, _ := json.Marshal(wire.MachineUser{User: "b1", Kind: "bot", Name: "review-bot", Labels: []string{}})
 	d.toldHostUser(told)
 
 	due := time.Date(2026, 10, 21, 9, 0, 0, 0, time.UTC)
@@ -101,24 +101,42 @@ func TestABotsMachineSendsTeamEventsAndKeepsItsOwn(t *testing.T) {
 	}
 	failing = false
 
-	// workflows/fire: run here, unclaimed, when the workflow is here and its trigger matches.
-	dir := project(t, c, 1)
+	// workflows/fire: run here, unclaimed, when the workflow is here and a server trigger of
+	// it matches the server's event; an app event, or a trigger id the event does not name,
+	// is not run.
+	dir := folder(t, c, 1)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
-	os.WriteFile(filepath.Join(workflowsFolder(dir), "review.md"), []byte("---\nname: Review\non: lease.granted\nruns-on: [review-bot]\n---\nLook.\n"), 0o644)
+	os.WriteFile(filepath.Join(workflowsFolder(dir), "review.md"), []byte("---\nname: Review\non:\n  - pr.merged:\n      server: ci\nruns-on: [review-bot]\n---\nLook.\n"), 0o644)
+	os.WriteFile(filepath.Join(workflowsFolder(dir), "leases.md"), []byte("---\nname: Leases\non: lease.granted\nruns-on: [review-bot]\n---\nLook.\n"), 0o644)
 	approveAll(t, c, store.FolderURL(dir))
-	fire := func(workflow string, e wire.Event) bool {
-		params, _ := json.Marshal(wire.TeamTrigger{Workflow: workflow, Trigger: "event:x", RunsOn: w.RunsOn, Event: &e})
+	sendFire := func(workflow, trigger string, e wire.Event) bool {
+		params, _ := json.Marshal(wire.TeamTrigger{Workflow: workflow, Trigger: trigger, RunsOn: w.RunsOn, Event: &e})
 		out, ok := d.Asked(wire.CallWorkflowsFire.Name, params)
 		return ok && out.(wire.TeamTriggerFired).Ran
 	}
-	if _, ok := d.Asked("git/fill", nil); ok {
+	fire := func(workflow string, e wire.Event) bool { return sendFire(workflow, triggerID(fireRequest{}, &e), e) }
+	if _, ok := d.Asked("nothing/here", nil); ok {
 		t.Fatal("answered what it does not know")
 	}
-	other := wire.Event{Name: "lease.granted", Scope: projectScope("/elsewhere/" + filepath.Base(dir)), Details: map[string]string{"resource": "build"}}
-	if fire(filepath.Base(dir)+"/missing", other) || fire("nothing", other) || fire(filepath.Base(dir)+"/review", wire.Event{Name: "agent.finished"}) {
+	key := mcpTrigger{event: "pr.merged", arguments: map[string]json.RawMessage{}}.subscriptionKey("ci")
+	merged := wire.Event{Name: "pr.merged", Scope: folderScope("/elsewhere/" + filepath.Base(dir)), ChainDepth: 3,
+		Details: map[string]string{"server": "ci", "event": "pr.merged", "subscription": key, "mcp_event_id": "e7", "payload": "{}"}}
+	lease := wire.Event{Name: "lease.granted", Details: map[string]string{"resource": "build"}}
+	if fire(filepath.Base(dir)+"/missing", merged) || fire("nothing", merged) || fire(filepath.Base(dir)+"/review", wire.Event{Name: "agent.finished"}) {
 		t.Fatal("ran what is not here")
 	}
-	if !fire(filepath.Base(dir)+"/review", other) {
+	if fire(filepath.Base(dir)+"/leases", lease) {
+		t.Fatal("ran an app event the control plane sent")
+	}
+	if sendFire(filepath.Base(dir)+"/review", "event:x", merged) {
+		t.Fatal("ran a trigger its event does not name")
+	}
+	nowDue := wire.DateOf(time.Now().Truncate(15 * time.Minute))
+	params, _ := json.Marshal(wire.TeamTrigger{Workflow: filepath.Base(dir) + "/review", Trigger: wire.ScheduleTriggerID(nowDue.Time()), RunsOn: w.RunsOn, DueAt: &nowDue})
+	if out, _ := d.Asked(wire.CallWorkflowsFire.Name, params); out.(wire.TeamTriggerFired).Ran {
+		t.Fatal("ran a schedule the workflow does not have")
+	}
+	if !fire(filepath.Base(dir)+"/review", merged) {
 		t.Fatal("did not run it")
 	}
 	waitFor(t, "the run", func() bool {
@@ -145,7 +163,7 @@ func TestABotsMachineSendsTeamEventsAndKeepsItsOwn(t *testing.T) {
 func TestAPersonsMachineSendsABotsSchedule(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "nightly.md"), []byte("---\nname: Nightly\non:\n  - schedule:\n      at: \":00\"\nruns-on: [review-bot]\n---\nTidy up.\n"), 0o644)
 	var mu sync.Mutex
@@ -175,7 +193,7 @@ func TestAPersonsMachineSendsABotsSchedule(t *testing.T) {
 	}
 
 	// A bot's machine, another bot's workflow: nothing sent.
-	told, _ := json.Marshal(wire.HostUser{User: "b2", Kind: "bot", Name: "other-bot", Labels: []string{}})
+	told, _ := json.Marshal(wire.MachineUser{User: "b2", Kind: "bot", Name: "other-bot", Labels: []string{}})
 	d.toldHostUser(told)
 	d.workflowTickOnce(hour.Add(59 * time.Minute))
 	d.workflowTickOnce(hour.Add(60*time.Minute + 30*time.Second))
@@ -195,7 +213,7 @@ func TestAPersonsMachineHearsABotsServerEventsAndOnlySendsThem(t *testing.T) {
 	fakeRuntimes(t)
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "merged.md"), []byte("---\nname: Merged\non:\n  - pr.merged:\n      server: ci\nruns-on: [review-bot]\n---\nTidy up.\n"), 0o644)
@@ -222,7 +240,7 @@ func TestAPersonsMachineHearsABotsServerEventsAndOnlySendsThem(t *testing.T) {
 	}
 	key := mcpTrigger{event: "pr.merged", arguments: map[string]json.RawMessage{}}.subscriptionKey("ci")
 	merged := func(id string) {
-		d.raise(wire.EventDraft{Name: "pr.merged", At: now(), Scope: projectScope(dir), Sentence: "ci reported pr.merged",
+		d.raise(wire.EventDraft{Name: "pr.merged", At: now(), Scope: folderScope(dir), Sentence: "ci reported pr.merged",
 			Details: map[string]string{"server": "ci", "event": "pr.merged", "subscription": key, "mcp_event_id": id, "payload": "{}"}})
 	}
 	// The first start approves every file as it stands, this one too; it is not listed.
@@ -231,7 +249,7 @@ func TestAPersonsMachineHearsABotsServerEventsAndOnlySendsThem(t *testing.T) {
 	}
 
 	// Told Sam's groups have review-bot: it is listed, heard for the bot, and waits.
-	told, _ := json.Marshal(wire.HostUser{User: "u1", Kind: "person", Name: "Sam", Labels: []string{}, Bots: []string{"Review-Bot"}})
+	told, _ := json.Marshal(wire.MachineUser{User: "u1", Kind: "person", Name: "Sam", Labels: []string{}, Bots: []string{"Review-Bot"}})
 	d.toldHostUser(told)
 	s := summary()
 	if s == nil || s.HearsFor == nil || *s.HearsFor != "Review-Bot" || s.AwaitingApproval == nil {
@@ -290,7 +308,7 @@ func TestAPersonsMachineHearsABotsServerEventsAndOnlySendsThem(t *testing.T) {
 	}
 
 	// Out of the bot's group: no longer listed or heard, and nothing sent.
-	told, _ = json.Marshal(wire.HostUser{User: "u1", Kind: "person", Name: "Sam", Labels: []string{}})
+	told, _ = json.Marshal(wire.MachineUser{User: "u1", Kind: "person", Name: "Sam", Labels: []string{}})
 	d.toldHostUser(told)
 	if summary() != nil || len(d.workflowsHearingServers()) != 0 {
 		t.Fatal("still heard out of the group")
@@ -299,5 +317,33 @@ func TestAPersonsMachineHearsABotsServerEventsAndOnlySendsThem(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 	if n := sentCount(); n != 1 {
 		t.Fatalf("sent %d", n)
+	}
+}
+
+// A schedule the control plane sends runs only at a time one of the workflow's schedules
+// falls due here, about now, under the trigger id its due time names.
+func TestATeamScheduleRunsOnlyWhenItIsDue(t *testing.T) {
+	hourly := wire.WorkflowTrigger{Schedule: &wire.WorkflowTriggerStoredSchedule{Value: wire.WorkflowSchedule{Minutes: []int64{0},
+		Hours: [2]int64{0, 23}, EndMinute: 59, Days: []wire.Weekday{wire.WeekdaySun, wire.WeekdayMon, wire.WeekdayTue,
+			wire.WeekdayWed, wire.WeekdayThu, wire.WeekdayFri, wire.WeekdaySat}}}}
+	w := wire.Workflow{RunsOn: []string{"review-bot"}, Triggers: []wire.WorkflowTrigger{hourly}}
+	now := time.Date(2026, 10, 21, 9, 10, 0, 0, time.Local)
+	at := func(due time.Time, trigger string) bool {
+		d := wire.DateOf(due)
+		_, ok := matchTeamTrigger("/w/app", "nightly", w, wire.TeamTrigger{Workflow: "app/nightly", Trigger: trigger, DueAt: &d}, now)
+		return ok
+	}
+	nine := time.Date(2026, 10, 21, 9, 0, 0, 0, time.Local)
+	if !at(nine, wire.ScheduleTriggerID(nine)) || !at(nine.Add(-5*time.Hour), wire.ScheduleTriggerID(nine.Add(-5*time.Hour))) {
+		t.Fatal("a due schedule did not run")
+	}
+	for name, due := range map[string]time.Time{"not due": nine.Add(-30 * time.Minute), "ahead": nine.Add(time.Hour),
+		"two days ago": nine.Add(-48 * time.Hour), "off the half hour": nine.Add(-15 * time.Minute)} {
+		if at(due, wire.ScheduleTriggerID(due)) {
+			t.Errorf("%s: ran", name)
+		}
+	}
+	if at(nine, "schedule:x") {
+		t.Fatal("ran under another id")
 	}
 }

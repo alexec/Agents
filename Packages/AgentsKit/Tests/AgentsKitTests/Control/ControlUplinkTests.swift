@@ -61,7 +61,7 @@ struct ControlUplinkTests {
             return .success(["ok": true])
         }
         let uplink = ControlUplink(server: server,
-                                   hello: DaemonAPI.HostHello(host: .mac, version: "1", platform: "test", machineID: "m")) {
+                                   hello: DaemonAPI.MachineHello(host: .mac, version: "1", platform: "test", machineID: "m")) {
             let (ours, theirs) = PairedTransport.pair()
             dials.add(FakeControlEnd(theirs))
             return ours
@@ -86,7 +86,7 @@ struct ControlUplinkTests {
             try await Task.sleep(for: .seconds(3600))
         }
         let uplink = ControlUplink(server: server,
-                                   hello: DaemonAPI.HostHello(host: .mac, version: "1", platform: "test", machineID: "m"),
+                                   hello: DaemonAPI.MachineHello(host: .mac, version: "1", platform: "test", machineID: "m"),
                                    backoff: backoff) {
             count.lock.withLock { count.dials += 1 }
             throw URLError(.cannotConnectToHost)

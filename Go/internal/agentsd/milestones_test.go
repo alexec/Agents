@@ -25,7 +25,7 @@ func TestMilestonesEarned(t *testing.T) {
 	c.until(t, "the first agent earned", func(m string, p json.RawMessage) bool {
 		return m == "milestones/changed" && strings.Contains(string(p), `"firstAgent"`)
 	})
-	dir := project(t, c, 2)
+	dir := folder(t, c, 2)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "tidy.md"), []byte("---\non: agent.finished\n---\nTidy.\n"), 0o644)
 	c.call(t, 3, "workflows/list", map[string]any{"folder": store.FolderURL(dir)})
@@ -96,7 +96,7 @@ func TestACloudMachineStarted(t *testing.T) {
 	defer d.Shutdown()
 	listed := `{"providers":[{"id":"p","name":"DigitalOcean","canMake":false,"canDelete":false,"workspaces":[{"name":"box","state":"stopped"}]}]}`
 	d.SetControlAsk(func(_ context.Context, method string, params any) (json.RawMessage, error) {
-		call := params.(wire.HostWorkspaceCall)
+		call := params.(wire.MachineWorkspaceCall)
 		if call.Method == hostsStart {
 			return json.RawMessage(`{"state":"starting"}`), nil
 		}
@@ -117,18 +117,18 @@ func TestACloudMachineStarted(t *testing.T) {
 	d2.SetControlAsk(func(context.Context, string, any) (json.RawMessage, error) {
 		return json.RawMessage(`{"state":"starting"}`), nil
 	})
-	if _, err := d2.startWorkspace("", map[string]json.RawMessage{"host": json.RawMessage(`"box"`)}); err != nil {
+	if _, err := d2.startMachine("", map[string]json.RawMessage{"host": json.RawMessage(`"box"`)}); err != nil {
 		t.Fatal(err)
 	}
 	if !earned(d2, firstCloudHost) {
-		t.Fatal("start_workspace did not earn it")
+		t.Fatal("start_machine did not earn it")
 	}
 }
 
 func TestALandedPullRequestIsCounted(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	os.Mkdir(filepath.Join(dir, ".git"), 0o755)
 	day := time.Now().AddDate(0, 0, -2)
 	merged := day.UTC().Format(time.RFC3339)
@@ -136,9 +136,7 @@ func TestALandedPullRequestIsCounted(t *testing.T) {
 		`{"url":"https://github.com/o/r/pull/2","mergedAt":"` + merged + `","headRefName":"someone-else"}]`
 	gh := filepath.Join(t.TempDir(), "gh")
 	os.WriteFile(gh, []byte("#!/bin/sh\ncat <<'END'\n"+pulls+"\nEND\n"), 0o755)
-	findGH = func() string { return gh }
-	defer func() { findGH = func() string { return "" } }()
-	d.countMergedPRs()
+	d.countMergedPRsWith(gh)
 	h := d.timeHistory()
 	if r := h.Recap[dayStamp(day)]; r.PrsMerged == nil || *r.PrsMerged != 1 {
 		t.Fatalf("%+v", r)

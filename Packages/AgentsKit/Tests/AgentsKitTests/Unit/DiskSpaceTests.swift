@@ -70,7 +70,7 @@ struct DiskSpaceTests {
         #expect(DiskSpace.next(from: .critical, reading(400), thresholds) == (.ok, .ok(threshold: 50 * gb)))
     }
 
-    @Test func theStrictestOfSeveralProjectsWins() {
+    @Test func theStrictestOfSeveralFoldersWins() {
         let lines = DiskThresholds.strictest([DiskThresholds(lowGB: 10), DiskThresholds(lowGB: 50, criticalGB: 1)])
         #expect(lines.effectiveLowGB == 50)
         #expect(lines.effectiveCriticalGB == 2, "one at the default is the default's 2 GB")

@@ -9,7 +9,7 @@ public enum IconMood: String, Sendable, CaseIterable {
     case happy
     case quizzical
 
-    /// From each live project's group counts.
+    /// From each live folder's group counts.
     public init(counts: some Sequence<[AgentGroup: Int]>) {
         var working = false
         for count in counts {

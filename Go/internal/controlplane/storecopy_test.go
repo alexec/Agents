@@ -11,9 +11,10 @@ import (
 
 // A copy carries every record but leases and copies, and refuses a store already in use.
 func TestCopyStoreCarriesRecordsAndRefusesAStoreInUse(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	from, to := store.NewFolder(t.TempDir()), store.NewFolder(t.TempDir())
-	for _, key := range []string{records.SettingsKey, "v1/hosts/a.json", "v1/leases/a.json", "v1/copies/b.json", "v1/keys/control.sealed"} {
+	for _, key := range []string{records.SettingsKey, "v1/machines/a.json", "v1/leases/a.json", "v1/copies/b.json", "v1/keys/control.sealed"} {
 		if _, err := from.Put(ctx, key, []byte(key), store.Absent); err != nil {
 			t.Fatal(err)
 		}
@@ -24,7 +25,7 @@ func TestCopyStoreCarriesRecordsAndRefusesAStoreInUse(t *testing.T) {
 	if err != nil || copied != 2 || skipped != 3 {
 		t.Fatal(copied, skipped, err)
 	}
-	if o, _ := to.Get(ctx, "v1/hosts/a.json"); o == nil || string(o.Data) != "v1/hosts/a.json" {
+	if o, _ := to.Get(ctx, "v1/machines/a.json"); o == nil || string(o.Data) != "v1/machines/a.json" {
 		t.Fatal("the host record did not land")
 	}
 	if o, _ := to.Get(ctx, "v1/leases/a.json"); o != nil {

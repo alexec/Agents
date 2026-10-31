@@ -73,7 +73,7 @@ struct ChatActions {
     var dropKept: @MainActor (DaemonAPI.KeptRequest) async -> Void = { _ in }
     var retryKept: @MainActor (DaemonAPI.KeptRequest) async -> Void = { _ in }
     /// A host's name, for the line under a kept prompt.
-    var hostName: @MainActor (HostID) -> String = { $0.rawValue }
+    var hostName: @MainActor (MachineRef) -> String = { $0.rawValue }
     /// A file shown with `show_file`, opened again from its card in the chat (#836): the
     /// Files pane, at its line. Nil draws the card without the tap.
     var showFile: (@MainActor (ShownFile) -> Void)? = nil
@@ -82,6 +82,12 @@ struct ChatActions {
     /// The open agent's picture, drawn, for a card's preview (#836): each app decodes
     /// its own way, the phone rasterising an SVG.
     var picture: @MainActor (ShownFile) async -> Image? = { _ in nil }
+    /// What an agent holds and waits for in line (036), by its id, drawn with the working
+    /// line (#2344). Nil draws nothing.
+    var leaseStatus: @MainActor (UUID) -> LeaseStatus? = { _ in nil }
+    /// A press on that line: the Mac opens Resources at the resource, the Remote its
+    /// Resources page. Nil draws the words alone.
+    var openLease: (@MainActor (ResourceName) -> Void)? = nil
 }
 
 extension EnvironmentValues {

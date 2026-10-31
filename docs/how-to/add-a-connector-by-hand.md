@@ -8,7 +8,7 @@ description: Add a connector (an MCP server) that is not in the registry, a loca
 
 Not every connector is on the [MCP Registry](https://registry.modelcontextprotocol.io). One
 your team runs, or one you are building, can still be added from the app, for yourself or
-to a project. The app connects to it first. Only a server that answered is written, and
+to a folder. The app connects to it first. Only a server that answered is written, and
 the sheet shows the tools it listed.
 
 ## Before you start
@@ -19,7 +19,7 @@ the sheet shows the tools it listed.
 
 ## Add it
 
-1. Open **Settings ▸ Agent Configuration ▸ Connectors**, or **Project Settings ▸ Agent Configuration ▸ Connectors**, and
+1. Open **Settings ▸ Agent Configuration ▸ Connectors**, or **Folder Settings ▸ Agent Configuration ▸ Connectors**, and
    choose **Add Connector…**.
 2. Choose **Add by hand…**.
 3. Give it a **Name**: letters, digits, dots, dashes and underscores. Agents see its tools
@@ -43,11 +43,11 @@ the sheet shows the tools it listed.
    - **It asks you to sign in**: the server wants a sign-in, an OAuth one, before it answers.
      The sign-in sheet opens, and once you have signed in in your browser, Verify runs
      again with it: see [Sign in to a connector](sign-in-to-a-connector.md).
-7. Choose **Add to ~/.agents**, or **Add to project**. It is offered only once the server
+7. Choose **Add to ~/.agents**, or **Add to folder**. It is offered only once the server
    has answered, and only while the form still says what was verified. Change anything and
    you verify again.
 
-Agents you start after that have the connector. A project's entry is approved as it goes in,
+Agents you start after that have the connector. A folder's entry is approved as it goes in,
 as a registry one is.
 
 ## Take it out
@@ -57,7 +57,7 @@ The row shows **added by hand**, and has **Remove…**, as a registry connector'
 
 ## Where Verify runs
 
-A local server runs on this Mac, in the project's folder (or your home folder for your own
+A local server runs on this Mac, in the folder (or your home folder for your own
 servers), with the same environment the app gives the runtimes, and is stopped as soon as
 it has answered. The app logs the server's name and whether it answered, never its command,
 arguments, variables, headers or URL.

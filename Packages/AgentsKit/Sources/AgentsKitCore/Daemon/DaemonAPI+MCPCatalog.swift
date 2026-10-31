@@ -19,17 +19,15 @@ extension DaemonAPI.Method {
     public static let mcpSignInWait = "mcp/sign-in/wait"
     public static let mcpSignInCancel = "mcp/sign-in/cancel"
     public static let mcpSignOut = "mcp/sign-out"
-    /// The connectors Agents makes, for the catalogue's first group (#1428).
-    public static let mcpMadeByAgents = "mcp/made-by-agents"
 
     public static let mcpCatalogMethods: [String] = [
         mcpPreview, mcpAdd, mcpList, mcpApprove, mcpSetSecret, mcpRemove, mcpVerify, mcpAddByHand,
-        mcpSignIn, mcpSignInWait, mcpSignInCancel, mcpSignOut, mcpForgetViews, mcpMadeByAgents,
+        mcpSignIn, mcpSignInWait, mcpSignInCancel, mcpSignOut, mcpForgetViews,
     ]
 }
 
 extension DaemonAPI {
-    public enum CatalogKind: String, Codable, Sendable {
+    public enum CatalogKind: String, Codable, Hashable, Sendable {
         case skills
         case mcp
     }
@@ -62,15 +60,13 @@ extension DaemonAPI {
         public var marketplace: String?
         /// The five levels it reaches (#1428); nil when no host has seen what it declares.
         public var levels: MCPLevels?
-        /// One of the connectors Agents makes (#1428).
-        public var madeByAgents: Bool?
 
         public init(id: String, title: String, description: String, version: String,
                     publisher: MCPPublisherInfo, known: Bool, runs: [MCPRunKind], remoteHost: String?,
-                    marketplace: String? = nil, levels: MCPLevels? = nil, madeByAgents: Bool? = nil) {
+                    marketplace: String? = nil, levels: MCPLevels? = nil) {
             self.id = id; self.title = title; self.description = description; self.version = version
             self.publisher = publisher; self.known = known; self.runs = runs; self.remoteHost = remoteHost
-            self.marketplace = marketplace; self.levels = levels; self.madeByAgents = madeByAgents
+            self.marketplace = marketplace; self.levels = levels
         }
     }
 
@@ -119,7 +115,7 @@ extension DaemonAPI {
         case previewExpired
         case noRunnableWay
         case replaceMismatch
-        case notAProject(path: String)
+        case notAFolder(path: String)
         /// The name is already in that `mcp.json` (#305).
         case nameTaken(name: String)
         /// Something typed on the by-hand sheet that cannot be written as it is (#305).
@@ -366,14 +362,14 @@ extension DaemonAPI {
         public init(ok: Bool) { self.ok = ok }
     }
 
-    /// A project entry is approved, or waiting on the digest the person was shown.
+    /// A folder entry is approved, or waiting on the digest the person was shown.
     public enum MCPApprovalState: Codable, Hashable, Sendable {
         case approved
         case waiting(digest: String, isNew: Bool)
     }
 
-    /// One server on the project page, or in `mcp/list` (060, frame D).
-    public struct ProjectMCPServer: Codable, Hashable, Sendable, Identifiable {
+    /// One server on the folder page, or in `mcp/list` (060, frame D).
+    public struct FolderMCPServer: Codable, Hashable, Sendable, Identifiable {
         public var name: String
         public var summary: String
         public var managed: ManagedMCPServer?
@@ -422,12 +418,12 @@ extension DaemonAPI {
     }
 
     public struct MCPListAnswer: Codable, Sendable {
-        public var servers: [ProjectMCPServer]
+        public var servers: [FolderMCPServer]
         public var problem: String?
         /// The approvals file could not be read, so every server waits (#169): what the
         /// section says above them.
         public var approvalsProblem: String?
-        public init(servers: [ProjectMCPServer], problem: String? = nil, approvalsProblem: String? = nil) {
+        public init(servers: [FolderMCPServer], problem: String? = nil, approvalsProblem: String? = nil) {
             self.servers = servers
             self.problem = problem
             self.approvalsProblem = approvalsProblem

@@ -66,6 +66,23 @@ func TestSuggestingTheNextPrompt(t *testing.T) {
 	}
 }
 
+func TestHangingUpVoiceMode(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	a := seeded(t, d, t.TempDir(), nil)
+	m := appClient(t, d, a.ID)
+	m.post("initialize", map[string]any{}, 1)
+	if d.Store.Agent(a.ID).VoiceHungUpAt != nil {
+		t.Fatal("hung up before hang_up")
+	}
+	if text, isErr := m.tool(2, "hang_up", map[string]any{}); isErr || !strings.HasPrefix(text, "Voice mode ends") {
+		t.Fatal(text)
+	}
+	if d.Store.Agent(a.ID).VoiceHungUpAt == nil {
+		t.Fatal("hang_up left no mark for the client")
+	}
+}
+
 func TestAskingThePersonAForm(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
@@ -74,7 +91,7 @@ func TestAskingThePersonAForm(t *testing.T) {
 	m.post("initialize", map[string]any{}, 1)
 	question := map[string]any{"questions": []any{map[string]any{"id": "colour", "prompt": "Which colour?",
 		"options": []any{map[string]any{"id": "red", "label": "Red"}, map[string]any{"id": "blue"}}}}}
-	if text, isErr := m.tool(2, "ask_form", question); !isErr || text != "A question can only be asked while this agent is working." {
+	if text, isErr := m.tool(2, "ask_question", question); !isErr || text != "A question can only be asked while this agent is working." {
 		t.Fatal(text)
 	}
 	l := d.live(a.ID)
@@ -82,7 +99,7 @@ func TestAskingThePersonAForm(t *testing.T) {
 	l.inTurn = true
 	l.mu.Unlock()
 	answered := make(chan string, 1)
-	go func() { text, _ := m.tool(3, "ask_form", question); answered <- text }()
+	go func() { text, _ := m.tool(3, "ask_question", question); answered <- text }()
 	var pending []wire.ElicitationRequest
 	waitFor(t, "the form", func() bool {
 		json.Unmarshal(c.call(t, 1, "elicitations/pending", nil), &pending)
@@ -96,7 +113,7 @@ func TestAskingThePersonAForm(t *testing.T) {
 	if text := <-answered; text != "They answered:\n- Which colour?: Red" {
 		t.Fatal(text)
 	}
-	if text, isErr := m.tool(4, "ask_form", map[string]any{"questions": []any{map[string]any{"id": "x"}}}); !isErr || text != "Nothing was asked: each question needs an `id` and a `prompt`." {
+	if text, isErr := m.tool(4, "ask_question", map[string]any{"questions": []any{map[string]any{"id": "x"}}}); !isErr || text != "Nothing was asked: each question needs an `id` and a `prompt`." {
 		t.Fatal(text)
 	}
 }
@@ -120,7 +137,7 @@ func TestAFormLeftOpenBringsItsAnswerLater(t *testing.T) {
 	l.mu.Unlock()
 	question := map[string]any{"title": "Pick a colour", "questions": []any{map[string]any{"id": "colour", "prompt": "Which colour?",
 		"options": []any{map[string]any{"id": "red", "label": "Red"}}}}}
-	if text, isErr := m.tool(2, "ask_form", question); isErr || text != formStillOpen {
+	if text, isErr := m.tool(2, "ask_question", question); isErr || text != formStillOpen {
 		t.Fatal(text)
 	}
 	if s := d.Store.Agent(a.ID).State; s != wire.AgentStateRunning {
@@ -140,10 +157,26 @@ func TestAFormLeftOpenBringsItsAnswerLater(t *testing.T) {
 	}
 	c.call(t, 2, "elicitations/answer", map[string]any{"requestID": pending[0].ID, "action": "accept", "content": map[string]any{"colour": "red"}})
 	waitFor(t, "the answer in its chat", func() bool {
-		return slices.Contains(userMessages(d, a.ID), "The person replied to your form \"Pick a colour\" (ask_form). They answered:\n- Which colour?: Red")
+		return slices.Contains(userMessages(d, a.ID), "The person replied to your form \"Pick a colour\" (ask_question). They answered:\n- Which colour?: Red")
 	})
 	json.Unmarshal(c.call(t, 3, "elicitations/pending", nil), &pending)
 	if len(pending) != 0 {
 		t.Fatalf("%+v", pending)
+	}
+	// The prompt that brings the answer starts a turn, so the answer is the end of the
+	// turn that asked, not drawn after the next turn's steps (#2934).
+	var page wire.TurnsPage
+	json.Unmarshal(c.call(t, 4, "agents/turns", map[string]any{"agentID": a.ID, "limit": 50}), &page)
+	ends, err := d.Store.LineEnds(a.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	opening, _, err := d.Store.Entries(a.ID, ends, int(page.OpenStart), int(page.OpenStart)+1)
+	if err != nil || len(opening) != 1 || opening[0].Kind.UserMessage == nil || *opening[0].Kind.UserMessage.From != wire.PromptOriginApp {
+		t.Fatalf("the last turn starts with %+v", opening)
+	}
+	if n := len(page.Turns); n == 0 || page.Turns[n-1].Outcome[len(page.Turns[n-1].Outcome)-1].Kind.ElicitationAnswered == nil {
+		b, _ := json.Marshal(page)
+		t.Fatalf("the answer is not the end of the turn that asked: %s", b)
 	}
 }

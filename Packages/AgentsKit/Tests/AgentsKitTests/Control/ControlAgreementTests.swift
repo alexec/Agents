@@ -36,7 +36,7 @@ struct ControlAgreementTests {
                                                         peerPublic: b.publicKey.x963Representation)
             let kit = try a.sharedSecretFromKeyAgreement(with: b.publicKey)
             #expect(ours == kit.withUnsafeBytes { Data($0) })
-            let host = HostID(rawValue: "devbox01")
+            let host = MachineRef(rawValue: "devbox01")
             let derived = kit.hkdfDerivedSymmetricKey(using: SHA256.self,
                                                       salt: Data("agents-control-host-v1".utf8),
                                                       sharedInfo: Data(host.rawValue.utf8), outputByteCount: 32)

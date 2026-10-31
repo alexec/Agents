@@ -43,10 +43,10 @@ network with no relay. While the relay is off, nothing of yours goes through iCl
    - **If this Mac runs the control plane,** that is all. Agents Host makes the relay's
      code itself. The switch works only while the control plane runs.
    - **If this Mac joins a control plane elsewhere** (on a server, for example), Agents
-     Host asks for a host code the first time. Continue with step 4.
-4. Get a host code from your control plane. In the Agents window, open **Settings ▸
+     Host asks for a join code the first time. Continue with step 4.
+4. Get a join code from your control plane. In the Agents window, open **Settings ▸
    Control plane**, click **Add by Code…** under **Hosts**, then click **Copy**.
-5. In Agents Host's **Relay for My Devices** sheet, paste the code under **Host code** and
+5. In Agents Host's **Relay for My Devices** sheet, paste the code under **Join code** and
    click **Start Relay**.
 
    The relay joins the control plane as a host that runs no agents.
@@ -77,7 +77,7 @@ and asks for no code.
 If you choose a different control plane in Agents Host later (**Join one elsewhere** again,
 or **Run It Here Again…**), Agents Host stops the relay, tells the old control plane, and
 forgets that enrolment. The next time you turn it on there, a control plane elsewhere asks
-for a new host code.
+for a new join code.
 
 ## See whether the relay is on
 
@@ -100,7 +100,7 @@ for a new host code.
   it on while the control plane runs.** Start the control plane first. While this Mac waits
   for its control plane to come back, the line says **Turn it on once your control plane is
   back here.**
-- **That isn't a host code.** The code you pasted is for a window or a device, not a host.
+- **That isn't a join code.** The code you pasted is for a window or a device, not a host.
   Get one with **Add by Code…**, as in step 4. The message calls the button **Add a Mac**.
 - **Allow Agents Host in System Settings ▸ General ▸ Login Items, then try again.** macOS
   did not let the relay start. Allow Agents Host there, and turn the switch on again.
@@ -115,5 +115,5 @@ for a new host code.
 
 - [How the phone and iPad reach your agents](../explanation/phone-and-ipad.md)
 - [Set up Agents on this Mac](set-up-on-this-mac.md)
-- [Add a server](add-a-server.md)
+- [Add a machine](add-a-machine.md)
 - [The control plane](../explanation/control-plane.md)

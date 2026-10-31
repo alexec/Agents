@@ -15,13 +15,19 @@ import (
 )
 
 // The marketplaces a catalogue sheet can search (Marketplaces): the app's own list, then
-// the person's ~/.agents/marketplaces.json, then the destination project's
+// the person's ~/.agents/marketplaces.json, then the destination folder's
 // .agents/marketplaces.json. A token names a line in secrets.env, sent as a bearer token.
-// off and on are the person's only. A project's marketplaces start off, and are used once
+// off and on are the person's only. A folder's marketplaces start off, and are used once
 // the person names them in on: a committed file could otherwise send one of their secrets
 // to any host it names.
 
 const SkillsShID = "provided:skills-sh"
+
+// The Agents marketplace (#2155): its id, and the address the built-in file is listed under.
+const (
+	AgentsMarketplaceID   = "provided:agents"
+	AgentsMarketplaceFile = "builtin:agents.json"
+)
 
 // RegistryVariable points every provided MCP registry at a walk's fixture server.
 const RegistryVariable = "AGENTS_TEST_MCP_REGISTRY_URL"
@@ -46,6 +52,9 @@ func Provided(env func(string) string) []wire.Marketplace {
 		{ID: "provided:official-mcp", Name: "MCP Registry", Format: wire.MarketplaceFormatMCPRegistry,
 			URL: registry("https://registry.modelcontextprotocol.io"), Origin: wire.MarketplaceOriginProvided,
 			About: about("The open registry: everything published, in its own order.")},
+		// The connectors Agents makes (#2155): a file carried inside agentsd (mcpcatalog's agents.json).
+		{ID: AgentsMarketplaceID, Name: "Agents", Format: wire.MarketplaceFormatFile, URL: AgentsMarketplaceFile,
+			Origin: wire.MarketplaceOriginProvided, About: about("The connectors Agents makes, carried by every host.")},
 		{ID: SkillsShID, Name: "skills.sh", Format: wire.MarketplaceFormatSkillsSh, URL: catalog,
 			Origin: wire.MarketplaceOriginProvided, About: about("Skills on GitHub, most installed first.")},
 		{ID: "provided:anthropic-skills", Name: "Anthropic skills", Format: wire.MarketplaceFormatGithubSkills,
@@ -55,7 +64,7 @@ func Provided(env func(string) string) []wire.Marketplace {
 
 // KindOf is what a format lists.
 func KindOf(f wire.MarketplaceFormat) wire.CatalogKind {
-	if f == wire.MarketplaceFormatMCPRegistry {
+	if f == wire.MarketplaceFormatMCPRegistry || f == wire.MarketplaceFormatFile {
 		return wire.CatalogKindMCP
 	}
 	return wire.CatalogKindSkills
@@ -86,7 +95,7 @@ func (e UnreadableMarketplaces) Error() string {
 func PersonalMarketplaces(home string) string {
 	return filepath.Join(home, ".agents", "marketplaces.json")
 }
-func ProjectMarketplaces(folder string) string {
+func FolderMarketplaces(folder string) string {
 	return filepath.Join(folder, ".agents", "marketplaces.json")
 }
 
@@ -123,17 +132,17 @@ func SaveMarketplaces(f MarketplaceFile, path string) error {
 }
 
 // ListMarketplaces is every marketplace for a kind (all for nil), provided first, then the
-// person's, then the project's.
-func ListMarketplaces(kind *wire.CatalogKind, personal MarketplaceFile, project *MarketplaceFile,
+// person's, then the folder's.
+func ListMarketplaces(kind *wire.CatalogKind, personal MarketplaceFile, folder *MarketplaceFile,
 	secretIsSet func(string) bool, env func(string) string) []wire.Marketplace {
 	off, on := set(personal.Off), set(personal.On)
 	all := Provided(env)
 	for _, e := range personal.Marketplaces {
 		all = append(all, fromEntry(e, wire.MarketplaceOriginPersonal, secretIsSet))
 	}
-	if project != nil {
-		for _, e := range project.Marketplaces {
-			all = append(all, fromEntry(e, wire.MarketplaceOriginProject, secretIsSet))
+	if folder != nil {
+		for _, e := range folder.Marketplaces {
+			all = append(all, fromEntry(e, wire.MarketplaceOriginFolder, secretIsSet))
 		}
 	}
 	seen := map[string]bool{}
@@ -143,7 +152,7 @@ func ListMarketplaces(kind *wire.CatalogKind, personal MarketplaceFile, project 
 			continue
 		}
 		seen[m.ID] = true
-		if m.Origin == wire.MarketplaceOriginProject {
+		if m.Origin == wire.MarketplaceOriginFolder {
 			m.Enabled = on[m.ID]
 		} else {
 			m.Enabled = !off[m.ID]
@@ -171,7 +180,7 @@ func fromEntry(e MarketplaceEntry, origin wire.MarketplaceOrigin, secretIsSet fu
 }
 
 // SetEnabled turns one on or off in the person's file.
-func SetEnabled(id string, project bool, enabled bool, f *MarketplaceFile) {
+func SetEnabled(id string, folder bool, enabled bool, f *MarketplaceFile) {
 	without := func(xs []string) []string {
 		var out []string
 		for _, x := range xs {
@@ -181,7 +190,7 @@ func SetEnabled(id string, project bool, enabled bool, f *MarketplaceFile) {
 		}
 		return out
 	}
-	if project {
+	if folder {
 		f.On = without(f.On)
 		if enabled {
 			f.On = append(f.On, id)
@@ -212,6 +221,14 @@ func MarketplaceProblem(r wire.MarketplaceAddRequest) string {
 	case wire.MarketplaceFormatGithubSkills:
 		if _, _, ok := GitHubSource(u); !ok {
 			return "A GitHub repository is owner/repo."
+		}
+	case wire.MarketplaceFormatFile:
+		// A path: absolute, from ~/, or from the folder that holds the marketplaces.json's .agents.
+		if u == "" || strings.Contains(u, "://") || strings.HasPrefix(u, "builtin:") {
+			return "A file marketplace is a path, such as ~/team/connectors.json."
+		}
+		if r.Token != nil && *r.Token != "" {
+			return "A file marketplace takes no token."
 		}
 	default:
 		p, err := url.Parse(u)

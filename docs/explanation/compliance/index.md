@@ -37,16 +37,23 @@ the page says so and names its issue.
 
 ## Not built yet
 
-Data governance is roadmap step T8 (#1001). These parts of it are planned, not built:
+Data governance is roadmap step T8 (#1001, `specs/1001-data-governance/`). These parts are
+built:
 
-- **Redaction.** Agents does not redact tokens from transcripts or `daemon.log` yet.
-- **Full erasure.** Delete removes an agent's records on its machine. It does not remove
-  the runtime's own session files.
-- **Export and import** of an agent or a project.
-- **Tamper-evident audit.** No hash chain on events, and no syslog or HTTP sink.
+- **Redaction:** known token shapes are cut out of transcripts, `app-tools.jsonl` and
+  `daemon.log` when they are written (see [Security overview](security-overview.md#logs)).
+- **Erasure:** Delete also removes the runtime's own copy, and a restore never brings a
+  deleted agent back (see [Data and retention](data-and-retention.md#erasure)).
+- **Export and import:** an agent or a folder's agents as a `.tar.gz`, and brought back,
+  archived, on another machine (see [Data and retention](data-and-retention.md#export-and-import)).
 
-The organisation policy (T5, #998) and org keys and model gateways (T6, #999) are planned
-for 0.11.
+- **A tamper-evident audit:** a hash chain on the audit's entries, a seal for each day,
+  `agents-control audit verify`, and syslog and HTTP sinks (see
+  [Security overview](security-overview.md#who-did-what)).
+
+The organisation policy (T5, #998) and org keys and model gateways (T6, #999) are built
+too: see [Policy](../../reference/policy.md) and
+[Org keys and gateways](../org-keys-and-gateways.md).
 
 ## Related
 

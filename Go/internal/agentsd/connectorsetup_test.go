@@ -53,7 +53,7 @@ func (f *fakeSetupGitHub) AppReach(ctx context.Context, repo, slug string) (bool
 	return repo == "alexec/agents-walk" && slug == "agents-loops", 3, f.fail("reach")
 }
 
-func gitProject(t *testing.T, remote string) string {
+func gitFolder(t *testing.T, remote string) string {
 	t.Helper()
 	dir := t.TempDir()
 	for _, args := range [][]string{{"init", "-q"}, {"remote", "add", "origin", remote}} {
@@ -75,11 +75,11 @@ func slotsByKind(s wire.ConnectorSetup) map[wire.ConnectorSlotKind]wire.Connecto
 	return out
 }
 
-// A project's set-up (#1336): before the connection every GitHub slot waits for it and This
+// A folder's set-up (#1336): before the connection every GitHub slot waits for it and This
 // Mac is done; once connected each slot reads one real thing, a refusal says so, the github
 // connector's events go on once, a read that does not reach GitHub keeps a tick, and a skip
-// is kept in .agents/project.json and counts.
-func TestAProjectsConnectorSetUp(t *testing.T) {
+// is kept in .agents/folder.json and counts.
+func TestAFoldersConnectorSetUp(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("AGENTS_PERSONAL_HOME", home)
 	d, c := start(t, t.TempDir())
@@ -93,11 +93,11 @@ func TestAProjectsConnectorSetUp(t *testing.T) {
 		}
 		return gh
 	}
-	project := gitProject(t, "git@github.com:alexec/agents-walk.git")
-	c.call(t, 1, "projects/add", map[string]any{"folder": "file://" + project})
+	folder := gitFolder(t, "git@github.com:alexec/agents-walk.git")
+	c.call(t, 1, "folders/add", map[string]any{"folder": "file://" + folder})
 
 	var setup wire.ConnectorSetup
-	json.Unmarshal(c.call(t, 2, "connectors/setup", map[string]any{"folder": project}), &setup)
+	json.Unmarshal(c.call(t, 2, "connectors/setup", map[string]any{"folder": folder}), &setup)
 	slots := slotsByKind(setup)
 	if setup.Repository == nil || *setup.Repository != "alexec/agents-walk" || setup.Connection != nil || setup.Done != 1 ||
 		slots[wire.ConnectorSlotKindTasks].State != wire.ConnectorSlotStateNotConnected ||
@@ -108,7 +108,7 @@ func TestAProjectsConnectorSetUp(t *testing.T) {
 
 	file.Put(connections.Connection{Provider: connections.GitHub, Login: "alexec", Access: "ghu_secret",
 		AccessExpiresAt: time.Now().Add(time.Hour), ConnectedAt: time.Now()})
-	raw := c.call(t, 3, "connectors/setup", map[string]any{"folder": project})
+	raw := c.call(t, 3, "connectors/setup", map[string]any{"folder": folder})
 	if strings.Contains(string(raw), "ghu_secret") {
 		t.Fatalf("a token went to the client: %s", raw)
 	}
@@ -132,22 +132,22 @@ func TestAProjectsConnectorSetUp(t *testing.T) {
 		len(setup.Events.Names) == 0 {
 		t.Fatalf("events: %+v", setup.Events)
 	}
-	if b, _ := os.ReadFile(filepath.Join(project, ".agents", "mcp.json")); !strings.Contains(string(b), "github-mcp") {
+	if b, _ := os.ReadFile(filepath.Join(folder, ".agents", "mcp.json")); !strings.Contains(string(b), "github-mcp") {
 		t.Fatalf("mcp.json: %s", b)
 	}
 
 	// A read inside five minutes is used again; Try Again reads now. GitHub not reached: the
 	// tick stays. The events are not added a second time once taken out.
 	reads := gh.reads
-	c.call(t, 4, "connectors/setup", map[string]any{"folder": project})
+	c.call(t, 4, "connectors/setup", map[string]any{"folder": folder})
 	if gh.reads != reads {
 		t.Fatalf("read again inside five minutes: %d", gh.reads)
 	}
-	os.Remove(filepath.Join(project, ".agents", "mcp.json"))
+	os.Remove(filepath.Join(folder, ".agents", "mcp.json"))
 	gh.mu.Lock()
 	gh.err = map[string]error{"issue": &githubmcp.GitHubError{Kind: githubmcp.Failed, Message: "GitHub: dial tcp: no route"}}
 	gh.mu.Unlock()
-	json.Unmarshal(c.call(t, 5, "connectors/setup", map[string]any{"folder": project, "reading": "fresh"}), &setup)
+	json.Unmarshal(c.call(t, 5, "connectors/setup", map[string]any{"folder": folder, "reading": "fresh"}), &setup)
 	slots = slotsByKind(setup)
 	if s := slots[wire.ConnectorSlotKindTasks]; s.State != wire.ConnectorSlotStateRead || s.Proof == nil {
 		t.Fatalf("a lost read untick: %+v", s)
@@ -159,27 +159,28 @@ func TestAProjectsConnectorSetUp(t *testing.T) {
 		t.Fatalf("the events came back after they were taken out: %+v", setup.Events)
 	}
 
-	json.Unmarshal(c.call(t, 6, "connectors/setup/skip", map[string]any{"folder": project, "slot": "codeReview", "skipped": true}), &setup)
+	json.Unmarshal(c.call(t, 6, "connectors/setup/skip", map[string]any{"folder": folder, "slot": "codeReview", "skipped": true}), &setup)
 	if s := slotsByKind(setup)[wire.ConnectorSlotKindCodeReview]; s.State != wire.ConnectorSlotStateSkipped || setup.Done != 4 {
 		t.Fatalf("skipped: %+v %d", s, setup.Done)
 	}
-	if b, _ := os.ReadFile(filepath.Join(project, ".agents", "project.json")); !strings.Contains(string(b), `"codeReview"`) {
-		t.Fatalf("project.json: %s", b)
+	if b, _ := os.ReadFile(filepath.Join(folder, ".agents", "folder.json")); !strings.Contains(string(b), `"codeReview"`) {
+		t.Fatalf("folder.json: %s", b)
 	}
-	json.Unmarshal(c.call(t, 7, "connectors/setup/skip", map[string]any{"folder": project, "slot": "codeReview", "skipped": false}), &setup)
+	json.Unmarshal(c.call(t, 7, "connectors/setup/skip", map[string]any{"folder": folder, "slot": "codeReview", "skipped": false}), &setup)
 	if s := slotsByKind(setup)[wire.ConnectorSlotKindCodeReview]; s.State != wire.ConnectorSlotStateRead {
 		t.Fatalf("set up again: %+v", s)
 	}
-	if _, err := os.Stat(filepath.Join(project, ".agents", "project.json")); !os.IsNotExist(err) {
-		t.Fatalf("project.json is kept with nothing in it: %v", err)
+	// Only the project id that adding the folder wrote (#2317) is left.
+	if b, _ := os.ReadFile(filepath.Join(folder, ".agents", "folder.json")); strings.Contains(string(b), "connectors") || !strings.Contains(string(b), `"project"`) {
+		t.Fatalf("folder.json: %s", b)
 	}
-	if e := c.callError(t, 8, "connectors/setup/skip", map[string]any{"folder": project, "slot": "workspace", "skipped": true}); e == nil {
+	if e := c.callError(t, 8, "connectors/setup/skip", map[string]any{"folder": folder, "slot": "workspace", "skipped": true}); e == nil {
 		t.Fatal("This Mac was skipped")
 	}
 
 	// Disconnected, the slots wait for the connection again.
 	file.Delete(connections.GitHub)
-	json.Unmarshal(c.call(t, 9, "connectors/setup", map[string]any{"folder": project, "reading": "stored"}), &setup)
+	json.Unmarshal(c.call(t, 9, "connectors/setup", map[string]any{"folder": folder, "reading": "stored"}), &setup)
 	if s := slotsByKind(setup)[wire.ConnectorSlotKindTasks]; s.State != wire.ConnectorSlotStateNotConnected || setup.Done != 1 {
 		t.Fatalf("disconnected: %+v", setup)
 	}
@@ -196,11 +197,11 @@ func TestEventsThatCannotBeTurnedOnSayWhy(t *testing.T) {
 		AccessExpiresAt: time.Now().Add(time.Hour), ConnectedAt: time.Now()})
 	d.connStoreFor = func() (connections.Store, error) { return file, nil }
 	d.newSetupReader = func(string) setupReader { return &fakeSetupGitHub{} }
-	project := gitProject(t, "https://github.com/alexec/agents-walk.git")
-	c.call(t, 1, "projects/add", map[string]any{"folder": "file://" + project})
+	folder := gitFolder(t, "https://github.com/alexec/agents-walk.git")
+	c.call(t, 1, "folders/add", map[string]any{"folder": "file://" + folder})
 
 	var setup wire.ConnectorSetup
-	json.Unmarshal(c.call(t, 2, "connectors/setup", map[string]any{"folder": project}), &setup)
+	json.Unmarshal(c.call(t, 2, "connectors/setup", map[string]any{"folder": folder}), &setup)
 	if setup.Events.State != wire.ConnectorEventsStateFailed || setup.Events.Message == nil ||
 		strings.Contains(*setup.Events.Message, "-32") {
 		t.Fatalf("%+v", setup.Events)
@@ -218,17 +219,17 @@ func TestASetUpWithNoGitHubRemote(t *testing.T) {
 	d.connStoreFor = func() (connections.Store, error) { return file, nil }
 	gh := &fakeSetupGitHub{}
 	d.newSetupReader = func(string) setupReader { return gh }
-	project := gitProject(t, "https://code.example.org/alexec/blog.git")
-	c.call(t, 1, "projects/add", map[string]any{"folder": "file://" + project})
+	folder := gitFolder(t, "https://code.example.org/alexec/blog.git")
+	c.call(t, 1, "folders/add", map[string]any{"folder": "file://" + folder})
 
 	var setup wire.ConnectorSetup
-	json.Unmarshal(c.call(t, 2, "connectors/setup", map[string]any{"folder": project}), &setup)
+	json.Unmarshal(c.call(t, 2, "connectors/setup", map[string]any{"folder": folder}), &setup)
 	if setup.Repository != nil || slotsByKind(setup)[wire.ConnectorSlotKindTasks].State != wire.ConnectorSlotStateNoRemote ||
 		gh.reads != 0 || setup.Events.State != wire.ConnectorEventsStateOff {
 		t.Fatalf("%+v", setup)
 	}
 	if e := c.callError(t, 3, "connectors/setup", map[string]any{"folder": t.TempDir()}); e == nil {
-		t.Fatal("a folder that is not a project")
+		t.Fatal("a folder that is not a folder")
 	}
 }
 
@@ -245,17 +246,17 @@ func (f *fakeSetupGitLab) read() {
 	f.reads++
 }
 
-func (f *fakeSetupGitLab) NewestIssue(ctx context.Context, project string) (*gitlabmcp.Newest, error) {
+func (f *fakeSetupGitLab) NewestIssue(ctx context.Context, folder string) (*gitlabmcp.Newest, error) {
 	f.read()
-	return &gitlabmcp.Newest{Number: 3, Title: "Walk the views", URL: "https://gitlab.com/" + project + "/-/issues/3", At: "2026-10-20T10:00:00Z"}, nil
+	return &gitlabmcp.Newest{Number: 3, Title: "Walk the views", URL: "https://gitlab.com/" + folder + "/-/issues/3", At: "2026-10-20T10:00:00Z"}, nil
 }
 
-func (f *fakeSetupGitLab) NewestMergeRequest(ctx context.Context, project string) (*gitlabmcp.Newest, error) {
+func (f *fakeSetupGitLab) NewestMergeRequest(ctx context.Context, folder string) (*gitlabmcp.Newest, error) {
 	f.read()
 	return &gitlabmcp.Newest{Number: 2, Title: "Add a README", At: "2026-10-20T10:00:00Z"}, nil
 }
 
-func (f *fakeSetupGitLab) LastPipeline(ctx context.Context, project string) (*gitlabmcp.Newest, error) {
+func (f *fakeSetupGitLab) LastPipeline(ctx context.Context, folder string) (*gitlabmcp.Newest, error) {
 	f.read()
 	if f.refuse {
 		return nil, &gitlabmcp.GitLabError{Kind: gitlabmcp.Failed, Message: "GitLab: HTTP 403", Refused: true}
@@ -263,10 +264,10 @@ func (f *fakeSetupGitLab) LastPipeline(ctx context.Context, project string) (*gi
 	return &gitlabmcp.Newest{Title: "Pipeline on main", Outcome: "passed", At: "2026-10-20T10:00:00Z"}, nil
 }
 
-// A GitLab project (#1632): its remote picks GitLab, the GitLab connection fills the three
+// A GitLab folder (#1632): its remote picks GitLab, the GitLab connection fills the three
 // slots, each proved by one read, the gitlab connector's events go on, and a connection to
 // another GitLab is not used here.
-func TestAGitLabProjectsConnectorSetUp(t *testing.T) {
+func TestAGitLabFoldersConnectorSetUp(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("AGENTS_PERSONAL_HOME", home)
 	d, c := start(t, t.TempDir())
@@ -281,14 +282,14 @@ func TestAGitLabProjectsConnectorSetUp(t *testing.T) {
 		return gl
 	}
 	d.newSetupReader = func(string) setupReader {
-		t.Error("GitHub was read for a GitLab project")
+		t.Error("GitHub was read for a GitLab folder")
 		return &fakeSetupGitHub{}
 	}
-	project := gitProject(t, "git@gitlab.com:agentstest-group/agents-walk.git")
-	c.call(t, 1, "projects/add", map[string]any{"folder": "file://" + project})
+	folder := gitFolder(t, "git@gitlab.com:agentstest-group/agents-walk.git")
+	c.call(t, 1, "folders/add", map[string]any{"folder": "file://" + folder})
 
 	var setup wire.ConnectorSetup
-	json.Unmarshal(c.call(t, 2, "connectors/setup", map[string]any{"folder": project}), &setup)
+	json.Unmarshal(c.call(t, 2, "connectors/setup", map[string]any{"folder": folder}), &setup)
 	slots := slotsByKind(setup)
 	if setup.Forge == nil || *setup.Forge != wire.ConnectionProviderGitlab || deref(setup.Site) != "gitlab.com" ||
 		deref(setup.Repository) != "agentstest-group/agents-walk" || setup.InstallURL != nil ||
@@ -300,14 +301,14 @@ func TestAGitLabProjectsConnectorSetUp(t *testing.T) {
 	// A connection to a self-managed GitLab is not sent to gitlab.com.
 	file.Put(connections.Connection{Provider: connections.GitLab, Login: "agentstest", Access: "glpat-other",
 		URL: "https://gitlab.example.com/", ConnectedAt: time.Now()})
-	json.Unmarshal(c.call(t, 3, "connectors/setup", map[string]any{"folder": project, "reading": "fresh"}), &setup)
+	json.Unmarshal(c.call(t, 3, "connectors/setup", map[string]any{"folder": folder, "reading": "fresh"}), &setup)
 	if setup.Connection != nil || gl.reads != 0 || slotsByKind(setup)[wire.ConnectorSlotKindCi].State != wire.ConnectorSlotStateNotConnected {
 		t.Fatalf("another GitLab's connection: %+v", setup)
 	}
 
 	file.Put(connections.Connection{Provider: connections.GitLab, Login: "agentstest", Access: "gloas-secret",
 		AccessExpiresAt: time.Now().Add(time.Hour), ConnectedAt: time.Now()})
-	raw := c.call(t, 4, "connectors/setup", map[string]any{"folder": project, "reading": "fresh"})
+	raw := c.call(t, 4, "connectors/setup", map[string]any{"folder": folder, "reading": "fresh"})
 	if strings.Contains(string(raw), "gloas-secret") {
 		t.Fatalf("a token went to the client: %s", raw)
 	}
@@ -327,7 +328,98 @@ func TestAGitLabProjectsConnectorSetUp(t *testing.T) {
 	if setup.Events.State != wire.ConnectorEventsStateOn || deref(setup.Events.Server) != "gitlab" {
 		t.Fatalf("events: %+v", setup.Events)
 	}
-	if b, _ := os.ReadFile(filepath.Join(project, ".agents", "mcp.json")); !strings.Contains(string(b), "gitlab-mcp") {
+	if b, _ := os.ReadFile(filepath.Join(folder, ".agents", "mcp.json")); !strings.Contains(string(b), "gitlab-mcp") {
 		t.Fatalf("mcp.json: %s", b)
 	}
+}
+
+// US4 (#2669): a folder whose project sets Code review reads the project's repository, even
+// with no remote of its own; a slot the project skips is skipped; a slot the project does
+// not set is the folder's own; the folder cannot skip a slot the project sets; the Pull
+// requests page follows the project; the slots are kept across a restart.
+func TestAProjectsSlotsFillItsFolders(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("AGENTS_PERSONAL_HOME", home)
+	root := t.TempDir()
+	d, c := start(t, root)
+	defer d.Shutdown()
+	file := &connections.File{Path: filepath.Join(t.TempDir(), ".agents-secrets", connections.FileName)}
+	d.connStoreFor = func() (connections.Store, error) { return file, nil }
+	file.Put(connections.Connection{Provider: connections.GitHub, Login: "alexec", Access: "ghu_secret",
+		AccessExpiresAt: time.Now().Add(time.Hour), ConnectedAt: time.Now()})
+	var mu sync.Mutex
+	readRepos := map[string]bool{}
+	d.newSetupReader = func(token string) setupReader { return &recordingGitHub{fakeSetupGitHub: &fakeSetupGitHub{}, mu: &mu, repos: readRepos} }
+	folder := gitFolder(t, "")
+	c.call(t, 1, "folders/add", map[string]any{"folder": "file://" + folder})
+	id, _, _ := d.folderProject(folder)
+	if id == "" {
+		t.Fatal("no project id")
+	}
+
+	forge, repo, yes := wire.ConnectionProviderGithub, "alexec/agents-walk", true
+	d.heardProjects(wire.MachineProjects{Projects: []wire.ProjectTools{{ID: id, Name: "Agents", Slots: []wire.ProjectSlot{
+		{Slot: wire.ConnectorSlotKindTasks, Skipped: &yes},
+		{Slot: wire.ConnectorSlotKindCodeReview, Forge: &forge, Repository: &repo},
+	}}}})
+
+	var setup wire.ConnectorSetup
+	json.Unmarshal(c.call(t, 2, "connectors/setup", map[string]any{"folder": folder, "reading": "fresh"}), &setup)
+	slots := slotsByKind(setup)
+	tasks, review, ci := slots[wire.ConnectorSlotKindTasks], slots[wire.ConnectorSlotKindCodeReview], slots[wire.ConnectorSlotKindCi]
+	if setup.Project == nil || *setup.Project != id || setup.ProjectName == nil || *setup.ProjectName != "Agents" {
+		t.Fatalf("project: %+v", setup)
+	}
+	if tasks.State != wire.ConnectorSlotStateSkipped || tasks.FromProject == nil {
+		t.Fatalf("tasks: %+v", tasks)
+	}
+	if review.State != wire.ConnectorSlotStateRead || review.FromProject == nil || review.Repository == nil || *review.Repository != repo {
+		t.Fatalf("review: %+v", review)
+	}
+	if ci.State != wire.ConnectorSlotStateNoRemote || ci.FromProject != nil {
+		t.Fatalf("ci: %+v", ci)
+	}
+	mu.Lock()
+	if !readRepos[repo] || len(readRepos) != 1 {
+		t.Fatalf("read %v", readRepos)
+	}
+	mu.Unlock()
+	if e := c.callError(t, 3, "connectors/setup/skip", map[string]any{"folder": folder, "slot": "codeReview", "skipped": true}); e == nil || !strings.Contains(e.Message, "owner or an admin") {
+		t.Fatalf("%+v", e)
+	}
+	if args, ok := d.projectViewArguments(folder, "agents/github", githubmcp.PullsURI); !ok || string(args) != `{"repo":"alexec/agents-walk"}` {
+		t.Fatalf("pulls page: %s %v", args, ok)
+	}
+	if _, ok := d.projectViewArguments(folder, "agents/github", githubmcp.IssuesURI); ok {
+		t.Fatal("the skipped Tasks slot pointed the Issues page")
+	}
+
+	// Kept on disk: a machine that starts again before the control plane answers has them.
+	d.projectToolsMu.Lock()
+	d.projectTools = nil
+	d.projectToolsMu.Unlock()
+	if _, set := d.projectSlot(folder, wire.ConnectorSlotKindCodeReview); !set {
+		t.Fatal("the slots were not kept")
+	}
+	// The project gives the slot back: the folder's own again.
+	d.heardProjects(wire.MachineProjects{Projects: []wire.ProjectTools{{ID: id, Name: "Agents", Slots: []wire.ProjectSlot{}}}})
+	var again wire.ConnectorSetup
+	json.Unmarshal(c.call(t, 4, "connectors/setup", map[string]any{"folder": folder}), &again)
+	if s := slotsByKind(again)[wire.ConnectorSlotKindCodeReview]; s.State != wire.ConnectorSlotStateNoRemote || s.FromProject != nil || s.Repository != nil {
+		t.Fatalf("given back: %+v", s)
+	}
+}
+
+// recordingGitHub is fakeSetupGitHub, noting each repository read.
+type recordingGitHub struct {
+	*fakeSetupGitHub
+	mu    *sync.Mutex
+	repos map[string]bool
+}
+
+func (r *recordingGitHub) NewestPull(ctx context.Context, repo string) (*githubmcp.Newest, error) {
+	r.mu.Lock()
+	r.repos[repo] = true
+	r.mu.Unlock()
+	return r.fakeSetupGitHub.NewestPull(ctx, repo)
 }

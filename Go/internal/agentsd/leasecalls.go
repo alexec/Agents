@@ -8,30 +8,20 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Agents' own lease calls, through the app's tools, as DaemonCore+Leases makes them on the
-// Swift host: lease_resource takes a resource, extends it, or waits in line for it, the
-// call kept open up to leaseWaitLimit and then answered with the place kept (the agent is
-// started again when its turn comes); release_resource gives it back or leaves the line;
-// list_resources says the caller's own first, then the declared ones, then the rest. The
-// words are LeaseWords'.
-
-// leaseWaitLimit is LeaseLimits.waitLimit: how long a lease call may wait in line.
-var leaseWaitLimit = 45 * time.Second
+// Agents' own lease calls, through the app's tools: lease_resource takes a resource,
+// extends it, or joins its line, and answers at once; a place in line is an event wait on
+// lease.granted (#2361, leasewaits.go), so the grant's event starts the agent again.
+// release_resource gives it back or leaves the line; list_resources says the caller's own
+// first, then the declared ones, then the rest. The words are LeaseWords'.
 
 const (
 	leaseCappedWords = " That is the longest a lease can run; extend it again before then if you need more."
 	leaseEmptyName   = "Nothing was leased: say which resource."
 	leaseNoCall      = "That conversation is not open any more, so nothing was leased."
 )
-
-type openLeaseCall struct {
-	answer  chan string
-	started time.Time
-}
 
 func ordinal(n int) string {
 	tens, units := (n/10)%10, n%10
@@ -65,15 +55,6 @@ func grantedWords(l wire.Lease, capped bool) string {
 	return s
 }
 
-func grantedAfterWaitingWords(l wire.Lease, waited int, capped bool) string {
-	s := fmt.Sprintf("%s is yours now, until %s (%d minutes). You waited %d seconds.",
-		l.DisplayName, clock(l.ExpiresAt), leaseMinutes(l.GrantedAt, l.ExpiresAt), waited)
-	if capped {
-		s += leaseCappedWords
-	}
-	return s
-}
-
 func extendedWords(l wire.Lease, capped bool) string {
 	s := "You still hold " + l.DisplayName + ", now until " + clock(l.ExpiresAt) + "."
 	if capped {
@@ -82,9 +63,13 @@ func extendedWords(l wire.Lease, capped bool) string {
 	return s
 }
 
-func stillInLineWords(held string, place int) string {
-	return held + ". You are " + ordinal(place) + " in line and keep your place. Call lease_resource again to go on waiting, " +
-		"or end your turn — you will be started again when it is yours."
+func inLineWords(held string, place int) string {
+	return held + ". You are " + ordinal(place) + " in line. You will get a lease.granted event when it is yours. " +
+		"End your turn, and you will be started again with it."
+}
+
+func notWaitingInLineWords(held string, place int) string {
+	return held + ". You are " + ordinal(place) + " in line."
 }
 
 func leftLineWords(display string) string { return "You left the line for " + display + "." }
@@ -174,16 +159,6 @@ func (d *Daemon) resolveResource(given string) (wire.ResourceName, wire.Resource
 	return name, "named", strings.TrimSpace(given), true
 }
 
-func (e *leaseEntry) nextToEnd() *wire.Lease {
-	var next *wire.Lease
-	for i := range e.Leases {
-		if next == nil || e.Leases[i].ExpiresAt < next.ExpiresAt {
-			next = &e.Leases[i]
-		}
-	}
-	return next
-}
-
 // leaseResource is lease_resource.
 func (d *Daemon) leaseResource(agent wire.UUID, args map[string]json.RawMessage) (string, error) {
 	given := argString(args, "name")
@@ -230,15 +205,9 @@ func (d *Daemon) leaseResource(agent wire.UUID, args map[string]json.RawMessage)
 	}
 	length, capped := e.Rules.length(minutes)
 	t := now()
-	var waitID *wire.UUID
-	if wait {
-		id := store.NewUUID()
-		waitID = &id
-	}
 	reply := ""
 	var events []leaseEvent
-	var superseded *wire.UUID
-	park := false
+	queued := false
 	place := 0
 	switch i := holderIndex(e, agent); {
 	case i >= 0:
@@ -261,58 +230,53 @@ func (d *Daemon) leaseResource(agent wire.UUID, args map[string]json.RawMessage)
 	default:
 		if j := lineIndex(e, agent); j >= 0 {
 			place = j + 1
-			if wait {
-				superseded = e.Line[j].WaitID
-				e.Line[j].WaitID = waitID
-				park = true
-			}
+			queued = wait
 		} else if wait {
-			e.Line = append(e.Line, waiter{AgentID: agent, AskedAt: t, Minutes: minutes, WaitID: waitID})
+			e.Line = append(e.Line, waiter{AgentID: agent, AskedAt: t, Minutes: minutes})
 			place = len(e.Line)
-			park = true
+			queued = true
 		}
 	}
 	d.store(name, e)
 	held := d.heldWords(name, e.DisplayName)
-	if !park && reply == "" {
-		if place > 0 {
-			reply = stillInLineWords(held, place)
-		} else {
-			reply = held + ". You are not in line."
-		}
+	switch {
+	case reply != "":
+	case queued:
+		reply = inLineWords(held, place)
+	case place > 0:
+		reply = notWaitingInLineWords(held, place)
+	default:
+		reply = held + ". You are not in line."
 	}
-	var call *openLeaseCall
-	if park {
-		call = &openLeaseCall{answer: make(chan string, 1), started: time.Now()}
-		if d.openLeaseCalls == nil {
-			d.openLeaseCalls = map[wire.UUID]*openLeaseCall{}
-		}
-		d.openLeaseCalls[*waitID] = call
-	}
-	if len(events) > 0 || park {
+	if len(events) > 0 || queued {
 		d.leasesChanged()
 	}
-	var supersededCall *openLeaseCall
-	if superseded != nil {
-		supersededCall = d.openLeaseCalls[*superseded]
-		delete(d.openLeaseCalls, *superseded)
-	}
 	d.leaseMu.Unlock()
-	if supersededCall != nil {
-		supersededCall.answer <- stillInLineWords(held, place)
-	}
 	d.settle(append(loaded, events...))
-	if !park {
+	if !queued {
 		return told + reply, nil
 	}
-	timer := time.AfterFunc(leaseWaitLimit, func() { d.leaseWaitLimitReached(*waitID) })
-	defer timer.Stop()
-	select {
-	case text := <-call.answer:
-		return told + text, nil
-	case <-d.ctx.Done():
-		return told + stillInLineWords(held, place), nil
+	d.openLineWait(agent, name)
+	// Its turn may have come between joining the line and the wait opening: then it holds
+	// it, has been started again with the news, and nothing is left to wait for.
+	d.leaseMu.Lock()
+	var granted *wire.Lease
+	if e := d.book.Entries[name]; e != nil {
+		if i := holderIndex(e, agent); i >= 0 {
+			l := e.Leases[i]
+			granted = &l
+		}
 	}
+	d.leaseMu.Unlock()
+	if granted != nil {
+		if a := d.Store.Agent(agent); a != nil {
+			if r, ok := lineWaitResource(a.EventWait, agent); ok && r == name && a.EventWait.Ending == nil {
+				d.endWait(agent, "agent", true)
+			}
+		}
+		return told + grantedWords(*granted, false), nil
+	}
+	return told + reply, nil
 }
 
 func minTime(a, b time.Time) time.Time {
@@ -340,49 +304,6 @@ func lineIndex(e *leaseEntry, agent wire.UUID) int {
 	return -1
 }
 
-// leaseWaitLimitReached is waitLimitReached: the call has waited as long as a call may. It
-// answers with the place, which is kept.
-func (d *Daemon) leaseWaitLimitReached(waitID wire.UUID) {
-	d.leaseMu.Lock()
-	call := d.openLeaseCalls[waitID]
-	if call == nil {
-		d.leaseMu.Unlock()
-		return
-	}
-	delete(d.openLeaseCalls, waitID)
-	text := ""
-	for name, e := range d.book.Entries {
-		for i := range e.Line {
-			if e.Line[i].WaitID != nil && *e.Line[i].WaitID == waitID {
-				e.Line[i].WaitID = nil
-				text = stillInLineWords(d.heldWords(name, e.DisplayName), i+1)
-			}
-		}
-	}
-	d.leasesChanged()
-	d.leaseMu.Unlock()
-	if text == "" {
-		text = leftLineWords("It")
-	}
-	call.answer <- text
-}
-
-// answerLeaseCall answers an open call with a grant: true when there was one to answer.
-func (d *Daemon) answerLeaseCall(w *waiter, l wire.Lease, capped bool) bool {
-	if w == nil || w.WaitID == nil {
-		return false
-	}
-	d.leaseMu.Lock()
-	call := d.openLeaseCalls[*w.WaitID]
-	delete(d.openLeaseCalls, *w.WaitID)
-	d.leaseMu.Unlock()
-	if call == nil {
-		return false
-	}
-	call.answer <- grantedAfterWaitingWords(l, int(time.Since(call.started).Round(time.Second).Seconds()), capped)
-	return true
-}
-
 // releaseResource is release_resource: give it back, or leave the line.
 func (d *Daemon) releaseResource(agent wire.UUID, args map[string]json.RawMessage) (string, error) {
 	given := argString(args, "name")
@@ -399,13 +320,9 @@ func (d *Daemon) releaseResource(agent wire.UUID, args map[string]json.RawMessag
 	e := d.book.Entries[name]
 	var events []leaseEvent
 	reply := "You neither hold nor are waiting for " + display + "; nothing changed."
-	var own *openLeaseCall
+	left := false
 	if e != nil {
 		display = e.DisplayName
-		if j := lineIndex(e, agent); j >= 0 && e.Line[j].WaitID != nil {
-			own = d.openLeaseCalls[*e.Line[j].WaitID]
-			delete(d.openLeaseCalls, *e.Line[j].WaitID)
-		}
 		if i := holderIndex(e, agent); i >= 0 {
 			l := e.Leases[i]
 			e.Leases = append(e.Leases[:i], e.Leases[i+1:]...)
@@ -419,6 +336,7 @@ func (d *Daemon) releaseResource(agent wire.UUID, args map[string]json.RawMessag
 		} else if j := lineIndex(e, agent); j >= 0 {
 			e.Line = append(e.Line[:j], e.Line[j+1:]...)
 			reply = leftLineWords(display)
+			left = true
 			events = append(events, leaseEvent{})
 		}
 		d.store(name, e)
@@ -427,8 +345,11 @@ func (d *Daemon) releaseResource(agent wire.UUID, args map[string]json.RawMessag
 		d.leasesChanged()
 	}
 	d.leaseMu.Unlock()
-	if own != nil {
-		own.answer <- leftLineWords(display)
+	if a := d.Store.Agent(agent); left && a != nil {
+		// Out of the line, its wait for its turn goes too.
+		if r, ok := lineWaitResource(a.EventWait, agent); ok && r == name && a.EventWait.Ending == nil {
+			d.endWait(agent, "agent", true)
+		}
 	}
 	var said []leaseEvent
 	for _, ev := range append(loaded, events...) {

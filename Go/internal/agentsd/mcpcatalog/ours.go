@@ -1,6 +1,7 @@
 package mcpcatalog
 
 import (
+	_ "embed"
 	"path/filepath"
 	"strings"
 
@@ -8,10 +9,21 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// The connectors Agents makes (#1428): first in the catalogue, in a group of their own, and
-// marked Made by Agents. They are added the same way as any other connector and run hosted,
-// one copy per host (#488). The mark is who made them; their levels come from what they
-// declare, as for any server.
+// The connectors Agents makes (#1428, #2155): rows of the Agents marketplace, a file carried
+// inside agentsd (agents.json), like any other connector: no group and no badge of their own.
+// They are added the same way as any other connector and run hosted, one copy per host
+// (#488). Their levels come from what they declare, as for any server.
+//
+// None asks for a secret. github-mcp, linear-mcp and gitlab-mcp read the person's GitHub,
+// Linear and GitLab connections (#1343, #1630); email-mcp reads the person's email connection
+// (Connect Email, #1780) and never sends mail. A token set by hand in mcp.json's env still goes
+// first. tested is when each was last tested on a real account (docs/reference/integrations.md).
+
+//go:embed agents.json
+var agentsFile []byte
+
+// AgentsMarketplace is the provided marketplace's id, as skillcatalog lists it.
+const AgentsMarketplace = skillcatalog.AgentsMarketplaceID
 
 // Ours is one connector that Agents makes.
 type Ours struct {
@@ -26,46 +38,26 @@ type Ours struct {
 	// Declares is what the server declares, for the catalogue before this host has checked
 	// it. A test holds its events and tools to the servers' own.
 	Declares Declared
-	// Tested is when it was last tested on a real account (docs/reference/integrations.md),
-	// empty when never.
+	// Tested is when it was last tested on a real account, empty when never.
 	Tested string
 }
 
-// Made is every connector Agents makes, in the catalogue's order.
-var Made = []Ours{
-	{ID: "agents/github", Title: "GitHub", Description: "Issues, pull requests and Actions: the official GitHub MCP server's tools, and events",
-		// Views: the official tools that name a ui:// view (create_pull_request, issue_write, …).
-		// Tested: the three ready-made workflows walked on alexec/agents-walk (#1342).
-		Command: "github-mcp", Declares: Declared{Tools: true, Events: githubEvents, Views: true}, Tested: "2026-10-19"},
-	// No secret to ask for: it reads the person's Linear connection (#1343). A personal API key in
-	// LINEAR_API_KEY, set by hand in mcp.json's env, still goes first. Tools and Views: its one
-	// tool, show_issues, and its page; Linear's own server (mcp.linear.app) changes issues.
-	{ID: "agents/linear", Title: "Linear", Description: "Linear issues: a page of open issues with Start Agent, and events when one is opened, labelled, commented on or closed",
-		// Tested: show_issues and the events on Alex's workspace with a personal API key (#1343).
-		Command: "linear-mcp", Declares: Declared{Tools: true, Events: linearEvents, Views: true}, Tested: "2026-10-19"},
-	// No secret to ask for: it reads the person's GitLab connection (#1630), which also says
-	// which GitLab. An access token in GITLAB_TOKEN (and GITLAB_URL), set by hand in mcp.json's
-	// env, still goes first. Not yet tested on a real account (#1634).
-	{ID: "agents/gitlab", Title: "GitLab", Description: "Merge requests, pipelines and issues on gitlab.com or a self-managed GitLab: their pages, tools to read them and comment, and events",
-		// Tested: the tools, the events and the three ready-made workflows on
-		// agentstest-group/agents-walk with a personal access token (#1634).
-		Command: "gitlab-mcp", Declares: Declared{Tools: true, Events: gitlabEvents, Views: true}, Tested: "2026-10-20"},
-	// No secret to ask for: it reads the person's email connection (Connect Email, #1780): the
-	// IMAP server, the user and an app password. EMAIL_IMAP_URL, EMAIL_USER and EMAIL_PASSWORD,
-	// set by hand in mcp.json's env, still go first. Read-only: it never sends mail. Not yet
-	// tested on a real mailbox (Alex's step on #1780).
-	{ID: "agents/email", Title: "Email", Description: "One mailbox over IMAP: an event when mail comes, a Mail page, and tools to list, search and read it, mark it read and move it. It never sends mail",
-		Command: "email-mcp", Declares: Declared{Tools: true, Events: emailEvents, Views: true}},
-}
+// Made is every connector Agents makes, in the file's order.
+var Made = mustOurs(agentsFile)
 
-var (
-	githubEvents = []string{"checks.failed", "pr.opened", "pr.merged", "pr.closed", "pr.conflicted",
-		"review.posted", "review.comment", "issue.opened", "issue.labelled", "issue.commented", "issue.closed"}
-	linearEvents = []string{"issue.opened", "issue.labelled", "issue.commented", "issue.closed"}
-	gitlabEvents = []string{"checks.failed", "pr.opened", "pr.merged", "pr.closed", "pr.conflicted", "review.comment",
-		"issue.opened", "issue.labelled", "issue.commented", "issue.closed"}
-	emailEvents = []string{"email.received"}
-)
+func mustOurs(b []byte) []Ours {
+	entries, err := parseFileMarketplace(b)
+	if err != nil {
+		panic("mcpcatalog: agents.json: " + err.Error())
+	}
+	out := []Ours{}
+	for _, e := range entries {
+		if o, ok := e.ours(); ok {
+			out = append(out, o)
+		}
+	}
+	return out
+}
 
 // NameHere is the name its entry takes in an mcp.json: github, gitlab.
 func (o Ours) NameHere() string { return slug(o.Title) }
@@ -92,13 +84,13 @@ func OursByCommand(command string) (Ours, bool) {
 	return Ours{}, false
 }
 
-// OursResult is the connector as a catalogue row, with the levels it declares.
+// OursResult is the connector as a row of the Agents marketplace, with the levels it declares.
 func OursResult(o Ours, declared Declared) wire.MCPCatalogResult {
 	levels := Levels(declared, o.Tested != "")
-	made := true
+	market := AgentsMarketplace
 	return wire.MCPCatalogResult{ID: o.ID, Title: o.Title, Description: o.Description, Version: "",
 		Publisher: wire.MCPPublisherInfo{Label: "Agents", Namespace: "agents", Known: true}, Known: true,
-		Runs: []wire.MCPRunKind{wire.MCPRunKindCommand}, Levels: &levels, MadeByAgents: &made}
+		Runs: []wire.MCPRunKind{wire.MCPRunKindCommand}, Levels: &levels, Marketplace: &market}
 }
 
 // BuildOurs is the mcp.json entry for one of ours: its command, hosted, and its secret by name.

@@ -1,6 +1,6 @@
 import Foundation
 
-/// One project-scoped name attached to a session. The owner is the person or the
+/// One folder-scoped name attached to a session. The owner is the person or the
 /// agent represented by the containing session.
 public struct SessionLabel: Codable, Hashable, Sendable {
     public enum Owner: String, Codable, Hashable, Sendable {
@@ -13,6 +13,29 @@ public struct SessionLabel: Codable, Hashable, Sendable {
     public var addedAt: Date
 
     public var normalizedValue: String { SessionLabelPolicy.key(value) }
+
+    /// What a label names, by its text alone, so a chip can be coloured by it (#2958).
+    /// No tracker is asked: `#12` is an issue and `P#12` a pull request whatever they hold.
+    public enum Kind: String, Codable, Hashable, Sendable {
+        /// `#123`, or a tracker key such as `ENG-4`: the labels that link a session to an issue.
+        case issue
+        /// `P#123`: the label that links a session to a pull request.
+        case pullRequest
+        /// `merged`, `closed` or `archived`: the work is over.
+        case finished
+        /// Anything else.
+        case plain
+    }
+
+    public var kind: Kind { Self.kind(of: value) }
+
+    public static func kind(of value: String) -> Kind {
+        let text = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.wholeMatch(of: /#[0-9]+/) != nil || text.wholeMatch(of: /[A-Z][A-Z0-9]*-[0-9]+/) != nil { return .issue }
+        if text.wholeMatch(of: /[Pp]#[0-9]+/) != nil { return .pullRequest }
+        if ["merged", "closed", "archived"].contains(text.lowercased()) { return .finished }
+        return .plain
+    }
 
     public init(value: String, owner: Owner, addedAt: Date = Date()) {
         self.value = value
@@ -82,10 +105,10 @@ public enum SessionLabelPolicy {
         return result
     }
 
-    /// Existing labels elsewhere in the project carry its current canonical spelling.
+    /// Existing labels elsewhere in the folder carry its current canonical spelling.
     /// The caller supplies those from `vocabulary(in:agents:)`.
     public static func change(current: [SessionLabel], add: [String] = [], remove: [String] = [],
-                              actor: SessionLabel.Owner, projectLabels: [SessionLabel],
+                              actor: SessionLabel.Owner, folderLabels: [SessionLabel],
                               at date: Date = Date()) throws -> [SessionLabel] {
         let adding = try add.map(cleaned)
         let removing = try remove.map(cleaned)
@@ -111,7 +134,7 @@ public enum SessionLabelPolicy {
                 continue
             }
             guard result.count < maximumCount else { throw Refusal.tooMany }
-            let canonical = projectLabels.first(where: { $0.normalizedValue == key(value) })?.value ?? value
+            let canonical = folderLabels.first(where: { $0.normalizedValue == key(value) })?.value ?? value
             result.append(SessionLabel(value: canonical, owner: actor, addedAt: date))
         }
         return result
@@ -119,9 +142,9 @@ public enum SessionLabelPolicy {
 
     /// Only labels still attached to a session are suggested. The daemon serializes
     /// mutations, so every new copy can reuse the spelling already in this vocabulary.
-    public static func vocabulary(in project: URL, agents: some Sequence<Agent>) -> [SessionLabel] {
-        let folder = Project.standardize(project)
-        let all = agents.filter { $0.projectFolder == folder }.flatMap(\.labels)
+    public static func vocabulary(in folder: URL, agents: some Sequence<Agent>) -> [SessionLabel] {
+        let folder = Folder.standardize(folder)
+        let all = agents.filter { $0.folderPath == folder }.flatMap(\.labels)
             .sorted { left, right in
                 if left.addedAt != right.addedAt { return left.addedAt < right.addedAt }
                 return left.normalizedValue < right.normalizedValue

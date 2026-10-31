@@ -1,7 +1,7 @@
 import Foundation
 
 /// The words for a server's row on an MCP Servers page (#753): Activity's, with the person's
-/// own servers, and each project's. The same on the Mac, the Remote and the web page
+/// own servers, and each folder's. The same on the Mac, the Remote and the web page
 /// (`Web/src/model/hostedMCP.ts`).
 public enum MCPHealthWords {
     public typealias Server = DaemonAPI.MCPServerHealth
@@ -38,7 +38,7 @@ public enum MCPHealthWords {
             let tools = server.tools.map { $0 == 1 ? " \u{00B7} 1 tool" : " \u{00B7} \($0) tools" } ?? ""
             return "Answered" + tools + checked
         case .failed: return "Didn't answer" + checked
-        case .waiting: return "Waiting for approval in this project's settings, so it is not started"
+        case .waiting: return "Waiting for approval in this folder's settings, so it is not started"
         case .missingSecret: return "Needs a secret that isn't set here, so it is not started"
         case .signIn: return "Wants a sign-in first, in Settings"
         case .oldTransport: return "Uses the old sse transport, which isn't checked"
@@ -93,27 +93,40 @@ public enum MCPHealthWords {
         return "Reaches " + reached.joined(separator: ", ") + ". Not yet " + not.joined(separator: ", ") + "."
     }
 
-    /// The mark on the connectors that Agents makes (#1428).
-    public static let madeByAgents = "Made by Agents"
-
     public static let personalIntro = "Every connector in your own ~/.agents/mcp.json, which every agent has. "
         + "A hosted one runs once on this machine; any other is checked every four hours, and when its entry changes. "
         + "Edit them in the Mac's Settings \u{25B8} Agent Configuration \u{25B8} Connectors."
 
-    /// Above a project's servers.
-    public static let projectIntro = "Every connector in this project's .agents/mcp.json. "
+    /// Above a folder's servers.
+    public static let folderIntro = "Every connector in this folder's .agents/mcp.json. "
         + "A hosted one runs once on its machine; any other is checked every four hours, and when its entry changes. "
-        + "Edit them in the project's settings."
+        + "Edit them in the folder's settings."
 
     public static let personalEmpty = "No connectors in ~/.agents/mcp.json yet."
-    public static let projectEmpty = "No connectors in this project's .agents/mcp.json yet."
+    public static let folderEmpty = "No connectors in this folder's .agents/mcp.json yet."
 
     /// What Remove… takes out (#2154), whether the app added it or it was written by hand.
-    public static func removes(_ name: String, inProject: Bool) -> String {
-        "This removes the \(name) entry from \(inProject ? ".agents/mcp.json" : "~/.agents/mcp.json"). "
-            + "Agents started after that won't have it."
+    /// `machine` names a server a folder is on (#2266); nil for this Mac's. The personal file
+    /// is in no git, so the daemon keeps a copy of what went, and this says where (#2195).
+    public static func removes(_ name: String, inFolder: Bool, on machine: String? = nil) -> String {
+        "This removes the \(name) entry from \(inFolder ? ".agents/mcp.json" : "~/.agents/mcp.json")"
+            + (machine.map { " on \($0)" } ?? "") + ". Agents started after that won't have it."
+            + (inFolder ? "" : removesKept)
     }
 
-    /// Said too for a project's: its mcp.json is committed (#2154).
-    public static let removesCommitted = "That file is committed with the project, so the change shows in git."
+    /// Where a removed personal entry is kept (#2195).
+    public static let removesKept = " A copy of the entry is kept in ~/.agents/mcp.removed.json."
+
+    /// Remove… found the machine offline (#2266).
+    public static func notRemoved(_ name: String, offline machine: String) -> String {
+        "\(name) was not removed: \(machine) is offline."
+    }
+
+    /// Remove… was refused: `why` is a sentence (#2266).
+    public static func notRemoved(_ name: String, because why: String) -> String {
+        "\(name) was not removed. \(why)"
+    }
+
+    /// Said too for a folder's: its mcp.json is committed (#2154).
+    public static let removesCommitted = "That file is committed with the folder, so the change shows in git, and git can bring back what was committed."
 }

@@ -24,7 +24,7 @@ const prPills = (ui, pr) => {
 const prPage = (ui, repo, back) => {
   const { el, link, button, request, log } = ui;
   const root = document.getElementById("page");
-  let pr = null, tab = "conversation", confirming = null, line = { text: "", error: false };
+  let pr = null, lineage = null, tab = "conversation", confirming = null, line = { text: "", error: false };
   // Kept across redraws, so a tab or a refresh doesn't lose what was typed, or a log shown.
   const text = el("textarea", { placeholder: "A comment, a review's words, or what the agent is to do…", rows: 3 });
   const logs = new Map();
@@ -271,13 +271,13 @@ const prPage = (ui, repo, back) => {
     head.push(el("span", { className: "grow" }), link("GitHub ↗", pr.url), button("Refresh", refresh));
     const open = (pr.threads || []).filter((t) => !t.resolved).length;
     const tabs = [["conversation", "Conversation", (pr.comments || []).length], ["review", "Review comments", open],
-      ["files", "Files", pr.filesTotal || (pr.files || []).length], ["checks", "Checks", (pr.checkRuns || []).length]]
+      ["files", "Files", pr.filesTotal || (pr.files || []).length], ["checks", "Checks", (pr.checkRuns || []).length], ["lineage", "Lineage", 0]]
       .map(([id, words, count]) => button(count ? `${words} ${count}` : words, () => { tab = id; draw(); }, { className: tab === id ? "chosen" : "" }));
-    const panel = tab === "files" ? files() : tab === "checks" ? checks() : tab === "review" ? threads() : conversation();
+    const panel = tab === "lineage" ? [lineage || (lineage = lineageSection(ui, pr.url))] : tab === "files" ? files() : tab === "checks" ? checks() : tab === "review" ? threads() : conversation();
     root.replaceChildren(
       el("div", { className: "bar" }, head),
       el("div", { className: "bar" }, [link(`#${pr.number}`, pr.url), el("h2", { className: "grow", textContent: pr.title })]),
-      el("div", { className: "pills" }, prPills(ui, pr)),
+      el("div", { className: "pills" }, [...prPills(ui, pr), ...prLabels(ui, pr, pr.labelColors)]),
       el("div", { className: "branch", textContent: `${pr.branch} → ${pr.base} · ${pr.author || "someone"} · ${ui.ago(pr.createdAt)} · +${pr.additions} −${pr.deletions}` }),
       el("div", { className: "tabs" }, tabs),
       ...panel.filter(Boolean),
@@ -288,12 +288,12 @@ const prPage = (ui, repo, back) => {
   };
   const refresh = async () => {
     if (!pr) return;
-    try { pr = await fetchPR(pr.number); draw(); }
+    try { pr = await fetchPR(pr.number); lineage = null; draw(); }
     catch (e) { say("Couldn't refresh: " + e.message, true); }
   };
   return {
     show: async (number) => {
-      pr = null; tab = "conversation"; confirming = null; line = { text: "", error: false }; text.value = ""; logs.clear(); opened.clear();
+      pr = null; lineage = null; tab = "conversation"; confirming = null; line = { text: "", error: false }; text.value = ""; logs.clear(); opened.clear();
       root.replaceChildren(el("div", { className: "muted", textContent: `Loading #${number}…` }));
       ui.size();
       try { pr = await fetchPR(number); draw(); }
@@ -309,7 +309,7 @@ const prPage = (ui, repo, back) => {
         ui.size();
         return;
       }
-      pr = detail; draw();
+      pr = detail; lineage = null; draw();
     },
   };
 };

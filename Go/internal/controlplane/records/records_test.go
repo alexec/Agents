@@ -98,7 +98,7 @@ func TestWritingKeepsWhatItDoesNotKnow(t *testing.T) {
 func TestAnUnchangedHostIsNotWritten(t *testing.T) {
 	s := store.NewMemory()
 	r := New(s)
-	r.SaveHost(ctx, HostRecord{ID: "box", Name: "Box", Platform: "linux"})
+	r.SaveHost(ctx, MachineRecord{ID: "box", Name: "Box", Platform: "linux"})
 	before, _ := s.Get(ctx, HostKey("box"))
 	h := r.Host("box")
 	h.Rev = 99
@@ -160,7 +160,7 @@ func TestForgettingAndPairingAgain(t *testing.T) {
 		t.Fatal(err)
 	}
 	// And a host removed twice is there once.
-	r.SaveHost(ctx, HostRecord{ID: "box", Name: "Box"})
+	r.SaveHost(ctx, MachineRecord{ID: "box", Name: "Box"})
 	if gone, _ := r.RemoveHost(ctx, "box"); !gone {
 		t.Fatal("not removed")
 	}

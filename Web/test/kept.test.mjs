@@ -1,4 +1,4 @@
-// Start a workspace by using it (#691 US3, layouts.md L6): a prompt or a start for a stopped
+// Start a machine by using it (#691 US3, layouts.md L6): a prompt or a start for a stopped
 // workspace is kept by the control plane, shown as a queued bubble with what it waits for, and
 // dropped with ×. The words are OfflineWords.swift's keptLine.
 import { test } from "node:test";
@@ -53,7 +53,7 @@ test("a kept prompt counts as sent, and shows at once in its agent's chat", asyn
   assert.deepEqual(store.keptFor("box", "a2"), []);
 });
 
-test("a kept start answers what was kept, and is found by its project", async () => {
+test("a kept start answers what was kept, and is found by its folder", async () => {
   const start = kept({ id: "k2", kind: "start", agentID: undefined, folder: "file:///home/alex/app/", runtimeID: "claude" });
   const store = new Store(fakeLink((method) => {
     if (method === "agents/start") throw new CallFailed(-32067, "devbox is starting.", start);

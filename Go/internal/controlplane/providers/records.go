@@ -189,7 +189,7 @@ func (p *ProviderRecord) preset() string { return strOr(get(p.Commands, "preset"
 const DefaultIdleMinutes = 30
 
 // WorkspaceLink is WorkspaceLink: a host and the workspace it runs on, kept in the host's
-// own record (HostRecord.Workspace).
+// own record (MachineRecord.Workspace).
 type WorkspaceLink struct {
 	Provider string
 	// The workspace's id, as its provider lists it.
@@ -209,7 +209,7 @@ type WorkspaceLink struct {
 	Extra   records.Extra
 }
 
-// Schedule is DaemonAPI.HostSchedule as a link keeps it.
+// Schedule is DaemonAPI.MachineSchedule as a link keeps it.
 type Schedule struct {
 	At       *time.Time
 	Workflow string
@@ -294,7 +294,7 @@ func (l *WorkspaceLink) equal(o *WorkspaceLink) bool {
 }
 
 // LinkOf is a host's workspace link, or nil.
-func LinkOf(h *records.HostRecord) *WorkspaceLink {
+func LinkOf(h *records.MachineRecord) *WorkspaceLink {
 	if h == nil || len(h.Workspace) == 0 || string(h.Workspace) == "null" {
 		return nil
 	}
@@ -306,7 +306,7 @@ func LinkOf(h *records.HostRecord) *WorkspaceLink {
 }
 
 // setLink sets a host's workspace link; nil unlinks it.
-func setLink(h *records.HostRecord, l *WorkspaceLink) {
+func setLink(h *records.MachineRecord, l *WorkspaceLink) {
 	if l == nil {
 		h.Workspace = nil
 		return

@@ -3,8 +3,10 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 
-/** A modal `<dialog>`: Escape and the backdrop's focus come with it. */
-export function Modal({ label, close, children }: { label: string; close: () => void; children: ComponentChildren }) {
+/** A modal `<dialog>`: Escape and the backdrop's focus come with it. `keep` true leaves it open on Escape. */
+export function Modal({ label, close, keep, children }: {
+  label: string; close: () => void; keep?: () => boolean; children: ComponentChildren;
+}) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current;
@@ -12,7 +14,8 @@ export function Modal({ label, close, children }: { label: string; close: () => 
     return () => dialog?.close();
   }, []);
   return (
-    <dialog class="sheet" ref={ref} aria-label={label} onClose={close}>
+    <dialog class="sheet" ref={ref} aria-label={label} onClose={close}
+      onCancel={(event) => { if (keep?.()) event.preventDefault(); }}>
       {children}
     </dialog>
   );

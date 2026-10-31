@@ -46,12 +46,25 @@ func TestAnAgentMovesIntoANewWorktreeWhenItsTurnEnds(t *testing.T) {
 	if got.PendingMove != nil || got.Worktree == nil || store.FolderPath(got.Cwd) != root || *got.Worktree.Branch != "agents/fix-the-login" || !got.Worktree.MadeByApp {
 		t.Fatalf("%+v %+v", got.Cwd, got.Worktree)
 	}
-	if !slices.Contains(notes(d, a.ID), "Moved from the project folder to worktree fix-the-login on agents/fix-the-login, from main.") {
+	if !slices.Contains(notes(d, a.ID), "Moved from the folder to worktree fix-the-login on agents/fix-the-login, from main.") {
 		t.Fatal(notes(d, a.ID))
 	}
 	// Started again there, with the app's words, and its runtime in the new folder.
-	waitFor(t, "the carry-on turn", func() bool { return slices.Contains(userMessages(d, a.ID), carryOn) })
+	waitFor(t, "the carry-on turn", func() bool { return slices.ContainsFunc(userMessages(d, a.ID), func(m string) bool {
+		return strings.HasPrefix(m, "You have moved: ") && strings.HasSuffix(m, " "+carryOn)
+	}) })
 	waitFor(t, "finished again", func() bool { return d.Store.Agent(a.ID).State == wire.AgentStateFinished })
+	// The turn that moved is not a finish (#1955): only the carry-on turn's is heard.
+	waitFor(t, "the finish on the log", func() bool { return slices.Contains(names(d), "agent.finished") })
+	finishes := 0
+	for _, e := range logged(d) {
+		if e.Name == "agent.finished" {
+			finishes++
+		}
+	}
+	if finishes != 1 {
+		t.Fatalf("%d agent.finished, want 1: %v", finishes, names(d))
+	}
 }
 
 func TestAnAgentMovesIntoAnExistingWorktreeAtOnce(t *testing.T) {
@@ -68,10 +81,10 @@ func TestAnAgentMovesIntoAnExistingWorktreeAtOnce(t *testing.T) {
 		t.Fatal(text)
 	}
 	got := d.Store.Agent(a.ID)
-	if got.Worktree == nil || got.Worktree.MadeByApp || store.FolderPath(got.Worktree.Project) != dir {
+	if got.Worktree == nil || got.Worktree.MadeByApp || store.FolderPath(got.Worktree.Folder) != dir {
 		t.Fatalf("%+v", got.Worktree)
 	}
-	// Not one of the project's: refused, and nothing moves.
+	// Not one of the folder's: refused, and nothing moves.
 	if text, isError := m.tool(3, "move_worktree", map[string]any{"worktree": t.TempDir()}); !isError || !strings.Contains(text, "is not a worktree of") {
 		t.Fatal(text)
 	}
@@ -105,14 +118,14 @@ func TestLeavingWithRemoveOnceTheWorkIsPushed(t *testing.T) {
 	m := appClient(t, d, a.ID)
 	m.post("initialize", map[string]any{}, 1)
 	text, isError := m.tool(2, "move_worktree", map[string]any{"leave_worktree": "remove"})
-	if isError || text != "Moved. Now working in the project folder, "+dir+"." {
+	if isError || text != "Moved. Now working in the folder, "+dir+"." {
 		t.Fatal(text)
 	}
 	got := d.Store.Agent(a.ID)
 	if got.Worktree != nil || store.FolderPath(got.Cwd) != dir || isDir(cwd) {
 		t.Fatalf("%+v %s", got.Worktree, got.Cwd)
 	}
-	if n := notes(d, a.ID); !slices.Contains(n, "Moved from worktree lane to the project folder. Removed the worktree lane; its branch agents/lane is kept.") {
+	if n := notes(d, a.ID); !slices.Contains(n, "Moved from worktree lane to the folder. Removed the worktree lane; its branch agents/lane is kept.") {
 		t.Fatal(n)
 	}
 }

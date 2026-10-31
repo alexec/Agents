@@ -1,6 +1,6 @@
 // Start a Machine from a Repository (#1809): pick a repository, pick a provider that makes
 // machines, start. The control plane gives the repository to the provider (Codespaces makes the
-// codespace from it) or has the new host clone it once it joins, and the project shows then.
+// codespace from it) or has the new host clone it once it joins, and the folder shows then.
 // The window's and the Remote's MachineFromRepository words are the same.
 import type { JSONValue, ProviderCreate, ProviderID, ProviderSummary } from "../protocol/generated";
 
@@ -72,27 +72,29 @@ export function formFields(schema: JSONValue | undefined): FormField[] {
   });
 }
 
-/** What Start sends: providers/create with the repository and the form's values, typed. */
-export function createRequest(provider: string, name: string, repository: Repository, fields: readonly FormField[]): ProviderCreate {
+/** What Start sends: providers/create with the repository, if any (#2131), and the form's values, typed. */
+export function createRequest(provider: string, name: string, repository: Repository | null, fields: readonly FormField[]): ProviderCreate {
   const options: Record<string, JSONValue> = {};
   for (const f of fields) {
     const v = f.value.trim();
     if (!v) continue;
     options[f.key] = f.kind === "integer" ? Number(v) : f.kind === "boolean" ? v === "true" : v;
   }
-  return { id: provider as ProviderID, name, options, repository: repository.url };
+  const request: ProviderCreate = { id: provider as ProviderID, name, options };
+  if (repository) request.repository = repository.url;
+  return request;
 }
 
 export const machineWords = {
   title: "Start a Machine from a Repository",
   menuItem: "Start a Machine from a Repository…",
   repositoryPrompt: "The repository’s https address",
-  repositoryNote: (r: Repository | null, typed: boolean) => r ? `The machine clones ${r.path} and adds it as a project.`
+  repositoryNote: (r: Repository | null, typed: boolean) => r ? `The machine clones ${r.path} and adds it as a folder.`
     : typed ? "Give an https address of a repository, such as on GitHub or GitLab." : "The repository to work in.",
-  noMakers: "No provider here can make a machine. Add DigitalOcean, Compute Engine or Codespaces in Settings ▸ Workspace providers.",
+  noMakers: "No provider here can make a machine. Add DigitalOcean, Compute Engine or Codespaces in Settings ▸ Machine providers.",
   start: "Start",
   starting: (name: string) => `Starting ${name}…`,
-  joining: (name: string, r: Repository) => `${name} is starting. It installs Agents, joins and clones ${r.path} on its first boot. The project shows when it has.`,
-  notJoining: (name: string, provider: string) => `${provider} made ${name}, but can't install Agents on its first boot. Add it as a machine in the Mac app: Settings ▸ Workspace Providers, Add as Machine….`,
+  joining: (name: string, r: Repository) => `${name} is starting. It installs Agents, joins and clones ${r.path} on its first boot. The folder shows when it has.`,
+  notJoining: (name: string, provider: string) => `${provider} made ${name}, but can't install Agents on its first boot. Add it as a machine in the Mac app: Settings ▸ Machine Providers, Add as Machine….`,
   privateNote: "A private repository needs git access on the new machine.",
 };

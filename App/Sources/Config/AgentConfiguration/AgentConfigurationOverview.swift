@@ -2,11 +2,13 @@ import AgentsKitCore
 import SwiftUI
 
 /// Frame A: what every agent gets and under it every exception, each opening its own page.
-/// Yours is a grid of kinds by runtimes. A project's has no runtimes to draw (#754), so it
+/// Yours is a grid of kinds by runtimes. A folder's has no runtimes to draw (#754), so it
 /// is a line per kind with how many, each opening its page.
 struct AgentConfigurationOverview: View {
     let place: AgentsPlace
     let snapshot: DaemonAPI.SharedSnapshot
+    /// Nil until counted: then the line says nothing rather than "None".
+    let workflows: Int?
     @Binding var page: AgentConfigurationPage
 
     var body: some View {
@@ -19,7 +21,7 @@ struct AgentConfigurationOverview: View {
                 case .you:
                     grid
                     legend
-                case .project:
+                case .folder:
                     Text(place.explainer)
                         .appText(.fine).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -39,11 +41,11 @@ struct AgentConfigurationOverview: View {
     private var title: String {
         switch place {
         case .you: "Shared by every agent"
-        case .project: "Shared by every agent in this project"
+        case .folder: "Shared by every agent in this folder"
         }
     }
 
-    // MARK: A project's kinds
+    // MARK: A folder's kinds
 
     private var kinds: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -68,11 +70,14 @@ struct AgentConfigurationOverview: View {
         case .overview: return ""
         case .instructions: return snapshot.instructions?.exists == true ? "AGENTS.md" : "No AGENTS.md yet"
         case .mcp where snapshot.mcp.problem != nil: return "mcp.json can't be read"
+        case .workflows where workflows == nil: return ""
         default:
-            let count = kind.count(in: snapshot) ?? 0
+            let count = kind.count(in: snapshot, workflows: workflows) ?? 0
             if count == 0 { return "None" }
             let noun: (String, String) = switch kind {
             case .skills: ("skill", "skills")
+            case .personas: ("persona", "personas")
+            case .workflows: ("workflow", "workflows")
             case .mcp: ("connector", "connectors")
             case .plugins: ("plugin", "plugins")
             default: ("file", "files")
@@ -199,7 +204,7 @@ extension AgentConfigurationOverview.Cell: View {
 }
 
 /// A Needs a look row: what kind, what about, why, and the whole row opens its page.
-private struct LookRow: View {
+struct LookRow: View {
     let look: DaemonAPI.Look
     let show: () -> Void
 

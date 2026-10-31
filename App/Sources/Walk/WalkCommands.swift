@@ -32,6 +32,9 @@ enum WalkCommands {
 
     private static func perform(_ verb: String, _ request: [String: Any]) throws -> [String: Any] {
         switch verb {
+        // Voice mode with no microphone and no sound (#2322).
+        case "voice":
+            return VoiceWalk.perform(request)
         case "ping":
             return ["ok": true, "pid": Int(getpid())]
         // For when a shot or a press goes wrong: the views, a view's layers.
@@ -390,8 +393,11 @@ enum WalkCommands {
                 // A menu, not an item: say what is in it.
                 if let submenu = item.submenu { submenu.delegate?.menuNeedsUpdate?(submenu) }
                 item.submenu?.update()
-                return ["ok": true, "did": items.filter { !$0.isSeparatorItem }
-                    .map { $0.title + ($0.isEnabled ? "" : " (off)") }.joined(separator: "\n")]
+                // Separators and hidden items too: a blank row in a menu is one of them (#2384).
+                return ["ok": true, "did": items.map {
+                    ($0.isSeparatorItem ? "—" : $0.title) + ($0.isEnabled || $0.isSeparatorItem ? "" : " (off)")
+                        + ($0.isHidden ? " (hidden)" : "")
+                }.joined(separator: "\n")]
             }
             if at == path.count - 1 {
                 guard item.isEnabled else { throw WalkError("\(item.title) is turned off") }

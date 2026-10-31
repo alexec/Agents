@@ -55,7 +55,7 @@ struct StartPageAsksTests {
 
         func start() async throws {}
 
-        static let persona = Persona(id: "reviewer", name: "Reviewer", origin: .project)
+        static let persona = Persona(id: "reviewer", name: "Reviewer", origin: .folder)
 
         private static func reply(_ id: Int, to method: String) -> String {
             let result: JSONValue? = switch method {
@@ -69,7 +69,7 @@ struct StartPageAsksTests {
         }
     }
 
-    private let folder = URL(filePath: "/tmp/project")
+    private let folder = URL(filePath: "/tmp/folder")
 
     /// What the page asks, as the Remote's model asks it: each ask with no answer, side by
     /// side, each with its own deadline. What came back, by ask.

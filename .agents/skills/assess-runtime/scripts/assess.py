@@ -26,7 +26,6 @@ import os
 import sys
 import time
 from pathlib import Path
-from urllib.parse import unquote, urlparse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "..", "run-app", "scripts"))
@@ -73,18 +72,10 @@ def ours(client, assessor):
 
 
 def assessment_folder(client, override=None):
-    """Use the requested project, or find this host's marked chat project."""
-    if override:
-        return os.path.abspath(override)
-    projects = client.call("projects/list", {}) or []
-    chat = next((p for p in projects if p.get("isChat")), None)
-    if not chat:
-        raise RuntimeError("This host has no chat project. Pass --folder PROJECT to choose one.")
-    folder = (chat.get("project") or {}).get("folder")
-    parsed = urlparse(folder or "")
-    if parsed.scheme != "file" or not parsed.path:
-        raise RuntimeError("The chat project did not include a local folder. Pass --folder PROJECT to choose one.")
-    return os.path.abspath(unquote(parsed.path))
+    """The project to assess in: --folder. There is no chat project to default to (#2134)."""
+    if not override:
+        raise RuntimeError("Pass --folder PROJECT: the project to assess in.")
+    return os.path.abspath(override)
 
 
 def assess(client, runtime, folder, minutes, model=None):
@@ -158,7 +149,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("root")
     parser.add_argument("runtimes", nargs="+")
-    parser.add_argument("--folder", help="project folder (default: this host's chat project)")
+    parser.add_argument("--folder", help="the project folder to assess in (needed unless --follow)")
     parser.add_argument("--minutes", type=int, default=20)
     parser.add_argument("--json", help="write every result here too")
     parser.add_argument("--model", help="a model to assess on, or `default` for the runtime's own (else the cheapest)")

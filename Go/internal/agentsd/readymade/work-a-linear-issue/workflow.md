@@ -6,7 +6,7 @@ on:
       label: agent
 agent: new
 labels: [linear]
-permission-mode: auto
+permission-mode: approve-for-me
 enabled: false
 when-done: park
 ---

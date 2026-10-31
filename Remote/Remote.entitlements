@@ -22,5 +22,11 @@
 	<array>
 		<string>group.com.alexecollins.agents</string>
 	</array>
+	<!-- Sign in with Apple (#995, #2507): the native sheet, whose ID token the control plane
+	     checks. The App ID has the capability; the profile carries it. -->
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
 </dict>
 </plist>

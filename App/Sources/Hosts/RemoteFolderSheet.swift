@@ -1,19 +1,22 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Choose a folder on a server as a project (037, wireframes/mac-new-project.svg B).
+/// Choose a folder on a server as a folder (037, wireframes/mac-new-folder.svg B).
 ///
 /// The Mac's own folder picker cannot see a server, so this stands in for it: a path
 /// field, and the folders under it, read with `files/browse` on that server.
 struct RemoteFolderSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
-    let host: HostID
+    let host: MachineRef
 
     @State private var path = "~"
     @State private var listing: DirectoryListing?
     @State private var chosen: URL?
     @State private var problem: String?
+    /// The Project picked (#2671); nil is the folder's own.
+    @State private var project: String?
+    @State private var projects: [DaemonAPI.Project] = []
 
     private var label: String { model.hosts.label(host) }
 
@@ -53,13 +56,16 @@ struct RemoteFolderSheet: View {
                 Text("Type a path or click into a folder. Files are shown but can’t be chosen.")
                     .appText(.fine).foregroundStyle(.secondary)
             }
+            if !projects.isEmpty {
+                NewFolderProjectChoice(projects: projects, project: $project)
+            }
             HStack {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Add as project") {
+                Button("Add as folder") {
                     let folder = chosen ?? listing?.url
                     dismiss()
-                    if let folder { Task { await model.addProject(folder, on: host) } }
+                    if let folder { Task { await model.addFolder(folder, on: host, project: project) } }
                 }
                 .keyboardShortcut(.defaultAction)
                 .disabled(listing == nil)
@@ -68,6 +74,7 @@ struct RemoteFolderSheet: View {
         .padding(20)
         .frame(width: 520)
         .task { await load(model.hosts.host(host)?.facts?.home ?? "~") }
+        .task { projects = await NewFolderProjectChoice.projects(on: model.controlRequests) }
     }
 
     /// Folders first, then files, each by name.

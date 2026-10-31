@@ -58,6 +58,11 @@ if [[ ${1:-} == --store ]]; then
         found[$secret]=$(profile_named $name)
         [[ -n $found[$secret] ]] || { print -u2 "No installed \"$name\" profile."; exit 1 }
     done
+    # The release checks the same before it archives (#2781): a stale profile stops here.
+    checks=()
+    for secret file in ${(kv)found}; do checks+=("$secret=$file"); done
+    python3 ${0:A:h}/check-store-profiles.py $checks ||
+        { print -u2 "Make the profiles above again and install them; no secret was set."; exit 1 }
     print "the App Store identities…"
     set_identity APPLE_DISTRIBUTION_P12 $distribution "Apple Distribution"
     set_identity MAC_INSTALLER_P12 $installer "3rd Party Mac Developer Installer"

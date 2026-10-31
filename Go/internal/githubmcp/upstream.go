@@ -2,6 +2,7 @@ package githubmcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -49,6 +50,20 @@ type UpstreamConfig struct {
 
 // NewUpstream is the official server with cfg's toolsets and without HiddenTools.
 func NewUpstream(ctx context.Context, cfg UpstreamConfig) (*mcp.Server, error) {
+	return newUpstream(ctx, cfg, nil)
+}
+
+// NewUpstreamWithIssueReader also returns the upstream issue_read implementation for the view.
+func NewUpstreamWithIssueReader(ctx context.Context, cfg UpstreamConfig) (*mcp.Server, IssueReader, error) {
+	var reader IssueReader
+	server, err := newUpstream(ctx, cfg, &reader)
+	if err != nil {
+		return nil, nil, err
+	}
+	return server, reader, nil
+}
+
+func newUpstream(ctx context.Context, cfg UpstreamConfig, issueReader *IssueReader) (*mcp.Server, error) {
 	apiHost, err := utils.NewAPIHost("")
 	if err != nil {
 		return nil, err
@@ -96,6 +111,22 @@ func NewUpstream(ctx context.Context, cfg UpstreamConfig) (*mcp.Server, error) {
 	t := translations.NullTranslationHelper
 	// No request-state sealer: the one tool that needs it, delete_repository, then refuses.
 	deps := github.NewBaseDeps(rest, gql, rawClient, nil, t, github.FeatureFlags{}, 5000, checker, obs)
+	if issueReader != nil {
+		*issueReader = func(ctx context.Context, owner, repo string, number int) (map[string]any, error) {
+			result, err := github.GetIssue(ctx, rest, deps, owner, repo, number)
+			if err != nil {
+				return nil, err
+			}
+			if result.IsError {
+				return nil, fmt.Errorf("issue_read: %s", contentText(result.Content))
+			}
+			var details map[string]any
+			if err := json.Unmarshal([]byte(contentText(result.Content)), &details); err != nil {
+				return nil, fmt.Errorf("issue_read returned invalid JSON: %w", err)
+			}
+			return details, nil
+		}
+	}
 
 	toolsets := cfg.Toolsets
 	if len(toolsets) == 0 {
@@ -116,4 +147,13 @@ func NewUpstream(ctx context.Context, cfg UpstreamConfig) (*mcp.Server, error) {
 		Version: cfg.Version, Translator: t, ContentWindowSize: 5000, ReadOnly: cfg.ReadOnly,
 		Logger: cfg.Logger, TokenProvider: cfg.Token, ExcludeTools: HiddenTools,
 	}, deps, inv)
+}
+
+func contentText(contents []mcp.Content) string {
+	for _, content := range contents {
+		if text, ok := content.(*mcp.TextContent); ok {
+			return text.Text
+		}
+	}
+	return "GitHub returned no issue details"
 }

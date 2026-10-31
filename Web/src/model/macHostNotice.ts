@@ -1,6 +1,6 @@
 // Why this Mac's host is quiet, in the window's words (MacHostNotice.swift, #303, #666): the
 // process is down, it is up and has no membership, its uplink keeps failing, or it isn't answering.
-import type { HostJoinStatus } from "../protocol/generated";
+import type { MachineJoinStatus } from "../protocol/generated";
 import { hostAnswers } from "./capabilities";
 
 export type MacHostNotice =
@@ -15,7 +15,7 @@ export type MacHostNotice =
  * the Mac host's), so elsewhere a missing join is not "the process is down". Nil while it is online.
  */
 export function decideMacHostNotice(planeOnThisMac: boolean, macState: string | undefined,
-                                    join: HostJoinStatus | undefined): MacHostNotice | null {
+                                    join: MachineJoinStatus | undefined): MacHostNotice | null {
   if (join) {
     if (!join.member) return { kind: "notJoined", problem: join.problem };
     if (!join.connected) {

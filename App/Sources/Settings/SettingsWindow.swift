@@ -17,6 +17,9 @@ struct SettingsWindow: View {
     /// back to the front, which is when an edit made elsewhere shows.
     @State private var sharedSnapshot: DaemonAPI.SharedSnapshot?
     @State private var machinesPage: MachinesPage = .list
+    /// A Skills, Personas or Workflows file has edits not saved: another pane asks first (#2745).
+    @State private var unsaved = false
+    @State private var leaving: UnsavedLeave?
     /// Settings ▸ Control plane's own view of the control plane, while the window has one
     /// (058). Without one, Devices and Servers are listed as they always were.
     @State private var control: ControlSettingsModel? = ControlConfig.endpoint.flatMap { ControlSettingsModel(endpoint: $0) }
@@ -41,7 +44,7 @@ struct SettingsWindow: View {
     private var runtimeID: Binding<String> {
         Binding(
             get: {
-                let known = Set(model.runtimes.map(\.id))
+                let known = Set(model.runtimes.map(\.id)).union([LevelWords.autoID])
                 if known.contains(runtimeIDRaw) { return runtimeIDRaw }
                 return model.runtimes.first?.id ?? RuntimeCatalog.claude.id
             },
@@ -50,7 +53,12 @@ struct SettingsWindow: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            SettingsRail(pane: pane, shows: shows)
+            SettingsRail(pane: Binding(get: { pane.wrappedValue },
+                                       set: { next in
+                                           guard next != pane.wrappedValue else { return }
+                                           $leaving.leave(unsaved: unsaved) { pane.wrappedValue = next }
+                                       }),
+                         shows: shows)
             Divider()
             VStack(alignment: .leading, spacing: 0) {
                 // A pane of this Mac's own things, with no host on this Mac (#1503): what is
@@ -62,9 +70,9 @@ struct SettingsWindow: View {
                     }
                     Divider()
                 }
-                // A pane whose edits go to every machine of the person's (#2069): it says so.
-                if let part = followedPart {
-                    FollowedPaneNote(part: part) { pane.wrappedValue = .onEveryMachine }
+                // Each setting states its fixed scope (#2410).
+                if let scope = scopeOnEveryMachine {
+                    ScopeLine(onEveryMachine: scope)
                     Divider()
                 }
                 content
@@ -72,6 +80,7 @@ struct SettingsWindow: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .discardUnsavedQuestion($leaving)
         .frame(minWidth: Self.size.width, idealWidth: Self.size.width,
                maxWidth: .infinity,
                minHeight: Self.size.height, idealHeight: Self.size.height,
@@ -102,6 +111,15 @@ struct SettingsWindow: View {
             guard let asked else { return }
             pane.wrappedValue = asked
             model.settingsPaneAsked = nil
+            // A file for the editor (#2803): its page, unless edits not saved hold this one.
+            if asked == .agentConfiguration, let file = model.agentConfigFileAsked, file.folder == nil {
+                let wanted = AgentConfigurationPage(file.kind)
+                if sharedPage.wrappedValue == wanted || !unsaved {
+                    sharedPage.wrappedValue = wanted
+                } else {
+                    model.agentConfigFileAsked = nil
+                }
+            }
             if asked == .machines { machinesPage = .list }
         }
         .onChange(of: pane.wrappedValue) { _, chosen in
@@ -128,32 +146,32 @@ struct SettingsWindow: View {
     private func shows(_ each: SettingsPane) -> Bool {
         switch each {
         // A person's own sign-ins (#995), a pane of its own as on the Remote (#2197).
-        case .controlPlane, .clients, .onEveryMachine, .channels, .signIns: control != nil
+        // People with no control plane would say it can't be reached: it lists Account only (#2258).
+        case .controlPlane, .clients, .secrets, .people, .channels, .signIns, .policy: control != nil
         // An admin's, and a member's in a group, who sees the groups they are in (#1761, #2076).
         case .groups: control != nil && model.people.showsGroups
         // An admin's: which providers people sign in with (#995).
         case .signIn: control != nil && model.people.you?.isAdmin == true
+        // An admin's: a member sees only themselves, so no bots (#2132).
+        case .bots: control != nil && model.people.you?.isAdmin == true
         case .providers: control?.providersHere ?? false
         default: true
         }
     }
 
-    /// The part of You ▸ On Every Machine this pane edits, when it is the same on every
-    /// machine: an edit here then goes to each of them.
-    private var followedPart: DaemonAPI.UserSettingsPartName? {
-        let part: DaemonAPI.UserSettingsPartName? = switch pane.wrappedValue {
-        case .spending: .costLimits
-        case .resources: .resources
-        case .runtimes: .runtimes
-        case .agentConfiguration: .agentConfig
+    /// The part this pane edits, so it can state its fixed scope (#2410).
+    private var scopeOnEveryMachine: Bool? {
+        return switch pane.wrappedValue {
+        case .spending, .runtimes: true
+        case .resources: false
+        case .agentConfiguration: nil
         default: nil
         }
-        guard let part, model.userScope.follows(part) else { return nil }
-        return part
     }
 
     private var title: String {
         guard pane.wrappedValue == .runtimes else { return pane.wrappedValue.title }
+        if runtimeID.wrappedValue == LevelWords.autoID { return LevelWords.auto }
         return model.runtimes.first { $0.id == runtimeID.wrappedValue }?.runtime.name
             ?? SettingsPane.runtimes.title
     }
@@ -163,6 +181,8 @@ struct SettingsWindow: View {
         switch pane.wrappedValue {
         case .appearance: FormColumn { Form { AppearanceSettingsView() }.paperForm() }
         case .sidebar: FormColumn { Form { SidebarSettingsSection() }.paperForm() }
+        case .notifications: FormColumn { Form { NotificationLimitsSection() }.paperForm() }
+        case .voice: FormColumn { Form { VoiceSettingsSection() }.paperForm() }
         case .account: FormColumn { AccountSettingsView() }
         case .signIns:
             FormColumn {
@@ -186,9 +206,15 @@ struct SettingsWindow: View {
         case .runtimes:
             HStack(spacing: 0) {
                 RuntimePageList(runtimeID: runtimeID)
-                FormColumn { AgentRuntimesSettingsView(runtimeID: runtimeID.wrappedValue) }
+                // Auto's own page, first (#2658).
+                if runtimeID.wrappedValue == LevelWords.autoID {
+                    FormColumn { AutoSettingsView() }
+                } else {
+                    FormColumn { AgentRuntimesSettingsView(runtimeID: runtimeID.wrappedValue) }
+                }
             }
-        case .agentConfiguration: AgentConfigurationView(place: .you, snapshot: sharedSnapshot, page: sharedPage, refresh: { await refreshShared() })
+        case .agentConfiguration: AgentConfigurationView(place: .you, snapshot: sharedSnapshot, page: sharedPage, refresh: { await refreshShared() },
+                                                         unsaved: $unsaved)
         case .spending: FormColumn { CostSettingsView() }
         case .resources: FormColumn { ResourcesSettingsView() }
         case .controlPlane:
@@ -197,16 +223,15 @@ struct SettingsWindow: View {
             if let control { ControlSettingsView(control: control, page: .providers) }
         case .clients:
             if let control { ControlSettingsView(control: control, page: .clients) }
-        case .onEveryMachine:
+        case .secrets:
             // Through the window's own connection, which hears when they change (#1760).
-            FormColumn {
-                UserScopePane(control: model.controlRequests, state: model.userScope,
-                              takeHere: (name: "This Mac", take: { part in await model.takeUserPartFromThisMac(part) }))
-            }
+            FormColumn { SecretsPane(control: model.controlRequests, state: model.userScope) }
         case .people:
             // Through the window's own connection to the control plane, which hears when
             // people change (#994).
             FormColumn { PeoplePane(control: model.controlRequests, people: model.people) }
+        case .bots:
+            FormColumn { PeoplePane(control: model.controlRequests, people: model.people, kind: .bot) }
         case .groups:
             FormColumn { GroupsPane(control: model.controlRequests, state: model.people) }
         case .channels:
@@ -214,6 +239,8 @@ struct SettingsWindow: View {
             FormColumn { ChannelsPane(control: model.controlRequests, people: model.people) }
         case .signIn:
             FormColumn { SignInPane(control: model.controlRequests, revision: model.people.revision) }
+        case .policy:
+            FormColumn { OrgPolicyPane(control: model.controlRequests, people: model.people) }
         }
     }
 
@@ -228,10 +255,10 @@ extension SettingsScope {
         switch self {
         // How this app draws: Sidebar is kept on the Mac's host so every client draws the
         // same (#1033, #2079), but its subject is the app (#2157).
-        case .thisApp: [.appearance, .sidebar]
-        case .machines: [.machines, .runtimes, .agentConfiguration, .spending, .resources, .onEveryMachine]
+        case .thisApp: [.appearance, .sidebar, .notifications, .voice]
+        case .machines: [.machines, .runtimes, .agentConfiguration, .spending, .resources, .secrets]
         // The person's account first, shown with no control plane too (#2157).
-        case .controlPlane: [.account, .signIns, .people, .groups, .channels, .signIn, .providers, .clients, .controlPlane]
+        case .controlPlane: [.account, .signIns, .people, .bots, .groups, .channels, .signIn, .policy, .providers, .clients, .controlPlane]
         }
     }
 }
@@ -240,48 +267,65 @@ enum SettingsPane: String, Hashable, CaseIterable {
     /// Was General (#846), split in four: its raw value is what a window left open on it kept.
     case appearance = "general"
     case sidebar, account
+    /// How many notices agents may send (#2805), kept on the Mac's host.
+    case notifications
+    /// Voice mode, its voice and its sounds (Alex, 2026-10-29): was in Appearance.
+    case voice
     /// Every machine, and this Mac's own settings (#1759). Was the Mac pane: its raw value is
     /// what a window left open on it kept.
     case machines = "mac"
     case runtimes, spending, resources
     /// The control plane's Overview.
     case controlPlane
-    /// The control plane's workspace providers (#691) and its clients, pages of Control plane
+    /// The control plane's machine providers (#691) and its clients, pages of Control plane
     /// before #1759.
     case providers, clients
     /// Who uses the control plane, and the machines and clients that belong to them (#994).
     case people
-    /// Groups own workspace providers (#1761).
+    /// The bots that run the team's workflows (#1761), apart from the people (#2132).
+    case bots
+    /// Groups own machine providers (#1761).
     case groups
     /// Channel identities linked to people (#1762).
     case channels
     /// Which providers people sign in with (#995).
     case signIn
-    /// How this person signs in on their other clients (#995): You ▸ Sign-ins, as the
-    /// Remote has it and every client's words name it (#2197). Was in Account.
+    /// The organisation's policy, read only, and the kill switch for an admin (#998).
+    case policy
+    /// How this person signs in on their other clients (#995): Control plane ▸ Sign-ins, as
+    /// the Remote and the page have it and every client's words name it (#2197, #2256). Was
+    /// in Account.
     case signIns
     /// Was Shared (#754): the raw value is what a window left open on it kept.
     case agentConfiguration = "shared"
-    /// The settings and secrets the control plane keeps for the person (#1760).
-    case onEveryMachine
+    /// The secrets the control plane keeps for the person (#1760). Was On Every Machine, whose
+    /// settings moved into their own panes (#2157): its raw value is what a window left open
+    /// on it kept.
+    case secrets = "onEveryMachine"
 
     /// A pane of what this Mac's host keeps: its runtimes, settings, cost and resources.
     /// Machines is one only on its This Mac page.
     var isThisMacs: Bool {
         switch self {
         case .runtimes, .agentConfiguration, .spending, .resources: true
-        case .appearance, .sidebar, .account, .machines, .controlPlane, .providers, .clients, .people, .groups,
-             .channels, .signIn, .signIns, .onEveryMachine: false
+        case .appearance, .sidebar, .notifications, .voice, .account, .machines, .controlPlane, .providers, .clients, .people, .bots, .groups,
+             .channels, .signIn, .signIns, .secrets, .policy: false
         }
     }
 
-    /// A pane drawn only with a control plane to show.
-    var needsControlPlane: Bool { [.controlPlane, .providers, .clients, .onEveryMachine, .signIns].contains(self) }
+    /// A pane drawn only with a control plane to show: a window left on one moves away when
+    /// the Mac is forgotten (#2258).
+    var needsControlPlane: Bool {
+        [.controlPlane, .providers, .clients, .secrets, .signIns, .people, .bots, .groups, .channels, .signIn, .policy]
+            .contains(self)
+    }
 
     var title: String {
         switch self {
         case .appearance: "Appearance"
         case .sidebar: "Sidebar"
+        case .notifications: "Notifications"
+        case .voice: "Voice"
         case .account: "Account"
         case .machines: "Machines"
         case .runtimes: "Agent Runtimes"
@@ -289,14 +333,16 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .spending: "Cost"
         case .resources: "Resources"
         case .controlPlane: "Overview"
-        case .providers: "Workspace Providers"
+        case .providers: "Machine Providers"
         case .clients: "Clients"
         case .people: "People"
+        case .bots: BotWords.title
         case .groups: GroupWords.title
         case .channels: ChannelLinkWords.title
         case .signIn: SignInWords.paneTitle
+        case .policy: OrgPolicyWords.title
         case .signIns: SignInWords.signInsTitle
-        case .onEveryMachine: UserScopeWords.title
+        case .secrets: UserScopeWords.secretsTitle
         }
     }
 
@@ -304,6 +350,8 @@ enum SettingsPane: String, Hashable, CaseIterable {
         switch self {
         case .appearance: "paintbrush"
         case .sidebar: "sidebar.left"
+        case .notifications: "bell"
+        case .voice: "waveform"
         case .account: "person.crop.circle"
         case .machines: "desktopcomputer"
         case .runtimes: "cpu"
@@ -314,11 +362,13 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .providers: "cloud"
         case .clients: "iphone"
         case .people: "person.2"
+        case .bots: "gearshape.2"
         case .groups: "person.3"
         case .channels: "bubble.left.and.bubble.right"
         case .signIn: SignInWords.paneSymbol
+        case .policy: OrgPolicyWords.symbol
         case .signIns: "person.badge.key"
-        case .onEveryMachine: "arrow.triangle.2.circlepath"
+        case .secrets: "key"
         }
     }
 }
@@ -409,24 +459,15 @@ private struct NoMacHostNotice: View {
     }
 }
 
-/// Over a pane whose part is the same on every machine (#2069): an edit here changes them all.
-private struct FollowedPaneNote: View {
-    let part: DaemonAPI.UserSettingsPartName
-    let show: () -> Void
+/// The top of a settings pane: its scope is fixed (#2410).
+private struct ScopeLine: View {
+    let onEveryMachine: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Label(UserScopeWords.followedTitle, systemImage: "arrow.triangle.2.circlepath")
-                .appText(.supporting).fontWeight(.semibold)
-            Text(UserScopeWords.followedNote(part))
-                .appText(.fine).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Button(UserScopeWords.showOnEveryMachine, action: show)
-                .controlSize(.small)
-        }
+        Text(onEveryMachine ? UserScopeWords.yoursOnEveryMachine : UserScopeWords.thisMacOnly)
+            .appText(.supporting).fontWeight(.semibold)
         .frame(maxWidth: 560, alignment: .leading)
         .padding(16)
-        .accessibilityElement(children: .contain)
     }
 }
 
@@ -560,6 +601,11 @@ private struct RuntimePageList: View {
 
     var body: some View {
         PageList {
+            // Auto first: the runtime choice that is not a runtime (#2658, Story 3).
+            PageLine(title: LevelWords.auto, lit: runtimeID == LevelWords.autoID,
+                     action: { runtimeID = LevelWords.autoID }) {
+                EmptyView()
+            }
             ForEach(model.runtimes) { status in
                 PageLine(title: status.runtime.name, lit: runtimeID == status.id,
                          action: { runtimeID = status.id }) {

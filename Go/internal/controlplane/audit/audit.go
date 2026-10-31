@@ -60,7 +60,7 @@ var hostActions = map[string]string{
 	"agents/unarchive":         "Unarchived an agent",
 	"agents/fork":              "Forked an agent",
 	"agents/branchFrom":        "Branched an agent",
-	"agents/continueInProject": "Continued an agent in a project",
+	"agents/continueInFolder":  "Continued an agent in a folder",
 	"sessions/delete":          "Deleted a session",
 	"approvals/answer":         "Answered an approval",
 	"permissions/answer":       "Answered a permission card",
@@ -71,8 +71,9 @@ var hostActions = map[string]string{
 	"preferences/set":          "Changed a setting",
 	"cost/setLimits":           "Changed the cost limits",
 	"wake/set":                 "Changed the wake settings",
-	"projects/setDiskSpace":    "Changed a project's disk space",
-	"projects/setHelperLimits": "Changed a project's helper limits",
+	"folders/setDiskSpace":     "Changed a folder's disk space",
+	"folders/setHelperLimits":  "Changed a folder's helper limits",
+	"folders/setPRCostComment": "Changed what a folder's merged pull requests say of their cost",
 	"runtimes/setProvider":     "Changed a runtime's provider",
 	"runtimes/disableProvider": "Turned off a runtime's provider",
 	"runtimes/install":         "Installed a runtime",
@@ -94,9 +95,9 @@ var hostActions = map[string]string{
 	"marketplaces/add":         "Added a marketplace",
 	"marketplaces/remove":      "Removed a marketplace",
 	"marketplaces/set-enabled": "Turned a marketplace on or off",
-	"projects/add":             "Added a project",
-	"projects/delete":          "Deleted a project",
-	"projects/archive":         "Archived a project",
+	"folders/add":              "Added a folder",
+	"folders/delete":           "Deleted a folder",
+	"folders/archive":          "Archived a folder",
 	"worktrees/remove":         "Removed a worktree",
 	"resources/declare":        "Declared a resource",
 	"resources/remove":         "Removed a resource",
@@ -107,34 +108,75 @@ var hostActions = map[string]string{
 
 // controlActions are the control plane's own methods that the audit keeps.
 var controlActions = map[string]string{
-	"clients/forget":              "Forgot a client",
-	"clients/forgetSelf":          "Forgot a client",
-	"devices/forget":              "Forgot a client",
-	"hosts/remove":                "Removed a machine",
-	"clients/startPairing":        "Made a pairing code",
-	"devices/startPairing":        "Made a pairing code",
-	"hosts/startEnroll":           "Made a machine code",
-	"hosts/install":               "Installed a machine over ssh",
-	"hosts/update":                "Updated a machine",
-	"hosts/setRelay":              "Changed a machine's relay",
-	"hosts/lendSignIn":            "Lent a sign-in to a machine",
-	"hosts/lendGit":               "Lent git access to a machine",
-	"hosts/detect":                "Added the machines it found",
-	"control/setProjectDetection": "Changed project detection",
-	"control/setAuditDays":        "Changed how long the audit is kept",
-	"control/rotate":              "Rotated the control key",
-	"policy/set":                  "Changed the organisation's policy",
-	"policy/stopAll":              "Turned the kill switch on or off",
-	"policy/raise":                "Raised a person's budget for today",
-	"providers/add":               "Added a workspace provider",
-	"providers/create":            "Added a workspace provider",
-	"providers/update":            "Changed a workspace provider",
-	"providers/remove":            "Removed a workspace provider",
-	"hosts/start":                 "Started a workspace",
-	"hosts/stop":                  "Stopped a workspace",
-	"hosts/deleteWorkspace":       "Deleted a workspace",
-	"hosts/link":                  "Linked a machine to a workspace",
-	"hosts/unlink":                "Unlinked a machine from its workspace",
+	"clients/forget":             "Forgot a client",
+	"clients/forgetSelf":         "Forgot a client",
+	"devices/forget":             "Forgot a client",
+	"hosts/remove":            "Removed a machine",
+	"clients/startPairing":       "Made a pairing code",
+	"devices/startPairing":       "Made a pairing code",
+	"hosts/startEnroll":       "Made a machine code",
+	"hosts/install":           "Installed a machine over ssh",
+	"hosts/update":            "Updated a machine",
+	"hosts/setRelay":          "Changed a machine's relay",
+	"hosts/lendSignIn":        "Lent a sign-in to a machine",
+	"hosts/lendGit":           "Lent git access to a machine",
+	"hosts/detect":            "Added the machines it found",
+	"control/setFolderDetection": "Changed folder detection",
+	"control/setAuditDays":       "Changed how long the audit is kept",
+	"audit/setSinks":             "Changed where the audit is sent",
+	"control/rotate":             "Rotated the control key",
+	"policy/set":                 "Changed the organisation's policy",
+	"policy/stopAll":             "Turned the kill switch on or off",
+	"policy/raise":               "Raised a person's budget for today",
+	"orgRoutes/set":              "Added or changed an org route",
+	"orgRoutes/replaceKey":       "Replaced an org route's key",
+	"orgRoutes/check":            "Checked an org route",
+	"orgRoutes/remove":           "Removed an org route",
+	"providers/add":              "Added a machine provider",
+	"providers/create":           "Added a machine provider",
+	"providers/update":           "Changed a machine provider",
+	"providers/remove":           "Removed a machine provider",
+	"hosts/start":             "Started a workspace",
+	"hosts/stop":              "Stopped a workspace",
+	"hosts/deleteMachine":     "Deleted a workspace",
+	"hosts/link":              "Linked a machine to a workspace",
+	"hosts/unlink":            "Unlinked a machine from its workspace",
+
+	// Org sign-in (#1002, FR-025): each writes its own entry, with what changed and no secret.
+	"signIn/orgProviders/set":    "Added or changed an org sign-in provider",
+	"signIn/orgProviders/check":  "Checked an org sign-in provider",
+	"signIn/orgProviders/remove": "Removed an org sign-in provider",
+	"signIn/domains/claim":       "Claimed a domain",
+	"signIn/domains/check":       "Checked a domain",
+	"signIn/domains/set":         "Changed a domain's sign-in",
+	"signIn/domains/remove":      "Removed a domain's claim",
+	"signIn/domains/lost":        "Lost a domain's proof",
+	"signIn/ticket":              "Signed in with an org provider",
+	"signIn/refusedByRequire":    "Refused a sign-in the organisation does not allow",
+
+	// SCIM and suspension (#1002, slice 2a, FR-025): each writes its own entry. A SCIM
+	// write's actor is the provider and its token's id, never its value.
+	"scim/set":           "Turned SCIM on or off",
+	"scim/tokens/make":   "Made a SCIM token",
+	"scim/tokens/revoke": "Revoked a SCIM token",
+	"groups/setRole":     "Changed the role a group gives",
+	"scim/user/create":   "Added a person by SCIM",
+	"scim/user/change":   "Changed a person by SCIM",
+	"scim/user/delete":   "Deleted a person by SCIM",
+	"scim/group/create":  "Added a group by SCIM",
+	"scim/group/change":  "Changed a group by SCIM",
+	"scim/group/delete":  "Deleted a group by SCIM",
+	"person/suspended":   "Suspended a person",
+	"person/unsuspended": "Ended a person's suspension",
+
+	// Catalogue governance (#2019, M5): each writes its own entry, naming the item.
+	"governance/asked":    "Asked for an MCP server or skill",
+	"governance/approved": "Approved an MCP server or skill",
+	"governance/refused":  "Refused an MCP server or skill",
+	"governance/revoked":  "Took back an approval of an MCP server or skill",
+	// The read API (#2019): each writes its own entry, naming the token, never its value.
+	"readApi/made":    "Made a read API token",
+	"readApi/revoked": "Revoked a read API token",
 }
 
 // Action is what a call is in words, and whether the audit keeps it at all. toHost is a
@@ -146,6 +188,16 @@ func Action(method string, toHost bool) (string, bool) {
 	}
 	a, ok := controlActions[method]
 	return a, ok
+}
+
+// HostMethods are the calls passed to a host that the audit keeps, sorted.
+func HostMethods() []string {
+	out := make([]string, 0, len(hostActions))
+	for m := range hostActions {
+		out = append(out, m)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // targetKeys are where a call names what it acts on, most telling first.
@@ -214,12 +266,21 @@ type stored struct {
 	At     records.Stamp    `json:"at"`
 	By     string           `json:"by,omitempty"`
 	Actor  *wire.AuditActor `json:"actor,omitempty"`
+	// The chain this entry is in (#1001): the copy that wrote it, its place in that copy's
+	// entries, and the SHA-256 of the stored bytes of the one before (none for the first).
+	Chain string `json:"chain,omitempty"`
+	Seq   int64  `json:"seq,omitempty"`
+	Prev  string `json:"prev,omitempty"`
 }
 
 // Log writes and reads the entries.
 type Log struct {
 	Store store.Store
 	Now   func() time.Time
+	// Chain links what this copy writes (#1001); nil writes entries in no chain.
+	Chain *Chain
+	// Out hears each entry kept, for the sinks (#1001); nil sends nowhere.
+	Out func(key string, data []byte)
 }
 
 func (l *Log) now() time.Time {
@@ -249,6 +310,22 @@ func dayPrefix(day, user string) string {
 // over each other.
 func (l *Log) Write(ctx context.Context, actor wire.AuditActor, method, action string, host string, target *string) error {
 	at := l.now()
+	e, key := entry(actor, method, action, host, target, at)
+	var data []byte
+	var err error
+	if l.Chain != nil {
+		data, err = l.Chain.write(ctx, l.Store, &e, key, at)
+	} else if data, err = records.Encode(e); err == nil {
+		_, err = l.Store.Put(ctx, key, data, store.Absent)
+	}
+	if err == nil && l.Out != nil {
+		l.Out(key, data)
+	}
+	return err
+}
+
+// entry is what Write and a Writer keep, and where.
+func entry(actor wire.AuditActor, method, action string, host string, target *string, at time.Time) (stored, string) {
 	e := stored{Kind: Kind, Action: action, Method: method, Target: target, At: records.At(at), Actor: &actor}
 	if actor.Client != nil {
 		e.By = string(*actor.Client)
@@ -256,12 +333,7 @@ func (l *Log) Write(ctx context.Context, actor wire.AuditActor, method, action s
 	if host != "" {
 		e.Host = &host
 	}
-	data, err := records.Encode(e)
-	if err != nil {
-		return err
-	}
-	_, err = l.Store.Put(ctx, Key(at, actor.User), data, store.Absent)
-	return err
+	return e, Key(at, actor.User)
 }
 
 // decode reads one stored event as an entry. The control plane's own events between
@@ -274,7 +346,7 @@ func decode(key string, data []byte, owner func(by string) wire.AuditActor) (wir
 	e := wire.AuditEntry{ID: strings.TrimSuffix(strings.TrimPrefix(key, Prefix), ".json"), At: wire.DateOf(s.At.Time),
 		Action: s.Action, Method: s.Method, Target: s.Target}
 	if s.Host != nil {
-		h := wire.HostID(*s.Host)
+		h := wire.MachineRef(*s.Host)
 		e.Host = &h
 	}
 	if s.Kind != Kind {

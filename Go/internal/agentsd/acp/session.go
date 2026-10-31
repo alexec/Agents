@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -113,8 +114,8 @@ func handshake(ctx context.Context, l Launch, sink Sink) (_ *Session, silent boo
 		return nil, false, fmt.Errorf("start %s: %w", l.Command, err)
 	}
 	s := &Session{cmd: cmd, stderr: stderr, done: make(chan struct{})}
-	s.client = &client{sink: sink, dir: l.Dir, env: l.Env, terminals: map[string]*terminal{}}
-	s.conn = sdk.NewClientSideConnection(s.client, stdin, &rawElicitations{r: bufio.NewReader(stdout), c: s.client})
+	s.client = &client{sink: sink, dir: l.Dir, env: l.Env, runtime: l.Name, terminals: map[string]*terminal{}}
+	s.conn = sdk.NewClientSideConnection(s.client, &sessionPromptWriter{w: stdin, c: s.client}, &rawElicitations{r: bufio.NewReader(stdout), c: s.client})
 	safe.Go("runtime wait", func() { _ = cmd.Wait(); close(s.done) })
 
 	ictx, cancel := context.WithTimeout(ctx, handshakeWait)
@@ -169,7 +170,7 @@ func (s *Session) takes(mcp []sdk.McpServer, command string) []sdk.McpServer {
 // Start launches the runtime and says initialize, then continues the conversation it
 // names (session/resume where the runtime offers it, else session/load with its replay
 // dropped), or begins one with session/new: also when the runtime no longer has it.
-func Start(ctx context.Context, l Launch, sink Sink, mcp []sdk.McpServer, meta map[string]any, continuing string) (*Session, error) {
+func Start(ctx context.Context, l Launch, sink Sink, mcp []sdk.McpServer, meta, compatibilityMeta map[string]any, continuing, brief string) (*Session, error) {
 	s, err := Handshake(ctx, l, sink)
 	if err != nil {
 		return nil, err
@@ -178,6 +179,13 @@ func Start(ctx context.Context, l Launch, sink Sink, mcp []sdk.McpServer, meta m
 	ictx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	mcp = s.takes(mcp, l.Command)
+	if s.SupportsSystemPrompt() {
+		s.client.mu.Lock()
+		s.client.systemPrompt = brief
+		s.client.mu.Unlock()
+	} else {
+		meta = compatibilityMeta
+	}
 	if continuing != "" {
 		if err := s.continueSession(ictx, continuing, l.Dir, mcp, meta); err == nil {
 			s.Continued = true
@@ -263,6 +271,15 @@ func (s *Session) SupportsSteering() bool {
 	return supported
 }
 
+// SupportsSystemPrompt reports whether initialize advertised a session system prompt: the
+// draft ACP sessionCapabilities.systemPrompt, or Antigravity's
+// agentCapabilities._meta.antigravity.systemPrompt.append (agy_acp_server 1.4.5, #2613).
+func (s *Session) SupportsSystemPrompt() bool {
+	s.client.mu.Lock()
+	defer s.client.mu.Unlock()
+	return s.client.supportsSystemPrompt || s.client.antigravitySystemPrompt
+}
+
 // Steer puts words into the running turn (ACPSession.steer), always with idleBehavior
 // promptRequired, and is what the runtime did with them: injected, startedNewTurn,
 // promptRequired, or failed for an answer that cannot be read.
@@ -313,6 +330,17 @@ func (s *Session) Done() <-chan struct{} { return s.done }
 type client struct {
 	sink Sink
 	dir  string
+	// runtime is the name shown to the person (Launch.Name), used for narrow client
+	// compatibility where an ACP runtime does not follow the standard request shape.
+	runtime string
+	// systemPrompt is attached to every session lifecycle request only when initialize
+	// advertised the draft ACP sessionCapabilities.systemPrompt field.
+	systemPrompt         string
+	supportsSystemPrompt bool
+	// antigravitySystemPrompt is Antigravity's own advertised route, used only without the
+	// draft ACP one: _meta.antigravity.systemPrompt.append on each lifecycle request. The
+	// runtime keeps it only for the life of its process, so load and resume send it again.
+	antigravitySystemPrompt bool
 	// env is the runtime's own environment (environment, runtimes.go), which its
 	// terminals get too: never the daemon's whole one.
 	env       []string
@@ -446,12 +474,22 @@ func (c *client) takeRaw(p sdk.UnstableCreateElicitationRequest) json.RawMessage
 }
 
 // rawElicitations reads the runtime's output for the SDK, keeping a copy of each
-// elicitation/create's params on the way (at most 16, the oldest dropped).
+// elicitation/create's params on the way (at most 16, the oldest dropped), and whether the
+// initialize response advertised systemPrompt. Only lines with a marker are decoded: every
+// chunk, tool result and replayed line passes through here (#2733).
 type rawElicitations struct {
 	r       *bufio.Reader
 	c       *client
 	pending []byte
+	// handshook is set once the initialize response has been read; no later line is
+	// decoded for capabilities.
+	handshook bool
 }
+
+var (
+	agentCapabilitiesMarker = []byte(`"agentCapabilities"`)
+	elicitationCreateMarker = []byte(`"elicitation/create"`)
+)
 
 func (e *rawElicitations) Read(b []byte) (int, error) {
 	if len(e.pending) == 0 {
@@ -468,7 +506,10 @@ func (e *rawElicitations) Read(b []byte) (int, error) {
 }
 
 func (e *rawElicitations) keep(line []byte) {
-	if !bytes.Contains(line, []byte(`"elicitation/create"`)) {
+	if !e.handshook && bytes.Contains(line, agentCapabilitiesMarker) {
+		e.capabilities(line)
+	}
+	if !bytes.Contains(line, elicitationCreateMarker) {
 		return
 	}
 	var m struct {
@@ -484,6 +525,142 @@ func (e *rawElicitations) keep(line []byte) {
 	if len(e.c.raw) > 16 {
 		e.c.raw = e.c.raw[1:]
 	}
+}
+
+// capabilities reads the systemPrompt capability from the initialize response, and marks
+// the handshake done once a response with agentCapabilities has been read.
+func (e *rawElicitations) capabilities(line []byte) {
+	var response struct {
+		Result struct {
+			AgentCapabilities *struct {
+				SessionCapabilities map[string]json.RawMessage `json:"sessionCapabilities"`
+				Meta                struct {
+					Antigravity struct {
+						SystemPrompt struct {
+							Append bool `json:"append"`
+						} `json:"systemPrompt"`
+					} `json:"antigravity"`
+				} `json:"_meta"`
+			} `json:"agentCapabilities"`
+		} `json:"result"`
+	}
+	if json.Unmarshal(line, &response) != nil || response.Result.AgentCapabilities == nil {
+		return
+	}
+	e.handshook = true
+	if response.Result.AgentCapabilities.Meta.Antigravity.SystemPrompt.Append {
+		e.c.mu.Lock()
+		e.c.antigravitySystemPrompt = true
+		e.c.mu.Unlock()
+	}
+	if raw, ok := response.Result.AgentCapabilities.SessionCapabilities["systemPrompt"]; ok {
+		var capability map[string]json.RawMessage
+		if json.Unmarshal(raw, &capability) == nil && capability != nil {
+			e.c.mu.Lock()
+			e.c.supportsSystemPrompt = true
+			e.c.mu.Unlock()
+		}
+	}
+}
+
+// sessionPromptWriter adds standard ACP systemPrompt fields to the lifecycle calls, or
+// Antigravity's _meta.antigravity.systemPrompt where only that is advertised. This keeps
+// the draft protocol field out of the pinned SDK's generated request structs.
+type sessionPromptWriter struct {
+	w   io.Writer
+	c   *client
+	mu  sync.Mutex
+	buf []byte
+}
+
+func (w *sessionPromptWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.buf = append(w.buf, p...)
+	start := 0
+	defer func() { w.buf = append(w.buf[:0], w.buf[start:]...) }()
+	for {
+		i := bytes.IndexByte(w.buf[start:], '\n')
+		if i < 0 {
+			break
+		}
+		// The line is written before w.buf changes, so it needs no copy of its own.
+		line := w.inject(w.buf[start : start+i+1])
+		start += i + 1
+		n, err := w.w.Write(line)
+		if err != nil {
+			return 0, err
+		}
+		if n != len(line) {
+			return 0, io.ErrShortWrite
+		}
+	}
+	return len(p), nil
+}
+
+func (w *sessionPromptWriter) inject(line []byte) []byte {
+	w.c.mu.Lock()
+	brief, standard, antigravity := w.c.systemPrompt, w.c.supportsSystemPrompt, w.c.antigravitySystemPrompt
+	w.c.mu.Unlock()
+	if !(standard || antigravity) || brief == "" || !isSessionLifecycle(line) {
+		return line
+	}
+	var message map[string]any
+	if json.Unmarshal(line, &message) != nil {
+		return line
+	}
+	method, _ := message["method"].(string)
+	if !slices.Contains(sessionLifecycleMethods, method) {
+		return line
+	}
+	params, ok := message["params"].(map[string]any)
+	if !ok {
+		return line
+	}
+	if standard {
+		params["systemPrompt"] = map[string]any{"mode": "append", "content": []any{map[string]any{"type": "text", "text": brief}}}
+	} else {
+		meta, _ := params["_meta"].(map[string]any)
+		if meta == nil {
+			meta = map[string]any{}
+		}
+		own, _ := meta["antigravity"].(map[string]any)
+		if own == nil {
+			own = map[string]any{}
+		}
+		own["systemPrompt"] = map[string]any{"append": brief}
+		meta["antigravity"] = own
+		params["_meta"] = meta
+	}
+	out, err := json.Marshal(message)
+	if err != nil {
+		return line
+	}
+	return append(out, '\n')
+}
+
+// sessionLifecycleMethods are the requests that carry systemPrompt, and
+// sessionLifecycleMarkers their quoted names to look for before any decode.
+var (
+	sessionLifecycleMethods = []string{"session/new", "session/load", "session/resume", "session/fork"}
+	sessionLifecycleMarkers = func() [][]byte {
+		markers := make([][]byte, len(sessionLifecycleMethods))
+		for i, method := range sessionLifecycleMethods {
+			markers[i] = []byte(`"` + method + `"`)
+		}
+		return markers
+	}()
+)
+
+// isSessionLifecycle is a byte check for a lifecycle method name, so prompts, attachments
+// and replies are not decoded on the way out (#2733).
+func isSessionLifecycle(line []byte) bool {
+	for _, marker := range sessionLifecycleMarkers {
+		if bytes.Contains(line, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *client) SessionUpdate(ctx context.Context, n sdk.SessionNotification) (err error) {
@@ -637,7 +814,15 @@ func (t *terminal) Write(b []byte) (int, error) {
 
 func (c *client) CreateTerminal(ctx context.Context, p sdk.CreateTerminalRequest) (_ sdk.CreateTerminalResponse, err error) {
 	defer safe.Err("acp CreateTerminal", &err)
-	cmd := exec.Command(p.Command, p.Args...)
+	command, args := p.Command, p.Args
+	// Grok sends its full shell invocation in command instead of separating the
+	// executable and arguments. Run only that known shape through bash; other
+	// runtimes keep the standard executable-plus-arguments path below.
+	if strings.EqualFold(c.runtime, "Grok") && len(args) == 0 && strings.HasPrefix(command, "/bin/bash -lc ") {
+		args = []string{"-lc", command}
+		command = "/bin/bash"
+	}
+	cmd := exec.Command(command, args...)
 	cmd.Dir = c.dir
 	if p.Cwd != nil {
 		dir, err := c.inside(*p.Cwd)
@@ -678,7 +863,7 @@ func (c *client) CreateTerminal(ctx context.Context, p sdk.CreateTerminalRequest
 	id := fmt.Sprintf("term-%d", c.next)
 	c.terminals[id] = t
 	c.mu.Unlock()
-	c.sink.Served("terminal", strings.Join(append([]string{p.Command}, p.Args...), " "))
+	c.sink.Served("terminal", strings.Join(append([]string{command}, args...), " "))
 	return sdk.CreateTerminalResponse{TerminalId: id}, nil
 }
 
@@ -793,9 +978,9 @@ var ErrConversationGone = errors.New("the runtime no longer has this conversatio
 
 // Fork is agents/fork's handshake (DaemonCore.fork): a runtime of its own, the
 // conversation continued, then session/fork; the process goes once it has answered.
-func Fork(ctx context.Context, l Launch, sink Sink, sessionID, cwd string, meta map[string]any) (string, error) {
+func Fork(ctx context.Context, l Launch, sink Sink, sessionID, cwd string, meta, compatibilityMeta map[string]any, brief string) (string, error) {
 	l.Dir = cwd
-	s, err := Start(ctx, l, sink, nil, meta, sessionID)
+	s, err := Start(ctx, l, sink, nil, meta, compatibilityMeta, sessionID, brief)
 	if err != nil {
 		return "", err
 	}
@@ -808,7 +993,11 @@ func Fork(ctx context.Context, l Launch, sink Sink, sessionID, cwd string, meta 
 	}
 	fctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
-	r, err := s.conn.UnstableForkSession(fctx, sdk.UnstableForkSessionRequest{SessionId: sdk.SessionId(sessionID), Cwd: cwd, Meta: meta})
+	requestMeta := compatibilityMeta
+	if s.SupportsSystemPrompt() {
+		requestMeta = meta
+	}
+	r, err := s.conn.UnstableForkSession(fctx, sdk.UnstableForkSessionRequest{SessionId: sdk.SessionId(sessionID), Cwd: cwd, Meta: requestMeta})
 	if err != nil {
 		return "", err
 	}

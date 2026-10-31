@@ -17,7 +17,7 @@ import (
 func (p *plane) botMachine(admin *controllink.Session, bot, name string) *fakeHost {
 	p.t.Helper()
 	var shown wire.ControlCodeShown
-	json.Unmarshal(call(p.t, admin, "", "hosts/startEnroll", wire.HostEnroll{As: &bot}), &shown)
+	json.Unmarshal(call(p.t, admin, "", "hosts/startEnroll", wire.MachineEnroll{As: &bot}), &shown)
 	code, err := controllink.ParseCode(shown.Text)
 	if err != nil {
 		p.t.Fatal(err)
@@ -33,24 +33,24 @@ func (p *plane) botMachine(admin *controllink.Session, bot, name string) *fakeHo
 // hostUsers keeps the last host/user each machine was told.
 type hostUsers struct {
 	mu   sync.Mutex
-	last map[string]wire.HostUser
+	last map[string]wire.MachineUser
 }
 
 func (h *hostUsers) heard(host, method string, params json.RawMessage) {
 	if method != wire.NotifyHostUser.Name {
 		return
 	}
-	var u wire.HostUser
+	var u wire.MachineUser
 	json.Unmarshal(params, &u)
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.last == nil {
-		h.last = map[string]wire.HostUser{}
+		h.last = map[string]wire.MachineUser{}
 	}
 	h.last[host] = u
 }
 
-func (h *hostUsers) of(host string) (wire.HostUser, bool) {
+func (h *hostUsers) of(host string) (wire.MachineUser, bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	u, ok := h.last[host]
@@ -62,6 +62,7 @@ func (h *hostUsers) of(host string) (wire.HostUser, bool) {
 // an admin is told it is a bot's; one trigger claimed by three machines runs once in 100
 // tries; and its cap stops it, with a notice to the admins.
 func TestABotRunsOncePerTriggerAndStopsAtItsCap(t *testing.T) {
+	t.Parallel()
 	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) { c.ProviderHome = t.TempDir() })
 	users := &hostUsers{}
 	p.told = users.heard
@@ -79,7 +80,7 @@ func TestABotRunsOncePerTriggerAndStopsAtItsCap(t *testing.T) {
 	var made wire.BotMade
 	json.Unmarshal(call(t, admin, "", "bots/make", wire.BotMake{Name: "review-bot", Group: platform.ID}), &made)
 	bot := made.User
-	if e := callError(t, sam.window, "", "hosts/startEnroll", wire.HostEnroll{As: &bot}); !strings.Contains(e, "Only an admin") {
+	if e := callError(t, sam.window, "", "hosts/startEnroll", wire.MachineEnroll{As: &bot}); !strings.Contains(e, "Only an admin") {
 		t.Fatal(e)
 	}
 	if e := callError(t, admin, "", "groups/remove", wire.GroupRequest{ID: platform.ID}); !strings.Contains(e, "review-bot") {
@@ -116,11 +117,11 @@ func TestABotRunsOncePerTriggerAndStopsAtItsCap(t *testing.T) {
 	if e := callError(t, sam.window, host, "daemon/ping", nil); !strings.Contains(e, "-32091") {
 		t.Fatal(e)
 	}
-	if e := callError(t, sam.window, "", "bots/stopRun", wire.BotStopRun{Host: wire.HostID(host), Agent: "A"}); !strings.Contains(e, "Only an admin") {
+	if e := callError(t, sam.window, "", "bots/stopRun", wire.BotStopRun{Host: wire.MachineRef(host), Agent: "A"}); !strings.Contains(e, "Only an admin") {
 		t.Fatal(e)
 	}
 	// The fake machine does not know agents/stop: its refusal is what came back.
-	if e := callError(t, admin, "", "bots/stopRun", wire.BotStopRun{Host: wire.HostID(host), Agent: "A"}); !strings.Contains(e, "agents/stop") {
+	if e := callError(t, admin, "", "bots/stopRun", wire.BotStopRun{Host: wire.MachineRef(host), Agent: "A"}); !strings.Contains(e, "agents/stop") {
 		t.Fatal(e)
 	}
 
@@ -160,7 +161,7 @@ func TestABotRunsOncePerTriggerAndStopsAtItsCap(t *testing.T) {
 	call(t, admin, "", "bots/setCaps", wire.BotCaps{User: bot, Caps: wire.SpendCaps{DailyUSD: &cap}})
 	today := time.Now().UTC().Format(usageDayLayout)
 	rollup, _ := json.Marshal(wire.UsageRollup{Hours: []wire.UsageRollupPeriod{},
-		Days: []wire.UsageRollupPeriod{{At: today, Rows: []wire.UsageRollupRow{{Project: "app", Runtime: "claude", Cost: map[string]float64{"USD": 3}}}}}})
+		Days: []wire.UsageRollupPeriod{{At: today, Rows: []wire.UsageRollupRow{{Folder: "app", Runtime: "claude", Cost: map[string]float64{"USD": 3}}}}}})
 	if _, err := p.s.methods.HostSaid(host, "usage/rollup", rollup); err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +173,10 @@ func TestABotRunsOncePerTriggerAndStopsAtItsCap(t *testing.T) {
 	}
 	for _, m := range machines {
 		host := m.member.Host
-		p.waitFor(func() bool { u, _ := users.of(host); return u.CapReachedUntil != nil && u.CapReachedUntil.Time().After(time.Now()) },
+		p.waitFor(func() bool {
+			u, _ := users.of(host)
+			return u.CapReachedUntil != nil && u.CapReachedUntil.Time().After(time.Now())
+		},
 			"told it is at its cap")
 	}
 	// A higher cap lets it start again.

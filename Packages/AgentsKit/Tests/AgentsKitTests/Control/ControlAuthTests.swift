@@ -46,7 +46,7 @@ struct ControlAuthTests {
 
     @Test func aHostProvesItsKey() async throws {
         let host = ControlAgreement.generate()
-        let id = HostID(rawValue: "k3v9x0qa")
+        let id = MachineRef(rawValue: "k3v9x0qa")
         let peerKey = try ControlAuth.hostKey(privateKey: host.privateKey, peer: control.publicKey, host: id)
         let who = try await exchange(identity: .host(id), peerKey: peerKey) { _ in
             try ControlAuth.hostKey(privateKey: control.privateKey, peer: host.publicKey, host: id)

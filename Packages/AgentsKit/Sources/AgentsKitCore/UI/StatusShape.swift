@@ -44,13 +44,12 @@ public enum StatusShape: Hashable, Sendable {
             switch outcome {
             case .some(let outcome) where outcome.needsAPerson: self = .needsYou
             case _ where isWaiting: self = .waiting
-            case .blocked: self = .needsYou
+            // Only a question needs the person (#1916).
             default: self = .done
             }
         case .stopped where waitingForAllowance: self = .waiting
-        // The same three as `AgentGroup`'s Paused: stopped on purpose, or out of allowance
-        // (065), where the way on is a new chat. Anything else stopped wants a person.
-        case .stopped where ![.cancelled, .stoppedByAgent, .allowanceSpent].contains(endedReason):
+        // Only deliberate stops use the stop mark. A spent allowance ended in an error.
+        case .stopped where ![.cancelled, .stoppedByAgent, .stoppedByAdmin].contains(endedReason):
             self = .needsYou
         case .stopped, .archived: self = .stopped
         // Starts by itself when a place frees (#362).
@@ -58,19 +57,25 @@ public enum StatusShape: Hashable, Sendable {
         }
     }
 
-    /// The SF Symbol to draw. Nil for `working`, which is drawn as a spinner.
+    /// The SF Symbol to draw. Nil for `working`, which is drawn as the working ring. For
+    /// `waiting`, the waiting card's beacon (#2582, #2657), which breathes as the dot of
+    /// #2456 did: one icon for waiting, on the card and on the session's mark. Before the
+    /// dot, the hourglass, `moon.zzz` and `zzz` (#765).
     public var symbol: String? {
         switch self {
         case .working: return nil
+        case .waiting: return Self.waitingSymbol
         case .needsYou: return "exclamationmark.circle.fill"
-        case .waiting: return "zzz"
-        case .done: return "checkmark.circle"
+        case .done: return "checkmark"
         case .stopped: return "stop.circle"
         }
     }
 
+    /// The beacon: the waiting mark and the waiting card's icon (#2657).
+    public static let waitingSymbol = "dot.radiowaves.left.and.right"
+
     /// What the Mac's row and the phone's card say for `waiting`, in place of the
-    /// outcome's heading: a blocked report the app will resume is not Blocked to the
+    /// outcome's heading: a waiting report the app will resume is Waiting to the
     /// person, whatever word the agent used.
     public static let waitingLabel = "Waiting"
 
@@ -95,11 +100,11 @@ public extension StatusShape {
     }
 
     /// What a screen reader hears for the shape, and what the tooltip says. Precise where
-    /// the shape is not: the outcome's words come from `WorkOutcome.heading`, and a
-    /// stopped agent says why.
+    /// the shape is not: the outcome's words come from `WorkOutcome.heading`, a
+    /// stopped agent says why, and a running one names its tool (#2261).
     static func words(_ shape: StatusShape, state: AgentState, isComingBack: Bool, outcome: WorkOutcome?,
                       isUnaccountedFor: Bool, ending: String?, isUnread: Bool,
-                      isWaitingForAllowance: Bool = false) -> String {
+                      isWaitingForAllowance: Bool = false, tool: String? = nil) -> String {
         if isComingBack { return AgentsModel.comingBackDescription }
         if isUnread && state == .finished { return "Unread · \(outcome?.heading ?? "Finished")" }
         if isWaitingForAllowance { return "Waiting for an allowance" }
@@ -108,7 +113,7 @@ public extension StatusShape {
         if state == .finished, let outcome { return outcome.heading }
         if isUnaccountedFor && state == .finished { return "Finished without saying how it went" }
         switch state {
-        case .running: return "Working"
+        case .running: return tool.map(runningLabel) ?? "Working"
         case .starting: return AgentState.startingLabel
         case .waitingOnUser: return "Waiting on you"
         case .finished: return "Finished"
@@ -123,6 +128,26 @@ public extension StatusShape {
         words(StatusShape(row: agent, isComingBack: isComingBack), state: agent.state, isComingBack: isComingBack,
               outcome: agent.report?.outcome, isUnaccountedFor: agent.endingIsUnaccountedFor,
               ending: agent.endedReason?.summary, isUnread: agent.isUnread,
-              isWaitingForAllowance: agent.continueWhenBack != nil)
+              isWaitingForAllowance: agent.continueWhenBack != nil,
+              tool: agent.state == .running ? agent.runningTool : nil)
     }
+
+    /// The single grey line for a session under Needs You: its pending question, why it
+    /// stopped, or why its finished turn has no report. The report returns when the row
+    /// leaves Needs You (#1324).
+    static func needsYouLine(row agent: Agent, isComingBack: Bool = false, question: String? = nil) -> String? {
+        guard StatusShape(row: agent, isComingBack: isComingBack) == .needsYou else { return nil }
+        if agent.state == .waitingOnUser || agent.report?.outcome == .needsAnswer,
+           let question, let first = question.split(whereSeparator: { $0.isNewline }).first {
+            let line = first.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !line.isEmpty { return line }
+        }
+        if agent.state == .stopped, let summary = agent.endedReason?.summary { return summary }
+        if agent.endingIsUnaccountedFor { return "Finished without saying how it went" }
+        return nil
+    }
+
+    /// "Running: swift test": a running agent's words while it runs a tool (#1902), in the
+    /// sidebar, the rows, the cards and the chat's working line alike.
+    static func runningLabel(_ tool: String) -> String { "Running: \(tool)" }
 }

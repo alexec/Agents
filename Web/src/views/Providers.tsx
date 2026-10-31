@@ -1,14 +1,16 @@
-// Settings ▸ Workspace providers (#1808), the window's Settings ▸ Workspace Providers: each
+// Settings ▸ Machine providers (#1808), the window's Settings ▸ Machine Providers: each
 // provider as a card of its workspaces, Add Provider… (kind first, then its short form), Edit…,
 // List Again and Remove…, and on a workspace Link to Host…, Start, Stop and Unlink.
 import { useEffect, useState } from "preact/hooks";
-import type { ControlHost, ProviderSummary, WorkspaceInfo } from "../protocol/generated";
+import type { ControlMachine, ProviderSummary, MachineInfo } from "../protocol/generated";
 import type { Store } from "../model/store";
 import {
   defaultIdleMinutes, idleChoices, kindChip, kindFields, kindNeeds, kindOfPreset, kindTitle, linkableHosts, mayBe, noHostLine,
   providerKinds, providerLine, providerRequest, providerWords as words, workspaceLine, type ProviderKind,
-} from "../model/workspaceProviders";
+} from "../model/machineProviders";
 import { Modal } from "./Modal";
+import { MachineDialog } from "./MachineDialog";
+import { makers } from "../model/machineFromRepository";
 import { adminsOnly, providerLine as groupLine } from "../model/teamGroups";
 
 const time = (at: Date) => at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -18,7 +20,7 @@ export function ProvidersSection({ store }: { store: Store }) {
   const problem = store.providers.problem.value;
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<ProviderSummary>();
-  const [linking, setLinking] = useState<{ provider: ProviderSummary; workspace: WorkspaceInfo }>();
+  const [linking, setLinking] = useState<{ provider: ProviderSummary; workspace: MachineInfo }>();
   const [said, setSaid] = useState<string | null>(null);
   // Lists every provider again when the page opens (FR-004).
   useEffect(() => { void store.providers.load(); }, []);
@@ -52,12 +54,13 @@ export function ProvidersSection({ store }: { store: Store }) {
 }
 
 function ProviderCard({ store, provider, say, edit, link }: {
-  store: Store; provider: ProviderSummary; say: (why: string | null) => void; edit: () => void; link: (w: WorkspaceInfo) => void;
+  store: Store; provider: ProviderSummary; say: (why: string | null) => void; edit: () => void; link: (w: MachineInfo) => void;
 }) {
   const hosts = store.hosts.value;
   const groups = store.providers.groups.value;
   const admin = store.person.value?.role !== "member";
   const line = [providerLine(provider, time), groupLine(provider, groups)].filter(Boolean).join(" · ");
+  const [making, setMaking] = useState(false);
   const setGroup = async (group: string) => say(await store.providers.setGroup(provider.id, group || null));
   const remove = async () => {
     if (!window.confirm(`${words.removeTitle(provider.name)} ${words.removeNote}`)) return;
@@ -70,6 +73,10 @@ function ProviderCard({ store, provider, say, edit, link }: {
           <p class="strong">{provider.name} <span class="chip">{kindChip(provider)}</span></p>
           {line && <p class="small quiet">{line}</p>}
         </div>
+        {/* The same New Machine as Add a Machine…, at this provider (#2131). */}
+        {makers([provider]).length > 0 && (
+          <button type="button" onClick={() => setMaking(true)}>New Machine…</button>
+        )}
         <button type="button" class="link small" onClick={() => void store.providers.refresh(provider.id)}>List Again</button>
         {/* Who may start machines from it (#1761): an admin gives it to a group. */}
         {admin && (
@@ -85,12 +92,13 @@ function ProviderCard({ store, provider, say, edit, link }: {
       {provider.workspaces.map((w) => (
         <WorkspaceRow key={w.id} store={store} provider={provider} workspace={w} hosts={hosts} say={say} link={() => link(w)} />
       ))}
+      {making && <MachineDialog store={store} machine picked={provider.id} close={() => setMaking(false)} />}
     </ul>
   );
 }
 
 function WorkspaceRow({ store, provider, workspace, hosts, say, link }: {
-  store: Store; provider: ProviderSummary; workspace: WorkspaceInfo; hosts: readonly ControlHost[];
+  store: Store; provider: ProviderSummary; workspace: MachineInfo; hosts: readonly ControlMachine[];
   say: (why: string | null) => void; link: () => void;
 }) {
   const host = workspace.host ? hosts.find((h) => h.id === workspace.host) : undefined;
@@ -133,8 +141,10 @@ function WorkspaceRow({ store, provider, workspace, hosts, say, link }: {
   );
 }
 
-/** Add a Provider (kind first, then its form), or Edit… one: its name and its secrets again. */
-function AddProviderDialog({ store, editing, close }: { store: Store; editing?: ProviderSummary | undefined; close: () => void }) {
+/** Add a Provider, or Edit… one. With `added` (Add a Machine, #2131) it goes on with the provider it added, in place of closing. */
+export function AddProviderDialog({ store, editing, close, added }: {
+  store: Store; editing?: ProviderSummary | undefined; close: () => void; added?: (id: string | undefined) => void;
+}) {
   const [kind, setKind] = useState<ProviderKind | undefined>(kindOfPreset(editing?.preset));
   const [name, setName] = useState(editing?.name ?? "");
   // The values, secrets among them, live in this sheet's state only, and go when it closes.
@@ -154,9 +164,11 @@ function AddProviderDialog({ store, editing, close }: { store: Store; editing?: 
     if (typeof request === "string") return setProblem(request);
     setWorking(true);
     setProblem(undefined);
+    const before = new Set((store.providers.list.peek() ?? []).map((p) => p.id));
     const refused = await store.providers.save(request);
     setWorking(false);
     if (refused) setProblem(refused);
+    else if (added) added((store.providers.list.peek() ?? []).find((p) => !before.has(p.id))?.id);
     else close();
   };
   return (
@@ -164,7 +176,7 @@ function AddProviderDialog({ store, editing, close }: { store: Store; editing?: 
       <div class="sheet-body connect-sheet provider-sheet">
         <p class="strong">{editing ? `Edit ${editing.name}` : "Add a Provider"}</p>
         {!editing && (
-          <div class="segmented" role="radiogroup" aria-label="Kind">
+          <div class="button-group" role="radiogroup" aria-label="Kind">
             {providerKinds.map((k) => (
               <button key={k} type="button" role="radio" aria-checked={kind === k} class={kind === k ? "on" : ""}
                 disabled={working} onClick={() => choose(k)}>{kindTitle(k)}</button>
@@ -206,9 +218,9 @@ function AddProviderDialog({ store, editing, close }: { store: Store; editing?: 
   );
 }
 
-/** Link to Workspace (#691 L5): a host that already runs on this workspace, with when to start and stop it. */
+/** Link to Machine (#691 L5): a host that already runs on this workspace, with when to start and stop it. */
 function LinkDialog({ store, provider, workspace, close }: {
-  store: Store; provider: ProviderSummary; workspace: WorkspaceInfo; close: () => void;
+  store: Store; provider: ProviderSummary; workspace: MachineInfo; close: () => void;
 }) {
   const hosts = linkableHosts(workspace, store.hosts.value);
   const [host, setHost] = useState(hosts[0]?.id ?? "");

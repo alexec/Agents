@@ -7,12 +7,18 @@
 #   build-cache.sh dir                     where the cache is
 #   build-cache.sh du                      its size, by part
 #   build-cache.sh prune [--max-gb N] [--go-max-gb M]
-#                                          bring the Swift part under N GB (default 30) and
-#                                          Go's under M GB (default 10); safe any time
+#                                          bring the cache under N GB (default 15), Go's
+#                                          part under M GB of it (default 3); safe any time
 #
 # The cache lives outside every worktree, so deleting a worktree's own build/ and .build
 # (the clean-up rule) leaves it alone. AGENTS_BUILD_CACHE moves it; AGENTS_BUILD_CACHE=off
 # runs the command as it is, with nothing shared.
+#
+# The cache has a bound (#2346): each xcodebuild and swift run prunes it behind the build,
+# at most once in 30 minutes, to AGENTS_BUILD_CACHE_MAX_GB (default 15) with Go's part
+# under AGENTS_BUILD_CACHE_GO_MAX_GB (default 3), into prune.log in the cache.
+# AGENTS_BUILD_CACHE_PRUNE=off stops that. A prune never removes a folder that a running
+# build named in in-use/<pid>.
 #
 # `swift test` gets AGENTS_QUARANTINE=1 unless it is set already: tests marked
 # .flakyUnderLoad skip, and `eventually` waits as long as on CI, as a local full run is
@@ -32,15 +38,26 @@
 #                   (Go's build cache) and lint/ (golangci-lint's). Bounded by prune on its
 #                   own, so a large Go cache never costs the Swift one (#1796).
 #   npm/            scripts/lint.sh's Biome download
+#   in-use/<pid>    the folders the build with that pid uses; prune keeps them
+#   pruned, prune.log  when the last prune behind a build ran, and what it did
 #
 # What is not shared: DerivedData and .build. Their contents name the worktree's own
 # paths, and SwiftPM locks .build for one process at a time, so a shared one would make
 # lanes rebuild each other's or wait.
+#
+# An xcodebuild that names no -derivedDataPath gets <worktree>/build/DerivedData (#2684),
+# not Xcode's ~/Library/Developer/Xcode/DerivedData/Agents-<hash>: deleting the worktree's
+# build/ then deletes its build output too. AGENTS_BUILD_CACHE=off keeps Xcode's default.
 set -euo pipefail
 
 CACHE=${AGENTS_BUILD_CACHE:-$HOME/Library/Caches/Agents-build}
-# Xcode trims the compilation cache to this after a build; prune keeps the rest in step.
-CAS_LIMIT_GB=20
+MAX_GB=${AGENTS_BUILD_CACHE_MAX_GB:-15}
+GO_MAX_GB=${AGENTS_BUILD_CACHE_GO_MAX_GB:-3}
+# Xcode trims the compilation cache to this after a build: the Swift part's bound less
+# 2 GB for the packages and checkouts, at least 1 GB.
+CAS_LIMIT_GB=$(awk -v m="$MAX_GB" -v g="$GO_MAX_GB" 'BEGIN { c = int(m - g - 2); print (c < 1 ? 1 : c) }')
+# The processes that are builds, for a build that wrote no in-use/<pid> (an older script).
+BUILD_PROCS=${AGENTS_BUILD_CACHE_PROCS:-xcodebuild|swift-build|swift-test}
 
 die() { echo "build-cache.sh: $*" >&2; exit 1; }
 
@@ -51,7 +68,9 @@ checkouts_key() {
 	local top
 	top=$(repo)
 	# Every pinned package set the apps build with; the spikes under specs/ are not built.
-	(cd "$top" && cat Packages/*/Package.resolved 2>/dev/null) |
+	# And the packages project.yml names itself (FluidAudio, #2322), which no
+	# Package.resolved holds: a package added there is a new set.
+	(cd "$top" && cat Packages/*/Package.resolved 2>/dev/null && sed -n '/^packages:/,/^targets:/p' project.yml) |
 		shasum | cut -c1-12
 }
 
@@ -73,7 +92,23 @@ xcode() {
 	key=$(checkouts_key)
 	co=$CACHE/checkouts/$key
 	mkdir -p "$CACHE/cas" "$CACHE/packages" "$co"
-	touch "$co" # prune keeps the folders used lately
+	using "$co" "$CACHE/packages" "$CACHE/cas"
+	auto_prune
+	# The worktree's own DerivedData, unless the command names one (#2684). It is under
+	# $PWD, so the prefix mappings below keep it out of the cache keys. An action that
+	# builds nothing gets no -derivedDataPath.
+	local dd=(-derivedDataPath "$PWD/build/DerivedData") a prev= target=() rdd=()
+	for a in "$@"; do
+		case $a in
+		-derivedDataPath | -exportArchive | -exportLocalizations | -importLocalizations | -version | -showsdks | -list | -help | -usage | -license) dd=() ;;
+		esac
+		# What the cold-cache resolve below needs from the command (#2773).
+		case $prev in
+		-project | -workspace | -scheme) target+=("$prev" "$a") ;;
+		-derivedDataPath) rdd=(-derivedDataPath "$a") ;;
+		esac
+		prev=$a
+	done
 	local flags=(
 		-packageCachePath "$CACHE/packages"
 		-clonedSourcePackagesDirPath "$co"
@@ -88,6 +123,7 @@ xcode() {
 		SWIFT_ENABLE_PROJECT_PREFIX_MAPPING=YES
 		CLANG_ENABLE_PROJECT_PREFIX_MAPPING=YES
 		# The project mappings leave the explicit modules' folders in DerivedData unmapped.
+		# Each DerivedData here is under $PWD (build/DerivedData, or a caller's build/DD).
 		# The path as the build sees it, which under /tmp is not git's /private/tmp.
 		# Quoted as one item of the list: Xcode splits these settings on spaces (#1417).
 		SWIFT_OTHER_PREFIX_MAPPINGS="\"$PWD=/^worktree\""
@@ -101,7 +137,11 @@ xcode() {
 		lock "$co.lock"
 		trap 'rmdir "$co.lock" 2>/dev/null || true' EXIT
 		if [ ! -e "$co/Package.resolved" ]; then
-			xcodebuild -resolvePackageDependencies "${flags[@]:0:4}" >&2
+			# xcodebuild refuses -derivedDataPath without -scheme (#2773): the resolve takes
+			# the command's project and scheme, and a DerivedData only with a scheme.
+			[ ${#rdd[@]} -gt 0 ] || rdd=(-derivedDataPath "$PWD/build/DerivedData")
+			case " ${target[*]-} " in *" -scheme "*) ;; *) rdd=() ;; esac
+			xcodebuild -resolvePackageDependencies ${target[@]+"${target[@]}"} "${flags[@]:0:4}" ${rdd[@]+"${rdd[@]}"} >&2
 			cp "$pins" "$co/Package.resolved"
 		fi
 		rmdir "$co.lock" 2>/dev/null || true
@@ -109,7 +149,7 @@ xcode() {
 	fi
 	mkdir -p "$(dirname "$pins")"
 	cp "$co/Package.resolved" "$pins"
-	exec xcodebuild "$@" "${flags[@]}" -disableAutomaticPackageResolution
+	exec xcodebuild "$@" ${dd[@]+"${dd[@]}"} "${flags[@]}" -disableAutomaticPackageResolution
 }
 
 swiftpm() {
@@ -117,10 +157,53 @@ swiftpm() {
 	case $sub in build | test | run | package) ;; *) die "swift $sub: only build, test, run or package" ;; esac
 	shift
 	mkdir -p "$CACHE/swiftpm"
+	using "$CACHE/swiftpm"
+	auto_prune
 	exec swift "$sub" --cache-path "$CACHE/swiftpm" "$@"
 }
 
 gb() { du -sk "$1" 2>/dev/null | awk '{printf "%.1f", $1 / 1048576}'; }
+kb_gb() { awk -v k="$1" 'BEGIN { printf "%.1f", k / 1048576 }'; }
+gb_kb() { awk -v g="$1" 'BEGIN { printf "%d", g * 1048576 }'; }
+
+# This build uses these folders: prune keeps them while this pid runs (exec keeps the
+# pid), and their times say when each was used last, for prune's order.
+using() {
+	mkdir -p "$CACHE/in-use"
+	printf '%s\n' "$@" >"$CACHE/in-use/$$"
+	touch "$@"
+}
+
+# The folders running builds use, one a line; "all" when a build runs that said nothing,
+# as one from a worktree on an older script does. A marker whose pid ended goes.
+in_use() {
+	local f pid ppid
+	for f in "$CACHE"/in-use/*; do
+		[ -e "$f" ] || continue
+		pid=${f##*/}
+		if kill -0 "$pid" 2>/dev/null; then cat "$f"; else rm -f "$f"; fi
+	done
+	for pid in $(pgrep -f "$BUILD_PROCS" || true); do
+		[ -e "$CACHE/in-use/$pid" ] && continue
+		ppid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
+		[ -n "$ppid" ] && [ -e "$CACHE/in-use/$ppid" ] && continue
+		echo all
+		return
+	done
+}
+
+# Prune behind the build, so it never waits: at most once in 30 minutes, one at a time.
+auto_prune() {
+	[ "${AGENTS_BUILD_CACHE_PRUNE:-on}" != off ] || return 0
+	[ -z "$(find "$CACHE/prune.lock" -maxdepth 0 -mmin +60 2>/dev/null)" ] || rmdir "$CACHE/prune.lock" 2>/dev/null || true
+	[ -z "$(find "$CACHE/pruned" -mmin -30 2>/dev/null)" ] || return 0
+	mkdir "$CACHE/prune.lock" 2>/dev/null || return 0
+	touch "$CACHE/pruned"
+	(
+		prune || true
+		rmdir "$CACHE/prune.lock" 2>/dev/null || true
+	) </dev/null >"$CACHE/prune.log" 2>&1 &
+}
 
 usage_report() {
 	local d
@@ -132,18 +215,26 @@ usage_report() {
 }
 
 # Nothing here is needed by a build that is not running: everything can be fetched or
-# compiled again. So prune drops the oldest checkouts folders first, then the package
-# repositories and SwiftPM's cache, and the compilation cache last, and never while a
-# build might be using what it drops. Go's part has a bound of its own: its build cache
-# goes by age (Go marks an entry used when it reads it), and never while Go runs.
-building() { pgrep -qf 'xcodebuild|swift-build|swift-test|swiftpm-testing-helper|swift-frontend'; }
+# compiled again. So prune drops the Swift part's folders by last use, oldest first, and
+# never one a running build uses. Go's part has a bound of its own: its build cache goes
+# by age (Go marks an entry used when it reads it), and never while Go runs.
 going() { pgrep -qf 'Go/scripts/go.sh|golang:|golangci'; }
 
-# The Swift part: everything prune can drop for the bound, Go's and npm's aside.
-SWIFT_PARTS="cas packages checkouts swiftpm linux"
 kb_of() { local t=0 d k; for d in "$@"; do [ -e "$d" ] || continue; k=$(du -sk "$d" | cut -f1); t=$((t + k)); done; echo "$t"; }
-swift_kb() { local d a=(); for d in $SWIFT_PARTS; do a+=("$CACHE/$d"); done; kb_of "${a[@]}"; }
 go_kb() { kb_of "$CACHE/go"; }
+mtime() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1"; }
+
+# The Swift part's folders, the oldest used first: each checkouts/<k>, the package
+# repositories, SwiftPM's cache, what the Linux builds left, and the compilation cache.
+units() {
+	local d
+	for d in "$CACHE"/checkouts/* "$CACHE/packages" "$CACHE/swiftpm" "$CACHE/linux" "$CACHE/cas"; do
+		[ -d "$d" ] || continue
+		case $d in *.lock) continue ;; esac
+		echo "$(mtime "$d") $d"
+	done | sort -n | cut -d' ' -f2-
+}
+swift_kb() { local d a=(); while IFS= read -r d; do a+=("$d"); done < <(units); kb_of ${a[@]+"${a[@]}"}; }
 
 # Folders under DIR not changed in a week; nothing when DIR is not there.
 unused_week() { [ -d "$1" ] || return 0; find "$1" -mindepth 1 -maxdepth 1 -type d ! -name '*.lock' -mtime +7 -print; }
@@ -153,7 +244,7 @@ unused_week() { [ -d "$1" ] || return 0; find "$1" -mindepth 1 -maxdepth 1 -type
 OLD_GO="go-build go-mod gocache gopath go/build go/cache go/mod go/github.com go/golang.org go/go.yaml.in"
 
 prune() {
-	local max=30 gomax=10
+	local max=$MAX_GB gomax=$GO_MAX_GB
 	while [ $# -gt 0 ]; do
 		case $1 in
 		--max-gb) max=$2; shift ;;
@@ -163,26 +254,31 @@ prune() {
 		shift
 	done
 	[ -d "$CACHE" ] || { echo "no cache at $CACHE"; return; }
-	local kb=$((max * 1048576)) gokb=$((gomax * 1048576)) d days
-	echo "before: $(gb "$CACHE") GB; bounds: Swift $max GB, Go $gomax GB"
+	local gokb kb before total size d days inuse
+	gokb=$(gb_kb "$gomax")
+	kb=$(($(gb_kb "$max") - gokb))
+	[ "$kb" -gt 0 ] || die "prune: --max-gb $max leaves nothing over Go's $gomax GB"
+	before=$(kb_of "$CACHE")
+	echo "before: $(kb_gb "$before") GB; bound $max GB, of it Go $gomax GB"
+	inuse=$(in_use)
 	# Checkouts nobody built with in a week go regardless; they are small, but they add up.
-	unused_week "$CACHE/checkouts" | while IFS= read -r d; do echo "removing $d (unused a week)"; rm -rf "$d"; done
+	unused_week "$CACHE/checkouts" | while IFS= read -r d; do
+		printf '%s\n' "$inuse" | grep -qxF -e "$d" -e all && continue
+		echo "removing $d (unused a week)"; rm -rf "$d"
+	done
 	unused_week "$CACHE/linux" | while IFS= read -r d; do echo "removing $d (unused a week)"; rm -rf "$d"; done
-	if [ "$(swift_kb)" -gt "$kb" ]; then
-		if building; then
-			echo "Swift part over the bound, but a build is running: left as it is"
-		else
-			# Oldest first; the newest checkouts folder is the one main builds with.
-			# shellcheck disable=SC2010 # checkouts/<k> names are hash keys (checkouts_key), never with spaces
-			for d in $(ls -1t "$CACHE/checkouts" 2>/dev/null | grep -v '\.lock$' | tail -n +2 | tail -r) packages swiftpm linux cas; do
-				[ "$(swift_kb)" -gt "$kb" ] || break
-				case $d in packages | swiftpm | linux | cas) d=$CACHE/$d ;; *) d=$CACHE/checkouts/$d ;; esac
-				[ -e "$d" ] || continue
-				echo "removing $d ($(gb "$d") GB)"
-				rm -rf "$d"
-			done
+	total=$(swift_kb)
+	while IFS= read -r d; do
+		[ "$total" -gt "$kb" ] || break
+		if printf '%s\n' "$inuse" | grep -qxF -e "$d" -e all; then
+			echo "kept $d: a running build uses it"
+			continue
 		fi
-	fi
+		size=$(kb_of "$d")
+		echo "removing $d ($(kb_gb "$size") GB)"
+		rm -rf "$d"
+		total=$((total - size))
+	done < <(units)
 	if going; then
 		echo "Go is running: its part left as it is ($(gb "$CACHE/go") GB)"
 	else
@@ -209,7 +305,8 @@ prune() {
 			rm -rf "$CACHE/go/lint"
 		fi
 	fi
-	echo "after: $(gb "$CACHE") GB"
+	total=$(kb_of "$CACHE")
+	echo "after: $(kb_gb "$total") GB; freed $(kb_gb $((before - total))) GB"
 }
 
 [ "${1:-} ${2:-}" != "swift test" ] || export AGENTS_QUARANTINE=${AGENTS_QUARANTINE:-1}
@@ -225,5 +322,5 @@ swift) shift; swiftpm "$@" ;;
 dir) echo "$CACHE" ;;
 du) usage_report ;;
 prune) shift; prune "$@" ;;
-*) sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+*) awk 'NR > 1 && !/^#/ { exit } NR > 1' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

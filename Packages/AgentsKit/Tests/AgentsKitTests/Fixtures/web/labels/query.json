@@ -14,7 +14,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000050",
         "labels" : [
           {
@@ -65,7 +65,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000050",
         "labels" : [
           {
@@ -116,7 +116,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000050",
         "labels" : [
           {
@@ -167,7 +167,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000050",
         "labels" : [
           {
@@ -218,7 +218,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000050",
         "labels" : [
           {
@@ -269,7 +269,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000050",
         "labels" : [
           {
@@ -320,7 +320,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000050",
         "labels" : [
           {
@@ -371,7 +371,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000050",
         "labels" : [
           {
@@ -422,7 +422,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000050",
         "labels" : [
           {
@@ -473,7 +473,7 @@
 
         ],
         "createdAt" : 812500000,
-        "cwd" : "file:///fixture/project/",
+        "cwd" : "file:///fixture/folder/",
         "id" : "00000000-0000-0000-0000-000000000050",
         "labels" : [
           {

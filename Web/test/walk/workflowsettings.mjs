@@ -17,8 +17,8 @@ try {
   await page.focus("textarea");
   await page.type(code);
   await page.press("Connect");
-  await page.waitFor(`document.querySelector(".project-fold .row.project")`, 30_000);
-  await page.eval(`document.querySelector(".project-fold .disclosure[aria-expanded=false]")?.click()`);
+  await page.waitFor(`document.querySelector(".folder-fold .row.folder")`, 30_000);
+  await page.eval(`document.querySelector(".folder-fold .disclosure[aria-expanded=false]")?.click()`);
   await page.waitFor(`document.querySelector(".row.workflow")`, 30_000);
   await page.eval(`document.querySelector(".row.workflow .pick").click()`);
   await page.waitFor(`document.querySelector(".workflow-page h1")?.textContent === "Nightly sweep"`, 10_000);
@@ -47,14 +47,8 @@ try {
     throw new Error(`the file never ${gone ? "lost" : "got"} ${needle}:\n${front()}`);
   };
 
-  const steps = [
-    ["Runtime", process.env.RUNTIME_NAME ?? "Codex", `runtime: ${process.env.RUNTIME_ID ?? "codex"}`],
-    ["Runtime", "Default (Claude)", "runtime:", true],
-  ];
-  for (const [menu, name, needle, gone] of steps) {
-    await choose(menu, name);
-    await waitFile(needle, gone);
-    console.log(`${menu} → ${name}: ok`);
+  if (await page.eval(`document.querySelector('.workflow-page select[aria-label="Runtime"]') !== null`)) {
+    throw new Error("the workflow page must not show a runtime picker");
   }
   await page.waitFor(`document.querySelector(".workflow-page select[aria-label='Model']")`, 10_000);
   const pick = async (menu, index) => {

@@ -11,11 +11,16 @@ import { type KeyRecord, type KeyStore, UnsupportedBrowser } from "./keys";
 export type LinkState =
   | { kind: "connecting" }
   | { kind: "open"; name: string }
-  | { kind: "down"; since: number }
+  // `crowded` when the control plane said this browser holds as many sockets as it may: too
+  // many tabs open (#2194). It tries again as for any other.
+  | { kind: "down"; since: number; crowded?: boolean }
   | { kind: "unpaired" }
   | { kind: "forgotten" }
   | { kind: "wrongControlPlane" }
-  | { kind: "unsupported" };
+  | { kind: "unsupported" }
+  // The person's org provider suspended them (#1002, FR-029): the key stays, and the link tries
+  // again now and then. `unpaired` when it stopped a sign-in before this browser paired.
+  | { kind: "suspended"; unpaired?: boolean };
 
 /** A JSON-RPC error from a host or the control plane. */
 export class CallFailed extends Error {
@@ -45,11 +50,14 @@ export const defaultCallTimeout = 30_000;
  * or a draft of one, is the same kind of wait, shorter.
  */
 const slowCallTimeout: Readonly<Record<string, number>> = {
-  "projects/clone": 65 * 60_000,
+  "folders/clone": 65 * 60_000,
   "agents/start": 2 * 60_000,
   "agents/options": 2 * 60_000,
   // A restore from the control plane's store reads every part first (#1815): hundreds of MB.
   "backups/restore": 30 * 60_000,
+  // An export or an import of a folder's agents (#1001) packs or unpacks every transcript.
+  "agents/export": 10 * 60_000,
+  "agents/import": 10 * 60_000,
 };
 
 /** How long `method` waits. `override` is a test's one timeout for every method. */
@@ -92,6 +100,8 @@ export interface LinkOptions {
    * key is let go: the Swift clients' RefusalPatience (#81, #171). Milliseconds. */
   patience?: number;
   now?: () => number;
+  /** How long, in ms, a suspended link waits before it tries again (#1002, FR-029). */
+  suspendedRetry?: number;
   /** The exchange; the real one unless a test stands in for it. */
   authenticate?: (socket: LineSocket, record: KeyRecord, origin: string) => Promise<Admitted>;
 }
@@ -108,6 +118,9 @@ export function retryDelay(steps: number[], attempt: number, random: number): nu
 
 /** Close code the control plane sends a forgotten client (contracts/browser-auth.md). */
 export const forgottenCode = 4403;
+
+/** The close reason, with 4403, for a client of a suspended person (#1002, D13): not forgotten. */
+export const suspendedReason = "suspended";
 
 /** A call waiting for its reply, and the route it went on: a host, or null for the control plane. */
 type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void; route: string | null };
@@ -173,6 +186,8 @@ export class Link {
   private stable: ReturnType<typeof setTimeout> | null = null;
   private nextID = 1;
   private pending = new Map<number, Pending>();
+  /** control/cutOff came (#1002): the 4403 after it is a suspension, not a forgetting. */
+  private cutOff = false;
   private stateListeners = new Set<(state: LinkState) => void>();
   private noticeListeners = new Set<(method: string, params: unknown, host: string | null) => void>();
   state: LinkState = { kind: "connecting" };
@@ -186,6 +201,7 @@ export class Link {
       stableAfter: 30_000,
       hidden: () => globalThis.document?.visibilityState === "hidden",
       patience: 120_000,
+      suspendedRetry: 60_000,
       now: Date.now,
       authenticate: connect,
       open: (url) => new WebSocket(url) as unknown as SocketLike,
@@ -227,7 +243,7 @@ export class Link {
    */
   retryNow(): void {
     if (!this.stopped && this.state.kind === "open") return this.check();
-    if (this.stopped || this.state.kind !== "down") return;
+    if (this.stopped || (this.state.kind !== "down" && this.state.kind !== "suspended")) return;
     if (this.retry) clearTimeout(this.retry);
     this.retry = null;
     void this.dial();
@@ -278,7 +294,8 @@ export class Link {
       throw error;
     }
     if (!record) return this.set({ kind: "unpaired" });
-    if (this.state.kind !== "down") this.set({ kind: "connecting" });
+    // A suspended page stays as it is while it tries again (FR-029).
+    if (this.state.kind !== "down" && this.state.kind !== "suspended") this.set({ kind: "connecting" });
     log("link.connecting");
 
     const socket = this.options.open(this.options.url);
@@ -296,7 +313,11 @@ export class Link {
       if (this.socket !== socket) return;
       this.socket = null;
       this.failPending();
-      if (event.code === forgottenCode) return void this.forgotten();
+      if (event.code === forgottenCode) {
+        if (event.reason === suspendedReason || this.cutOff) return void this.suspended();
+        return void this.forgotten();
+      }
+      if (!authed && this.state.kind === "suspended") return void this.suspended();
       if (authed || this.state.kind === "connecting" || this.state.kind === "down") this.down();
     };
     socket.onopen = async () => {
@@ -312,6 +333,7 @@ export class Link {
         // each sign-in would otherwise redial, and reload everything, every second (#170).
         this.stable = setTimeout(() => (this.attempt = 0), this.options.stableAfter);
         this.firstUnknown = null;
+        this.cutOff = false;
         log("link.open");
         this.set({ kind: "open", name: admitted.name });
         this.startHeartbeat();
@@ -322,6 +344,20 @@ export class Link {
           this.socket = null;
           socket.close(1000, "");
           return void this.forgotten();
+        }
+        // Suspended (#1002, D13): the key stays; it tries again now and then.
+        if (error instanceof Refused && error.reason === "suspended") {
+          log("link.refused", error.reason);
+          this.socket = null;
+          socket.close(1000, "");
+          return void this.suspended();
+        }
+        // Too many tabs (#2194): down, and said so, trying again as ever.
+        if (error instanceof Refused && error.reason === "crowded") {
+          log("link.refused", error.reason);
+          this.socket = null;
+          socket.close(1000, "");
+          return void this.down(true);
         }
         if (error instanceof WrongControlPlane) {
           log("link.wrongControlPlane");
@@ -370,6 +406,8 @@ export class Link {
       return;
     }
     if (typeof message.method === "string") {
+      // The close that follows is a suspension (#1002, D13), whatever its reason says.
+      if (message.method === "control/cutOff") this.cutOff = true;
       for (const listener of this.noticeListeners) listener(message.method, message.params, frame.h ?? null);
     }
   }
@@ -404,11 +442,12 @@ export class Link {
     this.pending.clear();
   }
 
-  private down(): void {
+  private down(crowded = false): void {
     this.clearTimers();
-    if (this.state.kind !== "down") {
-      log("link.down");
-      this.set({ kind: "down", since: Date.now() });
+    if (this.state.kind !== "down" || (this.state.crowded ?? false) !== crowded) {
+      if (this.state.kind !== "down") log("link.down");
+      const since = this.state.kind === "down" ? this.state.since : Date.now();
+      this.set(crowded ? { kind: "down", since, crowded } : { kind: "down", since });
     }
     // Out of sight it waits: the tab's return calls retryNow (#170).
     if (this.stopped || this.options.hidden()) return;
@@ -428,6 +467,20 @@ export class Link {
       return false;
     }
     return now - this.firstUnknown >= this.options.patience;
+  }
+
+  /** Suspended by the person's org provider (#1002, FR-029): the key stays, and the link tries
+   * again every `suspendedRetry`, and opens again when the provider lets the person back. */
+  private suspended(): void {
+    this.clearTimers();
+    this.failPending();
+    this.cutOff = false;
+    if (this.state.kind !== "suspended") {
+      log("link.suspended");
+      this.set({ kind: "suspended" });
+    }
+    if (this.stopped || this.options.hidden()) return;
+    this.retry = setTimeout(() => void this.dial(), this.options.suspendedRetry);
   }
 
   private async forgotten(): Promise<void> {

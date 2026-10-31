@@ -14,11 +14,13 @@
 
 # The broad lines come first, so that the feature lines below them win (#873).
 
-# build: building, testing and shipping: scripts, CI, project files, entitlements and
+# build: building, testing and shipping: scripts, CI, folder files, entitlements and
 # privacy manifests.
 .github/                                               build
 .agents/areas                                          build
-project.yml                                            build
+# The run-app skill (#2400): the scratch set-up every lane tests with.
+.agents/skills/run-app/                                build
+folder.yml                                            build
 **/Package.swift                                       build
 **/Package.resolved                                    build
 **/Info.plist                                          build
@@ -112,7 +114,6 @@ Web/src/views/Labels.tsx                               chat
 Shared/UI/LabelTagField.swift                          chat
 docs/how-to/answer-a-question.md                       chat
 docs/how-to/send-while-an-agent-works.md               chat
-docs/how-to/chat-without-a-project.md                  chat
 
 # panes: the panes beside a chat: files and the file editor, changes, terminal and
 # shells, the browser pane, pages and show_file.
@@ -132,7 +133,7 @@ Packages/AgentsKit/Sources/AgentsKitCore/Files/        panes
 Packages/AgentsKit/Sources/AgentsKitCore/Model/ShownFile.swift  panes
 Packages/AgentsKit/Sources/AgentsKitCore/Model/ChartSpec.swift  panes
 Packages/AgentsKit/Sources/AgentsKitCore/Model/File*.swift  panes
-Packages/AgentsKit/Sources/AgentsKitCore/Model/ProjectShell.swift  panes
+Packages/AgentsKit/Sources/AgentsKitCore/Model/FolderShell.swift  panes
 Packages/AgentsKit/Sources/AgentsKitCore/Model/ShellState.swift  panes
 Packages/AgentsKit/Sources/AgentsKitCore/UI/PanePlacement.swift  panes
 Packages/AgentsKit/Sources/AgentsKitCore/UI/PageMetrics.swift  panes
@@ -166,42 +167,42 @@ docs/how-to/read-an-agents-changes.md                  panes
 docs/how-to/follow-a-live-document.md                  panes
 docs/how-to/look-at-an-html-page.md                    panes
 
-# projects: projects and their settings, pins, the drop box, worktrees, cloning and
+# folders: folders and their settings, pins, the drop box, worktrees, cloning and
 # the .agents files.
-App/Sources/Projects/                                  projects
-App/Sources/Worktrees/                                 projects
-Remote/Sources/Projects/                               projects
-Remote/Sources/Worktrees/                              projects
-Shared/UI/AppView/                                     projects
-Packages/AgentsKit/Sources/AgentsKitCore/Pins/         projects
-Packages/AgentsKit/Sources/AgentsKitCore/AppViews/     projects
-Packages/AgentsKit/Sources/AgentsKitCore/Model/Project*.swift  projects
-Packages/AgentsKit/Sources/AgentsKitCore/Model/*Worktree*.swift  projects
-Packages/AgentsKit/Sources/AgentsKitCore/Model/GuardedFile.swift  projects
-Packages/AgentsKit/Sources/AgentsKitCore/Model/MissingFolder.swift  projects
-Packages/AgentsKit/Sources/AgentsKitCore/Model/Persona.swift  projects
-Packages/AgentsKit/Tests/AgentsKitTests/**/*Project*   projects
-Packages/AgentsKit/Tests/AgentsKitTests/**/*Worktree*  projects
-Web/src/views/NewProject.tsx                           projects
-Web/src/views/Worktrees.tsx                            projects
-Web/src/views/Dropbox*.tsx                             projects
-Web/src/views/Pinned*.tsx                              projects
-Web/src/views/Archive*.tsx                             projects
-Web/src/views/GuardedChange.tsx                        projects
-Web/src/views/MissingFolder.tsx                        projects
-Web/src/model/worktrees.ts                             projects
-Web/src/model/dropbox.ts                               projects
-Web/src/model/personas.ts                              projects
-Web/src/model/missingFolder.ts                         projects
-docs/how-to/add-a-project.md                           projects
-docs/how-to/start-in-a-worktree.md                     projects
-docs/how-to/pin-a-page-to-a-project.md                 projects
-docs/how-to/archive-and-stop.md                        projects
-docs/explanation/projects-hosts-worktrees.md           projects
+App/Sources/Folders/                                  folders
+App/Sources/Worktrees/                                 folders
+Remote/Sources/Folders/                               folders
+Remote/Sources/Worktrees/                              folders
+Shared/UI/AppView/                                     folders
+Packages/AgentsKit/Sources/AgentsKitCore/Pins/         folders
+Packages/AgentsKit/Sources/AgentsKitCore/AppViews/     folders
+Packages/AgentsKit/Sources/AgentsKitCore/Model/Folder*.swift  folders
+Packages/AgentsKit/Sources/AgentsKitCore/Model/*Worktree*.swift  folders
+Packages/AgentsKit/Sources/AgentsKitCore/Model/GuardedFile.swift  folders
+Packages/AgentsKit/Sources/AgentsKitCore/Model/MissingFolder.swift  folders
+Packages/AgentsKit/Sources/AgentsKitCore/Model/Persona.swift  folders
+Packages/AgentsKit/Tests/AgentsKitTests/**/*Folder*   folders
+Packages/AgentsKit/Tests/AgentsKitTests/**/*Worktree*  folders
+Web/src/views/NewFolder.tsx                           folders
+Web/src/views/Worktrees.tsx                            folders
+Web/src/views/Dropbox*.tsx                             folders
+Web/src/views/Pinned*.tsx                              folders
+Web/src/views/Archive*.tsx                             folders
+Web/src/views/GuardedChange.tsx                        folders
+Web/src/views/MissingFolder.tsx                        folders
+Web/src/model/worktrees.ts                             folders
+Web/src/model/dropbox.ts                               folders
+Web/src/model/personas.ts                              folders
+Web/src/model/missingFolder.ts                         folders
+docs/how-to/add-a-folder.md                           folders
+docs/how-to/start-in-a-worktree.md                     folders
+docs/how-to/pin-a-page-to-a-folder.md                 folders
+docs/how-to/archive-and-stop.md                        folders
+docs/explanation/folders-machines-worktrees.md        folders
 
 # workflows: workflows, their page, schedule and switches (triggers are events).
-App/Sources/Projects/WorkflowPage.swift                workflows
-Remote/Sources/Projects/WorkflowPage.swift             workflows
+App/Sources/Folders/WorkflowPage.swift                workflows
+Remote/Sources/Folders/WorkflowPage.swift             workflows
 Shared/UI/WorkflowStatus.swift                         workflows
 Shared/UI/WorkflowHostsSection.swift                   workflows
 Packages/AgentsKit/Sources/AgentsKitCore/Workflows/    workflows
@@ -225,13 +226,19 @@ Web/src/views/settings/                                settings
 Remote/Sources/Settings/                               settings
 Web/src/theme/                                         settings
 docs/reference/settings.md                             settings
+# The organisation's policy (#998): its words and the read-only Policy pane are settings'; the
+# "Set by your organisation" line under a refused choice is drawn by the runtimes lanes.
+**/OrgPolicy*                                          settings
+Web/src/model/orgPolicy.ts                             settings
+Web/test/orgPolicy.test.mjs                            settings
+**/OrgPolicyLine*                                      runtimes
 
 # usage: cost, spending limits, allowances, usage and time charts.
 App/Sources/Spending/                                  usage
 App/Sources/Time/                                      usage
 App/Sources/Settings/CostSettingsView.swift            usage
 Remote/Sources/Time/                                   usage
-Remote/Sources/Projects/TotalsView.swift               usage
+Remote/Sources/Folders/TotalsView.swift               usage
 Shared/UI/UsageCharts.swift                            usage
 Shared/UI/TimeCharts.swift                             usage
 Packages/AgentsKit/Sources/AgentsKitCore/Runtimes/Allowance/  usage
@@ -252,7 +259,7 @@ docs/how-to/limit-spending.md                          usage
 App/Sources/Runtimes/                                  runtimes
 App/Sources/Config/                                    runtimes
 App/Sources/Settings/AgentRuntimesSettingsView.swift   runtimes
-Remote/Sources/Projects/RuntimesView.swift             runtimes
+Remote/Sources/Folders/RuntimesView.swift             runtimes
 Shared/UI/Chat/ModelPill.swift                         runtimes
 Shared/UI/Chat/Sandbox*.swift                          runtimes
 Packages/AgentsKit/Sources/AgentsKitCore/ACP/          runtimes
@@ -282,8 +289,8 @@ docs/how-to/keep-going-when-a-runtime-runs-out.md      runtimes
 # marketplace: MCP servers, skills, plugins and the marketplaces they come from.
 App/Sources/Catalog/                                   marketplace
 App/Sources/MCPServers/                                marketplace
-App/Sources/Projects/PluginsSection.swift              marketplace
-App/Sources/Projects/ProjectMCPSection.swift           marketplace
+App/Sources/Folders/PluginsSection.swift              marketplace
+App/Sources/Folders/FolderMCPSection.swift           marketplace
 Remote/Sources/MCPServers/                             marketplace
 Shared/UI/MCPHealthRow.swift                           marketplace
 Packages/AgentsKit/Sources/AgentsKitCore/Daemon/*MCP*.swift  marketplace
@@ -291,7 +298,7 @@ Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI+Catalog.swift  marketp
 Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI+Marketplaces.swift  marketplace
 Packages/AgentsKit/Sources/AgentsKitCore/Model/MCP*.swift  marketplace
 Packages/AgentsKit/Sources/AgentsKitCore/Model/HostedMCPWords.swift  marketplace
-Packages/AgentsKit/Sources/AgentsKitCore/Model/ProjectPlugin.swift  marketplace
+Packages/AgentsKit/Sources/AgentsKitCore/Model/FolderPlugin.swift  marketplace
 Packages/AgentsKit/Tests/AgentsKitTests/Catalog/       marketplace
 Web/src/views/MCPServers.tsx                           marketplace
 Web/src/model/hostedMCP.ts                             marketplace
@@ -355,39 +362,38 @@ deploy/gcp/hosted*                                     hosted-ops
 # billing: plans bought through Stripe (#2224). After hosted, so that it wins.
 Go/internal/hosted/billing/                            billing
 
-# hosts: the machines agents run on: Agents Host, agentsd, servers over ssh, Linux
+# machines: the computers agents run on: Agents Host, agentsd, servers over ssh, Linux
 # hosts, wakefulness and lending.
-Host/                                                  hosts
-App/Sources/Hosts/                                     hosts
-App/Sources/AppModel+MacHost.swift                     hosts
-App/Sources/WakeAndNetwork.swift                       hosts
-App/Sources/Settings/WakeSettingsSection.swift         hosts
-App/Sources/Settings/ServerCredentials.swift           hosts
-App/Sources/Control/ControlAddServerSheet.swift        hosts
-App/Sources/Control/ThisMacHost.swift                  hosts
-App/Sources/Control/HostProjectsPicker.swift           hosts
-Shared/UI/HostListHeading.swift                        hosts
-Shared/UI/OfflineWords.swift                           hosts
-Packages/AgentsKit/Sources/AgentsKit/Hosts/            hosts
-Packages/AgentsKit/Sources/AgentsKitCore/Hosts/        hosts
-Packages/AgentsKit/Sources/AgentsKitCore/Machine/      hosts
-Packages/AgentsKit/Sources/AgentsKitCore/Model/Wake*.swift  hosts
-Packages/AgentsKit/Sources/AgentsKitCore/Control/Host*.swift  hosts
-Go/cmd/agentsd/                                        hosts
-Go/cmd/agentsctl/                                      hosts
-Go/internal/agentsd/                                   hosts
-scripts/host-install.sh                                hosts
-scripts/release-host.sh                                hosts
-.agents/skills/test-servers/                           hosts
-Go/cmd/agentsd/                                        hosts
-Go/internal/agentsd/                                   hosts
-docs/how-to/add-a-server.md                            hosts
-docs/how-to/fix-agents-host-not-starting.md            hosts
-docs/how-to/release-agents-host.md                     hosts
-docs/how-to/set-up-on-this-mac.md                      hosts
-docs/explanation/window-and-daemon.md                  hosts
-specs/037-*/                                           hosts
-specs/043-*/                                           hosts
+Host/                                                  machines
+App/Sources/Hosts/                                     machines
+App/Sources/AppModel+MacHost.swift                     machines
+App/Sources/WakeAndNetwork.swift                       machines
+App/Sources/Settings/WakeSettingsSection.swift         machines
+App/Sources/Settings/ServerCredentials.swift           machines
+App/Sources/Control/ControlAddServerSheet.swift        machines
+App/Sources/Control/ThisMacHost.swift                  machines
+App/Sources/Control/HostFoldersPicker.swift           machines
+Shared/UI/OfflineWords.swift                           machines
+Packages/AgentsKit/Sources/AgentsKit/Hosts/            machines
+Packages/AgentsKit/Sources/AgentsKitCore/Hosts/        machines
+Packages/AgentsKit/Sources/AgentsKitCore/Machine/      machines
+Packages/AgentsKit/Sources/AgentsKitCore/Model/Wake*.swift  machines
+Packages/AgentsKit/Sources/AgentsKitCore/Control/Host*.swift  machines
+Go/cmd/agentsd/                                        machines
+Go/cmd/agentsctl/                                      machines
+Go/internal/agentsd/                                   machines
+scripts/host-install.sh                                machines
+scripts/release-host.sh                                machines
+.agents/skills/test-servers/                           machines
+Go/cmd/agentsd/                                        machines
+Go/internal/agentsd/                                   machines
+docs/how-to/add-a-machine.md                           machines
+docs/how-to/fix-agents-host-not-starting.md            machines
+docs/how-to/release-agents-host.md                     machines
+docs/how-to/set-up-on-this-mac.md                      machines
+docs/explanation/window-and-daemon.md                  machines
+specs/037-*/                                           machines
+specs/043-*/                                           machines
 
 # devices: how phones, iPads and browsers reach the Mac: pairing, the relay, links,
 # notifications, the widget and the web page's wire.
@@ -434,16 +440,16 @@ Packages/AgentsKit/Sources/AgentsKitCore/Model/LeaseStatus.swift  agent-tools
 Web/src/views/Resources.tsx                            agent-tools
 docs/explanation/leases.md                             agent-tools
 
-# sidebar: the list of projects, sessions and workflows, and its row grammar (#587).
+# sidebar: the list of folders, sessions and workflows, and its row grammar (#587).
 App/Sources/AgentList/                                 sidebar
-App/Sources/Projects/ProjectListView.swift             sidebar
-App/Sources/Projects/ProjectRow.swift                  sidebar
-App/Sources/Projects/ProjectWorkRows.swift             sidebar
-App/Sources/Projects/PinnedPageRows.swift              sidebar
-App/Sources/Projects/SidebarSmartRows.swift            sidebar
-App/Sources/Projects/WorkflowRow.swift                 sidebar
-App/Sources/Projects/WindowFolds.swift                 sidebar
-App/Sources/Projects/SwipeAction.swift                 sidebar
+App/Sources/Folders/FolderListView.swift             sidebar
+App/Sources/Folders/FolderRow.swift                  sidebar
+App/Sources/Folders/FolderWorkRows.swift             sidebar
+App/Sources/Folders/PinnedPageRows.swift              sidebar
+App/Sources/Folders/SidebarSmartRows.swift            sidebar
+App/Sources/Folders/WorkflowStatusIcon.swift          sidebar
+App/Sources/Folders/WindowFolds.swift                 sidebar
+App/Sources/Folders/SwipeAction.swift                 sidebar
 Packages/AgentsKit/Sources/AgentsKitCore/Sidebar/      sidebar
 Packages/AgentsKit/Tests/AgentsKitTests/Unit/Sidebar*  sidebar
 Remote/Sources/Sidebar/                                sidebar
@@ -489,31 +495,31 @@ docs/explanation/scoped-tools.md                       agent-tools
 # brief: what every agent is told when it starts (#599, #601, #615).
 Packages/AgentsKit/Sources/AgentsKitCore/Model/LeaseWords.swift  brief
 
-# workspaces: workspace providers and the tools that start them (#691).
-App/Sources/Control/ControlProvidersPage.swift         workspaces
-App/Sources/Control/NewWorkspaceSheet.swift            workspaces
-Packages/AgentsKit/Sources/AgentsKitCore/Control/Workspace*.swift  workspaces
-Packages/AgentsKit/Sources/AgentsKitCore/Control/ShippedToolMaps.swift  workspaces
-Packages/AgentsKit/Tests/AgentsKitTests/Control/HostWorkspaceOverlayTests.swift  workspaces
-Go/cmd/workspace-commands/                             workspaces
-Go/internal/workspacecommands/                         workspaces
-Shared/UI/Chat/KeptPromptRow.swift                     workspaces
-Web/src/views/Kept.tsx                                 workspaces
-Web/test/kept*                                         workspaces
-docs/reference/workspace-providers.md                  workspaces
-docs/how-to/add-a-workspace-provider.md                workspaces
-docs/how-to/start-workspaces-from-agents.md            workspaces
-specs/691-*/                                           workspaces
-specs/858-*/                                           workspaces
+# machine-providers: providers that make, start and stop machines (#691).
+App/Sources/Control/ControlProvidersPage.swift         machine-providers
+App/Sources/Control/NewMachineSheet.swift            machine-providers
+Packages/AgentsKit/Sources/AgentsKitCore/Control/Workspace*.swift  machine-providers
+Packages/AgentsKit/Sources/AgentsKitCore/Control/ShippedToolMaps.swift  machine-providers
+Packages/AgentsKit/Tests/AgentsKitTests/Control/HostWorkspaceOverlayTests.swift  machine-providers
+Go/cmd/workspace-commands/                             machine-providers
+Go/internal/workspacecommands/                         machine-providers
+Shared/UI/Chat/KeptPromptRow.swift                     machine-providers
+Web/src/views/Kept.tsx                                 machine-providers
+Web/test/kept*                                         machine-providers
+docs/reference/machine-providers.md                  machine-providers
+docs/how-to/add-a-machine-provider.md                machine-providers
+docs/how-to/start-machines-from-agents.md            machine-providers
+specs/691-*/                                           machine-providers
+specs/858-*/                                           machine-providers
 
-# workspaces also takes the control plane's providers and its workspaces (#2017), and
+# machine-providers also takes the control plane's providers and its workspaces (#2017), and
 # Start a Machine from a Repository (#1809).
-Go/internal/controlplane/providers/                    workspaces
-Go/internal/controlplane/workspaces*.go                workspaces
-Packages/AgentsKit/Sources/AgentsKitCore/Control/MachineFromRepository.swift  workspaces
-Web/src/model/machineFromRepository.ts                 workspaces
-Web/src/views/MachineDialog.tsx                        workspaces
-Web/test/machineFromRepository.test.mjs                workspaces
+Go/internal/controlplane/providers/                    machine-providers
+Go/internal/controlplane/workspaces*.go                machine-providers
+Packages/AgentsKit/Sources/AgentsKitCore/Control/MachineFromRepository.swift  machine-providers
+Web/src/model/machineFromRepository.ts                 machine-providers
+Web/src/views/MachineDialog.tsx                        machine-providers
+Web/test/machineFromRepository.test.mjs                machine-providers
 
 # team: people, groups, bots, the user scope and the person's settings on every machine
 # (spec 736, #994, #1760, #1761), on the control plane and on the three clients (#2017).
@@ -573,6 +579,12 @@ Web/test/audit.test.mjs                                reports
 Web/test/reports.test.mjs                              reports
 docs/reference/reports.md                              reports
 specs/research/1804-*/                                 reports
+
+# lineage: the graph of the SDLC (#2347): its store, the links made without help, the cost
+# on them, and the views (#2348–#2352).
+Go/internal/lineage/                                   lineage
+Go/internal/agentsd/lineage*.go                        lineage
+specs/2348-lineage/                                    lineage
 
 # channels: a channel identity linked to a person (#1762), and Control plane ▸ Channels.
 Go/internal/controlplane/links*.go                     channels

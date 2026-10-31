@@ -23,9 +23,9 @@ try {
   await page.focus("textarea");
   await page.type(code);
   await page.press("Connect");
-  await page.waitFor(`document.querySelectorAll(".sidebar .row.project").length >= 2`, 30_000);
+  await page.waitFor(`document.querySelectorAll(".sidebar .row.folder").length >= 2`, 30_000);
   await page.eval(`(() => {
-    for (const b of document.querySelectorAll(".sidebar .row.project .disclosure"))
+    for (const b of document.querySelectorAll(".sidebar .row.folder .disclosure"))
       if (b.getAttribute("aria-expanded") !== "true") b.click();
   })()`);
   await sleep(1000);

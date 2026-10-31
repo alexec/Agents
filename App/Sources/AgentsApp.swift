@@ -5,7 +5,7 @@ import SwiftUI
 @main
 struct AgentsApp: App {
     @State private var model = AppModel()
-    /// The Dock's menu of projects (#1089).
+    /// The Dock's menu of folders (#1089).
     @NSApplicationDelegateAdaptor(AgentsAppDelegate.self) private var delegate
 
     /// Light, dark or the Mac's own, from Settings. Applied to the whole app from here,
@@ -15,7 +15,7 @@ struct AgentsApp: App {
     /// One window, so one of each: the menus act on the window they were made with.
     @State private var requests = WindowRequests()
     @State private var frame = SidebarFrame()
-    @State private var terminal = ProjectTerminalFrame()
+    @State private var terminal = FolderTerminalFrame()
 
     init() {
         // Before anything can throw: the next layout crash names its view (#76).
@@ -34,7 +34,7 @@ struct AgentsApp: App {
         // Still a `WindowGroup`, but one window in practice: File ▸ New Window is
         // replaced by New Session (see `AgentsCommands`), and tabbing is off. Not a
         // `Window` scene: the window saved by this group would restore into nothing.
-        // Its id is what Window ▸ Agents (All Projects) opens it again by once closed
+        // Its id is what Window ▸ Agents (All Folders) opens it again by once closed
         // (#1454), and what the saved window is named after. Renaming the id renames
         // the saved window: the one saved last time matches no scene, and the app
         // opens with none.
@@ -56,11 +56,11 @@ struct AgentsApp: App {
         }
         .defaultSize(width: 640, height: 720)
 
-        // A project in a window of its own (#1089), from Open in New Window on its heading,
-        // ⌥⌘O, a double-click on the heading, the Window menu or the Dock. One per project:
+        // A folder in a window of its own (#1089), from Open in New Window on its heading,
+        // ⌥⌘O, a double-click on the heading, the Window menu or the Dock. One per folder:
         // opening one already open brings it forward. Saved and opened again at launch.
-        WindowGroup(id: ProjectWindowScene.id, for: ProjectKey.self) { $key in
-            ProjectWindow(key: key)
+        WindowGroup(id: FolderWindowScene.id, for: FolderKey.self) { $key in
+            FolderWindow(key: key)
                 .environment(model)
         }
         .defaultSize(width: 1_240, height: 760)

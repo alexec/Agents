@@ -6,19 +6,20 @@ import SwiftUI
 ///
 /// Our extension of MCP Apps: SEP-1865 ties a view to a call the model made, and a pin is
 /// the host making that call itself. There is no agent here, so the view's `ui/message` and
-/// `ui/update-model-context` are refused (`AppViewActions.project`). Its `agents/start-agent`
-/// opens the form in this project, as it would from a chat, and its `agents/message-agent`
+/// `ui/update-model-context` are refused (`AppViewActions.folder`). Its `agents/start-agent`
+/// opens the form in this folder, as it would from a chat, and its `agents/message-agent`
 /// goes to the session on the branch it names (#837).
 struct PinnedViewPage: View {
     let folder: URL
     let pin: PinView
     let view: ViewPin
-    /// One of `views/*`, to the host the project is on.
+    /// One of `views/*`, to the host the folder is on.
     var call: @MainActor (String, JSONValue) async throws -> JSONValue
+    /// Unpin, or Hide for a server's list view (#2032).
     var unpin: @MainActor () async -> Void
-    /// The new-agent form in this project, filled in by the view (#834).
+    /// The new-agent form in this folder, filled in by the view (#834).
     var startAgent: (@MainActor (AppViewStart) -> String?)? = nil
-    /// The session on a branch in this project, and a send to it (#837).
+    /// The session on a branch in this folder, and a send to it (#837).
     var recipient: (@MainActor (AppViewAgentMessage) -> AppViewRecipient?)? = nil
     var sendTo: (@MainActor (UUID, String) async -> Bool)? = nil
     /// Whether the link to the host is up. Coming back, a page whose call or read failed or
@@ -89,7 +90,7 @@ struct PinnedViewPage: View {
                     .truncationMode(.middle)
             }
             Spacer()
-            Button("Unpin") { Task { await unpin() } }
+            Button(pin.isServerView ? "Hide" : "Unpin") { Task { await unpin() } }
                 .buttonStyle(.paper)
         }
         .padding(.horizontal, 16)
@@ -122,7 +123,7 @@ struct PinnedViewPage: View {
     }
 
     private var actions: AppViewActions {
-        AppViewActions(agentID: place, project: folder, call: call, send: { _ in false },
+        AppViewActions(agentID: place, folder: folder, call: call, send: { _ in false },
                        openLink: { openURL($0) }, startAgent: startAgent, recipient: recipient, sendTo: sendTo)
     }
 
@@ -145,7 +146,7 @@ struct PinnedViewPage: View {
         let call = call
         do {
             let params = try JSONValue.encoding(DaemonAPI.ViewCallRequest(
-                agentID: place, viewID: place, name: view.tool, arguments: view.arguments, project: folder, feed: true,
+                agentID: place, viewID: place, name: view.tool, arguments: view.arguments, folder: folder, feed: true,
                 server: view.server == AppTool.serverName ? nil : view.server))
             let value = try await AppViewLoad.answered(within: AppViewLoad.feedDeadline) {
                 try await call(DaemonAPI.Method.viewsCall, params)

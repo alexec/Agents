@@ -61,20 +61,55 @@ struct TurnView: View, Equatable {
     let fetch: () async -> Void
     /// Fetch the page of its steps before the ones held.
     var fetchEarlier: () async -> Void = {}
+    /// The row of the turn drawn, when its reply is long enough to be several
+    /// (`TurnRows`, P20261022-18). Nil draws the whole turn.
+    var row: TurnRows.Row? = nil
+    /// Whether this is the turn's last row, which keeps the room after the turn.
+    var isLastRow = true
 
     nonisolated static func == (a: TurnView, b: TurnView) -> Bool {
         a.turn == b.turn && a.detail == b.detail && a.focusedRun == b.focusedRun && a.fetched == b.fetched
             && a.fetchFailed == b.fetchFailed && a.hasEarlier == b.hasEarlier && a.isLive == b.isLive
+            && a.row == b.row && a.isLastRow == b.isLastRow
+    }
+
+    /// The outcome the turn draws: none while the steps it shows before it are on their way.
+    /// The chat cuts it into rows from this, so it is the one place it is worked out.
+    static func outcome(of turn: ChatTurn, detail: TurnDetail, fetched: [TranscriptItem]?,
+                        isLive: Bool) -> [TranscriptItem] {
+        let read = Read(turn: turn, fetched: fetched, isLive: isLive)
+        return read.drawsOutcome(detail) ? read.outcome : []
+    }
+
+    /// A turn's items, read once. Each of these used to fold the turn again (#285).
+    private struct Read {
+        let waiting: Bool
+        let items: [TranscriptItem]
+        let parts: TurnParts?
+        let outcome: [TranscriptItem]
+        /// Nil for a summary written before 069 (after the #58 cut-off), whose steps are not counted.
+        let stepCount: Int?
+
+        init(turn: ChatTurn, fetched: [TranscriptItem]?, isLive: Bool) {
+            waiting = turn.isSummaryOnly && fetched == nil
+            items = turn.isSummaryOnly ? (fetched ?? []) : turn.items
+            parts = waiting ? nil : TurnParts(items, isLive: isLive)
+            outcome = parts?.outcome ?? turn.storedOutcome ?? []
+            stepCount = parts?.stepCount ?? turn.storedStepCount
+        }
+
+        /// The outcome is drawn unless the steps before it are still to come, or did not.
+        func drawsOutcome(_ detail: TurnDetail) -> Bool {
+            !(detail.showsSteps && stepCount != 0 && waiting)
+        }
     }
 
     var body: some View {
-        // Once. Each of these used to fold the turn again (#285).
-        let waiting = turn.isSummaryOnly && fetched == nil
-        let items = turn.isSummaryOnly ? (fetched ?? []) : turn.items
-        let parts = waiting ? nil : TurnParts(items, isLive: isLive)
-        let outcome = parts?.outcome ?? turn.storedOutcome ?? []
-        // Nil for a summary written before 069 (after the #58 cut-off), whose steps are not counted.
-        let stepCount = parts?.stepCount ?? turn.storedStepCount
+        let read = Read(turn: turn, fetched: fetched, isLive: isLive)
+        let waiting = read.waiting, items = read.items, parts = read.parts
+        let outcome = read.outcome, stepCount = read.stepCount
+        let pieces = row?.pieces ?? [.head] + outcome.indices.map(TurnRows.Piece.item)
+        let hasHead = pieces.first == .head
         let steps: [TranscriptItem] = {
             guard detail.showsSteps, parts != nil else { return [] }
             let shown = Set(outcome.map(\.id))
@@ -82,40 +117,94 @@ struct TurnView: View, Equatable {
             return TurnParts.drawn(items, isLive: isLive).filter { !shown.contains($0.id) }
         }()
         VStack(alignment: .leading, spacing: 14) {
-            if let ask = turn.ask {
-                TranscriptRow(item: ask)
-            }
-            if detail.showsSteps, stepCount != 0 {
-                if waiting, fetchFailed {
-                    HStack(spacing: 8) {
-                        Text("These steps did not load.").foregroundStyle(.secondary)
-                        Button("Try Again") { Task { await fetch() } }
-                    }
-                    .appText(.fine)
-                } else if waiting {
-                    ProgressView().controlSize(.small)
-                } else {
-                    if hasEarlier { EarlierStepsControl(fetch: fetchEarlier) }
-                    // In the turn's own margin: no rule and no indent (#148).
-                    VStack(alignment: .leading, spacing: 10) {
-                        ForEach(steps) { StepRow(item: $0, isFocused: $0.id == focusedRun) }
-                    }
-                    ForEach(outcome) { StepRow(item: $0) }
+            if hasHead {
+                if let ask = turn.ask {
+                    TranscriptRow(item: ask)
                 }
-            } else {
-                // Where its steps go, a stored turn the chat let go: asked for again only
-                // by hand, so two of them cannot push each other out in a loop (#285).
-                if stepCount != 0 { LoadStepsControl(load: loadSteps) }
-                if let live = parts?.live { LiveLine(item: live) }
-                ForEach(outcome) { StepRow(item: $0) }
+                if detail.showsSteps, stepCount != 0 {
+                    if waiting, fetchFailed {
+                        HStack(spacing: 8) {
+                            Text("These steps did not load.").foregroundStyle(.secondary)
+                            Button("Try Again") { Task { await fetch() } }
+                        }
+                        .appText(.fine)
+                    } else if waiting {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        if hasEarlier { EarlierStepsControl(fetch: fetchEarlier) }
+                        // In the turn's own margin: no rule and no indent (#148).
+                        VStack(alignment: .leading, spacing: 10) {
+                            ForEach(steps) {
+                                StepRow(item: $0, isFocused: $0.id == focusedRun)
+                            }
+                        }
+                    }
+                } else {
+                    // Where its steps go, a stored turn the chat let go: asked for again only
+                    // by hand, so two of them cannot push each other out in a loop (#285).
+                    if stepCount != 0 { LoadStepsControl(load: loadSteps) }
+                    if let live = parts?.live { LiveLine(item: live) }
+                }
+            }
+            if read.drawsOutcome(detail) {
+                ForEach(Self.shown(pieces, of: outcome), id: \.id) { shown in
+                    switch shown.piece {
+                    case .head: EmptyView()
+                    case .item(let index): StepRow(item: outcome[index])
+                    case .blocks(let index, let range): ReplyBlocks(item: outcome[index], range: range)
+                    }
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        // A row that goes on with a reply the row before it started: the room between its blocks.
+        .padding(.top, pieces.first.map(Self.continues) == true ? 10 : 0)
+        .padding(.bottom, isLastRow ? 14 : 0)
         // Keyed on waiting too: a turn drawn from its entries becomes a stored summary when
         // the chat's history is read again (its host restarted), with its steps still open,
-        // and was left a spinner that never asked for them (#1266).
-        .task(id: detail.showsSteps && waiting) {
-            if detail.showsSteps, waiting { await fetch() }
+        // and was left a spinner that never asked for them (#1266). The first row's alone.
+        .task(id: hasHead && detail.showsSteps && waiting) {
+            if hasHead, detail.showsSteps, waiting { await fetch() }
+        }
+    }
+
+    /// The outcome's pieces in a row, by the id they are drawn by: an item's own, so a
+    /// message is gone to by its id where it starts; the rest of a long reply its own.
+    private static func shown(_ pieces: [TurnRows.Piece],
+                              of outcome: [TranscriptItem]) -> [(id: UUID, piece: TurnRows.Piece)] {
+        pieces.compactMap { piece in
+            switch piece {
+            case .head: return nil
+            case .item(let index):
+                return outcome.indices.contains(index) ? (outcome[index].id, piece) : nil
+            case .blocks(let index, let range):
+                guard outcome.indices.contains(index) else { return nil }
+                let id = outcome[index].id
+                return (range.lowerBound == 0 ? id : TurnRows.rowID(id, range.lowerBound), piece)
+            }
+        }
+    }
+
+    private static func continues(_ piece: TurnRows.Piece) -> Bool {
+        if case .blocks(_, let range) = piece { return range.lowerBound > 0 }
+        return false
+    }
+}
+
+/// Some of the blocks of a long reply, drawn as the reply is (`EntryRow`): a row of the
+/// chat of its own (P20261022-18).
+private struct ReplyBlocks: View {
+    let item: TranscriptItem
+    let range: Range<Int>
+
+    var body: some View {
+        if case .entry(let entry) = item, let text = TurnRows.text(of: item) {
+            MarkdownText(markdown: text, range: range)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .appText(.reading)
+                // A shell's code block in a reply can be run (#1533).
+                .environment(\.codeRuns, true)
+                .copiesMessage(entry)
         }
     }
 }
@@ -246,12 +335,12 @@ private struct EntryRow: View {
     var body: some View {
         switch entry.kind {
         case .userMessage(let text, let blocks, let from):
-            // Not in the person's bubble when it is not the person's. The app asks an
-            // agent that ended without saying how it went, once, and a question they
-            // never typed must not be shown as though they had (FR-022).
+            // Not in the person's bubble when it is not the person's: words the app sent
+            // the agent (a woken wait, a lease, a move, a workflow run) must not be shown
+            // as though the person had typed them (FR-022, #2407).
             if from == .app {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Agents asked").appText(.reading).foregroundStyle(.tertiary)
+                    Text("From the app").appText(.reading).foregroundStyle(.tertiary)
                     BlocksView(blocks: blocks.isEmpty ? [.text(text)] : blocks)
                         .appText(.reading)
                         .foregroundStyle(.secondary)
@@ -394,6 +483,13 @@ private struct EntryRow: View {
         case .fileShown(let file):
             FileCard(file: file)
 
+        case .notified(let notice):
+            NotifiedLine(id: entry.id, notice: notice, at: entry.at)
+
+        case .noticeDelivered:
+            // Said on the notice's line by `TranscriptEntry.display` (#2860), never here.
+            EmptyView()
+
         case .unrecognised:
             // Written by a newer version of this app. Kept in the record, skipped here.
             EmptyView()
@@ -444,7 +540,7 @@ private struct ThoughtLine: View {
                     .truncationMode(.tail)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(.rect)
-                    .onHover { isHovering = $0 }
+                .onHover { isHovering = $0 }
             }
             .buttonStyle(.plain)
             .help(isExpanded ? "Hide the thought" : "Show the whole thought")
@@ -764,7 +860,7 @@ private struct ToolCallLine: View {
             .truncationMode(.tail)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(.rect)
-            .onHover { isHovering = brightensOnHover && $0 }
+        .onHover { isHovering = brightensOnHover && $0 }
     }
 
     /// " · running in the background", while what this call started still runs (057).
@@ -919,17 +1015,20 @@ private extension JSONEncoder {
     }()
 }
 
-/// The agent is at work and the person is waiting: the same small spinner the
-/// sidebar row shows, turning in step with it (`SyncedSpinner`), at the foot of the
-/// conversation, so the chat itself moves while nothing else on it does. Live rather
-/// than recorded — it is there exactly as long as the wait is, and it rides the end of
-/// the transcript as the reply arrives.
+/// The agent is at work and the person is waiting: the same mark the sidebar row shows,
+/// in step with it (#2044), at the foot of the conversation, so the chat itself moves
+/// while nothing else on it does: the ring spins while it thinks or replies, and also
+/// pivots while it runs a tool (#2332). Live rather than recorded — it is there exactly as long as the wait is,
+/// and it rides the end of the transcript as the reply arrives.
 struct WorkingLine: View {
+    /// The tool it runs, or nil while it thinks (`RunningToolWords.tool`).
+    var tool: String?
+
     var body: some View {
-        SyncedSpinner(diameter: 16)
+        WorkingRing(size: 16, doing: tool != nil)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.leading, 2)
-            .accessibilityLabel("Working")
+            .accessibilityLabel(tool.map(RunningToolWords.label) ?? "Working")
     }
 }
 
@@ -988,6 +1087,7 @@ private struct StateLine: View {
             switch reason {
             case .cancelled: return "You stopped it"
             case .stoppedByAgent: return "The agent that started it stopped it"
+            case .stoppedByAdmin: return "An admin stopped it in the Console"
             case .processDied: return "The runtime crashed"
             case .signInRefused: return "Its sign-in was refused"
             case .runtimeError: return "The runtime reported an error"

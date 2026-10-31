@@ -14,15 +14,20 @@ struct PromptBar: View {
     @Environment(\.chatActions) private var chatActions
     /// Set in a window of its own (#826): this bar is that session's.
     @Environment(\.poppedChat) private var popped
+    @Environment(\.openURL) private var openURL
+    @Environment(\.openSettings) private var openSettings
     /// Whether the folder is the caller's to decide rather than this bar's.
     ///
-    /// Set on a project page, where the folder is the project and changing it would
+    /// Set on a folder page, where the folder is the folder and changing it would
     /// start the agent under a different one.
     var folderIsFixed = false
     /// Told whether the field has focus and how many characters it holds, for the Blobs
     /// over a new session to look at it (#987).
     var presence: ((_ focused: Bool, _ typed: Int) -> Void)?
     @State private var text = ""
+    /// Where the cursor is, so dictation writes there (#427, #2515).
+    @State private var selection: TextSelection?
+    @State private var dictation = Dictation()
     /// How far back Up has gone through the prompts sent here; nil at the prompt bar's
     /// own text (#1551).
     @State private var recalled: Int?
@@ -64,11 +69,11 @@ struct PromptBar: View {
         model.promptCapabilities(for: agent?.runtimeID ?? model.draftRuntimeID)
     }
 
-    /// Which conversation the words in this bar belong to, and are kept against. A project
-    /// page's bar is that project's; the chat's is its agent's.
+    /// Which conversation the words in this bar belong to, and are kept against. A folder
+    /// page's bar is that folder's; the chat's is its agent's.
     private var draftKey: DraftKey {
         if let agent { return .agent(agent.id) }
-        return .newAgent(folder: folderIsFixed ? model.selectedProject : nil)
+        return .newAgent(folder: folderIsFixed ? model.selectedFolder : nil)
     }
 
     // MARK: What the agent thinks you might ask
@@ -96,7 +101,7 @@ struct PromptBar: View {
     }
 
     /// A new agent a view filled in (#834): the prompt in the field, its labels on the form
-    /// and its worktree chosen, on this project's page only. Taken after the page has
+    /// and its worktree chosen, on this folder's page only. Taken after the page has
     /// settled, since adopting the folder clears the worktree and a kept draft comes back
     /// on appear; starting it is still the person's move.
     private func takeOfferedStart() {
@@ -125,13 +130,6 @@ struct PromptBar: View {
                 whereAndWhat
                 atItsLimit
                 startingOnOut
-                if !attachments.isEmpty {
-                    AttachmentStrip(attachments: attachments,
-                                    refusal: { $0.refusal(from: promptCapabilities) },
-                                    remove: { attachment in
-                                        attachments.removeAll { $0.id == attachment.id }
-                                    })
-                }
                 if draftLostSomething {
                     Text(PromptWords.draftLostSomething)
                         .appText(.fine)
@@ -148,6 +146,9 @@ struct PromptBar: View {
                 }
                 if agent == nil, let refusal = model.draftSandboxRefusal {
                     sandboxRefusal(refusal)
+                }
+                if agent == nil, let reasons = model.draftAutoRefusal {
+                    autoRefusal(reasons)
                 }
                 // On its way (#87): a start can take seconds, making a worktree and a
                 // runtime, and a send to a slow host as long.
@@ -192,14 +193,20 @@ struct PromptBar: View {
                                             set: { model.draftServers = $0 }))
                 .paperSheet()
         }
+        // Voice mode listens with its own dictation (#2445).
+        .onChange(of: VoiceMode.shared.isOn) { _, isOn in
+            if isOn { dictation.stop() }
+        }
+        .onDisappear { dictation.stop() }
         .onChange(of: model.selection) {
+            dictation.stop()
             dismissedSuggestions = false
             // What was half typed is no longer thrown away here. It is kept against the
             // conversation it was typed for, and each conversation's own comes back, files
             // and all — see `KeepsDrafts`. Words meant for one agent still never reach
             // the next: the bar only ever holds what belongs to where it is.
         }
-        // File ▸ New Session: the keyboard goes where the session starts, the project
+        // File ▸ New Session: the keyboard goes where the session starts, the folder
         // page's bar. The chat's own bar, on its way out, has no agent by then either,
         // so it is told apart by being the one whose folder is not fixed.
         .onChange(of: requests.wantsPromptFocus, initial: true) { takeFocusIfAsked() }
@@ -216,10 +223,10 @@ struct PromptBar: View {
         .onChange(of: model.offeredStart, initial: true) { takeOfferedStart() }
         .onChange(of: model.draftCwd) { takeOfferedStart() }
         // A persona is picked on the page's heading (#913); its labels go here.
-        .onChange(of: model.draftPersona) { _, id in addLabels(ofPersona: id) }
+        .onChange(of: model.draftPersona) { old, new in switchLabels(fromPersona: old, to: new) }
         // And a quote from a reply (#1553). One modifier for both: the chain is at the
         // type checker's limit. From the start too (#1739): Clean up worktrees offers its
-        // words in the same update that makes the project page, and this bar with it.
+        // words in the same update that makes the folder page, and this bar with it.
         .onChange(of: [model.offeredPrompt, model.offeredQuote], initial: true) { takeOfferedWords() }
         // A new one is a new turn's worth, so it comes back from having been dismissed.
         .onChange(of: agent?.suggestedPrompts ?? []) {
@@ -231,16 +238,10 @@ struct PromptBar: View {
         // as Try again would, rather than kept until the form is closed and opened.
         .modifier(OnReachable(reachable: hostReachable) { prepare() })
         // Until a folder is chosen, the first agent to arrive names it. After that,
-        // another project's agent arriving is not a reason to list this one's
+        // another folder's agent arriving is not a reason to list this one's
         // worktrees again (#285).
-        .onChange(of: model.work.agentCount) {
-            guard isNew, model.draftCwd == nil else { return }
-            prepare()
-        }
-        .onChange(of: draftProjectAgentCount) {
-            guard isNew, model.draftCwd != nil else { return }
-            Task { await model.loadDraftWorktrees() }
-        }
+        .onChange(of: model.work.agentCount) { prepareWhenFolderChanges() }
+        .onChange(of: draftFolderAgentCount) { loadWorktreesWhenFolderChanges() }
         .modifier(KeepsDrafts(text: $text, attachments: $attachments,
                               lostSomething: $draftLostSomething, key: draftKey))
     }
@@ -328,8 +329,6 @@ struct PromptBar: View {
                             .fixedSize(horizontal: true, vertical: false)
                     }
                 PromptHeader(agent: agent,
-                             leaseStatus: model.work.leaseStatus(of: agent.id),
-                             openLease: { model.showResources(at: $0) },
                              background: agent.background,
                              backgroundActions: backgroundActions(agent))
                 }
@@ -337,23 +336,6 @@ struct PromptBar: View {
                 Spacer(minLength: 0)
                 runtimeLabel(agent)
             } else {
-                // On a project page the folder is the project, named in the middle of
-                // the page; only a session with no project yet chooses one.
-                if !folderIsFixed {
-                    Button(action: chooseFolder) {
-                        HStack(spacing: 5) {
-                            Image(systemName: "folder")
-                            // The folder's own name. The path it sits under is rarely the
-                            // thing you are checking, and it is in the tooltip when it is.
-                            Text(model.draftCwd?.lastPathComponent ?? "Choose a folder")
-                                .lineLimit(1)
-                        }
-                    }
-                    .buttonStyle(.paper)
-                    .appText(.fine)
-                    .help(folderHelp)
-                }
-
                 if model.draftWorktrees.isRepository {
                     worktreeChooser
                 }
@@ -372,13 +354,20 @@ struct PromptBar: View {
                 }
                 .buttonStyle(.paper)
                 .appText(.fine)
-                .disabled(model.draftCwd == nil || model.draftRuntimeID == nil)
+                .disabled(model.draftCwd == nil || model.draftRuntimeID == nil || model.isAutoDraft)
                 .help("Conversations this runtime is already holding here")
                 .accessibilityLabel("Sessions")
 
                 SelectCapsule(name: "Runtime",
                               title: model.draftRuntimeID.map(runtimeName) ?? "Runtime") { dismiss in
                     ScrollingChoices {
+                        // Auto first (#2658): the app picks the runtime when the session starts.
+                        SelectChoice(title: LevelWords.auto, description: autoNote,
+                                     isChosen: model.isAutoDraft) {
+                            chooseRuntime(LevelWords.autoID)
+                            dismiss()
+                        }
+                        Divider().padding(.vertical, 4)
                         if !outRuntimes.isEmpty {
                             SelectGroupHeading(title: "Available")
                         }
@@ -403,6 +392,13 @@ struct PromptBar: View {
                             }
                         }
                     }
+                    if !model.refusedRuntimes.isEmpty {
+                        Divider().padding(.vertical, 4)
+                        ForEach(model.refusedRuntimes) { status in
+                            SelectChoice(title: status.runtime.name, description: nil, isChosen: false,
+                                         setBy: status.setBy) {}
+                        }
+                    }
                     Divider().padding(.vertical, 4)
                     SelectChoice(title: "Sign in, sign out, providers…",
                                  description: nil,
@@ -415,19 +411,22 @@ struct PromptBar: View {
                 .help(noServerRuntime ?? "")
 
                 // Which of the runtime's accounts the session uses (#840): only when it has
-                // more than one. Chosen, never switched to by itself.
-                if !model.draftAccounts.isEmpty {
-                    SelectCapsule(name: "Account", title: draftAccountName) { dismiss in
+                // more than one, an org account included (#999). Chosen, never switched to by itself.
+                if let choices = model.draftAccountChoices, choices.shows {
+                    SelectCapsule(name: "Account", title: choices.name(model.draftAccountID)) { dismiss in
+                        let chosen = choices.account(for: model.draftAccountID)
                         SelectChoice(title: AccountProfile.defaultName,
                                      description: accountNote(nil),
-                                     isChosen: model.draftAccountID == nil) {
-                            model.draftAccountID = nil
+                                     isChosen: chosen == nil,
+                                     setBy: choices.ownSetBy) {
+                            model.draftAccountID = choices.ownChoice
                             dismiss()
                         }
-                        ForEach(model.draftAccounts) { account in
+                        ForEach(choices.accounts) { account in
                             SelectChoice(title: account.name,
                                          description: accountNote(account),
-                                         isChosen: model.draftAccountID == account.id) {
+                                         isChosen: chosen?.id == account.id,
+                                         setBy: account.setBy) {
                                 model.draftAccountID = account.id
                                 dismiss()
                             }
@@ -438,37 +437,32 @@ struct PromptBar: View {
         }
     }
 
-    private var draftAccountName: String {
-        model.draftAccounts.first { $0.id == model.draftAccountID }?.name ?? AccountProfile.defaultName
-    }
-
     /// Under an account's name: why it cannot be used, or where its allowance stands.
     private func accountNote(_ account: AccountProfile?) -> String? {
         guard let runtimeID = model.draftRuntimeID else { return nil }
-        if let account, !account.signedIn { return account.state }
-        guard let row = model.runtimeAllowances?.row(runtimeID, account: account?.id) else { return account?.signedInAs }
-        if let unusable = row.unusable { return "Not usable: \(unusable)" }
-        return row.state.isOut ? row.line(now: model.runtimeAllowances?.at ?? Date()) : account?.signedInAs
+        return AccountWords.choiceNote(account, row: model.runtimeAllowances?.row(runtimeID, account: account?.id),
+                                       now: model.runtimeAllowances?.at ?? Date())
     }
 
     /// The runtime the conversation is on, where a new chat chooses one. Said, not
     /// offered: a conversation stays on the runtime it started on.
     private func runtimeLabel(_ agent: Agent) -> some View {
-        Text(runtimeName(agent.runtimeID))
+        let name = PromptWords.runtimeName(agent, accounts: model.accountProfiles)
+        return Text(name)
             .lineLimit(1)
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
             .appText(.fine)
             .fixedSize()
             .paperRaised(in: .capsule)
-            .help("Runtime")
-            .accessibilityLabel("Runtime: \(runtimeName(agent.runtimeID))")
+            .help(agent.accountID == nil ? "Runtime" : "Runtime and account")
+            .accessibilityLabel("Runtime: \(name)")
     }
 
     /// A server with nothing to start agents with says so where the runtime is chosen
     /// (037, FR-012).
     private var noServerRuntime: String? {
-        let host = model.selectedProjectHost
+        let host = model.selectedFolderHost
         guard agent == nil, host != .mac, !model.hosts.isOffline(host), model.availableRuntimes.isEmpty else { return nil }
         let label = model.hosts.label(host)
         return "No agent runtime on \(label). Install one there and log in, then choose Check again."
@@ -476,178 +470,230 @@ struct PromptBar: View {
 
     // MARK: What you want done
 
+    /// Voice mode is on in this chat, or in this new session (#2375).
+    private var voiceIsOn: Bool { VoiceMode.shared.isOn(in: agent?.id) }
+
     private var field: some View {
-        HStack(alignment: .bottom, spacing: 8) {
-            TextField(placeholder, text: $text, axis: .vertical)
-                .textFieldStyle(.plain)
-                .appText(.reading)
-                .lineLimit(2...12)
-                .focused($focused)
-                .onChange(of: focused) { presence?(focused, text.count) }
-                // ⌘V attaches pictures and files too, and still pastes the words (#396).
-                .modifier(PastesIntoPrompt(isFocused: focused, attachFile: attach,
-                                           attachPicture: attachPicture))
-                // Held, words and all, while they start an agent (#87).
-                .disabled(agent == nil && model.isStarting)
-                // Return sends. Shift-Return and Option-Return break the line (#377,
-                // #1514), put in here: the field editor takes Shift-Return for Return.
-                .onKeyPress(.return, phases: .down) { press in
-                    guard PromptReturn(option: press.modifiers.contains(.option),
-                                       shift: press.modifiers.contains(.shift)) == .send else {
-                        guard let editor = NSApp.keyWindow?.firstResponder as? NSTextView else { return .ignored }
-                        editor.insertNewlineIgnoringFieldEditor(nil)
-                        return .handled
-                    }
-                    // While the list is up, Return takes the command rather than
-                    // sending a half-typed one.
-                    if isCompleting || isMentioning {
-                        acceptSelected()
-                    } else {
-                        send()
-                    }
-                    return .handled
-                }
-                .onKeyPress(.tab) {
-                    if isCompleting || isMentioning {
-                        acceptSelected()
-                        return .handled
-                    }
-                    // Tab takes what is being offered, the way it does everywhere else
-                    // something is written ahead of you.
-                    guard suggestion != nil else { return .ignored }
-                    takeSuggestion()
-                    return .handled
-                }
-                .onKeyPress(.downArrow) {
-                    if isCompleting {
-                        selectedCommand = min(selectedCommand + 1, matchingCommands.count - 1)
-                        return .handled
-                    }
-                    if isMentioning {
-                        selectedMention = min(selectedMention + 1, mentions.count - 1)
-                        return .handled
-                    }
-                    // The prompts sent before, as a terminal gives back its commands (#1551).
-                    if let step = PromptHistory.recall(.down, text: text, sent: sentPrompts, at: recalled) {
-                        text = step.text
-                        recalled = step.at
-                        return .handled
-                    }
-                    return .ignored
-                }
-                .onKeyPress(.upArrow) {
-                    if isCompleting {
-                        selectedCommand = max(selectedCommand - 1, 0)
-                        return .handled
-                    }
-                    if isMentioning {
-                        selectedMention = max(selectedMention - 1, 0)
-                        return .handled
-                    }
-                    // The prompts sent before, as a terminal gives back its commands (#1551).
-                    if let step = PromptHistory.recall(.up, text: text, sent: sentPrompts, at: recalled) {
-                        text = step.text
-                        recalled = step.at
-                        return .handled
-                    }
-                    return .ignored
-                }
-                .onKeyPress(.escape) {
-                    if isCompleting {
-                        dismissedCommandTerm = commandQuery?.term
-                        return .handled
-                    }
-                    if isMentioning {
-                        dismissedMentionTerm = mentionQuery?.term
-                        return .handled
-                    }
-                    // Put it away, and it stays away until the next turn ends.
-                    guard suggestion != nil else { return .ignored }
-                    dismissedSuggestions = true
-                    return .handled
-                }
-                .onChange(of: text) {
-                    selectedCommand = 0
-                    selectedMention = 0
-                    if dismissedCommandTerm != commandQuery?.term { dismissedCommandTerm = nil }
-                    if dismissedMentionTerm != mentionQuery?.term { dismissedMentionTerm = nil }
-                    updateMentions()
-                    presence?(focused, text.count)
-                    // Typing is a prompt coming (#183).
-                    if !text.isEmpty, let id = agent?.id { Task { await model.prewarm(id, .typing) } }
-                }
-
-            Button(action: chooseAttachment) {
-                Image(systemName: "paperclip")
-                    .appText(.reading).fontWeight(.semibold)
-                    .frame(width: 22, height: 22)
+        VStack(alignment: .leading, spacing: 8) {
+            if !attachments.isEmpty {
+                AttachmentStrip(attachments: attachments,
+                                refusal: { $0.refusal(from: promptCapabilities) },
+                                remove: { attachment in attachments.removeAll { $0.id == attachment.id } })
             }
-            .buttonStyle(.paper)
-            .buttonBorderShape(.circle)
-            .help("Attach a file or a picture")
-            .accessibilityLabel("Attach")
-
-            Button(action: dictate) {
-                Image(systemName: "microphone")
-                    .appText(.reading).fontWeight(.semibold)
-                    .frame(width: 22, height: 22)
-            }
-            .buttonStyle(.paper)
-            .buttonBorderShape(.circle)
-            .help("Dictate, as the Mac does everywhere")
-            .accessibilityLabel("Dictate")
-
-            // While it works and nothing is typed, send is stop. Type and it is send
-            // again, queueing what is typed for when the turn ends.
-            if let agent, model.canStop(agent), text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-               sending == 0 {
-                let acting = model.acting(agent.id)
-                Button {
-                    Task { await model.stop(agent.id) }
-                } label: {
-                    Group {
-                        if acting == .stop {
-                            ProgressView().controlSize(.small)
-                        } else {
-                            Image(systemName: PromptWords.stopSymbol)
-                                .appText(.reading).fontWeight(.semibold)
-                        }
-                    }
-                    .frame(width: 22, height: 22)
-                }
-                .buttonStyle(.paperProminent)
-                .buttonBorderShape(.circle)
-                // Held while something else is on its way to this agent. Not while it is Stop:.
-                // the one that went stays bright, as on the answer cards (#86), and the
-                // model refuses a second press.
-                .disabled(acting != nil && acting != .stop)
-                .help(acting == .stop ? Telling.words(doing: "Stopping", host: recipient) : PromptWords.stopHelp)
-                .accessibilityLabel("Stop")
-                .accessibilityValue(acting == .stop ? Telling.words(doing: "Stopping", host: recipient) : "")
+            // Voice mode (#2322) takes only the field's place: the pills stay, to change an
+            // option while it listens (Alex, 2026-10-29).
+            if voiceIsOn {
+                VoiceSpeechPrompt()
+                    .frame(minHeight: 44, alignment: .topLeading)
+                    // Left before its first words: a new session's voice mode ends (#2388).
+                    .onDisappear { if agent == nil { VoiceMode.shared.leave(nil) } }
             } else {
-                Button(action: send) {
-                    Group {
-                        if isGoing {
-                            ProgressView().controlSize(.small)
-                        } else {
-                            Image(systemName: PromptWords.sendSymbol(willQueue: willQueue))
-                                .appText(.reading).fontWeight(.semibold)
+                TextField(placeholder, text: $text, selection: $selection, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .appText(.reading)
+                    .lineLimit(2...12)
+                    .overlay(alignment: .topLeading) { HeardUnderline(dictation: dictation, text: text) }
+                    .focused($focused)
+                    .onChange(of: focused) { presence?(focused, text.count) }
+                    // ⌘V attaches pictures and files too, and still pastes the words (#396).
+                    .modifier(PastesIntoPrompt(isFocused: focused, attachFile: attach,
+                                               attachPicture: attachPicture))
+                    // Held, words and all, while they start an agent (#87).
+                    .disabled(agent == nil && model.isStarting)
+                    // Return sends. Shift-Return and Option-Return break the line (#377,
+                    // #1514), put in here: the field editor takes Shift-Return for Return.
+                    .onKeyPress(.return, phases: .down) { press in
+                        guard PromptReturn(option: press.modifiers.contains(.option),
+                                           shift: press.modifiers.contains(.shift)) == .send else {
+                            guard let editor = NSApp.keyWindow?.firstResponder as? NSTextView else { return .ignored }
+                            editor.insertNewlineIgnoringFieldEditor(nil)
+                            return .handled
                         }
+                        // While the list is up, Return takes the command rather than
+                        // sending a half-typed one.
+                        if isCompleting || isMentioning {
+                            acceptSelected()
+                        } else {
+                            send()
+                        }
+                        return .handled
                     }
-                    .frame(width: 22, height: 22)
+                    .onKeyPress(.tab) {
+                        if isCompleting || isMentioning {
+                            acceptSelected()
+                            return .handled
+                        }
+                        // Tab takes what is being offered, the way it does everywhere else
+                        // something is written ahead of you.
+                        guard suggestion != nil else { return .ignored }
+                        takeSuggestion()
+                        return .handled
+                    }
+                    .onKeyPress(.downArrow) {
+                        if isCompleting {
+                            selectedCommand = min(selectedCommand + 1, matchingCommands.count - 1)
+                            return .handled
+                        }
+                        if isMentioning {
+                            selectedMention = min(selectedMention + 1, mentions.count - 1)
+                            return .handled
+                        }
+                        // The prompts sent before, as a terminal gives back its commands (#1551).
+                        if let step = PromptHistory.recall(.down, text: text, sent: sentPrompts, at: recalled) {
+                            text = step.text
+                            recalled = step.at
+                            return .handled
+                        }
+                        return .ignored
+                    }
+                    .onKeyPress(.upArrow) {
+                        if isCompleting {
+                            selectedCommand = max(selectedCommand - 1, 0)
+                            return .handled
+                        }
+                        if isMentioning {
+                            selectedMention = max(selectedMention - 1, 0)
+                            return .handled
+                        }
+                        // The prompts sent before, as a terminal gives back its commands (#1551).
+                        if let step = PromptHistory.recall(.up, text: text, sent: sentPrompts, at: recalled) {
+                            text = step.text
+                            recalled = step.at
+                            return .handled
+                        }
+                        return .ignored
+                    }
+                    .onKeyPress(.escape) {
+                        if isCompleting {
+                            dismissedCommandTerm = commandQuery?.term
+                            return .handled
+                        }
+                        if isMentioning {
+                            dismissedMentionTerm = mentionQuery?.term
+                            return .handled
+                        }
+                        // Put it away, and it stays away until the next turn ends.
+                        guard suggestion != nil else { return .ignored }
+                        dismissedSuggestions = true
+                        return .handled
+                    }
+                    .onChange(of: text) {
+                        selectedCommand = 0
+                        selectedMention = 0
+                        if dismissedCommandTerm != commandQuery?.term { dismissedCommandTerm = nil }
+                        if dismissedMentionTerm != mentionQuery?.term { dismissedMentionTerm = nil }
+                        updateMentions()
+                        presence?(focused, text.count)
+                        // Typed while dictating: theirs, and never written over (#427).
+                        dictation.edited(text)
+                        // Typing is a prompt coming (#183).
+                        if !text.isEmpty, let id = agent?.id { Task { await model.prewarm(id, .typing) } }
+                    }
+                    .onChange(of: selection) {
+                        if let range = DictationCursor.range(of: selection, in: text) { dictation.selected(range) }
+                    }
+                    .frame(minHeight: 44, alignment: .topLeading)
+            }
+
+            HStack(spacing: 8) {
+                Button(action: chooseAttachment) {
+                    Image(systemName: "paperclip")
+                        .appText(.reading).fontWeight(.semibold)
+                        .frame(width: 22, height: 22)
                 }
-                .buttonStyle(.paperProminent)
+                .buttonStyle(.paper)
                 .buttonBorderShape(.circle)
-                // Bright while its own spinner turns, as the answer that went stays bright
-                // on the cards (#86); `send()` refuses the press meanwhile.
-                .disabled(!canSend && !isGoing)
-                .keyboardShortcut(.return, modifiers: .command)
-                .help(targetOffline ? model.offlineHelp(for: targetHost)
-                                    : PromptWords.sendHelp(willQueue: willQueue))
-                .accessibilityLabel(PromptWords.sendLabel(willQueue: willQueue))
+                .help("Attach a file or a picture")
+                .accessibilityLabel("Attach")
+
+                Spacer(minLength: 0)
+                // Dictate and voice mode sit with send, on the right (#2634).
+                PushToTalkButton(tap: toggleDictation, begin: beginDictation, end: finishPushToTalk,
+                                 cancel: dictation.stop) {
+                    // The microphone, blue while it listens: the waveform is voice mode's (Alex, 2026-10-29).
+                    Image(systemName: "microphone")
+                        .appText(.reading).fontWeight(.semibold)
+                        .foregroundStyle(dictation.isListening ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
+                        .frame(width: 22, height: 22)
+                        .symbolEffect(.variableColor.iterative, isActive: dictation.isListening)
+                }
+                .buttonStyle(.paper)
+                .buttonBorderShape(.circle)
+                .help(dictation.isListening ? "Stop dictating" : "Dictate")
+                .accessibilityLabel(dictation.isListening ? "Stop dictating" : "Dictate")
+                // Voice mode listens already, in this window or another (#2445).
+                .disabled(VoiceMode.shared.isOn && !dictation.isListening)
+                .alert("Dictation", isPresented: Binding(get: { dictation.problem != nil },
+                                                         set: { if !$0 { dictation.dismissProblem() } })) {
+                    if let permission = dictation.problem?.permission {
+                        Button("Open Settings") { openURL(permission.settings) }
+                    }
+                    Button("OK", role: .cancel) {}
+                } message: {
+                    Text(dictation.problem?.message ?? "")
+                }
+
+                // Voice mode (#2322), while Settings ▸ Appearance has it on: in this chat, or in a
+                // new session that its first words start (#2375).
+                VoiceModeButton(agentID: agent?.id, vocabulary: { speechSeeds }, send: sendSpoken)
+
+                // Voice mode's Stop is where send and stop are (Alex, 2026-10-29).
+
+                // While it works and nothing is typed, send is stop. Type and it is send
+                // again, queueing what is typed for when the turn ends.
+                if voiceIsOn {
+                    VoiceStopButton()
+                } else if let agent, model.canStop(agent), text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                   sending == 0 {
+                    let acting = model.acting(agent.id)
+                    Button {
+                        Task { await model.stop(agent.id) }
+                    } label: {
+                        Group {
+                            if acting == .stop {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Image(systemName: PromptWords.stopSymbol)
+                                    .appText(.reading).fontWeight(.semibold)
+                            }
+                        }
+                        .frame(width: 22, height: 22)
+                    }
+                    .buttonStyle(.paperProminent)
+                    .buttonBorderShape(.circle)
+                    // Held while something else is on its way to this agent. Not while it is Stop:.
+                    // the one that went stays bright, as on the answer cards (#86), and the
+                    // model refuses a second press.
+                    .disabled(acting != nil && acting != .stop)
+                    .help(acting == .stop ? Telling.words(doing: "Stopping", host: recipient) : PromptWords.stopHelp)
+                    .accessibilityLabel("Stop")
+                    .accessibilityValue(acting == .stop ? Telling.words(doing: "Stopping", host: recipient) : "")
+                } else {
+                    Button(action: send) {
+                        Group {
+                            if isGoing {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Image(systemName: PromptWords.sendSymbol(willQueue: willQueue))
+                                    .appText(.reading).fontWeight(.semibold)
+                            }
+                        }
+                        .frame(width: 22, height: 22)
+                    }
+                    .buttonStyle(.paperProminent)
+                    .buttonBorderShape(.circle)
+                    // Bright while its own spinner turns, as the answer that went stays bright
+                    // on the cards (#86); `send()` refuses the press meanwhile.
+                    .disabled(!canSend && !isGoing)
+                    .keyboardShortcut(.return, modifiers: .command)
+                    .help(targetOffline ? model.offlineHelp(for: targetHost)
+                                        : PromptWords.sendHelp(willQueue: willQueue))
+                    .accessibilityLabel(PromptWords.sendLabel(willQueue: willQueue))
+                }
             }
         }
-        .padding(14)
+        .padding(10)
+        .frame(minHeight: 94, alignment: .topLeading)
         .paperRaised(in: RoundedRectangle(cornerRadius: 18))
         // A file dragged onto the prompt is a file you are talking about.
         .dropDestination(for: URL.self) { urls, _ in
@@ -661,50 +707,39 @@ struct PromptBar: View {
 
     // MARK: Said instead of typed
 
-    /// The Mac's own dictation, in this field (#427).
-    ///
-    /// It is the same thing pressing the dictation key starts. It writes at the cursor,
-    /// underlines what it is still unsure of, and lets the person type and edit while it
-    /// listens. A recogniser of our own would only be a worse copy of it. The system
-    /// shows its own microphone and stops it the usual ways, and asks for nothing more
-    /// than its own switch in Keyboard settings.
-    private func dictate() {
+    /// The open folders, and this folder's titles and issue numbers (#2515). Read only when
+    /// dictation or voice mode starts, never in `body` (#2732).
+    private var speechSeeds: [String] {
+        let folder = agent?.folderPath ?? model.draftCwd ?? model.selectedFolder
+        return DictationVocabulary.seeds(folders: model.work.folders, agents: model.work.agents, in: folder)
+    }
+
+    /// On-device dictation in this field (#427, #2515). The words go in at the cursor.
+    /// A late volatile result leaves the underline off and the button pulsing.
+    private func toggleDictation() {
+        if dictation.isListening {
+            dictation.stop()
+            return
+        }
+        beginDictation()
+    }
+
+    private func beginDictation() {
         focused = true
-        // Once the field has focus, so the field editor is the one that listens.
-        DispatchQueue.main.async {
-            NSApp.sendAction(Selector(("startDictation:")), to: nil, from: nil)
+        dictation.start(in: text, selection: DictationCursor.range(of: selection, in: text),
+                        vocabulary: speechSeeds) { field, cursor in
+            text = field
+            selection = DictationCursor.selection(cursor, in: field)
         }
     }
 
-    /// Ends any dictation in the field before a send, and answers the words the field
-    /// shows when dictation was still unsure of some of them.
-    ///
-    /// It never sends `stopDictation:` (#517): AppKit gives that the same toggle as
-    /// `startDictation:`, so a send with dictation off turned it on. The field gives up
-    /// the caret instead, which ends whatever session it had, and takes it back once it
-    /// has been emptied. The words still underlined are the system's to finish, and it
-    /// can write its final copy of them after the field has been emptied, bringing #318
-    /// back (#449), so they are kept as shown first.
-    private func endDictation() -> String? {
-        guard focused,
-              let window = NSApp.keyWindow,
-              let editor = window.firstResponder as? NSTextView,
-              editor.isFieldEditor
-        else { return nil }
-        var shown: String?
-        if editor.hasMarkedText() {
-            editor.unmarkText()
-            shown = editor.string
+    /// Sends once the last words said are in the field (#2753).
+    private func finishPushToTalk() {
+        guard dictation.isListening else { return }
+        Task {
+            await dictation.finish()
+            send()
         }
-        // Back to this field itself (#650). Asked of SwiftUI alone, focus could land
-        // on the next field along instead, the labels.
-        let field = editor.delegate as? NSView
-        window.makeFirstResponder(nil)
-        DispatchQueue.main.async {
-            if let field, field.window === window { window.makeFirstResponder(field) }
-            focused = true
-        }
-        return shown
     }
 
     // MARK: What goes with the words
@@ -845,6 +880,7 @@ struct PromptBar: View {
         // the placeholder rather than anything drawn over the field: the field has
         // one text style and one origin, and this way the words sit in it exactly as
         // the typed ones will.
+        if let refused = policyRefusal { return refused }
         if let suggestion { return suggestion.prompt }
         guard let agent else { return PromptWords.askPlaceholder }
         return PromptWords.placeholder(for: agent)
@@ -859,11 +895,19 @@ struct PromptBar: View {
     /// failed and a folder not yet chosen were all the same silent gap.
     @ViewBuilder
     private var options: some View {
-        if case .controls(let shown) = controlsState {
+        if agent == nil, model.isAutoDraft {
+            autoRow
+        } else if case .controls(let shown) = controlsState {
             optionsRow(shown)
         } else {
-            // The same sentences the phone says (033).
-            OptionsNote(state: controlsState, retry: { Task { await model.loadDraftOptions() } })
+            VStack(alignment: .leading, spacing: 8) {
+                // The same sentences the phone says (033).
+                OptionsNote(state: controlsState, retry: { Task { await model.loadDraftOptions() } })
+                if let runtimeID = agent?.runtimeID ?? model.draftRuntimeID,
+                   ClientPermissionSettings.supports(runtimeID) {
+                    optionsRow([])
+                }
+            }
         }
     }
 
@@ -960,9 +1004,105 @@ struct PromptBar: View {
 
     @ViewBuilder
     private func permissionOptions(_ shown: [ConfigOption]) -> some View {
-        ForEach(shown.filter(\.isAboutPermission)) { option in
-            OptionMenu(option: option, chosen: binding(for: option))
+        if let runtimeID = agent?.runtimeID ?? model.draftRuntimeID {
+            let own = shown.filter(\.isAboutPermission)
+            // The permission mode in the shared words (#2658), the runtime's own behind ⋯.
+            if !own.isEmpty || model.autoMappings.cell(runtimeID, .permission, "ask")?.native != nil {
+                levelPill(.permission, runtimeID: runtimeID, own: own)
+            }
+            // Its own answer to permission requests, else Settings' (FR-019).
+            if ClientPermissionSettings.supports(runtimeID) {
+                ClientPermissionCapsule(runtimeID: runtimeID,
+                                        own: agent == nil ? model.draftClientPermission : agent?.clientPermission,
+                                        settings: model.clientPermissions.mode(for: runtimeID)) { mode in
+                    if let agent {
+                        Task { await model.setAgentClientPermission(agent.id, mode) }
+                    } else {
+                        model.draftClientPermission = mode
+                    }
+                }
+            }
         }
+    }
+
+    /// A Model or Permission mode pill (#2658): the value in force, Custom where the
+    /// runtime's own setting matches none, each value said as it is on this runtime.
+    private func levelPill(_ field: AutoField, runtimeID: String, own: [ConfigOption]) -> some View {
+        let chosen: String? = if let agent {
+            field == .model ? agent.levels?.model?.rawValue : agent.levels?.permission?.rawValue
+        } else {
+            model.draftLevel(field)
+        }
+        return LevelPill(field: field, chosen: chosen, runtimeName: runtimeName(runtimeID),
+                         cell: { model.autoMappings.cell(runtimeID, field, $0) },
+                         own: own, binding: binding(for:)) { level in
+            if let agent {
+                Task { await model.setAgentLevel(agent.id, field, level) }
+            } else {
+                model.chooseDraftLevel(field, level)
+            }
+        }
+    }
+
+    /// The pills of a new session on Auto (#2658): Permission mode, Sandbox and Model, each
+    /// said as it is on the runtime Auto picks now. No Permission requests: on Auto they
+    /// follow the permission mode (FR-010).
+    private var autoRow: some View {
+        let picked = model.draftAutoPreview?.runtimeID
+        return HStack(spacing: 10) {
+            LevelPill(field: .permission, chosen: model.draftLevels.permission?.rawValue,
+                      runtimeName: picked.map(runtimeName),
+                      cell: { level in picked.flatMap { model.autoMappings.cell($0, .permission, level) } }) {
+                model.chooseDraftLevel(.permission, $0)
+            }
+            SelectCapsule(name: LevelWords.sandboxField, title: LevelWords.sandbox(model.draftSandbox ?? .runtime)) { dismiss in
+                SelectGroupHeading(title: LevelWords.sandboxField)
+                ForEach(SandboxChoice.allCases, id: \.self) { choice in
+                    let cell = picked.flatMap { model.autoMappings.cell($0, .sandbox, choice.rawValue) }
+                    SelectChoice(title: LevelWords.sandbox(choice),
+                                 description: cell.map { "\($0.words) on \(runtimeName($0.runtimeID))" } ?? LevelWords.meaning(sandbox: choice),
+                                 isChosen: (model.draftSandbox ?? .runtime) == choice,
+                                 setBy: choice == .on ? nil : model.sandboxSettings.setBy) {
+                        model.chooseDraftLevel(.sandbox, choice.rawValue)
+                        dismiss()
+                    }
+                }
+            }
+            Spacer(minLength: 16)
+            LevelPill(field: .model, chosen: model.draftLevels.model?.rawValue,
+                      runtimeName: picked.map(runtimeName),
+                      cell: { level in picked.flatMap { model.autoMappings.cell($0, .model, level) } }) {
+                model.chooseDraftLevel(.model, $0)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Under Auto in the chooser: the runtime it picks now, or that none is included.
+    private var autoNote: String {
+        if model.autoSettings.excluded.count >= model.availableRuntimes.count, !model.availableRuntimes.isEmpty {
+            return LevelWords.noneIncluded
+        }
+        return LevelWords.picks(model.draftAutoPreview?.runtimeID.map(runtimeName))
+    }
+
+    /// No runtime Auto may use can take the session (FR-011): each runtime and why, with
+    /// the way to Settings ▸ Agent Runtimes ▸ Auto. The prompt stays in the field.
+    private func autoRefusal(_ reasons: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(reasons)
+                .appText(.fine)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer()
+            Button(LevelWords.openAutoSettings) {
+                WindowDefaults.store.set(LevelWords.autoID, forKey: "settingsRuntimeID")
+                openSettings()
+            }
+            .controlSize(.small)
+        }
+        .padding(10)
+        .background(StateTint.attention.color?.opacity(0.07) ?? .clear, in: RoundedRectangle(cornerRadius: 8))
     }
 
     /// The command sandbox, beside the mode it is so often mistaken for (064, FR-004).
@@ -975,7 +1115,8 @@ struct PromptBar: View {
                            runtimeDefault: model.sandboxSettings.choice(for: runtimeID),
                            codexMode: mode,
                            effective: agent?.effectiveSandbox,
-                           isWorking: agent?.state == .running) { choice in
+                           isWorking: agent?.state == .running,
+                           setBy: model.sandboxSettings.setBy) { choice in
                 if let agent {
                     Task { await model.setAgentSandbox(agent.id, choice) }
                 } else {
@@ -997,8 +1138,9 @@ struct PromptBar: View {
     @ViewBuilder
     private func otherOptions(_ shown: [ConfigOption]) -> some View {
         let others = shown.filter { !$0.isAboutPermission }
-        if !others.isEmpty {
-            ModelPill(options: others, binding: binding(for:))
+        if !others.isEmpty, let runtimeID = agent?.runtimeID ?? model.draftRuntimeID {
+            // The model in the shared words (#2658); effort, fast mode and the rest behind ⋯.
+            levelPill(.model, runtimeID: runtimeID, own: others)
         }
     }
 
@@ -1035,7 +1177,7 @@ struct PromptBar: View {
     /// typed and sends it when the turn ends, which is what the queue below the
     /// prompt is showing.
     /// The machine this prompt would go to (037).
-    private var targetHost: HostID { agent?.host ?? model.selectedProjectHost }
+    private var targetHost: MachineRef { agent?.host ?? model.selectedFolderHost }
     /// Offline, and not a stopped workspace that keeps what is sent until it is up (#691 US3).
     private var targetOffline: Bool { model.hosts.isOffline(targetHost) && !model.startsWhenUsed(targetHost) }
 
@@ -1048,7 +1190,15 @@ struct PromptBar: View {
     /// Something from this bar is on its way: the agent being started, or a prompt.
     private var isGoing: Bool { agent == nil ? model.isStarting : sending > 0 }
 
+    /// Why nothing can be sent on this Mac's host now, in its organisation's words (#998): the
+    /// kill switch, or no policy it can trust. A server says its own when it refuses.
+    private var policyRefusal: String? {
+        guard (agent?.host ?? model.selectedFolderHost) == .mac else { return nil }
+        return model.policyState?.composerReason
+    }
+
     private var canSend: Bool {
+        guard policyRefusal == nil else { return false }
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         // One new agent at a time: a second Return is not a second agent (#87).
         if agent == nil, model.isStarting { return false }
@@ -1092,15 +1242,28 @@ struct PromptBar: View {
 
     private var labelDraft: some View {
         LabelTagField(labels: draftLabels.map { SessionLabel(value: $0, owner: .person) },
-                      suggestions: model.draftCwd.map { model.labelSuggestions(in: $0, on: model.selectedProjectHost) } ?? [],
+                      suggestions: model.draftCwd.map { model.labelSuggestions(in: $0, on: model.selectedFolderHost) } ?? [],
                       add: { draftLabels += $0 },
                       remove: { value in draftLabels.removeAll { SessionLabelPolicy.key($0) == SessionLabelPolicy.key(value) } })
             // Held with the words while they start, so the caret the prompt field gives
             // up does not fall into it (#650).
             .disabled(model.isStarting)
-            .task(id: model.draftCwd.map { ProjectKey(host: model.selectedProjectHost, folder: $0) }) {
-                if let folder = model.draftCwd { await model.loadLabelVocabulary(in: folder, on: model.selectedProjectHost) }
+            .task(id: model.draftCwd.map { FolderKey(host: model.selectedFolderHost, folder: $0) }) {
+                if let folder = model.draftCwd { await model.loadLabelVocabulary(in: folder, on: model.selectedFolderHost) }
             }
+    }
+
+    /// Words from voice mode: to this chat, or the start of a new session with this bar's
+    /// labels (#2375). Says which chat took them.
+    private func sendSpoken(_ words: String, _ stopping: UUID?) async -> UUID? {
+        if let agent {
+            if let stopping { await model.stop(stopping) }
+            return await model.send(words, to: agent.id, voice: true) ? agent.id : nil
+        }
+        var started: UUID?
+        guard await model.startDraft(prompt: words, labels: draftLabels, voice: true, started: { started = $0 }) else { return nil }
+        draftLabels = []
+        return started
     }
 
     private func send() {
@@ -1110,9 +1273,10 @@ struct PromptBar: View {
             model.show(problem: refused)
             return
         }
-        // Whatever is said next is not part of what went (#318).
-        let shown = endDictation()
-        let outgoing = shown ?? text
+        // Whatever is said next is not part of what went (#318). Words still being
+        // heard stay as shown: a later result belongs to the run that stopped.
+        dictation.stop()
+        let outgoing = text
         let going = attachments
         let labels = draftLabels
         let starting = agent == nil
@@ -1163,14 +1327,6 @@ struct PromptBar: View {
         }
     }
 
-    /// What the folder chip says when you hover it. On a project page it says why it
-    /// cannot be pressed, rather than looking broken.
-    private var folderHelp: String {
-        guard let cwd = model.draftCwd else { return "Folder" }
-        let path = cwd.path(percentEncoded: false)
-        return folderIsFixed ? "This project's folder: \(path)" : "Folder: \(path)"
-    }
-
     /// What an agent can reach beyond its own folder, said in the control itself.
     private var reachTitle: String {
         let folders = model.draftFolders.count
@@ -1198,7 +1354,7 @@ struct PromptBar: View {
     /// A server's runtimes are left in one run: the allowance below is the Mac's own, so
     /// splitting by it would label a server's runtime with the Mac's state. Runtimes is
     /// where the Mac's own standing is read.
-    private var splitsByAllowance: Bool { model.selectedProjectHost == .mac }
+    private var splitsByAllowance: Bool { model.selectedFolderHost == .mac }
 
     private var availableRuntimes: [RuntimeStatus] {
         guard splitsByAllowance else { return model.availableRuntimes }
@@ -1232,17 +1388,29 @@ struct PromptBar: View {
         PromptWords.runtimeName(id)
     }
 
-    /// How many agents the draft's project holds. Moves when that project does, and
+    /// How many agents the draft's folder holds. Moves when that folder does, and
     /// not when any other does (#285).
-    private var draftProjectAgentCount: Int {
+    private var draftFolderAgentCount: Int {
         guard isNew, let folder = model.draftCwd else { return 0 }
-        let counts = model.work.counts(in: ProjectKey(host: model.selectedProjectHost, folder: folder))
+        let counts = model.work.counts(in: FolderKey(host: model.selectedFolderHost, folder: folder))
         return counts.values.reduce(0, +)
     }
 
-    /// The new agent's host answers: this Mac's daemon, or the project's server.
+    private func prepareWhenFolderChanges() {
+        guard isNew else { return }
+        guard model.draftCwd == nil else { return }
+        prepare()
+    }
+
+    private func loadWorktreesWhenFolderChanges() {
+        guard isNew else { return }
+        guard model.draftCwd != nil else { return }
+        Task { await model.loadDraftWorktrees() }
+    }
+
+    /// The new agent's host answers: this Mac's daemon, or the folder's server.
     private var hostReachable: Bool {
-        let host = model.selectedProjectHost
+        let host = model.selectedFolderHost
         return host == .mac ? model.isConnected : !model.hosts.isOffline(host)
     }
 
@@ -1254,15 +1422,15 @@ struct PromptBar: View {
         DraftKeeper.shared.putBackStartForm(into: model)
         // Else what the person last chose on any client (#1033).
         if model.draftRuntimeID == nil, let shared = DraftKeeper.shared.sharedStartForm(in: model),
-           model.availableRuntimes.contains(where: { $0.id == shared.runtimeID }) {
+           shared.runtimeID == LevelWords.autoID || model.availableRuntimes.contains(where: { $0.id == shared.runtimeID }) {
             model.draftRuntimeID = shared.runtimeID
             DraftKeeper.shared.putBackSharedChoices(shared.chosen)
         }
-        if model.draftRuntimeID == nil || !model.availableRuntimes.contains(where: { $0.id == model.draftRuntimeID }) {
+        if model.draftRuntimeID == nil || !model.isAutoDraft && !model.availableRuntimes.contains(where: { $0.id == model.draftRuntimeID }) {
             // The one rule (#264): what was put back, else the catalog's default, else the first.
             model.draftRuntimeID = model.defaultRuntimeID
         }
-        if model.draftCwd == nil { model.draftCwd = model.agents.first?.projectFolder }
+        if model.draftCwd == nil { model.draftCwd = model.agents.first?.folderPath }
         if model.draftCwd != nil, model.draftRuntimeID != nil, model.draftOptions.isEmpty {
             Task { await model.loadDraftOptions() }
         }
@@ -1272,24 +1440,23 @@ struct PromptBar: View {
 
     // MARK: A kind of session (#760)
 
-    /// The picked persona's labels, beside any already there.
-    private func addLabels(ofPersona id: String?) {
-        guard isNew, let persona = model.draftPersonas.first(where: { $0.id == id }) else { return }
-        for label in persona.settings.labels
-        where !draftLabels.contains(where: { SessionLabelPolicy.key($0) == SessionLabelPolicy.key(label) }) {
-            draftLabels.append(label)
-        }
+    /// The picked persona's labels, beside any already there, in place of the last one's (#2649).
+    private func switchLabels(fromPersona old: String?, to new: String?) {
+        guard isNew else { return }
+        draftLabels = Persona.labels(draftLabels,
+                                     switchingFrom: model.draftPersonas.first { $0.id == old },
+                                     to: model.draftPersonas.first { $0.id == new })
     }
 
-    // MARK: Where in the project (030)
+    // MARK: Where in the folder (030)
 
-    /// Project folder, a new worktree, or one already there. Only on a repository;
+    /// Folder, a new worktree, or one already there. Only on a repository;
     /// only before the agent exists, since where an agent works is settled at its start.
     private var worktreeChooser: some View {
         let listed = model.draftWorktrees
         return SelectCapsule(name: "Worktree", title: worktreeTitle) { dismiss in
-            SelectChoice(title: "Project folder",
-                         description: listed.projectFolderDescription,
+            SelectChoice(title: "Folder",
+                         description: listed.folderPathDescription,
                          isChosen: model.draftWorktree == nil) {
                 model.chooseWorktree(nil)
                 dismiss()
@@ -1302,7 +1469,14 @@ struct PromptBar: View {
                 dismiss()
             }
             .disabled(!listed.canMakeNew)
-            let others = listed.worktrees.filter { !$0.isProjectFolder }
+            // The one a view named (#834), on one line: an issue's title is long (#2659).
+            if case .named(let name) = model.draftWorktree {
+                SelectChoice(title: "New worktree", description: name, isChosen: true,
+                             descriptionLines: 1) {
+                    dismiss()
+                }
+            }
+            let others = listed.worktrees.filter { !$0.isFolderPath }
             if !others.isEmpty || !listed.branches.isEmpty {
                 Divider().padding(.vertical, 4)
                 ScrollingChoices {
@@ -1339,11 +1513,11 @@ struct PromptBar: View {
     // MARK: Moving an agent that is already working (053)
 
     /// The Worktree choice on an agent's page, where the header names its place: where it
-    /// works now, and every other place in the project it could move to. Only for an agent
+    /// works now, and every other place in the folder it could move to. Only for an agent
     /// on this Mac, in a repository; anywhere else the header keeps its label.
     private func agentPlace(_ agent: Agent) -> AnyView? {
         guard agent.host == .mac, agent.state != .archived,
-              let listed = model.agentWorktrees[agent.projectFolder], listed.isRepository else { return nil }
+              let listed = model.agentWorktrees[agent.folderPath], listed.isRepository else { return nil }
         // Shown but not opened on a runtime that would forget its conversation in another
         // folder (053), with the reason where the pointer finds it.
         guard RuntimeCatalog.canMoveFolders(runtimeID: agent.runtimeID) else {
@@ -1355,10 +1529,10 @@ struct PromptBar: View {
         let waiting = agent.pendingMove
         return AnyView(VStack(alignment: .leading, spacing: 4) {
             SelectCapsule(name: "Worktree", title: placeTitle(agent, listed)) { dismiss in
-                SelectChoice(title: "Project folder",
-                             description: listed.projectFolderDescription,
-                             isChosen: waiting == nil ? here == nil : waiting?.target == .projectFolder) {
-                    Task { await model.move(agent, to: .projectFolder) }
+                SelectChoice(title: "Folder",
+                             description: listed.folderPathDescription,
+                             isChosen: waiting == nil ? here == nil : waiting?.target == .folderPath) {
+                    Task { await model.move(agent, to: .folderPath) }
                     dismiss()
                 }
                 SelectChoice(title: "New worktree",
@@ -1369,7 +1543,7 @@ struct PromptBar: View {
                     dismiss()
                 }
                 .disabled(!listed.canMakeNew)
-                let others = listed.worktrees.filter { !$0.isProjectFolder }
+                let others = listed.worktrees.filter { !$0.isFolderPath }
                 if !others.isEmpty {
                     Divider().padding(.vertical, 4)
                     ScrollingChoices {
@@ -1412,13 +1586,13 @@ struct PromptBar: View {
     private func placeTitle(_ agent: Agent, _ listed: DaemonAPI.WorktreesListResponse) -> String {
         if let waiting = agent.pendingMove {
             switch waiting.target {
-            case .projectFolder: return "Moving to project folder…"
+            case .folderPath: return "Moving to folder…"
             case .newWorktree(let name): return "Moving to \(name ?? "a new worktree")…"
             case .existing(let root): return "Moving to \(root.lastPathComponent)…"
             }
         }
         if let worktree = agent.worktree { return worktree.name }
-        return listed.projectFolderBranch ?? "Project folder"
+        return listed.folderPathBranch ?? "Folder"
     }
 
     private var chosenBranch: String? {
@@ -1431,7 +1605,7 @@ struct PromptBar: View {
     private func worktreeDescription(_ worktree: DaemonAPI.WorktreeSummary) -> String {
         guard worktree.exists else { return "Missing" }
         let branch = worktree.branch ?? "detached"
-        let size = model.work.size(of: worktree, on: model.selectedProjectKey?.host ?? .mac)
+        let size = model.work.size(of: worktree, on: model.selectedFolderKey?.host ?? .mac)
             .map { " · \($0.words)" } ?? ""
         switch worktree.agents.count {
         case 0: return branch + size
@@ -1442,9 +1616,9 @@ struct PromptBar: View {
 
     private var worktreeTitle: String {
         switch model.draftWorktree {
-        case nil: "Project folder"
-        case .new: "New worktree"
-        case .named(let name): name
+        case nil: "Folder"
+        // A named one's name is long and is not what the daemon calls it (#2659): the menu shows it.
+        case .new, .named: "New worktree"
         case .existing(let root): root.lastPathComponent
         case .branch(let name): name
         }
@@ -1453,18 +1627,6 @@ struct PromptBar: View {
     private func chooseRuntime(_ id: String) {
         model.draftRuntimeID = id
         Task { await model.loadDraftOptions() }
-    }
-
-    private func chooseFolder() {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.prompt = "Work here"
-        if panel.runModal() == .OK {
-            model.draftCwd = panel.url
-            Task { await model.loadDraftOptions() }
-        }
     }
 }
 

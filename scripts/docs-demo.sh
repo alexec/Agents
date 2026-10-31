@@ -94,7 +94,7 @@ for p in "$w" "$r"; do
 		git -C "$p" add -A
 		git -C "$p" -c user.name=Demo -c user.email=demo@example.com commit -qm "First version"
 	fi
-	"$S/rpc.py" "$ROOT" call projects/add "{\"folder\":\"file://$p\"}" >/dev/null
+	"$S/rpc.py" "$ROOT" call folders/add "{\"folder\":\"file://$p\"}" >/dev/null
 done
 
 echo "ROOT=$ROOT"

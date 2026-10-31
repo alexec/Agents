@@ -16,13 +16,14 @@ import UserNotifications
 /// The banner's three lines come from `Need.headline` alone, built once in Core so the
 /// Mac and the phone say the same words about the same agent. Swiping a banner away
 /// marks nothing met: there is no "dismissed" in a need's life, the agent is still
-/// blocked, and the project row still says so.
+/// blocked, and the folder row still says so.
 @MainActor
 final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
-    /// Open that agent's conversation, with the question in front of the person.
-    var open: @MainActor (UUID) -> Void = { _ in }
-    /// A project's page, for a question asked of the project rather than a session (#531).
-    var openProject: @MainActor (URL) -> Void = { _ in }
+    /// Open that agent's conversation, with the question in front of the person, or at a
+    /// notice's line (#2860) when the banner was one.
+    var open: @MainActor (UUID, UUID?) -> Void = { _, _ in }
+    /// A folder's page, for a question asked of the folder rather than a session (#531).
+    var openFolder: @MainActor (URL) -> Void = { _ in }
     /// One of the banner's own buttons (#1170): the need's token, the answer, and the line
     /// typed for a reply.
     var answer: @MainActor (String, QuickAnswer, String?) async -> Void = { _, _, _ in }
@@ -64,7 +65,8 @@ final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
     func sweep(keeping pending: DaemonAPI.AttentionPending, me: Surface = .mac) async {
         let live = Set(pending.needs.map(\.id.token))
         let delivered = await center.deliveredNotifications().map(\.request.identifier)
-        let stale = delivered.filter { $0.hasPrefix("permission:") || $0.hasPrefix("elicitation:") || $0.hasPrefix("report:") }
+        let stale = delivered.filter { $0.hasPrefix("permission:") || $0.hasPrefix("elicitation:") || $0.hasPrefix("report:")
+            || $0.hasPrefix("notice:") }
             .filter { !live.contains($0) }
         if !stale.isEmpty {
             note("notifier: sweep removing stale \(stale); live \(Array(live))")
@@ -85,7 +87,7 @@ final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
 
     private func show(_ need: Need, token: String, alert: Bool) {
         let content = UNMutableNotificationContent()
-        // The agent first, because it is what the person will recognise; the project
+        // The agent first, because it is what the person will recognise; the folder
         // under it; what is wanted as the body. Never blank: the headline is truncated
         // rather than emptied, in Core, before it gets here.
         let headline = need.headline.truncating()
@@ -98,7 +100,7 @@ final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
             content.userInfo["agentID"] = agentID.uuidString
             content.threadIdentifier = agentID.uuidString
         } else {
-            // The project's own question (#531): its token names the project.
+            // The folder's own question (#531): its token names the folder.
             content.threadIdentifier = token
         }
         showing[token] = need.id
@@ -169,14 +171,15 @@ final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
         }
         let request = response.notification.request
         if let text = request.content.userInfo["agentID"] as? String, let agentID = UUID(uuidString: text) {
+            let line = NeedID.noticeEntry(fromToken: request.identifier)
             await MainActor.run {
                 NSApp.activate()
-                open(agentID)
+                open(agentID, line)
             }
         } else if let folder = NeedID.guardedFolder(fromToken: request.identifier) {
             await MainActor.run {
                 NSApp.activate()
-                openProject(folder)
+                openFolder(folder)
             }
         }
     }
@@ -185,6 +188,23 @@ final class MacNotifier: NSObject, UNUserNotificationCenterDelegate {
 /// A line on stderr, unbuffered, for a walk that runs the app from a shell. `print`
 /// goes to stdout, which is block-buffered when it is a file, and says nothing until
 /// the app exits.
+///
+/// In the unified log too (#2700): the installed window's stderr is /dev/null, and voice
+/// mode's lines (#2679) were lost there. Read them with
+/// `log show --predicate 'subsystem == "com.alexecollins.agents.store" AND category == "voice"'`.
+/// The lines hold states, formats, counts and errors, never what the person wrote or said,
+/// so they are public.
 func note(_ line: String) {
     FileHandle.standardError.write(Data((line + "\n").utf8))
+    NoteLog.logger(for: line).log("\(line, privacy: .public)")
+}
+
+private enum NoteLog {
+    static let subsystem = Bundle.main.bundleIdentifier ?? "com.alexecollins.agents.store"
+    static let voice = Logger(subsystem: subsystem, category: "voice")
+    static let other = Logger(subsystem: subsystem, category: "note")
+
+    static func logger(for line: String) -> Logger {
+        line.hasPrefix("voice:") || line.hasPrefix("dictation:") ? voice : other
+    }
 }

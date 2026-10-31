@@ -16,6 +16,7 @@ and its footer names the host the results come from.
 |---|---|---|
 | **GitHub MCP Registry** | Connectors | Curated by GitHub, most starred first. The default, because it is the easiest to find things in. |
 | **MCP Registry** | Connectors | The official open registry: everything published, in its own order. |
+| **Agents** | Connectors | The connectors Agents makes: GitHub, Linear, GitLab and Email. A file that every host carries, read with no network. It lists all of them before you type. |
 | **skills.sh** | Skills | Skills on GitHub, most installed first. The default for skills. |
 | **Anthropic skills** | Skills | The `anthropics/skills` repository. It lists every skill before you type. |
 
@@ -38,6 +39,8 @@ What you turn off is saved in `~/.agents/marketplaces.json` as `off`.
      except on `localhost`;
    - for skills, a GitHub repository (`owner/repo`) whose folders hold `SKILL.md` files, or
      a site that answers skills.sh's search.
+   - for connectors, a file on this machine instead: choose **A file on this machine** and
+     type its path, such as `~/team/connectors.json`. See [A marketplace that is a file](#a-marketplace-that-is-a-file).
 3. If the registry needs a token, type a name for it, such as `ACME_MCP_TOKEN`, and the
    token. The value goes into `~/.agents-secrets/secrets.env` and is never shown again. The app
    sends it as `Authorization: Bearer …` to that address only.
@@ -48,9 +51,9 @@ A skills repository can be private: the app reads a private one through `gh`, so
 when `gh` is signed in on this Mac with access to the repository, and says the repository
 is unreachable otherwise. A public one is read over plain HTTPS and needs no `gh`.
 
-## A project's marketplaces
+## A folder's marketplaces
 
-A project can ship its own list in `.agents/marketplaces.json`, committed with it, in the
+A folder can ship its own list in `.agents/marketplaces.json`, committed with it, in the
 same shape:
 
 ```json
@@ -62,11 +65,33 @@ same shape:
 }
 ```
 
-`format` is `mcp-registry`, `skills.sh` or `github-skills`. They are listed when the sheet
-adds to that project, marked **project**, and they start **off**. A committed file could
+`format` is `mcp-registry`, `skills.sh`, `github-skills` or `file`. They are listed when the sheet
+adds to that folder, marked **folder**, and they start **off**. A committed file could
 otherwise send a token from your `secrets.env` to any address it names. Turn one on, and
-that choice is saved as `on` in your own `~/.agents/marketplaces.json`, not in the project.
-Edit the project's list in the file itself.
+that choice is saved as `on` in your own `~/.agents/marketplaces.json`, not in the folder.
+Edit the folder's list in the file itself.
+
+## A marketplace that is a file
+
+A connector marketplace can be a JSON file, or a folder of them, in the MCP Registry's shape:
+`{"servers": [{"server": {…}}]}`, or one `server.json` per file. A team can keep its own
+connectors in its repository this way. The sheet lists every entry before you type, and the
+words you type narrow the list.
+
+```json
+{
+  "servers": [
+    { "server": { "name": "io.github.acme/tickets", "title": "Tickets",
+        "description": "Acme's tickets",
+        "remotes": [{ "type": "streamable-http", "url": "https://mcp.acme.example/mcp" }] } }
+  ]
+}
+```
+
+A path is a full path, starts with `~/`, or is relative: to your home for your own list, and to
+the folder for a folder's. Each entry runs as its `packages` or `remotes` say, as from
+a registry. A file of your own or of a folder cannot name a command to run: only the Agents
+marketplace, carried by the host, does that.
 
 ## If something is wrong
 

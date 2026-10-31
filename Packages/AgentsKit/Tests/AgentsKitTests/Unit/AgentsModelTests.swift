@@ -74,8 +74,7 @@ struct AgentsModelTests {
     }
 
     /// A withdrawal carries no request, and a client that read it as "nothing to do"
-    /// would leave the question on screen for somebody to answer a second time. Without
-    /// a request identity, every question for that agent goes — the legacy shape.
+    /// would leave the question on screen for somebody to answer a second time.
     @Test func aWithdrawnQuestionTakesTheOneThatWasWaiting() throws {
         let model = AgentsModel()
         let id = UUID()
@@ -88,7 +87,7 @@ struct AgentsModelTests {
         #expect(model.permission(for: id) != nil)
 
         model.apply(DaemonAPI.Notification.agentPermission,
-                    try notification(DaemonAPI.PermissionNotification(agentID: id, request: nil)))
+                    try notification(DaemonAPI.PermissionNotification(agentID: id, request: nil, requestID: question.id)))
         #expect(model.permission(for: id) == nil)
         #expect(model.permissions.isEmpty)
     }
@@ -254,23 +253,56 @@ struct AgentsModelTests {
         #expect(model.entries.first?.text == "new")
     }
 
-    /// An agent's `cwd` is whatever it was started with and a project's folder is the
-    /// resolved form. Comparing them raw is how a project looks empty while its agents
+    /// A catch-up page that starts in a long turn's reply lays over it only what was heard
+    /// while it was on its way: the ask and steps heard live before it are not laid after
+    /// the reply, where the Remote drew the person's prompt below its own reply (#2807).
+    @Test func aCatchUpPageNeverPutsTheAskBelowTheReply() throws {
+        let model = AgentsModel()
+        let agentID = UUID()
+        model.watching = agentID
+        let ask = TranscriptEntry(kind: .userMessage("Do we have a way to notify the user?"))
+        let step = TranscriptEntry(kind: .agentMessage(messageID: "a", text: "Still checking."))
+        let reply = (0..<4).map { TranscriptEntry(kind: .agentMessage(messageID: "b", text: "Part \($0). ")) }
+        let after = TranscriptEntry(kind: .agentMessage(messageID: "b", text: "The end."))
+        func hear(_ entry: TranscriptEntry) {
+            model.apply(.entry(DaemonAPI.EntryNotification(agentID: agentID, entry: entry)))
+        }
+
+        // Opened as the turn starts, then the whole turn heard as it ran.
+        _ = model.beginTranscriptLoad()
+        model.replaceTranscript(with: TranscriptPage(firstIndex: 0, total: 1, entries: [ask]))
+        ([step] + reply).forEach(hear)
+        #expect(model.entries.map(\.id) == ([ask, step] + reply).map(\.id))
+
+        // A catch-up (a reconnect) reads the turn's last entries only, and one more
+        // entry is heard while that page is on its way.
+        _ = model.beginTranscriptLoad()
+        hear(after)
+        model.replaceTranscript(with: TranscriptPage(firstIndex: 4, total: 6, entries: Array(reply.suffix(2))))
+
+        #expect(model.entries.map(\.id) == (Array(reply.suffix(2)) + [after]).map(\.id))
+        #expect(model.hasMoreBefore)
+        let turns = model.transcriptItems.turns(reusing: [])
+        #expect(turns.allSatisfy { $0.ask == nil }, "the ask is earlier than the page, not after it")
+    }
+
+    /// An agent's `cwd` is whatever it was started with and a folder is the
+    /// resolved form. Comparing them raw is how a folder looks empty while its agents
     /// are plainly running.
-    @Test func anAgentIsFoundByItsProjectHoweverTheFolderWasWritten() throws {
+    @Test func anAgentIsFoundByItsFolderHoweverTheFolderWasWritten() throws {
         let model = AgentsModel()
         model.apply(DaemonAPI.Notification.agentChanged,
                     try notification(agent(cwd: URL(filePath: "/tmp/work/api/"))))
         #expect(model.agents(in: URL(filePath: "/tmp/work/./api"), group: .running).count == 1)
     }
 
-    /// Working in a worktree, filed under the project it was started from (030).
-    @Test func anAgentInAWorktreeIsFoundUnderItsProject() throws {
+    /// Working in a worktree, filed under the folder it was started from (030).
+    @Test func anAgentInAWorktreeIsFoundUnderItsFolder() throws {
         let model = AgentsModel()
         let root = folder.appending(path: ".agents/worktrees/fix-login")
         var working = agent(cwd: root)
         working.worktree = AgentWorktree(name: "fix-login", root: root, branch: "agents/fix-login",
-                                         project: folder, base: "main", madeByApp: true)
+                                         folder: folder, base: "main", madeByApp: true)
         model.apply(DaemonAPI.Notification.agentChanged, try notification(working))
         #expect(model.agents(in: folder, group: .running).map(\.id) == [working.id])
         #expect(model.agents(in: root, group: .running).isEmpty)
@@ -431,23 +463,23 @@ struct AgentsModelTests {
                 "while a method nobody knows is still passed on")
     }
 
-    @Test func archivedProjectsAreKeptApartFromLiveOnes() {
+    @Test func archivedFoldersAreKeptApartFromLiveOnes() {
         let model = AgentsModel()
-        let live = DaemonAPI.ProjectSummary(
-            project: Project(folder: URL(filePath: "/tmp/work/api")),
+        let live = DaemonAPI.FolderSummary(
+            folder: Folder(folder: URL(filePath: "/tmp/work/api")),
             name: "api", exists: true, lastActivityAt: Date(), counts: [:])
-        let filed = DaemonAPI.ProjectSummary(
-            project: Project(folder: URL(filePath: "/tmp/work/old"), archivedAt: Date()),
+        let filed = DaemonAPI.FolderSummary(
+            folder: Folder(folder: URL(filePath: "/tmp/work/old"), archivedAt: Date()),
             name: "old", exists: true, lastActivityAt: Date(), counts: [:])
-        model.replaceProjects([live, filed])
-        #expect(model.liveProjects.map(\.name) == ["api"])
-        #expect(model.archivedProjects.map(\.name) == ["old"])
+        model.replaceFolders([live, filed])
+        #expect(model.liveFolders.map(\.name) == ["api"])
+        #expect(model.archivedFolders.map(\.name) == ["old"])
     }
 
     // MARK: What is being spent
 
     @Test("cost state is seeded on connect and kept current by the notification")
-    func moneyArrivesTheWayProjectsDo() throws {
+    func moneyArrivesTheWayFoldersDo() throws {
         let model = AgentsModel()
         #expect(model.costState == nil,
                 "nothing until the daemon says, so a window shows nothing rather than a zero")
@@ -640,8 +672,8 @@ struct AgentsModelTests {
         #expect(!model.holds(index: 10))
     }
 
-    /// One project's workflows changing leaves another's list as it was (#285).
-    @Test func aWorkflowInOneProjectLeavesTheOther() {
+    /// One folder's workflows changing leaves another's list as it was (#285).
+    @Test func aWorkflowInOneFolderLeavesTheOther() {
         let model = AgentsModel()
         let api = URL(filePath: "/tmp/work/api")
         let web = URL(filePath: "/tmp/work/web")

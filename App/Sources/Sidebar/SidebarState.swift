@@ -2,12 +2,12 @@ import AgentsKitCore
 import Foundation
 import Observation
 
-/// Which of the seven panes the column is showing.
+/// Which of the eight panes the column is showing.
 ///
-/// One column, seven panes, taking turns. The spec's assumption, and the reason a pane
+/// One column, eight panes, taking turns. The spec's assumption, and the reason a pane
 /// is a single case rather than a set.
 enum SidebarPane: String, CaseIterable, Identifiable, Sendable {
-    case files, changes, terminal, browser, artifacts, background, simulator
+    case files, changes, terminal, browser, artifacts, background, simulator, lineage
 
     var id: String { rawValue }
 
@@ -20,6 +20,7 @@ enum SidebarPane: String, CaseIterable, Identifiable, Sendable {
         case .artifacts: return "Exchanged"
         case .background: return "Background"
         case .simulator: return "Simulator"
+        case .lineage: return "Lineage"
         }
     }
 
@@ -32,6 +33,7 @@ enum SidebarPane: String, CaseIterable, Identifiable, Sendable {
         case .artifacts: return "tray.full"
         case .background: return "person.crop.circle.badge.clock"
         case .simulator: return "iphone"
+        case .lineage: return "point.3.connected.trianglepath.dotted"
         }
     }
 }
@@ -58,7 +60,7 @@ final class SidebarFrame {
     static let minimumConversationWidth: Double = 520
 
     /// Where the width and the pane are kept: `sidebar.width`, `sidebar.pane` for the
-    /// main window, and a key of its own for each project's window (#1089).
+    /// main window, and a key of its own for each folder's window (#1089).
     private let widthKey: String
     private let paneKey: String
 
@@ -78,12 +80,12 @@ final class SidebarFrame {
         didSet { defaults.set(pane.rawValue, forKey: paneKey) }
     }
 
-    /// How wide the window and the pane beside the project list are. Measured by the
+    /// How wide the window and the pane beside the folder list are. Measured by the
     /// window as it lays out and never stored: they are facts about now.
     var windowWidth: Double = 0
     var paneWidth: Double = 0
 
-    /// `keyedBy` names a project's window, whose inspector is its own (#1089, Alex).
+    /// `keyedBy` names a folder's window, whose inspector is its own (#1089, Alex).
     init(defaults: UserDefaults = WindowDefaults.store, keyedBy window: String? = nil) {
         self.defaults = defaults
         let prefix = window.map { "sidebar.\($0)" } ?? "sidebar"

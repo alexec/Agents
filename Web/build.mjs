@@ -62,6 +62,8 @@ await esbuild.build({
   jsxImportSource: "preact",
 });
 await esbuild.build({ ...common, entryPoints: ["src/app.css"], outfile: "dist/app.css" });
+// The page's service worker (#1486), at the top so its scope is the whole page: Web Push.
+await esbuild.build({ ...common, entryPoints: ["src/sw.ts"], outfile: "dist/sw.js", format: "iife" });
 // The sandbox proxy a view is drawn through (#187), served at another origin than the page.
 await esbuild.build({ ...common, entryPoints: ["src/sandbox/proxy.ts"], outfile: "dist/sandbox.js", format: "iife" });
 cpSync(join(web, "index.html"), join(dist, "index.html"));

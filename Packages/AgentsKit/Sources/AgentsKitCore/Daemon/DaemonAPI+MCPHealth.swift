@@ -1,7 +1,7 @@
 import Foundation
 
 /// Every MCP server a host's `mcp.json` files name, and how each is doing (#753): the
-/// person's own on Activity ▸ MCP Servers, a project's on its own MCP Servers page.
+/// person's own on Activity ▸ MCP Servers, a folder's on its own MCP Servers page.
 ///
 /// A hosted server (#488) says what its one copy is doing. Any other is checked by the
 /// host as a session would reach it, `initialize` then `tools/list`, as it starts, when its
@@ -10,8 +10,8 @@ extension DaemonAPI.Method {
     /// Every server and its health, for a client that has just connected. Kept up to date
     /// after that by `mcp/healthChanged`.
     public static let mcpHealth = "mcp/health"
-    /// Check Now: check again the servers of one file, the person's (no project) or a
-    /// project's. Answers with the snapshot, the checks under way.
+    /// Check Now: check again the servers of one file, the person's (no folder) or a
+    /// folder's. Answers with the snapshot, the checks under way.
     public static let mcpHealthCheck = "mcp/health/check"
 }
 
@@ -35,7 +35,7 @@ extension DaemonAPI {
         case answered
         /// It did not answer; `lastError` says why.
         case failed
-        /// A project's server not yet approved here, so it is never started.
+        /// A folder's server not yet approved here, so it is never started.
         case waiting
         /// It needs a secret that is not set, so it is never started.
         case missingSecret
@@ -49,8 +49,8 @@ extension DaemonAPI {
     public struct MCPServerHealth: Codable, Sendable, Hashable, Identifiable {
         /// The server's name in `mcp.json`.
         public var name: String
-        /// The project folder whose `.agents/mcp.json` names it, or nil for the person's own.
-        public var project: String?
+        /// The folder whose `.agents/mcp.json` names it, or nil for the person's own.
+        public var folder: String?
         public var transport: MCPTransportName
         /// Hosted (#488): `live` says what its one copy is doing, and it is not checked.
         public var hosted: Bool
@@ -66,17 +66,15 @@ extension DaemonAPI {
         public var tools: Int?
         /// The five levels it reaches (#1428), from what it declared when it last answered.
         public var levels: MCPLevels?
-        /// One of the connectors Agents makes (#1428).
-        public var madeByAgents: Bool?
 
-        public var id: String { (project ?? "~") + "|" + name }
+        public var id: String { (folder ?? "~") + "|" + name }
 
-        public init(name: String, project: String?, transport: MCPTransportName, hosted: Bool = false,
+        public init(name: String, folder: String?, transport: MCPTransportName, hosted: Bool = false,
                     live: HostedMCPStatus? = nil, check: MCPCheckState = .unchecked, checkedAt: Date? = nil,
-                    lastError: String? = nil, tools: Int? = nil, levels: MCPLevels? = nil, madeByAgents: Bool? = nil) {
-            self.name = name; self.project = project; self.transport = transport; self.hosted = hosted
+                    lastError: String? = nil, tools: Int? = nil, levels: MCPLevels? = nil) {
+            self.name = name; self.folder = folder; self.transport = transport; self.hosted = hosted
             self.live = live; self.check = check; self.checkedAt = checkedAt; self.lastError = lastError
-            self.tools = tools; self.levels = levels; self.madeByAgents = madeByAgents
+            self.tools = tools; self.levels = levels
         }
     }
 
@@ -104,17 +102,17 @@ extension DaemonAPI {
 
     /// An `mcp.json` that could not be read, so none of its servers are listed.
     public struct MCPHealthFileProblem: Codable, Sendable, Hashable {
-        /// The project folder, or nil for the person's own file.
-        public var project: String?
+        /// The folder, or nil for the person's own file.
+        public var folder: String?
         public var message: String
 
-        public init(project: String?, message: String) {
-            self.project = project
+        public init(folder: String?, message: String) {
+            self.folder = folder
             self.message = message
         }
     }
 
-    /// Every server on a host, in each file's order (the person's first, then each project
+    /// Every server on a host, in each file's order (the person's first, then each folder
     /// by its path), and the daemon's time when it was read.
     public struct MCPHealthSnapshot: Codable, Sendable, Hashable {
         public var servers: [MCPServerHealth]
@@ -130,23 +128,23 @@ extension DaemonAPI {
         public static let empty = MCPHealthSnapshot(servers: [], at: .distantPast)
 
         /// The person's own servers, for Activity.
-        public var personal: [MCPServerHealth] { servers.filter { $0.project == nil } }
+        public var personal: [MCPServerHealth] { servers.filter { $0.folder == nil } }
 
-        /// One project's, for its page in the sidebar.
-        public func servers(in project: String) -> [MCPServerHealth] {
-            servers.filter { $0.project == project }
+        /// One folder's, for its page in the sidebar.
+        public func servers(in folder: String) -> [MCPServerHealth] {
+            servers.filter { $0.folder == folder }
         }
 
-        public func problem(in project: String?) -> String? {
-            problems.first { $0.project == project }?.message
+        public func problem(in folder: String?) -> String? {
+            problems.first { $0.folder == folder }?.message
         }
     }
 
     /// Check Now on one file's servers.
     public struct MCPHealthCheckRequest: Codable, Sendable, Hashable {
-        /// The project folder, or nil for the person's own servers.
-        public var project: String?
+        /// The folder, or nil for the person's own servers.
+        public var folder: String?
 
-        public init(project: String?) { self.project = project }
+        public init(folder: String?) { self.folder = folder }
     }
 }

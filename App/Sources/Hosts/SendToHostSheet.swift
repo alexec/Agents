@@ -1,47 +1,47 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Send to ‹host›… (#1123): a project's or a worktree's folder on this Mac, sent to a host
-/// over the link the window already has to it, and added there as a project. `from` is the
+/// Send to ‹host›… (#1123): a folder's or a worktree's folder on this Mac, sent to a host
+/// over the link the window already has to it, and added there as a folder. `from` is the
 /// host the folder is on: this Mac's, whose agentsd makes the bundle and the patch, since
 /// the window is sandboxed and reads no repository itself.
 struct SendToHostRequest: Identifiable, Hashable {
     let folder: URL
-    let from: HostID
-    let host: HostID
+    let from: MachineRef
+    let host: MachineRef
     var id: String { "\(host.rawValue) \(folder.path)" }
 }
 
 extension AppModel {
     /// The hosts a folder on this Mac can be sent to: the servers that are reachable now.
-    var sendTargets: [HostID] {
+    var sendTargets: [MachineRef] {
         hosts.servers.filter { $0 != .mac && !isOnThisMac($0) && !hostUnreachable($0) }
     }
 
-    /// Whether a project's folder is this Mac's to send.
-    func canSend(from host: HostID) -> Bool { host == .mac || isOnThisMac(host) }
+    /// Whether a folder is this Mac's to send.
+    func canSend(from host: MachineRef) -> Bool { host == .mac || isOnThisMac(host) }
 
     /// What the host has at `destination`.
-    func receiveState(at destination: String, on host: HostID) async throws -> DaemonAPI.ReceiveState {
-        try await client(for: host).call(DaemonAPI.Method.projectsReceiveState,
+    func receiveState(at destination: String, on host: MachineRef) async throws -> DaemonAPI.ReceiveState {
+        try await client(for: host).call(DaemonAPI.Method.foldersReceiveState,
                                          DaemonAPI.ReceiveStateRequest(folder: destination),
                                          returning: DaemonAPI.ReceiveState.self)
     }
 
     /// What the sheet shows of the repository at `folder`, from this Mac's host.
-    func sendFacts(_ folder: URL, on from: HostID) async throws -> DaemonAPI.SendFacts {
-        try await client(for: from).call(DaemonAPI.Method.projectsSendFacts, DaemonAPI.SendFactsRequest(folder: folder),
+    func sendFacts(_ folder: URL, on from: MachineRef) async throws -> DaemonAPI.SendFacts {
+        try await client(for: from).call(DaemonAPI.Method.foldersSendFacts, DaemonAPI.SendFactsRequest(folder: folder),
                                          returning: DaemonAPI.SendFacts.self)
     }
 
     /// Sends `branches` of the repository at `folder` on this Mac's host `from`, less what
     /// `host` already has, and the uncommitted changes when `includeChanges`, then has
     /// `host` make or bring up to date its copy at `destination`. Each part goes through
-    /// the window, from one host's link to the other's. The project it becomes is listed
+    /// the window, from one host's link to the other's. The folder it becomes is listed
     /// and returned.
-    func sendRepository(_ folder: URL, from: HostID, to host: HostID, at destination: String, branches: [String],
+    func sendRepository(_ folder: URL, from: MachineRef, to host: MachineRef, at destination: String, branches: [String],
                         checkout: String, includeChanges: Bool, origin: String?,
-                        progress: @escaping @MainActor (String) -> Void) async throws -> DaemonAPI.ProjectSummary {
+                        progress: @escaping @MainActor (String) -> Void) async throws -> DaemonAPI.FolderSummary {
         let label = hosts.label(host)
         let state = try await receiveState(at: destination, on: host)
         if state.ownChanges {
@@ -50,18 +50,18 @@ extension AppModel {
         progress("Making the bundle…")
         let mac = client(for: from), there = client(for: host)
         let pack = try await mac.callWhileAnswering(
-            DaemonAPI.Method.projectsSendPack,
+            DaemonAPI.Method.foldersSendPack,
             DaemonAPI.SendPackRequest(folder: folder, branches: branches, leavingOut: state.repository ? state.heads : [],
                                       includeChanges: includeChanges),
             checkingEvery: .seconds(10)).decode(DaemonAPI.SendPack.self)
         let (bundle, patch) = try await relay(pack, from: mac, to: there, verb: "Sending", progress: progress)
         progress("Adding it on \(label)…")
         let answer = try await there.callWhileAnswering(
-            DaemonAPI.Method.projectsReceive,
+            DaemonAPI.Method.foldersReceive,
             DaemonAPI.ReceiveRequest(folder: destination, bundle: bundle, patch: patch, branches: pack.commits,
                                      checkout: checkout, origin: origin),
             checkingEvery: .seconds(10))
-        var summary = try answer.decode(DaemonAPI.ProjectSummary.self)
+        var summary = try answer.decode(DaemonAPI.FolderSummary.self)
         summary.host = host
         upsert(summary)
         return summary
@@ -78,7 +78,7 @@ extension AppModel {
         let total = (pack.bundle?.size ?? 0) + (pack.patch?.size ?? 0)
         var sent = 0
         func read(_ file: DaemonAPI.SendFile, at offset: Int) async throws -> RelayPart {
-            try RelayPart(try await from.call(DaemonAPI.Method.projectsSendRead,
+            try RelayPart(try await from.call(DaemonAPI.Method.foldersSendRead,
                                               DaemonAPI.SendReadRequest(id: file.id, offset: offset)))
         }
         func carry(_ file: DaemonAPI.SendFile?) async throws -> UUID? {
@@ -89,7 +89,7 @@ extension AppModel {
             while true {
                 let next = offset + part.size, more = !part.end && part.size > 0
                 async let ahead: RelayPart? = more ? try await read(file, at: next) : nil
-                try await to.call(DaemonAPI.Method.projectsReceiveUpload,
+                try await to.call(DaemonAPI.Method.foldersReceiveUpload,
                                   JSONValue.object(["upload": .string(id.uuidString), "offset": .int(offset), "data": part.data]))
                 offset = next
                 sent += part.size
@@ -103,7 +103,7 @@ extension AppModel {
     }
 }
 
-/// One part of a send as `projects/sendRead` answered it: its data still the base64 text.
+/// One part of a send as `folders/sendRead` answered it: its data still the base64 text.
 struct RelayPart: Sendable {
     let data: JSONValue
     let size: Int
@@ -127,7 +127,7 @@ struct RelayPart: Sendable {
 }
 
 extension View {
-    /// The Send to ‹host›… sheet a project's menu asks for in `requests`.
+    /// The Send to ‹host›… sheet a folder's menu asks for in `requests`.
     func sendToHostSheet(_ requests: WindowRequests) -> some View {
         sheet(item: Binding(get: { requests.sendToHost }, set: { requests.sendToHost = $0 })) { request in
             SendToHostSheet(request: request).paperSheet()

@@ -158,8 +158,8 @@ func restartNoticeWords(gaps []restartGap, w *wire.EventWait) string {
 	if len(missing) == 0 {
 		lines = append(lines, "What you wait on was caught up after it: "+strings.Join(names, ", ")+".")
 	} else {
-		lines = append(lines, "Events in that time may be missing: "+strings.Join(missing, ", ")+". Check with "+
-			"wait_for_event action \"recent\", and check the state yourself (for example the branch or the PR).")
+		lines = append(lines, "Events in that time may be missing: "+strings.Join(missing, ", ")+
+			". Check the state yourself (for example the branch or the PR).")
 	}
 	return "\n" + strings.Join(lines, "\n")
 }

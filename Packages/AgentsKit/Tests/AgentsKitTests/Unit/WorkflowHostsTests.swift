@@ -5,8 +5,8 @@ import Testing
 /// The computers a workflow page offers, under the names already on screen (#317).
 @Suite("Choosing a workflow's hosts")
 struct WorkflowHostsTests {
-    private func host(_ id: String, _ name: String, machine: String?, relay: Bool? = nil) -> DaemonAPI.ControlHost {
-        DaemonAPI.ControlHost(id: HostID(rawValue: id), name: name, platform: "macOS", version: "1",
+    private func host(_ id: String, _ name: String, machine: String?, relay: Bool? = nil) -> DaemonAPI.ControlMachine {
+        DaemonAPI.ControlMachine(id: MachineRef(rawValue: id), name: name, platform: "macOS", version: "1",
                               state: "online", reach: "local", machineID: machine, relay: relay)
     }
 

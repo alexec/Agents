@@ -26,7 +26,7 @@ An agent that has finished can also archive itself. A chat you started does so w
 1. Open its conversation and click **Stop** above the prompt, or press **⌘.** (Command
    and full stop). On iPhone and iPad, tap **Stop** in the bar at the top.
 
-   On the project's page you can also right-click the agent's card and choose **Stop**.
+   On the folder's page you can also right-click the agent's card and choose **Stop**.
 2. The turn ends where it is, any question it was waiting on is cancelled, and the agent
    moves to **Stopped**. The conversation stays open, so you can read what it did.
 3. To carry on, type a prompt and send it. The agent picks up with the whole conversation
@@ -40,7 +40,7 @@ An agent that has finished can also archive itself. A chat you started does so w
    and choose **Archive**.
 
    An agent still working is stopped first. The chat moves under **Archived** at the
-   bottom of the project's page, folded away.
+   bottom of the folder's page, folded away.
 2. If the agent worked in a worktree the app made, and everything there is committed,
    archiving also removes the worktree. See
    [Start an agent in its own worktree](start-in-a-worktree.md).
@@ -61,7 +61,7 @@ partly done one stays under **Needs you**. Nothing is hidden until you approve i
    it, or **Keep Session** to keep it. The card is the same on the Mac, iPhone, iPad and the
    web page. When you are scrolled up, **↓** takes you back to it at the end.
 2. Or use **Needs You**, at the top of the sidebar. It shows every chat waiting for
-   approval, in every project and on every host. **Approve** is beside the mark on the
+   approval, in every folder and on every host. **Approve** is beside the mark on the
    Mac's row; on the Remote and the web page it is in the row's menu and its swipe. Each
    row is approved on its own; there is no button that archives them all.
 3. To keep the chat instead, send it a prompt. That drops it. So does a later turn
@@ -69,13 +69,13 @@ partly done one stays under **Needs you**. Nothing is hidden until you approve i
    archived chat does not bring the mark back.
 
 A chat you started, a workflow's run whose workflow allows it to archive itself, and a
-helper in a project where agents may archive their helpers, are archived without your
+helper in a folder where agents may archive their helpers, are archived without your
 approval, if the turn ends **Complete** or **Nothing to do**. A partly done one still waits
 for it.
 
 For chats you started, this is the setting **Agents may archive the chats I start**, in
-**Settings ▸ You ▸ Sidebar ▸ Finished chats** on the Mac, iPhone and iPad, and **Settings ▸
-You ▸ Finished chats** on the web page. It is kept on your Mac, so it is the same on every
+**Settings ▸ This app ▸ Sidebar ▸ Finished chats** on the Mac, iPhone and iPad, and
+**Settings ▸ This browser ▸ Finished chats** on the web page. It is kept on your Mac, so it is the same on every
 client. It is on at first. Turn it off to approve each one, as
 above. Even with it on, a chat whose last turn showed you a file with `show_file` is not
 archived: it stays unread under **Done**, with the file's mark on its row, and asks no
@@ -150,4 +150,4 @@ it. An event or a chat that named it just says "another agent".
 Deleting removes only what Agents keeps. It never touches your files, your commits, or the
 runtime's own copy of the conversation.
 
-To put a whole project away, see [Add a project](add-a-project.md).
+To put a whole folder away, see [Add a folder](add-a-folder.md).

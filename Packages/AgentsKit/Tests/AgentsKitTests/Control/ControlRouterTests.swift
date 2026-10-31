@@ -76,7 +76,7 @@ final class FakeControlClient: @unchecked Sendable {
 
     func send(_ line: String) throws { try transport.write(line: line) }
 
-    func request(_ id: Int, _ method: String, host: HostID?) throws {
+    func request(_ id: Int, _ method: String, host: MachineRef?) throws {
         let message = try JSONRPCCodec.encode(.request(id: .number(id), method: method, params: nil))
         try send(ControlWire.wrap(host: host, message: message))
     }
@@ -87,7 +87,7 @@ struct StubControl: ControlHandling {
     func handle(method: String, params: JSONValue?, from caller: ControlRouter.Caller) async throws -> JSONValue {
         ["answeredBy": "control", "kind": .string(caller.kind.rawValue)]
     }
-    func hostSaid(_ host: HostID, method: String, params: JSONValue?) async throws -> JSONValue { [:] }
+    func hostSaid(_ host: MachineRef, method: String, params: JSONValue?) async throws -> JSONValue { [:] }
 }
 
 func client(_ kind: ClientRecord.Kind, id: UUID = UUID()) -> ClientRecord {
@@ -96,10 +96,10 @@ func client(_ kind: ClientRecord.Kind, id: UUID = UUID()) -> ClientRecord {
 
 @Suite("The control plane's router")
 struct ControlRouterTests {
-    let home = HostID(rawValue: "mac")
-    let server = HostID(rawValue: "k3v9x0qa")
+    let home = MachineRef(rawValue: "mac")
+    let server = MachineRef(rawValue: "k3v9x0qa")
 
-    func connectHost(_ router: ControlRouter, _ id: HostID) async -> FakeUplinkHost {
+    func connectHost(_ router: ControlRouter, _ id: MachineRef) async -> FakeUplinkHost {
         let (ours, theirs) = PairedTransport.pair()
         await router.attachHost(id, transport: ours)
         return FakeUplinkHost(transport: theirs)
@@ -238,7 +238,7 @@ struct ControlRouterTests {
         let router = ControlRouter(handler: StubControl(), knownHosts: [server], homeHost: home)
         let window = await connectClient(router, client(.mac))
         try window.request(1, DaemonAPI.Method.agentsList, host: server)
-        try window.request(2, DaemonAPI.Method.agentsList, host: HostID(rawValue: "nobody"))
+        try window.request(2, DaemonAPI.Method.agentsList, host: MachineRef(rawValue: "nobody"))
         await eventually { window.lines.count == 2 }
         #expect(window.lines.contains { $0.contains("\(DaemonAPI.Failure.hostOffline)") })
         #expect(window.lines.contains { $0.contains("\(DaemonAPI.Failure.noSuchHost)") })

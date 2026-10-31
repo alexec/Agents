@@ -89,9 +89,9 @@ func Ended(u DraftUpdate) bool {
 	return u.State == "done" || u.State == "failed" || u.State == "cancelled"
 }
 
-// HostProviderDraftCall is DaemonAPI.HostProviderDraftCall: a writer's tool call, relayed
+// MachineProviderDraftCall is DaemonAPI.MachineProviderDraftCall: a writer's tool call, relayed
 // by its host. AgentID is the caller, which is checked against the draft's agent (FR-011).
-type HostProviderDraftCall = wire.HostProviderDraftCall
+type MachineProviderDraftCall = wire.MachineProviderDraftCall
 
 // StartRequest is DaemonAPI.StartRequest, as a writing agent's start sends it.
 type StartRequest = wire.StartRequest
@@ -260,7 +260,7 @@ type draft struct {
 	ended          bool
 	tools          []any
 	helpSeen       string
-	workspaces     []WorkspaceInfo
+	workspaces     []MachineInfo
 	stop           chan struct{}
 }
 
@@ -498,7 +498,7 @@ func (s *Drafts) Result(id string) (string, any, bool) {
 // MARK: The writer's tools
 
 // Call is ProviderDrafts.call: a writer's tool, from its host (host/providerDraft).
-func (s *Drafts) Call(host string, call HostProviderDraftCall) (any, error) {
+func (s *Drafts) Call(host string, call MachineProviderDraftCall) (any, error) {
 	s.mu.Lock()
 	d := s.drafts[strings.ToUpper(string(call.Draft))]
 	s.mu.Unlock()
@@ -681,7 +681,7 @@ func (s *Drafts) check(d *draft, given any) string {
 			noSSH = noSSH && deref(w.SSH) == ""
 		}
 	}
-	var withSSH *WorkspaceInfo
+	var withSSH *MachineInfo
 	for i := range checked.Workspaces {
 		if deref(checked.Workspaces[i].SSH) != "" {
 			withSSH = &checked.Workspaces[i]
@@ -722,7 +722,7 @@ func (s *Drafts) prove(d *draft, start bool, arguments any) string {
 	}
 	named := strOr(get(arguments, "workspace"))
 	s.mu.Lock()
-	var workspace *WorkspaceInfo
+	var workspace *MachineInfo
 	for i := range d.workspaces {
 		if d.workspaces[i].ID == named {
 			workspace = &d.workspaces[i]
@@ -777,7 +777,7 @@ func (s *Drafts) prove(d *draft, start bool, arguments any) string {
 	d.paused = true
 	s.mu.Unlock()
 	s.tell(d)
-	var after *WorkspaceInfo
+	var after *MachineInfo
 	connection, err := s.hooks.Connect(draftRecord(d, given), d.secrets)
 	if err == nil {
 		if start {
@@ -1218,7 +1218,7 @@ func sample(item any) string {
 }
 
 // workspaceLine is ProviderDrafts.line.
-func workspaceLine(w WorkspaceInfo) string {
+func workspaceLine(w MachineInfo) string {
 	parts := []string{fmt.Sprintf("%s (id %s): %s", w.Name, w.ID, w.State)}
 	if deref(w.SSH) != "" {
 		parts = append(parts, "ssh "+*w.SSH)
@@ -1410,7 +1410,7 @@ Or many from one list:
 // DraftWiring is what NewDraftsFor needs to wire drafts as ControlService does.
 type DraftWiring struct {
 	Router  Router
-	Records HostRecords
+	Records MachineRecords
 	// MachineID is this control plane's machine, for the host on it.
 	MachineID func() string
 	// Home is the control plane's home: where help and ssh -G run.

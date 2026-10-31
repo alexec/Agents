@@ -16,6 +16,8 @@ struct ControlSignInTests {
         private var continuation: AsyncThrowingStream<String, any Error>.Continuation?
         private var pending: [String] = []
         var paired: DaemonAPI.SignInPair?
+        var started: DaemonAPI.SignInOrgStart?
+        var ticketed: DaemonAPI.SignInTicket?
         var identity: ControlAuth.Identity?
         let pair: (DaemonAPI.SignInPair, FakeControlPlane) -> [String]
 
@@ -69,6 +71,26 @@ struct ControlSignInTests {
                 let providers = DaemonAPI.SignInProviders(providers: [.init(provider: "github", on: true, available: true)],
                                                           challenge: ControlCode.base64url(helloNonce))
                 try say(JSONRPCCodec.encode(.success(id: id, result: JSONValue.encoding(providers))))
+            case DaemonAPI.Method.signInDiscover:
+                let email = try params!.decode(DaemonAPI.SignInDiscover.self).email
+                let found = email.hasSuffix("@acme.com") ? DaemonAPI.SignInDiscovered(provider: "acme-okta", name: "Acme Okta")
+                    : DaemonAPI.SignInDiscovered()
+                try say(JSONRPCCodec.encode(.success(id: id, result: JSONValue.encoding(found))))
+            case DaemonAPI.Method.signInOrgStart:
+                let start = try params!.decode(DaemonAPI.SignInOrgStart.self)
+                started = start
+                try say(JSONRPCCodec.encode(.success(id: id, result: JSONValue.encoding(
+                    DaemonAPI.SignInOrgStarted(url: "https://control.example/v1/oidc/start?s=abc")))))
+            case DaemonAPI.Method.signInTicket:
+                let ticket = try params!.decode(DaemonAPI.SignInTicket.self)
+                ticketed = ticket
+                if ticket.ticket == "good-ticket", case .signingIn(let client)? = identity {
+                    try say(JSONRPCCodec.encode(.success(id: id, result: JSONValue.encoding(DaemonAPI.SignInTicketResult(client: client)))))
+                } else {
+                    try say(JSONRPCCodec.encode(.failure(id: id, error: JSONRPCError(code: SignInWords.orgSignInRequired,
+                        message: "Your organisation asks you to sign in with Acme Okta.",
+                        data: ["provider": "acme-okta", "name": "Acme Okta"]))))
+                }
             case DaemonAPI.Method.signInPair:
                 let request = try params!.decode(DaemonAPI.SignInPair.self)
                 paired = request
@@ -92,6 +114,12 @@ struct ControlSignInTests {
             == "f399352dbd13beb7c27b5061d7085781ee74d846b27756855bb0fc428a15e0dc")
     }
 
+    // One vector with the control plane's Go (controllink.TestApprovalCodeIsBoundToBothKeys).
+    @Test func theApprovalCodeIsTheControlPlanes() {
+        #expect(ControlSignIn.approvalCode(clientPublicKey: Data(repeating: 1, count: 65), controlKey: Data(repeating: 2, count: 65))
+            == "8UMUNH")
+    }
+
     @Test func aSigningInIdentityReadsBack() {
         let id = UUID()
         #expect(ControlAuth.Identity(text: ControlAuth.Identity.signingIn(id).text) == .signingIn(id))
@@ -112,15 +140,62 @@ struct ControlSignInTests {
         let membership = try await ControlSignIn.pair(
             url: URL(string: "https://control.example")!, pin: nil, controlKey: nil, privateKey: client.privateKey, id: id,
             name: "Sam's iPhone", kind: .iPhone, dial: { _, _ in server },
-            signIn: { providers, nonce in
+            signIn: { providers, nonce, _ in
                 saw.set(nonce)
-                return (providers.turnedOn[0].provider, "ghu_token")
+                return .token(provider: providers.turnedOn[0].provider, token: "ghu_token")
             }, waiting: { shown.set($0.code) })
         #expect(server.identity == .signingIn(id))
         #expect(saw.value == ControlSignIn.nonce(controlKey: server.control.publicKey, challenge: server.helloNonce))
         #expect(server.paired?.token == "ghu_token" && server.paired?.provider == "github" && server.paired?.kind == .iPhone)
-        #expect(shown.value == "K7M2QX")
+        // The code made here from its own key and the key it trusts, never the control plane's.
+        #expect(shown.value == ControlSignIn.approvalCode(clientPublicKey: client.publicKey, controlKey: server.control.publicKey))
+        #expect(shown.value != "K7M2QX")
         #expect(membership.client == id && membership.controlKey == server.control.publicKey && membership.name == "Team plane")
+    }
+
+    /// An org provider (#1002): the email finds its provider, the flow starts on this
+    /// connection, and the ticket the browser came back with pairs it.
+    @Test func anOrgSignInPairsByTicket() async throws {
+        let server = FakeControlPlane { _, _ in [] }
+        let client = ControlAgreement.generate()
+        let id = UUID()
+        let opened = Nonces()
+        let membership = try await ControlSignIn.pair(
+            url: URL(string: "https://control.example")!, pin: nil, controlKey: nil, privateKey: client.privateKey, id: id,
+            name: "Sam's iPhone", kind: .iPhone, dial: { _, _ in server },
+            signIn: { _, _, ask in
+                #expect(try await ask.discover("lee@other.org").provider == nil)
+                let found = try await ask.discover("sam@acme.com")
+                let address = try await ask.orgStart(found.provider!, "sam@acme.com")
+                opened.set(address.absoluteString)
+                return .ticket("good-ticket")
+            })
+        #expect(opened.value == "https://control.example/v1/oidc/start?s=abc")
+        #expect(server.started == DaemonAPI.SignInOrgStart(provider: "acme-okta", purpose: .pair, returnTo: .app, loginHint: "sam@acme.com"))
+        #expect(server.ticketed == DaemonAPI.SignInTicket(ticket: "good-ticket", name: "Sam's iPhone", kind: .iPhone))
+        #expect(membership.client == id)
+    }
+
+    /// A refused ticket says which org provider the organisation asks for (FR-029).
+    @Test func aRefusedTicketNamesTheProvider() async throws {
+        let server = FakeControlPlane { _, _ in [] }
+        let client = ControlAgreement.generate()
+        do {
+            _ = try await ControlSignIn.pair(url: URL(string: "https://control.example")!, pin: nil, controlKey: nil,
+                                             privateKey: client.privateKey, id: UUID(), name: "Mac", kind: .mac,
+                                             dial: { _, _ in server }, signIn: { _, _, _ in .ticket("bad") })
+            Issue.record("a refused ticket paired")
+        } catch {
+            #expect(SignInWords.requiredProvider(error) == DaemonAPI.SignInOrgProvider(id: "acme-okta", name: "Acme Okta"))
+        }
+    }
+
+    @Test func theCallbackGivesTheTicketOrWhy() {
+        #expect(SignInWords.callback(URL(string: "agents://oidc#ticket=T1ck3t")!) == .ticket("T1ck3t"))
+        #expect(SignInWords.callback(URL(string: "agents://oidc#error=expired&message=The%20sign-in%20took%20more%20than%2010%20minutes.")!)
+            == .failed("The sign-in took more than 10 minutes."))
+        #expect(SignInWords.callback(URL(string: "agents://oidc#error=access_denied")!) == .failed("The sign-in was cancelled."))
+        #expect(SignInWords.callback(URL(string: "agents://oidc")!) == .failed("The sign-in came back with no answer. Try again."))
     }
 
     /// A refused sign-in says why, and keeps nothing.
@@ -132,7 +207,7 @@ struct ControlSignInTests {
         await #expect(throws: (any Error).self) {
             _ = try await ControlSignIn.pair(url: URL(string: "https://control.example")!, pin: nil, controlKey: nil,
                                              privateKey: client.privateKey, id: UUID(), name: "Mac", kind: .mac,
-                                             dial: { _, _ in server }, signIn: { _, _ in ("github", "x") })
+                                             dial: { _, _ in server }, signIn: { _, _, _ in .token(provider: "github", token: "x") })
         }
     }
 
@@ -144,7 +219,7 @@ struct ControlSignInTests {
             _ = try await ControlSignIn.pair(url: URL(string: "https://control.example")!, pin: nil,
                                              controlKey: ControlAgreement.generate().publicKey, privateKey: client.privateKey,
                                              id: UUID(), name: "Mac", kind: .mac, dial: { _, _ in server },
-                                             signIn: { _, _ in ("github", "x") })
+                                             signIn: { _, _, _ in .token(provider: "github", token: "x") })
         }
         #expect(server.paired == nil)
     }

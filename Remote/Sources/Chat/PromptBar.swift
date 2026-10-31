@@ -7,8 +7,8 @@ import SwiftUI
 /// and the one suggestion. Starting an agent is still its own screen (029). But talking
 /// to one is now the same as on the Mac, from top to bottom: where it is working, how
 /// full it is and what runs it; the cost limit when it has been reached; what is
-/// attached; the runtime's commands and the Mac's files; the field with attach, dictate
-/// and send; and the agent's own controls under it.
+/// attached; the runtime's commands and the Mac's files; then one outlined composer with
+/// its field above its attach, dictate, voice and send actions; and the agent's controls under it.
 ///
 /// Two things differ, both because this is a touch screen. The suggestion is a chip
 /// rather than the field's placeholder (031), and a touched file opens the change in a
@@ -38,7 +38,6 @@ struct PromptBar: View {
     /// Why something picked could not be attached, said where it was picked.
     @State private var attachRefusal: String?
     @State private var dictation = Dictation()
-    @State private var isPrimingDictation = false
     /// Set when the list is put away, so it stays away until the word changes.
     @State private var dismissedCommandTerm: String?
     @State private var selectedCommand = 0
@@ -65,7 +64,6 @@ struct PromptBar: View {
                 // window and the page (#108, #242).
                 PromptHead(agent: agent)
                 PromptHeader(agent: agent,
-                             leaseStatus: model.work.leaseStatus(of: agent.id),
                              background: agent.background,
                              backgroundActions: BackgroundActions(
                                 stop: { [model] item in await model.stopBackground(item, of: agent.id) },
@@ -76,10 +74,6 @@ struct PromptBar: View {
                                 goOn: { Task { await model.letThisAgentGoOn(agent) } }) {
                     RaiseTheLimitOnTheMac()
                 }
-            }
-            if !attachments.isEmpty {
-                AttachmentStrip(attachments: $attachments,
-                                capabilities: model.promptCapabilities(for: agent.runtimeID))
             }
             if let attachRefusal {
                 Text(attachRefusal).appText(.fine).tinted(.failure)
@@ -119,19 +113,13 @@ struct PromptBar: View {
         .padding(.vertical, 12)
         .animation(.easeOut(duration: 0.15), value: isCompleting)
         .animation(.easeOut(duration: 0.15), value: isMentioning)
-        .sheet(isPresented: $isPrimingDictation) { dictationPrimer.paperSheet() }
-        .alert("Dictation", isPresented: Binding(get: { dictation.problem != nil },
-                                                 set: { if !$0 { dictation.dismissProblem() } })) {
-            // Where a switch would fix it, offer to open the switch.
-            if let permission = dictation.problem?.permission {
-                Button("Open Settings") { UIApplication.shared.open(permission.settings) }
-            }
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(dictation.problem?.message ?? "")
-        }
         .onAppear { restoreDraft() }
         .onChange(of: agent.id) { restoreDraft() }
+        // Voice mode listens with its own dictation: this bar's stops, so the same words do
+        // not go two ways (#2445).
+        .onChange(of: VoiceMode.shared.isOn) { _, isOn in
+            if isOn { dictation.stop() }
+        }
         // Opened: its runtime starts now, so the reply does not wait for it (#183). Once
         // it has been on screen a moment, so paging past chats starts nothing (#202).
         .task(id: agent.id) {
@@ -186,180 +174,182 @@ struct PromptBar: View {
 
     // MARK: What you want done
 
+    /// Voice mode is on in this chat (#2375).
+    private var voiceIsOn: Bool { VoiceMode.shared.isOn(in: agent.id) }
+
     private var field: some View {
-        HStack(alignment: .bottom, spacing: 8) {
-            TextField(PromptWords.placeholder(for: agent), text: $text, selection: $selection, axis: .vertical)
-                .textFieldStyle(.plain)
-                .appText(.reading)
-                .lineLimit(1...8)
-                .overlay(alignment: .topLeading) { heardUnderline }
-                .focused($focused)
-                .onChange(of: focused) { _, now in model.isTyping = now }
-                // ⌘V of a picture from an iPad's keyboard attaches it (#396).
-                .modifier(PastesPictures(attachments: $attachments, refusal: $attachRefusal))
-                .accessibilityLabel("What to say to \(agent.title ?? "this agent")")
-                // The Mac's keys, from an iPad's keyboard. SwiftUI hands these over from
-                // a hardware keyboard only, so the on-screen one is left as iOS has it:
-                // Return is a new line and Send is the button. From a hardware keyboard,
-                // Return sends, and Shift-Return and Option-Return are a new line (#377, #1514).
-                .onKeyPress(.return, phases: .down) { press in
-                    guard PromptReturn(option: press.modifiers.contains(.option),
-                                       shift: press.modifiers.contains(.shift)) == .send else { return .ignored }
-                    if isCompleting || isMentioning { acceptSelected() } else { send() }
-                    return .handled
-                }
-                .onKeyPress(.tab) {
-                    if isCompleting || isMentioning {
-                        acceptSelected()
-                        return .handled
-                    }
-                    guard let suggestion else { return .ignored }
-                    take(suggestion)
-                    return .handled
-                }
-                .onKeyPress(.downArrow) {
-                    if isCompleting {
-                        selectedCommand = min(selectedCommand + 1, matchingCommands.count - 1)
-                        return .handled
-                    }
-                    if isMentioning {
-                        selectedMention = min(selectedMention + 1, mentions.count - 1)
-                        return .handled
-                    }
-                    // The prompts sent before, as a terminal gives back its commands (#1551).
-                    if let step = PromptHistory.recall(.down, text: text, sent: sentPrompts, at: recalled) {
-                        text = step.text
-                        recalled = step.at
-                        return .handled
-                    }
-                    return .ignored
-                }
-                .onKeyPress(.upArrow) {
-                    if isCompleting {
-                        selectedCommand = max(selectedCommand - 1, 0)
-                        return .handled
-                    }
-                    if isMentioning {
-                        selectedMention = max(selectedMention - 1, 0)
-                        return .handled
-                    }
-                    // The prompts sent before, as a terminal gives back its commands (#1551).
-                    if let step = PromptHistory.recall(.up, text: text, sent: sentPrompts, at: recalled) {
-                        text = step.text
-                        recalled = step.at
-                        return .handled
-                    }
-                    return .ignored
-                }
-                .onKeyPress(.escape) {
-                    if isCompleting {
-                        dismissedCommandTerm = commandQuery?.term
-                        return .handled
-                    }
-                    if isMentioning {
-                        dismissedMentionTerm = mentionQuery?.term
-                        return .handled
-                    }
-                    guard suggestion != nil else { return .ignored }
-                    dismissedSuggestions = true
-                    return .handled
-                }
-
-            AttachButton(attachments: $attachments, refusal: $attachRefusal)
-
-            Button(action: toggleDictation) {
-                Image(systemName: dictation.isListening ? "waveform" : "microphone")
-                    .appText(.reading).fontWeight(.semibold)
-                    .frame(width: 22, height: 22)
-                    .symbolEffect(.variableColor, isActive: dictation.isListening)
+        VStack(alignment: .leading, spacing: 8) {
+            if !attachments.isEmpty {
+                AttachmentStrip(attachments: $attachments,
+                                capabilities: model.promptCapabilities(for: agent.runtimeID))
             }
-            .buttonStyle(.paper)
-            .buttonBorderShape(.circle)
-            .accessibilityLabel(dictation.isListening ? "Stop dictating" : "Dictate")
-
-            // While it works and nothing is typed, send is stop. Type and it is send
-            // again, queueing what is typed for when the turn ends.
-            if model.canStop(agent), !model.isStale(agent), text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-               sending == 0 {
-                let acting = model.acting(agent.id)
-                Button {
-                    Task { await model.stop(agent.id) }
-                } label: {
-                    Group {
-                        if acting == .stop {
-                            ProgressView()
-                        } else {
-                            Image(systemName: PromptWords.stopSymbol)
-                                .appText(.reading).fontWeight(.semibold)
-                        }
-                    }
-                    .frame(width: 22, height: 22)
-                }
-                .buttonStyle(.paperProminent)
-                .buttonBorderShape(.circle)
-                // Held while something else is on its way to this agent. Not while it is Stop: (#87).
-                // the one that went stays bright, as on the answer cards (#86), and the
-                // model refuses a second press.
-                .disabled(acting != nil && acting != .stop)
-                .help(PromptWords.stopHelp)
-                .accessibilityLabel("Stop")
-                .accessibilityValue(acting == .stop ? Telling.words(doing: "Stopping", host: "your Mac") : "")
+            // Voice mode (#2322) takes only the field's place: the options stay, to change
+            // one while it listens, as on the Mac (Alex, 2026-10-29).
+            if voiceIsOn {
+                VoiceSpeechPrompt()
+                    .frame(minHeight: 44, alignment: .topLeading)
             } else {
-                Button(action: send) {
-                    Group {
-                        if sending > 0 {
-                            ProgressView()
-                        } else {
-                            Image(systemName: PromptWords.sendSymbol(willQueue: willQueue))
-                                .appText(.reading).fontWeight(.semibold)
-                        }
+                TextField(policyRefusal ?? PromptWords.placeholder(for: agent), text: $text, selection: $selection, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .appText(.reading)
+                    .lineLimit(2...8)
+                    .overlay(alignment: .topLeading) { HeardUnderline(dictation: dictation, text: text) }
+                    .focused($focused)
+                    .onChange(of: focused) { _, now in model.isTyping = now }
+                    // ⌘V of a picture from an iPad's keyboard attaches it (#396).
+                    .modifier(PastesPictures(attachments: $attachments, refusal: $attachRefusal))
+                    .accessibilityLabel("What to say to \(agent.title ?? "this agent")")
+                    // The Mac's keys, from an iPad's keyboard. SwiftUI hands these over from
+                    // a hardware keyboard only, so the on-screen one is left as iOS has it:
+                    // Return is a new line and Send is the button. From a hardware keyboard,
+                    // Return sends, and Shift-Return and Option-Return are a new line (#377, #1514).
+                    .onKeyPress(.return, phases: .down) { press in
+                        guard PromptReturn(option: press.modifiers.contains(.option),
+                                           shift: press.modifiers.contains(.shift)) == .send else { return .ignored }
+                        if isCompleting || isMentioning { acceptSelected() } else { send() }
+                        return .handled
                     }
-                    .frame(width: 22, height: 22)
-                }
-                .buttonStyle(.paperProminent)
-                .buttonBorderShape(.circle)
-                // Bright while its own spinner turns, as the answer that went stays bright
-                // on the cards (#86); `send()` refuses the press meanwhile.
-                .disabled(!canSend && sending == 0)
-                .accessibilityLabel(PromptWords.sendLabel(willQueue: willQueue))
-                .accessibilityHint(willQueue ? PromptWords.sendHelp(willQueue: true) : "")
+                    .onKeyPress(.tab) {
+                        if isCompleting || isMentioning {
+                            acceptSelected()
+                            return .handled
+                        }
+                        guard let suggestion else { return .ignored }
+                        take(suggestion)
+                        return .handled
+                    }
+                    .onKeyPress(.downArrow) {
+                        if isCompleting {
+                            selectedCommand = min(selectedCommand + 1, matchingCommands.count - 1)
+                            return .handled
+                        }
+                        if isMentioning {
+                            selectedMention = min(selectedMention + 1, mentions.count - 1)
+                            return .handled
+                        }
+                        // The prompts sent before, as a terminal gives back its commands (#1551).
+                        if let step = PromptHistory.recall(.down, text: text, sent: sentPrompts, at: recalled) {
+                            text = step.text
+                            recalled = step.at
+                            return .handled
+                        }
+                        return .ignored
+                    }
+                    .onKeyPress(.upArrow) {
+                        if isCompleting {
+                            selectedCommand = max(selectedCommand - 1, 0)
+                            return .handled
+                        }
+                        if isMentioning {
+                            selectedMention = max(selectedMention - 1, 0)
+                            return .handled
+                        }
+                        // The prompts sent before, as a terminal gives back its commands (#1551).
+                        if let step = PromptHistory.recall(.up, text: text, sent: sentPrompts, at: recalled) {
+                            text = step.text
+                            recalled = step.at
+                            return .handled
+                        }
+                        return .ignored
+                    }
+                    .onKeyPress(.escape) {
+                        if isCompleting {
+                            dismissedCommandTerm = commandQuery?.term
+                            return .handled
+                        }
+                        if isMentioning {
+                            dismissedMentionTerm = mentionQuery?.term
+                            return .handled
+                        }
+                        guard suggestion != nil else { return .ignored }
+                        dismissedSuggestions = true
+                        return .handled
+                    }
+                    .frame(minHeight: 44, alignment: .topLeading)
             }
+
+            HStack(spacing: 8) {
+                AttachButton(attachments: $attachments, refusal: $attachRefusal)
+
+                Spacer(minLength: 0)
+                // Dictate and voice mode sit with send, on the right (#2634).
+                DictateButton(dictation: dictation, begin: beginDictation, send: send)
+
+                // Voice mode (#2322), while Settings ▸ Voice has it on.
+                VoiceModeButton(agentID: agent.id, vocabulary: { speechSeeds }) { words, stopping in
+                    if let stopping { await model.stop(stopping) }
+                    return await model.send(words, to: agent.id, voice: true) ? agent.id : nil
+                }
+
+                // Voice mode's Stop is where send and stop are, as on the Mac (Alex, 2026-10-29).
+                // While it works and nothing is typed, send is stop. Type and it is send
+                // again, queueing what is typed for when the turn ends.
+                if voiceIsOn {
+                    VoiceStopButton()
+                } else if model.canStop(agent), !model.isStale(agent), text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                   sending == 0 {
+                    let acting = model.acting(agent.id)
+                    Button {
+                        Task { await model.stop(agent.id) }
+                    } label: {
+                        Group {
+                            if acting == .stop {
+                                ProgressView()
+                            } else {
+                                Image(systemName: PromptWords.stopSymbol)
+                                    .appText(.reading).fontWeight(.semibold)
+                            }
+                        }
+                        .frame(width: 22, height: 22)
+                    }
+                    .buttonStyle(.paperProminent)
+                    .buttonBorderShape(.circle)
+                    // Held while something else is on its way to this agent. Not while it is Stop: (#87).
+                    // the one that went stays bright, as on the answer cards (#86), and the
+                    // model refuses a second press.
+                    .disabled(acting != nil && acting != .stop)
+                    .help(PromptWords.stopHelp)
+                    .accessibilityLabel("Stop")
+                    .accessibilityValue(acting == .stop ? Telling.words(doing: "Stopping", host: "your Mac") : "")
+                } else {
+                    Button(action: send) {
+                        Group {
+                            if sending > 0 {
+                                ProgressView()
+                            } else {
+                                Image(systemName: PromptWords.sendSymbol(willQueue: willQueue))
+                                    .appText(.reading).fontWeight(.semibold)
+                            }
+                        }
+                        .frame(width: 22, height: 22)
+                    }
+                    .buttonStyle(.paperProminent)
+                    .buttonBorderShape(.circle)
+                    // Bright while its own spinner turns, as the answer that went stays bright
+                    // on the cards (#86); `send()` refuses the press meanwhile.
+                    .disabled(!canSend && sending == 0)
+                    .accessibilityLabel(PromptWords.sendLabel(willQueue: willQueue))
+                    .accessibilityHint(willQueue ? PromptWords.sendHelp(willQueue: true) : "")
+                }
+            }
+            // Each button takes a 44 pt tap, though it is drawn at 32 (#2897).
+            .environment(\.paperTapTargets, true)
         }
-        .padding(14)
+        .padding(10)
+        .frame(minHeight: 94, alignment: .topLeading)
         .paperRaised(in: RoundedRectangle(cornerRadius: 18))
     }
 
-    /// The words dictation is still hearing, underlined as system dictation does until
-    /// they settle (#448). A plain-text field cannot style part of its text, so this is
-    /// the same text laid over the field, invisible but for the underline. The field
-    /// itself is left exactly as it is: its keys, paste, focus and height. Once the text
-    /// is taller than the field, the field scrolls and the copy could not follow it, so
-    /// then nothing is drawn.
-    @ViewBuilder private var heardUnderline: some View {
-        if let heard = dictation.heardWords, heard.upperBound <= text.count {
-            ViewThatFits(in: .vertical) {
-                Text(Self.underlining(heard, of: text))
-                    .appText(.reading)
-                    .fixedSize(horizontal: false, vertical: true)
-                Color.clear
-            }
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
-        }
-    }
-
-    private static func underlining(_ heard: Range<Int>, of text: String) -> AttributedString {
-        var styled = AttributedString(text)
-        styled.foregroundColor = .clear
-        let lower = styled.index(styled.startIndex, offsetByCharacters: heard.lowerBound)
-        let upper = styled.index(lower, offsetByCharacters: heard.count)
-        styled[lower..<upper].underlineStyle = Text.LineStyle(pattern: .solid, color: .secondary)
-        return styled
+    /// Why nothing can be sent on the Mac's host now, in its organisation's words (#998). A
+    /// server says its own when it refuses.
+    private var policyRefusal: String? {
+        agent.host == .mac ? model.policyState?.composerReason : nil
     }
 
     private var canSend: Bool {
+        guard policyRefusal == nil else { return false }
         // A stopped workspace that starts when used keeps what is sent until it is up (#691 US3).
-        (!model.isStale(agent) || model.startsWhenUsed(agent.host)) && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return (!model.isStale(agent) || model.startsWhenUsed(agent.host)) && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     /// Whether what is typed now will wait for the turn to end rather than go.
@@ -402,48 +392,20 @@ struct PromptBar: View {
 
     // MARK: Said instead of typed
 
-    private func toggleDictation() {
-        if dictation.isListening {
-            dictation.stop()
-        } else if dictation.hasBeenAsked {
-            beginDictation()
-        } else {
-            isPrimingDictation = true
-        }
+    /// The open folders, and this folder's titles and issue numbers (#2515). Read only when
+    /// dictation or voice mode starts, never in `body` (#2732).
+    private var speechSeeds: [String] {
+        DictationVocabulary.seeds(folders: model.work.folders, agents: model.work.agents, in: agent.folderPath)
     }
 
     private func beginDictation() {
         focused = true
         // What is already in the field stays, and the words go in at the cursor.
         dictation.start(in: text, selection: DictationCursor.range(of: selection, in: text),
-                        vocabulary: [agent.title].compactMap { $0 }) { field, cursor in
+                        vocabulary: speechSeeds) { field, cursor in
             text = field
             selection = DictationCursor.selection(cursor, in: field)
         }
-    }
-
-    /// Our own words before the system's alert, the first time only.
-    private var dictationPrimer: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text(PromptWords.dictationPrimerTitle).appText(.reading).fontWeight(.semibold)
-            Text("The phone listens while the button is on, and what you say becomes the words in the prompt. It is recognised on this phone where this phone can do it.")
-                .foregroundStyle(.secondary)
-            Text("iOS will ask for the microphone and for speech recognition next.")
-                .appText(.supporting)
-                .foregroundStyle(.secondary)
-            HStack {
-                Spacer()
-                Button("Not now") { isPrimingDictation = false }
-                    .buttonStyle(.paper)
-                Button("Continue") {
-                    isPrimingDictation = false
-                    beginDictation()
-                }
-                .buttonStyle(.paperProminent)
-            }
-        }
-        .padding(20)
-        .presentationDetents([.medium])
     }
 
     // MARK: Kept against this conversation
@@ -566,7 +528,12 @@ struct PromptBar: View {
         if case .controls(let shown) = state {
             optionsRow(shown)
         } else {
-            OptionsNote(state: state)
+            VStack(alignment: .leading, spacing: 8) {
+                OptionsNote(state: state)
+                if ClientPermissionSettings.supports(agent.runtimeID) {
+                    optionsRow([])
+                }
+            }
         }
     }
 
@@ -575,11 +542,30 @@ struct PromptBar: View {
     /// order. It scrolls sideways, as the Mac's does in a narrow window, rather than
     /// wrapping or cutting a control short; the row is given a floor of its own width
     /// so the spacer has something to push against.
+    /// A Model or Permission mode pill (#2658), as the Mac's.
+    private func levelPill(_ field: AutoField, own: [ConfigOption]) -> some View {
+        LevelPill(field: field,
+                  chosen: field == .model ? agent.levels?.model?.rawValue : agent.levels?.permission?.rawValue,
+                  runtimeName: PromptWords.runtimeName(agent.runtimeID),
+                  cell: { model.autoMappings.cell(agent.runtimeID, field, $0) },
+                  own: own, binding: binding(for:)) { level in
+            Task { await model.setAgentLevel(agent.id, field, level) }
+        }
+    }
+
     private func optionsRow(_ shown: [ConfigOption]) -> some View {
         ScrollView(.horizontal) {
             HStack(spacing: 10) {
-                ForEach(shown.filter(\.isAboutPermission)) { option in
-                    OptionMenu(option: option, chosen: binding(for: option))
+                if ClientPermissionSettings.supports(agent.runtimeID) {
+                    ClientPermissionCapsule(runtimeID: agent.runtimeID, own: agent.clientPermission,
+                                            settings: model.clientPermissions.mode(for: agent.runtimeID)) { mode in
+                        Task { await model.setAgentClientPermission(agent.id, mode) }
+                    }
+                }
+                // The permission mode in the shared words (#2658), the runtime's own behind ⋯.
+                let permissions = shown.filter(\.isAboutPermission)
+                if !permissions.isEmpty || model.autoMappings.cell(agent.runtimeID, .permission, "ask")?.native != nil {
+                    levelPill(.permission, own: permissions)
                 }
                 // The command sandbox, beside the mode, as on the Mac (064).
                 SandboxCapsule(runtimeID: agent.runtimeID,
@@ -587,13 +573,14 @@ struct PromptBar: View {
                                runtimeDefault: model.sandboxSettings.choice(for: agent.runtimeID),
                                codexMode: agent.startOptions.values["mode"]?.stringValue,
                                effective: agent.effectiveSandbox,
-                               isWorking: agent.state == .running) { choice in
+                               isWorking: agent.state == .running,
+                               setBy: model.sandboxSettings.setBy) { choice in
                     Task { await model.setAgentSandbox(agent.id, choice) }
                 }
                 Spacer(minLength: 16)
                 let others = shown.filter { !$0.isAboutPermission }
                 if !others.isEmpty {
-                    ModelPill(options: others, binding: binding(for:))
+                    levelPill(.model, own: others)
                 }
                 // What it has used, beside how it thinks.
                 ContextMeter(agent: agent)
@@ -653,14 +640,14 @@ private struct SuggestionChip: View {
 private struct PromptHead: View {
     @Environment(RemoteModel.self) private var model
     let agent: Agent
-    /// The project folder's branch, for an agent working there rather than in a worktree.
-    @State private var projectBranch: String?
+    /// The folder's branch, for an agent working there rather than in a worktree.
+    @State private var folderBranch: String?
     @Environment(\.horizontalSizeClass) private var sizeClass
-    /// At compact width the labels are one line until tapped (#1107).
+    /// At compact width the labels are one line, and a tap opens them in a popover (#2173).
     @State private var editingLabels = false
 
     var body: some View {
-        HStack(alignment: sizeClass == .compact && !editingLabels ? .center : .top, spacing: 10) {
+        HStack(alignment: sizeClass == .compact ? .center : .top, spacing: 10) {
             if let place {
                 Text(place)
                     .lineLimit(1)
@@ -676,42 +663,27 @@ private struct PromptHead: View {
             // chips wrapped beside empty space (#670).
             labels
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Text(PromptWords.runtimeName(agent.runtimeID))
+            Text(PromptWords.runtimeName(agent, accounts: model.accountProfiles))
                 .lineLimit(1)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 4)
                 .appText(.fine)
                 .fixedSize()
                 .paperRaised(in: .capsule)
-                .accessibilityLabel("Runtime: \(PromptWords.runtimeName(agent.runtimeID))")
+                .accessibilityLabel("Runtime: \(PromptWords.runtimeName(agent, accounts: model.accountProfiles))")
         }
         // Asked once a chat, as the window asks: the branch is not on the agent's record.
         .task(id: "\(agent.id)-\(agent.cwd.path)") {
-            projectBranch = agent.worktree == nil ? await model.projectFolderBranch(of: agent) : nil
+            folderBranch = agent.worktree == nil ? await model.folderPathBranch(of: agent) : nil
         }
     }
 
     /// On an iPhone, one line: the first label and +N, or Add label with none. A tap opens
-    /// the whole field in place, focused, and it folds again when the field loses the focus.
-    /// The iPad has the room for the field (#1107).
+    /// the whole field in a popover, focused, so the head stays one line and the chat does
+    /// not move (#2173). The iPad has the room for the field (#1107).
     @ViewBuilder private var labels: some View {
         if sizeClass != .compact {
             RemoteSessionLabels(agent: agent, compact: false)
-        } else if editingLabels {
-            HStack(alignment: .top, spacing: 6) {
-                LabelTagField(labels: agent.labels,
-                              suggestions: model.labelSuggestions(in: agent.projectFolder),
-                              add: { values in Task { _ = await model.setLabels(on: agent.id, add: values) } },
-                              remove: { value in Task { _ = await model.setLabels(on: agent.id, remove: [value]) } },
-                              focusFirst: true,
-                              onEndEditing: { editingLabels = false })
-                // With five labels there is no field to lose the focus: this folds it.
-                Button("Done") { editingLabels = false }
-                    .appText(.fine)
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Paper.accent)
-                    .padding(.vertical, 3)
-            }
         } else {
             Button { editingLabels = true } label: {
                 if agent.labels.isEmpty {
@@ -728,13 +700,36 @@ private struct PromptHead: View {
                 ? "Add label"
                 : "Labels: \(agent.labels.map(\.value).joined(separator: ", "))")
             .accessibilityHint("Edits the labels.")
+            .popover(isPresented: $editingLabels, arrowEdge: .bottom) {
+                labelEditor
+                    .presentationCompactAdaptation(.popover)
+            }
         }
     }
 
-    /// Its worktree, or the project folder's branch. None for an archived agent, whose
+    /// The whole field, as the iPad has it. Each change applies as it is made, so a tap
+    /// outside closes it as Done does.
+    private var labelEditor: some View {
+        VStack(alignment: .trailing, spacing: 8) {
+            LabelTagField(labels: agent.labels,
+                          suggestions: model.labelSuggestions(in: agent.folderPath),
+                          add: { values in Task { _ = await model.setLabels(on: agent.id, add: values) } },
+                          remove: { value in Task { _ = await model.setLabels(on: agent.id, remove: [value]) } },
+                          focusFirst: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button("Done") { editingLabels = false }
+                .appText(.fine)
+                .buttonStyle(.plain)
+                .foregroundStyle(Paper.accent)
+        }
+        .padding(12)
+        .frame(width: 300)
+    }
+
+    /// Its worktree, or the folder's branch. None for an archived agent, whose
     /// place may be gone, as on the window.
     private var place: String? {
         guard agent.state != .archived else { return nil }
-        return agent.worktree?.name ?? projectBranch
+        return agent.worktree?.name ?? folderBranch
     }
 }

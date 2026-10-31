@@ -202,7 +202,7 @@ func (d *Daemon) raiseCostLimit(limit string, a *wire.Agent) {
 	if a != nil {
 		details := agentDetails(a)
 		details["limit"] = limit
-		d.raise(wire.EventDraft{Name: "cost.limit_reached", At: now(), Scope: projectScope(projectFolder(a)),
+		d.raise(wire.EventDraft{Name: "cost.limit_reached", At: now(), Scope: folderScope(folderPath(a)),
 			Sentence: agentName(a.Title) + " reached its spending limit.", Details: details})
 		return
 	}

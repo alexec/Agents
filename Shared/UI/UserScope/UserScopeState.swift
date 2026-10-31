@@ -17,9 +17,6 @@ final class UserScopeState {
     /// Why the user scope could not be read, or nil.
     private(set) var problem: String?
 
-    /// Whether a part is the same on every machine.
-    func follows(_ part: DaemonAPI.UserSettingsPartName) -> Bool { settings?[part] != nil }
-
     func load(_ control: DaemonClient?) async {
         guard let control else {
             problem = "The control plane can’t be reached."

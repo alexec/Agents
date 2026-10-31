@@ -2,10 +2,10 @@
 // plane's TLS address and a browser-kind client through the web remote's loopback listener,
 // each with a fresh `agents-control code --client` (add `--browser` for the browser's), and has
 // each ask what only an operator could before: the control plane's clients, a pairing code,
-// a host code, and on the Mac's host the helper limits (#64), a folder outside any project
+// a host code, and on the Mac's host the helper limits (#64), a folder outside any folder
 // and the client permissions. Prints what each call answered. Scratch roots only.
 //
-//   node Web/test/walk/onegrant.mjs <CONTROL_URL> <client code> <WEB_URL> <browser code> <project folder>
+//   node Web/test/walk/onegrant.mjs <CONTROL_URL> <client code> <WEB_URL> <browser code> <folder>
 
 import { load } from "../load.mjs";
 
@@ -83,10 +83,10 @@ for (const [label, base, code, kind] of [["phone (iPhone, TLS)", controlURL, pho
     ["clients/startPairing", {}, null],
     ["hosts/startEnroll", {}, null],
     ["clients/stopPairing", {}, null],
-    ["projects/setHelperLimits", { folder: `file://${folder}`, limits: { running: 4, notArchived: 6 } }, "mac"],
+    ["folders/setHelperLimits", { folder: `file://${folder}`, limits: { running: 4, notArchived: 6 } }, "mac"],
     ["files/browse", { path: folder.replace(/\/[^/]+\/?$/, "") }, "mac"],
     ["clientPermissions/state", {}, "mac"],
-    ["projects/list", {}, "mac"],
+    ["folders/list", {}, "mac"],
   ];
   for (const [method, params, host] of calls) {
     const answer = await c.ask(method, params, host);

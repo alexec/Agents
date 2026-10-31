@@ -11,7 +11,7 @@
 # because the sandboxed window reaches every host through the control plane and runs nothing.
 #
 # For a Mac archive it also checks the app's entitlements are T044's list and no more:
-# the sandbox, network client, audio input and user-selected read-only files, plus the
+# the sandbox, network client, audio input and user-selected read-write files (Export…, #2302), plus the
 # identifiers signing adds, and one app group (#1118, #1546): 6T4RVD5724.com.alexecollins.agents,
 # where agentsd's socket for the window is. A team-prefixed group needs no registration on
 # macOS, and the Mac App Store profile allows 6T4RVD5724.*. Any other group is a failure.
@@ -19,8 +19,19 @@
 # For a Mac archive every file must be readable by everyone: App Store Connect refuses an
 # installer package holding one only its owner can read (90255), which a shell with umask
 # 077 leaves in _CodeSignature.
+#
+# scripts/check-store-entitlements.py checks App/Agents-Store.entitlements against the same
+# list, so a pull request fails on a new entitlement before a release's archive does (#2498).
 
 set -euo pipefail
+expected=(
+  application-identifier com.apple.application-identifier com.apple.developer.team-identifier
+  com.apple.security.app-sandbox com.apple.security.device.audio-input
+  com.apple.security.files.user-selected.read-write com.apple.security.network.client
+  com.apple.security.get-task-allow keychain-access-groups
+  com.apple.security.application-groups com.apple.developer.applesignin
+)
+
 archive=${1:?usage: check-store-archive.sh path/to/Some.xcarchive}
 [[ -d $archive/Products ]] || { print -u2 "$archive is not an archive (no Products)"; exit 2 }
 
@@ -77,13 +88,6 @@ if (( mac )); then
 fi
 
 if (( mac )); then
-  expected=(
-    application-identifier com.apple.application-identifier com.apple.developer.team-identifier
-    com.apple.security.app-sandbox com.apple.security.device.audio-input
-    com.apple.security.files.user-selected.read-only com.apple.security.network.client
-    com.apple.security.get-task-allow keychain-access-groups
-    com.apple.security.application-groups
-  )
   # The only app group the window may join: the one it shares with Agents Host (#1118).
   groups_allowed=( 6T4RVD5724.com.alexecollins.agents )
   # get-task-allow is a development signature's; an App Store export removes it.

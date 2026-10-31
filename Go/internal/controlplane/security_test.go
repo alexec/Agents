@@ -44,6 +44,7 @@ func (c *countingStore) Get(ctx context.Context, key string) (*store.Object, err
 // P1: a crowd of made-up client and host ids costs one read of the store, not one each,
 // and another crowd straight after costs none.
 func TestUnknownIDsReadTheStoreOnce(t *testing.T) {
+	t.Parallel()
 	st := &countingStore{Store: store.NewMemory()}
 	p := startPlane(t, st, controllink.NewPrivateKey())
 	// Past the window of any read Start made.
@@ -67,9 +68,10 @@ func TestUnknownIDsReadTheStoreOnce(t *testing.T) {
 	}
 	before := st.lists.Load()
 	crowd()
-	// One read lists the clients, the hosts, the people (#994) and the groups (#1761).
-	if got := st.lists.Load() - before; got > 4 {
-		t.Fatalf("200 made-up ids made %d lists; one read is 4", got)
+	// One read lists the clients, the hosts, the people (#994), the groups (#1761) and the
+	// projects (#2317).
+	if got := st.lists.Load() - before; got > 5 {
+		t.Fatalf("200 made-up ids made %d lists; one read is 5", got)
 	}
 	before = st.lists.Load()
 	crowd()
@@ -80,6 +82,7 @@ func TestUnknownIDsReadTheStoreOnce(t *testing.T) {
 
 // P1: a member paired at another copy is still admitted, once the window has passed.
 func TestAMemberPairedElsewhereIsReadAgain(t *testing.T) {
+	t.Parallel()
 	st := store.NewMemory()
 	p := startPlane(t, st, controllink.NewPrivateKey())
 	time.Sleep(readAgainEvery)
@@ -98,6 +101,7 @@ func TestAMemberPairedElsewhereIsReadAgain(t *testing.T) {
 
 // P3: twenty failed proofs in a minute, then a minute of refusals; the minute passes.
 func TestSourcesRefuseAfterTwentyFailedProofs(t *testing.T) {
+	t.Parallel()
 	now := time.Unix(1_000_000, 0)
 	table := newSources(nil, func(string) {})
 	table.now = func() time.Time { return now }
@@ -134,6 +138,7 @@ func TestSourcesRefuseAfterTwentyFailedProofs(t *testing.T) {
 // P3: fifty sockets waiting to prove a key from one address, and the fifty-first is
 // refused until one has.
 func TestSourcesCapSocketsWaitingForAuth(t *testing.T) {
+	t.Parallel()
 	table := newSources(nil, func(string) {})
 	var waiting []func(bool)
 	for range waitingAllowed {
@@ -159,6 +164,7 @@ func TestSourcesCapSocketsWaitingForAuth(t *testing.T) {
 
 // P3: the table holds a bounded number of addresses, letting idle ones go.
 func TestSourcesHoldABoundedTable(t *testing.T) {
+	t.Parallel()
 	table := newSources(nil, func(string) {})
 	for i := range 3 * sourcesHeld {
 		addr := netip.AddrFrom4([4]byte{10, byte(i >> 16), byte(i >> 8), byte(i)}).String()
@@ -175,6 +181,7 @@ func TestSourcesHoldABoundedTable(t *testing.T) {
 
 // P3: X-Forwarded-For says where a socket came from only when the proxy wrote it.
 func TestForwardedForIsTrustedOnlyFromTheProxy(t *testing.T) {
+	t.Parallel()
 	trusted, err := ParseTrustedProxies("172.30.61.250, 10.0.0.0/8")
 	if err != nil {
 		t.Fatal(err)
@@ -243,6 +250,7 @@ func failProof(t *testing.T, url, from string) int {
 // P3 end to end: behind a trusted proxy, a stranger that fails twenty proofs is refused
 // before its socket opens, and a member from another address is not.
 func TestAStrangerIsRefusedAfterTwentyFailedProofs(t *testing.T) {
+	t.Parallel()
 	port := freePort(t)
 	url := "http://127.0.0.1:" + itoa(port)
 	s, err := New(Config{Store: store.NewMemory(), PrivateKey: controllink.NewPrivateKey(), URL: url, Bind: "127.0.0.1",
@@ -277,6 +285,7 @@ func TestAStrangerIsRefusedAfterTwentyFailedProofs(t *testing.T) {
 // P4: a copy that was forwarding when it stopped comes back frozen and forwarding, to the
 // same list, until the same time; --no-forwarding serves again.
 func TestAForwardingCopyForwardsAfterARestart(t *testing.T) {
+	t.Parallel()
 	key := controllink.NewPrivateKey()
 	st := store.NewMemory()
 	port := freePort(t)
@@ -338,6 +347,7 @@ func TestAForwardingCopyForwardsAfterARestart(t *testing.T) {
 // Logs: no code, no code's id, no MAC and no key reaches a log line, whether the code
 // pairs, fails, or the store can't read it.
 func TestNoSecretReachesTheLog(t *testing.T) {
+	t.Parallel()
 	private := controllink.NewPrivateKey()
 	st := &countingStore{Store: store.NewMemory()}
 	p := startPlane(t, st, private)
@@ -401,6 +411,7 @@ func TestNoSecretReachesTheLog(t *testing.T) {
 
 // P3 in Caddy: every site in the Caddyfiles caps its request bodies.
 func TestEveryPublicRouteCapsItsBody(t *testing.T) {
+	t.Parallel()
 	for _, name := range []string{"Caddyfile.public", "Caddyfile"} {
 		data, err := os.ReadFile(filepath.Join("..", "..", "..", "deploy", name))
 		if err != nil {

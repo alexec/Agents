@@ -1,10 +1,10 @@
 // What the Things-style sidebar (#495, #499) gathers and in what order, as the window's and the
-// Remote's `SidebarSmartRow` and `SidebarProjectFold` (AgentsKitCore/Sidebar) work it out: the
-// smart groups at the top across every project (Pinned, Needs You, Working, Unread), and each
-// project's sessions as one list, newest started first, the state the row's mark. Each session is
+// Remote's `SidebarSmartRow` and `SidebarFolderFold` (AgentsKitCore/Sidebar) work it out: the
+// smart groups at the top across every folder (Pinned, Needs You, Working, Unread), and each
+// folder's sessions as one list, newest started first, the state the row's mark. Each session is
 // listed once, in its first group (#587). Needs You holds everything waiting for the person (#773):
 // sessions asking or blocked, sessions asking to be archived (#584, #649, once a group of their own),
-// and each project's approvals as rows of their own.
+// and each folder's approvals as rows of their own.
 import type { Agent, Approval, WorkflowSummary } from "../protocol/generated";
 import { asksToArchive, byStart, folderKey, groupOf, showsUnread } from "./groups";
 import { queryMatches, type LabelQuery } from "./labels";
@@ -30,7 +30,7 @@ export function smartStartsOpen(row: SmartRow): boolean {
 /**
  * Where a live session is listed (#587), as `SidebarSmartRow.home`: once, in the first of the smart
  * groups it belongs to (Pinned, Needs You (asking, blocked, or asking to be archived, #773), Working,
- * Unread), or, in none of them, under its project (null). A group turned off (#846) is passed over:
+ * Unread), or, in none of them, under its folder (null). A group turned off (#846) is passed over:
  * its sessions go to the next one they fit, so one unread that asks to be archived goes to Unread
  * with Needs You off.
  */
@@ -42,12 +42,6 @@ export function home(agent: Agent, isPinned: boolean, on: ReadonlySet<SmartRow> 
   if (waits && on.has("needsYou")) return "needsYou";
   if (group === "running" && on.has("working")) return "working";
   return showsUnread(agent) && on.has("unread") ? "unread" : null;
-}
-
-/** Whether a live session, not pinned, is listed under Needs You, Working or Unread. */
-export function inSmartRow(row: Exclude<SmartRow, "pinned">, agent: Agent,
-  on: ReadonlySet<SmartRow> = allSmartRows): boolean {
-  return home(agent, false, on) === row;
 }
 
 /** The mark a session's row carries in the sidebar (#495): what it wants, or null for its own status mark. */
@@ -72,42 +66,36 @@ export function sessionMark(agent: Agent): SessionMark | null {
     // A queued helper waits for a free place, not on anything it asked for.
     case "waiting": return agent.state === "queued" ? "queued" : "waiting";
     // Asking to be archived (#584) is what the person has left to do with it, as the window's mark says.
-    // Read or unread, one ring (#1323): the bold title alone says unread.
+    // Read or unread, one tick (#1323, #2363): the bold title alone says unread.
     case "finished": return asksToArchive(agent) ? "asksToArchive" : "done";
     case "stopped": return asksToArchive(agent) ? "asksToArchive" : "paused";
     default: return null;
   }
 }
 
-/** One project's pinned sessions, held and not archived, in the order they were put in, as a search leaves them. */
+/** One folder's pinned sessions, held and not archived, in the order they were put in, as a search leaves them. */
 export function pinnedSessions(live: readonly Agent[], pins: readonly string[], query?: LabelQuery): Agent[] {
   const pinned = pins.flatMap((id) => live.filter((a) => a.id === id && a.state !== "archived"));
   return query ? pinned.filter((a) => queryMatches(query, a)) : pinned;
 }
 
-/** One project's pinned workflows held and not archived (#432), in their order. */
+/** One folder's pinned workflows held and not archived (#432), in their order. */
 export function pinnedWorkflows(held: readonly WorkflowSummary[], pins: readonly string[]): WorkflowSummary[] {
   return pins.flatMap((id) => held.filter((w) => w.workflow.workflowID === id && !w.isArchived));
 }
 
 /**
- * A project's live sessions as one list (#495), those a smart group lists left out, as each is
+ * A folder's live sessions as one list (#495), those a smart group lists left out, as each is
  * listed once (#587): newest started first, not by last activity, so a working session does not
  * climb past the pointer with every line (#357). `kept` is the session Unread keeps while it is
  * open, listed there and not here (#689). `on` is the smart groups turned on (#846): with Pinned
  * off, the pinned are listed here as any other.
  */
-export function projectSessions(live: readonly Agent[], pins: readonly string[], query?: LabelQuery,
+export function folderSessions(live: readonly Agent[], pins: readonly string[], query?: LabelQuery,
   kept?: string, on: ReadonlySet<SmartRow> = allSmartRows): Agent[] {
   const pinned = new Set(pins);
   return live.filter((a) => home(a, pinned.has(a.id), on) === null && a.id !== kept && (!query || queryMatches(query, a)))
     .sort(byStart);
-}
-
-/** How many sessions a project's own group lists, folded or not (#587), as `SidebarProjectFold.ownCount`. */
-export function ownCount(live: readonly Agent[], pins: readonly string[], kept?: string,
-  on: ReadonlySet<SmartRow> = allSmartRows): number {
-  return projectSessions(live, pins, undefined, kept, on).length;
 }
 
 /**
@@ -122,7 +110,7 @@ export function keepsInUnread(agent: Agent, pins: readonly string[], on: Readonl
 }
 
 /**
- * What a smart group (not Pinned) gathers from the projects' live sessions, the pinned left out
+ * What a smart group (not Pinned) gathers from the folders' live sessions, the pinned left out
  * as they are listed in Pinned (#587): newest started first. With a group off (#846), each goes
  * where `home` puts it, the pinned too while Pinned is off; a group off gathers nothing.
  */
@@ -145,47 +133,47 @@ export function withKept(agents: readonly Agent[], kept: Agent | undefined): Age
 }
 
 /**
- * What waits for an OK across the projects named, each with its project (#773), as
+ * What waits for an OK across the folders named, each with its folder (#773), as
  * `SidebarSmartRow.approvals`: only Needs You lists them, after its sessions, oldest waiting first
  * (one with no time first of all). A session's archive request is its own row, not one of these. A
  * search matches the title, the kind and the grey line.
  */
-export function smartApprovals<P>(projects: readonly { project: P; approvals?: readonly Approval[] | undefined }[],
-  query = ""): { project: P; approval: Approval }[] {
+export function smartApprovals<P>(folders: readonly { folder: P; approvals?: readonly Approval[] | undefined }[],
+  query = ""): { folder: P; approval: Approval }[] {
   const words = query.trim().toLowerCase();
-  return projects.flatMap(({ project, approvals }) => (approvals ?? [])
+  return folders.flatMap(({ folder, approvals }) => (approvals ?? [])
     .filter((a) => !isSessionApproval(a)
       && (!words || `${a.title} ${kindWords[a.kind]} ${a.line}`.toLowerCase().includes(words)))
-    .map((approval) => ({ project, approval })))
+    .map((approval) => ({ folder, approval })))
     .sort((a, b) => sinceOf(a.approval) - sinceOf(b.approval));
 }
 
-/** When it began waiting, the unknown first: a stable sort keeps those in their projects' order. */
+/** When it began waiting, the unknown first: a stable sort keeps those in their folders' order. */
 function sinceOf(approval: Approval): number {
   return approval.since ?? Number.MIN_SAFE_INTEGER;
 }
 
-export interface ProjectKey { host: string; folder: string }
+export interface FolderKey { host: string; folder: string }
 
-function sameProject(a: ProjectKey, b: ProjectKey): boolean {
+function sameFolder(a: FolderKey, b: FolderKey): boolean {
   return a.host === b.host && folderKey(a.folder) === folderKey(b.folder);
 }
 
 /**
- * The project New Session at the top of the sidebar starts in (#495): the last one a new session
- * was opened in, while it is still a live project; otherwise the one open; otherwise the first.
+ * The folder New Session at the top of the sidebar starts in (#495): the last one a new session
+ * was opened in, while it is still a live folder; otherwise the one open; otherwise the first.
  */
-export function newSessionProject(live: readonly ProjectKey[], remembered: ProjectKey | undefined,
-  open: ProjectKey | undefined): ProjectKey | undefined {
-  if (remembered && live.some((p) => sameProject(p, remembered))) return live.find((p) => sameProject(p, remembered));
-  if (open && live.some((p) => sameProject(p, open))) return live.find((p) => sameProject(p, open));
+export function newSessionFolder(live: readonly FolderKey[], remembered: FolderKey | undefined,
+  open: FolderKey | undefined): FolderKey | undefined {
+  if (remembered && live.some((p) => sameFolder(p, remembered))) return live.find((p) => sameFolder(p, remembered));
+  if (open && live.some((p) => sameFolder(p, open))) return live.find((p) => sameFolder(p, open));
   return live[0];
 }
 
-const rememberedKey = "agents.sidebar.newSessionProject";
+const rememberedKey = "agents.sidebar.newSessionFolder";
 
-/** The project New Session last opened in, kept in localStorage as the window keeps it in defaults. */
-export function rememberedProject(storage: Storage | undefined): ProjectKey | undefined {
+/** The folder New Session last opened in, kept in localStorage as the window keeps it in defaults. */
+export function rememberedFolder(storage: Storage | undefined): FolderKey | undefined {
   try {
     const stored = JSON.parse(storage?.getItem(rememberedKey) ?? "null");
     return stored && typeof stored.host === "string" && typeof stored.folder === "string"
@@ -195,12 +183,12 @@ export function rememberedProject(storage: Storage | undefined): ProjectKey | un
   }
 }
 
-export function rememberProject(storage: Storage | undefined, project: ProjectKey): void {
+export function rememberFolder(storage: Storage | undefined, folder: FolderKey): void {
   try {
-    const was = rememberedProject(storage);
-    if (was && sameProject(was, project)) return;
-    storage?.setItem(rememberedKey, JSON.stringify({ host: project.host, folder: project.folder }));
+    const was = rememberedFolder(storage);
+    if (was && sameFolder(was, folder)) return;
+    storage?.setItem(rememberedKey, JSON.stringify({ host: folder.host, folder: folder.folder }));
   } catch {
-    // A private window may refuse to store; the first project stands in.
+    // A private window may refuse to store; the first folder stands in.
   }
 }

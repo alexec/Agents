@@ -23,9 +23,9 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// A project's plugins, each approved or waiting (DaemonCore+PluginApproval). A plugin in
+// A folder's plugins, each approved or waiting (DaemonCore+PluginApproval). A plugin in
 // .agents/plugins can carry hooks and MCP servers that a runtime runs by itself, so a
-// digest of its folder is kept here, outside the project, in plugin-approvals.json, and one
+// digest of its folder is kept here, outside the folder, in plugin-approvals.json, and one
 // that no longer matches waits for the person's Approve. Every plugin present when approval
 // began is approved as it stands.
 //
@@ -34,9 +34,8 @@ import (
 
 func (d *Daemon) registerPlugins() {
 	On(d, wire.CallPluginsList, func(ctx context.Context, c *Client, r wire.PluginsListRequest) (wire.PluginsList, error) {
-		folder := store.FolderPath(r.Folder)
-		project := pluginProject(folder)
-		return wire.PluginsList{Folder: store.FolderURL(project), Plugins: d.projectPlugins(folder)}, nil
+		folder := pluginFolder(store.FolderPath(r.Folder))
+		return wire.PluginsList{Folder: store.FolderURL(folder), Plugins: d.folderPlugins(folder)}, nil
 	})
 	On(d, wire.CallPluginsApprove, func(ctx context.Context, c *Client, r wire.PluginApproveRequest) (wire.PluginsList, error) {
 		return d.approvePlugin(r)
@@ -63,7 +62,7 @@ func beganMarker(path string) string {
 
 // loadPluginApprovals reads the file (ApprovalFile.read). One that is there and cannot be
 // read approves nothing, and so does one that lost approvalsBegan once it had begun.
-// Approval begins here the first time, with every plugin in a project approved as it is.
+// Approval begins here the first time, with every plugin in a folder approved as it is.
 func (d *Daemon) loadPluginApprovals() (r pluginApprovals, unreadable bool) {
 	path := d.pluginApprovalsPath()
 	_, markErr := os.Stat(beganMarker(path))
@@ -82,8 +81,8 @@ func (d *Daemon) loadPluginApprovals() (r pluginApprovals, unreadable bool) {
 		r.Approved = map[string]string{}
 	}
 	if r.ApprovalsBegan == nil {
-		for _, p := range d.projects(true) {
-			for _, plugin := range pluginFolders(store.FolderPath(p.Project.Folder)) {
+		for _, p := range d.folders(true) {
+			for _, plugin := range pluginFolders(store.FolderPath(p.Folder.Folder)) {
 				if digest, ok := pluginDigest(plugin); ok {
 					r.Approved[pluginKey(plugin)] = digest
 				}
@@ -113,15 +112,15 @@ func (d *Daemon) savePluginApprovals(r pluginApprovals) error {
 	return nil
 }
 
-// projectPlugins is every plugin in the project folder belongs to, approved or waiting.
-func (d *Daemon) projectPlugins(folder string) []wire.ProjectPlugin {
+// folderPlugins is every plugin in the folder belongs to, approved or waiting.
+func (d *Daemon) folderPlugins(folder string) []wire.FolderPlugin {
 	pluginMu.Lock()
 	records, unreadable := d.loadPluginApprovals()
 	pluginMu.Unlock()
-	project := pluginProject(folder)
-	out := []wire.ProjectPlugin{}
+	parent := pluginFolder(folder)
+	out := []wire.FolderPlugin{}
 	for _, plugin := range pluginFolders(folder) {
-		out = append(out, wire.ProjectPlugin{Project: store.FolderURL(project), Folder: store.FolderURL(plugin),
+		out = append(out, wire.FolderPlugin{FolderPath: store.FolderURL(parent), Folder: store.FolderURL(plugin),
 			Name: filepath.Base(plugin), Carries: pluginCarries(plugin),
 			AwaitingApproval: d.pluginAwaiting(plugin, records, unreadable)})
 	}
@@ -150,17 +149,17 @@ func (d *Daemon) pluginAwaiting(plugin string, r pluginApprovals, unreadable boo
 // since, nothing is approved and they are told.
 func (d *Daemon) approvePlugin(r wire.PluginApproveRequest) (wire.PluginsList, error) {
 	plugin := filepath.Clean(store.FolderPath(r.Plugin))
-	project := filepath.Dir(filepath.Dir(filepath.Dir(plugin)))
+	folder := filepath.Dir(filepath.Dir(filepath.Dir(plugin)))
 	listed := false
 	if strings.HasSuffix(filepath.Dir(plugin), "/.agents/plugins") {
-		for _, p := range pluginFolders(project) {
+		for _, p := range pluginFolders(folder) {
 			if pluginKey(p) == pluginKey(plugin) {
 				listed = true
 			}
 		}
 	}
 	if !listed {
-		return wire.PluginsList{}, Invalid("%s is not a plugin in a project's .agents/plugins.", filepath.Base(plugin))
+		return wire.PluginsList{}, Invalid("%s is not a plugin in a folder's .agents/plugins.", filepath.Base(plugin))
 	}
 	if digest, _ := pluginDigest(plugin); digest != r.Digest {
 		return wire.PluginsList{}, &Error{Code: wire.FailureNotChanged,
@@ -172,6 +171,7 @@ func (d *Daemon) approvePlugin(r wire.PluginApproveRequest) (wire.PluginsList, e
 		path := d.pluginApprovalsPath()
 		if b, err := os.ReadFile(path); err == nil {
 			os.WriteFile(fmt.Sprintf("%s.unreadable-%d", path, time.Now().Unix()), b, 0o644)
+			store.TrimSetAsides(path)
 		}
 		began := now()
 		records = pluginApprovals{ApprovalsBegan: &began, Approved: map[string]string{}}
@@ -182,8 +182,8 @@ func (d *Daemon) approvePlugin(r wire.PluginApproveRequest) (wire.PluginsList, e
 	if err != nil {
 		return wire.PluginsList{}, &Error{Code: CodeServer, Message: "The plugin approval could not be saved: " + err.Error()}
 	}
-	log.Printf("plugins: %s in %s approved", filepath.Base(plugin), project)
-	list := wire.PluginsList{Folder: store.FolderURL(project), Plugins: d.projectPlugins(project)}
+	log.Printf("plugins: %s in %s approved", filepath.Base(plugin), folder)
+	list := wire.PluginsList{Folder: store.FolderURL(folder), Plugins: d.folderPlugins(folder)}
 	Broadcast(d, wire.NotifyPluginsChanged, list)
 	return list, nil
 }
@@ -191,9 +191,9 @@ func (d *Daemon) approvePlugin(r wire.PluginApproveRequest) (wire.PluginsList, e
 // pluginKey is the folder as listed, cleaned: what an approval is kept under.
 func pluginKey(plugin string) string { return filepath.Clean(plugin) }
 
-// pluginProject is the project a working folder belongs to: itself, or for one of the
-// app's worktrees, the project it was made from (DotAgents.projectFolder).
-func pluginProject(cwd string) string {
+// pluginFolder is the folder a working folder belongs to: itself, or for one of the
+// app's worktrees, the folder it was made from (DotAgents.folderPath).
+func pluginFolder(cwd string) string {
 	path := filepath.Clean(cwd)
 	if resolved, err := store.Resolve(path); err == nil {
 		path = resolved
@@ -204,10 +204,10 @@ func pluginProject(cwd string) string {
 	return path
 }
 
-// pluginFolders is every folder in the project's .agents/plugins, by name, a link to a
+// pluginFolders is every folder in the folder's .agents/plugins, by name, a link to a
 // folder included.
 func pluginFolders(cwd string) []string {
-	dir := filepath.Join(pluginProject(cwd), ".agents", "plugins")
+	dir := filepath.Join(pluginFolder(cwd), ".agents", "plugins")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil

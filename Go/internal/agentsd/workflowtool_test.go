@@ -17,14 +17,14 @@ import (
 func TestAnAgentWritesAWorkflow(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	a := seeded(t, d, dir, nil)
 	m := appClient(t, d, a.ID)
 	m.post("initialize", map[string]any{}, 1)
-	if text, _ := m.tool(2, "manage_workflows", map[string]any{"action": "list"}); text != "This project has no workflows yet. They live in .agents/workflows, one Markdown file each." {
+	if text, _ := m.tool(2, "manage_workflows", map[string]any{"action": "list"}); text != "This folder has no workflows yet. They live in .agents/workflows, one Markdown file each." {
 		t.Fatal(text)
 	}
-	if text, isErr := m.tool(3, "manage_workflows", map[string]any{"action": "write", "id": "../x", "content": "x"}); !isErr || !strings.HasPrefix(text, "Workflows can only be read and written inside this project's .agents/workflows") {
+	if text, isErr := m.tool(3, "manage_workflows", map[string]any{"action": "write", "id": "../x", "content": "x"}); !isErr || !strings.HasPrefix(text, "Workflows can only be read and written inside this folder's .agents/workflows") {
 		t.Fatal(text)
 	}
 	if text, isErr := m.tool(4, "manage_workflows", map[string]any{"action": "write", "id": "bad", "content": "no front matter"}); !isErr ||
@@ -63,7 +63,7 @@ func TestAnAgentRunsAWorkflow(t *testing.T) {
 	fakeRuntimes(t)
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	write := func(id, text string) {
@@ -117,7 +117,7 @@ func TestTheSessionThatRanAWorkflowArchivesIt(t *testing.T) {
 	fakeRuntimes(t)
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "review.md"), []byte("---\nname: Review\non: manual\n---\nReview what changed.\n"), 0o644)
 	approveAll(t, c, store.FolderURL(dir))

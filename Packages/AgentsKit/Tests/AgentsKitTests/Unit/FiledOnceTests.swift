@@ -9,10 +9,10 @@ import Testing
 struct FiledOnceTests {
     private let api = URL(filePath: "/tmp/work/api")
     private let web = URL(filePath: "/tmp/work/web")
-    private let devbox = HostID(rawValue: "devbox01")
+    private let devbox = MachineRef(rawValue: "devbox01")
     private let t0 = Date(timeIntervalSince1970: 1_800_000_000)
 
-    private func agent(_ folder: URL, _ state: AgentState, at offset: Double, host: HostID = .mac) -> Agent {
+    private func agent(_ folder: URL, _ state: AgentState, at offset: Double, host: MachineRef = .mac) -> Agent {
         var agent = Agent(runtimeID: "claude", cwd: folder, title: "t", state: state,
                           lastActivityAt: t0.addingTimeInterval(offset))
         agent.host = host
@@ -20,25 +20,25 @@ struct FiledOnceTests {
     }
 
     /// `agents(in:group:)` as it was: a pass over everything held.
-    private func scanned(_ model: AgentsModel, _ folder: URL, _ group: AgentGroup, host: HostID? = nil) -> [UUID] {
-        let wanted = Project.standardize(folder)
+    private func scanned(_ model: AgentsModel, _ folder: URL, _ group: AgentGroup, host: MachineRef? = nil) -> [UUID] {
+        let wanted = Folder.standardize(folder)
         let found = model.agents.filter {
-            $0.projectFolder == wanted && model.group(of: $0) == group && (host == nil || $0.host == host)
+            $0.folderPath == wanted && model.group(of: $0) == group && (host == nil || $0.host == host)
         }
-        return found.sorted(by: ProjectShelf.order(group)).map(\.id)
+        return found.sorted(by: FolderShelf.order(group)).map(\.id)
     }
 
     private func expectAgreement(_ model: AgentsModel, _ note: Comment) {
         for folder in [api, web] {
             for group in AgentGroup.allCases {
                 #expect(model.agents(in: folder, group: group).map(\.id) == scanned(model, folder, group), note)
-                for host in [HostID.mac, devbox] {
-                    #expect(model.agents(in: ProjectKey(host: host, folder: folder), group: group).map(\.id)
+                for host in [MachineRef.mac, devbox] {
+                    #expect(model.agents(in: FolderKey(host: host, folder: folder), group: group).map(\.id)
                             == scanned(model, folder, group, host: host), note)
                 }
             }
-            let key = ProjectKey(host: .mac, folder: folder)
-            let held = model.agents.filter { $0.projectFolder == Project.standardize(folder) }
+            let key = FolderKey(host: .mac, folder: folder)
+            let held = model.agents.filter { $0.folderPath == Folder.standardize(folder) }
             let mine = held.filter { $0.host == .mac }
             #expect(model.unreadCount(in: folder) == held.count(where: \.showsUnread), note)
             #expect(model.unreadCount(in: key) == mine.count(where: \.showsUnread), note)
@@ -173,7 +173,7 @@ struct FiledOnceTests {
         model.replaceAgents(held)
         let page = (0..<12).map { agent(web, .archived, at: Double(100 + $0)) }
         model.takeListed(page)
-        let wanted = (held + page).sorted(by: ProjectShelf.byActivity)
+        let wanted = (held + page).sorted(by: FolderShelf.byActivity)
         #expect(model.agents.map(\.id) == wanted.map(\.id))
         expectAgreement(model, "a long page")
     }
@@ -198,7 +198,7 @@ struct FiledOnceTests {
 
     private func event(_ position: EventPosition, _ folder: URL, at offset: Double) -> Event {
         Event(EventDraft(name: "agent.finished", at: t0.addingTimeInterval(offset),
-                         scope: .project(folder: folder), sentence: "finished", details: [:]),
+                         scope: .folder(folder: folder), sentence: "finished", details: [:]),
               position: position)
     }
 
@@ -218,7 +218,7 @@ struct FiledOnceTests {
         model.upsert(fresh)
         model.forget([held[3].id, held[10].id, fresh.id])
         let kept = held.enumerated().filter { ![3, 10].contains($0.offset) }.map(\.element)
-        #expect(model.agents.map(\.id) == kept.sorted(by: ProjectShelf.byActivity).map(\.id))
+        #expect(model.agents.map(\.id) == kept.sorted(by: FolderShelf.byActivity).map(\.id))
         #expect(model.agentCount == kept.count)
     }
 
@@ -234,7 +234,7 @@ struct FiledOnceTests {
         #expect(all.events.map(\.position) == [4, 3, 2, 1])
         #expect(all.days.map { $0.events.map(\.position) } == [[4, 3], [2, 1]])
 
-        let onlyAPI = EventFilter(scope: .project(folder: api))
+        let onlyAPI = EventFilter(scope: .folder(folder: api))
         #expect(model.shownEvents(onlyAPI, calendar: calendar).days.map { $0.events.map(\.position) } == [[4], [2, 1]])
 
         model.takeEvent(event(5, api, at: day + 120))

@@ -7,8 +7,8 @@ import Testing
 @MainActor
 @Suite("The events a window keeps")
 struct EventsPageModelTests {
-    private let api = EventScope.project(folder: URL(filePath: "/tmp/work/api"))
-    private let web = EventScope.project(folder: URL(filePath: "/tmp/work/web"))
+    private let api = EventScope.folder(folder: URL(filePath: "/tmp/work/api"))
+    private let web = EventScope.folder(folder: URL(filePath: "/tmp/work/web"))
     private let t0 = Date(timeIntervalSince1970: 1_800_000_000)
 
     private func event(_ position: EventPosition, _ name: String = "agent.finished",

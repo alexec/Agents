@@ -3,8 +3,8 @@ import Foundation
 
 /// What the fake Mac has on it.
 ///
-/// Chosen to make the screens hard rather than easy: a project whose folder has gone,
-/// two projects that would share a name, an agent waiting on a question, one working
+/// Chosen to make the screens hard rather than easy: a folder whose folder has gone,
+/// two folders that would share a name, an agent waiting on a question, one working
 /// with a plan half done, one that crashed, one archived, and a conversation long
 /// enough that opening it has to page.
 ///
@@ -67,6 +67,17 @@ enum Canned {
                       availability: .needsSignIn(authMethods: [], fixCommand: "grok login")),
     ]
 
+    /// The working agent holding "build" for 18 minutes more, for the chat's lease line.
+    static var leases: DaemonAPI.LeaseSnapshot {
+        let name = ResourceName("build")!
+        let lease = Lease(resource: name, displayName: "build", holder: working,
+                          grantedAt: ago(4), expiresAt: Date().addingTimeInterval(18 * 60))
+        return DaemonAPI.LeaseSnapshot(resources: [DaemonAPI.ResourceState(name: name, kind: .named,
+                                                                           displayName: "build",
+                                                                           holds: [lease])],
+                                       at: Date())
+    }
+
     static var agents: [Agent] {
         [
             Agent(id: waiting, runtimeID: "claude", cwd: agentsFolder,
@@ -111,15 +122,15 @@ enum Canned {
                   title: "Update the call sites", state: .finished,
                   createdAt: ago(70), lastActivityAt: ago(44),
                   endedReason: .endTurn, costToDate: ["USD": 0.22],
-                  report: WorkReport(outcome: .partlyDone,
+                  report: WorkReport(outcome: .done,
                                      message: "Five of six done; the sixth is generated code.",
                                      at: ago(44))),
             Agent(id: stuck, runtimeID: "cursor", cwd: apiFolder,
                   title: "Ship the release", state: .finished,
                   createdAt: ago(60), lastActivityAt: ago(35),
                   endedReason: .endTurn, costToDate: ["USD": 0.08],
-                  report: WorkReport(outcome: .stuck,
-                                     message: "No signing certificate on this machine.",
+                  report: WorkReport(outcome: .needsAnswer,
+                                     message: "No signing certificate here: shall I make one?",
                                      at: ago(35))),
             // Waiting on two agents of its own, one of which has finished (039): under
             // Blocked, grey, with a line for each.
@@ -127,7 +138,7 @@ enum Canned {
                   title: "Land the settings rewrite", state: .finished,
                   createdAt: ago(50), lastActivityAt: ago(12),
                   endedReason: .endTurn, costToDate: ["USD": 0.19],
-                  report: WorkReport(outcome: .blocked,
+                  report: WorkReport(outcome: .waiting,
                                      message: "Waiting on the two helpers before I merge.",
                                      at: ago(12),
                                      block: Block(waits: [
@@ -157,7 +168,7 @@ enum Canned {
                   endedReason: .endTurn, costToDate: ["USD": 0.05],
                   outcomeAsked: true),
             Agent(id: filed, runtimeID: "claude", cwd: agentsFolder,
-                  title: "The project lead that came back out", state: .archived,
+                  title: "The folder lead that came back out", state: .archived,
                   createdAt: ago(2_200), lastActivityAt: ago(2_000),
                   archivedReason: .byUser),
             // Waiting on an event (042): the wait card at the end of its chat, with Show in
@@ -168,15 +179,20 @@ enum Canned {
                   endedReason: .endTurn,
                   eventWait: EventWait(patterns: [EventPattern("checks.passed")], from: 0,
                                        deadline: ago(-55), since: ago(5))),
-            Agent(id: inTheOther, runtimeID: "cursor", cwd: apiFolder,
-                  title: "Work out what the new tier costs", state: .running,
-                  createdAt: ago(9), lastActivityAt: ago(3)),
+            {
+                var agent = Agent(id: inTheOther, runtimeID: "cursor", cwd: apiFolder,
+                                  title: "Work out what the new tier costs", state: .running,
+                                  createdAt: ago(9), lastActivityAt: ago(3))
+                // In a tool, so a walk sees the ring pivot beside one that thinks (#2332).
+                agent.runningTool = "swift test"
+                return agent
+            }(),
         ]
     }
 
     /// The daemon works these out from the agents, so the fake does too rather than
     /// writing counts by hand that could disagree with the cards below them.
-    static func projects(for agents: [Agent]) -> [DaemonAPI.ProjectSummary] {
+    static func folders(for agents: [Agent]) -> [DaemonAPI.FolderSummary] {
         let folders: [(URL, String, Bool, Date?)] = [
             (agentsFolder, "Agents", true, nil),
             (apiFolder, "pricing/api", true, nil),
@@ -188,8 +204,8 @@ enum Canned {
             var counts: [AgentGroup: Int] = [:]
             // The preview says what the daemon says: without eyes.
             for agent in mine { counts[agent.group(), default: 0] += 1 }
-            return DaemonAPI.ProjectSummary(
-                project: Project(folder: folder, archivedAt: archivedAt, addedAt: ago(9_000)),
+            return DaemonAPI.FolderSummary(
+                folder: Folder(folder: folder, archivedAt: archivedAt, addedAt: ago(9_000)),
                 name: name,
                 exists: exists,
                 lastActivityAt: mine.map(\.lastActivityAt).max() ?? ago(9_000),
@@ -217,25 +233,25 @@ enum Canned {
                 text: "The Mac ships two columns and a push, which is already the shape a phone wants.")),
             TranscriptEntry(at: ago(39), kind: .agentMessage(
                 messageID: nil,
-                text: "Starting with the project list. I will copy what shipped rather than what the contract described.")),
+                text: "Starting with the folder list. I will copy what shipped rather than what the contract described.")),
             TranscriptEntry(at: ago(36), kind: .toolCall(ToolCall(
                 toolCallID: "t1",
-                title: "Read ProjectAgentsView.swift",
+                title: "Read FolderAgentsView.swift",
                 kind: "read",
                 content: [.content(.text("200 lines, the 144pt gutter and the grouped cards."))],
-                locations: [ToolCallLocation(path: "/App/Sources/Projects/ProjectAgentsView.swift",
+                locations: [ToolCallLocation(path: "/App/Sources/Folders/FolderAgentsView.swift",
                                              line: 1)]))),
             TranscriptEntry(at: ago(30), kind: .toolCall(ToolCall(
                 toolCallID: "t2",
-                title: "Write Remote/Sources/Projects/ProjectListView.swift",
+                title: "Write Remote/Sources/Folders/FolderListView.swift",
                 kind: "edit",
                 content: [.diff(ToolCallContent.Diff(
-                    path: "/Remote/Sources/Projects/ProjectListView.swift",
-                    oldText: "struct ProjectListView: View {\n    var body: some View {\n        List {}\n    }\n}\n",
-                    newText: "struct ProjectListView: View {\n    var body: some View {\n        List(model.liveProjects) { ProjectRow(summary: $0) }\n    }\n}\n"))]))),
+                    path: "/Remote/Sources/Folders/FolderListView.swift",
+                    oldText: "struct FolderListView: View {\n    var body: some View {\n        List {}\n    }\n}\n",
+                    newText: "struct FolderListView: View {\n    var body: some View {\n        List(model.liveFolders) { FolderRow(summary: $0) }\n    }\n}\n"))]))),
             TranscriptEntry(at: ago(24), kind: .planUpdated(Plan(planID: "p1", entries: [
-                PlanEntry(content: "The project list", status: .completed),
-                PlanEntry(content: "The project page", status: .inProgress),
+                PlanEntry(content: "The folder list", status: .completed),
+                PlanEntry(content: "The folder page", status: .inProgress),
                 PlanEntry(content: "The conversation", status: .pending),
             ]))),
             TranscriptEntry(at: ago(20), kind: .toolCall(ToolCall(

@@ -107,6 +107,7 @@ func (d *Daemon) loadDevices() {
 	var raws []json.RawMessage
 	if json.Unmarshal(b, &raws) != nil {
 		os.Rename(d.devicesFile(), fmt.Sprintf("%s.corrupt-%d", d.devicesFile(), time.Now().Unix()))
+		store.TrimSetAsides(d.devicesFile())
 		log.Print("devices.json: could not read it; starting with no paired devices")
 		return
 	}
@@ -252,8 +253,7 @@ func (d *Daemon) announce(c *Client, a wire.DeviceAnnouncement) (wire.AnnounceRe
 	if i < 0 {
 		safe.Go("reconsider", d.reconsider)
 	}
-	return wire.AnnounceReply{ID: r.ID, PublicKey: r.PublicKey, Name: r.Name, Kind: r.Kind, AnnouncedAt: r.AnnouncedAt,
-		LastSeenAt: r.LastSeenAt, MayNotify: r.MayNotify, MacKey: d.relayKey()}, nil
+	return wire.AnnounceReply{Device: r.Device, MacKey: d.relayKey()}, nil
 }
 
 // forgetDevice is devices/forget: the Mac's window only. Its connections are closed too,

@@ -57,6 +57,14 @@ func copyStoreLeaving(ctx context.Context, from, to store.Store, leaving []strin
 	if err != nil {
 		return 0, 0, err
 	}
+	// A store of a build before #2316 keeps machines under v1/hosts (#2662): they land
+	// under v1/machines, unless the store has both.
+	oldMachines := true
+	for _, k := range keys {
+		if strings.HasPrefix(k.Key, records.MachinesPrefix) {
+			oldMachines = false
+		}
+	}
 	written := map[string][]byte{}
 	for _, k := range keys {
 		if leftOut(k.Key, leaving) {
@@ -70,11 +78,15 @@ func copyStoreLeaving(ctx context.Context, from, to store.Store, leaving []strin
 		if object == nil {
 			continue
 		}
+		key := k.Key
+		if oldMachines && strings.HasPrefix(key, records.OldMachinesPrefix) {
+			key = records.MachinesPrefix + strings.TrimPrefix(key, records.OldMachinesPrefix)
+		}
 		// Create only: a destination written to meanwhile is a conflict, not overwritten.
-		if _, err := to.Put(ctx, k.Key, object.Data, store.Absent); err != nil {
+		if _, err := to.Put(ctx, key, object.Data, store.Absent); err != nil {
 			return 0, 0, err
 		}
-		written[k.Key] = object.Data
+		written[key] = object.Data
 	}
 	landed, err := to.List(ctx, "v1/")
 	if err != nil {

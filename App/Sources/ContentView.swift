@@ -9,15 +9,14 @@ struct ContentView: View {
     /// scene's content: see the note in `AgentsApp`.
     let requests: WindowRequests
     let frame: SidebarFrame
-    /// The project's own shell under the page (#418).
-    let terminal: ProjectTerminalFrame
+    /// The folder's own shell under the page (#418).
+    let terminal: FolderTerminalFrame
     @State private var sidebarStates = SidebarStates()
     @State private var webHolders = WebHolders()
-    /// Which columns are showing. The projects stay put: moving between them is the
+    /// Which columns are showing. The folders stay put: moving between them is the
     /// ordinary thing to do here, and a list that hides itself when used is a list you
     /// have to keep fetching back.
     @State private var columns = NavigationSplitViewVisibility.all
-    @State private var offeringMove = false
 
     /// Put the file the selected agent asked about in front of the user.
     ///
@@ -79,11 +78,11 @@ struct ContentView: View {
         // Its toggle is in the detail's toolbar.
     }
 
-    /// The one sidebar (#145): Activity, the projects folded open on their sessions, and
+    /// The one sidebar (#145): Activity, the folders folded open on their sessions, and
     /// at its foot what this Mac and its hosts are doing.
-    private var projects: some View {
+    private var folders: some View {
         @Bindable var model = model
-        return ProjectListView(selection: $model.sidebarItem)
+        return FolderListView(selection: $model.sidebarItem)
             .navigationSplitViewColumnWidth(min: 240, ideal: 300, max: 420)
             // A server asked for a credential there is none of (043).
             .sheet(item: $model.tokenAsk) { ask in
@@ -97,6 +96,10 @@ struct ContentView: View {
             // A known server with a new key: rebuilt, or not what it says (043).
             // Agents missing at start-up, offered once each (048). Closed any way at
             // all, what was missing counts as offered.
+            // An export or import on its way, with Cancel (#2437).
+            .sheet(item: $model.exportImport) { progress in
+                ExportImportProgressView(progress: progress).paperSheet()
+            }
             .sheet(isPresented: $model.isOfferingInstall,
                    onDismiss: { model.rememberInstallOffer() }) {
                 InstallAgentsSheet().paperSheet()
@@ -129,25 +132,32 @@ struct ContentView: View {
             // No files pane and no sidebar toggle: a workflow has no agent to have
             // asked about a file, so there would be nothing for either to show.
             WorkflowPage(workflowID: id).paperGround()
-        } else if case .review(let id)? = model.projectPage, let key = model.selectedProjectKey {
+        } else if case .review(let id)? = model.folderPage, let key = model.selectedFolderKey {
             // A change waiting for an OK, on its own page (#1472).
-            ReviewDestination(id: id, project: key).paperGround()
-        } else if model.projectPage == .mcpServers, let key = model.selectedProjectKey {
-            // A project's MCP servers, from its row in the sidebar (#753).
-            MCPServersView(project: key).paperGround()
-        } else if let page = model.projectPage, let key = model.selectedProjectKey {
-            // A project's workflows or its archive, from its row in the sidebar (#495).
-            ProjectWorkPage(page: page, project: key).paperGround()
-        } else if let path = model.openPin, let key = model.selectedProjectKey, let summary = model.selectedProjectSummary {
-            // One of the project's pinned pages (#159), live, where the chat would be; or a
+            ReviewDestination(id: id, folder: key).paperGround()
+        } else if model.folderPage == .mcpServers, let key = model.selectedFolderKey {
+            // A folder's MCP servers, from its row in the sidebar (#753).
+            MCPServersView(folder: key).paperGround()
+        } else if let page = model.folderPage, let key = model.selectedFolderKey {
+            // A folder's workflows or its archive, from its row in the sidebar (#495).
+            FolderWorkPage(page: page, folder: key).paperGround()
+        } else if let path = model.openPin, let key = model.selectedFolderKey, let summary = model.selectedFolderSummary {
+            // One of the folder's pinned pages (#159), live, where the chat would be; or a
             // pinned view (#189), fed afresh.
             VStack(spacing: 0) {
                 OfflineStrip(host: summary.host)
                 DiskStrip(host: summary.host)
-                if let pin = model.pins(in: key.folder).first(where: { $0.path == path }), let view = pin.view {
+                // Or a server's list view (#2032), whose Hide is its Unpin.
+                if let pin = model.work.pinOrView(path, in: key.folder), let view = pin.view {
                     PinnedViewPage(folder: key.folder, pin: pin, view: view,
                                    call: { method, params in try await model.client(for: key.host).call(method, params) },
-                                   unpin: { await model.unpin(path, in: key) },
+                                   unpin: {
+                                       if pin.isServerView {
+                                           await model.setViewHidden(path, true, in: key)
+                                       } else {
+                                           await model.unpin(path, in: key)
+                                       }
+                                   },
                                    startAgent: { model.offerStart($0, in: key) },
                                    recipient: { model.recipient(of: $0, in: key) },
                                    sendTo: { id, text in await model.send(text, to: id) },
@@ -155,15 +165,15 @@ struct ContentView: View {
                         // One page per pin, so another pin gets its own store and place (#872).
                         .id(pin.path)
                 } else {
-                    PinnedPage(project: key, path: path)
+                    PinnedPage(folder: key, path: path)
                 }
             }
             .paperGround()
         } else if model.selection != nil {
             chat(inWindowOf: width)
         } else if model.composing {
-            // A new session in the project: the empty chat with its prompt (066).
-            ProjectAgentsView(selection: Binding(get: { model.selection },
+            // A new session in the folder: the empty chat with its prompt (066).
+            FolderAgentsView(selection: Binding(get: { model.selection },
                                                  set: { model.selection = $0 }))
                 .paperGround()
         } else {
@@ -171,18 +181,18 @@ struct ContentView: View {
         }
     }
 
-    /// The project whose shell is under the page, while Control-` has it open (#418):
-    /// the selected project, with an agent chosen or none, but not under the pages
-    /// about all the work, which are no project's.
-    private var projectForTerminal: DaemonAPI.ProjectSummary? {
+    /// The folder whose shell is under the page, while Control-` has it open (#418):
+    /// the selected folder, with an agent chosen or none, but not under the pages
+    /// about all the work, which are no folder's.
+    private var folderForTerminal: DaemonAPI.FolderSummary? {
         guard terminal.isOpen, !model.showsEvents, !model.showsResources, !model.showsRuntimes,
               !model.showsMCPServers, !model.showsWorktrees,
-              !model.showsSpending, !model.showsTokens, !model.showsTime, !model.showsMilestones, let project = model.selectedProjectSummary, project.exists else { return nil }
-        return project
+              !model.showsSpending, !model.showsTokens, !model.showsTime, !model.showsMilestones, let folder = model.selectedFolderSummary, folder.exists else { return nil }
+        return folder
     }
 
     /// The selected session, while the detail shows its chat: not while a page, a
-    /// workflow, a project page or a pin is open over it (#926). Opening a workflow
+    /// workflow, a folder page or a pin is open over it (#926). Opening a workflow
     /// keeps the selection, so Back and the sidebar still know the session.
     private var chatAgent: Agent? { showsChat ? model.selectedAgent : nil }
 
@@ -192,15 +202,15 @@ struct ContentView: View {
         model.selection != nil && !model.showsEvents && !model.showsResources
             && !model.showsRuntimes && !model.showsMCPServers && !model.showsWorktrees
             && !model.showsSpending && !model.showsTime && !model.showsMilestones && model.openWorkflow == nil
-            && model.projectPage == nil && model.openPin == nil
+            && model.folderPage == nil && model.openPin == nil
     }
 
-    /// The detail's toolbar: what a project and its sessions are done with, in reach
+    /// The detail's toolbar: what a folder and its sessions are done with, in reach
     /// whichever of its pages is open (#97).
     @ToolbarContentBuilder
     private var detailToolbar: some ToolbarContent {
-        // No New Session button (#375): the project's New session row, ⌘N and the
-        // project menu start one.
+        // No New Session button (#375): the folder's New session row, ⌘N and the
+        // folder menu start one.
         // Pin and Archive (#586), as the workflow page has them: the two things a session
         // is most often done with. Archive leaves the chat, as ⌥⌘⌫ does.
         if let agent = chatAgent {
@@ -251,36 +261,41 @@ struct ContentView: View {
     /// The window's title: the worktree this build came from, then whatever the detail
     /// is reading. The primary checkout is "main".
     private var title: String {
-        AppCheckout.windowTitle(model.selectedAgent?.title ?? (model.composing ? model.selectedProjectSummary?.name : nil))
+        AppCheckout.windowTitle(model.selectedAgent?.title ?? (model.composing ? model.selectedFolderSummary?.name : nil))
     }
 
     var body: some View {
         @Bindable var model = model
         // A sidebar and what is being read (#145). Picking a session shows its chat
-        // beside the list rather than pushing it over the project, so moving between
+        // beside the list rather than pushing it over the folder, so moving between
         // two chats is one click, and the list stays in sight.
         // Today's set-up, offered the move to a control plane, never moved on its own
         // (058, frame I). Above the columns, not an inset: a split view's columns run
         // under an inset and hide their first rows behind it.
         VStack(spacing: 0) {
         if model.controlPlaneAway { ControlAwayStrip() }
+        // The organisation stopped all agent work, or this Mac follows no policy it can trust (#998).
+        OrgPolicyStrip(state: model.policyState)
         Group {
             if model.needsFirstRun {
                 // No control plane and nothing of the old way: one question, and no
                 // sidebar or toolbar until it is answered (058, frame A).
                 FirstRunView()
+            } else if model.signIn.suspended {
+                // The organisation turned this person's access off: only that (#1002, FR-029).
+                SuspendedPage(device: "Mac")
             } else {
                 // Two columns (#145): the one sidebar, then what is being read, with the
                 // inspector beside a chat.
                 NavigationSplitView(columnVisibility: $columns) {
-                    projects
+                    folders
                 } detail: {
                     GeometryReader { pane in
                         VStack(spacing: 0) {
                             detail(inPaneOf: pane.size.width)
                                 .frame(maxHeight: .infinity)
-                            if let project = projectForTerminal {
-                                ProjectTerminalPanel(project: project, pageHeight: pane.size.height)
+                            if let folder = folderForTerminal {
+                                FolderTerminalPanel(folder: folder, pageHeight: pane.size.height)
                             }
                         }
                     }
@@ -290,7 +305,7 @@ struct ContentView: View {
                     .overlay { fileSearch }
                     .toolbar { detailToolbar }
                     .navigationTitle(title)
-                    .navigationSubtitle(model.selectedAgent == nil ? "" : (model.selectedProjectSummary?.name ?? ""))
+                    .navigationSubtitle(model.selectedAgent == nil ? "" : (model.selectedFolderSummary?.name ?? ""))
                 }
             }
         }
@@ -306,20 +321,17 @@ struct ContentView: View {
         // A file a chat links to is on its host: that host opens it (058, US1). Links to
         // the web are the window's own.
         .environment(\.openURL, OpenURLAction { url in
-            guard url.isFileURL else { return .systemAction }
-            model.open(url, on: model.selectedProjectHost)
+            guard let fileURL = ChatLinkURL.fileURL(from: url) else { return .systemAction }
+            model.open(fileURL, on: model.selectedFolderHost)
             return .handled
         })
         .task { await model.stayConnected() }
-        // What opens a project's own window from outside a view: a notification, the
+        // What opens a folder's own window from outside a view: a notification, the
         // Dock's menu (#1089).
         .onAppear {
             AgentsAppDelegate.model = model
-            model.openProjectWindow = { [openWindow] in openWindow(id: ProjectWindowScene.id, value: $0) }
+            model.openFolderWindow = { [openWindow] in openWindow(id: FolderWindowScene.id, value: $0) }
         }
-        // No tabs: the only way left to a second window, and a second window would be a
-        // mirror of the first, because what is selected lives on the one model.
-        .onAppear { NSWindow.allowsAutomaticWindowTabbing = false }
         // An agent asking to be looked at is the one thing that opens this column by
         // itself. Here rather than in the sidebar, because the sidebar may be shut,
         // and shut means gone: there would be nothing listening.
@@ -351,8 +363,8 @@ struct ContentView: View {
             case .folderGone(let ask):
                 // The ways on (#119). What was typed goes with Continue; Cancel leaves it
                 // in the bar.
-                Button(MissingFolderWords.continueInProject) {
-                    Task { await model.continueInProject(ask.agentID, text: ask.text, attachments: ask.attachments) }
+                Button(MissingFolderWords.continueInFolder) {
+                    Task { await model.continueInFolder(ask.agentID, text: ask.text, attachments: ask.attachments) }
                 }
                 .keyboardShortcut(.defaultAction)
                 if model.work.agent(ask.agentID)?.mayRecreateWorktree == true {
@@ -364,11 +376,11 @@ struct ContentView: View {
         } message: { alert in
             Text(alert.message)
         }
-        // One project's settings, over whatever the window is showing (066).
-        .sheet(isPresented: Binding(get: { requests.projectSettings != nil },
-                                    set: { if !$0 { requests.projectSettings = nil } })) {
-            ProjectSettingsSheet(pane: Binding(get: { requests.projectSettings },
-                                               set: { requests.projectSettings = $0 }))
+        // One folder's settings, over whatever the window is showing (066).
+        .sheet(isPresented: Binding(get: { requests.folderSettings != nil },
+                                    set: { if !$0 { requests.folderSettings = nil } })) {
+            FolderSettingsSheet(pane: Binding(get: { requests.folderSettings },
+                                               set: { requests.folderSettings = $0 }))
                 .environment(requests)
                 .paperSheet()
         }
@@ -402,7 +414,7 @@ private struct NothingPickedPage: View {
             Pick a session on the left to read it, or New Session at the top to \
             start one. ⌘N does the same.
 
-            ↑ and ↓ move through the list, → and ← unfold and fold a project, \
+            ↑ and ↓ move through the list, → and ← unfold and fold a folder, \
             and ⌘F finds a session.
             """)
         }

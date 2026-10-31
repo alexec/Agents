@@ -13,7 +13,7 @@ try {
   await page.focus("textarea");
   await page.type(code);
   await page.press("Connect");
-  await page.waitFor(`document.querySelector(".sidebar .row.project")`, 20_000);
+  await page.waitFor(`document.querySelector(".sidebar .row.folder")`, 20_000);
   await sleep(800);
   await page.focus(".sidebar input.search");
   await page.type(word);

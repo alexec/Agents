@@ -3,9 +3,6 @@ package controllink
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,10 +23,10 @@ type JoinAsk struct {
 }
 
 // AskToJoin asks a control plane to let this host join as a person, with no code (#994,
-// spec 736 FR-017): it says its key, shows the short code the control plane gives it
-// (shown), and waits until the person approves or denies it, or 10 minutes pass. Once
+// spec 736 FR-017): it says its key, shows the short code made from that key (shown,
+// JoinCode), and waits until the person approves or denies it, or 10 minutes pass. Once
 // approved, it keeps the membership, and connects as h:<id> with its own key.
-func AskToJoin(ctx context.Context, root string, ask JoinAsk, private []byte, hello HostHello, shown func(code string)) (*Membership, error) {
+func AskToJoin(ctx context.Context, root string, ask JoinAsk, private []byte, hello MachineHello, shown func(code string)) (*Membership, error) {
 	pin := ask.Pin
 	if pin == "-" {
 		pin = ""
@@ -47,15 +44,17 @@ func AskToJoin(ctx context.Context, root string, ask JoinAsk, private []byte, he
 	if hello.Name != nil {
 		name = *hello.Name
 	}
-	body, _ := json.Marshal(wire.HostJoinAsk{Name: name, Platform: hello.Platform, Version: &hello.Version,
+	body, _ := json.Marshal(wire.MachineJoinAsk{Name: name, Platform: hello.Platform, Version: &hello.Version,
 		PublicKey: pub, MachineID: &hello.MachineID, Person: &ask.Person})
-	var ticket wire.HostJoinTicket
+	var ticket wire.MachineJoinTicket
 	if err := callJSON(ctx, client, http.MethodPost, base+"/v1/join", body, &ticket); err != nil {
 		return nil, err
 	}
-	shown(ticket.Code)
+	// The code made here, never the control plane's: one that passed the request on with
+	// another key could only pass on that key's code.
+	shown(JoinCode(pub))
 	for {
-		var d wire.HostJoinDecision
+		var d wire.MachineJoinDecision
 		if err := callJSON(ctx, client, http.MethodGet, base+"/v1/join/"+ticket.Request, nil, &d); err != nil {
 			if ctx.Err() != nil {
 				return nil, ctx.Err()
@@ -88,29 +87,10 @@ func AskToJoin(ctx context.Context, root string, ask JoinAsk, private []byte, he
 	}
 }
 
-// httpsClient checks the control plane's certificate by its pin, or by the system's roots.
+// httpsClient checks the control plane's certificate by its pin, or by TrustRoots, through
+// the network's proxy (#2177).
 func httpsClient(pin string) *http.Client {
-	config := &tls.Config{MinVersion: tls.VersionTLS12}
-	if pin != "" {
-		config.InsecureSkipVerify = true
-		config.VerifyPeerCertificate = func(raw [][]byte, _ [][]*x509.Certificate) error {
-			if len(raw) == 0 {
-				return errors.New("no certificate")
-			}
-			leaf, err := x509.ParseCertificate(raw[0])
-			if err != nil {
-				return err
-			}
-			sum := sha256.Sum256(leaf.RawSubjectPublicKeyInfo)
-			if B64URL(sum[:]) != pin {
-				return errors.New("the certificate is not the pinned one")
-			}
-			return nil
-		}
-	} else {
-		config.RootCAs = TestTrustRoots()
-	}
-	return &http.Client{Timeout: 40 * time.Second, Transport: &http.Transport{TLSClientConfig: config}}
+	return &http.Client{Timeout: 40 * time.Second, Transport: transport(pin)}
 }
 
 func callJSON(ctx context.Context, client *http.Client, method, url string, body []byte, into any) error {

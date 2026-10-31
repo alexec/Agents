@@ -27,21 +27,17 @@ func TestAWaitSaysWhatIsWrongWithIt(t *testing.T) {
 		{map[string]any{"events": "agent.finsihed", "until_minutes": 5}, `"agent.finsihed" is not an event. Did you mean agent.finished? Events you can wait on: agent.started,`},
 		{map[string]any{"events": "custom.done", "until_minutes": 5}, `"custom.done" is never raised: agents no longer publish events`},
 		{map[string]any{"events": "agent.finished", "where": map[string]any{"x": 1}, "until_minutes": 5},
-			`agent.finished takes no arguments; "x" is not one of its arguments. To wait for particular agents, use wait_for_event with agents.`},
+			`agent.finished takes no arguments; "x" is not one of its arguments. To wait for particular agents, use wait_for_agents.`},
 		{map[string]any{"events": "person.away", "where": map[string]any{"why": "asleep"}, "until_minutes": 5},
 			"person.away: why is one of locked, idle, not asleep."},
 		{map[string]any{"events": []string{"mac.wake", "person.back"}, "until_minutes": 5},
 			"mac.wake, person.back are only raised on a Mac, and this machine is a Linux server, so they never happen here. Nothing is waiting."},
-		{map[string]any{"events": "pr.merged", "until_minutes": 5}, "No server here offers pr.merged. This project has no MCP server that offers events."},
-		{map[string]any{"action": "sing"}, "action is wait, recent or list."},
+		{map[string]any{"events": "pr.merged", "until_minutes": 5}, "No server here offers pr.merged. This folder has no MCP server that offers events."},
 	} {
 		text, isErr := m.tool(10+i, "wait_for_event", c.args)
 		if !isErr || !strings.HasPrefix(text, c.want) {
 			t.Errorf("%v: %s", c.args, text)
 		}
-	}
-	if text, _ := m.tool(30, "wait_for_event", map[string]any{"action": "list"}); !strings.Contains(text, `{"name":"agent.started","source":"app"`) {
-		t.Fatal(text)
 	}
 	if text, _ := m.tool(31, "cancel_wait", nil); text != "You weren't waiting on anything." {
 		t.Fatal(text)
@@ -75,13 +71,7 @@ func TestAWaitIsAnsweredByItsEvent(t *testing.T) {
 	if d.Store.Agent(a.ID).EventWait != nil || len(d.waitingAgents()) != 0 {
 		t.Fatal("still waiting")
 	}
-	// An event already after from answers at once; recent lists it.
-	if text, _ := m.tool(3, "wait_for_event", map[string]any{"events": "server.offline", "from": e.Position - 1, "until_minutes": 10}); !strings.HasPrefix(text, "server.offline happened at ") {
-		t.Fatal(text)
-	}
-	if text, _ := m.tool(4, "wait_for_event", map[string]any{"action": "recent"}); !strings.Contains(text, " · server.offline · ci went offline. · server=ci") {
-		t.Fatal(text)
-	}
+	// A later wait starts from the current head, so an event already on the log is not a match.
 }
 
 func TestAHeldWaitWakesTheAgentLater(t *testing.T) {
@@ -99,12 +89,12 @@ func TestAHeldWaitWakesTheAgentLater(t *testing.T) {
 	if !strings.HasPrefix(text, "Still waiting for branch.moved branch ci|cd, since ") || !strings.Contains(text, "Your place is kept; you can end your turn.") {
 		t.Fatal(text)
 	}
-	waitFor(t, "agent.blocked on the log", func() bool { n := names(d); return len(n) > 0 && n[len(n)-1] == "agent.blocked" })
-	d.raise(wire.EventDraft{Name: "branch.moved", At: now(), Scope: projectScope(dir), Sentence: "other moved.", Details: map[string]string{"branch": "other"}})
+	waitFor(t, "agent.waiting on the log", func() bool { n := names(d); return len(n) > 0 && n[len(n)-1] == "agent.waiting" })
+	d.raise(wire.EventDraft{Name: "branch.moved", At: now(), Scope: folderScope(dir), Sentence: "other moved.", Details: map[string]string{"branch": "other"}})
 	if w := d.Store.Agent(a.ID).EventWait; w == nil || w.Ending != nil {
 		t.Fatal("woken by an event it did not wait for")
 	}
-	d.raise(wire.EventDraft{Name: "branch.moved", At: now(), Scope: projectScope(dir), Sentence: "cd moved.", Details: map[string]string{"branch": "cd"}})
+	d.raise(wire.EventDraft{Name: "branch.moved", At: now(), Scope: folderScope(dir), Sentence: "cd moved.", Details: map[string]string{"branch": "cd"}})
 	waitFor(t, "the wake in its chat", func() bool {
 		for _, u := range userMessages(d, a.ID) {
 			if strings.HasPrefix(u, "The event you were waiting for happened.\n\nbranch.moved at ") && strings.Contains(u, "\ncd moved.\nbranch: cd") {
@@ -136,7 +126,7 @@ func TestAWaitEnds(t *testing.T) {
 	}
 	answered := wait(2)
 	c.call(t, 1, "events/cancelWait", map[string]any{"agentID": a.ID})
-	if text := <-answered; text != "The person cancelled your wait for lease.granted." {
+	if text := <-answered; text != "The person cancelled your wait for lease.granted. Check whether lease.granted happened anyway before you stop: the person may only be telling you to carry on without waiting, not that it did not happen." {
 		t.Fatal(text)
 	}
 	if e := c.callError(t, 2, "events/cancelWait", map[string]any{"agentID": a.ID}); e.Message != "That agent is not waiting on anything." {

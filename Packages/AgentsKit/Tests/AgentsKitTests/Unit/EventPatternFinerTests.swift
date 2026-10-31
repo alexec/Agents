@@ -7,11 +7,11 @@ import Testing
 /// trigger share. Every other key is refused naming what the event does take.
 @Suite("Event patterns, finer")
 struct EventPatternFinerTests {
-    private let folder = URL(fileURLWithPath: "/tmp/project")
+    private let folder = URL(fileURLWithPath: "/tmp/folder")
 
     private func event(_ name: String, _ details: [String: String] = [:]) -> Event {
         Event(position: 1, name: name, at: Date(timeIntervalSince1970: 0),
-              scope: .project(folder: folder), sentence: "", details: details)
+              scope: .folder(folder: folder), sentence: "", details: details)
     }
 
     /// An agent event as the daemon raises one: the agent and its context, then its own.
@@ -77,7 +77,7 @@ struct EventPatternFinerTests {
             let problem = EventPattern.parse(name, filters: [key: "x"]).failure
             #expect(problem?.isBadFilter == true, "\(name) \(key)")
             #expect(problem?.message == "\(name) takes no arguments; \"\(key)\" is not one of its arguments. "
-                    + "To wait for particular agents, use wait_for_event with agents.")
+                    + "To wait for particular agents, use wait_for_agents.")
         }
     }
 
@@ -86,7 +86,7 @@ struct EventPatternFinerTests {
                 == "branch.moved takes branch; \"to\" is not one of its arguments.")
         #expect(EventPattern.parse("workflow.completed", filters: ["workflow": "nightly"]).failure?.message
                 == "workflow.completed takes no arguments; \"workflow\" is not one of its arguments.")
-        for (name, key) in [("project.idle", "agents"), ("dropbox.file_added", "extension"),
+        for (name, key) in [("folder.idle", "agents"), ("dropbox.file_added", "extension"),
                             ("lease.released", "how"), ("machine.disk_low", "level"), ("cost.allowance_out", "runtime"),
                             ("server.offline", "server"), ("workflow.*", "workflow")] {
             #expect(EventPattern.parse(name, filters: [key: "x"]).failure?.isBadFilter == true, "\(name) \(key)")

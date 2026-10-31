@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="14" fill="#1c1d20">
+  <rect width="1440" height="900" fill="#f7f8f9"/>
+  <rect width="1440" height="54" fill="#ffffff"/><line x1="0" y1="54" x2="1440" y2="54" stroke="#dde1e6"/>
+  <text x="24" y="33" font-weight="700" font-size="16" fill="#1c1d20">acme control plane</text>
+  <g font-size="14" fill="#1c1d20">
+    <text x="216" y="33">Overview</text>
+    <text x="300" y="33">Agents</text><rect x="352" y="20" width="20" height="16" rx="8" fill="#b4232b"/><text x="358" y="32" fill="#fff" font-size="11">2</text>
+    <text x="392" y="33">Machines</text>
+    <text x="474" y="33">Workflows</text>
+    <text x="562" y="33">Reports</text>
+    <text x="636" y="33">Requests</text><rect x="700" y="20" width="20" height="16" rx="8" fill="#b4232b"/><text x="706" y="32" fill="#fff" font-size="11">3</text>
+    <text x="740" y="33">People</text>
+    <text x="804" y="33">Settings</text>
+  </g>
+  <rect x="210" y="51" width="70" height="3" fill="#1f5fc8"/>
+  <rect x="1040" y="13" width="320" height="28" rx="6" fill="#f0f2f4" stroke="#dde1e6"/>
+  <text x="1054" y="32" font-size="13" fill="#6b7078">Search or jump to…</text>
+  <rect x="1332" y="18" width="18" height="18" rx="4" fill="none" stroke="#dde1e6"/><text x="1338" y="31" font-size="11" fill="#6b7078">/</text>
+  <circle cx="1394" cy="27" r="14" fill="#1f5fc8"/><text x="1388" y="32" font-size="13" font-weight="700" fill="#ffffff">B</text>
+  <text x="24" y="98" font-size="12" fill="#6b7078">Overview</text>
+  <text x="24" y="126" font-size="22" font-weight="700">Overview</text>
+  <rect x="1270" y="104" width="146" height="32" rx="6" fill="#1f5fc8"/><text x="1290" y="125" fill="#fff" font-weight="600">New Session</text>
+
+  <!-- A card: header row, hairline, body -->
+  <g transform="translate(24,152)">
+    <rect width="440" height="290" rx="8" fill="#fff" stroke="#dde1e6"/>
+    <text x="16" y="28" font-weight="700">Machines</text><text x="330" y="28" fill="#1f5fc8" font-size="13">All machines ›</text>
+    <line x1="0" y1="44" x2="440" y2="44" stroke="#dde1e6"/>
+    <g font-size="13"><text x="16" y="76" font-size="26" font-weight="700">3</text><text x="16" y="96" fill="#6b7078">machines</text>
+      <text x="130" y="76" font-size="26" font-weight="700" fill="#2d765c">2</text><text x="130" y="96" fill="#6b7078">online</text>
+      <text x="244" y="76" font-size="26" font-weight="700" fill="#ba4a13">1</text><text x="244" y="96" fill="#6b7078">out of date</text></g>
+    <line x1="0" y1="116" x2="440" y2="116" stroke="#eceef1"/>
+    <g font-size="13"><text x="16" y="140" fill="#6b7078" font-size="11" font-weight="600">NAME</text><text x="160" y="140" fill="#6b7078" font-size="11" font-weight="600">STATE</text><text x="300" y="140" fill="#6b7078" font-size="11" font-weight="600">VERSION</text>
+      <text x="16" y="170">bea-mbp</text><text x="160" y="170" fill="#2d765c">● Online</text><text x="300" y="170">0.14.0</text>
+      <line x1="16" y1="182" x2="424" y2="182" stroke="#eceef1"/>
+      <text x="16" y="204">build-01</text><text x="160" y="204" fill="#2d765c">● Online</text><text x="300" y="204">0.14.0</text>
+      <line x1="16" y1="216" x2="424" y2="216" stroke="#eceef1"/>
+      <text x="16" y="238">sam-mini</text><text x="160" y="238" fill="#b4232b">○ Offline 2 h</text><text x="300" y="238" fill="#ba4a13">0.13.1 · update</text></g>
+  </g>
+  <g transform="translate(488,152)">
+    <rect width="440" height="290" rx="8" fill="#fff" stroke="#dde1e6"/>
+    <text x="16" y="28" font-weight="700">Running now</text><text x="352" y="28" fill="#1f5fc8" font-size="13">Live Now ›</text>
+    <line x1="0" y1="44" x2="440" y2="44" stroke="#dde1e6"/>
+    <text x="16" y="72" font-size="13" fill="#6b7078">6 agents on 2 machines · $3.84 so far</text>
+    <g font-size="13"><text x="16" y="104" fill="#6b7078" font-size="11" font-weight="600">AGENT</text><text x="260" y="104" fill="#6b7078" font-size="11" font-weight="600">FOR</text><text x="424" y="104" text-anchor="end" fill="#6b7078" font-size="11" font-weight="600">COST</text>
+      <text x="16" y="134">Claude · api · fix login redirect</text><text x="260" y="134">12 m</text><text x="424" y="134" text-anchor="end">$0.92</text>
+      <line x1="16" y1="146" x2="424" y2="146" stroke="#eceef1"/>
+      <text x="16" y="168">Codex · web · lineage pane</text><text x="260" y="168">40 m</text><text x="424" y="168" text-anchor="end">$1.10</text>
+      <line x1="16" y1="180" x2="424" y2="180" stroke="#eceef1"/>
+      <text x="16" y="202">Claude · infra · nightly deps</text><text x="260" y="202">3 m</text><text x="424" y="202" text-anchor="end">$0.12</text>
+      <line x1="16" y1="214" x2="424" y2="214" stroke="#eceef1"/>
+      <text x="16" y="236">Gemini · docs · release notes</text><text x="260" y="236">1 h</text><text x="424" y="236" text-anchor="end">$0.80</text>
+      <line x1="16" y1="248" x2="424" y2="248" stroke="#eceef1"/>
+      <text x="16" y="270">OpenCode · api · flaky test</text><text x="260" y="270">8 m</text><text x="424" y="270" text-anchor="end">$0.20</text></g>
+  </g>
+  <g transform="translate(952,152)">
+    <rect width="464" height="290" rx="8" fill="#fff" stroke="#dde1e6"/>
+    <text x="16" y="28" font-weight="700">Waiting for you</text><text x="368" y="28" fill="#1f5fc8" font-size="13">Requests ›</text>
+    <line x1="0" y1="44" x2="464" y2="44" stroke="#dde1e6"/>
+    <g font-size="13">
+      <text x="16" y="76" fill="#ba4a13">● api · fix login redirect</text><text x="448" y="76" text-anchor="end" fill="#6b7078">asks which branch</text>
+      <line x1="16" y1="90" x2="448" y2="90" stroke="#eceef1"/>
+      <text x="16" y="112" fill="#ba4a13">● web · lineage pane</text><text x="448" y="112" text-anchor="end" fill="#6b7078">wants an OK to push</text>
+      <line x1="0" y1="134" x2="464" y2="134" stroke="#dde1e6"/>
+      <text x="16" y="162">Machine asks to join</text><text x="448" y="162" text-anchor="end" font-weight="600">1</text>
+      <line x1="16" y1="176" x2="448" y2="176" stroke="#eceef1"/>
+      <text x="16" y="198">Bot stopped at its cap</text><text x="448" y="198" text-anchor="end" font-weight="600">1</text>
+      <line x1="16" y1="212" x2="448" y2="212" stroke="#eceef1"/>
+      <text x="16" y="234">Ask for an MCP server</text><text x="448" y="234" text-anchor="end" font-weight="600">1</text></g>
+  </g>
+  <g transform="translate(24,466)">
+    <rect width="440" height="290" rx="8" fill="#fff" stroke="#dde1e6"/>
+    <text x="16" y="28" font-weight="700">Spend today</text><text x="340" y="28" fill="#1f5fc8" font-size="13">Reports ▸ Spend ›</text>
+    <line x1="0" y1="44" x2="440" y2="44" stroke="#dde1e6"/>
+    <text x="16" y="96" font-size="34" font-weight="700">$41.20</text>
+    <text x="16" y="120" font-size="13" fill="#6b7078">Organisation · 9 people</text>
+    <text x="16" y="168" font-size="13">This month: $612 of $1,500</text>
+    <rect x="16" y="180" width="408" height="8" rx="4" fill="#eceef1"/>
+    <rect x="16" y="180" width="166" height="8" rx="4" fill="#1f5fc8"/>
+    <rect x="182" y="180" width="122" height="8" fill="#1f5fc8" opacity="0.3"/>
+    <text x="16" y="212" font-size="13" fill="#6b7078">Forecast $1,180 by 31 October</text>
+  </g>
+  <g transform="translate(488,466)" font-size="13">
+    <rect width="928" height="290" rx="8" fill="#fff" stroke="#dde1e6"/>
+    <text x="16" y="28" font-weight="700" font-size="14">Recent activity</text><text x="800" y="28" fill="#1f5fc8">Reports ▸ Events ›</text>
+    <line x1="0" y1="44" x2="928" y2="44" stroke="#dde1e6"/>
+    <text x="16" y="70" fill="#6b7078" font-size="11" font-weight="600">WHAT</text><text x="520" y="70" fill="#6b7078" font-size="11" font-weight="600">MACHINE</text><text x="912" y="70" text-anchor="end" fill="#6b7078" font-size="11" font-weight="600">WHEN ▼</text>
+    <text x="16" y="100">Bea started Claude in api</text><text x="520" y="100">bea-mbp</text><text x="912" y="100" text-anchor="end" fill="#6b7078">2 min ago</text>
+    <line x1="16" y1="112" x2="912" y2="112" stroke="#eceef1"/>
+    <text x="16" y="134">Nightly (bot) ran workflow “deps”</text><text x="520" y="134">build-01</text><text x="912" y="134" text-anchor="end" fill="#6b7078">5 min ago</text>
+    <line x1="16" y1="146" x2="912" y2="146" stroke="#eceef1"/>
+    <text x="16" y="168">Sam’s machine went offline</text><text x="520" y="168">sam-mini</text><text x="912" y="168" text-anchor="end" fill="#6b7078">2 h ago</text>
+    <line x1="16" y1="180" x2="912" y2="180" stroke="#eceef1"/>
+    <text x="16" y="202">Bea merged PR #412 (cost $2.10)</text><text x="520" y="202">bea-mbp</text><text x="912" y="202" text-anchor="end" fill="#6b7078">3 h ago</text>
+    <line x1="16" y1="214" x2="912" y2="214" stroke="#eceef1"/>
+    <text x="16" y="236">Policy v5 saved by Alex</text><text x="520" y="236">control plane</text><text x="912" y="236" text-anchor="end" fill="#6b7078">yesterday</text>
+  </g>
+  <text x="24" y="800" fill="#6b7078" font-size="12">Mock for #2142 (the look; the structure is #2141's). An admin, 1440 px, light. Paper colours, flat cards, tabs in the top bar, search, the person's initial.</text>
+</svg>

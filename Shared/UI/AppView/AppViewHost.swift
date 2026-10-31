@@ -7,22 +7,22 @@ import WebKit
 struct AppViewActions {
     /// The conversation the views are in.
     var agentID: UUID
-    /// Set for a view on a project's page (a pin), which has no agent: its
+    /// Set for a view on a folder's page (a pin), which has no agent: its
     /// `ui/message` and `ui/update-model-context` are refused, and logged (#189).
-    var project: URL? = nil
+    var folder: URL? = nil
     /// One of `views/*`, to the host the conversation is on.
     var call: @MainActor (String, JSONValue) async throws -> JSONValue
     /// A `ui/message` the person said yes to, sent as their prompt.
     var send: @MainActor (String) async -> Bool
     /// A `ui/open-link`, in the default browser.
     var openLink: @MainActor (URL) -> Void
-    /// Pin this call's view under the chat's project (#189). Why it was not, or nil.
+    /// Pin this call's view under the chat's folder (#189). Why it was not, or nil.
     var pin: (@MainActor (ViewPin) async -> String?)? = nil
-    /// Open the new-agent form in the view's project, filled in (#834). Why it was not, or
+    /// Open the new-agent form in the view's folder, filled in (#834). Why it was not, or
     /// nil. The person starts the agent; a view never does.
     var startAgent: (@MainActor (AppViewStart) -> String?)? = nil
     /// The session a view's `agents/message-agent` goes to (#837): the one in the view's
-    /// project on that branch, or nil when there is none.
+    /// folder on that branch, or nil when there is none.
     var recipient: (@MainActor (AppViewAgentMessage) -> AppViewRecipient?)? = nil
     /// An `agents/message-agent` the person said yes to, sent to that session as their prompt.
     var sendTo: (@MainActor (UUID, String) async -> Bool)? = nil
@@ -107,7 +107,7 @@ final class AppViewHost {
     private(set) var contextLine: String?
     private(set) var title: String
     private(set) var prefersBorder = true
-    /// What Pin to Project last said: pinned, or why not.
+    /// What Pin to Folder last said: pinned, or why not.
     private(set) var pinNote: String?
     /// Whether `retry()` would read it again: a failure drawn with Try Again (#978).
     private(set) var canRetry = false
@@ -194,7 +194,7 @@ final class AppViewHost {
     private func load(_ mine: Int) async {
         let call = actions.call
         let outcome = await AppViewLoad.read(DaemonAPI.ViewReadRequest(
-            agentID: actions.agentID, uri: self.call.resourceURI, server: server, project: actions.project)) { method, params in
+            agentID: actions.agentID, uri: self.call.resourceURI, server: server, folder: actions.folder)) { method, params in
             try await call(method, params)
         }
         guard mine == attempt, phase != .gone else { return }
@@ -342,7 +342,7 @@ final class AppViewHost {
         Task {
             do {
                 _ = try await actions.call(DaemonAPI.Method.viewsShow, try JSONValue.encoding(DaemonAPI.ViewShowRequest(
-                    agentID: actions.agentID, project: actions.project, server: ask.server, uri: ask.uri,
+                    agentID: actions.agentID, folder: actions.folder, server: ask.server, uri: ask.uri,
                     hash: ask.hash, show: show)))
             } catch {
                 phase = .failed("That could not be kept: \(Self.words(error))")
@@ -352,7 +352,12 @@ final class AppViewHost {
             if show {
                 await load(mine)
             } else {
-                phase = .failed("Not shown. Ask Again is on \(ask.server)'s row in the project's Connectors.")
+                #if os(iOS)
+                // The Remote has no Connectors page (#2798), so no line names one (#2899).
+                phase = .failed("Not shown.")
+                #else
+                phase = .failed("Not shown. Ask Again is on \(ask.server)'s row in the folder's Connectors.")
+                #endif
             }
         }
     }
@@ -365,14 +370,14 @@ final class AppViewHost {
         }
     }
 
-    /// Pin to Project is offered: the server says the call can feed a pin, it is answered,
-    /// and the chat knows its project.
+    /// Pin to Folder is offered: the server says the call can feed a pin, it is answered,
+    /// and the chat knows its folder.
     var canPin: Bool { call.pinnable == true && call.state == .done && actions.pin != nil }
 
-    func pinToProject() {
+    func pinToFolder() {
         guard let pin = actions.pin else { return }
         Task {
-            pinNote = await pin(call.viewPin) ?? "Pinned under the project."
+            pinNote = await pin(call.viewPin) ?? "Pinned under the folder."
             try? await Task.sleep(for: .seconds(4))
             pinNote = nil
         }
@@ -435,13 +440,13 @@ final class AppViewHost {
         case .callTool(let id, let name, let arguments):
             relay(id, DaemonAPI.Method.viewsCall,
                   DaemonAPI.ViewCallRequest(agentID: actions.agentID, viewID: call.id, name: name,
-                                            arguments: arguments, project: actions.project, server: server))
+                                            arguments: arguments, folder: actions.folder, server: server))
         case .readResource(let id, let uri):
             Task {
                 do {
                     // The same server's only: the one whose view it is.
                     let value = try await actions.call(DaemonAPI.Method.viewsRead, try JSONValue.encoding(
-                        DaemonAPI.ViewReadRequest(agentID: actions.agentID, uri: uri, server: server, project: actions.project)))
+                        DaemonAPI.ViewReadRequest(agentID: actions.agentID, uri: uri, server: server, folder: actions.folder)))
                     let resource = try value.decode(DaemonAPI.ViewResource.self)
                     send(AppViewBridge.result(id, ["contents": [["uri": .string(resource.uri),
                                                                  "mimeType": .string(resource.mimeType),
@@ -453,10 +458,10 @@ final class AppViewHost {
         case .openLink(let id, let url):
             actions.openLink(url)
             send(AppViewBridge.result(id))
-        case .message(let id, _) where actions.project != nil:
-            refuseOnProjectPage(id, "ui/message")
-        case .updateContext(let id, _, _) where actions.project != nil:
-            refuseOnProjectPage(id, "ui/update-model-context")
+        case .message(let id, _) where actions.folder != nil:
+            refuseOnFolderPage(id, "ui/message")
+        case .updateContext(let id, _, _) where actions.folder != nil:
+            refuseOnFolderPage(id, "ui/update-model-context")
         case .message(let id, let text):
             // Never sent on the view's say-so: the person is asked, under the view.
             if let earlier = messageID { send(AppViewBridge.error(earlier, code: -32000, "Another message replaced it.")) }
@@ -520,14 +525,14 @@ final class AppViewHost {
         }
     }
 
-    /// A view on a project's page has no agent to tell anything to: refused, and the
+    /// A view on a folder's page has no agent to tell anything to: refused, and the
     /// daemon's log says so.
-    private func refuseOnProjectPage(_ id: JSONValue, _ method: String) {
-        send(AppViewBridge.error(id, code: -32000, "A view on a project's page has no agent to tell."))
+    private func refuseOnFolderPage(_ id: JSONValue, _ method: String) {
+        send(AppViewBridge.error(id, code: -32000, "A view on a folder's page has no agent to tell."))
         Task {
             _ = try? await actions.call(DaemonAPI.Method.viewsLog, try JSONValue.encoding(
                 DaemonAPI.ViewLogRequest(agentID: actions.agentID, viewID: call.id, level: "warning",
-                                         data: .string("\(method) refused: the view is on a project's page, with no agent"))))
+                                         data: .string("\(method) refused: the view is on a folder's page, with no agent"))))
         }
     }
 

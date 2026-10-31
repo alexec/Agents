@@ -109,6 +109,11 @@ func mcpEventsErrorOf(err error) *mcpEventsError {
 			e.kind = "notFound"
 		case -32012:
 			e.kind = "forbidden"
+			// A sign-in that ended, or failed for a moment, is tried again as an HTTP 401 is
+			// (#2457): stopped, a wait on pr.merged never woke though the next poll would do.
+			if data.Reason == "not connected" || strings.Contains(strings.ToLower(data.Reason), "not signed in") {
+				e.kind = "needsSignIn"
+			}
 		case -32013:
 			e.kind = "exhausted"
 			if data.RetryAfterMs != nil {

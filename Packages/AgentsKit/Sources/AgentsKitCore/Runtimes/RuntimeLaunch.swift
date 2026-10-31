@@ -243,7 +243,7 @@ public enum RuntimeLaunchCatalog {
     /// - `OPENCODE_AUTH_CONTENT` removed: on the Mac, OpenCode uses its own sign-in in the
     ///   person's home (D3). A server run is lent the Mac's through this variable, set after
     ///   this by the lending (D7), never from a stray one in the daemon's environment.
-    /// - `OPENCODE_ENABLE_QUESTION_TOOL` removed: questions go through the app's `ask_form`.
+    /// - `OPENCODE_ENABLE_QUESTION_TOOL` removed: questions go through the app's `ask_question`.
     /// - `TMPDIR` of its own: at the start of every turn OpenCode walks its temporary folder,
     ///   and a Mac's per-user one can hold close to a million entries. Measured on this Mac on
     ///   2026-09-29: 40 s before the first word with `/var/folders/…/T/`, 2 s with an empty

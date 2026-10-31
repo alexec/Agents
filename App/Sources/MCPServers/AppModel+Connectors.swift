@@ -1,35 +1,45 @@
 import AgentsKitCore
 import Foundation
 
-/// The person's connections (#1335) and a project's Connectors set-up (#1336), on the host
-/// that has the project. The answer or the error in words.
+/// The person's connections (#1335) and a folder's Connectors set-up (#1336), on the host
+/// that has the folder. The answer or the error in words.
 extension AppModel {
-    func connectorSetup(_ project: ProjectKey, reading: DaemonAPI.ConnectorSetupReading = .cached) async
+    func connectorSetup(_ folder: FolderKey, reading: DaemonAPI.ConnectorSetupReading = .cached) async
         -> Result<DaemonAPI.ConnectorSetup, ConnectorProblem> {
-        await connectorCall(project.host) {
+        await connectorCall(folder.host) {
             try await $0.call(DaemonAPI.Method.connectorsSetup,
-                              DaemonAPI.ConnectorSetupRequest(folder: project.folder.path, reading: reading),
+                              DaemonAPI.ConnectorSetupRequest(folder: folder.folder.path, reading: reading),
                               returning: DaemonAPI.ConnectorSetup.self)
         }
     }
 
-    func skipConnectorSlot(_ project: ProjectKey, _ slot: DaemonAPI.ConnectorSlotKind, skipped: Bool) async
+    func skipConnectorSlot(_ folder: FolderKey, _ slot: DaemonAPI.ConnectorSlotKind, skipped: Bool) async
         -> Result<DaemonAPI.ConnectorSetup, ConnectorProblem> {
-        await connectorCall(project.host) {
+        await connectorCall(folder.host) {
             try await $0.call(DaemonAPI.Method.connectorsSetupSkip,
-                              DaemonAPI.ConnectorSkipRequest(folder: project.folder.path, slot: slot, skipped: skipped),
+                              DaemonAPI.ConnectorSkipRequest(folder: folder.folder.path, slot: slot, skipped: skipped),
                               returning: DaemonAPI.ConnectorSetup.self)
         }
     }
 
-    func connections(on host: HostID = .mac) async -> Result<[DaemonAPI.Connection], ConnectorProblem> {
+    func codespaces(_ folder: FolderKey, action: DaemonAPI.ConnectorCodespacesRequest.Action,
+                    id: String? = nil, name: String? = nil) async
+        -> Result<DaemonAPI.ConnectorCodespaces, ConnectorProblem> {
+        await connectorCall(folder.host) {
+            try await $0.call(DaemonAPI.Method.connectorsCodespaces,
+                              DaemonAPI.ConnectorCodespacesRequest(folder: folder.folder.path, action: action, id: id, name: name),
+                              returning: DaemonAPI.ConnectorCodespaces.self)
+        }
+    }
+
+    func connections(on host: MachineRef = .mac) async -> Result<[DaemonAPI.Connection], ConnectorProblem> {
         await connectorCall(host) {
             try await $0.call(DaemonAPI.Method.connectionsList, DaemonAPI.Empty(),
                               returning: DaemonAPI.ConnectionsList.self).connections
         }
     }
 
-    func startSignIn(_ provider: DaemonAPI.ConnectionProvider, on host: HostID) async
+    func startSignIn(_ provider: DaemonAPI.ConnectionProvider, on host: MachineRef) async
         -> Result<DaemonAPI.ConnectionSignIn, ConnectorProblem> {
         await connectorCall(host) {
             try await $0.call(DaemonAPI.Method.connectionsSignIn, DaemonAPI.ConnectionProviderRequest(provider: provider),
@@ -38,7 +48,7 @@ extension AppModel {
     }
 
     /// One long poll: the sign-in once it ended, or still waiting after 25 seconds.
-    func waitForSignIn(_ flow: UUID, on host: HostID) async -> Result<DaemonAPI.ConnectionSignIn, ConnectorProblem> {
+    func waitForSignIn(_ flow: UUID, on host: MachineRef) async -> Result<DaemonAPI.ConnectionSignIn, ConnectorProblem> {
         await connectorCall(host) {
             try await $0.call(DaemonAPI.Method.connectionsSignInWait, DaemonAPI.ConnectionSignInFlowRequest(flowID: flow),
                               returning: DaemonAPI.ConnectionSignIn.self)
@@ -46,7 +56,7 @@ extension AppModel {
     }
 
     /// Gives the host the code and the state that the hand-back page gave back (Linear).
-    func completeSignIn(_ request: DaemonAPI.ConnectionSignInCompleteRequest, on host: HostID) async
+    func completeSignIn(_ request: DaemonAPI.ConnectionSignInCompleteRequest, on host: MachineRef) async
         -> Result<DaemonAPI.ConnectionSignIn, ConnectorProblem> {
         await connectorCall(host) {
             try await $0.call(DaemonAPI.Method.connectionsSignInComplete, request, returning: DaemonAPI.ConnectionSignIn.self)
@@ -54,7 +64,7 @@ extension AppModel {
     }
 
     /// A personal access token (GitLab, #1630): the connection it made, or why it made none.
-    func signInWithToken(_ provider: DaemonAPI.ConnectionProvider, url: String?, token: String, on host: HostID) async
+    func signInWithToken(_ provider: DaemonAPI.ConnectionProvider, url: String?, token: String, on host: MachineRef) async
         -> Result<DaemonAPI.Connection, ConnectorProblem> {
         let answer = await connectorCall(host) {
             try await $0.call(DaemonAPI.Method.connectionsSignInToken,
@@ -71,7 +81,7 @@ extension AppModel {
 
     /// One IMAP mailbox and its app password (Email, #1780): the connection it made, or why it
     /// made none. The host signs in once to check it, and keeps the password.
-    func signInWithEmail(server: String, user: String, password: String, on host: HostID) async
+    func signInWithEmail(server: String, user: String, password: String, on host: MachineRef) async
         -> Result<DaemonAPI.Connection, ConnectorProblem> {
         let answer = await connectorCall(host) {
             try await $0.call(DaemonAPI.Method.connectionsSignInEmail,
@@ -86,7 +96,7 @@ extension AppModel {
         }
     }
 
-    func cancelSignIn(_ flow: UUID, on host: HostID) async {
+    func cancelSignIn(_ flow: UUID, on host: MachineRef) async {
         _ = await connectorCall(host) {
             try await $0.call(DaemonAPI.Method.connectionsSignInCancel, DaemonAPI.ConnectionSignInFlowRequest(flowID: flow),
                               returning: DaemonAPI.ConnectionSignIn.self)
@@ -94,7 +104,7 @@ extension AppModel {
     }
 
     /// Nil when it went; else why not.
-    func disconnect(_ provider: DaemonAPI.ConnectionProvider, on host: HostID = .mac) async -> String? {
+    func disconnect(_ provider: DaemonAPI.ConnectionProvider, on host: MachineRef = .mac) async -> String? {
         let answer = await connectorCall(host) {
             try await $0.call(DaemonAPI.Method.connectionsDisconnect, DaemonAPI.ConnectionProviderRequest(provider: provider),
                               returning: DaemonAPI.ConnectionDisconnectAnswer.self)
@@ -105,7 +115,7 @@ extension AppModel {
         }
     }
 
-    private func connectorCall<T: Sendable>(_ host: HostID, _ body: (DaemonClient) async throws -> T) async
+    private func connectorCall<T: Sendable>(_ host: MachineRef, _ body: (DaemonClient) async throws -> T) async
         -> Result<T, ConnectorProblem> {
         do {
             return .success(try await body(client(for: host)))

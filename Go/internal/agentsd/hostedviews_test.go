@@ -18,7 +18,7 @@ func TestAHostedServersViewsComeThroughItsOneCopy(t *testing.T) {
 	d, _ := start(t, t.TempDir())
 	defer d.Shutdown()
 	home := t.TempDir()
-	d.ChatHome = home
+	d.PersonalHome = home
 	os.MkdirAll(filepath.Join(home, ".agents"), 0o755)
 	entry, _ := json.Marshal(map[string]any{"mcpServers": map[string]any{"gh": map[string]any{"command": self, "hosted": true}}})
 	os.WriteFile(filepath.Join(home, ".agents", "mcp.json"), entry, 0o644)

@@ -1,0 +1,222 @@
+[
+  {
+    "expected" : {
+      "asksFirst" : {
+        "balanced" : false,
+        "fast" : false,
+        "smart" : false
+      },
+      "bypassConfirm" : {
+        "button" : "Bypass Permissions",
+        "message" : "It will not ask before it edits files or runs commands, even outside its folder. Choose Ask to make it ask again.",
+        "title" : "Let this agent bypass every permission?"
+      },
+      "continueOn" : "Continue on Codex",
+      "custom" : "Custom",
+      "field" : "Model",
+      "files" : {
+        "balanced" : "balanced",
+        "fast" : "fast",
+        "smart" : "smart"
+      },
+      "followsSettings" : "follows Settings",
+      "header" : "Auto · Claude",
+      "levels" : [
+        "fast",
+        "balanced",
+        "smart"
+      ],
+      "marks" : {
+        "autoMapped" : "auto-mapped",
+        "dropped" : "no longer offered",
+        "nearestSafer" : "nearest safer",
+        "notPossible" : "Not possible",
+        "yours" : "yours"
+      },
+      "meanings" : {
+        "balanced" : "Its usual model.",
+        "fast" : "The runtime’s smallest and quickest model that can do the work.",
+        "smart" : "Its most capable model."
+      },
+      "noRuntime" : "Claude: out; Codex: not signed in",
+      "on" : "Balanced: Sonnet 5 on Claude",
+      "own" : "⋯ Claude’s own",
+      "picks" : "Picks Claude now",
+      "picksNone" : "No runtime can start now",
+      "words" : {
+        "balanced" : "Balanced",
+        "fast" : "Fast",
+        "smart" : "Smart"
+      }
+    },
+    "input" : {
+      "field" : "model"
+    },
+    "name" : "model"
+  },
+  {
+    "expected" : {
+      "asksFirst" : {
+        "approveForMe" : false,
+        "ask" : false,
+        "bypassPermissions" : true,
+        "plan" : false
+      },
+      "bypassConfirm" : {
+        "button" : "Bypass Permissions",
+        "message" : "It will not ask before it edits files or runs commands, even outside its folder. Choose Ask to make it ask again.",
+        "title" : "Let this agent bypass every permission?"
+      },
+      "continueOn" : "Continue on Codex",
+      "custom" : "Custom",
+      "field" : "Permission mode",
+      "files" : {
+        "approveForMe" : "approve-for-me",
+        "ask" : "ask",
+        "bypassPermissions" : "bypass-permissions",
+        "plan" : "plan"
+      },
+      "followsSettings" : "follows Settings",
+      "header" : "Auto · Claude",
+      "levels" : [
+        "plan",
+        "ask",
+        "approveForMe",
+        "bypassPermissions"
+      ],
+      "marks" : {
+        "autoMapped" : "auto-mapped",
+        "dropped" : "no longer offered",
+        "nearestSafer" : "nearest safer",
+        "notPossible" : "Not possible",
+        "yours" : "yours"
+      },
+      "meanings" : {
+        "approveForMe" : "Does not ask for normal changes in its folder.",
+        "ask" : "Asks before it changes things.",
+        "bypassPermissions" : "Never asks, even for a change outside its folder.",
+        "plan" : "Reads and plans; cannot change files or run commands that change things."
+      },
+      "noRuntime" : "Claude: out; Codex: not signed in",
+      "on" : "Balanced: Sonnet 5 on Claude",
+      "own" : "⋯ Claude’s own",
+      "picks" : "Picks Claude now",
+      "picksNone" : "No runtime can start now",
+      "words" : {
+        "approveForMe" : "Approve for me",
+        "ask" : "Ask",
+        "bypassPermissions" : "Bypass Permissions",
+        "plan" : "Plan"
+      }
+    },
+    "input" : {
+      "field" : "permission"
+    },
+    "name" : "permission"
+  },
+  {
+    "expected" : {
+      "asksFirst" : {
+        "alwaysApprove" : false,
+        "default" : false
+      },
+      "bypassConfirm" : {
+        "button" : "Bypass Permissions",
+        "message" : "It will not ask before it edits files or runs commands, even outside its folder. Choose Ask to make it ask again.",
+        "title" : "Let this agent bypass every permission?"
+      },
+      "continueOn" : "Continue on Codex",
+      "custom" : "Custom",
+      "field" : "Permission requests",
+      "files" : {
+        "alwaysApprove" : "yes-to-all",
+        "default" : "request-cards"
+      },
+      "followsSettings" : "follows Settings",
+      "header" : "Auto · Claude",
+      "levels" : [
+        "default",
+        "alwaysApprove"
+      ],
+      "marks" : {
+        "autoMapped" : "auto-mapped",
+        "dropped" : "no longer offered",
+        "nearestSafer" : "nearest safer",
+        "notPossible" : "Not possible",
+        "yours" : "yours"
+      },
+      "meanings" : {
+        "alwaysApprove" : "The app says yes to each permission request.",
+        "default" : "Each permission request is a card for you."
+      },
+      "noRuntime" : "Claude: out; Codex: not signed in",
+      "on" : "Balanced: Sonnet 5 on Claude",
+      "own" : "⋯ Claude’s own",
+      "picks" : "Picks Claude now",
+      "picksNone" : "No runtime can start now",
+      "words" : {
+        "alwaysApprove" : "Yes to all",
+        "default" : "Request cards"
+      }
+    },
+    "input" : {
+      "field" : "permissionRequests"
+    },
+    "name" : "permissionRequests"
+  },
+  {
+    "expected" : {
+      "asksFirst" : {
+        "off" : false,
+        "on" : false,
+        "runtime" : false
+      },
+      "bypassConfirm" : {
+        "button" : "Bypass Permissions",
+        "message" : "It will not ask before it edits files or runs commands, even outside its folder. Choose Ask to make it ask again.",
+        "title" : "Let this agent bypass every permission?"
+      },
+      "continueOn" : "Continue on Codex",
+      "custom" : "Custom",
+      "field" : "Sandbox",
+      "files" : {
+        "off" : "none",
+        "on" : "runtime",
+        "runtime" : "default"
+      },
+      "followsSettings" : "follows Settings",
+      "header" : "Auto · Claude",
+      "levels" : [
+        "runtime",
+        "on",
+        "off"
+      ],
+      "marks" : {
+        "autoMapped" : "auto-mapped",
+        "dropped" : "no longer offered",
+        "nearestSafer" : "nearest safer",
+        "notPossible" : "Not possible",
+        "yours" : "yours"
+      },
+      "meanings" : {
+        "off" : "Commands run with your own access.",
+        "on" : "The app turns the runtime’s sandbox on.",
+        "runtime" : "The runtime’s own settings decide."
+      },
+      "noRuntime" : "Claude: out; Codex: not signed in",
+      "on" : "Balanced: Sonnet 5 on Claude",
+      "own" : "⋯ Claude’s own",
+      "picks" : "Picks Claude now",
+      "picksNone" : "No runtime can start now",
+      "words" : {
+        "off" : "No sandbox",
+        "on" : "Runtime sandbox",
+        "runtime" : "Default sandbox"
+      }
+    },
+    "input" : {
+      "field" : "sandbox"
+    },
+    "name" : "sandbox"
+  }
+]

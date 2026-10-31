@@ -1,10 +1,10 @@
-// The #159 walk: a project's pinned pages on the web page, under the project in the sidebar and
-// open in the chat's place. Pairs, unfolds the project, opens each pin, follows an edit, and
+// The #159 walk: a folder's pinned pages on the web page, under the folder in the sidebar and
+// open in the chat's place. Pairs, unfolds the folder, opens each pin, follows an edit, and
 // drags the last pin to the top. Fails on any error the page throws.
 //
-//   node Web/test/walk/pins.mjs <WEB_URL> <browser code> <project folder> <project name> <out dir>
+//   node Web/test/walk/pins.mjs <WEB_URL> <browser code> <folder> <folder name> <out dir>
 //
-// Expects the project to have docs/roadmap.md, coverage/index.html (with a stylesheet beside it)
+// Expects the folder to have docs/roadmap.md, coverage/index.html (with a stylesheet beside it)
 // and specs/review/README.md pinned, in that order, as /tmp/seed-pins159.sh leaves it.
 
 import { appendFileSync } from "node:fs";
@@ -23,14 +23,14 @@ try {
   await page.focus("textarea");
   await page.type(code);
   await page.press("Connect");
-  await page.waitFor(`document.querySelectorAll(".sidebar .row.project").length >= 1`, 20_000);
+  await page.waitFor(`document.querySelectorAll(".sidebar .row.folder").length >= 1`, 20_000);
   await page.eval(`(() => {
-    const b = [...document.querySelectorAll(".sidebar .row.project .disclosure")].find((d) => d.getAttribute("aria-label").endsWith(" " + ${js(name)}));
+    const b = [...document.querySelectorAll(".sidebar .row.folder .disclosure")].find((d) => d.getAttribute("aria-label").endsWith(" " + ${js(name)}));
     if (b && b.getAttribute("aria-expanded") !== "true") b.click();
   })()`);
   await page.waitFor(`document.querySelectorAll(".sidebar .row.pin").length >= 3`, 10_000);
   const pins = () => page.eval(`[...document.querySelectorAll(".sidebar .row.pin .title")].map((t) => t.textContent)`);
-  check(js(await pins()) === js(["Roadmap", "Coverage", "Security review"]), `pins under the project: ${js(await pins())}`);
+  check(js(await pins()) === js(["Roadmap", "Coverage", "Security review"]), `pins under the folder: ${js(await pins())}`);
 
   const open = (title) => page.eval(`[...document.querySelectorAll(".sidebar .row.pin .pick")].find((b) => b.querySelector(".title").textContent === ${js(title)}).click()`);
   await open("Roadmap");

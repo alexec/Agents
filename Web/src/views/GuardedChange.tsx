@@ -1,7 +1,7 @@
-// A change to one of the app's own files in a project's `.agents`, made outside the app (#502), as
+// A change to one of the app's own files in a folder's `.agents`, made outside the app (#502), as
 // the question every client asks (#531; Shared/UI/Chat/GuardedChangeCard.swift): who made it, how many
 // lines changed, Review… for the whole change on its own page (#1472), and Keep or Undo for a quick answer. Asked over the prompt of the agent that made it, or on the
-// project's page when no agent did. Until then the host goes on with the copy last approved. A workflow
+// folder's page when no agent did. Until then the host goes on with the copy last approved. A workflow
 // waiting for an OK is asked the same way, by its file's path (#569).
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
@@ -10,7 +10,7 @@ import type { Store } from "../model/store";
 import { go } from "../route";
 import { readingCounts } from "./Review";
 
-/** Every guarded change asked here: in `session`, or of the project `folder` when there is none. */
+/** Every guarded change asked here: in `session`, or of the folder `folder` when there is none. */
 export function GuardedChangeCards({ store, host, where, down = false }: {
   store: Store; host: string; where: { session: string } | { folder: string };
   /** Its host is down: the answers are held until it is back. */
@@ -32,7 +32,7 @@ function workflowID(path: string): string | undefined {
   return /^\.agents\/workflows\/([^/]+)\.md$/.exec(path)?.[1];
 }
 
-/** GuardedChange.approvalID: the item in the project's approvals that asks the same thing, whose Review page opens by it. */
+/** GuardedChange.approvalID: the item in the folder's approvals that asks the same thing, whose Review page opens by it. */
 export function guardedApprovalID(change: GuardedChange): string {
   const id = workflowID(change.path);
   return id === undefined ? `file:${change.path}` : `workflow:${id}`;
@@ -76,7 +76,7 @@ export function GuardedChangeCard({ store, host, folder, change, down }: {
         {counts ? <span class="quiet small counts" aria-label={`${counts.added} lines added, ${counts.removed} removed`}>
           +{counts.added} −{counts.removed}</span> : <span class="quiet small">Reading the change…</span>}
         <span class="spacer" />
-        <button onClick={() => go({ host, project: folder, review: guardedApprovalID(change) })}>Review…</button>
+        <button onClick={() => go({ host, folder: folder, review: guardedApprovalID(change) })}>Review…</button>
         <button disabled={held} onClick={() => answer(false)}>Undo</button>
         <button class="prominent" disabled={held} onClick={() => answer(true)}>Keep</button>
       </p>

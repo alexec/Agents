@@ -29,6 +29,12 @@ services:
 
   pebble:
     image: ghcr.io/letsencrypt/pebble:latest
+    # As each service in compose.public.yaml (#2290).
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: "3"
     command: ["-config", "/config/pebble-config.json"]
     environment:
       PEBBLE_VA_NOSLEEP: "1"

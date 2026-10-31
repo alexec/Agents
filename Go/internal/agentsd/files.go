@@ -246,7 +246,7 @@ func (d *Daemon) registerFiles() {
 		}
 		return reading(path, r.KnownStamp)
 	})
-	// Add Project's folder picker: anywhere this user may read, ~ allowed.
+	// Add Folder's directory picker: anywhere this user may read, ~ allowed.
 	On(d, wire.CallFilesBrowse, func(ctx context.Context, c *Client, r wire.FilesBrowseRequest) (wire.DirectoryListing, error) {
 		path := ""
 		if r.Path != nil {
@@ -332,7 +332,7 @@ func (d *Daemon) registerFiles() {
 	})
 }
 
-// buildOutputNames is what a project's watch leaves out (#216), as DaemonCore does.
+// buildOutputNames is what a folder's watch leaves out (#216), as DaemonCore does.
 var buildOutputNames = []string{"node_modules", ".build", "build", "DerivedData", "target", "dist"}
 
 func excludedName(name string) bool {
@@ -370,7 +370,7 @@ func (d *Daemon) watchFiles(c *Client, r wire.FilesWatchRequest) error {
 	defer d.mu.Unlock()
 	w := d.watches[root]
 	if w == nil {
-		w, err = newFolderWatch(root, func(folders []string) { d.filesChanged(root, folders) })
+		w, err = newFilesWatch(root, func(folders []string) { d.filesChanged(root, folders) })
 		if err != nil {
 			return err
 		}

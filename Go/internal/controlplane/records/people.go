@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"sort"
 
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // People (#994, spec 736 data-model.md "User"): every client and every machine belongs
@@ -44,18 +46,61 @@ type SignIn struct {
 // Person is people/<id>.json: a user, a person or a bot. Today's record is {id, name};
 // a role that is not there is admin, as the existing person is (FR-003).
 type Person struct {
-	ID        string
-	Name      string
-	Kind      string
-	Role      string
-	SignIns   []SignIn
+	ID      string
+	Name    string
+	Kind    string
+	Role    string
+	SignIns []SignIn
 	// A bot's group and spend caps (#1761); none for a person.
-	Group     string
-	Caps      *Caps
+	Group string
+	Caps  *Caps
+	// What an org provider's SCIM says of the person (#1002, FR-015); nil for one SCIM did
+	// not make. Provisioned until their first sign-in links a SignIn.
+	SCIM        *PersonSCIM
+	Provisioned bool
+	// Suspended by their org provider (#1002, D13): no client connects, no key renews.
+	Suspended *Suspension
+	// The SCIM groups that give the role (FR-020), and the role set by hand before they
+	// did, which comes back when the person leaves them all.
+	RoleFrom   []string
+	RoleByHand string
+	// The userNames the person matched by before a rename, each kept 90 days.
+	LastNames []LastName
 	Rev       int
 	Removed   *bool
 	RemovedAt *Stamp
 	Extra     Extra
+}
+
+// PersonSCIM is a person's scim part: the SCIM user as it came, the Enterprise User
+// extension and any attribute not read kept in Extra.
+type PersonSCIM struct {
+	Provider    string           `json:"provider"`
+	ExternalID  string           `json:"externalId,omitempty"`
+	UserName    string           `json:"userName"`
+	Name        *wire.SCIMName   `json:"name,omitempty"`
+	DisplayName string           `json:"displayName,omitempty"`
+	Emails      []wire.SCIMEmail `json:"emails,omitempty"`
+	Active      bool             `json:"active"`
+	Created     *Stamp           `json:"created,omitempty"`
+	Changed     *Stamp           `json:"changed,omitempty"`
+	// Deleted by SCIM (D13): gone to the provider, suspended, and waiting for an admin.
+	Deleted bool                       `json:"deleted,omitempty"`
+	Extra   map[string]json.RawMessage `json:"extra,omitempty"`
+}
+
+// Suspension is why a person is suspended: by "scim", "refresh", or an admin's id.
+type Suspension struct {
+	By       string `json:"by"`
+	Provider string `json:"provider"`
+	At       Stamp  `json:"at"`
+	Why      string `json:"why,omitempty"`
+}
+
+// LastName is a userName a person matched by before a rename, until when it is kept.
+type LastName struct {
+	UserName string `json:"userName"`
+	Until    Stamp  `json:"until"`
 }
 
 // Caps are a bot's or a group's spend caps (#1761, FR-033): none is no cap.
@@ -64,20 +109,27 @@ type Caps struct {
 }
 
 type personJSON struct {
-	ID        string   `json:"id"`
-	Name      string   `json:"name"`
-	Kind      string   `json:"kind,omitempty"`
-	Role      string   `json:"role,omitempty"`
-	SignIns   []SignIn `json:"signIns,omitempty"`
-	Group     string   `json:"group,omitempty"`
-	Caps      *Caps    `json:"caps,omitempty"`
-	Rev       int      `json:"rev,omitempty"`
-	Removed   *bool    `json:"removed,omitempty"`
-	RemovedAt *Stamp   `json:"removedAt,omitempty"`
+	ID          string      `json:"id"`
+	Name        string      `json:"name"`
+	Kind        string      `json:"kind,omitempty"`
+	Role        string      `json:"role,omitempty"`
+	SignIns     []SignIn    `json:"signIns,omitempty"`
+	Group       string      `json:"group,omitempty"`
+	Caps        *Caps       `json:"caps,omitempty"`
+	SCIM        *PersonSCIM `json:"scim,omitempty"`
+	Provisioned bool        `json:"provisioned,omitempty"`
+	Suspended   *Suspension `json:"suspended,omitempty"`
+	RoleFrom    []string    `json:"roleFrom,omitempty"`
+	RoleByHand  string      `json:"roleByHand,omitempty"`
+	LastNames   []LastName  `json:"lastNames,omitempty"`
+	Rev         int         `json:"rev,omitempty"`
+	Removed     *bool       `json:"removed,omitempty"`
+	RemovedAt   *Stamp      `json:"removedAt,omitempty"`
 }
 
 func (p Person) MarshalJSON() ([]byte, error) {
-	return encodeKeeping(personJSON{p.ID, p.Name, p.Kind, p.Role, p.SignIns, p.Group, p.Caps, p.Rev, p.Removed, p.RemovedAt}, p.Extra)
+	return encodeKeeping(personJSON{p.ID, p.Name, p.Kind, p.Role, p.SignIns, p.Group, p.Caps, p.SCIM, p.Provisioned, p.Suspended,
+		p.RoleFrom, p.RoleByHand, p.LastNames, p.Rev, p.Removed, p.RemovedAt}, p.Extra)
 }
 
 func (p *Person) UnmarshalJSON(data []byte) error {
@@ -86,7 +138,8 @@ func (p *Person) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	*p = Person{j.ID, j.Name, j.Kind, j.Role, j.SignIns, j.Group, j.Caps, j.Rev, j.Removed, j.RemovedAt, extra}
+	*p = Person{j.ID, j.Name, j.Kind, j.Role, j.SignIns, j.Group, j.Caps, j.SCIM, j.Provisioned, j.Suspended, j.RoleFrom,
+		j.RoleByHand, j.LastNames, j.Rev, j.Removed, j.RemovedAt, extra}
 	return nil
 }
 
@@ -103,6 +156,9 @@ func (p *Person) RoleOrAdmin() string {
 	}
 	return p.Role
 }
+
+// IsSuspended says the person's org provider suspended them (#1002, D13).
+func (p *Person) IsSuspended() bool { return p.Suspended != nil }
 
 // IsRemoved says the person was removed: kept, so their sign-ins stay refused.
 func (p *Person) IsRemoved() bool { return p.Removed != nil && *p.Removed }
@@ -184,6 +240,50 @@ func (r *Records) People() []Person {
 		return out[i].ID < out[j].ID
 	})
 	return out
+}
+
+// EachPerson calls each with every person this copy holds, removed or not, in no order,
+// under the lock: each must not call Records.
+func (r *Records) EachPerson(each func(*Person)) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, h := range r.people {
+		p := h.record
+		each(&p)
+	}
+}
+
+// PersonWithSignIn is the person this copy holds, removed or not, who signs in with that
+// account, or nil. It reads nothing from the store.
+func (r *Records) PersonWithSignIn(provider, account string) *Person {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, h := range r.people {
+		if h.record.HasSignIn(provider, account) {
+			p := h.record
+			return &p
+		}
+	}
+	return nil
+}
+
+// ReadPerson reads one person from the store, removed or not, and holds it when this copy
+// held none: nil when there is none.
+func (r *Records) ReadPerson(ctx context.Context, id string) (*Person, error) {
+	object, err := r.Store.Get(ctx, PersonKey(id))
+	if err != nil || object == nil {
+		return nil, err
+	}
+	var p Person
+	if err := p.UnmarshalJSON(object.Data); err != nil || p.ID != id {
+		return nil, nil
+	}
+	r.mu.Lock()
+	if _, ok := r.people[id]; !ok {
+		r.people[id] = held[Person]{p, object.ETag}
+	}
+	r.mu.Unlock()
+	return &p, nil
 }
 
 // Person is the person of that id, removed or not, or nil.

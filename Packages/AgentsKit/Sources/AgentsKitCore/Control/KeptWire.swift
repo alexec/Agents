@@ -9,9 +9,9 @@ import Foundation
 public protocol KeptHandling: Sendable {
     /// A prompt or an agent start for a host that can't take it now. The error to answer
     /// with: `kept` when it was kept, another refusal, or nil to refuse it as today.
-    func keep(host: HostID, method: String, params: JSONValue?, from caller: ControlRouter.Caller) async -> JSONRPCError?
+    func keep(host: MachineRef, method: String, params: JSONValue?, from caller: ControlRouter.Caller) async -> JSONRPCError?
     /// A host's uplink is up: what was kept for it goes now, in order.
-    func attached(_ host: HostID) async
+    func attached(_ host: MachineRef) async
 }
 
 public extension DaemonAPI.Method {
@@ -19,7 +19,7 @@ public extension DaemonAPI.Method {
     /// (FR-020, FR-022). Both are idempotent by an id of their own (`sendID`, `requestID`),
     /// which the control plane fills in when the client left it out.
     static let keptMethods: Set<String> = [agentsPrompt, agentsStart]
-    /// `HostStatus`, from a host on channel 0, whenever it changes (#691 US4).
+    /// `MachineStatus`, from a host on channel 0, whenever it changes (#691 US4).
     static let hostStatus = "host/status"
     /// `KeepRequest` → never a result: the `kept` error, or the host's refusal. For a client
     /// whose link to a host closes while the host is offline (the window's, the Remote's),
@@ -50,21 +50,21 @@ public extension DaemonAPI {
     /// A kept request, as clients draw it: never its attachments or options.
     struct KeptRequest: Codable, Sendable, Hashable, Identifiable {
         public var id: UUID
-        public var host: HostID
-        /// `prompt` (to an agent there) or `start` (a new agent in a project there).
+        public var host: MachineRef
+        /// `prompt` (to an agent there) or `start` (a new agent in a folder there).
         public var kind: String
         /// For a prompt.
         public var agentID: UUID?
         /// The prompt's words, or the new agent's first prompt.
         public var text: String
-        /// For a start: the project folder, and the runtime it starts.
+        /// For a start: the folder, and the runtime it starts.
         public var folder: URL?
         public var runtimeID: String?
         public var at: Date
         /// Not sent, and why (US3 AS4): the start failed, or the host refused it.
         public var failed: String?
 
-        public init(id: UUID, host: HostID, kind: String, agentID: UUID? = nil, text: String,
+        public init(id: UUID, host: MachineRef, kind: String, agentID: UUID? = nil, text: String,
                     folder: URL? = nil, runtimeID: String? = nil, at: Date, failed: String? = nil) {
             self.id = id
             self.host = host
@@ -82,10 +82,10 @@ public extension DaemonAPI {
 
     /// `hosts/keep`: a prompt or a start, as it would have gone to the host.
     struct KeepRequest: Codable, Sendable {
-        public var host: HostID
+        public var host: MachineRef
         public var method: String
         public var params: JSONValue
-        public init(host: HostID, method: String, params: JSONValue) {
+        public init(host: MachineRef, method: String, params: JSONValue) {
             self.host = host
             self.method = method
             self.params = params
@@ -94,9 +94,9 @@ public extension DaemonAPI {
 
     /// `hosts/dropKept`, `hosts/retryKept`.
     struct KeptRequestID: Codable, Sendable, Hashable {
-        public var host: HostID
+        public var host: MachineRef
         public var id: UUID
-        public init(host: HostID, id: UUID) {
+        public init(host: MachineRef, id: UUID) {
             self.host = host
             self.id = id
         }
@@ -109,14 +109,14 @@ public extension DaemonAPI {
 
     /// `host/status` on channel 0 (#691 US4): whether the host is idle, and what is working
     /// there when it isn't, for the stop when idle and for Stop's confirmation.
-    struct HostStatus: Codable, Sendable, Hashable {
+    struct MachineStatus: Codable, Sendable, Hashable {
         public var idle: Bool
         /// "Claude (fix-login)": each agent working or waiting on a person.
         public var running: [String]
         /// Its next scheduled workflow, for the control plane's wake-up call (#1004 FR-002).
         /// Nil from a host from before #1004 (FR-011); empty when nothing is scheduled.
-        public var schedule: HostSchedule?
-        public init(idle: Bool, running: [String] = [], schedule: HostSchedule? = nil) {
+        public var schedule: MachineSchedule?
+        public init(idle: Bool, running: [String] = [], schedule: MachineSchedule? = nil) {
             self.idle = idle
             self.running = running
             self.schedule = schedule
@@ -125,7 +125,7 @@ public extension DaemonAPI {
 
     /// A host's next scheduled workflow (#1004): only workflows that run on it, are
     /// approved, on and not archived. Both nil when there is none.
-    struct HostSchedule: Codable, Sendable, Hashable {
+    struct MachineSchedule: Codable, Sendable, Hashable {
         public var at: Date?
         /// The workflow's name, as its page shows it.
         public var workflow: String?
@@ -137,11 +137,11 @@ public extension DaemonAPI {
 
     /// `control/keptDelivered`.
     struct KeptDelivered: Codable, Sendable, Hashable {
-        public var host: HostID
+        public var host: MachineRef
         public var id: UUID
         /// For a start: the agent it made.
         public var agentID: UUID?
-        public init(host: HostID, id: UUID, agentID: UUID? = nil) {
+        public init(host: MachineRef, id: UUID, agentID: UUID? = nil) {
             self.host = host
             self.id = id
             self.agentID = agentID

@@ -6,7 +6,7 @@ import Foundation
 public extension DaemonAPI {
     /// A part of the user settings. Each keeps the shape its file has on a machine.
     enum UserSettingsPartName: String, Codable, Sendable, Hashable, CaseIterable {
-        case mcpServers, agentConfig, runtimes, costLimits, resources
+        case mcpServers, agentConfig, runtimes, costLimits, notifications
     }
 
     /// The agentConfig part: the person's own instructions, personas and skills.
@@ -25,23 +25,43 @@ public extension DaemonAPI {
         }
     }
 
-    /// `user/settings`: a part that is absent is not set at the user scope, and each machine
-    /// keeps its own.
+    /// Per-file configuration state (#2129). Clients get metadata only; machines receive
+    /// the base64 file contents on host/userSettings.
+    struct AgentConfigFile: Codable, Sendable, Hashable {
+        public var path: String
+        public var contents: String?
+        public var deleted: Bool?
+        public var time: Int64
+        public var counter: Int64
+        public var machine: String
+        public var digest: String
+    }
+
+    struct AgentConfigFiles: Codable, Sendable, Hashable {
+        public var files: [AgentConfigFile]
+        public var updated: String?
+    }
+
+    /// `user/settings`: the person's fixed-scope settings. An omitted part has no value yet;
+    /// it does not make that setting machine-local.
     struct UserSettings: Codable, Sendable, Hashable {
         public var mcpServers: JSONValue?
         public var agentConfig: JSONValue?
+        public var agentConfigFiles: AgentConfigFiles?
         public var runtimes: JSONValue?
         public var costLimits: JSONValue?
-        public var resources: JSONValue?
+        /// The person's notice limits (#2859): `{"burst", "cooldownMinutes"}`.
+        public var notifications: JSONValue?
         public var updated: String?
 
-        public init(mcpServers: JSONValue? = nil, agentConfig: JSONValue? = nil, runtimes: JSONValue? = nil,
-                    costLimits: JSONValue? = nil, resources: JSONValue? = nil, updated: String? = nil) {
+        public init(mcpServers: JSONValue? = nil, agentConfig: JSONValue? = nil, agentConfigFiles: AgentConfigFiles? = nil, runtimes: JSONValue? = nil,
+                    costLimits: JSONValue? = nil, notifications: JSONValue? = nil, updated: String? = nil) {
             self.mcpServers = mcpServers
             self.agentConfig = agentConfig
+            self.agentConfigFiles = agentConfigFiles
             self.runtimes = runtimes
             self.costLimits = costLimits
-            self.resources = resources
+            self.notifications = notifications
             self.updated = updated
         }
 
@@ -51,7 +71,7 @@ public extension DaemonAPI {
             case .agentConfig: agentConfig
             case .runtimes: runtimes
             case .costLimits: costLimits
-            case .resources: resources
+            case .notifications: notifications
             }
         }
     }
@@ -111,6 +131,7 @@ public extension DaemonAPI {
     /// `control/userSettingsChanged`: read the user scope again.
     struct UserSettingsChanged: Codable, Sendable, Hashable {
         public var parts: [UserSettingsPartName]?
+        public var agentConfigFiles: Bool?
         public var secrets: Bool?
     }
 
@@ -142,6 +163,8 @@ public extension DaemonAPI.Method {
     static let userSettings = "user/settings"
     /// `UserSettingsPart` → `{}` (#1760).
     static let userSetSettings = "user/setSettings"
+    /// `AgentConfigFileRequest` → `{}` (#2129).
+    static let userSetAgentConfigFile = "user/setAgentConfigFile"
     /// `UserSecret` → `{}` (#1760).
     static let userSetSecret = "user/setSecret"
     /// `UserSecretRequest` → `{}` (#1760).
@@ -159,62 +182,24 @@ public extension DaemonAPI.Notification {
     static let controlSecretsLeft = "control/secretsLeft"
 }
 
-/// The words of You ▸ On Every Machine (#1760), for the window and the Remote. The web page
-/// says the same in `Web/src/model/userScope.ts`.
+/// The words for settings with a fixed scope (#2410) and the Secrets page.
 public enum UserScopeWords {
-    public static let title = "On Every Machine"
-    public static let secretsHeading = "Secrets"
-    public static let partsHeading = "Settings"
+    /// Machines ▸ Secrets.
+    public static let secretsTitle = "Secrets"
+    public static let yoursOnEveryMachine = "Yours, on every machine"
+    /// Under "This Mac's" at the top of the `~/.agents` pages and editors (#2704): what goes to
+    /// the person's other machines. A machine does not send its `~/.agents` files (#2703); the
+    /// Mac's Settings window sets these parts at the user scope (`keepFollowingParts`).
+    public static let agentConfigurationFollows = "Your other machines get this Mac's instructions, personas, "
+        + "skills and MCP servers from the Mac's Settings window. Workflows, plugins and a skill's other files stay on this Mac."
 
-    public static func partTitle(_ part: DaemonAPI.UserSettingsPartName) -> String {
-        switch part {
-        case .mcpServers: "MCP servers"
-        case .agentConfig: "Agent configuration"
-        case .runtimes: "Agent runtime choices"
-        case .costLimits: "Cost limits"
-        case .resources: "Resources"
-        }
-    }
-
-    /// What each part holds, under its title.
-    public static func partDetail(_ part: DaemonAPI.UserSettingsPartName) -> String {
-        switch part {
-        case .mcpServers: "Your own servers in ~/.agents/mcp.json."
-        case .agentConfig: "Your instructions, personas and one-file skills in ~/.agents."
-        case .runtimes: "Each runtime's sandbox and permission choices. Sign-ins stay on each machine."
-        case .costLimits: "The most an agent and a day may spend."
-        case .resources: "What agents take turns with, such as build."
-        }
-    }
-
-    public static func partState(_ value: JSONValue?, updated: String?) -> String {
-        guard value != nil else { return "Each machine keeps its own." }
-        return "The same on every machine of yours."
-    }
-
-    public static func useHere(_ machine: String) -> String { "Use \(machine)’s" }
-    public static let stop = "Each Machine Its Own"
+    public static let thisMacOnly = "This Mac's"
     public static let addSecret = "Add a Secret…"
 
     public static let secretsFoot = "A secret goes only to your own machines, into ~/.agents-secrets/secrets.env. "
         + "Write ${NAME} for it in an MCP server's env or headers. Nobody can read it back, you included: to change it, replace it."
     public static let noSealing = "This control plane has no key to seal secrets with, so it keeps none. "
         + "Its operator starts it with a key file or AGENTS_CONTROL_KMS."
-    public static let partsFoot = "A setting here is the same on every machine of yours, and on each new one as it joins. "
-        + "Change it in its own pane on any of your Macs: the change goes to every machine of yours."
-    /// Over a Mac pane whose part is the same on every machine (#2069).
-    public static let followedTitle = "The same on every machine of yours"
-    public static func followedNote(_ part: DaemonAPI.UserSettingsPartName) -> String {
-        "\(partTitle(part)): a change here goes to every machine of yours, not only to this Mac."
-    }
-    public static let showOnEveryMachine = "Show On Every Machine"
-    /// Use This Mac's on a part that is the same on every machine already (#2069).
-    public static func replaceTitle(_ part: DaemonAPI.UserSettingsPartName, machine: String) -> String {
-        "Use \(machine)’s \(partTitle(part))?"
-    }
-    public static let replaceMessage = "Every machine of yours takes this one’s, in place of what they all have now."
-    public static let partsFootNoTake = "Choose on the Mac which of its settings are the same on every machine of yours."
-
     /// A secret's row: where it is.
     public static func machines(_ row: DaemonAPI.UserSecretRow) -> String {
         switch row.machines.count {

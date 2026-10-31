@@ -6,10 +6,10 @@ description: Add session labels, find labeled work, see who owns each label, and
 
 # Label a session
 
-Use labels to tell similar sessions apart and find them later in the same project.
+Use labels to tell similar sessions apart and find them later in the same folder.
 Each session can have up to five labels. A label has 1–24 characters; surrounding
 spaces are removed, and capitalization does not make a second label.
-Server projects can be labeled from the Mac. iPhone and iPad show Mac projects only.
+Server folders can be labeled from the Mac. iPhone and iPad show Mac folders only.
 
 ## Add labels
 
@@ -17,9 +17,9 @@ On the Mac, labels are edited in one field in the row above the prompt, beside t
 folder and **Reach** for a new session and beside the worktree for an open one. On
 iPhone and iPad the field is at the top of the chat and in the new-session sheet. Type a
 label and press comma, or Return, to add it; a pasted `perf, ui` adds both. As
-you type, labels already used in the project are offered: on the Mac in a list
+you type, labels already used in the folder are offered: on the Mac in a list
 under the field, on iPhone and iPad as chips after it. Suggestions come from
-sessions still in the project, including archived ones, and disappear after the
+sessions still in the folder, including archived ones, and disappear after the
 last use is removed. The session list shows a session's labels but does not
 change them.
 
@@ -38,12 +38,12 @@ one of yours.
 
 ## Find a session
 
-Search the project's sessions for `label:review` to find the **review** label.
+Search the folder's sessions for `label:review` to find the **review** label.
 Capitalization does not matter. Add ordinary words to narrow the result, such
 as `label:review login`; both the label and the title or last report must match.
 Use quotes for a label with spaces: `label:"code review"`.
 
-Search includes archived sessions. On the phone it loads the full project archive
+Search includes archived sessions. On the phone it loads the full folder archive
 for the query, even when only the newest ten archived cards were previously shown.
 If nothing matches, the session list says so. A new chat starts with its own
 labels; it does not copy labels from the session whose work you continue.

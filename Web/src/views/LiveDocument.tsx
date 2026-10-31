@@ -37,7 +37,7 @@ interface Editing {
 }
 
 /**
- * Where a page is read and written: an agent's folder (the default), or a project's own folder
+ * Where a page is read and written: an agent's folder (the default), or a folder's own folder
  * for a pinned page (#159). `changed` moves whenever the page may have changed on disk.
  */
 export interface PageSource {

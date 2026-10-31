@@ -3,11 +3,13 @@ package store
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -15,10 +17,11 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
+	"github.com/alexec/agents/Go/internal/agentsd/redact"
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Store holds the root's agents and projects. Agent records are kept in memory, as the
+// Store holds the root's agents and folders. Agent records are kept in memory, as the
 // Swift daemon keeps them; transcripts are read from disk when asked for, never held.
 type Store struct {
 	Loc Locations
@@ -26,9 +29,9 @@ type Store struct {
 	// it, and one stamped with another root's is never run.
 	RootID string
 
-	mu       sync.Mutex
-	agents   map[wire.UUID]*wire.Agent
-	projects []wire.Project
+	mu      sync.Mutex
+	agents  map[wire.UUID]*wire.Agent
+	folders []wire.Folder
 	// lines is each transcript's count of lines, once counted, for an entry's index.
 	lines map[wire.UUID]int
 	// ib is where the lines of the transcripts read most recently end (lineindex.go).
@@ -46,7 +49,7 @@ func Open(root string) (*Store, error) {
 	s := &Store{Loc: loc, agents: map[wire.UUID]*wire.Agent{}, lines: map[wire.UUID]int{}}
 	id, adopts := loadOrMakeRootID(loc.RootIdentity(), loc.Root)
 	s.RootID = id
-	s.projects = s.loadProjects()
+	s.folders = s.loadFolders()
 	finishDeleting(loc)
 	entries, _ := os.ReadDir(loc.Agents())
 	for _, e := range entries {
@@ -54,13 +57,13 @@ func Open(root string) (*Store, error) {
 		if !wireUUID(name) {
 			continue
 		}
-		a, err := s.load(name)
+		a, filled, err := s.load(name)
 		if err != nil {
 			// Left where it is, for a build that can read it, and said (AgentStore.load).
 			log.Printf("could not read agent %s, left on disk: %v", name, err)
 			continue
 		}
-		changed := mend(a)
+		changed := mend(a) || filled
 		if a.MadeInRoot == nil && adopts {
 			a.MadeInRoot = &id
 			changed = true
@@ -83,17 +86,64 @@ func wireUUID(s string) bool {
 	return len(s) == 36 && strings.Count(s, "-") == 4 && s == strings.ToUpper(s)
 }
 
-func (s *Store) load(id string) (*wire.Agent, error) {
+// load reads a record, and says whether it filled the worktree's folder (FillFolder).
+func (s *Store) load(id string) (*wire.Agent, bool, error) {
 	b, err := os.ReadFile(s.Loc.Record(id))
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	var a wire.Agent
 	if err := diskjson.Unmarshal(b, &a); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	a.ID = wire.UUID(strings.ToUpper(string(a.ID)))
-	return &a, nil
+	return &a, FillFolder(&a, b), nil
+}
+
+// FillFolder gives a worktree with no folder one (#2650). #2617 renamed the record's
+// "project" key to "folder" with no migration, and records written since have "folder": "",
+// which no client reads as a URL. The folder is the old "project" key when the record has
+// it, else the repository the worktree's root belongs to, else the folder its
+// .agents/worktrees is in, else the root itself: never empty.
+func FillFolder(a *wire.Agent, record []byte) bool {
+	w := a.Worktree
+	if w == nil || w.Folder != "" {
+		return false
+	}
+	var old struct {
+		Worktree *struct {
+			Project wire.URL `json:"project"`
+		} `json:"worktree"`
+	}
+	if json.Unmarshal(record, &old) == nil && old.Worktree != nil && old.Worktree.Project != "" {
+		w.Folder = old.Worktree.Project
+	} else {
+		w.Folder = repositoryFolder(FolderPath(w.Root))
+	}
+	log.Printf("agent %s: its worktree had no folder; it is %s now", a.ID, w.Folder)
+	return true
+}
+
+// repositoryFolder is the folder a worktree at root is of: the parent of git's common
+// dir, else what comes before .agents/worktrees in root, else root.
+func repositoryFolder(root string) wire.URL {
+	if root == "" {
+		return PathURL("/")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", "-C", root, "rev-parse", "--path-format=absolute", "--git-common-dir")
+	cmd.Env = append(os.Environ(), "GIT_OPTIONAL_LOCKS=0")
+	if out, err := cmd.Output(); err == nil {
+		if dir := strings.TrimSpace(string(out)); dir != "" {
+			return FolderURL(filepath.Dir(dir))
+		}
+	}
+	marker := string(filepath.Separator) + filepath.Join(".agents", "worktrees") + string(filepath.Separator)
+	if i := strings.Index(root, marker); i > 0 {
+		return FolderURL(root[:i])
+	}
+	return FolderURL(root)
 }
 
 // mend brings a record the rules forbid to one they allow (AgentStore.mended), and ends
@@ -241,8 +291,18 @@ func (s *Store) Agents() []wire.Agent {
 }
 
 // Append adds an entry to an agent's transcript and says its index: the line it is.
+// The entry is redacted as AppendMany does it; AppendOne also gives it back.
 func (s *Store) Append(id wire.UUID, e wire.TranscriptEntry) (int, error) {
-	return s.AppendMany(id, []wire.TranscriptEntry{e})
+	n, _, err := s.AppendOne(id, e)
+	return n, err
+}
+
+// AppendOne is Append that also gives back the entry as it was written: redacted when it
+// held a known token shape (#1001).
+func (s *Store) AppendOne(id wire.UUID, e wire.TranscriptEntry) (int, wire.TranscriptEntry, error) {
+	es := []wire.TranscriptEntry{e}
+	n, err := s.AppendMany(id, es)
+	return n, es[0], err
 }
 
 // openTranscript opens a transcript to append to; a test counts the opens through it.
@@ -253,12 +313,22 @@ var openTranscript = func(file string) (*os.File, error) {
 // AppendMany adds entries to an agent's transcript with one open and one write, and says
 // the index of the first (#1852): a branch copies up to 10,000 entries at once, and the
 // store's lock, which every agent lookup takes, is held once rather than for each.
+//
+// Each line is written with its known token shapes redacted (#1001), and an entry that
+// held one is changed in es to what was written, for the caller to send on.
 func (s *Store) AppendMany(id wire.UUID, es []wire.TranscriptEntry) (int, error) {
 	var buf []byte
-	for _, e := range es {
+	for i, e := range es {
 		b, err := diskjson.Marshal(e)
 		if err != nil {
 			return 0, err
+		}
+		if r, changed := redact.Bytes(b); changed {
+			var cut wire.TranscriptEntry
+			if err := diskjson.Unmarshal(r, &cut); err != nil {
+				return 0, fmt.Errorf("redact an entry: %w", err)
+			}
+			b, es[i] = r, cut
 		}
 		buf = append(append(buf, b...), '\n')
 	}
@@ -337,16 +407,16 @@ func (s *Store) Transcript(id wire.UUID, from int) ([]wire.TranscriptEntry, []in
 	return out, at, r.Err()
 }
 
-// MARK: projects.json
+// MARK: folders.json
 
-func (s *Store) loadProjects() []wire.Project {
-	b, err := os.ReadFile(s.Loc.Projects())
+func (s *Store) loadFolders() []wire.Folder {
+	b, err := os.ReadFile(s.Loc.Folders())
 	if err != nil {
 		return nil
 	}
-	var ps []wire.Project
+	var ps []wire.Folder
 	if err := diskjson.Unmarshal(b, &ps); err != nil {
-		log.Printf("projects.json could not be read, starting with no archived projects: %v", err)
+		log.Printf("folders.json could not be read, starting with no archived folders: %v", err)
 		return nil
 	}
 	seen := map[wire.URL]bool{}
@@ -360,26 +430,26 @@ func (s *Store) loadProjects() []wire.Project {
 	return out
 }
 
-// Projects is the projects.json list.
-func (s *Store) Projects() []wire.Project {
+// Folders is the folders.json list.
+func (s *Store) Folders() []wire.Folder {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return append([]wire.Project(nil), s.projects...)
+	return append([]wire.Folder(nil), s.folders...)
 }
 
-// SaveProjects writes the list, sorted by folder path, as ProjectStore.save does.
-func (s *Store) SaveProjects(ps []wire.Project) error {
-	ps = append([]wire.Project(nil), ps...)
+// SaveFolders writes the list, sorted by folder, as FolderStore.save does.
+func (s *Store) SaveFolders(ps []wire.Folder) error {
+	ps = append([]wire.Folder(nil), ps...)
 	sort.SliceStable(ps, func(i, j int) bool { return FolderPath(ps[i].Folder) < FolderPath(ps[j].Folder) })
 	b, err := diskjson.Marshal(ps)
 	if err != nil {
 		return err
 	}
-	if err := WriteAtomically(s.Loc.Projects(), b, 0o644); err != nil {
+	if err := WriteAtomically(s.Loc.Folders(), b, 0o644); err != nil {
 		return err
 	}
 	s.mu.Lock()
-	s.projects = ps
+	s.folders = ps
 	s.mu.Unlock()
 	return nil
 }
@@ -396,7 +466,7 @@ func FolderPath(u wire.URL) string {
 	return p
 }
 
-// FolderURL is a project's folder as Project.standardize makes it: the path cleaned, its
+// FolderURL is a folder as Folder.standardize makes it: the path cleaned, its
 // links resolved, and no trailing slash ("file:///home/a/src/x").
 func FolderURL(path string) wire.URL {
 	path = filepath.Clean(path)

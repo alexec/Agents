@@ -72,13 +72,6 @@ func (i *Issuer) Rotate() {
 	i.key, i.kid, i.keys[kid] = key, kid, key
 }
 
-// Drop takes every key but the newest out of the JWKS.
-func (i *Issuer) Drop() {
-	i.mu.Lock()
-	defer i.mu.Unlock()
-	i.keys = map[string]*rsa.PrivateKey{i.kid: i.key}
-}
-
 // Claims are an ID token's claims; Mint fills iss, iat and exp when they are not set.
 type Claims map[string]any
 

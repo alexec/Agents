@@ -4,11 +4,11 @@ import Foundation
 /// behind a phone's New session.
 ///
 /// SwiftUI can say a page went after the page that replaced it said it came: the detail
-/// is rebuilt with each pick. Keyed by the showing, not by the page's project, the late
+/// is rebuilt with each pick. Keyed by the showing, not by the page's folder, the late
 /// "went" of the old one does not let go of what the new one holds.
 ///
-/// More than one showing can be on screen at once (#2089): an iPhone's project screen over
-/// the sidebar of every project, an iPad's project scene beside the main one. The last to
+/// More than one showing can be on screen at once (#2089): an iPhone's folder screen over
+/// the sidebar of every folder, an iPad's folder scene beside the main one. The last to
 /// come holds the page; when it goes, the one under it holds it again, so a page still on
 /// screen is never left with nothing behind it.
 public struct PageHold<Key: Equatable>: Equatable {

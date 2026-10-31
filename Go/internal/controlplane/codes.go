@@ -24,9 +24,9 @@ type Codes struct {
 	Public  []byte
 	// The control plane's keys now, after any rotation (#997); nil uses Private and Public.
 	Keys func() (private, public []byte)
-	URL     string
-	Pin     string
-	Name    string
+	URL  string
+	Pin  string
+	Name string
 }
 
 func (c *Codes) keys() (private, public []byte) {
@@ -41,7 +41,7 @@ type storedCode struct {
 	Purpose string `json:"purpose"`
 	// Made for a browser (071 R2): good only through a page, the loopback listener's or the
 	// page on the control plane's own domain (#1459).
-	Browser *bool         `json:"browser,omitempty"`
+	Browser *bool `json:"browser,omitempty"`
 	// The person whose client or machine uses it (#994); none is the local owner.
 	Owner *string `json:"owner,omitempty"`
 	// An invite (#994): the client that uses it is a new person's first.

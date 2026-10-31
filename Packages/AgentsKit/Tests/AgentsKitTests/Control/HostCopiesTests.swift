@@ -7,14 +7,14 @@ import Testing
 /// client that starts while it is offline.
 @Suite("What an offline host last listed")
 struct HostCopiesTests {
-    let host = HostID(rawValue: "k3v9x0qa")
+    let host = MachineRef(rawValue: "k3v9x0qa")
 
     static func reply(_ result: JSONValue) throws -> String {
         try JSONRPCCodec.encode(.success(id: .number(1), result: result))
     }
 
     @Test func onlyWholeListsAreKept() {
-        #expect(HostCopies.keeps(DaemonAPI.Method.projectsList, ["includeArchived": true]))
+        #expect(HostCopies.keeps(DaemonAPI.Method.foldersList, ["includeArchived": true]))
         #expect(HostCopies.keeps(DaemonAPI.Method.agentsList, ["includeArchived": false, "lean": true, "limit": 500]))
         #expect(HostCopies.keeps(DaemonAPI.Method.agentsList,
                                  ["includeArchived": false, "archivedCommands": false, "archivedOnly": false, "lean": true]))
@@ -31,8 +31,8 @@ struct HostCopiesTests {
         let store = MemoryStore()
         let copies = HostCopies(store: store)
         #expect(await copies.lastHeard(host) == ["host": "k3v9x0qa"])
-        let projects: JSONValue = [["project": ["folder": "/src/api"]]]
-        await copies.take(host, method: DaemonAPI.Method.projectsList, reply: try Self.reply(projects))
+        let folders: JSONValue = [["folder": ["folder": "/src/api"]]]
+        await copies.take(host, method: DaemonAPI.Method.foldersList, reply: try Self.reply(folders))
         await copies.take(host, method: DaemonAPI.Method.agentsList, reply: try Self.reply([["id": "a1", "title": "Fix login"]]))
         // A refusal changes nothing.
         await copies.take(host, method: DaemonAPI.Method.agentsList,
@@ -40,7 +40,7 @@ struct HostCopiesTests {
 
         let again = HostCopies(store: store)
         let heard = try #require(await again.lastHeard(host).objectValue)
-        #expect(heard["projects"] == projects)
+        #expect(heard["folders"] == folders)
         #expect(heard["agents"] == [["id": "a1", "title": "Fix login"]])
         #expect(heard["heardAt"] != nil)
 

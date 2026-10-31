@@ -6,6 +6,7 @@
 #   free-disk.sh status                free space now, and how far from the target
 #   free-disk.sh chromes [--hours N]   end leaked headless Chromes, then their clones
 #   free-disk.sh xcode                 older iOS DeviceSupport builds, unavailable simulators
+#   free-disk.sh deriveddata [--dry-run]  Xcode DerivedData of worktrees that are gone
 #
 # status: the target is 20% of the disk (AGENTS_FREE_TARGET_PCT moves it). It exits 0 when
 # free space is at the target or over it, and 1 when it is under.
@@ -24,6 +25,16 @@
 # xcode: Xcode keeps a DeviceSupport folder per device model and OS build (about 6.5 GB
 # each). Only the newest build of each model is kept. Simulators whose runtime is gone
 # (`simctl delete unavailable`) go too.
+#
+# deriveddata: Xcode builds each worktree into ~/Library/Developer/Xcode/DerivedData/
+# Agents-<hash> (3-4 GB each), not into the worktree, so removing the worktree leaves it
+# (#2683). This removes an Agents-* folder only when all of these are true:
+#   - its info.plist has a WorkspacePath;
+#   - that path is under <main checkout>/.agents/worktrees/;
+#   - that path does not exist;
+#   - no running xcodebuild names the folder or that worktree.
+# A folder with no info.plist, a folder of another project, and Xcode's shared caches
+# (ModuleCache.noindex, SDK*) are kept. --dry-run says what it would remove.
 set -euo pipefail
 
 die() { echo "free-disk.sh: $*" >&2; exit 1; }
@@ -114,9 +125,56 @@ xcode() {
 	xcrun simctl delete unavailable || echo "simctl delete unavailable failed: left as it is"
 }
 
+deriveddata() {
+	local dry=0
+	while [ $# -gt 0 ]; do
+		case $1 in
+		--dry-run) dry=1 ;;
+		*) die "deriveddata [--dry-run]" ;;
+		esac
+		shift
+	done
+	local dd="$HOME/Library/Developer/Xcode/DerivedData" main
+	[ -d "$dd" ] || { echo "no DerivedData"; return 0; }
+	main=$(dirname "$(git -C "$(dirname "$0")" rev-parse --path-format=absolute --git-common-dir)")
+	local builds d name ws k freed=0 removed=0 verb=removing
+	[ "$dry" = 0 ] || verb="would remove"
+	builds=$(pgrep -fl xcodebuild || true)
+	while IFS= read -r d; do
+		name=$(basename "$d")
+		if ! ws=$(plutil -extract WorkspacePath raw "$d/info.plist" 2>/dev/null) || [ -z "$ws" ]; then
+			echo "kept $name: no WorkspacePath"
+			continue
+		fi
+		case $ws in
+		"$main"/.agents/worktrees/*) ;;
+		*) echo "kept $name: $ws is not a worktree of $main"; continue ;;
+		esac
+		if [ -e "$ws" ]; then
+			echo "kept $name: $ws is there"
+			continue
+		fi
+		if [ -n "$builds" ] && printf '%s\n' "$builds" | grep -qF -e "$name" -e "$(dirname "$ws")"; then
+			echo "kept $name: an xcodebuild uses it"
+			continue
+		fi
+		k=$(du -sk "$d" | cut -f1)
+		echo "$verb $name ($(gb "$k") GB): $ws is gone"
+		[ "$dry" = 1 ] || rm -rf -- "$d"
+		freed=$((freed + k))
+		removed=$((removed + 1))
+	done < <(find "$dd" -mindepth 1 -maxdepth 1 -type d -name 'Agents-*')
+	if [ "$dry" = 1 ]; then
+		echo "would remove $removed folder(s), $(gb "$freed") GB"
+	else
+		echo "removed $removed folder(s), $(gb "$freed") GB"
+	fi
+}
+
 case ${1:-} in
 status) status ;;
 chromes) shift; chromes "$@" ;;
 xcode) xcode ;;
-*) sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+deriveddata) shift; deriveddata "$@" ;;
+*) sed -n '2,37p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

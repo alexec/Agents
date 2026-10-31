@@ -118,7 +118,7 @@ func (r *Router) SetNeedsUpdate(host, from, to string) {
 
 // hostCapabilities is the list a host said in its last host/hello, kept beside the record's
 // own fields as its implementation is; nil for a host older than #1748.
-func hostCapabilities(h records.HostRecord) []string {
+func hostCapabilities(h records.MachineRecord) []string {
 	raw, ok := h.Extra["capabilities"]
 	if !ok {
 		return nil
@@ -131,7 +131,7 @@ func hostCapabilities(h records.HostRecord) []string {
 }
 
 // withCapabilities is the record with the list a host said, or without one when it said none.
-func withCapabilities(h records.HostRecord, list []string) records.HostRecord {
+func withCapabilities(h records.MachineRecord, list []string) records.MachineRecord {
 	extra := records.Extra{}
 	for k, v := range h.Extra {
 		if k != "capabilities" {

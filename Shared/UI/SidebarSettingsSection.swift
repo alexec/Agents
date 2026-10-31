@@ -2,7 +2,8 @@ import AgentsKitCore
 import SwiftUI
 
 /// Settings ▸ You ▸ Sidebar (#846, #2079): a switch for each smart group, and whether agents
-/// may archive the chats the person starts (#1802). Both are kept on the Mac's host, so every
+/// may archive the chats the person starts (#1802).
+/// All are kept on the Mac's host, so every
 /// client shows the same (#1033). The Mac's Settings window and the Remote's Settings screen
 /// draw the same section; the web page has the same two sections under You.
 struct SidebarSettingsSection: View {
@@ -26,7 +27,7 @@ struct SidebarSettingsSection: View {
         } header: {
             Text("Smart groups")
         } footer: {
-            Text("A group that is off is not shown. Its sessions go to the next group they fit, or under their project. "
+            Text("A group that is off is not shown. Its sessions go to the next group they fit, or under their folder. "
                  + "With Needs You off, approvals are not listed in the sidebar. The same on every client of yours.")
                 .appText(.fine)
                 .foregroundStyle(.secondary)
@@ -42,7 +43,7 @@ struct SidebarSettingsSection: View {
                  + "Nothing to do, unless it showed you a file. Off, it waits for you to approve it. "
                  + "Archived chats come back with Unarchive. "
                  // Each host reads its own preferences (#1872): the docs' sentence.
-                 + "A server does not read this switch, so a chat in a server project may still archive itself.")
+                 + "Another machine does not read this switch, so a chat in a folder on another machine may still archive itself.")
                 .appText(.fine)
                 .foregroundStyle(.secondary)
         }

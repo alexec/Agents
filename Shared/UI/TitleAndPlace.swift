@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// A sidebar row's title and the project it is in, on one line (#936), drawn by the window's
-/// and the Remote's session rows. The project's name is whole while it takes at most
-/// `placeShare` of the line, and is cut after that, so a long project name never pushes the
+/// A sidebar row's title and the folder it is in, on one line (#936), drawn by the window's
+/// and the Remote's session rows. The folder's name is whole while it takes at most
+/// `placeShare` of the line, and is cut after that, so a long folder name never pushes the
 /// title out (cut to "p" it said nothing, #587). The title has the rest. Two subviews, title
 /// first; one is drawn alone. Set on their first text baseline, as the web's flex row does.
 struct TitleAndPlace: Layout {

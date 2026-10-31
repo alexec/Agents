@@ -4,19 +4,19 @@ import SwiftUI
 /// What happened, what came of it, and who is still waiting (042 US2; wireframes §1).
 ///
 /// A page like Resources, reached from the foot of the sidebar. Machine-wide on purpose:
-/// the story the person wants after a night away runs across projects and the Mac, and a
-/// log per project would cut it into pieces (wireframes §6).
+/// the story the person wants after a night away runs across folders and the Mac, and a
+/// log per folder would cut it into pieces (wireframes §6).
 ///
 /// "Waiting now" sits at the top because it answers the other half of the same question —
 /// why hasn't this agent moved? — and is absent when nobody is waiting. The list below is
-/// newest first in days, filtered by project and by kind, and it takes new events at the
+/// newest first in days, filtered by folder and by kind, and it takes new events at the
 /// top without moving what the person is reading.
 ///
 /// Nothing is tinted. An event is a fact, not a state.
 struct EventsView: View {
     @Environment(AppModel.self) private var model
 
-    /// Nil: every project and the Mac.
+    /// Nil: every folder and the Mac.
     @State private var scope: EventScope?
     /// Empty: every kind.
     @State private var groups: Set<EventGroup> = []
@@ -199,11 +199,11 @@ struct EventsView: View {
                 Button("All") { scope = nil }
                 Button("This Mac") { scope = .mac }
                 Divider()
-                ForEach(model.projects, id: \.project.folder) { summary in
-                    Button(summary.name) { scope = .project(folder: summary.project.folder) }
+                ForEach(model.folders, id: \.folder.folder) { summary in
+                    Button(summary.name) { scope = .folder(folder: summary.folder.folder) }
                 }
             } label: {
-                Text(scope.map(scopeName) ?? "All projects").appText(.fine)
+                Text(scope.map(scopeName) ?? "All folders").appText(.fine)
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
@@ -231,8 +231,8 @@ struct EventsView: View {
     private func scopeName(_ scope: EventScope) -> String {
         switch scope {
         case .mac: return "This Mac"
-        case .project(let folder):
-            return model.projects.first { Project.standardize($0.project.folder) == folder }?.name
+        case .folder(let folder):
+            return model.folders.first { Folder.standardize($0.folder.folder) == folder }?.name
                 ?? folder.lastPathComponent
         }
     }

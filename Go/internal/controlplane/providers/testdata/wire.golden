@@ -4,7 +4,7 @@ providers/list
 hosts/link
 {"ID":"devbox01","State":"online","Workspace":{"provider":"<provider>","providerName":"DigitalOcean","workspace":"agents-devbox","workspaceName":"agents-devbox","workspaceState":"stopped","hostState":"stopped","canStart":true,"canStop":false,"startWhenUsed":true,"stopWhenIdleMinutes":30,"current":true,"startForSchedules":true,"tellsSchedule":false}}
 
-hosts/setWorkspaceOptions
+hosts/setMachineOptions
 {"ID":"devbox01","State":"online","Workspace":{"provider":"<provider>","providerName":"DigitalOcean","workspace":"agents-devbox","workspaceName":"agents-devbox","workspaceState":"stopped","hostState":"stopped","canStart":true,"canStop":false,"startWhenUsed":true,"stopWhenIdleMinutes":30,"current":true,"startForSchedules":true,"tellsSchedule":false}}
 
 providers/options
@@ -26,15 +26,15 @@ providers/update refused
 {"code":-32602,"message":"Those parameters are not a ProviderAdd."}
 
 hosts/unlink refused
-{"code":-32602,"message":"Those parameters are not a HostRequest."}
+{"code":-32602,"message":"Those parameters are not a MachineRequest."}
 
 host/status (host)
 {}
 
-host/workspaces (host)
-{"providers":[{"id":"<provider>","name":"DigitalOcean","canMake":true,"canDelete":true,"options":{"properties":{"size":{"enum":["small","big"],"title":"Size","type":"string","x-costs":{"big":"$0.05/hour","small":"$0.01/hour"}}},"type":"object"},"workspaces":[{"id":"agents-devbox","name":"agents-devbox","state":"stopped"},{"id":"scratch-1","name":"scratch-1","state":"running"}]}]}
+host/machines (host)
+{"providers":[{"id":"<provider>","name":"DigitalOcean","canMake":true,"canDelete":true,"options":{"properties":{"size":{"enum":["small","big"],"title":"Size","type":"string","x-costs":{"big":"$0.05/hour","small":"$0.01/hour"}}},"type":"object"},"workspaces":[{"id":"agents-devbox","name":"agents-devbox","state":"stopped"},{"id":"scratch-1","name":"scratch-1","state":"running"}]}],"hosts":[{"name":"devbox","state":"online"},{"name":"other","state":"offline"}]}
 
-host/workspaces (host) refused
+host/machines (host) refused
 {"code":-32045,"message":"Agents can’t ask that of the control plane."}
 
 providers/list

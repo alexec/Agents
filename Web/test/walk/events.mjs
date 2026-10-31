@@ -1,6 +1,6 @@
-// #170: what one event costs the page, on a large root (5,000 agents, 50 projects), in headless
-// Chrome. The page is paired, five projects are unfolded with one Archived fold open, and then:
-//   sidebar  N label changes to agents across every project (agent/changed per change);
+// #170: what one event costs the page, on a large root (5,000 agents, 50 folders), in headless
+// Chrome. The page is paired, five folders are unfolded with one Archived fold open, and then:
+//   sidebar  N label changes to agents across every folder (agent/changed per change);
 //   chat     a demo agent's chat open while it is prompted again and again (agent/entry).
 // For each, the main thread's script and task time per event, the DOM mutations per event, and
 // the heap and node count after a collection. Needs the host started with AGENTS_TEST_RUNTIME=echo.
@@ -60,18 +60,18 @@ await page.waitFor(`document.querySelector("textarea")`);
 await page.focus("textarea");
 await page.type(code);
 await page.press("Connect");
-await page.waitFor(`document.querySelectorAll(".project-fold").length >= 50`, 60_000);
+await page.waitFor(`document.querySelectorAll(".folder-fold").length >= 50`, 60_000);
 await sleep(2000);
 
-const projects = (await host.call("projects/list", { includeArchived: false })).map((p) => p.project.folder).sort();
+const folders = (await host.call("folders/list", { includeArchived: false })).map((p) => p.folder.folder).sort();
 const live = await host.call("agents/list", { lean: true, includeArchived: false });
 
-// Five projects unfolded, the first's Archived fold open too.
-for (const folder of projects.slice(0, 5)) {
-  await page.eval(`document.querySelector('.project-fold[data-folder="${folder}"] .disclosure')?.click()`);
+// Five folders unfolded, the first's Archived fold open too.
+for (const folder of folders.slice(0, 5)) {
+  await page.eval(`document.querySelector('.folder-fold[data-folder="${folder}"] .disclosure')?.click()`);
 }
 await sleep(500);
-await page.eval(`(() => { const d = document.querySelector('.project-fold[data-folder="${projects[0]}"] details.archived'); if (d) { d.open = true; d.dispatchEvent(new Event("toggle")); } })()`);
+await page.eval(`(() => { const d = document.querySelector('.folder-fold[data-folder="${folders[0]}"] details.archived'); if (d) { d.open = true; d.dispatchEvent(new Event("toggle")); } })()`);
 await sleep(2000);
 
 async function metrics() {
@@ -102,9 +102,9 @@ async function measure(name, count, drive) {
   say(`${label} ${name}: ${count} events in ${((Date.now() - started) / 1000).toFixed(1)} s; per event script ${per("ScriptDuration")} ms, task ${per("TaskDuration")} ms, ${(mutations / count).toFixed(1)} DOM mutations; style recalcs ${after.RecalcStyleCount - before.RecalcStyleCount}, layouts ${after.LayoutCount - before.LayoutCount}`);
 }
 
-say(`${label} loaded: ${live.length} live agents in ${projects.length} projects; ${JSON.stringify(await settled())}`);
+say(`${label} loaded: ${live.length} live agents in ${folders.length} folders; ${JSON.stringify(await settled())}`);
 
-// Sidebar: a label added to agents in every project, at about 20 a second.
+// Sidebar: a label added to agents in every folder, at about 20 a second.
 await measure("sidebar (agent/changed)", changes, async () => {
   for (let i = 0; i < changes; i++) {
     const agent = live[(i * 37) % live.length];
@@ -114,8 +114,8 @@ await measure("sidebar (agent/changed)", changes, async () => {
 });
 say(`${label} after sidebar: ${JSON.stringify(await settled())}`);
 
-// Chat: a demo agent in the first project, its chat open while it is prompted.
-const folder = projects[0];
+// Chat: a demo agent in the first folder, its chat open while it is prompted.
+const folder = folders[0];
 const started = await host.call("agents/start", { runtimeID: "demo", cwd: folder, prompt: "hello" });
 const agentID = typeof started === "string" ? started : started.id;
 const record = async () => (await host.call("agents/list", { agentID, lean: true, limit: 1 })).find((a) => a.id === agentID);
@@ -128,7 +128,7 @@ const finished = (since = 0) => new Promise((resolve) => {
   void check();
 });
 await finished();
-const hostID = await page.eval(`document.querySelector('.project-fold[data-folder="${folder}"]').dataset.host`);
+const hostID = await page.eval(`document.querySelector('.folder-fold[data-folder="${folder}"]').dataset.host`);
 await page.eval(`location.hash = "#/" + ["h", ${JSON.stringify(hostID)}, "p", ${JSON.stringify(folder)}, "s", ${JSON.stringify(agentID)}].map(encodeURIComponent).join("/")`);
 await page.waitFor(`document.querySelector(".chat .transcript")`, 20_000);
 say(`${label} chat opened at ${(await page.eval("location.hash")).slice(0, 60)}`);

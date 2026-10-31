@@ -307,3 +307,23 @@ func TestAFailedLogReadsOnlyTheLogsEnd(t *testing.T) {
 	equal(t, lines[len(lines)-1], "FAIL: the end", "the failure at the end")
 	equal(t, lines[1], "2026-10-19T00:00:00Z step line 199701", "the first line kept, clean")
 }
+
+// #2349: the issues a PR's body closes, by GitHub's keywords, each once.
+func TestClosingRefs(t *testing.T) {
+	got := closingRefs("Fixes #12. Also closes alexec/Other#3, resolved: #12, fixes #0, and see #99.\nCloses #7")
+	want := []string{"#12", "alexec/Other#3", "#7"}
+	if len(got) != len(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+	}
+	if j := (PR{Number: 1, Fixes: got}).json(); j["fixes"] == nil {
+		t.Fatalf("no fixes in %v", j)
+	}
+	if j := (PR{Number: 1}).json(); j["fixes"] != nil {
+		t.Fatalf("fixes with none: %v", j)
+	}
+}

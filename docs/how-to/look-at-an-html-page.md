@@ -37,7 +37,7 @@ What an agent writes is treated as untrusted:
 - **No network.** Nothing is loaded from the internet: no remote stylesheets, fonts,
   pictures or scripts, and scripts cannot fetch or open sockets, even when allowed.
 - **Only files beside it.** The page reaches files inside the agent's folder, read
-  through the agent's host, so it works the same for a project on a server. A path with
+  through the agent's host, so it works the same for a folder on a server. A path with
   `..` in it is refused. A file opened from outside the agent's folder reaches only its
   own folder.
 - **Links go outside.** A web link opens in the Browser pane (on the iPhone and iPad, in

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -48,6 +49,65 @@ func callTool(t *testing.T, c *mcp.ClientSession, name string, args map[string]a
 	return r, data
 }
 
+func TestTheListsAskForNewestCreatedFirst(t *testing.T) {
+	f := viewsFake(t)
+	c := viewsClient(t, f)
+	callTool(t, c, "show_merge_requests", map[string]any{})
+	callTool(t, c, "show_issues", map[string]any{})
+
+	mergeRequests, issues := "", ""
+	for _, request := range f.asked() {
+		if strings.Contains(request, "/merge_requests?") {
+			mergeRequests = request
+		}
+		if strings.Contains(request, "/issues?") {
+			issues = request
+		}
+	}
+	for label, request := range map[string]string{"merge requests": mergeRequests, "issues": issues} {
+		if !strings.Contains(request, "order_by=created_at") || !strings.Contains(request, "sort=desc") || strings.Contains(request, "order_by=updated_at") {
+			t.Errorf("%s request: %s", label, request)
+		}
+	}
+
+	tools, err := c.ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"show_merge_requests", "show_issues"} {
+		found := false
+		for _, tool := range tools.Tools {
+			if tool.Name == name {
+				found = true
+				if !strings.Contains(tool.Description, "newest created first") {
+					t.Errorf("%s description: %s", name, tool.Description)
+				}
+			}
+		}
+		if !found {
+			t.Errorf("missing tool %s", name)
+		}
+	}
+	resources, err := c.ListResources(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, title := range []string{"Merge requests", "Issues"} {
+		found := false
+		for _, resource := range resources.Resources {
+			if resource.Title == title {
+				found = true
+				if !strings.Contains(resource.Description, "newest created first") {
+					t.Errorf("%s resource description: %s", title, resource.Description)
+				}
+			}
+		}
+		if !found {
+			t.Errorf("missing resource %s", title)
+		}
+	}
+}
+
 func viewsFake(t *testing.T) *fakeGitLab {
 	f := newFake(t)
 	f.addMembers()
@@ -77,7 +137,7 @@ func viewsFake(t *testing.T) *fakeGitLab {
 			{"id": 33, "type": "DiffNote", "body": "Then it raises.", "author": dev, "created_at": at(3)}}},
 		{"id": "d3", "notes": []obj{{"id": 34, "body": "added 1 commit", "system": true, "author": dev, "created_at": at(0)}}},
 	}
-	f.issues = []obj{issueObj(5, dev, obj{"labels": []string{"bug"}, "assignees": []obj{alex}, "user_notes_count": 2})}
+	f.issues = []obj{issueObj(5, dev, obj{"description": "## Work\n\n- **Inspect**", "labels": []string{"bug"}, "assignees": []obj{alex}, "user_notes_count": 2})}
 	return f
 }
 
@@ -117,15 +177,22 @@ func TestEachViewHasAToolThatFeedsItAndAPage(t *testing.T) {
 		}
 		html := r.Contents[0].Text
 		if r.Contents[0].MIMEType != viewMime || !strings.HasPrefix(html, "<!doctype html>") ||
-			strings.Contains(html, "/*common.css*/") || strings.Contains(html, "/*bridge.js*/") || !strings.Contains(html, "const bridge") {
+			strings.Contains(html, "/*common.css*/") || strings.Contains(html, "/*bridge.js*/") || strings.Contains(html, "/*lineage.js*/") || !strings.Contains(html, "const bridge") {
 			t.Errorf("%s is not a whole page", uri)
 		}
 		if uri != issuesURI && !strings.Contains(html, "const mrPage") {
 			t.Errorf("%s has no merge request page in it", uri)
 		}
+		if uri == issuesURI {
+			for _, want := range []string{"Add a label filter", "label-tags", "removeLabel", "Promise.all"} {
+				if !strings.Contains(html, want) {
+					t.Errorf("issues page is missing %q", want)
+				}
+			}
+		}
 		// Every tool a page calls is one this server has.
 		for _, called := range []string{"show_merge_requests", "show_merge_request", "show_merge_request_diff", "failed_log",
-			"retry_pipeline", "comment_on_merge_request", "approve_merge_request", "merge_merge_request", "show_issues"} {
+			"retry_pipeline", "comment_on_merge_request", "approve_merge_request", "merge_merge_request", "show_issues", "show_issue_details"} {
 			if strings.Contains(html, `"`+called+`"`) && visibility[called] == nil {
 				t.Errorf("%s calls %s, which is not a tool", uri, called)
 			}
@@ -133,12 +200,15 @@ func TestEachViewHasAToolThatFeedsItAndAPage(t *testing.T) {
 		if strings.Contains(html, "GitHub") || strings.Contains(html, "gh pr") || strings.Contains(html, "CodeRabbit") {
 			t.Errorf("%s still speaks of GitHub", uri)
 		}
+		if uri == issuesURI && (!strings.Contains(html, "aria-expanded") || strings.Contains(html, "Show details")) {
+			t.Error("issues page does not expand issue rows without a details button")
+		}
 	}
 }
 
 // The bridge and the styles are the github server's, word for word: one host draws both.
 func TestThePagesShareTheGitHubServersBridge(t *testing.T) {
-	for _, pair := range [][2]string{{"bridge.js", "bridge.js"}, {"common.css", "common.css"}, {"mrpage.css", "prpage.css"}} {
+	for _, pair := range [][2]string{{"bridge.js", "bridge.js"}, {"lineage.js", "lineage.js"}, {"common.css", "common.css"}, {"mrpage.css", "prpage.css"}} {
 		ours, err := pageFiles.ReadFile("pages/" + pair[0])
 		if err != nil {
 			t.Fatal(err)
@@ -170,6 +240,38 @@ func TestTheMergeRequestsListSaysEachOnesState(t *testing.T) {
 	}
 }
 
+// #2952: each merge request is in a section for the viewer; attention counts Needs you, and
+// the authors' access is one call, kept for the next list.
+func TestTheMergeRequestsListPutsEachInASection(t *testing.T) {
+	f := viewsFake(t)
+	f.mrs = append(f.mrs,
+		mrJSON(6, "outside", stranger, obj{"reviewers": []obj{{"id": 1, "username": "Alex"}}}),
+		mrJSON(7, "deps", tokenBot, nil),
+		mrJSON(8, "guest", guest, nil),
+		mrJSON(9, "mine", alex, obj{"detailed_merge_status": "requested_changes"}))
+	c := viewsClient(t, f)
+	_, data := callTool(t, c, "show_merge_requests", map[string]any{})
+	sections := map[float64]any{}
+	for _, m := range data["mergeRequests"].([]any) {
+		m := m.(map[string]any)
+		sections[m["number"].(float64)] = m["section"]
+		if m["number"] == 7.0 && m["authorBot"] != true {
+			t.Errorf("!7 is a bot's: %v", m)
+		}
+		if m["number"] == 9.0 && m["review"] != "changes_requested" {
+			t.Errorf("!9's review: %v", m["review"])
+		}
+	}
+	want := map[float64]any{3: sectionTeam, 4: sectionYours, 6: sectionNeedsYou, 7: sectionTeam, 8: sectionOthers, 9: sectionNeedsYou}
+	if !reflect.DeepEqual(sections, want) || data["attention"] != 2.0 {
+		t.Errorf("sections %v, attention %v", sections, data["attention"])
+	}
+	callTool(t, c, "show_merge_requests", map[string]any{})
+	if f.memberLists != 1 {
+		t.Errorf("member listings: %d", f.memberLists)
+	}
+}
+
 func TestTheIssuesListHasLabelsAndAssignees(t *testing.T) {
 	f := viewsFake(t)
 	c := viewsClient(t, f)
@@ -178,9 +280,40 @@ func TestTheIssuesListHasLabelsAndAssignees(t *testing.T) {
 	if issue["number"] != 5.0 || issue["comments"] != 2.0 || issue["assignees"].([]any)[0] != "alex" {
 		t.Fatalf("issue %v", issue)
 	}
-	asked := f.asked()
-	if last := asked[len(asked)-1]; !strings.Contains(last, "state=opened") || !strings.Contains(last, "labels=bug") {
-		t.Fatalf("asked %s", last)
+	listed := ""
+	for _, request := range f.asked() {
+		if strings.Contains(request, "/issues?") {
+			listed = request
+		}
+	}
+	if !strings.Contains(listed, "state=opened") || !strings.Contains(listed, "labels=bug") {
+		t.Fatalf("asked %s", listed)
+	}
+}
+
+// #2952: an issue assigned to the viewer needs them; the viewer's own is theirs; a Reporter's
+// is the others'.
+func TestTheIssuesListPutsEachInASection(t *testing.T) {
+	f := viewsFake(t)
+	f.issues = append(f.issues, issueObj(6, guest, nil), issueObj(7, alex, nil), issueObj(8, tokenBot, nil), issueObj(9, dev, nil))
+	c := viewsClient(t, f)
+	_, data := callTool(t, c, "show_issues", map[string]any{})
+	sections := map[float64]any{}
+	for _, i := range data["issues"].([]any) {
+		i := i.(map[string]any)
+		sections[i["number"].(float64)] = i["section"]
+	}
+	want := map[float64]any{5: sectionNeedsYou, 6: sectionOthers, 7: sectionYours, 8: sectionTeam, 9: sectionTeam}
+	if !reflect.DeepEqual(sections, want) || data["viewer"] != "alex" || data["attention"] != 1.0 {
+		t.Errorf("sections %v, viewer %v, attention %v", sections, data["viewer"], data["attention"])
+	}
+}
+
+func TestIssueDetailsRenderMarkdownForTheView(t *testing.T) {
+	c := viewsClient(t, viewsFake(t))
+	_, details := callTool(t, c, "show_issue_details", map[string]any{"number": 5})
+	if details["description"] != "## Work\n\n- **Inspect**" || !strings.Contains(details["descriptionHTML"].(string), "<strong>Inspect</strong>") {
+		t.Fatalf("issue details: %v", details)
 	}
 }
 

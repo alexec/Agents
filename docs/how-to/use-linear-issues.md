@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac, iphone, ipad, web]
-description: Connect Linear, see a project's open Linear issues on a page with Start Agent, give its agents Linear's tools, and start an agent when a Linear issue is opened, labelled, commented on or closed.
+description: Connect Linear, see a folder's open Linear issues on a page with Start Agent, give its agents Linear's tools, and start an agent when a Linear issue is opened, labelled, commented on or closed.
 ---
 
 # Use Linear issues
@@ -11,8 +11,9 @@ Two connectors (MCP servers) work together:
 - **Tools** come from Linear's own MCP server, `https://mcp.linear.app/mcp`. Agents use it
   to find, read and change issues.
 - **The Linear issues page and the events** come from `linear-mcp`, a small server that
-  Agents ships. Its one tool, `show_issues`, feeds the **Linear issues** page: the open
-  issues, narrowed by team, state or label, with **Start Agent** on each. Its events are
+  Agents ships. Its tools feed the **Linear issues** page: the open issues, narrowed by team,
+  state or label, with **Start Agent** on each. Click a row to expand its rich-text description.
+  Its events are
   `issue.opened`, `issue.labelled`, `issue.commented` and `issue.closed`. A workflow or a
   wait can use them. See
   [Start a workflow from an MCP event](start-a-workflow-from-an-mcp-event.md).
@@ -43,7 +44,7 @@ Add Linear's own server from the registry, or by hand with the URL
 
 ## Add the page and the events
 
-1. Add **Linear** from **Made by Agents** in the catalogue, or by hand in the project's
+1. Add **Linear** from the **Agents** marketplace in the catalogue, or by hand in the folder's
    `.agents/mcp.json`:
 
    ```json
@@ -51,13 +52,13 @@ Add Linear's own server from the registry, or by hand with the URL
    ```
 
    With a personal API key, put the key in your own `~/.agents-secrets/secrets.env`
-   (`LINEAR_API_KEY=lin_api_…`), not in the project, and name it in the entry:
+   (`LINEAR_API_KEY=lin_api_…`), not in the folder, and name it in the entry:
    `"env": { "LINEAR_API_KEY": "${LINEAR_API_KEY}" }`.
 
-2. In **Project Settings ▸ Agent Configuration ▸ Connectors**, choose **Approve** on
+2. In **Folder Settings ▸ Agent Configuration ▸ Connectors**, choose **Approve** on
    `linear`. See [Add a connector by hand](add-a-connector-by-hand.md).
 
-3. To keep the page in the sidebar, pin it in the project's `.agents/pins.json`:
+3. To keep the page in the sidebar, pin it in the folder's `.agents/pins.json`:
 
    ```json
    { "pins": [ { "pinned_by": { "person": true }, "title": "Linear issues",
@@ -73,8 +74,8 @@ Linear's GitHub integration links the pull request to the issue.
 
 ## Work a Linear issue with an agent
 
-A project that pushes to GitHub lists the ready-made workflow **Work a Linear issue**, off.
-Turn it on in the project's Workflows. Then, when a Linear issue gets the `agent` label, a
+A folder that pushes to GitHub lists the ready-made workflow **Work a Linear issue**, off.
+Turn it on in the folder's Workflows. Then, when a Linear issue gets the `agent` label, a
 new agent reads it with Linear's server, takes it, works on a branch `agent/eng-12`, opens a
 pull request whose title starts with `ENG-12`, and comments on the issue with the link. With
 Linear's GitHub integration on, the pull request shows on the issue, and `Fixes ENG-12` in its

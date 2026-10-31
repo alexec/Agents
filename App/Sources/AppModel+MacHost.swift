@@ -31,7 +31,7 @@ extension AppModel {
     }
 
     /// Reveal in Finder. Only offered for this Mac's host.
-    func reveal(_ url: URL, on host: HostID) {
+    func reveal(_ url: URL, on host: MachineRef) {
         // What the host says when it cannot is shown, not dropped (073).
         Task {
             await attempt(on: host) {
@@ -42,7 +42,7 @@ extension AppModel {
     }
 
     /// Open with the app macOS would choose, or `app`.
-    func open(_ url: URL, on host: HostID, app: String? = nil) {
+    func open(_ url: URL, on host: MachineRef, app: String? = nil) {
         Task {
             await attempt(on: host) {
                 try await self.client(for: host).call(DaemonAPI.Method.macOpen,
@@ -52,7 +52,7 @@ extension AppModel {
     }
 
     /// Terminal, on this Mac's host.
-    func openTerminal(at url: URL? = nil, on host: HostID = .mac) {
+    func openTerminal(at url: URL? = nil, on host: MachineRef = .mac) {
         Task {
             await attempt(on: host) {
                 try await self.client(for: host).call(DaemonAPI.Method.macTerminal,
@@ -62,7 +62,7 @@ extension AppModel {
     }
 
     /// A text file by its full path on `host`: `files/readText`.
-    func readText(_ url: URL, on host: HostID) async -> String? {
+    func readText(_ url: URL, on host: MachineRef) async -> String? {
         let answer = try? await client(for: host).call(DaemonAPI.Method.filesReadText,
                                                        DaemonAPI.FilesTextRequest(path: url.path(percentEncoded: false)),
                                                        returning: DaemonAPI.FilesText.self)
@@ -70,7 +70,7 @@ extension AppModel {
     }
 
     /// Writes a text file on `host`; `onlyIfAbsent` leaves one that is there alone.
-    func saveText(_ text: String, to url: URL, on host: HostID, onlyIfAbsent: Bool = false) async -> Bool {
+    func saveText(_ text: String, to url: URL, on host: MachineRef, onlyIfAbsent: Bool = false) async -> Bool {
         return (try? await client(for: host).call(DaemonAPI.Method.filesSaveText,
                                                   DaemonAPI.FilesSaveTextRequest(path: url.path(percentEncoded: false), text: text,
                                                                                  onlyIfAbsent: onlyIfAbsent))) != nil

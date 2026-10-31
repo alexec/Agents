@@ -5,6 +5,7 @@
 // does not read inside:
 //
 //	v1/users/<user>/settings.json          wire.UserSettings
+//	v1/users/<user>/notices.json           the person's notice bucket (#2859)
 //	v1/users/<user>/secrets/<NAME>.json    a secret, sealed (FR-025, SC-007)
 //
 // Each secret is sealed in an envelope (kms.SealFor): a data key of its own encrypts it,
@@ -31,6 +32,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controlplane/kms"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/internal/noticebucket"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -83,11 +85,29 @@ func New(s store.Store, keeper *secrets.Keeper, keeperURL string) *Book {
 // Sealing says whether this book can keep secrets.
 func (b *Book) Sealing() bool { return b != nil && b.keeper != nil }
 
+// SealFor seals a value with this book's keeper, bound to the store key it is kept at. The
+// organisation's route secrets (#999) are sealed with the same keeper as a person's.
+func (b *Book) SealFor(ctx context.Context, plaintext, boundTo []byte) (*kms.Sealed, error) {
+	if !b.Sealing() {
+		return nil, ErrNoSealing
+	}
+	return kms.SealFor(ctx, b.keeper, b.keeperURL, plaintext, boundTo)
+}
+
+// OpenFor opens what SealFor sealed for the same store key.
+func (b *Book) OpenFor(ctx context.Context, sealed *kms.Sealed, boundTo []byte) ([]byte, error) {
+	if !b.Sealing() {
+		return nil, ErrNoSealing
+	}
+	return kms.OpenFor(ctx, b.keeper, sealed, boundTo)
+}
+
 func settingsKey(user string) string { return Prefix + user + "/settings.json" }
 func secretsPrefix(user string) string {
 	return Prefix + user + "/secrets/"
 }
 func secretKey(user, name string) string { return secretsPrefix(user) + name + ".json" }
+func noticesKey(user string) string      { return Prefix + user + "/notices.json" }
 
 // secretRecord is a secret as stored. Sealed is nil once the secret is removed: the record
 // stays, as a tombstone, so a removal is a conditional write like any other.
@@ -115,23 +135,44 @@ func (b *Book) Settings(ctx context.Context, user string) (wire.UserSettings, er
 		return out, err
 	}
 	o, err := b.store.Get(ctx, settingsKey(user))
-	if err != nil || o == nil {
+	if err != nil {
 		return out, err
 	}
-	if err := json.Unmarshal(o.Data, &out); err != nil {
-		return wire.UserSettings{}, fmt.Errorf("%s cannot be read: %w", settingsKey(user), err)
+	if o != nil {
+		if err := json.Unmarshal(o.Data, &out); err != nil {
+			return wire.UserSettings{}, fmt.Errorf("%s cannot be read: %w", settingsKey(user), err)
+		}
 	}
+	// A record kept before #2703 can hold the machines' agent configuration files, which
+	// nothing reads now and which can be more than a machine's link takes (#2730).
+	out.AgentConfigFiles = nil
 	return out, nil
 }
 
-// kinds is the JSON a part must be: an object, but for resources, a list.
+// Forget deletes everything kept for a person: their settings and every sealed secret
+// (#2293). For a person removed, so what was theirs does not stay for ever.
+func (b *Book) Forget(ctx context.Context, user string) error {
+	if err := checkUser(user); err != nil {
+		return err
+	}
+	keys, err := b.store.List(ctx, Prefix+user+"/")
+	if err != nil {
+		return err
+	}
+	for _, k := range keys {
+		if err := b.store.Delete(ctx, k.Key); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// kinds is the JSON object shape each person-scoped part must have.
 func partKind(part wire.UserSettingsPartName) (string, bool) {
 	switch part {
 	case wire.UserSettingsPartNameMcpServers, wire.UserSettingsPartNameAgentConfig,
-		wire.UserSettingsPartNameRuntimes, wire.UserSettingsPartNameCostLimits:
+		wire.UserSettingsPartNameRuntimes, wire.UserSettingsPartNameCostLimits, wire.UserSettingsPartNameNotifications:
 		return "{", true
-	case wire.UserSettingsPartNameResources:
-		return "[", true
 	}
 	return "", false
 }
@@ -168,6 +209,7 @@ func (b *Book) SetPart(ctx context.Context, user string, part wire.UserSettingsP
 				return nil, err
 			}
 		}
+		s.AgentConfigFiles = nil
 		slot := partOf(&s, part)
 		if string(canonical(*slot)) == string(parsed) {
 			return nil, nil
@@ -204,9 +246,10 @@ func partOf(s *wire.UserSettings, part wire.UserSettingsPartName) *wire.JSONValu
 		return &s.Runtimes
 	case wire.UserSettingsPartNameCostLimits:
 		return &s.CostLimits
-	default:
-		return &s.Resources
+	case wire.UserSettingsPartNameNotifications:
+		return &s.Notifications
 	}
+	return nil
 }
 
 // change writes key as edit makes it from what is there (nil for nothing), on the record
@@ -234,6 +277,49 @@ func (b *Book) change(ctx context.Context, key string, edit func(raw []byte) ([]
 	}
 	return fmt.Errorf("%s kept changing; try again", key)
 }
+
+// SetNoticeLimits is the notifications part as a machine of the person's sends it
+// (user/setNoticeLimits), within the bounds. It says whether anything changed.
+func (b *Book) SetNoticeLimits(ctx context.Context, user string, limits wire.NoticeLimits) (bool, error) {
+	burst, cooldown := noticebucket.Limits(limits.Burst, limits.CooldownMinutes)
+	value, _ := json.Marshal(wire.NoticeLimits{Burst: int64(burst), CooldownMinutes: cooldown.Minutes()})
+	return b.SetPart(ctx, user, wire.UserSettingsPartNameNotifications, value)
+}
+
+// TakeNotice is notices/take: one notice from the person's one bucket, which every
+// machine of theirs shares (#2859). The person's notifications part decides the limits;
+// without one, the machine's own (given).
+func (b *Book) TakeNotice(ctx context.Context, user string, given wire.NoticeLimits) (wire.NoticeTaken, error) {
+	var out wire.NoticeTaken
+	if err := checkUser(user); err != nil {
+		return out, err
+	}
+	settings, err := b.Settings(ctx, user)
+	if err != nil {
+		return out, err
+	}
+	limits := given
+	if partSent(settings.Notifications) {
+		var kept wire.NoticeLimits
+		if json.Unmarshal(settings.Notifications, &kept) == nil {
+			limits = kept
+		}
+	}
+	burst, cooldown := noticebucket.Limits(limits.Burst, limits.CooldownMinutes)
+	err = b.change(ctx, noticesKey(user), func(raw []byte) ([]byte, error) {
+		var bucket noticebucket.Bucket
+		if raw != nil {
+			// A record that will not read is a full bucket, not a person who can be told nothing.
+			json.Unmarshal(raw, &bucket)
+		}
+		left, next, ok := bucket.Take(b.now(), burst, cooldown)
+		out = wire.NoticeTaken{Sent: ok, Left: int64(left), NextAt: wire.DateOf(next)}
+		return records.Encode(bucket)
+	})
+	return out, err
+}
+
+func partSent(v wire.JSONValue) bool { return len(v) > 0 && string(v) != "null" }
 
 // CheckSecret says whether a secret may be kept, with words that never hold its value.
 func CheckSecret(name, value string) error {
@@ -367,9 +453,9 @@ func (b *Book) Names(ctx context.Context, user string) ([]wire.UserSecretRow, er
 		if r.Sealed == nil {
 			continue
 		}
-		row := wire.UserSecretRow{Name: wire.UserSecretName(r.Name), Updated: r.Updated, Machines: []wire.HostID{}, LeftOn: r.LeftOn}
+		row := wire.UserSecretRow{Name: wire.UserSecretName(r.Name), Updated: r.Updated, Machines: []wire.MachineRef{}, LeftOn: r.LeftOn}
 		for _, m := range r.Machines {
-			row.Machines = append(row.Machines, wire.HostID(m))
+			row.Machines = append(row.Machines, wire.MachineRef(m))
 		}
 		rows = append(rows, row)
 	}
@@ -380,12 +466,12 @@ func (b *Book) Names(ctx context.Context, user string) ([]wire.UserSecretRow, er
 // Delivery is host/userSettings for a machine of user's: the settings and every secret,
 // opened. Only for that user's own machine's link (FR-025). A secret that will not open
 // (sealed by another keeper, as after a move) is left out, and named in skipped.
-func (b *Book) Delivery(ctx context.Context, user string) (out wire.HostUserSettings, skipped []string, err error) {
+func (b *Book) Delivery(ctx context.Context, user string) (out wire.MachineUserSettings, skipped []string, err error) {
 	settings, err := b.Settings(ctx, user)
 	if err != nil {
 		return out, nil, err
 	}
-	out = wire.HostUserSettings{User: user, Settings: settings, Secrets: []wire.UserSecret{}}
+	out = wire.MachineUserSettings{User: user, Settings: settings, Secrets: []wire.UserSecret{}}
 	all, tags, err := b.secretRecords(ctx, user)
 	if err != nil {
 		return out, nil, err
@@ -464,7 +550,7 @@ func (b *Book) Left(ctx context.Context, user, host, hostName string) ([]string,
 			}
 			r.Machines = slices.DeleteFunc(r.Machines, func(m string) bool { return m == host })
 			if r.Sealed != nil {
-				r.LeftOn = append(r.LeftOn, wire.SecretLeftOn{Host: wire.HostID(host), Name: hostName, At: b.stamp()})
+				r.LeftOn = append(r.LeftOn, wire.SecretLeftOn{Host: wire.MachineRef(host), Name: hostName, At: b.stamp()})
 			}
 			return records.Encode(r)
 		})

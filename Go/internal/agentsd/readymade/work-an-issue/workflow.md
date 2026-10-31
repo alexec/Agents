@@ -6,7 +6,7 @@ on:
       label: agent
 agent: new
 labels: [dev-loop]
-permission-mode: default
+permission-mode: ask
 enabled: false
 when-done: park
 ---

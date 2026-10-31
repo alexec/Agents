@@ -1,5 +1,5 @@
 // Package workspacecommands is the command provider (#691, FR-070; in Go since #1364): a
-// workspace provider whose workspaces are shell commands. It follows the provider contract
+// machine provider whose workspaces are shell commands. It follows the provider contract
 // (specs/691-workspace-providers/contracts/provider-contract.md) and its own
 // (contracts/command-provider.md), so the control plane uses it as it uses any other
 // provider, and a configuration written for the Swift one works unchanged.
@@ -98,7 +98,7 @@ type Making struct {
 	// CreateRequest and DeleteRequest are HTTP actions in place of Create and Delete (#1119).
 	CreateRequest *Request
 	DeleteRequest *Request
-	// Options is the New Workspace form, as a flat JSON Schema object (workspace_options).
+	// Options is the New Machine form, as a flat JSON Schema object (workspace_options).
 	Options map[string]any
 }
 

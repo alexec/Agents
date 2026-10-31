@@ -1,22 +1,22 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Every project's worktrees on this Mac, and how much each holds on disk (#790).
+/// Every folder's worktrees on this Mac, and how much each holds on disk (#790).
 ///
-/// It was Project Settings ▸ Worktrees (030), one project at a time and with no sizes.
+/// It was Folder Settings ▸ Worktrees (030), one folder at a time and with no sizes.
 /// What a worktree holds changes without anybody setting anything, so it is a page under
 /// Activity now. On 2026-10-03 the disk filled with 80 GB of them: idle ones, with no
 /// session in them, come first, largest first, with Remove build output and Remove….
 ///
 /// All of them are listed, because an agent working in one made in a terminal, or by a
-/// runtime, is still working on the project. Only the app's own can be cleaned or
+/// runtime, is still working on the folder. Only the app's own can be cleaned or
 /// removed: the others are somebody else's. Sizes are walked by the daemon in the
 /// background and fill in as they come (`worktrees/sized`); the list never waits on them.
 struct WorktreesView: View {
     @Environment(AppModel.self) private var model
     @State private var loading = false
 
-    private var groups: [DaemonAPI.ProjectWorktrees] { model.work.worktreesForCleanup() }
+    private var groups: [DaemonAPI.FolderWorktrees] { model.work.worktreesForCleanup() }
 
     var body: some View {
         ScrollView {
@@ -53,26 +53,26 @@ struct WorktreesView: View {
     }
 }
 
-/// One project's worktrees under its name, with Clean up worktrees.
+/// One folder's worktrees under its name, with Clean up worktrees.
 private struct WorktreesGroup: View {
     @Environment(AppModel.self) private var model
-    let group: DaemonAPI.ProjectWorktrees
+    let group: DaemonAPI.FolderWorktrees
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(model.work.project(ProjectKey(folder: group.project))?.name ?? group.project.lastPathComponent)
+                Text(model.work.folder(FolderKey(folder: group.folder))?.name ?? group.folder.lastPathComponent)
                     .appText(.supporting).fontWeight(.semibold)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("Clean up worktrees") { model.offerCleanUp(in: group.project) }
+                Button("Clean up worktrees") { model.offerCleanUp(in: group.folder) }
                     .buttonStyle(.paper)
                     .appText(.fine)
                     .help("A new session here, offered the words to remove what has been merged")
             }
             .padding(.leading, 2)
             ForEach(group.worktrees) { worktree in
-                WorktreeRow(worktree: worktree, project: group.project)
+                WorktreeRow(worktree: worktree, folder: group.folder)
             }
         }
     }
@@ -83,7 +83,7 @@ private struct WorktreesGroup: View {
 struct WorktreeRow: View {
     @Environment(AppModel.self) private var model
     let worktree: DaemonAPI.WorktreeSummary
-    let project: URL
+    let folder: URL
 
     @State private var asking: DaemonAPI.RemovalCheck?
     @State private var isBusy = false
@@ -97,7 +97,7 @@ struct WorktreeRow: View {
     private var canClean: Bool { worktree.madeByApp && worktree.exists && worktree.isIdle }
 
     var body: some View {
-        // Laid out the way `AgentRow` and `WorkflowRow` are, so the page has one kind of
+        // Laid out the way `AgentRow` is, so the page has one kind of
         // card: an icon at the reading size, a semibold name, a grey line under it.
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "arrow.triangle.branch")
@@ -166,7 +166,7 @@ struct WorktreeRow: View {
         .alert(alertTitle, isPresented: isAsking, presenting: asking) { check in
             if check.blockedBy.isEmpty {
                 Button("Remove", role: .destructive) {
-                    Task { await model.removeWorktree(worktree.root, in: project, confirmed: true) }
+                    Task { await model.removeWorktree(worktree.root, in: folder, confirmed: true) }
                 }
             }
             Button(check.blockedBy.isEmpty ? "Keep it" : "OK", role: .cancel) {}
@@ -196,7 +196,7 @@ struct WorktreeRow: View {
     private func removeBuildOutput() async {
         isBusy = true
         defer { isBusy = false }
-        freed = await model.removeBuildOutput(worktree.root, in: project)
+        freed = await model.removeBuildOutput(worktree.root, in: folder)
     }
 
     /// Asked first, always; removed straight away only when nothing would be lost and
@@ -204,9 +204,9 @@ struct WorktreeRow: View {
     private func remove() async {
         isBusy = true
         defer { isBusy = false }
-        guard let check = await model.checkWorktreeRemoval(worktree.root, in: project) else { return }
+        guard let check = await model.checkWorktreeRemoval(worktree.root, in: folder) else { return }
         if check.blockedBy.isEmpty && !check.losesWork {
-            await model.removeWorktree(worktree.root, in: project, confirmed: false)
+            await model.removeWorktree(worktree.root, in: folder, confirmed: false)
         } else {
             asking = check
         }
@@ -242,8 +242,8 @@ struct WorktreesRow: View {
             Text("Worktrees").foregroundStyle(.primary)
             Spacer()
         }
-        .help(words.map { "\($0). Every project's worktrees, and how much each holds" }
-              ?? "Every project's worktrees, and how much each holds")
+        .help(words.map { "\($0). Every folder's worktrees, and how much each holds" }
+              ?? "Every folder's worktrees, and how much each holds")
         .accessibilityValue(words ?? "")
     }
 }

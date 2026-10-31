@@ -2,10 +2,15 @@ package agentsd
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -33,6 +38,10 @@ func TestMain(m *testing.M) {
 	}
 	// No test asks the person's gh about merged pull requests unless it says so.
 	findGH = func() string { return "" }
+	// Nor asks the forge for an issue's milestone (#2935): a test sets issueLookup.
+	milestoneLookup = func(context.Context, string, forgeRepo, int) (int, error) { return 0, errNoForgeInTests }
+	// Nor erases a deleted agent's runtime copy (#1001): that starts the runtime.
+	erasing = false
 	os.Exit(m.Run())
 }
 
@@ -45,7 +54,7 @@ type fakeRuntime struct {
 	sandboxOff bool
 	// rateLimited is whether "rate limit me" was refused once already.
 	rateLimited bool
-	// systemPrompt is _meta.systemPrompt.append or _meta.rules from session/new or resume.
+	// systemPrompt is the runtime's system-prompt field from session/new or resume.
 	systemPrompt string
 }
 
@@ -56,15 +65,35 @@ func systemPromptOf(meta any) string {
 		s, _ := sp["append"].(string)
 		return s
 	}
+	if jetbrains, ok := m["jetbrains"].(map[string]any); ok {
+		if air, ok := jetbrains["air"].(map[string]any); ok {
+			s, _ := air["customInstructions"].(string)
+			if s != "" {
+				return s
+			}
+		}
+	}
 	s, _ := m["rules"].(string)
 	return s
 }
 
 func (f *fakeRuntime) Initialize(context.Context, sdk.InitializeRequest) (sdk.InitializeResponse, error) {
+	// AGENTS_FAKE_STARTS names a file the fake adds a line to each time it starts.
+	if file := os.Getenv("AGENTS_FAKE_STARTS"); file != "" {
+		if f, err := os.OpenFile(file, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600); err == nil {
+			f.WriteString("started\n")
+			f.Close()
+		}
+	}
+	// AGENTS_FAKE_NO_DELETE: an adapter that cannot delete a session.
+	var del *sdk.SessionDeleteCapabilities
+	if os.Getenv("AGENTS_FAKE_NO_DELETE") == "" {
+		del = &sdk.SessionDeleteCapabilities{}
+	}
 	return sdk.InitializeResponse{ProtocolVersion: sdk.ProtocolVersionNumber, AuthMethods: fakeAuthMethods(),
 		AgentCapabilities: sdk.AgentCapabilities{Auth: sdk.AgentAuthCapabilities{Logout: &sdk.LogoutCapabilities{}},
 			Providers: &sdk.ProvidersCapabilities{}, LoadSession: true, SessionCapabilities: sdk.SessionCapabilities{Resume: &sdk.SessionResumeCapabilities{},
-				Fork: &sdk.SessionForkCapabilities{}, List: &sdk.SessionListCapabilities{}, Delete: &sdk.SessionDeleteCapabilities{}}}}, nil
+				Fork: &sdk.SessionForkCapabilities{}, List: &sdk.SessionListCapabilities{}, Delete: del}}}, nil
 }
 
 // The fake holds one conversation the app did not start, "theirs", in any folder.
@@ -85,7 +114,14 @@ func (f *fakeRuntime) LoadSession(ctx context.Context, r sdk.LoadSessionRequest)
 	return sdk.LoadSessionResponse{}, nil
 }
 
-func (f *fakeRuntime) UnstableDeleteSession(context.Context, sdk.UnstableDeleteSessionRequest) (sdk.UnstableDeleteSessionResponse, error) {
+func (f *fakeRuntime) UnstableDeleteSession(_ context.Context, r sdk.UnstableDeleteSessionRequest) (sdk.UnstableDeleteSessionResponse, error) {
+	// AGENTS_FAKE_DELETED names a file the fake adds each deleted session's ID to, a line each.
+	if file := os.Getenv("AGENTS_FAKE_DELETED"); file != "" {
+		if f, err := os.OpenFile(file, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600); err == nil {
+			f.WriteString(string(r.SessionId) + "\n")
+			f.Close()
+		}
+	}
 	return sdk.UnstableDeleteSessionResponse{}, nil
 }
 
@@ -154,6 +190,20 @@ func (f *fakeRuntime) Prompt(ctx context.Context, p sdk.PromptRequest) (sdk.Prom
 		say("System: " + f.systemPrompt + "\nBefore: " + strings.Join(before, "\n"))
 		return sdk.PromptResponse{StopReason: sdk.StopReasonEndTurn}, nil
 	}
+	// An agent on an org account (#999): it calls the model with what its environment
+	// holds (the relay's address, a stand-in and the relay's CA), then prints that
+	// environment, as an agent that runs env would.
+	if strings.Contains(text, "call the model") {
+		say("The model said " + callTheModel() + ".\nMy environment:\n" + strings.Join(os.Environ(), "\n"))
+		return sdk.PromptResponse{StopReason: sdk.StopReasonEndTurn}, nil
+	}
+	// A token split over two chunks, and a last word held back to the turn's end (#1001).
+	if strings.Contains(text, "split a token") {
+		token := "ghp_" + strings.Repeat("a1B2", 9)
+		say("Your token is " + token[:10])
+		say(token[10:] + " so keep it. Done")
+		return sdk.PromptResponse{StopReason: sdk.StopReasonEndTurn}, nil
+	}
 	// Deaf to session/cancel, as Claude was waiting on CI (#1611): only a SIGTERM ends it.
 	if strings.Contains(text, "keep going") {
 		select {}
@@ -161,6 +211,13 @@ func (f *fakeRuntime) Prompt(ctx context.Context, p sdk.PromptRequest) (sdk.Prom
 	if strings.Contains(text, "wait for me") {
 		<-ctx.Done()
 		return sdk.PromptResponse{StopReason: sdk.StopReasonCancelled}, nil
+	}
+	// A pause before ending the turn, so a test can open an event wait on this agent
+	// first, as joining a lease's line does mid-turn (#2911).
+	if strings.Contains(text, "line for a lease") {
+		time.Sleep(300 * time.Millisecond)
+		say("Waiting for the build lease.")
+		return sdk.PromptResponse{StopReason: sdk.StopReasonEndTurn}, nil
 	}
 	// Refused once for too many requests, then answered.
 	if strings.Contains(text, "rate limit me") {
@@ -372,6 +429,32 @@ func TestStopEndsTheTurnCancelled(t *testing.T) {
 	}
 }
 
+// An admin's stop from the Console (#2435) reads as theirs, not "Stopped by you"; the
+// owner's next stop is the owner's again.
+func TestAnAdminsStopSaysSo(t *testing.T) {
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	var id wire.UUID
+	json.Unmarshal(c.call(t, 1, "agents/start", map[string]any{"runtimeID": "claude", "cwd": "file://" + t.TempDir(),
+		"prompt": "wait for me"}), &id)
+	c.until(t, "running", ended(id, wire.AgentStateRunning))
+	time.Sleep(200 * time.Millisecond)
+	c.call(t, 2, "agents/stop", map[string]any{"agentID": id, "byAdmin": true})
+	c.until(t, "stopped", ended(id, wire.AgentStateStopped))
+	if a := d.Store.Agent(id); *a.EndedReason != wire.EndedReasonStoppedByAdmin {
+		t.Fatalf("ended %s", *a.EndedReason)
+	}
+	if endedSummary[wire.EndedReasonStoppedByAdmin] != "Stopped by an admin in the Console" {
+		t.Fatal(endedSummary[wire.EndedReasonStoppedByAdmin])
+	}
+	d.noteAdminStop(id, true)
+	d.noteAdminStop(id, false)
+	if d.takeAdminStop(id) {
+		t.Fatal("the owner's own stop read as an admin's")
+	}
+}
+
 func TestAStartInAFolderThatIsNotThere(t *testing.T) {
 	_, c := start(t, t.TempDir())
 	c.in <- `{"jsonrpc":"2.0","id":1,"method":"agents/start","params":{"runtimeID":"claude","cwd":"file:///no/such","prompt":"x"}}`
@@ -464,4 +547,26 @@ func TestAToolCallIsRecordedAsSwiftRecordsIt(t *testing.T) {
 	if kind.Title != "edit" {
 		t.Fatalf("title %q", kind.Title)
 	}
+}
+
+// callTheModel is the fake runtime's model request: to ANTHROPIC_BASE_URL with
+// ANTHROPIC_AUTH_TOKEN, trusting NODE_EXTRA_CA_CERTS, as Claude Code does.
+func callTheModel() string {
+	pool := x509.NewCertPool()
+	if ca, err := os.ReadFile(os.Getenv("NODE_EXTRA_CA_CERTS")); err == nil {
+		pool.AppendCertsFromPEM(ca)
+	}
+	client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: pool}}, Timeout: 10 * time.Second}
+	req, err := http.NewRequest("POST", os.Getenv("ANTHROPIC_BASE_URL")+"/v1/messages", strings.NewReader(`{"model":"claude","messages":[]}`))
+	if err != nil {
+		return err.Error()
+	}
+	req.Header.Set("Authorization", "Bearer "+os.Getenv("ANTHROPIC_AUTH_TOKEN"))
+	resp, err := client.Do(req)
+	if err != nil {
+		return err.Error()
+	}
+	defer resp.Body.Close()
+	io.Copy(io.Discard, resp.Body)
+	return strconv.Itoa(resp.StatusCode)
 }

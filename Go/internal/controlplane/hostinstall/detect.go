@@ -34,7 +34,7 @@ const (
 	Failed Outcome = "failed"
 )
 
-// SSHHost is DaemonAPI.SSHHost: a server ssh knows by a name, for Add a Server's server
+// SSHHost is DaemonAPI.SSHHost: a server ssh knows by a name, for Add a Machine's server
 // box (#610): the Host name in the config (or the destination as typed), user@hostname:port
 // as `ssh -G` resolved it, whether it is reached through a ProxyJump or ProxyCommand (so
 // it rarely can dial back, and a tunnel is the default), whether it is another host's way
@@ -229,7 +229,7 @@ func detected(host Resolved, outcome Outcome, detail string) DetectedServer {
 	return server
 }
 
-// sshHosts is HostDetect.sshHosts (#610): what Add a Server's server box suggests, from
+// sshHosts is HostDetect.sshHosts (#610): what Add a Machine's server box suggests, from
 // `ssh -G` alone, with no network. Each says whether ssh reaches it through a bastion,
 // so the sheet can turn a tunnel on for it.
 func (d detector) sshHosts(ctx context.Context, destination string) []SSHHost {

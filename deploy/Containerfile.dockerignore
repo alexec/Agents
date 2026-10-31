@@ -1,8 +1,15 @@
-# What deploy/Containerfile is sent from the repository (#1381): Go/ and Web/ only, so a
-# checkout's builds, worktrees and node_modules never go to the builder.
+# What deploy/Containerfile is sent from the repository (#1381): Go/, Web/, the runtimes'
+# toolsets and the deploy files the image carries (#2140), so a checkout's builds, worktrees
+# and node_modules never go to the builder.
 *
 !Go/
 !Web/
+!App/Resources/toolsets/
+!deploy/compose.public.yaml
+!deploy/compose.hosted.yaml
+!deploy/Caddyfile.public
+!deploy/Caddyfile.hosted
+!deploy/make-secrets.sh
 Go/out/
 Web/node_modules/
 Web/dist/

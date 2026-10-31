@@ -6,7 +6,7 @@ description: How each option in your ~/.ssh/config fares when the control plane 
 
 # ssh options
 
-When you [add a server](../how-to/add-a-server.md) over ssh, the control plane runs the
+When you [add a machine](../how-to/add-a-machine.md) over ssh, the control plane runs the
 system `ssh` with your `~/.ssh/config`, through the alias you typed. It adds a few options of
 its own on the command line: `StrictHostKeyChecking=yes`, `BatchMode=yes`,
 `ClearAllForwardings=yes`, `ControlMaster=no` and `ControlPath=none` (except on the tunnel's
@@ -39,5 +39,5 @@ OpenSSH 10.3p1 on a Mac, against an sshd on Debian.
 
 ## Related
 
-- [Add a server](../how-to/add-a-server.md)
+- [Add a machine](../how-to/add-a-machine.md)
 - [The control plane](../explanation/control-plane.md)

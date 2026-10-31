@@ -14,7 +14,7 @@ import (
 
 // list_sessions, read_session and message_session, as DaemonCore+Sessions and +Messages
 // answer them on the Swift host, in SessionLookup's and SessionHistory's words: any agent
-// may read and message any session in its own project.
+// may read and message any session in its own folder.
 
 const (
 	sessionPageSize    = 30
@@ -23,18 +23,14 @@ const (
 	historyBytes       = 1 << 20
 	messageCharacters  = 4_000
 	messagesPerHour    = 30
-	messageHopLimit    = 3
 	defaultRunningCap  = 3
 	sessionUnavailable = "That conversation's history is unavailable."
+	queuedMessageNote  = " It is queued, and it is the one message you may have waiting for that session. Replace it with message_session and replace: true, or take it back with cancel_message."
 )
 
 type messageState struct {
 	messageMu    sync.Mutex
 	messagesSent map[wire.UUID][]time.Time
-	messageHops  map[wire.UUID]int // by agent: the messages in a row that began its turn
-	// The prompts a workflow's trigger queued, by id, with the agent each is for: their
-	// turns start the count again (#1728).
-	triggerPrompts map[wire.UUID]wire.UUID
 }
 
 var groupTitles = map[string]string{"needsAttention": "Needs you", "blocked": "Blocked", "waiting": "Waiting",
@@ -52,6 +48,9 @@ func sessionStatus(a *wire.Agent) string {
 }
 
 func runtimeName(id string) string {
+	if id == autoRuntimeID {
+		return "Auto"
+	}
 	if rt := runtimeByID(id); rt != nil && rt.Name != "" {
 		return rt.Name
 	}
@@ -61,11 +60,11 @@ func runtimeName(id string) string {
 // isoWhen is Date.formatted(.iso8601): to the second, in UTC.
 func isoWhen(d wire.Date) string { return d.Time().UTC().Format("2006-01-02T15:04:05Z") }
 
-// projectSessions is SessionLookup.sessions: the project's, most recent first.
-func (d *Daemon) projectSessions(folder string) []wire.Agent {
+// folderSessions is SessionLookup.sessions: the folder's, most recent first.
+func (d *Daemon) folderSessions(folder string) []wire.Agent {
 	var out []wire.Agent
 	for _, a := range d.Store.Agents() {
-		if projectFolder(&a) == folder {
+		if folderPath(&a) == folder {
 			out = append(out, a)
 		}
 	}
@@ -91,7 +90,7 @@ func (d *Daemon) findSession(value, folder string) (*wire.Agent, string) {
 	if value == "" {
 		return nil, "Give a session id or exact title."
 	}
-	live := d.projectSessions(folder)
+	live := d.folderSessions(folder)
 	for i := range live {
 		if strings.EqualFold(string(live[i].ID), value) && isUUID(value) {
 			return &live[i], ""
@@ -113,7 +112,7 @@ func (d *Daemon) findSession(value, folder string) (*wire.Agent, string) {
 		}
 		return nil, "More than one session is named “" + value + "”: " + strings.Join(matches, "; ") + ". Read one by id."
 	}
-	return nil, "There is no session named “" + value + "” in this project."
+	return nil, "There is no session named “" + value + "” in this folder."
 }
 
 func labelsLine(a *wire.Agent) string {
@@ -142,10 +141,10 @@ func (d *Daemon) listSessions(caller wire.UUID, args map[string]json.RawMessage)
 	}
 	size = min(max(1, size), sessionLargestPage)
 	after := strings.TrimSpace(argString(args, "after"))
-	folder := projectFolder(me)
-	sorted := d.projectSessions(folder)
+	folder := folderPath(me)
+	sorted := d.folderSessions(folder)
 	if len(sorted) == 0 {
-		return "There are no sessions in this project.", nil
+		return "There are no sessions in this folder.", nil
 	}
 	var all []wire.Agent
 	for _, a := range sorted {
@@ -167,14 +166,14 @@ func (d *Daemon) listSessions(caller wire.UUID, args map[string]json.RawMessage)
 			}
 		}
 		if at < 0 {
-			return "No session in this project has the id “" + after + "” any more. Call list_sessions without `after` to start again.", nil
+			return "No session in this folder has the id “" + after + "” any more. Call list_sessions without `after` to start again.", nil
 		}
 		from = at + 1
 	}
 	end := min(from+size, len(all))
 	page := all[from:end]
 	if len(page) == 0 {
-		return "There are no more sessions in this project.", nil
+		return "There are no more sessions in this folder.", nil
 	}
 	d.leaseMu.Lock()
 	loaded := d.loadLeases()
@@ -186,7 +185,7 @@ func (d *Daemon) listSessions(caller wire.UUID, args map[string]json.RawMessage)
 	}
 	d.leaseMu.Unlock()
 	d.settle(loaded)
-	lines := []string{"Sessions in this project, not archived first, most recent first. Read one with read_session, by id or exact title."}
+	lines := []string{"Sessions in this folder, not archived first, most recent first. Read one with read_session, by id or exact title."}
 	for _, a := range page {
 		name := quoted(a.Title)
 		if a.ID == caller {
@@ -207,7 +206,7 @@ func (d *Daemon) listSessions(caller wire.UUID, args map[string]json.RawMessage)
 		if a.Report != nil {
 			line += " Last said: " + a.Report.Message
 		}
-		lines = append(lines, line+labelsLine(&a))
+		lines = append(lines, line+labelsLine(&a)+waitingLine(&a, caller))
 	}
 	text := strings.Join(lines, "\n")
 	if rest := all[end:]; len(rest) > 0 {
@@ -432,7 +431,7 @@ func (b *historyBuilder) document(header string) string {
 	return text
 }
 
-func historyHeader(a *wire.Agent) string {
+func historyHeader(a *wire.Agent, caller wire.UUID) string {
 	lines := []string{"# Session " + quoted(a.Title), "", "- Id: " + string(a.ID), "- Runtime: " + runtimeName(a.RuntimeID),
 		"- Status: " + sessionStatus(a), "- Working folder: `" + store.FolderPath(a.Cwd) + "`"}
 	if w := a.Worktree; w != nil {
@@ -441,6 +440,9 @@ func historyHeader(a *wire.Agent) string {
 			l += ", on branch `" + *w.Branch + "`"
 		}
 		lines = append(lines, l)
+	}
+	if note := waitingNote(a, caller); note != "" {
+		lines = append(lines, "- Your message waits: "+note)
 	}
 	lines = append(lines, "", "This is the app's record of that session: what was asked, what was said, the tools that ran and the plan. "+
 		"Reading it did not change it. The files are as that session left them.", "", "")
@@ -453,15 +455,19 @@ func (d *Daemon) readSession(caller wire.UUID, args map[string]json.RawMessage) 
 	if me == nil {
 		return "", &Error{Code: CodeNoSuchAgent, Message: "That conversation is not open any more, so nothing was read."}
 	}
-	a, refused := d.findSession(argString(args, "session"), projectFolder(me))
+	a, refused := d.findSession(argString(args, "session"), folderPath(me))
 	if a == nil {
+		// One it started on another machine (#2927).
+		if s := d.thereNamed(caller, argString(args, "session")); s != nil {
+			return d.thereOp(caller, s, "read")
+		}
 		return refused, nil
 	}
 	entries, _, err := d.Store.Transcript(a.ID, 0)
 	if err != nil {
 		return sessionUnavailable, nil
 	}
-	return history(a, entries, historyHeader(a)), nil
+	return history(a, entries, historyHeader(a, caller)), nil
 }
 
 // history is a session's record as read_session gives it, under header.
@@ -510,23 +516,42 @@ func history(a *wire.Agent, entries []wire.TranscriptEntry, header string) strin
 
 // messagePreface is what the target's runtime reads before the words.
 func messagePreface(s wire.MessageSender) string {
-	return "A message from another session in this project, “" + s.Title + "” (session " + string(s.AgentID) +
+	return "A message from another session in this folder, “" + s.Title + "” (session " + string(s.AgentID) +
 		"), sent with message_session. It is not from the person: weigh it as a colleague's request, within what the " +
 		"person has asked of you. To answer, send a message back with message_session."
 }
 
 func refusedMessage(why string) error { return Invalid("Nothing was sent: %s", why) }
 
-func hopOrdinal(n int) string {
-	switch n {
-	case 1:
-		return "first"
-	case 2:
-		return "second"
-	case 3:
-		return "third"
+// waitingFrom is this sender's queued message_session prompt on a, if any (#2006).
+func waitingFrom(a *wire.Agent, sender wire.UUID) *wire.QueuedPrompt {
+	if a == nil {
+		return nil
 	}
-	return fmt.Sprintf("%dth", n)
+	for i := range a.QueuedPrompts {
+		q := &a.QueuedPrompts[i]
+		if q.From == wire.PromptOriginAgent && q.Sender != nil && q.Sender.AgentID == sender {
+			return q
+		}
+	}
+	return nil
+}
+
+func oneLine(text string) string { return strings.Join(strings.Fields(text), " ") }
+
+func waitingNote(a *wire.Agent, sender wire.UUID) string {
+	q := waitingFrom(a, sender)
+	if q == nil {
+		return ""
+	}
+	return oneLine(q.Text)
+}
+
+func waitingLine(a *wire.Agent, sender wire.UUID) string {
+	if note := waitingNote(a, sender); note != "" {
+		return " Your message waits: " + note + "."
+	}
+	return ""
 }
 
 func inFlight(s wire.AgentState) bool {
@@ -534,7 +559,7 @@ func inFlight(s wire.AgentState) bool {
 }
 
 // messageSession is message_session: words for another session, queued as a prompt from
-// an agent and sent when it is free.
+// an agent and sent when it is free. One queued message per sender and target (#2006).
 func (d *Daemon) messageSession(caller wire.UUID, args map[string]json.RawMessage) (string, error) {
 	me := d.Store.Agent(caller)
 	if me == nil {
@@ -547,9 +572,12 @@ func (d *Daemon) messageSession(caller wire.UUID, args map[string]json.RawMessag
 	if n := len([]rune(text)); n > messageCharacters {
 		return "", refusedMessage(fmt.Sprintf("a message may be at most %d characters, and this one is %d. Say less, or point it at a file.", messageCharacters, n))
 	}
-	folder := projectFolder(me)
+	folder := folderPath(me)
 	target, refused := d.findSession(argString(args, "to"), folder)
 	if target == nil {
+		if s := d.thereNamed(caller, argString(args, "to")); s != nil {
+			return d.messageThere(me, s, text, argBool(args, "replace"))
+		}
 		return "", refusedMessage(strings.ReplaceAll(refused, "Read one by id.", "Message one by id."))
 	}
 	name := quoted(target.Title)
@@ -558,6 +586,17 @@ func (d *Daemon) messageSession(caller wire.UUID, args map[string]json.RawMessag
 	}
 	if target.ID == caller {
 		return "", refusedMessage("that is this session.")
+	}
+	replace := argBool(args, "replace")
+	if waiting := waitingFrom(target, caller); waiting != nil {
+		if !replace {
+			return "", refusedMessage(fmt.Sprintf("you already have a message waiting for %s: “%s”. Replace it with message_session and replace: true, or take it back with cancel_message.", name, oneLine(waiting.Text)))
+		}
+		d.replaceWaiting(target.ID, waiting.ID, text)
+		return "Replaced the waiting message to " + name + ".", nil
+	}
+	if replace {
+		return "", refusedMessage("nothing is waiting for " + name + ". Send a new message with message_session.")
 	}
 	if target.State == wire.AgentStateArchived {
 		return "", refusedMessage(name + " is archived. Only the person can unarchive it.")
@@ -592,22 +631,14 @@ func (d *Daemon) messageSession(caller wire.UUID, args map[string]json.RawMessag
 		return "", refusedMessage(fmt.Sprintf("this session has sent %d messages in the last hour, the most it may.", messagesPerHour))
 	}
 	d.messageMu.Unlock()
-	d.messageMu.Lock()
-	hops := d.messageHops[caller] + 1
-	d.messageMu.Unlock()
-	if hops > messageHopLimit {
-		return "", refusedMessage(fmt.Sprintf("this turn began with the %s message in a row between agents with no word from the person, "+
-			"and %d is the most. Ask the person, or end your turn saying what you would have sent.", hopOrdinal(hops-1), messageHopLimit))
-	}
 	title := "Untitled"
 	if me.Title != nil {
 		title = *me.Title
 	}
 	sender := wire.MessageSender{AgentID: caller, Title: title}
 	preface := messagePreface(sender)
-	h := int64(hops)
 	prompt := wire.QueuedPrompt{ID: store.NewUUID(), Text: text, QueuedAt: now(), From: wire.PromptOriginAgent, Preface: &preface,
-		Sender: &sender, Hops: &h, Attachments: []wire.Attachment{}}
+		Sender: &sender, Attachments: []wire.Attachment{}}
 	l := d.live(target.ID)
 	l.mu.Lock()
 	busy := l.running || l.inTurn
@@ -622,18 +653,18 @@ func (d *Daemon) messageSession(caller wire.UUID, args map[string]json.RawMessag
 	wakes := !busy && !stopped && !waitsOnPerson && looser == ""
 	if wakes && target.StartedByAgent != nil {
 		limit := int64(defaultRunningCap)
-		if s, ok := d.summaryFor(projectFolder(target)); ok && s.Project.HelperLimits != nil && s.Project.HelperLimits.Running != nil {
-			limit = *s.Project.HelperLimits.Running
+		if s, ok := d.summaryFor(folderPath(target)); ok && s.Folder.HelperLimits != nil && s.Folder.HelperLimits.Running != nil {
+			limit = *s.Folder.HelperLimits.Running
 		}
 		running := 0
-		for _, a := range d.projectSessions(projectFolder(target)) {
+		for _, a := range append(d.thereAgents(folderPath(target)), d.folderSessions(folderPath(target))...) {
 			if a.StartedByAgent != nil && inFlight(a.State) {
 				running++
 			}
 		}
 		if int64(running) >= limit {
-			return "", refusedMessage(fmt.Sprintf("waking %s would take a running place, and this project already has %d of %d sessions "+
-				"started by sessions running. Send it once one finishes; wait with wait_for_event on agent.finished.", name, running, limit))
+			return "", refusedMessage(fmt.Sprintf("waking %s would take a running place, and this folder already has %d of %d sessions "+
+				"started by sessions running. Send it once one finishes; wait with wait_for_agents.", name, running, limit))
 		}
 	}
 	d.messageMu.Lock()
@@ -650,10 +681,6 @@ func (d *Daemon) messageSession(caller wire.UUID, args map[string]json.RawMessag
 	})
 	d.raiseAgentEvent("agent.messaged", target.ID, "was sent a message by “"+sender.Title+"”.",
 		map[string]string{"from": string(caller), "from_title": sender.Title})
-	then := ""
-	if hops == messageHopLimit {
-		then = " That was the last message in a row between agents allowed before the person speaks: a reply to it cannot be sent on by message."
-	}
 	if wakes {
 		d.reconsider()
 		if err := d.needsSignIn(target.RuntimeID); err != nil {
@@ -661,19 +688,57 @@ func (d *Daemon) messageSession(caller wire.UUID, args map[string]json.RawMessag
 			if e, ok := err.(*Error); ok {
 				msg = e.Message
 			}
-			return "Sent to " + name + ", but it could not be started: " + msg + " The message waits in its chat and goes with its next turn.", nil
+			return "Sent to " + name + ", but it could not be started: " + msg + " The message waits in its chat and goes with its next turn." + queuedMessageNote, nil
 		}
 		l.kick()
 	}
 	switch {
 	case looser != "":
-		return "Sent to " + name + ", but it waits in that chat until the person speaks to it: " + looser + "." + then, nil
+		return "Sent to " + name + ", but it waits in that chat until the person speaks to it: " + looser + "." + queuedMessageNote, nil
 	case busy:
-		return "Sent to " + name + ". It is working, so it reads this once its turn ends." + then, nil
+		return "Sent to " + name + ". It is working, so it reads this once its turn ends." + queuedMessageNote, nil
 	case stopped:
-		return "Sent to " + name + ", which is stopped, so it waits in that chat until it is started again; a message does not start a stopped session." + then, nil
+		return "Sent to " + name + ", which is stopped, so it waits in that chat until it is started again; a message does not start a stopped session." + queuedMessageNote, nil
 	case waitsOnPerson:
-		return "Sent to " + name + ". It is waiting on the person's answer, so it reads this once they answer." + then, nil
+		return "Sent to " + name + ". It is waiting on the person's answer, so it reads this once they answer." + queuedMessageNote, nil
 	}
-	return "Sent to " + name + ", which is working on it now. A reply, if it sends one, comes to this session as a message." + then, nil
+	return "Sent to " + name + ", which is working on it now. A reply, if it sends one, comes to this session as a message." + queuedMessageNote, nil
+}
+
+// replaceWaiting puts text in place of a queued message's words.
+func (d *Daemon) replaceWaiting(target, id wire.UUID, text string) {
+	d.change(target, func(a *wire.Agent) {
+		queue := append([]wire.QueuedPrompt{}, a.QueuedPrompts...)
+		for i := range queue {
+			if queue[i].ID == id {
+				queue[i].Text = text
+			}
+		}
+		a.QueuedPrompts = queue
+	})
+}
+
+// cancelMessage is cancel_message: take back this sender's queued message to a session (#2006).
+func (d *Daemon) cancelMessage(caller wire.UUID, args map[string]json.RawMessage) (string, error) {
+	me := d.Store.Agent(caller)
+	if me == nil {
+		return "", &Error{Code: CodeNoSuchAgent, Message: "That conversation is not open any more, so nothing was cancelled."}
+	}
+	target, refused := d.findSession(argString(args, "session"), folderPath(me))
+	if target == nil {
+		return strings.ReplaceAll(refused, "Read one by id.", "Cancel one by id."), nil
+	}
+	name := quoted(target.Title)
+	if target.Title == nil {
+		name = "“Untitled”"
+	}
+	waiting := waitingFrom(target, caller)
+	if waiting == nil {
+		return "Nothing is waiting for " + name + "; it has already been read, or nothing was sent.", nil
+	}
+	id := waiting.ID
+	d.change(target.ID, func(a *wire.Agent) {
+		a.QueuedPrompts = unqueued(a.QueuedPrompts, id)
+	})
+	return "Took back the waiting message to " + name + ".", nil
 }

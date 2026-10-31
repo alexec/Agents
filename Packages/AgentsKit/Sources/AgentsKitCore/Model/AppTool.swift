@@ -19,30 +19,41 @@ public enum AppTool {
     /// Add or remove the agent's own labels on its session (#481).
     public static let setSessionLabels = "set_session_labels"
 
-    /// Move into a worktree, or back to the project folder, once the turn ends (#481).
+    /// Move into a worktree, or back to the folder, once the turn ends (#481).
     /// Offered only on a runtime that can carry its conversation across folders.
     public static let moveWorktree = "move_worktree"
 
     /// What one passes to this becomes the file open in the sidebar.
     public static let showFile = "show_file"
 
-    /// And this one reads and writes the project's standing arrangements: the prompts
+    /// Tell the person something happened, with a notification that opens the chat
+    /// (#2805). It asks nothing; the chat keeps a line of what was sent.
+    public static let notify = "notify"
+
+    /// And this one reads and writes the folder's standing arrangements: the prompts
     /// that run themselves when something happens.
     public static let manageWorkflows = "manage_workflows"
 
     /// Ask the person a question or a short form and wait for the answer. The
     /// fallback for runtimes whose own ask tool never reaches the model, and the
-    /// only channel on runtimes that have none. Named `ask_form` rather than
-    /// `ask_question` so it does not collide with Antigravity's own tool.
-    public static let askForm = "ask_form"
+    /// only channel on runtimes that have none. It was `ask_form` until #2298. Antigravity's
+    /// own tool has the same name: the two are told apart by server (`mcp__agents__`), and
+    /// assessments score the app's by its own call log, not by the name.
+    public static let askQuestion = "ask_question"
+
+    /// Ask the person for one named secret, typed into a masked card (#2885). The host saves
+    /// it to their secrets.env, and the agent gets its name and where it is, never the value.
+    public static let askSecret = "ask_secret"
 
     /// Offer one optional prompt for the person to send next.
     public static let suggestNextPrompt = "suggest_next_prompt"
+    /// Ends voice mode once the reply is said: the person is done talking (#2375).
+    public static let hangUp = "hang_up"
 
     // The session tools (#638): one family for every session, a helper an agent
-    // started included (#940). The project's helper limits bound how many there are.
+    // started included (#940). The folder's helper limits bound how many there are.
 
-    /// Start a session in the caller's own project (028).
+    /// Start a session in the caller's own folder (028).
     public static let startSession = "start_session"
 
     /// Stop a session the caller started.
@@ -52,16 +63,19 @@ public enum AppTool {
     /// the caller may already archive it; otherwise waits for the person.
     public static let archiveSession = "archive_session"
 
-    /// The sessions in the caller's project, newest first (065); with `started_by: me`,
+    /// The sessions in the caller's folder, newest first (065); with `started_by: me`,
     /// the ones it started, and the places in use (028).
     public static let listSessions = "list_sessions"
 
     /// One session's history, by id or exact title.
     public static let readSession = "read_session"
 
-    /// Say something to another session in the project (#560), which it reads as a
+    /// Say something to another session in the folder (#560), which it reads as a
     /// prompt marked as this agent's.
     public static let messageSession = "message_session"
+
+    /// Take back this agent's queued message to another session (#2006).
+    public static let cancelMessage = "cancel_message"
 
     /// What the session tools were called before #638 (and `park_agent` before #584).
     /// No longer offered or answered; kept so a conversation that called them still
@@ -87,31 +101,39 @@ public enum AppTool {
     /// What can be leased on this Mac, and who holds what.
     public static let listResources = "list_resources"
 
-    // Three for waiting on what happens, and saying that something has (042). Offered
-    // to every agent, including one another agent started. None of the three names
-    // ends with another tool's name, which is how the app tells tools apart (see 036's
-    // release_resource).
+    // Four for waiting on what happens, and saying that something has (042, #1915). Offered
+    // to every agent, including one another agent started. None of the names is a suffix of
+    // another, which is how the app tells tools apart (see 036's release_resource).
 
-    /// Wait for an event, read the recent ones, or list what can be waited on.
+    /// Wait for an event in this folder or on this Mac.
     public static let waitForEvent = "wait_for_event"
+
+    /// Wait for sessions in this folder to finish.
+    public static let waitForAgents = "wait_for_agents"
+
+    /// Resume after a set number of minutes.
+    public static let checkAgain = "check_again"
 
     /// Stop waiting.
     public static let cancelWait = "cancel_wait"
 
-    // Five for the control plane's workspaces (#691 US6). Offered to every agent. Making and
-    // deleting ask the person first; none ends with another tool's name.
+    // Six for the control plane's workspaces (#691 US6) and their folders (#2947). Offered to
+    // every agent. Making, deleting and bringing back ask the person first; none ends with
+    // another tool's name.
 
     /// Every provider's workspaces, their hosts, and what a new one takes.
-    public static let listWorkspaces = "list_workspaces"
+    public static let listMachines = "list_machines"
     /// Start a host's workspace.
-    public static let startWorkspace = "start_workspace"
+    public static let startMachine = "start_machine"
     /// Stop a host's workspace.
-    public static let stopWorkspace = "stop_workspace"
-    /// Make a new workspace at a provider, once the person says yes.
-    public static let makeWorkspace = "make_workspace"
+    public static let stopMachine = "stop_machine"
+    /// Make a new machine at a provider, once the person says yes.
+    public static let makeMachine = "make_machine"
     /// Delete a host's workspace and the host, once the person says yes.
-    public static let deleteWorkspace = "delete_workspace"
-    public static let workspaceTools = [listWorkspaces, startWorkspace, stopWorkspace, makeWorkspace, deleteWorkspace]
+    public static let deleteMachine = "delete_machine"
+    /// Bring a branch back from a folder on another machine, once the person says yes.
+    public static let bringBack = "bring_back"
+    public static let machineTools = [listMachines, startMachine, stopMachine, makeMachine, deleteMachine, bringBack]
 
     // Seven for the agent that writes a provider's tool map or commands (#858). Offered to
     // that agent alone, and it is offered nothing else. None ends with another tool's name.
@@ -151,11 +173,11 @@ public enum AppTool {
 
     /// Every tool the app's MCP server serves.
     public static let all: [String] = [
-        finishTurn, showFile, manageWorkflows, askForm, suggestNextPrompt, startSession, stopSession, archiveSession,
-        leaseResource, releaseResource, listResources, waitForEvent,
+        finishTurn, showFile, notify, manageWorkflows, askQuestion, askSecret, suggestNextPrompt, hangUp, startSession, stopSession, archiveSession,
+        leaseResource, releaseResource, listResources, waitForEvent, waitForAgents, checkAgain,
         cancelWait, listSessions, readSession,
-        setSessionLabels, moveWorktree, messageSession,
-    ] + workspaceTools + writerTools
+        setSessionLabels, moveWorktree, messageSession, cancelMessage,
+    ] + machineTools + writerTools
 
     /// How runtimes put the server's name in front of a tool's, as measured: Claude's
     /// adapter says `mcp__agents__finish_turn`, Antigravity `agents_finish_turn` (049).

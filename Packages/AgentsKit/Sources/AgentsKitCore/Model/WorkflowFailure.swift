@@ -5,7 +5,7 @@ import Foundation
 ///
 /// Only the kinds that do not clear by themselves. A cooldown, the day's limit, the app
 /// closed, a run in flight or queued sort themselves out; waiting for an OK is listed as
-/// an approval (#773). A row orange on its project's page was easy to miss: a workflow
+/// an approval (#773). A row orange on its folder's page was easy to miss: a workflow
 /// runs with nobody watching, so its failure has to reach the person where they look.
 public struct WorkflowFailure: Hashable, Sendable {
     /// Which failure this is: the run or the refusal. Dismiss keeps it on the workflow's
@@ -48,20 +48,15 @@ public struct WorkflowFailure: Hashable, Sendable {
         }
     }
 
-    /// How a run's agent ended, when it failed or is blocked on the person: stopped short
-    /// (a crash, an error, a refusal, a limit), stuck, or blocked on nothing the app can
-    /// wait for. A question is the agent's own row in Needs You, not a failure; an agent
+    /// How a run's agent ended, when it failed: stopped short (a crash, an error, a
+    /// refusal, a limit). A finished run is never a failure (#1916). A question is the agent's own row in Needs You, not a failure; an agent
     /// archived is one the person has put away.
     public static func runFailure(of agent: Agent) -> String? {
         switch agent.state {
         case .stopped:
             guard agent.group() == .needsAttention else { return nil }
             return "Run failed — " + (agent.endedReason?.summary ?? "it stopped")
-        case .finished:
-            guard let report = agent.report else { return nil }
-            if report.outcome == .stuck { return "Run failed — \(report.message)" }
-            if report.isOpenBlock && !report.resumesByItself { return "Run blocked — \(report.message)" }
-            return nil
+        // A finished run is never a failure: only a question wants the person (#1916).
         default:
             return nil
         }
@@ -80,8 +75,8 @@ extension WorkflowSummary {
     }
 }
 
-extension DaemonAPI.ProjectSummary {
-    /// Whether a workflow here has stopped working (#989): the project's row says "Needs
+extension DaemonAPI.FolderSummary {
+    /// Whether a workflow here has stopped working (#989): the folder's row says "Needs
     /// you" for it, as for a session waiting.
     public var hasFailedWorkflow: Bool {
         approvals?.contains { $0.kind == .workflowFailed } == true

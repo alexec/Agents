@@ -9,13 +9,13 @@ control/status
   "awayFromHome": true,
   "you": "<UUID>",
   "relayKey": "<secret>",
-  "projectDetection": {
+  "folderDetection": {
     "enabled": true,
     "paths": [
       "~",
       "~/src",
       "~/code",
-      "~/projects",
+      "~/folders",
       "~/Developer",
       "~/dev",
       "~/git"
@@ -23,6 +23,7 @@ control/status
   },
   "capabilities": [
     "attention/1",
+    "audit.sinks/1",
     "backups.store/1",
     "bots/1",
     "clients/1",
@@ -31,26 +32,42 @@ control/status
     "control/1",
     "events.audit/1",
     "events.team/1",
+    "folders.to-machine/1",
+    "folders/1",
     "git/1",
+    "governance/1",
     "groups/1",
     "handover/1",
+    "host.org-routes/1",
     "host.policy/1",
+    "host.suspend/1",
+    "host.update/1",
     "host/1",
     "hosts.join/1",
     "hosts/1",
     "links/1",
     "liveactivity/1",
+    "machine/1",
+    "machines/1",
+    "notices/1",
+    "org-identity/1",
+    "org-routes/1",
     "people/1",
     "policy/1",
     "projects/1",
     "providers/1",
+    "readapi/1",
     "relay/1",
     "reports.scope/1",
+    "reports.value/1",
+    "reports.views/1",
     "reports/1",
+    "sessions.elsewhere/1",
+    "sessions.on-machine/1",
+    "signin.ask/1",
     "signin/1",
     "tunnel/1",
-    "user/1",
-    "workspaces/1"
+    "user/1"
   ],
   "required": {
     "host": [
@@ -207,7 +224,7 @@ hosts/lastHeard
   "host": "<host a>"
 }
 
-control/setProjectDetection
+control/setFolderDetection
 {
   "enabled": true,
   "paths": [
@@ -236,7 +253,7 @@ control/status
   "awayFromHome": true,
   "you": "<UUID>",
   "relayKey": "<secret>",
-  "projectDetection": {
+  "folderDetection": {
     "enabled": true,
     "paths": [
       "~/src",
@@ -245,6 +262,7 @@ control/status
   },
   "capabilities": [
     "attention/1",
+    "audit.sinks/1",
     "backups.store/1",
     "bots/1",
     "clients/1",
@@ -253,26 +271,42 @@ control/status
     "control/1",
     "events.audit/1",
     "events.team/1",
+    "folders.to-machine/1",
+    "folders/1",
     "git/1",
+    "governance/1",
     "groups/1",
     "handover/1",
+    "host.org-routes/1",
     "host.policy/1",
+    "host.suspend/1",
+    "host.update/1",
     "host/1",
     "hosts.join/1",
     "hosts/1",
     "links/1",
     "liveactivity/1",
+    "machine/1",
+    "machines/1",
+    "notices/1",
+    "org-identity/1",
+    "org-routes/1",
     "people/1",
     "policy/1",
     "projects/1",
     "providers/1",
+    "readapi/1",
     "relay/1",
     "reports.scope/1",
+    "reports.value/1",
+    "reports.views/1",
     "reports/1",
+    "sessions.elsewhere/1",
+    "sessions.on-machine/1",
+    "signin.ask/1",
     "signin/1",
     "tunnel/1",
-    "user/1",
-    "workspaces/1"
+    "user/1"
   ],
   "required": {
     "host": [
@@ -365,7 +399,7 @@ hosts/update refused
 providers/list refused
 {
   "code": -32064,
-  "message": "Workspace providers need a control plane with one copy, for now."
+  "message": "Machine providers need a control plane with one copy, for now."
 }
 
 nothing/here refused

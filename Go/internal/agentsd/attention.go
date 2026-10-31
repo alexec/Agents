@@ -17,6 +17,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
 	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/alexec/agents/Go/internal/noticebucket"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -97,6 +98,10 @@ type attentionState struct {
 	tellControl atomic.Pointer[func(method string, params any)]
 	// askControl asks the control plane on channel 0 and waits (workspacetools.go).
 	askControl atomic.Pointer[askControl]
+	// notices are what agents told the person and are still posted, and noticeBucket the
+	// person's attention they share when this host has no control plane (#2805, notify.go).
+	notices      []postedNotice
+	noticeBucket noticebucket.Bucket
 }
 
 // token is Need.token: one string per need, for keys and the file's order.
@@ -110,6 +115,8 @@ func token(id wire.NeedID) string {
 		return fmt.Sprintf("report:%s:%v", id.Report.AgentID, float64(id.Report.At))
 	case id.GuardedChange != nil:
 		return "guarded:" + store.FolderPath(id.GuardedChange.Folder) + ":" + id.GuardedChange.Path
+	case id.Notice != nil:
+		return "notice:" + *id.Notice
 	}
 	return ""
 }
@@ -224,8 +231,8 @@ func line(tc wire.ToolCall) string {
 }
 
 var headings = map[wire.WorkOutcome]string{wire.WorkOutcomeDone: "Complete", wire.WorkOutcomeNothingToDo: "Nothing to do",
-	wire.WorkOutcomeNeedsAnswer: "Waiting on your answer", wire.WorkOutcomePartlyDone: "Partly done",
-	wire.WorkOutcomeStuck: "Stuck", wire.WorkOutcomeBlocked: "Blocked"}
+	wire.WorkOutcomeNeedsAnswer: "Waiting on your answer",
+	wire.WorkOutcomeWaiting: "Waiting"}
 
 func cut(s string, budget int) string {
 	if utf8.RuneCountInString(s) > budget {
@@ -274,9 +281,10 @@ func permissionAnswers(r wire.PermissionRequest) []wire.QuickAnswer {
 }
 
 // formAnswers is QuickAnswer.answers(for:) for a form of one page whose question is a
-// string: its two to four choices, or one free reply.
+// string: its two to four choices, or one free reply. A secret has none (#2885): a
+// notification's reply is typed in clear, so it is answered on its masked card.
 func formAnswers(r wire.ElicitationRequest) []wire.QuickAnswer {
-	if r.Mode.Form == nil {
+	if r.Mode.Form == nil || r.Secret != nil {
 		return nil
 	}
 	ps := pages(r.Mode.Form.Value)
@@ -306,7 +314,7 @@ func formAnswers(r wire.ElicitationRequest) []wire.QuickAnswer {
 func (d *Daemon) needs() []wire.Need {
 	at := now()
 	archived := map[string]bool{}
-	for _, p := range d.Store.Projects() {
+	for _, p := range d.Store.Folders() {
 		if p.ArchivedAt != nil {
 			archived[store.FolderPath(p.Folder)] = true
 		}
@@ -325,25 +333,25 @@ func (d *Daemon) needs() []wire.Need {
 		if a.Title != nil {
 			title = *a.Title
 		}
-		folder := projectFolder(a)
+		folder := folderPath(a)
 		agentID := a.ID
 		found = append(found, wire.Need{ID: id, AgentID: &agentID, Folder: fileURL(folder, true), Kind: kind, RaisedAt: raised,
 			Headline: truncating(wire.Headline{H1: filepath.Base(folder), H2: title, H3: wanted, Answers: answers})})
 	}
 	for _, p := range d.pendingPermissions() {
-		if a := d.Store.Agent(p.AgentID); a != nil && !archived[projectFolder(a)] {
+		if a := d.Store.Agent(p.AgentID); a != nil && !archived[folderPath(a)] {
 			id := p.ID
 			need(wire.NeedID{Permission: &id}, a, wire.NeedKindPermission, "Wants to "+line(p.ToolCall), permissionAnswers(p))
 		}
 	}
 	for _, e := range d.pendingElicitations() {
-		if a := d.Store.Agent(e.AgentID); a != nil && !archived[projectFolder(a)] {
+		if a := d.Store.Agent(e.AgentID); a != nil && !archived[folderPath(a)] {
 			id := e.ID
 			need(wire.NeedID{Elicitation: &id}, a, wire.NeedKindElicitation, "Asks: "+elicitationTitle(e), formAnswers(e))
 		}
 	}
 	for _, a := range d.Store.Agents() {
-		if a.State != wire.AgentStateFinished || a.Report == nil || !needsAPerson(a.Report.Outcome) || archived[projectFolder(&a)] {
+		if a.State != wire.AgentStateFinished || a.Report == nil || !needsAPerson(a.Report.Outcome) || archived[folderPath(&a)] {
 			continue
 		}
 		if a.ReportSeenAt != nil && *a.ReportSeenAt == a.Report.At {
@@ -353,8 +361,8 @@ func (d *Daemon) needs() []wire.Need {
 		need(wire.NeedID{Report: &wire.NeedIDReport{AgentID: a.ID, At: r.At}}, &a, wire.NeedKindReport, headings[r.Outcome]+": "+r.Message, nil)
 	}
 	// A change to the app's own files, made outside it (#531): asked in the session of the
-	// agent that made it, or of the project when none did.
-	for _, p := range d.Store.Projects() {
+	// agent that made it, or of the folder when none did.
+	for _, p := range d.Store.Folders() {
 		folder := store.FolderPath(p.Folder)
 		if p.ArchivedAt != nil {
 			continue
@@ -377,6 +385,12 @@ func (d *Daemon) needs() []wire.Need {
 			found = append(found, wire.Need{ID: id, AgentID: c.AskedIn, Folder: fileURL(folder, true), Kind: wire.NeedKindGuardedChange,
 				RaisedAt: raised, Headline: truncating(wire.Headline{H1: filepath.Base(folder), H2: title, H3: guardedHeadline(c)})})
 		}
+	}
+	// What an agent told the person (#2805): posted as a need is, never a Needs you row.
+	notices := d.noticeNeedsLocked(at.Time())
+	found = append(found, notices...)
+	for _, n := range notices {
+		ids = append(ids, n.ID)
 	}
 	// Forget the first-seen time of anything no longer outstanding.
 	live := map[string]bool{}
@@ -450,6 +464,8 @@ func (d *Daemon) reconsider() {
 		live[token(n.ID)] = true
 	}
 	var notes []wire.AttentionNotification
+	// Notices sent to the window now, for their lines (#2860), recorded once unlocked.
+	var toComputer []string
 	tell := d.tellControl.Load()
 	var told []wire.AttentionNeed
 	withdraw := func(t string) {
@@ -556,6 +572,9 @@ func (d *Daemon) reconsider() {
 			}
 			d.deliveries[t] = dv
 			notes = append(notes, wire.AttentionNotification{NeedID: n.ID, Need: &need, To: to, Alert: alert})
+			if to != nil && n.ID.Notice != nil {
+				toComputer = append(toComputer, *n.ID.Notice)
+			}
 		case to == nil:
 			// Shown nowhere, yet still news to every client (#1367): its model is what
 			// Needs you and the phone's widget draw from. Not a banner: no surface is named.
@@ -566,6 +585,9 @@ func (d *Daemon) reconsider() {
 		default:
 			d.deliveries[t] = delivery{NeedID: n.ID, To: to, AlertedAt: wire.DateOf(at), AlertCount: 1}
 			notes = append(notes, wire.AttentionNotification{NeedID: n.ID, Need: &need, To: to, Alert: true})
+			if n.ID.Notice != nil {
+				toComputer = append(toComputer, *n.ID.Notice)
+			}
 		}
 	}
 	// Each recent turn that moved, for its Live Activity (#1744).
@@ -598,21 +620,24 @@ func (d *Daemon) reconsider() {
 	for _, turn := range turns {
 		(*tell)(wire.CallAttentionTurn.Name, turn)
 	}
+	for _, id := range toComputer {
+		d.noticeWentTo(id, wire.NoticeDeviceComputer)
+	}
 }
 
 // waitingCount is DaemonCore.waitingCount: the agents that need the person (Needs you or
-// Blocked), the badge's count, outside archived projects. An unread finish is not
+// Blocked), the badge's count, outside archived folders. An unread finish is not
 // counted (#1565).
 func (d *Daemon) waitingCount() int64 {
 	archived := map[string]bool{}
-	for _, p := range d.Store.Projects() {
+	for _, p := range d.Store.Folders() {
 		if p.ArchivedAt != nil {
 			archived[store.FolderPath(p.Folder)] = true
 		}
 	}
 	var n int64
 	for _, a := range d.Store.Agents() {
-		if a.State == wire.AgentStateArchived || archived[projectFolder(&a)] {
+		if a.State == wire.AgentStateArchived || archived[folderPath(&a)] {
 			continue
 		}
 		if g := Group(&a); g == "needsAttention" || g == "blocked" {
@@ -657,6 +682,8 @@ func (d *Daemon) ControlUplinkChanged(up bool) {
 	d.startHostStatus()
 	// And the usage it has not sent yet (#1811).
 	d.startReports()
+	// And which folder is in which project (#2317).
+	d.sendJoinedSoon()
 	d.reconsider()
 }
 

@@ -56,7 +56,7 @@
 
 ## R4. Sealing to a machine
 
-- **Decision**: HPKE (P-256, HKDF-SHA256, AES-256-GCM), as `apns.Seal`, with info `com.alexecollins.agents.orgroute.v1` and associated data `<route id>|<machine id>|<version>`. The machine keeps the envelope, not the value.
+- **Decision**: HPKE (P-256, HKDF-SHA256, AES-256-GCM), as `apns.Seal`, with info `com.alexecollins.agents.orgroute.v2` and associated data `<route id>|<machine id>|<version>|<hex SHA-256 of the route's JSON without sealed>` (`controllink.OrgRouteAD`). The machine keeps the envelope, not the value.
 - **Rationale**: a message seen by another copy, a log or a relay opens nowhere else; a file copied to another machine does not open there; an old envelope cannot replace a newer one.
 - **Alternatives**: the value in the clear on channel 0 (as #1760 does today for user secrets; acceptable for a person's own secret, not for an organisation's); a key per route shared with every machine (one leaked machine opens all deliveries).
 

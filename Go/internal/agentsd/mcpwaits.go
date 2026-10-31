@@ -10,7 +10,7 @@ import (
 )
 
 // A wait on a server's event (#577), as the Swift host has it: a subscription the wait
-// holds, as a trigger's is, checked against what the project's servers offer, `where` as
+// holds, as a trigger's is, checked against what the folder's servers offer, `where` as
 // its arguments. It is matched by the subscription that raised the event, never by its
 // details; the subscription goes when nothing holds it.
 
@@ -84,7 +84,7 @@ func notOfferedWords(name string, offers map[string][]string) string {
 		}
 	}
 	if len(offers) == 0 {
-		words += " This project has no MCP server that offers events."
+		words += " This folder has no MCP server that offers events."
 	}
 	if g := closestEvent(name); g != "" {
 		words += " Did you mean " + g + "?"
@@ -161,12 +161,12 @@ type offeredEvents struct {
 
 // mcpOfferedEvents is each of these servers' events as listed now, only those it may
 // raise, or why it could not be asked.
-func (d *Daemon) mcpOfferedEvents(names []string, project string) (map[string]offeredEvents, []string) {
+func (d *Daemon) mcpOfferedEvents(names []string, folder string) (map[string]offeredEvents, []string) {
 	secrets := d.secrets()
 	offered := map[string]offeredEvents{}
 	var mayComeBack []string
 	for _, name := range names {
-		s, problem := d.eventServerNamed(name, project, secrets)
+		s, problem := d.eventServerNamed(name, folder, secrets)
 		switch problem {
 		case "":
 			listing := d.mcpEventListing(s)
@@ -182,7 +182,7 @@ func (d *Daemon) mcpOfferedEvents(names []string, project string) (map[string]of
 				mayComeBack = append(mayComeBack, mcpEventsWords(listing.failure, name))
 			}
 		case "waiting":
-			mayComeBack = append(mayComeBack, name+" is waiting for approval in this project's Connectors.")
+			mayComeBack = append(mayComeBack, name+" is waiting for approval in this folder's Connectors.")
 		}
 	}
 	return offered, mayComeBack
@@ -200,7 +200,7 @@ type mcpWaitCheck struct {
 // checkMCPWait checks a wait's servers' events as a trigger's are checked. Refused, with
 // the sentence, when no server offers a name or its arguments fit none; a server that
 // could not be asked is a warning.
-func (d *Daemon) checkMCPWait(names []string, filters map[string][]string, project string) (mcpWaitCheck, error) {
+func (d *Daemon) checkMCPWait(names []string, filters map[string][]string, folder string) (mcpWaitCheck, error) {
 	var check mcpWaitCheck
 	if len(names) == 0 {
 		return check, nil
@@ -211,7 +211,7 @@ func (d *Daemon) checkMCPWait(names []string, filters map[string][]string, proje
 	}
 	narrowed, isNarrowed := given[mcpServerKey]
 	delete(given, mcpServerKey)
-	here := d.mcpServerNames(project)
+	here := d.mcpServerNames(folder)
 	if isNarrowed {
 		for _, n := range narrowed {
 			if !contains(here, n) {
@@ -231,7 +231,7 @@ func (d *Daemon) checkMCPWait(names []string, filters map[string][]string, proje
 	}
 	asked = append([]string(nil), asked...)
 	sort.Strings(asked)
-	offered, mayComeBack := d.mcpOfferedEvents(asked, project)
+	offered, mayComeBack := d.mcpOfferedEvents(asked, folder)
 	servers := make([]string, 0, len(offered))
 	for s := range offered {
 		servers = append(servers, s)
@@ -267,7 +267,7 @@ func (d *Daemon) checkMCPWait(names []string, filters map[string][]string, proje
 					on = append(on, server)
 				}
 				key := mcpTrigger{event: def.Name, servers: servedBy, arguments: arguments}.subscriptionKey(server)
-				keys = append(keys, mcpRecordKey(project, key))
+				keys = append(keys, mcpRecordKey(folder, key))
 			}
 		}
 		if arguments == nil {
@@ -328,62 +328,10 @@ func (d *Daemon) startMCPWait(check mcpWaitCheck) {
 	d.kickMCPEvents()
 }
 
-// mcpEventList is the one list of events (#579): the app's, then each of the project's
-// servers' that it offers by poll, then a line for each server that could not be asked.
-func (d *Daemon) mcpEventList(project string) string {
-	_, text := catalogue()
-	names := d.mcpServerNames(project)
-	sort.Strings(names)
-	offered, mayComeBack := d.mcpOfferedEvents(names, project)
-	var extra []string
-	for _, name := range names {
-		o, ok := offered[name]
-		if !ok {
-			continue
-		}
-		events := append([]mcpEventDef(nil), o.events...)
-		sort.Slice(events, func(i, j int) bool { return events[i].Name < events[j].Name })
-		for _, e := range events {
-			if e.offersPoll() {
-				extra = append(extra, eventListLine(e, name))
-			}
-		}
-	}
-	for _, why := range mayComeBack {
-		extra = append(extra, "Not listed: "+why)
-	}
-	if len(extra) == 0 {
-		return text
-	}
-	// The servers' lines go before the last line, which says how .* and lists match.
-	lines := strings.Split(text, "\n")
-	last := lines[len(lines)-1]
-	return strings.Join(append(append(lines[:len(lines)-1:len(lines)-1], extra...), last), "\n")
-}
-
-// eventListLine is EventList.line: one entry as a line of JSON, name first and the
-// schemas last.
-func eventListLine(e mcpEventDef, source string) string {
-	object := json.RawMessage(`{"type":"object"}`)
-	fields := []string{`"name":` + canonicalJSON(mustRaw(e.Name)), `"source":` + canonicalJSON(mustRaw(source))}
-	if e.Description != nil {
-		fields = append(fields, `"description":`+canonicalJSON(mustRaw(*e.Description)))
-	}
-	input, payload := e.InputSchema, e.PayloadSchema
-	if len(input) == 0 {
-		input = object
-	}
-	if len(payload) == 0 {
-		payload = object
-	}
-	fields = append(fields, `"inputSchema":`+canonicalJSON(input), `"payloadSchema":`+canonicalJSON(payload))
-	return "{" + strings.Join(fields, ",") + "}"
-}
-
 // waitingOnServers is every open wait's server events, by agent, for the subscriptions.
 type serverWait struct {
 	agent   wire.UUID
-	project string
+	folder string
 	events  []wire.WaitServerEvent
 }
 
@@ -394,7 +342,7 @@ func (d *Daemon) serverWaits() []serverWait {
 		if w == nil || w.Ending != nil || len(w.ServerEvents) == 0 {
 			continue
 		}
-		out = append(out, serverWait{agent: a.ID, project: projectFolder(&a), events: w.ServerEvents})
+		out = append(out, serverWait{agent: a.ID, folder: folderPath(&a), events: w.ServerEvents})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].agent < out[j].agent })
 	return out

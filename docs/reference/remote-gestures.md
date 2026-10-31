@@ -7,21 +7,21 @@ description: Every swipe, long press, pull and menu in the iPhone and iPad app, 
 # Gestures on the iPhone and iPad
 
 This page lists the gestures in the iPhone and iPad app: swipes on rows, long presses,
-pulls, the chat's **···** menu, the edge pull for panes and the project terminal. The Mac
+pulls, the chat's **···** menu, the edge pull for panes and the folder terminal. The Mac
 window does most of these with a right-click or a two-finger swipe, and the web page with
 a row's **···** menu.
 
 A long press on a row opens the same menu that a right-click opens on the Mac, less what
-the phone leaves to the Mac, such as **Show in Finder** and **Project Settings**.
+the phone leaves to the Mac, such as **Show in Finder** and **Folder Settings**.
 
 ## Session rows
 
-These work on a session's row in the sidebar, and on its card on the project's page.
+These work on a session's row in the sidebar, and on its card on the folder's page.
 
 | Gesture | What it does |
 | --- | --- |
 | Tap | Opens the chat. |
-| Swipe right | **Pin** or **Unpin**. On an archived card on the project's page, **Unarchive**. |
+| Swipe right | **Pin** or **Unpin**. On an archived card on the folder's page, **Unarchive**. |
 | Swipe left | **Archive**. A long swipe archives at once, as in Mail. In the sidebar, a session that is done also shows **Mark as Read** or **Mark as Unread**. On an archived session, **Unarchive**. |
 | Long press | The session's menu. See below. |
 | Drag out of the sidebar | On an iPad, opens the session in a window of its own. |
@@ -41,21 +41,21 @@ The session's menu has these, when they apply:
 
 | Row | Swipe right | Swipe left | Long press |
 | --- | --- | --- | --- |
-| A project's heading in the sidebar | | | **New Session**, **Open in New Window** on an iPad or **Open Project Alone** on an iPhone, **Put Files in Drop Box…**, **Pin** or **Unpin**, **Archive…** |
+| A folder's heading in the sidebar | | | **New Session**, **Open in New Window** on an iPad or **Open Folder Alone** on an iPhone, **Put Files in Drop Box…**, **Pin** or **Unpin**, **Archive…** |
 | A workflow | **Pin** or **Unpin** | **Archive**, or **Unarchive** | **Approve** and **Deny on This Host** while it waits for your OK, **Run now**, **Pin** or **Unpin**, **Move Up** and **Move Down** when pinned, **Turn Off** or **Turn On**, **Archive** or **Unarchive**, **Delete…** |
 | Something that waits for your OK, under **Needs You** | | | **Review…**, the answers it takes (such as **Approve**, **Deny**, **Keep** or **Undo**), and **Request Changes…** |
 | A pinned page | | | **Move Up**, **Move Down**, **Unpin** |
-| An archived project | **Unarchive** | **Delete** | **Unarchive**, **Delete…** |
+| An archived folder | **Unarchive** | **Delete** | **Unarchive**, **Delete…** |
 | A worktree | | **Remove…**, **Remove Build Output** | **Remove Build Output**, **Remove…** |
-| A runtime, on **Runtimes** | | **Mark available**, when it is out | **Assess in…** |
+| A runtime, on **Runtimes** | | **Mark available**, when it is out | |
 
-A tap on a project's heading, or on its **Workflows** row, folds or unfolds it.
+A tap on a folder's heading, or on its **Workflows** row, folds or unfolds it.
 
 ## Pull down to refresh
 
-Pull down on these lists to ask the control plane again: the sidebar (archived projects
+Pull down on these lists to ask the control plane again: the sidebar (archived folders
 too), a workflow's page, **Runtimes**, the cost and token pages, worktrees, events,
-connectors, reports, **People** and the workspace providers. The app also catches up by
+connectors, reports, **People** and the machine providers. The app also catches up by
 itself when it connects and each time you go back to it, so a pull is for when you think
 it has missed something.
 
@@ -96,18 +96,18 @@ On an iPhone, or an iPad without room, the pane opens over the chat, and Back cl
 The switch at the top of a pane goes to the others: **Page**, **Files**, **Changes**,
 **Terminal**, **Exchanged** and **Simulator**.
 
-## The project terminal
+## The folder terminal
 
-**Project Terminal** opens the project's own shells, in the project's folder on its host
+**Folder Terminal** opens the folder's own shells, in the folder on its host
 (#418). They are the shells that Control-\` opens on the Mac. They are not an agent's, so
-they stay in the project folder whichever session you open.
+they stay in the folder whichever session you open.
 
-- Open it from **Project Terminal** in the bar of any page of the project.
+- Open it from **Folder Terminal** in the bar of any page of the folder.
 - On an iPad with a keyboard, press Control-\`.
 - Each shell is a tab. Closing a tab ends its shell. **End Shell** ends the shell in front.
 - **Done**, or Control-\` again, puts the shells away and leaves them running.
 
-Away from home, through the relay, the project terminal and the panes say they need the
+Away from home, through the relay, the folder terminal and the panes say they need the
 same network, because a shell sends too much for iCloud.
 
 ### Keys above the keyboard
@@ -124,7 +124,7 @@ then **c** is two taps.
 | Command-P | **Open File…** in the chat. |
 | Command-F | **Find in Chat**. |
 | Shift-Command-P | **Prompts**. |
-| Control-\` | **Project Terminal**. |
+| Control-\` | **Folder Terminal**. |
 | Command-+, Command-− and Command-0 | Zoom the Page in, out and to its actual size. |
 
 ## See also

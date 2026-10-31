@@ -34,6 +34,10 @@ $W start agents/fix-github-issue-139@1a2b3c agents/work-github-issue-47@4d5e6f
 
 `plan` (or `--dry-run`) shows which branch fast-forwards, which merge cleanly, which
 conflicts the wave settles itself, which stop it, and the builds. A wave does not install.
+For a branch that fast-forwards, which is a lane's own rebased branch, `plan` also lists
+the commands its lane runs to verify it (#2685): an `App/` or `Host/` change builds only
+the Mac schemes, a `Remote/` change only the Remote, and a `Shared/`, `Packages/` or
+`project.yml` change both. Run `plan` from the lane's worktree to get its tests too.
 It simulates the merges with `git merge-tree`, so no ref, worktree or file changes.
 
 Then repeat until the step is `finish`:
@@ -83,7 +87,7 @@ verified by its lane.
 | Changed | Steps |
 |---|---|
 | `App/`, `Host/`, `Packages/` | `build-host` and `build-store` |
-| `Remote*/`, `Shared/`, `Packages/AgentsKit` or `CodeText`, `project.yml` | `build-remote` (generic iOS Simulator) |
+| `Remote*/`, `Shared/`, `Packages/AgentsKit` or `CodeText`, `folder.yml` | `build-remote` (generic iOS Simulator) |
 | `Web/` | `web`: a rebuild that must change nothing, `npm run check` and `npm test` |
 | Swift packages | `test-*`: the suites `scripts/select-test-suites.sh` picks, as CI does (AgentsKit filtered) |
 | shippable and `build-host` | `smoke`: the run-app check below |
@@ -123,8 +127,10 @@ login-item jobs (`launchctl kickstart` on `com.alexecollins.agentshost.daemon` o
 `.control`). Putting the app on this Mac is ship-app with `--install-mac`, and only when
 Alex asks for that by name.
 
-Then `$W clean $WAVE` removes the wave's own worktree and its `lead/wave-*` branch.
-That is the only worktree the wave removes.
+Then `$W clean $WAVE` removes the wave's own worktree and its `lead/wave-*` branch,
+and with it the wave's `build/DD` and `.build`. That is the only worktree the wave
+removes. A lane whose branch the wave landed deletes its own `build/` and `.build`
+(run-app's "When you are done", step 5; #2346): the wave never touches a lane worktree.
 
 ## Standing rules
 

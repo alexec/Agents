@@ -32,9 +32,11 @@ for why every client is trusted alike, and what that risks.
 
    If Agents Host runs on that Mac, the window says **Agents Host is running on this Mac**
    instead. Click **Connect to a different control plane…**.
-4. Paste the code under **CODE** and click **Connect**.
+4. The sheet shows **SIGN IN** first. Click **Use a Code Instead…**, paste the code under
+   **CODE**, and click **Connect**. To pair with no code, see [Sign in with Google, Apple or
+   GitHub](sign-in-with-google-apple-or-github.md).
 
-   The window is paired, and lists the projects on every host.
+   The window is paired, and lists the folders on every host.
 
 On the Mac that runs Agents Host, you can also get a code from Agents Host itself: click
 **Pair a Window or Phone…**, choose **A window on a Mac**, and click **Copy**.
@@ -44,10 +46,11 @@ On the Mac that runs Agents Host, you can also get a code from Agents Host itsel
 1. In a paired window, open **Settings ▸ Control plane**, and click **Show** beside
    **Clients**.
 2. Click **Pair a Device…**. The window shows a code to scan.
-3. On the iPhone or iPad, open Agents. It says **Connect to your agents**. Tap **Scan the
-   Code** and point the camera at the code.
+3. On the iPhone or iPad, open Agents. It says **Connect to your agents**, with the sign-in
+   first. Tap **Use a Code Instead…**, then **Scan the Code**, and point the camera at the
+   code.
 
-   The device is paired, and lists the projects on every host, each under its host's
+   The device is paired, and lists the folders on every host, each under its host's
    heading.
 
 On the Mac that runs Agents Host, you can also get the code from Agents Host itself: click
@@ -88,7 +91,7 @@ Host on the Mac that runs the control plane.
 - **That isn't a control plane's code. It starts with agents-control:.** The window was
   given something else. Copy the code again.
 - **This is a code for a host.** It adds a machine that runs agents, not a window. Ask for
-  a code from **Pair a Mac…** instead, or see [Add a server](add-a-server.md).
+  a code from **Pair a Mac…** instead, or see [Add a machine](add-a-machine.md).
 - **That code is for adding a host, not a phone.** On the device: the same mistake. Use a
   code from **Pair a Device…**.
 - **The control plane didn't take that code. It may have run out: show a new one and try

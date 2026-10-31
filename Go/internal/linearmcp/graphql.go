@@ -156,14 +156,15 @@ func linearError(res *http.Response, errs []gqlError) *LinearError {
 // MARK: What is read
 
 const fragments = `
-fragment P on User { displayName app guest }
+fragment P on User { id displayName app guest }
 fragment I on Issue {
   id identifier title url createdAt
-  team { key } state { name type } labels { nodes { name } } assignee { displayName }
+  team { key } state { name type } labels { nodes { name } } assignee { id displayName }
   creator { ...P } botActor { name }
 }`
 
 type gqlPerson struct {
+	ID          string `json:"id"`
 	DisplayName string `json:"displayName"`
 	App         bool   `json:"app"`
 	Guest       bool   `json:"guest"`
@@ -176,7 +177,7 @@ type gqlBot struct {
 // person is who did something: the user, else the app (bot) that did it, else nobody.
 func person(user *gqlPerson, bot *gqlBot) *Person {
 	if user != nil {
-		return &Person{Name: user.DisplayName, App: user.App, Guest: user.Guest}
+		return &Person{ID: user.ID, Name: user.DisplayName, App: user.App, Guest: user.Guest}
 	}
 	if bot != nil {
 		name := bot.Name
@@ -207,6 +208,7 @@ type gqlIssue struct {
 		} `json:"nodes"`
 	} `json:"labels"`
 	Assignee *struct {
+		ID          string `json:"id"`
 		DisplayName string `json:"displayName"`
 	} `json:"assignee"`
 	Creator  *gqlPerson `json:"creator"`
@@ -227,7 +229,7 @@ func (g gqlIssue) issue() Issue {
 	}
 	sort.Strings(i.Labels)
 	if g.Assignee != nil {
-		i.Assignee = g.Assignee.DisplayName
+		i.Assignee, i.AssigneeID = g.Assignee.DisplayName, g.Assignee.ID
 	}
 	return i
 }
@@ -310,7 +312,7 @@ func (l *RealLinear) commented(ctx context.Context, team, since string) ([]Activ
 	}
 	var items []Activity
 	for _, c := range out.Comments.Nodes {
-		if c.Issue == nil { // a comment on a project update, not an issue
+		if c.Issue == nil { // a comment on a folder update, not an issue
 			continue
 		}
 		items = append(items, Activity{ID: c.ID, At: c.CreatedAt, Issue: c.Issue.issue(), Kind: Commented,
@@ -333,6 +335,10 @@ type gqlHistory struct {
 	ToState *struct {
 		Type string `json:"type"`
 	} `json:"toState"`
+	// ToAssignee is who it was assigned to, for issue.assigned (#2034).
+	ToAssignee *struct {
+		ID string `json:"id"`
+	} `json:"toAssignee"`
 }
 
 // changed reads the latest history of the issues updated since: a label added is labelled, a
@@ -344,6 +350,9 @@ func (l *RealLinear) changed(ctx context.Context, kind Kind, team, since string)
 		filter["team"] = teamFilter(team)
 	}
 	var out struct {
+		Viewer struct {
+			ID string `json:"id"`
+		} `json:"viewer"`
 		Issues struct {
 			Nodes []struct {
 				gqlIssue
@@ -355,11 +364,12 @@ func (l *RealLinear) changed(ctx context.Context, kind Kind, team, since string)
 		} `json:"issues"`
 	}
 	q := `query Changed($filter: IssueFilter, $first: Int, $history: Int) {
+  viewer { id }
   issues(filter: $filter, first: $first, orderBy: updatedAt) {
     nodes {
       ...I
       history(first: $history) {
-        nodes { id createdAt actor { ...P } botActor { name } addedLabels { name } fromState { type } toState { type } }
+        nodes { id createdAt actor { ...P } botActor { name } addedLabels { name } fromState { type } toState { type } toAssignee { id } }
       }
     }
     pageInfo { hasNextPage }
@@ -383,6 +393,11 @@ func (l *RealLinear) changed(ctx context.Context, kind Kind, team, since string)
 				case Closed:
 					if h.ToState != nil && isClosed(h.ToState.Type) && (h.FromState == nil || !isClosed(h.FromState.Type)) {
 						items = append(items, Activity{ID: h.ID, At: h.CreatedAt, Issue: i, Kind: Closed, By: by, Reason: h.ToState.Type})
+					}
+				// To the connection's owner (#2034), by anyone.
+				case Assigned:
+					if h.ToAssignee != nil && h.ToAssignee.ID != "" && h.ToAssignee.ID == out.Viewer.ID {
+						items = append(items, Activity{ID: h.ID, At: h.CreatedAt, Issue: i, Kind: Assigned, By: by})
 					}
 				}
 			}

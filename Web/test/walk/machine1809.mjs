@@ -24,7 +24,7 @@ try {
   await page.press("Connect");
   await page.waitFor(`document.querySelector(".sidebar")`, 20_000);
 
-  await page.press("New project");
+  await page.press("New folder");
   await page.press("Start a Machine from a Repository…");
   await page.waitFor(`${dialog}?.textContent.includes("Fake cloud")`, 15_000);
   await page.waitFor(`${dialog}.textContent.includes("Size")`, 15_000);

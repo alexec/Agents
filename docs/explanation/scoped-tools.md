@@ -16,7 +16,7 @@ why none of it touches your own setup.
 The app's job is to show you every agent and everything it is waiting on, in one place,
 on your Mac and your phone. A runtime's own tools put work somewhere else.
 
-- A schedule made with the runtime's own scheduler is a job with no row in the project.
+- A schedule made with the runtime's own scheduler is a job with no row in the folder.
   You would not see it, and you could not stop it from the app.
 - An agent the runtime addresses as a peer, by listing other agents and messaging them,
   is talking to agents the app cannot see, open or stop.
@@ -33,7 +33,7 @@ each of these things: its own.
 
 The app gives each agent a small set of tools of its own. With them an agent can say how
 its turn went, show you a file, suggest what you might say next, start, stop and archive
-other agents in the project, set up a workflow, take a turn on a shared resource, wait
+other agents in the folder, set up a workflow, take a turn on a shared resource, wait
 for an event or publish one, and move into a worktree and back.
 Everything these tools do shows up in the window and on your phone. The
 [tools reference](../reference/agent-tools.md) lists them all.
@@ -41,7 +41,7 @@ Everything these tools do shows up in the window and on your phone. The
 Every runtime gets them, the same way: the app serves them itself over a local http address
 on this computer, with a key only that agent's session holds. Nothing is started for them,
 and when the session ends the key stops working. Every agent gets the same set, including
-one that another agent started. The project's helper limits bound how many agents can be
+one that another agent started. The folder's helper limits bound how many agents can be
 started, however deep the chain goes. An agent can touch only the sessions below it.
 
 ## What is kept
@@ -91,7 +91,7 @@ each one has.
 - **Codex** takes feature switches in a variable set only for the sessions the app starts.
   It loses its sleep tool, its automations, its memories and its ChatGPT connectors. Its
   sub-agents and its goals are switched on, and the app shows the sub-agents as it does
-  Claude's. Its question tool stays, and its questions reach you as a card.
+  Claude's, and its goal as a card over the plan, as it does Claude's `/goal` (#2742). Its question tool stays, and its questions reach you as a card.
 - **Gemini** keeps its own subagents and task tracker, so it is sent no policy file at all.
 - **Antigravity** takes a list of tools to deny for each session, and has nothing left in
   it, so it is sent no list; its question tool stays, and its questions reach you as a card.
@@ -100,9 +100,10 @@ each one has.
   its to-do list, as Claude's and Gemini's do. Sharing a conversation to OpenCode's website
   and self-update are switched off, as switches your own settings cannot turn back on. Left
   to itself OpenCode asks for nothing, so the app makes it ask before editing files, running
-  commands and fetching web pages, unless you choose **Always-approve** for it in
-  **Settings ▸ Agent Runtimes**. Its own question tool is off, so its questions come through
-  the app's and reach you as a card.
+  commands and fetching web pages. The **Default** or **Always-approve** capsule under the
+  prompt sets one Mac-wide value for every OpenCode agent, including workflows and agents
+  in server folders. Its own question tool is off, so its questions come through the app's
+  and reach you as a card.
 
 Where a tool can only be named in the briefing, the agent is being asked, not stopped.
 That is weaker, and the app says so rather than pretending otherwise.

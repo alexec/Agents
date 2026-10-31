@@ -75,12 +75,12 @@ public extension DaemonAPI {
 
     /// A machine in People: its name, its state and nothing inside it (FR-019).
     struct PersonMachine: Codable, Sendable, Hashable, Identifiable {
-        public var id: HostID
+        public var id: MachineRef
         public var name: String
         public var state: String
         public var platform: String?
 
-        public init(id: HostID, name: String, state: String, platform: String? = nil) {
+        public init(id: MachineRef, name: String, state: String, platform: String? = nil) {
             self.id = id
             self.name = name
             self.state = state
@@ -112,11 +112,24 @@ public extension DaemonAPI {
         public var group: String?
         public var caps: SpendCaps?
         public var spentTodayUSD: Double?
+        /// What SCIM says of the person, for one SCIM made (#1002): Managed by <provider>.
+        public var scim: PersonSCIM?
+        /// Made by SCIM and not signed in yet: Waiting for first sign-in.
+        public var provisioned: Bool?
+        /// Suspended by their org provider (D13).
+        public var suspended: PersonSuspended?
+        /// The SCIM groups that give the person their role (FR-020): Set by <provider>.
+        public var roleFrom: [String]?
 
         public init(id: String, name: String, kind: Kind = .person, role: UserRole, localOwner: Bool? = nil,
                     you: Bool? = nil, signIns: [SignIn] = [], clients: [PersonClient] = [],
                     machines: [PersonMachine] = [], group: String? = nil, caps: SpendCaps? = nil,
-                    spentTodayUSD: Double? = nil) {
+                    spentTodayUSD: Double? = nil, scim: PersonSCIM? = nil, provisioned: Bool? = nil,
+                    suspended: PersonSuspended? = nil, roleFrom: [String]? = nil) {
+            self.scim = scim
+            self.provisioned = provisioned
+            self.suspended = suspended
+            self.roleFrom = roleFrom
             self.group = group
             self.caps = caps
             self.spentTodayUSD = spentTodayUSD
@@ -133,6 +146,39 @@ public extension DaemonAPI {
 
         public var isYou: Bool { you == true }
         public var isLocalOwner: Bool { localOwner == true }
+        /// The org provider that sets this person's role: people/setRole refuses it.
+        public var roleSetBy: String? { roleFrom?.isEmpty == false ? scim?.provider ?? suspended?.provider : nil }
+    }
+
+    /// What an org provider's SCIM says of a person (#1002, FR-015). Only what a client shows.
+    struct PersonSCIM: Codable, Sendable, Hashable {
+        public var provider: String
+        public var userName: String
+        public var displayName: String?
+        public var active: Bool
+
+        public init(provider: String, userName: String, displayName: String? = nil, active: Bool = true) {
+            self.provider = provider
+            self.userName = userName
+            self.displayName = displayName
+            self.active = active
+        }
+    }
+
+    /// Why a person is suspended (#1002, D13): by SCIM, a refused refresh, or an admin; with
+    /// the provider and when.
+    struct PersonSuspended: Codable, Sendable, Hashable {
+        public var by: String
+        public var provider: String
+        public var at: Date
+        public var why: String?
+
+        public init(by: String, provider: String, at: Date, why: String? = nil) {
+            self.by = by
+            self.provider = provider
+            self.at = at
+            self.why = why
+        }
     }
 
     /// `people/list`: every user for an admin; for a member, only themselves.
@@ -195,13 +241,13 @@ public extension DaemonAPI {
 
     /// A started machine in `people/removePreview`. `unknown` says why it could not be asked.
     struct StartedMachinePreview: Codable, Sendable, Hashable {
-        public var host: HostID
+        public var host: MachineRef
         public var name: String
         public var state: String
         public var unpushed: [UnpushedWork]
         public var unknown: String?
 
-        public init(host: HostID, name: String, state: String, unpushed: [UnpushedWork] = [], unknown: String? = nil) {
+        public init(host: MachineRef, name: String, state: String, unpushed: [UnpushedWork] = [], unknown: String? = nil) {
             self.host = host
             self.name = name
             self.state = state
@@ -213,16 +259,16 @@ public extension DaemonAPI {
     /// A worktree with work that is not pushed: commits ahead of its upstream, commits on a
     /// branch with no upstream (`unmerged`), or changes not committed.
     struct UnpushedWork: Codable, Sendable, Hashable {
-        public var project: URL
+        public var folder: URL
         public var worktree: URL
         public var branch: String?
         public var ahead: Int?
         public var unmerged: Int?
         public var uncommitted: Int?
 
-        public init(project: URL, worktree: URL, branch: String? = nil, ahead: Int? = nil, unmerged: Int? = nil,
+        public init(folder: URL, worktree: URL, branch: String? = nil, ahead: Int? = nil, unmerged: Int? = nil,
                     uncommitted: Int? = nil) {
-            self.project = project
+            self.folder = folder
             self.worktree = worktree
             self.branch = branch
             self.ahead = ahead
@@ -287,17 +333,17 @@ public extension DaemonAPI {
     /// `GET /v1/join/<request>`, as a machine with no code reads it while it waits: still
     /// waiting, or how it ended. Once approved, its host, and the control plane's key and
     /// name, which the machine keeps as a code's would give it.
-    struct HostJoinDecision: Codable, Sendable, Hashable {
+    struct MachineJoinDecision: Codable, Sendable, Hashable {
         public enum Result: String, Codable, Sendable, Hashable {
             case waiting, approved, denied, expired
         }
 
         public var result: Result
-        public var host: HostID?
+        public var host: MachineRef?
         public var controlKey: Data?
         public var name: String?
 
-        public init(result: Result, host: HostID? = nil, controlKey: Data? = nil, name: String? = nil) {
+        public init(result: Result, host: MachineRef? = nil, controlKey: Data? = nil, name: String? = nil) {
             self.result = result
             self.host = host
             self.controlKey = controlKey
@@ -314,9 +360,9 @@ public extension DaemonAPI {
 
     /// `hosts/approveJoin`'s answer: the machine's new host.
     struct JoinApproved: Codable, Sendable, Hashable {
-        public var host: HostID
+        public var host: MachineRef
 
-        public init(host: HostID) { self.host = host }
+        public init(host: MachineRef) { self.host = host }
     }
 
     /// `control/joinDecided`: a request ended, approved or not, so every card for it goes.
@@ -410,6 +456,45 @@ public enum PeopleWords {
         return parts.joined(separator: " · ")
     }
 
+    /// The org provider lines under a person (#1002, FR-028), with `name` giving a provider's
+    /// name by its id: Managed by, Waiting for first sign-in, Suspended by.
+    public static func orgLines(_ person: DaemonAPI.PersonRow, name: (String) -> String) -> [String] {
+        var lines: [String] = []
+        if let scim = person.scim { lines.append(managedBy(name(scim.provider))) }
+        if person.provisioned == true { lines.append(waitingFirstSignIn) }
+        if let suspended = person.suspended { lines.append(suspendedBy(name(suspended.provider))) }
+        return lines
+    }
+
+    public static func managedBy(_ provider: String) -> String { "Managed by \(provider)" }
+    public static let waitingFirstSignIn = "Waiting for first sign-in"
+    public static let editInConsole = "Edit in Console"
+
+    /// Console ▸ People on the web page, for Edit in Console (D17), where Console ▸ Policy is.
+    public static func consoleURL(_ status: DaemonAPI.ControlStatus?) -> URL? {
+        guard let policy = OrgPolicyWords.consoleURL(status),
+              var parts = URLComponents(url: policy, resolvingAgainstBaseURL: false) else { return nil }
+        parts.fragment = "/console/people"
+        return parts.url
+    }
+    /// Console ▸ Sign-In on the web page, for the providers' Edit in Console (D17).
+    public static func signInConsoleURL(_ status: DaemonAPI.ControlStatus?) -> URL? {
+        guard let people = consoleURL(status), var parts = URLComponents(url: people, resolvingAgainstBaseURL: false) else { return nil }
+        parts.fragment = "/console/signIn"
+        return parts.url
+    }
+    public static let orgProvidersTitle = "Your organisation’s sign-in"
+    /// Under the providers, read only on the Mac and the Remote (D17).
+    public static func orgProvidersFoot(admin: Bool) -> String {
+        admin ? "People see these on the sign-in screen, in this order. Change them, their domains and SCIM in Console ▸ Sign-In on the web page."
+            : "People see these on the sign-in screen, in this order. An admin changes them in Console ▸ Sign-In on the web page."
+    }
+    public static func suspendedBy(_ provider: String) -> String { "Suspended by \(provider)" }
+    /// A SCIM group's line: where it comes from.
+    public static func fromProvider(_ provider: String) -> String { "From \(provider)" }
+    /// On a role or a group that the provider controls (FR-020, FR-028).
+    public static func setBy(_ provider: String) -> String { "Set by \(provider)" }
+
     /// "box-1 (online), studio (offline)", or nil with none.
     public static func machines(_ person: DaemonAPI.PersonRow) -> String? {
         guard !person.machines.isEmpty else { return nil }
@@ -446,6 +531,12 @@ public enum PeopleWords {
     /// Said while Remove asks the person's machines what work on them is not pushed.
     public static func asking(_ person: DaemonAPI.PersonRow) -> String {
         "Asking \(person.name)’s machines what work on them is not pushed…"
+    }
+
+    /// Remove…'s check failed (#2193): `why` is a sentence. Remove stays off until it works.
+    public static func checkFailed(_ person: DaemonAPI.PersonRow, why: String) -> String {
+        "Could not check what \(person.name)’s machines would lose. \(why) Removing \(person.name) stops and deletes "
+            + "the machines \(person.name) started, with any work on them not pushed, so Remove stays off until the check works."
     }
 
     public static func removeTitle(_ person: DaemonAPI.PersonRow) -> String {

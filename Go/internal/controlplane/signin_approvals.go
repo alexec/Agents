@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/signin"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
@@ -15,7 +16,7 @@ import (
 )
 
 // A GitHub sign-in on a new client waits for Approve on another client of the person (R3,
-// FR-010): a GitHub token carries no nonce, so a control plane that was given one could
+// FR-010), and so does a browser that asks by an account (#2097), with the code it shows typed: a GitHub token carries no nonce, so a control plane that was given one could
 // pass it on, and only the person's own client can say this new one is theirs. The new
 // client and the card show the same short code. Requests are kept in the store
 // (v1/signins/<request>.json), so the person may approve at any copy; the approving copy
@@ -26,6 +27,8 @@ const (
 	// At most this many requests wait for one person, and for everyone.
 	signInRequestsPerPerson = 5
 	signInRequestsOpen      = 50
+	// browserProvider is a browser's request (#2097): approved only with the code it shows.
+	browserProvider = "browser"
 )
 
 type signInRequest struct {
@@ -116,8 +119,46 @@ func (a *signInApprovals) write(ctx context.Context, r signInRequest, condition 
 }
 
 func (a *signInApprovals) row(r signInRequest) wire.SignInRequest {
+	code := r.Code
+	if r.Provider == browserProvider {
+		// The person types the code the browser shows: the card never carries it (FR-014a).
+		code = ""
+	}
 	return wire.SignInRequest{Request: r.ID, Name: r.Name, Kind: wire.ClientKind(r.Kind), Provider: r.Provider, Login: optional(r.Login),
-		Code: r.Code, Expires: dateOf(r.Expires.Time)}
+		Code: code, Expires: dateOf(r.Expires.Time)}
+}
+
+// code is the code a sign-in shows (controllink.ApprovalCode): bound to the new client's key
+// and this control plane's, so a control plane that passes a sign-in on cannot show the
+// person the code their card shows.
+func (a *signInApprovals) code(public []byte) string {
+	return controllink.ApprovalCode(public, a.s.currentKeys().public)
+}
+
+// sameCode says a typed code is the request's: case, spaces and dashes aside.
+func sameCode(typed, code string) bool {
+	clean := strings.Map(func(r rune) rune {
+		if r == ' ' || r == '-' {
+			return -1
+		}
+		return r
+	}, typed)
+	return code != "" && strings.EqualFold(clean, code)
+}
+
+// unanswered is a browser's wait that no person can approve (FR-014b): an account nobody
+// has, or one with every place taken. It looks the same as one that waits for a person.
+func (a *signInApprovals) unanswered(conn *Conn, ask signInAsk) (*wire.Admitted, error) {
+	expires := a.now().Add(joinLifetime)
+	conn.SendNow(notification("control/signInWaiting", wire.SignInWaiting{Code: a.code(ask.public), Expires: dateOf(expires)}))
+	timer := time.NewTimer(time.Until(expires))
+	defer timer.Stop()
+	select {
+	case <-conn.Done():
+		return nil, fail(notPermitted, "The sign-in connection closed.")
+	case <-timer.C:
+		return nil, fail(notPermitted, "Nobody approved the sign-in within 10 minutes. Sign in again.")
+	}
 }
 
 // wait asks the person's clients, tells the new client the code, and waits until the
@@ -138,12 +179,16 @@ func (a *signInApprovals) wait(ctx context.Context, conn *Conn, ask signInAsk) (
 			}
 		}
 	}
+	if ask.provider == browserProvider && waiting < signInRequestsOpen && (ask.person == "" || forPerson >= signInRequestsPerPerson) {
+		a.mu.Unlock()
+		return a.unanswered(conn, ask)
+	}
 	if waiting >= signInRequestsOpen || forPerson >= signInRequestsPerPerson {
 		a.mu.Unlock()
 		return nil, fail(notPermitted, "Too many sign-ins are waiting for approval. Try again in a few minutes.")
 	}
 	now := records.At(a.now())
-	r := signInRequest{ID: newJoinID(), Code: newJoinCode(), Client: ask.client, PublicKey: ask.public, Name: ask.name, Kind: ask.kind,
+	r := signInRequest{ID: newJoinID(), Code: a.code(ask.public), Client: ask.client, PublicKey: ask.public, Name: ask.name, Kind: ask.kind,
 		Person: ask.person, Provider: ask.provider, Login: ask.login, Created: now, Expires: records.At(now.Add(joinLifetime))}
 	err = a.write(ctx, r, store.Absent)
 	a.mu.Unlock()
@@ -152,7 +197,11 @@ func (a *signInApprovals) wait(ctx context.Context, conn *Conn, ask signInAsk) (
 	}
 	conn.SendNow(notification("control/signInWaiting", wire.SignInWaiting{Code: r.Code, Expires: dateOf(r.Expires.Time)}))
 	a.s.router.TellPerson(r.Person, "control/signInRequested", a.row(r))
-	a.s.log(ask.name + " signed in with " + signin.Title(ask.provider) + " and waits for approval (request " + r.ID[:8] + ")")
+	if ask.provider == browserProvider {
+		a.s.log(ask.name + " asked to sign in as a person and waits for approval (request " + r.ID[:8] + ")")
+	} else {
+		a.s.log(ask.name + " signed in with " + signin.Title(ask.provider) + " and waits for approval (request " + r.ID[:8] + ")")
+	}
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 	for {
@@ -211,7 +260,7 @@ func (a *signInApprovals) list(ctx context.Context, user string) ([]wire.SignInR
 
 // decide is signIn/approve and signIn/deny: only the person the sign-in names decides it,
 // never an admin for them. Approved, the client pairs as that person.
-func (a *signInApprovals) decide(ctx context.Context, id, user string, approve bool) error {
+func (a *signInApprovals) decide(ctx context.Context, id, user string, approve bool, code string) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	r, etag, err := a.read(ctx, id)
@@ -226,6 +275,9 @@ func (a *signInApprovals) decide(ctx context.Context, id, user string, approve b
 	}
 	if p := a.s.records.Person(user); p != nil && p.IsRemoved() {
 		return fail(notPermitted, "This person was removed.")
+	}
+	if approve && r.Provider == browserProvider && !sameCode(code, r.Code) {
+		return fail(invalidParams, "That is not the code the browser shows.")
 	}
 	r.By = user
 	if !approve {
@@ -250,6 +302,6 @@ func (a *signInApprovals) decide(ctx context.Context, id, user string, approve b
 	}
 	a.s.announce("clientPaired", r.Client, "signin")
 	a.s.router.TellPerson(r.Person, "control/signInDecided", wire.SignInDecided{Request: r.ID, Result: r.Result})
-	a.s.log(r.Name + " paired (" + r.Kind + ") by signing in with GitHub, approved by person " + user)
+	a.s.log(r.Name + " paired (" + r.Kind + ") by signing in with " + signin.Title(r.Provider) + ", approved by person " + user)
 	return nil
 }

@@ -7,7 +7,7 @@ import Foundation
 /// Pure, so the rules are tested here and #984's milestones can take the same facts.
 public enum GetStarted {
     public enum Step: String, CaseIterable, Hashable, Sendable, Identifiable {
-        case host, runtime, project, firstAgent, device
+        case host, runtime, folder, firstAgent, device
 
         public var id: String { rawValue }
 
@@ -19,7 +19,7 @@ public enum GetStarted {
             switch self {
             case .host: "Pair this window with Agents Host"
             case .runtime: "Install an agent runtime"
-            case .project: "Add a project"
+            case .folder: "Add a folder"
             case .firstAgent: "Start your first agent"
             case .device: "Pair a phone or browser"
             }
@@ -30,7 +30,7 @@ public enum GetStarted {
             switch self {
             case .host: "Agents Host runs your agents on this Mac."
             case .runtime: "Claude, Codex or another coding CLI, signed in."
-            case .project: "A folder you work in."
+            case .folder: "A folder you work in."
             case .firstAgent: "Say what you want done and let it run a turn."
             case .device: "Optional. Answer your agents from anywhere."
             }
@@ -45,17 +45,17 @@ public enum GetStarted {
         /// says it is signed out only once a call refuses, so "not known to be" is as
         /// close to "signed in" as the app can get.
         public var runtimeReady: Bool
-        public var hasProject: Bool
+        public var hasFolder: Bool
         /// An agent has run a turn to its end.
         public var ranAgent: Bool
         /// A phone, an iPad or a browser is paired, besides this window.
         public var pairedDevice: Bool
 
-        public init(paired: Bool = false, runtimeReady: Bool = false, hasProject: Bool = false,
+        public init(paired: Bool = false, runtimeReady: Bool = false, hasFolder: Bool = false,
                     ranAgent: Bool = false, pairedDevice: Bool = false) {
             self.paired = paired
             self.runtimeReady = runtimeReady
-            self.hasProject = hasProject
+            self.hasFolder = hasFolder
             self.ranAgent = ranAgent
             self.pairedDevice = pairedDevice
         }
@@ -64,7 +64,7 @@ public enum GetStarted {
             switch step {
             case .host: paired
             case .runtime: runtimeReady
-            case .project: hasProject
+            case .folder: hasFolder
             case .firstAgent: ranAgent
             case .device: pairedDevice
             }

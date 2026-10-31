@@ -349,7 +349,7 @@ func (d *Daemon) mcpVerify(ctx context.Context, r wire.MCPVerifyRequest) wire.MC
 	if home == "" {
 		return refuse(mcpcatalog.NoPersonalHome())
 	}
-	if err := d.requireMCPProject(r.Destination); err != nil {
+	if err := d.requireMCPFolder(r.Destination); err != nil {
 		return refuse(err)
 	}
 	built, err := buildHandEntry(r.Server, skillcatalog.LoadSecrets(skillcatalog.SecretsPath(home)))
@@ -366,7 +366,7 @@ func (d *Daemon) mcpVerify(ctx context.Context, r wire.MCPVerifyRequest) wire.MC
 		return refuse(&mcpcatalog.Error{Why: wire.MCPCatalogError{NameTaken: &wire.MCPCatalogErrorNameTaken{Name: built.name}}})
 	}
 	cwd := home
-	if r.Destination.Kind == wire.SkillDestinationKindProject {
+	if r.Destination.Kind == wire.SkillDestinationKindFolder {
 		cwd = *r.Destination.Folder
 	}
 	server := built.filled
@@ -432,7 +432,10 @@ func sameDestination(a, b wire.SkillDestination) bool {
 // mcpAddByHand writes a server that answered Verify, exactly as it was verified: its
 // secrets to secrets.env first, the name still free.
 func (d *Daemon) mcpAddByHand(r wire.MCPAddByHandRequest) (wire.MCPAddAnswer, error) {
-	if err := d.requireMCPProject(r.Destination); err != nil {
+	if err := d.customServerRefusal(); err != nil {
+		return wire.MCPAddAnswer{}, err
+	}
+	if err := d.requireMCPFolder(r.Destination); err != nil {
 		return wire.MCPAddAnswer{}, mcpRefusal(err)
 	}
 	mcpVerifiedStore.Lock()
@@ -482,7 +485,7 @@ func (d *Daemon) mcpAddByHand(r wire.MCPAddByHandRequest) (wire.MCPAddAnswer, er
 	side := mcpcatalog.LoadSidecar(d.mcpSidecarPath())
 	side.Servers[mcpcatalog.Key(r.Destination, name)] = mcpcatalog.Record{Run: string(v.built.run), AddedAt: addedAt, ByHand: &byHand}
 	side.Save(d.mcpSidecarPath())
-	if r.Destination.Kind == wire.SkillDestinationKindProject {
+	if r.Destination.Kind == wire.SkillDestinationKindFolder {
 		d.recordMCPApproval(*r.Destination.Folder, name, json.RawMessage(v.built.entry.Stringified()))
 	}
 	log.Printf("mcp: add %s by hand", name)

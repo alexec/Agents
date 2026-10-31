@@ -14,9 +14,7 @@ public extension DaemonAPI.Method {
     static let providersDraftAnswer = "providers/draftAnswer"
     /// `{}` → `ProviderRuntimes`: the runtimes that can write, on the control plane's host.
     static let providersRuntimes = "providers/runtimes"
-    /// `ProviderDraftToolRequest` → `{note}`: a writer's tool, from the agent to its daemon.
-    static let agentsProviderDraft = "agents/providerDraft"
-    /// `HostProviderDraftCall` → `{note}`: a host to its control plane on channel 0.
+    /// `MachineProviderDraftCall` → `{note}`: a host to its control plane on channel 0.
     static let hostProviderDraft = "host/providerDraft"
 }
 
@@ -140,13 +138,13 @@ public extension DaemonAPI {
     /// A draft's last check.
     struct DraftCheck: Codable, Sendable, Hashable {
         public var passed: Bool
-        public var workspaces: [WorkspaceInfo]?
+        public var workspaces: [MachineInfo]?
         public var problem: String?
         /// What `ssh -G` resolved one workspace's destination to, in words (#975).
         public var ssh: String?
         /// The draft gives no ssh destination, so Add as Host… and an ssh start can't work (#975).
         public var noSSH: Bool?
-        public init(passed: Bool, workspaces: [WorkspaceInfo]? = nil, problem: String? = nil, ssh: String? = nil,
+        public init(passed: Bool, workspaces: [MachineInfo]? = nil, problem: String? = nil, ssh: String? = nil,
                     noSSH: Bool? = nil) {
             self.passed = passed
             self.workspaces = workspaces
@@ -223,7 +221,7 @@ public extension DaemonAPI {
 
     /// `host/providerDraft`: a writer's tool call, relayed by its host. `agentID` is the
     /// caller, which the control plane checks against the draft's agent (FR-011).
-    struct HostProviderDraftCall: Codable, Sendable, Hashable {
+    struct MachineProviderDraftCall: Codable, Sendable, Hashable {
         public var agentID: UUID
         public var draft: UUID
         public var tool: String

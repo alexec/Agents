@@ -81,7 +81,7 @@ Codex's rows have no summary under them, because Codex sends none. That is right
 - **Default.** `autoCompactEnabled` is on unless `DISABLE_COMPACT` or `DISABLE_AUTO_COMPACT`
   is set. On 1M models, a 200K boundary may apply unless the model is natively 1M.
 - **Lever.** The adapter passes `_meta.claudeCode.options.settings` as Claude Code's
-  flag-settings tier. It sits above your user, project and local settings, and only managed
+  flag-settings tier. It sits above your user, folder and local settings, and only managed
   policy beats it. So `{autoCompactEnabled: false}` or `{autoCompactWindow: N}` (100K–1M)
   would set it for one agent. The same `_meta` can also carry `env`, but your settings
   file's own `env` block is applied after it.

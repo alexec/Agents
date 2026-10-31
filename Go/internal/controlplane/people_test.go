@@ -62,7 +62,7 @@ func (p *plane) machine(who *person, name string) *fakeHost {
 }
 
 // machineSaying is machine, with its own hello.
-func (p *plane) machineSaying(who *person, hello controllink.HostHello) *fakeHost {
+func (p *plane) machineSaying(who *person, hello controllink.MachineHello) *fakeHost {
 	p.t.Helper()
 	var shown wire.ControlCodeShown
 	json.Unmarshal(call(p.t, who.window, "", "hosts/startEnroll", nil), &shown)
@@ -88,7 +88,7 @@ func (p *plane) machineSaying(who *person, hello controllink.HostHello) *fakeHos
 
 func listedHosts(t *testing.T, s *controllink.Session) []string {
 	t.Helper()
-	var list []wire.ControlHost
+	var list []wire.ControlMachine
 	json.Unmarshal(call(t, s, "", "hosts/list", nil), &list)
 	out := []string{}
 	for _, h := range list {
@@ -110,6 +110,7 @@ func idsOf(hosts []*fakeHost) []string {
 // US1 (T012): one person sees no change. A code-paired client and a code-enrolled host
 // are the local owner's, who is the one admin.
 func TestOnePersonSeesNoChange(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	box := p.host("MACHINE-2")
 	_, window := p.client("Test window")
@@ -138,6 +139,7 @@ func TestOnePersonSeesNoChange(t *testing.T) {
 // their own machines; another's is not found, through the router and through every
 // control-plane method that names a machine. Admins see the name, user and state only.
 func TestEachPersonReachesOnlyTheirOwnMachines(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, alexWindow := p.client("Alex's Mac")
 	alex := &person{id: p.s.localOwner(), window: alexWindow}
@@ -206,7 +208,7 @@ var hostNamingMethods = map[string]bool{
 	"hosts/update": true, "hosts/checkAgain": true, "hosts/remove": true, "hosts/setRelay": true,
 	"hosts/lendSignIn": true, "hosts/lendGit": true, "hosts/lastHeard": true,
 	"hosts/link": true, "hosts/unlink": true, "hosts/start": true, "hosts/stop": true, "hosts/keep": true,
-	"hosts/deleteWorkspace": true, "hosts/setWorkspaceOptions": true,
+	"hosts/deleteMachine": true, "hosts/setMachineOptions": true,
 }
 
 // hostNamingParams are params that would do something with host for each of them.
@@ -219,6 +221,7 @@ func hostNamingParams(host string) map[string]any {
 // and each that does refuses another person's as not found. A method added with no
 // entry here fails.
 func TestEveryClientMethodChecksTheOwner(t *testing.T) {
+	t.Parallel()
 	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) { c.ProviderHome = t.TempDir() })
 	_, alexWindow := p.client("Alex's Mac")
 	alexMachine := p.host("MACHINE-2")
@@ -228,24 +231,36 @@ func TestEveryClientMethodChecksTheOwner(t *testing.T) {
 	// Methods that name no machine: answered for the caller alone.
 	namesNone := map[string]bool{
 		"daemon/ping": true, "control/status": true, "hosts/list": true, "hosts/startEnroll": true, "hosts/install": true,
-		"hosts/detect": true, "hosts/sshHosts": true, "control/setProjectDetection": true, "clients/list": true,
+		"hosts/detect": true, "hosts/sshHosts": true, "control/setFolderDetection": true, "clients/list": true,
 		"clients/startPairing": true, "clients/stopPairing": true, "clients/setGrant": true, "clients/forget": true,
-		"clients/connections": true, "clients/forgetSelf": true, "clients/setPushToken": true, "clients/setActivityToken": true, "devices/list": true,
-		"devices/startPairing": true, "devices/stopPairing": true, "devices/forget": true, "audit/list": true,
+		"clients/connections": true, "clients/forgetSelf": true, "clients/setPushToken": true, "clients/setActivityToken": true, "clients/setWebPush": true, "clients/webPushKey": true, "devices/list": true,
+		"devices/startPairing": true, "devices/stopPairing": true, "devices/forget": true, "audit/list": true, "audit/sinks": true, "audit/setSinks": true,
 		"audit/export": true, "control/setAuditDays": true, "people/list": true, "people/invite": true,
 		"people/setRole": true, "people/remove": true, "people/removePreview": true, "hosts/joinRequests": true, "hosts/approveJoin": true,
 		"hosts/denyJoin": true, "control/rotate": true,
 		"providers/list": true, "providers/refresh": true, "providers/add": true, "providers/update": true,
 		"providers/remove": true, "providers/options": true, "providers/runtimes": true, "providers/draftStart": true,
 		"providers/draftAnswer": true, "providers/draftCancel": true, "providers/create": true, "hosts/listKept": true,
-		"hosts/retryKept": true, "hosts/dropKept": true, "reports/usage": true, "reports/export": true,
-		"user/settings": true, "user/setSettings": true, "user/setSecret": true, "user/removeSecret": true,
+		"hosts/retryKept": true, "hosts/dropKept": true, "reports/usage": true, "reports/export": true, "reports/value": true,
+		"user/settings": true, "user/setSettings": true, "user/setAgentConfigFile": true, "user/setSecret": true, "user/removeSecret": true,
 		"user/secretNames": true, "groups/list": true, "groups/set": true, "groups/remove": true,
 		"providers/setGroup": true, "bots/make": true, "bots/setCaps": true,
 		"links/list": true, "links/requests": true, "links/approve": true, "links/deny": true, "links/remove": true,
 		"signIn/providers": true, "signIn/pair": true, "signIn/addToMe": true, "signIn/removeFromMe": true,
 		"signIn/configure": true, "signIn/requests": true, "signIn/approve": true, "signIn/deny": true,
+		"signIn/discover": true, "signIn/orgStart": true, "signIn/ticket": true, "signIn/orgProviders/list": true,
+		"signIn/orgProviders/set": true, "signIn/orgProviders/check": true, "signIn/orgProviders/remove": true,
+		"signIn/domains/list": true, "signIn/domains/claim": true, "signIn/domains/check": true, "signIn/domains/set": true,
+		"signIn/domains/preview": true, "signIn/domains/remove": true,
 		"policy/get": true, "policy/mine": true, "policy/set": true, "policy/stopAll": true, "policy/raise": true,
+		"orgRoutes/mine": true, "orgRoutes/list": true, "orgRoutes/set": true, "orgRoutes/replaceKey": true,
+		"orgRoutes/check": true, "orgRoutes/remove": true,
+		"scim/set": true, "scim/tokens/list": true, "scim/tokens/make": true, "scim/tokens/revoke": true,
+		"groups/setRole": true, "people/removeRequests": true,
+		"projects/list": true, "projects/set": true, "projects/remove": true, "projects/setSlot": true,
+		"governance/usage": true, "governance/request": true, "governance/requests": true, "governance/decide": true,
+		"governance/approvals": true, "governance/revoke": true,
+		"readApi/list": true, "readApi/make": true, "readApi/revoke": true,
 		// It names a bot's machine, an admin's to stop, and checks that itself (#1761).
 		"bots/stopRun": true,
 	}
@@ -283,6 +298,7 @@ func TestEveryClientMethodChecksTheOwner(t *testing.T) {
 // FR-006: a control plane keeps one admin at least; a removed person's clients are cut
 // off and their machines leave, and the code they paired with does nothing again.
 func TestRolesAndRemoval(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, alexWindow := p.client("Alex's Mac")
 	alex := p.s.localOwner()
@@ -329,6 +345,7 @@ func TestRolesAndRemoval(t *testing.T) {
 // FR-017: a machine with no code asks to join as a person, and joins once that person
 // approves it, as theirs. Another person cannot decide it, and a denied one ends.
 func TestAMachineJoinsByApproval(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, alexWindow := p.client("Alex's Mac")
 	sam := p.invite(alexWindow, "Sam", wire.UserRoleMember)
@@ -387,12 +404,12 @@ func TestAMachineJoinsByApproval(t *testing.T) {
 	}
 
 	// One that names nobody is an admin's to decide; denied, the machine hears so.
-	body, _ := json.Marshal(wire.HostJoinAsk{Name: "stray", Platform: "Linux", PublicKey: mustPublic(t)})
+	body, _ := json.Marshal(wire.MachineJoinAsk{Name: "stray", Platform: "Linux", PublicKey: mustPublic(t)})
 	resp, err := http.Post(p.url+"/v1/join", "application/json", bytes.NewReader(body))
 	if err != nil {
 		t.Fatal(err)
 	}
-	var ticket wire.HostJoinTicket
+	var ticket wire.MachineJoinTicket
 	json.NewDecoder(resp.Body).Decode(&ticket)
 	resp.Body.Close()
 	json.Unmarshal(call(t, sam.window, "", "hosts/joinRequests", nil), &waiting)
@@ -408,7 +425,7 @@ func TestAMachineJoinsByApproval(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var decision wire.HostJoinDecision
+	var decision wire.MachineJoinDecision
 	json.NewDecoder(resp.Body).Decode(&decision)
 	resp.Body.Close()
 	if decision.Result != "denied" || decision.Host != nil {
@@ -442,6 +459,7 @@ func waitNote(t *testing.T, s *controllink.Session, method string) controllink.N
 // A workspace's machine is the person's who started it (FR-028): the host code its first
 // boot uses names them.
 func TestACodeMadeForAPersonMakesTheirMachine(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	shown, err := p.s.Codes().Issue(withCodeOwner(context.Background(), "someone"), true, false, time.Minute)
 	if err != nil {
@@ -461,6 +479,7 @@ func TestACodeMadeForAPersonMakesTheirMachine(t *testing.T) {
 // sign-in or git access only within one user. A lend made before the team tier by another
 // user's machine is neither shown nor used.
 func TestLendsAndWindowsStayWithinOneUser(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	ctx := context.Background()
 	_, alexWindow := p.client("Alex's Mac")
@@ -489,11 +508,11 @@ func TestLendsAndWindowsStayWithinOneUser(t *testing.T) {
 	}
 
 	// Sam cannot name Alex's machine as a lender.
-	if e := callError(t, sam.window, "", "hosts/lendSignIn", wire.LendSignIn{Host: wire.HostID(samBox), From: wire.HostID(alexMac),
+	if e := callError(t, sam.window, "", "hosts/lendSignIn", wire.LendSignIn{Host: wire.MachineRef(samBox), From: wire.MachineRef(alexMac),
 		Runtime: "claude", Allowed: true}); !strings.Contains(e, "-32091") {
 		t.Fatalf("a lend from another user's machine: %s", e)
 	}
-	call(t, sam.window, "", "hosts/lendSignIn", wire.LendSignIn{Host: wire.HostID(samBox), From: wire.HostID(samMac),
+	call(t, sam.window, "", "hosts/lendSignIn", wire.LendSignIn{Host: wire.MachineRef(samBox), From: wire.MachineRef(samMac),
 		Runtime: "codex", Allowed: true})
 
 	// A lend from before the team tier, from Alex's Mac, is not shown and not used.
@@ -503,7 +522,7 @@ func TestLendsAndWindowsStayWithinOneUser(t *testing.T) {
 	if err := p.s.Records().SaveHost(ctx, record); err != nil {
 		t.Fatal(err)
 	}
-	var hosts []wire.ControlHost
+	var hosts []wire.ControlMachine
 	json.Unmarshal(call(t, sam.window, "", "hosts/list", nil), &hosts)
 	for _, h := range hosts {
 		if string(h.ID) != samBox {
@@ -527,6 +546,7 @@ func TestLendsAndWindowsStayWithinOneUser(t *testing.T) {
 // that is not pushed, and their registered machines. Only an admin may ask. Remove then
 // takes every machine off at once.
 func TestRemoveFirstSaysWhatWorkIsNotPushed(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	ctx := context.Background()
 	_, alexWindow := p.client("Alex's Mac")

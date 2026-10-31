@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="14" fill="#e8eaed">
+  <rect width="1440" height="900" fill="#1c1d20"/>
+  <rect width="1440" height="54" fill="#26282c"/><line x1="0" y1="54" x2="1440" y2="54" stroke="#3a3e44"/>
+  <text x="24" y="33" font-weight="700" font-size="16" fill="#e8eaed">acme control plane</text>
+  <g font-size="14" fill="#e8eaed">
+    <text x="216" y="33">Overview</text>
+    <text x="300" y="33">Agents</text><rect x="352" y="20" width="20" height="16" rx="8" fill="#b4232b"/><text x="358" y="32" fill="#fff" font-size="11">2</text>
+    <text x="392" y="33">Machines</text>
+    <text x="474" y="33">Workflows</text>
+    <text x="562" y="33">Reports</text>
+    <text x="636" y="33">Requests</text><rect x="700" y="20" width="20" height="16" rx="8" fill="#b4232b"/><text x="706" y="32" fill="#fff" font-size="11">3</text>
+    <text x="740" y="33">People</text>
+    <text x="804" y="33">Settings</text>
+  </g>
+  <rect x="386" y="51" width="72" height="3" fill="#7fb0ff"/>
+  <rect x="1040" y="13" width="320" height="28" rx="6" fill="#1c1d20" stroke="#3a3e44"/>
+  <text x="1054" y="32" font-size="13" fill="#9aa0a8">Search or jump to…</text>
+  <rect x="1332" y="18" width="18" height="18" rx="4" fill="none" stroke="#3a3e44"/><text x="1338" y="31" font-size="11" fill="#9aa0a8">/</text>
+  <circle cx="1394" cy="27" r="14" fill="#7fb0ff"/><text x="1388" y="32" font-size="13" font-weight="700" fill="#26282c">B</text>
+  <!-- Side navigation -->
+  <rect x="0" y="55" width="240" height="845" fill="#161719"/><line x1="240" y1="55" x2="240" y2="900" stroke="#3a3e44"/>
+  <g font-size="13">
+    <text x="24" y="90" font-size="11" font-weight="600" fill="#9aa0a8" letter-spacing="0.6">MACHINES</text>
+    <rect x="0" y="102" width="240" height="32" fill="#33363b"/><rect x="0" y="102" width="3" height="32" fill="#7fb0ff"/>
+    <text x="24" y="123" font-weight="700">Machines</text>
+    <text x="24" y="155">Runtimes</text>
+    <text x="24" y="187">Resources</text>
+    <text x="24" y="219">Worktrees</text>
+    <text x="24" y="251">MCP Servers</text>
+  </g>
+  <!-- Header: breadcrumb, title, actions -->
+  <text x="272" y="94" font-size="12" fill="#7fb0ff">Machines</text><text x="330" y="94" font-size="12" fill="#9aa0a8">›  Machines</text>
+  <text x="272" y="124" font-size="22" font-weight="700">Machines</text>
+  <rect x="1146" y="102" width="128" height="32" rx="6" fill="#26282c" stroke="#3a3e44"/><text x="1166" y="123" font-size="13">Export CSV</text>
+  <rect x="1286" y="102" width="130" height="32" rx="6" fill="#7fb0ff"/><text x="1304" y="123" font-size="13" font-weight="600" fill="#1c1d20">Add Machine</text>
+  <!-- Filter row -->
+  <rect x="272" y="152" width="260" height="30" rx="6" fill="#26282c" stroke="#3a3e44"/><text x="284" y="172" font-size="13" fill="#9aa0a8">Filter machines</text>
+  <rect x="544" y="152" width="150" height="30" rx="6" fill="#26282c" stroke="#3a3e44"/><text x="556" y="172" font-size="13">State: Any  ▾</text>
+  <text x="1416" y="172" text-anchor="end" font-size="13" fill="#9aa0a8">5 machines</text>
+  <!-- Table -->
+  <g font-size="13">
+    <rect x="272" y="196" width="1144" height="36" fill="#26282c" stroke="#3a3e44"/>
+    <g font-size="12" font-weight="600" fill="#9aa0a8">
+      <text x="288" y="219" fill="#e8eaed">Name ▲</text><text x="520" y="219">State</text><text x="700" y="219">Platform</text><text x="880" y="219">Version</text><text x="1120" y="219" text-anchor="end">Running</text><text x="1400" y="219" text-anchor="end">Last seen</text>
+    </g>
+    <g>
+      <rect x="272" y="232" width="1144" height="40" fill="#1c1d20"/>
+      <text x="288" y="257" font-weight="600">bea-mbp</text><text x="520" y="257" fill="#8bc6a7">● Online</text><text x="700" y="257">macOS 27</text><text x="880" y="257">0.14.0</text><text x="1120" y="257" text-anchor="end">4</text><text x="1400" y="257" text-anchor="end" fill="#9aa0a8">now</text>
+      <line x1="272" y1="272" x2="1416" y2="272" stroke="#3a3e44"/>
+      <rect x="272" y="272" width="1144" height="40" fill="#33363b"/>
+      <text x="288" y="297" font-weight="600">build-01</text><text x="520" y="297" fill="#8bc6a7">● Online</text><text x="700" y="297">Linux · Docker</text><text x="880" y="297">0.14.0</text><text x="1120" y="297" text-anchor="end">2</text><text x="1400" y="297" text-anchor="end" fill="#9aa0a8">now</text>
+      <line x1="272" y1="312" x2="1416" y2="312" stroke="#3a3e44"/>
+      <text x="288" y="337" font-weight="600">build-02</text><text x="520" y="337" fill="#8bc6a7">● Online</text><text x="700" y="337">Linux · ssh</text><text x="880" y="337">0.14.0</text><text x="1120" y="337" text-anchor="end">0</text><text x="1400" y="337" text-anchor="end" fill="#9aa0a8">now</text>
+      <line x1="272" y1="352" x2="1416" y2="352" stroke="#3a3e44"/>
+      <text x="288" y="377" font-weight="600">ci-runner</text><text x="520" y="377" fill="#f0a06b">◐ Starting</text><text x="700" y="377">Linux · GCP</text><text x="880" y="377">0.14.0</text><text x="1120" y="377" text-anchor="end">0</text><text x="1400" y="377" text-anchor="end" fill="#9aa0a8">1 min ago</text>
+      <line x1="272" y1="392" x2="1416" y2="392" stroke="#3a3e44"/>
+      <text x="288" y="417" font-weight="600">sam-mini</text><text x="520" y="417" fill="#f08086">○ Offline</text><text x="700" y="417">macOS 26</text><text x="880" y="417" fill="#f0a06b">0.13.1 · update</text><text x="1120" y="417" text-anchor="end">0</text><text x="1400" y="417" text-anchor="end" fill="#9aa0a8">2 h ago</text>
+      <line x1="272" y1="432" x2="1416" y2="432" stroke="#3a3e44"/>
+    </g>
+  </g>
+  <text x="272" y="470" font-size="12" fill="#9aa0a8">The row under the pointer is washed; a header sorts by its column, again reverses it (▲ ▼). Numbers are right-aligned.</text>
+  <text x="24" y="860" fill="#9aa0a8" font-size="12">Mock for #2142. Machines ▸ Machines for an admin, 1440 px, dark: side navigation with an accent bar, breadcrumb, actions at the title's right, a sortable table.</text>
+</svg>

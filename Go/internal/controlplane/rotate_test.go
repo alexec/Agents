@@ -19,6 +19,7 @@ import (
 // pairs again. A member away at the time takes it when it comes back, after a restart
 // too, until the previous key is let go.
 func TestRotatingTheControlKeyPairsNobodyAgain(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	keeper := kms.File{Path: filepath.Join(root, "control-key")}
 	key, err := keeper.ControlKey(context.Background())
@@ -94,6 +95,7 @@ func TestRotatingTheControlKeyPairsNobodyAgain(t *testing.T) {
 
 // A key handed in has nowhere to keep a new one, and is not rotated.
 func TestAKeyHandedInIsNotRotated(t *testing.T) {
+	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, window := p.client("Window")
 	if e := callError(t, window, "", "control/rotate", map[string]any{}); !strings.Contains(e, "given its key") {
@@ -103,6 +105,7 @@ func TestAKeyHandedInIsNotRotated(t *testing.T) {
 
 // A new key in ok with a proof the previous key's holder did not make is refused.
 func TestANewKeyWithoutItsProofIsRefused(t *testing.T) {
+	t.Parallel()
 	shared := []byte("0123456789abcdef0123456789abcdef")
 	public := publicOf(t, controllink.NewPrivateKey())
 	offer := newKeyFor(shared, public)
@@ -125,6 +128,7 @@ func publicOf(t *testing.T, private []byte) []byte {
 
 // The proof Swift and the page check (ControlAuthTests, auth.test.mjs): the same bytes.
 func TestTheNewKeyProofIsTheClientsOwn(t *testing.T) {
+	t.Parallel()
 	shared := bytes.Repeat([]byte{1}, 32)
 	key := append([]byte{4}, bytes.Repeat([]byte{2}, 64)...)
 	if got := controllink.B64URL(controllink.NewKeyProof(shared, key)); got != "v9-kYG-84IN39u6AMjxueMV9PJ0RFPVWlUAghG140Wg" {

@@ -55,6 +55,14 @@ const (
 	// The control plane could not tell, for now: its store could not be read, or a
 	// handover is filling it. Try again; it says nothing about the member (#81).
 	Unavailable = "unavailable"
+	// The client's person was suspended by their org provider (#1002, D13). The client
+	// keeps its key: it connects again once the suspension ends. A build from before it
+	// reads it as a failed dial.
+	Suspended = "suspended"
+	// The client's key, or its person, holds as many sockets as it may (#2150): too many tabs
+	// open in one browser, say. Try again; the page says to close one (#2194). A build from
+	// before it reads it as a failed dial, as it did unavailable.
+	Crowded = "crowded"
 )
 
 // Refusal is a refused exchange, with its reason.
@@ -131,7 +139,7 @@ func ParseMessage(line string) (Message, bool) {
 
 func knownReason(r string) bool {
 	switch r {
-	case Unknown, Forgotten, Expired, Spent, BadProof, WrongControlPlane, BadMessage, Unavailable:
+	case Unknown, Forgotten, Expired, Spent, BadProof, WrongControlPlane, BadMessage, Unavailable, Suspended:
 		return true
 	}
 	return false

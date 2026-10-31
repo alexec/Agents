@@ -18,7 +18,7 @@ import (
 func TestAChangeWhileAnAgentWorksWaitsForKeepOrUndo(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
 	os.WriteFile(filepath.Join(dir, "a.md"), nil, 0o644)
 	c.call(t, 2, "pins/pin", map[string]any{"folder": folder, "path": "a.md"})
@@ -31,7 +31,7 @@ func TestAChangeWhileAnAgentWorksWaitsForKeepOrUndo(t *testing.T) {
 	if f := d.readPins(dir); len(f.pins) != 1 {
 		t.Fatalf("the change was used: %+v", f.pins)
 	}
-	if e := c.callError(t, 3, "pins/unpin", map[string]any{"folder": folder, "path": "a.md"}); !strings.HasSuffix(e.Message, "is waiting for the person to keep or undo the change in Project Settings.") {
+	if e := c.callError(t, 3, "pins/unpin", map[string]any{"folder": folder, "path": "a.md"}); !strings.HasSuffix(e.Message, "is waiting for the person to keep or undo the change in Folder Settings.") {
 		t.Fatal(e.Message)
 	}
 	s, _ := d.summaryFor(dir)
@@ -43,12 +43,12 @@ func TestAChangeWhileAnAgentWorksWaitsForKeepOrUndo(t *testing.T) {
 		t.Fatalf("%+v", n)
 	}
 	var reading wire.GuardedChangeReading
-	json.Unmarshal(c.call(t, 4, "projects/readGuardedChange", map[string]any{"folder": folder, "path": ".agents/pins.json"}), &reading)
+	json.Unmarshal(c.call(t, 4, "folders/readGuardedChange", map[string]any{"folder": folder, "path": ".agents/pins.json"}), &reading)
 	if reading.Approved == nil || *reading.Approved != string(approved) || reading.Current == nil || len(reading.Lines) == 0 {
 		t.Fatalf("%+v", reading)
 	}
 	// Undo, with the digest that was looked at: the approved copy goes back.
-	if e := c.callError(t, 5, "projects/undoGuardedChange", map[string]any{"folder": folder, "path": ".agents/pins.json", "digest": "stale"}); e.Code != wire.FailureNotChanged {
+	if e := c.callError(t, 5, "folders/undoGuardedChange", map[string]any{"folder": folder, "path": ".agents/pins.json", "digest": "stale"}); e.Code != wire.FailureNotChanged {
 		t.Fatalf("%+v", e)
 	}
 	c.call(t, 6, "approvals/answer", map[string]any{"folder": folder, "kind": "file", "key": ".agents/pins.json", "digest": reading.Digest, "action": "deny"})
@@ -61,8 +61,8 @@ func TestAChangeWhileAnAgentWorksWaitsForKeepOrUndo(t *testing.T) {
 	// Changed again and kept: the change is used from now on.
 	os.WriteFile(filepath.Join(dir, ".agents", "pins.json"), []byte(`{"pins":[]}`), 0o644)
 	d.readPins(dir)
-	json.Unmarshal(c.call(t, 7, "projects/readGuardedChange", map[string]any{"folder": folder, "path": ".agents/pins.json"}), &reading)
-	c.call(t, 8, "projects/keepGuardedChange", map[string]any{"folder": folder, "path": ".agents/pins.json", "digest": reading.Digest})
+	json.Unmarshal(c.call(t, 7, "folders/readGuardedChange", map[string]any{"folder": folder, "path": ".agents/pins.json"}), &reading)
+	c.call(t, 8, "folders/keepGuardedChange", map[string]any{"folder": folder, "path": ".agents/pins.json", "digest": reading.Digest})
 	if f := d.readPins(dir); len(f.pins) != 0 {
 		t.Fatalf("%+v", f.pins)
 	}
@@ -71,7 +71,7 @@ func TestAChangeWhileAnAgentWorksWaitsForKeepOrUndo(t *testing.T) {
 func TestThePersonsOwnEditIsTheirs(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	os.WriteFile(filepath.Join(dir, "a.md"), nil, 0o644)
 	c.call(t, 2, "pins/pin", map[string]any{"folder": store.FolderURL(dir), "path": "a.md"})
 	os.WriteFile(filepath.Join(dir, ".agents", "pins.json"), []byte(`{"pins":[]}`), 0o644)
@@ -84,22 +84,21 @@ func TestAPullsChangeWaits(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
 	dir := repo(t)
-	c.call(t, 1, "projects/add", map[string]any{"folder": store.FolderURL(dir)})
+	c.call(t, 1, "folders/add", map[string]any{"folder": store.FolderURL(dir)})
 	os.MkdirAll(filepath.Join(dir, ".agents"), 0o755)
-	os.WriteFile(filepath.Join(dir, ".agents", "project.json"), []byte(`{"diskSpace":{"lowGB":30}}`), 0o644)
-	d.checkGuarded(dir, ".agents/project.json", nil) // first seen: approved
+	os.WriteFile(filepath.Join(dir, ".agents", "folder.json"), []byte(`{"diskSpace":{"lowGB":30}}`), 0o644)
+	d.checkGuarded(dir, ".agents/folder.json", nil) // first seen: approved
 	pulled := []byte(`{"diskSpace":{"lowGB":90}}`)
-	os.WriteFile(filepath.Join(dir, ".agents", "project.json"), pulled, 0o644)
-	git(dir, "add", ".agents/project.json")
+	os.WriteFile(filepath.Join(dir, ".agents", "folder.json"), pulled, 0o644)
+	git(dir, "add", ".agents/folder.json")
 	git(dir, "commit", "-q", "-m", "pulled")
+	d.checkGuarded(dir, ".agents/folder.json", nil)
 	s, _ := d.summaryFor(dir)
-	d.checkGuarded(dir, ".agents/project.json", nil)
-	s, _ = d.summaryFor(dir)
 	if len(s.GuardedChanges) != 1 || !s.GuardedChanges[0].ByGit || s.Approvals[0].Line != "Changed with the last pull" ||
-		s.Project.DiskSpace == nil || *s.Project.DiskSpace.LowGB != 30 {
-		t.Fatalf("%+v %+v %+v", s.GuardedChanges, s.Approvals, s.Project.DiskSpace)
+		s.Folder.DiskSpace == nil || *s.Folder.DiskSpace.LowGB != 30 {
+		t.Fatalf("%+v %+v %+v", s.GuardedChanges, s.Approvals, s.Folder.DiskSpace)
 	}
-	if e := c.callError(t, 2, "projects/setDiskSpace", map[string]any{"folder": store.FolderURL(dir), "diskSpace": map[string]any{"lowGB": 40}}); !strings.HasPrefix(e.Message, "The disk space lines were not changed: ") {
+	if e := c.callError(t, 2, "folders/setDiskSpace", map[string]any{"folder": store.FolderURL(dir), "diskSpace": map[string]any{"lowGB": 40}}); !strings.HasPrefix(e.Message, "The disk space lines were not changed: ") {
 		t.Fatal(e.Message)
 	}
 }
@@ -112,5 +111,24 @@ func TestDiffLines(t *testing.T) {
 	}
 	if strings.Join(s, " ") != "same:a removed:b added:B same:c added:d" {
 		t.Fatal(s)
+	}
+}
+
+// A change waiting on a file the app no longer keeps goes when the records are read (#2680).
+func TestAFileTheAppNoLongerKeepsWaitsForNothing(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := folder(t, c, 1)
+	recs := guardedRecords{States: []guardedState{
+		{Folder: store.FolderURL(dir), Path: ".agents/project.json", Pending: &guardedPending{ChangedByIDs: []wire.UUID{}, ChangedBy: []string{"Tidy"}}},
+		{Folder: store.FolderURL(dir), Path: ".agents/pins.json", Pending: &guardedPending{ChangedByIDs: []wire.UUID{}, ChangedBy: []string{"Tidy"}}},
+	}}
+	b, _ := json.Marshal(recs)
+	os.WriteFile(d.guardedFile(), b, 0o644)
+	d.guardedMu.Lock()
+	d.guarded = nil
+	d.guardedMu.Unlock()
+	if s, _ := d.summaryFor(dir); len(s.GuardedChanges) != 1 || s.GuardedChanges[0].Path != ".agents/pins.json" {
+		t.Fatalf("%+v", s.GuardedChanges)
 	}
 }

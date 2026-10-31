@@ -176,9 +176,9 @@ func TestRenameAndHandBack(t *testing.T) {
 func TestLabels(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	project := t.TempDir()
+	folder := t.TempDir()
 	mk := func(labels ...string) wire.UUID {
-		return seeded(t, d, project, func(a *wire.Agent) {
+		return seeded(t, d, folder, func(a *wire.Agent) {
 			for _, l := range labels {
 				a.Labels = append(a.Labels, wire.SessionLabel{Value: l, Owner: wire.SessionLabelOwnerAgent, AddedAt: now()})
 			}
@@ -201,7 +201,7 @@ func TestLabels(t *testing.T) {
 		t.Fatal(e.Message)
 	}
 	var words []string
-	json.Unmarshal(c.call(t, 5, "agents/labelVocabulary", map[string]any{"folder": store.FolderURL(project)}), &words)
+	json.Unmarshal(c.call(t, 5, "agents/labelVocabulary", map[string]any{"folder": store.FolderURL(folder)}), &words)
 	if strings.Join(words, ",") != "Release,bug" {
 		t.Fatal(words)
 	}
@@ -275,26 +275,26 @@ func TestTouchedPaths(t *testing.T) {
 	}
 }
 
-// A successor in the project folder carries on the work of one whose folder went, and the
+// A successor in the folder carries on the work of one whose folder went, and the
 // same start sent again is the agent it made.
-func TestContinueInProject(t *testing.T) {
+func TestContinueInFolder(t *testing.T) {
 	fakeRuntimes(t)
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	project := t.TempDir()
+	folder := t.TempDir()
 	title := "Old work"
-	old := seeded(t, d, filepath.Join(project, "gone"), func(a *wire.Agent) {
+	old := seeded(t, d, filepath.Join(folder, "gone"), func(a *wire.Agent) {
 		a.Title = &title
 		a.Labels = []wire.SessionLabel{{Value: "mine", Owner: wire.SessionLabelOwnerPerson, AddedAt: now()},
 			{Value: "its", Owner: wire.SessionLabelOwnerAgent, AddedAt: now()}}
-		a.Worktree = &wire.AgentWorktree{Project: store.FolderURL(project)}
+		a.Worktree = &wire.AgentWorktree{Folder: store.FolderURL(folder)}
 	})
 	request := store.NewUUID()
 	var id wire.UUID
-	json.Unmarshal(c.call(t, 1, "agents/continueInProject", map[string]any{"agentID": old.ID, "text": "and the tests", "requestID": request}), &id)
+	json.Unmarshal(c.call(t, 1, "agents/continueInFolder", map[string]any{"agentID": old.ID, "text": "and the tests", "requestID": request}), &id)
 	waitFor(t, "finished", func() bool { return d.Store.Agent(id).State == wire.AgentStateFinished })
 	a := d.Store.Agent(id)
-	if store.FolderPath(a.Cwd) != project || *a.Title != title || len(a.Labels) != 1 || a.Labels[0].Value != "mine" {
+	if store.FolderPath(a.Cwd) != folder || *a.Title != title || len(a.Labels) != 1 || a.Labels[0].Value != "mine" {
 		t.Fatalf("%+v", a)
 	}
 	said := userMessages(d, id)
@@ -303,7 +303,7 @@ func TestContinueInProject(t *testing.T) {
 		t.Fatalf("%q", said)
 	}
 	var again wire.UUID
-	json.Unmarshal(c.call(t, 2, "agents/continueInProject", map[string]any{"agentID": old.ID, "requestID": request}), &again)
+	json.Unmarshal(c.call(t, 2, "agents/continueInFolder", map[string]any{"agentID": old.ID, "requestID": request}), &again)
 	if again != id {
 		t.Fatalf("a second agent %s", again)
 	}

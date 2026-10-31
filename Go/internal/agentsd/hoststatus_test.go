@@ -12,7 +12,7 @@ import (
 
 type toldStatus struct {
 	mu   sync.Mutex
-	sent []wire.HostStatus
+	sent []wire.MachineStatus
 }
 
 func (c *toldStatus) tell(method string, params any) {
@@ -21,22 +21,22 @@ func (c *toldStatus) tell(method string, params any) {
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.sent = append(c.sent, params.(wire.HostStatus))
+	c.sent = append(c.sent, params.(wire.MachineStatus))
 }
 
-func (c *toldStatus) all() []wire.HostStatus {
+func (c *toldStatus) all() []wire.MachineStatus {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return append([]wire.HostStatus(nil), c.sent...)
+	return append([]wire.MachineStatus(nil), c.sent...)
 }
 
-// host/status (#1387), as DaemonCore+HostStatus: said to the control plane when the uplink
+// host/status (#1387), as DaemonCore+MachineStatus: said to the control plane when the uplink
 // comes, again only when it changes, and again whole when the uplink comes back; busy while
 // an agent works, idle once none does, with the next scheduled workflow.
 func TestAHostTellsItsControlPlaneWhetherItIsIdle(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	dir := project(t, c, 1)
+	dir := folder(t, c, 1)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "nightly.md"), []byte("---\nname: Nightly\non:\n  - schedule:\n      at: \":00\"\n---\nTidy up.\n"), 0o644)
 	approveAll(t, c, store.FolderURL(dir))

@@ -49,22 +49,29 @@ type ClientRecord struct {
 	// for the control plane to push to when no Mac host relays its notices. Never on the
 	// wire to another client.
 	PushToken *PushToken
-	// The push tokens of its Live Activities (#1744), one for each session it shows,
-	// newest last, held to MostActivityTokens. Set only by the device, as PushToken is.
+	// The push tokens of its Live Activity (#1744), one for each session it speaks for
+	// (#2991), newest last, held to MostActivityTokens. Set only by the device, as PushToken is.
 	ActivityTokens []ActivityToken
+	// A browser's own Web Push subscription (#1486), set only by that browser over its
+	// own session, as PushToken is: where the control plane posts its notices.
+	WebPush *WebPushSubscription
 	// When its key stops being accepted (#997, spec 736 FR-042); renewed while in use.
 	// None on a record paired before #997, until the sweep or its next connection sets it.
 	Expires *Stamp
 	Extra   Extra
 }
 
-// ActivityToken is one Live Activity's push token on a device: for which session, from
-// which APNs, and when its turn began, where the activity's timer counts from.
+// ActivityToken is a Live Activity's push token on a device for one session it speaks
+// for: from which APNs, and when the session's turn began, where the timer counts from. A
+// device shows one activity for every turn sent from it (#2991), so one token is here once
+// for each of those sessions.
 type ActivityToken struct {
 	Agent       string    `json:"agent"`
 	Token       string    `json:"token"`
 	Environment string    `json:"environment"`
 	StartedAt   wire.Date `json:"startedAt"`
+	// The session's phase as its host last said it (wire.TurnPhase); none is working.
+	Phase string `json:"phase,omitempty"`
 	// When the device gave it. A Live Activity lives at most 12 hours; one older is
 	// dropped.
 	SetAt Stamp `json:"setAt"`
@@ -78,6 +85,14 @@ const MostActivityTokens = 16
 type PushToken struct {
 	Token       string `json:"token"`
 	Environment string `json:"environment"`
+}
+
+// WebPushSubscription is a browser's push service endpoint and the two keys its pushes are
+// sealed with (RFC 8291): the P-256 public key, X9.63, and the 16-byte auth secret.
+type WebPushSubscription struct {
+	Endpoint string `json:"endpoint"`
+	P256dh   []byte `json:"p256dh"`
+	Auth     []byte `json:"auth"`
 }
 
 type clientJSON struct {
@@ -96,15 +111,16 @@ type clientJSON struct {
 	KnownEpoch  *int       `json:"knownEpoch,omitempty"`
 	PushToken   *PushToken `json:"pushToken,omitempty"`
 	// Activities: the push tokens of its Live Activities (#1744).
-	Activities []ActivityToken `json:"activityTokens,omitempty"`
-	Expires    *Stamp          `json:"expires,omitempty"`
+	Activities []ActivityToken      `json:"activityTokens,omitempty"`
+	Expires    *Stamp               `json:"expires,omitempty"`
+	WebPush    *WebPushSubscription `json:"webPush,omitempty"`
 }
 
 // MarshalJSON writes grant: operator, which an older copy needs to read the record at
 // all, and which tells it the truth.
 func (c ClientRecord) MarshalJSON() ([]byte, error) {
 	return encodeKeeping(clientJSON{c.ID, c.Name, c.Kind, c.PublicKey, LegacyGrant, c.Paired, c.LastSeen, c.MayNotify,
-		c.Owner, c.Rev, c.Forgotten, c.ForgottenAt, c.KnownEpoch, c.PushToken, c.ActivityTokens, c.Expires}, c.Extra)
+		c.Owner, c.Rev, c.Forgotten, c.ForgottenAt, c.KnownEpoch, c.PushToken, c.ActivityTokens, c.Expires, c.WebPush}, c.Extra)
 }
 
 // UnmarshalJSON does not read the grant: every client may do everything (#111).
@@ -123,7 +139,7 @@ func (c *ClientRecord) UnmarshalJSON(data []byte) error {
 		j.Kind = KindUnknown
 	}
 	*c = ClientRecord{strings.ToUpper(j.ID), j.Name, j.Kind, j.PublicKey, j.Paired, j.LastSeen, j.MayNotify, j.Owner,
-		j.Rev, j.Forgotten, j.ForgottenAt, j.KnownEpoch, j.PushToken, j.Activities, j.Expires, extra}
+		j.Rev, j.Forgotten, j.ForgottenAt, j.KnownEpoch, j.PushToken, j.Activities, j.WebPush, j.Expires, extra}
 	return nil
 }
 
@@ -131,8 +147,8 @@ func (c *ClientRecord) UnmarshalJSON(data []byte) error {
 // said; not the Mac's window, and not a browser, which has no mailbox (071).
 func (c *ClientRecord) IsDevice() bool { return c.Kind != KindMac && c.Kind != KindBrowser }
 
-// HostRecord is a machine that runs agents (v1/hosts/<id>.json).
-type HostRecord struct {
+// MachineRecord is a machine that runs agents (v1/machines/<id>.json).
+type MachineRecord struct {
 	ID   string
 	Name string
 	// For a host that connects out.
@@ -155,7 +171,7 @@ type HostRecord struct {
 	ForgottenAt *Stamp
 	KnownEpoch  *int
 	// Set before #656; cleared when the host next says hello.
-	DetectProjects *bool
+	DetectFolders *bool
 	// The provider's workspace this host runs on (#691), as it was written.
 	Workspace json.RawMessage
 	// When its key stops being accepted (#997), as ClientRecord.Expires.
@@ -164,45 +180,45 @@ type HostRecord struct {
 }
 
 type hostJSON struct {
-	ID             string            `json:"id"`
-	Name           string            `json:"name"`
-	PublicKey      []byte            `json:"publicKey,omitempty"`
-	Reach          json.RawMessage   `json:"reach"`
-	Platform       string            `json:"platform"`
-	Version        string            `json:"version"`
-	Installed      bool              `json:"installed"`
-	MachineID      *string           `json:"machineID,omitempty"`
-	Relay          *bool             `json:"relay,omitempty"`
-	SignInFrom     map[string]string `json:"signInFrom,omitempty"`
-	GitFrom        map[string]string `json:"gitFrom,omitempty"`
-	Owner          *string           `json:"owner,omitempty"`
-	Rev            int               `json:"rev"`
-	Forgotten      *bool             `json:"forgotten,omitempty"`
-	ForgottenAt    *Stamp            `json:"forgottenAt,omitempty"`
-	KnownEpoch     *int              `json:"knownEpoch,omitempty"`
-	DetectProjects *bool             `json:"detectProjects,omitempty"`
-	Workspace      json.RawMessage   `json:"workspace,omitempty"`
-	Expires        *Stamp            `json:"expires,omitempty"`
+	ID            string            `json:"id"`
+	Name          string            `json:"name"`
+	PublicKey     []byte            `json:"publicKey,omitempty"`
+	Reach         json.RawMessage   `json:"reach"`
+	Platform      string            `json:"platform"`
+	Version       string            `json:"version"`
+	Installed     bool              `json:"installed"`
+	MachineID     *string           `json:"machineID,omitempty"`
+	Relay         *bool             `json:"relay,omitempty"`
+	SignInFrom    map[string]string `json:"signInFrom,omitempty"`
+	GitFrom       map[string]string `json:"gitFrom,omitempty"`
+	Owner         *string           `json:"owner,omitempty"`
+	Rev           int               `json:"rev"`
+	Forgotten     *bool             `json:"forgotten,omitempty"`
+	ForgottenAt   *Stamp            `json:"forgottenAt,omitempty"`
+	KnownEpoch    *int              `json:"knownEpoch,omitempty"`
+	DetectFolders *bool             `json:"detectFolders,omitempty"`
+	Workspace     json.RawMessage   `json:"workspace,omitempty"`
+	Expires       *Stamp            `json:"expires,omitempty"`
 }
 
-// dialOut is HostReach.dialOut: every host connects out now (058, T073); a record that
+// dialOut is MachineReach.dialOut: every host connects out now (058, T073); a record that
 // says anything else is read as one that dials out.
 var dialOut = json.RawMessage(`{"dialOut":{}}`)
 
-func (h HostRecord) MarshalJSON() ([]byte, error) {
+func (h MachineRecord) MarshalJSON() ([]byte, error) {
 	return encodeKeeping(hostJSON{h.ID, h.Name, h.PublicKey, dialOut, h.Platform, h.Version, h.Installed, h.MachineID,
-		h.Relay, h.SignInFrom, h.GitFrom, h.Owner, h.Rev, h.Forgotten, h.ForgottenAt, h.KnownEpoch, h.DetectProjects,
+		h.Relay, h.SignInFrom, h.GitFrom, h.Owner, h.Rev, h.Forgotten, h.ForgottenAt, h.KnownEpoch, h.DetectFolders,
 		h.Workspace, h.Expires}, h.Extra)
 }
 
-func (h *HostRecord) UnmarshalJSON(data []byte) error {
+func (h *MachineRecord) UnmarshalJSON(data []byte) error {
 	var j hostJSON
 	extra, err := decodeKeeping(data, &j, "id", "name", "reach", "platform", "version", "installed", "rev")
 	if err != nil {
 		return err
 	}
-	*h = HostRecord{j.ID, j.Name, j.PublicKey, j.Platform, j.Version, j.Installed, j.MachineID, j.Relay, j.SignInFrom,
-		j.GitFrom, j.Owner, j.Rev, j.Forgotten, j.ForgottenAt, j.KnownEpoch, j.DetectProjects, j.Workspace, j.Expires, extra}
+	*h = MachineRecord{j.ID, j.Name, j.PublicKey, j.Platform, j.Version, j.Installed, j.MachineID, j.Relay, j.SignInFrom,
+		j.GitFrom, j.Owner, j.Rev, j.Forgotten, j.ForgottenAt, j.KnownEpoch, j.DetectFolders, j.Workspace, j.Expires, extra}
 	return nil
 }
 
@@ -228,8 +244,8 @@ type Settings struct {
 	Owner      *string
 	Created    *Stamp
 	Rev        *int
-	// Where a host added from now on has its projects found (#429), as written.
-	ProjectDetection json.RawMessage
+	// Where a host added from now on has its folders found (#429), as written.
+	FolderDetection json.RawMessage
 	// Chat apps that reach the person's agents (#1012), as written.
 	Channels json.RawMessage
 	// How many days audit entries are kept (#996); nil is the default, 90.
@@ -246,30 +262,30 @@ type Settings struct {
 }
 
 type settingsJSON struct {
-	Name             string          `json:"name"`
-	Port             int             `json:"port"`
-	HomeHost         *string         `json:"homeHost,omitempty"`
-	MachineID        string          `json:"machineID"`
-	URL              *string         `json:"url,omitempty"`
-	Pin              *string         `json:"pin,omitempty"`
-	Endpoints        []Endpoint      `json:"endpoints,omitempty"`
-	Epoch            *int            `json:"epoch,omitempty"`
-	ControlKey       []byte          `json:"controlKey,omitempty"`
-	Owner            *string         `json:"owner,omitempty"`
-	Created          *Stamp          `json:"created,omitempty"`
-	Rev              *int            `json:"rev,omitempty"`
-	ProjectDetection json.RawMessage `json:"projectDetection,omitempty"`
-	Channels         json.RawMessage `json:"channels,omitempty"`
-	AuditDays        *int            `json:"auditDays,omitempty"`
-	AuditDaysBefore  *int            `json:"auditDaysBefore,omitempty"`
-	AuditShortened   *Stamp          `json:"auditShortened,omitempty"`
-	PreviousKey      []byte          `json:"previousKey,omitempty"`
-	RotatedAt        *Stamp          `json:"rotatedAt,omitempty"`
+	Name            string          `json:"name"`
+	Port            int             `json:"port"`
+	HomeHost        *string         `json:"homeHost,omitempty"`
+	MachineID       string          `json:"machineID"`
+	URL             *string         `json:"url,omitempty"`
+	Pin             *string         `json:"pin,omitempty"`
+	Endpoints       []Endpoint      `json:"endpoints,omitempty"`
+	Epoch           *int            `json:"epoch,omitempty"`
+	ControlKey      []byte          `json:"controlKey,omitempty"`
+	Owner           *string         `json:"owner,omitempty"`
+	Created         *Stamp          `json:"created,omitempty"`
+	Rev             *int            `json:"rev,omitempty"`
+	FolderDetection json.RawMessage `json:"folderDetection,omitempty"`
+	Channels        json.RawMessage `json:"channels,omitempty"`
+	AuditDays       *int            `json:"auditDays,omitempty"`
+	AuditDaysBefore *int            `json:"auditDaysBefore,omitempty"`
+	AuditShortened  *Stamp          `json:"auditShortened,omitempty"`
+	PreviousKey     []byte          `json:"previousKey,omitempty"`
+	RotatedAt       *Stamp          `json:"rotatedAt,omitempty"`
 }
 
 func (s Settings) MarshalJSON() ([]byte, error) {
 	return encodeKeeping(settingsJSON{s.Name, s.Port, s.HomeHost, s.MachineID, s.URL, s.Pin, s.Endpoints, s.Epoch,
-		s.ControlKey, s.Owner, s.Created, s.Rev, s.ProjectDetection, s.Channels, s.AuditDays, s.AuditDaysBefore, s.AuditShortened, s.PreviousKey, s.RotatedAt}, s.Extra)
+		s.ControlKey, s.Owner, s.Created, s.Rev, s.FolderDetection, s.Channels, s.AuditDays, s.AuditDaysBefore, s.AuditShortened, s.PreviousKey, s.RotatedAt}, s.Extra)
 }
 
 func (s *Settings) UnmarshalJSON(data []byte) error {
@@ -279,7 +295,7 @@ func (s *Settings) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*s = Settings{j.Name, j.Port, j.HomeHost, j.MachineID, j.URL, j.Pin, j.Endpoints, j.Epoch, j.ControlKey, j.Owner,
-		j.Created, j.Rev, j.ProjectDetection, j.Channels, j.AuditDays, j.AuditDaysBefore, j.AuditShortened, j.PreviousKey, j.RotatedAt, extra}
+		j.Created, j.Rev, j.FolderDetection, j.Channels, j.AuditDays, j.AuditDaysBefore, j.AuditShortened, j.PreviousKey, j.RotatedAt, extra}
 	return nil
 }
 
@@ -295,7 +311,7 @@ func NewUUID() string {
 // NewPersonID is PersonID.make: a UUID in lower case.
 func NewPersonID() string { return strings.ToLower(NewUUID()) }
 
-// NewHostID is HostID.make: eight lower-case letters and digits, never "mac".
+// NewHostID is MachineRef.make: eight lower-case letters and digits, never "mac".
 func NewHostID() string {
 	const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
 	for {

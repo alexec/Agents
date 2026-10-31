@@ -4,14 +4,14 @@ import Foundation
 // not collide in DaemonAPI.swift.
 
 public extension DaemonAPI.Method {
-    /// Start an agent on a runtime with the assessment brief, in a project.
+    /// Start an agent on a runtime with the assessment brief, in a folder.
     static let runtimesAssess = "runtimes/assess"
     /// Score an assessing agent from the daemon's own record, now.
     static let runtimesAssessment = "runtimes/assessment"
 }
 
 public extension DaemonAPI {
-    /// `runtimes/assess`: which runtime, and which project the assessment works in.
+    /// `runtimes/assess`: which runtime, and which folder the assessment works in.
     struct AssessRuntimeRequest: Codable, Sendable, Hashable {
         public var runtimeID: String
         public var folder: URL

@@ -2,6 +2,7 @@ package githubmcp
 
 import (
 	"context"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -15,10 +16,42 @@ type PR struct {
 	Title  string
 	Branch string
 	URL    string
+	// Fixes is the issues its body says it closes (#2349), where the list read its body.
+	Fixes []string
 }
 
 func (p PR) json() map[string]any {
-	return map[string]any{"number": p.Number, "title": p.Title, "branch": p.Branch, "url": p.URL}
+	j := map[string]any{"number": p.Number, "title": p.Title, "branch": p.Branch, "url": p.URL}
+	if len(p.Fixes) > 0 {
+		j["fixes"] = p.Fixes
+	}
+	return j
+}
+
+// closingPattern is GitHub's keywords that close an issue when the PR merges, then the
+// issue: #12 in the PR's own repo, or owner/repo#12.
+var closingPattern = regexp.MustCompile(`(?i)\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?\s+([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#([0-9]{1,9})\b`)
+
+// mostFixes bounds the issues read from one body.
+const mostFixes = 20
+
+// closingRefs is the issues a PR's body closes, each once, in order: "#12", or
+// "owner/repo#12" for another repo's.
+func closingRefs(body string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, m := range closingPattern.FindAllStringSubmatch(body, -1) {
+		ref := m[1] + "#" + strings.TrimLeft(m[2], "0")
+		if strings.HasSuffix(ref, "#") || seen[strings.ToLower(ref)] {
+			continue
+		}
+		seen[strings.ToLower(ref)] = true
+		out = append(out, ref)
+		if len(out) == mostFixes {
+			break
+		}
+	}
+	return out
 }
 
 // RunRef is a failed run as listed, before its PR and jobs are looked up.
@@ -173,6 +206,26 @@ type GitHub interface {
 	CodeRabbitPRs(ctx context.Context, repo string) ([]ReviewedPR, error)
 	// CodeRabbitComments are CodeRabbit's review comments made at or after since.
 	CodeRabbitComments(ctx context.Context, repo, since string) (comments []CodeRabbitComment, truncated bool, err error)
+	// Yours is what the connection's owner has in the repo (#2034).
+	Yours(ctx context.Context, repo string) (Yours, error)
+}
+
+// Yours is what the connection's owner has in a repo (#2034): their login, their open PRs, the
+// open PRs that ask them for a review, and the open issues assigned to them.
+type Yours struct {
+	Login    string
+	PRs      []int
+	Reviews  []OpenPR
+	Assigned []Issue
+}
+
+func (y Yours) owns(pr int) bool {
+	for _, n := range y.PRs {
+		if n == pr {
+			return true
+		}
+	}
+	return false
 }
 
 // ErrorKind is why a GitHub call failed.

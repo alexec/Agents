@@ -42,8 +42,12 @@ public extension DaemonAPI {
         /// an empty object is `Empty`.
         public static var rows: [Row] {
             [
+                Row(Method.agentConfigEditorFiles, params: AgentConfigEditorRequest.self,
+                    result: [AgentConfigEditorFile].self, kind: .hostRequest),
+                Row(Method.agentConfigEditorSave, params: AgentConfigEditorSaveRequest.self,
+                    result: Empty.self, kind: .hostRequest),
                 // Reading
-                Row(Method.projectsList, params: ProjectsListRequest.self, result: [ProjectSummary].self, kind: .hostRequest),
+                Row(Method.foldersList, params: FoldersListRequest.self, result: [FolderSummary].self, kind: .hostRequest),
                 Row(Method.agentsList, params: ListRequest.self, result: [Agent].self, kind: .hostRequest),
                 Row(Method.agentsTranscript, params: TranscriptRequest.self, result: TranscriptPage.self, kind: .hostRequest),
                 Row(Method.agentsTouchedPaths, params: AgentRequest.self, result: [String].self, kind: .hostRequest),
@@ -57,6 +61,20 @@ public extension DaemonAPI {
                 Row(Method.runtimesAccountProfiles, params: Empty.self, result: [AccountProfile].self, kind: .hostRequest),
                 // Each runtime's sandbox default, for the new session's "Use runtime default (…)" (#257).
                 Row(Method.sandboxState, params: Empty.self, result: SandboxSettings.self, kind: .hostRequest),
+                // Auto (#2658): the order and cells, what it would pick now.
+                Row(Method.autoState, params: Empty.self, result: AutoSettings.self, kind: .hostRequest),
+                Row(Method.autoSet, params: AutoSettings.self, result: AutoSettings.self, kind: .hostRequest),
+                Row(Method.autoMappings, params: Empty.self, result: AutoMappings.self, kind: .hostRequest),
+                Row(Method.autoPreview, params: AutoPreviewRequest.self, result: AutoPreview.self, kind: .hostRequest),
+                // The Mac-wide permission choices shown under Cursor, Grok and OpenCode.
+                Row(Method.clientPermissionsState, params: Empty.self, result: ClientPermissionSettings.self,
+                    kind: .hostRequest),
+                Row(Method.clientPermissionsSet, params: ClientPermissionSettings.self, result: ClientPermissionSettings.self,
+                    kind: .hostRequest),
+                // The organisation's policy as the host follows it, for the red strip and the
+                // composer, and the person's pass-through names, marked (#998).
+                Row(Method.daemonPolicyState, params: Empty.self, result: PolicyState.self, kind: .hostRequest),
+                Row(Method.settingsPassThrough, params: Empty.self, result: PassThroughState.self, kind: .hostRequest),
                 Row(Method.optionsRemembered, params: RememberedOptionsRequest.self, result: [ConfigOption].self,
                     kind: .hostRequest),
                 Row(Method.modesRemembered, params: Empty.self, result: RememberedModes.self, kind: .hostRequest),
@@ -70,15 +88,18 @@ public extension DaemonAPI {
                 Row(Method.agentsResuming, params: Empty.self, result: ResumingResponse.self, kind: .hostRequest),
                 Row(Method.worktreesList, params: WorktreesListRequest.self, result: WorktreesListResponse.self,
                     kind: .hostRequest),
-                // Activity ▸ Worktrees (#790): every project's, with sizes; Remove build output and Remove….
-                Row(Method.worktreesAll, params: Empty.self, result: [ProjectWorktrees].self, kind: .hostRequest),
+                // Activity ▸ Worktrees (#790): every folder's, with sizes; Remove build output and Remove….
+                Row(Method.worktreesAll, params: Empty.self, result: [FolderWorktrees].self, kind: .hostRequest),
                 Row(Method.worktreesRemoveBuildOutput, params: WorktreeRemovalRequest.self, result: BuildOutputRemoved.self,
                     kind: .hostRequest),
                 Row(Method.worktreesCheck, params: WorktreeRemovalRequest.self, result: RemovalCheck.self, kind: .hostRequest),
                 Row(Method.worktreesRemove, params: WorktreeRemovalRequest.self, result: WorktreeRemoved.self,
                     kind: .hostRequest),
                 Row(Method.workflowsList, params: WorkflowsListRequest.self, result: [WorkflowSummary].self, kind: .hostRequest),
+                Row(Method.workflowsWrite, params: WorkflowWriteRequest.self, result: WorkflowSummary.self, kind: .hostRequest),
                 Row(Method.personasList, params: PersonasListRequest.self, result: [Persona].self, kind: .hostRequest),
+                Row(Method.personasFiles, params: PersonasFilesRequest.self, result: [PersonaFile].self, kind: .hostRequest),
+                Row(Method.personasSave, params: PersonaFileSaveRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.filesList, params: FilesListRequest.self, result: DirectoryListing.self, kind: .hostRequest),
                 Row(Method.filesRead, params: FilesReadRequest.self, result: FileReading.self, kind: .hostRequest),
                 Row(Method.changesList, params: ChangesListRequest.self, result: ChangesList.self, kind: .hostRequest),
@@ -90,10 +111,12 @@ public extension DaemonAPI {
                 Row(Method.usageHistory, params: Empty.self, result: UsageHistory.self, kind: .hostRequest),
                 // The Time page (#852).
                 Row(Method.timeHistory, params: Empty.self, result: TimeHistory.self, kind: .hostRequest),
+                // Reports ▸ Features (#2165).
+                Row(Method.reportsFeatures, params: Empty.self, result: FeatureUsage.self, kind: .hostRequest),
                 // The Time page's milestones (#984).
                 Row(Method.milestonesState, params: Empty.self, result: Milestones.self, kind: .hostRequest),
                 Row(Method.eventsList, params: EventsListRequest.self, result: EventsPage.self, kind: .hostRequest),
-                Row(Method.leasesSnapshot, params: Empty.self, result: LeaseSnapshot.self, kind: .hostRequest),
+                Row(Method.resourcesSnapshot, params: Empty.self, result: LeaseSnapshot.self, kind: .hostRequest),
                 // The MCP servers the host runs for every agent (#488), for the Resources page.
                 Row(Method.mcpHosted, params: Empty.self, result: HostedMCPSnapshot.self, kind: .hostRequest),
                 // Every MCP server's health (#753), for the MCP Servers pages, and Check Now.
@@ -102,7 +125,7 @@ public extension DaemonAPI {
                     kind: .hostRequest),
                 // Remove… on a Connectors page (#2154).
                 Row(Method.mcpRemove, params: MCPRemoveRequest.self, result: MCPRemoveAnswer.self, kind: .hostRequest),
-                // The person's connections (#1335) and a project's Connectors set-up (#1336).
+                // The person's connections (#1335) and a folder's Connectors set-up (#1336).
                 Row(Method.connectionsList, params: Empty.self, result: ConnectionsList.self, kind: .hostRequest),
                 Row(Method.connectionsSignIn, params: ConnectionProviderRequest.self, result: ConnectionSignIn.self,
                     kind: .hostRequest),
@@ -118,6 +141,8 @@ public extension DaemonAPI {
                     result: ConnectionTokenAnswer.self, kind: .hostRequest),
                 Row(Method.connectionsDisconnect, params: ConnectionProviderRequest.self,
                     result: ConnectionDisconnectAnswer.self, kind: .hostRequest),
+                Row(Method.connectorsCodespaces, params: ConnectorCodespacesRequest.self, result: ConnectorCodespaces.self,
+                    kind: .hostRequest),
                 Row(Method.connectorsSetup, params: ConnectorSetupRequest.self, result: ConnectorSetup.self, kind: .hostRequest),
                 Row(Method.connectorsSetupSkip, params: ConnectorSkipRequest.self, result: ConnectorSetup.self,
                     kind: .hostRequest),
@@ -129,10 +154,16 @@ public extension DaemonAPI {
                 Row(Method.backupsMake, params: BackupMakeRequest.self, result: BackupState.self, kind: .hostRequest),
                 Row(Method.backupsRestore, params: BackupRestoreRequest.self, result: BackupRestoreResult.self,
                     kind: .hostRequest),
+                // Export and import of an agent or a folder (#1001).
+                Row(Method.agentsExport, params: AgentsExportRequest.self, result: AgentsExport.self, kind: .hostRequest),
+                Row(Method.agentsExportRead, params: SendReadRequest.self, result: SendRead.self, kind: .hostRequest),
+                Row(Method.agentsImportUpload, params: ReceiveUploadRequest.self, result: Empty.self, kind: .hostRequest),
+                Row(Method.agentsImport, params: AgentsImportRequest.self, result: BackupRestoreResult.self,
+                    kind: .hostRequest),
                 // The files the host could not read in this run (#205, #223), as the window's sidebar foot.
                 Row(Method.storeNotes, params: Empty.self, result: StoreNotes.self, kind: .hostRequest),
                 // Pinned pages (#159): the sidebar's rows and the pages themselves.
-                Row(Method.pinsList, params: Empty.self, result: [ProjectPins].self, kind: .hostRequest),
+                Row(Method.pinsList, params: Empty.self, result: [FolderPins].self, kind: .hostRequest),
                 Row(Method.pinsRead, params: PinReadRequest.self, result: FileReading.self, kind: .hostRequest),
                 // A view drawn in the chat (#187): its resource, and what it asks of its server.
                 Row(Method.viewsRead, params: ViewReadRequest.self, result: ViewResource.self, kind: .hostRequest),
@@ -150,6 +181,9 @@ public extension DaemonAPI {
                     kind: .hostRequest),
                 Row(Method.runtimesAddAccount, params: AddAccountRequest.self, result: AccountProfile.self, kind: .hostRequest),
                 Row(Method.runtimesRemoveAccount, params: AccountRequest.self, result: [UUID].self, kind: .hostRequest),
+                // Reaches the Model By (#999), on the runtime's row.
+                Row(Method.runtimesSetDefaultAccount, params: DefaultAccountRequest.self, result: Empty.self,
+                    kind: .hostRequest),
                 Row(Method.agentsPrompt, params: PromptRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsSendNow, params: UnqueueRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsUnqueue, params: UnqueueRequest.self, result: Empty.self, kind: .hostRequest),
@@ -161,6 +195,9 @@ public extension DaemonAPI {
                     kind: .hostRequest),
                 Row(Method.filesComplete, params: FileCompletionRequest.self, result: FileCompletions.self,
                     kind: .hostRequest),
+                Row(Method.lineageWalk, params: LineageNodeRequest.self, result: LineageGraph.self, kind: .hostRequest),
+                Row(Method.lineageCost, params: LineageNodeRequest.self, result: LineageCostRollup.self,
+                    kind: .hostRequest),
                 Row(Method.simulatorsList, params: Empty.self, result: SimulatorList.self, kind: .hostRequest),
                 Row(Method.simulatorsBoot, params: SimulatorRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.simulatorsShutdown, params: SimulatorRequest.self, result: Empty.self, kind: .hostRequest),
@@ -168,7 +205,7 @@ public extension DaemonAPI {
                     kind: .hostRequest),
                 Row(Method.simulatorsTap, params: SimulatorTapRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.simulatorsHome, params: SimulatorRequest.self, result: Empty.self, kind: .hostRequest),
-                Row(Method.agentsStop, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
+                Row(Method.agentsStop, params: AgentStopRequest.self, result: Empty.self, kind: .hostRequest),
                 // Events ▸ Waiting now's ✕, as the window and the Remote have it (#541).
                 Row(Method.eventsCancelWait, params: CancelWaitRequest.self, result: [WaitingAgent].self,
                     kind: .hostRequest),
@@ -176,8 +213,10 @@ public extension DaemonAPI {
                 Row(Method.agentsArchive, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsDelete, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
                 // The ways on from a missing folder (#119), as the window's header has them.
-                Row(Method.agentsContinueInProject, params: ContinueInProjectRequest.self, result: UUID.self,
+                Row(Method.agentsContinueInFolder, params: ContinueInFolderRequest.self, result: UUID.self,
                     kind: .hostRequest),
+                // Continue in New (#999): a session whose account the organisation removed or refuses.
+                Row(Method.agentsContinueInNew, params: ContinueInNewRequest.self, result: UUID.self, kind: .hostRequest),
                 Row(Method.agentsRecreateWorktree, params: AgentRequest.self, result: Agent.self, kind: .hostRequest),
                 Row(Method.agentsContinueWhenBack, params: AgentRequest.self, result: Agent.self, kind: .hostRequest),
                 Row(Method.agentsCancelContinue, params: AgentRequest.self, result: Agent.self, kind: .hostRequest),
@@ -194,18 +233,22 @@ public extension DaemonAPI {
                 Row(Method.agentsSetLabels, params: SetLabelsRequest.self, result: Agent.self, kind: .hostRequest),
                 Row(Method.agentsSetCeiling, params: SetCeilingRequest.self, result: Agent.self, kind: .hostRequest),
                 Row(Method.agentsSetSandbox, params: SetSandboxRequest.self, result: Agent.self, kind: .hostRequest),
+                Row(Method.agentsSetLevels, params: SetLevelsRequest.self, result: Agent.self, kind: .hostRequest),
+                Row(Method.agentsSetClientPermission, params: SetClientPermissionRequest.self, result: Agent.self, kind: .hostRequest),
                 Row(Method.agentsSetOption, params: SetOptionRequest.self, result: [ConfigOption].self, kind: .hostRequest),
                 Row(Method.permissionsAnswer, params: AnswerRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.elicitationsAnswer, params: AnswerElicitationRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsAnswerSandbox, params: AnswerSandboxRequest.self, result: Agent.self, kind: .hostRequest),
                 Row(Method.workflowsRun, params: WorkflowRequest.self, result: WorkflowSummary.self, kind: .hostRequest),
-                // A file put into a project's drop box (#231), as the window's drag and the Remote's pick.
+                // A file put into a folder's drop box (#231), as the window's drag and the Remote's pick.
                 Row(Method.dropboxPut, params: DropboxPutRequest.self, result: DropboxPutResponse.self,
                     kind: .hostRequest),
                 // Pin, Unpin, a drop, and typing on a pinned page (#159), from every client alike.
                 Row(Method.pinsPin, params: PinRequest.self, result: [PinView].self, kind: .hostRequest),
                 Row(Method.pinsUnpin, params: PinPathRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.pinsArrange, params: PinArrangeRequest.self, result: Empty.self, kind: .hostRequest),
+                // Hide and Show on a server's list view (#2032).
+                Row(Method.pinsHideView, params: PinHideViewRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.pinsWrite, params: PinWriteRequest.self, result: Empty.self, kind: .hostRequest),
                 // Pin, Unpin and a drop among pinned sessions (#180), from every client alike.
                 Row(Method.pinsPinSession, params: PinSessionRequest.self, result: Empty.self, kind: .hostRequest),
@@ -237,33 +280,37 @@ public extension DaemonAPI {
                 // Clear on a server's event trigger's missed-events line (#383).
                 Row(Method.workflowsClearMCPMissed, params: WorkflowMCPClearMissedRequest.self,
                     result: WorkflowSummary.self, kind: .hostRequest),
-                // New project (#115): Add Folder…, browsing the host's folders, and Clone Git URL…,
-                // as the window's projects column has them.
+                // New folder (#115): Add Folder…, browsing the host's folders, and Clone Git URL…,
+                // as the window's folders column has them.
                 Row(Method.filesBrowse, params: FilesBrowseRequest.self, result: DirectoryListing.self, kind: .hostRequest),
-                Row(Method.projectsAdd, params: ProjectRequest.self, result: ProjectSummary.self, kind: .hostRequest),
-                Row(Method.projectsClone, params: CloneRequest.self, result: ProjectSummary.self, kind: .hostRequest),
-                Row(Method.projectsClones, params: Empty.self, result: [CloneSummary].self, kind: .hostRequest),
-                // Archive… on a project's menu (#668), as the window's project menu has it.
-                Row(Method.projectsArchive, params: ProjectRequest.self, result: ProjectSummary.self, kind: .hostRequest),
-                // Unarchive in the Archived projects fold (#343), as the window's sidebar has it.
-                Row(Method.projectsUnarchive, params: ProjectRequest.self, result: ProjectSummary.self, kind: .hostRequest),
-                // Delete… on an archived project (#677).
-                Row(Method.projectsDelete, params: ProjectRequest.self, result: Empty.self, kind: .hostRequest),
-                // Pin and Unpin on a project's row, as the window's sidebar has them.
-                Row(Method.projectsSetPinned, params: SetPinnedRequest.self, result: ProjectSummary.self, kind: .hostRequest),
-                // A change to the project's own files made outside the app (#531): read, Keep, Undo.
-                Row(Method.projectsReadGuardedChange, params: GuardedChangeRequest.self, result: GuardedChangeReading.self,
+                Row(Method.foldersAdd, params: AddFolderRequest.self, result: FolderSummary.self, kind: .hostRequest),
+                Row(Method.foldersClone, params: CloneRequest.self, result: FolderSummary.self, kind: .hostRequest),
+                Row(Method.foldersClones, params: Empty.self, result: [CloneSummary].self, kind: .hostRequest),
+                // Archive… on a folder's menu (#668), as the window's folder menu has it.
+                Row(Method.foldersArchive, params: FolderRequest.self, result: FolderSummary.self, kind: .hostRequest),
+                // Unarchive in the Archived folders fold (#343), as the window's sidebar has it.
+                Row(Method.foldersUnarchive, params: FolderRequest.self, result: FolderSummary.self, kind: .hostRequest),
+                // Delete… on an archived folder (#677).
+                Row(Method.foldersDelete, params: FolderRequest.self, result: Empty.self, kind: .hostRequest),
+                // Pin and Unpin on a folder's row, as the window's sidebar has them.
+                Row(Method.foldersSetPinned, params: SetPinnedRequest.self, result: FolderSummary.self, kind: .hostRequest),
+                // A folder joins a project (#2317).
+                Row(Method.foldersSetProject, params: SetFolderProjectRequest.self, result: FolderSummary.self,
                     kind: .hostRequest),
-                Row(Method.projectsKeepGuardedChange, params: GuardedChangeRequest.self, result: ProjectSummary.self,
+                // Cost on Pull Requests… on a folder's menu (#2352), as the window's Folder Settings has it.
+                Row(Method.foldersSetPRCostComment, params: SetPRCostCommentRequest.self, result: FolderSummary.self,
                     kind: .hostRequest),
-                Row(Method.projectsUndoGuardedChange, params: GuardedChangeRequest.self, result: ProjectSummary.self,
+                // A change to the folder's own files made outside the app (#531): read, Keep, Undo.
+                Row(Method.foldersReadGuardedChange, params: GuardedChangeRequest.self, result: GuardedChangeReading.self,
+                    kind: .hostRequest),
+                Row(Method.foldersKeepGuardedChange, params: GuardedChangeRequest.self, result: FolderSummary.self,
+                    kind: .hostRequest),
+                Row(Method.foldersUndoGuardedChange, params: GuardedChangeRequest.self, result: FolderSummary.self,
                     kind: .hostRequest),
                 // Everything in Needs You waiting for an OK (#773): read it, then Approve, Deny or Request changes.
                 Row(Method.approvalsRead, params: ApprovalReadRequest.self, result: GuardedChangeReading.self,
                     kind: .hostRequest),
-                Row(Method.approvalsAnswer, params: ApprovalAnswer.self, result: ProjectSummary.self, kind: .hostRequest),
-                // New Chat (#229): why a host has no chat project, asked only when none is listed.
-                Row(Method.projectsChatState, params: Empty.self, result: ChatProjectState.self, kind: .hostRequest),
+                Row(Method.approvalsAnswer, params: ApprovalAnswer.self, result: FolderSummary.self, kind: .hostRequest),
                 Row(Method.filesWatch, params: FilesWatchRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.filesUnwatch, params: FilesWatchRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.artifactWrite, params: ArtifactWriteRequest.self, result: Empty.self, kind: .hostRequest),
@@ -272,23 +319,26 @@ public extension DaemonAPI {
                 Row(Method.surfaceIdentify, params: SurfaceIdentification.self, result: Empty.self, kind: .hostRequest),
                 // The control plane's own
                 Row(Method.controlStatus, params: Empty.self, result: ControlStatus.self, kind: .controlRequest),
-                Row(Method.hostsList, params: Empty.self, result: [ControlHost].self, kind: .controlRequest),
+                Row(Method.hostsList, params: Empty.self, result: [ControlMachine].self, kind: .controlRequest),
                 Row(Method.clientsForgetSelf, params: Empty.self, result: Empty.self, kind: .controlRequest),
+                // Web Push to this browser (#1486): the control plane's key, and the page's subscription.
+                Row(Method.clientsWebPushKey, params: Empty.self, result: JSONValue.self, kind: .controlRequest),
+                Row(Method.clientsSetWebPush, params: JSONValue.self, result: Empty.self, kind: .controlRequest),
                 // A host using a Mac's git access (#1122): Allow, Don't Allow and Revoke.
                 Row(Method.hostsLendGit, params: LendGit.self, result: Empty.self, kind: .controlRequest),
                 // A linked host's workspace (#691): Start on the offline strip.
-                Row(Method.hostsStart, params: HostRequest.self, result: ControlHost.self, kind: .controlRequest),
-                Row(Method.hostsStop, params: HostStop.self, result: ControlHost.self, kind: .controlRequest),
-                // Settings ▸ Workspace providers (#1808): the API providers, and a workspace's host
+                Row(Method.hostsStart, params: MachineRequest.self, result: ControlMachine.self, kind: .controlRequest),
+                Row(Method.hostsStop, params: MachineStop.self, result: ControlMachine.self, kind: .controlRequest),
+                // Settings ▸ Machine providers (#1808): the API providers, and a workspace's host
                 // linked and unlinked.
                 Row(Method.providersList, params: Empty.self, result: JSONValue.self, kind: .controlRequest),
                 Row(Method.providersAdd, params: ProviderAdd.self, result: ProviderSummary.self, kind: .controlRequest),
                 Row(Method.providersUpdate, params: ProviderAdd.self, result: ProviderSummary.self, kind: .controlRequest),
                 Row(Method.providersRemove, params: ProviderRequest.self, result: Empty.self, kind: .controlRequest),
                 Row(Method.providersRefresh, params: ProviderRequest.self, result: Empty.self, kind: .controlRequest),
-                Row(Method.hostsLink, params: HostLink.self, result: ControlHost.self, kind: .controlRequest),
-                Row(Method.hostsUnlink, params: HostRequest.self, result: ControlHost.self, kind: .controlRequest),
-                Row(Method.hostsSetWorkspaceOptions, params: HostWorkspaceOptions.self, result: ControlHost.self,
+                Row(Method.hostsLink, params: MachineLink.self, result: ControlMachine.self, kind: .controlRequest),
+                Row(Method.hostsUnlink, params: MachineRequest.self, result: ControlMachine.self, kind: .controlRequest),
+                Row(Method.hostsSetMachineOptions, params: MachineOptions.self, result: ControlMachine.self,
                     kind: .controlRequest),
                 // Start a Machine from a Repository (#1809): the provider's form, then the machine.
                 Row(Method.providersOptions, params: ProviderRequest.self, result: ProviderOptions.self, kind: .controlRequest),
@@ -298,22 +348,76 @@ public extension DaemonAPI {
                 Row(Method.hostsDropKept, params: KeptRequestID.self, result: Empty.self, kind: .controlRequest),
                 Row(Method.hostsRetryKept, params: KeptRequestID.self, result: Empty.self, kind: .controlRequest),
                 // What an offline host last listed (#962).
-                Row(Method.hostsLastHeard, params: HostRequest.self, result: HostLastHeard.self, kind: .controlRequest),
+                Row(Method.hostsLastHeard, params: MachineRequest.self, result: MachineLastHeard.self, kind: .controlRequest),
                 // Who did what (#996): Events ▸ Audit.
                 Row(Method.auditList, params: AuditQuery.self, result: AuditList.self, kind: .controlRequest),
                 Row(Method.auditExport, params: AuditQuery.self, result: AuditExport.self, kind: .controlRequest),
                 Row(Method.controlSetAuditDays, params: AuditDays.self, result: AuditDays.self, kind: .controlRequest),
+                // Where the audit is sent (#1001): Console ▸ Audit ▸ Sinks.
+                Row(Method.auditSinks, params: Empty.self, result: AuditSinksState.self, kind: .controlRequest),
+                Row(Method.auditSetSinks, params: AuditSinks.self, result: AuditSinksState.self, kind: .controlRequest),
                 // Rotate Control Key… in Settings ▸ People (#997).
                 Row(Method.controlRotate, params: Empty.self, result: Empty.self, kind: .controlRequest),
-                // Reports (#1811): usage, cost and time by person, project and machine.
+                // Reports (#1811): usage, cost and time by person, folder and machine.
                 Row(Method.reportsUsage, params: ReportQuery.self, result: UsageReport.self, kind: .controlRequest),
                 Row(Method.reportsExport, params: ReportQuery.self, result: ReportExport.self, kind: .controlRequest),
+                // Reports ▸ Value (#2351).
+                Row(Method.reportsValue, params: ReportQuery.self, result: ReportValue.self, kind: .controlRequest),
                 Row(Method.reportsScopes, params: Empty.self, result: ReportScopes.self, kind: .controlRequest),
                 Row(Method.reportsPolicy, params: Empty.self, result: ReportPolicy.self, kind: .controlRequest),
                 Row(Method.reportsSetPolicy, params: ReportPolicy.self, result: ReportPolicy.self, kind: .controlRequest),
+                // Saved views of Reports (#2019).
+                Row(Method.reportsViews, params: Empty.self, result: ReportViews.self, kind: .controlRequest),
+                Row(Method.reportsSaveView, params: ReportView.self, result: ReportViews.self, kind: .controlRequest),
+                Row(Method.reportsDeleteView, params: ReportViewID.self, result: ReportViews.self, kind: .controlRequest),
                 // The Console (#1804): the admins' app on the web page.
                 Row(Method.consoleFleet, params: Empty.self, result: FleetBoard.self, kind: .controlRequest),
                 Row(Method.consoleTeamWorkflows, params: Empty.self, result: TeamWorkflows.self, kind: .controlRequest),
+                Row(Method.consoleLive, params: Empty.self, result: LiveBoard.self, kind: .controlRequest),
+                Row(Method.consoleStopAgent, params: ConsoleStopAgent.self, result: Empty.self, kind: .controlRequest),
+                // Console ▸ Sign-In and the SCIM groups' admin role (#1002, slice 4): the web page's only, so
+                // no Swift types; the shapes are Packages/Wire's.
+                Row("groups/setRole", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                Row("people/removeRequests", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                // Catalogue governance (#2019, M5): a person's ask in Settings ▸ Policy, on all three
+                // (#2335); the rest are the Console's and the web page's only, so no Swift types.
+                Row(Method.governanceRequest, params: CatalogAsk.self, result: CatalogRequest.self, kind: .controlRequest),
+                Row(Method.governanceRequests, params: Empty.self, result: CatalogRequestList.self, kind: .controlRequest),
+                Row("governance/approvals", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                Row("governance/decide", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                Row("governance/revoke", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                Row("governance/usage", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                // The read API's tokens and the OTLP exporter (#2019): the Console's only.
+                Row("readApi/list", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                Row("readApi/make", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                Row("readApi/revoke", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                Row("scim/set", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                Row("scim/tokens/list", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                Row("scim/tokens/make", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                Row("scim/tokens/revoke", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                Row("signIn/domains/check", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                Row("signIn/domains/claim", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                Row("signIn/domains/list", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                Row("signIn/domains/preview", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                Row("signIn/domains/remove", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                Row("signIn/domains/set", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                Row("signIn/orgProviders/check", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                Row("signIn/orgProviders/list", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                Row("signIn/orgProviders/remove", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                Row("signIn/orgProviders/set", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                // The organisation's policy (#998): Console ▸ Policy, and Settings ▸ Policy on every client.
+                Row(Method.policyMine, params: Empty.self, result: PolicyView.self, kind: .controlRequest),
+                Row(Method.policyGet, params: Empty.self, result: PolicyKept.self, kind: .controlRequest),
+                Row(Method.policySet, params: PolicySet.self, result: PolicyKept.self, kind: .controlRequest),
+                Row(Method.policyStopAll, params: PolicyStopAllRequest.self, result: PolicyKept.self, kind: .controlRequest),
+                Row(Method.policyRaise, params: PolicyRaiseRequest.self, result: PolicyKept.self, kind: .controlRequest),
+                // The organisation's ways to the model (#999): Console ▸ Model Access, and Settings ▸ Policy.
+                Row(Method.orgRoutesMine, params: Empty.self, result: OrgRoutesMine.self, kind: .controlRequest),
+                Row(Method.orgRoutesList, params: Empty.self, result: OrgRouteList.self, kind: .controlRequest),
+                Row(Method.orgRoutesSet, params: OrgRouteSet.self, result: OrgRouteKept.self, kind: .controlRequest),
+                Row(Method.orgRoutesReplaceKey, params: OrgRouteReplaceKey.self, result: OrgRouteKept.self, kind: .controlRequest),
+                Row(Method.orgRoutesCheck, params: OrgRouteRequest.self, result: OrgRouteCheck.self, kind: .controlRequest),
+                Row(Method.orgRoutesRemove, params: OrgRouteRequest.self, result: Empty.self, kind: .controlRequest),
                 // The user scope (#1760): what follows the person to their machines, under You.
                 Row(Method.userSettings, params: Empty.self, result: UserSettings.self, kind: .controlRequest),
                 Row(Method.userSetSettings, params: UserSettingsPart.self, result: Empty.self, kind: .controlRequest),
@@ -327,17 +431,22 @@ public extension DaemonAPI {
                 Row(Method.peopleRemove, params: PersonRequest.self, result: Empty.self, kind: .controlRequest),
                 Row(Method.peopleRemovePreview, params: PersonRequest.self, result: PersonRemovePreview.self,
                     kind: .controlRequest),
-                // Groups own workspace providers (#1761): Settings ▸ Groups.
+                // Groups own machine providers (#1761): Settings ▸ Groups.
                 Row(Method.groupsList, params: Empty.self, result: GroupList.self, kind: .controlRequest),
                 Row(Method.groupsSet, params: GroupSet.self, result: Group.self, kind: .controlRequest),
                 Row(Method.groupsRemove, params: GroupRequest.self, result: Empty.self, kind: .controlRequest),
                 Row(Method.providersSetGroup, params: ProviderGroup.self, result: Empty.self, kind: .controlRequest),
+                // Projects, the record that folders join (#2317): a folder's Project.
+                Row(Method.projectsList, params: Empty.self, result: ProjectList.self, kind: .controlRequest),
+                Row(Method.projectsSet, params: ProjectSet.self, result: Project.self, kind: .controlRequest),
+                Row(Method.projectsSetSlot, params: ProjectSlotSet.self, result: Project.self, kind: .controlRequest),
+                Row(Method.projectsRemove, params: ProjectRequest.self, result: Empty.self, kind: .controlRequest),
                 // Bots run the team's workflows (#1761): in Settings ▸ People.
                 Row(Method.botsMake, params: BotMake.self, result: BotMade.self, kind: .controlRequest),
                 Row(Method.botsSetCaps, params: BotCaps.self, result: Empty.self, kind: .controlRequest),
                 Row(Method.botsStopRun, params: BotStopRun.self, result: Empty.self, kind: .controlRequest),
                 // A host code, the page's for a bot's machine (#1761).
-                Row(Method.hostsStartEnroll, params: HostEnroll.self, result: ControlCodeShown.self, kind: .controlRequest),
+                Row(Method.hostsStartEnroll, params: MachineEnroll.self, result: ControlCodeShown.self, kind: .controlRequest),
                 // A machine that asks to join, approved on a card (#994).
                 Row(Method.hostsJoinRequests, params: Empty.self, result: [JoinRequest].self, kind: .controlRequest),
                 Row(Method.hostsApproveJoin, params: JoinRequestDecide.self, result: JoinApproved.self,
@@ -358,6 +467,11 @@ public extension DaemonAPI {
                 Row(Method.signInDeny, params: SignInDecide.self, result: Empty.self, kind: .controlRequest),
                 // Heard
                 Row(Notification.agentChanged, params: Agent.self, result: Empty.self, kind: .hostNotification),
+                Row(Notification.clientPermissionsChanged, params: ClientPermissionSettings.self, result: Empty.self,
+                    kind: .hostNotification),
+                Row(Notification.autoChanged, params: AutoSettings.self, result: Empty.self, kind: .hostNotification),
+                Row(Notification.daemonPolicyStateChanged, params: PolicyState.self, result: Empty.self,
+                    kind: .hostNotification),
                 Row(Notification.runtimesAccountProfilesChanged, params: [AccountProfile].self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.agentEntry, params: EntryNotification.self, result: Empty.self, kind: .hostNotification),
@@ -369,8 +483,8 @@ public extension DaemonAPI {
                     kind: .hostNotification),
                 Row(Notification.agentElicitation, params: ElicitationNotification.self, result: Empty.self,
                     kind: .hostNotification),
-                Row(Notification.projectChanged, params: ProjectSummary.self, result: Empty.self, kind: .hostNotification),
-                Row(Notification.projectRemoved, params: ProjectRemovedNotification.self, result: Empty.self,
+                Row(Notification.folderChanged, params: FolderSummary.self, result: Empty.self, kind: .hostNotification),
+                Row(Notification.folderRemoved, params: FolderRemovedNotification.self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.cloneChanged, params: CloneNotification.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.draftOptions, params: DraftOptionsNotification.self, result: Empty.self,
@@ -390,7 +504,7 @@ public extension DaemonAPI {
                 // A write nobody was waiting on that the host could not keep (#88).
                 Row(Notification.writeFailed, params: WriteFailure.self, result: Empty.self, kind: .hostNotification),
                 // Who holds what, for the page's read-only Resources list (#116).
-                Row(Notification.leasesChanged, params: LeaseSnapshot.self, result: Empty.self, kind: .hostNotification),
+                Row(Notification.resourcesChanged, params: LeaseSnapshot.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.mcpHostedChanged, params: HostedMCPSnapshot.self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.mcpHealthChanged, params: MCPHealthSnapshot.self, result: Empty.self,
@@ -405,7 +519,7 @@ public extension DaemonAPI {
                     kind: .hostNotification),
                 Row(Notification.pagesChanged, params: PagesChangedNotification.self, result: Empty.self,
                     kind: .hostNotification),
-                // An ad-hoc dictionary from ControlRouter.described: a `ControlHost`'s state, and
+                // An ad-hoc dictionary from ControlRouter.described: a `ControlMachine`'s state, and
                 // its `workspace` (#691) when it is linked.
                 Row(Notification.controlHostChanged, params: JSONValue.self, result: Empty.self, kind: .controlNotification),
                 Row(Notification.controlKeptChanged, params: KeptList.self, result: Empty.self, kind: .controlNotification),
@@ -429,6 +543,8 @@ public extension DaemonAPI {
                     kind: .controlNotification),
                 Row(Notification.controlGroupsChanged, params: GroupsChanged.self, result: Empty.self,
                     kind: .controlNotification),
+                Row(Notification.controlProjectsChanged, params: ProjectsChanged.self, result: Empty.self,
+                    kind: .controlNotification),
                 Row(Notification.controlCapReached, params: CapReached.self, result: Empty.self,
                     kind: .controlNotification),
                 Row(Notification.controlPeopleChanged, params: PeopleChanged.self, result: Empty.self,
@@ -436,6 +552,14 @@ public extension DaemonAPI {
                 Row(Notification.controlUserSettingsChanged, params: UserSettingsChanged.self, result: Empty.self,
                     kind: .controlNotification),
                 Row(Notification.controlSecretsLeft, params: SecretsLeft.self, result: Empty.self,
+                    kind: .controlNotification),
+                Row(Notification.controlPolicyChanged, params: PolicyView.self, result: Empty.self,
+                    kind: .controlNotification),
+                Row(Notification.controlStopAll, params: PolicyView.self, result: Empty.self,
+                    kind: .controlNotification),
+                Row(Notification.controlOrgRoutesChanged, params: Empty.self, result: Empty.self,
+                    kind: .controlNotification),
+                Row(Notification.controlGovernanceRequested, params: CatalogRequest.self, result: Empty.self,
                     kind: .controlNotification),
             ]
         }

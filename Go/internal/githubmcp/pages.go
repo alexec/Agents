@@ -3,14 +3,19 @@ package githubmcp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
 )
+
+// IssueReader reads the upstream issue_read result for a single issue.
+type IssueReader func(ctx context.Context, owner, repo string, number int) (map[string]any, error)
 
 // What the views read and do on GitHub (#1341): the open pull requests and issues, one pull
 // request's page, a failed run's log, and a person's merge, review and comment. As the
@@ -19,8 +24,10 @@ import (
 // Views is what the views ask of GitHub. RealGitHub is one; tests use a fake API under it.
 type Views interface {
 	DefaultRepo(ctx context.Context) (string, error)
+	Viewer(ctx context.Context) (string, error)
 	BoardPRs(ctx context.Context, repo string) (Board, error)
-	OpenIssues(ctx context.Context, repo, label string) ([]ListedIssue, error)
+	OpenIssues(ctx context.Context, repo string, filter IssueFilter) ([]ListedIssue, error)
+	IssueDetails(ctx context.Context, repo string, number int) (map[string]any, error)
 	PRPage(ctx context.Context, repo string, number int) (map[string]any, error)
 	PRDiff(ctx context.Context, repo string, number int, sha string) (map[string]any, error)
 	FailedLog(ctx context.Context, repo string, runID int, job string) (string, error)
@@ -31,7 +38,7 @@ type Views interface {
 	ReplyInThread(ctx context.Context, repo string, number, commentID int, body string) (map[string]any, error)
 }
 
-// Board is the open pull requests, newest updated first, and who is signed in.
+// Board is the open pull requests, newest created first, and who is signed in.
 type Board struct {
 	Viewer string
 	PRs    []BoardPR
@@ -51,12 +58,21 @@ type BoardPR struct {
 	Review string
 	// CodeRabbit is its status: reviewing, reviewed, failed or "" (#1344).
 	CodeRabbit string
+	// ReviewRequested is the logins a review is asked of (#2453).
+	ReviewRequested []string
+	// Labels are its label names; LabelColors each one's #rrggbb, for those GitHub gives a colour (#2956).
+	Labels      []string
+	LabelColors map[string]string
+	authorInfo  author
 }
 
 func (p BoardPR) json() map[string]any {
 	j := p.PR.json()
 	j["base"], j["author"], j["updatedAt"], j["draft"], j["autoMerge"], j["checks"] =
 		p.Base, p.Author, p.UpdatedAt, p.Draft, p.AutoMerge, p.Checks
+	if p.authorInfo.Bot {
+		j["authorBot"] = true
+	}
 	if p.FailedRunID != 0 {
 		j["failedRunId"] = p.FailedRunID
 	}
@@ -69,7 +85,18 @@ func (p BoardPR) json() map[string]any {
 	if p.CodeRabbit != "" {
 		j["codeRabbit"] = p.CodeRabbit
 	}
+	j["labels"] = p.Labels
+	if p.Labels == nil {
+		j["labels"] = []string{}
+	}
 	return j
+}
+
+// IssueFilter narrows the Issues page's list (#2686): issues with all of Labels and, when
+// Query is set, the words of Query in their title or description.
+type IssueFilter struct {
+	Labels []string
+	Query  string
 }
 
 // ListedIssue is an open issue as the issues view lists it.
@@ -77,12 +104,33 @@ type ListedIssue struct {
 	Issue
 	Comments  int
 	UpdatedAt string
+	Milestone string
+	// LabelColors is each label's #rrggbb, for those GitHub gives a colour (#2686).
+	LabelColors map[string]string
+	authorInfo  author
 }
 
 func (i ListedIssue) json() map[string]any {
 	j := i.Issue.json()
 	j["comments"], j["updatedAt"] = i.Comments, i.UpdatedAt
+	if i.authorInfo.Bot {
+		j["authorBot"] = true
+	}
+	if i.Milestone != "" {
+		j["milestone"] = i.Milestone
+	}
 	return j
+}
+
+func (g *RealGitHub) IssueDetails(ctx context.Context, repo string, number int) (map[string]any, error) {
+	if g.IssueReader == nil {
+		return nil, errors.New("issue details are unavailable")
+	}
+	owner, name, err := ownerName(repo)
+	if err != nil {
+		return nil, err
+	}
+	return g.IssueReader(ctx, owner, name, number)
 }
 
 // MARK: Checks
@@ -221,6 +269,13 @@ func (a *gqlActor) isBot() bool { return a != nil && a.Typename == "Bot" }
 const rollupFields = `commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {
   __typename ... on CheckRun { name status conclusion detailsUrl } ... on StatusContext { context state targetUrl } } } } } } }`
 
+// labelFields are a PR's labels, with their colours (#2956).
+const labelFields = `labels(first: 50) { nodes { name color } }`
+
+type gqlLabels struct {
+	Nodes []label `json:"nodes"`
+}
+
 type gqlRollup struct {
 	Nodes []struct {
 		Commit struct {
@@ -253,9 +308,11 @@ func conflictsOf(mergeable string) *bool {
 // MARK: The board
 
 const boardQuery = `query($owner: String!, $name: String!) { viewer { login } repository(owner: $owner, name: $name) {
-  pullRequests(states: OPEN, first: 100, orderBy: {field: UPDATED_AT, direction: DESC}) { nodes {
-    number title url headRefName baseRefName isDraft updatedAt mergeable reviewDecision
-    author { login __typename } autoMergeRequest { enabledAt } ` + rollupFields + ` } } } }`
+  pullRequests(states: OPEN, first: 100, orderBy: {field: CREATED_AT, direction: DESC}) { nodes {
+    number title url headRefName baseRefName isDraft updatedAt mergeable reviewDecision authorAssociation
+    author { login __typename } autoMergeRequest { enabledAt }
+    reviewRequests(first: 20) { nodes { requestedReviewer { ... on User { login } ... on Bot { login } } } }
+    ` + labelFields + ` ` + rollupFields + ` } } } }`
 
 func (g *RealGitHub) BoardPRs(ctx context.Context, repo string) (Board, error) {
 	owner, name, err := ownerName(repo)
@@ -276,9 +333,16 @@ func (g *RealGitHub) BoardPRs(ctx context.Context, repo string) (Board, error) {
 					UpdatedAt   string    `json:"updatedAt"`
 					Mergeable   string    `json:"mergeable"`
 					Review      string    `json:"reviewDecision"`
+					Association string    `json:"authorAssociation"`
 					Author      *gqlActor `json:"author"`
 					AutoMerge   *struct{} `json:"autoMergeRequest"`
-					Commits     gqlRollup `json:"commits"`
+					Requests    struct {
+						Nodes []struct {
+							Reviewer *gqlActor `json:"requestedReviewer"`
+						} `json:"nodes"`
+					} `json:"reviewRequests"`
+					Labels  gqlLabels `json:"labels"`
+					Commits gqlRollup `json:"commits"`
 				} `json:"nodes"`
 			} `json:"pullRequests"`
 		} `json:"repository"`
@@ -292,11 +356,24 @@ func (g *RealGitHub) BoardPRs(ctx context.Context, repo string) (Board, error) {
 	b := Board{Viewer: data.Viewer.Login, PRs: []BoardPR{}}
 	for _, n := range data.Repository.PullRequests.Nodes {
 		checks, runID := rollup(n.Commits.items())
+		var requested []string
+		for _, r := range n.Requests.Nodes {
+			// A team asked for a review has no login here: not the viewer's yet.
+			if l := r.Reviewer.login(); l != "" {
+				requested = append(requested, l)
+			}
+		}
+		var typ string
+		if n.Author != nil {
+			typ = n.Author.Typename
+		}
+		labels, colors := labelsOf(n.Labels.Nodes)
 		b.PRs = append(b.PRs, BoardPR{
 			PR:   PR{Number: n.Number, Title: n.Title, Branch: n.HeadRefName, URL: n.URL},
 			Base: n.BaseRefName, Author: n.Author.login(), UpdatedAt: n.UpdatedAt, Draft: n.IsDraft,
 			AutoMerge: n.AutoMerge != nil, Checks: checks, FailedRunID: runID, Conflicts: conflictsOf(n.Mergeable),
 			Review: strings.ToLower(n.Review), CodeRabbit: codeRabbitState(n.Commits.items()),
+			ReviewRequested: requested, Labels: labels, LabelColors: colors, authorInfo: authorOf(n.Author.login(), n.Association, typ),
 		})
 	}
 	return b, nil
@@ -304,14 +381,29 @@ func (g *RealGitHub) BoardPRs(ctx context.Context, repo string) (Board, error) {
 
 // MARK: Issues
 
-func (g *RealGitHub) OpenIssues(ctx context.Context, repo, label string) ([]ListedIssue, error) {
+// Viewer is the login of the connection, the person the lists' sections are for (#2453).
+func (g *RealGitHub) Viewer(ctx context.Context) (string, error) {
+	var u user
+	if err := g.get(ctx, "user", true, &u); err != nil {
+		return "", err
+	}
+	return u.Login, nil
+}
+
+// OpenIssues are the open issues, newest created first, at most 100. With a query it is
+// GitHub search (#2686), which also finds issues older than the newest 100.
+func (g *RealGitHub) OpenIssues(ctx context.Context, repo string, filter IssueFilter) ([]ListedIssue, error) {
 	if _, _, err := ownerName(repo); err != nil {
 		return nil, err
 	}
-	// The listing has pull requests in it too: up to three pages, for 100 issues.
-	q := fmt.Sprintf("state=open&sort=updated&direction=desc&per_page=%d", perPage)
-	if label != "" {
-		q += "&labels=" + url.QueryEscape(label)
+	if filter.Query != "" {
+		return g.searchIssues(ctx, repo, filter)
+	}
+	// The listing has pull requests in it too: up to three pages, for 100 issues. Labels
+	// joined by commas are issues with all of them.
+	q := fmt.Sprintf("state=open&sort=created&direction=desc&per_page=%d", perPage)
+	if len(filter.Labels) > 0 {
+		q += "&labels=" + url.QueryEscape(strings.Join(filter.Labels, ","))
 	}
 	out := []ListedIssue{}
 	for page := 1; page <= 3 && len(out) < perPage; page++ {
@@ -321,7 +413,7 @@ func (g *RealGitHub) OpenIssues(ctx context.Context, repo, label string) ([]List
 		}
 		for _, i := range list {
 			if !i.isPR() && len(out) < perPage {
-				out = append(out, ListedIssue{Issue: i.issue(), Comments: i.Comments, UpdatedAt: i.UpdatedAt})
+				out = append(out, i.listed())
 			}
 		}
 		if len(list) < perPage {
@@ -331,12 +423,71 @@ func (g *RealGitHub) OpenIssues(ctx context.Context, repo, label string) ([]List
 	return out, nil
 }
 
+// searchIssues is one GitHub search for the query and every label. A number (2453 or
+// #2453) also finds that issue, first, when it is open and has the labels.
+func (g *RealGitHub) searchIssues(ctx context.Context, repo string, filter IssueFilter) ([]ListedIssue, error) {
+	q := fmt.Sprintf("repo:%s is:issue is:open %s", repo, filter.Query)
+	for _, l := range filter.Labels {
+		q += fmt.Sprintf(" label:%q", l)
+	}
+	var found struct {
+		Items []issueJSON `json:"items"`
+	}
+	path := fmt.Sprintf("search/issues?q=%s&sort=created&order=desc&per_page=%d", url.QueryEscape(q), perPage)
+	if err := g.get(ctx, path, false, &found); err != nil {
+		return nil, err
+	}
+	out := []ListedIssue{}
+	if n, err := strconv.Atoi(strings.TrimPrefix(filter.Query, "#")); err == nil && n > 0 {
+		var one issueJSON
+		if g.get(ctx, fmt.Sprintf("repos/%s/issues/%d", repo, n), false, &one) == nil && one.Number == n &&
+			one.State == "open" && !one.isPR() && one.hasLabels(filter.Labels) {
+			out = append(out, one.listed())
+		}
+	}
+	for _, i := range found.Items {
+		if !i.isPR() && len(out) < perPage && (len(out) == 0 || out[0].Number != i.Number) {
+			out = append(out, i.listed())
+		}
+	}
+	return out, nil
+}
+
+var hexColor = regexp.MustCompile(`^[0-9a-fA-F]{6}$`)
+
+// labelsOf is the labels' names, and each one's #rrggbb for those GitHub gives a colour.
+func labelsOf(ls []label) ([]string, map[string]string) {
+	names, colors := make([]string, len(ls)), map[string]string{}
+	for n, l := range ls {
+		names[n] = l.Name
+		if hexColor.MatchString(l.Color) {
+			colors[l.Name] = "#" + strings.ToLower(l.Color)
+		}
+	}
+	return names, colors
+}
+
+func (i issueJSON) listed() ListedIssue {
+	_, colors := labelsOf(i.Labels)
+	return ListedIssue{Issue: i.issue(), Comments: i.Comments, UpdatedAt: i.UpdatedAt, Milestone: i.Milestone.title(),
+		LabelColors: colors, authorInfo: authorOf(i.User.Login, i.Association, i.User.Type)}
+}
+
+func (i issueJSON) hasLabels(names []string) bool {
+	for _, name := range names {
+		if !slices.ContainsFunc(i.Labels, func(l label) bool { return strings.EqualFold(l.Name, name) }) {
+			return false
+		}
+	}
+	return true
+}
+
 // MARK: A pull request's page
 
 const pageQuery = `query($owner: String!, $name: String!, $number: Int!) { viewer { login } repository(owner: $owner, name: $name) {
   pullRequest(number: $number) {
     number title url headRefName headRefOid baseRefName state isDraft body createdAt additions deletions mergeable reviewDecision
-    author { login __typename } autoMergeRequest { enabledAt }
+    author { login __typename } autoMergeRequest { enabledAt } ` + labelFields + `
     files(first: 100) { totalCount nodes { path additions deletions changeType } }
     comments(first: 100) { nodes { author { login __typename } body createdAt url } }
     reviews(first: 100) { nodes { author { login __typename } body state submittedAt url } }
@@ -389,6 +540,7 @@ func (g *RealGitHub) PRPage(ctx context.Context, repo string, number int) (map[s
 				Review      string    `json:"reviewDecision"`
 				Author      *gqlActor `json:"author"`
 				AutoMerge   *struct{} `json:"autoMergeRequest"`
+				Labels      gqlLabels `json:"labels"`
 				Files       struct {
 					TotalCount int `json:"totalCount"`
 					Nodes      []struct {
@@ -514,6 +666,7 @@ func (g *RealGitHub) PRPage(ctx context.Context, repo string, number int) (map[s
 		"checkRuns": runs, "files": files, "filesTotal": p.Files.TotalCount,
 		"comments": conversation, "threads": threads, "viewer": data.Viewer.Login,
 	}
+	page["labels"], page["labelColors"] = labelsOf(p.Labels.Nodes)
 	if runID != 0 {
 		page["failedRunId"] = runID
 	}

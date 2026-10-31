@@ -11,7 +11,7 @@ struct SidebarView: View {
     @Environment(AppModel.self) private var model
     @Environment(SidebarFrame.self) private var frame
     @Environment(SidebarStates.self) private var states
-    /// A project's window shows its own session here, not the main window's (#1089).
+    /// A folder's window shows its own session here, not the main window's (#1089).
     @Environment(\.poppedChat) private var popped
 
     private var agent: Agent? { popped.map { model.work.agent($0.id) } ?? model.selectedAgent }
@@ -136,6 +136,18 @@ struct SidebarView: View {
                 }
                 .opacity(frame.pane == .simulator ? 1 : 0)
                 .allowsHitTesting(frame.pane == .simulator)
+            }
+            // What the session is linked to (#2940): read again each time it is shown.
+            if shows(.lineage, state) {
+                Group {
+                    if model.host(agent.host, has: Capability.lineage1) {
+                        LineagePane(agent: agent, isVisible: frame.pane == .lineage)
+                    } else {
+                        HostNeedsUpdateView()
+                    }
+                }
+                .opacity(frame.pane == .lineage ? 1 : 0)
+                .allowsHitTesting(frame.pane == .lineage)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

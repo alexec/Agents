@@ -14,7 +14,7 @@ import (
 )
 
 // What the control plane adds up across machines (#1811): cost, tokens and time by the
-// UTC hour, project and runtime, in <root>/report-hours.json. The hours are kept 8 days,
+// UTC hour, folder and runtime, in <root>/report-hours.json. The hours are kept 8 days,
 // so a UTC day's hours are all here to add up. Each hour, and each time the uplink comes
 // back, the hours that changed since they were last sent go to the control plane
 // (usage/rollup) with the UTC days they fall in. The control plane keeps hours 7 days and
@@ -42,6 +42,8 @@ type reportFile struct {
 	// the change it was last at.
 	Unsent map[string]int64 `json:"unsent,omitempty"`
 	Seq    int64            `json:"seq,omitempty"`
+	// EventsSeen is the last event log position counted into the hours (#2019).
+	EventsSeen int64 `json:"eventsSeen,omitempty"`
 }
 
 type reportBook struct {
@@ -61,14 +63,63 @@ func (d *Daemon) reportPath() string { return filepath.Join(d.Store.Loc.Root, "r
 
 func utcHour(t time.Time) string { return t.UTC().Format("2006-01-02T15") }
 
-func reportKey(project, runtime string) string { return project + "\t" + runtime }
+// reportKey is a row's key: its folder, runtime and, for a workflow's agents, the workflow
+// (#2019), and for an org account's turns its route (#999). The rows before keep their keys.
+func reportKey(folder, runtime, workflow, route string) string {
+	k := folder + "\t" + runtime
+	if workflow != "" {
+		k += "\t" + workflow
+	}
+	if route != "" {
+		k += "\troute:" + route
+	}
+	return k
+}
 
-// reportProject is an agent's project as the reports name it: its folder's name.
-func reportProject(a *wire.Agent) string {
+// routeTokensToday is an org account's tokens on this host since the start of today, as the
+// relay counted them (#999, D12): the limit tokens of its runtime's rows for its route, in the
+// UTC hours since local midnight.
+func (d *Daemon) routeTokensToday(runtime, route string, at time.Time) int64 {
+	y, m, day := at.Date()
+	since := utcHour(time.Date(y, m, day, 0, 0, 0, 0, at.Location()))
+	d.reportMu.Lock()
+	defer d.reportMu.Unlock()
+	var sum int64
+	for hour, rows := range d.reportLocked().Hours {
+		if hour < since {
+			continue
+		}
+		for _, row := range rows {
+			if row.Runtime == runtime && row.Route != nil && *row.Route == route && row.LimitTokens != nil {
+				sum += *row.LimitTokens
+			}
+		}
+	}
+	return sum
+}
+
+// reportRoute is the org route of an agent's account (#999), or "".
+func reportRoute(a *wire.Agent) string {
 	if a == nil {
 		return ""
 	}
-	f := projectFolder(a)
+	return orgRouteOf(a.AccountID)
+}
+
+// reportWorkflow is the workflow that started an agent, or "".
+func reportWorkflow(a *wire.Agent) string {
+	if a == nil || a.StartedByWorkflow == nil {
+		return ""
+	}
+	return *a.StartedByWorkflow
+}
+
+// reportFolder is an agent's folder as the reports name it: its folder's name.
+func reportFolder(a *wire.Agent) string {
+	if a == nil {
+		return ""
+	}
+	f := folderPath(a)
 	if f == "" || f == "/" {
 		return ""
 	}
@@ -98,6 +149,14 @@ func addRollupRow(r *wire.UsageRollupRow, o wire.UsageRollupRow) {
 	}
 	r.InputTokens += o.InputTokens
 	r.OutputTokens += o.OutputTokens
+	// The tokens a limit counts (#998, FR-017), so the control plane adds what a machine does.
+	if o.LimitTokens != nil {
+		n := *o.LimitTokens
+		if r.LimitTokens != nil {
+			n += *r.LimitTokens
+		}
+		r.LimitTokens = &n
+	}
 	r.ThoughtTokens += o.ThoughtTokens
 	r.CachedReadTokens += o.CachedReadTokens
 	r.CachedWriteTokens += o.CachedWriteTokens
@@ -105,6 +164,12 @@ func addRollupRow(r *wire.UsageRollupRow, o wire.UsageRollupRow) {
 	r.UnpricedTurns += o.UnpricedTurns
 	r.WorkingSeconds += o.WorkingSeconds
 	r.WaitingSeconds += o.WaitingSeconds
+	if o.Counts != nil {
+		if r.Counts == nil {
+			r.Counts = &wire.ReportCounts{}
+		}
+		addCounts(r.Counts, *o.Counts)
+	}
 }
 
 // pruneReport keeps the newest reportHoursKept hours, and only unsent hours still kept.
@@ -122,22 +187,28 @@ func pruneReport(r *reportFile, now time.Time) {
 	}
 }
 
-// addReport adds to an agent's project and runtime in the UTC hour at holds.
+// addReport adds to an agent's folder and runtime in the UTC hour at holds.
 func (d *Daemon) addReport(a *wire.Agent, runtime string, at time.Time, add wire.UsageRollupRow) {
 	d.reportMu.Lock()
 	defer d.reportMu.Unlock()
-	d.addReportLocked(reportProject(a), runtime, utcHour(at), add)
+	d.addReportLocked(reportFolder(a), runtime, reportWorkflow(a), reportRoute(a), utcHour(at), add)
 	d.reportChangedLocked()
 }
 
-func (d *Daemon) addReportLocked(project, runtime, hour string, add wire.UsageRollupRow) {
+func (d *Daemon) addReportLocked(folder, runtime, workflow, route, hour string, add wire.UsageRollupRow) {
 	r := d.reportLocked()
 	if r.Hours[hour] == nil {
 		r.Hours[hour] = map[string]wire.UsageRollupRow{}
 	}
-	k := reportKey(project, runtime)
+	k := reportKey(folder, runtime, workflow, route)
 	row := r.Hours[hour][k]
-	row.Project, row.Runtime = project, runtime
+	row.Folder, row.Runtime = folder, runtime
+	if workflow != "" {
+		row.Workflow = &workflow
+	}
+	if route != "" {
+		row.Route = &route
+	}
 	addRollupRow(&row, add)
 	r.Hours[hour][k] = row
 	r.Seq++
@@ -191,7 +262,17 @@ func (d *Daemon) reportTime(agent wire.UUID, runtime string, segments []timeSegm
 		return
 	}
 	a := d.Store.Agent(agent)
-	project := reportProject(a)
+	folder, workflow, route := reportFolder(a), reportWorkflow(a), reportRoute(a)
+	// The turn's time on the work the session is on now (#2350).
+	work := wire.LineageCost{Cost: map[string]float64{}}
+	for _, s := range segments {
+		if s.kind == "person" {
+			work.WaitingSeconds += s.end.Sub(s.start).Seconds()
+		} else {
+			work.WorkingSeconds += s.end.Sub(s.start).Seconds()
+		}
+	}
+	d.bankWork(a, work)
 	d.reportMu.Lock()
 	defer d.reportMu.Unlock()
 	for _, s := range segments {
@@ -204,10 +285,14 @@ func (d *Daemon) reportTime(agent wire.UUID, runtime string, segments []timeSegm
 			var add wire.UsageRollupRow
 			if s.kind == "person" {
 				add.WaitingSeconds = next.Sub(from).Seconds()
+				// The wait counts once, in the hour it began, by its whole length (#2019).
+				if from.Equal(s.start) {
+					add.Counts = waitCounts(s.end.Sub(s.start))
+				}
 			} else {
 				add.WorkingSeconds = next.Sub(from).Seconds()
 			}
-			d.addReportLocked(project, runtime, utcHour(from), add)
+			d.addReportLocked(folder, runtime, workflow, route, utcHour(from), add)
 			from = next
 		}
 	}
@@ -272,7 +357,7 @@ func (d *Daemon) rollupLocked() (wire.UsageRollup, map[string]int64) {
 			}
 			for k, row := range hr {
 				s := sum[k]
-				s.Project, s.Runtime = row.Project, row.Runtime
+				s.Folder, s.Runtime, s.Workflow = row.Folder, row.Runtime, row.Workflow
 				addRollupRow(&s, row)
 				sum[k] = s
 			}
@@ -291,12 +376,19 @@ func (d *Daemon) sendReport() {
 	}
 	d.reportSending.Lock()
 	defer d.reportSending.Unlock()
+	d.countReportEvents()
+	// The cost banked on links so far, so it goes with the hours it is in (#2350).
+	d.lineageSettle(5 * time.Second)
 	for d.ctx.Err() == nil {
 		d.reportMu.Lock()
 		rollup, sent := d.rollupLocked()
 		d.reportMu.Unlock()
-		if len(sent) == 0 {
+		work, workSent := d.unsentCost()
+		if len(sent) == 0 && len(work) == 0 {
 			return
+		}
+		if len(work) > 0 {
+			rollup.Work = work
 		}
 		ctx, cancel := context.WithTimeout(d.ctx, reportPatience)
 		_, err := (*ask)(ctx, wire.CallUsageRollup.Name, rollup)
@@ -315,12 +407,15 @@ func (d *Daemon) sendReport() {
 		}
 		d.saveReportLocked(time.Now())
 		d.reportMu.Unlock()
+		d.costSent(workSent)
 	}
 }
 
 // startReports sends what is unsent now, and starts the hourly send once.
 func (d *Daemon) startReports() {
 	safe.Go("usage rollup", d.sendReport)
+	// What it has from a catalogue (#2019, M5), on the same clock.
+	safe.Go("governance report", d.sendGovernanceReport)
 	d.reportTick.Do(func() {
 		safe.Go("usage rollup clock", func() {
 			tick := time.NewTicker(reportEvery)
@@ -331,6 +426,7 @@ func (d *Daemon) startReports() {
 					return
 				case <-tick.C:
 					d.sendReport()
+					d.sendGovernanceReport()
 				}
 			}
 		})

@@ -1,6 +1,7 @@
 package agentsd
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -9,11 +10,9 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"sort"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
 	"github.com/alexec/agents/Go/internal/agentsd/skillcatalog"
@@ -29,22 +28,21 @@ import (
 //	agentConfig   ~/.agents/AGENTS.md, ~/.agents/personas/<name>.md, ~/.agents/skills/<name>/SKILL.md
 //	runtimes      <settings>/sandbox.json and <settings>/client-permissions.json
 //	costLimits    <settings>/limits.json
+//	notifications <settings>/display.json's noticeBurst and noticeCooldownMinutes (#2859)
 //	resources     <root>/resources.json
 //	secrets       ~/.agents-secrets/secrets.env, NAME=value
 //
-// <root>/from-control-plane.json marks what came from the control plane: the parts, the
-// secrets and the agentConfig files written. A local edit to a marked part is refused; it
-// is changed under You. A part the control plane no longer sends stays as it was, and is
-// this machine's own again. A secret it no longer sends is taken out of secrets.env.
+// <root>/user-settings-sync.json stores sync metadata: secret names and the agentConfig
+// files written. A machine does not send its own agent configuration files to the person's
+// other machines, nor write the ones a control plane sends (agentConfigFiles), so one
+// machine cannot change what runs on the others.
 
-const userScopeFile = "from-control-plane.json"
+const userSettingsSyncFile = "user-settings-sync.json"
 
-// userScopeMark is from-control-plane.json. It never holds a secret's value.
-type userScopeMark struct {
-	User    string                      `json:"user"`
-	At      string                      `json:"at"`
-	Parts   []wire.UserSettingsPartName `json:"parts"`
-	Secrets []string                    `json:"secrets"`
+// userSettingsSyncState never holds a secret's value.
+type userSettingsSyncState struct {
+	User    string   `json:"user,omitempty"`
+	Secrets []string `json:"secrets"`
 	// The agentConfig files written, relative to ~/.agents, so a persona or skill the
 	// control plane no longer sends is taken away again.
 	Files []string `json:"files,omitempty"`
@@ -52,19 +50,26 @@ type userScopeMark struct {
 
 type userScopeState struct {
 	userScopeMu sync.Mutex
-	userMark    *userScopeMark
+	userMark    *userSettingsSyncState
 }
 
 // agentConfigName is a persona's or a skill's name, as one folder or file name.
 var agentConfigName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
 
-func (d *Daemon) userScopeFile() string { return filepath.Join(d.Store.Loc.Root, userScopeFile) }
+func (d *Daemon) userSettingsSyncPath() string {
+	return filepath.Join(d.Store.Loc.Root, userSettingsSyncFile)
+}
 
 // userMarkLocked is the mark, read once.
-func (d *Daemon) userMarkLocked() userScopeMark {
+func (d *Daemon) userMarkLocked() userSettingsSyncState {
 	if d.userMark == nil {
-		var m userScopeMark
-		if b, err := os.ReadFile(d.userScopeFile()); err == nil {
+		var m userSettingsSyncState
+		b, err := os.ReadFile(d.userSettingsSyncPath())
+		if err != nil {
+			// Read the old metadata once, so its secret names and files survive the upgrade.
+			b, _ = os.ReadFile(filepath.Join(d.Store.Loc.Root, "from-control-plane.json"))
+		}
+		if len(b) > 0 {
 			json.Unmarshal(b, &m)
 		}
 		d.userMark = &m
@@ -72,47 +77,9 @@ func (d *Daemon) userMarkLocked() userScopeMark {
 	return *d.userMark
 }
 
-// FromControlPlane says whether a part of the settings here is the control plane's.
-func (d *Daemon) FromControlPlane(part wire.UserSettingsPartName) bool {
-	d.userScopeMu.Lock()
-	defer d.userScopeMu.Unlock()
-	return slices.Contains(d.userMarkLocked().Parts, part)
-}
-
-// refuseUserScoped is a local edit of a part that is the control plane's.
-func (d *Daemon) refuseUserScoped(part wire.UserSettingsPartName) error {
-	if !d.FromControlPlane(part) {
-		return nil
-	}
-	return &Error{Code: CodeNotSupported, Message: "This is set under You on the control plane, for every machine of yours. Change it there.",
-		Data: map[string]any{"userScope": part}}
-}
-
-// guardUserScope refuses, on the methods that change a part here, a change to a part that
-// is the control plane's.
-func (d *Daemon) guardUserScope() {
-	guarded := map[string]wire.UserSettingsPartName{
-		wire.CallCostSetLimits.Name:      wire.UserSettingsPartNameCostLimits,
-		wire.CallResourcesDeclare.Name:   wire.UserSettingsPartNameResources,
-		wire.CallResourcesRemove.Name:    wire.UserSettingsPartNameResources,
-	}
-	for method, part := range guarded {
-		next, ok := d.handlers[method]
-		if !ok {
-			continue
-		}
-		d.handlers[method] = func(ctx context.Context, c *Client, params json.RawMessage) (any, error) {
-			if err := d.refuseUserScoped(part); err != nil {
-				return nil, err
-			}
-			return next(ctx, c, params)
-		}
-	}
-}
-
 // toldUserSettings is host/userSettings.
 func (d *Daemon) toldUserSettings(params json.RawMessage) {
-	var u wire.HostUserSettings
+	var u wire.MachineUserSettings
 	if err := json.Unmarshal(params, &u); err != nil {
 		log.Printf("user settings: %v", err)
 		return
@@ -123,18 +90,16 @@ func (d *Daemon) toldUserSettings(params json.RawMessage) {
 }
 
 // ApplyUserSettings writes what the control plane sent. Its errors never hold a secret.
-func (d *Daemon) ApplyUserSettings(u wire.HostUserSettings) error {
+func (d *Daemon) ApplyUserSettings(u wire.MachineUserSettings) error {
 	d.userScopeMu.Lock()
 	defer d.userScopeMu.Unlock()
 	before := d.userMarkLocked()
-	mark := userScopeMark{User: u.User, At: time.Now().UTC().Format(time.RFC3339), Parts: []wire.UserSettingsPartName{}, Secrets: []string{}}
+	mark := userSettingsSyncState{User: u.User, Secrets: []string{}}
 	var problems []string
 	note := func(part wire.UserSettingsPartName, err error) {
 		if err != nil {
 			problems = append(problems, fmt.Sprintf("%s: %v", part, err))
-			return
 		}
-		mark.Parts = append(mark.Parts, part)
 	}
 	home := d.personalHome()
 	s := u.Settings
@@ -142,12 +107,15 @@ func (d *Daemon) ApplyUserSettings(u wire.HostUserSettings) error {
 		note(wire.UserSettingsPartNameMcpServers, writeMCPServers(home, s.McpServers))
 	}
 	if partSent(s.AgentConfig) {
-		files, err := writeAgentConfig(home, s.AgentConfig, before.Files)
+		files, err := writeAgentConfig(home, s.AgentConfig, agentConfigWrote(before.Files))
 		mark.Files = files
 		note(wire.UserSettingsPartNameAgentConfig, err)
 	} else {
 		// Not the control plane's any more: what it wrote stays, as this machine's own.
 		mark.Files = nil
+	}
+	if s.AgentConfigFiles != nil && len(s.AgentConfigFiles.Files) > 0 {
+		log.Printf("user settings: %d agent configuration files from other machines were not written", len(s.AgentConfigFiles.Files))
 	}
 	if partSent(s.Runtimes) {
 		note(wire.UserSettingsPartNameRuntimes, d.writeRuntimeChoices(s.Runtimes))
@@ -155,8 +123,8 @@ func (d *Daemon) ApplyUserSettings(u wire.HostUserSettings) error {
 	if partSent(s.CostLimits) {
 		note(wire.UserSettingsPartNameCostLimits, d.writeCostLimits(s.CostLimits))
 	}
-	if partSent(s.Resources) {
-		note(wire.UserSettingsPartNameResources, d.writeResources(s.Resources))
+	if partSent(s.Notifications) {
+		note(wire.UserSettingsPartNameNotifications, d.writeNoticeLimits(s.Notifications))
 	}
 	names, err := writeSecrets(home, u.Secrets, before.Secrets)
 	if err != nil {
@@ -164,13 +132,14 @@ func (d *Daemon) ApplyUserSettings(u wire.HostUserSettings) error {
 		names = before.Secrets
 	}
 	mark.Secrets = names
-	sort.Slice(mark.Parts, func(i, j int) bool { return mark.Parts[i] < mark.Parts[j] })
 	b, _ := diskjson.Marshal(mark)
-	if err := store.WriteAtomically(d.userScopeFile(), b, 0o644); err != nil {
+	if err := store.WriteAtomically(d.userSettingsSyncPath(), b, 0o644); err != nil {
 		problems = append(problems, err.Error())
+	} else {
+		_ = os.Remove(filepath.Join(d.Store.Loc.Root, "from-control-plane.json"))
 	}
 	d.userMark = &mark
-	log.Printf("user settings from the control plane: %d parts, %d secrets", len(mark.Parts), len(mark.Secrets))
+	log.Printf("user settings synced from the control plane: %d secrets", len(mark.Secrets))
 	if len(problems) > 0 {
 		return errors.New(strings.Join(problems, "; "))
 	}
@@ -188,7 +157,10 @@ func writeMCPServers(home string, servers wire.JSONValue) error {
 	if json.Unmarshal(servers, &check) != nil {
 		return errors.New("not an object")
 	}
-	path := filepath.Join(home, ".agents", "mcp.json")
+	path, err := safeConfigPath(filepath.Join(home, ".agents"), "mcp.json", true)
+	if err != nil {
+		return err
+	}
 	file := map[string]json.RawMessage{}
 	if b, err := os.ReadFile(path); err == nil {
 		json.Unmarshal(b, &file)
@@ -198,10 +170,16 @@ func writeMCPServers(home string, servers wire.JSONValue) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
+	return writeIfChanged(path, append(b, '\n'))
+}
+
+// writeIfChanged writes a file only when its bytes on disk differ, so a delivery that
+// changes one part does not write and fsync every file of the others again (#2729).
+func writeIfChanged(path string, b []byte) error {
+	if on, err := os.ReadFile(path); err == nil && bytes.Equal(on, b) {
+		return nil
 	}
-	return store.WriteAtomically(path, append(b, '\n'), 0o644)
+	return store.WriteAtomically(path, b, 0o644)
 }
 
 // writeAgentConfig writes the instructions, personas and skills, and takes away the files
@@ -237,7 +215,7 @@ func writeAgentConfig(home string, raw wire.JSONValue, wroteBefore []string) ([]
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return wroteBefore, err
 		}
-		if err := store.WriteAtomically(path, []byte(text), 0o644); err != nil {
+		if err := writeIfChanged(path, []byte(text)); err != nil {
 			return wroteBefore, err
 		}
 		wrote = append(wrote, rel)
@@ -255,14 +233,100 @@ func writeAgentConfig(home string, raw wire.JSONValue, wroteBefore []string) ([]
 	return wrote, nil
 }
 
-// safeRelative is a path the mark may name: AGENTS.md, or inside personas/ or skills/.
+// agentConfigWrote is what the agentConfig part can have written of the files a mark names.
+// A mark from before agentConfigFiles were refused also names files other machines sent
+// (mcp.json, plugins and any file of a skill); those stay, as this machine's own.
+func agentConfigWrote(files []string) []string {
+	var out []string
+	for _, rel := range files {
+		parts := strings.Split(filepath.ToSlash(rel), "/")
+		if rel == "AGENTS.md" || len(parts) == 2 && parts[0] == "personas" && strings.HasSuffix(parts[1], ".md") ||
+			len(parts) == 3 && parts[0] == "skills" && parts[2] == "SKILL.md" {
+			out = append(out, rel)
+		}
+	}
+	return out
+}
+
+// safeRelative is a path the mark may name under ~/.agents.
 func safeRelative(rel string) bool {
 	clean := filepath.Clean(rel)
 	if clean != rel || filepath.IsAbs(rel) || strings.Contains(rel, "..") {
 		return false
 	}
-	return rel == "AGENTS.md" || strings.HasPrefix(rel, "personas"+string(filepath.Separator)) ||
-		strings.HasPrefix(rel, "skills"+string(filepath.Separator))
+	return rel == "AGENTS.md" || rel == "mcp.json" || strings.HasPrefix(rel, "personas"+string(filepath.Separator)) ||
+		strings.HasPrefix(rel, "skills"+string(filepath.Separator)) || strings.HasPrefix(rel, "plugins"+string(filepath.Separator))
+}
+
+func safeAgentConfigPath(rel string) bool {
+	if !safeRelative(rel) {
+		return false
+	}
+	if rel == "mcp.json" {
+		return true
+	}
+	parts := strings.Split(filepath.ToSlash(rel), "/")
+	if len(parts) == 1 {
+		return parts[0] == "AGENTS.md"
+	}
+	for _, part := range parts {
+		switch strings.ToLower(part) {
+		case "node_modules", ".git", ".cache", "cache", "caches", "dist", "build", "target", "vendor", "__pycache__":
+			return false
+		}
+	}
+	if len(parts) < 2 || !agentConfigName.MatchString(parts[1]) || strings.Contains(parts[1], "..") {
+		return false
+	}
+	if parts[0] == "personas" {
+		return len(parts) == 2 && strings.HasSuffix(parts[1], ".md")
+	}
+	return len(parts) >= 3
+}
+
+func safeConfigPath(base, rel string, createParents bool) (string, error) {
+	if !safeAgentConfigPath(rel) {
+		return "", errors.New("invalid agent configuration path")
+	}
+	if createParents {
+		if err := os.MkdirAll(base, 0o755); err != nil {
+			return "", err
+		}
+	}
+	if info, err := os.Lstat(base); err == nil {
+		if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+			return "", errors.New("~/.agents is not a regular folder")
+		}
+	} else if !errors.Is(err, os.ErrNotExist) || createParents {
+		return "", err
+	}
+	parts := strings.Split(filepath.FromSlash(rel), string(filepath.Separator))
+	current := base
+	for _, part := range parts[:len(parts)-1] {
+		current = filepath.Join(current, part)
+		if createParents {
+			if err := os.Mkdir(current, 0o755); err != nil && !errors.Is(err, os.ErrExist) {
+				return "", err
+			}
+		}
+		info, err := os.Lstat(current)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) && !createParents {
+				return filepath.Join(base, filepath.FromSlash(rel)), nil
+			}
+			return "", err
+		}
+		if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+			return "", errors.New("agent configuration path crosses a link or file")
+		}
+	}
+	target := filepath.Join(current, parts[len(parts)-1])
+	if info, err := os.Lstat(target); err == nil && info.Mode()&os.ModeSymlink != 0 {
+		return "", errors.New("agent configuration file is a link")
+	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return "", err
+	}
+	return target, nil
 }
 
 // userRuntimes is the runtimes part: each runtime's choices that follow the person.
@@ -288,7 +352,7 @@ func (d *Daemon) writeRuntimeChoices(raw wire.JSONValue) error {
 	}
 	if r.ClientPermissions != nil {
 		b, _ := json.Marshal(r.ClientPermissions)
-		if err := store.WriteAtomically(filepath.Join(d.SettingsDir, "client-permissions.json"), b, 0o644); err != nil {
+		if err := store.WriteAtomically(filepath.Join(d.SettingsDir, "client-permissions.json"), b, 0o600); err != nil {
 			return err
 		}
 	}
@@ -312,25 +376,6 @@ func (d *Daemon) writeCostLimits(raw wire.JSONValue) error {
 	b, _ := json.Marshal(whole)
 	_, err := d.setLimits(b)
 	return err
-}
-
-// writeResources declares the part's resources, and only those.
-func (d *Daemon) writeResources(raw wire.JSONValue) error {
-	var list []wire.DeclaredResource
-	if err := json.Unmarshal(raw, &list); err != nil {
-		return errors.New("not a list of resources")
-	}
-	var clean []wire.DeclaredResource
-	for _, r := range list {
-		name, ok := resourceName(string(r.Name))
-		if !ok || r.Holders < 1 {
-			continue
-		}
-		r.Name = name
-		clean = append(clean, r)
-	}
-	sort.Slice(clean, func(i, j int) bool { return clean[i].Name < clean[j].Name })
-	return d.declareAll(clean)
 }
 
 // writeSecrets sets each secret in secrets.env, and takes out the ones the control plane
@@ -373,23 +418,6 @@ func writeSecrets(home string, secrets []wire.UserSecret, before []string) ([]st
 
 var secretNameHere = regexp.MustCompile(`^[A-Z_][A-Z0-9_]{0,63}$`)
 
-// declareAll is resources.json as list, and each one's rules, as resources/declare does.
-func (d *Daemon) declareAll(list []wire.DeclaredResource) error {
-	d.leaseMu.Lock()
-	loaded := d.loadLeases()
-	err := d.saveDeclared(list)
-	var events []leaseEvent
-	if err == nil {
-		for _, r := range list {
-			events = append(events, d.setRules(r.Name, rulesOf(r))...)
-		}
-	}
-	d.leasesChanged()
-	d.leaseMu.Unlock()
-	d.settle(append(loaded, events...))
-	return err
-}
-
 // registerUserScope is settings/userPart: a part as this machine has it, for Use This
 // Mac's under You.
 func (d *Daemon) registerUserScope() {
@@ -423,12 +451,6 @@ func (d *Daemon) userPartHere(part wire.UserSettingsPartName) (wire.UserPartHere
 		out.Value = asJSON(userRuntimes{Sandbox: new(d.sandboxSettings()), ClientPermissions: new(d.clientPermissions())})
 	case wire.UserSettingsPartNameCostLimits:
 		out.Value = asJSON(d.costState().Limits)
-	case wire.UserSettingsPartNameResources:
-		declared := d.declaredResources()
-		if declared == nil {
-			declared = []wire.DeclaredResource{}
-		}
-		out.Value = asJSON(declared)
 	default:
 		return out, Invalid("There is no part called %q.", part)
 	}

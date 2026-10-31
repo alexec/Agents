@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// The reads that prove a project's set-up (#1336): each slot reads one real thing (the newest
+// The reads that prove a folder's set-up (#1336): each slot reads one real thing (the newest
 // issue, the newest pull request, the last workflow run), and the page asks whether the App
 // is installed on the repository. A refusal is a GitHubError with Kind NotFound or Failed
 // (403); a read that does not reach GitHub is Failed with no status.

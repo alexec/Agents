@@ -6,7 +6,7 @@ on:
 agent: new
 cooldown: 5m
 labels: [dev-loop]
-permission-mode: auto
+permission-mode: approve-for-me
 enabled: false
 when-done: archive
 ---

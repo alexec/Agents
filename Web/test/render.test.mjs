@@ -137,3 +137,16 @@ test("a file: link opens the file where the page says how, and nowhere else (#54
   button.props.onClick();
   assert.deepEqual(opened, ["/Users/a/My App/main.swift"]);
 });
+
+test("a link to a bare absolute path opens the file, as on the Mac (#2754)", () => {
+  const opened = [];
+  const nodes = renderMarkdown("see [Main](/Users/a/My%20App/main.swift#L3) and [x](//elsewhere/etc/passwd)",
+    undefined, (location) => opened.push(location.path));
+  const out = show(nodes);
+  assert.match(out, /<button type="button" class="link reading" title="\/Users\/a\/My App\/main.swift" onClick="[^"]*">Main<\/button>/);
+  assert.doesNotMatch(out, /href="\//);
+  assert.doesNotMatch(out, /title="\/etc/);
+  nodes[0].props.children.find((child) => child?.type === "button").props.onClick();
+  assert.deepEqual(opened, ["/Users/a/My App/main.swift"]);
+  assert.doesNotMatch(show(renderMarkdown("[Main](/Users/a/main.swift)")), /<button|href=/, "no opener, no link");
+});

@@ -7,7 +7,7 @@ struct RemoveMCPServerSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
 
-    let server: DaemonAPI.ProjectMCPServer
+    let server: DaemonAPI.FolderMCPServer
     let destination: DaemonAPI.SkillDestination
     /// Offered only when this server's one secret is not named by another server here.
     var forgettable: String?
@@ -20,15 +20,15 @@ struct RemoveMCPServerSheet: View {
     @State private var failure: String?
 
     /// The one secret this server names, when no other row in `servers` names it.
-    static func forgettable(_ server: DaemonAPI.ProjectMCPServer,
-                            among servers: [DaemonAPI.ProjectMCPServer]) -> String? {
+    static func forgettable(_ server: DaemonAPI.FolderMCPServer,
+                            among servers: [DaemonAPI.FolderMCPServer]) -> String? {
         guard server.secretNames.count == 1, let name = server.secretNames.first else { return nil }
         let usedElsewhere = servers.contains { $0.name != server.name && $0.secretNames.contains(name) }
         return usedElsewhere ? nil : name
     }
 
-    static func keptBecauseShared(_ server: DaemonAPI.ProjectMCPServer,
-                                  among servers: [DaemonAPI.ProjectMCPServer]) -> String? {
+    static func keptBecauseShared(_ server: DaemonAPI.FolderMCPServer,
+                                  among servers: [DaemonAPI.FolderMCPServer]) -> String? {
         guard server.secretNames.count == 1, let name = server.secretNames.first else { return nil }
         let usedElsewhere = servers.contains { $0.name != server.name && $0.secretNames.contains(name) }
         return usedElsewhere ? name : nil
@@ -37,11 +37,11 @@ struct RemoveMCPServerSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Remove \(server.name)?").appText(.title)
-            Text(MCPHealthWords.removes(server.name, inProject: inProject))
+            Text(MCPHealthWords.removes(server.name, inFolder: inFolder))
                 .appText(.fine)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            if inProject {
+            if inFolder {
                 Text(MCPHealthWords.removesCommitted)
                     .appText(.fine)
                     .foregroundStyle(.secondary)
@@ -73,8 +73,8 @@ struct RemoveMCPServerSheet: View {
         .paperSheet()
     }
 
-    private var inProject: Bool {
-        if case .project = destination { return true }
+    private var inFolder: Bool {
+        if case .folder = destination { return true }
         return false
     }
 
@@ -83,7 +83,7 @@ struct RemoveMCPServerSheet: View {
         defer { removing = false }
         let forget = alsoForget ? forgettable : nil
         if let error = await model.mcpRemove(server.name, at: destination, forgetSecret: forget) {
-            failure = MCPCatalogWords.sentence(error)
+            failure = MCPCatalogWords.notRemoved(server.name, error)
         } else {
             onRemoved()
             dismiss()

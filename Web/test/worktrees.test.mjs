@@ -5,8 +5,8 @@ import { load } from "./load.mjs";
 
 const w = await load("src/model/worktrees.ts");
 const gb = 1_000_000_000;
-const tree = (name, size, agents = 0, partial = false, project = "/p") => ({
-  name, root: `file://${project}/.agents/worktrees/${name}/`, branch: `agents/${name}`, isProjectFolder: false,
+const tree = (name, size, agents = 0, partial = false, folder = "/p") => ({
+  name, root: `file://${folder}/.agents/worktrees/${name}/`, branch: `agents/${name}`, isFolderPath: false,
   exists: true, madeByApp: true, agents: Array.from({ length: agents }, (_, i) => `a${i}`),
   ...(size === null ? {} : { size: { bytes: size * gb, partial } }),
 });
@@ -33,12 +33,12 @@ test("worktrees: what Remove build output freed, and what Remove… would lose",
     "This loses 2 uncommitted changes and commits that are not merged, and removes its branch agents/x.");
 });
 
-test("worktrees: a size heard after the list fills it in, and the project holding most idle comes first", () => {
+test("worktrees: a size heard after the list fills it in, and the folder holding most idle comes first", () => {
   const late = tree("late", null, 0, false, "/q");
-  const groups = [{ project: "/p", worktrees: [tree("a", 2)] }, { project: "/q", worktrees: [late] }];
-  assert.deepEqual(w.forCleanup(groups).map((g) => g.project), ["/p", "/q"]);
+  const groups = [{ folder: "/p", worktrees: [tree("a", 2)] }, { folder: "/q", worktrees: [late] }];
+  assert.deepEqual(w.forCleanup(groups).map((g) => g.folder), ["/p", "/q"]);
   const heard = { [late.root]: { bytes: 7 * gb, partial: false } };
-  assert.deepEqual(w.forCleanup(groups, heard).map((g) => g.project), ["/q", "/p"]);
+  assert.deepEqual(w.forCleanup(groups, heard).map((g) => g.folder), ["/q", "/p"]);
   assert.equal(w.worktreeDetail(tree("x", 1, 2), { bytes: 4.1 * gb, partial: false }), "agents/x · 2 agents working · 4.1 GB");
   assert.equal(w.statusSummary({ uncommitted: 2, unmerged: 1, ahead: 1 }), "2 uncommitted · 1 unmerged · ↑1");
 });

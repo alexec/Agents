@@ -7,10 +7,31 @@ import Foundation
 /// client trusts and the hello's nonce, never taken from the control plane, so a token made
 /// for one control plane is no good at another (R2, FR-011).
 public enum ControlSignIn {
-    /// Signs in with a provider, given the providers turned on and the nonce to sign in with:
-    /// the provider and its token (an ID token, or a GitHub user token).
-    public typealias Provider = @Sendable (_ providers: DaemonAPI.SignInProviders, _ nonce: String) async throws
-        -> (provider: String, token: String)
+    /// Signs in with a provider, given the providers turned on, the nonce to sign in with, and
+    /// what it may ask on the connection: a built-in provider's token (an ID token, or a GitHub
+    /// user token), or an org provider's ticket (#1002).
+    public typealias Provider = @Sendable (_ providers: DaemonAPI.SignInProviders, _ nonce: String, _ ask: Asking) async throws
+        -> Answer
+
+    /// What a sign-in gives: a built-in provider's token, or the ticket an org provider's
+    /// flow came back with (#1002, D3).
+    public enum Answer: Sendable, Equatable {
+        case token(provider: String, token: String)
+        case ticket(String)
+    }
+
+    /// What a sign-in screen asks on the connection that will pair (#1002): an org
+    /// provider's flow to open in a browser, and the provider of a typed email.
+    public struct Asking: Sendable {
+        public let orgStart: @Sendable (_ provider: String, _ loginHint: String?) async throws -> URL
+        public let discover: @Sendable (_ email: String) async throws -> DaemonAPI.SignInDiscovered
+
+        public init(orgStart: @escaping @Sendable (String, String?) async throws -> URL,
+                    discover: @escaping @Sendable (String) async throws -> DaemonAPI.SignInDiscovered) {
+            self.orgStart = orgStart
+            self.discover = discover
+        }
+    }
 
     public struct Failure: Error, Sendable, CustomStringConvertible, Equatable {
         public var description: String
@@ -21,6 +42,16 @@ public enum ControlSignIn {
     /// the first 8 bytes in hex.
     public static func keyID(controlKey: Data) -> String {
         ControlAuth.hex(ControlAgreement.sha256(controlKey).prefix(8))
+    }
+
+    /// The code a sign-in that waits for approval shows, made here as the control plane makes
+    /// it: SHA-256("agents-signin-approve" ‖ the new key's public half ‖ the control key this
+    /// client trusts), two bytes a letter. Never the control plane's: one that passed the
+    /// sign-in on could only pass on another key's code.
+    public static func approvalCode(clientPublicKey: Data, controlKey: Data) -> String {
+        let letters = Array("ABCDEFGHJKMNPQRSTUVWXYZ23456789")
+        let sum = Array(ControlAgreement.sha256(Data("agents-signin-approve".utf8) + clientPublicKey + controlKey))
+        return String((0..<6).map { letters[(Int(sum[2 * $0]) << 8 | Int(sum[2 * $0 + 1])) % letters.count] })
     }
 
     /// The nonce for a sign-in on one connection to one control plane:
@@ -52,22 +83,47 @@ public enum ControlSignIn {
 
     /// Pairs as the person the sign-in names: what the client keeps to dial again. A GitHub
     /// sign-in waits for Approve on another of the person's clients; `waiting` is told the
-    /// code to show.
+    /// code to show, made here (`approvalCode`).
     public static func pair(url: URL, pin: String?, controlKey: Data?, privateKey: Data, id: UUID, name: String,
                             kind: ClientRecord.Kind, dial: ControlCodeUse.Dial, signIn: Provider,
                             waiting: (@Sendable (DaemonAPI.SignInWaiting) -> Void)? = nil) async throws -> ControlMembership {
         let session = try await open(url: url, pin: pin, controlKey: controlKey, privateKey: privateKey, id: id, kind: kind,
                                      dial: dial)
         defer { session.reader.close() }
-        let providers = try await call(session.reader, id: 1, method: DaemonAPI.Method.signInProviders, params: .object([:]),
-                                       within: 15, waiting: nil).decode(DaemonAPI.SignInProviders.self)
-        let (provider, token) = try await signIn(providers, nonce(controlKey: session.controlKey, challenge: session.helloNonce))
-        let request = DaemonAPI.SignInPair(provider: provider, token: token, name: name, kind: kind)
-        // Long enough for another client to approve a GitHub sign-in (10 minutes there).
-        let admitted = try await call(session.reader, id: 2, method: DaemonAPI.Method.signInPair,
-                                      params: try JSONValue.encoding(request), within: 11 * 60, waiting: waiting)
-            .decode(DaemonAPI.Admitted.self)
-        guard admitted.client == id else { throw Failure("the control plane paired another client") }
+        let line = Line(session.reader)
+        let providers = try await line.call(DaemonAPI.Method.signInProviders, .object([:]), within: 15, waiting: nil)
+            .decode(DaemonAPI.SignInProviders.self)
+        let asking = Asking(orgStart: { provider, hint in
+            let start = DaemonAPI.SignInOrgStart(provider: provider, purpose: .pair, returnTo: .app, loginHint: hint)
+            let started = try await line.call(DaemonAPI.Method.signInOrgStart, try JSONValue.encoding(start), within: 30,
+                                              waiting: nil).decode(DaemonAPI.SignInOrgStarted.self)
+            guard let address = URL(string: started.url), ["https", "http"].contains(address.scheme?.lowercased()) else {
+                throw Failure("the control plane gave no address to sign in at")
+            }
+            return address
+        }, discover: { email in
+            try await line.call(DaemonAPI.Method.signInDiscover, try JSONValue.encoding(DaemonAPI.SignInDiscover(email: email)),
+                                within: 15, waiting: nil).decode(DaemonAPI.SignInDiscovered.self)
+        })
+        let paired: UUID?
+        switch try await signIn(providers, nonce(controlKey: session.controlKey, challenge: session.helloNonce), asking) {
+        case .token(let provider, let token):
+            let request = DaemonAPI.SignInPair(provider: provider, token: token, name: name, kind: kind)
+            let code = approvalCode(clientPublicKey: try ControlAgreement.publicKey(privateKey: privateKey),
+                                    controlKey: session.controlKey)
+            var shown: (@Sendable (DaemonAPI.SignInWaiting) -> Void)?
+            if let waiting {
+                shown = { told in waiting(DaemonAPI.SignInWaiting(code: code, expires: told.expires)) }
+            }
+            // Long enough for another client to approve a GitHub sign-in (10 minutes there).
+            paired = try await line.call(DaemonAPI.Method.signInPair, try JSONValue.encoding(request), within: 11 * 60,
+                                         waiting: shown).decode(DaemonAPI.Admitted.self).client
+        case .ticket(let ticket):
+            let request = DaemonAPI.SignInTicket(ticket: ticket, name: name, kind: kind)
+            paired = try await line.call(DaemonAPI.Method.signInTicket, try JSONValue.encoding(request), within: 30,
+                                         waiting: nil).decode(DaemonAPI.SignInTicketResult.self).client
+        }
+        guard paired == id else { throw Failure("the control plane paired another client") }
         return ControlMembership(client: id, controlKey: session.controlKey, addresses: [], name: session.name,
                                  url: url.absoluteString, pin: pin)
     }
@@ -112,7 +168,21 @@ public enum ControlSignIn {
         }
     }
 
-    private static func call(_ reader: PrefixReader, id: Int, method: String, params: JSONValue, within seconds: Double,
+    /// The connection's calls, one at a time, each with the next id.
+    private actor Line {
+        let reader: PrefixReader
+        var next = 0
+
+        init(_ reader: PrefixReader) { self.reader = reader }
+
+        func call(_ method: String, _ params: JSONValue, within seconds: Double,
+                  waiting: (@Sendable (DaemonAPI.SignInWaiting) -> Void)?) async throws -> JSONValue {
+            next += 1
+            return try await ControlSignIn.call(reader, id: next, method: method, params: params, within: seconds, waiting: waiting)
+        }
+    }
+
+    fileprivate static func call(_ reader: PrefixReader, id: Int, method: String, params: JSONValue, within seconds: Double,
                              waiting: (@Sendable (DaemonAPI.SignInWaiting) -> Void)?) async throws -> JSONValue {
         try reader.write(line: JSONRPCCodec.encode(.request(id: .number(id), method: method, params: params)))
         let deadline = Date().addingTimeInterval(seconds)

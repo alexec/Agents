@@ -4,10 +4,6 @@ import Foundation
 // do not collide in DaemonAPI.swift. contracts/daemon-api.md is the reference.
 
 public extension DaemonAPI.Method {
-    /// `wait_for_event`, relayed: wait, or read recent events, or list the catalogue.
-    static let eventsWait = "events/wait"
-    /// `cancel_wait`, relayed.
-    static let eventsCancel = "events/cancel"
     /// A page of the log and who is waiting, for the Mac's page and the phone's list.
     static let eventsList = "events/list"
     /// The person cancelling an agent's wait, from the Mac, the phone or the web page.
@@ -27,7 +23,7 @@ public extension DaemonAPI.Notification {
 
 public extension DaemonAPI.Failure {
     /// An event name, filter or scope the app will not take: unknown, outside the
-    /// caller's project, or a `custom.` one (#639). The message says which, and what
+    /// caller's folder, or a `custom.` one (#639). The message says which, and what
     /// would do (042 R16).
     static let eventRefused = -32050
     /// Cancelling a wait when there is none.

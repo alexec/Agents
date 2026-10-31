@@ -6,15 +6,25 @@ import SwiftUI
 /// A page like Resources, reached from the foot of the sidebar. It was in Settings ▸
 /// Agent Runtimes, which is where a control belongs; what it says is the state of the
 /// machine, and it changes without anybody touching a setting. Settings keeps what
-/// changes the Mac: installing a runtime, signing one in, its permission mode.
+/// changes the Mac: installing a runtime, its permission mode.
 ///
 /// Every runtime the app knows is here, installed or not, so the page answers "what can
 /// I start on" in one place. A runtime with no allowance of its own says so rather than
 /// being left out, and one that is not on the Mac says what stopped it. **Mark available**
-/// is the only thing here that changes anything, and a wrong mark costs one refused turn
-/// (FR-023), so it asks nothing first.
+/// asks nothing first: a wrong mark costs one refused turn (FR-023).
+///
+/// The accounts of a runtime are here too (#2255), as the Remote and the web page send a person
+/// here to sign one in: **Add Account…** on the runtime's row, **Sign In…** (the runtime's
+/// sign-in sheet, which has the Accounts section) and **Remove…** on an account's row.
 struct RuntimesView: View {
     @Environment(AppModel.self) private var model
+
+    /// The runtime whose sign-in sheet is open.
+    @State private var signingIn: String?
+    @State private var addingTo: Runtime?
+    @State private var newName = ""
+    @State private var addProblem: String?
+    @State private var removing: AccountProfile?
 
     var body: some View {
         ScrollView {
@@ -29,12 +39,35 @@ struct RuntimesView: View {
                         if index > 0 { Divider().padding(.leading, 14) }
                         RuntimeStatusRow(status: status,
                                          allowance: allowance(for: status.id),
-                                         at: model.runtimeAllowances?.at ?? Date())
-                        // Each account added to it (#840), under it, with its own allowance.
+                                         at: model.runtimeAllowances?.at ?? Date()) {
+                            if case .needsSignIn = status.availability {
+                                Button("Sign In…") { signingIn = status.id }
+                                    .controlSize(.small)
+                            }
+                            if status.runtime.accountFolderVariable != nil, !status.availability.isMissing {
+                                Button("Add Account…") {
+                                    newName = ""
+                                    addingTo = status.runtime
+                                }
+                                .controlSize(.small)
+                            }
+                        }
+                        // Each account added to it (#840), then the organisation's (#999), under
+                        // it, with its own allowance. Only one the person added can be signed in
+                        // or removed here; the organisation's is the organisation's.
                         ForEach(accountRows(for: status.id)) { row in
                             Divider().padding(.leading, 14)
                             RuntimeStatusRow(status: status, allowance: row, at: model.runtimeAllowances?.at ?? Date(),
-                                             title: row.title)
+                                             title: row.title) {
+                                if let account = account(of: row) {
+                                    if !account.signedIn {
+                                        Button("Sign In…") { signingIn = status.id }
+                                            .controlSize(.small)
+                                    }
+                                    Button("Remove…") { removing = account }
+                                        .controlSize(.small)
+                                }
+                            }
                         }
                     }
                 }
@@ -53,7 +86,47 @@ struct RuntimesView: View {
         .task {
             await model.refreshRuntimes()
             await model.refreshRuntimeAllowances()
+            await model.refreshAccountProfiles()
         }
+        .sheet(isPresented: Binding(get: { signingIn != nil }, set: { if !$0 { signingIn = nil } })) {
+            if let signingIn {
+                RuntimeAccountView(runtimeID: signingIn)
+                    .paperSheet()
+            }
+        }
+        .alert("Add a \(addingTo?.name ?? "") account", isPresented: Binding(get: { addingTo != nil },
+                                                                           set: { if !$0 { addingTo = nil } })) {
+            TextField("Name, such as Work", text: $newName)
+            Button("Add") {
+                guard let runtime = addingTo else { return }
+                let name = newName.trimmingCharacters(in: .whitespaces)
+                Task { addProblem = await model.addAccount(runtimeID: runtime.id, name: name) }
+            }
+            .disabled(newName.trimmingCharacters(in: .whitespaces).isEmpty)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("You choose it when you start a session. Then sign it in here.")
+        }
+        .alert("Not added", isPresented: Binding(get: { addProblem != nil }, set: { if !$0 { addProblem = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(addProblem ?? "")
+        }
+        .confirmationDialog("Remove \(removing?.name ?? "this account")?",
+                            isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } })) {
+            Button("Remove", role: .destructive) {
+                guard let account = removing else { return }
+                Task { await model.removeAccount(account) }
+            }
+        } message: {
+            Text(AccountWords.removeMessage(stopping: removing.map(model.agentsHolding(account:))?.count ?? 0,
+                                            from: "this Mac"))
+        }
+    }
+
+    /// The account a row is for, when the person may sign it in or remove it: not an org account.
+    private func account(of row: RuntimeAllowances.Row) -> AccountProfile? {
+        row.accountID.flatMap { id in model.accountProfiles.first { $0.id == id && !$0.isOrganisation } }
     }
 
     /// Every runtime the app knows, in its own order. The daemon sends the whole list
@@ -73,20 +146,28 @@ struct RuntimesView: View {
     }
 }
 
-/// One runtime: its name, what is true of it, and **Mark available** when it is out.
-private struct RuntimeStatusRow: View {
+/// One runtime: its name, what is true of it, **Mark available** when it is out, and the
+/// row's own buttons.
+private struct RuntimeStatusRow<Actions: View>: View {
     @Environment(AppModel.self) private var model
     let status: RuntimeStatus
     let allowance: RuntimeAllowances.Row?
     let at: Date
     /// An added account's row is named for it too: "Claude · Work".
     var title: String?
+    @ViewBuilder var actions: Actions
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title ?? status.runtime.name)
                     .fontWeight(.semibold)
+                // An org account says where it is from (spec FR-023), never a key or an address.
+                if allowance?.isOrganisation == true {
+                    Text(OrgAccountWords.fromOrganisation)
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                }
                 Text(line)
                     .appText(.fine)
                     .foregroundStyle(isOut ? StateTint.failure.style(or: .primary) : AnyShapeStyle(.secondary))
@@ -111,6 +192,7 @@ private struct RuntimeStatusRow: View {
                 }
                 .controlSize(.small)
             }
+            actions
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
@@ -123,7 +205,7 @@ private struct RuntimeStatusRow: View {
         // A runtime the daemon found but nothing can start is that, whatever its plan
         // says. "Available" on a binary that is not here would be true of nothing.
         if let unusable = allowance?.unusable { return "Not usable: \(unusable)" }
-        if let allowance { return allowance.line(now: at) }
+        if let allowance { return allowance.memberLine(now: at) }
         switch status.availability {
         case .available: return "Available · no plan of its own"
         case .missing: return "Not on this Mac"

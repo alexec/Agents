@@ -45,6 +45,9 @@ private struct AppViewInline: View {
                 case .failed(let words):
                     AppViewFailure(host: host, words: words)
                         .frame(maxWidth: .infinity, minHeight: 60)
+                    if let text = host.call.resultText {
+                        Text(text).appText(.reading).textSelection(.enabled)
+                    }
                 case .asking(let ask):
                     AppViewShowAsk(host: host, ask: ask)
                 case .gone:
@@ -243,7 +246,7 @@ private struct AppViewCaption: View {
     }
 }
 
-/// The view's menu: Pin to Project (#189), when the call can feed a pin. Nothing else yet,
+/// The view's menu: Pin to Folder (#189), when the call can feed a pin. Nothing else yet,
 /// so no menu at all without it.
 private struct AppViewMenu: View {
     let host: AppViewHost
@@ -251,7 +254,7 @@ private struct AppViewMenu: View {
     var body: some View {
         if host.canPin {
             Menu {
-                Button("Pin to Project") { host.pinToProject() }
+                Button("Pin to Folder") { host.pinToFolder() }
             } label: {
                 Image(systemName: "ellipsis.circle")
                     .accessibilityLabel("View menu")
@@ -261,7 +264,7 @@ private struct AppViewMenu: View {
             .menuIndicator(.hidden)
             .fixedSize()
             .foregroundStyle(.secondary)
-            .help("Pin this view under the project, opened by the same call")
+            .help("Pin this view under the folder, opened by the same call")
         }
     }
 }

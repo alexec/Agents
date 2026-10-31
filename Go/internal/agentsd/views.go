@@ -104,7 +104,7 @@ func (d *Daemon) viewToolCall(r wire.ViewToolCallRequest) (wire.JSONValue, error
 // noteViewToolCall is a tool call from the runtime: if it is a call of a person's server's
 // tool with a view, its appView entry, written as it starts (when the runtime named the
 // server outright) and again when it is answered. The app never calls the tool itself.
-func (d *Daemon) noteViewToolCall(agentID wire.UUID, project string, incoming wire.ToolCall) {
+func (d *Daemon) noteViewToolCall(agentID wire.UUID, folder string, incoming wire.ToolCall) {
 	if incoming.ToolCallID == nil {
 		return
 	}
@@ -114,7 +114,7 @@ func (d *Daemon) noteViewToolCall(agentID wire.UUID, project string, incoming wi
 	known := calls[id]
 	d.viewMu.Unlock()
 	if known == nil {
-		names := d.viewServerNames(project)
+		names := d.viewServerNames(folder)
 		if len(names) == 0 {
 			return
 		}
@@ -153,13 +153,13 @@ func (d *Daemon) noteViewToolCall(agentID wire.UUID, project string, incoming wi
 		}
 	}
 	d.viewMu.Unlock()
-	go d.writeThirdPartyView(id, agentID, project)
+	go d.writeThirdPartyView(id, agentID, folder)
 }
 
-// noteAgentViewCall is noteViewToolCall for a call in agentID's turn, in its project.
+// noteAgentViewCall is noteViewToolCall for a call in agentID's turn, in its folder.
 func (d *Daemon) noteAgentViewCall(agentID wire.UUID, call wire.ToolCall) {
 	if a := d.Store.Agent(agentID); a != nil {
-		d.noteViewToolCall(agentID, projectFolder(a), call)
+		d.noteViewToolCall(agentID, folderPath(a), call)
 	}
 }
 
@@ -184,7 +184,7 @@ func mergedCall(old, upd wire.ToolCall) wire.ToolCall {
 	return call
 }
 
-func (d *Daemon) writeThirdPartyView(id string, agentID wire.UUID, project string) {
+func (d *Daemon) writeThirdPartyView(id string, agentID wire.UUID, folder string) {
 	d.viewMu.Lock()
 	first := d.viewCalls[agentID][id]
 	var candidates []shapeCandidate
@@ -199,7 +199,7 @@ func (d *Daemon) writeThirdPartyView(id string, agentID wire.UUID, project strin
 	var chosen *shapeCandidate
 	var tool viewTool
 	for i, c := range candidates {
-		s, problem := d.viewServerFor(c.server, project)
+		s, problem := d.viewServerFor(c.server, folder)
 		if problem != 0 {
 			continue
 		}
@@ -321,25 +321,25 @@ func (d *Daemon) viewServerOf(viewID, agentID wire.UUID) string {
 
 // MARK: What a drawn view asks for
 
-// viewProject is the project a view's request is for: its agent's, or the pin's.
-func (d *Daemon) viewProject(agentID wire.UUID, claimed *wire.URL) (string, error) {
+// viewFolder is the folder a view's request is for: its agent's, or the pin's.
+func (d *Daemon) viewFolder(agentID wire.UUID, claimed *wire.URL) (string, error) {
 	if a := d.Store.Agent(agentID); a != nil {
-		project := filepath.Clean(projectFolder(a))
-		if claimed != nil && filepath.Clean(store.FolderPath(*claimed)) != project {
-			return "", viewRefused("That view is outside its project.")
+		folder := filepath.Clean(folderPath(a))
+		if claimed != nil && filepath.Clean(store.FolderPath(*claimed)) != folder {
+			return "", viewRefused("That view is outside its folder.")
 		}
-		return project, nil
+		return folder, nil
 	}
 	if claimed != nil {
-		if p := filepath.Clean(store.FolderPath(*claimed)); d.isProjectFolder(p) {
+		if p := filepath.Clean(store.FolderPath(*claimed)); d.isFolderPath(p) {
 			return p, nil
 		}
 	}
-	return "", &Error{Code: CodeNoSuchAgent, Message: "That view has no project."}
+	return "", &Error{Code: CodeNoSuchAgent, Message: "That view has no folder."}
 }
 
-func (d *Daemon) readyViewServer(name, project string) (viewServer, error) {
-	s, problem := d.viewServerFor(name, project)
+func (d *Daemon) readyViewServer(name, folder string) (viewServer, error) {
+	s, problem := d.viewServerFor(name, folder)
 	if problem != 0 {
 		log.Printf("mcp views: %s's view not shown: %s", name, problem.pinReason())
 		return viewServer{}, viewRefused(problem.words(name))
@@ -377,11 +377,11 @@ func (d *Daemon) readView(ctx context.Context, r wire.ViewReadRequest) (wire.Vie
 		return wire.ViewResource{}, viewRefused("No view at " + r.URI + ".")
 	}
 	name := *r.Server
-	project, err := d.viewProject(r.AgentID, r.Project)
+	folder, err := d.viewFolder(r.AgentID, r.Folder)
 	if err != nil {
 		return wire.ViewResource{}, err
 	}
-	s, err := d.readyViewServer(name, project)
+	s, err := d.readyViewServer(name, folder)
 	if err != nil {
 		return wire.ViewResource{}, err
 	}
@@ -440,7 +440,7 @@ func (d *Daemon) readView(ctx context.Context, r wire.ViewReadRequest) (wire.Vie
 	case "show":
 	case "hide":
 		return wire.ViewResource{}, viewRefused("You chose not to show " + name +
-			"'s views here. Ask Again is on its row in the project's MCP servers.")
+			"'s views here. Ask Again is on its row in the folder's MCP servers.")
 	default:
 		log.Printf("view %s of %s: waiting for Show", r.URI, name)
 		msg := name + "'s view has changed since you said Show."
@@ -452,7 +452,7 @@ func (d *Daemon) readView(ctx context.Context, r wire.ViewReadRequest) (wire.Vie
 	}
 	uiFields := objectOf(ui)
 	policy := viewPolicy(uiFields["csp"])
-	who := "a project page"
+	who := "a folder page"
 	if a := d.Store.Agent(r.AgentID); a != nil {
 		who = agentName(a.Title)
 	}
@@ -501,11 +501,11 @@ func (d *Daemon) viewAnswer(scope, server, uri, hash string) (string, bool) {
 
 // answerViewShow is the person's Show or Don't Show, for this version of the view.
 func (d *Daemon) answerViewShow(r wire.ViewShowRequest) error {
-	project, err := d.viewProject(r.AgentID, r.Project)
+	folder, err := d.viewFolder(r.AgentID, r.Folder)
 	if err != nil {
 		return err
 	}
-	s, err := d.readyViewServer(r.Server, project)
+	s, err := d.readyViewServer(r.Server, folder)
 	if err != nil {
 		return err
 	}
@@ -536,38 +536,56 @@ func (d *Daemon) callFromView(ctx context.Context, r wire.ViewCallRequest) (wire
 				return nil, viewRefused("A view may call only its own server's tools, not the " + appServerName + " server's.")
 			}
 		}
-		if _, err := d.viewProject(r.AgentID, r.Project); err != nil {
+		if _, err := d.viewFolder(r.AgentID, r.Folder); err != nil {
 			return nil, err
 		}
 		log.Printf("view %s asked for %s, which no view may call", r.ViewID, r.Name)
 		return nil, viewRefused("A view may not call " + r.Name + ".")
 	}
 	name := *r.Server
-	project, err := d.viewProject(r.AgentID, r.Project)
+	folder, err := d.viewFolder(r.AgentID, r.Folder)
 	if err != nil {
 		return nil, err
 	}
-	// The server the view is of, as the host wrote it or the project pinned it, not as the
-	// request says.
+	// The server the view is of, as the host wrote it, the folder pinned it or the server
+	// shows it (#2032), not as the request says.
 	own := false
 	if d.Store.Agent(r.AgentID) != nil {
 		own = d.viewServerOf(r.ViewID, r.AgentID) == name
 	} else {
-		for _, p := range d.readPins(project).pins {
+		f := d.readPins(folder)
+		for _, p := range f.pins {
 			if p.view != nil && p.view.Server == name {
 				own = true
 			}
+		}
+		// Or a server's list view, shown without a pin (#2032).
+		for _, v := range d.serverViews(folder, f) {
+			own = own || v.View.Server == name
 		}
 	}
 	if !own {
 		log.Printf("view %s asked for %s's %s, which is not its server's: refused", r.ViewID, name, r.Name)
 		return nil, viewRefused("A view may call only its own server's tools, not the " + name + " server's.")
 	}
-	s, err := d.readyViewServer(name, project)
+	s, err := d.readyViewServer(name, folder)
 	if err != nil {
 		return nil, err
 	}
+	// The Lineage section (#2941): the host answers it, from its own record.
+	if r.Name == lineageViewTool {
+		result, err := d.lineageViewResult(s, r.Arguments)
+		if err == nil {
+			log.Printf("view %s of %s called %s", r.ViewID, name, r.Name)
+		} else {
+			log.Printf("view %s of %s asked for %s, which only ours may call", r.ViewID, name, r.Name)
+		}
+		return result, err
+	}
 	catalog := d.loadViewCatalog(ctx, s)
+	if catalog != nil && !catalog.appTool(r.Name) {
+		catalog = d.refreshViewCatalog(ctx, s)
+	}
 	if catalog == nil || !catalog.appTool(r.Name) {
 		log.Printf("view %s of %s asked for %s, which no view may call", r.ViewID, name, r.Name)
 		return nil, viewRefused("A view may not call " + r.Name + ".")
@@ -620,9 +638,9 @@ func (d *Daemon) logFromView(r wire.ViewLogRequest) {
 // to the agent with the person's next message, before their words (takeViewContext).
 func (d *Daemon) keepViewContext(r wire.ViewContextRequest) error {
 	if d.Store.Agent(r.AgentID) == nil {
-		// A project's page (a pin) has no agent to tell (#189).
-		log.Printf("view %s on a project page asked to update the model's context: refused", r.ViewID)
-		return viewRefused("A view on a project's page has no agent to tell.")
+		// A folder's page (a pin) has no agent to tell (#189).
+		log.Printf("view %s on a folder page asked to update the model's context: refused", r.ViewID)
+		return viewRefused("A view on a folder's page has no agent to tell.")
 	}
 	preface := viewContextPreface("a view", r.Content, r.StructuredContent)
 	d.viewMu.Lock()
@@ -705,16 +723,16 @@ func (d *Daemon) withViewContext(agentID wire.UUID, q wire.QueuedPrompt) wire.Qu
 
 // MARK: Pins (#189, #191)
 
-// viewPinRefusal is why view can't be pinned in project, or "": by what was last read of
+// viewPinRefusal is why view can't be pinned in folder, or "": by what was last read of
 // its server. A view is pinned from where it was drawn, so its catalog is here.
-func (d *Daemon) viewPinRefusal(v wire.ViewPin, project string) string {
+func (d *Daemon) viewPinRefusal(v wire.ViewPin, folder string) string {
 	if why := viewProblem(v); why != "" {
 		return why
 	}
 	if v.Server == appServerName {
 		return "the " + appServerName + " server has no view at " + v.URI + "."
 	}
-	s, problem := d.viewServerFor(v.Server, project)
+	s, problem := d.viewServerFor(v.Server, folder)
 	if problem != 0 {
 		return problem.words(v.Server)
 	}
@@ -734,11 +752,11 @@ func (d *Daemon) viewPinRefusal(v wire.ViewPin, project string) string {
 }
 
 // viewPinMissing is why a pinned view can't be drawn on this host, or "".
-func (d *Daemon) viewPinMissing(v wire.ViewPin, project string) string {
+func (d *Daemon) viewPinMissing(v wire.ViewPin, folder string) string {
 	if v.Server == appServerName {
 		return "no such view"
 	}
-	s, problem := d.viewServerFor(v.Server, project)
+	s, problem := d.viewServerFor(v.Server, folder)
 	if problem != 0 {
 		return problem.pinReason()
 	}
@@ -754,8 +772,8 @@ func (d *Daemon) viewPinMissing(v wire.ViewPin, project string) string {
 
 // viewPinTitle is the view's own title, as its server gives it, kept with a pin (#905);
 // nil when it gives none.
-func (d *Daemon) viewPinTitle(v wire.ViewPin, project string) *string {
-	s, problem := d.viewServerFor(v.Server, project)
+func (d *Daemon) viewPinTitle(v wire.ViewPin, folder string) *string {
+	s, problem := d.viewServerFor(v.Server, folder)
 	if problem != 0 {
 		return nil
 	}
@@ -974,9 +992,9 @@ func viewThemeVariables() map[string]string {
 	return out
 }
 
-// pinned is whether path (a view's ui:// address) is pinned in project already.
-func (d *Daemon) pinned(project, path string) bool {
-	for _, e := range d.readPins(project).pins {
+// pinned is whether path (a view's ui:// address) is pinned in folder already.
+func (d *Daemon) pinned(folder, path string) bool {
+	for _, e := range d.readPins(folder).pins {
 		if e.path == path {
 			return true
 		}

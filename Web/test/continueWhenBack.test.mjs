@@ -1,4 +1,4 @@
-// A chat paused by a spent allowance carries on when it is back (#1859), as ContinueWhenBackWords says it.
+// An allowance failure can continue when it is back (#1859), as ContinueWhenBackWords says it.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "./load.mjs";
@@ -10,15 +10,15 @@ const s = await load("src/model/status.ts");
 
 // Wire dates are seconds since 2001-01-01.
 const wire = (date) => date.getTime() / 1000 - 978_307_200;
-const paused = {
+const allowanceFailure = {
   id: "A", runtimeID: "claude", cwd: "file:///p/", state: "stopped", startOptions: {}, advertisedOptions: [],
   availableCommands: [], createdAt: 0, lastActivityAt: 0, endedReason: "allowanceSpent",
 };
 
-test("a paused chat offers Continue, at the reset time when it is known", () => {
+test("an allowance failure offers Continue, at the reset time when it is known", () => {
   const now = new Date(2026, 9, 21, 3, 0);
-  assert.equal(w.offersContinue(paused), true);
-  assert.equal(w.offersContinue({ ...paused, endedReason: "cancelled" }), false);
+  assert.equal(w.offersContinue(allowanceFailure), true);
+  assert.equal(w.offersContinue({ ...allowanceFailure, endedReason: "cancelled" }), false);
   assert.match(w.continueButton(new Date(2026, 9, 21, 7, 0), now), /^Continue at /);
   assert.equal(w.continueButton(null, now), "Continue when it is back");
 });
@@ -26,14 +26,15 @@ test("a paused chat offers Continue, at the reset time when it is known", () => 
 test("a waiting chat says when it continues, on its row too, under Waiting", () => {
   const now = new Date(2026, 9, 21, 3, 0);
   const at = wire(new Date(2026, 9, 21, 7, 0));
-  const waiting = { ...paused, continueWhenBack: { at, resetKnown: true } };
+  const waiting = { ...allowanceFailure, continueWhenBack: { at, resetKnown: true } };
   assert.match(w.continueLine(waiting, now), /^Continues at /);
-  assert.match(w.continueLine({ ...paused, continueWhenBack: { at, resetKnown: false } }, now), /^Continues when it is back · tries at /);
-  assert.equal(w.continueLine(paused), null);
+  assert.match(w.continueLine({ ...allowanceFailure, continueWhenBack: { at, resetKnown: false } }, now), /^Continues when it is back · tries at /);
+  assert.equal(w.continueLine(allowanceFailure), null);
   assert.match(f.reportLine(waiting), /^Continues /);
   assert.equal(w.offersContinue(waiting), false);
   assert.equal(g.groupOf(waiting), "waiting");
-  assert.equal(g.groupOf(paused), "stopped");
+  assert.equal(g.groupOf(allowanceFailure), "needsAttention");
+  assert.equal(s.shapeOf(allowanceFailure), "needsYou");
   assert.equal(s.statusWords(waiting), "Waiting for an allowance");
 });
 

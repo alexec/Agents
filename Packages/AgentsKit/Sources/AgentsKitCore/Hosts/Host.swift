@@ -6,19 +6,19 @@ import Foundation
 /// this Mac's. A server's id is eight
 /// lowercase letters and digits, short on purpose because it names the socket files the
 /// window keeps for it, and those have a 104-byte ceiling.
-public struct HostID: RawRepresentable, Codable, Hashable, Sendable, CustomStringConvertible {
+public struct MachineRef: RawRepresentable, Codable, Hashable, Sendable, CustomStringConvertible {
     public var rawValue: String
     public init(rawValue: String) { self.rawValue = rawValue }
 
-    public static let mac = HostID(rawValue: "mac")
+    public static let mac = MachineRef(rawValue: "mac")
 
-    public static func make() -> HostID {
+    public static func make() -> MachineRef {
         let alphabet = Array("abcdefghijklmnopqrstuvwxyz0123456789")
         var id: String
         repeat {
             id = String((0..<8).map { _ in alphabet.randomElement()! })
         } while id == mac.rawValue
-        return HostID(rawValue: id)
+        return MachineRef(rawValue: id)
     }
 
     public var description: String { rawValue }
@@ -29,7 +29,7 @@ public struct HostID: RawRepresentable, Codable, Hashable, Sendable, CustomStrin
 /// Everything about reaching it — address, port, user, key, jump host — stays in their
 /// own ssh configuration. The window keeps the name and what it learned by asking.
 public struct ServerHost: Codable, Hashable, Sendable, Identifiable {
-    public var id: HostID
+    public var id: MachineRef
     /// Exactly what was typed. Handed to `ssh` as the destination, after `--`.
     public var sshName: String
     public var label: String
@@ -41,15 +41,15 @@ public struct ServerHost: Codable, Hashable, Sendable, Identifiable {
     /// "Use this server's own sign-in only" (043, FR-014): nothing from Settings is ever
     /// lent to it. For a box the person shares.
     public var ownSignInOnly: Bool = false
-    /// The project folders last seen on it, so that after a rebuild the ones it no longer
+    /// The folders last seen on it, so that after a rebuild the ones it no longer
     /// has can be shown as gone rather than offline (043, FR-019).
-    public var knownProjects: [String] = []
+    public var knownFolders: [String] = []
 
     public struct InvalidName: Error, Equatable, Sendable {
         public var name: String
     }
 
-    public init(sshName: String, id: HostID = .make(), addedAt: Date = Date()) throws {
+    public init(sshName: String, id: MachineRef = .make(), addedAt: Date = Date()) throws {
         guard Self.isValid(sshName) else { throw InvalidName(name: sshName) }
         self.id = id
         self.sshName = sshName
@@ -61,14 +61,14 @@ public struct ServerHost: Codable, Hashable, Sendable, Identifiable {
     /// every connect, so facts this build cannot read cost the facts and not the server.
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = try c.decode(HostID.self, forKey: .id)
+        id = try c.decode(MachineRef.self, forKey: .id)
         sshName = try c.decode(String.self, forKey: .sshName)
         label = try c.decode(String.self, forKey: .label)
         addedAt = try c.decode(Date.self, forKey: .addedAt)
         facts = (try? c.decodeIfPresent(ServerFacts.self, forKey: .facts)) ?? nil
         trustedFingerprint = try c.decodeIfPresent(String.self, forKey: .trustedFingerprint)
         ownSignInOnly = try c.decode(Bool.self, forKey: .ownSignInOnly)
-        knownProjects = try c.decode([String].self, forKey: .knownProjects)
+        knownFolders = try c.decode([String].self, forKey: .knownFolders)
     }
 
     /// Not empty, one word, and not something ssh would read as an option. The `--` in
@@ -143,28 +143,6 @@ public struct ServerFacts: Codable, Hashable, Sendable {
         if let toolsetID { toolsetIDs[RuntimeCatalog.claude.id] = toolsetID }
         self.hasNpx = hasNpx
         self.hasOwnClaudeSignIn = hasOwnClaudeSignIn
-    }
-
-    /// Written by hand for `avx2` alone, which facts saved before 049 do not have. They
-    /// are replaced on the next connect, so this can go once 049 is past the cut-off.
-    public init(from decoder: any Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        system = try c.decode(String.self, forKey: .system)
-        architecture = try c.decode(Architecture.self, forKey: .architecture)
-        home = try c.decode(String.self, forKey: .home)
-        freeBytes = try c.decode(Int64.self, forKey: .freeBytes)
-        installedVersion = try c.decodeIfPresent(String.self, forKey: .installedVersion)
-        installedSHA256 = try c.decodeIfPresent(String.self, forKey: .installedSHA256)
-        streamLocalForwarding = try c.decode(Bool.self, forKey: .streamLocalForwarding)
-        probedAt = try c.decode(Date.self, forKey: .probedAt)
-        libc = try c.decode(Libc.self, forKey: .libc)
-        downloader = try c.decodeIfPresent(String.self, forKey: .downloader)
-        toolsetID = try c.decodeIfPresent(String.self, forKey: .toolsetID)
-        hasNpx = try c.decode(Bool.self, forKey: .hasNpx)
-        hasOwnClaudeSignIn = try c.decode(Bool.self, forKey: .hasOwnClaudeSignIn)
-        toolsetIDs = try c.decode([String: String].self, forKey: .toolsetIDs)
-        ownSignIns = try c.decode(Set<String>.self, forKey: .ownSignIns)
-        avx2 = try c.decodeIfPresent(Bool.self, forKey: .avx2) ?? true
     }
 
     /// The toolset a runtime's `current` points at on this server, when it is whole.
@@ -314,11 +292,11 @@ public struct HostList: Codable, Hashable, Sendable {
         all[index] = host
     }
 
-    public mutating func remove(_ id: HostID) {
+    public mutating func remove(_ id: MachineRef) {
         all.removeAll { $0.id == id }
     }
 
-    public subscript(id: HostID) -> ServerHost? {
+    public subscript(id: MachineRef) -> ServerHost? {
         all.first { $0.id == id }
     }
 
@@ -332,12 +310,12 @@ public struct HostList: Codable, Hashable, Sendable {
     }
 }
 
-/// Which project, now that two machines can each have `/home/alex/src/api`.
-public struct ProjectKey: Hashable, Sendable, CustomStringConvertible {
-    public var host: HostID
+/// Which folder, now that two machines can each have `/home/alex/src/api`.
+public struct FolderKey: Hashable, Sendable, CustomStringConvertible {
+    public var host: MachineRef
     public var folder: URL
 
-    public init(host: HostID = .mac, folder: URL) {
+    public init(host: MachineRef = .mac, folder: URL) {
         self.host = host
         self.folder = folder.standardizedFileURL
     }
@@ -350,17 +328,17 @@ public struct ProjectKey: Hashable, Sendable, CustomStringConvertible {
         let host = String(stored[..<bar])
         let path = String(stored[stored.index(after: bar)...])
         guard !host.isEmpty, !path.isEmpty else { return nil }
-        self.init(host: HostID(rawValue: host), folder: URL(filePath: path))
+        self.init(host: MachineRef(rawValue: host), folder: URL(filePath: path))
     }
 
     public var description: String { stored }
 }
 
-/// As its `stored` form, one string: what a project's own window is restored with (#1089).
-extension ProjectKey: Codable {
+/// As its `stored` form, one string: what a folder's own window is restored with (#1089).
+extension FolderKey: Codable {
     public init(from decoder: Decoder) throws {
         let text = try decoder.singleValueContainer().decode(String.self)
-        guard let key = ProjectKey(stored: text) else {
+        guard let key = FolderKey(stored: text) else {
             throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath,
                                                     debugDescription: "Not host|path: \(text)"))
         }

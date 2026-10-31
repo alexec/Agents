@@ -78,9 +78,6 @@ public enum ControlAgreement {
         throw CocoaError(.fileReadCorruptFile, userInfo: [NSFilePathErrorKey: file.path])
     }
 
-    /// A key file a write never finished: shorter than a key, and not being written now.
-    static func isTorn(_ file: URL, now: Date) -> Bool { tornFile(file, now: now) != nil }
-
     private static func tornFile(_ file: URL, now: Date) -> stat? {
         var found = stat()
         guard lstat(file.path, &found) == 0, found.st_size < 32 else { return nil }
@@ -163,7 +160,7 @@ public enum ControlAgreement {
         hkdfSHA256(ikm: secret, salt: Data("agents-control-code-v1".utf8), info: Data(), length: 32)
     }
 
-    public static func hostKey(privateKey: Data, peer: Data, host: HostID) throws -> Data {
+    public static func hostKey(privateKey: Data, peer: Data, host: MachineRef) throws -> Data {
         let shared = try sharedSecret(privateKey: privateKey, peerPublic: peer)
         return hkdfSHA256(ikm: shared, salt: Data("agents-control-host-v1".utf8),
                           info: Data(host.rawValue.utf8), length: 32)

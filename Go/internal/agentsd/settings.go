@@ -21,7 +21,7 @@ import (
 // What the window reads of the person's settings on this host, as the Swift host keeps
 // them: display preferences (display.json) and each runtime's last mode (modes.json) in
 // the settings folder, each new agent's options as last seen (option-cache.json, in the
-// cache), and the personas in a project's .agents/personas.
+// cache), and the personas in a folder's .agents/personas.
 
 type settingsState struct {
 	settingsMu  sync.Mutex
@@ -41,6 +41,7 @@ func readJSONMap(path string) map[string]wire.JSONValue {
 	var m map[string]wire.JSONValue
 	if json.Unmarshal(b, &m) != nil || m == nil {
 		os.Rename(path, fmt.Sprintf("%s.corrupt-%d", path, time.Now().Unix()))
+		store.TrimSetAsides(path)
 		return map[string]wire.JSONValue{}
 	}
 	return m
@@ -180,12 +181,12 @@ func (d *Daemon) rememberedOptions(r wire.RememberedOptionsRequest) []wire.Confi
 
 // MARK: personas (PersonaFile)
 
-func personas(project string, home string) []wire.Persona {
+func personas(folder string, home string) []wire.Persona {
 	byID := map[string]wire.Persona{}
 	for _, p := range readPersonas(home, "personal") {
 		byID[p.ID] = p
 	}
-	for _, p := range readPersonas(project, "project") {
+	for _, p := range readPersonas(folder, "folder") {
 		byID[p.ID] = p
 	}
 	out := []wire.Persona{}
@@ -296,10 +297,21 @@ func workflowSettings(m map[string]yamlnode.Node) (wire.WorkflowSettings, error)
 	}
 	var err error
 	for key, to := range map[string]**string{"permission-mode": &s.PermissionMode, "runtime": &s.RuntimeID,
-		"model": &s.Model, "effort": &s.Effort} {
+		"model": &s.Model, "effort": &s.Effort, "permission-requests": &s.PermissionRequests, "sandbox": &s.Sandbox} {
 		if *to, err = setting(key); err != nil {
 			return s, err
 		}
+	}
+	// The shared words (#2658): `runtime: auto` takes only them, and the two keys that
+	// have no runtime's own values take only theirs.
+	runtimeID, model, requests, box := "", "", "", ""
+	for to, from := range map[*string]*string{&runtimeID: s.RuntimeID, &model: s.Model, &requests: s.PermissionRequests, &box: s.Sandbox} {
+		if from != nil {
+			*to = *from
+		}
+	}
+	if _, _, _, _, err := fileLevels(runtimeID, model, s.PermissionMode, requests, box); err != nil {
+		return s, &yamlnode.Failure{Message: err.(*Error).Message}
 	}
 	if n, ok := m["options"]; ok {
 		if v, isText := n.Text(); !(isText && v == "") {
@@ -338,7 +350,11 @@ func (d *Daemon) registerSettings() {
 		return d.preferences(), nil
 	})
 	On(d, wire.CallPreferencesSet, func(ctx context.Context, c *Client, r map[string]wire.JSONValue) (map[string]wire.JSONValue, error) {
-		return d.setPreferences(r)
+		m, err := d.setPreferences(r)
+		if err == nil {
+			d.noticeLimitsChanged(r)
+		}
+		return m, err
 	})
 	On(d, wire.CallModesRemembered, func(ctx context.Context, c *Client, _ wire.Empty) (map[string]wire.JSONValue, error) {
 		return d.modes(), nil
@@ -349,6 +365,116 @@ func (d *Daemon) registerSettings() {
 	On(d, wire.CallPersonasList, func(ctx context.Context, c *Client, r wire.PersonasListRequest) ([]wire.Persona, error) {
 		return personas(store.FolderPath(r.Folder), personaHome()), nil
 	})
+	On(d, wire.CallPersonasFiles, func(ctx context.Context, c *Client, r wire.PersonasFilesRequest) (wire.PersonaFilesAnswer, error) {
+		base, err := personaFilesBase(r.Folder, r.Origin)
+		if err != nil {
+			return nil, err
+		}
+		return listPersonaFiles(base, r.Origin)
+	})
+	On(d, wire.CallPersonasSave, func(ctx context.Context, c *Client, r wire.PersonaFileSaveRequest) (wire.Empty, error) {
+		base, err := personaFilesBase(r.Folder, r.Origin)
+		if err != nil {
+			return wire.Empty{}, err
+		}
+		return wire.Empty{}, savePersonaFile(base, r)
+	})
+}
+
+func personaFilesBase(folder *wire.URL, origin wire.PersonaOrigin) (string, error) {
+	var base string
+	switch origin {
+	case wire.PersonaOriginPersonal:
+		base = personaHome()
+	case wire.PersonaOriginFolder:
+		if folder == nil {
+			return "", Invalid("Choose a folder for folder personas.")
+		}
+		base = store.FolderPath(*folder)
+		root, err := store.Resolve(base)
+		if err != nil {
+			return "", Invalid("That folder is not available.")
+		}
+		if !inside(root, resolved(filepath.Join(base, ".agents", "personas"))) {
+			return "", Invalid("The folder's persona folder has to stay inside the folder.")
+		}
+	default:
+		return "", Invalid("Choose personal or folder personas.")
+	}
+	if base == "" {
+		return "", Invalid("Personal personas are not available on this host.")
+	}
+	return base, nil
+}
+
+func listPersonaFiles(base string, origin wire.PersonaOrigin) (wire.PersonaFilesAnswer, error) {
+	folder := filepath.Join(base, ".agents", "personas")
+	entries, err := os.ReadDir(folder)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, fileError(CodeFileNotReadable, "Persona files can't be opened.")
+	}
+	out := wire.PersonaFilesAnswer{}
+	for _, entry := range entries {
+		name := entry.Name()
+		if strings.HasPrefix(name, ".") || !strings.HasSuffix(name, ".md") {
+			continue
+		}
+		id := strings.TrimSuffix(name, ".md")
+		bytes, ok := regularFileBytes(filepath.Join(folder, name))
+		if ok {
+			out = append(out, wire.PersonaFile{ID: id, Origin: origin, Content: string(bytes)})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return strings.ToLower(out[i].ID) < strings.ToLower(out[j].ID) })
+	return out, nil
+}
+
+func savePersonaFile(base string, r wire.PersonaFileSaveRequest) error {
+	if r.ID == "" || r.ID == "." || r.ID == ".." || strings.HasPrefix(r.ID, ".") ||
+		strings.HasSuffix(r.ID, ".md") || filepath.Base(r.ID) != r.ID || strings.ContainsAny(r.ID, `/\\`) {
+		return Invalid("Use a persona name without a folder.")
+	}
+	if len(r.Content) > 256<<10 {
+		return Invalid("A persona file has to be smaller than 256 KB.")
+	}
+	folder := filepath.Join(base, ".agents", "personas")
+	path := filepath.Join(folder, r.ID+".md")
+	if r.Delete != nil && *r.Delete {
+		info, err := os.Lstat(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return fileError(CodeFileGone, r.ID+".md is gone.")
+			}
+			return fileError(CodeFileNotReadable, r.ID+".md can't be opened.")
+		}
+		if !info.Mode().IsRegular() || links(info) != 1 {
+			return Invalid("That persona file can't be safely removed.")
+		}
+		if err := os.Remove(path); err != nil {
+			return fileError(CodeFileNotReadable, r.ID+".md can't be removed.")
+		}
+		return nil
+	}
+	if err := unreadableFrontMatter("personas", r.ID+".md", r.Content); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(folder, 0o755); err != nil {
+		return fileError(CodeFileNotReadable, "The persona folder can't be created.")
+	}
+	if root, err := store.Resolve(base); err != nil || !inside(root, resolved(folder)) {
+		return Invalid("The folder's persona folder has to stay inside the folder.")
+	}
+	info, err := os.Lstat(path)
+	if err == nil && (!info.Mode().IsRegular() || links(info) != 1) {
+		return Invalid("That persona file can't be safely replaced.")
+	}
+	if err != nil && !os.IsNotExist(err) {
+		return fileError(CodeFileNotReadable, r.ID+".md can't be opened.")
+	}
+	if err := store.WriteAtomically(path, []byte(r.Content), 0o644); err != nil {
+		return fileError(CodeFileNotReadable, r.ID+".md can't be saved.")
+	}
+	return nil
 }
 
 // personaHome is the folder whose .agents/personas are the person's own.

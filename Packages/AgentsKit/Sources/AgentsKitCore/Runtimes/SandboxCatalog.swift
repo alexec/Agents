@@ -4,7 +4,7 @@ import Foundation
 ///
 /// Every route here was measured under ACP, on the version named, by
 /// `scripts/sandbox-probe.sh` (research R9, 2026-09-29): a real conversation asked for a
-/// command that writes outside its project, and the disk said whether it could. A route
+/// command that writes outside its folder, and the disk said whether it could. A route
 /// the probe did not confirm is not here, so the app never offers a choice it cannot
 /// vouch for (FR-002). Re-measure when a runtime changes, as `acp-handshake.sh` is rerun
 /// for options.
@@ -53,10 +53,9 @@ public enum SandboxCatalog {
               why: nil,
               failurePatterns: [seatbelt, "bwrap: No permissions to create a new namespace"],
               readsReply: true, hangsWhenOn: false),
-        Entry(runtimeID: RuntimeCatalog.grok.id,
-              route: .arguments(on: ["--sandbox", "workspace"], off: ["--sandbox", "off"]),
-              measuredOn: "Grok 1.0.44",
-              why: nil,
+        Entry(runtimeID: RuntimeCatalog.grok.id, route: .fixed(.runtimeControlled),
+              measuredOn: "Grok 1.0.67",
+              why: "Grok 1.0.67 does not accept --sandbox with agent stdio. The app cannot change Grok’s sandbox.",
               failurePatterns: ["Refusing to start with its protections missing", "sandbox initialization failed"],
               readsReply: false, hangsWhenOn: false),
         Entry(runtimeID: RuntimeCatalog.gemini.id,

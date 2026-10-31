@@ -52,7 +52,7 @@ const (
 	CodeFolderGone          = -32004
 	CodeNoSuchAgent         = -32005
 	CodeNotSupported        = -32009
-	CodeNoSuchProject       = -32012
+	CodeNoSuchFolder       = -32012
 	CodeCredentialWanted    = -32036
 )
 
@@ -152,6 +152,7 @@ func (d *Daemon) dispatch(c *Client, m message) {
 	}
 	if err == nil && h != nil {
 		d.noteMilestones(c, m.Method)
+		d.countCall(c, m.Method)
 	}
 	if m.ID == nil {
 		return // a notification

@@ -123,17 +123,10 @@ struct LabelTagField: View {
         .padding(.leading, 7)
         .padding(.trailing, 5)
         .padding(.vertical, 3)
-        .background(chipFill(label, isChosen: isChosen))
-        .clipShape(Capsule())
-        .overlay(Capsule().strokeBorder(Paper.accent.opacity(isChosen ? 1 : 0.5)))
+        .labelChip(label, isChosen: isChosen)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(label.value), \(label.owner.rawValue) label")
         .accessibilityAction(named: "Remove") { remove(label.value) }
-    }
-
-    private func chipFill(_ label: SessionLabel, isChosen: Bool) -> Color {
-        if isChosen { return Paper.accent.opacity(0.35) }
-        return label.owner == .person ? Paper.accent.opacity(0.16) : Color.clear
     }
 
     /// On a phone the empty field beside labels is only room to tap, so it does not wrap
@@ -217,9 +210,26 @@ struct LabelChip: View {
             .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
-            .background(label.owner == .person ? Paper.accent.opacity(0.16) : Color.clear)
-            .clipShape(Capsule())
-            .overlay(Capsule().strokeBorder(Paper.accent.opacity(0.5)))
+            .labelChip(label)
             .accessibilityLabel("\(label.value), \(label.owner.rawValue) label")
+    }
+}
+
+/// A label chip's colours (#2958). What the label names gives the hue: an issue and a pull
+/// request their own, finished work grey, anything else the accent. Who added it gives the
+/// fill: the person's labels are filled, the agent's only outlined.
+private extension View {
+    func labelChip(_ label: SessionLabel, isChosen: Bool = false) -> some View {
+        let hue: Color = switch label.kind {
+        case .issue: Paper.issue
+        case .pullRequest: Paper.pull
+        case .finished: .secondary
+        case .plain: Paper.accent
+        }
+        let fill = isChosen ? hue.opacity(0.35) : label.owner == .person ? hue.opacity(0.16) : .clear
+        return foregroundStyle(label.kind == .plain ? AnyShapeStyle(.primary) : AnyShapeStyle(hue))
+            .background(fill)
+            .clipShape(Capsule())
+            .overlay(Capsule().strokeBorder(hue.opacity(isChosen ? 1 : 0.5)))
     }
 }

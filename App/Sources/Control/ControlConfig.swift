@@ -82,7 +82,7 @@ enum ControlConfig {
     /// This Mac's host directly (#1118): agentsd's socket in the app group, named by the
     /// control plane's key, proved with this window's own key. Nil with no pairing, or no
     /// group container for this build.
-    static func localLink(_ endpoint: Endpoint, host: HostID) -> LocalHostLink? {
+    static func localLink(_ endpoint: Endpoint, host: MachineRef) -> LocalHostLink? {
         switch endpoint {
         case .remote(let membership):
             guard let client = membership.client,
@@ -96,6 +96,23 @@ enum ControlConfig {
 
     /// Forget This Mac (#344): the pairing goes, so the window asks how to work again, as
     /// at first run. Its key stays, as the Remote's does; a new pairing names it afresh.
+    /// The control plane the organisation pins this Mac to, from the configuration profile
+    /// in the window's own domain (#998, US7); read once.
+    static let pin = MachinePin.managed()
+
+    /// Why Forget This Mac is refused: the window is paired with the control plane its
+    /// organisation pins (FR-027). Nil when it may go.
+    static var leaveRefusal: String? {
+        guard let pin, pin.namesAControlPlane, let membership = ControlMembership.load(membershipFile),
+              pin.admits(membership) else { return nil }
+        return pin.leaveRefusal
+    }
+
+    /// A code or a sign-in for another control plane than the pinned one is refused (FR-027).
+    private static func refuseUnpinned(_ admitted: (MachinePin) -> Bool) throws {
+        if let pin, pin.namesAControlPlane, !admitted(pin) { throw MachinePin.Refused(words: pin.refusal) }
+    }
+
     static func forget() {
         try? FileManager.default.removeItem(at: membershipFile)  // store-ok: the window's own container
     }
@@ -103,6 +120,7 @@ enum ControlConfig {
     /// Connect to a control plane (frames C and K2): say who this window is with the code,
     /// then keep what it was told. What the window may do is the code's.
     static func pair(with code: ControlCode) async throws -> ControlMembership {
+        try refuseUnpinned { $0.admits(code) }
         let key = try ControlClientKey.loadOrMake(account: keyAccount)
         let membership = try await ControlCodeUse.pairClient(code, privateKey: key, id: UUID(),
                                                              name: Host.current().localizedName ?? "A Mac",
@@ -118,11 +136,13 @@ enum ControlConfig {
     /// pairs as the person the sign-in names, and keeps what it was told, as `pair` does.
     static func signIn(at url: URL, with signIn: @escaping ControlSignIn.Provider,
                        waiting: @escaping @Sendable (DaemonAPI.SignInWaiting) -> Void) async throws -> ControlMembership {
+        try refuseUnpinned { $0.admits(address: url.absoluteString) }
         let key = try ControlClientKey.loadOrMake(account: keyAccount)
         let membership = try await ControlSignIn.pair(url: url, pin: nil, controlKey: nil, privateKey: key, id: UUID(),
                                                       name: Host.current().localizedName ?? "A Mac", kind: .mac, dial: dial,
                                                       signIn: signIn, waiting: waiting)
         try Task.checkCancellation()
+        try refuseUnpinned { $0.admits(membership) }
         try membership.save(membershipFile, backedUp: false)
         return membership
     }

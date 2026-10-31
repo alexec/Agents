@@ -11,7 +11,7 @@ enum ControlPage: Hashable {
         switch self {
         case .overview: "Overview"
         case .hosts: "Machines"
-        case .providers: "Workspace Providers"
+        case .providers: "Machine Providers"
         case .clients: "Clients"
         }
     }
@@ -158,7 +158,7 @@ struct ControlOverviewPage: View {
                 }
             }
             if control.isOnThisMac {
-                Text("While this Mac sleeps, no window or device can reach any of your agents. Agents on servers keep working.")
+                Text("While this Mac sleeps, no window or device can reach any of your agents. Agents on other machines keep working.")
                     .appText(.supporting).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -205,7 +205,7 @@ struct ControlOverviewPage: View {
         return ([parts.joined(separator: " · ")] + [UpdateWords.appMissing(status)].compactMap { $0 }).joined(separator: "\n")
     }
 
-    private func hostName(_ host: DaemonAPI.ControlHost) -> String {
+    private func hostName(_ host: DaemonAPI.ControlMachine) -> String {
         let name = host.machineID == MachineID.current && host.runsAgents ? "This Mac" : host.name
         return host.state == "online" ? name : "\(name) (\(UpdateWords.state(host)))"
     }
@@ -253,30 +253,29 @@ func count(_ n: Int, _ noun: String) -> String { "\(n) \(noun)\(n == 1 ? "" : "s
 struct ControlHostsPage: View {
     @Environment(AppModel.self) private var model
     let control: ControlSettingsModel
-    @State private var removing: DaemonAPI.ControlHost?
-    @State private var addingByCode = false
-    @State private var addingServer = false
-    @State private var choosing: DaemonAPI.ControlHost?
-    /// Link to Workspace… (#691, L5).
-    @State private var linking: DaemonAPI.ControlHost?
+    @State private var removing: DaemonAPI.ControlMachine?
+    @State private var addingMachine = false
+    @State private var choosing: DaemonAPI.ControlMachine?
+    /// Link to Machine… (#691, L5).
+    @State private var linking: DaemonAPI.ControlMachine?
     /// Stop, asked first while agents are working there (L2), with who they are.
-    @State private var stopping: DaemonAPI.ControlHost?
+    @State private var stopping: DaemonAPI.ControlMachine?
     @State private var stoppingNames: [String] = []
-    /// Delete Workspace… (US5, L9).
-    @State private var deleting: DaemonAPI.ControlHost?
+    /// Delete Machine… (US5, L9).
+    @State private var deleting: DaemonAPI.ControlMachine?
     /// Backups… (#1815): the host's own backups page.
-    @State private var backingUp: DaemonAPI.ControlHost?
+    @State private var backingUp: DaemonAPI.ControlMachine?
     /// Update… (#1766): a host that needs an update, updated over ssh.
-    @State private var updating: DaemonAPI.ControlHost?
+    @State private var updating: DaemonAPI.ControlMachine?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             ControlCard {
                 if let mac = control.thisMacHost {
                     // This Mac's host has no buttons but this one (the look gate's
-                    // decision; #656 asked for projects to be chosen here too).
+                    // decision; #656 asked for folders to be chosen here too).
                     ControlRow(dot: dot(mac), title: "This Mac", detail: thisMacLine(mac)) {
-                        chooseProjects(mac)
+                        chooseFolders(mac)
                     }
                 }
                 ForEach(control.otherHosts) { host in
@@ -292,25 +291,22 @@ struct ControlHostsPage: View {
                     }
                 }
                 // Installed over a tunnel and not joined yet (#660): no host row yet, so
-                // this is where ssh's reason shows once Add a Server is closed.
+                // this is where ssh's reason shows once Add a Machine is closed.
                 ForEach(control.status?.unjoinedTunnels ?? [], id: \.name) { pending in
                     Divider()
                     ControlRow(dot: pending.tunnel.up ? .offline : .attention, title: pending.name,
                                detail: unjoinedLine(pending.tunnel)) { EmptyView() }
                 }
             }
-            HStack(spacing: 8) {
-                Button("Add a Server…") { addingServer = true }.buttonStyle(.paper)
-                Button("Add by Code…") { addingByCode = true }.buttonStyle(.paper)
-            }
-            Text("Add a Server gives you one command to run on it, or installs it over ssh as you log in from Terminal, through an ssh tunnel when it can’t reach this Mac. Either way the server connects out, so nothing has to reach it. Add by Code gives another Mac a code to join with. Removing a machine stops it connecting. Its agents are left running where they are.")
+            // One sheet, a provider first (#2131): a server and a code are its other two ways.
+            Button(AddMachine.Words.menuItem) { addingMachine = true }.buttonStyle(.paper)
+            Text("A machine comes from a machine provider, or a Linux machine runs one command, or is installed over ssh as you log in from Terminal, through an ssh tunnel when it can’t reach this Mac. Either way it connects out, so nothing has to reach it. Another Mac joins with a code. " + AddMachine.Words.machinesFoot)
                 .appText(.supporting).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             SharedSectionLabel("Auto-detect")
-            ProjectDetectionCard(control: control)
+            FolderDetectionCard(control: control)
         }
-        .sheet(isPresented: $addingByCode) { CodeSheet(control: control, purpose: .host).paperSheet() }
-        .sheet(isPresented: $addingServer) { ControlAddServerSheet(control: control).paperSheet() }
+        .sheet(isPresented: $addingMachine) { AddMachineSheet(control: control).paperSheet() }
         .sheet(item: $updating) { host in ControlAddServerSheet(control: control, updating: host).paperSheet() }
         .sheet(item: $linking) { host in
             LinkWorkspaceSheet(control: control, host: host).paperSheet()
@@ -335,13 +331,13 @@ struct ControlHostsPage: View {
             HostBackupsSheet(host: host).paperSheet()
         }
         .sheet(item: $choosing) { host in
-            ChooseProjectsSheet(host: host.id, hostName: host.id == control.thisMacHost?.id ? "This Mac" : host.name,
+            ChooseFoldersSheet(host: host.id, hostName: host.id == control.thisMacHost?.id ? "This Mac" : host.name,
                                 paths: control.suggestedPaths).paperSheet()
         }
         .confirmationDialog(deleting.map { "Delete \($0.workspace?.workspaceName ?? $0.name)?" } ?? "",
                             isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
                             titleVisibility: .visible, presenting: deleting) { host in
-            Button("Delete", role: .destructive) { Task { await control.deleteWorkspace(host.id) } }
+            Button("Delete", role: .destructive) { Task { await control.deleteMachine(host.id) } }
             Button("Cancel", role: .cancel) {}
         } message: { host in
             Text(deleteWords(host))
@@ -356,14 +352,14 @@ struct ControlHostsPage: View {
         }
     }
 
-    private func chooseProjects(_ host: DaemonAPI.ControlHost) -> some View {
-        Button("Choose Projects…") { choosing = host }
+    private func chooseFolders(_ host: DaemonAPI.ControlMachine) -> some View {
+        Button("Choose Folders…") { choosing = host }
             .buttonStyle(.paper)
             .disabled(!host.answers)
-            .help(host.answers ? "Pick folders on it to add as projects." : "It has to be online to be asked.")
+            .help(host.answers ? "Pick folders on it to add as folders." : "It has to be online to be asked.")
     }
 
-    private func dot(_ host: DaemonAPI.ControlHost) -> ControlDot {
+    private func dot(_ host: DaemonAPI.ControlMachine) -> ControlDot {
         if host.workspace?.problem != nil { return .attention }
         return switch host.state {
         case "online": .online
@@ -376,7 +372,7 @@ struct ControlHostsPage: View {
 
     /// Start or Stop for a linked host, while nothing is under way; Check again for any other.
     @ViewBuilder
-    private func mainAction(_ host: DaemonAPI.ControlHost) -> some View {
+    private func mainAction(_ host: DaemonAPI.ControlMachine) -> some View {
         if let workspace = host.workspace {
             if host.state == "starting" || host.state == "stopping" {
                 HStack(spacing: 6) {
@@ -412,21 +408,21 @@ struct ControlHostsPage: View {
     }
 
     /// What a start or stop under way says: a delete's backup is a stop of its own (#1815).
-    static func underWay(_ host: DaemonAPI.ControlHost) -> String {
+    static func underWay(_ host: DaemonAPI.ControlMachine) -> String {
         if host.state == "starting" { return "Starting…" }
         return host.workspace?.phase == "backing up" ? "Backing up to delete…" : "Stopping…"
     }
 
-    private func hostMenu(_ host: DaemonAPI.ControlHost) -> some View {
+    private func hostMenu(_ host: DaemonAPI.ControlMachine) -> some View {
         Menu {
             // Older than the control plane needs (#1748): updated over ssh, as installed (#1766).
             if host.state == "needsUpdate" {
                 Button("Update…") { updating = host }
                 Divider()
             }
-            // A relay runs no agents, so it has no projects, and nothing to back up.
+            // A relay runs no agents, so it has no folders, and nothing to back up.
             if host.relay == nil {
-                Button("Choose Projects…") { choosing = host }.disabled(!host.answers)
+                Button("Choose Folders…") { choosing = host }.disabled(!host.answers)
                 if model.host(host.id, has: Capability.backups1) {
                     Button("Backups…") { backingUp = host }.disabled(!host.answers)
                 }
@@ -480,9 +476,9 @@ struct ControlHostsPage: View {
         .accessibilityLabel("More for \(host.name)")
     }
 
-    /// What Delete Workspace… loses (L9): the workspace and its disk, and the host with its
+    /// What Delete Machine… loses (L9): the workspace and its disk, and the host with its
     /// agents, and whether it backs up first (#1815).
-    private func deleteWords(_ host: DaemonAPI.ControlHost) -> String {
+    private func deleteWords(_ host: DaemonAPI.ControlMachine) -> String {
         let agents = model.work.agents.filter { $0.host == host.id }.count
         let workspace = host.workspace.map { "\($0.workspaceName) at \($0.providerName)" } ?? "The machine"
         // An online host backs up first (#1815); an offline one keeps the backups it made.
@@ -503,7 +499,7 @@ struct ControlHostsPage: View {
     }
 
     /// Stop's confirmation: who is working there, and when it starts again (#1004 FR-010).
-    private func stopWords(_ host: DaemonAPI.ControlHost) -> String {
+    private func stopWords(_ host: DaemonAPI.ControlMachine) -> String {
         var words: [String] = []
         if !stoppingNames.isEmpty {
             words.append("\(Self.list(stoppingNames)) \(stoppingNames.count == 1 ? "is" : "are") working there. Stopping the machine stops them.")
@@ -515,32 +511,32 @@ struct ControlHostsPage: View {
     }
 
     /// The host's workflows that run on a clock (L8): they don't run while it is stopped.
-    private func scheduledWorkflows(_ host: HostID) -> Int {
-        model.work.projects.filter { $0.host == host }
-            .flatMap { model.work.workflows(in: $0.folder) }
+    private func scheduledWorkflows(_ host: MachineRef) -> Int {
+        model.work.folders.filter { $0.host == host }
+            .flatMap { model.work.workflows(in: $0.folder.folder) }
             .filter { !$0.isArchived && $0.isEnabled && !$0.workflow.schedules.isEmpty }
             .count
     }
 
-    private func thisMacLine(_ host: DaemonAPI.ControlHost) -> String {
-        let projects = model.work.projects.filter { $0.host == host.id }.count
+    private func thisMacLine(_ host: DaemonAPI.ControlMachine) -> String {
+        let folders = model.work.folders.filter { $0.host == host.id }.count
         let working = model.work.agents.filter { $0.host == host.id && ($0.state == .running || $0.state == .starting) }.count
         var parts = [host.platform.replacingOccurrences(of: " ", with: " · "), UpdateWords.version(host),
-                     count(projects, "project")]
+                     count(folders, "folder")]
         if working > 0 { parts.append("\(count(working, "agent")) working") }
         if host.state != "online" { parts.insert(UpdateWords.state(host), at: 0) }
         return ([parts.joined(separator: " · ")] + [UpdateWords.missing(host, controlVersion: control.status?.version)].compactMap { $0 })
             .joined(separator: "\n")
     }
 
-    private func unjoinedLine(_ tunnel: DaemonAPI.HostTunnel) -> String {
+    private func unjoinedLine(_ tunnel: DaemonAPI.MachineTunnel) -> String {
         tunnel.up
             ? "Not joined yet · connects through an ssh tunnel, which is up"
             : "Not joined yet · ssh tunnel down\(tunnel.problem.map { ": \($0)" } ?? "") · tried again by itself"
     }
 
     /// Its line, and what it may use of a Mac's (#1122) on one of its own.
-    private func line(_ host: DaemonAPI.ControlHost) -> String {
+    private func line(_ host: DaemonAPI.ControlMachine) -> String {
         let uses = GitLendWords.uses(host) { lender in
             lender == control.thisMacHost?.id ? nil : (control.hosts.first { $0.id == lender }?.name ?? lender.rawValue)
         }
@@ -548,7 +544,7 @@ struct ControlHostsPage: View {
             .compactMap { $0 }.joined(separator: "\n")
     }
 
-    private func baseLine(_ host: DaemonAPI.ControlHost) -> String {
+    private func baseLine(_ host: DaemonAPI.ControlMachine) -> String {
         // agents-relay (T096): it runs no agents, so the rest of the line is not its.
         if host.relay != nil {
             let state = host.state == "online" ? "" : "\(UpdateWords.state(host)) · "
@@ -595,8 +591,8 @@ struct ControlHostsPage: View {
     }
 }
 
-/// Auto-detect (#429, #656): where the projects picker looks on a host. It adds nothing.
-struct ProjectDetectionCard: View {
+/// Auto-detect (#429, #656): where the folders picker looks on a host. It adds nothing.
+struct FolderDetectionCard: View {
     let control: ControlSettingsModel
     /// The paths as typed, one a line; saved with Save.
     @State private var text = ""
@@ -604,12 +600,12 @@ struct ProjectDetectionCard: View {
     @State private var shown = ""
 
     var body: some View {
-        let detection = control.projectDetection
+        let detection = control.folderDetection
         ControlCard {
             VStack(alignment: .leading, spacing: 10) {
-                Toggle("Suggest projects on a machine", isOn: Binding(
+                Toggle("Suggest folders on a machine", isOn: Binding(
                     get: { detection.enabled },
-                    set: { on in Task { await control.setProjectDetection(ProjectDetection(enabled: on, paths: detection.paths)) } }))
+                    set: { on in Task { await control.setFolderDetection(FolderDetection(enabled: on, paths: detection.paths)) } }))
                 TextField("Paths", text: $text, axis: .vertical)
                     .lineLimit(3...10)
                     .textFieldStyle(.roundedBorder).appText(.code)
@@ -619,19 +615,19 @@ struct ProjectDetectionCard: View {
                     Button("Save") {
                         text = paths.joined(separator: "\n")
                         shown = text
-                        Task { await control.setProjectDetection(ProjectDetection(enabled: detection.enabled, paths: paths)) }
+                        Task { await control.setFolderDetection(FolderDetection(enabled: detection.enabled, paths: paths)) }
                     }
                     .buttonStyle(.paper)
                     .disabled(paths == detection.paths)
-                    Button("Use the Defaults") { text = ProjectDetection.defaultPaths.joined(separator: "\n") }
+                    Button("Use the Defaults") { text = FolderDetection.defaultPaths.joined(separator: "\n") }
                         .buttonStyle(.paper)
-                        .disabled(text == ProjectDetection.defaultPaths.joined(separator: "\n"))
+                        .disabled(text == FolderDetection.defaultPaths.joined(separator: "\n"))
                 }
                 .disabled(!detection.enabled)
             }
             .padding(16)
         }
-        Text("When a server joins, and from Choose Projects… on any machine, each git repository directly inside these paths is listed, unticked. Only the ones you tick become projects, and you can add any other folder by its path. ~ is the machine’s own home.")
+        Text("When a machine joins, and from Choose Folders… on any machine, each git repository directly inside these paths is listed, unticked. Only the ones you tick become folders, and you can add any other folder by its path. ~ is the machine’s own home.")
             .appText(.supporting).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
             .onAppear(perform: load)
@@ -644,7 +640,7 @@ struct ProjectDetectionCard: View {
 
     /// The saved paths, unless something has been typed over what was last shown.
     private func load() {
-        let saved = control.projectDetection.paths.joined(separator: "\n")
+        let saved = control.folderDetection.paths.joined(separator: "\n")
         guard text == shown else { return }
         text = saved
         shown = saved
@@ -773,7 +769,7 @@ struct CodeSheet: View {
 private struct HostBackupsSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
-    let host: DaemonAPI.ControlHost
+    let host: DaemonAPI.ControlMachine
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 0) {

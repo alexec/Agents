@@ -5,7 +5,7 @@ import Testing
 /// Both kinds of waiting, said one way (042 FR-012, R4).
 @Suite("Wait status")
 struct WaitStatusTests {
-    private let dir = URL(fileURLWithPath: "/tmp/project")
+    private let dir = URL(fileURLWithPath: "/tmp/folder")
     private let since = Calendar.current.date(from: DateComponents(year: 2026, month: 9, day: 25, hour: 23, minute: 30))!
     private let until = Calendar.current.date(from: DateComponents(year: 2026, month: 9, day: 26, hour: 9, minute: 0))!
 
@@ -42,7 +42,7 @@ struct WaitStatusTests {
         let names: (UUID) -> String? = { [fixLogin: "Fix login", docs: "Docs"][$0] }
 
         var blocked = agent()
-        blocked.report = WorkReport(outcome: .blocked, message: "waiting", at: since,
+        blocked.report = WorkReport(outcome: .waiting, message: "waiting", at: since,
                                     block: Block(waits: [Wait(agentID: fixLogin, nameAtReport: "Fix login")]))
         var waiting = agent()
         waiting.eventWait = EventWait(patterns: [EventPattern("agent.finished", filters: ["agent": DetailFilter(fixLogin.uuidString)])],
@@ -55,7 +55,7 @@ struct WaitStatusTests {
         #expect(block?.cancellable == false)
 
         var both = agent()
-        both.report = WorkReport(outcome: .blocked, message: "waiting", at: since,
+        both.report = WorkReport(outcome: .waiting, message: "waiting", at: since,
                                  block: Block(waits: [Wait(agentID: fixLogin, nameAtReport: "Fix login"),
                                                       Wait(agentID: docs, nameAtReport: "Docs")]))
         #expect(WaitStatus.of(both, names: names)?.mark == "◷ Waiting for “Fix login” and “Docs” to finish")
@@ -72,5 +72,68 @@ struct WaitStatusTests {
         let patterns = [EventPattern("agent.finished", filters: ["agent": DetailFilter(fixLogin.uuidString)]),
                         EventPattern("mac.wake")]
         #expect(WaitStatus.things(patterns, names: { $0 == fixLogin ? "Fix login" : nil }) == ["“Fix login”", "mac.wake"])
+    }
+
+    /// A place in a lease's line is a wait on its own grant (#2361), said as the line says it,
+    /// and left out of the lease row so it is said once.
+    @Test func aPlaceInLineIsSaidAsTheLineSaysIt() throws {
+        let fixLogin = UUID()
+        var waiting = agent()
+        let wait = EventWait(patterns: [EventPattern("lease.granted", filters: [
+            "agent": DetailFilter(waiting.id.uuidString), "resource": DetailFilter("build")])], from: 0, deadline: until, since: since)
+        waiting.eventWait = wait
+        #expect(wait.lineResource == ResourceName("build"))
+        #expect(WaitStatus.of(waiting, names: { _ in nil })?.line == "◷ Waiting for your turn with build")
+
+        let build = ResourceName("build")!
+        let snapshot = DaemonAPI.LeaseSnapshot(resources: [
+            .init(name: build, kind: .named, displayName: "Build",
+                  lease: Lease(resource: build, displayName: "Build", holder: fixLogin, grantedAt: since, expiresAt: until),
+                  line: [.init(agentID: UUID(), askedAt: since, isCallOpen: true),
+                         .init(agentID: waiting.id, askedAt: since, isCallOpen: true)]),
+        ], at: since)
+        let lease = try #require(LeaseStatus.of(waiting.id, in: snapshot, titles: [fixLogin: "Fix login"]))
+        let status = WaitStatus.of(waiting, names: { _ in nil }, lease: lease)
+        #expect(status?.line == "◷ Waiting for Build · held by “Fix login” until 09:00 · 2nd in line")
+        #expect(status?.mark == "◷ Waiting for Build · 2nd in line")
+        #expect(status?.cancellable == true)
+        #expect(WaitStatus.things(wait, names: { _ in nil }, lease: lease) == ["Build"])
+        #expect(lease.without(wait) == nil)
+        #expect(lease.without(nil) == lease)
+    }
+
+    /// The wait card names a session by its title and an event by its meaning (#2747).
+    @Test func theWaitCardSaysItsEventsInWords() throws {
+        let fixLogin = UUID(), docs = UUID()
+        let names: (UUID) -> String? = { [fixLogin: "Fix login", docs: "Docs"][$0] }
+        let wait = EventWait(patterns: [
+            EventPattern("agent.finished", filters: ["agent": DetailFilter(fixLogin.uuidString)]),
+            EventPattern("agent.finished", filters: ["agent": DetailFilter(docs.uuidString)]),
+            EventPattern("agent.failed", filters: ["agent": DetailFilter(docs.uuidString)]),
+            EventPattern("agent.stopped", filters: ["agent": DetailFilter(docs.uuidString)]),
+            EventPattern("mac.wake"),
+            EventPattern("checks.failed"),
+            EventPattern("pr.merged"),
+        ], from: 0, since: since, serverEvents: [
+            WaitServerEvent(trigger: MCPEventTrigger(event: "checks.failed", arguments: ["pr": .int(123)]), servers: ["github"]),
+            WaitServerEvent(trigger: MCPEventTrigger(event: "pr.merged", arguments: ["pr": .int(123)]), servers: ["github"]),
+        ])
+        let lines = WaitEventLine.lines(for: wait, names: names)
+        try #require(lines.count == 4)
+        #expect(lines.map { "\($0.source) · \($0.words)" + ($0.arguments.isEmpty ? "" : " (\($0.arguments.joined(separator: ", ")))") } == [
+            "Agents · “Fix login” and “Docs” to finish",
+            "Agents · An agent in this folder ended in an error or an agent in this folder was stopped before finishing (agent “Docs”)",
+            "This Mac · This Mac woke up",
+            "GitHub · Checks failed or PR merged (pr 123)",
+        ])
+        #expect(lines[0].events == ["agent.finished"]) // index-ok: required four above
+        #expect(lines[3].events == ["checks.failed", "pr.merged"]) // index-ok: required four above
+    }
+
+    @Test func aSessionTheWindowDoesNotKnowIsItsID() {
+        let gone = UUID()
+        let wait = EventWait(patterns: [EventPattern("agent.finished", filters: ["agent": DetailFilter(gone.uuidString)])],
+                             from: 0, since: since)
+        #expect(WaitEventLine.lines(for: wait, names: { _ in nil }).first?.words == "“\(gone.uuidString)” to finish")
     }
 }

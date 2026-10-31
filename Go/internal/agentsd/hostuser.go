@@ -2,15 +2,12 @@ package agentsd
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"log"
 	"os"
 	"path/filepath"
 	"regexp"
 	goruntime "runtime"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -34,18 +31,18 @@ const hostUserFile = "host-user.json"
 type hostUserState struct {
 	hostUserMu   sync.Mutex
 	hostUserRead bool
-	hostUser     *wire.HostUser
+	hostUser     *wire.MachineUser
 }
 
 func (d *Daemon) hostUserPath() string { return filepath.Join(d.Store.Loc.Root, hostUserFile) }
 
 // user is the last host/user, read from the root the first time; nil before any.
-func (d *Daemon) user() *wire.HostUser {
+func (d *Daemon) user() *wire.MachineUser {
 	d.hostUserMu.Lock()
 	defer d.hostUserMu.Unlock()
 	if !d.hostUserRead {
 		d.hostUserRead = true
-		var kept wire.HostUser
+		var kept wire.MachineUser
 		if b, err := os.ReadFile(d.hostUserPath()); err == nil && json.Unmarshal(b, &kept) == nil && kept.User != "" {
 			d.hostUser = &kept
 		}
@@ -55,7 +52,7 @@ func (d *Daemon) user() *wire.HostUser {
 
 // toldHostUser is host/user.
 func (d *Daemon) toldHostUser(params json.RawMessage) {
-	var u wire.HostUser
+	var u wire.MachineUser
 	if err := json.Unmarshal(params, &u); err != nil || u.User == "" {
 		log.Printf("host/user: %v", err)
 		return
@@ -188,30 +185,12 @@ func (d *Daemon) claimsRuns(w wire.Workflow) bool { return len(w.RunsOn) > 0 && 
 // schedule's due time, or the event's name and details. Run now has none.
 func triggerID(fr fireRequest, event *wire.Event) string {
 	if fr.dueAt != nil {
-		return "schedule:" + fr.dueAt.UTC().Format(time.RFC3339)
+		return wire.ScheduleTriggerID(*fr.dueAt)
 	}
 	if event == nil {
 		return ""
 	}
-	keys := make([]string, 0, len(event.Details))
-	for k := range event.Details {
-		// A server's event is the same on every machine by its server, event and id (#2011):
-		// when it was heard, what was missed before it, its subscription and what each
-		// machine's credentials were shown of it (a bot's, a person's heard for it, #2027)
-		// are each machine's own.
-		if event.Details["mcp_event_id"] != "" && k != "server" && k != "event" && k != "mcp_event_id" {
-			continue
-		}
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	h := sha256.New()
-	h.Write([]byte(event.Name))
-	for _, k := range keys {
-		h.Write([]byte{0})
-		h.Write([]byte(k + "=" + event.Details[k]))
-	}
-	return "event:" + event.Name + ":" + hex.EncodeToString(h.Sum(nil))[:24]
+	return wire.EventTriggerID(event.Name, event.Details)
 }
 
 // claimRun asks the control plane to run this trigger here. True when this machine runs it:
@@ -270,9 +249,13 @@ func (c senderChecks) linked(d *Daemon, sender wire.ChannelSender) (wire.Channel
 }
 
 // senderLinked asks the control plane whether a channel message's sender is linked to a
-// person (#1762, FR-037). False, so nothing starts, when it is not, when it is refused (an
-// email that fails DKIM), and when there is no control plane to ask or it does not answer.
+// person (#1762, FR-037). False, so nothing starts, when it is not, when it names no one,
+// when it is refused (an email that fails DKIM), and when there is no control plane to ask or it does not answer.
 func (d *Daemon) senderLinked(sender wire.ChannelSender) (wire.ChannelLinkChecked, bool) {
+	if strings.TrimSpace(sender.Identity) == "" {
+		log.Printf("channel message from %s names no one: nothing started", sender.Channel)
+		return wire.ChannelLinkChecked{}, false
+	}
 	ask := d.askControl.Load()
 	if ask == nil {
 		log.Printf("channel message from %s: no control plane to say whom it is from", sender.Channel)

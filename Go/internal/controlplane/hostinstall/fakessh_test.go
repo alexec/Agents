@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"testing"
 )
@@ -221,15 +220,6 @@ func (f *fake) installer(codes *fakeCodes, steps *[]string) *Installer {
 func contains(all []string, s string) bool {
 	for _, a := range all {
 		if a == s {
-			return true
-		}
-	}
-	return false
-}
-
-func hasPrefixIn(all []string, prefix string) bool {
-	for _, a := range all {
-		if strings.HasPrefix(a, prefix) {
 			return true
 		}
 	}

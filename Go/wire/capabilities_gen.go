@@ -5,6 +5,7 @@ package wire
 // The capabilities that Packages/Wire names (#1748): x-capability on each method.
 const CapAgent1 = "agent/1"
 const CapAgentsEditQueued1 = "agents.edit-queued/1"
+const CapAgentsExport1 = "agents.export/1"
 const CapAgentsFind1 = "agents.find/1"
 const CapAgentsMoveWorktree1 = "agents.move-worktree/1"
 const CapAgentsSaid1 = "agents.said/1"
@@ -12,6 +13,8 @@ const CapAgents1 = "agents/1"
 const CapApprovals1 = "approvals/1"
 const CapArtifact1 = "artifact/1"
 const CapAttention1 = "attention/1"
+const CapAuditSinks1 = "audit.sinks/1"
+const CapAuto1 = "auto/1"
 const CapBackupsStore1 = "backups.store/1"
 const CapBackups1 = "backups/1"
 const CapBots1 = "bots/1"
@@ -43,31 +46,44 @@ const CapElicitations1 = "elicitations/1"
 const CapEventsAudit1 = "events.audit/1"
 const CapEventsTeam1 = "events.team/1"
 const CapEvents1 = "events/1"
+const CapFeatures1 = "features/1"
 const CapFilesComplete1 = "files.complete/1"
 const CapFilesDiagnostics1 = "files.diagnostics/1"
 const CapFiles1 = "files/1"
+const CapFolder1 = "folder/1"
+const CapFoldersToMachine1 = "folders.to-machine/1"
+const CapFolders1 = "folders/1"
 const CapGit1 = "git/1"
+const CapGovernance1 = "governance/1"
 const CapGroups1 = "groups/1"
 const CapHandover1 = "handover/1"
+const CapHostOrgRoutes1 = "host.org-routes/1"
 const CapHostPolicy1 = "host.policy/1"
+const CapHostSuspend1 = "host.suspend/1"
 const CapHostTeam1 = "host.team/1"
+const CapHostUpdate1 = "host.update/1"
 const CapHostUserSettings1 = "host.user-settings/1"
 const CapHostWire1 = "host.wire/1"
 const CapHost1 = "host/1"
 const CapHostsJoin1 = "hosts.join/1"
 const CapHosts1 = "hosts/1"
-const CapLeases1 = "leases/1"
+const CapLineageComment1 = "lineage.comment/1"
+const CapLineage1 = "lineage/1"
 const CapLinks1 = "links/1"
 const CapLiveactivity1 = "liveactivity/1"
 const CapMac1 = "mac/1"
+const CapMachine1 = "machine/1"
+const CapMachines1 = "machines/1"
 const CapMailbox1 = "mailbox/1"
 const CapMarketplaces1 = "marketplaces/1"
-const CapMcpMadeByAgents1 = "mcp.made-by-agents/1"
 const CapMcp1 = "mcp/1"
 const CapMilestones1 = "milestones/1"
 const CapModes1 = "modes/1"
 const CapMute1 = "mute/1"
+const CapNotices1 = "notices/1"
 const CapOptions1 = "options/1"
+const CapOrgIdentity1 = "org-identity/1"
+const CapOrgRoutes1 = "org-routes/1"
 const CapPages1 = "pages/1"
 const CapPairing1 = "pairing/1"
 const CapPeople1 = "people/1"
@@ -75,26 +91,33 @@ const CapPermissions1 = "permissions/1"
 const CapPerson1 = "person/1"
 const CapPersonal1 = "personal/1"
 const CapPersonas1 = "personas/1"
+const CapPersonas2 = "personas/2"
 const CapPins1 = "pins/1"
 const CapPlugins1 = "plugins/1"
 const CapPolicy1 = "policy/1"
 const CapPool1 = "pool/1"
 const CapPreferences1 = "preferences/1"
 const CapPresence1 = "presence/1"
-const CapProject1 = "project/1"
 const CapProjects1 = "projects/1"
 const CapProviders1 = "providers/1"
+const CapReadapi1 = "readapi/1"
 const CapRelay1 = "relay/1"
 const CapReportsScope1 = "reports.scope/1"
+const CapReportsValue1 = "reports.value/1"
+const CapReportsViews1 = "reports.views/1"
 const CapReports1 = "reports/1"
+const CapResourcesLeases1 = "resources.leases/1"
 const CapResources1 = "resources/1"
 const CapRetention1 = "retention/1"
 const CapRuntime1 = "runtime/1"
 const CapRuntimesAccounts1 = "runtimes.accounts/1"
 const CapRuntimes1 = "runtimes/1"
 const CapSandbox1 = "sandbox/1"
+const CapSessionsElsewhere1 = "sessions.elsewhere/1"
+const CapSessionsOnMachine1 = "sessions.on-machine/1"
 const CapSessions1 = "sessions/1"
 const CapShell1 = "shell/1"
+const CapSigninAsk1 = "signin.ask/1"
 const CapSignin1 = "signin/1"
 const CapSimulators1 = "simulators/1"
 const CapSkills1 = "skills/1"
@@ -109,24 +132,33 @@ const CapViews1 = "views/1"
 const CapWake1 = "wake/1"
 const CapWorkflow1 = "workflow/1"
 const CapWorkflows1 = "workflows/1"
-const CapWorkspaces1 = "workspaces/1"
 const CapWorktrees1 = "worktrees/1"
 
 // HostCapabilities is the capability of each method and notification in daemon.openrpc.json.
 var HostCapabilities = pairs([][2]string{
+	{"agentConfig/editorFiles", "personal/1"},
+	{"agentConfig/editorSave", "personal/1"},
 	{"agents/answerSandbox", "agents/1"},
 	{"agents/archive", "agents/1"},
 	{"agents/branchFrom", "chat.branch/1"},
 	{"agents/cancelContinue", "chat.continue-when-back/1"},
-	{"agents/continueInProject", "agents/1"},
+	{"agents/continueInFolder", "agents/1"},
+	{"agents/continueInNew", "host.org-routes/1"},
 	{"agents/continueWhenBack", "chat.continue-when-back/1"},
 	{"agents/delete", "agents/1"},
 	{"agents/discardDraft", "agents/1"},
 	{"agents/editQueued", "agents.edit-queued/1"},
+	{"agents/endedElsewhere", "sessions.elsewhere/1"},
+	{"agents/export", "agents.export/1"},
+	{"agents/exportRead", "agents.export/1"},
 	{"agents/find", "agents.find/1"},
 	{"agents/fork", "agents/1"},
+	{"agents/fromStarter", "sessions.elsewhere/1"},
+	{"agents/import", "agents.export/1"},
+	{"agents/importUpload", "agents.export/1"},
 	{"agents/labelVocabulary", "agents/1"},
 	{"agents/list", "agents/1"},
+	{"agents/move", "agents/1"},
 	{"agents/options", "agents/1"},
 	{"agents/prewarm", "agents/1"},
 	{"agents/prompt", "agents/1"},
@@ -136,7 +168,9 @@ var HostCapabilities = pairs([][2]string{
 	{"agents/said", "agents.said/1"},
 	{"agents/sendNow", "agents/1"},
 	{"agents/setCeiling", "agents/1"},
+	{"agents/setClientPermission", "auto/1"},
 	{"agents/setLabels", "agents/1"},
+	{"agents/setLevels", "auto/1"},
 	{"agents/setMuted", "mute/1"},
 	{"agents/setOption", "agents/1"},
 	{"agents/setSandbox", "agents/1"},
@@ -153,6 +187,10 @@ var HostCapabilities = pairs([][2]string{
 	{"approvals/read", "approvals/1"},
 	{"artifact/write", "artifact/1"},
 	{"attention/pending", "attention/1"},
+	{"auto/mappings", "auto/1"},
+	{"auto/preview", "auto/1"},
+	{"auto/set", "auto/1"},
+	{"auto/state", "auto/1"},
 	{"backups/configure", "backups/1"},
 	{"backups/make", "backups/1"},
 	{"backups/restore", "backups/1"},
@@ -163,6 +201,7 @@ var HostCapabilities = pairs([][2]string{
 	{"changes/file", "changes/1"},
 	{"changes/list", "changes/1"},
 	{"client/catchUp", "client/1"},
+	{"clientPermissions/set", "client-permissions/1"},
 	{"clientPermissions/state", "client-permissions/1"},
 	{"connection/bindDevice", "connection/1"},
 	{"connections/disconnect", "connections/1"},
@@ -173,6 +212,7 @@ var HostCapabilities = pairs([][2]string{
 	{"connections/sign-in/email", "connections.email/1"},
 	{"connections/sign-in/token", "connections/1"},
 	{"connections/sign-in/wait", "connections/1"},
+	{"connectors/codespaces", "connectors.setup/1"},
 	{"connectors/setup", "connectors.setup/1"},
 	{"connectors/setup/skip", "connectors.setup/1"},
 	{"cost/setLimits", "cost/1"},
@@ -180,6 +220,7 @@ var HostCapabilities = pairs([][2]string{
 	{"credentials/lend", "credentials/1"},
 	{"credentials/offer", "credentials/1"},
 	{"daemon/ping", "daemon/1"},
+	{"daemon/policyState", "host.policy/1"},
 	{"daemon/quit", "daemon/1"},
 	{"daemon/status", "daemon/1"},
 	{"devices/announce", "devices/1"},
@@ -206,13 +247,35 @@ var HostCapabilities = pairs([][2]string{
 	{"files/unwatch", "files/1"},
 	{"files/watch", "files/1"},
 	{"files/write", "files/1"},
+	{"folders/add", "folders/1"},
+	{"folders/archive", "folders/1"},
+	{"folders/bringBack", "folders/1"},
+	{"folders/clone", "folders/1"},
+	{"folders/clones", "folders/1"},
+	{"folders/delete", "folders/1"},
+	{"folders/find", "folders/1"},
+	{"folders/keepGuardedChange", "folders/1"},
+	{"folders/list", "folders/1"},
+	{"folders/readGuardedChange", "folders/1"},
+	{"folders/receive", "folders/1"},
+	{"folders/receiveState", "folders/1"},
+	{"folders/receiveUpload", "folders/1"},
+	{"folders/sendFacts", "folders/1"},
+	{"folders/sendPack", "folders/1"},
+	{"folders/sendRead", "folders/1"},
+	{"folders/setDiskSpace", "folders/1"},
+	{"folders/setHelperLimits", "folders/1"},
+	{"folders/setPRCostComment", "lineage.comment/1"},
+	{"folders/setPinned", "folders/1"},
+	{"folders/setProject", "projects/1"},
+	{"folders/unarchive", "folders/1"},
+	{"folders/undoGuardedChange", "folders/1"},
 	{"git/fill", "git/1"},
-	{"leases/end", "leases/1"},
-	{"leases/lease", "leases/1"},
-	{"leases/list", "leases/1"},
-	{"leases/release", "leases/1"},
-	{"leases/removeWaiter", "leases/1"},
-	{"leases/snapshot", "leases/1"},
+	{"lineage/cost", "lineage/1"},
+	{"lineage/end", "lineage/1"},
+	{"lineage/link", "lineage/1"},
+	{"lineage/links", "lineage/1"},
+	{"lineage/walk", "lineage/1"},
 	{"mac/open", "mac/1"},
 	{"mac/reveal", "mac/1"},
 	{"mac/terminal", "mac/1"},
@@ -229,7 +292,6 @@ var HostCapabilities = pairs([][2]string{
 	{"mcp/health/check", "mcp/1"},
 	{"mcp/hosted", "mcp/1"},
 	{"mcp/list", "mcp/1"},
-	{"mcp/made-by-agents", "mcp.made-by-agents/1"},
 	{"mcp/preview", "mcp/1"},
 	{"mcp/remove", "mcp/1"},
 	{"mcp/set-secret", "mcp/1"},
@@ -247,10 +309,13 @@ var HostCapabilities = pairs([][2]string{
 	{"person/set", "person/1"},
 	{"person/state", "person/1"},
 	{"personal/shared", "personal/1"},
+	{"personas/files", "personas/2"},
 	{"personas/list", "personas/1"},
+	{"personas/save", "personas/2"},
 	{"pins/arrange", "pins/1"},
 	{"pins/arrangeSessions", "pins/1"},
 	{"pins/arrangeWorkflows", "pins/1"},
+	{"pins/hideView", "pins/1"},
 	{"pins/list", "pins/1"},
 	{"pins/pin", "pins/1"},
 	{"pins/pinSession", "pins/1"},
@@ -266,33 +331,19 @@ var HostCapabilities = pairs([][2]string{
 	{"preferences/get", "preferences/1"},
 	{"preferences/set", "preferences/1"},
 	{"presence/report", "presence/1"},
-	{"projects/add", "projects/1"},
-	{"projects/archive", "projects/1"},
-	{"projects/bringBack", "projects/1"},
-	{"projects/chatState", "projects/1"},
-	{"projects/clone", "projects/1"},
-	{"projects/clones", "projects/1"},
-	{"projects/delete", "projects/1"},
-	{"projects/find", "projects/1"},
-	{"projects/keepGuardedChange", "projects/1"},
-	{"projects/list", "projects/1"},
-	{"projects/readGuardedChange", "projects/1"},
-	{"projects/receive", "projects/1"},
-	{"projects/receiveState", "projects/1"},
-	{"projects/receiveUpload", "projects/1"},
-	{"projects/sendFacts", "projects/1"},
-	{"projects/sendPack", "projects/1"},
-	{"projects/sendRead", "projects/1"},
-	{"projects/setDiskSpace", "projects/1"},
-	{"projects/setHelperLimits", "projects/1"},
-	{"projects/setPinned", "projects/1"},
-	{"projects/unarchive", "projects/1"},
-	{"projects/undoGuardedChange", "projects/1"},
 	{"relay/grant", "relay/1"},
 	{"relay/offer", "relay/1"},
 	{"relay/register", "relay/1"},
+	{"reports/features", "features/1"},
 	{"resources/declare", "resources/1"},
+	{"resources/end", "resources.leases/1"},
+	{"resources/lease", "resources.leases/1"},
+	{"resources/list", "resources.leases/1"},
+	{"resources/release", "resources.leases/1"},
 	{"resources/remove", "resources/1"},
+	{"resources/removeWaiter", "resources.leases/1"},
+	{"resources/snapshot", "resources.leases/1"},
+	{"retention/set", "retention/1"},
 	{"retention/state", "retention/1"},
 	{"runtimes/accountProfiles", "runtimes.accounts/1"},
 	{"runtimes/accounts", "runtimes/1"},
@@ -307,11 +358,16 @@ var HostCapabilities = pairs([][2]string{
 	{"runtimes/logout", "runtimes/1"},
 	{"runtimes/markAvailable", "runtimes/1"},
 	{"runtimes/removeAccount", "runtimes.accounts/1"},
+	{"runtimes/setDefaultAccount", "host.org-routes/1"},
 	{"runtimes/setProvider", "runtimes/1"},
+	{"sandbox/set", "sandbox/1"},
 	{"sandbox/state", "sandbox/1"},
+	{"selfUpdate/set", "host.update/1"},
+	{"selfUpdate/status", "host.update/1"},
 	{"sessions/adopt", "sessions/1"},
 	{"sessions/delete", "sessions/1"},
 	{"sessions/list", "sessions/1"},
+	{"settings/passThrough", "host.policy/1"},
 	{"settings/userPart", "host.user-settings/1"},
 	{"shell/attach", "shell/1"},
 	{"shell/close", "shell/1"},
@@ -351,11 +407,14 @@ var HostCapabilities = pairs([][2]string{
 	{"workflows/delete", "workflows/1"},
 	{"workflows/deny", "workflows/1"},
 	{"workflows/enable", "workflows/1"},
+	{"workflows/limit", "workflows/1"},
 	{"workflows/list", "workflows/1"},
 	{"workflows/mcpTrigger/clearMissed", "workflows/1"},
 	{"workflows/run", "workflows/1"},
+	{"workflows/setLimit", "workflows/1"},
 	{"workflows/setMuted", "mute/1"},
 	{"workflows/settings", "workflows/1"},
+	{"workflows/write", "workflows/1"},
 	{"worktrees/all", "worktrees/1"},
 	{"worktrees/check", "worktrees/1"},
 	{"worktrees/list", "worktrees/1"},
@@ -370,14 +429,18 @@ var HostCapabilities = pairs([][2]string{
 	{"agent/showFile", "agent/1"},
 	{"agents/draftOptions", "agents/1"},
 	{"attention/changed", "attention/1"},
+	{"auto/changed", "auto/1"},
 	{"backups/changed", "backups/1"},
+	{"clientPermissions/changed", "client-permissions/1"},
 	{"clone/changed", "clone/1"},
 	{"cost/changed", "cost/1"},
+	{"daemon/policyStateChanged", "host.policy/1"},
 	{"device/changed", "device/1"},
 	{"disk/changed", "disk/1"},
 	{"events/changed", "events/1"},
 	{"files/changed", "files/1"},
-	{"leases/changed", "leases/1"},
+	{"folder/changed", "folder/1"},
+	{"folder/removed", "folder/1"},
 	{"mcp/healthChanged", "mcp/1"},
 	{"mcp/hostedChanged", "mcp/1"},
 	{"milestones/changed", "milestones/1"},
@@ -388,12 +451,14 @@ var HostCapabilities = pairs([][2]string{
 	{"pins/changed", "pins/1"},
 	{"plugins/changed", "plugins/1"},
 	{"preferences/changed", "preferences/1"},
-	{"project/changed", "project/1"},
-	{"project/removed", "project/1"},
+	{"resources/changed", "resources.leases/1"},
+	{"retention/changed", "retention/1"},
 	{"runtime/account", "runtime/1"},
 	{"runtime/changed", "runtime/1"},
 	{"runtimes/accountProfilesChanged", "runtimes.accounts/1"},
 	{"runtimes/allowancesChanged", "runtimes/1"},
+	{"sandbox/changed", "sandbox/1"},
+	{"selfUpdate/changed", "host.update/1"},
 	{"shell/output", "shell/1"},
 	{"shell/stateChanged", "shell/1"},
 	{"storage/writeFailed", "storage/1"},
@@ -415,14 +480,18 @@ var HostNotifications = set([]string{
 	"agent/showFile",
 	"agents/draftOptions",
 	"attention/changed",
+	"auto/changed",
 	"backups/changed",
+	"clientPermissions/changed",
 	"clone/changed",
 	"cost/changed",
+	"daemon/policyStateChanged",
 	"device/changed",
 	"disk/changed",
 	"events/changed",
 	"files/changed",
-	"leases/changed",
+	"folder/changed",
+	"folder/removed",
 	"mcp/healthChanged",
 	"mcp/hostedChanged",
 	"milestones/changed",
@@ -433,12 +502,14 @@ var HostNotifications = set([]string{
 	"pins/changed",
 	"plugins/changed",
 	"preferences/changed",
-	"project/changed",
-	"project/removed",
+	"resources/changed",
+	"retention/changed",
 	"runtime/account",
 	"runtime/changed",
 	"runtimes/accountProfilesChanged",
 	"runtimes/allowancesChanged",
+	"sandbox/changed",
+	"selfUpdate/changed",
 	"shell/output",
 	"shell/stateChanged",
 	"storage/writeFailed",
@@ -455,6 +526,8 @@ var ControlCapabilities = pairs([][2]string{
 	{"attention/turn", "liveactivity/1"},
 	{"audit/export", "events.audit/1"},
 	{"audit/list", "events.audit/1"},
+	{"audit/setSinks", "audit.sinks/1"},
+	{"audit/sinks", "audit.sinks/1"},
 	{"backups/commit", "backups.store/1"},
 	{"backups/download", "backups.store/1"},
 	{"backups/stored", "backups.store/1"},
@@ -470,29 +543,44 @@ var ControlCapabilities = pairs([][2]string{
 	{"clients/setActivityToken", "liveactivity/1"},
 	{"clients/setGrant", "clients/1"},
 	{"clients/setPushToken", "clients/1"},
+	{"clients/setWebPush", "clients/1"},
 	{"clients/startPairing", "clients/1"},
 	{"clients/stopPairing", "clients/1"},
+	{"clients/webPushKey", "clients/1"},
 	{"console/fleet", "console/1"},
+	{"console/live", "console/1"},
+	{"console/stopAgent", "console/1"},
 	{"console/teamWorkflows", "console/1"},
 	{"control/ping", "control/1"},
 	{"control/rotate", "control.rotate/1"},
 	{"control/setAuditDays", "events.audit/1"},
-	{"control/setProjectDetection", "control/1"},
+	{"control/setFolderDetection", "control/1"},
 	{"control/status", "control/1"},
+	{"folders/detected", "folders/1"},
 	{"git/credential", "git/1"},
+	{"governance/approvals", "governance/1"},
+	{"governance/decide", "governance/1"},
+	{"governance/report", "governance/1"},
+	{"governance/request", "governance/1"},
+	{"governance/requests", "governance/1"},
+	{"governance/revoke", "governance/1"},
+	{"governance/usage", "governance/1"},
 	{"groups/list", "groups/1"},
 	{"groups/remove", "groups/1"},
 	{"groups/set", "groups/1"},
+	{"groups/setRole", "org-identity/1"},
 	{"handover/status", "handover/1"},
 	{"host/hello", "host/1"},
+	{"host/machines", "host/1"},
+	{"host/orgRoutesAgain", "host.org-routes/1"},
+	{"host/orgRoutesApplied", "host.org-routes/1"},
 	{"host/policyApplied", "host.policy/1"},
 	{"host/providerDraft", "host/1"},
 	{"host/status", "host/1"},
-	{"host/workspaces", "host/1"},
 	{"hosts/announce", "hosts/1"},
 	{"hosts/approveJoin", "hosts.join/1"},
 	{"hosts/checkAgain", "hosts/1"},
-	{"hosts/deleteWorkspace", "hosts/1"},
+	{"hosts/deleteMachine", "hosts/1"},
 	{"hosts/denyJoin", "hosts.join/1"},
 	{"hosts/detect", "hosts/1"},
 	{"hosts/dropKept", "hosts/1"},
@@ -507,8 +595,8 @@ var ControlCapabilities = pairs([][2]string{
 	{"hosts/listKept", "hosts/1"},
 	{"hosts/remove", "hosts/1"},
 	{"hosts/retryKept", "hosts/1"},
+	{"hosts/setMachineOptions", "hosts/1"},
 	{"hosts/setRelay", "hosts/1"},
-	{"hosts/setWorkspaceOptions", "hosts/1"},
 	{"hosts/sshHosts", "hosts/1"},
 	{"hosts/start", "hosts/1"},
 	{"hosts/startEnroll", "hosts/1"},
@@ -521,17 +609,34 @@ var ControlCapabilities = pairs([][2]string{
 	{"links/list", "links/1"},
 	{"links/remove", "links/1"},
 	{"links/requests", "links/1"},
+	{"machines/forAgent", "machines/1"},
+	{"machines/sendFolder", "folders.to-machine/1"},
+	{"machines/sessionCall", "sessions.elsewhere/1"},
+	{"machines/sessionEnded", "sessions.elsewhere/1"},
+	{"machines/startSession", "sessions.on-machine/1"},
+	{"notices/take", "notices/1"},
+	{"orgRoutes/check", "org-routes/1"},
+	{"orgRoutes/list", "org-routes/1"},
+	{"orgRoutes/mine", "org-routes/1"},
+	{"orgRoutes/remove", "org-routes/1"},
+	{"orgRoutes/replaceKey", "org-routes/1"},
+	{"orgRoutes/set", "org-routes/1"},
 	{"people/invite", "people/1"},
 	{"people/list", "people/1"},
 	{"people/remove", "people/1"},
 	{"people/removePreview", "people/1"},
+	{"people/removeRequests", "org-identity/1"},
 	{"people/setRole", "people/1"},
 	{"policy/get", "policy/1"},
 	{"policy/mine", "policy/1"},
 	{"policy/raise", "policy/1"},
 	{"policy/set", "policy/1"},
 	{"policy/stopAll", "policy/1"},
-	{"projects/detected", "projects/1"},
+	{"projects/joined", "projects/1"},
+	{"projects/list", "projects/1"},
+	{"projects/remove", "projects/1"},
+	{"projects/set", "projects/1"},
+	{"projects/setSlot", "projects/1"},
 	{"providers/add", "providers/1"},
 	{"providers/create", "providers/1"},
 	{"providers/draftAnswer", "providers/1"},
@@ -544,33 +649,61 @@ var ControlCapabilities = pairs([][2]string{
 	{"providers/runtimes", "providers/1"},
 	{"providers/setGroup", "groups/1"},
 	{"providers/update", "providers/1"},
+	{"readApi/list", "readapi/1"},
+	{"readApi/make", "readapi/1"},
+	{"readApi/revoke", "readapi/1"},
 	{"relay/switch", "relay/1"},
+	{"reports/deleteView", "reports.views/1"},
 	{"reports/export", "reports/1"},
 	{"reports/policy", "reports.scope/1"},
+	{"reports/saveView", "reports.views/1"},
 	{"reports/scopes", "reports.scope/1"},
 	{"reports/setPolicy", "reports.scope/1"},
 	{"reports/usage", "reports/1"},
+	{"reports/value", "reports.value/1"},
+	{"reports/views", "reports.views/1"},
+	{"scim/set", "org-identity/1"},
+	{"scim/tokens/list", "org-identity/1"},
+	{"scim/tokens/make", "org-identity/1"},
+	{"scim/tokens/revoke", "org-identity/1"},
 	{"signIn/addToMe", "signin/1"},
 	{"signIn/approve", "signin/1"},
+	{"signIn/ask", "signin.ask/1"},
 	{"signIn/configure", "signin/1"},
 	{"signIn/deny", "signin/1"},
+	{"signIn/discover", "org-identity/1"},
+	{"signIn/domains/check", "org-identity/1"},
+	{"signIn/domains/claim", "org-identity/1"},
+	{"signIn/domains/list", "org-identity/1"},
+	{"signIn/domains/preview", "org-identity/1"},
+	{"signIn/domains/remove", "org-identity/1"},
+	{"signIn/domains/set", "org-identity/1"},
+	{"signIn/orgProviders/check", "org-identity/1"},
+	{"signIn/orgProviders/list", "org-identity/1"},
+	{"signIn/orgProviders/remove", "org-identity/1"},
+	{"signIn/orgProviders/set", "org-identity/1"},
+	{"signIn/orgStart", "org-identity/1"},
 	{"signIn/pair", "signin/1"},
 	{"signIn/providers", "signin/1"},
 	{"signIn/removeFromMe", "signin/1"},
 	{"signIn/requests", "signin/1"},
+	{"signIn/ticket", "org-identity/1"},
 	{"tunnel/open", "tunnel/1"},
 	{"usage/rollup", "reports/1"},
 	{"user/removeSecret", "user/1"},
 	{"user/secretNames", "user/1"},
+	{"user/setAgentConfigFile", "user/1"},
+	{"user/setNoticeLimits", "notices/1"},
 	{"user/setSecret", "user/1"},
 	{"user/setSettings", "user/1"},
 	{"user/settings", "user/1"},
 	{"workflows/claimRun", "bots/1"},
 	{"workflows/fire", "events.team/1"},
 	{"workflows/trigger", "events.team/1"},
-	{"workspaces/forAgent", "workspaces/1"},
 	{"control/capReached", "bots/1"},
 	{"control/clientChanged", "control/1"},
+	{"control/cutOff", "org-identity/1"},
+	{"control/governanceRequested", "governance/1"},
 	{"control/groupsChanged", "groups/1"},
 	{"control/hostChanged", "control/1"},
 	{"control/installProgress", "control/1"},
@@ -582,8 +715,12 @@ var ControlCapabilities = pairs([][2]string{
 	{"control/linkRequested", "links/1"},
 	{"control/linksChanged", "links/1"},
 	{"control/moved", "control/1"},
+	{"control/notice", "org-identity/1"},
+	{"control/orgRoutesChanged", "org-routes/1"},
+	{"control/orgRoutesLeft", "org-routes/1"},
 	{"control/peopleChanged", "people/1"},
 	{"control/policyChanged", "policy/1"},
+	{"control/projectsChanged", "projects/1"},
 	{"control/providerDraft", "control/1"},
 	{"control/providersChanged", "control/1"},
 	{"control/secretsLeft", "user/1"},
@@ -595,20 +732,27 @@ var ControlCapabilities = pairs([][2]string{
 	{"control/tunnelChanged", "control/1"},
 	{"control/userSettingsChanged", "user/1"},
 	{"control/webChanged", "control/1"},
+	{"folders/detect", "folders/1"},
 	{"host/clients", "host/1"},
+	{"host/orgRoutes", "host.org-routes/1"},
 	{"host/policy", "host.policy/1"},
+	{"host/projects", "projects/1"},
+	{"host/release", "host.update/1"},
 	{"host/user", "bots/1"},
 	{"host/userSettings", "user/1"},
-	{"projects/detect", "projects/1"},
+	{"notices/delivered", "notices/1"},
 	{"relay/count", "relay/1"},
 	{"relay/deliver", "relay/1"},
 	{"relay/devices", "relay/1"},
+	{"user/suspended", "host.suspend/1"},
 })
 
 // ControlNotifications is each notification in control.openrpc.json: what its server sends, not serves.
 var ControlNotifications = set([]string{
 	"control/capReached",
 	"control/clientChanged",
+	"control/cutOff",
+	"control/governanceRequested",
 	"control/groupsChanged",
 	"control/hostChanged",
 	"control/installProgress",
@@ -620,8 +764,12 @@ var ControlNotifications = set([]string{
 	"control/linkRequested",
 	"control/linksChanged",
 	"control/moved",
+	"control/notice",
+	"control/orgRoutesChanged",
+	"control/orgRoutesLeft",
 	"control/peopleChanged",
 	"control/policyChanged",
+	"control/projectsChanged",
 	"control/providerDraft",
 	"control/providersChanged",
 	"control/secretsLeft",
@@ -633,14 +781,19 @@ var ControlNotifications = set([]string{
 	"control/tunnelChanged",
 	"control/userSettingsChanged",
 	"control/webChanged",
+	"folders/detect",
 	"host/clients",
+	"host/orgRoutes",
 	"host/policy",
+	"host/projects",
+	"host/release",
 	"host/user",
 	"host/userSettings",
-	"projects/detect",
+	"notices/delivered",
 	"relay/count",
 	"relay/deliver",
 	"relay/devices",
+	"user/suspended",
 })
 
 // DeclaredCapabilities is x-declared-capabilities: what a host, a client or the control plane
@@ -650,9 +803,13 @@ var DeclaredCapabilities = map[string][]string{
 		"client.wire/1",
 		"client.team/1",
 	},
+	"control": {
+		"machine/1",
+	},
 	"host": {
 		"host.wire/1",
 		"agents.move-worktree/1",
 		"host.team/1",
+		"host.suspend/1",
 	},
 }

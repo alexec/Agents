@@ -62,14 +62,13 @@ public enum AfterTurn: String, Codable, Hashable, Sendable {
         self = after
     }
 
-    /// Whether it may go with an ending. A request keeps the session in the list until
-    /// the person agrees, so `partly_done` may too — but not an ending that asks the
+    /// Whether it may go with an ending. Not an ending that asks the
     /// person for something (that session wants them again), nor `blocked` (a blocked
     /// one has to be woken). Archiving puts the work out of sight, so only an ending
     /// with nothing left in it goes with it.
     public func goes(with outcome: WorkOutcome) -> Bool {
         switch (self, outcome) {
-        case (.requestArchive, .done), (.requestArchive, .nothingToDo), (.requestArchive, .partlyDone): return true
+        case (.requestArchive, .done), (.requestArchive, .nothingToDo): return true
         case (.archive, .done), (.archive, .nothingToDo): return true
         default: return false
         }
@@ -79,7 +78,7 @@ public enum AfterTurn: String, Codable, Hashable, Sendable {
     public var refusal: String {
         switch self {
         case .requestArchive:
-            "Nothing was recorded: a request to archive only goes with done, nothing_to_do or partly_done."
+            "Nothing was recorded: a request to archive only goes with done or nothing_to_do."
         case .archive: "Nothing was recorded: archive only goes with done or nothing_to_do."
         }
     }

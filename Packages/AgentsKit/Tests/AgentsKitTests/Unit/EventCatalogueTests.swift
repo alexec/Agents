@@ -11,15 +11,16 @@ struct EventCatalogueTests {
         // less the ten pull-request kinds that went with GitHub support, and the switch,
         // which went with the pool (065), and agent.parked (agent.archive_requested since #584)
         // and agent.archived (#96), and
-        // mac.disk_low and mac.disk_ok (#195, machine.* since #372), project.idle (#360),
+        // mac.disk_low and mac.disk_ok (#195, machine.* since #372), folder.idle (#360),
         // and dropbox.file_added (#231), and agent.messaged (#560), and system.restarted (#1219).
         #expect(names.count == 31)
         for name in ["system.restarted", "cost.allowance_out", "cost.allowance_back", "agent.archive_requested", "agent.archived",
-                     "machine.disk_low", "machine.disk_ok", "project.idle", "dropbox.file_added",
-                     "agent.messaged"] {
+                     "machine.disk_low", "machine.disk_ok", "folder.idle", "dropbox.file_added",
+                     "agent.messaged", "agent.waiting"] {
             #expect(names.contains(name), "\(name)")
         }
         #expect(!names.contains("agent.runtime_switched"))
+        #expect(!names.contains("agent.blocked"))
         #expect(Set(names).count == names.count)
         for name in names { #expect(EventDraft.isWellFormed(name), "\(name)") }
         for kind in EventCatalogue.all { #expect(EventSubject(name: kind.name) != nil, "\(kind.name)") }
@@ -80,12 +81,12 @@ struct EventCatalogueTests {
         #expect(granted.details == ["resource", "agent"])
     }
 
-    /// Only three events take a filter (#574), and only those have an inputSchema
+    /// Only four events take a filter (#574, #2361), and only those have an inputSchema
     /// with anything in it (#579).
     @Test func onlyTheFiltersAreInTheInputSchema() throws {
         let filtered = EventCatalogue.all.filter { !$0.filters.isEmpty }
             .map { "\($0.name) \($0.filters.map(\.key).joined(separator: ","))" }
-        #expect(filtered == ["branch.moved branch", "person.away why", "person.back why"])
+        #expect(filtered == ["branch.moved branch", "lease.granted resource,agent", "person.away why", "person.back why"])
         let branch = try #require(EventCatalogue.kind(named: "branch.moved"))
         #expect(branch.inputSchema == ["type": "object", "additionalProperties": false,
                                        "properties": ["branch": ["type": "string"]]])
@@ -93,7 +94,7 @@ struct EventCatalogueTests {
         #expect(away.inputSchema["properties"]?["why"] == ["type": "string", "enum": ["locked", "idle"]])
         let finished = try #require(EventCatalogue.kind(named: "agent.finished"))
         #expect(finished.inputSchema == ["type": "object", "additionalProperties": false, "properties": [:]])
-        #expect(EventList.text().contains("use wait_for_event with agents"))
+        #expect(EventList.text().contains("use wait_for_agents"))
     }
 
     // MARK: #579: the app's events in events/list's shape
@@ -196,7 +197,7 @@ struct EventCatalogueTests {
         }
         #expect(!text.isEmpty)
         // Not raised by the Go host yet (#1368): take each off as it is.
-        let notYet: Set<String> = ["mac.sleep", "mac.wake", "person.away", "person.back", "project.idle"]
+        let notYet: Set<String> = ["mac.sleep", "mac.wake", "person.away", "person.back", "folder.idle"]
         for kind in EventCatalogue.all where !notYet.contains(kind.name) {
             #expect(text.contains("\"\(kind.name)\""), "nothing raises \(kind.name)")
         }

@@ -43,7 +43,7 @@ await page.waitFor(`document.querySelector("textarea")`);
 await page.focus("textarea");
 await page.type((await op.call("clients/startPairing", { kind: "browser" })).text);
 await page.press("Connect");
-await page.waitFor(`document.querySelector(".projects .row")`);
+await page.waitFor(`document.querySelector(".folders .row")`);
 const clickText = (selector, text) => page.eval(`(() => {
   const el = [...document.querySelectorAll(${JSON.stringify(selector)})].find((e) => e.textContent.trim().startsWith(${JSON.stringify(text)}) && e.offsetParent !== null);
   el?.click(); return !!el;
@@ -63,7 +63,7 @@ const menu = async (label) => {
 };
 
 // 1. A new agent, in a new worktree, with a picture attached.
-if (!(await clickText(".projects .row", "work"))) throw new Error("no work project");
+if (!(await clickText(".folders .row", "work"))) throw new Error("no work folder");
 await page.waitFor(`document.querySelector(".sessions .section-head")`);
 await page.press("New session");
 await page.waitFor(`document.querySelector(".new-agent select[aria-label='Works in']")`);

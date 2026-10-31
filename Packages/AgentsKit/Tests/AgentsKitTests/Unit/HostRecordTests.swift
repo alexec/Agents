@@ -6,7 +6,7 @@ import Testing
 /// What 043 adds to a server's record. A `hosts.json` from before it is past the cut-off
 /// (#58): it does not read, and is set aside rather than written over.
 @Suite("A server's record after 043")
-struct HostRecordTests {
+struct MachineRecordTests {
     /// A host as 037 wrote it: today's encoding with every key 043 added taken out.
     static func from037(keeping kept: Set<String> = []) throws -> Data {
         var host = try ServerHost(sshName: "devbox")
@@ -15,7 +15,7 @@ struct HostRecordTests {
                                  installedVersion: "0.1.0+1", installedSHA256: "ff", streamLocalForwarding: true)
         var hosts = HostList()
         try hosts.add(host)
-        let added = Set(["ownSignInOnly", "knownProjects", "libc", "downloader", "toolsetID",
+        let added = Set(["ownSignInOnly", "knownFolders", "libc", "downloader", "toolsetID",
                          "hasNpx", "hasOwnClaudeSignIn"]).subtracting(kept)
         func strip(_ value: Any) -> Any {
             if let object = value as? [String: Any] {
@@ -39,7 +39,7 @@ struct HostRecordTests {
 
     @Test func anUnreadableHostsFileIsSetAsideNotWrittenOver() throws {
         let folder = FileManager.default.temporaryDirectory
-            .appending(path: "HostRecordTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+            .appending(path: "MachineRecordTests-\(UUID().uuidString)", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
         let file = folder.appending(path: "hosts.json")
@@ -57,7 +57,7 @@ struct HostRecordTests {
     /// facts, never the server.
     @Test func factsFromBefore043CostOnlyTheFacts() throws {
         let hosts = try JSONDecoder().decode(HostList.self,
-                                             from: Self.from037(keeping: ["ownSignInOnly", "knownProjects"]))
+                                             from: Self.from037(keeping: ["ownSignInOnly", "knownFolders"]))
         let host = try #require(hosts.all.first)
         #expect(host.sshName == "devbox")
         #expect(host.facts == nil)
@@ -66,7 +66,7 @@ struct HostRecordTests {
     @Test func theNewFieldsSurviveARoundTrip() throws {
         var host = try ServerHost(sshName: "agents@127.0.0.1:2223")
         host.ownSignInOnly = true
-        host.knownProjects = ["/home/agents/src/hello"]
+        host.knownFolders = ["/home/agents/src/hello"]
         host.facts = ServerFacts(system: "Linux", architecture: .aarch64, home: "/home/agents", freeBytes: 1,
                                  installedVersion: nil, streamLocalForwarding: true,
                                  libc: .glibc(major: 2, minor: 36), downloader: "curl",

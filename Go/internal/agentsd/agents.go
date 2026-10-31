@@ -91,8 +91,11 @@ func (d *Daemon) registerAgents() {
 	On(d, wire.CallAgentsResuming, func(ctx context.Context, c *Client, _ wire.Empty) (wire.ResumingResponse, error) {
 		return wire.ResumingResponse{AgentIDs: d.resumingNow()}, nil
 	})
-	On(d, wire.CallAgentsContinueInProject, func(ctx context.Context, c *Client, r wire.ContinueInProjectRequest) (wire.UUID, error) {
-		return d.continueInProject(r)
+	On(d, wire.CallAgentsContinueInFolder, func(ctx context.Context, c *Client, r wire.ContinueInFolderRequest) (wire.UUID, error) {
+		return d.continueInFolder(r)
+	})
+	On(d, wire.CallAgentsContinueInNew, func(ctx context.Context, c *Client, r wire.ContinueInNewRequest) (wire.UUID, error) {
+		return d.continueInNew(r)
 	})
 }
 
@@ -126,6 +129,19 @@ func (d *Daemon) editQueued(r wire.EditQueuedRequest) (wire.EditQueuedResult, er
 	return wire.EditQueuedResult{Edited: edited}, nil
 }
 
+// voicePreface is what the runtime reads before words sent from voice mode (#2322): the
+// person hears the reply and does not see it. It also says the words were dictated, so a
+// word that sounds like another is read as the one that was meant (#2515). The spike's
+// text (#1792) took Claude's replies from a median of 138 words to 48, with no markdown
+// and no paths.
+const voicePreface = "You are in voice mode. The person hears your reply and does not see it. " +
+	"The person's words were dictated. A word may be the wrong word that sounds the same. Use the names of this folder. " +
+	"Answer in one to three short spoken sentences. Use plain words. " +
+	"Do not use markdown, lists, tables, code or file paths. " +
+	"If the work changed files, say what changed in one sentence. " +
+	"If you need a decision, ask one clear question. " +
+	"If the person says they are done talking, say a short goodbye and call hang_up."
+
 // prompt is agents/prompt: the words go on the queue, never refused for the agent being
 // busy, and go once the agent is free.
 func (d *Daemon) prompt(r wire.PromptRequest) error {
@@ -134,6 +150,9 @@ func (d *Daemon) prompt(r wire.PromptRequest) error {
 		return noSuchAgent()
 	}
 	if err := d.refuseToRun(a); err != nil {
+		return err
+	}
+	if err := d.promptRefusal(a); err != nil {
 		return err
 	}
 	if err := d.needsSignIn(a.RuntimeID); err != nil {
@@ -161,9 +180,66 @@ func (d *Daemon) prompt(r wire.PromptRequest) error {
 			preface = &p
 		}
 	}
-	return d.enqueue(a.ID, wire.QueuedPrompt{ID: store.NewUUID(), Text: r.Text, Attachments: r.Attachments,
-		QueuedAt: now(), From: from, Preface: preface}, false)
+	if r.Voice != nil && *r.Voice {
+		p := voicePreface
+		if preface != nil {
+			p = *preface + "\n\n" + p
+		}
+		preface = &p
+	}
+	voice := r.Voice != nil && *r.Voice
+	// The turn running before the words were queued: the one they talk over.
+	l := d.live(a.ID)
+	l.mu.Lock()
+	busy, seq := l.inTurn, l.turnSeq
+	l.mu.Unlock()
+	if err := d.enqueue(a.ID, wire.QueuedPrompt{ID: store.NewUUID(), Text: r.Text, Attachments: r.Attachments,
+		QueuedAt: now(), From: from, Preface: preface}, voice); err != nil {
+		return err
+	}
+	if voice && busy {
+		d.bargeIn(a.ID, seq)
+	}
+	return nil
 }
+
+// bargeIn is words said in voice mode while a turn runs (#2375): the person talked over
+// the agent, as over a person, so the turn stops and the words, first in the queue, go
+// as soon as it has ended. A stop leaves the queue (run), so it is started again here.
+// Only turn seq, the one running when the words came: never the turn that carries them.
+func (d *Daemon) bargeIn(id wire.UUID, seq int) {
+	l := d.live(id)
+	l.mu.Lock()
+	still := l.inTurn && l.turnSeq == seq
+	l.mu.Unlock()
+	if !still {
+		return
+	}
+	l.cancel()
+	go func() {
+		for range bargeInTries {
+			select {
+			case <-d.ctx.Done():
+				return
+			case <-time.After(bargeInEvery):
+			}
+			l.mu.Lock()
+			ended := !l.inTurn && !l.running
+			l.mu.Unlock()
+			if ended {
+				l.kick()
+				return
+			}
+		}
+	}()
+}
+
+// How often, and how many times, a barge-in looks for the stopped turn to have ended:
+// 10 s in all, longer than a runtime takes to answer session/cancel.
+var (
+	bargeInEvery = 100 * time.Millisecond
+	bargeInTries = 100
+)
 
 // sendNow is DaemonCore.sendNow: a queued prompt goes at once, into the running turn
 // where the runtime takes words mid-turn, or as the next turn when none is running.
@@ -291,13 +367,13 @@ func cleanedLabel(v string) (string, error) {
 }
 
 // changeLabels is SessionLabelPolicy.change for the person.
-func changeLabels(current []wire.SessionLabel, add, remove []string, project []wire.SessionLabel) ([]wire.SessionLabel, error) {
-	return changeLabelsAs(wire.SessionLabelOwnerPerson, current, add, remove, project)
+func changeLabels(current []wire.SessionLabel, add, remove []string, folder []wire.SessionLabel) ([]wire.SessionLabel, error) {
+	return changeLabelsAs(wire.SessionLabelOwnerPerson, current, add, remove, folder)
 }
 
 // changeLabelsAs is SessionLabelPolicy.change by an actor: an agent cannot change a label
 // the person gave.
-func changeLabelsAs(actor wire.SessionLabelOwner, current []wire.SessionLabel, add, remove []string, project []wire.SessionLabel) ([]wire.SessionLabel, error) {
+func changeLabelsAs(actor wire.SessionLabelOwner, current []wire.SessionLabel, add, remove []string, folder []wire.SessionLabel) ([]wire.SessionLabel, error) {
 	ownedByPerson := func(v string) error {
 		return Invalid("The label %s belongs to the person, so an agent cannot change it.", v)
 	}
@@ -356,7 +432,7 @@ func changeLabelsAs(actor wire.SessionLabelOwner, current []wire.SessionLabel, a
 			return nil, Invalid("A session can have at most five labels.")
 		}
 		canonical := v
-		for _, l := range project {
+		for _, l := range folder {
 			if labelKey(l.Value) == labelKey(v) {
 				canonical = l.Value
 				break
@@ -367,12 +443,12 @@ func changeLabelsAs(actor wire.SessionLabelOwner, current []wire.SessionLabel, a
 	return result, nil
 }
 
-// vocabulary is SessionLabelPolicy.vocabulary: every label in the project, oldest first,
+// vocabulary is SessionLabelPolicy.vocabulary: every label in the folder, oldest first,
 // once each.
 func vocabulary(folder string, agents []wire.Agent) []wire.SessionLabel {
 	var all []wire.SessionLabel
 	for _, a := range agents {
-		if projectFolder(&a) == folder {
+		if folderPath(&a) == folder {
 			all = append(all, a.Labels...)
 		}
 	}
@@ -398,7 +474,7 @@ func (d *Daemon) setLabels(r wire.SetLabelsRequest) (wire.Agent, error) {
 	if a == nil {
 		return wire.Agent{}, &Error{Code: CodeNoSuchAgent, Message: "That session no longer exists."}
 	}
-	labels, err := changeLabels(a.Labels, r.Add, r.Remove, vocabulary(projectFolder(a), d.Store.Agents()))
+	labels, err := changeLabels(a.Labels, r.Add, r.Remove, vocabulary(folderPath(a), d.Store.Agents()))
 	if err != nil {
 		return wire.Agent{}, err
 	}
@@ -450,6 +526,12 @@ func (d *Daemon) delete(id wire.UUID) error {
 // deleteArchived removes an archived agent, its folder and its turns; because is who or
 // what deleted it ("person", or "retention" for the sweep).
 func (d *Daemon) deleteArchived(a *wire.Agent, because string) error {
+	return d.deleteArchivedThen(a, because, func(a *wire.Agent) { d.queueErasure(a) })
+}
+
+// deleteArchivedThen is deleteArchived, with erase to queue the runtime's copy: a sweep
+// collects them, to queue many at once (#2427).
+func (d *Daemon) deleteArchivedThen(a *wire.Agent, because string, erase func(*wire.Agent)) error {
 	d.mu.Lock()
 	l := d.lives[a.ID]
 	delete(d.lives, a.ID)
@@ -458,13 +540,20 @@ func (d *Daemon) deleteArchived(a *wire.Agent, because string) error {
 		l.halt()
 	}
 	d.dropAppTokens(a.ID)
+	d.dropStandIn(a.ID)
 	if err := d.Store.Delete(a.ID); err != nil {
 		return &Error{Code: wire.FailureCouldNotSave, Message: "The agent could not be deleted: " + err.Error()}
 	}
+	// The runtime's own copy goes next, and a backup never brings the agent back (#1001).
+	erase(a)
+	copyOf := "none"
+	if d.mayErase(a, nil) {
+		copyOf = "queued"
+	}
 	Broadcast(d, wire.NotifyAgentRemoved, wire.AgentRemovedNotification{AgentID: a.ID})
-	d.raiseAbout(a, "agent.deleted", "was deleted with its conversation.", map[string]string{"because": because})
+	d.raiseAbout(a, "agent.deleted", "was deleted with its conversation.", map[string]string{"because": because, "runtimeCopy": copyOf})
 	d.takeActor(a.ID) // a helper's deletion raises nothing to take it
-	d.projectChanged(projectFolder(a))
+	d.folderChanged(folderPath(a))
 	return nil
 }
 
@@ -474,6 +563,9 @@ func (d *Daemon) setOption(ctx context.Context, r wire.SetOptionRequest) ([]wire
 	a := d.Store.Agent(r.AgentID)
 	if a == nil {
 		return nil, noSuchAgent()
+	}
+	if err := d.optionRefusal(a, r.OptionID, stringValue(r.Value)); err != nil {
+		return nil, err
 	}
 	l := d.live(a.ID)
 	if a.RuntimeID == "claude" && r.OptionID == chromeOptionID {
@@ -506,8 +598,9 @@ func (d *Daemon) setOption(ctx context.Context, r wire.SetOptionRequest) ([]wire
 		values[r.OptionID] = r.Value
 		a.StartOptions.Values = values
 		if s != nil {
-			a.AdvertisedOptions = withAppOptions(a.RuntimeID, values, options)
+			a.AdvertisedOptions = d.markOptions(a.RuntimeID, withAppOptions(a.RuntimeID, values, options))
 		}
+		a.Levels = d.matchLevels(a)
 	})
 	known := options
 	if s == nil {
@@ -569,23 +662,70 @@ func shortPath(path string) string {
 	return path
 }
 
-// continueInProject starts a successor in the project folder that reads this session and
-// carries on (065), with its runtime, choices and the person's labels.
-func (d *Daemon) continueInProject(r wire.ContinueInProjectRequest) (wire.UUID, error) {
+// continueInNew is Continue in New (#999): a successor in the same folder that reads this
+// session and carries on, with its runtime, choices and the person's labels, on the account
+// asked for, else the runtime's account for new sessions. For a session whose account the
+// organisation removed or no longer allows; start applies the policy to the new account.
+func (d *Daemon) continueInNew(r wire.ContinueInNewRequest) (wire.UUID, error) {
 	a := d.Store.Agent(r.AgentID)
 	if a == nil {
 		return "", noSuchAgent()
 	}
-	project := projectFolder(a)
-	if !isDir(project) {
-		return "", &Error{Code: wire.FailureFolderGone, Message: "The project folder isn't there either (" + shortPath(project) + ")."}
+	cwd := a.Cwd
+	if !isDir(store.FolderPath(cwd)) {
+		cwd = store.FolderURL(folderPath(a))
+	}
+	name := string(a.ID)
+	if a.Title != nil {
+		name = "“" + *a.Title + "” (" + string(a.ID) + ")"
+	}
+	prompt := "Continue the work of the session " + name + ", which can no longer reach the model on its account. " +
+		"Read that session with read_session to see what it did and what is left, then carry on."
+	var labels []string
+	for _, l := range a.Labels {
+		if l.Owner == wire.SessionLabelOwnerPerson {
+			labels = append(labels, l.Value)
+		}
+	}
+	start := wire.StartRequest{RuntimeID: a.RuntimeID, Cwd: cwd, Prompt: prompt, Attachments: []wire.Attachment{},
+		StartOptions: a.StartOptions, AdditionalDirectories: a.AdditionalDirectories, McpServers: a.McpServers,
+		RequestID: r.RequestID, Sandbox: a.SandboxOverride, Labels: labels, AccountID: r.AccountID}
+	// Continue on Auto (#2658, FR-022): an Auto session whose runtime ran out carries on where
+	// Auto would start one now, with its values; its own runtime's options stay behind.
+	if r.Auto != nil && *r.Auto && a.Auto != nil {
+		levels := a.Auto.Levels
+		start.RuntimeID, start.Levels, start.AccountID = autoRuntimeID, &levels, nil
+		start.StartOptions = wire.StartOptions{Values: map[string]wire.JSONValue{}, ExtraArguments: []string{}}
+		start.Prompt = "Continue the work of the session " + name + ", whose runtime, " + runtimeName(a.RuntimeID) +
+			", ran out. Read that session with read_session to see what it did and what is left, then carry on."
+	}
+	id, err := d.start(start)
+	if err != nil {
+		return "", err
+	}
+	if a.Title != nil {
+		d.change(id, func(s *wire.Agent) { s.Title, s.TitleIsPersons = a.Title, a.TitleIsPersons })
+	}
+	return id, nil
+}
+
+// continueInFolder starts a successor in the folder that reads this session and
+// carries on (065), with its runtime, choices and the person's labels.
+func (d *Daemon) continueInFolder(r wire.ContinueInFolderRequest) (wire.UUID, error) {
+	a := d.Store.Agent(r.AgentID)
+	if a == nil {
+		return "", noSuchAgent()
+	}
+	folder := folderPath(a)
+	if !isDir(folder) {
+		return "", &Error{Code: wire.FailureFolderGone, Message: "The folder isn't there either (" + shortPath(folder) + ")."}
 	}
 	name := string(a.ID)
 	if a.Title != nil {
 		name = "“" + *a.Title + "” (" + string(a.ID) + ")"
 	}
 	prompt := "Continue the work of the session " + name + ". Its folder, " + shortPath(store.FolderPath(a.Cwd)) +
-		", is not there any more, so you are in the project folder, " + shortPath(project) +
+		", is not there any more, so you are in the folder, " + shortPath(folder) +
 		", instead. Read that session with read_session to see what it did and what is left, then carry on."
 	if said := strings.TrimSpace(r.Text); said != "" {
 		prompt += "\n\n" + said
@@ -596,7 +736,7 @@ func (d *Daemon) continueInProject(r wire.ContinueInProjectRequest) (wire.UUID, 
 			labels = append(labels, l.Value)
 		}
 	}
-	id, err := d.start(wire.StartRequest{RuntimeID: a.RuntimeID, Cwd: store.FolderURL(project), Prompt: prompt,
+	id, err := d.start(wire.StartRequest{RuntimeID: a.RuntimeID, Cwd: store.FolderURL(folder), Prompt: prompt,
 		Attachments: r.Attachments, StartOptions: a.StartOptions, AdditionalDirectories: a.AdditionalDirectories,
 		McpServers: a.McpServers, RequestID: r.RequestID, Sandbox: a.SandboxOverride, Labels: labels, AccountID: a.AccountID})
 	if err != nil {

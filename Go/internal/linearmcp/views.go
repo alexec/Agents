@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/alexec/agents/Go/internal/richtext"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -16,7 +17,7 @@ import (
 // shape (Go/internal/githubmcp/views.go). It is fed by show_issues, a read-only tool, so it
 // can be pinned. It only reads: Linear's own MCP server (mcp.linear.app) changes issues.
 
-// pages/bridge.js and pages/common.css are the github server's, copied: a page has no
+// pages/bridge.js, pages/lineage.js and pages/common.css are the github server's, copied: a page has no
 // network, so it carries its own.
 //
 //go:embed pages
@@ -35,7 +36,7 @@ func page(name string) string {
 		}
 		return string(b)
 	}
-	return strings.NewReplacer("/*common.css*/", read("common.css"), "/*bridge.js*/", read("bridge.js")).Replace(read(name))
+	return strings.NewReplacer("/*common.css*/", read("common.css"), "/*bridge.js*/", read("bridge.js"), "/*lineage.js*/", read("lineage.js")).Replace(read(name))
 }
 
 func uiMeta(uri string, visibility ...string) mcp.Meta {
@@ -45,8 +46,11 @@ func uiMeta(uri string, visibility ...string) mcp.Meta {
 // Views is what the view asks of Linear.
 type Views interface {
 	// OpenIssues is the workspace's issues not completed or canceled, newest updated first,
-	// at most 100, narrowed to a team key, a state type and a label when they are not empty.
-	OpenIssues(ctx context.Context, team, stateType, label string) ([]ListedIssue, error)
+	// at most 100, narrowed to a team key, a state type and a label when they are not empty,
+	// and the viewer, the user of the API key, for the page's sections (#2453).
+	OpenIssues(ctx context.Context, team, stateType, label string) ([]ListedIssue, *Person, error)
+	// IssueDetails reads one issue's Markdown description.
+	IssueDetails(ctx context.Context, identifier string) (map[string]any, error)
 	// Teams is the workspace's teams, for the page's team choice.
 	Teams(ctx context.Context) ([]Team, error)
 }
@@ -62,6 +66,9 @@ type ListedIssue struct {
 func (l ListedIssue) json() map[string]any {
 	d := l.Issue.json()
 	d["stateType"], d["priority"], d["updatedAt"], d["comments"] = l.StateType, l.Priority, l.UpdatedAt, l.Comments
+	if l.Creator != nil && l.Creator.App {
+		d["authorBot"] = true
+	}
 	return d
 }
 
@@ -77,6 +84,10 @@ type issuesArgs struct {
 	Team  string `json:"team,omitempty" jsonschema:"a team's key, such as ENG; every team when left out"`
 	State string `json:"state,omitempty" jsonschema:"only issues in this state type: triage, backlog, unstarted or started"`
 	Label string `json:"label,omitempty" jsonschema:"only issues with this label"`
+}
+
+type issueDetailsArgs struct {
+	Identifier string `json:"identifier" jsonschema:"the issue identifier, such as ENG-12"`
 }
 
 func structured(data map[string]any) *mcp.CallToolResult {
@@ -96,15 +107,17 @@ func failed(err error) *mcp.CallToolResult {
 func AddViews(server *mcp.Server, linear Views) {
 	mcp.AddTool(server, &mcp.Tool{Name: "show_issues", Title: "Show Linear issues",
 		Description: "The Linear workspace's open issues (not completed or canceled), newest updated first, at most 100, each with " +
-			"its identifier (ENG-12), team, state, priority, labels, assignee and comment count, and the workspace's teams. " +
+			"its identifier (ENG-12), team, state, priority, labels, assignee, comment count and section for the API key's user (viewer): " +
+			"needs_you (assigned to you), yours, team (the workspace's members and apps) or others (guests); attention counts needs_you. " +
+			"It also gives the workspace's teams. " +
 			"A team key, a state type (triage, backlog, unstarted, started) or a label narrows it. " +
-			"Its view is the Linear issues page, with Start Agent on each issue.",
+			"Its view is the Linear issues page, where a person expands a row for its Markdown description or chooses Start Agent.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true}, Meta: uiMeta(issuesURI, "model", "app")},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in issuesArgs) (*mcp.CallToolResult, any, error) {
 			if in.State != "" && !contains(openStateTypes, in.State) {
 				return failed(fmt.Errorf("state must be one of %s", strings.Join(openStateTypes, ", "))), nil, nil
 			}
-			list, err := linear.OpenIssues(ctx, in.Team, in.State, in.Label)
+			list, viewer, err := linear.OpenIssues(ctx, in.Team, in.State, in.Label)
 			if err != nil {
 				return failed(err), nil, nil
 			}
@@ -113,15 +126,36 @@ func AddViews(server *mcp.Server, linear Views) {
 				return failed(err), nil, nil
 			}
 			issues := make([]any, len(list))
+			// The count on the sidebar's row (#2033): the issues that need the viewer (#2453).
+			needsYou := 0
 			for i, l := range list {
-				issues[i] = l.json()
+				j := l.json()
+				j["section"] = issueSection(l.Issue, viewer)
+				if j["section"] == sectionNeedsYou {
+					needsYou++
+				}
+				issues[i] = j
 			}
 			names := make([]any, len(teams))
 			for i, t := range teams {
 				names[i] = map[string]any{"key": t.Key, "name": t.Name}
 			}
-			return structured(map[string]any{"team": in.Team, "state": in.State, "label": in.Label,
-				"teams": names, "states": openStateTypes, "issues": issues}), nil, nil
+			return structured(map[string]any{"team": in.Team, "state": in.State, "label": in.Label, "viewer": viewer.name(),
+				"teams": names, "states": openStateTypes, "issues": issues, "count": len(issues), "attention": needsYou}), nil, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{Name: "show_issue_details", Title: "Show issue details",
+		Description: "One issue's description, rendered as rich text for the Issues page.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true}, Meta: uiMeta("", "model", "app")},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in issueDetailsArgs) (*mcp.CallToolResult, any, error) {
+			if strings.TrimSpace(in.Identifier) == "" {
+				return failed(fmt.Errorf("issue identifier is required")), nil, nil
+			}
+			details, err := linear.IssueDetails(ctx, in.Identifier)
+			if err != nil {
+				return failed(err), nil, nil
+			}
+			return structured(details), nil, nil
 		})
 
 	// No network at all: an empty csp, so the host draws it under its strictest policy.
@@ -129,10 +163,29 @@ func AddViews(server *mcp.Server, linear Views) {
 	html := page("issues.html")
 	server.AddResource(&mcp.Resource{URI: issuesURI, Name: "issues", Title: "Linear issues",
 		Description: "The workspace's open Linear issues, with their team, state, priority, labels and assignee, and Start Agent; " +
-			"a team, a state or a label narrows the list. Fed by show_issues.", MIMEType: viewMime, Meta: meta},
+			"a team, a state or a label narrows the list. A person expands a row to read its Markdown description. Fed by show_issues.", MIMEType: viewMime, Meta: meta},
 		func(context.Context, *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
 			return &mcp.ReadResourceResult{Contents: []*mcp.ResourceContents{{URI: issuesURI, MIMEType: viewMime, Text: html, Meta: meta}}}, nil
 		})
+}
+
+// IssueDetails reads and renders one issue's Markdown description.
+func (l *RealLinear) IssueDetails(ctx context.Context, identifier string) (map[string]any, error) {
+	var out struct {
+		Issue *struct {
+			Identifier  string `json:"identifier"`
+			Description string `json:"description"`
+		} `json:"issue"`
+	}
+	q := `query IssueDetails($id: String!) { issue(id: $id) { identifier description } }`
+	if err := l.query(ctx, q, map[string]any{"id": identifier}, &out); err != nil {
+		return nil, err
+	}
+	if out.Issue == nil {
+		return nil, fmt.Errorf("Linear issue %s was not found", identifier)
+	}
+	return map[string]any{"identifier": out.Issue.Identifier, "description": out.Issue.Description,
+		"descriptionHTML": richtext.Markdown(out.Issue.Description)}, nil
 }
 
 // MARK: Read from Linear
@@ -142,8 +195,8 @@ func priorityName(p int) string {
 	return map[int]string{1: "Urgent", 2: "High", 3: "Medium", 4: "Low"}[p]
 }
 
-// OpenIssues reads the open issues, newest updated first.
-func (l *RealLinear) OpenIssues(ctx context.Context, team, stateType, label string) ([]ListedIssue, error) {
+// OpenIssues reads the open issues, newest updated first, and the viewer, in one query.
+func (l *RealLinear) OpenIssues(ctx context.Context, team, stateType, label string) ([]ListedIssue, *Person, error) {
 	state := map[string]any{"type": map[string]any{"nin": []string{"completed", "canceled"}}}
 	if stateType != "" {
 		state = map[string]any{"type": map[string]any{"eq": stateType}}
@@ -156,6 +209,7 @@ func (l *RealLinear) OpenIssues(ctx context.Context, team, stateType, label stri
 		filter["labels"] = map[string]any{"name": map[string]any{"eq": label}}
 	}
 	var out struct {
+		Viewer *gqlPerson `json:"viewer"`
 		Issues struct {
 			Nodes []struct {
 				gqlIssue
@@ -170,10 +224,11 @@ func (l *RealLinear) OpenIssues(ctx context.Context, team, stateType, label stri
 		} `json:"issues"`
 	}
 	q := `query OpenIssues($filter: IssueFilter, $first: Int) {
+  viewer { ...P }
   issues(filter: $filter, first: $first, orderBy: updatedAt) { nodes { ...I priority updatedAt comments(first: 50) { nodes { id } } } }
 }` + fragments
 	if err := l.query(ctx, q, map[string]any{"filter": filter, "first": 100}, &out); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	list := make([]ListedIssue, 0, len(out.Issues.Nodes))
 	for _, n := range out.Issues.Nodes {
@@ -182,7 +237,7 @@ func (l *RealLinear) OpenIssues(ctx context.Context, team, stateType, label stri
 	}
 	// orderBy updatedAt is newest first on Linear; sort anyway, so a page never jumps.
 	sort.SliceStable(list, func(i, j int) bool { return list[i].UpdatedAt > list[j].UpdatedAt })
-	return list, nil
+	return list, person(out.Viewer, nil), nil
 }
 
 // Teams reads the workspace's teams, by key.

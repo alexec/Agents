@@ -25,10 +25,16 @@ command). Only its user can read it (mode 0700).
 | `usage-history.json`, `time-history.json` | Usage, cost and time | 168 hours by the hour, 90 days by the day |
 | `spend.json` | Spend for the cost limits | 7 days |
 | `workflows.json` | Workflows and their runs | A run is kept 7 days, or until its agent is archived or gone |
-| `<project>/.agents/attachments` | Files attached to prompts | A file that no kept conversation names goes after 7 days. The folder stays under 500 MB, oldest first. |
-| `<project>/.agents/dropbox` | Files handed to a workflow | 25 MB a file. Not swept. |
+| `workflow-copies/` | The approved text of each workflow and its skills | The copies that `workflows.json` names; an older version goes when it is saved |
+| `assessments/` | Each runtime assessment's start, score and scope | The newest 50 |
+| `mcp-logs/`, in the log folder | What each hosted MCP server wrote to stderr | 1 MB and one older file a server, and the newest 32 servers |
+| `events-state.json` | The branch tips that `branch.moved` compares | The live folders only |
+| `<file>.unreadable-<time>`, `<file>.corrupt-<time>` | A store that could not be read, set aside | The newest 3 of each kind for each file |
+| `<folder>/.agents/attachments` | Files attached to prompts | A file that no kept conversation names goes after 7 days. The folder stays under 500 MB, oldest first. |
+| `<folder>/.agents/dropbox` | Files handed to a workflow | 25 MB a file. Not swept. |
 | Terminal scrollback | What a terminal showed | In memory only, 4 MiB a terminal |
-| `daemon.log` | What the host did | 4 MB, and one older file |
+| `daemon.log` | What the machine did | 4 MB, and one older file |
+| `erasures.json`, `erased.json` | Runtime copies of deleted agents still to erase; every agent deleted here | 1,000 entries for 7 days; 10,000 IDs for 400 days |
 | `~/.agents-secrets` | Secrets (see [Security overview](security-overview.md#where-secrets-live)) | Until you remove them |
 
 ## On the control plane
@@ -39,10 +45,10 @@ that machine starts.
 
 | Records | What they keep | How long |
 | --- | --- | --- |
-| Clients, hosts, people, groups | Who is paired, with their public keys, names and when last seen; which machines there are; a client's push tokens | Until forgotten or removed |
+| Clients, machines, people, groups | Who is paired, with their public keys, names and when last seen; which machines there are; a client's push tokens | Until forgotten or removed |
 | Codes | A code's purpose, owner and expiry, never its secret | Deleted 24 hours after it expires |
 | Audit events | Who did what (see [Security overview](security-overview.md#who-did-what)) | 90 days by default; an admin sets 1 to 3,650 days |
-| Usage reports | Usage, cost and time by person, project, machine and runtime, sent by each machine | 7 days by the hour, 90 days by the day |
+| Usage reports | Usage, cost and time by person, project, folder, machine and runtime, sent by each machine | 7 days by the hour, 90 days by the day |
 | Kept requests | Prompts and agent starts for a stopped workspace | Until the machine starts and takes them; 20 a machine at most |
 | A person's settings and secrets | Settings that follow a person; secrets, sealed | Until changed |
 | Server backups | See below | The newest **Keep** of each server; a removed server's for 90 days after its newest |
@@ -54,16 +60,39 @@ account, then the account. It does not delete the account's machines.
 ## Erasure
 
 **Delete** works on an archived agent. It stops the agent's runtime, takes back its tokens,
-and deletes its folder (record, conversation, tool log) and its turn summaries. These stay
-behind:
+and deletes its folder (record, conversation, tool log) and its turn summaries. Then
+(T8, #1001):
 
-- the runtime's own session files, such as Claude Code's in `~/.claude/projects`;
+- **The runtime's own copy goes.** The machine starts the runtime as the agent ran (with
+  its account) and asks it to delete the conversation (ACP `session/delete`). For Claude
+  and Codex it also removes the session's files in the runtime's folder (`~/.claude` or
+  `CLAUDE_CONFIG_DIR`; `~/.codex` or `CODEX_HOME`). This waits in `erasures.json` in the
+  data folder: 1,000 at most, done one at a time, and tried again at the next start when
+  the runtime does not answer, 3 times at most within 7 days.
+- **A restore never brings the agent back.** `erased.json` in the data folder names every
+  agent the machine deleted: 10,000 at most, each for 400 days. A backup carries it, and a
+  restore skips each agent in it, also on a new machine.
+
+These stay behind:
+
+- the copy of a runtime whose files are not known and that cannot delete a conversation;
 - attachments, until the next sweep finds no conversation that names them;
 - the agent's events, until they are 7 days old;
-- the backups that hold it.
+- the backups that hold it, until they age out (a restore skips it).
 
-Deleting the runtime's own files too is planned (T8, #1001). So are **export and import**
-of an agent or a project.
+## Export and import
+
+**Export…** in an agent's menu, and **Export Agents…** in a folder's, on the Mac, the
+Remote and the web page, give a `.tar.gz` of the agent, or of every agent of the folder
+(T8, #1001). It is in the backup format: each agent's record, conversation, turn summaries
+and tool log. It holds no secret, no usage history and no other agent.
+
+**Import Agents…** in a folder's menu sends the file to that folder's machine. Its agents
+come back archived, to read and search. They are never run there, and bring no MCP servers.
+An agent that the machine has already, or that it deleted (`erased.json`), is skipped.
+
+The machine makes an export in its `Outgoing` folder and an import arrives in `Incoming`.
+Each goes once it is read or imported, or after an hour untouched.
 
 ## Backups
 
@@ -90,11 +119,11 @@ The first HADR review (2026-10-21, #1557) found these. Each one is an open issue
 - **A copy of the store does not restore a control plane on its own** (#2137). A restore
   also needs the control key, the `secrets-key` and the TLS certificate from the old home.
   With all of them, a machine joined again in 26 seconds in the review's drill.
-- **Workspace providers' secrets are outside the store** (#2138). A copy of the store does not
+- **Machine providers' secrets are outside the store** (#2138). A copy of the store does not
   carry them.
 - **A machine's backups are on its own disk by default** (#2139).
 - **Not in a machine's backup:** settings, workflows, secrets, attachments, events and the
-  runtimes' own session files. A project's `.agents/` folder is in the project, and so in its
+  runtimes' own session files. A folder's `.agents/` folder is in the folder, and so in its
   git repository if you commit it.
 - **Writes that are not synced.** Appends to a machine's events, its records' logs and its turn summaries
   are not synced to disk one by one, so a power cut can lose the last lines.

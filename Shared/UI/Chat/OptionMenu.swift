@@ -37,7 +37,8 @@ struct OptionMenu: View {
                     ForEach(group.choices) { choice in
                         SelectChoice(title: choice.name,
                                      description: choice.description,
-                                     isChosen: choice.value == (chosen ?? option.currentValue)) {
+                                     isChosen: choice.value == (chosen ?? option.currentValue),
+                                     setBy: choice.setBy) {
                             chosen = choice.value
                             dismiss()
                         }

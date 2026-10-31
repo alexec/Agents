@@ -11,13 +11,13 @@ import (
 func enrolled(t *testing.T, f *fakeControl, accept Accept) *Uplink {
 	t.Helper()
 	root := t.TempDir()
-	private, err := HostPrivateKey(root)
+	private, err := HostPrivateKey(HostKeyFile{Root: root})
 	if err != nil {
 		t.Fatal(err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	m, err := Enroll(ctx, root, f.code(), private, HostHello{})
+	m, err := Enroll(ctx, root, f.code(), private, MachineHello{})
 	if err != nil {
 		t.Fatal(err)
 	}
