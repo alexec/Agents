@@ -12,6 +12,7 @@ import SwiftUI
 struct ArtifactsPane: View {
     @Environment(AppModel.self) private var model
     @Environment(SidebarFrame.self) private var frame
+    @Environment(\.openWindow) private var openWindow
     let agent: Agent
     let state: AgentPaneState
 
@@ -156,6 +157,11 @@ struct ArtifactsPane: View {
         .onTapGesture { open(artifact) }
         .contextMenu {
             Button("Show the message it came from") { showMessage(artifact) }
+            // Scoped to `.file`/`.web` (#3034): the two destinations a tap already opens
+            // somewhere; `.inPlace` and `.nowhere` do nothing on tap either.
+            if let key = ArtifactWindowKey(agentID: agent.id, artifact: artifact) {
+                Button("Open in New Window") { openWindow(id: ArtifactWindowScene.id, value: key) }
+            }
         }
     }
 

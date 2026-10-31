@@ -27,6 +27,10 @@ export interface Route {
   page?: string | undefined;
   /** The files pane, open beside or over the chat. */
   files?: boolean | undefined;
+  /** A file under Files to seed the pane with once, on this tab's first load (#3034):
+   * Exchanged's Open in New Window, so a fresh tab lands on the artifact rather than
+   * whatever this session's Files tab last had. */
+  artifactFile?: string | undefined;
   /** A new session's form, which is the folder's empty pane: shown on a narrow window too. */
   compose?: boolean | undefined;
   /** The folder's archived sessions and workflows (#495, #499), a page opened from one row of the sidebar. */
@@ -76,6 +80,7 @@ export function parseRoute(hash: string): Route {
       case "m": route.mcp = value === "1"; break;
       case "rv": route.review = value; break;
       case "o": route.alone = value === "1"; break;
+      case "af": route.artifactFile = value; break;
     }
   }
   return route;
@@ -96,6 +101,7 @@ export function routeHash(route: Route, aloneIn: AloneFolder | undefined = alone
   else if (route.host && route.folder && route.page) parts.push("pg", route.page);
   if (route.review) return "#/" + parts.map(encodeURIComponent).join("/");
   if (route.session && route.files) parts.push("f", "1");
+  if (route.session && route.files && route.artifactFile) parts.push("af", route.artifactFile);
   if (route.host && route.folder && !route.session && !route.workflow && !route.page && route.compose) parts.push("n", "1");
   else if (route.host && route.folder && !route.session && !route.workflow && !route.page && route.archive) parts.push("ar", "1");
   else if (route.host && route.folder && !route.session && !route.workflow && !route.page && route.mcp) parts.push("m", "1");

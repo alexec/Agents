@@ -9,7 +9,7 @@ import { useEffect } from "preact/hooks";
 import type { Store } from "../model/store";
 import { folderKey } from "../model/groups";
 import { replace, route } from "../route";
-import { setPane, textShownAs } from "./files/paneState";
+import { pathOf, setPane, textShownAs } from "./files/paneState";
 import type { Session } from "../session";
 import { Banner } from "./Banner";
 import { Chat } from "./Chat";
@@ -49,6 +49,20 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
     if (r.host && r.session) void store.openSession(r.host, r.session);
     else store.closeSession();
   }, [r.host, r.session]);
+  // A tab opened straight on one artifact (#3034), from Exchanged's Open in New Window:
+  // seeded once the agent is in hand (not yet on the tab's very first render), so it lands
+  // on that file under Files instead of whatever this session's Files tab last had. Keyed
+  // on whether the agent has arrived rather than on the agent itself, so a working
+  // session's later redraws do not reset the person's own clicks in Files back to it.
+  const artifactAgentHere = !!(r.artifactFile && r.host && r.session && store.agent(r.host, r.session));
+  useEffect(() => {
+    const path = r.artifactFile;
+    const agent = r.host && r.session ? store.agent(r.host, r.session) : undefined;
+    if (!path || !agent) return;
+    const root = pathOf(agent.cwd);
+    const parent = path.slice(0, path.lastIndexOf("/")) || "/";
+    setPane(agent.id, { tab: "files", file: path, fileLine: undefined, last: path, folder: parent === root ? undefined : parent });
+  }, [r.host, r.session, r.artifactFile, artifactAgentHere]);
   // A file the agent asks to be put in front of the person, beside the open chat (US4 scenario
   // 3): Markdown on the Page, anything else under Files at its line, as the Remote's
   // PaneState.open does; a chart is drawn there (#836). Shown for another session, it waits for that one.
