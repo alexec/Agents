@@ -145,28 +145,6 @@ public struct ServerFacts: Codable, Hashable, Sendable {
         self.hasOwnClaudeSignIn = hasOwnClaudeSignIn
     }
 
-    /// Written by hand for `avx2` alone, which facts saved before 049 do not have. They
-    /// are replaced on the next connect, so this can go once 049 is past the cut-off.
-    public init(from decoder: any Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        system = try c.decode(String.self, forKey: .system)
-        architecture = try c.decode(Architecture.self, forKey: .architecture)
-        home = try c.decode(String.self, forKey: .home)
-        freeBytes = try c.decode(Int64.self, forKey: .freeBytes)
-        installedVersion = try c.decodeIfPresent(String.self, forKey: .installedVersion)
-        installedSHA256 = try c.decodeIfPresent(String.self, forKey: .installedSHA256)
-        streamLocalForwarding = try c.decode(Bool.self, forKey: .streamLocalForwarding)
-        probedAt = try c.decode(Date.self, forKey: .probedAt)
-        libc = try c.decode(Libc.self, forKey: .libc)
-        downloader = try c.decodeIfPresent(String.self, forKey: .downloader)
-        toolsetID = try c.decodeIfPresent(String.self, forKey: .toolsetID)
-        hasNpx = try c.decode(Bool.self, forKey: .hasNpx)
-        hasOwnClaudeSignIn = try c.decode(Bool.self, forKey: .hasOwnClaudeSignIn)
-        toolsetIDs = try c.decode([String: String].self, forKey: .toolsetIDs)
-        ownSignIns = try c.decode(Set<String>.self, forKey: .ownSignIns)
-        avx2 = try c.decodeIfPresent(Bool.self, forKey: .avx2) ?? true
-    }
-
     /// The toolset a runtime's `current` points at on this server, when it is whole.
     public func toolsetID(for runtimeID: String) -> String? { toolsetIDs[runtimeID] }
 

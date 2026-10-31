@@ -543,17 +543,11 @@ export type AllowanceStateStatus =
   | { out: { until?: WireDate; retryAfter?: WireDate; why: AllowanceStateOutReason } };
 
 /**
- * What devices/announce answers: the device's record, with the Mac's relay key beside its fields
- * when a bridge has registered one (046).
+ * What devices/announce answers: the device's record, with the Mac's relay key beside it when a
+ * bridge has registered one (046).
  */
 export interface AnnounceReply {
-  id: UUID;
-  publicKey: Base64;
-  name: string;
-  kind: DeviceKind;
-  announcedAt: WireDate;
-  lastSeenAt?: WireDate;
-  mayNotify?: boolean;
+  device: Device;
   macKey?: Base64;
 }
 
@@ -3213,7 +3207,6 @@ export interface FolderSummary {
   counts: Partial<Record<AgentGroup, number>>;
   costToDate: Record<string, number>;
   unmeasuredAgents: number;
-  retiredCount: number;
   guardedChanges?: GuardedChange[];
   approvals?: Approval[];
   /**
@@ -5222,7 +5215,7 @@ export type PermissionLevel =
 export interface PermissionNotification {
   agentID: UUID;
   request?: PermissionRequest;
-  requestID?: UUID;
+  requestID: UUID;
 }
 
 export interface PermissionOption {
@@ -7313,7 +7306,7 @@ export interface ShellAttachResponse {
   scrollback: Base64;
   dropped: number;
   startedAt: WireDate;
-  folder?: URLString;
+  folder: URLString;
   offset?: number;
 }
 
@@ -9582,7 +9575,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AllowanceReading: { required: ["spent", "nearlySpent", "at"], optional: ["window", "used", "resetsAt"] },
   AllowanceState: { required: ["credentialKey", "entryID", "status", "since", "changedAt", "learnedFrom", "spent", "rateLimitStreak"], optional: ["lastRateLimit", "reading", "modelsOut"] },
   AllowanceStateModelOut: { required: ["model", "since", "retryAfter"], optional: ["name"] },
-  AnnounceReply: { required: ["id", "publicKey", "name", "kind", "announcedAt"], optional: ["lastSeenAt", "mayNotify", "macKey"] },
+  AnnounceReply: { required: ["device"], optional: ["macKey"] },
   AnswerElicitationRequest: { required: ["requestID", "action", "content"], optional: ["sendID"] },
   AnswerRequest: { required: ["permissionID", "optionID"], optional: ["sendID"] },
   AnswerSandboxRequest: { required: ["agentID", "carryOn"], optional: [] },
@@ -9830,7 +9823,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FolderPlugin: { required: ["folder", "name", "carries", "folderPath"], optional: ["awaitingApproval"] },
   FolderRemovedNotification: { required: ["folder"], optional: [] },
   FolderRequest: { required: ["folder"], optional: [] },
-  FolderSummary: { required: ["name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount", "folder"], optional: ["guardedChanges", "approvals", "project", "projectProblem", "helperLimitsSetBy"] },
+  FolderSummary: { required: ["name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "folder"], optional: ["guardedChanges", "approvals", "project", "projectProblem", "helperLimitsSetBy"] },
   FolderWorktrees: { required: ["worktrees", "folder"], optional: [] },
   FoldersFindRequest: { required: [], optional: ["paths", "folders"] },
   FoldersListRequest: { required: ["includeArchived"], optional: [] },
@@ -10022,7 +10015,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PendingMove: { required: ["target", "removeLeft", "discardChanges", "askedBy", "askedAt"], optional: [] },
   PeopleChanged: { required: [], optional: ["user", "removed"] },
   PeopleList: { required: ["people", "admin"], optional: [] },
-  PermissionNotification: { required: ["agentID"], optional: ["request", "requestID"] },
+  PermissionNotification: { required: ["agentID", "requestID"], optional: ["request"] },
   PermissionOption: { required: ["optionID", "name", "kind"], optional: [] },
   PermissionRequest: { required: ["id", "agentID", "toolCall", "options", "askedAt"], optional: ["subagent"] },
   PersonClient: { required: ["id", "name", "kind"], optional: [] },
@@ -10238,7 +10231,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SharedSkill: { required: ["name", "path", "source", "reach"], optional: ["description", "clash", "managed"] },
   SharedSnapshot: { required: ["home", "laidOut", "runtimes", "skills", "mcp", "plugins", "otherFiles", "needsALook"], optional: ["instructions"] },
   ShellAttachRequest: { required: ["agentID"], optional: ["shell", "rows", "cols", "since", "startedAt", "folder"] },
-  ShellAttachResponse: { required: ["state", "scrollback", "dropped", "startedAt"], optional: ["folder", "offset"] },
+  ShellAttachResponse: { required: ["state", "scrollback", "dropped", "startedAt", "folder"], optional: ["offset"] },
   ShellInputRequest: { required: ["agentID", "bytes"], optional: ["shell", "rows", "cols"] },
   ShellListResponse: { required: ["shells"], optional: [] },
   ShellOpenResponse: { required: ["shell"], optional: [] },

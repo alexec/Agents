@@ -177,7 +177,7 @@ private actor FakeState {
         await change(question.agentID) { $0.state = .running }
         await tell(DaemonAPI.Notification.agentPermission,
                    try? JSONValue.encoding(DaemonAPI.PermissionNotification(agentID: question.agentID,
-                                                                           request: nil)))
+                                                                           request: nil, requestID: question.id)))
         return .object([:])
     }
 
