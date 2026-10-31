@@ -7,7 +7,7 @@ import { signal, useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { Agent, SessionLabel } from "../protocol/generated";
 import type { Store } from "../model/store";
-import { accepted, labelKind, maximumLabels, splitTyped } from "../model/labels";
+import { accepted, labelClass, maximumLabels, splitTyped } from "../model/labels";
 
 /** Below 760 the prompt's head is one line, as on the iPhone (#1107). */
 const narrowQuery = typeof matchMedia === "function" ? matchMedia("(max-width: 759px)") : null;
@@ -40,7 +40,7 @@ export function LabelField({ store, host, folder, labels, add, remove, disabled,
   return (
     <div class="labels" role="group" aria-label="Labels" ref={group}>
       {labels.map((label) => (
-        <span key={label.value} class={`chip label ${labelKind(label.value)}`} title={label.owner === "agent" ? "Added by the agent" : "Added by you"}>
+        <span key={label.value} class={labelClass(label)} title={label.owner === "agent" ? "Added by the agent" : "Added by you"}>
           {label.value}
           <button class="remove" aria-label={`Remove the label ${label.value}`} disabled={disabled}
             onClick={() => {
@@ -109,7 +109,7 @@ export function Labels({ store, host, agent, folder, disabled }: {
       <button class="labels-folded" disabled={disabled} aria-haspopup="dialog" aria-expanded={editing.value}
         onClick={() => (editing.value = !editing.value)}
         aria-label={labels.length ? `Labels: ${labels.map((l) => l.value).join(", ")}. Edit` : "Add label"}>
-        {first ? <span class={`chip label ${labelKind(first.value)}`}>{first.value}</span> : <span class="add">+ Add label</span>}
+        {first ? <span class={labelClass(first)}>{first.value}</span> : <span class="add">+ Add label</span>}
         {more > 0 && <span class="more">+{more}</span>}
       </button>
       {editing.value && (
