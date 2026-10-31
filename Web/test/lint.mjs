@@ -22,12 +22,17 @@ function files(folder) {
   });
 }
 
-function scan(path, rules) {
+function scan(path, rules, { allowMarked = false } = {}) {
   const text = readFileSync(path, "utf8");
+  const lines = text.split("\n");
   for (const [pattern, why] of rules) {
     for (const match of text.matchAll(pattern)) {
       if (allowedURLs.has(match[0])) continue;
       const line = text.slice(0, match.index).split("\n").length;
+      // A single, reviewed exception (FR-030–032): the line right above names the issue
+      // and why, so an exception is never silent, and it bypasses only `ambient`'s rules,
+      // never eval, an HTML sink, or loading code at run time.
+      if (allowMarked && lines[line - 2]?.includes(allowExceptionMarker)) continue;
       failures.push(`${relative(web, path)}:${line}: ${why} (${match[0].slice(0, 60)})`);
     }
   }
@@ -80,14 +85,20 @@ const sinks = [
   [/\bcreateContextualFragment\b|\bDOMParser\b/g, "no HTML parsing"],
   [/\bimportScripts\b|\bimport\s*\(\s*[^"'`]/g, "no loading code at run time"],
 ];
-// FR-032: no ambient credential, and nothing but the one WebSocket to talk on.
+// FR-032: no ambient credential, and nothing but the one WebSocket to talk on. A line
+// marked `// lint:allow fetch` just above it may still make one same-origin request with
+// no credential of its own (#2235: a refusal's words, read from `/readyz` since a closed
+// WebSocket carries none a browser exposes); the comment above that says why.
+const allowExceptionMarker = "lint:allow fetch";
 const ambient = [
   [/\bdocument\.cookie\b|\bcredentials\s*:/g, "no cookies or ambient credentials"],
   [/\bfetch\s*\(|\bXMLHttpRequest\b|\bsendBeacon\b|\bEventSource\b/g, "no requests but the page's own WebSocket"],
 ];
 
 for (const path of files(join(web, "src"))) {
-  scan(path, [...strings, ...sinks, ...ambient, [/https?:\/\/[^\s"'`)]+/g, "no addresses in source; the page reaches only its own origin"]]);
+  scan(path, [...strings, ...sinks]);
+  scan(path, ambient, { allowMarked: true });
+  scan(path, [[/https?:\/\/[^\s"'`)]+/g, "no addresses in source; the page reaches only its own origin"]]);
 }
 
 for (const path of files(join(web, "dist"))) {

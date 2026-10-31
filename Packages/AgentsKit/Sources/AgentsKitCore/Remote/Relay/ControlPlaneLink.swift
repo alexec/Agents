@@ -55,6 +55,11 @@ public struct ControlPlaneLink: DaemonLink {
             // A control plane that answered and refused is not one to go round.
             ControlPlaneLink.refused.set(refusal.reason)
             throw refusal
+        } catch let refusal as ControlRefusal {
+            // The address itself refused (suspended, over a plan's limit, #2235): the
+            // relay dials the same address in the end, so going round would not help.
+            ControlPlaneLink.hostedRefusal.set(refusal.line)
+            throw refusal
         } catch {
             route.addressDidFail()
             guard let relayed else { throw error }
@@ -63,6 +68,9 @@ public struct ControlPlaneLink: DaemonLink {
                 transport = try await relayed()
             } catch let refusal as ControlAuth.Refusal {
                 ControlPlaneLink.refused.set(refusal.reason)
+                throw refusal
+            } catch let refusal as ControlRefusal {
+                ControlPlaneLink.hostedRefusal.set(refusal.line)
                 throw refusal
             } catch RelayTrouble.notPaired {
                 throw error
@@ -162,6 +170,17 @@ public struct ControlPlaneLink: DaemonLink {
         private var reason: ControlAuth.Reason?
         func set(_ reason: ControlAuth.Reason) { lock.withLock { self.reason = reason } }
         public func take() -> ControlAuth.Reason? { lock.withLock { defer { reason = nil }; return reason } }
+    }
+
+    /// The last line the address itself answered with, refusing the connection outright
+    /// (suspended, over a plan's limit, #2235), taken once.
+    public static let hostedRefusal = HostedRefusal()
+
+    public final class HostedRefusal: @unchecked Sendable {
+        private let lock = NSLock()
+        private var line: String?
+        func set(_ line: String) { lock.withLock { self.line = line } }
+        public func take() -> String? { lock.withLock { defer { line = nil }; return line } }
     }
 }
 #endif

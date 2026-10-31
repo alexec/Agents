@@ -51,6 +51,10 @@ struct PairingAttemptTests {
             .hasPrefix("Couldn’t reach the control plane."))
         #expect(PairingAttempt.sentence(for: JSONRPCError(code: 1, message: "That code was used."), device: "this Mac")
             == "That code was used.")
+        // The address itself refused (suspended, over a plan's limit, #2235): its own
+        // words, not "couldn't reach it".
+        #expect(PairingAttempt.sentence(for: ControlRefusal(line: "This hosted account is suspended."), device: "this Mac")
+            == "This hosted account is suspended.")
         // Paired, and the disk would not keep it (#212): said as that, not as a code refused.
         let full = PairingAttempt.sentence(for: POSIXError(.ENOSPC), device: "this Mac")
         #expect(full.hasPrefix("This Mac is out of disk space, so the pairing could not be saved."))

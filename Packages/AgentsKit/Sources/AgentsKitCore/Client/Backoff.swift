@@ -113,6 +113,13 @@ public final class Backoff: @unchecked Sendable {
         }
     }
 
+    /// A refusal came back, not silence (suspended, over a plan's limit, #2235): trying
+    /// again soon would only be refused again, so the next wait jumps straight to the
+    /// longest rather than climbing to it.
+    public func holdOff() {
+        lock.withLock { next = longest }
+    }
+
     /// No longer going back: the next loss starts from the first wait.
     public func settle() {
         lock.withLock {

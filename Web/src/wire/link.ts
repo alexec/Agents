@@ -13,7 +13,10 @@ export type LinkState =
   | { kind: "open"; name: string }
   // `crowded` when the control plane said this browser holds as many sockets as it may: too
   // many tabs open (#2194). It tries again as for any other.
-  | { kind: "down"; since: number; crowded?: boolean }
+  // `refusalLine` when the address itself refused the connection outright (a suspended
+  // hosted account, one over its plan's limit, 1003 CL-002, #2235): its words, read back
+  // from `/readyz` since the handshake's own close carries none, in place of "can't reach".
+  | { kind: "down"; since: number; crowded?: boolean; refusalLine?: string }
   | { kind: "unpaired" }
   | { kind: "forgotten" }
   | { kind: "wrongControlPlane" }
@@ -318,7 +321,11 @@ export class Link {
         return void this.forgotten();
       }
       if (!authed && this.state.kind === "suspended") return void this.suspended();
-      if (authed || this.state.kind === "connecting" || this.state.kind === "down") this.down();
+      // Closed before it opened (1003 CL-002, #2235): the handshake's own refusal (a
+      // suspended account, one over its plan's limit) carries no body a close event
+      // reads, so `/readyz` is asked once, plainly, for the words to show.
+      if (!authed && this.state.kind === "connecting") { void this.closedBeforeOpen(); return; }
+      if (authed || this.state.kind === "down") this.down();
     };
     socket.onopen = async () => {
       try {
@@ -442,18 +449,49 @@ export class Link {
     this.pending.clear();
   }
 
-  private down(crowded = false): void {
+  private down(crowded = false, refusalLine?: string): void {
     this.clearTimers();
-    if (this.state.kind !== "down" || (this.state.crowded ?? false) !== crowded) {
+    if (this.state.kind !== "down" || (this.state.crowded ?? false) !== crowded || this.state.refusalLine !== refusalLine) {
       if (this.state.kind !== "down") log("link.down");
       const since = this.state.kind === "down" ? this.state.since : Date.now();
-      this.set(crowded ? { kind: "down", since, crowded } : { kind: "down", since });
+      this.set({ kind: "down", since, ...(crowded ? { crowded } : {}), ...(refusalLine ? { refusalLine } : {}) });
     }
     // Out of sight it waits: the tab's return calls retryNow (#170).
     if (this.stopped || this.options.hidden()) return;
+    // A refusal: trying again soon would only be refused again (#2235), so the next
+    // wait jumps straight to the longest rather than climbing to it.
+    if (refusalLine) this.attempt = this.options.backoff.length - 1;
     const delay = retryDelay(this.options.backoff, this.attempt, this.options.random());
     this.attempt++;
     this.retry = setTimeout(() => void this.dial(), delay);
+  }
+
+  /** The socket closed before it opened: asks `/readyz` once for the words a refusal
+   * answered with, then goes down as any other failed try does. */
+  private async closedBeforeOpen(): Promise<void> {
+    const line = await this.refusalLine();
+    this.down(false, line);
+  }
+
+  /** The words a refusal answered with, from `/readyz` next to this link's own
+   * WebSocket address: the handshake's close event carries no body, so this is the
+   * only way to them. Undefined for an ordinary failure to reach the address at all. */
+  private async refusalLine(): Promise<string | undefined> {
+    try {
+      const url = new URL(this.options.url);
+      url.protocol = url.protocol === "wss:" ? "https:" : "http:";
+      url.pathname = "/readyz";
+      // One same-origin GET, no credential of its own, read only for a refusal's words;
+      // nothing it answers with is run (#2235).
+      // lint:allow fetch
+      const response = await fetch(url);
+      const kind = response.headers.get("Agents-Refusal");
+      if (!kind) return undefined;
+      const text = (await response.text()).trim();
+      return text ? text.slice(0, 200) : kind;
+    } catch {
+      return undefined;
+    }
   }
 
   /** `forgotten` is a person's decision and final; `unknown` is final only once it has

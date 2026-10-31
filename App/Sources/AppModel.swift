@@ -984,6 +984,9 @@ final class AppModel {
     private(set) var controlPlaneReachable = false
     /// A try to reach the control plane failed. Stays quiet during the first try.
     private(set) var controlPlaneMissed = false
+    /// The address itself refused the connection (suspended, over a plan's limit,
+    /// #2235): its words, shown in the away strip in place of "can't reach".
+    private(set) var controlPlaneRefusalLine: String?
     /// No control plane and nothing of the old way: the window asks how to work, and
     /// starts nothing until it is told (058, FR-017).
     private(set) var needsFirstRun = ControlConfig.needsFirstRun
@@ -1134,6 +1137,7 @@ final class AppModel {
 
     var controlPlaneAwayLine: String? {
         guard controlPlaneAway else { return nil }
+        if let controlPlaneRefusalLine { return controlPlaneRefusalLine }
         switch ControlConfig.endpoint {
         case .remote(let membership):
             return HostProblem.controlPlaneUnreachable(name: membership.name,
@@ -2903,6 +2907,7 @@ final class AppModel {
         controlPlaneListed = false
         controlPlaneReachable = false
         controlPlaneMissed = false
+        controlPlaneRefusalLine = nil
         directHost = nil
         keptHost = nil
         KeptThisMacHost.forget(in: WindowDefaults.store)
@@ -3252,6 +3257,14 @@ final class AppModel {
                 } catch {
                     // Refused as suspended (#1002): the window shows only that, and dials again.
                     self?.signIn.refused(error)
+                    // The address itself refused (suspended, over a plan's limit, #2235):
+                    // its words replace "can't reach", and trying again soon is pointless.
+                    // `DaemonClient` keeps only "could not connect", so `ControlLink` kept
+                    // the line on the side as it dialled.
+                    if let line = ControlLink.hostedRefusal.take() {
+                        self?.controlPlaneRefusalLine = line
+                        backoff.holdOff()
+                    }
                     answered = false
                 }
                 if answered {
@@ -3304,6 +3317,7 @@ final class AppModel {
     private func controlPlaneDidAnswer() {
         controlPlaneReachable = true
         controlPlaneMissed = false
+        controlPlaneRefusalLine = nil
     }
 
     private func controlPlaneWent() {

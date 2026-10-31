@@ -142,20 +142,50 @@ public final class WebSocketLink: NSObject, LineTransport, URLSessionWebSocketDe
     }
 
     private func finish(_ error: (any Error)?) {
-        let waiting = lock.withLock { () -> CheckedContinuation<Void, any Error>? in
+        let (waiting, task, session) = lock.withLock {
+            () -> (CheckedContinuation<Void, any Error>?, URLSessionWebSocketTask?, URLSession?) in
             defer { opening = nil }
-            return opening
+            return (opening, self.task, self.session)
         }
+        pinger?.cancel()
+        // A refusal (suspended, over a plan's limit, #2235): the handshake's own answer
+        // names the kind, in a header, because it cannot carry a body; the line it
+        // refused with is asked for again, plainly, from the address that gave it.
+        if let waiting, let error, let response = task?.response as? HTTPURLResponse,
+           let kind = response.value(forHTTPHeaderField: ControlRefusal.header) {
+            Task {
+                let line = await Self.refusalLine(session: session, socketURL: task?.originalRequest?.url, kind: kind)
+                self.lock.withLock { self.task = nil; self.session = nil }
+                session?.invalidateAndCancel()
+                waiting.resume(throwing: ControlRefusal(line: line))
+                self.continuation.finish(throwing: error)
+            }
+            return
+        }
+        lock.withLock { self.task = nil; self.session = nil }
+        session?.invalidateAndCancel()
         if let waiting {
             waiting.resume(throwing: error ?? Failure("the WebSocket closed before it opened"))
         }
-        pinger?.cancel()
-        let session = lock.withLock { () -> URLSession? in
-            defer { self.task = nil; self.session = nil }
-            return self.session
-        }
-        session?.invalidateAndCancel()
         if let error { continuation.finish(throwing: error) } else { continuation.finish() }
+    }
+
+    /// The words a refusal answered with, read back from `/readyz` on the same session
+    /// (so the same pin and TLS trust apply): the handshake's HTTP answer has no body a
+    /// `URLSessionWebSocketTask` delivers, so this is the only way to the line itself. The
+    /// header's own value (the refusal's kind) stands in for it when that GET does not
+    /// answer, so a refusal is never shown as silence.
+    private static func refusalLine(session: URLSession?, socketURL: URL?, kind: String) async -> String {
+        guard let session, var parts = socketURL.flatMap({ URLComponents(url: $0, resolvingAgainstBaseURL: false) }) else {
+            return kind
+        }
+        parts.scheme = parts.scheme == "wss" ? "https" : "http"
+        parts.path = "/readyz"
+        guard let url = parts.url, let (data, _) = try? await session.data(for: URLRequest(url: url, timeoutInterval: 5)) else {
+            return kind
+        }
+        let text = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? kind : String(text.prefix(ControlRefusal.maxLineLength))
     }
 
     // MARK: URLSessionWebSocketDelegate
