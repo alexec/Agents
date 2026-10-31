@@ -124,9 +124,13 @@ public enum RuntimeCatalog {
     /// The runtime an agent or workflow gets when it names none.
     public static var defaultRuntime: Runtime { claude }
 
-    /// The runtime a new session opens on: the most recently used runtime that can start,
-    /// then the form's kept choice, then the first runtime that can start (#264).
+    /// The runtime a new session opens on: a kept Auto while it can start, then the most
+    /// recently used runtime that can start, then the form's kept choice, then the first
+    /// runtime that can start (#264). Auto, once picked, stays (#3017): a session started on
+    /// a named runtime (a persona, a continued session, another client) does not move the
+    /// form off it.
     public static func newSessionRuntime(lastUsed: String?, kept: String?, available: [String]) -> String? {
+        if kept == LevelWords.autoID, available.contains(LevelWords.autoID) { return LevelWords.autoID }
         if let lastUsed, available.contains(lastUsed) { return lastUsed }
         if let kept, available.contains(kept) { return kept }
         return available.first
