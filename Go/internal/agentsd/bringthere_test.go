@@ -44,8 +44,8 @@ func TestBringBackBringsTheBranchHere(t *testing.T) {
 	var steps []string
 	offline := false
 	d.SetControlAsk(func(_ context.Context, method string, params any) (json.RawMessage, error) {
-		call := params.(wire.MachineWorkspaceCall)
-		if call.Method != "machines/sendFolder" {
+		call, ok := params.(wire.MachineWorkspaceCall)
+		if !ok || call.Method != "machines/sendFolder" {
 			return nil, &controllink.AskError{Code: -32010, Message: "Agents can’t ask that of the control plane."}
 		}
 		mu.Lock()
@@ -86,7 +86,9 @@ func TestBringBackBringsTheBranchHere(t *testing.T) {
 	from := map[string]any{"machine": "pc", "folder": there, "changes": true}
 
 	// Offline: refused before the card, saying how to start it.
+	mu.Lock()
 	offline = true
+	mu.Unlock()
 	if text, isErr := m.tool(2, "bring_back", from); !isErr ||
 		text != "Nothing was brought back from pc: pc is offline. Start it with start_machine, then try again." {
 		t.Fatal(text)
@@ -108,7 +110,7 @@ func TestBringBackBringsTheBranchHere(t *testing.T) {
 		json.Unmarshal(c.call(t, 1, "elicitations/pending", nil), &pending)
 		return len(pending) == 1
 	})
-	if f := pending[0].Mode.Form.Value; *f.Properties[0].Title != "Bring fix-login, with its uncommitted changes, back from "+there+" on pc into "+src+"?" {
+	if f := pending[0].Mode.Form.Value; *f.Properties[0].Title != "Bring fix-login, with its uncommitted changes, back from "+there+" on pc into "+shortPath(src)+"?" {
 		t.Fatal(*f.Properties[0].Title)
 	}
 	mu.Lock()
@@ -118,7 +120,7 @@ func TestBringBackBringsTheBranchHere(t *testing.T) {
 	steps = nil
 	mu.Unlock()
 	c.call(t, 2, "elicitations/answer", map[string]any{"requestID": pending[0].ID, "action": "accept", "content": map[string]any{"go": "yes"}})
-	if text := <-answered; text != "Brought fix-login back from "+there+" on pc: it moved forward in "+src+". The uncommitted changes from pc are in "+src+"." {
+	if text := <-answered; text != "Brought fix-login back from "+there+" on pc: it moved forward in "+shortPath(src)+". The uncommitted changes from pc are in "+shortPath(src)+"." {
 		t.Fatal(text)
 	}
 	mu.Lock()
@@ -140,7 +142,7 @@ func TestBringBackBringsTheBranchHere(t *testing.T) {
 
 	// Now uncommitted changes here: the changes are refused before the card.
 	if text, isErr := m.tool(5, "bring_back", from); !isErr ||
-		text != "Nothing was brought back: "+src+" has uncommitted changes. Commit or remove them to take the machine's." {
+		text != "Nothing was brought back: "+shortPath(src)+" has uncommitted changes. Commit or remove them to take the machine's." {
 		t.Fatal(text)
 	}
 }
