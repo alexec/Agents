@@ -55,7 +55,7 @@ func TestPairingTakesOneDeviceWithTheCode(t *testing.T) {
 	}
 	var reply wire.AnnounceReply
 	json.Unmarshal(p.call(t, 3, "devices/announce", announcement(phone, 1)), &reply)
-	if string(reply.ID) != phone || !bytes.Equal(reply.MacKey, relayPoint()) {
+	if string(reply.Device.ID) != phone || !bytes.Equal(reply.MacKey, relayPoint()) {
 		t.Fatalf("reply: %+v", reply)
 	}
 	// The code is spent.

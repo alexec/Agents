@@ -58,8 +58,7 @@ public enum HelperLimit {
     /// - `starting`, `running` and `waitingOnUser` — working, or mid-turn on a
     ///   permission question or a form;
     /// - a finished or stopped agent the app will carry on by itself: an open wait on
-    ///   events, a block that names agents or a time (039), or a wait for an allowance
-    ///   to come back (052);
+    ///   events, or a block that names agents or a time (039);
     /// - one the daemon is bringing back after a restart (`comingBack`).
     ///
     /// Not running: finished, stopped, asking to be archived (#584), a block only the
@@ -70,7 +69,7 @@ public enum HelperLimit {
         if agent.archiveRequest?.isRequested == true { return false }
         if agent.state.hasTurnInFlight { return true }
         if comingBack.contains(agent.id) { return true }
-        return agent.isWaiting || agent.allowanceWait != nil
+        return agent.isWaiting
     }
 
     /// The agents holding a folder's not-archived places, oldest first — what a

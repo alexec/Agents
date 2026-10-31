@@ -71,7 +71,7 @@ The waitlist entry is written with `store.Absent`, so two tabs make one. The pla
 
 - `plans.go`: `type Plan struct{ Name string; Machines, Clients, Connections int; StorageBytes int64; EventsKept time.Duration; AgentsRunning int }` and `var plans = map[string]Plan{"free": …, "pro": …}`.
 - `limited.go`: `limitedStore` wraps the account's `*store.Prefixed`:
-  - `Put` of a key under `v1/hosts/` or `v1/clients/` with `store.Absent` (a new record) lists that folder and refuses at the limit with `*LimitError`.
+  - `Put` of a key under `v1/machines/` or `v1/clients/` with `store.Absent` (a new record) lists that folder and refuses at the limit with `*LimitError`.
   - It keeps the account's bytes in memory: counted once when the copy starts (a `List` and the sizes; a store that can say a size without reading, the folder store, says it), then kept up to date on each `Put` and `Delete` (it reads the old size before a rewrite). A `Put` that makes the total larger than the plan's storage is refused.
   - `LimitError.Error()` is the refusal's words (FR-022).
 - The plan is read when the copy starts, and again by the minute sweep, so a webhook's change reaches a running copy within a minute.

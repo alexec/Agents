@@ -277,9 +277,6 @@
         },
         "host": {
           "$ref": "#/definitions/MachineRef"
-        },
-        "grant": {
-          "type": "string"
         }
       },
       "additionalProperties": false
@@ -1197,39 +1194,17 @@
     },
     "AnnounceReply": {
       "type": "object",
-      "description": "What devices/announce answers: the device's record, with the Mac's relay key beside its fields when a bridge has registered one (046).",
+      "description": "What devices/announce answers: the device's record, with the Mac's relay key beside it when a bridge has registered one (046).",
       "properties": {
-        "id": {
-          "$ref": "#/definitions/UUID"
-        },
-        "publicKey": {
-          "$ref": "#/definitions/Base64"
-        },
-        "name": {
-          "type": "string"
-        },
-        "kind": {
-          "$ref": "#/definitions/DeviceKind"
-        },
-        "announcedAt": {
-          "$ref": "#/definitions/WireDate"
-        },
-        "lastSeenAt": {
-          "$ref": "#/definitions/WireDate"
-        },
-        "mayNotify": {
-          "type": "boolean"
+        "device": {
+          "$ref": "#/definitions/Device"
         },
         "macKey": {
           "$ref": "#/definitions/Base64"
         }
       },
       "required": [
-        "id",
-        "publicKey",
-        "name",
-        "kind",
-        "announcedAt"
+        "device"
       ],
       "additionalProperties": false
     },
@@ -2946,162 +2921,6 @@
       ],
       "additionalProperties": false
     },
-    "CarriedSetting": {
-      "type": "object",
-      "properties": {
-        "optionID": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "from": {
-          "$ref": "#/definitions/JSONValue"
-        },
-        "to": {
-          "$ref": "#/definitions/JSONValue"
-        },
-        "source": {
-          "$ref": "#/definitions/CarriedSettingSource"
-        }
-      },
-      "required": [
-        "optionID",
-        "name",
-        "source"
-      ],
-      "additionalProperties": false
-    },
-    "CarriedSettingSource": {
-      "anyOf": [
-        {
-          "type": "object",
-          "properties": {
-            "level": {
-              "type": "object",
-              "properties": {
-                "_0": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "_0"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "level"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "sameValue": {
-              "type": "object",
-              "additionalProperties": {
-                "not": {}
-              }
-            }
-          },
-          "required": [
-            "sameValue"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "poolEntry": {
-              "type": "object",
-              "additionalProperties": {
-                "not": {}
-              }
-            }
-          },
-          "required": [
-            "poolEntry"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "remembered": {
-              "type": "object",
-              "additionalProperties": {
-                "not": {}
-              }
-            }
-          },
-          "required": [
-            "remembered"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "runtimeDefault": {
-              "type": "object",
-              "additionalProperties": {
-                "not": {}
-              }
-            }
-          },
-          "required": [
-            "runtimeDefault"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "strictestMode": {
-              "type": "object",
-              "additionalProperties": {
-                "not": {}
-              }
-            }
-          },
-          "required": [
-            "strictestMode"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "closestNoLooser": {
-              "type": "object",
-              "additionalProperties": {
-                "not": {}
-              }
-            }
-          },
-          "required": [
-            "closestNoLooser"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "person": {
-              "type": "object",
-              "additionalProperties": {
-                "not": {}
-              }
-            }
-          },
-          "required": [
-            "person"
-          ],
-          "additionalProperties": false
-        }
-      ]
-    },
     "CatalogApproval": {
       "type": "object",
       "description": "An approval of an MCP server or skill (#2019, M5): for a group, or for one person.",
@@ -4245,11 +4064,8 @@
     },
     "ChannelOpen": {
       "type": "object",
-      "description": "What a channel on a host's uplink is opened as (ControlWire.ChannelOpen). `grant` is always `operator`, for an older host (#111).",
+      "description": "What a channel on a host's uplink is opened as (ControlWire.ChannelOpen).",
       "properties": {
-        "grant": {
-          "type": "string"
-        },
         "client": {
           "type": "string"
         },
@@ -4274,7 +4090,6 @@
         }
       },
       "required": [
-        "grant",
         "client"
       ],
       "additionalProperties": false
@@ -4445,7 +4260,7 @@
     },
     "ClientRecord": {
       "type": "object",
-      "description": "A paired screen, as clients/list says it (ClientRecord). `grant` is always `operator`, for an older build (#111).",
+      "description": "A paired screen, as clients/list says it (ClientRecord).",
       "properties": {
         "id": {
           "$ref": "#/definitions/UUID"
@@ -4458,9 +4273,6 @@
         },
         "publicKey": {
           "$ref": "#/definitions/Base64"
-        },
-        "grant": {
-          "type": "string"
         },
         "paired": {
           "$ref": "#/definitions/WireDate"
@@ -4492,7 +4304,6 @@
         "name",
         "kind",
         "publicKey",
-        "grant",
         "paired",
         "rev"
       ],
@@ -5934,9 +5745,6 @@
         "mac": {
           "type": "string"
         },
-        "grant": {
-          "type": "string"
-        },
         "host": {
           "$ref": "#/definitions/MachineRef"
         },
@@ -7107,76 +6915,6 @@
         "path"
       ],
       "additionalProperties": false
-    },
-    "Dropped": {
-      "anyOf": [
-        {
-          "type": "object",
-          "properties": {
-            "extraArguments": {
-              "type": "object",
-              "properties": {
-                "_0": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                }
-              },
-              "required": [
-                "_0"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "extraArguments"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "alwaysAllow": {
-              "type": "object",
-              "properties": {
-                "count": {
-                  "type": "integer"
-                }
-              },
-              "required": [
-                "count"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "alwaysAllow"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "queuedSlashCommand": {
-              "type": "object",
-              "properties": {
-                "_0": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "_0"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "queuedSlashCommand"
-          ],
-          "additionalProperties": false
-        }
-      ]
     },
     "EarnedMilestone": {
       "type": "object",
@@ -8683,12 +8421,6 @@
         "addedAt": {
           "$ref": "#/definitions/WireDate"
         },
-        "laidOutAt": {
-          "$ref": "#/definitions/WireDate"
-        },
-        "layoutVersion": {
-          "type": "integer"
-        },
         "helperLimits": {
           "$ref": "#/definitions/HelperLimits"
         },
@@ -8942,9 +8674,6 @@
         "unmeasuredAgents": {
           "type": "integer"
         },
-        "retiredCount": {
-          "type": "integer"
-        },
         "guardedChanges": {
           "type": "array",
           "items": {
@@ -8980,8 +8709,7 @@
         "lastActivityAt",
         "counts",
         "costToDate",
-        "unmeasuredAgents",
-        "retiredCount"
+        "unmeasuredAgents"
       ],
       "additionalProperties": false
     },
@@ -12471,7 +12199,7 @@
     },
     "MachineFolderSend": {
       "type": "object",
-      "description": "machines/sendFolder, through host/machines (#2929): one step of an agent's start_session with send, which sends this folder's branch to another of the person's machines first. Exactly one of state, upload and receive; the control plane sends that machine's folders/receiveState, folders/receiveUpload or folders/receive.",
+      "description": "machines/sendFolder, through host/machines: one step of an agent's start_session with send (#2929), which sends this folder's branch to another of the person's machines first, or of its bring_back (#2947), which brings a branch back from there. Exactly one of state, upload, receive, facts, pack and read; the control plane sends that machine's folders/receiveState, folders/receiveUpload, folders/receive, folders/sendFacts, folders/sendPack or folders/sendRead.",
       "properties": {
         "host": {
           "type": "string"
@@ -12484,6 +12212,15 @@
         },
         "receive": {
           "$ref": "#/definitions/ReceiveRequest"
+        },
+        "facts": {
+          "$ref": "#/definitions/SendFactsRequest"
+        },
+        "pack": {
+          "$ref": "#/definitions/SendPackRequest"
+        },
+        "read": {
+          "$ref": "#/definitions/SendReadRequest"
         }
       },
       "required": [
@@ -12493,13 +12230,22 @@
     },
     "MachineFolderSent": {
       "type": "object",
-      "description": "What machines/sendFolder's step answered (#2929): state for state, folder for receive, neither for upload.",
+      "description": "What machines/sendFolder's step answered (#2929, #2947): state for state, folder for receive, facts for facts, pack for pack, read for read, none for upload.",
       "properties": {
         "state": {
           "$ref": "#/definitions/ReceiveState"
         },
         "folder": {
           "$ref": "#/definitions/FolderSummary"
+        },
+        "facts": {
+          "$ref": "#/definitions/SendFacts"
+        },
+        "pack": {
+          "$ref": "#/definitions/SendPack"
+        },
+        "read": {
+          "$ref": "#/definitions/SendRead"
         }
       },
       "additionalProperties": false
@@ -14911,7 +14657,8 @@
         }
       },
       "required": [
-        "agentID"
+        "agentID",
+        "requestID"
       ],
       "additionalProperties": false
     },
@@ -20844,7 +20591,8 @@
         "state",
         "scrollback",
         "dropped",
-        "startedAt"
+        "startedAt",
+        "folder"
       ],
       "additionalProperties": false
     },
@@ -22325,95 +22073,6 @@
       ],
       "additionalProperties": false
     },
-    "SwitchRecord": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "$ref": "#/definitions/UUID"
-        },
-        "at": {
-          "$ref": "#/definitions/WireDate"
-        },
-        "agentID": {
-          "$ref": "#/definitions/UUID"
-        },
-        "from": {
-          "$ref": "#/definitions/SwitchRecordSide"
-        },
-        "to": {
-          "$ref": "#/definitions/SwitchRecordSide"
-        },
-        "reason": {
-          "$ref": "#/definitions/SwitchRecordReason"
-        },
-        "carried": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/CarriedSetting"
-          }
-        },
-        "dropped": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/Dropped"
-          }
-        },
-        "shortened": {
-          "type": "integer"
-        },
-        "billing": {
-          "$ref": "#/definitions/Payment"
-        },
-        "fromReturnsAt": {
-          "$ref": "#/definitions/WireDate"
-        }
-      },
-      "required": [
-        "id",
-        "at",
-        "agentID",
-        "from",
-        "to",
-        "reason",
-        "carried",
-        "dropped",
-        "billing"
-      ],
-      "additionalProperties": false
-    },
-    "SwitchRecordReason": {
-      "type": "string",
-      "enum": [
-        "allowanceSpent",
-        "overage",
-        "creditUsedUp",
-        "rateLimitPersisted",
-        "runtimeFailed",
-        "everyoneOutResumed",
-        "byHand"
-      ]
-    },
-    "SwitchRecordSide": {
-      "type": "object",
-      "properties": {
-        "entryID": {
-          "$ref": "#/definitions/UUID"
-        },
-        "runtimeID": {
-          "type": "string"
-        },
-        "model": {
-          "$ref": "#/definitions/JSONValue"
-        },
-        "mode": {
-          "$ref": "#/definitions/JSONValue"
-        }
-      },
-      "required": [
-        "runtimeID"
-      ],
-      "additionalProperties": false
-    },
     "TeamBot": {
       "type": "object",
       "description": "A bot on Console ▸ Team Workflows (#1804, M6): its group, caps and spend today, its machines, the workflows it ran and what runs now.",
@@ -23306,27 +22965,6 @@
         {
           "type": "object",
           "properties": {
-            "poolSwitch": {
-              "type": "object",
-              "properties": {
-                "_0": {
-                  "$ref": "#/definitions/SwitchRecord"
-                }
-              },
-              "required": [
-                "_0"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "poolSwitch"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
             "sandboxFailure": {
               "type": "object",
               "properties": {
@@ -23342,52 +22980,6 @@
           },
           "required": [
             "sandboxFailure"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "handoff": {
-              "type": "object",
-              "properties": {
-                "markdown": {
-                  "type": "string"
-                },
-                "characters": {
-                  "type": "integer"
-                }
-              },
-              "required": [
-                "markdown",
-                "characters"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "handoff"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "settingsChanged": {
-              "type": "object",
-              "properties": {
-                "_0": {
-                  "$ref": "#/definitions/SwitchRecord"
-                }
-              },
-              "required": [
-                "_0"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "settingsChanged"
           ],
           "additionalProperties": false
         },
@@ -23569,15 +23161,6 @@
         },
         "ask": {
           "$ref": "#/definitions/TranscriptEntry"
-        },
-        "last": {
-          "$ref": "#/definitions/TranscriptEntry"
-        },
-        "concise": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/TranscriptEntry"
-          }
         },
         "outcome": {
           "type": "array",
@@ -24884,12 +24467,7 @@
         "waiting"
       ],
       "x-fallback": "done",
-      "description": "How a turn ended (#1916): only a question needs the person. Old `blocked` reads as `waiting`; old `stuck` or `partly_done` reads as `done`.",
-      "x-legacy": {
-        "blocked": "waiting",
-        "stuck": "done",
-        "partly_done": "done"
-      }
+      "description": "How a turn ended (#1916): only a question needs the person. A value this build does not know, such as an old record's `blocked`, `stuck` or `partly_done`, reads as `done`."
     },
     "WorkReport": {
       "type": "object",

@@ -7,9 +7,9 @@ import Foundation
 /// test exhausts it: a state that fell through would be an agent the user cannot see.
 public enum AgentGroup: String, Codable, Hashable, Sendable, CaseIterable {
     case needsAttention
-    /// Never assigned since groups were simplified (0ca8ebc5, 09-26). Kept because that
-    /// is after the #58 cut-off (051): a daemon from before it still counts sessions
-    /// here, and the badge and the widget add them to Needs you.
+    /// Never assigned since groups were simplified (0ca8ebc5, 09-26). Kept as forward
+    /// compatibility: an older daemon's counts can still carry it, and the badge and the
+    /// widget add them to Needs you.
     case blocked
     /// Waiting on something the app watches — agents, a time, events — and will carry
     /// on by itself when it comes. Nobody has to do anything.
@@ -129,7 +129,7 @@ public extension Agent {
     func group() -> AgentGroup {
         AgentGroup(for: state, report: report, outcomeAsked: outcomeAsked,
                    waitingOnEvents: eventWait?.isOpen == true, waitingForPerson: isWaitingForPerson,
-                   endedReason: endedReason, waitingForAllowance: allowanceWait != nil || continueWhenBack != nil)
+                   endedReason: endedReason, waitingForAllowance: continueWhenBack != nil)
     }
 
     /// Whether only the connected person can carry this open wait on, given its filter

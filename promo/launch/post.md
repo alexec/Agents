@@ -58,7 +58,7 @@ Agents does not. Agents needs a Mac.
 ## Get it
 
 - The app: TODO the App Store link (#659).
-- The site: [www.agentloops.dev](https://www.agentloops.dev/)
+- The site: [agentloops.dev](https://agentloops.dev/)
 - The docs, starting with [your first agent](https://docs.agentloops.dev/tutorials/first-agent/):
   [docs.agentloops.dev](https://docs.agentloops.dev/)
 - The source, visible for reference (all rights reserved): [github.com/alexec/Agents](https://github.com/alexec/Agents)

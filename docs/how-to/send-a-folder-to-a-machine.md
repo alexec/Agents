@@ -103,3 +103,11 @@ session on the server (#2929; see
 the agent's host makes the bundle and the patch, and sends them to the server in parts of
 4 MB, through the control plane (`machines/sendFolder`). You say yes on the agent's
 question card first.
+
+An agent can also bring a branch back, with `bring_back` (#2947), into the repository it
+works in. It names the machine, the folder there and, if it wants, the branch (the one
+checked out there at first) and the uncommitted changes. You say yes on its question card
+first. The checks are the same as for **Bring Back from ‹server›…**, and a branch the
+server does not have, or a server that is not running, stops it before you are asked. The
+server makes the bundle and the patch, and the agent's host reads them in parts of 1 MB,
+through the control plane (`machines/sendFolder`).

@@ -14,18 +14,15 @@ import (
 // CodeLifetime is how long a code works: five minutes, once.
 const CodeLifetime = 5 * time.Minute
 
-// LegacyGrant is the fourth field of a client's code and the grant in its ok: every
-// client may do everything now (#111), but an older Remote or web page needs to read it.
-const LegacyGrant = "operator"
-
 // Code is ControlCode, version 2: what a new client or host needs and nothing more.
 //
-//	agents-control:2:<c|h>:<operator or ->:<key>:<secret>:<url>:<pin or ->:<name>
+//	agents-control:2:<c|h>:-:<key>:<secret>:<url>:<pin or ->:<name>
 //
 // with the key and the secret in base64url, and the URL and name percent-encoded. The
-// pin is the SHA-256 of the certificate's public key, base64url, when that certificate
-// is not publicly trusted. A version 1 code (a list of addresses) is not read: no
-// control plane has made one since the first build.
+// fourth field was a client's grant; every client may do everything now (#111), so it is
+// always "-" and not read. The pin is the SHA-256 of the certificate's public key,
+// base64url, when that certificate is not publicly trusted. A version 1 code (a list of
+// addresses) is not read: no control plane has made one since the first build.
 type Code struct {
 	Host       bool
 	ControlKey []byte // X9.63, 65 bytes
@@ -37,15 +34,15 @@ type Code struct {
 
 // Text is the code as one line, to paste or to put in a QR code.
 func (c *Code) Text() string {
-	kind, grant := "c", LegacyGrant
+	kind := "c"
 	if c.Host {
-		kind, grant = "h", "-"
+		kind = "h"
 	}
 	pin := c.Pin
 	if pin == "" {
 		pin = "-"
 	}
-	return strings.Join([]string{"agents-control", "2", kind, grant, B64URL(c.ControlKey), B64URL(c.Secret),
+	return strings.Join([]string{"agents-control", "2", kind, "-", B64URL(c.ControlKey), B64URL(c.Secret),
 		escape(c.URL), pin, escape(c.Name)}, ":")
 }
 

@@ -87,15 +87,14 @@ struct TurnView: View, Equatable {
         let items: [TranscriptItem]
         let parts: TurnParts?
         let outcome: [TranscriptItem]
-        /// Nil for a summary written before 069 (after the #58 cut-off), whose steps are not counted.
-        let stepCount: Int?
+        let stepCount: Int
 
         init(turn: ChatTurn, fetched: [TranscriptItem]?, isLive: Bool) {
             waiting = turn.isSummaryOnly && fetched == nil
             items = turn.isSummaryOnly ? (fetched ?? []) : turn.items
             parts = waiting ? nil : TurnParts(items, isLive: isLive)
             outcome = parts?.outcome ?? turn.storedOutcome ?? []
-            stepCount = parts?.stepCount ?? turn.storedStepCount
+            stepCount = parts?.stepCount ?? turn.storedStepCount ?? 0
         }
 
         /// The outcome is drawn unless the steps before it are still to come, or did not.
@@ -461,19 +460,9 @@ private struct EntryRow: View {
         case .runtimeNote(let text):
             Text(text).appText(.reading).foregroundStyle(.secondary)
 
-        case .poolSwitch(let record):
-            SwitchNote(record: record)
-
         case .sandboxFailure(let record):
             SandboxFailureCard(record: record)
 
-        case .settingsChanged(let record):
-            Text("Changed what it carried on with: "
-                 + record.carried.compactMap { s in s.to?.stringValue.map { "\(s.name) \($0)" } }.joined(separator: ", "))
-                .appText(.reading).foregroundStyle(.secondary)
-
-        case .handoff(let markdown, let characters):
-            HandoffLine(markdown: markdown, characters: characters)
         case .background(let item):
             BackgroundEntryLine(item: item)
 

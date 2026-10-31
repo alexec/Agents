@@ -158,8 +158,7 @@ func (d *Daemon) keepShell(s *shell) {
 func (s *shell) replay(since *int64, startedAt *wire.Date) wire.ShellAttachResponse {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	folder := fileURL(s.folder, true)
-	out := wire.ShellAttachResponse{State: s.state, Dropped: s.dropped, StartedAt: s.started, Folder: &folder}
+	out := wire.ShellAttachResponse{State: s.state, Dropped: s.dropped, StartedAt: s.started, Folder: fileURL(s.folder, true)}
 	end := s.dropped + int64(len(s.buf))
 	if since != nil && startedAt != nil && *startedAt == s.started && *since >= s.dropped && *since <= end {
 		out.Scrollback = append(wire.Data{}, s.buf[*since-s.dropped:]...)

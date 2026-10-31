@@ -13,4 +13,4 @@ window. You answer them from your iPhone, your iPad or a browser.
 Its source is on GitHub for anyone to read, and it is open to everyone today.
 
 What it is and why I built it: POST_URL
-The site: https://www.agentloops.dev/
+The site: https://agentloops.dev/

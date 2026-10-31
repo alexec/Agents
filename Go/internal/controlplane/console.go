@@ -57,6 +57,24 @@ func (m *Methods) consoleMethod(ctx context.Context, method string, params json.
 // liveStates are the agent states a machine's list counts as running.
 var liveStates = map[string]bool{"starting": true, "running": true, "waitingOnUser": true}
 
+// runningInList is how many agents of a host's cached list (hostCopy.Agents) are in a
+// live state, for the fleet board and the plan's agentsRunningGate alike (#2243).
+func runningInList(data json.RawMessage) int64 {
+	var agents []struct {
+		State string `json:"state"`
+	}
+	if json.Unmarshal(data, &agents) != nil {
+		return 0
+	}
+	var n int64
+	for _, a := range agents {
+		if liveStates[a.State] {
+			n++
+		}
+	}
+	return n
+}
+
 // fleet is console/fleet (M1): every machine, its owner, and how many of its agents were
 // running when it last listed them. Offline first, then by owner and name.
 func (m *Methods) fleet(ctx context.Context) wire.FleetBoard {
@@ -69,20 +87,10 @@ func (m *Methods) fleet(ctx context.Context) wire.FleetBoard {
 			machine.OwnerName = audit.LocalOwnerName
 		}
 		if copy := m.s.copies.current(ctx, h.ID); copy != nil && copy.Agents != nil {
-			var agents []struct {
-				State string `json:"state"`
-			}
-			if json.Unmarshal(copy.Agents, &agents) == nil {
-				var running int64
-				for _, a := range agents {
-					if liveStates[a.State] {
-						running++
-					}
-				}
-				machine.Running = &running
-				heard := dateOf(copy.HeardAt.Time)
-				machine.HeardAt = &heard
-			}
+			running := runningInList(copy.Agents)
+			machine.Running = &running
+			heard := dateOf(copy.HeardAt.Time)
+			machine.HeardAt = &heard
 		}
 		out = append(out, machine)
 	}

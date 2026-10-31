@@ -26,7 +26,7 @@ func turnSummaryOf(entries []wire.TranscriptEntry, start int64) wire.TurnSummary
 	}
 	items := display(entries)
 	s := wire.TurnSummary{Start: start, End: start + int64(len(entries)), Ask: ask,
-		Concise: []wire.TranscriptEntry{}, Outcome: []wire.TranscriptEntry{}}
+		Outcome: []wire.TranscriptEntry{}}
 	switch {
 	case ask != nil:
 		s.ID = ask.ID
@@ -34,16 +34,6 @@ func turnSummaryOf(entries []wire.TranscriptEntry, start int64) wire.TurnSummary
 		s.ID = entries[0].ID
 	default:
 		s.ID = store.NewUUID()
-	}
-	for k := len(items) - 1; k >= 0; k-- {
-		if items[k].isBlock() {
-			c := items[k].concise()
-			s.Last = &c
-			break
-		}
-	}
-	for _, it := range conciseTurnItems(items) {
-		s.Concise = append(s.Concise, it.concise())
 	}
 	rest := items
 	if ask != nil && len(rest) > 0 {
@@ -119,16 +109,6 @@ func (it item) isInTurn() bool {
 	return true
 }
 
-func (it item) isBlock() bool {
-	k := it.kind()
-	return it.isRun() || k.AgentMessage != nil || k.SandboxFailure != nil
-}
-
-func (it item) isUserInput() bool {
-	k := it.kind()
-	return k.ElicitationAnswered != nil || k.PermissionAnswered != nil
-}
-
 func (it item) isPassing() bool { return it.entry != nil && entryIsPassing(it.entry) }
 
 func (it item) isDrawn() bool { return it.entry == nil || !isUnrecognised(&it.entry.Kind) }
@@ -189,26 +169,6 @@ func endsTheWork(k *wire.TranscriptEntryKind) bool {
 		return s.Value != wire.AgentStateStarting && s.Value != wire.AgentStateRunning
 	}
 	return false
-}
-
-// conciseTurnItems is what a turn's concise lines are: its last block (with the message
-// before a last run), and every answer the person gave.
-func conciseTurnItems(items []item) []item {
-	last := -1
-	for k := len(items) - 1; k >= 0; k-- {
-		if items[k].isBlock() {
-			last = k
-			break
-		}
-	}
-	var out []item
-	for k, it := range items {
-		chosen := k == last || last > 0 && k == last-1 && items[last].isRun() && it.isAgentMessage()
-		if chosen || it.isUserInput() {
-			out = append(out, it)
-		}
-	}
-	return out
 }
 
 // turnParts is TurnParts for a finished turn: the outcome and the count of steps.

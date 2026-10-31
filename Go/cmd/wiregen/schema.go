@@ -32,7 +32,6 @@ type Schema struct {
 	GoType   string // x-go-type: a type written by hand in Go/wire
 	TSType   string // x-ts-type: the TypeScript, written out
 	Fallback string // x-fallback: what a value this build does not know reads as
-	Legacy      map[string]string // x-legacy: old values this build reads as a current enum
 }
 
 // Property is one named property of an object.
@@ -195,8 +194,6 @@ func (s *Schema) UnmarshalJSON(b []byte) error {
 			err = json.Unmarshal(v, &s.TSType)
 		case "x-fallback":
 			err = json.Unmarshal(v, &s.Fallback)
-		case "x-legacy":
-			err = json.Unmarshal(v, &s.Legacy)
 		case "format", "pattern", "contentEncoding", "x-swift-type", "title":
 			// Said for people and validators; no generator reads them.
 		default:

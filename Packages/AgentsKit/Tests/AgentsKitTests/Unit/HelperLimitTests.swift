@@ -56,8 +56,8 @@ struct HelperLimitTests {
         #expect(HelperLimit.isRunning(later))
     }
 
-    /// Blocked on agents or a time, or waiting on events or an allowance: the app
-    /// carries it on by itself, so it holds a running place.
+    /// Blocked on agents or a time, or waiting on events: the app carries it on by
+    /// itself, so it holds a running place.
     @Test func aHelperTheAppWillResumeIsRunning() {
         var blocked = helper(.finished)
         blocked.report = WorkReport(outcome: .waiting, message: "Waiting on the build", at: Date(),
@@ -67,12 +67,6 @@ struct HelperLimitTests {
         var onEvents = helper(.finished)
         onEvents.eventWait = EventWait(patterns: [EventPattern("dropbox.file_added")], from: 0, since: Date())
         #expect(HelperLimit.isRunning(onEvents))
-
-        var onAllowance = helper(.stopped)
-        onAllowance.endedReason = .allowanceSpent
-        onAllowance.allowanceWait = AllowanceWait(resumeAt: Date().addingTimeInterval(600), entryID: nil,
-                                                  runtimeID: "codex", text: "go", blocks: [], from: .person)
-        #expect(HelperLimit.isRunning(onAllowance))
 
         let restarting = helper(.stopped)
         #expect(HelperLimit.isRunning(restarting, comingBack: [restarting.id]))

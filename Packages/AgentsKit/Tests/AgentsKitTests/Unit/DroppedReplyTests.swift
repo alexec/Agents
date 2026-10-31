@@ -187,7 +187,7 @@ struct DroppedReplyTests {
 
     private let home = MachineRef(rawValue: "mac")
 
-    /// A home host that never answers, and a phone on the bare wire, as today's Remote is.
+    /// A home host that never answers, and a phone paired to it.
     private func silentHomeAndPhone(_ kind: ClientRecord.Kind = .iPhone)
         async -> (ControlRouter, PairedTransport, FakeControlClient, PairedTransport) {
         let router = ControlRouter(handler: StubControl(), homeHost: home)
@@ -199,13 +199,13 @@ struct DroppedReplyTests {
         return (router, theirs, FakeControlClient(transport: phoneTheirs), phoneTheirs)
     }
 
-    /// The phone's home connection is the bare wire. When the host behind it goes, a call
-    /// already on its way is answered with a failure, as one the uplink refuses is
+    /// When the host behind a client's call goes, the call already on its way is answered
+    /// with a failure, as one the uplink refuses is
     /// (`aRequestTheUplinkWillNotTakeIsRefusedNotLost`). It used to be dropped, and the
     /// phone waited on it: the Remote's reconnect hang after a Mac restart (#77).
     @Test func aCallInFlightWhenTheHostGoesIsAnswered() async throws {
         let (router, host, phone, phoneEnd) = await silentHomeAndPhone()
-        try phone.send(#"{"jsonrpc":"2.0","id":3,"method":"agents/list"}"#)
+        try phone.request(3, DaemonAPI.Method.agentsList, host: home)
         _ = await eventually { await router.inFlight(of: home) == 1 }
         host.close()
 
@@ -256,11 +256,11 @@ struct DroppedReplyTests {
         await router.attachClient(client(.iPhone), transport: phoneOurs)
         let phone = FakeControlClient(transport: phoneTheirs)
         _ = await eventually { host.openChannels.count == 1 }
-        try phone.send(#"{"jsonrpc":"2.0","id":5,"method":"agents/list"}"#)
+        try phone.request(5, DaemonAPI.Method.agentsList, host: home)
         _ = await eventually { !phone.lines.isEmpty }
         #expect(await router.inFlight(of: home) == 0)
         host.stop()
-        _ = await eventually { await router.sessionCount == 0 }
+        await eventually { phone.lines.contains { $0.contains(DaemonAPI.Notification.controlHostChanged) } }
         #expect(phone.lines.filter { $0.contains(#""id":5"#) }.count == 1)
         phoneTheirs.close()
     }

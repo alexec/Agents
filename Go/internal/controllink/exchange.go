@@ -35,9 +35,8 @@ type Hello = wire.ControlHello
 // of the endpoints this peer holds (R16); nil from a build that keeps none.
 type Auth = wire.ControlAuth
 
-// OK is the server's proof back. Grant is LegacyGrant for a client, for an older web page
-// that shows it (#111), and is not read. Endpoints and Epoch say where the control plane
-// answers now, and from when (R16).
+// OK is the server's proof back. Endpoints and Epoch say where the control plane answers
+// now, and from when (R16).
 type OK = wire.ControlOK
 
 // NewKeyOffer is the control plane's new key in an ok, with its proof (#997).

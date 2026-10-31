@@ -25,8 +25,9 @@ const Linear = "linear"
 const (
 	LinearClientID = "dd741b1ff5ea16fcec75b61d86a19b6f"
 	// HandBackURL is the static page that holds nothing (#1335, S1 Q1c option 4): it sends the
-	// code and the state back to the client that opened the browser. deploy/site/oauth.
-	HandBackURL = "https://agentloops.dev/oauth/callback"
+	// code and the state back to the client that opened the browser. deploy/site/oauth. On
+	// oauth.agentloops.dev, not the apex, which is the promotional site (#3042).
+	HandBackURL = "https://oauth.agentloops.dev/oauth/callback"
 	// LinearScopes: read and write issues, folders and cycles; comment as the person.
 	LinearScopes = "read,write"
 )

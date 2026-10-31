@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/netip"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -45,6 +46,20 @@ type Config struct {
 	Log            func(string)
 	// Now, for tests.
 	Now func() time.Time
+
+	// Who may sign up (#2152): SignUpInvite (""), SignUpOpen or SignUpClosed.
+	SignUp string
+	// The most accounts; at the cap, new people wait. 0 is 100.
+	MaxAccounts int
+	// The youngest GitHub account that may sign up without an allowlist entry. 0 is 30
+	// days; below 0 is none.
+	MinGitHubAge time.Duration
+	// New accounts and waitlist entries an hour, from one address and in all. 0 is 3 and 30.
+	SignUpsPerAddress, SignUpsPerHour int
+	// The most copies running at once. 0 is 50.
+	MaxCopies int
+	// The most new certificates an hour and a week. 0 is 10 and 40.
+	CertsPerHour, CertsPerWeek int
 }
 
 // Service is the hosted service.
@@ -53,6 +68,8 @@ type Service struct {
 	accounts *accounts
 	sessions sessions
 	github   gitHub
+	rates    rates
+	certs    certificates
 
 	mu     sync.Mutex
 	copies map[string]*copyRunning
@@ -84,6 +101,21 @@ func New(ctx context.Context, cfg Config) (*Service, error) {
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
+	if cfg.SignUp == "" {
+		cfg.SignUp = SignUpInvite
+	}
+	if cfg.SignUp != SignUpInvite && cfg.SignUp != SignUpOpen && cfg.SignUp != SignUpClosed {
+		return nil, fmt.Errorf("sign-up is invite, open or closed, not %q", cfg.SignUp)
+	}
+	orDefault(&cfg.MaxAccounts, defaultMaxAccounts)
+	orDefault(&cfg.SignUpsPerAddress, defaultSignUpsPerAddress)
+	orDefault(&cfg.SignUpsPerHour, defaultSignUpsPerHour)
+	orDefault(&cfg.MaxCopies, defaultMaxCopies)
+	orDefault(&cfg.CertsPerHour, defaultCertsPerHour)
+	orDefault(&cfg.CertsPerWeek, defaultCertsPerWeek)
+	if cfg.MinGitHubAge == 0 {
+		cfg.MinGitHubAge = defaultMinGitHubAge
+	}
 	own, err := kms.Kept{Store: store.NewPrefixed(cfg.Store, hostedPrefix), Keeper: cfg.Keeper}.ControlKey(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("the hosted service's own key: %w", err)
@@ -107,8 +139,8 @@ func (s *Service) Stop() {
 	copies := s.copies
 	s.copies = map[string]*copyRunning{}
 	s.mu.Unlock()
-	for _, c := range copies {
-		c.service.Stop()
+	for id, c := range copies {
+		s.stopRunning(id, c)
 	}
 }
 
@@ -140,7 +172,9 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // tlsAllowed is Caddy's on-demand TLS ask (deploy/Caddyfile.hosted): a certificate only
 // for the pages' name and an account that exists, so nobody can have it fetch one for
-// every name under the domain.
+// every name under the domain; and a new one only under the caps (#2152 FR-008), below
+// Let's Encrypt's limits. A suspended account keeps its name, so its refusal is served
+// over TLS.
 func (s *Service) tlsAllowed(w http.ResponseWriter, r *http.Request) {
 	name := strings.ToLower(r.URL.Query().Get("domain"))
 	if name == s.cfg.Domain {
@@ -149,11 +183,77 @@ func (s *Service) tlsAllowed(w http.ResponseWriter, r *http.Request) {
 	}
 	if id, ok := strings.CutSuffix(name, "."+s.cfg.AccountsDomain); ok && validID(id) {
 		if acc, err := s.accounts.get(r.Context(), id); err == nil && acc != nil {
-			plain(w, http.StatusOK, "yes\n")
-			return
+			if acc.Certificate != nil || s.newCertificate(r.Context(), acc.ID) {
+				plain(w, http.StatusOK, "yes\n")
+				return
+			}
+			s.log(id + ": no certificate yet, at the cap")
 		}
 	}
 	plain(w, http.StatusNotFound, "no\n")
+}
+
+// certificates are the times new names were allowed in the last week, filled from the
+// accounts the first time they are needed.
+type certificates struct {
+	mu     sync.Mutex
+	loaded bool
+	times  []time.Time
+}
+
+// newCertificate allows a first certificate for an account, under the caps, and keeps
+// when on the account so it counts once.
+func (s *Service) newCertificate(ctx context.Context, id string) bool {
+	c := &s.certs
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	now := s.cfg.Now()
+	if !c.loaded {
+		list, err := s.accounts.all(ctx)
+		if err != nil {
+			return false
+		}
+		for _, acc := range list {
+			if acc.Certificate != nil {
+				c.times = append(c.times, *acc.Certificate)
+			}
+		}
+		sort.Slice(c.times, func(i, j int) bool { return c.times[i].Before(c.times[j]) })
+		c.loaded = true
+	}
+	c.times = recent(c.times, now.Add(-7*24*time.Hour))
+	if len(c.times) >= s.cfg.CertsPerWeek || len(recent(c.times, now.Add(-time.Hour))) >= s.cfg.CertsPerHour {
+		return false
+	}
+	at := now.UTC()
+	if _, err := s.accounts.update(ctx, id, func(acc *Account) {
+		if acc.Certificate == nil {
+			acc.Certificate = &at
+		}
+	}); err != nil {
+		return false
+	}
+	c.times = append(c.times, at)
+	return true
+}
+
+// certificateRoom says whether a new certificate would be allowed now.
+func (s *Service) certificateRoom() bool {
+	c := &s.certs
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !c.loaded {
+		return true
+	}
+	now := s.cfg.Now()
+	return len(recent(c.times, now.Add(-7*24*time.Hour))) < s.cfg.CertsPerWeek &&
+		len(recent(c.times, now.Add(-time.Hour))) < s.cfg.CertsPerHour
+}
+
+func orDefault(v *int, def int) {
+	if *v == 0 {
+		*v = def
+	}
 }
 
 func (s *Service) log(line string) { s.cfg.Log(line) }

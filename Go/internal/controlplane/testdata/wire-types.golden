@@ -1,11 +1,11 @@
 Admitted full
-{"client":"CLIENT","host":"HOST","grant":"GRANT"}
+{"client":"CLIENT","host":"HOST"}
 Admitted zero
 {}
 ChannelOpen full
-{"grant":"GRANT","client":"CLIENT","device":"DEVICE","relayed":true,"tunnel":"TUNNEL","tunnelRef":"TUNNELREF","fanOut":true}
+{"client":"CLIENT","device":"DEVICE","relayed":true,"tunnel":"TUNNEL","tunnelRef":"TUNNELREF","fanOut":true}
 ChannelOpen zero
-{"grant":"","client":""}
+{"client":""}
 ClientAnnounce full
 {"id":"ID","publicKey":"AQID","name":"NAME","kind":"iPhone"}
 ClientAnnounce zero
@@ -15,9 +15,9 @@ ClientConnection full
 ClientConnection zero
 {"client":"","relayed":false}
 ClientRecord full
-{"id":"ID","name":"NAME","kind":"iPhone","publicKey":"AQID","grant":"GRANT","paired":813922215.25,"lastSeen":813922215.25,"mayNotify":true,"owner":"OWNER","rev":7,"forgotten":true,"forgottenAt":813922215.25,"knownEpoch":7}
+{"id":"ID","name":"NAME","kind":"iPhone","publicKey":"AQID","paired":813922215.25,"lastSeen":813922215.25,"mayNotify":true,"owner":"OWNER","rev":7,"forgotten":true,"forgottenAt":813922215.25,"knownEpoch":7}
 ClientRecord zero
-{"id":"","name":"","kind":"unknown","publicKey":null,"grant":"","paired":0,"rev":0}
+{"id":"","name":"","kind":"unknown","publicKey":null,"paired":0,"rev":0}
 ControlCodeShown full
 {"text":"TEXT","expires":813922215.25,"command":"COMMAND"}
 ControlCodeShown zero

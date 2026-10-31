@@ -86,6 +86,11 @@ type Config struct {
 	// tunnels, and it installs, finds and updates no machine over ssh. Machines join by a
 	// code, their join command, or a provider.
 	Hosted bool
+	// AgentsRunningGate is this copy's plan's limit on agents running at once (#2243, spec
+	// 1003 FR-022): told how many run now, across every host here, before another is let
+	// start; it answers nil to allow, or the words of a refusal that names the limit and
+	// the plan. agents-hosted sets it per account; nil holds no copy to a limit.
+	AgentsRunningGate func(running int) error
 	// Where other copies reach this one (several copies over one store, US3). "" for a
 	// single copy (Agents Host's), which links with nobody and takes no leases (#206).
 	PeerURL string
@@ -282,6 +287,7 @@ func New(cfg Config) (*Service, error) {
 	s.router.handler = s.methods
 	s.router.SetOwnership(s)
 	s.router.SetPolicyGate(s.policyGate)
+	s.router.SetAgentsRunningGate(s.agentsRunningGate)
 	s.router.SetTeam(false, cfg.Version)
 	s.joins = newJoins(s)
 	s.links = newLinks(s)
@@ -819,11 +825,7 @@ func (s *Service) presenceHeard(client string, device bool, report json.RawMessa
 		s.keepMayNotify(client, *p.MayNotify)
 	}
 	if s.mesh != nil {
-		grant := records.LegacyGrant
-		if device {
-			grant = "device"
-		}
-		s.mesh.broadcast(encodePeer("presence", map[string]any{"client": client, "grant": grant, "report": report}))
+		s.mesh.broadcast(encodePeer("presence", map[string]any{"client": client, "device": device, "report": report}))
 	}
 }
 
@@ -1363,9 +1365,6 @@ func (s *Service) acceptVia(conn *Conn, webOrigin string, proved func(failed boo
 	// Once a list has been announced, every member is given it (R16).
 	settings := s.records.Settings()
 	ok2 := controllink.OK{Mac: controllink.B64URL(mac), Host: optional(wire.MachineRef(host)), NewKey: offer}
-	if client != nil {
-		ok2.Grant = new(records.LegacyGrant)
-	}
 	if relayed {
 		ok2.Relayed = &relayed
 	}
@@ -1802,7 +1801,7 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, webOrigin
 		if sp.Client != nil {
 			client = strings.ToUpper(*sp.Client)
 		}
-		result := &wire.Admitted{Client: new(wire.UUID(client)), Grant: new(records.LegacyGrant)}
+		result := &wire.Admitted{Client: new(wire.UUID(client))}
 		// The same join again (#212): it paired, and could not keep it.
 		if old := s.records.Client(client); sp.replayed && old != nil && bytes.Equal(old.PublicKey, a.PublicKey) {
 			s.log(name + " paired again with the code it spent (" + a.Kind + ")")

@@ -126,8 +126,6 @@ type Admitted struct {
 	Client *UUID `json:"client,omitzero"`
 
 	Host *MachineRef `json:"host,omitzero"`
-
-	Grant *string `json:"grant,omitzero"`
 }
 
 type AdoptRequest struct {
@@ -449,7 +447,6 @@ func (v *AgentState) UnmarshalJSON(b []byte) error {
 		AgentStateArchived,
 		AgentStateQueued:
 		*v = AgentState(s)
-
 	default:
 		*v = AgentStateStopped
 	}
@@ -597,21 +594,9 @@ type AllowanceStateStatusOut struct {
 	Why AllowanceStateOutReason `json:"why"`
 }
 
-// What devices/announce answers: the device's record, with the Mac's relay key beside its fields when a bridge has registered one (046).
+// What devices/announce answers: the device's record, with the Mac's relay key beside it when a bridge has registered one (046).
 type AnnounceReply struct {
-	ID UUID `json:"id"`
-
-	PublicKey Data `json:"publicKey"`
-
-	Name string `json:"name"`
-
-	Kind DeviceKind `json:"kind"`
-
-	AnnouncedAt Date `json:"announcedAt"`
-
-	LastSeenAt *Date `json:"lastSeenAt,omitzero"`
-
-	MayNotify *bool `json:"mayNotify,omitzero"`
+	Device Device `json:"device"`
 
 	MacKey Data `json:"macKey,omitzero"`
 }
@@ -1043,7 +1028,6 @@ func (v *AutoMark) UnmarshalJSON(b []byte) error {
 		AutoMarkNotPossible,
 		AutoMarkDropped:
 		*v = AutoMark(s)
-
 	default:
 		*v = AutoMarkAutoMapped
 	}
@@ -1199,7 +1183,6 @@ func (v *BackupEvery) UnmarshalJSON(b []byte) error {
 		BackupEveryDaily,
 		BackupEveryWeekly:
 		*v = BackupEvery(s)
-
 	default:
 		*v = BackupEveryDaily
 	}
@@ -1305,7 +1288,6 @@ func (v *BackupTarget) UnmarshalJSON(b []byte) error {
 	case BackupTargetFolder,
 		BackupTargetControl:
 		*v = BackupTarget(s)
-
 	default:
 		*v = BackupTargetFolder
 	}
@@ -1438,40 +1420,6 @@ type CapReached struct {
 	CapUSD float64 `json:"capUSD"`
 
 	Until Date `json:"until"`
-}
-
-type CarriedSetting struct {
-	OptionID string `json:"optionID"`
-
-	Name string `json:"name"`
-
-	From JSONValue `json:"from,omitzero"`
-
-	To JSONValue `json:"to,omitzero"`
-
-	Source CarriedSettingSource `json:"source"`
-}
-
-type CarriedSettingSource struct {
-	Level *CarriedSettingSourceLevel `json:"level,omitzero"`
-
-	SameValue *struct{} `json:"sameValue,omitzero"`
-
-	PoolEntry *struct{} `json:"poolEntry,omitzero"`
-
-	Remembered *struct{} `json:"remembered,omitzero"`
-
-	RuntimeDefault *struct{} `json:"runtimeDefault,omitzero"`
-
-	StrictestMode *struct{} `json:"strictestMode,omitzero"`
-
-	ClosestNoLooser *struct{} `json:"closestNoLooser,omitzero"`
-
-	Person *struct{} `json:"person,omitzero"`
-}
-
-type CarriedSettingSourceLevel struct {
-	Value string `json:"_0"`
 }
 
 // An approval of an MCP server or skill (#2019, M5): for a group, or for one person.
@@ -1937,10 +1885,8 @@ type ChannelLinkRequest struct {
 	Expires Date `json:"expires"`
 }
 
-// What a channel on a host's uplink is opened as (ControlWire.ChannelOpen). `grant` is always `operator`, for an older host (#111).
+// What a channel on a host's uplink is opened as (ControlWire.ChannelOpen).
 type ChannelOpen struct {
-	Grant string `json:"grant"`
-
 	Client string `json:"client"`
 
 	Device *UUID `json:"device,omitzero"`
@@ -2031,7 +1977,6 @@ func (v *ClientKind) UnmarshalJSON(b []byte) error {
 		ClientKindUnknown,
 		ClientKindBrowser:
 		*v = ClientKind(s)
-
 	default:
 		*v = ClientKindUnknown
 	}
@@ -2061,7 +2006,6 @@ func (v *ClientPermissionMode) UnmarshalJSON(b []byte) error {
 	case ClientPermissionModeDefault,
 		ClientPermissionModeAlwaysApprove:
 		*v = ClientPermissionMode(s)
-
 	default:
 		*v = ClientPermissionModeDefault
 	}
@@ -2079,7 +2023,7 @@ type ClientPermissionSettings struct {
 	SetBy *PolicySetBy `json:"setBy,omitzero"`
 }
 
-// A paired screen, as clients/list says it (ClientRecord). `grant` is always `operator`, for an older build (#111).
+// A paired screen, as clients/list says it (ClientRecord).
 type ClientRecord struct {
 	ID UUID `json:"id"`
 
@@ -2088,8 +2032,6 @@ type ClientRecord struct {
 	Kind ClientKind `json:"kind"`
 
 	PublicKey Data `json:"publicKey"`
-
-	Grant string `json:"grant"`
 
 	Paired Date `json:"paired"`
 
@@ -2756,8 +2698,6 @@ type ControlNotice struct {
 type ControlOK struct {
 	Mac string `json:"mac"`
 
-	Grant *string `json:"grant,omitzero"`
-
 	Host *MachineRef `json:"host,omitzero"`
 
 	Relayed *bool `json:"relayed,omitzero"`
@@ -3252,26 +3192,6 @@ type DropboxPutResponse struct {
 	Path string `json:"path"`
 }
 
-type Dropped struct {
-	ExtraArguments *DroppedExtraArguments `json:"extraArguments,omitzero"`
-
-	AlwaysAllow *DroppedAlwaysAllow `json:"alwaysAllow,omitzero"`
-
-	QueuedSlashCommand *DroppedQueuedSlashCommand `json:"queuedSlashCommand,omitzero"`
-}
-
-type DroppedExtraArguments struct {
-	Value []string `json:"_0"`
-}
-
-type DroppedAlwaysAllow struct {
-	Count int64 `json:"count"`
-}
-
-type DroppedQueuedSlashCommand struct {
-	Value string `json:"_0"`
-}
-
 type EarnedMilestone struct {
 	ID string `json:"id"`
 
@@ -3488,7 +3408,6 @@ func (v *EndedReason) UnmarshalJSON(b []byte) error {
 		EndedReasonImported,
 		EndedReasonStoppedByAdmin:
 		*v = EndedReason(s)
-
 	default:
 		*v = EndedReasonUnrecognised
 	}
@@ -3901,10 +3820,6 @@ type Folder struct {
 
 	AddedAt Date `json:"addedAt"`
 
-	LaidOutAt *Date `json:"laidOutAt,omitzero"`
-
-	LayoutVersion *int64 `json:"layoutVersion,omitzero"`
-
 	HelperLimits *HelperLimits `json:"helperLimits,omitzero"`
 
 	DiskSpace *DiskThresholds `json:"diskSpace,omitzero"`
@@ -3995,8 +3910,6 @@ type FolderSummary struct {
 	CostToDate map[string]float64 `json:"costToDate"`
 
 	UnmeasuredAgents int64 `json:"unmeasuredAgents"`
-
-	RetiredCount int64 `json:"retiredCount"`
 
 	GuardedChanges []GuardedChange `json:"guardedChanges,omitzero"`
 
@@ -5402,7 +5315,7 @@ type MachineEnroll struct {
 	As *string `json:"as,omitzero"`
 }
 
-// machines/sendFolder, through host/machines (#2929): one step of an agent's start_session with send, which sends this folder's branch to another of the person's machines first. Exactly one of state, upload and receive; the control plane sends that machine's folders/receiveState, folders/receiveUpload or folders/receive.
+// machines/sendFolder, through host/machines: one step of an agent's start_session with send (#2929), which sends this folder's branch to another of the person's machines first, or of its bring_back (#2947), which brings a branch back from there. Exactly one of state, upload, receive, facts, pack and read; the control plane sends that machine's folders/receiveState, folders/receiveUpload, folders/receive, folders/sendFacts, folders/sendPack or folders/sendRead.
 type MachineFolderSend struct {
 	Host string `json:"host"`
 
@@ -5411,13 +5324,25 @@ type MachineFolderSend struct {
 	Upload *ReceiveUploadRequest `json:"upload,omitzero"`
 
 	Receive *ReceiveRequest `json:"receive,omitzero"`
+
+	Facts *SendFactsRequest `json:"facts,omitzero"`
+
+	Pack *SendPackRequest `json:"pack,omitzero"`
+
+	Read *SendReadRequest `json:"read,omitzero"`
 }
 
-// What machines/sendFolder's step answered (#2929): state for state, folder for receive, neither for upload.
+// What machines/sendFolder's step answered (#2929, #2947): state for state, folder for receive, facts for facts, pack for pack, read for read, none for upload.
 type MachineFolderSent struct {
 	State *ReceiveState `json:"state,omitzero"`
 
 	Folder *FolderSummary `json:"folder,omitzero"`
+
+	Facts *SendFacts `json:"facts,omitzero"`
+
+	Pack *SendPack `json:"pack,omitzero"`
+
+	Read *SendRead `json:"read,omitzero"`
 }
 
 // host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134).
@@ -5879,7 +5804,6 @@ func (v *ModelLevel) UnmarshalJSON(b []byte) error {
 		ModelLevelBalanced,
 		ModelLevelSmart:
 		*v = ModelLevel(s)
-
 	default:
 		*v = ModelLevelBalanced
 	}
@@ -6525,7 +6449,6 @@ func (v *PermissionLevel) UnmarshalJSON(b []byte) error {
 		PermissionLevelApproveForMe,
 		PermissionLevelBypassPermissions:
 		*v = PermissionLevel(s)
-
 	default:
 		*v = PermissionLevelAsk
 	}
@@ -6537,7 +6460,7 @@ type PermissionNotification struct {
 
 	Request *PermissionRequest `json:"request,omitzero"`
 
-	RequestID *UUID `json:"requestID,omitzero"`
+	RequestID UUID `json:"requestID"`
 }
 
 type PermissionOption struct {
@@ -8092,7 +8015,6 @@ func (v *RetentionKeepFor) UnmarshalJSON(b []byte) error {
 		RetentionKeepForDays90,
 		RetentionKeepForForever:
 		*v = RetentionKeepFor(s)
-
 	default:
 		*v = RetentionKeepForDays30
 	}
@@ -8568,7 +8490,6 @@ func (v *SelfUpdateState) UnmarshalJSON(b []byte) error {
 		SelfUpdateStateFailed,
 		SelfUpdateStateCannot:
 		*v = SelfUpdateState(s)
-
 	default:
 		*v = SelfUpdateStateUpToDate
 	}
@@ -9085,7 +9006,7 @@ type ShellAttachResponse struct {
 
 	StartedAt Date `json:"startedAt"`
 
-	Folder *URL `json:"folder,omitzero"`
+	Folder URL `json:"folder"`
 
 	Offset *int64 `json:"offset,omitzero"`
 }
@@ -9687,50 +9608,6 @@ type SurfaceIdentification struct {
 	Kind DeviceKind `json:"kind"`
 }
 
-type SwitchRecord struct {
-	ID UUID `json:"id"`
-
-	At Date `json:"at"`
-
-	AgentID UUID `json:"agentID"`
-
-	From SwitchRecordSide `json:"from"`
-
-	To SwitchRecordSide `json:"to"`
-
-	Reason SwitchRecordReason `json:"reason"`
-
-	Carried []CarriedSetting `json:"carried"`
-
-	Dropped []Dropped `json:"dropped"`
-
-	Shortened *int64 `json:"shortened,omitzero"`
-
-	Billing Payment `json:"billing"`
-
-	FromReturnsAt *Date `json:"fromReturnsAt,omitzero"`
-}
-
-type SwitchRecordReason string
-
-const SwitchRecordReasonAllowanceSpent SwitchRecordReason = "allowanceSpent"
-const SwitchRecordReasonOverage SwitchRecordReason = "overage"
-const SwitchRecordReasonCreditUsedUp SwitchRecordReason = "creditUsedUp"
-const SwitchRecordReasonRateLimitPersisted SwitchRecordReason = "rateLimitPersisted"
-const SwitchRecordReasonRuntimeFailed SwitchRecordReason = "runtimeFailed"
-const SwitchRecordReasonEveryoneOutResumed SwitchRecordReason = "everyoneOutResumed"
-const SwitchRecordReasonByHand SwitchRecordReason = "byHand"
-
-type SwitchRecordSide struct {
-	EntryID *UUID `json:"entryID,omitzero"`
-
-	RuntimeID string `json:"runtimeID"`
-
-	Model JSONValue `json:"model,omitzero"`
-
-	Mode JSONValue `json:"mode,omitzero"`
-}
-
 // A bot on Console ▸ Team Workflows (#1804, M6): its group, caps and spend today, its machines, the workflows it ran and what runs now.
 type TeamBot struct {
 	User string `json:"user"`
@@ -9945,13 +9822,7 @@ type TranscriptEntryKind struct {
 
 	RuntimeNote *TranscriptEntryKindRuntimeNote `json:"runtimeNote,omitzero"`
 
-	PoolSwitch *TranscriptEntryKindPoolSwitch `json:"poolSwitch,omitzero"`
-
 	SandboxFailure *TranscriptEntryKindSandboxFailure `json:"sandboxFailure,omitzero"`
-
-	Handoff *TranscriptEntryKindHandoff `json:"handoff,omitzero"`
-
-	SettingsChanged *TranscriptEntryKindSettingsChanged `json:"settingsChanged,omitzero"`
 
 	AppView *TranscriptEntryKindAppView `json:"appView,omitzero"`
 
@@ -9978,7 +9849,7 @@ func (v TranscriptEntryKind) MarshalJSON() ([]byte, error) {
 func (v *TranscriptEntryKind) UnmarshalJSON(b []byte) error {
 	type plain TranscriptEntryKind
 	var p plain
-	if err := json.Unmarshal(b, &p); err != nil || (p.UserMessage == nil && p.AgentMessage == nil && p.AgentThought == nil && p.ToolCall == nil && p.ToolCallUpdate == nil && p.PlanUpdated == nil && p.UsageRecorded == nil && p.ServedRequest == nil && p.ElicitationAsked == nil && p.ElicitationAnswered == nil && p.Compaction == nil && p.Notice == nil && p.PermissionAsked == nil && p.PermissionAnswered == nil && p.OptionChanged == nil && p.StateChanged == nil && p.Background == nil && p.WorkReported == nil && p.RuntimeNote == nil && p.PoolSwitch == nil && p.SandboxFailure == nil && p.Handoff == nil && p.SettingsChanged == nil && p.AppView == nil && p.FileShown == nil && p.Notified == nil && p.NoticeDelivered == nil) {
+	if err := json.Unmarshal(b, &p); err != nil || (p.UserMessage == nil && p.AgentMessage == nil && p.AgentThought == nil && p.ToolCall == nil && p.ToolCallUpdate == nil && p.PlanUpdated == nil && p.UsageRecorded == nil && p.ServedRequest == nil && p.ElicitationAsked == nil && p.ElicitationAnswered == nil && p.Compaction == nil && p.Notice == nil && p.PermissionAsked == nil && p.PermissionAnswered == nil && p.OptionChanged == nil && p.StateChanged == nil && p.Background == nil && p.WorkReported == nil && p.RuntimeNote == nil && p.SandboxFailure == nil && p.AppView == nil && p.FileShown == nil && p.Notified == nil && p.NoticeDelivered == nil) {
 		*v = TranscriptEntryKind{Unrecognised: append(JSONValue(nil), b...)}
 		return nil
 	}
@@ -10088,22 +9959,8 @@ type TranscriptEntryKindRuntimeNote struct {
 	Value string `json:"_0"`
 }
 
-type TranscriptEntryKindPoolSwitch struct {
-	Value SwitchRecord `json:"_0"`
-}
-
 type TranscriptEntryKindSandboxFailure struct {
 	Value SandboxFailureRecord `json:"_0"`
-}
-
-type TranscriptEntryKindHandoff struct {
-	Markdown string `json:"markdown"`
-
-	Characters int64 `json:"characters"`
-}
-
-type TranscriptEntryKindSettingsChanged struct {
-	Value SwitchRecord `json:"_0"`
 }
 
 type TranscriptEntryKindAppView struct {
@@ -10167,10 +10024,6 @@ type TurnSummary struct {
 	End int64 `json:"end"`
 
 	Ask *TranscriptEntry `json:"ask,omitzero"`
-
-	Last *TranscriptEntry `json:"last,omitzero"`
-
-	Concise []TranscriptEntry `json:"concise,omitzero"`
 
 	Outcome []TranscriptEntry `json:"outcome,omitzero"`
 
@@ -10728,7 +10581,7 @@ const WeekdayThu Weekday = "thu"
 const WeekdayFri Weekday = "fri"
 const WeekdaySat Weekday = "sat"
 
-// How a turn ended (#1916): only a question needs the person. Old `blocked` reads as `waiting`; old `stuck` or `partly_done` reads as `done`.
+// How a turn ended (#1916): only a question needs the person. A value this build does not know, such as an old record's `blocked`, `stuck` or `partly_done`, reads as `done`.
 type WorkOutcome string
 
 const WorkOutcomeDone WorkOutcome = "done"
@@ -10748,13 +10601,6 @@ func (v *WorkOutcome) UnmarshalJSON(b []byte) error {
 		WorkOutcomeNeedsAnswer,
 		WorkOutcomeWaiting:
 		*v = WorkOutcome(s)
-	case WorkOutcome("blocked"):
-		*v = WorkOutcomeWaiting
-	case WorkOutcome("partly_done"):
-		*v = WorkOutcomeDone
-	case WorkOutcome("stuck"):
-		*v = WorkOutcomeDone
-
 	default:
 		*v = WorkOutcomeDone
 	}

@@ -9,10 +9,6 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// LegacyGrant is written where an older build expects a grant: every client may do
-// everything (#111), and the word stays for builds from before.
-const LegacyGrant = "operator"
-
 // Client kinds, as ClientRecord.Kind says them. A kind a later build added reads as
 // KindUnknown.
 const (
@@ -100,7 +96,6 @@ type clientJSON struct {
 	Name        string     `json:"name"`
 	Kind        string     `json:"kind"`
 	PublicKey   []byte     `json:"publicKey"`
-	Grant       string     `json:"grant"`
 	Paired      Stamp      `json:"paired"`
 	LastSeen    *Stamp     `json:"lastSeen,omitempty"`
 	MayNotify   *bool      `json:"mayNotify,omitempty"`
@@ -116,14 +111,12 @@ type clientJSON struct {
 	WebPush    *WebPushSubscription `json:"webPush,omitempty"`
 }
 
-// MarshalJSON writes grant: operator, which an older copy needs to read the record at
-// all, and which tells it the truth.
+// MarshalJSON writes the record's known fields, and anything else it held back unchanged.
 func (c ClientRecord) MarshalJSON() ([]byte, error) {
-	return encodeKeeping(clientJSON{c.ID, c.Name, c.Kind, c.PublicKey, LegacyGrant, c.Paired, c.LastSeen, c.MayNotify,
+	return encodeKeeping(clientJSON{c.ID, c.Name, c.Kind, c.PublicKey, c.Paired, c.LastSeen, c.MayNotify,
 		c.Owner, c.Rev, c.Forgotten, c.ForgottenAt, c.KnownEpoch, c.PushToken, c.ActivityTokens, c.Expires, c.WebPush}, c.Extra)
 }
 
-// UnmarshalJSON does not read the grant: every client may do everything (#111).
 func (c *ClientRecord) UnmarshalJSON(data []byte) error {
 	var j clientJSON
 	extra, err := decodeKeeping(data, &j, "id", "name", "kind", "publicKey", "paired", "rev")

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -239,6 +240,38 @@ func TestTheMergeRequestsListSaysEachOnesState(t *testing.T) {
 	}
 }
 
+// #2952: each merge request is in a section for the viewer; attention counts Needs you, and
+// the authors' access is one call, kept for the next list.
+func TestTheMergeRequestsListPutsEachInASection(t *testing.T) {
+	f := viewsFake(t)
+	f.mrs = append(f.mrs,
+		mrJSON(6, "outside", stranger, obj{"reviewers": []obj{{"id": 1, "username": "Alex"}}}),
+		mrJSON(7, "deps", tokenBot, nil),
+		mrJSON(8, "guest", guest, nil),
+		mrJSON(9, "mine", alex, obj{"detailed_merge_status": "requested_changes"}))
+	c := viewsClient(t, f)
+	_, data := callTool(t, c, "show_merge_requests", map[string]any{})
+	sections := map[float64]any{}
+	for _, m := range data["mergeRequests"].([]any) {
+		m := m.(map[string]any)
+		sections[m["number"].(float64)] = m["section"]
+		if m["number"] == 7.0 && m["authorBot"] != true {
+			t.Errorf("!7 is a bot's: %v", m)
+		}
+		if m["number"] == 9.0 && m["review"] != "changes_requested" {
+			t.Errorf("!9's review: %v", m["review"])
+		}
+	}
+	want := map[float64]any{3: sectionTeam, 4: sectionYours, 6: sectionNeedsYou, 7: sectionTeam, 8: sectionOthers, 9: sectionNeedsYou}
+	if !reflect.DeepEqual(sections, want) || data["attention"] != 2.0 {
+		t.Errorf("sections %v, attention %v", sections, data["attention"])
+	}
+	callTool(t, c, "show_merge_requests", map[string]any{})
+	if f.memberLists != 1 {
+		t.Errorf("member listings: %d", f.memberLists)
+	}
+}
+
 func TestTheIssuesListHasLabelsAndAssignees(t *testing.T) {
 	f := viewsFake(t)
 	c := viewsClient(t, f)
@@ -247,9 +280,32 @@ func TestTheIssuesListHasLabelsAndAssignees(t *testing.T) {
 	if issue["number"] != 5.0 || issue["comments"] != 2.0 || issue["assignees"].([]any)[0] != "alex" {
 		t.Fatalf("issue %v", issue)
 	}
-	asked := f.asked()
-	if last := asked[len(asked)-1]; !strings.Contains(last, "state=opened") || !strings.Contains(last, "labels=bug") {
-		t.Fatalf("asked %s", last)
+	listed := ""
+	for _, request := range f.asked() {
+		if strings.Contains(request, "/issues?") {
+			listed = request
+		}
+	}
+	if !strings.Contains(listed, "state=opened") || !strings.Contains(listed, "labels=bug") {
+		t.Fatalf("asked %s", listed)
+	}
+}
+
+// #2952: an issue assigned to the viewer needs them; the viewer's own is theirs; a Reporter's
+// is the others'.
+func TestTheIssuesListPutsEachInASection(t *testing.T) {
+	f := viewsFake(t)
+	f.issues = append(f.issues, issueObj(6, guest, nil), issueObj(7, alex, nil), issueObj(8, tokenBot, nil), issueObj(9, dev, nil))
+	c := viewsClient(t, f)
+	_, data := callTool(t, c, "show_issues", map[string]any{})
+	sections := map[float64]any{}
+	for _, i := range data["issues"].([]any) {
+		i := i.(map[string]any)
+		sections[i["number"].(float64)] = i["section"]
+	}
+	want := map[float64]any{5: sectionNeedsYou, 6: sectionOthers, 7: sectionYours, 8: sectionTeam, 9: sectionTeam}
+	if !reflect.DeepEqual(sections, want) || data["viewer"] != "alex" || data["attention"] != 1.0 {
+		t.Errorf("sections %v, viewer %v, attention %v", sections, data["viewer"], data["attention"])
 	}
 }
 

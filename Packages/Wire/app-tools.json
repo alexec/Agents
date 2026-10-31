@@ -789,6 +789,40 @@
     "title": "Delete a workspace"
   },
   {
+    "description": "Bring a branch back from a folder on another of the person's machines (list_machines names them) into the repository you work in here, as the person's Bring Back from ‹machine›… does. Use it when a session you started there with start_session has done its work, or when the person asks for it. The person is asked first, on your question card, and nothing comes back without their yes.\n\nThe branch moves forward only, also where a worktree here has it checked out. It never overwrites work done here: a branch with commits of its own here, or a worktree with uncommitted changes where the branch moves, stops it before anything changes. With changes, the uncommitted changes there come too, as a patch: only when this folder has that branch checked out and has no uncommitted changes. The machine has to be running; start it with start_machine first.",
+    "inputSchema": {
+      "properties": {
+        "branch": {
+          "description": "Optional. The branch to bring back. Leave it out to bring back the branch that is checked out there.",
+          "type": "string"
+        },
+        "changes": {
+          "description": "Optional. true brings the uncommitted changes there too, as a patch on the branch.",
+          "type": "boolean"
+        },
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
+        },
+        "folder": {
+          "description": "The folder on that machine, as an absolute path, such as /home/me/project.",
+          "type": "string"
+        },
+        "machine": {
+          "description": "The machine, by its name as list_machines gives it.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "machine",
+        "folder"
+      ],
+      "type": "object"
+    },
+    "name": "bring_back",
+    "title": "Bring a branch back"
+  },
+  {
     "description": "Take back the one message you have waiting for another session in this folder, by its id or exact title. It says when nothing is waiting: already read, or nothing was sent. Only your own queued message is removed.",
     "inputSchema": {
       "properties": {

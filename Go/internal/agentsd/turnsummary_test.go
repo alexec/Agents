@@ -3,7 +3,6 @@ package agentsd
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
@@ -44,17 +43,14 @@ func TestATurnSummarised(t *testing.T) {
 	if s.ID != es[0].ID || s.Ask == nil || s.Start != 7 || s.End != 18 {
 		t.Fatalf("%+v", s)
 	}
-	if s.Last == nil || s.Last.Kind.AgentMessage == nil || s.Last.Kind.AgentMessage.Text != "Fixed it." {
-		t.Fatalf("last %+v", s.Last)
-	}
 	if len(s.Outcome) != 1 || s.Outcome[0].Kind.AgentMessage.Text != "Fixed it." || *s.Steps != 2 {
 		t.Fatalf("outcome %+v steps %d", s.Outcome, *s.Steps)
 	}
 	if s.Usage == nil || s.Usage.TotalTokens != 15 || s.Usage.Cost.Amount != 0.75 {
 		t.Fatalf("%+v", s.Usage)
 	}
-	// A turn that ends on a run: the run as its last call, said in its own words, with the
-	// message before it.
+	// A turn that ends on a run: stopped is the outcome, and the message before the run is
+	// a step.
 	es = entriesOf(t,
 		`{"userMessage":{"_0":"Go"}}`,
 		`{"agentMessage":{"text":"On it."}}`,
@@ -63,11 +59,6 @@ func TestATurnSummarised(t *testing.T) {
 		`{"stateChanged":{"_0":"stopped","reason":"cancelled"}}`,
 	)
 	s = turnSummaryOf(es, 0)
-	b, _ := json.Marshal(s.Concise)
-	if len(s.Concise) != 3 || s.Concise[1].ID != es[2].ID || !strings.Contains(string(b), `"rawInput":{"description":"Build it"}`) || strings.Contains(string(b), `"command"`) || strings.Contains(string(b), `"ok"`) {
-		t.Fatalf("%s", b)
-	}
-	// Stopped is the outcome, and the message before the run is a step.
 	if len(s.Outcome) != 2 || s.Outcome[1].Kind.StateChanged == nil || *s.Steps != 2 {
 		b, _ := json.Marshal(s.Outcome)
 		t.Fatalf("%s %d", b, *s.Steps)

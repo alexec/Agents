@@ -438,11 +438,11 @@ func (m *mesh) received(line string, link *peerLink) {
 	case o["presence"] != nil:
 		var p struct {
 			Client string          `json:"client"`
-			Grant  string          `json:"grant"`
+			Device bool            `json:"device"`
 			Report json.RawMessage `json:"report"`
 		}
 		if json.Unmarshal(o["presence"], &p) == nil && controllink.IsUUID(p.Client) {
-			m.s.router.NotePeerPresence(strings.ToUpper(p.Client), p.Grant == "device", p.Report)
+			m.s.router.NotePeerPresence(strings.ToUpper(p.Client), p.Device, p.Report)
 		}
 	case o["link"] != nil:
 		var l struct {

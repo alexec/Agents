@@ -48,14 +48,12 @@ public struct ChatTurn: Identifiable, Hashable, Sendable {
         self.range = range
     }
 
-    /// A stored summary, drawn before its entries are in hand. One written before 069
-    /// has no outcome, and its concise blocks stand in: 069 is after the #58 cut-off.
+    /// A stored summary, drawn before its entries are in hand.
     public init(_ summary: TurnSummary) {
-        let outcome = summary.outcome ?? summary.concise ?? summary.last.map { [$0] } ?? []
         self.init(id: summary.id,
                   ask: summary.ask.map(TranscriptItem.entry),
                   items: [],
-                  storedOutcome: outcome.map(TranscriptItem.entry),
+                  storedOutcome: (summary.outcome ?? []).map(TranscriptItem.entry),
                   storedStepCount: summary.steps,
                   range: summary.start..<summary.end)
     }
@@ -141,29 +139,21 @@ public struct TurnSummary: Codable, Hashable, Sendable, Identifiable {
     public var start: Int
     public var end: Int
     public var ask: TranscriptEntry?
-    /// The last work block, retained for clients built before 069 (after the #58
-    /// cut-off of 051).
-    public var last: TranscriptEntry?
-    /// The latest work and its context, retained for clients built before 069, likewise.
-    public var concise: [TranscriptEntry]?
-    /// The answers, the reply and how it went (069). Nil in a summary written before.
+    /// The answers, the reply and how it went (069).
     public var outcome: [TranscriptEntry]?
     /// How many step lines the turn has behind its control (069).
     public var steps: Int?
     /// What the turn used, as its runtime reported it (#465): every report in the turn,
     /// added up, so turns can be compared across agents and before and after a change.
-    /// Nil when the runtime reported none, and in a summary written before.
+    /// Nil when the runtime reported none.
     public var usage: TurnUsage?
 
-    public init(id: UUID, start: Int, end: Int, ask: TranscriptEntry?, last: TranscriptEntry?,
-                concise: [TranscriptEntry]? = nil, outcome: [TranscriptEntry]? = nil,
-                steps: Int? = nil, usage: TurnUsage? = nil) {
+    public init(id: UUID, start: Int, end: Int, ask: TranscriptEntry?,
+                outcome: [TranscriptEntry]? = nil, steps: Int? = nil, usage: TurnUsage? = nil) {
         self.id = id
         self.start = start
         self.end = end
         self.ask = ask
-        self.last = last
-        self.concise = concise
         self.outcome = outcome
         self.steps = steps
         self.usage = usage
@@ -173,11 +163,9 @@ public struct TurnSummary: Codable, Hashable, Sendable, Identifiable {
     public static func of(_ entries: [TranscriptEntry], start: Int) -> TurnSummary {
         let ask = entries.first.flatMap { TranscriptItem.entry($0).isPersonsAsk ? $0 : nil }
         let items = TranscriptEntry.display(entries)
-        let last = items.last(where: \.isBlock).flatMap(\.concise)
-        let concise = items.conciseTurnItems().compactMap(\.concise)
         let parts = TurnParts(Array(items.dropFirst(ask == nil ? 0 : 1)), isLive: false)
         return TurnSummary(id: ask?.id ?? entries.first?.id ?? UUID(), start: start,
-                           end: start + entries.count, ask: ask, last: last, concise: concise,
+                           end: start + entries.count, ask: ask,
                            outcome: parts.outcome.compactMap(\.concise), steps: parts.stepCount,
                            usage: TurnUsage.total(of: entries))
     }
@@ -376,29 +364,6 @@ extension TranscriptItem {
         return false
     }
 
-    /// A tool call or something the agent said. And a sandbox that could not start
-    /// (064), which ends its turn and must be seen to be answered. Kept for the
-    /// summaries older clients read.
-    public var isBlock: Bool {
-        switch self {
-        case .toolRun: return true
-        case .entry(let entry):
-            switch entry.kind {
-            case .agentMessage, .sandboxFailure: return true
-            default: return false
-            }
-        }
-    }
-
-    /// Answers to questions and permission choices are the person's input mid-turn.
-    public var isUserInput: Bool {
-        guard case .entry(let entry) = self else { return false }
-        switch entry.kind {
-        case .elicitationAnswered, .permissionAnswered: return true
-        default: return false
-        }
-    }
-
     /// This item as a summary keeps text whole, and a tool run's last call with
     /// only its description.
     var concise: TranscriptEntry? {
@@ -413,22 +378,6 @@ extension TranscriptItem {
             call.raw = nil
             call.rawInput = call.describedAs.map { .object(["description": .string($0)]) }
             return TranscriptEntry(id: id, kind: .toolCall(call))
-        }
-    }
-}
-
-extension Array where Element == TranscriptItem {
-    /// The pre-069 concise turn, still written for older clients: answers wherever they
-    /// occurred, plus the latest work and the text before it when that work is a call.
-    func conciseTurnItems() -> [TranscriptItem] {
-        guard let last = lastIndex(where: \.isBlock) else { return filter(\.isUserInput) }
-        var selected = Set([last])
-        if last > 0, case .toolRun = self[last],
-           case .entry(let entry) = self[last - 1], case .agentMessage = entry.kind {
-            selected.insert(last - 1)
-        }
-        return enumerated().compactMap { index, item in
-            selected.contains(index) || item.isUserInput ? item : nil
         }
     }
 }

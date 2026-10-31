@@ -6,8 +6,8 @@ import Synchronization
 /// A folder is its folder, which is why the folder is the identity and there is no id
 /// of our own to keep in step. Almost everything about a folder is derived from the
 /// agents in it — the name, the activity, the counts — so the only things kept here are
-/// the ones that cannot be: that it is archived, that somebody added the folder before
-/// anything had run in it, and that it has been given the dotagents layout.
+/// the ones that cannot be: that it is archived, and that somebody added the folder
+/// before anything had run in it.
 public struct Folder: Codable, Hashable, Sendable, Identifiable {
     /// Resolved and standardised, so one folder is one folder however it was typed.
     public var folder: URL
@@ -15,14 +15,6 @@ public struct Folder: Codable, Hashable, Sendable, Identifiable {
     public var archivedAt: Date?
     /// When this record was made. Orders a folder that has no agents to order it by.
     public var addedAt: Date
-    /// When it was given the dotagents layout. Once: after that the files are the
-    /// person's, and one they deleted is not put back.
-    public var laidOutAt: Date?
-    /// Which layout it was given (`DotAgents.version`). Nil with `laidOutAt` set is the
-    /// first, from before the layout had a version (09-25). Kept past the #58 cut-off on
-    /// purpose: reading it as anything else would either lay out step 1 again, putting
-    /// back what the person deleted, or fail `folders.json`, which holds every folder.
-    public var layoutVersion: Int?
     /// The person's own helper limits (#64). Nil is the defaults. In a summary, what the
     /// folder's own `.agents/folder.json` says (#126); in `folders.json`, only a record
     /// from before then, moved into that file once. Set only by
@@ -83,15 +75,12 @@ public struct Folder: Codable, Hashable, Sendable, Identifiable {
     /// running app is not a case this app serves — so the answer is kept.
     private static let standardized = Mutex<[String: URL]>([:])
 
-    public init(folder: URL, archivedAt: Date? = nil, addedAt: Date = Date(),
-                laidOutAt: Date? = nil, layoutVersion: Int? = nil, helperLimits: HelperLimits? = nil,
+    public init(folder: URL, archivedAt: Date? = nil, addedAt: Date = Date(), helperLimits: HelperLimits? = nil,
                 diskSpace: DiskThresholds? = nil, pinned: Bool? = nil, prCostComment: PRCostComment? = nil,
                 unknownFields: [String: JSONValue] = [:]) {
         self.folder = Self.standardize(folder)
         self.archivedAt = archivedAt
         self.addedAt = addedAt
-        self.laidOutAt = laidOutAt
-        self.layoutVersion = layoutVersion
         self.helperLimits = helperLimits
         self.diskSpace = diskSpace
         self.pinned = pinned
@@ -104,8 +93,6 @@ public struct Folder: Codable, Hashable, Sendable, Identifiable {
         folder = Self.standardize(try c.decode(URL.self, forKey: .folder))
         archivedAt = try c.decodeIfPresent(Date.self, forKey: .archivedAt)
         addedAt = try c.decode(Date.self, forKey: .addedAt)
-        laidOutAt = try c.decodeIfPresent(Date.self, forKey: .laidOutAt)
-        layoutVersion = try c.decodeIfPresent(Int.self, forKey: .layoutVersion)
         // A setting this build cannot read is the defaults, not a folder that fails to load.
         helperLimits = (try? c.decodeIfPresent(HelperLimits.self, forKey: .helperLimits)) ?? nil
         diskSpace = (try? c.decodeIfPresent(DiskThresholds.self, forKey: .diskSpace)) ?? nil
@@ -125,8 +112,6 @@ public struct Folder: Codable, Hashable, Sendable, Identifiable {
         try c.encode(folder, forKey: .folder)
         try c.encodeIfPresent(archivedAt, forKey: .archivedAt)
         try c.encode(addedAt, forKey: .addedAt)
-        try c.encodeIfPresent(laidOutAt, forKey: .laidOutAt)
-        try c.encodeIfPresent(layoutVersion, forKey: .layoutVersion)
         try c.encodeIfPresent(helperLimits, forKey: .helperLimits)
         try c.encodeIfPresent(diskSpace, forKey: .diskSpace)
         try c.encodeIfPresent(pinned, forKey: .pinned)
@@ -140,7 +125,7 @@ public struct Folder: Codable, Hashable, Sendable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey, CaseIterable {
-        case folder, archivedAt, addedAt, laidOutAt, layoutVersion, helperLimits, diskSpace, pinned, prCostComment
+        case folder, archivedAt, addedAt, helperLimits, diskSpace, pinned, prCostComment
     }
 
     struct AnyKey: CodingKey {

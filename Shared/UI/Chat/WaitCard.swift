@@ -66,8 +66,8 @@ struct WaitCard: View {
         let elapsed = max(0, Int(now.timeIntervalSince(wait.since) / 60))
         VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 7) {
-                // The waiting mark's beacon in the same colour: one icon for waiting (#2657).
-                Image(systemName: StatusShape.waitingSymbol).foregroundStyle(Paper.accent)
+                // The waiting mark's beacon, breathing as it does everywhere else (#2657).
+                WaitingBeacon(size: 14)
                 Text("Waiting for event").fontWeight(.semibold)
                 Spacer(minLength: 6)
                 Text(total.map { "\(elapsed) / \($0) min" } ?? "\(elapsed) min")
@@ -146,7 +146,7 @@ struct BlockWaitCard: View {
         let elapsed = max(0, Int(now.timeIntervalSince(since) / 60))
         VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 7) {
-                Image(systemName: StatusShape.waitingSymbol).foregroundStyle(Paper.accent)
+                WaitingBeacon(size: 14)
                 Text(block.cardTitle()).fontWeight(.semibold)
                 Spacer(minLength: 6)
                 Text(total.map { "\(elapsed) / \($0) min" } ?? "\(elapsed) min")

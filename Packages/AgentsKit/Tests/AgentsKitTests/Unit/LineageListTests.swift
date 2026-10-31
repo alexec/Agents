@@ -27,26 +27,24 @@ struct LineageListTests {
         .init(cost: ["USD": usd], turns: 1, workingSeconds: working)
     }
 
-    @Test func nodesInGroupsByKindWithoutTheSessionItself() {
-        let groups = LineageList.groups(of: session, graph: graph, costs: [:]) { $0 == helper ? "Helper" : nil }
-        let rows = groups.flatMap(\.rows)
-        #expect(groups.map(\.title) == ["Issues", "Pull Requests", "Sessions"])
-        #expect(groups.map { $0.rows.map(\.name) } == [["alexec/agents#12"], ["alexec/agents#34"], ["Helper"]])
+    @Test func aRowForEachNodeWithoutTheSessionItself() {
+        let rows = LineageList.rows(of: session, graph: graph, costs: [:]) { $0 == helper ? "Helper" : nil }
+        #expect(rows.map(\.name) == ["alexec/agents#12", "Helper", "alexec/agents#34"])
         #expect(rows.map(\.links) == [
             ["This session works on it · from the branch", "Helper works on it · when it started",
              "alexec/agents#34 fixes it · from the PR's text · ended"],
-            ["Fixes alexec/agents#12 · from the PR's text · ended"],
             ["This session started it · as a helper", "Works on alexec/agents#12 · when it started"],
+            ["Fixes alexec/agents#12 · from the PR's text · ended"],
         ])
         #expect(rows.map { $0.url?.absoluteString } == [
-            "https://github.com/alexec/agents/issues/12", "https://github.com/alexec/agents/pull/34", nil,
+            "https://github.com/alexec/agents/issues/12", nil, "https://github.com/alexec/agents/pull/34",
         ])
-        #expect(rows.map(\.session) == [nil, nil, Self.t])
+        #expect(rows.map(\.session) == [nil, Self.t, nil])
         let run = Node(kind: "workflow-run", ref: "run:nightly")
-        let started = LineageList.groups(of: session, graph: .init(nodes: [session, run], links: [
+        let started = LineageList.rows(of: session, graph: .init(nodes: [session, run], links: [
             .init(from: run, to: session, rel: "started", source: "start", at: at),
         ]), costs: [:]) { _ in nil }
-        #expect(started.flatMap(\.rows).map(\.links) == [["Started this session · when it started"]])
+        #expect(started.map(\.links) == [["Started this session · when it started"]])
     }
 
     @Test func anIssuesAndAPRsCostWithHowThePRsEnded() {
@@ -54,9 +52,9 @@ struct LineageListTests {
             issue: .init(node: issue, total: Self.cost(10, working: 720), waste: Self.cost(3), prsMerged: 1, prsClosed: 1),
             pr: .init(node: pr, total: Self.cost(4), parts: [.init(node: pr, banked: Self.cost(4), outcome: "closed", lastAt: at)]),
         ]
-        let groups = LineageList.groups(of: session, graph: graph, costs: costs) { _ in nil }
-        #expect(groups.flatMap(\.rows).map(\.cost) == [
-            "$10.00 · 12m working · 1 merged, 1 closed · $3.00 wasted", "$4.00 · closed without a merge: waste", nil,
+        let rows = LineageList.rows(of: session, graph: graph, costs: costs) { _ in nil }
+        #expect(rows.map(\.cost) == [
+            "$10.00 · 12m working · 1 merged, 1 closed · $3.00 wasted", nil, "$4.00 · closed without a merge: waste",
         ])
         #expect(LineageList.costLine(.init(node: pr, total: Self.cost(1))) == "$1.00 · open")
         #expect(LineageList.costLine(.init(node: pr, total: Self.cost(0, working: 3))) == "3s working · open")

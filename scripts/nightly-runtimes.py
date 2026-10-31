@@ -47,6 +47,8 @@ report   A pinned runtime that passed every step: one PR per runtime, on the bra
          the same cause share one issue. What already fails on main is listed, never filed.
          A runtime with a dropped Auto mapping: one issue, "Auto mapping: <runtime>", opened
          or commented on, naming each cell; the pin's PR is still opened.
+         A runtime that offers a model it did not offer at its last check: one issue,
+         "Auto models: <runtime>", so the Model table's cells do not go stale (#3041).
          An assessment step that failed fails the runtime only when it did not fail last
          time; one that failed last time too is listed, not filed again. Then one PR on
          nightly/runtime-assessments off origin/main, with auto-merge: a record per runtime
@@ -506,8 +508,8 @@ def rpc_client(tree):
     return module.Client
 
 
-def cheapest_model(session):
-    """The model value to start with, or None for the runtime's own default."""
+def offered_models(session):
+    """The models a runtime's session offered: (value, its words lowercased), in its order."""
     choices = []
     for option in (session or {}).get("configOptions") or []:
         if option.get("id") != "model" and option.get("category") != "model":
@@ -521,6 +523,12 @@ def cheapest_model(session):
     if not choices:
         models = ((session or {}).get("models") or {}).get("availableModels") or []
         choices = [(m.get("modelId"), f"{m.get('modelId')} {m.get('name', '')}".lower()) for m in models]
+    return [(value, words) for value, words in choices if value]
+
+
+def cheapest_model(session):
+    """The model value to start with, or None for the runtime's own default."""
+    choices = offered_models(session)
     for word in CHEAP:
         for value, words in choices:
             if value and word in words:
@@ -650,6 +658,27 @@ def open_mapping_issue(record, rid, entry, dry_run):
     return file_issue(prefix, title, body, dry_run)
 
 
+def new_models(entry, known):
+    """The models the runtime offers tonight that it did not offer at its last check (#3041):
+    a newer model may be a better Smart cell than the shipped one. None before a first check."""
+    if known is None:
+        return []
+    return [m for m in entry.get("models") or [] if m not in known]
+
+
+def open_new_models_issue(record, rid, entry, models, dry_run):
+    """A runtime that offers a model it did not before: the shipped Model table may be stale."""
+    spec = RUNTIMES[rid]
+    prefix = f"Auto models: {spec['name']}"
+    title = f"{prefix} {entry.get('to', '?')} offers a new model"
+    listed = "\n".join(f"- `{m}`" for m in models)
+    body = (f"{spec['name']} {entry.get('to')}, run {record['started']}, offers models it did not offer at its "
+            f"last check:\n\n{listed}\n\nCheck whether one is a better Fast, Balanced or Smart cell than the "
+            f"shipped Model table's (`Go/internal/agentsd/automap.go`, `autoModels`), and update it and "
+            f"`docs/reference/runtimes.md` together. Found by the runtime check (#3041).")
+    return file_issue(prefix, title, body, dry_run)
+
+
 # The verdict kept for an assessment that never started.
 START = "(start)"
 
@@ -697,7 +726,9 @@ def check(args):
                 steps[step] = {"ok": status == 0, "output": tail(out)}
                 if status != 0:
                     entry["status"] = "failed"
-            model = cheapest_model(load(os.path.join(sessions, f"{rid}.json"), None))
+            session = load(os.path.join(sessions, f"{rid}.json"), None)
+            model = cheapest_model(session)
+            entry["models"] = [value for value, _ in offered_models(session)]
             account = None
             try:
                 ok, out, account = real_turn(client, root, rid, model)
@@ -1077,6 +1108,12 @@ def report(args):
             sent = open_mapping_issue(record, rid, entry, args.dry_run)
             lines.append(f"- {spec['name']}: Auto mapping no longer offered; issue {'would be ' if args.dry_run else ''}"
                          f"{'opened or updated' if sent else 'NOT opened (see above)'}")
+        known = state.get(rid, {}).get("models")
+        added = new_models(entry, known)
+        if added:
+            sent = open_new_models_issue(record, rid, entry, added, args.dry_run)
+            lines.append(f"- {spec['name']}: offers a new model ({', '.join(added)}); issue "
+                         f"{'would be ' if args.dry_run else ''}{'opened or updated' if sent else 'NOT opened (see above)'}")
         if not args.dry_run:
             previous = state.get(rid, {}).get("assessment")
             state[rid] = {"version": entry["to"], "result": "passed" if passed else "failed",
@@ -1084,6 +1121,8 @@ def report(args):
             verdicts = (assess or {}).get("verdicts")
             if verdicts or previous:
                 state[rid]["assessment"] = verdicts or previous
+            if entry.get("models") or known:
+                state[rid]["models"] = sorted(set(known or []) | set(entry.get("models") or []))
     for (step, _), rids in failed.items():
         shared = len(rids) > 1
         sent = (open_shared_issue if shared else lambda r, ids, d: open_issue(r, ids[0], r["runtimes"][ids[0]], d))(

@@ -74,8 +74,7 @@ struct AgentsModelTests {
     }
 
     /// A withdrawal carries no request, and a client that read it as "nothing to do"
-    /// would leave the question on screen for somebody to answer a second time. Without
-    /// a request identity, every question for that agent goes — the legacy shape.
+    /// would leave the question on screen for somebody to answer a second time.
     @Test func aWithdrawnQuestionTakesTheOneThatWasWaiting() throws {
         let model = AgentsModel()
         let id = UUID()
@@ -88,7 +87,7 @@ struct AgentsModelTests {
         #expect(model.permission(for: id) != nil)
 
         model.apply(DaemonAPI.Notification.agentPermission,
-                    try notification(DaemonAPI.PermissionNotification(agentID: id, request: nil)))
+                    try notification(DaemonAPI.PermissionNotification(agentID: id, request: nil, requestID: question.id)))
         #expect(model.permission(for: id) == nil)
         #expect(model.permissions.isEmpty)
     }
@@ -209,7 +208,7 @@ struct AgentsModelTests {
         let laterID = UUID()
         func summary(_ id: UUID, _ text: String, start: Int) -> TurnSummary {
             let ask = TranscriptEntry(id: id, kind: .userMessage(text))
-            return TurnSummary(id: id, start: start, end: start + 1, ask: ask, last: nil)
+            return TurnSummary(id: id, start: start, end: start + 1, ask: ask)
         }
         model.replaceTurns(with: TurnsPage(
             turns: [summary(overlapID, "old", start: 10), summary(laterID, "later", start: 20)],
@@ -633,7 +632,7 @@ struct AgentsModelTests {
         let model = AgentsModel()
         let page = (0..<80).map { n in
             TurnSummary(id: UUID(), start: n, end: n + 1, ask: TranscriptEntry(
-                at: Date(), kind: .userMessage("ask \(n)", from: n.isMultiple(of: 2) ? .person : .agent)), last: nil)
+                at: Date(), kind: .userMessage("ask \(n)", from: n.isMultiple(of: 2) ? .person : .agent)))
         }
         model.replaceTurns(with: TurnsPage(turns: page, firstTurn: 100, openStart: 80, firstPrompt: 60))
         let dropped = 80 - AgentsModel.turnsKept
@@ -714,7 +713,7 @@ struct AgentsModelTests {
     }
 
     private func turnSummary(_ start: Int) -> TurnSummary {
-        TurnSummary(id: UUID(), start: start, end: start + 1, ask: nil, last: nil)
+        TurnSummary(id: UUID(), start: start, end: start + 1, ask: nil)
     }
 
     @Test func aCommandsOutputIsKeptPerTerminalAndByItsTail() throws {

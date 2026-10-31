@@ -84,8 +84,6 @@ public enum ControlAuth {
 
     public struct OK: Codable, Sendable, Equatable {
         public var mac: String
-        /// `operator` for a client, for an older web page that shows it (#111). Not read.
-        public var grant: String?
         public var host: MachineRef?
         public var relayed: Bool?
         /// Where the control plane answers now, and from when (R16): a member with an older
@@ -95,10 +93,9 @@ public enum ControlAuth {
         /// The control plane's new key, to a member that proved itself with the previous
         /// one (#997).
         public var newKey: NewKey?
-        public init(mac: String, client: Bool = false, host: MachineRef? = nil, relayed: Bool? = nil,
+        public init(mac: String, host: MachineRef? = nil, relayed: Bool? = nil,
                     endpoints: [ControlEndpoint]? = nil, epoch: Int? = nil, newKey: NewKey? = nil) {
             self.mac = mac
-            self.grant = client ? LegacyGrant.everything : nil
             self.host = host
             self.relayed = relayed
             self.endpoints = endpoints

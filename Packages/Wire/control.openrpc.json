@@ -2809,7 +2809,7 @@
     {
       "name": "machines/sendFolder",
       "x-capability": "folders.to-machine/1",
-      "description": "Through host/machines only (#2929): one step of an agent's start_session with send, which sends this folder's branch to another of the person's machines, as Send to ‹machine›… does. The control plane sends that machine's folders/receiveState, folders/receiveUpload or folders/receive; the machine has to be online.",
+      "description": "Through host/machines only: one step of an agent's start_session with send (#2929), which sends this folder's branch to another of the person's machines, as Send to ‹machine›… does, or of its bring_back (#2947), which brings a branch back from there, as Bring Back from ‹machine›… does. The control plane sends that machine's folders/receiveState, folders/receiveUpload, folders/receive, folders/sendFacts, folders/sendPack or folders/sendRead; the machine has to be online.",
       "paramStructure": "by-name",
       "params": [
         {

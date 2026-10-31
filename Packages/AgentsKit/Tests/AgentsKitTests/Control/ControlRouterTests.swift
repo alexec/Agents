@@ -215,8 +215,7 @@ struct ControlRouterTests {
         host.stop()
     }
 
-    /// Every channel says `operator` for an older host, which then gives it everything;
-    /// a phone's or a browser's names it, and a Mac's window names nobody.
+    /// A phone's or a browser's channel names it, and a Mac's window names nobody.
     @Test func aDeviceChannelIsOpenedAsThatDeviceAndAWindowsAsNone() async throws {
         let router = ControlRouter(handler: StubControl(), homeHost: home)
         let host = await connectHost(router, server)
@@ -227,7 +226,6 @@ struct ControlRouterTests {
         _ = await connectClient(router, browser)
         await eventually { host.allOpened.count == 3 }
         let opens = Array(host.allOpened.values)
-        #expect(opens.allSatisfy { $0.grant == "operator" })
         #expect(opens.contains { $0.device == phone.id })
         #expect(opens.contains { $0.device == browser.id })
         #expect(opens.contains { $0.device == nil })
@@ -259,28 +257,16 @@ struct ControlRouterTests {
         theirs.close()
     }
 
-    @Test func aBareLineIsTheHomeHostsAndItsReplyComesBackBare() async throws {
+    /// A client older than v0.13.0 never wraps its lines (#111, #2981 D2): the control
+    /// plane no longer guesses it is the home host's, and refuses the line as unreadable.
+    @Test func aBareLineIsRefusedAsUnreadable() async throws {
         let router = ControlRouter(handler: StubControl(), homeHost: home)
         let host = await connectHost(router, home)
         let remote = await connectClient(router, client(.iPhone))
-        await eventually { host.openChannels.count == 1 }
-        let bare = #"{"jsonrpc":"2.0","id":3,"method":"agents/list"}"#
-        try remote.send(bare)
-        await eventually { !remote.lines.isEmpty }
-        #expect(host.messages.first?.message == bare)
-        try #require(!remote.lines.isEmpty)
-        #expect(!remote.lines[0].hasPrefix(#"{"h""#))
-        host.stop()
-    }
-
-    @Test func aBareLineForTheControlPlanesOwnMethodIsAnsweredThere() async throws {
-        let router = ControlRouter(handler: StubControl(), homeHost: home)
-        let host = await connectHost(router, home)
-        let remote = await connectClient(router, client(.iPhone))
-        try remote.send(#"{"jsonrpc":"2.0","id":4,"method":"hosts/list"}"#)
+        try remote.send(#"{"jsonrpc":"2.0","id":3,"method":"agents/list"}"#)
         await eventually { !remote.lines.isEmpty }
         try #require(!remote.lines.isEmpty)
-        #expect(remote.lines[0].contains("control"))
+        #expect(remote.lines[0].contains("\(JSONRPCError.parseError)"))
         #expect(host.messages.isEmpty)
         host.stop()
     }

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# The A records for the control plane's two names (#1461, #1484), at Cloudflare's DNS: the
+# The A records for the control plane's names (#1461, #1484), at Cloudflare's DNS: the
 # page's name and the views name, both to the VM's address that deploy/gcp/up.sh prints. The
-# name @ is the zone itself: --names @ points agentloops.dev at the VM, for the hand-back page
-# (#1343, deploy/gcp/site.sh).
+# name @ is the zone itself, kept free for the promotional site (#3042); --names oauth points
+# oauth.agentloops.dev at the VM, for the hand-back page (#1343, deploy/gcp/site.sh).
 # --cname TARGET makes CNAME records to TARGET instead of A records: --names docs --cname
 # alexec.github.io serves the docs site from GitHub Pages at docs.agentloops.dev (#1549).
 # A record that is already right is left alone, and one with another address is changed, so

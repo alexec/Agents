@@ -132,7 +132,7 @@ public final class AgentsModel {
     /// When the conversation last did anything: its last entry, or the last stored turn's
     /// when the page holds none. The foot of the chat says it once it is quiet (#1564).
     public var lastEntryAt: Date? {
-        entries.last?.at ?? turns.last.flatMap { $0.outcome?.last?.at ?? $0.last?.at ?? $0.ask?.at }
+        entries.last?.at ?? turns.last.flatMap { $0.outcome?.last?.at ?? $0.ask?.at }
     }
     @ObservationIgnored private var display = TranscriptDisplayBuilder()
     /// Everything exchanged in the page, newest first: `Artifact.all(in: entries)`,
@@ -630,13 +630,7 @@ public final class AgentsModel {
             }
 
         case .permission(let notification):
-            if let id = notification.requestID ?? notification.request?.id {
-                permissions.removeAll { $0.agentID == notification.agentID && $0.id == id }
-            } else {
-                // Every question at once: a daemon from before 09-27 withdraws this way
-                // (kept, #58; see `PermissionNotification.requestID`).
-                permissions.removeAll { $0.agentID == notification.agentID }
-            }
+            permissions.removeAll { $0.agentID == notification.agentID && $0.id == notification.requestID }
             if let request = notification.request { permissions.append(request) }
             permissions.sort { $0.askedAt < $1.askedAt }
 

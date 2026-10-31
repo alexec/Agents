@@ -5,6 +5,7 @@
 // (deploy/compose.hosted.yaml).
 //
 //	agents-hosted serve
+//	agents-hosted admin <verb> …   the operator's tool, on the same store (admin.go)
 //	agents-hosted version
 //
 // From the environment:
@@ -21,6 +22,17 @@
 //	AGENTS_HOSTED_VIEWS_DOMAIN     the views' sandbox proxy's name, or none
 //	AGENTS_HOSTED_PORT             the port to listen on, 8795
 //	AGENTS_CONTROL_TRUSTED_PROXIES the proxies in front, whose X-Forwarded-For is believed
+//
+// Who may sign up, and the limits that keep the service whole (#2152, spec 1003):
+//
+//	AGENTS_HOSTED_SIGNUP               invite (the default), open or closed
+//	AGENTS_HOSTED_MAX_ACCOUNTS         the most accounts, 100; then a waitlist
+//	AGENTS_HOSTED_MIN_GITHUB_AGE       the youngest GitHub account, in days, 30
+//	AGENTS_HOSTED_SIGNUPS_PER_ADDRESS  new accounts and waitlist entries an hour from one address, 3
+//	AGENTS_HOSTED_SIGNUPS_PER_HOUR     the same in all, 30
+//	AGENTS_HOSTED_MAX_COPIES           control planes running at once, 50
+//	AGENTS_HOSTED_CERTS_PER_HOUR       new certificates an hour, 10
+//	AGENTS_HOSTED_CERTS_PER_WEEK       new certificates a week, 40
 package main
 
 import (
@@ -30,6 +42,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -46,8 +59,11 @@ func main() {
 		fmt.Println(buildinfo.Version)
 		return
 	}
+	if len(os.Args) > 1 && os.Args[1] == "admin" {
+		os.Exit(admin(os.Args[2:], os.Stdout, os.Stderr))
+	}
 	if len(os.Args) < 2 || os.Args[1] != "serve" {
-		fmt.Fprintln(os.Stderr, "usage: agents-hosted serve | version")
+		fmt.Fprintln(os.Stderr, "usage: agents-hosted serve | admin <verb> … | version")
 		os.Exit(2)
 	}
 	if err := serve(); err != nil {
@@ -77,10 +93,29 @@ func serve() error {
 		client = connections.GitHubClientID
 	}
 	logf := func(line string) { fmt.Fprintln(os.Stderr, time.Now().UTC().Format(time.RFC3339)+" "+line) }
-	service, err := hosted.New(ctx, hosted.Config{Store: st, Keeper: os.Getenv("AGENTS_CONTROL_KMS"),
+	cfg := hosted.Config{Store: st, Keeper: os.Getenv("AGENTS_CONTROL_KMS"),
 		Domain: strings.ToLower(os.Getenv("AGENTS_HOSTED_DOMAIN")), AccountsDomain: strings.ToLower(os.Getenv("AGENTS_HOSTED_ACCOUNTS_DOMAIN")),
 		GitHubClientID: client, GitHubSecret: os.Getenv("AGENTS_HOSTED_GITHUB_SECRET"), Web: os.Getenv("AGENTS_HOSTED_WEB"),
-		ViewsDomain: os.Getenv("AGENTS_HOSTED_VIEWS_DOMAIN"), TrustedProxies: trusted, Log: logf})
+		ViewsDomain: os.Getenv("AGENTS_HOSTED_VIEWS_DOMAIN"), TrustedProxies: trusted, Log: logf,
+		SignUp: strings.ToLower(os.Getenv("AGENTS_HOSTED_SIGNUP"))}
+	for name, into := range map[string]*int{"AGENTS_HOSTED_MAX_ACCOUNTS": &cfg.MaxAccounts,
+		"AGENTS_HOSTED_SIGNUPS_PER_ADDRESS": &cfg.SignUpsPerAddress, "AGENTS_HOSTED_SIGNUPS_PER_HOUR": &cfg.SignUpsPerHour,
+		"AGENTS_HOSTED_MAX_COPIES": &cfg.MaxCopies, "AGENTS_HOSTED_CERTS_PER_HOUR": &cfg.CertsPerHour,
+		"AGENTS_HOSTED_CERTS_PER_WEEK": &cfg.CertsPerWeek} {
+		if *into, err = number(name); err != nil {
+			return err
+		}
+	}
+	days, err := number("AGENTS_HOSTED_MIN_GITHUB_AGE")
+	if err != nil {
+		return err
+	}
+	if days > 0 {
+		cfg.MinGitHubAge = time.Duration(days) * 24 * time.Hour
+	} else if os.Getenv("AGENTS_HOSTED_MIN_GITHUB_AGE") == "0" {
+		cfg.MinGitHubAge = -1
+	}
+	service, err := hosted.New(ctx, cfg)
 	if err != nil {
 		return err
 	}
@@ -101,4 +136,17 @@ func serve() error {
 		return err
 	}
 	return nil
+}
+
+// number is a whole number from the environment, 0 when unset.
+func number(name string) (int, error) {
+	v := os.Getenv(name)
+	if v == "" {
+		return 0, nil
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 0 {
+		return 0, fmt.Errorf("%s is a whole number, not %q", name, v)
+	}
+	return n, nil
 }

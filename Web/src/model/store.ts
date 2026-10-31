@@ -560,10 +560,8 @@ export class Work {
         return true;
       case "agent/permission": {
         const note = params as PermissionNotification;
-        const id = note.requestID ?? note.request?.id;
         let list = (this.permissions.value[host] ?? []).filter((p) =>
-          // Every question at once from a daemon that withdraws without an id.
-          !(p.agentID === note.agentID && (id === undefined || p.id === id)));
+          !(p.agentID === note.agentID && p.id === note.requestID));
         if (note.request) list = [...list, note.request];
         list.sort((a, b) => a.askedAt - b.askedAt);
         this.permissions.value = { ...this.permissions.value, [host]: list };

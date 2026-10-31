@@ -67,7 +67,7 @@ Loops' source is visible at github.com/alexec/Agents (all rights reserved).
 ## Support and marketing URLs
 
 - Support URL: `https://github.com/alexec/Agents/issues`
-- Marketing URL: `https://www.agentloops.dev/`
+- Marketing URL: `https://agentloops.dev/`
 - Privacy policy URL: `https://docs.agentloops.dev/privacy/`
 
 ## Screenshots

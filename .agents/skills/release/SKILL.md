@@ -239,21 +239,39 @@ Until the gate can pass:
 
 ## 5. Gate
 
-All of these, on the commit you will tag (`git rev-parse origin/main`, fetched again now).
-If `origin/main` now names a newer commit than the one the gate started on (a PR landed
-while an item below was waiting), re-pick the newest main and start the gate over on it
-from item 1: a run on the stale commit may already be cancelled, which is not a failure.
-`branch.moved` is never raised for `main`, the default branch; `pr.merged` is what wakes a
-wait for this instead.
+All of these, on the commit you will tag: `<sha>`, the pin, is `git rev-parse origin/main`
+(fetched again now) when the gate starts. The tag goes on the pin, so every item below,
+and step 6's plan and notes, is about the pin, not about the newest main.
+
+**The pin stays while lanes land** (#3045). A PR that lands while an item waits does not
+restart the gate: lanes keep merging during a milestone, and each restart cost a new cold
+dry run (up to an hour); v0.14.1's gate took about two hours this way. Each time you look
+again and `origin/main` has moved, run `release-plan.py --after <sha>`:
+
+- `verdict: keep the pin`: go on with the same `<sha>`. What merged after it goes out in the
+  next release.
+- `verdict: start over on origin/main`: a PR after the pin fixes a blocking issue
+  (`priority:high`, and on the patch path `priority:medium` bugs too), so the tag must hold
+  it. Re-pick the newest main and start the gate over on it from item 1. A dry run on the
+  old pin may go on or be cancelled; neither is a failure.
+- Also start over when a high security advisory's fix (`Fixed by <commit>` or its fix
+  branch) is on `origin/main` but not an ancestor of the pin.
+
+An issue whose closing PR merged after the pin is still open in what you tag: count it as
+open for item 2 and for the notes' known issues (`git merge-base --is-ancestor <merge commit>
+<sha>` fails for it). `branch.moved` is never raised for `main`, the default branch;
+`pr.merged` is what wakes a wait instead.
 
 1. **CI is green on it:** `gh run list --branch main --commit <sha> --json name,conclusion`
    shows every run `success` (or `skipped`). If one is still running, wait for it: a push
    to `main` is never a pull request, so `checks.failed` (a PR's own runs) never fires for
    it, and nothing wakes on a pass either. Wait instead with `wait_for_event` (`pr.merged`,
    `until_minutes: 10`), since a PR landing is what would cancel this run by moving main
-   past `<sha>`, then look again however it woke (re-pick as above if it did move). If a
-   run failed and main did not move, end with `partly_done`; main broken is fixed by its
-   own PR, through the Scrum Master.
+   past `<sha>`, then look again however it woke (run `--after` as above if it did move).
+   A newer push never cancels a running run on `main` (#2218), but it replaces a pending
+   one: when the pin's CI was replaced and never ran, start over on the newest main. If a
+   run on `<sha>` failed, end with `partly_done`; main broken is fixed by its own PR,
+   through the Scrum Master.
 2. **No open high:** none of step 3's high issues is open, and none of its high security
    advisories is without its fix. **For a patch** (#2801), instead: no `priority:high` or
    `priority:medium` bug is open in its milestone. Two days after the last tag
@@ -270,8 +288,8 @@ wait for this instead.
    databaseId,displayTitle,status --jq '.[] | select(.displayTitle == "release dry run <sha>")'`)
    and look again until it is `completed` (it takes up to an hour). It runs by
    `workflow_dispatch`, not a pull request, so no event here wakes on it ending, in success
-   or failure: `check_again` (`in_minutes: 10`) and look again (re-pick as above if main
-   moved meanwhile). It runs release.yml's `mac` and `testflight` archives as dry runs on a
+   or failure: `check_again` (`in_minutes: 10`) and look again (run `--after` as above if main
+   moved meanwhile; with `keep the pin`, the same run goes on). It runs release.yml's `mac` and `testflight` archives as dry runs on a
    runner with an empty build cache, which no lane or merge wave does (#2773 spent
    v0.12.0's tag). A run of it on a pull request does not count: run it on `<sha>`. If it
    failed, end with `partly_done`, naming the job and its first error; the fix goes through
@@ -279,7 +297,8 @@ wait for this instead.
 
 ## 6. Version and notes
 
-1. Run `release-plan.py` again. Its `next:` is the version, when it agrees with the open
+1. Run `release-plan.py --ref <sha>` again, so the plan lists what the pin holds and nothing
+   merged after it. Its `next:` is the version, when it agrees with the open
    milestone's version beside it. When the plan prints `differs:` (#2779), stop before the
    tag and ask Alex by form which version to use, with the `differs:` line's reason (an
    enhancement merged, a capability removed). Renumber the milestones only when Alex says.

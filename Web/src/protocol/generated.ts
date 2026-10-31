@@ -197,7 +197,6 @@ export interface AddFolderRequest {
 export interface Admitted {
   client?: UUID;
   host?: MachineRef;
-  grant?: string;
 }
 
 export interface AdoptRequest {
@@ -543,17 +542,11 @@ export type AllowanceStateStatus =
   | { out: { until?: WireDate; retryAfter?: WireDate; why: AllowanceStateOutReason } };
 
 /**
- * What devices/announce answers: the device's record, with the Mac's relay key beside its fields
- * when a bridge has registered one (046).
+ * What devices/announce answers: the device's record, with the Mac's relay key beside it when a
+ * bridge has registered one (046).
  */
 export interface AnnounceReply {
-  id: UUID;
-  publicKey: Base64;
-  name: string;
-  kind: DeviceKind;
-  announcedAt: WireDate;
-  lastSeenAt?: WireDate;
-  mayNotify?: boolean;
+  device: Device;
   macKey?: Base64;
 }
 
@@ -1228,24 +1221,6 @@ export interface CapReached {
   until: WireDate;
 }
 
-export interface CarriedSetting {
-  optionID: string;
-  name: string;
-  from?: JSONValue;
-  to?: JSONValue;
-  source: CarriedSettingSource;
-}
-
-export type CarriedSettingSource =
-  | { level: { _0: string } }
-  | { sameValue: Record<string, never> }
-  | { poolEntry: Record<string, never> }
-  | { remembered: Record<string, never> }
-  | { runtimeDefault: Record<string, never> }
-  | { strictestMode: Record<string, never> }
-  | { closestNoLooser: Record<string, never> }
-  | { person: Record<string, never> };
-
 /** An approval of an MCP server or skill (#2019, M5): for a group, or for one person. */
 export interface CatalogApproval {
   kind: CatalogKind;
@@ -1586,12 +1561,8 @@ export interface ChannelLinkRequest {
   expires: WireDate;
 }
 
-/**
- * What a channel on a host's uplink is opened as (ControlWire.ChannelOpen). `grant` is always
- * `operator`, for an older host (#111).
- */
+/** What a channel on a host's uplink is opened as (ControlWire.ChannelOpen). */
 export interface ChannelOpen {
-  grant: string;
   client: string;
   device?: UUID;
   relayed?: boolean;
@@ -1676,16 +1647,12 @@ export interface ClientPermissionSettings {
   setBy?: PolicySetBy;
 }
 
-/**
- * A paired screen, as clients/list says it (ClientRecord). `grant` is always `operator`, for an
- * older build (#111).
- */
+/** A paired screen, as clients/list says it (ClientRecord). */
 export interface ClientRecord {
   id: UUID;
   name: string;
   kind: ClientKind;
   publicKey: Base64;
-  grant: string;
   paired: WireDate;
   lastSeen?: WireDate;
   mayNotify?: boolean;
@@ -2317,7 +2284,6 @@ export interface ControlNotice {
 /** The control plane's proof back: {"ok":…} (ControlAuth.OK). */
 export interface ControlOK {
   mac: string;
-  grant?: string;
   host?: MachineRef;
   relayed?: boolean;
   endpoints?: ControlEndpoint[];
@@ -2696,11 +2662,6 @@ export interface DropboxPutRequest {
 export interface DropboxPutResponse {
   path: string;
 }
-
-export type Dropped =
-  | { extraArguments: { _0: string[] } }
-  | { alwaysAllow: { count: number } }
-  | { queuedSlashCommand: { _0: string } };
 
 export interface EarnedMilestone {
   id: string;
@@ -3154,8 +3115,6 @@ export interface Folder {
   folder: URLString;
   archivedAt?: WireDate;
   addedAt: WireDate;
-  laidOutAt?: WireDate;
-  layoutVersion?: number;
   helperLimits?: HelperLimits;
   diskSpace?: DiskThresholds;
   pinned?: boolean;
@@ -3218,7 +3177,6 @@ export interface FolderSummary {
   counts: Partial<Record<AgentGroup, number>>;
   costToDate: Record<string, number>;
   unmeasuredAgents: number;
-  retiredCount: number;
   guardedChanges?: GuardedChange[];
   approvals?: Approval[];
   /**
@@ -4255,25 +4213,32 @@ export interface MachineEnroll {
 }
 
 /**
- * machines/sendFolder, through host/machines (#2929): one step of an agent's start_session with
- * send, which sends this folder's branch to another of the person's machines first. Exactly one of
- * state, upload and receive; the control plane sends that machine's folders/receiveState,
- * folders/receiveUpload or folders/receive.
+ * machines/sendFolder, through host/machines: one step of an agent's start_session with send
+ * (#2929), which sends this folder's branch to another of the person's machines first, or of its
+ * bring_back (#2947), which brings a branch back from there. Exactly one of state, upload, receive,
+ * facts, pack and read; the control plane sends that machine's folders/receiveState,
+ * folders/receiveUpload, folders/receive, folders/sendFacts, folders/sendPack or folders/sendRead.
  */
 export interface MachineFolderSend {
   host: string;
   state?: ReceiveStateRequest;
   upload?: ReceiveUploadRequest;
   receive?: ReceiveRequest;
+  facts?: SendFactsRequest;
+  pack?: SendPackRequest;
+  read?: SendReadRequest;
 }
 
 /**
- * What machines/sendFolder's step answered (#2929): state for state, folder for receive, neither
- * for upload.
+ * What machines/sendFolder's step answered (#2929, #2947): state for state, folder for receive,
+ * facts for facts, pack for pack, read for read, none for upload.
  */
 export interface MachineFolderSent {
   state?: ReceiveState;
   folder?: FolderSummary;
+  facts?: SendFacts;
+  pack?: SendPack;
+  read?: SendRead;
 }
 
 /** host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134). */
@@ -5227,7 +5192,7 @@ export type PermissionLevel =
 export interface PermissionNotification {
   agentID: UUID;
   request?: PermissionRequest;
-  requestID?: UUID;
+  requestID: UUID;
 }
 
 export interface PermissionOption {
@@ -7318,7 +7283,7 @@ export interface ShellAttachResponse {
   scrollback: Base64;
   dropped: number;
   startedAt: WireDate;
-  folder?: URLString;
+  folder: URLString;
   offset?: number;
 }
 
@@ -7866,36 +7831,6 @@ export interface SurfaceIdentification {
   kind: DeviceKind;
 }
 
-export interface SwitchRecord {
-  id: UUID;
-  at: WireDate;
-  agentID: UUID;
-  from: SwitchRecordSide;
-  to: SwitchRecordSide;
-  reason: SwitchRecordReason;
-  carried: CarriedSetting[];
-  dropped: Dropped[];
-  shortened?: number;
-  billing: Payment;
-  fromReturnsAt?: WireDate;
-}
-
-export type SwitchRecordReason =
-  | "allowanceSpent"
-  | "overage"
-  | "creditUsedUp"
-  | "rateLimitPersisted"
-  | "runtimeFailed"
-  | "everyoneOutResumed"
-  | "byHand";
-
-export interface SwitchRecordSide {
-  entryID?: UUID;
-  runtimeID: string;
-  model?: JSONValue;
-  mode?: JSONValue;
-}
-
 /**
  * A bot on Console ▸ Team Workflows (#1804, M6): its group, caps and spend today, its machines, the
  * workflows it ran and what runs now.
@@ -8064,10 +7999,7 @@ export type TranscriptEntryKind =
   | { background: { _0: BackgroundItem } }
   | { workReported: { _0: WorkReport } }
   | { runtimeNote: { _0: string } }
-  | { poolSwitch: { _0: SwitchRecord } }
   | { sandboxFailure: { _0: SandboxFailureRecord } }
-  | { handoff: { markdown: string; characters: number } }
-  | { settingsChanged: { _0: SwitchRecord } }
   | { appView: { _0: AppViewCall } }
   | { fileShown: { _0: ShownFile } }
   | { notified: { _0: SentNotice } }
@@ -8113,8 +8045,6 @@ export interface TurnSummary {
   start: number;
   end: number;
   ask?: TranscriptEntry;
-  last?: TranscriptEntry;
-  concise?: TranscriptEntry[];
   outcome?: TranscriptEntry[];
   steps?: number;
   usage?: TurnUsage;
@@ -8583,8 +8513,8 @@ export type Weekday =
   | "sat";
 
 /**
- * How a turn ended (#1916): only a question needs the person. Old `blocked` reads as `waiting`; old
- * `stuck` or `partly_done` reads as `done`.
+ * How a turn ended (#1916): only a question needs the person. A value this build does not know,
+ * such as an old record's `blocked`, `stuck` or `partly_done`, reads as `done`.
  */
 export type WorkOutcome =
   | "done"
@@ -9564,7 +9494,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ActivityToken: { required: ["agentID", "environment", "startedAt"], optional: ["token"] },
   AddAccountRequest: { required: ["runtimeID", "name"], optional: [] },
   AddFolderRequest: { required: ["folder"], optional: ["project"] },
-  Admitted: { required: [], optional: ["client", "host", "grant"] },
+  Admitted: { required: [], optional: ["client", "host"] },
   AdoptRequest: { required: ["runtimeID", "sessionID", "cwd"], optional: [] },
   Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID", "auto", "clientPermission", "levels", "voiceHungUpAt", "goal"] },
   AgentConfigEditorFile: { required: ["path", "content"], optional: [] },
@@ -9587,7 +9517,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AllowanceReading: { required: ["spent", "nearlySpent", "at"], optional: ["window", "used", "resetsAt"] },
   AllowanceState: { required: ["credentialKey", "entryID", "status", "since", "changedAt", "learnedFrom", "spent", "rateLimitStreak"], optional: ["lastRateLimit", "reading", "modelsOut"] },
   AllowanceStateModelOut: { required: ["model", "since", "retryAfter"], optional: ["name"] },
-  AnnounceReply: { required: ["id", "publicKey", "name", "kind", "announcedAt"], optional: ["lastSeenAt", "mayNotify", "macKey"] },
+  AnnounceReply: { required: ["device"], optional: ["macKey"] },
   AnswerElicitationRequest: { required: ["requestID", "action", "content"], optional: ["sendID"] },
   AnswerRequest: { required: ["permissionID", "optionID"], optional: ["sendID"] },
   AnswerSandboxRequest: { required: ["agentID", "carryOn"], optional: [] },
@@ -9654,7 +9584,6 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BuildOutputRemoved: { required: ["removed", "freed"], optional: [] },
   CancelWaitRequest: { required: ["agentID"], optional: [] },
   CapReached: { required: ["user", "name", "spentUSD", "capUSD", "until"], optional: ["group"] },
-  CarriedSetting: { required: ["optionID", "name", "source"], optional: ["from", "to"] },
   CatalogApproval: { required: ["kind", "name", "by", "at"], optional: ["source", "group", "groupName", "user", "userName"] },
   CatalogApprovalList: { required: ["approvals"], optional: [] },
   CatalogAsk: { required: ["kind", "name"], optional: ["source", "why"] },
@@ -9686,14 +9615,14 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ChannelLinkDecided: { required: ["request", "result"], optional: [] },
   ChannelLinkRemove: { required: ["channel", "identity"], optional: [] },
   ChannelLinkRequest: { required: ["request", "channel", "identity", "expires"], optional: ["name", "email", "for", "forName"] },
-  ChannelOpen: { required: ["grant", "client"], optional: ["device", "relayed", "tunnel", "tunnelRef", "fanOut", "actor"] },
+  ChannelOpen: { required: ["client"], optional: ["device", "relayed", "tunnel", "tunnelRef", "fanOut", "actor"] },
   ChannelSender: { required: ["channel", "identity"], optional: ["name", "email", "dkim"] },
   ChartHint: { required: ["mark", "x", "y"], optional: ["color", "title"] },
   ClientAnnounce: { required: ["id", "publicKey", "name", "kind"], optional: [] },
   ClientConnection: { required: ["client", "relayed"], optional: ["through"] },
   ClientPairingRequest: { required: [], optional: ["kind", "grant"] },
   ClientPermissionSettings: { required: ["cursor", "grok", "opencode"], optional: ["setBy"] },
-  ClientRecord: { required: ["id", "name", "kind", "publicKey", "grant", "paired", "rev"], optional: ["lastSeen", "mayNotify", "owner", "forgotten", "forgottenAt", "knownEpoch"] },
+  ClientRecord: { required: ["id", "name", "kind", "publicKey", "paired", "rev"], optional: ["lastSeen", "mayNotify", "owner", "forgotten", "forgottenAt", "knownEpoch"] },
   ClientRequest: { required: ["client"], optional: [] },
   CloneNotification: { required: ["clone", "finished"], optional: [] },
   CloneRequest: { required: ["url"], optional: [] },
@@ -9737,7 +9666,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ControlMoved: { required: ["url", "controlKey", "name"], optional: ["pin"] },
   ControlNewKey: { required: ["key", "proof"], optional: [] },
   ControlNotice: { required: ["kind", "words"], optional: ["user", "group"] },
-  ControlOK: { required: ["mac"], optional: ["grant", "host", "relayed", "endpoints", "epoch", "newKey"] },
+  ControlOK: { required: ["mac"], optional: ["host", "relayed", "endpoints", "epoch", "newKey"] },
   ControlPerson: { required: ["id", "name", "role"], optional: ["localOwner"] },
   ControlPush: { required: ["sealed"], optional: [] },
   ControlPushItem: { required: ["needID", "alert"], optional: ["headline"] },
@@ -9827,7 +9756,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FindResult: { required: ["matches", "more"], optional: [] },
   FleetBoard: { required: ["machines"], optional: [] },
   FleetMachine: { required: ["host", "ownerName", "bot"], optional: ["running", "heardAt"] },
-  Folder: { required: ["folder", "addedAt"], optional: ["archivedAt", "laidOutAt", "layoutVersion", "helperLimits", "diskSpace", "pinned", "prCostComment"] },
+  Folder: { required: ["folder", "addedAt"], optional: ["archivedAt", "helperLimits", "diskSpace", "pinned", "prCostComment"] },
   FolderDetection: { required: ["enabled", "paths"], optional: [] },
   FolderHunk: { required: ["oldStart", "newStart", "noNewlineAtEnd", "lines"], optional: [] },
   FolderMCPServer: { required: ["name", "summary", "approval", "missingSecrets", "secretNames", "entryDigest"], optional: ["managed", "signIn", "views"] },
@@ -9835,7 +9764,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FolderPlugin: { required: ["folder", "name", "carries", "folderPath"], optional: ["awaitingApproval"] },
   FolderRemovedNotification: { required: ["folder"], optional: [] },
   FolderRequest: { required: ["folder"], optional: [] },
-  FolderSummary: { required: ["name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount", "folder"], optional: ["guardedChanges", "approvals", "project", "projectProblem", "helperLimitsSetBy"] },
+  FolderSummary: { required: ["name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "folder"], optional: ["guardedChanges", "approvals", "project", "projectProblem", "helperLimitsSetBy"] },
   FolderWorktrees: { required: ["worktrees", "folder"], optional: [] },
   FoldersFindRequest: { required: [], optional: ["paths", "folders"] },
   FoldersListRequest: { required: ["includeArchived"], optional: [] },
@@ -9942,8 +9871,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineClient: { required: ["id", "kind", "publicKey"], optional: ["person"] },
   MachineClients: { required: ["clients"], optional: ["user"] },
   MachineEnroll: { required: [], optional: ["as"] },
-  MachineFolderSend: { required: ["host"], optional: ["state", "upload", "receive"] },
-  MachineFolderSent: { required: [], optional: ["state", "folder"] },
+  MachineFolderSend: { required: ["host"], optional: ["state", "upload", "receive", "facts", "pack", "read"] },
+  MachineFolderSent: { required: [], optional: ["state", "folder", "facts", "pack", "read"] },
   MachineHello: { required: ["version", "platform", "machineID"], optional: ["host", "name", "relay", "implementation", "capabilities"] },
   MachineInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "hostKeyRenews", "cost", "host"] },
   MachineInstall: { required: ["destination"], optional: ["name", "key", "trust", "tunnel"] },
@@ -10027,7 +9956,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PendingMove: { required: ["target", "removeLeft", "discardChanges", "askedBy", "askedAt"], optional: [] },
   PeopleChanged: { required: [], optional: ["user", "removed"] },
   PeopleList: { required: ["people", "admin"], optional: [] },
-  PermissionNotification: { required: ["agentID"], optional: ["request", "requestID"] },
+  PermissionNotification: { required: ["agentID", "requestID"], optional: ["request"] },
   PermissionOption: { required: ["optionID", "name", "kind"], optional: [] },
   PermissionRequest: { required: ["id", "agentID", "toolCall", "options", "askedAt"], optional: ["subagent"] },
   PersonClient: { required: ["id", "name", "kind"], optional: [] },
@@ -10243,7 +10172,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SharedSkill: { required: ["name", "path", "source", "reach"], optional: ["description", "clash", "managed"] },
   SharedSnapshot: { required: ["home", "laidOut", "runtimes", "skills", "mcp", "plugins", "otherFiles", "needsALook"], optional: ["instructions"] },
   ShellAttachRequest: { required: ["agentID"], optional: ["shell", "rows", "cols", "since", "startedAt", "folder"] },
-  ShellAttachResponse: { required: ["state", "scrollback", "dropped", "startedAt"], optional: ["folder", "offset"] },
+  ShellAttachResponse: { required: ["state", "scrollback", "dropped", "startedAt", "folder"], optional: ["offset"] },
   ShellInputRequest: { required: ["agentID", "bytes"], optional: ["shell", "rows", "cols"] },
   ShellListResponse: { required: ["shells"], optional: [] },
   ShellOpenResponse: { required: ["shell"], optional: [] },
@@ -10308,8 +10237,6 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   StoreNotes: { required: ["notes"], optional: [] },
   SuggestedPrompt: { required: ["id", "label", "prompt"], optional: [] },
   SurfaceIdentification: { required: ["id", "name", "kind"], optional: [] },
-  SwitchRecord: { required: ["id", "at", "agentID", "from", "to", "reason", "carried", "dropped", "billing"], optional: ["shortened", "fromReturnsAt"] },
-  SwitchRecordSide: { required: ["runtimeID"], optional: ["entryID", "model", "mode"] },
   TeamBot: { required: ["user", "name", "spentTodayUSD", "capped", "machines", "online", "workflows", "live"], optional: ["group", "groupName", "caps"] },
   TeamBotRun: { required: ["host", "hostName", "agent"], optional: ["workflow", "since"] },
   TeamTrigger: { required: ["workflow", "trigger", "runsOn"], optional: ["event", "dueAt"] },
@@ -10327,7 +10254,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   TranscriptPage: { required: ["firstIndex", "total", "entries"], optional: [] },
   TranscriptRequest: { required: ["agentID", "limit"], optional: ["before", "from"] },
   TunnelOpen: { required: ["runtime", "ref"], optional: [] },
-  TurnSummary: { required: ["id", "start", "end"], optional: ["ask", "last", "concise", "outcome", "steps", "usage"] },
+  TurnSummary: { required: ["id", "start", "end"], optional: ["ask", "outcome", "steps", "usage"] },
   TurnUsage: { required: ["totalTokens", "inputTokens", "outputTokens"], optional: ["thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "cost", "route", "relayTokens"] },
   TurnsPage: { required: ["turns", "firstTurn", "openStart"], optional: ["firstPrompt"] },
   TurnsRequest: { required: ["agentID", "limit"], optional: ["before"] },

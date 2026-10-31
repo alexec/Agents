@@ -1,6 +1,6 @@
 // A session's Lineage pane (#2940), as LineageList has it on the window: the nodes the session is
-// linked to, from lineage/walk (depth 2), in groups by kind, each with its links and, for an issue
-// or a PR, what lineage/cost says was banked on it.
+// linked to, from lineage/walk (depth 2), each with its links and, for an issue or a PR, what
+// lineage/cost says was banked on it.
 import type { LineageCostRollup, LineageGraph, LineageLink, LineageNode } from "../protocol/generated";
 import { timeWords } from "./time";
 import { costWords, nodeName, nodeUrl, spent } from "./value";
@@ -27,12 +27,6 @@ export interface LineageRow {
   url?: string | undefined;
 }
 
-export interface LineageGroup { title: string; rows: LineageRow[] }
-
-const kinds: [string, string][] = [
-  ["issue", "Issues"], ["pr", "Pull Requests"], ["session", "Sessions"], ["workflow-run", "Workflow Runs"],
-  ["milestone", "Milestones"],
-];
 
 /** A node's address on GitHub: a PR's is its /pull/ page. */
 export function lineageUrl(n: LineageNode): string | undefined {
@@ -76,9 +70,9 @@ export function costLine(r: LineageCostRollup): string {
   return parts.length === 0 ? "Nothing banked yet" : parts.join(" · ");
 }
 
-/** The groups, the session itself left out. `title` names a session node by its title when this page has it. */
-export function lineageGroups(session: LineageNode, graph: LineageGraph, costs: ReadonlyMap<string, LineageCostRollup>,
-  title: (n: LineageNode) => string | undefined): LineageGroup[] {
+/** A row for each node the walk reached, once, in the walk's order, the session itself left out. */
+export function lineageRows(session: LineageNode, graph: LineageGraph, costs: ReadonlyMap<string, LineageCostRollup>,
+  title: (n: LineageNode) => string | undefined): LineageRow[] {
   const seen = new Set<string>();
   const nodes = graph.nodes.filter((n) => !same(n, session) && !seen.has(key(n)) && (seen.add(key(n)), true));
   const name = (n: LineageNode) => same(n, session) ? "This session" : title(n) ?? nodeName(n);
@@ -92,10 +86,115 @@ export function lineageGroups(session: LineageNode, graph: LineageGraph, costs: 
       url: lineageUrl(n),
     };
   });
-  const groups = kinds.map(([kind, title]) => ({ title, rows: rows.filter((r) => r.node.kind === kind) })).filter((g) => g.rows.length > 0);
-  const rest = rows.filter((r) => !kinds.some(([kind]) => kind === r.node.kind));
-  if (rest.length > 0) groups.push({ title: "Other", rows: rest });
-  return groups;
+  return rows;
+}
+
+// The pane as a graph of boxes and lines (#3019), as LineageLayout has it on the window: this
+// session and the nodes it is linked to, a line for every link. The links are not a tree: a session
+// that works on an issue and on the PR that fixes it makes a triangle.
+
+/** The row for this session itself, a box of the graph. */
+export const hereRow = (session: LineageNode): LineageRow => ({ node: session, name: "This session", links: [] });
+
+/** Each node's links, either way, in the order the walk gave them. */
+function neighbours(graph: LineageGraph): Map<string, LineageNode[]> {
+  const next = new Map<string, LineageNode[]>();
+  const add = (a: LineageNode, b: LineageNode) => { const list = next.get(key(a)) ?? []; list.push(b); next.set(key(a), list); };
+  for (const l of graph.links) { add(l.from, l.to); add(l.to, l.from); }
+  return next;
+}
+
+/** One box of the graph, its top-left corner in pixels. */
+export interface GraphNode {
+  row: LineageRow; x: number; y: number; here: boolean;
+  /** The box's second line: "Issue · $4.00 · 12m working · merged". */
+  detail: string;
+}
+/** One line of the graph: a link, from one box to another (by ref), named by its verb. */
+export interface GraphEdge { from: string; to: string; label: string; ended: boolean }
+export interface LineageGraphLayout { nodes: GraphNode[]; edges: GraphEdge[]; width: number; height: number }
+
+/** A box's size and the room between them, as LineageLayout's. */
+export const box = { width: 180, height: 52, tierGap: 56, gap: 16, margin: 16, arc: 40 } as const;
+
+const kindWords: Record<string, string> = {
+  issue: "Issue", pr: "Pull request", session: "Session", "workflow-run": "Workflow run", workflow: "Workflow", milestone: "Milestone",
+};
+
+/** "Issue", "Pull request": the first words of a box's second line. */
+export const kindWord = (kind: string) => kindWords[kind] ?? kind;
+
+export interface Point { x: number; y: number }
+/** A cubic curve, and the point halfway along it. */
+export interface Curve { start: Point; c1: Point; c2: Point; end: Point; mid: Point }
+
+/** Where an edge's line goes: from the bottom or top of one box to the top or bottom of the other, or below a
+ * tier for two boxes in it, with `mid` the point halfway for its label. */
+export function curve(g: LineageGraphLayout, edge: GraphEdge): Curve | undefined {
+  const a = g.nodes.find((n) => n.row.node.ref === edge.from), b = g.nodes.find((n) => n.row.node.ref === edge.to);
+  if (!a || !b) return undefined;
+  const ax = a.x + box.width / 2, bx = b.x + box.width / 2;
+  let start: Point, end: Point, c1: Point, c2: Point;
+  if (a.y === b.y) {
+    start = { x: ax, y: a.y + box.height }; end = { x: bx, y: b.y + box.height };
+    c1 = { x: ax, y: start.y + box.arc }; c2 = { x: bx, y: end.y + box.arc };
+  } else {
+    const down = a.y < b.y;
+    start = { x: ax, y: down ? a.y + box.height : a.y }; end = { x: bx, y: down ? b.y : b.y + box.height };
+    const dy = (end.y - start.y) / 2;
+    c1 = { x: ax, y: start.y + dy }; c2 = { x: bx, y: end.y - dy };
+  }
+  const mid = { x: (start.x + 3 * c1.x + 3 * c2.x + end.x) / 8, y: (start.y + 3 * c1.y + 3 * c2.y + end.y) / 8 };
+  return { start, c1, c2, end, mid };
+}
+
+/** The graph's tier for a kind, so it reads top to bottom: milestone, issue, session, PR. */
+function tier(kind: string): number {
+  switch (kind) {
+    case "milestone": case "workflow": return 0;
+    case "issue": case "workflow-run": return 1;
+    case "session": return 2;
+    case "pr": return 3;
+    default: return 4;
+  }
+}
+
+/** The graph: a tier per kind, top to bottom, empty tiers left out, each tier in the order of the boxes it links
+ * to above it, so fewer lines cross. Tiers are centred on the widest. Top to bottom, so that it fits the files
+ * pane: a walk has few tiers and few boxes in each. */
+export function lineageGraph(session: LineageNode, walked: LineageGraph, costs: ReadonlyMap<string, LineageCostRollup>,
+  title: (n: LineageNode) => string | undefined): LineageGraphLayout {
+  const rows = lineageRows(session, walked, costs, title);
+  if (rows.length === 0) return { nodes: [], edges: [], width: 0, height: 0 };
+  const all = [hereRow(session), ...rows];
+  const next = neighbours(walked);
+  const index = new Map<string, number>();
+  const tiers = [...new Set(all.map((r) => tier(r.node.kind)))].sort((a, b) => a - b).map((t) => {
+    const ordered = all.flatMap((row, i) => tier(row.node.kind) === t ? [{ row, i }] : []).map(({ row, i }) => {
+      const above = (next.get(key(row.node)) ?? []).flatMap((n) => index.has(key(n)) ? [index.get(key(n))!] : []);
+      return { row, i, at: above.length === 0 ? Infinity : above.reduce((a, b) => a + b, 0) / above.length };
+    }).sort((a, b) => (a.at === b.at ? 0 : a.at < b.at ? -1 : 1) || a.i - b.i).map(({ row }) => row);
+    ordered.forEach((row, i) => { index.set(key(row.node), i); });
+    return ordered;
+  });
+  const span = (n: number) => n * (box.width + box.gap) - box.gap;
+  const wide = span(Math.max(...tiers.map((t) => t.length)));
+  const nodes = tiers.flatMap((row, t) => row.map((r, i) => ({
+    row: r, x: box.margin + (wide - span(row.length)) / 2 + i * (box.width + box.gap), y: box.margin + t * (box.height + box.tierGap),
+    here: same(r.node, session), detail: [kindWord(r.node.kind), ...r.cost ? [r.cost] : []].join(" · "),
+  })));
+  const seen = new Set<string>();
+  const edges = walked.links.flatMap((l) => {
+    const id = `${l.from.ref}\n${l.rel}\n${l.to.ref}`;
+    if (!index.has(key(l.from)) || !index.has(key(l.to)) || seen.has(id)) return [];
+    seen.add(id);
+    return [{ from: l.from.ref, to: l.to.ref, label: l.rel.replaceAll("-", " "), ended: l.endedAt !== undefined }];
+  });
+  // A line below the last tier needs room for its bend.
+  const last = tiers.at(-1)!;
+  const bends = edges.some((e) => [e.from, e.to].every((ref) => last.some((r) => r.node.ref === ref)));
+  return { nodes, edges, width: 2 * box.margin + wide,
+    height: 2 * box.margin + tiers.length * box.height + (tiers.length - 1) * box.tierGap + (bends ? box.arc : 0) };
 }
 
 export const costKey = key;

@@ -9,8 +9,9 @@ import Foundation
 ///
 /// Only a question needs the person (#1916): the app never assumes an agent needs them
 /// unless it asks. An agent that waits on other agents or a time is `waiting`. So there
-/// is no `stuck` and no `partlyDone` any more; an old record's (finish_turn's, before
-/// #494) reads as `done`. An old `blocked` reads as `waiting`.
+/// is no `stuck`, `partlyDone` or `blocked` any more; an old record's (finish_turn's,
+/// before #494, or a wait before #1915) reads as `done`, as the wire's `x-fallback` does
+/// (#2981).
 ///
 /// The wording lives here and not in any view, for the reason `EndedReason.summary`
 /// gives: the phone and the window have to say the same words about the same agent,
@@ -66,18 +67,14 @@ public enum WorkOutcome: String, Codable, Hashable, Sendable, CaseIterable {
         self.init(rawValue: wire.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
-    /// The words an old record may hold that read as `done` (#1916): finish_turn's.
-    static let readAsDone: Set<String> = ["stuck", "partly_done"]
-
-    /// An old wait recorded as `blocked` (#1915).
-    static let readAsWaiting: Set<String> = ["blocked"]
+    /// The words an old record may hold that read as `done` (#1916, #2981): finish_turn's,
+    /// and a wait recorded before #1915.
+    static let readAsDone: Set<String> = ["stuck", "partly_done", "blocked"]
 
     public init(from decoder: Decoder) throws {
         let word = try decoder.singleValueContainer().decode(String.self)
         if let known = WorkOutcome(rawValue: word) {
             self = known
-        } else if Self.readAsWaiting.contains(word) {
-            self = .waiting
         } else if Self.readAsDone.contains(word) {
             self = .done
         } else {
@@ -154,9 +151,8 @@ public struct WorkReport: Codable, Hashable, Sendable {
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let word = try c.decode(String.self, forKey: .outcome)
-        // An old record's blocked reads as waiting (#1915); stuck or partly_done as done (#1916).
+        // An old record's stuck, partly_done or blocked reads as done (#1916, #2981).
         guard let outcome = WorkOutcome(rawValue: word)
-                ?? (WorkOutcome.readAsWaiting.contains(word) ? .waiting : nil)
                 ?? (WorkOutcome.readAsDone.contains(word) ? .done : nil)
         else { throw UnknownOutcome(word: word) }
         self.outcome = outcome

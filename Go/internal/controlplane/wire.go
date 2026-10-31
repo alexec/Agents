@@ -65,11 +65,10 @@ func hostIDs(m map[string]string) map[string]wire.MachineRef {
 	return out
 }
 
-// clientOnWire is a ClientRecord as clients/list answers it: grant operator, for an
-// older build (#111).
+// clientOnWire is a ClientRecord as clients/list answers it.
 func clientOnWire(c records.ClientRecord) wire.ClientRecord {
 	return wire.ClientRecord{ID: wire.UUID(c.ID), Name: c.Name, Kind: wire.ClientKind(c.Kind), PublicKey: c.PublicKey,
-		Grant: records.LegacyGrant, Paired: dateOf(c.Paired.Time), LastSeen: stampDate(c.LastSeen), MayNotify: c.MayNotify,
+		Paired: dateOf(c.Paired.Time), LastSeen: stampDate(c.LastSeen), MayNotify: c.MayNotify,
 		Owner: c.Owner, Rev: int64(c.Rev), Forgotten: c.Forgotten, ForgottenAt: stampDate(c.ForgottenAt),
 		KnownEpoch: int64Of(c.KnownEpoch)}
 }

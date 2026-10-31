@@ -855,7 +855,7 @@ function WaitCard({ agent, title, disabled, stop }: { agent: Agent; title: (id: 
       <div class="card wait-card">
         {lineResource(agent) !== undefined ? <p class="strong">{line}</p> : <>
           <div class="wait-card-heading">
-            <span class="wait-card-title"><span class="wait-card-broadcast" aria-hidden="true"><Beacon /></span>Waiting for event</span>
+            <span class="wait-card-title"><span class="wait-card-broadcast waiting-beacon" aria-hidden="true"><Beacon /></span>Waiting for event</span>
             <span class="wait-card-time">{total === undefined ? `${elapsed} min` : `${elapsed} / ${total} min`}</span>
           </div>
           <div class="wait-card-events">
@@ -902,7 +902,7 @@ function BlockWaitCard({ store, host, agent, disabled }: { store: Store; host: s
     <div class="cards">
       <div class="card wait-card block-wait-card">
         <div class="wait-card-heading">
-          <span class="wait-card-title"><span class="wait-card-broadcast" aria-hidden="true"><Beacon /></span>{cardTitle(block)}</span>
+          <span class="wait-card-title"><span class="wait-card-broadcast waiting-beacon" aria-hidden="true"><Beacon /></span>{cardTitle(block)}</span>
           <span class="wait-card-time">{total === undefined ? `${elapsed} min` : `${elapsed} / ${total} min`}</span>
         </div>
         <div class="wait-card-events">
@@ -993,7 +993,7 @@ function BackgroundRows({ store, host, agent, disabled, steps }: {
 /** When the conversation last did anything: its last entry, or the last stored turn's (AgentsModel.lastEntryAt). */
 function lastEntryAt(entries: readonly TranscriptEntry[], turns: readonly TurnSummary[]): Date | null {
   const turn = turns[turns.length - 1];
-  const at = entries[entries.length - 1]?.at ?? turn?.outcome?.[turn.outcome.length - 1]?.at ?? turn?.last?.at ?? turn?.ask?.at;
+  const at = entries[entries.length - 1]?.at ?? turn?.outcome?.[turn.outcome.length - 1]?.at ?? turn?.ask?.at;
   return at === undefined ? null : fromWireDate(at);
 }
 

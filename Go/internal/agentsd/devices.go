@@ -253,8 +253,7 @@ func (d *Daemon) announce(c *Client, a wire.DeviceAnnouncement) (wire.AnnounceRe
 	if i < 0 {
 		safe.Go("reconsider", d.reconsider)
 	}
-	return wire.AnnounceReply{ID: r.ID, PublicKey: r.PublicKey, Name: r.Name, Kind: r.Kind, AnnouncedAt: r.AnnouncedAt,
-		LastSeenAt: r.LastSeenAt, MayNotify: r.MayNotify, MacKey: d.relayKey()}, nil
+	return wire.AnnounceReply{Device: r.Device, MacKey: d.relayKey()}, nil
 }
 
 // forgetDevice is devices/forget: the Mac's window only. Its connections are closed too,

@@ -1,7 +1,8 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>Linear issues</title>
 <!-- The linear server's Issues (ui://linear/issues, #1343): show_issues's result, the same
-     shape as the github server's Issues page. A team, a state or a label narrows it. Start
+     shape as the github server's Issues page, in sections by how each relates to the viewer
+     (#2453). A team, a state or a label narrows it. Start
      Agent opens the app's new-agent form filled in for the issue (agents/start-agent, #834).
      It has no network: it speaks only the MCP Apps bridge. -->
 <style>
@@ -71,7 +72,7 @@ select { font: inherit; }
     $("label-options").replaceChildren(...options.map((name) => el("option", { value: name })));
     fill($("team"), "Every team", (found.teams || []).map((t) => [t.key, `${t.name} (${t.key})`]), team);
     fill($("state"), "Every open state", (found.states || []).map((s) => [s, stateWords[s] || s]), state);
-    $("issues").replaceChildren(...issues.map(row));
+    $("issues").replaceChildren(...ui.sections(issues, row));
     drawLabel();
     const started = issues.filter((issue) => issue.stateType === "started").length;
     say(issues.length ? `${issues.length} open · ${started} in progress · as of ${new Date().toLocaleTimeString()}`
@@ -84,8 +85,7 @@ select { font: inherit; }
       { className: activeLabels.includes(name) ? "pill chosen" : "pill", title: "Filter by label " + name }));
     const assignee = issue.assignee
       ? el("span", { className: "pill assigned", textContent: issue.assignee, title: "Assigned to " + issue.assignee }) : null;
-    const comments = issue.comments ? ` · ${issue.comments} comment${issue.comments === 1 ? "" : "s"}` : "";
-    const priority = issue.priority ? ` · ${issue.priority}` : "";
+    const comments = issue.comments ? `${issue.comments} comment${issue.comments === 1 ? "" : "s"}` : "";
     const start = button("Start Agent", () => startAgent(issue),
       { className: "start", title: `A new agent for ${issue.identifier}, in a worktree of its own` });
     const details = el("div", { className: "issue-details", hidden: true });
@@ -97,7 +97,8 @@ select { font: inherit; }
       el("span", { className: "meta" }, [
         el("span", { className: "pill", textContent: issue.state || stateWords[issue.stateType] || "" }),
         assignee,
-        el("span", { textContent: `${issue.author || "someone"}${priority}${comments}${issue.updatedAt ? " · " + ui.ago(issue.updatedAt) : ""}` }),
+        ...ui.who(issue.author, issue.authorBot),
+        el("span", { textContent: [issue.priority, comments, issue.updatedAt ? ui.ago(issue.updatedAt) : ""].filter(Boolean).join(" · ") }),
         ...issueLabels,
       ]),
       details,
