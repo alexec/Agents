@@ -422,13 +422,14 @@
           "notify" : {
             "method" : "agent/permission",
             "params" : {
-              "agentID" : "00000000-0000-0000-0000-000000000061"
+              "agentID" : "00000000-0000-0000-0000-000000000061",
+              "requestID" : "00000000-0000-0000-0000-000000000071"
             }
           }
         }
       ]
     },
-    "name" : "permissions in order asked, withdrawn by id or all at once"
+    "name" : "permissions in order asked, withdrawn by id"
   },
   {
     "expected" : {

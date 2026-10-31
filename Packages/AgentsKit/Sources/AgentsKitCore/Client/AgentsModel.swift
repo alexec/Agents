@@ -630,13 +630,7 @@ public final class AgentsModel {
             }
 
         case .permission(let notification):
-            if let id = notification.requestID ?? notification.request?.id {
-                permissions.removeAll { $0.agentID == notification.agentID && $0.id == id }
-            } else {
-                // Every question at once: a daemon from before 09-27 withdraws this way
-                // (kept, #58; see `PermissionNotification.requestID`).
-                permissions.removeAll { $0.agentID == notification.agentID }
-            }
+            permissions.removeAll { $0.agentID == notification.agentID && $0.id == notification.requestID }
             if let request = notification.request { permissions.append(request) }
             permissions.sort { $0.askedAt < $1.askedAt }
 

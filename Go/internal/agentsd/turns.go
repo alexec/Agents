@@ -1325,7 +1325,7 @@ func (l *live) Permission(ctx context.Context, p sdk.RequestPermissionRequest) s
 	l.mu.Unlock()
 	d.record(l.id, wire.TranscriptEntryKind{PermissionAsked: &wire.TranscriptEntryKindPermissionAsked{Value: req}})
 	d.setState(l.id, wire.AgentStateWaitingOnUser)
-	Broadcast(d, wire.NotifyAgentPermission, wire.PermissionNotification{AgentID: l.id, Request: &req})
+	Broadcast(d, wire.NotifyAgentPermission, wire.PermissionNotification{AgentID: l.id, Request: &req, RequestID: req.ID})
 	d.raiseAgentEvent("agent.asked_permission", l.id, "is asking for permission.", nil)
 	d.reconsider()
 	var option string
@@ -1345,8 +1345,7 @@ func (l *live) Permission(ctx context.Context, p sdk.RequestPermissionRequest) s
 		}
 		d.record(l.id, wire.TranscriptEntryKind{PermissionAnswered: &wire.TranscriptEntryKindPermissionAnswered{OptionID: option, OptionName: &name}})
 	}
-	id := req.ID
-	Broadcast(d, wire.NotifyAgentPermission, wire.PermissionNotification{AgentID: l.id, RequestID: &id})
+	Broadcast(d, wire.NotifyAgentPermission, wire.PermissionNotification{AgentID: l.id, RequestID: req.ID})
 	d.reconsider()
 	if ctx.Err() == nil {
 		d.setState(l.id, wire.AgentStateRunning)

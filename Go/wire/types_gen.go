@@ -596,21 +596,9 @@ type AllowanceStateStatusOut struct {
 	Why AllowanceStateOutReason `json:"why"`
 }
 
-// What devices/announce answers: the device's record, with the Mac's relay key beside its fields when a bridge has registered one (046).
+// What devices/announce answers: the device's record, with the Mac's relay key beside it when a bridge has registered one (046).
 type AnnounceReply struct {
-	ID UUID `json:"id"`
-
-	PublicKey Data `json:"publicKey"`
-
-	Name string `json:"name"`
-
-	Kind DeviceKind `json:"kind"`
-
-	AnnouncedAt Date `json:"announcedAt"`
-
-	LastSeenAt *Date `json:"lastSeenAt,omitzero"`
-
-	MayNotify *bool `json:"mayNotify,omitzero"`
+	Device Device `json:"device"`
 
 	MacKey Data `json:"macKey,omitzero"`
 }
@@ -3986,8 +3974,6 @@ type FolderSummary struct {
 
 	UnmeasuredAgents int64 `json:"unmeasuredAgents"`
 
-	RetiredCount int64 `json:"retiredCount"`
-
 	GuardedChanges []GuardedChange `json:"guardedChanges,omitzero"`
 
 	Approvals []Approval `json:"approvals,omitzero"`
@@ -6537,7 +6523,7 @@ type PermissionNotification struct {
 
 	Request *PermissionRequest `json:"request,omitzero"`
 
-	RequestID *UUID `json:"requestID,omitzero"`
+	RequestID UUID `json:"requestID"`
 }
 
 type PermissionOption struct {
@@ -9083,7 +9069,7 @@ type ShellAttachResponse struct {
 
 	StartedAt Date `json:"startedAt"`
 
-	Folder *URL `json:"folder,omitzero"`
+	Folder URL `json:"folder"`
 
 	Offset *int64 `json:"offset,omitzero"`
 }

@@ -464,8 +464,8 @@ public enum DaemonAPI {
         public static let runtimesAllowances = "runtimes/allowances"
         public static let runtimesMarkAvailable = "runtimes/markAvailable"
         /// What another daemon learned about a shared allowance (052, R6): the Mac's
-        /// window carries it between the Mac and each server. The name is 052's, kept so
-        /// an older server still hears it: renaming it buys nothing (#58).
+        /// window carries it between the Mac and each server. The name is 052's; renaming
+        /// it buys nothing.
         public static let poolApplyAllowances = "pool/applyAllowances"
 
         /// Why the Mac is, or is not, being kept awake (024). A question about state,
@@ -782,9 +782,6 @@ public enum DaemonAPI {
         /// the ordinary case; non-zero means `costToDate` is a floor rather than the
         /// whole.** Like `counts`, recomputed on every call and never stored.
         public var unmeasuredAgents: Int
-        /// Always none since #398, which dropped retiring: sent for a Remote older than
-        /// that, whose summary cannot be read without it.
-        private var retiredCount: Int = 0
         /// The app-owned files in `.agents` changed outside the app and waiting for the
         /// person's Keep or Undo (#502); absent when none is, so an older reader sees
         /// nothing new. Until then the app goes on using the copy last approved.
@@ -821,7 +818,7 @@ public enum DaemonAPI {
 
         enum CodingKeys: String, CodingKey {
             case folder, name, exists, lastActivityAt, counts, costToDate, unmeasuredAgents
-            case retiredCount, guardedChanges, approvals, helperLimitsSetBy, project, projectProblem
+            case guardedChanges, approvals, helperLimitsSetBy, project, projectProblem
         }
 
         /// Whether anything in this folder wants the user.
@@ -2231,13 +2228,11 @@ public enum DaemonAPI {
         public var agentID: UUID
         /// Nil when the question has been answered and is no longer waiting.
         public var request: PermissionRequest?
-        /// Identifies a single withdrawn question. Every withdrawal this daemon sends
-        /// carries one; nil is a daemon from before 09-27 withdrawing them all, kept
-        /// because that is after the #58 cut-off (051).
-        public var requestID: UUID?
+        /// Identifies a single withdrawn, or newly asked, question.
+        public var requestID: UUID
         public init(agentID: UUID, request: PermissionRequest?, requestID: UUID? = nil) {
             self.agentID = agentID
-            self.requestID = requestID ?? request?.id
+            self.requestID = requestID ?? request!.id
             self.request = request
         }
     }
@@ -2469,14 +2464,13 @@ public enum DaemonAPI {
         /// replay's first byte: the replay ends where the next `shell/output` starts.
         public var dropped: Int
         public var startedAt: Date
-        /// Where the shell was started. Nil from a daemon before 053, which is after the
-        /// #58 cut-off (051), so it stays optional.
-        public var folder: URL?
+        /// Where the shell was started.
+        public var folder: URL
         /// The offset of the replay's first byte, when it is not the whole buffer: an
         /// attach that said `since` gets only what came after. Nil means `dropped`.
         public var offset: Int?
 
-        public init(state: ShellState, scrollback: Data, dropped: Int, startedAt: Date, folder: URL? = nil,
+        public init(state: ShellState, scrollback: Data, dropped: Int, startedAt: Date, folder: URL,
                     offset: Int? = nil) {
             self.state = state
             self.scrollback = scrollback

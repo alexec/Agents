@@ -1218,13 +1218,14 @@ struct WebFixturesTests {
                                                                                       request: question)),
                 try Self.notify(N.agentRemoved, DaemonAPI.AgentRemovedNotification(agentID: one.id)),
             ]),
-            ("permissions in order asked, withdrawn by id or all at once", [
+            ("permissions in order asked, withdrawn by id", [
                 try Self.notify(N.agentPermission, DaemonAPI.PermissionNotification(agentID: one.id, request: permission)),
                 try Self.notify(N.agentPermission, DaemonAPI.PermissionNotification(agentID: two.id, request: earlier)),
                 try Self.notify(N.agentPermission, DaemonAPI.PermissionNotification(agentID: one.id, request: nil,
                                                                                     requestID: permission.id)),
                 try Self.notify(N.agentPermission, DaemonAPI.PermissionNotification(agentID: one.id, request: permission)),
-                try Self.notify(N.agentPermission, DaemonAPI.PermissionNotification(agentID: two.id, request: nil)),
+                try Self.notify(N.agentPermission, DaemonAPI.PermissionNotification(agentID: two.id, request: nil,
+                                                                                    requestID: earlier.id)),
             ]),
             ("a question asked and answered", [
                 try Self.notify(N.agentElicitation, DaemonAPI.ElicitationNotification(agentID: one.id, requestID: question.id,

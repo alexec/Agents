@@ -74,8 +74,7 @@ struct AgentsModelTests {
     }
 
     /// A withdrawal carries no request, and a client that read it as "nothing to do"
-    /// would leave the question on screen for somebody to answer a second time. Without
-    /// a request identity, every question for that agent goes — the legacy shape.
+    /// would leave the question on screen for somebody to answer a second time.
     @Test func aWithdrawnQuestionTakesTheOneThatWasWaiting() throws {
         let model = AgentsModel()
         let id = UUID()
@@ -88,7 +87,7 @@ struct AgentsModelTests {
         #expect(model.permission(for: id) != nil)
 
         model.apply(DaemonAPI.Notification.agentPermission,
-                    try notification(DaemonAPI.PermissionNotification(agentID: id, request: nil)))
+                    try notification(DaemonAPI.PermissionNotification(agentID: id, request: nil, requestID: question.id)))
         #expect(model.permission(for: id) == nil)
         #expect(model.permissions.isEmpty)
     }

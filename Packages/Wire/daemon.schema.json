@@ -1197,39 +1197,17 @@
     },
     "AnnounceReply": {
       "type": "object",
-      "description": "What devices/announce answers: the device's record, with the Mac's relay key beside its fields when a bridge has registered one (046).",
+      "description": "What devices/announce answers: the device's record, with the Mac's relay key beside it when a bridge has registered one (046).",
       "properties": {
-        "id": {
-          "$ref": "#/definitions/UUID"
-        },
-        "publicKey": {
-          "$ref": "#/definitions/Base64"
-        },
-        "name": {
-          "type": "string"
-        },
-        "kind": {
-          "$ref": "#/definitions/DeviceKind"
-        },
-        "announcedAt": {
-          "$ref": "#/definitions/WireDate"
-        },
-        "lastSeenAt": {
-          "$ref": "#/definitions/WireDate"
-        },
-        "mayNotify": {
-          "type": "boolean"
+        "device": {
+          "$ref": "#/definitions/Device"
         },
         "macKey": {
           "$ref": "#/definitions/Base64"
         }
       },
       "required": [
-        "id",
-        "publicKey",
-        "name",
-        "kind",
-        "announcedAt"
+        "device"
       ],
       "additionalProperties": false
     },
@@ -8938,9 +8916,6 @@
         "unmeasuredAgents": {
           "type": "integer"
         },
-        "retiredCount": {
-          "type": "integer"
-        },
         "guardedChanges": {
           "type": "array",
           "items": {
@@ -8976,8 +8951,7 @@
         "lastActivityAt",
         "counts",
         "costToDate",
-        "unmeasuredAgents",
-        "retiredCount"
+        "unmeasuredAgents"
       ],
       "additionalProperties": false
     },
@@ -14925,7 +14899,8 @@
         }
       },
       "required": [
-        "agentID"
+        "agentID",
+        "requestID"
       ],
       "additionalProperties": false
     },
@@ -20858,7 +20833,8 @@
         "state",
         "scrollback",
         "dropped",
-        "startedAt"
+        "startedAt",
+        "folder"
       ],
       "additionalProperties": false
     },
