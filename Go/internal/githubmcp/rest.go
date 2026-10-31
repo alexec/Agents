@@ -772,6 +772,18 @@ func newest[T any](ctx context.Context, g *RealGitHub, path, since string, at fu
 	return items, true, nil
 }
 
+// issueEvent is one of repos/%s/issues/events, for an issue or a pull request alike: GitHub
+// treats a pull request as an issue for this endpoint.
+type issueEvent struct {
+	ID          int        `json:"id"`
+	Event       string     `json:"event"`
+	Actor       user       `json:"actor"`
+	Label       label      `json:"label"`
+	StateReason string     `json:"state_reason"`
+	CreatedAt   string     `json:"created_at"`
+	Issue       *issueJSON `json:"issue"`
+}
+
 func (g *RealGitHub) IssueActivity(ctx context.Context, repo string, kind IssueKind, since string) ([]IssueActivity, bool, error) {
 	switch kind {
 	case IssueOpened:
@@ -826,15 +838,6 @@ func (g *RealGitHub) IssueActivity(ctx context.Context, repo string, kind IssueK
 		}
 		return out, truncated, nil
 	}
-	type issueEvent struct {
-		ID          int        `json:"id"`
-		Event       string     `json:"event"`
-		Actor       user       `json:"actor"`
-		Label       label      `json:"label"`
-		StateReason string     `json:"state_reason"`
-		CreatedAt   string     `json:"created_at"`
-		Issue       *issueJSON `json:"issue"`
-	}
 	items, truncated, err := newest(ctx, g, fmt.Sprintf("repos/%s/issues/events", repo), since,
 		func(e issueEvent) string { return e.CreatedAt })
 	if err != nil {
@@ -861,6 +864,35 @@ func (g *RealGitHub) IssueActivity(ctx context.Context, repo string, kind IssueK
 			a.Reason = reasonOf(reason)
 		}
 		out = append(out, a)
+	}
+	return out, truncated, nil
+}
+
+func (g *RealGitHub) PRLabelActivity(ctx context.Context, repo string, kind PRLabelKind, since string) ([]PRLabelActivity, bool, error) {
+	items, truncated, err := newest(ctx, g, fmt.Sprintf("repos/%s/issues/events", repo), since,
+		func(e issueEvent) string { return e.CreatedAt })
+	if err != nil {
+		return nil, false, err
+	}
+	wanted := "labeled"
+	if kind == PRUnlabelled {
+		wanted = "unlabeled"
+	}
+	var out []PRLabelActivity
+	for _, e := range items {
+		if e.Event != wanted || e.Issue == nil || !e.Issue.isPR() {
+			continue
+		}
+		// Labelling takes triage access, so whoever did it is trusted, never a bot (#728).
+		out = append(out, PRLabelActivity{
+			ID:      strconv.Itoa(e.ID),
+			At:      e.CreatedAt,
+			PR:      PR{Number: e.Issue.Number, Title: e.Issue.Title, URL: e.Issue.HTMLURL},
+			Kind:    kind,
+			Label:   e.Label.Name,
+			By:      e.Actor.Login,
+			Trusted: isTrustedActor(e.Actor.Login, e.Actor.Type, false, "", false),
+		})
 	}
 	return out, truncated, nil
 }

@@ -196,6 +196,34 @@ func (a IssueActivity) data() map[string]any {
 	return d
 }
 
+// PRLabelKind is what happened to a pull request's labels.
+type PRLabelKind string
+
+const (
+	PRLabelled   PRLabelKind = "labelled"
+	PRUnlabelled PRLabelKind = "unlabelled"
+)
+
+// PRLabelActivity is a label added to or removed from a pull request (never an issue).
+type PRLabelActivity struct {
+	ID    string
+	At    string
+	PR    PR
+	Kind  PRLabelKind
+	Label string
+	By    string
+	// Trusted says whether whoever changed the label is one of the repo's own (#728).
+	Trusted bool
+}
+
+func (a PRLabelActivity) data() map[string]any {
+	key := "labelledAt"
+	if a.Kind == PRUnlabelled {
+		key = "unlabelledAt"
+	}
+	return map[string]any{"pr": a.PR.json(), "label": a.Label, "by": a.By, key: a.At}
+}
+
 // GitHub is what the events ask of GitHub.
 type GitHub interface {
 	// FailedRuns are failed pull_request runs updated at or after since, in any order.
@@ -214,6 +242,8 @@ type GitHub interface {
 	OpenPRs(ctx context.Context, repo string) ([]OpenPR, error)
 	// IssueActivity is what happened to the repo's issues at or after since, of one kind.
 	IssueActivity(ctx context.Context, repo string, kind IssueKind, since string) (items []IssueActivity, truncated bool, err error)
+	// PRLabelActivity is a label added to or removed from a pull request at or after since.
+	PRLabelActivity(ctx context.Context, repo string, kind PRLabelKind, since string) (items []PRLabelActivity, truncated bool, err error)
 	// CodeRabbitPRs are the open PRs and whether CodeRabbit has reviewed each one's head commit (#1344).
 	CodeRabbitPRs(ctx context.Context, repo string) ([]ReviewedPR, error)
 	// CodeRabbitComments are CodeRabbit's review comments made at or after since.

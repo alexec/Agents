@@ -22,6 +22,8 @@
               "review.requested",
               "review.posted",
               "review.comment",
+              "pr.labelled",
+              "pr.unlabelled",
               "issue.opened",
               "issue.labelled",
               "issue.commented",
