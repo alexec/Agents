@@ -14,8 +14,10 @@ it out:
 | `Caddyfile` | TLS, round robin, and `/readyz` health checks, so a copy that can't reach the store gets no new connections. |
 | `make-secrets.sh` | The control plane's key, shared by every copy, plus Caddy's certificate and its pin. With `--public`, no key file: the Cloud KMS key's name and the service account file. |
 | `compose.public.yaml`, `Caddyfile.public` | One copy at a real domain, with a certificate from Let's Encrypt and no pin (#61). It pulls the release's image, `AGENTS_VERSION`; `--build` builds this checkout. |
-| `gcp/up.sh`, `gcp/down.sh` | The machine on Google Cloud (#1461): a VM, its firewall and address, and the Cloud KMS key, then `compose.public.yaml` on it, and the release's image pulled there (`--build` builds this checkout instead). `--dry-run` prints the commands only. |
-| `cloudflare/dns.sh` | The A records for both names at Cloudflare, with the token from the Keychain. `--names @` is the zone itself (agentloops.dev). |
+| `gcp/up.sh`, `gcp/down.sh` | The machine on Google Cloud (#1461): a VM, its firewall and address, and the Cloud KMS key, then `compose.public.yaml` on it, and the release's image pulled there (`--build` builds this checkout instead). `--dry-run` prints the commands only. `--cloudflare` locks the firewall to Cloudflare's ranges (#2151). |
+| `cloudflare/dns.sh` | The A records for both names at Cloudflare, with the token from the Keychain. `--names @` is the zone itself (agentloops.dev). `--proxied` orange-clouds the record, through Cloudflare's proxy (#2151). |
+| `cloudflare/ips.sh` | Cloudflare's published IPv4 and IPv6 ranges, fetched fresh; `gcp/up.sh --cloudflare`'s source. |
+| `cloudflare/edge.sh` | Cloudflare's edge settings for the zone (#2151): SSL mode Full (strict), HSTS, and one rate-limiting rule across the control plane's join, sign-in and download paths. Needs a token with Zone WAF and Zone Settings edit too (its own head says). |
 | `site/`, `gcp/site.sh` | The hand-back page for sign-ins at `https://oauth.agentloops.dev/oauth/callback` (#1343, moved off the apex by #3042), served by the same Caddy. See below. |
 | `compose.pebble.yaml`, `pebble/` | The same with Pebble, Let's Encrypt's test CA, standing in: no domain and no real CA. A local keeper stands in for Cloud KMS. |
 
@@ -100,6 +102,43 @@ terminal:
 
 The how-to is
 [Run the control plane in the cloud](../docs/how-to/run-the-control-plane-in-the-cloud.md).
+
+### Cloudflare in front
+
+On `agentloops.dev`, Cloudflare's proxy and rate rules sit in front of the VM (#2151): a DDoS
+layer and a WAF that hides the VM's own address, over #2150's in-process limits, not a
+replacement for them. `deploy/Caddyfile.public` already trusts Cloudflare's published ranges
+for the real client address (harmless with no proxy in front: a direct peer is never in those
+ranges), and TLS-ALPN's certificate renewal falls back to HTTP-01 on its own when the proxy is
+on, since TLS-ALPN can't reach this Caddy through it. What's left is turned on by hand, once:
+
+1. In Cloudflare, set the zone's SSL mode to **Full (strict)**, then turn on the edge
+   settings (SSL mode again, HSTS, and one rate-limiting rule across `/v1/join`, the sign-in
+   paths and the downloads):
+
+   ```sh
+   deploy/cloudflare/edge.sh
+   ```
+
+   The token needs **Zone ▸ Zone WAF ▸ Edit** and **Zone ▸ Zone Settings ▸ Edit** too, beside
+   `dns.sh`'s DNS one, for this zone only.
+2. Orange-cloud both names:
+
+   ```sh
+   deploy/cloudflare/dns.sh --proxied <the VM's address>
+   ```
+
+   Wait for it to take (`dig +short control.agentloops.dev` answers one of Cloudflare's own
+   addresses, not the VM's).
+3. Lock the GCP firewall to Cloudflare's ranges, so nobody can reach the VM straight past the
+   proxy:
+
+   ```sh
+   deploy/gcp/up.sh --cloudflare
+   ```
+
+A self-hosted control plane, with no Cloudflare in front, needs none of this: leave `dns.sh`
+and `up.sh`'s flags off, and the VM takes connections as before.
 
 ### The hand-back page for sign-ins
 

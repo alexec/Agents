@@ -17,9 +17,12 @@
 #
 #   security add-generic-password -a "$USER" -s agents-cloudflare-token -w
 #
-# The records are DNS only (not proxied): Caddy on the VM gets the certificates from Let's
-# Encrypt, and each client checks Caddy's certificate itself. GitHub Pages also gets its own
-# certificate, so a CNAME is DNS only too. --dry-run prints the requests and
+# The records are DNS only (not proxied) by default: Caddy on the VM gets the certificates
+# from Let's Encrypt, and each client checks Caddy's certificate itself. GitHub Pages also
+# gets its own certificate, so a CNAME is DNS only too. --proxied orange-clouds the record
+# instead, through Cloudflare's proxy and rate rules (#2151: control and views, once
+# deploy/cloudflare/edge.sh has set SSL mode to Full (strict) and the GCP firewall is ready
+# for deploy/gcp/up.sh --cloudflare). --dry-run prints the requests and
 # makes none: it needs no token.
 set -euo pipefail
 die() {
@@ -32,12 +35,14 @@ zone=agentloops.dev
 names='control views'
 ip=''
 cname=''
+proxied=false
 while (($#)); do
 	case $1 in
 	--dry-run) dry_run=1; shift ;;
 	--zone) zone=${2:?--zone needs a domain}; shift 2 ;;
 	--names) names=${2:?--names needs the names, such as "control views"}; shift 2 ;;
 	--cname) cname=${2:?--cname needs the target, such as alexec.github.io}; shift 2 ;;
+	--proxied) proxied=true; shift ;;
 	-*) die "$1 is not an option" ;;
 	*) ip=$1; shift ;;
 	esac
@@ -88,13 +93,13 @@ for n in $names; do
 		c=$(jq -c '[.[] | select(.type == "CNAME")]' <<<"$records")
 		if [[ $(jq length <<<"$c") == 0 ]]; then
 			cf POST "/zones/$zone_id/dns_records" \
-				"{\"type\":\"CNAME\",\"name\":\"$fqdn\",\"content\":\"$cname\",\"ttl\":300,\"proxied\":false}" >/dev/null
+				"{\"type\":\"CNAME\",\"name\":\"$fqdn\",\"content\":\"$cname\",\"ttl\":300,\"proxied\":$proxied}" >/dev/null
 			echo "$fqdn: CNAME $cname, made"
-		elif [[ $(jq -r '.[0].content' <<<"$c") == "$cname" && $(jq -r '.[0].proxied' <<<"$c") == false ]]; then
+		elif [[ $(jq -r '.[0].content' <<<"$c") == "$cname" && $(jq -r '.[0].proxied' <<<"$c") == "$proxied" ]]; then
 			echo "$fqdn: CNAME $cname, already"
 		else
 			cf PATCH "/zones/$zone_id/dns_records/$(jq -r '.[0].id' <<<"$c")" \
-				"{\"content\":\"$cname\",\"proxied\":false}" >/dev/null
+				"{\"content\":\"$cname\",\"proxied\":$proxied}" >/dev/null
 			echo "$fqdn: CNAME $cname, changed from $(jq -r '.[0].content' <<<"$c")"
 		fi
 		continue
@@ -109,15 +114,15 @@ for n in $names; do
 	case $(jq length <<<"$a") in
 	0)
 		cf POST "/zones/$zone_id/dns_records" \
-			"{\"type\":\"A\",\"name\":\"$fqdn\",\"content\":\"$ip\",\"ttl\":300,\"proxied\":false}" >/dev/null
+			"{\"type\":\"A\",\"name\":\"$fqdn\",\"content\":\"$ip\",\"ttl\":300,\"proxied\":$proxied}" >/dev/null
 		echo "$fqdn: A $ip, made"
 		;;
 	1)
-		if [[ $(jq -r '.[0].content' <<<"$a") == "$ip" && $(jq -r '.[0].proxied' <<<"$a") == false ]]; then
+		if [[ $(jq -r '.[0].content' <<<"$a") == "$ip" && $(jq -r '.[0].proxied' <<<"$a") == "$proxied" ]]; then
 			echo "$fqdn: A $ip, already"
 		else
 			cf PATCH "/zones/$zone_id/dns_records/$(jq -r '.[0].id' <<<"$a")" \
-				"{\"content\":\"$ip\",\"proxied\":false}" >/dev/null
+				"{\"content\":\"$ip\",\"proxied\":$proxied}" >/dev/null
 			echo "$fqdn: A $ip, changed from $(jq -r '.[0].content' <<<"$a")"
 		fi
 		;;

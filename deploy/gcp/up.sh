@@ -4,7 +4,7 @@
 # file's). Each step first looks for what it makes, so running it again is safe, and carries on
 # where it stopped.
 #
-#   deploy/gcp/up.sh [--dry-run] [--build] [--apns AuthKey_KEYID.p8 [--apns-key-id KEYID]]
+#   deploy/gcp/up.sh [--dry-run] [--build] [--cloudflare] [--apns AuthKey_KEYID.p8 [--apns-key-id KEYID]]
 #       [--email you@example.com] [--domain control.agentloops.dev] [--views-domain views.agentloops.dev]
 #       [--seal-key control-key]
 #
@@ -12,8 +12,9 @@
 # - Compute Engine, Cloud KMS and IAM turned on in the project;
 # - the Cloud KMS key ring "agents" and key "control" (global), which seals the control key (#1458);
 # - the service account agents-control-vm, which may only encrypt and decrypt with that key;
-# - the network agents-control (us-west1), with 80 and 443 open to all, and 22 open only to this
-#   machine's IPv4 address (made again at each run, for a new address);
+# - the network agents-control (us-west1), with 80 and 443 open to all (or, with --cloudflare,
+#   only to Cloudflare's own ranges: #2151), and 22 open only to this machine's IPv4 address
+#   (made again at each run, for a new address);
 # - the static IPv4 address agents-control, about $3.65 a month;
 # - the e2-micro VM agents-control in us-west1-b, Debian with a 30 GB standard disk (the free
 #   tier's), running as agents-control-vm, with deploy/gcp/startup.sh to put Docker on it;
@@ -35,6 +36,14 @@
 # from a Mac (docs/how-to/run-the-control-plane-in-the-cloud.md). --dry-run prints every command
 # and runs none: it needs no gcloud, no key file and no account.
 #
+# --cloudflare locks the firewall to Cloudflare's own ranges (#2151), so only its proxy
+# reaches the VM; once locked, a later run with no flag leaves it locked (it's only ever
+# widened by a fresh VM's own first run). Run deploy/cloudflare/dns.sh --proxied first, and
+# wait for it to take: this shuts out anyone still going straight to the VM's address. Caddy
+# already trusts only those ranges for the real client address (deploy/Caddyfile.public),
+# whether or not this flag is given, so giving it late costs nothing but a moment with the
+# firewall wider than it need be.
+#
 # AGENTS_VERSION is the version it runs: a release sets it to the tag's, X.Y.Z (#2100), whose
 # image it pulls. Without it, scripts/version.sh says. That is a release's only
 # on its tag, so elsewhere give --build, which stamps that version on what it builds. At the end
@@ -50,10 +59,12 @@ views_domain=views.agentloops.dev
 email=''
 apns=()
 seal_key=''
+cloudflare=0
 while (($#)); do
 	case $1 in
 	--dry-run) dry_run=1; shift ;;
 	--build) build=1; shift ;;
+	--cloudflare) cloudflare=1; shift ;;
 	--apns) apns+=(--apns "${2:?--apns needs the .p8 file}"); shift 2 ;;
 	--apns-key-id) apns+=(--apns-key-id "${2:?--apns-key-id needs the Key ID}"); shift 2 ;;
 	--email) email=${2:?--email needs an address}; shift 2 ;;
@@ -99,9 +110,28 @@ exists gcloud compute networks describe "$name" ||
 	run gcloud compute networks create "$name" --subnet-mode custom
 exists gcloud compute networks subnets describe "$name" --region "$region" ||
 	run gcloud compute networks subnets create "$name" --network "$name" --region "$region" --range "$subnet_range"
-exists gcloud compute firewall-rules describe "$name-web" ||
+# --cloudflare: only Cloudflare's own ranges reach 80 and 443, so nobody can go around its
+# proxy and rate rules (#2151) to the VM directly. Fetched fresh each run, so a change to
+# Cloudflare's list (rare) is picked up without editing this script. Flip the DNS records to
+# proxied (deploy/cloudflare/dns.sh --proxied) first: run this before that, and real traffic,
+# still going straight to the VM, is shut out until the DNS change reaches everyone.
+#
+# Without --cloudflare, an existing rule is left alone: a release that runs up.sh with no
+# flag, after Alex has locked it down once, must not widen it back open. Only a rule made
+# fresh here defaults to 0.0.0.0/0, as before #2151.
+if exists gcloud compute firewall-rules describe "$name-web"; then web_exists=1; else web_exists=0; fi
+if ((cloudflare)); then
+	ips_args=(-4)
+	((!dry_run)) || ips_args+=(--dry-run)
+	web_ranges=$("$here/../cloudflare/ips.sh" "${ips_args[@]}" | paste -sd, -)
+	[[ -n $web_ranges ]] || die "could not fetch Cloudflare's IPv4 ranges: see deploy/cloudflare/ips.sh"
+fi
+if ((web_exists)); then
+	((cloudflare)) && run gcloud compute firewall-rules update "$name-web" --source-ranges "$web_ranges"
+else
 	run gcloud compute firewall-rules create "$name-web" --network "$name" --direction INGRESS \
-		--allow tcp:80,tcp:443 --source-ranges 0.0.0.0/0 --target-tags "$name"
+		--allow tcp:80,tcp:443 --source-ranges "${web_ranges:-0.0.0.0/0}" --target-tags "$name"
+fi
 if ((dry_run)); then
 	caller=198.51.100.7
 	say "+ curl -4 -fsS https://checkip.amazonaws.com   (this machine's address; $caller stands in)"
