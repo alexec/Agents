@@ -23,31 +23,31 @@ func limited(p Plan) *limitedStore {
 func TestMachinesAndClientsHoldToThePlan(t *testing.T) {
 	ctx := context.Background()
 	l := limited(plans[PlanFree])
-	for _, key := range []string{"v1/hosts/a.json", "v1/hosts/b.json"} {
+	for _, key := range []string{"v1/machines/a.json", "v1/machines/b.json"} {
 		if _, err := l.Put(ctx, key, []byte(`{"id":"x"}`), store.Absent); err != nil {
 			t.Fatal(key, err)
 		}
 	}
-	_, err := l.Put(ctx, "v1/hosts/c.json", []byte(`{"id":"c"}`), store.Absent)
+	_, err := l.Put(ctx, "v1/machines/c.json", []byte(`{"id":"c"}`), store.Absent)
 	var limit *LimitError
 	if !errors.As(err, &limit) || err.Error() != "Your Free plan allows 2 machines. Remove one, or upgrade at https://hosted.test/account." {
 		t.Fatalf("%v", err)
 	}
-	if o, _ := l.Get(ctx, "v1/hosts/c.json"); o != nil {
+	if o, _ := l.Get(ctx, "v1/machines/c.json"); o != nil {
 		t.Fatal("a refused machine was written")
 	}
 	// A rewrite of a machine there is not new.
-	if _, err := l.Put(ctx, "v1/hosts/a.json", []byte(`{"id":"a","name":"renamed"}`), store.Always); err != nil {
+	if _, err := l.Put(ctx, "v1/machines/a.json", []byte(`{"id":"a","name":"renamed"}`), store.Always); err != nil {
 		t.Fatal(err)
 	}
 	// Forgotten: a tombstone does not count, and a new record may be written over one.
-	if _, err := l.Put(ctx, "v1/hosts/b.json", []byte(`{"forgotten":true}`), store.Always); err != nil {
+	if _, err := l.Put(ctx, "v1/machines/b.json", []byte(`{"forgotten":true}`), store.Always); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := l.Put(ctx, "v1/hosts/c.json", []byte(`{"id":"c"}`), store.Absent); err != nil {
+	if _, err := l.Put(ctx, "v1/machines/c.json", []byte(`{"id":"c"}`), store.Absent); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := l.Put(ctx, "v1/hosts/b.json", []byte(`{"id":"b"}`), store.Always); !errors.As(err, &limit) {
+	if _, err := l.Put(ctx, "v1/machines/b.json", []byte(`{"id":"b"}`), store.Always); !errors.As(err, &limit) {
 		t.Fatal("a record over a tombstone was let past the limit:", err)
 	}
 	for i := range 5 {
@@ -119,11 +119,11 @@ func TestARunningCopyHoldsToItsPlan(t *testing.T) {
 	s.mu.Unlock()
 	rs := c.service.Records()
 	for _, h := range []string{"h1", "h2"} {
-		if err := rs.AddHost(ctx, records.HostRecord{ID: h, Name: h}); err != nil {
+		if err := rs.AddHost(ctx, records.MachineRecord{ID: h, Name: h}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	err := rs.AddHost(ctx, records.HostRecord{ID: "h3", Name: "h3"})
+	err := rs.AddHost(ctx, records.MachineRecord{ID: "h3", Name: "h3"})
 	if err == nil || !strings.Contains(err.Error(), "Your Free plan allows 2 machines") {
 		t.Fatal(err)
 	}
@@ -150,7 +150,7 @@ func TestARunningCopyHoldsToItsPlan(t *testing.T) {
 	if c.limits.planNow().ID != PlanPro {
 		t.Fatal(c.limits.planNow())
 	}
-	if err := c.service.Records().AddHost(ctx, records.HostRecord{ID: "h3", Name: "h3"}); err != nil {
+	if err := c.service.Records().AddHost(ctx, records.MachineRecord{ID: "h3", Name: "h3"}); err != nil {
 		t.Fatal("a third machine on Pro:", err)
 	}
 }
@@ -208,7 +208,7 @@ func TestAccountsStayApart(t *testing.T) {
 	if _, err := a.limits.Put(ctx, "v1/policy.json", []byte(`{"mode":"acceptEdits"}`), store.Always); err != nil {
 		t.Fatal(err)
 	}
-	if err := a.service.Records().AddHost(ctx, records.HostRecord{ID: "ah", Name: "a's"}); err != nil {
+	if err := a.service.Records().AddHost(ctx, records.MachineRecord{ID: "ah", Name: "a's"}); err != nil {
 		t.Fatal(err)
 	}
 	if o, _ := b.limits.Get(ctx, "v1/policy.json"); o != nil {

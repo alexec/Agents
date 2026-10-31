@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 )
 
@@ -49,8 +50,8 @@ type limitedStore struct {
 
 // The folders whose live records a plan counts.
 var countedFolders = map[string]func(Plan) (int, string, string){
-	"v1/hosts/":   func(p Plan) (int, string, string) { return p.Machines, "machine", "machines" },
-	"v1/clients/": func(p Plan) (int, string, string) { return p.Clients, "client", "clients" },
+	records.MachinesPrefix: func(p Plan) (int, string, string) { return p.Machines, "machine", "machines" },
+	records.ClientsPrefix:  func(p Plan) (int, string, string) { return p.Clients, "client", "clients" },
 }
 
 func (l *limitedStore) setPlan(p Plan) {
@@ -290,9 +291,9 @@ func (s *Service) useOf(ctx context.Context, acc *Account) (Use, error) {
 		u.Storage = s.keptUsage(ctx, acc.ID)
 	}
 	var err error
-	if u.Machines, err = l.live(ctx, "v1/hosts/"); err != nil {
+	if u.Machines, err = l.live(ctx, records.MachinesPrefix); err != nil {
 		return u, err
 	}
-	u.Clients, err = l.live(ctx, "v1/clients/")
+	u.Clients, err = l.live(ctx, records.ClientsPrefix)
 	return u, err
 }

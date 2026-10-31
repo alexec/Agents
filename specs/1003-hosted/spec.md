@@ -249,7 +249,7 @@ Alex runs `deploy/gcp/hosted-up.sh` with a project, a zone, the names and the se
 
   The numbers are in one table in `Go/internal/hosted/plans.go`; changing them is a one-line change.
 - **FR-021**: `agents-hosted` holds each account's control plane to its plan:
-  - **Machines and clients:** a new record under `v1/hosts/` or `v1/clients/` over the limit is refused by the account's store.
+  - **Machines and clients:** a new record under `v1/machines/` or `v1/clients/` over the limit is refused by the account's store.
   - **Storage:** a write that makes the account's store larger than the limit is refused. A write that does not make it larger is never refused.
   - **Connections:** the proxy counts each account's open WebSockets. One over the limit gets `429` and the words.
   - **Events:** a sweep each hour deletes the account's events older than the plan keeps.
