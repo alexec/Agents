@@ -7,11 +7,10 @@ import Foundation
 /// public key, a one-time secret, whether its holder becomes a client or a host, and
 /// where to reach the control plane. Its text is one line, to paste or to put in a QR code:
 ///
-///     agents-control:2:<c|h>:<operator or ->:<key>:<secret>:<url>:<pin or ->:<name>
+///     agents-control:2:<c|h>:-:<key>:<secret>:<url>:<pin or ->:<name>
 ///
-/// The fourth field was a client's grant. Every client may do everything now (#111), so
-/// it is always `operator`, which an older Remote or web page needs to read the code,
-/// and whatever is there is not read.
+/// The fourth field was a client's grant; every client may do everything now (#111), so
+/// it is always `-` and not read.
 /// with the key and the secret in base64url, and the URL and name percent-encoded. The
 /// URL is the control plane's one address (R8); the pin is the SHA-256 of its
 /// certificate's public key, base64url, when that certificate is not publicly trusted
@@ -58,16 +57,15 @@ public struct ControlCode: Sendable, Hashable {
 
     public var text: String {
         let kind: String
-        let grant: String
         switch purpose {
-        case .client: kind = "c"; grant = LegacyGrant.everything
-        case .host: kind = "h"; grant = "-"
+        case .client: kind = "c"
+        case .host: kind = "h"
         }
         if let url {
-            return ["agents-control", "2", kind, grant, Self.base64url(controlKey), Self.base64url(secret),
+            return ["agents-control", "2", kind, "-", Self.base64url(controlKey), Self.base64url(secret),
                     Self.escape(url), pin ?? "-", Self.escape(name)].joined(separator: ":")
         }
-        return ["agents-control", "1", kind, grant, Self.base64url(controlKey), Self.base64url(secret),
+        return ["agents-control", "1", kind, "-", Self.base64url(controlKey), Self.base64url(secret),
                 Self.escape(addresses.joined(separator: ",")), Self.escape(name)].joined(separator: ":")
     }
 
@@ -183,16 +181,13 @@ public extension DaemonAPI {
         }
     }
 
-    /// What either announce is answered with: who the new party now is. A client's says
-    /// `grant: operator` for an older web page, which shows it (#111).
+    /// What either announce is answered with: who the new party now is.
     struct Admitted: Codable, Sendable, Hashable {
         public var client: UUID?
         public var host: MachineRef?
-        public var grant: String?
         public init(client: UUID? = nil, host: MachineRef? = nil) {
             self.client = client
             self.host = host
-            self.grant = client == nil ? nil : LegacyGrant.everything
         }
     }
 }

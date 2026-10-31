@@ -20,10 +20,6 @@ public enum ControlWire {
         case toHost(MachineRef, message: String)
         /// For the control plane itself.
         case toControl(message: String)
-        /// A bare JSON-RPC line, from a client that has never heard of the control plane:
-        /// today's Remote. It is the home host's, unless it is a method the control plane
-        /// answers (R7).
-        case legacy(message: String)
     }
 
     /// A line on a host's uplink, taken apart.
@@ -41,9 +37,6 @@ public enum ControlWire {
     /// bound to `device` when it carries a phone, an iPad or a browser, so presence and a
     /// device's own name are its. Nothing else on the uplink can set who a connection is.
     public struct ChannelOpen: Codable, Equatable, Sendable {
-        /// Always `operator`, which an older host needs to open the channel at all and
-        /// which gives a client everything there, as it now has (#111). Not read.
-        public var grant: String = LegacyGrant.everything
         public var client: String
         public var device: UUID?
         /// The device reached the control plane through `agents-relay` (T096).
@@ -93,7 +86,6 @@ public enum ControlWire {
             return .toHost(MachineRef(rawValue: host), message: String(rest.dropFirst(5).dropLast()))
         }
         guard let object = try? JSONValue.parse(Data(line.utf8)).objectValue else { throw WireError.notAnObject }
-        if object["jsonrpc"] != nil { return .legacy(message: line) }
         guard let m = object["m"] else { throw WireError.noMessage }
         let message = try encode(m)
         switch object["h"] {

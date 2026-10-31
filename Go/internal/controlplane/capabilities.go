@@ -76,7 +76,7 @@ func hostRefusal(list []string, version string, team bool) *RPCError {
 
 // refusedOld answers a request from a client too old for this control plane (#1748), and
 // says so; control/status still goes, so the client can say what to do.
-func (r *Router) refusedOld(sessionID, host, msg string, kind int) bool {
+func (r *Router) refusedOld(sessionID, host, msg string) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	s := r.clients[sessionID]
@@ -91,11 +91,7 @@ func (r *Router) refusedOld(sessionID, host, msg string, kind int) bool {
 	if !ok || !m.isRequest() || m.Method == "control/status" {
 		return false
 	}
-	e := replyError(m.ID, refusal)
-	if kind != frameLegacy {
-		e = wrap(host, e)
-	}
-	r.writeLocked(sessionID, e)
+	r.writeLocked(sessionID, wrap(host, replyError(m.ID, refusal)))
 	return true
 }
 

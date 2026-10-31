@@ -1,19 +1,5 @@
 import Foundation
 
-/// What every paired client may do: everything the Mac's own window may (#111, 2026-10-02).
-///
-/// There were two grants, operator and device (058, R4). A device could already start
-/// agents and open terminals on any host, so it could run any command there, and the
-/// split protected the hosts very little while asking a question on every pairing sheet.
-/// Now there is one. The word stays on the wire, always `operator`, for builds from
-/// before: an older control plane copy reading `clients.json`, an older host opening a
-/// channel, an older Remote or web page reading a code. Nothing here reads it.
-public enum LegacyGrant {
-    /// What is written where an older build expects a grant: the one that may do
-    /// everything, which is what every client now may.
-    public static let everything = "operator"
-}
-
 /// A paired screen: the Mac window, an iPhone, an iPad, a browser on the control plane's
 /// own Mac (071). `clients.json` under the control root, which is today's `devices.json`
 /// with a Mac allowed.
@@ -80,11 +66,9 @@ public struct ClientRecord: Codable, Hashable, Sendable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, kind, publicKey, grant, paired, lastSeen, mayNotify, owner, rev, forgotten, forgottenAt, knownEpoch
+        case id, name, kind, publicKey, paired, lastSeen, mayNotify, owner, rev, forgotten, forgottenAt, knownEpoch
     }
 
-    /// A record's `grant`, `device` or `operator`, is not read: every client may do
-    /// everything (#111).
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(UUID.self, forKey: .id)
@@ -101,15 +85,12 @@ public struct ClientRecord: Codable, Hashable, Sendable, Identifiable {
         knownEpoch = try c.decodeIfPresent(Int.self, forKey: .knownEpoch)
     }
 
-    /// Written with `grant: operator`, which an older copy of the control plane needs to
-    /// read the record at all, and which tells it the truth.
     public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(id, forKey: .id)
         try c.encode(name, forKey: .name)
         try c.encode(kind, forKey: .kind)
         try c.encode(publicKey, forKey: .publicKey)
-        try c.encode(LegacyGrant.everything, forKey: .grant)
         try c.encode(paired, forKey: .paired)
         try c.encodeIfPresent(lastSeen, forKey: .lastSeen)
         try c.encodeIfPresent(mayNotify, forKey: .mayNotify)

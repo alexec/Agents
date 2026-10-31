@@ -277,9 +277,6 @@
         },
         "host": {
           "$ref": "#/definitions/MachineRef"
-        },
-        "grant": {
-          "type": "string"
         }
       },
       "additionalProperties": false
@@ -4245,11 +4242,8 @@
     },
     "ChannelOpen": {
       "type": "object",
-      "description": "What a channel on a host's uplink is opened as (ControlWire.ChannelOpen). `grant` is always `operator`, for an older host (#111).",
+      "description": "What a channel on a host's uplink is opened as (ControlWire.ChannelOpen).",
       "properties": {
-        "grant": {
-          "type": "string"
-        },
         "client": {
           "type": "string"
         },
@@ -4274,7 +4268,6 @@
         }
       },
       "required": [
-        "grant",
         "client"
       ],
       "additionalProperties": false
@@ -4445,7 +4438,7 @@
     },
     "ClientRecord": {
       "type": "object",
-      "description": "A paired screen, as clients/list says it (ClientRecord). `grant` is always `operator`, for an older build (#111).",
+      "description": "A paired screen, as clients/list says it (ClientRecord).",
       "properties": {
         "id": {
           "$ref": "#/definitions/UUID"
@@ -4458,9 +4451,6 @@
         },
         "publicKey": {
           "$ref": "#/definitions/Base64"
-        },
-        "grant": {
-          "type": "string"
         },
         "paired": {
           "$ref": "#/definitions/WireDate"
@@ -4492,7 +4482,6 @@
         "name",
         "kind",
         "publicKey",
-        "grant",
         "paired",
         "rev"
       ],
@@ -5932,9 +5921,6 @@
       "description": "The control plane's proof back: {\"ok\":…} (ControlAuth.OK).",
       "properties": {
         "mac": {
-          "type": "string"
-        },
-        "grant": {
           "type": "string"
         },
         "host": {

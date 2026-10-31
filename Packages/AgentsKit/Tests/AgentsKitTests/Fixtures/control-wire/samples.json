@@ -4,7 +4,6 @@
     "name": "name",
     "kind": "iPhone",
     "publicKey": "AQID",
-    "grant": "operator",
     "paired": 812345678.5,
     "lastSeen": 812345678.5,
     "mayNotify": true,
@@ -39,8 +38,7 @@
   },
   "Admitted": {
     "client": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
-    "host": "box",
-    "grant": "grant"
+    "host": "box"
   },
   "ControlCodeShown": {
     "text": "text",
@@ -100,7 +98,6 @@
   },
   "ControlOK": {
     "mac": "mac",
-    "grant": "grant",
     "host": "box",
     "relayed": true,
     "endpoints": [
@@ -112,7 +109,6 @@
     "epoch": 7
   },
   "ChannelOpen": {
-    "grant": "operator",
     "client": "client",
     "device": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
     "relayed": true,

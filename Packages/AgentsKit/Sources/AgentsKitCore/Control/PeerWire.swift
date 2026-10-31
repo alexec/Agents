@@ -13,9 +13,7 @@ public enum PeerWire {
         case host(MachineRef, online: Bool, epoch: Int)
         /// A change a person made, applied at every copy.
         case event(ControlEvent)
-        /// A client here said where the person is, and whether it is a device's say. On
-        /// the wire that is `grant`, `device` or `operator`, as a copy from before #111
-        /// reads it; it says nothing else now.
+        /// A client here said where the person is, and whether it is a device's say.
         case presence(client: UUID, device: Bool, report: DaemonAPI.PresenceReport)
         /// A host's `attention/need`, for the copy that holds a relay host (T097).
         case need(DaemonAPI.AttentionNeed)
@@ -43,7 +41,7 @@ public enum PeerWire {
 
     public static func presence(client: UUID, device: Bool, report: DaemonAPI.PresenceReport) -> String {
         encode(["presence": .object(["client": .string(client.uuidString),
-                                     "grant": .string(device ? "device" : LegacyGrant.everything),
+                                     "device": .bool(device),
                                      "report": (try? JSONValue.encoding(report)) ?? .null])])
     }
 
@@ -80,9 +78,8 @@ public enum PeerWire {
             return .event(decoded)
         }
         if let presence = object["presence"], let client = presence["client"]?.stringValue.flatMap(UUID.init(uuidString:)),
-           let grant = presence["grant"]?.stringValue,
            let report = try? presence["report"]?.decode(DaemonAPI.PresenceReport.self) {
-            return .presence(client: client, device: grant == "device", report: report)
+            return .presence(client: client, device: presence["device"]?.boolValue ?? false, report: report)
         }
         if let link = object["link"], let client = link["client"]?.stringValue.flatMap(UUID.init(uuidString:)) {
             return .link(client: client, relayed: link["gone"] != nil ? nil : (link["relayed"]?.boolValue ?? false))

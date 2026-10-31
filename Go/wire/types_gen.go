@@ -126,8 +126,6 @@ type Admitted struct {
 	Client *UUID `json:"client,omitzero"`
 
 	Host *MachineRef `json:"host,omitzero"`
-
-	Grant *string `json:"grant,omitzero"`
 }
 
 type AdoptRequest struct {
@@ -1937,10 +1935,8 @@ type ChannelLinkRequest struct {
 	Expires Date `json:"expires"`
 }
 
-// What a channel on a host's uplink is opened as (ControlWire.ChannelOpen). `grant` is always `operator`, for an older host (#111).
+// What a channel on a host's uplink is opened as (ControlWire.ChannelOpen).
 type ChannelOpen struct {
-	Grant string `json:"grant"`
-
 	Client string `json:"client"`
 
 	Device *UUID `json:"device,omitzero"`
@@ -2079,7 +2075,7 @@ type ClientPermissionSettings struct {
 	SetBy *PolicySetBy `json:"setBy,omitzero"`
 }
 
-// A paired screen, as clients/list says it (ClientRecord). `grant` is always `operator`, for an older build (#111).
+// A paired screen, as clients/list says it (ClientRecord).
 type ClientRecord struct {
 	ID UUID `json:"id"`
 
@@ -2088,8 +2084,6 @@ type ClientRecord struct {
 	Kind ClientKind `json:"kind"`
 
 	PublicKey Data `json:"publicKey"`
-
-	Grant string `json:"grant"`
 
 	Paired Date `json:"paired"`
 
@@ -2755,8 +2749,6 @@ type ControlNotice struct {
 // The control plane's proof back: {"ok":…} (ControlAuth.OK).
 type ControlOK struct {
 	Mac string `json:"mac"`
-
-	Grant *string `json:"grant,omitzero"`
 
 	Host *MachineRef `json:"host,omitzero"`
 
