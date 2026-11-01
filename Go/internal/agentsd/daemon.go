@@ -50,6 +50,7 @@ type Daemon struct {
 	eventBook
 	actorBook
 	appToolsState
+	screenDriveState
 	hostUserState
 	userSuspendState
 	machinePinState
@@ -232,6 +233,7 @@ func (d *Daemon) Shutdown() {
 	d.stopMCPEvents()
 	d.stopEvents()
 	d.stopAppTools()
+	d.stopScreenDrives()
 	d.allowMu.Lock()
 	d.allowStopped = true
 	d.allowMu.Unlock()

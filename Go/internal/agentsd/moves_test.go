@@ -157,13 +157,13 @@ func TestLeavingWithRemoveIsRefusedWhileWorkIsNotPushed(t *testing.T) {
 }
 
 func TestARuntimeThatCannotMoveIsNotOfferedTheTool(t *testing.T) {
-	for _, raw := range offeredTools(runtimeCanMove("grok"), false) {
+	for _, raw := range offeredTools(runtimeCanMove("grok"), false, false) {
 		if strings.Contains(string(raw), `"move_worktree"`) {
 			t.Fatal("offered to grok")
 		}
 	}
 	found := false
-	for _, raw := range offeredTools(runtimeCanMove("claude"), false) {
+	for _, raw := range offeredTools(runtimeCanMove("claude"), false, false) {
 		found = found || strings.Contains(string(raw), `"move_worktree"`)
 	}
 	if !found {

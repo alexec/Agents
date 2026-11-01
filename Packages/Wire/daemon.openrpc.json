@@ -30,6 +30,11 @@
       "name": "host.policy-layers/1",
       "by": "host",
       "description": "A host resolves the effective policy from the organisation, your and a folder's layers through policylayers.Resolve (#2957), instead of only the organisation's ceiling. Declared so slice 2's policy/effective, policy/yours and policy/setYours, and the organisation's new rules of FR-003, have a capability to require."
+    },
+    {
+      "name": "host.desktop-control/1",
+      "by": "host",
+      "description": "The host serves the app tool drive_screen (#3004, US1): an agent drives an app on this Mac through its own screen, mouse and keyboard, holding the screen lease while it does. An app tool, not a method, so declared, the same shape as agents.move-worktree/1. Mac only."
     }
   ],
   "methods": [

@@ -842,5 +842,58 @@
     },
     "name": "cancel_message",
     "title": "Take back a waiting message"
+  },
+  {
+    "description": "Drive an app on this Mac through its own screen, mouse and keyboard, for a task no API reaches: a non-browser app, or an app's own GUI. Takes the screen lease the first time you call it (lease_resource's own line and events apply); keep driving with no need to lease it again. click presses by label (an exact or partial match of the element's title, description, value or help) when you give one, or by x,y when you don't. type sends real keystrokes to whatever has focus. key presses one named key (return, tab, escape, space, an arrow, backspace, and the like). read answers with the app's own accessibility tree, to find a label to click or confirm what changed. screenshot answers with a picture of the whole screen. Needs Accessibility granted to this Mac's Agents Host once; Stop frees the lease at once.",
+    "inputSchema": {
+      "properties": {
+        "action": {
+          "description": "What to do.",
+          "enum": [
+            "screenshot",
+            "click",
+            "type",
+            "key",
+            "read"
+          ],
+          "type": "string"
+        },
+        "app": {
+          "description": "The app to drive, by its name as it shows in the menu bar (for example \"TextEdit\", \"Finder\").",
+          "type": "string"
+        },
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
+        },
+        "keyName": {
+          "description": "The key to press, for action key: return, tab, escape, space, up, down, left, right, backspace, or a single character.",
+          "type": "string"
+        },
+        "label": {
+          "description": "The element to click, by its title, description, value or help text. With no label, click uses x,y instead.",
+          "type": "string"
+        },
+        "text": {
+          "description": "The text to type, for action type.",
+          "type": "string"
+        },
+        "x": {
+          "description": "Where to click, for action click with no label.",
+          "type": "number"
+        },
+        "y": {
+          "description": "Where to click, for action click with no label.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "app",
+        "action"
+      ],
+      "type": "object"
+    },
+    "name": "drive_screen",
+    "title": "Drive an app through its own screen"
   }
 ]

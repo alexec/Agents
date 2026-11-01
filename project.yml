@@ -580,6 +580,12 @@ targets:
         copy:
           destination: wrapper
           subpath: Contents/Helpers
+      # agentsd's driver of another app's own screen (#3004), beside it in
+      # Contents/Helpers the same way.
+      - target: agents-drive
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
     info:
       path: Host/Info.plist
       properties:
@@ -628,6 +634,29 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.watch
         PRODUCT_NAME: agents-watch
+        SDKROOT: macosx
+        SUPPORTED_PLATFORMS: macosx
+        SKIP_INSTALL: YES
+        ENABLE_HARDENED_RUNTIME: YES
+      # The GitHub release (#669): Release signs it with Developer ID, outside the App Store.
+      configs:
+        Release:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: Developer ID Application
+          OTHER_CODE_SIGN_FLAGS: --timestamp
+
+  # agentsd's driver of another app's own screen (#3004): the AX tree and real
+  # mouse/keyboard events drive_screen needs, which Go cannot reach without cgo, the same
+  # reason agents-watch exists.
+  agents-drive:
+    type: tool
+    supportedDestinations: [macOS]
+    sources:
+      - path: Host/AgentsDrive
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.drive
+        PRODUCT_NAME: agents-drive
         SDKROOT: macosx
         SUPPORTED_PLATFORMS: macosx
         SKIP_INSTALL: YES
@@ -700,6 +729,12 @@ schemes:
     build:
       targets:
         agents-watch: all
+    run:
+      config: Debug
+  agents-drive:
+    build:
+      targets:
+        agents-drive: all
     run:
       config: Debug
   Remote:

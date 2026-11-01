@@ -149,10 +149,18 @@ exists.
   the same marker to avoid hearing the helper's own events); polling mouse location
   (`CGEventGetLocation` on a timer) misses key presses and is not sub-second reliably.
 
-### R3. The screenshot: `CGWindowListCreateImage` of the whole main display, kept only in memory
+### R3. The screenshot: `SCScreenshotManager.captureImage` of the main display, kept only in memory
 
-- **Decision**: `agents-drive` makes the screenshot with
-  `CGWindowListCreateImage(CGRect.infinite, .optionOnScreenOnly, kCGNullWindowID, [])` on the
+- **Decided (US1's build, superseding this row's original choice): `ScreenCaptureKit`'s
+  `SCScreenshotManager.captureImage`, not `CGWindowListCreateImage`, because Alex can
+  overrule.** `CGWindowListCreateImage` is obsolete on this project's deployment target
+  (macOS 27, `project.yml`'s `deploymentTarget.macOS`): Swift refuses to build it
+  ("obsoleted in macOS 15.0 … Please use ScreenCaptureKit instead"), so the row below's
+  original decision does not compile and could not have been walked. `captureImage` is
+  itself a one-shot still (`SCScreenshotManager`, not `SCStream`), so the "built for a
+  continuous video stream" reason for not choosing ScreenCaptureKit no longer holds either:
+  there is no media server or running stream to hold open, one `await` per request.
+- **Decision (original, for the shape kept)**: `agents-drive` makes the screenshot of the
   main display (Assumptions: single display), downscaled to a width that keeps each frame
   well under the size of an ordinary chat image, and hands it to `agentsd` once per request;
   `agentsd` forwards it to clients that are showing the session (R7) and never calls
@@ -160,14 +168,12 @@ exists.
   raising anything" idea to the whole screen because the tool can act on any app, not one
   known window.
 - **Why**: this is the full-display equivalent of what `shot.sh` already proves works
-  without stealing focus; `CGWindowListCreateImage` (no need to raise or activate anything)
-  is close to the API `screencapture -l` itself uses, and gives pixel data directly to the
-  helper instead of a file `screencapture` would have to write and the Go side would have to
-  delete.
+  without stealing focus; neither API raises or activates anything, and both give pixel
+  data directly to the helper instead of a file `screencapture` would have to write and the
+  Go side would have to delete. `captureImage` needs Screen Recording granted once, a
+  second permission beside Accessibility (US2's gate names both).
 - **Not chosen**: `screencapture` as a subprocess per frame (an extra process launch every
-  few seconds, and a file on disk, however briefly, that FR-016 says must never exist);
-  `ScreenCaptureKit` (built for a continuous video stream; this feature is periodic stills,
-  spec Decisions table, "no new media server").
+  few seconds, and a file on disk, however briefly, that FR-016 says must never exist).
 
 ### R4. Where the lease is taken: by the tool itself, not by the agent's own `lease_resource` call
 

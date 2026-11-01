@@ -40,13 +40,13 @@ func TestABotsMachineAsksNobodyAndClaimsItsRuns(t *testing.T) {
 	if b, err := os.ReadFile(d.hostUserPath()); err != nil || !strings.Contains(string(b), "review-bot") {
 		t.Fatalf("%s %v", b, err)
 	}
-	for _, raw := range offeredTools(false, true) {
+	for _, raw := range offeredTools(false, true, false) {
 		if strings.Contains(string(raw), `"ask_question"`) {
 			t.Fatal("ask_question offered on a bot's machine")
 		}
 	}
 	found := false
-	for _, raw := range offeredTools(false, false) {
+	for _, raw := range offeredTools(false, false, false) {
 		found = found || strings.Contains(string(raw), `"ask_question"`)
 	}
 	if !found {

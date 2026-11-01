@@ -33,6 +33,10 @@ screen. An agent can list them and pick one by its name, so two agents asking fo
 thing always ask for it the same way. An agent can also lease a name of its own for
 something the app does not know about, such as a network port.
 
+The screen lease is now actually acquired by a shipped tool (#3004): `drive_screen` takes
+it the first time an agent drives an app through its own screen, mouse and keyboard, and
+lets it go when the agent's turn ends or you press **Stop**.
+
 Every lease has an end. A lease lasts 30 minutes unless the agent asks for another length,
 and never more than four hours without being extended. An agent that needs longer extends
 the lease before it runs out, and is warned when the end is five minutes away.
