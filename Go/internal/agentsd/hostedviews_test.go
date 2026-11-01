@@ -65,3 +65,46 @@ func TestAHostedServersViewsComeThroughItsOneCopy(t *testing.T) {
 		t.Fatalf("a session's own tool: %v", err)
 	}
 }
+
+// A changed entry is a new catalog, and the old one goes; so does one too old to be read
+// (#3128).
+func TestAChangedEntrysOldViewCatalogIsRemoved(t *testing.T) {
+	self, _ := os.Executable()
+	t.Setenv("AGENTS_FAKE_MCP", "1")
+	t.Setenv("AGENTS_FAKE_MCP_VIEWS", "1")
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	home := t.TempDir()
+	d.PersonalHome = home
+	os.MkdirAll(filepath.Join(home, ".agents"), 0o755)
+	write := func(args ...string) {
+		entry, _ := json.Marshal(map[string]any{"mcpServers": map[string]any{
+			"gh": map[string]any{"command": self, "args": args, "hosted": true}}})
+		os.WriteFile(filepath.Join(home, ".agents", "mcp.json"), entry, 0o644)
+	}
+	dir := filepath.Dir(d.viewCatalogPath("x"))
+	old, _ := json.Marshal(viewCatalog{Version: viewCatalogVersion, Server: "gone", MadeAt: nowFunc().Add(-2 * viewCatalogFresh)})
+	os.MkdirAll(dir, 0o755)
+	os.WriteFile(filepath.Join(dir, "removed-entry.json"), old, 0o644)
+
+	var last viewServer
+	for _, args := range [][]string{nil, {"-test.run=^$"}} {
+		write(args...)
+		s, problem := d.viewServerFor("gh", t.TempDir())
+		if problem != 0 {
+			t.Fatalf("no views: %d", problem)
+		}
+		if d.loadViewCatalog(context.Background(), s) == nil {
+			t.Fatal("no catalog")
+		}
+		last = s
+	}
+	files, _ := os.ReadDir(dir)
+	if len(files) != 1 || files[0].Name() != last.entry+".json" {
+		var names []string
+		for _, f := range files {
+			names = append(names, f.Name())
+		}
+		t.Fatalf("mcp-views/ holds %v, not only %s.json", names, last.entry)
+	}
+}

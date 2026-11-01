@@ -173,11 +173,14 @@ func (d *Daemon) viewServerNames(folder string) []string {
 
 // viewCatalog is ServerViewCatalog: a server's tools that name a ui:// resource, who may
 // call each, and the resources' addresses. Kept at <root>/mcp-views/<key>.json, keyed by
-// the entry, so a changed entry is a new catalog. Never a secret, a URL or a header.
+// the entry, so a changed entry is a new catalog, and the old one is removed (#3128).
+// Never a secret, a URL or a header.
 type viewCatalog struct {
 	// Version is viewCatalogVersion when it was made; an older one is read again.
 	Version int    `json:"version"`
 	Server  string `json:"server"`
+	// Scope is the server's viewScope: with Server, which entry the catalog is of.
+	Scope string `json:"scope,omitempty"`
 	// Title is the server's own title (initialize's serverInfo.title), when it gives one.
 	Title     string         `json:"title,omitempty"`
 	MadeAt    time.Time      `json:"madeAt"`
@@ -359,6 +362,41 @@ func (d *Daemon) keepViewCatalog(key string, c viewCatalog) {
 	}
 }
 
+// pruneViewCatalogs removes, after kept was written as key, each catalog no read can use:
+// one of the same server and scope from an entry since changed, and one too old to be read
+// (an entry removed, or a catalog from before Scope). So mcp-views/ holds about one file for
+// each entry read in the last viewCatalogFresh (#3128).
+func (d *Daemon) pruneViewCatalogs(key string, kept viewCatalog) {
+	dir := filepath.Dir(d.viewCatalogPath(key))
+	names, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	removed := 0
+	for _, n := range names {
+		name := n.Name()
+		if n.IsDir() || !strings.HasSuffix(name, ".json") || name == key+".json" {
+			continue
+		}
+		path := filepath.Join(dir, name)
+		stale := false
+		var c viewCatalog
+		if b, err := os.ReadFile(path); err != nil || json.Unmarshal(b, &c) != nil {
+			info, err := n.Info()
+			stale = err == nil && nowFunc().Sub(info.ModTime()) >= viewCatalogFresh
+		} else {
+			stale = nowFunc().Sub(c.MadeAt) >= viewCatalogFresh ||
+				(c.Server == kept.Server && c.Scope == kept.Scope && c.Scope != "")
+		}
+		if stale && os.Remove(path) == nil {
+			removed++
+		}
+	}
+	if removed > 0 {
+		log.Printf("mcp views: %d old catalog(s) removed", removed)
+	}
+}
+
 // loadViewCatalog is the server's views, read from it when none is kept; nil when it
 // could not be read. A server that failed is not asked again for five minutes, and two
 // asking at once share one read.
@@ -425,6 +463,7 @@ func (d *Daemon) readViewCatalog(ctx context.Context, s viewServer, refresh bool
 		}
 		c = makeViewCatalog(s.name, tools, resources, nowFunc())
 		c.Title = m.serverTitle
+		c.Scope = s.scope
 		return nil
 	})
 	if err != nil {
@@ -438,6 +477,7 @@ func (d *Daemon) readViewCatalog(ctx context.Context, s viewServer, refresh bool
 		if store.WriteAtomically(d.viewCatalogPath(s.entry), b, 0o644) != nil {
 			log.Printf("mcp views: the catalog of %s could not be kept", s.name)
 		}
+		d.pruneViewCatalogs(s.entry, c)
 	}
 	d.keepViewCatalog(s.entry, c)
 	d.viewMu.Lock()
