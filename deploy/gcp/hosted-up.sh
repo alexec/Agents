@@ -218,11 +218,13 @@ else
 	done
 fi
 
-say "== the image, built here"
+# The build is tagged as deploy/compose.hosted.yaml names it, so compose runs this image, not
+# the release's from ghcr.io (#3124). A tag has no "+" (Docker's rule), so .env gets the tag.
 version=${AGENTS_VERSION:-$("$root/scripts/version.sh")}
-say "version $version"
+tag=${version//+/-}
+say "== the image, built here: $image:$tag"
 run docker build --platform linux/amd64 --build-arg "VERSION=$version" \
-	-f "$root/deploy/Containerfile" -t agents-control:latest "$root"
+	-f "$root/deploy/Containerfile" -t "$image:$tag" "$root"
 
 say "== what the VM runs, in /opt/agents"
 stage=$(mktemp -d)
@@ -233,7 +235,7 @@ cp "$root/deploy/compose.hosted.yaml" "$root/deploy/Caddyfile.hosted" "$stage/de
 : >"$stage/deploy/secrets/gcp-service-account"
 # The settings, secrets too, go only into the VM's deploy/.env (mode 600), never to a log.
 {
-	printf '%s=%s\n' AGENTS_CONTROL_KMS "gcpkms://$kms" AGENTS_VERSION "$version"
+	printf '%s=%s\n' AGENTS_CONTROL_KMS "gcpkms://$kms" AGENTS_VERSION "$tag"
 	for v in AGENTS_HOSTED_DOMAIN AGENTS_HOSTED_ACCOUNTS_DOMAIN AGENTS_HOSTED_GITHUB_SECRET ACME_EMAIL \
 		AGENTS_HOSTED_GITHUB_CLIENT_ID AGENTS_HOSTED_VIEWS_DOMAIN AGENTS_HOSTED_SIGNUP AGENTS_HOSTED_MAX_ACCOUNTS \
 		AGENTS_HOSTED_MIN_GITHUB_AGE AGENTS_HOSTED_SIGNUPS_PER_ADDRESS AGENTS_HOSTED_SIGNUPS_PER_HOUR \
@@ -249,10 +251,10 @@ sudo touch .env; sudo chmod 600 .env
 while IFS= read -r line; do k=${line%%=*}; { sudo grep -v "^$k=" .env || true; echo "$line"; } | sudo tee .env.t >/dev/null; sudo mv .env.t .env; done < .env.new
 sudo rm .env.new'
 if ((dry_run)); then
-	say "+ docker save agents-control:latest | gzip | $(shown gcloud compute ssh "$name" --zone "$zone" --quiet --command 'gunzip | sudo docker load')"
+	say "+ docker save $image:$tag | gzip | $(shown gcloud compute ssh "$name" --zone "$zone" --quiet --command 'gunzip | sudo docker load')"
 	say "+ tar -C STAGE -czf - deploy | $(shown gcloud compute ssh "$name" --zone "$zone" --quiet --command "$install")"
 else
-	docker save agents-control:latest | gzip | vm_ssh 'gunzip | sudo docker load'
+	docker save "$image:$tag" | gzip | vm_ssh 'gunzip | sudo docker load'
 	COPYFILE_DISABLE=1 tar --no-xattrs -C "$stage" -czf - deploy | vm_ssh "$install"
 fi
 
@@ -272,6 +274,10 @@ else
 	curl -fsS "https://$domain/healthz" >/dev/null ||
 		die "https://$domain/healthz does not answer: see gcloud compute ssh $name --zone $zone --command '$compose logs caddy'"
 fi
+# Each deploy loads a new image, and the old ones stay on the disk that holds every account
+# (#3124, as up.sh does since #2290). Once the new one serves, every image no container uses goes.
+say "== the images no container uses, removed"
+vm_ssh 'sudo docker image prune -af'
 say
 say "https://$domain is up, at $ip. The first invite link:"
 say "    gcloud compute ssh $name --zone $zone --command '$compose exec -T hosted /agents-hosted admin invite'"
