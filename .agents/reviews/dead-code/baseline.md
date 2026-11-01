@@ -40,6 +40,11 @@ Added 2026-10-29 (`2026-10-29.md`, the first complete `GOOS=darwin -test` scan):
 
 ### Periphery (Swift)
 
+- `Packages/AgentsKit/Sources/AgentsKitCore/Runtimes/Allowance/LimitRecognition.swift`
+  `isAntigravityUsageLimit(_:)`: Periphery lists it as unused, but line 101 passes it to
+  `contains(where:)`. A function reference has no `(` after the name, so a label test
+  misses it; look for `.name` and `where: name` too (added 2026-10-31).
+
 - `Agents.xcodeproj` is not checked in. Run `xcodegen generate` in the review worktree
   after merging `main` and before the index build, or files added since the project was
   made are missing from the build and from the index (added 2026-10-30).
@@ -73,3 +78,11 @@ Added 2026-10-29 (`2026-10-29.md`, the first complete `GOOS=darwin -test` scan):
   their old `host/*` names, step 1 of the two-release rename that the open issue #2653
   tracks. Live: it is the rename, not migration code. It goes in #2653's step 3
   (added 2026-10-30).
+- The policy layers' first-start move (#2957 FR-012, research R9):
+  `Go/internal/agentsd/policyyours.go` `firstStartMoveLocked` and `moveAsideLocked`.
+  They read the v0.14 settings files (`limits.json`, `workflow-limit.json`,
+  `display.json`'s notice keys, the archive switch, `runtime-environment.json`) once into
+  your policy layer. Migration code by a decision in the spec, because a limit that went
+  away without a word would make the rules looser. Live while a v0.14 machine can still
+  start v0.15 for the first time; propose its removal once v0.15 is the oldest supported
+  release (added 2026-10-31).

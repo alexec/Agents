@@ -43,6 +43,10 @@ the keyboard, that is true only of a workflow run.
   container used by `scripts/lint.sh`; scan `./...` from `Go/`. Scan again with
   `GOOS=darwin GOARCH=arm64` (install `deadcode` for linux first, then run it with those
   set), or every function with only `_darwin.go` callers reads as dead.
+  If the container is killed for memory (exit 137; the VM has about 4 GB), run the same
+  `deadcode` on the Mac with the Go of `go.mod` downloaded from go.dev to a temporary
+  folder (verify its SHA-256 against go.dev's list; do not install it), with `GOOS=linux`
+  and then `GOOS=darwin` set, and record that in the report.
 - Run Knip 6.42.1 from the pinned `node:$NODE` container used by `scripts/lint.sh`, with
   `KNIP_DISABLE_RAW_TRANSFER=1` (needed for container memory limits) and the npm cache
   under `~/Library/Caches/Agents-build/npm`; run it from `Web/`. Keep the
