@@ -196,7 +196,7 @@ export function LineagePage({ store }: { store: Store }) {
     body = (
       <>
         <div class="lineage-start">
-          <strong>{place.node.kind === "session" ? title(place.node) ?? "A session" : here.name}</strong>
+          <strong title={here.ref ?? here.name}>{place.node.kind === "session" ? title(place.node) ?? "A session" : here.name}</strong>
           <span class="quiet">{[kindWord(place.node.kind), ...here.cost ? [here.cost] : [], ...here.resolved ? [here.resolved] : []].join(" · ")}</span>
           {here.url ? <a class="link" href={here.url} target="_blank" rel="noopener noreferrer">Open on GitHub</a>
             : chat && <button class="link" onClick={() => go({ host: place.host, folder: chat.worktree?.folder || chat.cwd, session: chat.id })}>Show the chat</button>}
@@ -305,7 +305,7 @@ function Box({ node, show, verb }: { node: GraphNode; show: Show; verb: (row: Li
   const go = show(node.row);
   const inner = (
     <>
-      <title>{[node.row.name, ...node.row.links, ...go || node.row.url ? [verb(node.row)] : []].join("\n")}</title>
+      <title>{[node.row.name, ...node.row.ref ? [node.row.ref] : [], ...node.row.links, ...go || node.row.url ? [verb(node.row)] : []].join("\n")}</title>
       <rect class={node.here ? "box here" : "box"} width={box.width} height={box.height} rx={10} />
       <text class="name" x={10} y={20}>{clip(node.row.name, 28)}</text>
       <text class="detail" x={10} y={38}>{clip(node.detail, 34)}</text>

@@ -79,7 +79,7 @@ struct LineageLayoutTests {
         resolvedGraph.resolved = [issue.ref: .init(title: "Fix the flaky test", state: "open", labels: ["bug"])]
         let g = LineageLayout.graph(of: session, graph: resolvedGraph, costs: [:], title: title)
         #expect(g.node(issue.ref)?.detail == "Issue · open · bug")
-        #expect(g.node(issue.ref)?.row.name == "Fix the flaky test")
+        #expect(g.node(issue.ref)?.row.name == "#12 Fix the flaky test")
     }
 
     @Test func aTierFollowsTheOrderOfTheBoxesAboveIt() {

@@ -248,10 +248,10 @@ private struct LineageBox: View {
         if let open {
             Button(action: open) { content }
                 .buttonStyle(.plain)
-                .help(([node.row.name] + node.row.links + [verb])
+                .help(([node.row.name] + [node.row.ref].compactMap { $0 } + node.row.links + [verb])
                     .joined(separator: "\n"))
         } else {
-            content.help(([node.row.name] + node.row.links).joined(separator: "\n"))
+            content.help(([node.row.name] + [node.row.ref].compactMap { $0 } + node.row.links).joined(separator: "\n"))
         }
     }
 
