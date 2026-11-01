@@ -5,13 +5,14 @@ description: How the policy's three layers (Organisation, You, Folder) decide wh
 
 # Policy layers
 
-One policy tells what agents may do (#2957). It has three layers, from the top down:
+One policy tells what agents may do (#2957). It has three layers. From the top down, they
+are:
 
-1. **Organisation**: the organisation's policy, signed on the control plane. See
-   [Organisation policy on a machine](organisation-policy.md).
-2. **You**: your own rules. You edit them in **Settings ▸ Agents ▸ Policy**.
-3. **Folder**: a folder's rules, in its file `.agents/policy.json`, committed with the
-   folder's code.
+- **Organisation**: the organisation's policy, signed on the control plane. See
+  [Organisation policy on a machine](organisation-policy.md).
+- **You**: your own rules. You edit them in **Settings ▸ Agents ▸ Policy**.
+- **Folder**: a folder's rules, in its file `.agents/policy.json`, committed with the
+  folder's code.
 
 A slot for a **Group** layer, between Organisation and You, is kept for later.
 
