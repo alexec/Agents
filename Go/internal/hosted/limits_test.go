@@ -3,11 +3,14 @@ package hosted
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"net/http"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
@@ -85,6 +88,59 @@ func TestStorageHoldsToThePlan(t *testing.T) {
 	}
 	if _, err := l.Put(ctx, "v1/b.json", make([]byte, 600), store.Always); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// countedGets counts reads of an account's objects, the ones a count of its bytes made.
+type countedGets struct {
+	store.Store
+	gets atomic.Int64
+}
+
+func (c *countedGets) Get(ctx context.Context, key string) (*store.Object, error) {
+	if strings.HasPrefix(key, accountsPrefix) && strings.Count(key, "/") > 1 {
+		c.gets.Add(1)
+	}
+	return c.Store.Get(ctx, key)
+}
+
+// #3103: a start with no kept count counts the account's bytes from one listing, with no
+// read of any object, so a large store does not hold the first request past its 30 s.
+func TestACountReadsNoObject(t *testing.T) {
+	ctx := context.Background()
+	st := &countedGets{Store: store.NewMemory()}
+	keeper := "base64key://" + base64.URLEncoding.EncodeToString(bytes.Repeat([]byte{3}, 32))
+	s, err := New(ctx, Config{Store: st, Keeper: keeper, Domain: domain, Now: time.Now, MaxCopies: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(s.Stop)
+	acc, _, err := s.accounts.make(ctx, GitHubID{ID: 7, Login: "user"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	own := accountStore(st.Store, acc.ID)
+	for i := range 100 {
+		if _, err := own.Put(ctx, "v1/events/2026-10-31/"+itoa(i)+".json", make([]byte, 10+i), store.Always); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var want int64
+	keys, _ := own.List(ctx, "")
+	for _, k := range keys {
+		o, _ := own.Get(ctx, k.Key)
+		want += int64(len(o.Data))
+	}
+	st.gets.Store(0)
+	l, err := s.limitedFor(ctx, acc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if l.used() != want {
+		t.Fatal(l.used(), want)
+	}
+	if n := st.gets.Load(); n != 0 {
+		t.Fatalf("the count read %d objects", n)
 	}
 }
 

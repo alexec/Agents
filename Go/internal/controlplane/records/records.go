@@ -176,7 +176,7 @@ func (r *Records) load(ctx context.Context) error {
 	if err := r.loadProjects(ctx); err != nil {
 		return err
 	}
-	if object, ok := r.read(ctx, store.Key{Key: SettingsKey, ETag: "unreadable"}); ok && object != nil {
+	if object, ok := r.read(ctx, store.Key{Key: SettingsKey, ETag: "unreadable", Size: -1}); ok && object != nil {
 		var settings Settings
 		if err := json.Unmarshal(object.Data, &settings); err != nil {
 			r.noteUnreadable(SettingsKey, object.ETag, "")

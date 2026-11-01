@@ -285,7 +285,7 @@ func (f *Folder) walk(folder string, keys *[]Key) {
 		l = f.scan(folder, p, st)
 	}
 	for _, e := range l.files {
-		*keys = append(*keys, Key{join(folder, e.name), e.etag})
+		*keys = append(*keys, Key{join(folder, e.name), e.etag, e.size})
 	}
 	for _, name := range l.folders {
 		f.walk(join(folder, name), keys)
@@ -315,18 +315,18 @@ func (f *Folder) scan(folder, p string, st stamp) listing {
 			l.folders = append(l.folders, name)
 		case entry.isFile:
 			if tag, ok := f.index.etag(key, entry); ok {
-				l.files = append(l.files, named{name, tag})
+				l.files = append(l.files, named{name, tag, entry.size})
 			} else if data, err := os.ReadFile(file); err == nil {
 				tag := SHA256Tag(data)
 				f.index.know(key, entry, tag, true)
-				l.files = append(l.files, named{name, tag})
+				l.files = append(l.files, named{name, tag, int64(len(data))})
 			} else {
 				// There and unreadable (EACCES, EIO) is listed all the same (#206): left
 				// out, its member would be refused as unknown and a browser delete its
 				// key. The tag is no file's hash, so whoever lists it reads it, fails, and
 				// keeps what they held. It is not remembered: it is tried again.
 				unreadable = true
-				l.files = append(l.files, named{name, unreadableTag(entry)})
+				l.files = append(l.files, named{name, unreadableTag(entry), entry.size})
 			}
 		}
 	}
@@ -377,7 +377,10 @@ func stampOf(p string, following bool) (stamp, bool) {
 	return s, true
 }
 
-type named struct{ name, etag string }
+type named struct {
+	name, etag string
+	size       int64
+}
 
 type listing struct {
 	stamp stamp

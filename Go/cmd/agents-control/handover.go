@@ -139,7 +139,7 @@ func (p peerStore) List(_ context.Context, prefix string) ([]store.Key, error) {
 	}
 	keys := make([]store.Key, 0, len(entries))
 	for _, e := range entries {
-		keys = append(keys, store.Key{Key: e.Key, ETag: e.ETag})
+		keys = append(keys, store.Key{Key: e.Key, ETag: e.ETag, Size: -1})
 	}
 	return keys, nil
 }

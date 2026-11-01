@@ -42,6 +42,9 @@ type Object struct {
 type Key struct {
 	Key  string
 	ETag string
+	// Size is the object's bytes, as the listing says them, so its size needs no read
+	// (#3103); -1 when the store's listing does not say.
+	Size int64
 }
 
 // Condition is StoreCondition: Absent (If-None-Match: *), Matching(tag) (If-Match, the

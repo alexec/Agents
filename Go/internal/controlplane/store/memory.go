@@ -81,7 +81,7 @@ func (m *Memory) List(_ context.Context, prefix string) ([]Key, error) {
 	out := []Key{}
 	for k, o := range m.objects {
 		if strings.HasPrefix(k, prefix) {
-			out = append(out, Key{k, o.ETag})
+			out = append(out, Key{k, o.ETag, int64(len(o.Data))})
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Key < out[j].Key })

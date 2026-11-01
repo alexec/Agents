@@ -87,7 +87,7 @@ func TestListSeesNewKeys(t *testing.T) {
 		tag, _ := s.Put(ctx, "v1/clients/one.json", []byte("1"), Absent)
 		s.Put(ctx, "v1/machines/mac.json", []byte("2"), Absent)
 		l, err := s.List(ctx, "v1/clients/")
-		if err != nil || len(l) != 1 || l[0] != (Key{"v1/clients/one.json", tag}) {
+		if err != nil || len(l) != 1 || l[0] != (Key{"v1/clients/one.json", tag, 1}) {
 			t.Fatalf("listed %v %v", l, err)
 		}
 		if l, _ := s.List(ctx, "v1/"); len(l) != 2 {
@@ -273,7 +273,7 @@ func TestOnlyChangedRecordsAreReadAgain(t *testing.T) {
 		t.Fatal(err)
 	}
 	after, _ := reader.List(ctx, "v1/clients/")
-	if reader.HashedByListing() != 41 || after[5] != (Key{key, tag}) {
+	if reader.HashedByListing() != 41 || after[5] != (Key{key, tag, int64(len("renamed"))}) {
 		t.Fatal(reader.HashedByListing(), after[5])
 	}
 
