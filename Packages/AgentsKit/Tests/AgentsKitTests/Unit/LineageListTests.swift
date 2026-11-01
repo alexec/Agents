@@ -117,6 +117,15 @@ struct LineageListTests {
         }
     }
 
+    @Test func theBareFormMayAlsoBeAPullRequest() {
+        #expect(LineageList.pullRequest(typed: "alexec/Agents#12") == Node(kind: "pr", ref: "github:alexec/Agents#12"))
+        #expect(LineageList.pullRequest(typed: " github:alexec/Agents#12 ") == Node(kind: "pr", ref: "github:alexec/Agents#12"))
+        for no in ["https://github.com/alexec/Agents/issues/12", "https://github.com/alexec/Agents/pull/12",
+                   "https://github.com/alexec/Agents/milestone/15", "session:\(Self.s.uuidString)", "alexec/Agents"] {
+            #expect(LineageList.pullRequest(typed: no) == nil, "\(no)")
+        }
+    }
+
     @Test func theStartsGoBackAndForwardAsABrowsers() {
         var h = LineageHistory<String>()
         #expect(h.current == nil)

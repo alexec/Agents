@@ -238,8 +238,8 @@ export const noLineageHere = "No links from here yet. Start from another session
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** The start a person typed on the Lineage page (#3087), as LineageList.node(typed:) has it: a GitHub address of
- * an issue, a pull request, a milestone or a release; "owner/repo#12" (an issue); "github:owner/repo#12"; or a
- * session's id. Undefined for anything else. */
+ * an issue, a pull request, a milestone or a release; "owner/repo#12" (an issue, or the pull request of
+ * typedPullRequest); "github:owner/repo#12"; or a session's id. Undefined for anything else. */
 export function typedNode(text: string): LineageNode | undefined {
   text = text.trim();
   const id = text.startsWith("session:") ? text.slice("session:".length) : text;
@@ -262,6 +262,16 @@ export function typedNode(text: string): LineageNode | undefined {
   }
   const bare = text.startsWith("github:") ? text.slice("github:".length) : text;
   return /^[^/#\s]+\/[^/#\s]+#\d+$/.test(bare) ? { kind: "issue", ref: `github:${bare}` } : undefined;
+}
+
+/** The pull request that "owner/repo#12" may be (#3148), as LineageList.pullRequest(typed:) has it: GitHub gives
+ * issues and pull requests one number space, so the bare form is either. The page walks it when the issue has no
+ * links. Undefined for any other start. */
+export function typedPullRequest(text: string): LineageNode | undefined {
+  text = text.trim();
+  if (text.includes("://")) return undefined;
+  const node = typedNode(text);
+  return node?.kind === "issue" ? { kind: "pr", ref: node.ref } : undefined;
 }
 
 /** Where the Lineage page's walk starts (#3087), and the starts before and after it, as a browser's Back and
