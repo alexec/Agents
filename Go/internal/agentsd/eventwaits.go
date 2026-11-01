@@ -810,6 +810,9 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 		return warning + replaced + matchedWords(*hit, nil), nil
 	}
 	prev := d.endWait(agent, "agent", true)
+	// Only one of EventWait and an open Block is ever current (#3094): the chat draws one
+	// card at the foot of the chat, not both.
+	d.dropBlock(agent)
 	call := &openEventCall{waitID: wait.ID, answer: make(chan string, 1), started: time.Now()}
 	// Parked before the record says it waits, so an event in the next instant finds the
 	// call to answer rather than starting the agent again.

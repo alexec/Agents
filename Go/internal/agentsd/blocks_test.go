@@ -3,6 +3,7 @@ package agentsd
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/alexec/agents/Go/wire"
 )
@@ -116,5 +117,52 @@ func TestCheckAgainNeedsInMinutes(t *testing.T) {
 	}
 	if r := d.Store.Agent(lead.ID).Report; r == nil || r.Outcome != wire.WorkOutcomeWaiting {
 		t.Fatalf("%+v", r)
+	}
+}
+
+// Only one of a Block (check_again, wait_for_agents) and an EventWait (wait_for_event) is
+// ever open at a time, in either order (#3094): the chat draws one wait card at the foot
+// of the chat, not two.
+func TestOnlyOneWaitAtATime(t *testing.T) {
+	fakeRuntimes(t)
+	was := eventHoldLimit
+	eventHoldLimit = 300 * time.Millisecond
+	defer func() { eventHoldLimit = was }()
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	a := seeded(t, d, t.TempDir(), func(a *wire.Agent) { a.State, a.EndedReason = wire.AgentStateRunning, nil })
+	m := appClient(t, d, a.ID)
+	m.post("initialize", map[string]any{}, 1)
+
+	text, _ := m.tool(2, "check_again", map[string]any{"in_minutes": 30, "message": "Waiting for CI."})
+	if !strings.Contains(text, "Recorded.") {
+		t.Fatal(text)
+	}
+	if r := d.Store.Agent(a.ID).Report; r == nil || !isOpenBlock(r) {
+		t.Fatalf("no open block: %+v", r)
+	}
+
+	// wait_for_event closes the open block: it is replaced, not stacked.
+	text, _ = m.tool(3, "wait_for_event", map[string]any{"events": "branch.moved", "until_minutes": 10})
+	if !strings.HasPrefix(text, "Still waiting for branch.moved") {
+		t.Fatal(text)
+	}
+	if r := d.Store.Agent(a.ID).Report; isOpenBlock(r) {
+		t.Fatalf("the check-again block is still open: %+v", r.Block)
+	}
+	if d.Store.Agent(a.ID).EventWait == nil {
+		t.Fatal("no event wait was recorded")
+	}
+
+	// check_again closes the open event wait the same way.
+	text, _ = m.tool(4, "check_again", map[string]any{"in_minutes": 15, "message": "Waiting again."})
+	if !strings.Contains(text, "Replaced your earlier wait on branch.moved") || !strings.Contains(text, "Recorded.") {
+		t.Fatal(text)
+	}
+	if d.Store.Agent(a.ID).EventWait != nil {
+		t.Fatal("the event wait is still open")
+	}
+	if r := d.Store.Agent(a.ID).Report; r == nil || !isOpenBlock(r) {
+		t.Fatalf("no open block: %+v", r)
 	}
 }
