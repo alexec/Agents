@@ -384,6 +384,11 @@ struct ChatView: View {
 
     private var form: some View {
         PromptBar()
+            // The transcript scrolls under the bar (#3196): one material across the
+            // whole block, so its words blur behind the pills and between them rather
+            // than read through them. Kept to the bar's own bounds, as the top strip's.
+            .frame(maxWidth: .infinity)
+            .background(.bar, ignoresSafeAreaEdges: [])
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { formHeight = $0 }
     }
 }
