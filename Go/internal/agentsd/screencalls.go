@@ -50,6 +50,11 @@ type screenDriveState struct {
 	drives  map[wire.UUID]*driveProcess
 }
 
+// driveCallDeadline is how long one agents-drive request may take (#3109): a helper stuck
+// in an AX call (an app paused in the debugger, a hung app) would otherwise hold the tool
+// call open for ever. A var so a test can shorten it.
+var driveCallDeadline = 30 * time.Second
+
 func (p *driveProcess) call(req map[string]any) (map[string]any, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -58,10 +63,29 @@ func (p *driveProcess) call(req map[string]any) (map[string]any, error) {
 		return nil, err
 	}
 	b = append(b, 0)
-	if _, err := p.stdin.Write(b); err != nil {
-		return nil, fmt.Errorf("agents-drive: %w", err)
+	type read struct {
+		frame []byte
+		err   error
 	}
-	frame, err := p.out.ReadBytes(0)
+	got := make(chan read, 1)
+	go func() {
+		if _, err := p.stdin.Write(b); err != nil {
+			got <- read{err: err}
+			return
+		}
+		frame, err := p.out.ReadBytes(0)
+		got <- read{frame, err}
+	}()
+	var r read
+	select {
+	case r = <-got:
+	case <-time.After(driveCallDeadline):
+		// Killed, so the read above ends too; every caller drops this helper on an error
+		// (releaseScreenDrive), and the next call starts a fresh one.
+		p.cmd.Process.Kill()
+		return nil, fmt.Errorf("agents-drive: no answer to %v in %s, so it was stopped", req["action"], driveCallDeadline)
+	}
+	frame, err := r.frame, r.err
 	if err != nil {
 		return nil, fmt.Errorf("agents-drive: %w", err)
 	}
