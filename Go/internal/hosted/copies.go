@@ -34,7 +34,7 @@ type copyRunning struct {
 	last time.Time
 	// Under Service.mu: its WebSockets open now, against the plan's connections.
 	sockets int
-	// When the sweep last deleted its old events.
+	// When the sweep last deleted its old events; zero, as at start, sweeps them next.
 	eventsSwept time.Time
 }
 
@@ -144,13 +144,8 @@ func (s *Service) startCopy(ctx context.Context, id string) (*copyRunning, error
 		plain(w, http.StatusBadGateway, "Your control plane did not answer. Try again in a moment.\n")
 	}
 	s.log(fmt.Sprintf("%s: started at %s", id, cfg.URL))
-	c := &copyRunning{service: service, proxy: proxy, limits: st, agents: agents, eventsSwept: s.cfg.Now()}
-	if n, err := s.sweepEvents(ctx, st); err != nil {
-		s.log(id + ": events sweep: " + err.Error())
-	} else if n > 0 {
-		s.log(fmt.Sprintf("%s: deleted %d events older than its plan keeps", id, n))
-	}
-	return c, nil
+	// Its old events go at the next minute's sweep, not before its first answer (#3104).
+	return &copyRunning{service: service, proxy: proxy, limits: st, agents: agents}, nil
 }
 
 // clientOf is the address a request comes from: the last X-Forwarded-For entry when the
@@ -438,10 +433,17 @@ func (s *Service) sweepAccounts(ctx context.Context) {
 		}
 		s.mu.Unlock()
 		if due {
-			if n, err := s.sweepEvents(ctx, c.limits); err != nil {
+			n, err := s.sweepEvents(ctx, c.limits, eventsSweepMost)
+			if err != nil {
 				s.log(id + ": events sweep: " + err.Error())
 			} else if n > 0 {
 				s.log(fmt.Sprintf("%s: deleted %d events older than its plan keeps", id, n))
+			}
+			if n >= eventsSweepMost {
+				// More to delete: sweep again at the next minute.
+				s.mu.Lock()
+				c.eventsSwept = time.Time{}
+				s.mu.Unlock()
 			}
 		}
 	}

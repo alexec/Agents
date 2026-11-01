@@ -177,7 +177,7 @@ func TestEventsPastThePlanGo(t *testing.T) {
 	for _, key := range []string{"v1/events/" + old + "/1.json", "v1/events/" + old + "/2.json", "v1/events/" + kept + "/3.json"} {
 		l.Put(ctx, key, []byte(`{}`), store.Always)
 	}
-	if n, err := s.sweepEvents(ctx, l); err != nil || n != 2 {
+	if n, err := s.sweepEvents(ctx, l, eventsSweepMost); err != nil || n != 2 {
 		t.Fatal(n, err)
 	}
 	if left, _ := l.List(ctx, "v1/events/"); len(left) != 1 || !strings.Contains(left[0].Key, kept) {
@@ -185,6 +185,44 @@ func TestEventsPastThePlanGo(t *testing.T) {
 	}
 	if l.used() != 2 {
 		t.Fatal("the freed bytes were not counted:", l.used())
+	}
+}
+
+// #3104: a copy answers before its old events go; the sweep then deletes at most
+// eventsSweepMost a run, the oldest day first, and goes on at the next minute's run.
+func TestEventsGoAfterTheFirstAnswerABoundedRunAtATime(t *testing.T) {
+	s, _, now, _ := idleService(t, 0)
+	ctx := context.Background()
+	acc, _, err := s.accounts.make(ctx, GitHubID{ID: 3104, Login: "user"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	own := accountStore(s.cfg.Store, acc.ID)
+	older := now.Now().Add(-20 * day).Format("2006-01-02")
+	old := now.Now().Add(-8 * day).Format("2006-01-02")
+	for i := range 600 {
+		for _, d := range []string{older, old} {
+			if _, err := own.Put(ctx, "v1/events/"+d+"/"+itoa(i)+".json", []byte(`{}`), store.Absent); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	left := func(d string) int {
+		keys, _ := own.List(ctx, "v1/events/"+d+"/")
+		return len(keys)
+	}
+	open(t, s, acc.ID)
+	if left(older)+left(old) != 1200 {
+		t.Fatal("events deleted before the first answer:", left(older), left(old))
+	}
+	s.sweepAccounts(ctx)
+	if left(older) != 0 || left(old) != 200 {
+		t.Fatal("first run:", left(older), left(old))
+	}
+	now.add(time.Minute)
+	s.sweepAccounts(ctx)
+	if left(old) != 0 {
+		t.Fatal("second run:", left(old))
 	}
 }
 
@@ -223,7 +261,7 @@ func TestWritesReadNoOldObject(t *testing.T) {
 	if l.used() != 2000+20 {
 		t.Fatal(l.used())
 	}
-	if n, err := s.sweepEvents(ctx, l); err != nil || n != 1000 {
+	if n, err := s.sweepEvents(ctx, l, eventsSweepMost); err != nil || n != 1000 {
 		t.Fatal(n, err)
 	}
 	if err := l.Delete(ctx, "v1/copies/a.json"); err != nil {

@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/controlplane/audit"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 )
@@ -57,6 +58,9 @@ type limitedStore struct {
 	// of the old one first (#3105). Events are not in it: each is written once, Absent,
 	// and the sweep deletes them by the listing's sizes, so it holds only records.
 	sizes map[string]int
+	// The oldest day of events the sweep has not deleted yet, "" before its first run.
+	// Only sweepEvents, one run at a time, reads and writes it.
+	eventsOldest string
 }
 
 // The folders whose live records a plan counts.
@@ -358,29 +362,52 @@ func (s *Service) keptUsage(ctx context.Context, id string) int64 {
 
 // eventsFolder is where a control plane keeps its events, one folder a day
 // (v1/events/2026-10-22/…), as its own sweep reads them.
-const eventsFolder = "v1/events/"
+const eventsFolder = audit.Prefix
 
-// sweepEvents deletes an account's events from the days before its plan keeps.
-func (s *Service) sweepEvents(ctx context.Context, l *limitedStore) (int, error) {
-	keys, err := l.Store.List(ctx, eventsFolder)
-	if err != nil {
-		return 0, err
-	}
+// eventsSweepMost is the most events one sweep deletes (#3104), as the control plane's
+// own sweep bounds a round: a copy with more to delete (a downgrade from Pro leaves 83
+// days) goes on at the next minute's sweep.
+const eventsSweepMost = 1000
+
+// sweepEvents deletes an account's events from the days before its plan keeps, at most
+// most of them, a day folder at a time from the oldest (#3104), as the control plane's
+// eventSweep: only its first run lists the whole folder, to find the oldest day.
+func (s *Service) sweepEvents(ctx context.Context, l *limitedStore, most int) (int, error) {
 	cutoff := s.cfg.Now().UTC().Add(-l.planNow().EventsKept).Format("2006-01-02")
+	if l.eventsOldest == "" {
+		all, err := l.Store.List(ctx, eventsFolder)
+		if err != nil {
+			return 0, err
+		}
+		l.eventsOldest = cutoff
+		for _, k := range all {
+			// Sorted, so the first that names a day names the oldest.
+			if day := audit.KeyDay(k.Key); audit.NextDay(day) != "" {
+				l.eventsOldest = min(day, cutoff)
+				break
+			}
+		}
+	}
 	n := 0
-	for _, k := range keys {
-		day, _, ok := strings.Cut(strings.TrimPrefix(k.Key, eventsFolder), "/")
-		if !ok || len(day) != len("2006-01-02") || day >= cutoff {
-			continue
-		}
-		del := l.Delete
-		if k.Size >= 0 {
-			del = func(ctx context.Context, key string) error { return l.deleteSized(ctx, key, k.Size) }
-		}
-		if err := del(ctx, k.Key); err != nil {
+	for l.eventsOldest < cutoff && n < most {
+		keys, err := l.Store.List(ctx, audit.DayFolder(l.eventsOldest))
+		if err != nil {
 			return n, err
 		}
-		n++
+		for _, k := range keys {
+			if n >= most {
+				return n, nil
+			}
+			del := l.Delete
+			if k.Size >= 0 {
+				del = func(ctx context.Context, key string) error { return l.deleteSized(ctx, key, k.Size) }
+			}
+			if err := del(ctx, k.Key); err != nil {
+				return n, err
+			}
+			n++
+		}
+		l.eventsOldest = audit.NextDay(l.eventsOldest)
 	}
 	return n, nil
 }
