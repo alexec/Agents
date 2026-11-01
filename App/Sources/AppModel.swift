@@ -5740,6 +5740,16 @@ final class AppModel {
     /// folder's, as a new session's.
     var lineageHost: MachineRef { selectedFolderHost }
 
+    /// The machines that keep links (#3157), as the Lineage page's Machine menu names them: This
+    /// Mac first, then the rest by name. Empty without a control plane, where there is only one.
+    var lineageMachines: [(id: MachineRef, name: String)] {
+        let mine = thisMacHostID
+        return (controlPlaneHosts ?? [])
+            .filter { $0.runsAgents && $0.has(Capability.lineage1) }
+            .map { (id: $0.id, name: $0.id == mine ? "This Mac" : $0.name) }
+            .sorted { ($0.id == mine ? 0 : 1, $0.name) < ($1.id == mine ? 0 : 1, $1.name) }
+    }
+
     /// Open the Lineage page (#3087), from a place or from where it was.
     func showLineage(from place: LineagePlace? = nil) {
         if let place { lineageHistory.go(place) }
