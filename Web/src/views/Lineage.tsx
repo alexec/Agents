@@ -12,7 +12,7 @@ import { Capability } from "../protocol/capabilities.generated";
 import { describe } from "../model/errors";
 import {
   box, costKey, costed, curve, currentStart, emptyHistory, goBack, goForward, goTo, kindWord, lineageDepth, lineageGraph,
-  lineageNote, lineagePageNote, noLineage, noLineageHere, readingTitles, resolvingAsks, sessionNode, startRow, typedNode, typedPullRequest, type GraphNode, type LineageGraphLayout,
+  lineageNote, lineagePageNote, noLineage, noLineageHere, readingTitles, resolvingAsks, sessionHost, sessionNode, startRow, typedNode, typedPullRequest, type GraphNode, type LineageGraphLayout,
   type LineageHistory, type LineageRow,
 } from "../model/lineage";
 import { go, route } from "../route";
@@ -144,7 +144,7 @@ export function LineagePage({ store }: { store: Store }) {
     const text = typed.value;
     const node = typedNode(text);
     if (!node) { wrong.value = true; return; }
-    const owner = node.kind === "session" ? sessions.find((s) => s.agent.id === node.ref.slice("session:".length))?.host : undefined;
+    const owner = node.kind === "session" ? sessionHost(store.agents.value, node.ref.slice("session:".length)) : undefined;
     const host = owner ?? machine;
     if (!host) return;
     typed.value = "";
@@ -204,7 +204,7 @@ export function LineagePage({ store }: { store: Store }) {
         {layout.nodes.length === 0 ? <p class="hint">{noLineageHere}</p> : (
           <Graph layout={layout} verb={() => "Start from it"}
             show={(row) => row.node.kind === place.node.kind && row.node.ref === place.node.ref ? undefined
-              : () => startFrom({ host: row.session ? sessions.find((s) => s.agent.id === row.session)?.host ?? place.host : place.host, node: row.node })} />
+              : () => startFrom({ host: row.session ? sessionHost(store.agents.value, row.session) ?? place.host : place.host, node: row.node })} />
         )}
         {reading.value && <p class="quiet small">{readingTitles}</p>}
         {walked.limited && <p class="quiet small">The walk stopped at its limit: there are more links.</p>}

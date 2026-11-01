@@ -206,3 +206,11 @@ test("the starts go back and forward as a browser's", () => {
   assert.equal(h.places.length, l.mostStarts);
   assert.equal(l.currentStart(h), "n59");
 });
+
+test("a session's machine is found among every machine's sessions, not only the newest (#3156)", () => {
+  const many = Array.from({ length: 20 }, (_, i) => ({ id: `old-${i}` }));
+  const agents = { mac: many, linux: [{ id: "a" }, { id: S }] };
+  assert.equal(l.sessionHost(agents, S), "linux");
+  assert.equal(l.sessionHost(agents, "old-19"), "mac");
+  assert.equal(l.sessionHost(agents, "nowhere"), undefined);
+});
