@@ -84,13 +84,37 @@ func TestFailedRunsAndTheirDetails(t *testing.T) {
 	equal(t, len(runs), 2, "runs since")
 	equal(t, runs[1], RunRef{ID: 1, Attempt: 2, Name: "CI", URL: "u1", HeadSHA: "s1", Branch: "agents/a", PRNumber: 7,
 		UpdatedAt: "2026-10-16T10:01:00Z"}, "run")
-	details, err := g.RunDetails(context.Background(), repo, runs[0])
+	details, err := g.RunDetails(context.Background(), repo, runs[0], true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	equal(t, details.PR, PR{Number: 9, Title: "From a fork", Branch: "fork/main", URL: "p9"}, "a fork's PR is found by its commit")
 	equal(t, details.FailedJobs, []Job{{Name: "test", URL: "j"}}, "failed jobs only")
 	equal(t, details.Trusted, false, "a first-time contributor is not one of the repo's own")
+}
+
+func TestRunDetailsWithoutJobsAndPRBranchAskOnce(t *testing.T) {
+	api := newFakeAPI(t, map[string]string{
+		"repos/" + repo + "/actions/runs/3/jobs": `{"jobs": []}`,
+		"repos/" + repo + "/pulls/11": `{"number": 11, "title": "Green", "html_url": "p11", "head": {"ref": "agents/b", "repo": {"full_name": "` + repo + `"}},
+			"user": {"login": "alexec"}, "author_association": "OWNER"}`,
+	})
+	g := api.github()
+	run := RunRef{ID: 3, Attempt: 1, HeadSHA: "s3", Branch: "agents/b", PRNumber: 11}
+	details, err := g.RunDetails(context.Background(), repo, run, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	equal(t, details.PR.Number, 11, "the PR")
+	equal(t, api.hits["repos/"+repo+"/actions/runs/3/jobs"].Load(), int32(0), "checks.passed fetches no jobs (#3107)")
+	for range 3 {
+		branch, err := g.PRBranch(context.Background(), repo, 11)
+		if err != nil {
+			t.Fatal(err)
+		}
+		equal(t, branch, "agents/b", "the PR's branch")
+	}
+	equal(t, api.hits["repos/"+repo+"/pulls/11"].Load(), int32(2), "the branch is asked once, after RunDetails' own GET")
 }
 
 func TestPassedRunsOnlyMatchesSuccess(t *testing.T) {
