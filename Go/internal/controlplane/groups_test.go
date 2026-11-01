@@ -8,6 +8,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/providers"
+	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -116,4 +117,26 @@ func TestOnlyAProvidersGroupSeesAndUsesIt(t *testing.T) {
 	if got := listedProviders(t, sam.window); len(got) != 0 {
 		t.Fatalf("Sam, after: %+v", got)
 	}
+}
+
+// #3126: every group is read into memory at start, so groups are bounded; a removed one
+// makes room.
+func TestGroupsAreBounded(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	st := store.NewMemory()
+	for n := range mostGroups {
+		id := "g-" + itoa(n)
+		record := `{"id":"` + id + `","name":"` + id + `","members":[],"rev":1}`
+		if _, err := st.Put(ctx, records.GroupKey(id), []byte(record), store.Absent); err != nil {
+			t.Fatal(err)
+		}
+	}
+	p := startPlaneWith(t, st, controllink.NewPrivateKey(), nil)
+	_, owner := p.client("Alex's Mac")
+	if e := callError(t, owner, "", "groups/set", wire.GroupSet{Name: "One more"}); !strings.Contains(e, "Remove one first") {
+		t.Fatal(e)
+	}
+	call(t, owner, "", "groups/remove", wire.GroupRequest{ID: "g-0"})
+	call(t, owner, "", "groups/set", wire.GroupSet{Name: "One more"})
 }

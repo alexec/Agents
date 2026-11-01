@@ -17,6 +17,8 @@ import (
 const (
 	codesKeptAfterExpiry = 24 * time.Hour
 	tombstonesKept       = 7 * 24 * time.Hour
+	// A removed person goes once every code they made has run out (FR-029, #3126).
+	removedPeopleKept = inviteLifetime + tombstonesKept
 	leftoversKept        = time.Hour
 	sweepEvery           = time.Hour
 	mostPerSweep         = 1000
@@ -144,14 +146,25 @@ func sweep(ctx context.Context, rs *records.Records, now time.Time, most int, ev
 			ForgottenAt *records.Stamp `json:"forgottenAt"`
 			Removed     *bool          `json:"removed"`
 			RemovedAt   *records.Stamp `json:"removedAt"`
+			SignIns     []any          `json:"signIns"`
 		}
 		if object == nil || json.Unmarshal(object.Data, &mark) != nil {
 			continue
 		}
-		if strings.HasPrefix(key, records.ProjectsPrefix) {
-			// A removed project (#2711): projects/remove always gives it removedAt.
+		before := forgottenBefore
+		if strings.HasPrefix(key, records.ProjectsPrefix) || strings.HasPrefix(key, records.GroupsPrefix) ||
+			strings.HasPrefix(key, records.PeoplePrefix) {
+			// A removed project (#2711), group or person (#3126): removing one always gives
+			// it removedAt.
 			if mark.Removed == nil || !*mark.Removed || mark.RemovedAt == nil {
 				continue
+			}
+			if strings.HasPrefix(key, records.PeoplePrefix) {
+				// A person's sign-ins stay refused while the record is kept.
+				if len(mark.SignIns) > 0 {
+					continue
+				}
+				before = now.Add(-removedPeopleKept)
 			}
 			mark.Forgotten, mark.ForgottenAt = mark.Removed, mark.RemovedAt
 		}
@@ -167,7 +180,7 @@ func sweep(ctx context.Context, rs *records.Records, now time.Time, most int, ev
 			}
 			continue
 		}
-		if !mark.ForgottenAt.Before(forgottenBefore) {
+		if !mark.ForgottenAt.Before(before) {
 			continue
 		}
 		// Read again just before: a record written over it since is not a tombstone.

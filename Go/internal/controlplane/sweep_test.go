@@ -149,6 +149,58 @@ func TestTheSweepRemovesRemovedProjects(t *testing.T) {
 	}
 }
 
+// #3126: a removed group goes a week on, as a project does; a removed person goes once
+// every code they made has run out, unless a sign-in of theirs is still to be refused.
+func TestTheSweepRemovesRemovedGroupsAndPeople(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	s := store.NewMemory()
+	rs := records.New(s)
+	rs.SettingsOrMake(ctx, func() records.Settings { return records.Settings{Name: "test", MachineID: "m"} })
+	yes, now := true, records.Now()
+	for _, id := range []string{"g-live", "g-gone"} {
+		rs.ChangeGroup(ctx, id, func(*records.Group) (*records.Group, error) {
+			return &records.Group{ID: id, Name: id}, nil
+		})
+	}
+	rs.ChangeGroup(ctx, "g-gone", func(g *records.Group) (*records.Group, error) {
+		next := *g
+		next.Removed, next.RemovedAt = &yes, &now
+		return &next, nil
+	})
+	rs.ChangePeople(ctx, func(map[string]records.Person) ([]records.Person, error) {
+		return []records.Person{
+			{ID: "u-live", Name: "Live"},
+			{ID: "u-gone", Name: "Gone", Removed: &yes, RemovedAt: &now},
+			{ID: "u-refused", Name: "Refused", Removed: &yes, RemovedAt: &now,
+				SignIns: []records.SignIn{{Provider: "google", Account: "1"}}},
+		}, nil
+	})
+	at := time.Now()
+	if report, err := sweep(ctx, rs, at, mostPerSweep, nil); err != nil || report.tombstones != 0 {
+		t.Fatalf("%+v %v", report, err)
+	}
+	// A week on, the group goes; the person's invite could still be spent.
+	if report, err := sweep(ctx, rs, at.Add(8*24*time.Hour), mostPerSweep, nil); err != nil || report.tombstones != 1 {
+		t.Fatalf("%+v %v", report, err)
+	}
+	if o, _ := s.Get(ctx, records.GroupKey("g-gone")); o != nil {
+		t.Fatal("the removed group stayed")
+	}
+	if report, err := sweep(ctx, rs, at.Add(15*24*time.Hour), mostPerSweep, nil); err != nil || report.tombstones != 1 {
+		t.Fatalf("%+v %v", report, err)
+	}
+	if o, _ := s.Get(ctx, records.PersonKey("u-gone")); o != nil {
+		t.Fatal("the removed person stayed")
+	}
+	if o, _ := s.Get(ctx, records.PersonKey("u-refused")); o == nil {
+		t.Fatal("the removed person with a sign-in went, so the sign-in is no longer refused")
+	}
+	if rs.Group("g-live") == nil || rs.Person("u-live") == nil {
+		t.Fatal("the live ones went")
+	}
+}
+
 func TestTheSweepStopsAtItsBound(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
