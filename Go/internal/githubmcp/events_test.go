@@ -236,7 +236,7 @@ func (f *fakeGitHub) PRLabelActivity(_ context.Context, _ string, kind PRLabelKi
 	return out, false, nil
 }
 
-func (f *fakeGitHub) PRComments(_ context.Context, _, since string) ([]PRComment, bool, error) {
+func (f *fakeGitHub) PRComments(_ context.Context, _, since string, pr int) ([]PRComment, bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.err != nil {
@@ -244,9 +244,13 @@ func (f *fakeGitHub) PRComments(_ context.Context, _, since string) ([]PRComment
 	}
 	var out []PRComment
 	for _, c := range f.prComments {
-		if !before(c.At, since) && !strings.HasPrefix(c.Body, agentCommentPrefix) {
-			out = append(out, c)
+		if before(c.At, since) {
+			continue
 		}
+		if strings.HasPrefix(c.Body, agentCommentPrefix) || pr != 0 && c.PR.Number != pr {
+			c = PRComment{ID: c.ID, At: c.At, Other: true}
+		}
+		out = append(out, c)
 	}
 	return out, false, nil
 }

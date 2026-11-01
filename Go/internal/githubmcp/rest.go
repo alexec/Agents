@@ -900,8 +900,9 @@ func (g *RealGitHub) PRLabelActivity(ctx context.Context, repo string, kind PRLa
 // PRComments is the pr.commented event's reads: the repo's issues/comments endpoint carries a
 // pull request's conversation comments too (GitHub treats a PR as an issue underneath), so the
 // issue each one names (cached) says whether it is a pull request; the pull itself (cached too)
-// gives its branch and whether it is the repo's own.
-func (g *RealGitHub) PRComments(ctx context.Context, repo, since string) ([]PRComment, bool, error) {
+// gives its branch and whether it is the repo's own. With pr not 0, a comment on another number
+// fetches nothing: the number is in its issue_url (P20261031-1).
+func (g *RealGitHub) PRComments(ctx context.Context, repo, since string, pr int) ([]PRComment, bool, error) {
 	type comment struct {
 		ID          int    `json:"id"`
 		HTMLURL     string `json:"html_url"`
@@ -921,10 +922,12 @@ func (g *RealGitHub) PRComments(ctx context.Context, repo, since string) ([]PRCo
 	issues := map[string]issueJSON{}
 	pulls := map[string]pull{}
 	for _, c := range items {
-		if strings.HasPrefix(c.Body, agentCommentPrefix) {
+		issuePath := strings.TrimPrefix(strings.TrimPrefix(c.IssueURL, g.API), "https://api.github.com/")
+		other := PRComment{ID: c.ID, At: c.CreatedAt, Other: true}
+		if strings.HasPrefix(c.Body, agentCommentPrefix) || pr != 0 && issueNumber(issuePath) != pr {
+			out = append(out, other)
 			continue
 		}
-		issuePath := strings.TrimPrefix(strings.TrimPrefix(c.IssueURL, g.API), "https://api.github.com/")
 		i, ok := issues[issuePath]
 		if !ok {
 			if err := g.get(ctx, issuePath, false, &i); err != nil {
@@ -933,6 +936,7 @@ func (g *RealGitHub) PRComments(ctx context.Context, repo, since string) ([]PRCo
 			issues[issuePath] = i
 		}
 		if !i.isPR() {
+			out = append(out, other)
 			continue
 		}
 		pullPath := strings.Replace(issuePath, "/issues/", "/pulls/", 1)
@@ -947,6 +951,12 @@ func (g *RealGitHub) PRComments(ctx context.Context, repo, since string) ([]PRCo
 			Trusted: isTrusted(c.Association, c.User.Login, c.User.Type)})
 	}
 	return out, truncated, nil
+}
+
+// issueNumber is the number at the end of an issue's API path, 0 when there is none.
+func issueNumber(path string) int {
+	n, _ := strconv.Atoi(path[strings.LastIndex(path, "/")+1:])
+	return n
 }
 
 // MARK: The host's connection

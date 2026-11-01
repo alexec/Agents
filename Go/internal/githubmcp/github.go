@@ -234,6 +234,9 @@ type PRComment struct {
 	URL     string
 	At      string
 	Trusted bool
+	// Other is a comment that is never raised (an agent's own, an issue's, or another PR's when
+	// the wait names one): only its ID and At are set, so the cursor still moves past it.
+	Other bool
 }
 
 // agentCommentPrefix marks a comment the agents posted themselves, not a person (#2838): every
@@ -266,8 +269,9 @@ type GitHub interface {
 	// PRLabelActivity is a label added to or removed from a pull request at or after since.
 	PRLabelActivity(ctx context.Context, repo string, kind PRLabelKind, since string) (items []PRLabelActivity, truncated bool, err error)
 	// PRComments are comments left on pull requests' conversations (not CodeRabbitComments' review
-	// comments on a line) at or after since, an agent's own left out.
-	PRComments(ctx context.Context, repo, since string) (comments []PRComment, truncated bool, err error)
+	// comments on a line) at or after since. An agent's own, an issue's, and another PR's when pr
+	// is not 0 are Other, with nothing fetched for them.
+	PRComments(ctx context.Context, repo, since string, pr int) (comments []PRComment, truncated bool, err error)
 	// CodeRabbitPRs are the open PRs and whether CodeRabbit has reviewed each one's head commit (#1344).
 	CodeRabbitPRs(ctx context.Context, repo string) ([]ReviewedPR, error)
 	// CodeRabbitComments are CodeRabbit's review comments made at or after since.
