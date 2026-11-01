@@ -3,13 +3,16 @@
 // are OrgPolicyWords (Packages/AgentsKit/.../Model/OrgPolicy.swift) on the Mac and the Remote; the
 // same here, for Settings ▸ Policy and Console ▸ Policy. Below them, the Console's form: the policy
 // as fields an admin types in, back to a policy, and what a change does before it is saved.
-import type { AuditActor, CostLimits, FleetMachine, OrgPolicy, PolicyBudgets, PolicyReach, PolicyRefusal, PolicyRuntimeRule, PolicySetBy, PolicyState, PolicyStopAll,
+import type { AuditActor, CostLimits, FleetMachine, OrgPolicy, PolicyBudgets, PolicyLayerRef, PolicyReach, PolicyRefusal, PolicyRuntimeRule, PolicySetBy, PolicyState, PolicyStopAll,
   PolicyView, WireDate }
   from "../protocol/generated";
 import type { CallFailed } from "../wire/link";
 import { Failure } from "../protocol/generated";
 
 export const setBy = "Set by your organisation";
+/** The titles of a limit from the person's own layer and from a folder's (#2957, #3150). */
+export const setByYou = "Set by you";
+export const setByFolder = "Set by this folder";
 export const title = "Policy";
 export const none = "Your organisation sets no policy.";
 export const editPolicy = "Edit Policy";
@@ -212,9 +215,19 @@ export function viewOf(policy: OrgPolicy | undefined): PolicyView {
   return policy ? { policy } : {};
 }
 
-/** The line under a refused choice: the mark's words under **Set by your organisation**. */
+/** The title for the layer that decided (PolicyLayerRef.kind): the organisation's when none is named (#3150). */
+export function layerTitle(kind: PolicyLayerRef["kind"] | undefined): string {
+  return kind === "you" ? setByYou : kind === "folder" ? setByFolder : setBy;
+}
+
+/** A mark's title: **Set by you**, **Set by this folder** or **Set by your organisation**. */
+export function markTitle(mark: PolicySetBy): string {
+  return layerTitle(mark.layer?.kind ?? mark.by);
+}
+
+/** The line under a refused choice: the mark's words under its layer's title. */
 export function line(mark: PolicySetBy): string {
-  return `${setBy}. ${mark.words}`;
+  return `${markTitle(mark)}. ${mark.words}`;
 }
 
 /** The organisation's budgets in force for this person today (CostState.organisation), as rows on Cost. */
@@ -250,9 +263,9 @@ export function refusalOf(error: unknown): PolicyRefusal | null {
   return data as PolicyRefusal;
 }
 
-/** A refusal as one line: **Set by your organisation** first, except where the words say what to do. */
+/** A refusal as one line: its layer's title first (**Set by your organisation** when it names none), except where the words say what to do. */
 export function refusalLine(r: PolicyRefusal): string {
-  return r.reason === "noPolicy" || r.reason === "mustJoin" ? r.words : `${setBy}. ${r.words}`;
+  return r.reason === "noPolicy" || r.reason === "mustJoin" ? r.words : `${layerTitle(r.layer?.kind)}. ${r.words}`;
 }
 
 // Console ▸ Policy: the policy as the fields an admin types in.

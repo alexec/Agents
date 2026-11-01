@@ -72,6 +72,17 @@ test("a mark and a policyRefused error say the line", () => {
   assert.equal(o.refusalOf(new Error("no")), null);
 });
 
+test("a limit from your own or a folder's layer says that layer, not the organisation (#3150)", () => {
+  const you = { kind: "you", name: "You" };
+  const folder = { kind: "folder", name: "web", folder: "/src/web" };
+  assert.equal(o.line({ by: "you", rule: "modeCeiling", words: "At most Approve.", layer: you }), "Set by you. At most Approve.");
+  assert.equal(o.line({ by: "folder", rule: "modeCeiling", words: "At most Approve.", layer: folder }), "Set by this folder. At most Approve.");
+  assert.equal(o.refusalLine({ reason: "policy", words: "At most Approve.", layer: you }), "Set by you. At most Approve.");
+  assert.equal(o.refusalLine({ reason: "policy", words: "At most Approve.", layer: folder }), "Set by this folder. At most Approve.");
+  assert.equal(o.refusalLine({ reason: "policy", words: "At most Approve.", layer: { kind: "organisation", name: "Acme" } }),
+    "Set by your organisation. At most Approve.");
+});
+
 test("no policy is a form that sets nothing, and back to a policy with no rules", () => {
   const form = o.formOf(undefined);
   assert.equal(form.limitRuntimes, false);

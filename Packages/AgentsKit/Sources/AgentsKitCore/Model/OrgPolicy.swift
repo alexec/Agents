@@ -226,17 +226,27 @@ public extension DaemonAPI {
 
     /// The mark on a choice the policy refuses or caps (FR-010), on the lists a machine sends.
     struct PolicySetBy: Codable, Sendable, Hashable {
-        /// Always `organisation`.
+        /// `organisation`, `you` or `folder`: the layer that decided (#2957, R8).
         public var by: String
         /// The rule's name, such as `modeCeiling` or `runtimes.codex.models`.
         public var rule: String
         public var words: String
+        /// The layer that decided, with its name (#2957, R8).
+        public var layer: PolicyLayerRef?
 
-        public init(by: String = "organisation", rule: String, words: String) {
+        public init(by: String = "organisation", rule: String, words: String, layer: PolicyLayerRef? = nil) {
             self.by = by
             self.rule = rule
             self.words = words
+            self.layer = layer
         }
+
+        /// **Set by you**, **Set by this folder** or **Set by your organisation**, from the layer
+        /// that decided (#3150).
+        public var title: String { OrgPolicyWords.layerTitle(layer?.kind ?? by) }
+
+        /// The layer's symbol beside the title.
+        public var symbol: String { OrgPolicyWords.layerSymbol(layer?.kind ?? by) }
     }
 
     /// The data of a `policyRefused` error (FR-010): why, the rule, and the words.
@@ -246,12 +256,20 @@ public extension DaemonAPI {
         public var rule: String?
         public var words: String
         public var until: Date?
+        /// The layer that decided, when the machine names one (#2957, R8); absent for the
+        /// organisation's own refusals.
+        public var layer: PolicyLayerRef?
+        /// What that layer allows.
+        public var value: String?
 
-        public init(reason: String, rule: String? = nil, words: String, until: Date? = nil) {
+        public init(reason: String, rule: String? = nil, words: String, until: Date? = nil,
+                    layer: PolicyLayerRef? = nil, value: String? = nil) {
             self.reason = reason
             self.rule = rule
             self.words = words
             self.until = until
+            self.layer = layer
+            self.value = value
         }
 
         /// The refusal in a `policyRefused` error, or nil for any other error.
@@ -262,11 +280,15 @@ public extension DaemonAPI {
             self = refusal
         }
 
-        /// The title over the words: **Set by your organisation**, except where the words say
-        /// what to do (`noPolicy`, `mustJoin`).
+        /// The title over the words: **Set by your organisation**, or **Set by you** or **Set by
+        /// this folder** for those layers' refusals (#3150), except where the words say what to do
+        /// (`noPolicy`, `mustJoin`).
         public var title: String? {
-            ["noPolicy", "mustJoin"].contains(reason) ? nil : OrgPolicyWords.setBy
+            ["noPolicy", "mustJoin"].contains(reason) ? nil : OrgPolicyWords.layerTitle(layer?.kind)
         }
+
+        /// The layer's symbol beside the title.
+        public var symbol: String { OrgPolicyWords.layerSymbol(layer?.kind) }
 
         /// The title and the words, as one line.
         public var line: String {
@@ -385,6 +407,9 @@ public enum OrgPolicyWords {
     public static let setBy = "Set by your organisation"
     public static let title = "Policy"
     public static let symbol = "building.columns"
+    /// The titles of a limit from the person's own layer and from a folder's (#2957, #3150).
+    public static let setByYou = "Set by you"
+    public static let setByFolder = "Set by this folder"
     public static let none = "Your organisation sets no policy."
     public static let editInConsole = "Edit in Console"
     /// Over the person's pass-through names (`runtime-environment.json`).
@@ -590,8 +615,28 @@ public enum OrgPolicyWords {
                                      words: "Your organisation does not allow MCP servers added by hand.")
     }
 
-    /// The line under a refused choice: the mark's words, under **Set by your organisation**.
+    /// The title for the layer that decided (`PolicyLayerRef.kind`): the organisation's when none
+    /// is named (#3150).
+    public static func layerTitle(_ kind: String?) -> String {
+        switch kind {
+        case "you": setByYou
+        case "folder": setByFolder
+        default: setBy
+        }
+    }
+
+    /// The symbol for the layer that decided: a person, a folder, or the organisation's building.
+    public static func layerSymbol(_ kind: String?) -> String {
+        switch kind {
+        case "you": "person"
+        case "folder": "folder"
+        default: symbol
+        }
+    }
+
+    /// The line under a refused choice: the mark's words, under its layer's title (**Set by your
+    /// organisation**, **Set by you** or **Set by this folder**).
     public static func line(_ mark: DaemonAPI.PolicySetBy) -> String {
-        "\(setBy). \(mark.words)"
+        "\(mark.title). \(mark.words)"
     }
 }
