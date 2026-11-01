@@ -111,12 +111,13 @@ POLICIES = {
     },
     "copilot": {
         "lever": "three launch flags, one of them --excluded-tools",
-        "removed": ["session_store_sql"],
+        "removed": ["session_store_sql", "dynamic_workflows_manage", "run_dynamic_workflow"],
         "kept": ["task", "list_agents", "read_agent", "write_agent"],
         "residue": ["search_code_subagent"],
         "meta": None,
         "args": ["--disable-mcp-server", "software-factory", "--disable-builtin-mcps",
-                 "--excluded-tools", "session_store_sql"],
+                 "--excluded-tools", "session_store_sql", "dynamic_workflows_manage",
+                 "run_dynamic_workflow"],
         "env": {},
     },
     "cursor": {
