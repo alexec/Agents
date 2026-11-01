@@ -617,7 +617,7 @@ final class RemoteModel {
                 openWorkflow = nil
                 openReview = nil
                 openArchive = true
-            case .spending, .tokens, .time, .milestones, .mcpServers, .folderMCPServers:
+            case .spending, .tokens, .time, .lineage, .milestones, .mcpServers, .folderMCPServers:
                 // Usage and connectors are Mac + web (#2798): the Remote opens none of them.
                 break
             }
