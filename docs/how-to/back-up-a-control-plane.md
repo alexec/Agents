@@ -24,7 +24,7 @@ machine, see [Back up and restore a machine](back-up-and-restore.md).
 
 | In the backup | What it is |
 | --- | --- |
-| `store/` | Every record: clients, machines, people, settings, and your and the providers' secrets, sealed. Machine records are under `v1/machines/`. On a cloud machine, the control key sealed by its KMS too. |
+| `store/` | Every record: clients, machines, people, settings, and your and the providers' secrets, sealed. Machine records are under `v1/machines/`. The servers' backups, sealed with their own key, are under `v1/backups/`, and that key, sealed with the control key, is `v1/backups.key`. On a cloud machine, the control key sealed by its KMS too. |
 | `control-key` | The control key, when it is in a file or handed in (a Mac). |
 | `secrets-key` | The key that seals secrets on a Mac. A cloud machine uses its KMS instead. |
 | `tls/cert.pem`, `tls/key.pem` | The certificate that every device and machine is pinned to, when the control plane makes its own. |
