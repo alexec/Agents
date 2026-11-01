@@ -93,6 +93,54 @@ func TestMetricsCountLimits(t *testing.T) {
 	}
 }
 
+// #3123: N+2 backups with --keep N leave the newest N, and nothing else in the folder goes.
+func TestPruneBackupsKeepsTheNewest(t *testing.T) {
+	ctx := context.Background()
+	st := store.NewMemory()
+	a := Admin{Store: st}
+	if _, _, err := a.accounts().make(ctx, GitHubID{ID: 1, Login: "ana"}); err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	other := filepath.Join(root, "notes")
+	if err := os.MkdirAll(filepath.Join(other, "abcdefghij"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	const keep = 3
+	days := []string{"2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05"}
+	for _, day := range days {
+		dir := filepath.Join(root, day)
+		if _, err := a.Backup(ctx, dir, nil); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := PruneBackups(dir, keep); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var left []string
+	entries, _ := os.ReadDir(root)
+	for _, e := range entries {
+		left = append(left, e.Name())
+	}
+	if want := append(append([]string{}, days[len(days)-keep:]...), "notes"); strings.Join(left, " ") != strings.Join(want, " ") {
+		t.Fatal(left)
+	}
+	// A backup named before the newest keeps them, and is never deleted itself.
+	again := filepath.Join(root, "2026-09-30")
+	if _, err := a.Backup(ctx, again, nil); err != nil {
+		t.Fatal(err)
+	}
+	if gone, err := PruneBackups(again, keep); err != nil || len(gone) != 0 {
+		t.Fatal(gone, err)
+	}
+	if _, err := os.Stat(again); err != nil {
+		t.Fatal("deleted the backup just made:", err)
+	}
+	if _, err := PruneBackups(again, 0); err == nil {
+		t.Fatal("kept no backup")
+	}
+}
+
 // #2226 FR-041: a backup of one account restores only that account's records, and only
 // once it is suspended; a deleted account comes back whole.
 func TestBackupAndRestoreOneAccount(t *testing.T) {

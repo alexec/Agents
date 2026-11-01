@@ -221,11 +221,25 @@ the snapshot schedule on the new disk.
 every other account stays as it is.
 
 ```sh
-admin backup /data/backups/2026-10-22            # every account
+admin backup --keep 7 /data/backups/2026-10-22   # every account; keep the newest 7
 admin backup /data/backups/2026-10-22 <account>  # one
 ```
 
-`/data` is the service's volume, so a backup there is in the next snapshot too. To restore:
+Name each backup folder by its date, so the names sort oldest first. Each backup holds every
+account, so it is as large as the store. `--keep N` deletes all but the newest N backup folders
+beside the new one, after the new one is whole. It deletes only folders that `admin backup`
+wrote, and nothing else in `/data/backups`. Without `--keep`, nothing is deleted.
+
+`/data` is the service's volume, so a backup there is in the next snapshot too, but a loss of
+the disk takes it too. To keep a copy off the disk, copy each backup to a bucket in a different
+region, with a lifecycle rule that deletes objects after the days you keep:
+
+```sh
+gcloud storage cp -r /data/backups/2026-10-22 gs://<backups-bucket>/
+```
+
+The records hold each account's sealed control key, so give the bucket only to the service's
+operators. To restore from the bucket, copy the folder back to `/data/backups` first. To restore:
 
 1. `admin suspend <account> restoring`, then wait a minute, so its control plane stops.
 2. `admin restore /data/backups/2026-10-22 <account>`. Each record in the backup is put back,
@@ -249,7 +263,7 @@ Run these on the service's machine. A running service sees each change within a 
 | `agents-hosted admin unblock <GitHub id>` | Lets them sign up again |
 | `agents-hosted admin plan <account> free\|pro` | Puts an account on a plan by hand |
 | `agents-hosted admin delete <account>` | Deletes a suspended account and everything it keeps |
-| `agents-hosted admin backup <dir> [account…]` | Copies accounts' records into a folder |
+| `agents-hosted admin backup [--keep N] <dir> [account…]` | Copies accounts' records into a folder, and keeps the newest N backups |
 | `agents-hosted admin restore <dir> <account>` | Puts one suspended or deleted account back |
 
 **Delete an account:** the person deletes their own with **Delete Account** on the account
@@ -299,7 +313,7 @@ one line per event, and never a code, a key, a token or an email address.
 | What you see | What to do |
 | --- | --- |
 | `refusals_total{kind="full"}` rises | More control planes are wanted at once than `AGENTS_HOSTED_MAX_COPIES`: raise it, or use a bigger VM |
-| `disk_bytes{kind="total"}` less `disk_bytes{kind="free"}` nears `disk_high_water_bytes`, or `refusals_total{kind="disk"}` rises | The disk is nearly full and accounts can no longer write: grow the disk, delete old `admin backup` folders, prune old images |
+| `disk_bytes{kind="total"}` less `disk_bytes{kind="free"}` nears `disk_high_water_bytes`, or `refusals_total{kind="disk"}` rises | The disk is nearly full and accounts can no longer write: grow the disk, run `admin backup` with a smaller `--keep`, prune old images |
 | `storage_promised_bytes` nears `storage_total_bytes`, or `refusals_total{kind="upgrade_full"}` rises | New accounts wait and upgrades are refused: grow the disk, or raise `AGENTS_HOSTED_STORAGE_TOTAL_GB` |
 | `refusals_total{kind="certificates"}` rises | New accounts wait for Let's Encrypt's limits: see #2227 for one wildcard certificate |
 | `refusals_total{kind="rate"}` rises fast | A sign-up flood: lower the rates, or set `AGENTS_HOSTED_SIGNUP=closed` |

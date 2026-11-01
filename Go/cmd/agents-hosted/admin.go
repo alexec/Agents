@@ -28,7 +28,9 @@ const adminUsage = `usage: agents-hosted admin <verb> …
   block <github id|login> [why]  refuse a GitHub user, and suspend their account
   unblock <github id>        let them sign up again
   plan <account> free|pro    put an account on a plan by hand
-  backup <dir> [account…]    copy accounts (every one when none is named) into dir
+  backup [--keep N] <dir> [account…]
+                             copy accounts (every one when none is named) into dir;
+                             --keep N deletes all but the newest N backups beside it
   restore <dir> <account>    put one suspended or deleted account back from dir
   delete <account>           delete a suspended account and everything it keeps
 
@@ -160,12 +162,36 @@ func runAdmin(ctx context.Context, a hosted.Admin, args []string, out io.Writer)
 		}
 		return a.SetPlan(ctx, rest[0], rest[1])
 	case "backup":
+		keep := 0
+		if len(rest) > 0 && (rest[0] == "--keep" || strings.HasPrefix(rest[0], "--keep=")) {
+			n := strings.TrimPrefix(rest[0], "--keep=")
+			rest = rest[1:]
+			if n == "--keep" {
+				if len(rest) == 0 {
+					return errUsage
+				}
+				n, rest = rest[0], rest[1:]
+			}
+			k, err := strconv.Atoi(n)
+			if err != nil || k < 1 {
+				return errUsage
+			}
+			keep = k
+		}
 		if err := need(1); err != nil {
 			return err
 		}
 		done, err := a.Backup(ctx, rest[0], rest[1:])
 		for _, id := range done {
 			fmt.Fprintln(out, "backed up "+id)
+		}
+		if err != nil || keep == 0 {
+			return err
+		}
+		// Only after a whole backup, so a failed one never costs an older one.
+		gone, err := hosted.PruneBackups(rest[0], keep)
+		for _, p := range gone {
+			fmt.Fprintln(out, "deleted "+p)
 		}
 		return err
 	case "delete":
