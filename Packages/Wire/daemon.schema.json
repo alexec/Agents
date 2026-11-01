@@ -14913,6 +14913,27 @@
       ],
       "additionalProperties": false
     },
+    "PersonKeyRotation": {
+      "type": "object",
+      "description": "The person key moving to a new pair (#2957, data-model.md \"PersonKeyRotation\"): the new public key, signed by the one it replaces. A machine moves its pin only with one that checks against the key it has pinned.",
+      "properties": {
+        "newKey": {
+          "$ref": "#/definitions/Base64"
+        },
+        "newKeyID": {
+          "type": "string"
+        },
+        "signature": {
+          "$ref": "#/definitions/PolicySignature"
+        }
+      },
+      "required": [
+        "newKey",
+        "newKeyID",
+        "signature"
+      ],
+      "additionalProperties": false
+    },
     "PersonMachine": {
       "type": "object",
       "description": "A machine in People: its name, its state and nothing inside it (FR-019).",
@@ -15521,6 +15542,36 @@
       ],
       "additionalProperties": false
     },
+    "PinnedPersonKey": {
+      "type": "object",
+      "description": "The person's public key this machine trusts (#2957, data-model.md \"PinnedPersonKey\"), kept at <root>/person-key.pub.json: from a join code, the Mac window's direct link, or, for a machine joined before this version, the first signed layer the control plane sends (trust on first use, research R3).",
+      "properties": {
+        "key": {
+          "$ref": "#/definitions/Base64"
+        },
+        "keyID": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string",
+          "enum": [
+            "joinCode",
+            "window",
+            "controlPlane"
+          ]
+        },
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "key",
+        "keyID",
+        "from",
+        "at"
+      ],
+      "additionalProperties": false
+    },
     "PinnerKind": {
       "type": "string",
       "enum": [
@@ -15770,14 +15821,33 @@
       ],
       "additionalProperties": false
     },
+    "PolicyEffectiveRequest": {
+      "type": "object",
+      "description": "policy/effective (#2957): the rules for an agent in folder, or, with no folder, outside any folder layer.",
+      "properties": {
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        }
+      },
+      "additionalProperties": false
+    },
     "PolicyEnvironment": {
       "type": "object",
-      "description": "The variable names a person's own pass-through list may name (#998, FR-011a), * at the end allowed.",
+      "description": "The variable names a person's own pass-through list may name (#998, FR-011a), * at the end allowed. runtimes names ones for one runtime only (#2957, moved here from runtime-environment.json's own runtimes map).",
       "properties": {
         "passThrough": {
           "type": "array",
           "items": {
             "type": "string"
+          }
+        },
+        "runtimes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -15818,6 +15888,23 @@
           "type": "integer"
         }
       },
+      "additionalProperties": false
+    },
+    "PolicyKeeper": {
+      "type": "object",
+      "description": "Which machine signs your layer (#2957, research R4): the Mac's host, or the first machine of yours that saved one, when you have no Mac.",
+      "properties": {
+        "host": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "host",
+        "name"
+      ],
       "additionalProperties": false
     },
     "PolicyKept": {
@@ -20325,6 +20412,23 @@
       ],
       "additionalProperties": false
     },
+    "SetYourPolicyRequest": {
+      "type": "object",
+      "description": "policy/setYours (#2957): the rules to save as your layer, at the revision this client last read. Refused conflict when revision is not the current one, notKeeper on a machine that is not the keeper, forbidden from the agent socket role, an MCP tool or a workflow (FR-010), and invalid when the rules fail policylayers.Validate.",
+      "properties": {
+        "rules": {
+          "$ref": "#/definitions/PolicyRules"
+        },
+        "revision": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "rules",
+        "revision"
+      ],
+      "additionalProperties": false
+    },
     "SharedInstructions": {
       "type": "object",
       "properties": {
@@ -21703,6 +21807,28 @@
         },
         "signature": {
           "$ref": "#/definitions/PolicySignature"
+        }
+      },
+      "required": [
+        "policy",
+        "signature"
+      ],
+      "additionalProperties": false
+    },
+    "SignedYourPolicy": {
+      "type": "object",
+      "description": "Your layer, signed by the person key (#2957, data-model.md \"SignedYourPolicy\"): what the control plane stores and forwards, and what a non-keeper machine verifies before it applies a copy.",
+      "properties": {
+        "policy": {
+          "type": "string",
+          "description": "The exact CanonicalJSON bytes of YourPolicy, base64."
+        },
+        "signature": {
+          "$ref": "#/definitions/PolicySignature"
+        },
+        "rotation": {
+          "$ref": "#/definitions/PersonKeyRotation",
+          "description": "Present only on the first copy after a new person key."
         }
       },
       "required": [
@@ -26238,6 +26364,80 @@
         "notAllowed",
         "readOnly"
       ]
+    },
+    "YourPolicy": {
+      "type": "object",
+      "description": "Your layer (#2957, data-model.md \"YourPolicy\"): the rules, kept on the keeper and sent, signed, to your other machines. No agent, MCP tool or workflow can change it (FR-010).",
+      "properties": {
+        "rules": {
+          "$ref": "#/definitions/PolicyRules"
+        },
+        "revision": {
+          "type": "integer",
+          "description": "One higher at each save. A machine refuses a lower one (FR-011)."
+        },
+        "changed": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "changedFrom": {
+          "type": "object",
+          "description": "Which client saved it.",
+          "properties": {
+            "client": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "mac",
+                "remote",
+                "web"
+              ]
+            }
+          },
+          "required": [
+            "client",
+            "kind"
+          ],
+          "additionalProperties": false
+        },
+        "person": {
+          "type": "string",
+          "description": "The person's id (the user scope's user, or local for a person with no control plane)."
+        },
+        "keeper": {
+          "type": "string",
+          "description": "The host id of the keeper (research R4)."
+        }
+      },
+      "required": [
+        "rules",
+        "revision",
+        "changed",
+        "person",
+        "keeper"
+      ],
+      "additionalProperties": false
+    },
+    "YourPolicyState": {
+      "type": "object",
+      "description": "policy/yours (#2957): your layer, which machine is the keeper, and the person key this machine has pinned.",
+      "properties": {
+        "policy": {
+          "$ref": "#/definitions/YourPolicy"
+        },
+        "keeper": {
+          "$ref": "#/definitions/PolicyKeeper"
+        },
+        "pinnedKeyID": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "policy",
+        "keeper"
+      ],
+      "additionalProperties": false
     }
   }
 }

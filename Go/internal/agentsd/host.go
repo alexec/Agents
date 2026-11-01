@@ -157,8 +157,8 @@ func (d *Daemon) writeSetting(name string, v any) error {
 // organisation's policy does.
 func (d *Daemon) sandboxState() wire.SandboxSettings {
 	st := d.sandboxSettings()
-	if sandboxRequired(d.orgPolicy()) {
-		st.SetBy = setBy("sandbox", sandboxRequiredWords)
+	if on, layer := d.effectiveSandboxOn(""); on {
+		st.SetBy = setBy(*layer, "sandbox", sandboxRequiredWordsFor(layer))
 	}
 	return st
 }
@@ -215,7 +215,7 @@ func (d *Daemon) setClientPermissions(in wire.ClientPermissionSettings) (wire.Cl
 func (d *Daemon) clientPermissionsState() wire.ClientPermissionSettings {
 	s := d.clientPermissions()
 	if ceiling, _, ok := d.alwaysApproveCeiling(); ok {
-		s.SetBy = setBy("modeCeiling", modeWords(ceiling))
+		s.SetBy = setBy(orgLayerRef(d.orgPolicy()), "modeCeiling", modeWords(ceiling))
 	}
 	return s
 }
@@ -230,10 +230,15 @@ func (d *Daemon) alwaysApproveCeiling() (string, int, bool) {
 	return ceiling, rank, true
 }
 
-// alwaysApproveRefusal is why the policy does not allow Always-approve, or nil.
+// alwaysApproveRefusal is why the policy does not allow Always-approve, by your layer's
+// permissionRequests rule (#2957, FR-002: tighter is Ask me) or the organisation's mode
+// ceiling, or nil.
 func (d *Daemon) alwaysApproveRefusal() error {
+	if yr := d.yourPolicyRules().PermissionRequests; yr != nil && *yr == wire.ClientPermissionModeDefault {
+		return policyRefusal("policy", "permissionRequests", "Your policy allows at most Ask me.", nil, youLayerRef())
+	}
 	if ceiling, _, ok := d.alwaysApproveCeiling(); ok {
-		return policyRefusal("policy", "modeCeiling", modeWords(ceiling), nil)
+		return policyRefusal("policy", "modeCeiling", modeWords(ceiling), nil, orgLayerRef(d.orgPolicy()))
 	}
 	return nil
 }
@@ -244,6 +249,9 @@ func (d *Daemon) alwaysApproveRefusal() error {
 // does the same for Copilot's). A helper or a workflow's agent follows its own choice
 // only: the person's in Settings is for the agents they start.
 func (d *Daemon) agentAlwaysApproves(a *wire.Agent) bool {
+	if yr := d.yourPolicyRules().PermissionRequests; yr != nil && *yr == wire.ClientPermissionModeDefault {
+		return false
+	}
 	if _, _, capped := d.alwaysApproveCeiling(); capped {
 		return false
 	}

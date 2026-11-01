@@ -91,6 +91,8 @@ func main() {
 	// This machine's key: in a Keychain item only agentsd reads on a Mac (the root's own
 	// service, so a scratch root has its own), control-host-key on Linux.
 	d.HostKey = controllink.HostKeyFor(cl.root)
+	// The person key (#2957): the same per-root Keychain pattern, a distinct item.
+	d.PersonKey = controllink.PersonKeyFor(cl.root)
 	// events/raise, as a debug build on a scratch root has it: never on a root a person
 	// uses, nor in a release.
 	d.RaiseByHand = buildinfo.Version == "dev" && !ordinaryRoot(cl.root)
@@ -100,6 +102,10 @@ func main() {
 		d.SettingsDir = filepath.Join(home, ".agents", "settings")
 		d.PersonalHome = home
 	}
+	// Your layer (#2957), read or made once, before any connection below can read it from
+	// inside another lock (cost.go's costMu) at the same time as a concurrent write takes
+	// yoursMu.
+	d.WarmYourPolicy()
 	// A root that joined follows its organisation's policy from its first call, also when
 	// started without the control network (#998, FR-013): only its control plane's key
 	// checks the policy it keeps. join sets it again after a new enrolment.

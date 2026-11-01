@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/alexec/agents/Go/internal/policylayers"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -85,8 +86,8 @@ func (d *Daemon) autoOrder(s wire.AutoSettings) []string {
 }
 
 // autoLevels is the levels a start asks for, with the defaults Auto uses for a value not
-// given: Balanced and Ask.
-func autoLevels(l *wire.Levels) wire.Levels {
+// given: Balanced, and the effective permissionMode rule (#2957, FR-008), else Ask.
+func (d *Daemon) autoLevels(l *wire.Levels) wire.Levels {
 	out := wire.Levels{}
 	if l != nil {
 		out = *l
@@ -97,9 +98,32 @@ func autoLevels(l *wire.Levels) wire.Levels {
 	}
 	if out.Permission == nil {
 		p := wire.PermissionLevelAsk
+		if v, _, ok := d.effectivePermissionMode(); ok {
+			p = v
+		}
 		out.Permission = &p
 	}
 	return out
+}
+
+// permissionLevelCeiling caps or refuses levels.Permission against the effective
+// permissionMode rule (#2957, FR-008): a person's own choice looser than the ceiling is
+// refused; an agent's, a helper's or a workflow's own falls to the ceiling, with a note for
+// the new agent's chat. levels is changed in place when it falls.
+func (d *Daemon) permissionLevelCeiling(levels *wire.Levels, by startedBy) (note string, err error) {
+	if levels.Permission == nil {
+		return "", nil
+	}
+	ceiling, layer, ok := d.effectivePermissionMode()
+	if !ok || policylayers.PermissionModeOrder(*levels.Permission) >= policylayers.PermissionModeOrder(ceiling) {
+		return "", nil
+	}
+	if by.owner == wire.SessionLabelOwnerPerson && by.agent == nil {
+		return "", policyRefusal("policy", "permissionMode", "Your policy allows at most "+permissionWord(ceiling)+".", nil, *layer)
+	}
+	asked := permissionWord(*levels.Permission)
+	levels.Permission = &ceiling
+	return "It asked for " + asked + ". " + layer.Name + " allows at most " + permissionWord(ceiling) + ". It runs within that.", nil
 }
 
 // levelCells is the cells a start's levels and sandbox ask for on one runtime.
@@ -179,7 +203,6 @@ func (d *Daemon) pickRuntime(l wire.Levels, sandbox *wire.SandboxChoice) (string
 	}
 	var limited []candidate
 	skip := func(id, why string) { skipped = append(skipped, wire.AutoSkip{RuntimeID: id, Reason: why}) }
-	policy := d.orgPolicy()
 	for _, id := range d.autoOrder(settings) {
 		rt := runtimeByID(id)
 		if slices.Contains(settings.Excluded, id) {
@@ -203,11 +226,11 @@ func (d *Daemon) pickRuntime(l wire.Levels, sandbox *wire.SandboxChoice) (string
 			skip(id, why)
 			continue
 		}
-		// The organisation's required sandbox (#998): a runtime that cannot turn its own on
+		// The effective sandbox rule (#998, #2957): a runtime that cannot turn its own on
 		// is not used.
-		if sandboxRequired(policy) {
+		if d.sandboxRequired() {
 			if _, ok := requiredSandbox(id); !ok {
-				skip(id, "no sandbox, which your organisation requires")
+				skip(id, "no sandbox, which your policy requires")
 				continue
 			}
 		}
@@ -356,6 +379,15 @@ func (d *Daemon) setLevels(ctx context.Context, r wire.SetLevelsRequest) (wire.A
 	if a == nil {
 		return wire.Agent{}, &Error{Code: CodeNoSuchAgent, Message: "That agent is not here."}
 	}
+	// The effective permissionMode rule (#2957, FR-008): a direct choice looser than the
+	// ceiling is refused, as this call always is the person's or an agent's own, not a
+	// helper or workflow's start that could fall to it instead (resolveLevels).
+	if r.Levels.Permission != nil {
+		if ceiling, layer, ok := d.effectivePermissionMode(); ok &&
+			policylayers.PermissionModeOrder(*r.Levels.Permission) < policylayers.PermissionModeOrder(ceiling) {
+			return wire.Agent{}, policyRefusal("policy", "permissionMode", "Your policy allows at most "+permissionWord(ceiling)+".", nil, *layer)
+		}
+	}
 	settings := d.autoSettings()
 	offers := a.AdvertisedOptions
 	if len(offers) == 0 {
@@ -430,7 +462,7 @@ func (d *Daemon) setClientPermission(r wire.SetClientPermissionRequest) (wire.Ag
 // autoPreview is auto/preview: what Auto would pick now, for the chooser's "Picks Claude
 // now" and the menus' "Balanced: Sonnet on Claude".
 func (d *Daemon) autoPreview(r wire.AutoPreviewRequest) wire.AutoPreview {
-	id, native, skipped := d.pickRuntime(autoLevels(r.Levels), r.Sandbox)
+	id, native, skipped := d.pickRuntime(d.autoLevels(r.Levels), r.Sandbox)
 	out := wire.AutoPreview{Skipped: skipped}
 	if id != "" {
 		out.RuntimeID, out.Native = &id, &native
@@ -475,29 +507,35 @@ func autoNote(p wire.AutoPick) string {
 
 // resolveLevels is a start's levels made the runtime's own settings (#2658): on Auto, the
 // runtime is picked first (FR-006); then the model and mode cells fill the options the start
-// did not set itself. It returns the pick, for an Auto start, and the agent's own answer to
-// permission requests, when the start gives one.
-func (d *Daemon) resolveLevels(r *wire.StartRequest, by startedBy) (*wire.AutoPick, *wire.ClientPermissionMode, error) {
+// did not set itself. It returns the pick, for an Auto start, the agent's own answer to
+// permission requests, when the start gives one, and a note for the chat when the
+// effective permissionMode rule (#2957, FR-008) capped a looser choice.
+func (d *Daemon) resolveLevels(r *wire.StartRequest, by startedBy) (pick *wire.AutoPick, client *wire.ClientPermissionMode, note string, err error) {
 	auto := r.RuntimeID == autoRuntimeID
 	if !auto && r.Levels == nil {
-		return nil, nil, nil
+		return nil, nil, "", nil
 	}
 	settings := d.autoSettings()
 	levels := wire.Levels{}
 	if r.Levels != nil {
 		levels = *r.Levels
 	}
-	var pick *wire.AutoPick
 	askOnly := false
 	if auto {
-		levels = autoLevels(r.Levels)
+		levels = d.autoLevels(r.Levels)
 		// On Auto, permission requests follow the permission mode (FR-010), but no further
 		// than a start that asks for Request cards (a helper whose starter asks).
 		askOnly = levels.PermissionRequests != nil && *levels.PermissionRequests == wire.ClientPermissionModeDefault
 		levels.PermissionRequests = nil
+	}
+	note, err = d.permissionLevelCeiling(&levels, by)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	if auto {
 		id, native, skipped := d.pickRuntime(levels, r.Sandbox)
 		if id == "" {
-			return nil, nil, noRuntime(skipped)
+			return nil, nil, "", noRuntime(skipped)
 		}
 		r.RuntimeID = id
 		if r.Sandbox != nil && native.Sandbox != nil {
@@ -506,12 +544,13 @@ func (d *Daemon) resolveLevels(r *wire.StartRequest, by startedBy) (*wire.AutoPi
 		}
 		pick = &wire.AutoPick{RuntimeID: id, Levels: levels, Native: native, Skipped: skipped}
 	}
-	values, client := applyLevels(r.RuntimeID, levels, r.StartOptions.Values, auto, settings, d.runtimeOffers(r.RuntimeID))
+	var values map[string]wire.JSONValue
+	values, client = applyLevels(r.RuntimeID, levels, r.StartOptions.Values, auto, settings, d.runtimeOffers(r.RuntimeID))
 	r.StartOptions.Values = values
 	if askOnly && client != nil {
 		client = requestCards
 	}
-	return pick, client, nil
+	return pick, client, note, nil
 }
 
 // The words in workflow files and start_session (#2658): the shared values in lower case

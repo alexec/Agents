@@ -31,15 +31,15 @@ func (d *Daemon) agentsMayArchive(folder string) bool {
 	return true
 }
 
-// agentsMayArchiveMyChatsKey is the person's setting (#1802), in the display preferences
-// every client shows: whether a chat the person started may archive itself.
+// agentsMayArchiveMyChatsKey is the old key in the display preferences (#1802), read once
+// into your layer on the first start (FR-012) and not read again.
 const agentsMayArchiveMyChatsKey = "agentsMayArchiveMyChats"
 
-// agentsMayArchiveMyChats is that setting: true unless the person said not.
+// agentsMayArchiveMyChats is your layer's archiveMyChats rule (#2957, FR-002's new rule):
+// true unless your layer says not.
 func (d *Daemon) agentsMayArchiveMyChats() bool {
-	var on bool
-	if v, ok := d.preferences()[agentsMayArchiveMyChatsKey]; ok && json.Unmarshal(v, &on) == nil {
-		return on
+	if on := d.yourPolicyRules().ArchiveMyChats; on != nil {
+		return *on
 	}
 	return true
 }

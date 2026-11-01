@@ -1,37 +1,37 @@
 package agentsd
 
 import (
-	"encoding/json"
-	"os"
-	"path/filepath"
 	"sort"
 
 	"github.com/alexec/agents/Go/wire"
 )
 
-// The person's own pass-through list (#727, #998 FR-011a): <settings>/runtime-environment.json
-// names the variables of this machine's environment that runtimes get beyond the built-in
-// allowlist (allowed in runtimes.go) and each runtime's own names. Names only, never values:
-//
-//	{"names": ["AWS_PROFILE", "MY_*"], "runtimes": {"claude": ["ANTHROPIC_MODEL"]}}
-//
-// names go to every runtime, runtimes.<id> to that runtime only; * at the end is a prefix.
-// The organisation's policy (environment.passThrough) cuts the list: a name it does not
-// allow is not passed, and settings/passThrough marks it.
+// The person's own pass-through list (#727, #998 FR-011a; #2957): your layer's
+// environment.passThrough and environment.runtimes name the variables of this machine's
+// environment that runtimes get beyond the built-in allowlist (allowed in runtimes.go) and
+// each runtime's own names. Names only, never values. names go to every runtime, the
+// runtimes map to that runtime only; * at the end is a prefix. Before this slice these were
+// <settings>/runtime-environment.json, read once into your layer on the first start
+// (FR-012) and not read again. The organisation's policy (environment.passThrough) cuts
+// the list: a name it does not allow is not passed, and settings/passThrough marks it.
 
+// passThroughFile is the old file's name, read once into your layer on the first start
+// (FR-012, policyyours.go's firstStartMoveLocked) and not read again.
 const passThroughFile = "runtime-environment.json"
 
+// passThroughList is your layer's environment rule, in the file's old shape, kept for the
+// rest of this file's logic.
 type passThroughList struct {
-	Names    []string            `json:"names"`
-	Runtimes map[string][]string `json:"runtimes"`
+	Names    []string
+	Runtimes map[string][]string
 }
 
 func (d *Daemon) readPassThrough() passThroughList {
-	var l passThroughList
-	if b, err := os.ReadFile(filepath.Join(d.SettingsDir, passThroughFile)); err == nil {
-		json.Unmarshal(b, &l)
+	e := d.yourPolicyRules().Environment
+	if e == nil {
+		return passThroughList{}
 	}
-	return l
+	return passThroughList{Names: e.PassThrough, Runtimes: e.Runtimes}
 }
 
 // passThrough is the names a runtime gets from the person's list, as the policy allows.
@@ -70,7 +70,7 @@ func (d *Daemon) passThroughState() wire.PassThroughState {
 			n.Runtime = &runtime
 		}
 		if !passThroughAllowed(p, name) {
-			n.SetBy = setBy("environment.passThrough", passThroughWords)
+			n.SetBy = setBy(orgLayerRef(p), "environment.passThrough", passThroughWords)
 		}
 		out.Names = append(out.Names, n)
 	}

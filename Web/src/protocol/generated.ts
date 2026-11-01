@@ -60,6 +60,7 @@ export const Failure = {
   notChanged: -32034,
   notConfirmed: -32010,
   notInWorkflowFolder: -32016,
+  notKeeper: -32101,
   notLinked: -32065,
   notOffered: -32039,
   notPermitted: -32045,
@@ -5303,6 +5304,17 @@ export interface PersonInvited {
   role: UserRole;
 }
 
+/**
+ * The person key moving to a new pair (#2957, data-model.md "PersonKeyRotation"): the new public
+ * key, signed by the one it replaces. A machine moves its pin only with one that checks against the
+ * key it has pinned.
+ */
+export interface PersonKeyRotation {
+  newKey: Base64;
+  newKeyID: string;
+  signature: PolicySignature;
+}
+
 /** A machine in People: its name, its state and nothing inside it (FR-019). */
 export interface PersonMachine {
   id: MachineRef;
@@ -5513,6 +5525,19 @@ export interface PingResponse {
   ok: boolean;
 }
 
+/**
+ * The person's public key this machine trusts (#2957, data-model.md "PinnedPersonKey"), kept at
+ * <root>/person-key.pub.json: from a join code, the Mac window's direct link, or, for a machine
+ * joined before this version, the first signed layer the control plane sends (trust on first use,
+ * research R3).
+ */
+export interface PinnedPersonKey {
+  key: Base64;
+  keyID: string;
+  from: "joinCode" | "window" | "controlPlane";
+  at: WireDate;
+}
+
 export type PinnerKind =
   | "person"
   | "agent"
@@ -5606,11 +5631,21 @@ export interface PolicyBudgets {
 }
 
 /**
+ * policy/effective (#2957): the rules for an agent in folder, or, with no folder, outside any
+ * folder layer.
+ */
+export interface PolicyEffectiveRequest {
+  folder?: URLString;
+}
+
+/**
  * The variable names a person's own pass-through list may name (#998, FR-011a), * at the end
- * allowed.
+ * allowed. runtimes names ones for one runtime only (#2957, moved here from
+ * runtime-environment.json's own runtimes map).
  */
 export interface PolicyEnvironment {
   passThrough: string[];
+  runtimes?: Record<string, string[]>;
 }
 
 /**
@@ -5627,6 +5662,15 @@ export interface PolicyFolderWithRules {
 export interface PolicyHelpers {
   mostRunning?: number;
   mostNotArchived?: number;
+}
+
+/**
+ * Which machine signs your layer (#2957, research R4): the Mac's host, or the first machine of
+ * yours that saved one, when you have no Mac.
+ */
+export interface PolicyKeeper {
+  host: string;
+  name: string;
 }
 
 /**
@@ -7282,6 +7326,17 @@ export interface SetUnreadRequest {
   unread: boolean;
 }
 
+/**
+ * policy/setYours (#2957): the rules to save as your layer, at the revision this client last read.
+ * Refused conflict when revision is not the current one, notKeeper on a machine that is not the
+ * keeper, forbidden from the agent socket role, an MCP tool or a workflow (FR-010), and invalid
+ * when the rules fail policylayers.Validate.
+ */
+export interface SetYourPolicyRequest {
+  rules: PolicyRules;
+  revision: number;
+}
+
 export interface SharedInstructions {
   path: string;
   exists: boolean;
@@ -7772,6 +7827,18 @@ export type SignInWantedReason =
 export interface SignedPolicy {
   policy: OrgPolicy;
   signature: PolicySignature;
+}
+
+/**
+ * Your layer, signed by the person key (#2957, data-model.md "SignedYourPolicy"): what the control
+ * plane stores and forwards, and what a non-keeper machine verifies before it applies a copy.
+ */
+export interface SignedYourPolicy {
+  /** The exact CanonicalJSON bytes of YourPolicy, base64. */
+  policy: string;
+  signature: PolicySignature;
+  /** Present only on the first copy after a new person key. */
+  rotation?: PersonKeyRotation;
 }
 
 /**
@@ -9026,6 +9093,33 @@ export type WriteFailureCause =
   | "notAllowed"
   | "readOnly";
 
+/**
+ * Your layer (#2957, data-model.md "YourPolicy"): the rules, kept on the keeper and sent, signed,
+ * to your other machines. No agent, MCP tool or workflow can change it (FR-010).
+ */
+export interface YourPolicy {
+  rules: PolicyRules;
+  /** One higher at each save. A machine refuses a lower one (FR-011). */
+  revision: number;
+  changed: WireDate;
+  /** Which client saved it. */
+  changedFrom?: { client: string; kind: "mac" | "remote" | "web" };
+  /** The person's id (the user scope's user, or local for a person with no control plane). */
+  person: string;
+  /** The host id of the keeper (research R4). */
+  keeper: string;
+}
+
+/**
+ * policy/yours (#2957): your layer, which machine is the keeper, and the person key this machine
+ * has pinned.
+ */
+export interface YourPolicyState {
+  policy: YourPolicy;
+  keeper: PolicyKeeper;
+  pinnedKeyID?: string;
+}
+
 /** Every method the web remote may call: its params and its result. */
 export interface Methods {
   "agentConfig/editorFiles": { params: AgentConfigEditorRequest; result: AgentConfigEditorFiles };
@@ -9217,11 +9311,14 @@ export interface Methods {
   "pins/unpinSession": { params: PinSessionRequest; result: Empty };
   "pins/unpinWorkflow": { params: WorkflowRequest; result: Empty };
   "pins/write": { params: PinWriteRequest; result: Empty };
+  "policy/effective": { params: PolicyEffectiveRequest; result: EffectivePolicy };
   "policy/get": { params: Empty; result: PolicyKept };
   "policy/mine": { params: Empty; result: PolicyView };
   "policy/raise": { params: PolicyRaiseRequest; result: PolicyKept };
   "policy/set": { params: PolicySet; result: PolicyKept };
+  "policy/setYours": { params: SetYourPolicyRequest; result: YourPolicy };
   "policy/stopAll": { params: PolicyStopAllRequest; result: PolicyKept };
+  "policy/yours": { params: Empty; result: YourPolicyState };
   "preferences/get": { params: Empty; result: Record<string, JSONValue> };
   "preferences/set": { params: Record<string, JSONValue>; result: Record<string, JSONValue> };
   "presence/report": { params: PresenceReport; result: Empty };
@@ -9510,11 +9607,14 @@ export const MethodTarget = {
   "pins/unpinSession": "host",
   "pins/unpinWorkflow": "host",
   "pins/write": "host",
+  "policy/effective": "host",
   "policy/get": "control",
   "policy/mine": "control",
   "policy/raise": "control",
   "policy/set": "control",
+  "policy/setYours": "host",
   "policy/stopAll": "control",
+  "policy/yours": "host",
   "preferences/get": "host",
   "preferences/set": "host",
   "presence/report": "host",
@@ -10152,6 +10252,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PersonEndRequest: { required: ["name"], optional: ["agentID"] },
   PersonInvite: { required: ["name", "role"], optional: [] },
   PersonInvited: { required: ["text", "expires", "name", "role"], optional: [] },
+  PersonKeyRotation: { required: ["newKey", "newKeyID", "signature"], optional: [] },
   PersonMachine: { required: ["id", "name", "state"], optional: ["platform"] },
   PersonRemovePreview: { required: ["startedMachines", "registeredMachines"], optional: [] },
   PersonRemoveRequest: { required: ["name", "agentID"], optional: [] },
@@ -10177,6 +10278,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PinView: { required: ["path", "title", "kind", "missing", "pinnedBy"], optional: ["view", "missingReason", "hidden", "count", "attention", "countAt", "countStale"] },
   PinWriteRequest: { required: ["folder", "path", "text"], optional: [] },
   PingResponse: { required: ["ok"], optional: [] },
+  PinnedPersonKey: { required: ["key", "keyID", "from", "at"], optional: [] },
   PinnerView: { required: ["kind", "id", "name"], optional: [] },
   PinsChangedNotification: { required: ["folder", "pins"], optional: ["sessions", "workflows", "views"] },
   Plan: { required: ["entries", "state", "at"], optional: ["planID"] },
@@ -10187,9 +10289,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PolicyApplied: { required: ["version"], optional: [] },
   PolicyBehindMachine: { required: ["host", "name"], optional: [] },
   PolicyBudgets: { required: ["allowUnmetered", "raises"], optional: ["daily", "dailyTokens", "perAgent", "perAgentTokens"] },
-  PolicyEnvironment: { required: ["passThrough"], optional: [] },
+  PolicyEffectiveRequest: { required: [], optional: ["folder"] },
+  PolicyEnvironment: { required: ["passThrough"], optional: ["runtimes"] },
   PolicyFolderWithRules: { required: ["folder", "name", "count"], optional: [] },
   PolicyHelpers: { required: [], optional: ["mostRunning", "mostNotArchived"] },
+  PolicyKeeper: { required: ["host", "name"], optional: [] },
   PolicyKept: { required: [], optional: ["policy", "rev", "machines"] },
   PolicyLayerRef: { required: ["kind", "name"], optional: ["folder"] },
   PolicyMarketplaces: { required: ["allowed", "customServers"], optional: [] },
@@ -10354,6 +10458,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SetProviderRequest: { required: ["runtimeID", "providerID"], optional: [] },
   SetSandboxRequest: { required: ["agentID"], optional: ["choice"] },
   SetUnreadRequest: { required: ["agentID", "unread"], optional: [] },
+  SetYourPolicyRequest: { required: ["rules", "revision"], optional: [] },
   SharedInstructions: { required: ["path", "exists", "reach"], optional: [] },
   SharedLook: { required: ["kind", "page", "item", "text"], optional: [] },
   SharedMCP: { required: ["file", "servers", "app", "runtimeOnly"], optional: ["problem"] },
@@ -10405,6 +10510,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SignInTicketResult: { required: [], optional: ["client", "signIn"] },
   SignInWaiting: { required: ["code", "expires"], optional: [] },
   SignedPolicy: { required: ["policy", "signature"], optional: [] },
+  SignedYourPolicy: { required: ["policy", "signature"], optional: ["rotation"] },
   Simulator: { required: ["udid", "name", "os", "booted"], optional: [] },
   SimulatorList: { required: ["simulators"], optional: ["reason"] },
   SimulatorRequest: { required: ["udid"], optional: [] },
@@ -10523,4 +10629,6 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorktreesListResponse: { required: ["isRepository", "canMakeNew", "worktrees", "branches"], optional: ["whyNot"] },
   WorktreesSized: { required: ["sizes"], optional: [] },
   WriteFailure: { required: ["cause", "what", "message"], optional: ["path"] },
+  YourPolicy: { required: ["rules", "revision", "changed", "person", "keeper"], optional: ["changedFrom"] },
+  YourPolicyState: { required: ["policy", "keeper"], optional: ["pinnedKeyID"] },
 };

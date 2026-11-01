@@ -76,12 +76,15 @@ func (d *Daemon) resolveSandbox(runtimeID string, override *wire.SandboxChoice, 
 			return wire.SandboxChoiceRuntime, &why
 		}
 	}
-	// The organisation's required sandbox caps the person's choice (#998): on where the
-	// app can set it. The person's own default is kept as they wrote it.
-	if sandboxRequired(d.orgPolicy()) && choice != wire.SandboxChoiceOn {
-		if on, ok := requiredSandbox(runtimeID); ok {
-			why := orgSetBy + " " + sandboxRequiredWords
-			return on, &why
+	// The effective sandbox rule caps the person's choice (#998, #2957): on where the app
+	// can set it. The person's own default is kept as they wrote it.
+	if on, layer := d.effectiveSandboxOn(""); on && choice != wire.SandboxChoiceOn {
+		if onChoice, ok := requiredSandbox(runtimeID); ok {
+			why := sandboxRequiredWordsFor(layer)
+			if layer != nil && layer.Kind == "organisation" {
+				why = orgSetBy + " " + why
+			}
+			return onChoice, &why
 		}
 	}
 	return choice, nil
@@ -187,8 +190,10 @@ func (d *Daemon) setSandbox(ctx context.Context, r wire.SetSandboxRequest) (wire
 	if a == nil {
 		return wire.Agent{}, &Error{Code: CodeNoSuchAgent, Message: "That agent is not here."}
 	}
-	if r.Choice != nil && *r.Choice == wire.SandboxChoiceOff && sandboxRequired(d.orgPolicy()) {
-		return wire.Agent{}, policyRefusal("policy", "sandbox", sandboxRequiredWords, nil)
+	if r.Choice != nil && *r.Choice == wire.SandboxChoiceOff {
+		if on, layer := d.effectiveSandboxOn(""); on {
+			return wire.Agent{}, policyRefusal("policy", "sandbox", sandboxRequiredWordsFor(layer), nil, *layer)
+		}
 	}
 	if r.Choice != nil && !slices.Contains(sandboxChoices(a.RuntimeID), *r.Choice) {
 		why := sandboxCatalog[a.RuntimeID].why

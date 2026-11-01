@@ -369,7 +369,7 @@ func (d *Daemon) marketplaceFile() (string, skillcatalog.MarketplaceFile, error)
 
 func (d *Daemon) marketplacesAdd(r wire.MarketplaceAddRequest) (wire.MarketplacesListAnswer, error) {
 	if url := skillcatalog.Normalized(r.URL); !d.marketplaceAllowed(skillcatalog.MarketplaceID(wire.MarketplaceOriginPersonal, url), url) {
-		return wire.MarketplacesListAnswer{}, policyRefusal("policy", "marketplaces", marketplaceRefusalWords(), nil)
+		return wire.MarketplacesListAnswer{}, d.marketplaceRefusal(skillcatalog.MarketplaceID(wire.MarketplaceOriginPersonal, url), url)
 	}
 	path, f, err := d.marketplaceFile()
 	if err != nil {
@@ -437,7 +437,7 @@ func (d *Daemon) marketplacesRemove(id string) (wire.MarketplacesListAnswer, err
 
 func (d *Daemon) marketplacesSetEnabled(r wire.MarketplaceSetEnabledRequest) (wire.MarketplacesListAnswer, error) {
 	if r.Enabled && !d.marketplaceAllowed(r.ID, "") {
-		return wire.MarketplacesListAnswer{}, policyRefusal("policy", "marketplaces", marketplaceRefusalWords(), nil)
+		return wire.MarketplacesListAnswer{}, d.marketplaceRefusal(r.ID, "")
 	}
 	path, f, err := d.marketplaceFile()
 	if err != nil {
