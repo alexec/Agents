@@ -352,7 +352,6 @@ func (d *Daemon) registerSettings() {
 	On(d, wire.CallPreferencesSet, func(ctx context.Context, c *Client, r map[string]wire.JSONValue) (map[string]wire.JSONValue, error) {
 		m, err := d.setPreferences(r)
 		if err == nil {
-			d.noticeLimitsChanged(r)
 			// The old notice-limit and archive-switch keys also change your layer (#2957,
 			// FR-023): display.json is kept too, so the window's old panes keep working
 			// until slice 4 moves them to Agents ▸ Policy. m is what setPreferences just

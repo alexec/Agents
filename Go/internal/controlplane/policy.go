@@ -62,8 +62,34 @@ var policyGated = methodSet(
 	"agents/start",
 )
 
-// modeNames are a mode ceiling's names, by ModeLooseness rank.
-var modeNames = []string{"ask", "default", "acceptEdits", "auto", "bypassPermissions"}
+// permissionModeNames are permissionMode's values (#2957), Auto's four levels.
+var permissionModeNames = []string{"plan", "ask", "approveForMe", "bypassPermissions"}
+
+// permissionRequestsNames are permissionRequests' values (#2957).
+var permissionRequestsNames = []string{"default", "alwaysApprove"}
+
+// sandboxNames are sandbox's values (#2957): required means on, runtime refuses only off.
+var sandboxNames = []string{"required", "runtime"}
+
+// orgModeCeilingMap is research R5's map: each of the old modeCeiling's five values onto
+// Auto's four permission levels, the same or a tighter one, so the one-time migration never
+// loosens a stored policy by this reading.
+var orgModeCeilingMap = map[string]wire.PermissionLevel{
+	"ask":               wire.PermissionLevelPlan,
+	"default":           wire.PermissionLevelAsk,
+	"acceptEdits":       wire.PermissionLevelApproveForMe,
+	"auto":              wire.PermissionLevelApproveForMe,
+	"bypassPermissions": wire.PermissionLevelBypassPermissions,
+}
+
+// orgModeCeilingToPermissionLevel reads research R5's map once, for the migration of a
+// stored policy that still has the old modeCeiling field (migrateModeCeiling).
+func orgModeCeilingToPermissionLevel(ceiling string) wire.PermissionLevel {
+	if l, ok := orgModeCeilingMap[ceiling]; ok {
+		return l
+	}
+	return wire.PermissionLevelBypassPermissions // an unknown ceiling counts as the loosest (R6)
+}
 
 // policyBook is what this copy knows of the policy: its version and requireFollowing, for
 // the router's gate, and what each machine here was last sent, by a hash.
@@ -113,6 +139,9 @@ func (m *Methods) policyMethod(ctx context.Context, method string, params json.R
 	case "policy/set":
 		request, err := require[wire.PolicySet](params, "PolicySet")
 		if err != nil {
+			return nil, err
+		}
+		if err := checkPolicyRawEnums(params); err != nil {
 			return nil, err
 		}
 		if err := checkPolicy(request.Policy); err != nil {
@@ -229,16 +258,54 @@ var (
 	policyID        = regexp.MustCompile(`^[^\s*]+\*?$`)
 )
 
+// checkPolicyRawEnums refuses an unrecognised permissionMode or permissionRequests before
+// require's decode ever reaches them: PermissionLevel and ClientPermissionMode have an
+// x-fallback (#2658, as policylayers.Validate's own comment explains), so their generated
+// UnmarshalJSON would otherwise silently replace an unknown string with the fallback before
+// checkPolicy ever saw it. params is policy/set's own raw request.
+func checkPolicyRawEnums(params json.RawMessage) error {
+	var wrapper struct {
+		Policy struct {
+			PermissionMode     *string `json:"permissionMode"`
+			PermissionRequests *string `json:"permissionRequests"`
+		} `json:"policy"`
+	}
+	if json.Unmarshal(params, &wrapper) != nil {
+		return nil // a badly shaped request fails require's own decode instead
+	}
+	if wrapper.Policy.PermissionMode != nil && !slices.Contains(permissionModeNames, *wrapper.Policy.PermissionMode) {
+		return fail(invalidParams, "The permission mode is one of %s.", strings.Join(permissionModeNames, ", "))
+	}
+	if wrapper.Policy.PermissionRequests != nil && !slices.Contains(permissionRequestsNames, *wrapper.Policy.PermissionRequests) {
+		return fail(invalidParams, "Permission requests are one of %s.", strings.Join(permissionRequestsNames, ", "))
+	}
+	return nil
+}
+
 // checkPolicy refuses a document out of bounds, in words for the admin.
 func checkPolicy(p wire.OrgPolicy) error {
 	if b, _ := json.Marshal(p); len(b) > mostPolicyBytes {
 		return fail(invalidParams, "The policy is larger than %d KiB.", mostPolicyBytes>>10)
 	}
-	if p.ModeCeiling != nil && !slices.Contains(modeNames, *p.ModeCeiling) {
-		return fail(invalidParams, "The mode ceiling is one of %s.", strings.Join(modeNames, ", "))
+	if p.PermissionMode != nil && !slices.Contains(permissionModeNames, string(*p.PermissionMode)) {
+		return fail(invalidParams, "The permission mode is one of %s.", strings.Join(permissionModeNames, ", "))
 	}
-	if p.Sandbox != nil && *p.Sandbox != "required" {
-		return fail(invalidParams, "The sandbox rule is required, or not set.")
+	if p.PermissionRequests != nil && !slices.Contains(permissionRequestsNames, string(*p.PermissionRequests)) {
+		return fail(invalidParams, "Permission requests are one of %s.", strings.Join(permissionRequestsNames, ", "))
+	}
+	if p.Sandbox != nil && !slices.Contains(sandboxNames, *p.Sandbox) {
+		return fail(invalidParams, "The sandbox rule is one of %s, or not set.", strings.Join(sandboxNames, ", "))
+	}
+	if w := p.Workflows; w != nil && w.MostOn != nil && (*w.MostOn < 1 || *w.MostOn > 100) {
+		return fail(invalidParams, "The most workflows on at once is 1 to 100.")
+	}
+	if n := p.NoticeLimits; n != nil {
+		if n.Burst != nil && (*n.Burst < 1 || *n.Burst > 20) {
+			return fail(invalidParams, "The notice burst is 1 to 20.")
+		}
+		if n.WaitMinutes != nil && (*n.WaitMinutes < 1 || *n.WaitMinutes > 1440) {
+			return fail(invalidParams, "The notice wait is 1 to 1440 minutes.")
+		}
 	}
 	if len(p.Runtimes) > mostPolicyItems {
 		return fail(invalidParams, "Allow at most %d runtimes.", mostPolicyItems)
@@ -374,7 +441,47 @@ func (s *Service) readPolicy(ctx context.Context) (keptPolicy, error) {
 			kept.signature = &signature
 		}
 	}
-	return kept, nil
+	return s.migrateModeCeiling(ctx, kept)
+}
+
+// migrateModeCeiling reads a stored policy's old modeCeiling field, when there is one and
+// permissionMode is not already set, into permissionMode (research R5), signs a new version,
+// and keeps it (#2957, T035, data-model.md "modeCeiling goes"). A limit that only vanished
+// would make the organisation's rules looser with no word said (FR-012's reasoning, applied
+// to this layer too), so the migration runs once, here, before anything else reads the
+// policy: encodePolicy never writes modeCeiling again, so a later read finds nothing to
+// migrate and returns at once.
+func (s *Service) migrateModeCeiling(ctx context.Context, kept keptPolicy) (keptPolicy, error) {
+	if kept.policy == nil || kept.policy.PermissionMode != nil {
+		return kept, nil
+	}
+	var legacy struct {
+		ModeCeiling *string `json:"modeCeiling"`
+	}
+	if json.Unmarshal(kept.raw, &legacy) != nil || legacy.ModeCeiling == nil {
+		return kept, nil
+	}
+	level := orgModeCeilingToPermissionLevel(*legacy.ModeCeiling)
+	next := *kept.policy
+	next.PermissionMode = &level
+	next.Version++
+	next.Issued = wire.DateOf(time.Now().UTC())
+	raw, err := encodePolicy(next)
+	if err != nil {
+		return kept, err
+	}
+	tag, err := s.cfg.Store.Put(ctx, policyKey, raw, store.Matching(kept.rev))
+	if err != nil {
+		// Another copy is migrating it, or already has: not fatal, this read just keeps
+		// the old shape once more; the next one finds the migrated document.
+		return kept, nil
+	}
+	if err := s.signPolicy(ctx, next.Version, raw); err != nil {
+		return kept, err
+	}
+	s.keepPolicyVersion(ctx, next.Version, raw)
+	s.log(fmt.Sprintf("the policy's modeCeiling was read once into permissionMode; now version %d", next.Version))
+	return keptPolicy{raw: raw, policy: &next, rev: tag}, nil
 }
 
 // changePolicy keeps the next policy, one version higher and signed, then has every copy
@@ -449,8 +556,10 @@ func encodePolicy(p wire.OrgPolicy) ([]byte, error) {
 	return controllink.CanonicalJSON(b)
 }
 
-// policyRequires is what a machine needs to follow p: host.policy/1 for every rule, and
-// host.org-routes/1 for a reach rule or Antigravity's terms (FR-014, FR-030; #999 FR-008).
+// policyRequires is what a machine needs to follow p: host.policy/1 for every rule,
+// host.org-routes/1 for a reach rule or Antigravity's terms (FR-014, FR-030; #999 FR-008),
+// and host.policy-layers/1 when any of the new rules of #2957 is set, so an older machine
+// refuses work rather than silently ignore them (data-model.md "OrgPolicy", "requires").
 func policyRequires(p wire.OrgPolicy) []string {
 	out := []string{CapHostPolicy}
 	routes := p.Notices != nil && p.Notices.AntigravityTerms != nil
@@ -459,6 +568,10 @@ func policyRequires(p wire.OrgPolicy) []string {
 	}
 	if routes {
 		out = append(out, CapHostOrgRoutes)
+	}
+	if p.PermissionMode != nil || p.PermissionRequests != nil || p.Workflows != nil ||
+		p.NoticeLimits != nil || p.ArchiveMyChats != nil || (p.Sandbox != nil && *p.Sandbox == "runtime") {
+		out = append(out, wire.CapHostPolicyLayers1)
 	}
 	return out
 }

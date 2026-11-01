@@ -17,6 +17,7 @@ package usersettings
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -276,6 +277,60 @@ func (b *Book) change(ctx context.Context, key string, edit func(raw []byte) ([]
 		}
 	}
 	return fmt.Errorf("%s kept changing; try again", key)
+}
+
+// SetPolicy is the part policy as the keeper sends it (user/setPolicy, #2957, research
+// R11): stored unchanged, kept only when its revision is higher than the one already there.
+// The control plane can read the layer (no secret in it) but does not sign or change it;
+// only HostSaid's caller check (the sender is the layer's own keeper) guards who may call
+// this. It says whether anything changed.
+func (b *Book) SetPolicy(ctx context.Context, user string, signed wire.SignedYourPolicy) (bool, error) {
+	if err := checkUser(user); err != nil {
+		return false, err
+	}
+	value, err := json.Marshal(signed)
+	if err != nil {
+		return false, fmt.Errorf("%w: policy is not a signed policy", ErrInvalid)
+	}
+	if len(value) > MaxPart {
+		return false, fmt.Errorf("%w: policy is over %d KB", ErrInvalid, MaxPart>>10)
+	}
+	decoded, err := base64.StdEncoding.DecodeString(signed.Policy)
+	if err != nil {
+		return false, fmt.Errorf("%w: policy is not base64", ErrInvalid)
+	}
+	var next wire.YourPolicy
+	if json.Unmarshal(decoded, &next) != nil || next.Revision < 1 {
+		return false, fmt.Errorf("%w: policy is not a YourPolicy", ErrInvalid)
+	}
+	changed := false
+	err = b.change(ctx, settingsKey(user), func(raw []byte) ([]byte, error) {
+		var s wire.UserSettings
+		if raw != nil {
+			if err := json.Unmarshal(raw, &s); err != nil {
+				return nil, err
+			}
+		}
+		s.AgentConfigFiles = nil
+		var current wire.YourPolicy
+		if partSent(s.Policy) {
+			var currentSigned wire.SignedYourPolicy
+			if json.Unmarshal(s.Policy, &currentSigned) == nil {
+				if decoded, err := base64.StdEncoding.DecodeString(currentSigned.Policy); err == nil {
+					json.Unmarshal(decoded, &current)
+				}
+			}
+		}
+		if next.Revision <= current.Revision {
+			return nil, nil // not newer: kept, silently (the keeper may resend the same layer)
+		}
+		s.Policy = value
+		changed = true
+		at := b.stamp()
+		s.Updated = &at
+		return records.Encode(s)
+	})
+	return changed, err
 }
 
 // SetNoticeLimits is the notifications part as a machine of the person's sends it

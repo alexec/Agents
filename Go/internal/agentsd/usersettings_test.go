@@ -28,7 +28,6 @@ func TestUserSettingsGoIntoTheMachinesFiles(t *testing.T) {
 		McpServers:  json.RawMessage(`{"github":{"url":"https://api.githubcopilot.com/mcp/","headers":{"Authorization":"Bearer ${GITHUB_TOKEN}"}}}`),
 		AgentConfig: mustJSON(wire.UserAgentConfig{Instructions: &instructions, Personas: map[string]string{"reviewer": "You review."}, Skills: map[string]string{"release": "---\nname: release\n---\n"}}),
 		Runtimes:    json.RawMessage(`{"sandbox":{"defaults":{"claude":"on"}}}`),
-		CostLimits:  json.RawMessage(`{"dailyTokens":5000}`),
 	}, Secrets: []wire.UserSecret{{Name: "GITHUB_TOKEN", Value: "ghp_sams"}}}
 	d.Told(wire.NotifyHostUserSettings.Name, mustJSON(sent))
 
@@ -45,11 +44,6 @@ func TestUserSettingsGoIntoTheMachinesFiles(t *testing.T) {
 	}
 	if !strings.Contains(read(d.SettingsDir, "sandbox.json"), `"claude":"on"`) {
 		t.Fatal(read(d.SettingsDir, "sandbox.json"))
-	}
-	var st wire.CostState
-	json.Unmarshal(c.call(t, 1, "cost/state", nil), &st)
-	if st.Limits.DailyTokens == nil || *st.Limits.DailyTokens != 5000 {
-		t.Fatalf("%+v", st.Limits)
 	}
 	secrets := read(home, ".agents-secrets", "secrets.env")
 	if !strings.Contains(secrets, "GITHUB_TOKEN=ghp_sams") || !strings.Contains(secrets, "MINE=kept") {
@@ -70,9 +64,8 @@ func TestUserSettingsGoIntoTheMachinesFiles(t *testing.T) {
 		Name: "build", DisplayName: "Build", Description: "Build jobs", Holders: 3,
 	}})
 
-	// A removed persona and secret are taken away; omitted cost limits stay as they are.
+	// A removed persona and secret are taken away.
 	sent.Settings.AgentConfig = mustJSON(wire.UserAgentConfig{Instructions: &instructions})
-	sent.Settings.CostLimits = nil
 	sent.Secrets = nil
 	d.Told(wire.NotifyHostUserSettings.Name, mustJSON(sent))
 	if _, err := os.Stat(filepath.Join(home, ".agents", "personas", "reviewer.md")); !os.IsNotExist(err) {

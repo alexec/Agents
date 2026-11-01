@@ -13828,23 +13828,21 @@
           },
           "description": "The capabilities a machine needs to follow this policy: host.policy/1, and one for each later rule (FR-014). A machine that lacks one starts no agent."
         },
-        "modeCeiling": {
-          "type": "string",
-          "enum": [
-            "ask",
-            "default",
-            "acceptEdits",
-            "auto",
-            "bypassPermissions"
-          ],
-          "description": "The loosest mode, by ModeLooseness rank 0 to 4. A mode a machine does not know counts as rank 4."
+        "permissionMode": {
+          "$ref": "#/definitions/PermissionLevel",
+          "description": "#2957: the loosest permission level, on Auto's four levels (research R5). The control plane reads modeCeiling into this once and drops modeCeiling."
+        },
+        "permissionRequests": {
+          "$ref": "#/definitions/ClientPermissionMode",
+          "description": "#2957: alwaysApprove or default (Ask me), the loosest answer to a permission request."
         },
         "sandbox": {
           "type": "string",
           "enum": [
-            "required"
+            "required",
+            "runtime"
           ],
-          "description": "Required refuses the choice off and the states none and runtimeControlled. Absent is the person's choice."
+          "description": "Required refuses the choice off and the states none and runtimeControlled. runtime (#2957) refuses only off. Absent is the person's choice."
         },
         "runtimes": {
           "type": "object",
@@ -13864,6 +13862,18 @@
         },
         "environment": {
           "$ref": "#/definitions/PolicyEnvironment"
+        },
+        "workflows": {
+          "$ref": "#/definitions/PolicyWorkflows",
+          "description": "#2957: the most workflows on at once, in each folder."
+        },
+        "noticeLimits": {
+          "$ref": "#/definitions/PolicyNoticeLimits",
+          "description": "#2957: how many notices a burst allows, and how long to wait after one."
+        },
+        "archiveMyChats": {
+          "type": "boolean",
+          "description": "#2957: whether agents may archive the person's finished chats. false is tighter."
         },
         "stopAll": {
           "$ref": "#/definitions/PolicyStopAll"
@@ -15811,6 +15821,19 @@
       ],
       "additionalProperties": false
     },
+    "PolicyApplyYoursResult": {
+      "type": "object",
+      "description": "policy/applyYours's result (#2957): the revision now applied here.",
+      "properties": {
+        "revision": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "revision"
+      ],
+      "additionalProperties": false
+    },
     "PolicyBehindMachine": {
       "type": "object",
       "description": "A machine of the person's that does not say host.policy-layers/1 (#2957, EffectivePolicy.behind, Edge Cases \"A machine of an older version\").",
@@ -15897,6 +15920,39 @@
       },
       "required": [
         "passThrough"
+      ],
+      "additionalProperties": false
+    },
+    "PolicyFolderRequest": {
+      "type": "object",
+      "description": "policy/folder (#2957): the folder's own layer, from .agents/policy.json.",
+      "properties": {
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        }
+      },
+      "required": [
+        "folder"
+      ],
+      "additionalProperties": false
+    },
+    "PolicyFolderState": {
+      "type": "object",
+      "description": "policy/folder's result (#2957, data-model.md \"A folder's layer\"): the approved copy, and a waiting change when one is pending.",
+      "properties": {
+        "rules": {
+          "$ref": "#/definitions/PolicyRules"
+        },
+        "pending": {
+          "$ref": "#/definitions/GuardedChange"
+        },
+        "invalid": {
+          "type": "string",
+          "description": "Why the file on disk cannot be read as a layer (not JSON, or a value out of range), when that is why a change is pending."
+        }
+      },
+      "required": [
+        "rules"
       ],
       "additionalProperties": false
     },
@@ -20227,6 +20283,23 @@
       ],
       "additionalProperties": false
     },
+    "SetFolderPolicyRequest": {
+      "type": "object",
+      "description": "policy/setFolder (#2957): writes .agents/policy.json in a stable order and approves it. A value looser than the person's own effective value is kept, and the result shows it capped.",
+      "properties": {
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "rules": {
+          "$ref": "#/definitions/PolicyRules"
+        }
+      },
+      "required": [
+        "folder",
+        "rules"
+      ],
+      "additionalProperties": false
+    },
       "SetFolderProjectRequest": {
         "type": "object",
         "description": "folders/setProject (#2317): the project id to write into the folder's .agents/folder.json.",
@@ -21873,6 +21946,10 @@
         "rotation": {
           "$ref": "#/definitions/PersonKeyRotation",
           "description": "Present only on the first copy after a new person key."
+        },
+        "key": {
+          "$ref": "#/definitions/Base64",
+          "description": "#2957, research R3: the person key's public half (X9.63), so a machine that has not pinned one yet can check the signature and pin it (trust on first use) or match it against a join code's key. Sent every time; cheap, and no secret."
         }
       },
       "required": [
@@ -24357,6 +24434,10 @@
           "$ref": "#/definitions/JSONValue",
           "description": "The person's notice limits (#2859), as a NoticeLimits."
         },
+        "policy": {
+          "$ref": "#/definitions/JSONValue",
+          "description": "#2957, research R11: your layer, as a SignedYourPolicy. Only the keeper sets it (user/setPolicy); a client cannot (user/setSettings refuses this part)."
+        },
         "updated": {
           "type": "string",
           "format": "date-time",
@@ -24409,9 +24490,10 @@
         "agentConfig",
         "runtimes",
         "costLimits",
-        "notifications"
+        "notifications",
+        "policy"
       ],
-      "description": "A part of a person's user settings (#1760, #2410). Each part has one fixed scope: MCP servers, agent configuration, runtimes, cost limits and notices (#2859) follow the person. Resources belong to each machine."
+      "description": "A part of a person's user settings (#1760, #2410). Each part has one fixed scope: MCP servers, agent configuration, runtimes, cost limits and notices (#2859) follow the person. Resources belong to each machine. policy (#2957) is set only by the keeper, through user/setPolicy; user/setSettings refuses it."
     },
     "UserSuspended": {
       "type": "object",

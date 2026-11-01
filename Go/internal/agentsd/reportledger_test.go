@@ -31,6 +31,10 @@ func TestUsageGoesToTheControlPlaneByTheHour(t *testing.T) {
 	var sent []wire.UsageRollup
 	fail := true
 	ask := askControl(func(_ context.Context, method string, params any) (json.RawMessage, error) {
+		if method == wire.CallUserSetPolicy.Name {
+			// The keeper tells a newly connected control plane your layer (#2957).
+			return json.RawMessage(`{}`), nil
+		}
 		if method != wire.CallUsageRollup.Name {
 			t.Fatal(method)
 		}

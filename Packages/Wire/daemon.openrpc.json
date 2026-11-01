@@ -5129,6 +5129,27 @@
       }
     },
     {
+      "name": "policy/applyYours",
+      "x-capability": "host.policy-layers/1",
+      "description": "The Mac window's direct link to a server (#2957, research R3 path 2): applies a copy of your layer, pinning the person key when none is pinned yet. Refused signature or older.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignedYourPolicy"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/PolicyApplyYoursResult"
+        }
+      }
+    },
+    {
       "name": "policy/effective",
       "x-capability": "host.policy-layers/1",
       "tags": [
@@ -5151,6 +5172,79 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/EffectivePolicy"
+        }
+      }
+    },
+    {
+      "name": "policy/effectiveChanged",
+      "x-capability": "host.policy-layers/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "description": "A layer changed (#2957): clients call policy/effective again. folder names the one folder layer that changed; absent for the organisation's or your own layer, which can change what any folder's effective policy is.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PolicyEffectiveRequest"
+          }
+        }
+      ]
+    },
+    {
+      "name": "policy/folder",
+      "x-capability": "host.policy-layers/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "A folder's own layer, from .agents/policy.json: the approved copy, and a waiting change (#2957).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PolicyFolderRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/PolicyFolderState"
+        }
+      }
+    },
+    {
+      "name": "policy/setFolder",
+      "x-capability": "host.policy-layers/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Writes a folder's own layer to .agents/policy.json, in a stable order, and approves it (#2957, FR-014). A value looser than the person's own effective value is kept and marked capped.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SetFolderPolicyRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/PolicyRules"
         }
       }
     },
@@ -7825,6 +7919,10 @@
         "code": -32027,
         "message": "notYours"
       },
+      "older": {
+        "code": -32102,
+        "message": "older"
+      },
       "orgProviderUnavailable": {
         "code": -32082,
         "message": "orgProviderUnavailable"
@@ -7900,6 +7998,10 @@
       "signInWanted": {
         "code": -32070,
         "message": "signInWanted"
+      },
+      "signature": {
+        "code": -32103,
+        "message": "signature"
       },
       "storeUnavailable": {
         "code": -32094,

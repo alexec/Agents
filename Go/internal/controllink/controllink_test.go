@@ -223,6 +223,34 @@ func TestACodeRoundTrips(t *testing.T) {
 	}
 }
 
+// TestACodeWithAPersonKeyIsVersion3 covers research R3 path 1: a host code the person's
+// own Mac window makes carries the person key, as a version 3 code; a code with none is
+// still a version 2 code, so an older copy that only reads version 2 keeps working.
+func TestACodeWithAPersonKeyIsVersion3(t *testing.T) {
+	priv := NewPrivateKey()
+	pub, _ := PublicKey(priv)
+	_, secret := MakeCodeSecret(priv)
+	personPub, _ := PublicKey(NewPrivateKey())
+	c := &Code{Host: true, ControlKey: pub, Secret: secret, URL: "https://192.168.1.2:8791", Name: "Alex's Mac", PersonKey: personPub}
+	text := c.Text()
+	if !strings.HasPrefix(text, "agents-control:3:h:-:") {
+		t.Fatal(text)
+	}
+	back, err := ParseCode(text)
+	if err != nil || !bytes.Equal(back.PersonKey, personPub) {
+		t.Fatalf("%v %+v", err, back)
+	}
+	// No person key: a version 2 code, with no tenth field, and ParseCode gives none back.
+	c.PersonKey = nil
+	if strings.HasPrefix(c.Text(), "agents-control:3:") {
+		t.Fatal("a code with no person key was written as version 3")
+	}
+	back, err = ParseCode(c.Text())
+	if err != nil || len(back.PersonKey) != 0 {
+		t.Fatalf("%v %+v", err, back)
+	}
+}
+
 func TestCodesSwiftRefuses(t *testing.T) {
 	pub, _ := PublicKey(NewPrivateKey())
 	_, secret := MakeCodeSecret(NewPrivateKey())

@@ -2,6 +2,7 @@ package agentsd
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -152,30 +153,43 @@ func TestNoticeLineSaysWhereItWent(t *testing.T) {
 	}
 }
 
-// With a control plane (#2859), the person's one bucket there decides, Burst and
-// Cool-down set in a client go to it, and its notifications part is written here.
+// With a control plane (#2859), the person's one bucket there decides; Burst and Cool-down
+// set in a client go into your layer (#2957) and are pushed on, as every change to it is
+// (user/setPolicy), not by the old dedicated user/setNoticeLimits call, which is gone.
 func TestNoticeLimitsFollowThePerson(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
 	d.SettingsDir = t.TempDir()
-	asked := make(chan string, 8)
-	var sent wire.NoticeLimits
+	policies := make(chan wire.YourPolicy, 8)
 	d.SetControlAsk(func(_ context.Context, method string, params any) (json.RawMessage, error) {
 		switch method {
 		case wire.CallNoticesTake.Name:
-			asked <- method
 			return mustJSON(wire.NoticeTaken{Sent: false, NextAt: wire.DateOf(time.Now().Add(time.Minute))}), nil
-		case wire.CallUserSetNoticeLimits.Name:
-			sent = params.(wire.NoticeLimits)
-			asked <- method
+		case wire.CallUserSetPolicy.Name:
+			signed := params.(wire.SignedYourPolicy)
+			raw, _ := base64.StdEncoding.DecodeString(signed.Policy)
+			var policy wire.YourPolicy
+			json.Unmarshal(raw, &policy)
+			policies <- policy
 			return json.RawMessage(`{}`), nil
 		}
 		return nil, errors.New("no such method")
 	})
 	c.call(t, 1, "preferences/set", map[string]any{noticeBurstKey: 7, "other": true})
-	if got := <-asked; got != wire.CallUserSetNoticeLimits.Name || sent.Burst != 7 || sent.CooldownMinutes != 10 {
-		t.Fatalf("%s %+v", got, sent)
+	// Burst 7 reaches the control plane in your layer's noticeLimits rule; an earlier push,
+	// from the first-start move at connect, may arrive first and is skipped.
+	deadline := time.After(5 * time.Second)
+	for {
+		select {
+		case p := <-policies:
+			if n := p.Rules.NoticeLimits; n != nil && n.Burst != nil && *n.Burst == 7 {
+				goto gotBurst
+			}
+		case <-deadline:
+			t.Fatal("burst 7 never reached the control plane")
+		}
 	}
+gotBurst:
 	// The control plane's bucket is empty, though this host's is full.
 	a := seeded(t, d, t.TempDir(), nil)
 	m := appClient(t, d, a.ID)
@@ -187,13 +201,6 @@ func TestNoticeLimitsFollowThePerson(t *testing.T) {
 	d.SetControlAsk(func(context.Context, string, any) (json.RawMessage, error) { return nil, errors.New("gone") })
 	if text, _ := m.tool(3, "notify", map[string]any{"title": "Done"}); !strings.HasPrefix(text, "Sent. 6 more") {
 		t.Fatal(text)
-	}
-	// The person's part from the control plane is what every client here shows.
-	d.SetControlAsk(nil)
-	d.Told(wire.NotifyHostUserSettings.Name, mustJSON(wire.MachineUserSettings{User: "sam", Secrets: []wire.UserSecret{},
-		Settings: wire.UserSettings{Notifications: json.RawMessage(`{"burst":4,"cooldownMinutes":30}`)}}))
-	if burst, cooldown := d.noticeLimits(); burst != 4 || cooldown != 30*time.Minute {
-		t.Fatal(burst, cooldown)
 	}
 	if prefs := d.preferences(); string(prefs["other"]) != "true" {
 		t.Fatalf("%s", prefs)

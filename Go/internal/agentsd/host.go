@@ -215,7 +215,7 @@ func (d *Daemon) setClientPermissions(in wire.ClientPermissionSettings) (wire.Cl
 func (d *Daemon) clientPermissionsState() wire.ClientPermissionSettings {
 	s := d.clientPermissions()
 	if ceiling, _, ok := d.alwaysApproveCeiling(); ok {
-		s.SetBy = setBy(orgLayerRef(d.orgPolicy()), "modeCeiling", modeWords(ceiling))
+		s.SetBy = setBy(orgLayerRef(d.orgPolicy()), "permissionMode", modeWords(ceiling))
 	}
 	return s
 }
@@ -238,7 +238,7 @@ func (d *Daemon) alwaysApproveRefusal() error {
 		return policyRefusal("policy", "permissionRequests", "Your policy allows at most Ask me.", nil, youLayerRef())
 	}
 	if ceiling, _, ok := d.alwaysApproveCeiling(); ok {
-		return policyRefusal("policy", "modeCeiling", modeWords(ceiling), nil, orgLayerRef(d.orgPolicy()))
+		return policyRefusal("policy", "permissionMode", modeWords(ceiling), nil, orgLayerRef(d.orgPolicy()))
 	}
 	return nil
 }

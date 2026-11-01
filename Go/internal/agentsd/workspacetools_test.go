@@ -35,6 +35,10 @@ func TestAnAgentsWorkspaceTools(t *testing.T) {
 	var mu sync.Mutex
 	var asked []wire.MachineWorkspaceCall
 	d.SetControlAsk(func(_ context.Context, method string, params any) (json.RawMessage, error) {
+		if method == wire.CallUserSetPolicy.Name {
+			// The keeper's layer, saved the first time anything reads it (#2957).
+			return json.RawMessage(`{}`), nil
+		}
 		call := params.(wire.MachineWorkspaceCall)
 		mu.Lock()
 		asked = append(asked, call)

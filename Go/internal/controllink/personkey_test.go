@@ -3,6 +3,7 @@ package controllink
 import (
 	"bytes"
 	"testing"
+	"time"
 )
 
 // The person key (#2957, research R1): made on the first save of your layer, kept in the
@@ -117,5 +118,81 @@ func TestPersonKeyRotationChecksOnlyAgainstThePinnedKey(t *testing.T) {
 	tampered.NewKey[0] ^= 0xFF
 	if PersonKeyRotationValid(oldPublic, tampered) {
 		t.Fatal("a tampered rotation checks")
+	}
+}
+
+// TestPinnedPersonKeyStateTransitions covers data-model.md's "State transitions" for a
+// machine that is not the keeper (#2957, T024): no pin -> pinned (from a join code, the
+// window, or trust on first use from the control plane); pinned -> moves only on a rotation
+// that checks against the key already pinned; a second PinPersonKey call, with no
+// rotation, never overwrites an existing pin, from whichever source.
+func TestPinnedPersonKeyStateTransitions(t *testing.T) {
+	root := t.TempDir()
+	if p, err := LoadPinnedPersonKey(root); err != nil || p != nil {
+		t.Fatalf("no pin: %v, %v", p, err)
+	}
+	private := NewPrivateKey()
+	public, err := PublicKey(private)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Path 3: trust on first use, from the first signed layer the control plane sends.
+	pinned, err := PinPersonKey(root, public, PinFromControlPlane, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pinned.From != PinFromControlPlane || pinned.KeyID != KeyID(public) {
+		t.Fatalf("not pinned as expected: %+v", pinned)
+	}
+	again, err := LoadPinnedPersonKey(root)
+	if err != nil || again == nil || !bytes.Equal(again.Key, public) {
+		t.Fatalf("the pin did not persist: %v, %v", again, err)
+	}
+	// A second pin attempt, from a different source and a different key, changes nothing:
+	// only a rotation moves an existing pin.
+	other, _ := PublicKey(NewPrivateKey())
+	unchanged, err := PinPersonKey(root, other, PinFromWindow, time.Now())
+	if err != nil || !bytes.Equal(unchanged.Key, public) || unchanged.From != PinFromControlPlane {
+		t.Fatalf("a second pin overwrote the first: %+v, %v", unchanged, err)
+	}
+	// A rotation signed by a stranger's key does not check against the pin, and does not
+	// move it.
+	_, forged, err := PersonKeyRotationFor(NewPrivateKey())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := AcceptPersonKeyRotation(root, forged, time.Now()); err == nil {
+		t.Fatal("a forged rotation moved the pin")
+	}
+	if kept, _ := LoadPinnedPersonKey(root); !bytes.Equal(kept.Key, public) {
+		t.Fatal("the pin moved on a forged rotation")
+	}
+	// A rotation signed by the pinned key's own private half moves the pin.
+	newPrivate, rotation, err := PersonKeyRotationFor(private)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newPublic, err := PublicKey(newPrivate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	moved, err := AcceptPersonKeyRotation(root, rotation, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(moved.Key, newPublic) || moved.From != PinFromControlPlane {
+		t.Fatalf("the rotation did not move the pin as expected: %+v", moved)
+	}
+}
+
+// TestAcceptPersonKeyRotationRefusesWithNoPinYet: a rotation is never the first pin.
+func TestAcceptPersonKeyRotationRefusesWithNoPinYet(t *testing.T) {
+	root := t.TempDir()
+	_, rotation, err := PersonKeyRotationFor(NewPrivateKey())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := AcceptPersonKeyRotation(root, rotation, time.Now()); err == nil {
+		t.Fatal("a rotation with nothing pinned yet was accepted")
 	}
 }

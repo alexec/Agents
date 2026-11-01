@@ -14,15 +14,19 @@ import (
 // CodeLifetime is how long a code works: five minutes, once.
 const CodeLifetime = 5 * time.Minute
 
-// Code is ControlCode, version 2: what a new client or host needs and nothing more.
+// Code is ControlCode, version 2 or 3: what a new client or host needs and nothing more.
 //
 //	agents-control:2:<c|h>:-:<key>:<secret>:<url>:<pin or ->:<name>
+//	agents-control:3:<c|h>:-:<key>:<secret>:<url>:<pin or ->:<name>:<personKey or ->
 //
 // with the key and the secret in base64url, and the URL and name percent-encoded. The
 // fourth field was a client's grant; every client may do everything now (#111), so it is
 // always "-" and not read. The pin is the SHA-256 of the certificate's public key,
 // base64url, when that certificate is not publicly trusted. A version 1 code (a list of
-// addresses) is not read: no control plane has made one since the first build.
+// addresses) is not read: no control plane has made one since the first build. Version 3
+// (#2957, research R3 path 1) adds a tenth field, the person key's public half in
+// base64url, so a host code from the person's own Mac window pins it (PinFromJoinCode); "-"
+// when the code carries none, as every version 2 code does.
 type Code struct {
 	Host       bool
 	ControlKey []byte // X9.63, 65 bytes
@@ -30,9 +34,14 @@ type Code struct {
 	URL        string
 	Pin        string // "" for none
 	Name       string
+	// PersonKey is the person key's public half (X9.63), present only on a version 3 host
+	// code the person's own Mac window made (research R3 path 1). nil for none.
+	PersonKey []byte
 }
 
-// Text is the code as one line, to paste or to put in a QR code.
+// Text is the code as one line, to paste or to put in a QR code: version 3 when PersonKey
+// is set, version 2 otherwise, so a code that carries no person key keeps working with an
+// older copy that only reads version 2.
 func (c *Code) Text() string {
 	kind := "c"
 	if c.Host {
@@ -42,16 +51,22 @@ func (c *Code) Text() string {
 	if pin == "" {
 		pin = "-"
 	}
-	return strings.Join([]string{"agents-control", "2", kind, "-", B64URL(c.ControlKey), B64URL(c.Secret),
-		escape(c.URL), pin, escape(c.Name)}, ":")
+	fields := []string{"agents-control", "2", kind, "-", B64URL(c.ControlKey), B64URL(c.Secret),
+		escape(c.URL), pin, escape(c.Name)}
+	if len(c.PersonKey) > 0 {
+		fields[1] = "3"
+		fields = append(fields, B64URL(c.PersonKey))
+	}
+	return strings.Join(fields, ":")
 }
 
-// ParseCode reads a version 2 code back from its text; whitespace around it, as a paste
-// brings, is let go.
+// ParseCode reads a version 2 or 3 code back from its text; whitespace around it, as a
+// paste brings, is let go.
 func ParseCode(text string) (*Code, error) {
 	parts := strings.Split(strings.TrimSpace(text), ":")
-	if len(parts) != 9 || parts[0] != "agents-control" || parts[1] != "2" {
-		return nil, errors.New("not a version 2 control code")
+	v3 := len(parts) == 10 && parts[1] == "3"
+	if !v3 && (len(parts) != 9 || parts[1] != "2") || parts[0] != "agents-control" {
+		return nil, errors.New("not a version 2 or 3 control code")
 	}
 	key, err := FromB64URL(parts[4])
 	if err != nil || len(key) != 65 || key[0] != 4 {
@@ -82,6 +97,13 @@ func ParseCode(text string) (*Code, error) {
 		return nil, errors.New("the code's pin is not 32 bytes")
 	}
 	c := &Code{ControlKey: key, Secret: secret, URL: where, Pin: pin, Name: name}
+	if v3 && parts[9] != "-" {
+		personKey, err := FromB64URL(parts[9])
+		if err != nil || len(personKey) != 65 || personKey[0] != 4 {
+			return nil, errors.New("the code's person key is not a P-256 public key")
+		}
+		c.PersonKey = personKey
+	}
 	switch {
 	case parts[2] == "c" && parts[3] != "":
 	case parts[2] == "h" && parts[3] == "-":

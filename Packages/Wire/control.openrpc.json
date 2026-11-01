@@ -4959,16 +4959,16 @@
       }
     },
     {
-      "name": "user/setNoticeLimits",
-      "x-capability": "notices/1",
-      "description": "A host, on its channel 0 (#2859): the person changed Burst or Cool-down in one of its clients, so the notifications part of their user settings takes it. A machine may set this part and no other.",
+      "name": "user/setPolicy",
+      "x-capability": "host.policy-layers/1",
+      "description": "The keeper, on its channel 0 (#2957, research R11): your layer changed, so the part policy of your user settings takes it. The control plane checks the revision goes up, stores it unchanged, and pushes it (host/userSettings) to the person's machines that say host.policy-layers/1. Refused notKeeper when host is not the layer's own keeper.",
       "paramStructure": "by-name",
       "params": [
         {
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/NoticeLimits"
+            "$ref": "daemon.schema.json#/definitions/SignedYourPolicy"
           }
         }
       ],

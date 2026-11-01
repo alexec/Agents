@@ -3,7 +3,6 @@ package agentsd
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -13,7 +12,6 @@ import (
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/internal/noticebucket"
-	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -95,44 +93,6 @@ func (d *Daemon) takeNoticeOnControl(burst int, cooldown time.Duration) (taken w
 		return wire.NoticeTaken{}, false
 	}
 	return taken, true
-}
-
-// noticeLimitsChanged is the person setting Burst or Cool-down in a client of this host:
-// with a control plane, the person's other machines take it too.
-func (d *Daemon) noticeLimitsChanged(change map[string]wire.JSONValue) {
-	_, burst := change[noticeBurstKey]
-	_, cooldown := change[noticeCooldownKey]
-	ask := d.askControl.Load()
-	if !burst && !cooldown || ask == nil {
-		return
-	}
-	limits := noticeLimitsWire(d.noticeLimits())
-	safe.Go("user/setNoticeLimits", func() {
-		ctx, cancel := context.WithTimeout(d.ctx, noticePatience)
-		defer cancel()
-		if _, err := (*ask)(ctx, wire.CallUserSetNoticeLimits.Name, limits); err != nil {
-			log.Printf("user/setNoticeLimits: kept on this machine only: %v", err)
-		}
-	})
-}
-
-// writeNoticeLimits is the notifications part from the control plane, written into your
-// layer (#2957), so this host and every client of it use the person's limits. display.json
-// is also written, unchanged, so the window's old Notifications pane keeps working until
-// slice 4 moves it to Agents ▸ Policy (FR-023).
-func (d *Daemon) writeNoticeLimits(raw wire.JSONValue) error {
-	var limits wire.NoticeLimits
-	if err := json.Unmarshal(raw, &limits); err != nil {
-		return errors.New("not notice limits")
-	}
-	burst, cooldown := noticebucket.Limits(limits.Burst, limits.CooldownMinutes)
-	if _, err := d.setPreferences(map[string]wire.JSONValue{
-		noticeBurstKey:    asJSON(burst),
-		noticeCooldownKey: asJSON(max(int(math.Round(cooldown.Minutes())), 1)),
-	}); err != nil {
-		return err
-	}
-	return d.setYourNoticeLimits(int64(burst), cooldown)
 }
 
 // mirrorNoticeLimitsFrom reads noticeBurst and noticeCooldownMinutes out of m (the display

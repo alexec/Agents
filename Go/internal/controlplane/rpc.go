@@ -32,6 +32,7 @@ const (
 	noSuchHost           = -32091
 	changedElsewhere     = -32093
 	storeUnavailable     = -32094
+	notKeeper            = -32101
 )
 
 // RPCError is JSONRPCError.
