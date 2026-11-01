@@ -35,4 +35,17 @@ struct VoiceModeWordsTests {
         #expect(!VoiceModeWords.isEcho("Fix the bug", of: "Voice mode is on. Say what you want."))
         #expect(!VoiceModeWords.isEcho("", of: "Voice mode is on."))
     }
+
+    /// #3163: words heard while a prompt was sent are the words after it, also when the
+    /// recognizer revised it meanwhile; the prompt itself is never heard again.
+    @Test func wordsHeardWhileSendingAreOnlyTheNewOnes() {
+        #expect(VoiceModeWords.heard(after: "fix the bug", in: "fix the bug") == "")
+        #expect(VoiceModeWords.heard(after: "fix the bug", in: "fix the bug and add a test") == "and add a test")
+        #expect(VoiceModeWords.heard(after: "fix the bug", in: "Fix the bug. And add a test") == "And add a test")
+        #expect(VoiceModeWords.heard(after: "fix the cafe", in: "Fix the café, then push") == "then push")
+        #expect(VoiceModeWords.heard(after: "fix the bug", in: "Fix the bugs") == "")
+        #expect(VoiceModeWords.heard(after: "fix the bug", in: "Fix that bug and push") == "and push")
+        #expect(VoiceModeWords.heard(after: "", in: "and push") == "and push")
+        #expect(VoiceModeWords.heard(after: "fix the bug", in: "fix") == "")
+    }
 }

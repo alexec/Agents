@@ -872,9 +872,9 @@ final class VoiceMode {
         guard agentID == agent, phase == .sending else { return }
         // What was heard while that call was in flight, not sent with it (#3070).
         let continued = heard.trimmingCharacters(in: .whitespacesAndNewlines)
-        let leftover = continued == words ? "" :
-            (continued.hasPrefix(words) ? String(continued.dropFirst(words.count)) : continued)
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+        // The recognizer may have revised the words sent meanwhile: they are not sent twice
+        // (#3163).
+        let leftover = VoiceModeWords.heard(after: words, in: continued)
         if let target {
             sound(.sent)
             // A new session's first words started it: voice mode goes on in its chat.
@@ -900,9 +900,10 @@ final class VoiceMode {
             }
             saidSteps = []
         } else {
-            // The words are not lost: the strip keeps them, and the voice says so first.
+            // The words are not lost: the strip keeps them, with those said while they
+            // were sent (#3163), and the voice says so first.
             sound(.problem)
-            unsent = words
+            unsent = leftover.isEmpty ? words : words + " " + leftover
             queue.insert(VoiceModeWords.notSent, at: 0)
         }
         if queue.isEmpty {
