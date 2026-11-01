@@ -15,6 +15,10 @@ import (
 // users, and gives each machine provider to one. Only a provider's group's users see it
 // and start machines from it; a provider with no group is the admins' alone.
 
+// mostGroups is how many groups a control plane keeps, removed ones not counted: every
+// group is read into memory at start (#3126).
+const mostGroups = 1000
+
 // inGroup says a user is in a group: everyone, or named.
 func (s *Service) inGroup(user, group string) bool {
 	g := s.records.Group(group)
@@ -157,6 +161,9 @@ func (m *Methods) setGroup(ctx context.Context, request wire.GroupSet) (wire.Gro
 	kept, err := m.records.ChangeGroup(ctx, id, func(g *records.Group) (*records.Group, error) {
 		if g == nil && !making {
 			return nil, fail(invalidParams, "There is no such group.")
+		}
+		if g == nil && len(m.records.Groups()) >= mostGroups {
+			return nil, fail(notPermitted, "There are %d groups. Remove one first.", mostGroups)
 		}
 		next := records.Group{ID: id, Name: name, Everyone: everyone, Members: members, Caps: capsOf(request.Caps)}
 		if g != nil {
