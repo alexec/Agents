@@ -1,6 +1,6 @@
 // Where a session sits in the sessions column: AgentGroup (Model/AgentGroup.swift), ported by
 // hand and held to Packages/AgentsKit/Tests/AgentsKitTests/Fixtures/web/groups (research R7).
-import type { Agent, AgentGroup, EndedReason, WorkOutcome, WorkReport } from "../protocol/generated";
+import type { Agent, AgentGroup, EndedReason, EventWait, MCPEventTrigger, WorkOutcome, WorkReport } from "../protocol/generated";
 
 export const groupTitles: Record<AgentGroup, string> = {
   needsAttention: "Needs you",
@@ -52,6 +52,39 @@ export function isWaiting(agent: Agent): boolean {
  */
 export function waitingForPerson(agent: Agent): boolean {
   return agent.eventWait !== undefined && agent.eventWait.ending === undefined && agent.eventWait.forPerson === true;
+}
+
+/** EventWait.personAsks: what each wait only the person can settle asks of them (#3051, #3147). */
+const personAsks: Record<string, string> = { "review.requested": "Review requested", "issue.assigned": "Issue assigned" };
+
+function personTrigger(wait: EventWait): MCPEventTrigger | undefined {
+  return wait.serverEvents?.find((e) => personAsks[e.trigger.event] !== undefined)?.trigger;
+}
+
+/**
+ * EventWait.personLine (#3147): what an open wait for the person asks of them, "Review requested:
+ * alexec/Agents#123", as the row says it under Needs you and the wait card heads with it.
+ */
+export function personLine(agent: Agent): string | null {
+  const wait = agent.eventWait;
+  if (!wait || !waitingForPerson(agent)) return null;
+  const trigger = personTrigger(wait);
+  const name = trigger?.event ?? wait.patterns.find((p) => personAsks[p.name] !== undefined)?.name;
+  const ask = name === undefined ? undefined : personAsks[name];
+  if (ask === undefined) return null;
+  if (!trigger) return ask;
+  const args = trigger.arguments;
+  const place = typeof args.repo === "string" ? args.repo : typeof args.project === "string" ? args.project : undefined;
+  const mark = args.repo === undefined && args.pr !== undefined ? "!" : "#";
+  const n = typeof args.pr === "number" ? args.pr : typeof args.issue === "number" ? args.issue : undefined;
+  const number = n === undefined ? "" : `${mark}${n}`;
+  if (place !== undefined) return `${ask}: ${place}${number}`;
+  return number ? `${ask}: ${number}` : ask;
+}
+
+/** EventWait.personURL (#3147): the PR or issue a wait for the person names, the card's main action. */
+export function personTriggerOf(agent: Agent): MCPEventTrigger | undefined {
+  return agent.eventWait && waitingForPerson(agent) ? personTrigger(agent.eventWait) : undefined;
 }
 
 /** Agent.showsUnread: a finished turn nobody has opened since. A mark on the row, never a group (#70). */

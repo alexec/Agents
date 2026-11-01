@@ -45,7 +45,7 @@ for (const { name, input, expected } of cases("status/rows.json")) {
 
 test("a folder row says Needs you first, unread beside it (FolderRow.subtitle, #70)", () => {
   const [{ input }] = cases("groups/panels.json");
-  assert.equal(groups.folderSubtitle(input.agents, input.folder), "Needs you · 3 unread");
+  assert.equal(groups.folderSubtitle(input.agents, input.folder), "Needs you · 4 unread");
   assert.equal(groups.folderSubtitle([], input.folder), null);
 });
 

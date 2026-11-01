@@ -35,7 +35,7 @@ import { cardTitle, carryOnHelp, carryOnPrompt, openBlock } from "../model/block
 import { sentPrompts } from "../model/promptHistory";
 import { sessionPrompts } from "../model/sessionPrompts";
 import { PromptList } from "./chat/PromptList";
-import { asksToArchive, folderPath } from "../model/groups";
+import { asksToArchive, folderPath, personLine, personTriggerOf } from "../model/groups";
 import { CallActionsContext, fromLine, ItemRow, TurnView, type CallActions } from "./chat/Rows";
 import { Modal } from "./Modal";
 import { nameOf, pathOf, setPane } from "./files/paneState";
@@ -51,7 +51,7 @@ import { comingBackDescription, footStatusWords } from "../model/status";
 import { ArchiveCard } from "./ArchiveCard";
 import { showsThoughts, shownItems } from "../model/thoughts";
 import { hasTurnInFlight, promptPlaceholder, willQueue } from "../model/promptWords";
-import { eventCarryOnPrompt, eventWaitLine, eventWaitMinutes, eventWaitSummaryLines, leaseMark, lineResource } from "../model/rowLines";
+import { eventCarryOnPrompt, eventWaitLine, eventWaitMinutes, eventWaitSummaryLines, leaseMark, lineResource, triggerURL } from "../model/rowLines";
 import { routeHash } from "../route";
 import { sessionRuntimeName } from "../model/runtimes";
 import { GuardedChangeCard } from "./GuardedChange";
@@ -622,8 +622,9 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         {/* A wait on sessions or on a time, the same card in the same place (#2750): it was a strip
             under the chat's head with Carry on. */}
         {agent && openBlock(agent) && <BlockWaitCard store={store} host={host} agent={agent} disabled={down} />}
-        {/* Under them, and not in "Waiting for you": the agent waits, not the person (#2084). Only
-            while the wait is open: an ended one stays on the record until the agent goes on (#2749). */}
+        {/* Under them, and not in "Waiting for you": the agent waits, not the person (#2084), except a
+            wait only the person can settle, which the card tints and says (#3147). Only while the
+            wait is open: an ended one stays on the record until the agent goes on (#2749). */}
         {agent?.eventWait && agent.eventWait.ending === undefined && <WaitCard agent={agent} title={(id) => store.agent(host, id)?.title}
           disabled={down} continueNow={async () => { await store.prompt(host, agent.id, eventCarryOnPrompt, []); }}
           stop={() => store.cancelWait(host, agent.id)} />}
@@ -845,7 +846,8 @@ const waitWords = {
 
 /**
  * The agent's wait on events, as a card under the questions (WaitCard.swift, #1995): what, since
- * when, until when, Carry On and End Wait (#3052, #3152). Not tinted.
+ * when, until when, Carry On and End Wait (#3052, #3152). Not tinted, except a wait only the person
+ * can settle (#3147): tinted, headed with what it asks of them, and Open on the PR or issue it names.
  */
 function WaitCard({ agent, title, disabled, continueNow, stop }: { agent: Agent; title: (id: string) => string | undefined;
   disabled: boolean; continueNow: () => Promise<void>; stop: () => Promise<void> }) {
@@ -859,12 +861,18 @@ function WaitCard({ agent, title, disabled, continueNow, stop }: { agent: Agent;
   const line = eventWaitLine(agent, title);
   if (!wait || wait.ending !== undefined || (!line && wait.patterns.length === 0)) return null;
   const { elapsed, total, percent } = eventWaitMinutes(wait, new Date(now.value));
+  const isLine = lineResource(agent) !== undefined;
+  const asks = isLine ? null : personLine(agent);
+  const trigger = asks ? personTriggerOf(agent) : undefined;
+  const url = trigger ? triggerURL(trigger) : undefined;
   return (
     <div class="cards">
-      <div class="card wait-card">
-        {lineResource(agent) !== undefined ? <p class="strong">{line}</p> : <>
+      <div class={`card wait-card${asks ? " for-person" : ""}`}>
+        {isLine ? <p class="strong">{line}</p> : <>
           <div class="wait-card-heading">
-            <span class="wait-card-title"><span class="wait-card-broadcast waiting-beacon" aria-hidden="true"><Beacon /></span>Waiting for event</span>
+            {asks
+              ? <span class="wait-card-title tinted"><span class="wait-card-mark" aria-hidden="true">!</span>{asks}</span>
+              : <span class="wait-card-title"><span class="wait-card-broadcast waiting-beacon" aria-hidden="true"><Beacon /></span>Waiting for event</span>}
             <span class="wait-card-time">{total === undefined ? `${elapsed} min` : `${elapsed} / ${total} min`}</span>
           </div>
           <div class="wait-card-events">
@@ -882,6 +890,8 @@ function WaitCard({ agent, title, disabled, continueNow, stop }: { agent: Agent;
           </div>}
         </>}
         <p class="wait-answers">
+          {url && <a class="button prominent" href={url} target="_blank" rel="noopener noreferrer"
+            title={`Open ${url} in the browser.`}>Open</a>}
           <button disabled={disabled || busy.value} title={waitWords.carryOnHelp}
             onClick={() => { busy.value = true; void continueNow().finally(() => (busy.value = false)); }}>{waitWords.carryOn}</button>
           <button class="destructive" disabled={disabled || busy.value} title={waitWords.endWaitHelp}

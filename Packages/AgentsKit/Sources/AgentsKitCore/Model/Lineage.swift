@@ -143,6 +143,8 @@ public enum LineageList {
     /// How many times, a second apart, the pane walks again while the daemon is still
     /// resolving titles (#3102).
     public static let resolvingAsks = 20
+    /// Under the graph while those walks go on (#3154).
+    public static let readingTitles = "Reading titles…"
 
     public static func node(ofSession id: UUID) -> Node {
         Node(kind: "session", ref: "session:\(id.uuidString)")
@@ -285,8 +287,8 @@ public enum LineageList {
     public static let pageNone = "No links from here yet. Start from another session, or type an issue’s, a pull request’s, a milestone’s or a release’s address."
 
     /// The start a person typed on the Lineage page (#3087): a GitHub address of an issue, a pull
-    /// request, a milestone or a release; "owner/repo#12" (an issue); "github:owner/repo#12"; or a
-    /// session's id. Nil for anything else.
+    /// request, a milestone or a release; "owner/repo#12" (an issue, or the pull request of
+    /// `pullRequest(typed:)`); "github:owner/repo#12"; or a session's id. Nil for anything else.
     public static func node(typed text: String) -> Node? {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if let id = UUID(uuidString: text.hasPrefix("session:") ? String(text.dropFirst("session:".count)) : text) {
@@ -310,6 +312,15 @@ public enum LineageList {
         guard halves.count == 2, Int(halves[1]) != nil, halves[0].split(separator: "/").count == 2,
               !halves[0].contains(" ") else { return nil }
         return Node(kind: "issue", ref: "github:\(bare)")
+    }
+
+    /// The pull request that "owner/repo#12" may be (#3148): GitHub gives issues and pull requests
+    /// one number space, so the bare form is either. The page walks it when the issue has no links.
+    /// Nil for any other start.
+    public static func pullRequest(typed text: String) -> Node? {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.contains("://"), let node = node(typed: text), node.kind == "issue" else { return nil }
+        return Node(kind: "pr", ref: node.ref)
     }
 }
 

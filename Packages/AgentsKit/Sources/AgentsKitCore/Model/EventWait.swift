@@ -88,6 +88,42 @@ public struct EventWait: Codable, Hashable, Sendable {
         }
     }
 
+    /// What only the connected person can settle, in words (#3147): "Review requested:
+    /// alexec/Agents#123", as the row says it under Needs you and the wait card heads
+    /// with it. `nil` unless the wait is open and for the person (#3051).
+    public var personLine: String? {
+        guard isOpen, forPerson == true,
+              let name = personEventName, let ask = Self.personAsks[name] else { return nil }
+        guard let arguments = personTrigger?.arguments else { return ask }
+        let place = arguments["repo"]?.stringValue ?? arguments["project"]?.stringValue
+        let mark = arguments["repo"] == nil && arguments["pr"] != nil ? "!" : "#"
+        let number = (arguments["pr"] ?? arguments["issue"])?.intValue.map { "\(mark)\($0)" }
+        switch (place, number) {
+        case let (place?, number): return "\(ask): \(place)\(number ?? "")"
+        case let (nil, number?): return "\(ask): \(number)"
+        case (nil, nil): return ask
+        }
+    }
+
+    /// The PR or issue a wait for the person names, when it names one (#3147): the card's
+    /// main action, as `MCPEventTrigger.url` builds it.
+    public var personURL: URL? {
+        guard isOpen, forPerson == true else { return nil }
+        return personTrigger?.url
+    }
+
+    /// The events only the connected person can settle and what each asks of them: the
+    /// daemon's `forPersonEventNames` (`eventwaits.go`, #3051).
+    static let personAsks = ["review.requested": "Review requested", "issue.assigned": "Issue assigned"]
+
+    private var personEventName: String? {
+        personTrigger?.event ?? patterns.first { Self.personAsks[$0.name] != nil }?.name
+    }
+
+    private var personTrigger: MCPEventTrigger? {
+        serverEvents?.first { Self.personAsks[$0.trigger.event] != nil }?.trigger
+    }
+
     /// What Continue sends, as the person: an ordinary prompt, which ends a wait as one
     /// always does (`EventWaitEnding.Canceller.prompt`), carrying the agent on without
     /// the event (#3052).
