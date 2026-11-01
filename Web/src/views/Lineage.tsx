@@ -18,7 +18,7 @@ import {
 import { go, route } from "../route";
 
 /** The walk and the costs from a node on a host, asked again when either or `asked` changes. */
-function useWalk(store: Store, host: string | undefined, node: LineageNode | undefined, asked: number) {
+export function useWalk(store: Store, host: string | undefined, node: LineageNode | undefined, asked: number) {
   const graph = useSignal<LineageGraph | null>(null);
   const costs = useSignal<ReadonlyMap<string, LineageCostRollup>>(new Map());
   const failed = useSignal<string | null>(null);
@@ -65,7 +65,7 @@ function useWalk(store: Store, host: string | undefined, node: LineageNode | und
 
 /** The graph's layout, worked out again only when the walk, the costs, the start or the session titles change
  * (#3182), not on each render. */
-function useLayout(store: Store, host: string | undefined, start: LineageNode | undefined, graph: LineageGraph | null,
+export function useLayout(store: Store, host: string | undefined, start: LineageNode | undefined, graph: LineageGraph | null,
   costs: ReadonlyMap<string, LineageCostRollup>) {
   const agents = store.agents.value;
   return useMemo(() => host && start && graph ? lineageGraph(start, graph, costs, sessionTitle(store, host)) : undefined,
@@ -239,7 +239,7 @@ export function LineagePage({ store }: { store: Store }) {
   return <div class="lineage lineage-page">{bar}{body}</div>;
 }
 
-type Show = (row: LineageRow) => (() => void) | undefined;
+export type Show = (row: LineageRow) => (() => void) | undefined;
 
 /** "alexec/agents#12" in at most `n` letters, cut in the middle as the window's truncationMode(.middle). */
 function clip(text: string, n: number): string {
@@ -251,7 +251,7 @@ function clip(text: string, n: number): string {
 /** The graph (#3019): a box for each node, in a tier per kind, a line for each link named by its verb, a box's
  * cost on its second line. It starts as wide as the pane, at most actual size. Drag or scroll to move about;
  * pinch, ctrl-scroll or the buttons to zoom. */
-function Graph({ layout, show, verb }: { layout: LineageGraphLayout; show: Show; verb: (row: LineageRow) => string }) {
+export function Graph({ layout, show, verb }: { layout: LineageGraphLayout; show: Show; verb: (row: LineageRow) => string }) {
   const view = useSignal({ x: 0, y: 0, k: 1 });
   const svg = useRef<SVGSVGElement>(null);
   const drag = useRef<{ id: number; x: number; y: number } | null>(null);

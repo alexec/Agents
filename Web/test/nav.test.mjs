@@ -6,12 +6,12 @@ import { load } from "./load.mjs";
 
 const n = await load("src/model/nav.ts");
 
-test("a member's bar has six sections, an admin's eight", () => {
+test("a member's bar has seven sections, an admin's nine", () => {
   assert.deepEqual(n.sectionsShown(false, "overview").map((s) => n.navTitle[s]),
-    ["Overview", "Agents", "Machines", "Workflows", "Reports", "Settings"]);
+    ["Overview", "Agents", "Work", "Machines", "Workflows", "Reports", "Settings"]);
   assert.deepEqual(n.sectionsShown(null, "agents"), n.sectionsShown(false, "agents"), "not known yet is a member's");
   assert.deepEqual(n.sectionsShown(true, "overview").map((s) => n.navTitle[s]),
-    ["Overview", "Agents", "Machines", "Workflows", "Reports", "Requests", "People", "Settings"]);
+    ["Overview", "Agents", "Work", "Machines", "Workflows", "Reports", "Requests", "People", "Settings"]);
   assert.ok(n.sectionsShown(false, "people").includes("people"), "a member who opens People by its address sees where they are");
 });
 
@@ -48,6 +48,11 @@ test("each section is its own address, and #/ is the Overview", async () => {
     assert.equal(r.routeHash({ nav: "settings", section: "policy" }, undefined), "#/settings/policy");
     assert.equal(r.routeHash({}, undefined), "#/");
     assert.deepEqual(r.parseRoute(r.routeHash({ nav: "reports", section: "a b" }, undefined)), { nav: "reports", section: "a b" });
+    // An issue's or a PR's page is its Work list's page with the ref after it (#3119).
+    const pr = { nav: "work", section: "pr", item: "github:alexec/Agents#99" };
+    assert.equal(r.routeHash(pr, undefined), "#/work/pr/github%3Aalexec%2FAgents%2399");
+    assert.deepEqual(r.parseRoute("#/work/pr/github%3Aalexec%2FAgents%2399"), pr);
+    assert.deepEqual(r.parseRoute("#/work/issue"), { nav: "work", section: "issue" });
     // A session is in Agents, at the address it always had: every notice and link still opens it.
     const chat = { host: "mac", folder: "file:///w/a", session: "S1" };
     assert.equal(r.routeHash(chat, undefined), "#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/s/S1");
