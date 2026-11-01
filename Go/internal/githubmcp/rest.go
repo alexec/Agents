@@ -42,6 +42,9 @@ type RealGitHub struct {
 	// pulls says, by issue path, whether an issue is a pull request: that never changes, so
 	// pr.commented asks once, not on every poll (P20261031-1). At most pullsCount.
 	pulls map[string]bool
+	// branches is each PR's head branch, by repo and number: that never changes either (#3107).
+	// At most pullsCount.
+	branches map[string]string
 }
 
 type etagged struct{ etag, body string }
@@ -487,7 +490,7 @@ func (g *RealGitHub) runs(ctx context.Context, repo, branch, since, status strin
 	return runs, true, nil
 }
 
-func (g *RealGitHub) RunDetails(ctx context.Context, repo string, run RunRef) (*RunData, error) {
+func (g *RealGitHub) RunDetails(ctx context.Context, repo string, run RunRef, wantJobs bool) (*RunData, error) {
 	number := run.PRNumber
 	if number == 0 {
 		// A fork's PR isn't on the run; find it by the head commit.
@@ -515,8 +518,10 @@ func (g *RealGitHub) RunDetails(ctx context.Context, repo string, run RunRef) (*
 			Conclusion string `json:"conclusion"`
 		} `json:"jobs"`
 	}
-	if err := g.get(ctx, fmt.Sprintf("repos/%s/actions/runs/%d/jobs?filter=latest&per_page=100", repo, run.ID), false, &jobs); err != nil {
-		return nil, err
+	if wantJobs {
+		if err := g.get(ctx, fmt.Sprintf("repos/%s/actions/runs/%d/jobs?filter=latest&per_page=100", repo, run.ID), false, &jobs); err != nil {
+			return nil, err
+		}
 	}
 	var p pull
 	if err := g.get(ctx, fmt.Sprintf("repos/%s/pulls/%d", repo, number), false, &p); err != nil {
@@ -952,6 +957,28 @@ func (g *RealGitHub) PRComments(ctx context.Context, repo, since string, pr int)
 			Trusted: isTrusted(c.Association, c.User.Login, c.User.Type)})
 	}
 	return out, truncated, nil
+}
+
+// PRBranch is the head branch of PR number pr, asking GitHub only the first time.
+func (g *RealGitHub) PRBranch(ctx context.Context, repo string, pr int) (string, error) {
+	key := fmt.Sprintf("%s#%d", repo, pr)
+	g.mu.Lock()
+	branch, ok := g.branches[key]
+	g.mu.Unlock()
+	if ok {
+		return branch, nil
+	}
+	var p pull
+	if err := g.get(ctx, fmt.Sprintf("repos/%s/pulls/%d", repo, pr), false, &p); err != nil {
+		return "", err
+	}
+	g.mu.Lock()
+	if g.branches == nil || len(g.branches) >= pullsCount {
+		g.branches = map[string]string{}
+	}
+	g.branches[key] = p.Head.Ref
+	g.mu.Unlock()
+	return p.Head.Ref, nil
 }
 
 // isPR says whether the issue at path is a pull request, asking GitHub only the first time.

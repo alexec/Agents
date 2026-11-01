@@ -254,8 +254,12 @@ type GitHub interface {
 	FailedRuns(ctx context.Context, repo, branch, since string) (runs []RunRef, truncated bool, err error)
 	// PassedRuns are successful pull_request runs updated at or after since, in any order.
 	PassedRuns(ctx context.Context, repo, branch, since string) (runs []RunRef, truncated bool, err error)
-	// RunDetails is the run's PR and its failed jobs, or nil when it belongs to no PR.
-	RunDetails(ctx context.Context, repo string, run RunRef) (*RunData, error)
+	// RunDetails is the run's PR, and its failed jobs when jobs is true, or nil when it belongs to
+	// no PR. checks.passed asks for no jobs: its payload has none (#3107).
+	RunDetails(ctx context.Context, repo string, run RunRef, jobs bool) (*RunData, error)
+	// PRBranch is the head branch of PR number pr. checks.failed and checks.passed with a pr and
+	// no branch list only that branch's runs, not the whole repo's (#3107).
+	PRBranch(ctx context.Context, repo string, pr int) (string, error)
 	// DefaultRepo is the repo the server's folder pushes to, owner/name (#702).
 	DefaultRepo(ctx context.Context) (string, error)
 	// ClosedPRs are PRs merged, and PRs closed without merging, at or after since.
