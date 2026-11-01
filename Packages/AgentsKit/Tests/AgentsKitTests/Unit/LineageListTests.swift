@@ -82,4 +82,52 @@ struct LineageListTests {
         let withCost = LineageList.rows(of: session, graph: resolved, costs: costs) { $0 == helper ? "Helper" : nil }
         #expect(withCost.first?.resolved == "open · bug, area:lineage")
     }
+
+    // The Lineage page (#3087): the graph from any start, as `Web/test/lineage.test.mjs` has it.
+
+    @Test func anIssueAsTheStartHasItsOwnNameAndItsLinksNameIt() throws {
+        let title = { (n: Node) -> String? in n == helper ? "Helper" : n == session ? "Fix it" : nil }
+        let rows = LineageList.rows(of: issue, graph: graph, costs: [:], title: title)
+        try #require(rows.map(\.name) == ["Fix it", "Helper", "alexec/agents#34"])
+        #expect(rows[0].links == ["Works on alexec/agents#12 · from the branch", "Started Helper · as a helper"])
+        #expect(rows.first { $0.node == pr }?.links == ["Fixes alexec/agents#12 · from the PR's text · ended"])
+        let start = LineageList.start(issue, graph: graph, costs: [issue: .init(node: issue, total: Self.cost(2))], title: { _ in nil })
+        #expect(start.name == "alexec/agents#12")
+        #expect(start.cost == "$2.00")
+        #expect(start.url?.absoluteString == "https://github.com/alexec/agents/issues/12")
+        #expect(start.links.isEmpty)
+        let g = LineageLayout.graph(of: issue, graph: graph, costs: [:], title: { _ in nil })
+        #expect(g.nodes.filter(\.here).map(\.row.name) == ["alexec/agents#12"])
+        #expect(LineageList.start(session, graph: graph, costs: [:], title: { _ in nil }).name == "This session")
+    }
+
+    @Test func aTypedStartIsAGitHubAddressOwnerRepoNumberOrASessionsID() {
+        #expect(LineageList.node(typed: " https://github.com/alexec/Agents/issues/12 ") == Node(kind: "issue", ref: "github:alexec/Agents#12"))
+        #expect(LineageList.node(typed: "https://github.com/alexec/Agents/pull/34/files") == Node(kind: "pr", ref: "github:alexec/Agents#34"))
+        #expect(LineageList.node(typed: "https://github.com/alexec/Agents/milestone/15")
+            == Node(kind: "milestone", ref: "github:alexec/Agents/milestone/15"))
+        #expect(LineageList.node(typed: "https://github.com/alexec/Agents/releases/tag/v0.14.0")
+            == Node(kind: "release", ref: "github:alexec/Agents/release/v0.14.0"))
+        #expect(LineageList.node(typed: "alexec/Agents#12") == Node(kind: "issue", ref: "github:alexec/Agents#12"))
+        #expect(LineageList.node(typed: "github:alexec/Agents#12") == Node(kind: "issue", ref: "github:alexec/Agents#12"))
+        #expect(LineageList.node(typed: Self.s.uuidString.lowercased()) == session)
+        #expect(LineageList.node(typed: "session:\(Self.s.uuidString)") == session)
+        for no in ["", "#12", "alexec/Agents", "https://gitlab.com/a/b/-/issues/1", "https://github.com/alexec/Agents/issues/x", "a b/c#1"] {
+            #expect(LineageList.node(typed: no) == nil, "\(no)")
+        }
+    }
+
+    @Test func theStartsGoBackAndForwardAsABrowsers() {
+        var h = LineageHistory<String>()
+        #expect(h.current == nil)
+        h.go("a"); h.go("b"); h.go("b")
+        #expect(h.places == ["a", "b"] && h.at == 1)
+        h.back()
+        #expect(h.current == "a" && !h.canGoBack)
+        h.go("c")
+        #expect(h.places == ["a", "c"] && !h.canGoForward)
+        for i in 0..<60 { h.go("n\(i)") }
+        #expect(h.places.count == LineageHistory<String>.most)
+        #expect(h.current == "n59")
+    }
 }

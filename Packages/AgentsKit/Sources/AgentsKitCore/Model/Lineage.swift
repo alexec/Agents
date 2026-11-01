@@ -168,24 +168,42 @@ public enum LineageList {
     }
 
 
-    /// A row for each node the walk reached, once, in the walk's order, the session itself left out.
+    /// A row for each node the walk reached, once, in the walk's order, the start itself left out.
+    /// The start is "This session" when it is one; any other start (#3087) has its own name.
     public static func rows(of session: Node, graph: DaemonAPI.LineageGraph,
                             costs: [Node: DaemonAPI.LineageCostRollup],
                             title: @escaping (Node) -> String?) -> [Row] {
         var seen = Set<Node>()
         let nodes = graph.nodes.filter { $0 != session && seen.insert($0).inserted }
-        let name = { (n: Node) -> String in
-            if n == session { return "This session" }
+        let name = names(of: session, graph: graph, title: title)
+        return nodes.map { row($0, graph: graph, costs: costs, name: name, start: session) }
+    }
+
+    /// The row for the start itself, a box of the graph: "This session", or the issue's or PR's
+    /// name, its cost and where it is (#3087).
+    public static func start(_ node: Node, graph: DaemonAPI.LineageGraph,
+                             costs: [Node: DaemonAPI.LineageCostRollup],
+                             title: @escaping (Node) -> String?) -> Row {
+        var here = row(node, graph: graph, costs: costs, name: names(of: node, graph: graph, title: title), start: node)
+        here.links = []
+        return here
+    }
+
+    static func names(of start: Node, graph: DaemonAPI.LineageGraph, title: @escaping (Node) -> String?) -> (Node) -> String {
+        { n in
+            if n == start, n.kind == "session" { return "This session" }
             return title(n) ?? graph.resolved?[n.ref]?.title ?? ReportValueWords.name(n)
         }
-        return nodes.map { n in
-            Row(node: n, name: name(n),
-                links: graph.links.filter { $0.from == n || $0.to == n }.map { line($0, of: n, session: session, name: name) },
-                cost: costs[n].map { costLine($0) },
-                resolved: resolvedLine(graph.resolved?[n.ref]),
-                url: ReportValueWords.url(n).map { pullRequest(n, $0) },
-                session: n.kind == "session" ? UUID(uuidString: String(n.ref.dropFirst("session:".count))) : nil)
-        }
+    }
+
+    static func row(_ n: Node, graph: DaemonAPI.LineageGraph, costs: [Node: DaemonAPI.LineageCostRollup],
+                    name: (Node) -> String, start: Node) -> Row {
+        Row(node: n, name: name(n),
+            links: graph.links.filter { $0.from == n || $0.to == n }.map { line($0, of: n, session: start, name: name) },
+            cost: costs[n].map { costLine($0) },
+            resolved: resolvedLine(graph.resolved?[n.ref]),
+            url: ReportValueWords.url(n).map { pullRequest(n, $0) },
+            session: n.kind == "session" ? UUID(uuidString: String(n.ref.dropFirst("session:".count))) : nil)
     }
 
     /// "open · bug, area:lineage", from a node's resolved state and labels; nil with neither.
@@ -208,7 +226,7 @@ public enum LineageList {
         let verb = relWords(link.rel)
         var parts = [link.to == node
             ? "\(name(link.from)) \(verb) it"
-            : "\(verb.prefix(1).uppercased())\(verb.dropFirst()) \(link.to == session ? "this session" : name(link.to))"]
+            : "\(verb.prefix(1).uppercased())\(verb.dropFirst()) \(link.to == session && session.kind == "session" ? "this session" : name(link.to))"]
         parts.append(sourceWords(link.source))
         if link.endedAt != nil { parts.append("ended") }
         return parts.joined(separator: " · ")
@@ -260,4 +278,63 @@ public enum LineageList {
 
     public static let none = "No links yet. A session is linked to an issue when it has a label such as #12, to a pull request when it opens one on its branch, and to the helpers and workflow runs it starts."
     public static let note = "Linked within two steps of this session. An issue’s cost is its own and its pull requests’."
+
+    /// The Lineage page's note (#3087), for any start.
+    public static let pageNote = "Linked within two steps. Click a box to start from it. An issue’s cost is its own and its pull requests’."
+    /// The Lineage page with nothing to start from yet.
+    public static let pageNone = "No links from here yet. Start from another session, or type an issue’s, a pull request’s, a milestone’s or a release’s address."
+
+    /// The start a person typed on the Lineage page (#3087): a GitHub address of an issue, a pull
+    /// request, a milestone or a release; "owner/repo#12" (an issue); "github:owner/repo#12"; or a
+    /// session's id. Nil for anything else.
+    public static func node(typed text: String) -> Node? {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let id = UUID(uuidString: text.hasPrefix("session:") ? String(text.dropFirst("session:".count)) : text) {
+            return node(ofSession: id)
+        }
+        if let url = URL(string: text), let host = url.host?.lowercased(), host == "github.com" || host == "www.github.com" {
+            let parts = url.path.split(separator: "/").map(String.init)
+            guard parts.count >= 4 else { return nil }
+            let repo = "\(parts[0])/\(parts[1])"
+            switch parts[2] {
+            case "issues" where Int(parts[3]) != nil: return Node(kind: "issue", ref: "github:\(repo)#\(parts[3])")
+            case "pull" where Int(parts[3]) != nil: return Node(kind: "pr", ref: "github:\(repo)#\(parts[3])")
+            case "milestone": return Node(kind: "milestone", ref: "github:\(repo)/milestone/\(parts[3])")
+            case "releases" where parts.count >= 5 && parts[3] == "tag":
+                return Node(kind: "release", ref: "github:\(repo)/release/\(parts[4...].joined(separator: "/"))")
+            default: return nil
+            }
+        }
+        let bare = text.hasPrefix("github:") ? String(text.dropFirst("github:".count)) : text
+        let halves = bare.split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false)
+        guard halves.count == 2, Int(halves[1]) != nil, halves[0].split(separator: "/").count == 2,
+              !halves[0].contains(" ") else { return nil }
+        return Node(kind: "issue", ref: "github:\(bare)")
+    }
+}
+
+/// Where the Lineage page's walk starts (#3087), and the starts before and after it, as a
+/// browser's Back and Forward. `Place` is the node and the machine it is walked on.
+public struct LineageHistory<Place: Hashable & Sendable>: Hashable, Sendable {
+    public private(set) var places: [Place] = []
+    public private(set) var at = -1
+    /// How many starts it keeps: the oldest go first.
+    public static var most: Int { 50 }
+
+    public init() {}
+
+    public var current: Place? { places.indices.contains(at) ? places[at] : nil }
+    public var canGoBack: Bool { at > 0 }
+    public var canGoForward: Bool { at + 1 < places.count }
+
+    /// Start from a place: the starts after this one are dropped, as a browser drops them.
+    public mutating func go(_ place: Place) {
+        guard place != current else { return }
+        places = Array(places.prefix(at + 1)) + [place]
+        if places.count > Self.most { places.removeFirst(places.count - Self.most) }
+        at = places.count - 1
+    }
+
+    public mutating func back() { if canGoBack { at -= 1 } }
+    public mutating func forward() { if canGoForward { at += 1 } }
 }

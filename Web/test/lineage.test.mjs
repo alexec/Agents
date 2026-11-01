@@ -133,3 +133,54 @@ test("a tier follows the order of the boxes above it", () => {
   const prs = g.nodes.filter((n) => n.row.node.kind === "pr").sort((a, b) => a.x - b.x).map((n) => n.row.node.ref);
   assert.deepEqual(prs, [pr.ref, otherPR.ref]);
 });
+
+// Reports ▸ Lineage (#3087): the graph from any start, as LineageListTests has it on the window.
+test("an issue as the start has its own name, and its links name it", () => {
+  const title = (n) => n.ref === helper.ref ? "Helper" : n.ref === session.ref ? "Fix it" : undefined;
+  const rows = l.lineageRows(issue, graph, new Map(), title);
+  assert.deepEqual(rows.map((r) => r.name), ["Fix it", "Helper", "alexec/agents#34"]);
+  assert.deepEqual(rows[0].links, ["Works on alexec/agents#12 · from the branch", "Started Helper · as a helper"]);
+  assert.ok(!rows.some((r) => r.node.ref === issue.ref));
+  const the = rows.find((r) => r.node.ref === pr.ref);
+  assert.deepEqual(the.links, ["Fixes alexec/agents#12 · from the PR's text · ended"]);
+  const start = l.startRow(issue, graph, new Map([[l.costKey(issue), rollup(issue, cost(2))]]), () => undefined);
+  assert.equal(start.name, "alexec/agents#12");
+  assert.equal(start.cost, "$2.00");
+  assert.equal(start.url, "https://github.com/alexec/agents/issues/12");
+  assert.deepEqual(start.links, []);
+  const g = l.lineageGraph(issue, graph, new Map(), () => undefined);
+  assert.deepEqual(g.nodes.filter((n) => n.here).map((n) => n.row.name), ["alexec/agents#12"]);
+  assert.equal(l.startRow(session, graph, new Map(), () => undefined).name, "This session");
+});
+
+test("a typed start: a GitHub address, owner/repo#12 or a session's id", () => {
+  assert.deepEqual(l.typedNode(" https://github.com/alexec/Agents/issues/12 "), { kind: "issue", ref: "github:alexec/Agents#12" });
+  assert.deepEqual(l.typedNode("https://github.com/alexec/Agents/pull/34/files"), { kind: "pr", ref: "github:alexec/Agents#34" });
+  assert.deepEqual(l.typedNode("https://github.com/alexec/Agents/milestone/15"), { kind: "milestone", ref: "github:alexec/Agents/milestone/15" });
+  assert.deepEqual(l.typedNode("https://github.com/alexec/Agents/releases/tag/v0.14.0"),
+    { kind: "release", ref: "github:alexec/Agents/release/v0.14.0" });
+  assert.deepEqual(l.typedNode("alexec/Agents#12"), { kind: "issue", ref: "github:alexec/Agents#12" });
+  assert.deepEqual(l.typedNode("github:alexec/Agents#12"), { kind: "issue", ref: "github:alexec/Agents#12" });
+  assert.deepEqual(l.typedNode(S.toLowerCase()), session);
+  assert.deepEqual(l.typedNode(`session:${S}`), session);
+  for (const no of ["", "#12", "alexec/Agents", "https://gitlab.com/a/b/-/issues/1", "https://github.com/alexec/Agents/issues/x", "a b/c#1"]) {
+    assert.equal(l.typedNode(no), undefined, no);
+  }
+});
+
+test("the starts go back and forward as a browser's", () => {
+  const same = (a, b) => a === b;
+  let h = l.emptyHistory();
+  assert.equal(l.currentStart(h), undefined);
+  h = l.goTo(h, "a", same); h = l.goTo(h, "b", same); h = l.goTo(h, "b", same);
+  assert.deepEqual(h, { places: ["a", "b"], at: 1 });
+  h = l.goBack(h);
+  assert.equal(l.currentStart(h), "a");
+  assert.equal(l.goBack(h), h);
+  h = l.goTo(h, "c", same);
+  assert.deepEqual(h, { places: ["a", "c"], at: 1 });
+  assert.equal(l.goForward(h), h);
+  for (let i = 0; i < 60; i++) h = l.goTo(h, `n${i}`, same);
+  assert.equal(h.places.length, l.mostStarts);
+  assert.equal(l.currentStart(h), "n59");
+});

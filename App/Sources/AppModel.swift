@@ -181,6 +181,12 @@ final class AppModel {
     /// Not persisted, unlike the selected folder. Spending is somewhere you go to
     /// answer a question — what has this cost — and a window that reopens on the bill
     /// rather than on the work would be answering a question nobody asked twice.
+    /// The Cost page's pane (#1811), or Lineage (#3087). Not persisted, as the page is not.
+    var costPane: CostPane = .cost
+    /// Where the Lineage page's walk starts, and the starts before and after it (#3087). Kept
+    /// while the window is open, so going back to the page goes back to where it was.
+    var lineageHistory = LineageHistory<LineagePlace>()
+
     var showsSpending = false {
         didSet {
             guard showsSpending, showsSpending != oldValue else { return }
@@ -477,7 +483,7 @@ final class AppModel {
             if showsRuntimes { return .runtimes }
             if showsMCPServers { return .mcpServers }
             if showsWorktrees { return .worktrees }
-            if showsSpending { return .spending }
+            if showsSpending { return costPane == .lineage ? .lineage : .spending }
             if showsTokens { return .tokens }
             if showsTime { return .time }
             if showsMilestones { return .milestones }
@@ -517,7 +523,10 @@ final class AppModel {
             case .review(let id, let key):
                 showFolderPage(.review(id), of: key)
             case .spending:
+                if costPane == .lineage { costPane = .cost }
                 showsSpending = true
+            case .lineage:
+                showLineage()
             case .tokens:
                 showsTokens = true
             case .time:
@@ -5662,16 +5671,35 @@ final class AppModel {
 
     /// What a session is linked to (#2940): `lineage/walk` from it, on its host.
     func lineageWalk(of agentID: UUID) async throws -> DaemonAPI.LineageGraph {
-        try await client(forAgent: agentID).call(
-            DaemonAPI.Method.lineageWalk,
-            DaemonAPI.LineageNodeRequest(node: LineageList.node(ofSession: agentID), depth: LineageList.depth),
-            returning: DaemonAPI.LineageGraph.self)
+        try await lineageWalk(LineageList.node(ofSession: agentID), on: host(ofAgent: agentID))
+    }
+
+    /// What a node is linked to, on a host (#3087): the Lineage page starts from any node.
+    func lineageWalk(_ node: DaemonAPI.LineageNode, on host: MachineRef) async throws -> DaemonAPI.LineageGraph {
+        try await client(for: host).call(DaemonAPI.Method.lineageWalk,
+                                         DaemonAPI.LineageNodeRequest(node: node, depth: LineageList.depth),
+                                         returning: DaemonAPI.LineageGraph.self)
     }
 
     /// An issue's or a PR's cost rolled up, from the session's host; nil when it will not say.
     func lineageCost(_ node: DaemonAPI.LineageNode, of agentID: UUID) async -> DaemonAPI.LineageCostRollup? {
-        try? await client(forAgent: agentID).call(DaemonAPI.Method.lineageCost, DaemonAPI.LineageNodeRequest(node: node),
-                                                   returning: DaemonAPI.LineageCostRollup.self)
+        await lineageCost(node, on: host(ofAgent: agentID))
+    }
+
+    func lineageCost(_ node: DaemonAPI.LineageNode, on host: MachineRef) async -> DaemonAPI.LineageCostRollup? {
+        try? await client(for: host).call(DaemonAPI.Method.lineageCost, DaemonAPI.LineageNodeRequest(node: node),
+                                          returning: DaemonAPI.LineageCostRollup.self)
+    }
+
+    /// The machine a Lineage page start is walked on when the person types one: the selected
+    /// folder's, as a new session's.
+    var lineageHost: MachineRef { selectedFolderHost }
+
+    /// Open the Lineage page (#3087), from a place or from where it was.
+    func showLineage(from place: LineagePlace? = nil) {
+        if let place { lineageHistory.go(place) }
+        costPane = .lineage
+        showsSpending = true
     }
 
     /// Go to a match in the open chat: earlier pages come in until its turn is in hand

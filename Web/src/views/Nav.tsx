@@ -18,6 +18,7 @@ import { requestCount } from "./ConsoleRecords";
 import { policyNotSaved } from "./ConsolePolicy";
 import { orgPolicyNotSaved } from "./ConsoleOrgPolicy";
 import { ReportsPage } from "./Reports";
+import { LineagePage } from "./Lineage";
 import { SettingsPage } from "./Settings";
 import { WorkflowRow } from "./WorkflowRow";
 import { BackToList } from "./BackToList";
@@ -142,7 +143,8 @@ export function PageView({ store, page, down }: { store: Store; page: NavPage; d
         : page.draw.kind === "report" ? <ReportsPage store={store} section={page.draw.section} down={down} />
         : page.draw.kind === "machines" ? (admin === true ? <MachinesPage store={store} down={down} /> : <YourMachines store={store} />)
         : page.draw.kind === "workflows" ? <AllWorkflows store={store} down={down} />
-        : page.draw.kind === "usage" ? <Usage store={store} /> : null}
+        : page.draw.kind === "usage" ? <Usage store={store} />
+        : page.draw.kind === "lineage" ? <LineagePage store={store} /> : null}
     </Framed>
   );
 }

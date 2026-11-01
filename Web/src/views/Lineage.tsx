@@ -1,36 +1,41 @@
 // A session's Lineage tab (#2940), as the window's LineagePane: the issues, pull requests,
 // helpers and workflow runs the session is linked to, from lineage/walk (depth 2), each with its
 // links and, for an issue or a PR, what lineage/cost says was banked on it, as a graph of boxes
-// and lines (#3019).
-import { useSignal } from "@preact/signals";
+// and lines (#3019). And Reports ▸ Lineage (#3087), as the window's LineagePage: the same graph
+// from any start, a click on a box starting from it, with Back and Forward along the starts.
+import { signal, useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { LineageCostRollup, LineageGraph, LineageNode } from "../protocol/generated";
 import type { UUID } from "../protocol/generated";
 import type { Store } from "../model/store";
+import { Capability } from "../protocol/capabilities.generated";
 import { describe } from "../model/errors";
 import {
-  box, costKey, costed, curve, lineageDepth, lineageGraph, lineageNote, noLineage, resolvingAsks, sessionNode, type GraphNode,
-  type LineageGraphLayout, type LineageRow,
+  box, costKey, costed, curve, currentStart, emptyHistory, goBack, goForward, goTo, kindWord, lineageDepth, lineageGraph,
+  lineageNote, lineagePageNote, noLineage, noLineageHere, resolvingAsks, sessionNode, startRow, typedNode, type GraphNode, type LineageGraphLayout,
+  type LineageHistory, type LineageRow,
 } from "../model/lineage";
 import { go, route } from "../route";
 
-export function Lineage({ store, host, session }: { store: Store; host: string; session: string }) {
+/** The walk and the costs from a node on a host, asked again when either or `asked` changes. */
+function useWalk(store: Store, host: string | undefined, node: LineageNode | undefined, asked: number) {
   const graph = useSignal<LineageGraph | null>(null);
   const costs = useSignal<ReadonlyMap<string, LineageCostRollup>>(new Map());
   const failed = useSignal<string | null>(null);
-  const asked = useSignal(0);
-  const me = sessionNode(session);
   useEffect(() => {
     let current = true;
     failed.value = null;
+    graph.value = null;
+    costs.value = new Map();
+    if (!host || !node) return;
     void (async () => {
       try {
-        const walked = await store.link.call("lineage/walk", { node: me, depth: lineageDepth }, host);
+        const walked = await store.link.call("lineage/walk", { node, depth: lineageDepth }, host);
         if (!current) return;
         graph.value = walked;
         // Each issue's and PR's cost, as it comes; a node that will not say is left without one.
-        const answers = await Promise.all(walked.nodes.filter(costed).map((node) =>
-          store.link.call("lineage/cost", { node }, host).catch(() => null)));
+        const answers = await Promise.all(walked.nodes.filter(costed).map((n) =>
+          store.link.call("lineage/cost", { node: n }, host).catch(() => null)));
         if (current) costs.value = new Map(answers.flatMap((r) => r ? [[costKey(r.node), r] as const] : []));
         // The daemon resolves issues' and PRs' titles in the background (#3102): walk again while it says
         // some are still to come.
@@ -38,7 +43,7 @@ export function Lineage({ store, host, session }: { store: Store; host: string; 
         for (let i = 0; current && latest.resolving && i < resolvingAsks; i++) {
           await new Promise((done) => setTimeout(done, 1000));
           if (!current) return;
-          latest = await store.link.call("lineage/walk", { node: me, depth: lineageDepth }, host);
+          latest = await store.link.call("lineage/walk", { node, depth: lineageDepth }, host);
           if (current) graph.value = latest;
         }
       } catch (e) {
@@ -46,15 +51,24 @@ export function Lineage({ store, host, session }: { store: Store; host: string; 
       }
     })();
     return () => { current = false; };
-  }, [host, session, asked.value]);
+  }, [host, node?.kind, node?.ref, asked]);
+  return { graph, costs, failed };
+}
+
+const sessionTitle = (store: Store, host: string) => (n: LineageNode) =>
+  n.kind === "session" ? store.agent(host, n.ref.slice("session:".length))?.title ?? undefined : undefined;
+
+export function Lineage({ store, host, session }: { store: Store; host: string; session: string }) {
+  const asked = useSignal(0);
+  const me = sessionNode(session);
+  const { graph, costs, failed } = useWalk(store, host, me, asked.value);
 
   if (failed.value) return <p class="hint">{failed.value}</p>;
   if (!graph.value) return <p class="hint">Reading the links…</p>;
-  const title = (n: LineageNode) =>
-    n.kind === "session" ? store.agent(host, n.ref.slice("session:".length))?.title ?? undefined : undefined;
+  const title = sessionTitle(store, host);
   const empty = !graph.value.nodes.some((n) => n.kind !== me.kind || n.ref !== me.ref);
   // A session this page has goes to its chat; an issue, a PR or a milestone on GitHub opens there (row.url).
-  const show = (row: LineageRow) => row.session && store.agent(host, row.session)
+  const show = (row: LineageRow) => row.session && row.session !== session && store.agent(host, row.session)
     ? () => go({ ...route.value, host, session: row.session as UUID }) : undefined;
   const footer = (
     <>
@@ -66,12 +80,120 @@ export function Lineage({ store, host, session }: { store: Store; host: string; 
     <div class="lineage">
       <div class="crumbs">
         <span class="title">Lineage</span>
+        <button class="link" title="Open it on Reports ▸ Lineage, where a click on a box starts from it"
+          onClick={() => { exploreFrom({ host, node: me }); }}>Explore</button>
         <button class="link" onClick={() => { asked.value++; }}>Refresh</button>
       </div>
-      {empty ? <p class="hint">{noLineage}</p> : <Graph layout={lineageGraph(me, graph.value, costs.value, title)} show={show} />}
+      {empty ? <p class="hint">{noLineage}</p> : <Graph layout={lineageGraph(me, graph.value, costs.value, title)} show={show}
+        verb={(row) => row.url ? "Open it on GitHub" : "Show this session"} />}
       {footer}
     </div>
   );
+}
+
+/** A start of the Lineage page: a node, and the host whose links are walked from it. */
+interface Place { host: string; node: LineageNode }
+const samePlace = (a: Place, b: Place) => a.host === b.host && a.node.kind === b.node.kind && a.node.ref === b.node.ref;
+
+/** The Lineage page's starts, kept while the tab is open, so going back to the page goes back to where it was. */
+const history = signal<LineageHistory<Place>>(emptyHistory());
+
+/** Open Reports ▸ Lineage from a place: a session pane's Explore. */
+export function exploreFrom(place: Place): void {
+  history.value = goTo(history.value, place, samePlace);
+  go({ nav: "reports", section: "lineage" });
+}
+
+/** Reports ▸ Lineage (#3087): the graph from any start, a click on a box starting from it. */
+export function LineagePage({ store }: { store: Store }) {
+  const typed = useSignal("");
+  const wrong = useSignal(false);
+  const asked = useSignal(0);
+  const hosts = store.hosts.value.filter((h) => store.has(h.id, Capability.lineage1));
+  const chosen = useSignal<string | undefined>(undefined);
+  const machine = chosen.value && hosts.some((h) => h.id === chosen.value) ? chosen.value
+    : hosts.find((h) => h.id === store.macHostID.value)?.id ?? hosts[0]?.id;
+  // With nothing walked yet, the session open is where it starts.
+  useEffect(() => {
+    const r = route.value;
+    if (!currentStart(history.value) && r.host && r.session) history.value = goTo(history.value, { host: r.host, node: sessionNode(r.session) }, samePlace);
+  }, []);
+  const place = currentStart(history.value);
+  const { graph, costs, failed } = useWalk(store, place?.host, place?.node, asked.value);
+  const startFrom = (p: Place) => { wrong.value = false; history.value = goTo(history.value, p, samePlace); };
+  const sessions = store.hosts.value.flatMap((h) => (store.agents.value[h.id] ?? []).filter((a) => !a.archivedAt)
+    .map((a) => ({ host: h.id, agent: a }))).sort((a, b) => b.agent.lastActivityAt - a.agent.lastActivityAt).slice(0, 15);
+  const submit = () => {
+    const node = typedNode(typed.value);
+    if (!node) { wrong.value = true; return; }
+    const owner = node.kind === "session" ? sessions.find((s) => s.agent.id === node.ref.slice("session:".length))?.host : undefined;
+    const host = owner ?? machine;
+    if (!host) return;
+    startFrom({ host, node });
+    typed.value = "";
+  };
+  const title = place ? sessionTitle(store, place.host) : () => undefined;
+  const bar = (
+    <form class="lineage-bar" onSubmit={(e) => { e.preventDefault(); submit(); }}>
+      <button type="button" title="Back: the start before this one" aria-label="Back" disabled={history.value.at <= 0}
+        onClick={() => { history.value = goBack(history.value); }}>‹</button>
+      <button type="button" title="Forward" aria-label="Forward" disabled={history.value.at + 1 >= history.value.places.length}
+        onClick={() => { history.value = goForward(history.value); }}>›</button>
+      <input type="text" value={typed.value} aria-label="Start from"
+        placeholder="An issue’s, a pull request’s, a milestone’s or a release’s address, or owner/repo#12"
+        onInput={(e) => { typed.value = (e.target as HTMLInputElement).value; wrong.value = false; }} />
+      {hosts.length > 1 && (
+        <select aria-label="Machine" title="The machine whose links are walked" value={machine}
+          onChange={(e) => { chosen.value = (e.target as HTMLSelectElement).value; }}>
+          {hosts.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
+        </select>
+      )}
+      <select aria-label="Start from a session" title="Start from one of your sessions" value="" disabled={sessions.length === 0}
+        onChange={(e) => {
+          const s = sessions[Number((e.target as HTMLSelectElement).value)];
+          if (s) startFrom({ host: s.host, node: sessionNode(s.agent.id) });
+        }}>
+        <option value="">Session</option>
+        {sessions.map((s, i) => <option key={`${s.host}|${s.agent.id}`} value={i}>{s.agent.title ?? "Untitled"}</option>)}
+      </select>
+      <button type="button" class="link" disabled={!place} onClick={() => { asked.value++; }}>Refresh</button>
+    </form>
+  );
+  let body;
+  if (wrong.value) {
+    body = <p class="hint">That is not an address Lineage knows. Type a GitHub issue’s, pull request’s, milestone’s or release’s address, owner/repo#12, or a session’s id.</p>;
+  } else if (hosts.length === 0) {
+    body = <p class="hint">No machine keeps links yet. Update Agents on a machine to see them.</p>;
+  } else if (!place) {
+    body = <p class="hint">Start from a session, or type an issue’s, a pull request’s, a milestone’s or a release’s address. Then click a box to start from it.</p>;
+  } else if (failed.value) {
+    body = <p class="hint">{failed.value}</p>;
+  } else if (!graph.value) {
+    body = <p class="hint">Reading the links…</p>;
+  } else {
+    const walked = graph.value;
+    const here = startRow(place.node, walked, costs.value, title);
+    const layout = lineageGraph(place.node, walked, costs.value, title);
+    const chat = here.session ? store.agent(place.host, here.session) : undefined;
+    body = (
+      <>
+        <div class="lineage-start">
+          <strong>{place.node.kind === "session" ? title(place.node) ?? "A session" : here.name}</strong>
+          <span class="quiet">{[kindWord(place.node.kind), ...here.cost ? [here.cost] : [], ...here.resolved ? [here.resolved] : []].join(" · ")}</span>
+          {here.url ? <a class="link" href={here.url} target="_blank" rel="noopener noreferrer">Open on GitHub</a>
+            : chat && <button class="link" onClick={() => go({ host: place.host, folder: chat.worktree?.folder || chat.cwd, session: chat.id })}>Show the chat</button>}
+        </div>
+        {layout.nodes.length === 0 ? <p class="hint">{noLineageHere}</p> : (
+          <Graph layout={layout} verb={() => "Start from it"}
+            show={(row) => row.node.kind === place.node.kind && row.node.ref === place.node.ref ? undefined
+              : () => startFrom({ host: row.session ? sessions.find((s) => s.agent.id === row.session)?.host ?? place.host : place.host, node: row.node })} />
+        )}
+        {walked.limited && <p class="quiet small">The walk stopped at its limit: there are more links.</p>}
+        {layout.nodes.length > 0 && <p class="quiet small">{lineagePageNote}</p>}
+      </>
+    );
+  }
+  return <div class="lineage lineage-page">{bar}{body}</div>;
 }
 
 type Show = (row: LineageRow) => (() => void) | undefined;
@@ -86,7 +208,7 @@ function clip(text: string, n: number): string {
 /** The graph (#3019): a box for each node, in a tier per kind, a line for each link named by its verb, a box's
  * cost on its second line. It starts as wide as the pane, at most actual size. Drag or scroll to move about;
  * pinch, ctrl-scroll or the buttons to zoom. */
-function Graph({ layout, show }: { layout: LineageGraphLayout; show: Show }) {
+function Graph({ layout, show, verb }: { layout: LineageGraphLayout; show: Show; verb: (row: LineageRow) => string }) {
   const view = useSignal({ x: 0, y: 0, k: 1 });
   const svg = useRef<SVGSVGElement>(null);
   const drag = useRef<{ id: number; x: number; y: number } | null>(null);
@@ -145,7 +267,7 @@ function Graph({ layout, show }: { layout: LineageGraphLayout; show: Show }) {
               </g>
             );
           })}
-          {layout.nodes.map((n) => <Box key={n.row.node.ref} node={n} show={show} />)}
+          {layout.nodes.map((n) => <Box key={n.row.node.ref} node={n} show={show} verb={verb} />)}
           {/* The verbs over the boxes: a line that skips a tier passes under one. */}
           {layout.edges.map((e) => {
             const c = curve(layout, e);
@@ -158,21 +280,22 @@ function Graph({ layout, show }: { layout: LineageGraphLayout; show: Show }) {
   );
 }
 
-/** One box of the graph: the node's name, and its kind and cost; its links, one a line, in its title. */
-function Box({ node, show }: { node: GraphNode; show: Show }) {
+/** One box of the graph: the node's name, and its kind and cost; its links, one a line, in its title. A box that
+ * `show` gives a click to is a button; else an issue's or a PR's opens on GitHub. */
+function Box({ node, show, verb }: { node: GraphNode; show: Show; verb: (row: LineageRow) => string }) {
+  const go = show(node.row);
   const inner = (
     <>
-      <title>{[node.row.name, ...node.row.links].join("\n")}</title>
+      <title>{[node.row.name, ...node.row.links, ...go || node.row.url ? [verb(node.row)] : []].join("\n")}</title>
       <rect class={node.here ? "box here" : "box"} width={box.width} height={box.height} rx={10} />
       <text class="name" x={10} y={20}>{clip(node.row.name, 28)}</text>
       <text class="detail" x={10} y={38}>{clip(node.detail, 34)}</text>
     </>
   );
   const at = `translate(${node.x},${node.y})`;
-  if (node.row.url) {
+  if (!go && node.row.url) {
     return <g class="lineage-box link" transform={at}><a href={node.row.url} target="_blank" rel="noopener noreferrer">{inner}</a></g>;
   }
-  const go = show(node.row);
   return <g class={`lineage-box${go ? " link" : ""}`} transform={at} role={go ? "button" : undefined} tabIndex={go ? 0 : undefined}
     onClick={go} onKeyDown={(e) => { if (go && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); go(); } }}>{inner}</g>;
 }
