@@ -83,8 +83,8 @@ struct LineagePage: View {
         guard let pr else { model.lineageHistory.go(LineagePlace(host: host, node: node)); return }
         // "owner/repo#12" is an issue or a pull request (#3148): the pull request when only it has links.
         Task {
-            let issueLinked = await linked(node, on: host)
-            let start = !issueLinked && (await linked(pr, on: host)) ? pr : node
+            var start = node
+            if await !linked(node, on: host), await linked(pr, on: host) { start = pr }
             model.lineageHistory.go(LineagePlace(host: host, node: start))
         }
     }
