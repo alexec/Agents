@@ -16,10 +16,18 @@ export function Banner({ session }: { session: Session }) {
   // The address itself refused the connection (suspended, over a plan's limit, 1003
   // CL-002, #2235): its own words, not "can't reach".
   if (state.kind === "down" && state.refusalLine) {
+    const account = refusalLink(state.refusalLine);
     return (
       <div class="banner" role="status">
         <span>⚠︎ <strong>{state.refusalLine}</strong></span>
-        <button onClick={() => session.link.retryNow()}>Try Now</button>
+        <span class="banner-actions">
+          {account && (
+            <a href={account} target="_blank" rel="noopener noreferrer">
+              Open Account
+            </a>
+          )}
+          <button onClick={() => session.link.retryNow()}>Try Now</button>
+        </span>
       </div>
     );
   }
@@ -29,4 +37,11 @@ export function Banner({ session }: { session: Session }) {
       <button onClick={() => session.link.retryNow()}>Try Now</button>
     </div>
   );
+}
+
+// The account page a refusal's words name (#3153), offered as a link. Only https: the
+// words come from outside.
+export function refusalLink(line: string): string | undefined {
+  const found = line.match(/https:\/\/[^\s]+/)?.[0].replace(/[.,;:!?)]+$/, "");
+  return found && URL.canParse(found) ? found : undefined;
 }

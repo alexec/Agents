@@ -10,6 +10,7 @@ import UIKit
 /// while this is showing (FR-035).
 struct StaleBanner: View {
     @Environment(RemoteModel.self) private var model
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         // The organisation stopped all agent work, or the Mac follows no policy it can trust
@@ -26,6 +27,28 @@ struct StaleBanner: View {
             // Never paired, or forgotten by the Mac: the list below may still be what it
             // last knew, so the one thing to do is said here, on every screen.
             row(icon: "qrcode.viewfinder", lead: nil, line: "Scan the code on your Mac to connect")
+        } else if let refusal = model.controlPlaneRefusalLine, model.isStale {
+            // The control plane's address refused (suspended, over a plan's limit): a
+            // fault to act on, not a Mac asleep (#3153). Its account page, when it names
+            // one, and a try now rather than at the end of the long wait.
+            VStack(spacing: 0) {
+                row(icon: "exclamationmark.triangle", lead: nil, line: refusal)
+                HStack(spacing: 8) {
+                    if let account = ControlRefusal.link(in: refusal) {
+                        Button("Open Account") { openURL(account) }
+                    }
+                    Button("Try Again") { model.tryAgainNow() }
+                    Spacer(minLength: 0)
+                }
+                .appText(.supporting)
+                .buttonStyle(.bordered)
+                // At least 44 pt high, the touch target iOS asks for.
+                .controlSize(.large)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 4)
+                .frame(maxWidth: .infinity)
+                .background(Paper.ground)
+            }
         } else if model.isStale {
             row(icon: "wifi.slash", lead: nil, line: staleLine)
         } else if let trouble = troubleLine {
@@ -64,7 +87,6 @@ struct StaleBanner: View {
     }
 
     private var staleLine: String {
-        if let refusal = model.controlPlaneRefusalLine { return refusal }
         guard let last = model.lastHeard else { return "Not connected to your Mac yet" }
         return "Last heard from your Mac \(last)"
     }

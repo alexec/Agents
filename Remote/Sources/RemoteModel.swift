@@ -1904,6 +1904,16 @@ final class RemoteModel {
         await reconnect.run()
     }
 
+    /// The stale banner's Try Again (#3153): the wait before the next try is cut short,
+    /// also the long one after a hosted refusal, and a stopped loop is started again.
+    func tryAgainNow() {
+        guard !reconnect.isStopped else { return }
+        note("link: try again, from the banner")
+        if backoff.nudge() == .idle, !reconnect.isRunning, !isConnected {
+            Task { await connect() }
+        }
+    }
+
     /// How long the loop waits before the next attempt, and the wait itself, which coming
     /// back to the app or a network change cuts short (#82); and the other hosts' watch's.
     @ObservationIgnored private let backoff = Backoff()
