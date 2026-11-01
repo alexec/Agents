@@ -9,7 +9,7 @@ import type { UUID } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { describe } from "../model/errors";
 import {
-  box, costKey, costed, curve, lineageDepth, lineageGraph, lineageNote, noLineage, sessionNode, type GraphNode,
+  box, costKey, costed, curve, lineageDepth, lineageGraph, lineageNote, noLineage, resolvingAsks, sessionNode, type GraphNode,
   type LineageGraphLayout, type LineageRow,
 } from "../model/lineage";
 import { go, route } from "../route";
@@ -32,6 +32,15 @@ export function Lineage({ store, host, session }: { store: Store; host: string; 
         const answers = await Promise.all(walked.nodes.filter(costed).map((node) =>
           store.link.call("lineage/cost", { node }, host).catch(() => null)));
         if (current) costs.value = new Map(answers.flatMap((r) => r ? [[costKey(r.node), r] as const] : []));
+        // The daemon resolves issues' and PRs' titles in the background (#3102): walk again while it says
+        // some are still to come.
+        let latest = walked;
+        for (let i = 0; current && latest.resolving && i < resolvingAsks; i++) {
+          await new Promise((done) => setTimeout(done, 1000));
+          if (!current) return;
+          latest = await store.link.call("lineage/walk", { node: me, depth: lineageDepth }, host);
+          if (current) graph.value = latest;
+        }
       } catch (e) {
         if (current) { graph.value = null; failed.value = describe(e); }
       }

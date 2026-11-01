@@ -3716,12 +3716,15 @@ export interface LineageEndRequest {
 /**
  * lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the
  * walk stopped at its limit on nodes, so there is more. resolved is each node's title, state and
- * labels from its connector, by ref, for the nodes a connector could resolve (#3089).
+ * labels from its connector, by ref, for the nodes a connector could resolve (#3089). resolving
+ * says some nodes are still being resolved in the background, so walk again shortly for them
+ * (#3102).
  */
 export interface LineageGraph {
   nodes: LineageNode[];
   links: LineageLink[];
   limited?: boolean;
+  resolving?: boolean;
   resolved?: Record<string, LineageResolved>;
 }
 
@@ -10118,7 +10121,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["project", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "endedAt"] },
   LineageCostRollup: { required: ["node", "own", "total", "waste", "unlinked", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "parts"], optional: ["limited"] },
   LineageEndRequest: { required: ["from", "to", "rel"], optional: [] },
-  LineageGraph: { required: ["nodes", "links"], optional: ["limited", "resolved"] },
+  LineageGraph: { required: ["nodes", "links"], optional: ["limited", "resolving", "resolved"] },
   LineageLink: { required: ["from", "to", "rel", "source", "at"], optional: ["endedAt"] },
   LineageLinkRequest: { required: ["from", "to", "rel", "source"], optional: [] },
   LineageLinks: { required: ["links"], optional: ["limited"] },

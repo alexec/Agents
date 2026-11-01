@@ -3,8 +3,10 @@ package agentsd
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/alexec/agents/Go/wire"
 )
@@ -59,8 +61,18 @@ func TestLineageWalkResolvesForgeNodes(t *testing.T) {
 	c.call(t, 1, "lineage/link", wire.LineageLinkRequest{From: s, To: issue, Rel: "works-on", Source: "start"})
 	c.call(t, 2, "lineage/link", wire.LineageLinkRequest{From: s, To: pr, Rel: "opens", Source: "agent"})
 
+	// The first walk answers at once and resolves in the background (#3102).
 	var g wire.LineageGraph
 	json.Unmarshal(c.call(t, 3, "lineage/walk", wire.LineageNodeRequest{Node: issue}), &g)
+	if g.Resolving == nil || !*g.Resolving {
+		t.Fatalf("first walk: want resolving, got %+v", g)
+	}
+	d.resolveSettle(5 * time.Second)
+	g = wire.LineageGraph{}
+	json.Unmarshal(c.call(t, 30, "lineage/walk", wire.LineageNodeRequest{Node: issue}), &g)
+	if g.Resolving != nil {
+		t.Fatalf("settled walk: want nothing resolving, got %+v", g)
+	}
 	if r, ok := g.Resolved[issue.Ref]; !ok || r.Title != "Resolve a node's title" || len(r.Labels) != 1 || r.Labels[0] != "area:lineage" {
 		t.Fatalf("issue resolved: %+v", g.Resolved[issue.Ref])
 	}
@@ -73,6 +85,7 @@ func TestLineageWalkResolvesForgeNodes(t *testing.T) {
 
 	// Asked once; a second walk within resolveRecheck uses the cache.
 	json.Unmarshal(c.call(t, 4, "lineage/walk", wire.LineageNodeRequest{Node: issue}), &g)
+	d.resolveSettle(5 * time.Second)
 	if n := fake.times(issue.Ref); n != 1 {
 		t.Fatalf("%s was asked %d times, want 1", issue.Ref, n)
 	}
@@ -90,8 +103,79 @@ func TestLineageWalkSkipsResolvingWithNoFolder(t *testing.T) {
 	})
 	var g wire.LineageGraph
 	json.Unmarshal(c.call(t, 2, "lineage/walk", wire.LineageNodeRequest{Node: issue}), &g)
-	if len(g.Resolved) != 0 {
+	d.resolveSettle(5 * time.Second)
+	g = wire.LineageGraph{}
+	json.Unmarshal(c.call(t, 3, "lineage/walk", wire.LineageNodeRequest{Node: issue}), &g)
+	if len(g.Resolved) != 0 || g.Resolving != nil {
 		t.Fatalf("resolved with no folder signed in: %+v", g.Resolved)
+	}
+}
+
+// #3102: a walk never waits on the forge. Its slow lookups run in the background, at most
+// resolveWorkers at once, at most resolvePerWalk sent by one walk, and each node once however
+// many walks want it.
+func TestLineageWalkResolvesOffTheRequestPath(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	folder := t.TempDir()
+	d.repos = map[string]forgeRepo{folder: {"github", "alexec/agents"}}
+	seeded(t, d, folder, nil)
+	var mu sync.Mutex
+	asked := map[int]int{}
+	running, most := 0, 0
+	release := make(chan struct{})
+	d.resolveLookup = func(_ context.Context, _ string, _ forgeRepo, _ string, n int) (wire.LineageResolved, error) {
+		mu.Lock()
+		asked[n]++
+		running++
+		most = max(most, running)
+		mu.Unlock()
+		<-release
+		mu.Lock()
+		running--
+		mu.Unlock()
+		return wire.LineageResolved{Title: fmt.Sprintf("Issue %d", n)}, nil
+	}
+	var g wire.LineageGraph
+	for i := 1; i <= resolvePerWalk+10; i++ {
+		g.Nodes = append(g.Nodes, wire.LineageNode{Kind: "issue", Ref: fmt.Sprintf("github:alexec/agents#%d", i)})
+	}
+
+	began := time.Now()
+	first := d.resolvedGraph(g)
+	d.resolveMu.Lock()
+	sent := len(d.resolveAsking)
+	d.resolveMu.Unlock()
+	// The second walk sends only the ten the first left: the first fifty are being asked.
+	second := d.resolvedGraph(g)
+	if took := time.Since(began); took > time.Second {
+		t.Fatalf("two cold walks took %v", took)
+	}
+	if sent != resolvePerWalk {
+		t.Errorf("one walk sent %d nodes, want %d", sent, resolvePerWalk)
+	}
+	for _, w := range []wire.LineageGraph{first, second} {
+		if w.Resolving == nil || !*w.Resolving || len(w.Resolved) != 0 {
+			t.Fatalf("cold walk: want resolving and nothing resolved, got %+v", w)
+		}
+	}
+	close(release)
+	d.resolveSettle(5 * time.Second)
+	mu.Lock()
+	if most > resolveWorkers {
+		t.Errorf("%d lookups at once, want at most %d", most, resolveWorkers)
+	}
+	if len(asked) != len(g.Nodes) {
+		t.Errorf("%d nodes asked, want %d", len(asked), len(g.Nodes))
+	}
+	for n, times := range asked {
+		if times != 1 {
+			t.Errorf("node %d asked %d times", n, times)
+		}
+	}
+	mu.Unlock()
+	if last := d.resolvedGraph(g); len(last.Resolved) != len(g.Nodes) || last.Resolving != nil {
+		t.Fatalf("warm walk: %d resolved, resolving %v", len(last.Resolved), last.Resolving)
 	}
 }
 

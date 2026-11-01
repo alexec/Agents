@@ -24,10 +24,21 @@ import (
 // when it is walked again after resolveRecheck, and never when no folder is signed in to ask
 // with. Linear, milestones and releases are not resolved yet; a GitHub or GitLab issue or
 // pull request is.
+//
+// Never on the walk's own path (#3102): a walk answers at once with what the cache holds
+// (a node past resolveRecheck keeps its old answer while it is asked again), and the nodes it
+// lacks are asked in the background, resolveWorkers at a time, each node once however many
+// walks want it. The answer says resolving while any are still being asked, and the clients
+// walk again shortly to pick them up.
 const (
 	resolveRecheck = 10 * time.Minute
 	// resolvedCached bounds the cache: the nodes asked longest ago go first.
 	resolvedCached = 2_000
+	// resolveWorkers is how many gh or glab processes resolve nodes at once.
+	resolveWorkers = 4
+	// resolvePerWalk is how many nodes one walk sends to be asked, the nearest first; the
+	// rest go on the next walk, which resolving asks for.
+	resolvePerWalk = 50
 )
 
 // resolveLookup asks the forge for a node's title, state and labels. Tests set a daemon's
@@ -43,36 +54,98 @@ type resolvedEntry struct {
 type lineageResolveBook struct {
 	resolveMu    sync.Mutex
 	resolveCache map[wire.LineageNode]resolvedEntry
+	// resolveAsking is the nodes being asked now, so two walks ask each one once.
+	resolveAsking map[wire.LineageNode]bool
+	// resolveSlots holds a place for each gh or glab running, at most resolveWorkers.
+	resolveSlots chan struct{}
+	// resolveWait counts the nodes being asked, for tests and shutdown to wait on.
+	resolveWait sync.WaitGroup
 	// resolveLookup, when set, is asked in place of forgeResolveNode.
 	resolveLookup resolveLookup
 }
 
-// resolvedGraph is g with resolved filled in for every node it can resolve now.
-func (d *Daemon) resolvedGraph(ctx context.Context, g wire.LineageGraph) wire.LineageGraph {
+// resolvedGraph is g with resolved filled in from the cache, at once. The nodes the cache
+// lacks, or holds past resolveRecheck, are sent to be asked in the background, and resolving
+// says some are still to come.
+func (d *Daemon) resolvedGraph(g wire.LineageGraph) wire.LineageGraph {
 	resolved := map[string]wire.LineageResolved{}
+	var ask []wire.LineageNode
+	pending := false
+	now := nowFunc()
+	d.resolveMu.Lock()
 	for _, n := range g.Nodes {
-		if r, ok := d.resolvedNode(ctx, n); ok {
-			resolved[n.Ref] = r
+		if _, _, ok := nodeOfRepo(n); !ok {
+			continue
 		}
+		e, cached := d.resolveCache[n]
+		if cached && e.ok {
+			resolved[n.Ref] = e.resolved
+		}
+		if cached && now.Sub(e.at) < resolveRecheck {
+			continue
+		}
+		if !cached {
+			pending = true
+		}
+		if d.resolveAsking[n] || len(ask) >= resolvePerWalk {
+			continue
+		}
+		if d.resolveAsking == nil {
+			d.resolveAsking = map[wire.LineageNode]bool{}
+		}
+		d.resolveAsking[n] = true
+		ask = append(ask, n)
+	}
+	if d.resolveSlots == nil {
+		d.resolveSlots = make(chan struct{}, resolveWorkers)
+	}
+	d.resolveWait.Add(len(ask))
+	d.resolveMu.Unlock()
+	for _, n := range ask {
+		go d.resolveInBackground(n)
 	}
 	if len(resolved) > 0 {
 		g.Resolved = resolved
 	}
+	if pending {
+		g.Resolving = &pending
+	}
 	return g
 }
 
-// resolvedNode is n's title, state and labels, cached within resolveRecheck; false when n is
-// not a GitHub or GitLab issue or pull request, or no folder is signed in to ask with.
-func (d *Daemon) resolvedNode(ctx context.Context, n wire.LineageNode) (wire.LineageResolved, bool) {
+// resolveInBackground asks for n once a place is free, and caches the answer.
+func (d *Daemon) resolveInBackground(n wire.LineageNode) {
+	defer d.resolveWait.Done()
+	d.resolveSlots <- struct{}{}
+	defer func() { <-d.resolveSlots }()
+	ctx := d.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	d.resolveNode(ctx, n)
+	d.resolveMu.Lock()
+	delete(d.resolveAsking, n)
+	d.resolveMu.Unlock()
+}
+
+// resolveSettle waits up to wait for the nodes being asked.
+func (d *Daemon) resolveSettle(wait time.Duration) {
+	done := make(chan struct{})
+	go func() { d.resolveWait.Wait(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(wait):
+	}
+}
+
+// resolveNode asks for n's title, state and labels and caches them; the answer is not ok when
+// n is not a GitHub or GitLab issue or pull request, or no folder is signed in to ask with.
+func (d *Daemon) resolveNode(ctx context.Context, n wire.LineageNode) {
 	repo, num, ok := nodeOfRepo(n)
 	if !ok {
-		return wire.LineageResolved{}, false
+		return
 	}
 	d.resolveMu.Lock()
-	if e, cached := d.resolveCache[n]; cached && nowFunc().Sub(e.at) < resolveRecheck {
-		d.resolveMu.Unlock()
-		return e.resolved, e.ok
-	}
 	ask := d.resolveLookup
 	d.resolveMu.Unlock()
 	folder := d.repoFolder(repo)
@@ -98,7 +171,6 @@ func (d *Daemon) resolvedNode(ctx context.Context, n wire.LineageNode) (wire.Lin
 		d.dropOldestResolvedLocked()
 	}
 	d.resolveCache[n] = resolvedEntry{resolved: r, ok: err == nil, at: nowFunc()}
-	return r, err == nil
 }
 
 // dropOldestResolvedLocked makes room for one more cached node.

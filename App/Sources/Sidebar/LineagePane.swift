@@ -91,6 +91,15 @@ struct LineagePane: View {
             }
             guard !Task.isCancelled else { return }
             costs = found
+            // The daemon resolves issues' and PRs' titles in the background (#3102): walk
+            // again while it says some are still to come.
+            var latest = walked
+            for _ in 0 ..< LineageList.resolvingAsks where latest.resolving == true {
+                try await Task.sleep(for: .seconds(1))
+                latest = try await model.lineageWalk(of: agent.id)
+                guard !Task.isCancelled else { return }
+                graph = latest
+            }
         } catch {
             guard !Task.isCancelled else { return }
             failure = "The links could not be read: \(error.localizedDescription)"

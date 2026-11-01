@@ -38,18 +38,21 @@ public extension DaemonAPI {
 
     /// `lineage/walk`'s answer: the nodes reached and the links gone along. `limited` says the
     /// walk stopped at its limit on nodes. `resolved` is each node's title, state and labels from
-    /// its connector, by ref, for the nodes a connector could resolve (#3089).
+    /// its connector, by ref, for the nodes a connector could resolve (#3089). `resolving` says
+    /// some nodes are still being resolved in the background: walk again shortly for them (#3102).
     struct LineageGraph: Codable, Sendable, Hashable {
         public var nodes: [LineageNode]
         public var links: [LineageLink]
         public var limited: Bool?
+        public var resolving: Bool?
         public var resolved: [String: LineageResolved]?
 
         public init(nodes: [LineageNode] = [], links: [LineageLink] = [], limited: Bool? = nil,
-                    resolved: [String: LineageResolved]? = nil) {
+                    resolving: Bool? = nil, resolved: [String: LineageResolved]? = nil) {
             self.nodes = nodes
             self.links = links
             self.limited = limited
+            self.resolving = resolving
             self.resolved = resolved
         }
     }
@@ -136,6 +139,10 @@ public enum LineageList {
 
     /// How far the pane walks: issue, its sessions, their PRs.
     public static let depth = 2
+
+    /// How many times, a second apart, the pane walks again while the daemon is still
+    /// resolving titles (#3102).
+    public static let resolvingAsks = 20
 
     public static func node(ofSession id: UUID) -> Node {
         Node(kind: "session", ref: "session:\(id.uuidString)")
