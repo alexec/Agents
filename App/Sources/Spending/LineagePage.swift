@@ -25,8 +25,26 @@ struct LineagePage: View {
     /// The daemon is still resolving titles and the graph is walked again each second.
     @State private var reading = false
     @State private var asked = 0
+    /// The machine chosen in the Machine menu (#3157), for a typed start.
+    @State private var chosen: MachineRef?
 
     private var place: LineagePlace? { model.lineageHistory.current }
+
+    /// The machine a typed start is walked on (#3157): the one chosen, else the selected folder's
+    /// when it keeps links, else the first that does.
+    private var machine: MachineRef {
+        let machines = model.lineageMachines
+        if let chosen, machines.contains(where: { $0.id == chosen }) { return chosen }
+        if machines.isEmpty || machines.contains(where: { $0.id == model.lineageHost }) { return model.lineageHost }
+        return machines[0].id
+    }
+
+    /// The machine's name, when more than one machine keeps links and a name is worth saying.
+    private func machineName(_ host: MachineRef) -> String? {
+        let machines = model.lineageMachines
+        guard machines.count > 1 else { return nil }
+        return machines.first { $0.id == host }?.name
+    }
 
     /// The folder's newest sessions, to start from one.
     private var sessions: [Agent] {
@@ -62,6 +80,16 @@ struct LineagePage: View {
                 .accessibilityLabel("Start from")
                 .onSubmit(startTyped)
                 .onChange(of: typed) { typedWrong = false }
+            if model.lineageMachines.count > 1 {
+                Menu(machineName(machine) ?? "Machine") {
+                    ForEach(model.lineageMachines, id: \.id) { choice in
+                        Button(choice.name) { choose(choice.id) }
+                    }
+                }
+                .fixedSize()
+                .accessibilityLabel("Machine")
+                .help("The machine whose links are walked")
+            }
             Menu("Session") {
                 ForEach(sessions) { agent in
                     Button(agent.title ?? "Untitled") {
@@ -81,7 +109,7 @@ struct LineagePage: View {
 
     private func startTyped() {
         guard let node = LineageList.node(typed: typed) else { typedWrong = true; return }
-        let host = node.kind == "session" ? sessionHost(node) ?? model.lineageHost : model.lineageHost
+        let host = node.kind == "session" ? sessionHost(node) ?? machine : machine
         let pr = LineageList.pullRequest(typed: typed)
         typed = ""
         guard let pr else { model.lineageHistory.go(LineagePlace(host: host, node: node)); return }
@@ -90,6 +118,14 @@ struct LineagePage: View {
             var start = node
             if await !linked(node, on: host), await linked(pr, on: host) { start = pr }
             model.lineageHistory.go(LineagePlace(host: host, node: start))
+        }
+    }
+
+    /// A machine chosen: a start that is not a session is walked again on it (#3157).
+    private func choose(_ host: MachineRef) {
+        chosen = host
+        if let place, place.node.kind != "session", place.host != host {
+            model.lineageHistory.go(LineagePlace(host: host, node: place.node))
         }
     }
 
@@ -108,7 +144,7 @@ struct LineagePage: View {
                 message(failure)
             } else if let graph, let layout {
                 VStack(spacing: 0) {
-                    heading(LineageList.start(place.node, graph: graph, costs: costs, title: title))
+                    heading(LineageList.start(place.node, graph: graph, costs: costs, title: title), on: place.host)
                     if layout.nodes.isEmpty {
                         message(LineageList.pageNone)
                     } else {
@@ -124,15 +160,15 @@ struct LineagePage: View {
         }
     }
 
-    /// The start's name and what it is, and where to open it: on GitHub, or its chat.
-    private func heading(_ row: LineageList.Row) -> some View {
+    /// The start's name and what it is, the machine it is walked on (#3157), and where to open it: on GitHub, or its chat.
+    private func heading(_ row: LineageList.Row, on host: MachineRef) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(row.node.kind == "session" ? title(row.node) ?? "A session" : row.name)
                 .appText(.reading).fontWeight(.semibold)
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .help(row.ref ?? row.name)
-            Text(([LineageLayout.kindWord(row.node.kind)] + [row.cost, row.resolved].compactMap { $0 })
+            Text(([LineageLayout.kindWord(row.node.kind)] + [row.cost, row.resolved, machineName(host).map { "on \($0)" }].compactMap { $0 })
                 .joined(separator: " · "))
                 .appText(.supporting)
                 .foregroundStyle(.secondary)

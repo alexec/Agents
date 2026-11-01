@@ -154,7 +154,8 @@ export function LineagePage({ store }: { store: Store }) {
   const { graph, costs, failed, reading } = useWalk(store, place?.host, place?.node, asked.value);
   const layout = useLayout(store, place?.host, place?.node, graph.value, costs.value);
   const startFrom = (p: Place) => { wrong.value = false; history.value = goTo(history.value, p, samePlace); };
-  const sessions = store.hosts.value.flatMap((h) => (store.agents.value[h.id] ?? []).filter((a) => !a.archivedAt)
+  // Only sessions on machines that keep links (#3157).
+  const sessions = hosts.flatMap((h) => (store.agents.value[h.id] ?? []).filter((a) => !a.archivedAt)
     .map((a) => ({ host: h.id, agent: a }))).sort((a, b) => b.agent.lastActivityAt - a.agent.lastActivityAt).slice(0, 15);
   const submit = async () => {
     const text = typed.value;
@@ -178,7 +179,12 @@ export function LineagePage({ store }: { store: Store }) {
         onInput={(e) => { typed.value = (e.target as HTMLInputElement).value; wrong.value = false; }} />
       {hosts.length > 1 && (
         <select aria-label="Machine" title="The machine whose links are walked" value={machine}
-          onChange={(e) => { chosen.value = (e.target as HTMLSelectElement).value; }}>
+          onChange={(e) => {
+            const host = (e.target as HTMLSelectElement).value;
+            chosen.value = host;
+            // A start that is not a session is walked again on the machine chosen (#3157).
+            if (place && place.node.kind !== "session" && place.host !== host) startFrom({ host, node: place.node });
+          }}>
           {hosts.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
         </select>
       )}
@@ -208,11 +214,14 @@ export function LineagePage({ store }: { store: Store }) {
     const walked = graph.value;
     const here = startRow(place.node, walked, costs.value, title);
     const chat = here.session ? store.agent(place.host, here.session) : undefined;
+    // The machine it is walked on (#3157), when more than one keeps links.
+    const on = hosts.length > 1 ? hosts.find((h) => h.id === place.host)?.name : undefined;
     body = (
       <>
         <div class="lineage-start">
           <strong title={here.ref ?? here.name}>{place.node.kind === "session" ? title(place.node) ?? "A session" : here.name}</strong>
-          <span class="quiet">{[kindWord(place.node.kind), ...here.cost ? [here.cost] : [], ...here.resolved ? [here.resolved] : []].join(" · ")}</span>
+          <span class="quiet">{[kindWord(place.node.kind), ...here.cost ? [here.cost] : [], ...here.resolved ? [here.resolved] : [],
+            ...on ? [`on ${on}`] : []].join(" · ")}</span>
           {here.url ? <a class="link" href={here.url} target="_blank" rel="noopener noreferrer">Open on GitHub</a>
             : chat && <button class="link" onClick={() => go({ host: place.host, folder: chat.worktree?.folder || chat.cwd, session: chat.id })}>Show the chat</button>}
         </div>
