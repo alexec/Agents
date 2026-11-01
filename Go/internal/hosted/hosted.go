@@ -101,7 +101,9 @@ type Service struct {
 	// When the Stripe events acted on were last swept (billing.go).
 	stripeSwept time.Time
 	metrics     metrics
-	disk        *disk
+	// The metrics' account and waitlist counts, as the sweep last counted them.
+	counts *accountCounts
+	disk   *disk
 }
 
 // New makes the service: its session key comes from its own key, sealed in the store
