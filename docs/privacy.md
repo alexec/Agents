@@ -37,8 +37,8 @@ machine.
 Agents sends data to another service only when you set up an integration that needs it.
 Each one sends only what it needs, to that service only:
 
-- **The coding agents (runtimes):** Claude, Codex, Gemini, Antigravity, Grok, Copilot,
-  Cursor and OpenCode run on your machine. Each one sends your prompts and the files it reads
+- **The coding agents (runtimes):** Claude, Codex, Antigravity, Grok, Copilot, Cursor
+  and OpenCode run on your machine. Each one sends your prompts and the files it reads
   to its own company, under that company's terms. Agents does not see that traffic and does
   not copy it.
 - **GitHub, GitLab and Linear:** when you connect one, your host signs in to it and keeps

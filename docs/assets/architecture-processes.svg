@@ -104,7 +104,7 @@
   <text class="mono" x="366" y="578">   └─ claude            Agent SDK binary (the model loop)</text>
   <text class="mono" x="366" y="596">      ├─ /bin/zsh       its Bash tool's shells</text>
   <text class="mono" x="366" y="614">      └─ stdio MCP servers it starts from .mcp.json / plugins</text>
-  <text class="small" x="366" y="640">Likewise codex, copilot, opencode, cursor, grok, gemini (the adapter differs, not the shape).</text>
+  <text class="small" x="366" y="640">Likewise codex, copilot, opencode, cursor, grok, antigravity (the adapter differs, not the shape).</text>
   <text class="small" x="366" y="658">The runtime calls back into agentsd for its mcp__agents__* tools over loopback http,</text>
   <text class="small" x="366" y="676">and reaches http MCP servers (ci on :8795) itself.</text>
 

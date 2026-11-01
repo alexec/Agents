@@ -19,7 +19,7 @@ work.
   | Runtime | Reports | Limit that applies |
   |---|---|---|
   | Claude | price and tokens | money and tokens |
-  | Codex, Gemini, OpenCode, Copilot | tokens | tokens |
+  | Codex, OpenCode, Copilot | tokens | tokens |
   | Cursor, Antigravity, Grok | neither | none |
 
   An agent on a runtime that reports neither runs past every limit. See
