@@ -8,6 +8,7 @@ import type { AuditActor, CostLimits, FleetMachine, OrgPolicy, PolicyBudgets, Po
   from "../protocol/generated";
 import type { CallFailed } from "../wire/link";
 import { Failure } from "../protocol/generated";
+import { levelsOf, levelWords } from "./levels";
 
 export const setBy = "Set by your organisation";
 export const title = "Policy";
@@ -58,12 +59,10 @@ export function stoppedBy(stop: PolicyStopAll, at: Date, now: Date): string {
   return `Stopped by ${actorName(stop.by)} ${when(at, now)}.`;
 }
 
-export type ModeName = NonNullable<OrgPolicy["modeCeiling"]>;
-/** The modes by ModeLooseness rank, tightest first. */
-export const modes: readonly ModeName[] = ["ask", "default", "acceptEdits", "auto", "bypassPermissions"];
-export const modeNames: Record<ModeName, string> = {
-  ask: "Ask", default: "Default", acceptEdits: "Accept Edits", auto: "Auto", bypassPermissions: "Bypass Permissions",
-};
+export type ModeName = NonNullable<OrgPolicy["permissionMode"]>;
+/** The permission modes, tightest first, in the words Auto's permission field uses (#2658). */
+export const modes = levelsOf("permission") as readonly ModeName[];
+export const modeNames = Object.fromEntries(modes.map((m) => [m, levelWords("permission", m)])) as Record<ModeName, string>;
 
 /** RuntimeCatalog's runtimes, by name, for a runtime this page may not be told about. */
 export const runtimeNames: Record<string, string> = {
@@ -172,7 +171,7 @@ export function helperWords(h: { mostRunning?: number; mostNotArchived?: number 
 /** Each rule the policy sets, in words, in the pane's order. Empty for a policy that sets none. */
 export function rules(p: OrgPolicy): Rule[] {
   const out: Rule[] = [];
-  if (p.modeCeiling) out.push({ name: "modeCeiling", title: "Modes", words: `Up to ${modeNames[p.modeCeiling] ?? p.modeCeiling}` });
+  if (p.permissionMode) out.push({ name: "permissionMode", title: "Modes", words: `Up to ${modeNames[p.permissionMode] ?? p.permissionMode}` });
   if (p.sandbox === "required") out.push({ name: "sandbox", title: "Command sandbox", words: "Required" });
   if (p.runtimes) {
     out.push({ name: "runtimes", title: "Runtimes", words: runtimeWords(p.runtimes) });
@@ -303,7 +302,7 @@ export function formOf(p: OrgPolicy | undefined): PolicyForm {
     runtimes[id] = { on: !p?.runtimes || rule !== undefined, models: rule?.models?.join(", ") ?? "" };
   }
   return {
-    mode: p?.modeCeiling ?? "",
+    mode: p?.permissionMode ?? "",
     sandboxRequired: p?.sandbox === "required",
     limitRuntimes: p?.runtimes !== undefined,
     runtimes,
@@ -351,7 +350,7 @@ export function policyOf(form: PolicyForm, base: OrgPolicy | undefined, me: Audi
     if (value === undefined) delete p[key];
     else p[key] = value;
   };
-  set("modeCeiling", form.mode === "" ? undefined : form.mode);
+  set("permissionMode", form.mode === "" ? undefined : form.mode);
   set("sandbox", form.sandboxRequired ? "required" : undefined);
   // A runtime's ways to the model sit on its rule (#999), so a reach rule with no runtime list names every runtime.
   const reached = Object.entries(form.reach).some(([, c]) => c !== "any");
