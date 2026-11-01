@@ -307,6 +307,9 @@ func (d *Daemon) waitOn(caller wire.UUID, names []string, wakeOn string, minutes
 	if wake != nil && *wake == wire.BlockWakeOnAny && len(block.Waits) > 0 {
 		block.WakeOn = wake
 	}
+	// Only one of EventWait and an open Block is ever current (#3094): the chat draws one
+	// card at the foot of the chat, not both.
+	prevWait := d.endWait(caller, "agent", true)
 	report := wire.WorkReport{Outcome: wire.WorkOutcomeWaiting, Message: strings.TrimSpace(message), At: at, Block: &block}
 	d.record(caller, wire.TranscriptEntryKind{WorkReported: &wire.TranscriptEntryKindWorkReported{Value: report}})
 	l.mu.Lock()
@@ -329,7 +332,11 @@ func (d *Daemon) waitOn(caller wire.UUID, names []string, wakeOn string, minutes
 		d.raiseAgentEvent("agent.waiting", caller, "is waiting for "+anyOf+joined+" to finish.", map[string]string{"waiting_on": joined})
 	}
 	d.armBlockTimer()
-	return d.blockedNote(&block), nil
+	note := d.blockedNote(&block)
+	if prevWait != nil {
+		note = replacedWords(prevWait) + note
+	}
+	return note, nil
 }
 
 // waitEndingHow is how an agent's end closes the waits on it, or nil while it goes on.
