@@ -303,9 +303,7 @@ func New(cfg Config) (*Service, error) {
 	if s.users, err = openUserBook(cfg); err != nil {
 		return nil, err
 	}
-	if s.backups, err = newBackupStore(cfg.Store, s.records, cfg.PrivateKey); err != nil {
-		return nil, err
-	}
+	s.backups = newBackupStore(cfg.Store, s.records, s.currentKeys)
 	if cfg.PeerURL != "" {
 		if s.peerOrigin, err = controllink.Origin(cfg.PeerURL); err != nil {
 			return nil, fmt.Errorf("%s is not an address copies can dial", cfg.PeerURL)
@@ -518,6 +516,10 @@ func (s *Service) takeUp(ctx context.Context) error {
 		settings.ControlKey = public
 	}); err != nil {
 		return err
+	}
+	// The backups' key, sealed with this key too, after a rotation that stopped half way.
+	if err := s.backups.keepDataKey(ctx); err != nil {
+		s.log("the backups' key: " + err.Error())
 	}
 	// People (#994): the existing person becomes the local owner and the admin.
 	if err := s.records.Migrate(ctx); err != nil {
