@@ -38,6 +38,40 @@ public enum VoiceModeWords {
             .map(String.init)
     }
 
+    /// What `transcript` heard after `sent`, the words that already went (#3163). The
+    /// recognizer can revise what it heard while a prompt is sent ("fix the bug" becomes
+    /// "Fix the bug."), so the two are compared on letters and numbers only, without case
+    /// or accents. When the transcript does not start with the words sent even so, as many
+    /// words as were sent are left out: the prompt is never sent a second time.
+    public static func heard(after sent: String, in transcript: String) -> String {
+        let key = { (c: Character) in
+            String(c).folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
+        }
+        let counts = { (c: Character) in c.isLetter || c.isNumber }
+        guard sent.contains(where: counts) else {
+            return transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        var rest = transcript[...]
+        var matched = true
+        for c in sent where counts(c) {
+            guard let i = rest.firstIndex(where: counts), key(rest[i]) == key(c) else {
+                matched = false
+                break
+            }
+            rest = rest[rest.index(after: i)...]
+        }
+        if !matched {
+            rest = transcript[...]
+            for _ in words(sent) {
+                rest = rest.drop { !counts($0) && $0 != "'" }
+                rest = rest.drop { counts($0) || $0 == "'" }
+            }
+        }
+        // A word the recognizer only made longer ("test" to "testing") is not new words.
+        rest = rest.drop { counts($0) || $0 == "'" }
+        return String(rest.drop { !counts($0) }).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     /// Dictation's problem, in voice mode's alert, which is titled "Voice mode": "Voice mode
     /// needs the microphone.", not "Dictation needs the microphone." (#2444).
     public static func problem(dictation message: String) -> String {
