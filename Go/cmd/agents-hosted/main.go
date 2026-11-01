@@ -33,6 +33,8 @@
 //	AGENTS_HOSTED_MAX_COPIES           control planes running at once, 50
 //	AGENTS_HOSTED_CERTS_PER_HOUR       new certificates an hour, 10
 //	AGENTS_HOSTED_CERTS_PER_WEEK       new certificates a week, 40
+//	AGENTS_HOSTED_STORAGE_TOTAL_GB     the most the plans' storage may add up to over all
+//	                                   accounts (#3121); a file store's disk to 90% when unset
 //
 // Billing (#2225), off without a key:
 //
@@ -51,6 +53,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
@@ -119,6 +122,15 @@ func serve() error {
 			return err
 		}
 	}
+	// The disk a file store is on is watched (#3121); a bucket's is not this machine's.
+	if u, err := url.Parse(where); err == nil && u.Scheme == "file" && u.Path != "" {
+		cfg.Disk = hosted.DiskOf(u.Path)
+	}
+	gb, err := number("AGENTS_HOSTED_STORAGE_TOTAL_GB")
+	if err != nil {
+		return err
+	}
+	cfg.StorageTotal = int64(gb) << 30
 	days, err := number("AGENTS_HOSTED_MIN_GITHUB_AGE")
 	if err != nil {
 		return err

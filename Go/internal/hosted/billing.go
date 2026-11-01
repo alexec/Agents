@@ -41,6 +41,15 @@ func (s *Service) upgrade(w http.ResponseWriter, r *http.Request, account string
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
+	// Pro's storage must fit beside every other plan's (#3121).
+	if room, err := s.roomFor(ctx, plans[PlanPro].Storage-PlanOf(acc).Storage); err != nil || !room {
+		if err != nil {
+			s.log(acc.ID + ": upgrade: " + err.Error())
+		}
+		s.metrics.refused("upgrade_full")
+		s.accountPage(w, r, account, "Agents has no room for more Pro plans just now. Try Upgrade again another day.")
+		return
+	}
 	back := "https://" + s.cfg.Domain + "/account"
 	to, err := s.stripe.Checkout(ctx, billing.Checkout{Price: s.cfg.StripePrice, Account: acc.ID,
 		Customer: acc.StripeCustomer, SuccessURL: back + "?upgraded=1", CancelURL: back})

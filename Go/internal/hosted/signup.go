@@ -188,6 +188,11 @@ func (s *Service) gate(ctx context.Context, from string, user GitHubID, invite s
 		}
 		if n >= s.cfg.MaxAccounts {
 			why = whyCap
+		} else if room, err := s.roomFor(ctx, plans[PlanFree].Storage); err != nil {
+			return unreadable(err)
+		} else if !room {
+			// The plans' storage would add up to more than the disk (#3121).
+			why = whyCap
 		}
 	}
 	if why == "" {

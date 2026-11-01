@@ -14,8 +14,9 @@ import (
 // Each account's control plane is held to its plan (#2224, spec 1003 FR-021), mostly
 // from outside it, so the control plane stays mostly unchanged:
 //
-//   - its store (limitedStore) refuses a new machine or client over the plan's number, and
-//     a write that makes the store larger than the plan's storage;
+//   - its store (limitedStore) refuses a new machine or client over the plan's number, a
+//     write that makes the store larger than the plan's storage, and a write that grows it
+//     while the disk is past its high-water mark (disk.go);
 //   - the proxy counts its open WebSockets (toAccount);
 //   - the sweep deletes its events older than the plan keeps (sweepEvents);
 //   - its agents running at once (agentsCap) go through the control plane's one hook for
@@ -44,6 +45,8 @@ type limitedStore struct {
 	account string
 	// Told each refusal's limit, for the metrics; nil in tests.
 	onRefuse func(limit string)
+	// Whether the disk is past its high-water mark (#3121); nil in tests.
+	diskFull func() bool
 
 	mu    sync.Mutex
 	plan  Plan
@@ -145,6 +148,9 @@ func (l *limitedStore) Put(ctx context.Context, key string, data []byte, when st
 		return "", l.refuse(p, "storage", bytesText(p.Storage)+" of storage", "Delete something")
 	}
 	l.mu.Unlock()
+	if grow > 0 && l.diskFull != nil && l.diskFull() {
+		return "", l.refuse(p, limitDisk, "", "")
+	}
 	tag, err := l.Store.Put(ctx, key, data, when)
 	if err == nil {
 		l.mu.Lock()
@@ -230,7 +236,7 @@ func count(ctx context.Context, st store.Store) (int64, error) {
 // counted again when there is none or it is old.
 func (s *Service) limitedFor(ctx context.Context, acc *Account) (*limitedStore, error) {
 	l := &limitedStore{Store: accountStore(s.cfg.Store, acc.ID), account: "https://" + s.cfg.Domain + "/account",
-		plan: PlanOf(acc), onRefuse: s.metrics.refused}
+		plan: PlanOf(acc), onRefuse: s.metrics.refused, diskFull: s.disk.full}
 	var u usage
 	if o, err := s.cfg.Store.Get(ctx, usageKey(acc.ID)); err != nil {
 		return nil, err

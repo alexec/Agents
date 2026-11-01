@@ -22,8 +22,13 @@ import (
 //	agents_hosted_copies_running              control planes running now
 //	agents_hosted_signups_total{kind}         new accounts and waitlist entries
 //	agents_hosted_refusals_total{kind}        refusals: blocked, closed, rate, waitlist_full,
-//	                                          store, full, suspended, certificates, and each
-//	                                          plan limit (machines, clients, storage, connections)
+//	                                          store, full, suspended, certificates, upgrade_full,
+//	                                          disk, and each plan limit (machines, clients,
+//	                                          storage, connections)
+//	agents_hosted_disk_bytes{kind}            the store's disk: total, free (#3121)
+//	agents_hosted_disk_high_water_bytes       used bytes past which accounts' writes are refused
+//	agents_hosted_storage_promised_bytes      the plans' storage, added up over all accounts
+//	agents_hosted_storage_total_bytes         the most it may add up to
 //	agents_hosted_certificates_allowed_total  new names allowed a certificate
 //	agents_hosted_requests_total{status}      requests answered, by status
 type metrics struct {
@@ -148,6 +153,23 @@ func (s *Service) metricsText(ctx context.Context) (string, error) {
 	b.line("agents_hosted_waitlist", int64(len(waiting)))
 	b.head("agents_hosted_copies_running", "gauge", "Control planes running now.")
 	b.line("agents_hosted_copies_running", int64(running))
+	if sp, ok := s.disk.space(); ok {
+		b.head("agents_hosted_disk_bytes", "gauge", "The store's disk, total and free.")
+		b.line(`agents_hosted_disk_bytes{kind="free"}`, sp.Free)
+		b.line(`agents_hosted_disk_bytes{kind="total"}`, sp.Total)
+		b.head("agents_hosted_disk_high_water_bytes", "gauge", "Used bytes past which accounts' writes are refused.")
+		b.line("agents_hosted_disk_high_water_bytes", sp.Total/100*diskHighWater)
+	}
+	var promised int64
+	for i := range list {
+		promised += PlanOf(&list[i]).Storage
+	}
+	b.head("agents_hosted_storage_promised_bytes", "gauge", "The plans' storage, added up over all accounts.")
+	b.line("agents_hosted_storage_promised_bytes", promised)
+	if most, ok := s.storageTotal(); ok {
+		b.head("agents_hosted_storage_total_bytes", "gauge", "The most the plans' storage may add up to.")
+		b.line("agents_hosted_storage_total_bytes", most)
+	}
 
 	m := &s.metrics
 	m.mu.Lock()

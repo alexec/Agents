@@ -260,6 +260,13 @@ page. To delete one yourself, `admin suspend <account> deleting`, wait a minute,
 **Raise the cap:** set `AGENTS_HOSTED_MAX_ACCOUNTS` and run `hosted-up.sh` again. Nobody on
 the waitlist is admitted by it: they sign in again, or you `admin allow <login>` each.
 
+**Room on the disk (#3121):** a new account, and an upgrade to Pro, are refused when the
+plans' storage over all accounts would add up to more than 90% of the store's disk, or
+`AGENTS_HOSTED_STORAGE_TOTAL_GB` when set. A new account then goes on the waitlist, at the
+front, as at the cap. Separately, once the disk itself is 90% full, an account's write that
+grows its store is refused, so the service's own records still have room. Grow the disk
+(`AGENTS_HOSTED_DISK_GB`), or set the total, to make room.
+
 **Admit from the waitlist:** `admin waitlist`, then `admin admit <login>`. They sign in again
 to make their account.
 
@@ -276,8 +283,12 @@ pass. They answer only from loopback and `AGENTS_HOSTED_METRICS_FROM`. In
 | `agents_hosted_waitlist` | People on the waitlist |
 | `agents_hosted_copies_running` | Control planes running now |
 | `agents_hosted_signups_total{kind}` | New accounts (`account`) and waitlist entries (`waitlist`) |
-| `agents_hosted_refusals_total{kind}` | Refusals: `blocked`, `closed`, `rate`, `waitlist_full`, `store`, `full`, `suspended`, `certificates`, and each plan limit (`machines`, `clients`, `storage`, `connections`) |
+| `agents_hosted_refusals_total{kind}` | Refusals: `blocked`, `closed`, `rate`, `waitlist_full`, `store`, `full`, `suspended`, `certificates`, `upgrade_full`, `disk`, and each plan limit (`machines`, `clients`, `storage`, `connections`) |
 | `agents_hosted_certificates_allowed_total` | New names allowed a certificate |
+| `agents_hosted_disk_bytes{kind}` | The store's disk: `total` and `free` (a file store only) |
+| `agents_hosted_disk_high_water_bytes` | Used bytes past which accounts' writes are refused: 90% of the disk |
+| `agents_hosted_storage_promised_bytes` | The plans' storage, added up over all accounts |
+| `agents_hosted_storage_total_bytes` | The most it may add up to |
 | `agents_hosted_requests_total{status}` | Requests answered, by status |
 
 The counters start again when the service does. The log, `docker compose logs hosted`, has
@@ -288,6 +299,8 @@ one line per event, and never a code, a key, a token or an email address.
 | What you see | What to do |
 | --- | --- |
 | `refusals_total{kind="full"}` rises | More control planes are wanted at once than `AGENTS_HOSTED_MAX_COPIES`: raise it, or use a bigger VM |
+| `disk_bytes{kind="total"}` less `disk_bytes{kind="free"}` nears `disk_high_water_bytes`, or `refusals_total{kind="disk"}` rises | The disk is nearly full and accounts can no longer write: grow the disk, delete old `admin backup` folders, prune old images |
+| `storage_promised_bytes` nears `storage_total_bytes`, or `refusals_total{kind="upgrade_full"}` rises | New accounts wait and upgrades are refused: grow the disk, or raise `AGENTS_HOSTED_STORAGE_TOTAL_GB` |
 | `refusals_total{kind="certificates"}` rises | New accounts wait for Let's Encrypt's limits: see #2227 for one wildcard certificate |
 | `refusals_total{kind="rate"}` rises fast | A sign-up flood: lower the rates, or set `AGENTS_HOSTED_SIGNUP=closed` |
 | `https://<domain>/healthz` does not answer | `docker compose logs caddy hosted` on the VM; `docker compose up -d` |
@@ -313,6 +326,7 @@ one line per event, and never a code, a key, a token or an email address.
 | `AGENTS_HOSTED_MAX_COPIES` | Control planes running at once; 50 |
 | `AGENTS_HOSTED_CERTS_PER_HOUR` | New certificates an hour; 10 |
 | `AGENTS_HOSTED_CERTS_PER_WEEK` | New certificates a week; 40 |
+| `AGENTS_HOSTED_STORAGE_TOTAL_GB` | The most the plans' storage may add up to over all accounts; 90% of a file store's disk when unset |
 | `AGENTS_HOSTED_STRIPE_KEY` | Stripe's secret key; billing is off without it |
 | `AGENTS_HOSTED_STRIPE_PRICE` | The Pro plan's price, `price_…` |
 | `AGENTS_HOSTED_STRIPE_WEBHOOK_SECRET` | The webhook endpoint's signing secret, `whsec_…` |
