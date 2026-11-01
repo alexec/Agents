@@ -81,6 +81,13 @@ struct WebFixturesTests {
     // ownership filter like mine, which only narrows which PRs a wait watches.
     static let personWait = EventWait(id: id(902), patterns: [EventPattern("review.requested")], from: 4, since: base,
                                       forPerson: true)
+    /// The same, on a server's event naming the PR (#3147): the row says which.
+    static let personPRWait = EventWait(
+        id: id(903), patterns: [EventPattern("review.requested")], from: 4, since: base,
+        serverEvents: [WaitServerEvent(trigger: MCPEventTrigger(event: "review.requested", servers: ["github"],
+                                                                arguments: ["repo": .string("alexec/Agents"), "pr": .int(123)]),
+                                       servers: ["github"])],
+        forPerson: true)
 
     static func encode(_ value: some Encodable) throws -> JSONValue { try JSONValue.encoding(value) }
     static func encodeAny(_ value: any Encodable) throws -> JSONValue { try encode(value) }
@@ -107,6 +114,9 @@ struct WebFixturesTests {
             ("finished, waiting on events", agent(16, .finished, endedReason: .endTurn, eventWait: openWait)),
             ("finished, wait on events ended", agent(17, .finished, endedReason: .endTurn, eventWait: endedWait)),
             ("finished, waiting on the person", agent(38, .finished, endedReason: .endTurn, eventWait: personWait)),
+            ("finished, review requested on a PR", agent(100, .finished, endedReason: .endTurn, eventWait: personPRWait)),
+            ("unread, waiting on the person", agent(101, .finished, isUnread: true, endedReason: .endTurn, eventWait: personPRWait)),
+            ("needs an answer, waiting on the person", agent(102, .finished, report: report(.needsAnswer), eventWait: personPRWait)),
             ("asked how it went, said nothing", agent(18, .finished, endedReason: .endTurn, outcomeAsked: true)),
             ("done", agent(19, .finished, endedReason: .endTurn, report: report(.done))),
             ("nothing to do", agent(20, .finished, report: report(.nothingToDo))),
