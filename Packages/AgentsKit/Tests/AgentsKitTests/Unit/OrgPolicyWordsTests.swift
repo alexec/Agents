@@ -22,7 +22,7 @@ struct OrgPolicyWordsTests {
 
     @Test func eachRuleSetIsSaidInItsOrder() {
         let p = Self.policy {
-            $0.modeCeiling = "acceptEdits"
+            $0.permissionMode = .approveForMe
             $0.sandbox = "required"
             $0.runtimes = ["codex": .init(), "claude": .init(models: ["claude-sonnet-*"])]
             $0.marketplaces = .init(allowed: ["acme", "github"], customServers: "refuse")
@@ -37,7 +37,7 @@ struct OrgPolicyWordsTests {
                                        "Budget", "Unmetered runtimes", "Helper sessions", "Variables passed to runtimes",
                                        "Antigravity’s terms", "Machines"])
         #expect(rules.map(\.words) == [
-            "Up to Accept Edits", "Required", "Only Claude (claude-sonnet-*), Codex", "Only acme, github", "Not allowed",
+            "Up to Approve for me", "Required", "Only Claude (claude-sonnet-*), Codex", "Only acme, github", "Not allowed",
             "$40 a day, 50,000 tokens a day, $2.50 an agent", "Allowed: Cursor", "At most 3 running and 10 not archived in a folder",
             "Only ANTHROPIC_*, OPENAI_*", "Antigravity is not allowed",
             "A machine that does not follow this policy starts no agent",
@@ -116,12 +116,12 @@ struct OrgPolicyWordsTests {
     @Test func aPolicyViewDecodesWhatTheControlPlaneSends() throws {
         let json = #"""
         {"policy":{"version":2,"issued":700000000,"changedBy":{"user":"u-priya","userName":"Priya"},"requires":["host.policy/1"],
-         "modeCeiling":"auto","groups":{},"stopAll":{"on":true,"by":{"user":"u-priya"},"at":700000100},
+         "permissionMode":"approveForMe","groups":{},"stopAll":{"on":true,"by":{"user":"u-priya"},"at":700000100},
          "budgets":{"daily":10,"allowUnmetered":[],"raises":[]}}}
         """#
         let view = try JSONDecoder().decode(DaemonAPI.PolicyView.self, from: Data(json.utf8))
         #expect(view.policy?.isStopped == true)
-        #expect(view.policy?.modeCeiling == "auto")
+        #expect(view.policy?.permissionMode == .approveForMe)
         #expect(DaemonAPI.PolicyView(policy: nil).policy == nil)
     }
 
