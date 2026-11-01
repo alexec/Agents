@@ -31,13 +31,12 @@ do not sync (#2410).
 
 | File | What it holds | Set in |
 | --- | --- | --- |
-| `limits.json` | The spending limits per agent and per day | **Settings ▸ Cost** |
+| `policy-yours.json` | Your own rules (#2957): the spending limits, how many workflows may be on, the notice limits and the variables passed through to runtimes. It is signed with your person key, which stays in this Mac's keychain. | **Settings ▸ Cost**, and the other settings that set your rules |
+| `policy-yours-seen.json` | The highest revision of `policy-yours.json` kept here, and whether the old files below were moved into it | Agents |
 | `retention.json` | How long archived agents are kept | **Settings ▸ Machines ▸ This Mac** |
-| `workflow-limit.json` | How many approved workflows may be on in each folder. No file is the default. | **Settings ▸ Cost** |
 | `person.json` | What agents call you, and your pronouns | **Settings ▸ Account** |
 | `client-permissions.json` | The permission mode of each runtime | Under a supported runtime's prompt |
 | `sandbox.json` | The command sandbox of each runtime | **Settings ▸ Agent Runtimes** |
-| `runtime-environment.json` | The names of the variables passed through to runtimes, never their values | By hand |
 | `modes.json` | The mode last chosen for each runtime | The start form |
 | `display.json` | Your display choices, the same on every client: how much of a turn shows, the smart groups that are off, whether Archived folders, Status and Usage are open, the new-session form's runtime and choices, and the marketplace last chosen | Any client |
 | `host.json` | The role of each of your Macs in Agents Host (its store, bucket, web remote and relay), one entry per Mac, by its local host name. The bucket's keys stay in the keychain. | Agents Host |
@@ -46,6 +45,19 @@ A file you change by hand counts at once, without a restart. A file that cannot 
 set aside as `<name>.corrupt-<time>`, and the setting goes back to its default. For
 `host.json`, the file is left as it is, and Agents Host starts with the defaults until you
 mend the file or remove it.
+
+`limits.json`, `workflow-limit.json` and `runtime-environment.json` are not read now. On
+the first start, Agents moves what they hold into `policy-yours.json` and renames each one
+`<name>.moved`.
+
+### Your rules on another Mac
+
+`policy-yours.json` is signed with a key that is in the keychain of the Mac that signed it,
+not in this folder. When you copy or sync the folder to another Mac, that Mac cannot check
+the signature, so it does not use the file: your rules do not apply there until you set
+them again. Agents does not write over the file. The first change on that Mac keeps it as
+`policy-yours.json.untrusted-<time>`, with your rules in it, and starts a new layer
+(#3122).
 
 On a server, the settings are in `~/.agents/settings` of the server's account. The Mac
 sends its own settings to each server when it connects.
