@@ -65,4 +65,21 @@ struct LineageListTests {
         #expect(LineageList.costed(issue) && LineageList.costed(pr))
         #expect(!LineageList.costed(helper))
     }
+
+    /// #3089: a resolved node's real title is shown, and its state and labels alongside its
+    /// cost, banked or not.
+    @Test func aResolvedNodeShowsItsTitleStateAndLabels() {
+        var resolved = graph
+        resolved.resolved = [
+            issue.ref: .init(title: "Fix the flaky test", state: "open", labels: ["bug", "area:lineage"]),
+            pr.ref: .init(title: "Fix it", state: "merged"),
+        ]
+        let rows = LineageList.rows(of: session, graph: resolved, costs: [:]) { $0 == helper ? "Helper" : nil }
+        #expect(rows.map(\.name) == ["Fix the flaky test", "Helper", "Fix it"])
+        #expect(rows.map(\.resolved) == ["open · bug, area:lineage", nil, "merged"])
+
+        let costs: [Node: DaemonAPI.LineageCostRollup] = [issue: .init(node: issue, total: Self.cost(10))]
+        let withCost = LineageList.rows(of: session, graph: resolved, costs: costs) { $0 == helper ? "Helper" : nil }
+        #expect(withCost.first?.resolved == "open · bug, area:lineage")
+    }
 }

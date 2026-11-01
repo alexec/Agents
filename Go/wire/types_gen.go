@@ -4556,13 +4556,15 @@ type LineageEndRequest struct {
 	Rel string `json:"rel"`
 }
 
-// lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the walk stopped at its limit on nodes, so there is more.
+// lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the walk stopped at its limit on nodes, so there is more. resolved is each node's title, state and labels from its connector, by ref, for the nodes a connector could resolve (#3089).
 type LineageGraph struct {
 	Nodes []LineageNode `json:"nodes"`
 
 	Links []LineageLink `json:"links"`
 
 	Limited *bool `json:"limited,omitzero"`
+
+	Resolved map[string]LineageResolved `json:"resolved,omitzero"`
 }
 
 // A typed link in the lineage graph (#2348): from works-on, opens, fixes, started, reviews, closes or part-of to. source is how the host knows it: start, branch, pr-body, helper, agent, person or forge. at is when it started; endedAt is set when it stops being active (a PR merged, a session archived). Both lists are open: a host keeps a relationship or a source it does not know.
@@ -4610,6 +4612,15 @@ type LineageNodeRequest struct {
 	Node LineageNode `json:"node"`
 
 	Depth *int64 `json:"depth,omitzero"`
+}
+
+// A node's title, state and labels from its connector (#3089), resolved and cached on the daemon so a lineage renderer shows "Fix flaky test" rather than its ref. state is open, closed or merged (a pull request's; an issue's is open or closed); absent when the connector does not say. labels is empty when it has none. Resolved for a GitHub or GitLab issue or pull request only; Linear, milestones and releases are not resolved yet.
+type LineageResolved struct {
+	Title string `json:"title"`
+
+	State *string `json:"state,omitzero"`
+
+	Labels []string `json:"labels,omitzero"`
 }
 
 type ListCursor struct {

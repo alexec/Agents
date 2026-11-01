@@ -58,6 +58,25 @@ test("only issues and PRs are costed", () => {
   assert.ok(!l.costed(helper));
 });
 
+// #3089: a resolved node's real title is shown, and its state and labels when nothing is banked
+// on it yet; once something is banked, the cost line's own state is shown instead.
+test("a resolved node shows its title, state and labels", () => {
+  const resolved = { ...graph, resolved: {
+    [issue.ref]: { title: "Fix the flaky test", state: "open", labels: ["bug", "area:lineage"] },
+    [pr.ref]: { title: "Fix it", state: "merged" },
+  } };
+  const rows = l.lineageRows(session, resolved, new Map(), (n) => n.ref === helper.ref ? "Helper" : undefined);
+  assert.deepEqual(rows.map((r) => r.name), ["Fix the flaky test", "Helper", "Fix it"]);
+  assert.deepEqual(rows.map((r) => r.resolved), ["open · bug, area:lineage", undefined, "merged"]);
+
+  const costs = new Map([[l.costKey(issue), rollup(issue, cost(10))]]);
+  const withCost = l.lineageRows(session, resolved, costs, (n) => n.ref === helper.ref ? "Helper" : undefined);
+  assert.equal(withCost[0].resolved, "open · bug, area:lineage");
+
+  const g = l.lineageGraph(session, resolved, new Map(), title);
+  assert.equal(g.nodes.find((n) => n.row.node.ref === issue.ref).detail, "Issue · open · bug, area:lineage");
+});
+
 test("an issue, a PR, a milestone or a release on GitHub has its address; a session has none", () => {
   const rows = l.lineageRows(session, graph, new Map(), () => undefined);
   const url = (ref) => rows.find((r) => r.node.ref === ref).url;

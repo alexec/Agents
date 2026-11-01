@@ -10152,7 +10152,7 @@
     },
     "LineageGraph": {
       "type": "object",
-      "description": "lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the walk stopped at its limit on nodes, so there is more.",
+      "description": "lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the walk stopped at its limit on nodes, so there is more. resolved is each node's title, state and labels from its connector, by ref, for the nodes a connector could resolve (#3089).",
       "properties": {
         "nodes": {
           "type": "array",
@@ -10168,6 +10168,12 @@
         },
         "limited": {
           "type": "boolean"
+        },
+        "resolved": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/LineageResolved"
+          }
         }
       },
       "required": [
@@ -10282,6 +10288,28 @@
       },
       "required": [
         "node"
+      ],
+      "additionalProperties": false
+    },
+    "LineageResolved": {
+      "type": "object",
+      "description": "A node's title, state and labels from its connector (#3089), resolved and cached on the daemon so a lineage renderer shows \"Fix flaky test\" rather than its ref. state is open, closed or merged (a pull request's; an issue's is open or closed); absent when the connector does not say. labels is empty when it has none. Resolved for a GitHub or GitLab issue or pull request only; Linear, milestones and releases are not resolved yet.",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "title"
       ],
       "additionalProperties": false
     },
