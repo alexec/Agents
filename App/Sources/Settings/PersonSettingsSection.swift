@@ -72,7 +72,7 @@ struct PersonSettingsSection: View {
                         if loginsNotSaved {
                             Text("Your logins were not saved.")
                                 .appText(.fine)
-                                .foregroundStyle(.red)
+                                .tinted(.failure)
                         }
                         Text("Named on the Pull requests, Merge requests and Issues pages’ Team section, and used to say an agent is on one of your own. Filled in from this Mac’s own connection (Activity ▸ Connectors) when it is signed in; given here only when it is not.")
                             .appText(.fine)
