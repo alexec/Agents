@@ -299,13 +299,14 @@ function Graph({ layout, show, verb }: { layout: LineageGraphLayout; show: Show;
   );
 }
 
-/** One box of the graph: the node's name, and its kind and cost; its links, one a line, in its title. A box that
- * `show` gives a click to is a button; else an issue's or a PR's opens on GitHub. */
+/** One box of the graph: the node's name, and its kind and cost; its name, ref, the whole of that line and its links,
+ * one a line, in its title (#3159). A box that `show` gives a click to is a button; else an issue's or a PR's opens on
+ * GitHub. */
 function Box({ node, show, verb }: { node: GraphNode; show: Show; verb: (row: LineageRow) => string }) {
   const go = show(node.row);
   const inner = (
     <>
-      <title>{[node.row.name, ...node.row.ref ? [node.row.ref] : [], ...node.row.links, ...go || node.row.url ? [verb(node.row)] : []].join("\n")}</title>
+      <title>{[node.row.name, ...node.row.ref ? [node.row.ref] : [], node.detail, ...node.row.links, ...go || node.row.url ? [verb(node.row)] : []].join("\n")}</title>
       <rect class={node.here ? "box here" : "box"} width={box.width} height={box.height} rx={10} />
       <text class="name" x={10} y={20}>{clip(node.row.name, 28)}</text>
       <text class="detail" x={10} y={38}>{clip(node.detail, 34)}</text>

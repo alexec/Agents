@@ -138,8 +138,7 @@ public enum LineageLayout {
                 nodes.append(GraphNode(row: row, x: margin + (wide - span(tier.count)) / 2 + Double(i) * (boxWidth + gap),
                                        y: margin + Double(t) * (boxHeight + tierGap),
                                        here: row.node == session,
-                                       detail: ([kindWord(row.node.kind)] + (row.cost.map { [$0] } ?? [])
-                                           + (row.resolved.map { [$0] } ?? [])).joined(separator: " · ")))
+                                       detail: detail(row, resolved: walked.resolved?[row.node.ref])))
             }
         }
         var seen = Set<String>()
@@ -156,6 +155,15 @@ public enum LineageLayout {
         }
         let height = 2 * margin + Double(tiers.count) * boxHeight + Double(last) * tierGap + (bends ? arc : 0)
         return Graph(nodes: nodes, edges: edges, width: 2 * margin + wide, height: height)
+    }
+
+    /// A box's second line: "Pull request · $4.00 · merged · bug". A PR's cost line already ends in
+    /// its state, so its state from the forge is left out then, not said twice (#3159).
+    static func detail(_ row: LineageList.Row, resolved r: DaemonAPI.LineageResolved?) -> String {
+        var parts = [kindWord(row.node.kind)] + (row.cost.map { [$0] } ?? [])
+        if let state = r?.state, !(row.node.kind == "pr" && row.cost != nil) { parts.append(state) }
+        if let labels = r?.labels, !labels.isEmpty { parts.append(labels.joined(separator: ", ")) }
+        return parts.joined(separator: " · ")
     }
 
     /// Each node's links, either way, in the order the walk gave them.

@@ -80,6 +80,16 @@ test("a resolved node shows its title, state and labels", () => {
   assert.equal(g.nodes.find((n) => n.row.node.ref === issue.ref).row.name, "#12 Fix the flaky test");
 });
 
+// #3159: a merged PR's box says "merged" once: its cost line's state, not the forge's as well.
+test("a PR's state shows once in its box", () => {
+  const resolved = { ...graph, resolved: { [pr.ref]: { title: "Fix it", state: "merged", labels: ["bug"] } } };
+  const banked = rollup(pr, cost(4), { parts: [{ node: pr, banked: cost(4), outcome: "merged", lastAt: at }] });
+  const g = l.lineageGraph(session, resolved, new Map([[l.costKey(pr), banked]]), title);
+  assert.equal(g.nodes.find((n) => n.row.node.ref === pr.ref).detail, "Pull request · $4.00 · merged · bug");
+  const unbanked = l.lineageGraph(session, resolved, new Map(), title);
+  assert.equal(unbanked.nodes.find((n) => n.row.node.ref === pr.ref).detail, "Pull request · merged · bug");
+});
+
 test("an issue, a PR, a milestone or a release on GitHub has its address; a session has none", () => {
   const rows = l.lineageRows(session, graph, new Map(), () => undefined);
   const url = (ref) => rows.find((r) => r.node.ref === ref).url;

@@ -203,6 +203,14 @@ function tier(kind: string): number {
   }
 }
 
+/** A box's second line: "Pull request · $4.00 · merged · bug". A PR's cost line already ends in its state, so its
+ * state from the forge is left out then, not said twice (#3159). */
+function detail(row: LineageRow, r: LineageResolved | undefined): string {
+  const state = r?.state && !(row.node.kind === "pr" && row.cost) ? [r.state] : [];
+  const labels = r?.labels && r.labels.length > 0 ? [r.labels.join(", ")] : [];
+  return [kindWord(row.node.kind), ...row.cost ? [row.cost] : [], ...state, ...labels].join(" · ");
+}
+
 /** The graph: a tier per kind, top to bottom, empty tiers left out, each tier in the order of the boxes it links
  * to above it, so fewer lines cross. Tiers are centred on the widest. Top to bottom, so that it fits the files
  * pane: a walk has few tiers and few boxes in each. */
@@ -225,7 +233,7 @@ export function lineageGraph(session: LineageNode, walked: LineageGraph, costs: 
   const wide = span(Math.max(...tiers.map((t) => t.length)));
   const nodes = tiers.flatMap((row, t) => row.map((r, i) => ({
     row: r, x: box.margin + (wide - span(row.length)) / 2 + i * (box.width + box.gap), y: box.margin + t * (box.height + box.tierGap),
-    here: same(r.node, session), detail: [kindWord(r.node.kind), ...r.cost ? [r.cost] : [], ...r.resolved ? [r.resolved] : []].join(" · "),
+    here: same(r.node, session), detail: detail(r, walked.resolved?.[r.node.ref]),
   })));
   const seen = new Set<string>();
   const edges = walked.links.flatMap((l) => {
