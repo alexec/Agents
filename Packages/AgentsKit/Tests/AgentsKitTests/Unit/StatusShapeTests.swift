@@ -108,6 +108,40 @@ struct StatusShapeTests {
         asking.report = WorkReport(outcome: .done, message: "The report", at: Date())
         #expect(StatusShape.needsYouLine(row: asking) == nil)
     }
+
+    @Test("A wait for the person says what it asks of them, and links the PR (#3147)")
+    func personWait() {
+        let trigger = MCPEventTrigger(event: "review.requested", servers: ["github"],
+                                      arguments: ["repo": .string("alexec/Agents"), "pr": .int(123)])
+        var wait = EventWait(patterns: [EventPattern("review.requested")], from: 4, since: Date(),
+                             serverEvents: [WaitServerEvent(trigger: trigger, servers: ["github"])], forPerson: true)
+        var agent = Agent(runtimeID: "test", cwd: URL(fileURLWithPath: "/tmp"), state: .finished)
+        agent.endedReason = .endTurn
+        agent.eventWait = wait
+        #expect(StatusShape.needsYouLine(row: agent) == "Review requested: alexec/Agents#123")
+        #expect(StatusShape.words(row: agent, isComingBack: false) == "Review requested: alexec/Agents#123")
+        #expect(wait.personURL == URL(string: "https://github.com/alexec/Agents/pull/123"))
+
+        // Before #577 a wait had no server events: the event's own words, no place.
+        agent.eventWait = EventWait(patterns: [EventPattern("issue.assigned")], from: 4, since: Date(), forPerson: true)
+        #expect(StatusShape.needsYouLine(row: agent) == "Issue assigned")
+        #expect(agent.eventWait?.personURL == nil)
+
+        // A GitLab merge request is !12.
+        wait.serverEvents = [WaitServerEvent(trigger: MCPEventTrigger(event: "review.requested",
+            arguments: ["project": .string("group/name"), "pr": .int(12)]), servers: [])]
+        #expect(wait.personLine == "Review requested: group/name!12")
+
+        // A question's own words win; a wait for anyone, or an ended one, asks nothing.
+        agent.eventWait = wait
+        agent.report = WorkReport(outcome: .needsAnswer, message: "Which?", at: Date())
+        #expect(StatusShape.words(row: agent, isComingBack: false) == WorkOutcome.needsAnswer.heading)
+        wait.forPerson = nil
+        #expect(wait.personLine == nil)
+        wait.forPerson = true
+        wait.ending = .timedOut
+        #expect(wait.personLine == nil && wait.personURL == nil)
+    }
 }
 
 @Suite("An agent's own title")

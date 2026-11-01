@@ -510,6 +510,12 @@ a.wait-card-filters { color: var(--accent); opacity: 1; text-decoration: underli
 .wait-card-progress { height: 3px; overflow: hidden; border-radius: 99px; background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .wait-card-progress span { display: block; height: 100%; background: var(--accent); transition: width .2s linear; }
 .wait-card .wait-answers { display: flex; justify-content: flex-end; gap: 10px; }
+/* A wait only the person can settle (#3147): tinted as a question is, its session under Needs you. */
+.wait-card.for-person {
+  border-color: color-mix(in srgb, var(--tint-attention) 25%, transparent);
+  background: color-mix(in srgb, var(--tint-attention) 7%, transparent);
+}
+.wait-card-mark { font-weight: 700; }
 .note.switch {
   padding: 10px 12px;
   border-radius: var(--radius-card);

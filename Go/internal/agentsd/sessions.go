@@ -23,7 +23,6 @@ const (
 	historyBytes       = 1 << 20
 	messageCharacters  = 4_000
 	messagesPerHour    = 30
-	defaultRunningCap  = 3
 	sessionUnavailable = "That conversation's history is unavailable."
 	queuedMessageNote  = " It is queued, and it is the one message you may have waiting for that session. Replace it with message_session and replace: true, or take it back with cancel_message."
 )
@@ -652,10 +651,8 @@ func (d *Daemon) messageSession(caller wire.UUID, args map[string]json.RawMessag
 	looser := d.holdsMessageFrom(target, me)
 	wakes := !busy && !stopped && !waitsOnPerson && looser == ""
 	if wakes && target.StartedByAgent != nil {
-		limit := int64(defaultRunningCap)
-		if s, ok := d.summaryFor(folderPath(target)); ok && s.Folder.HelperLimits != nil && s.Folder.HelperLimits.Running != nil {
-			limit = *s.Folder.HelperLimits.Running
-		}
+		// The limit in force (#3149): the effective policy's helpers.mostRunning.
+		limit, _, _ := d.helperLimitsIn(folderPath(target))
 		running := 0
 		for _, a := range append(d.thereAgents(folderPath(target)), d.folderSessions(folderPath(target))...) {
 			if a.StartedByAgent != nil && inFlight(a.State) {

@@ -174,14 +174,16 @@ public final class WebSocketLink: NSObject, LineTransport, URLSessionWebSocketDe
     /// (so the same pin and TLS trust apply): the handshake's HTTP answer has no body a
     /// `URLSessionWebSocketTask` delivers, so this is the only way to the line itself. The
     /// header's own value (the refusal's kind) stands in for it when that GET does not
-    /// answer, so a refusal is never shown as silence.
+    /// answer, or answers without `Agents-Refusal` (a copy's own "ready", #3146), so a
+    /// refusal is never shown as silence or as something else's words.
     private static func refusalLine(session: URLSession?, socketURL: URL?, kind: String) async -> String {
         guard let session, var parts = socketURL.flatMap({ URLComponents(url: $0, resolvingAgainstBaseURL: false) }) else {
             return kind
         }
         parts.scheme = parts.scheme == "wss" ? "https" : "http"
         parts.path = "/readyz"
-        guard let url = parts.url, let (data, _) = try? await session.data(for: URLRequest(url: url, timeoutInterval: 5)) else {
+        guard let url = parts.url, let (data, response) = try? await session.data(for: URLRequest(url: url, timeoutInterval: 5)),
+              (response as? HTTPURLResponse)?.value(forHTTPHeaderField: ControlRefusal.header) != nil else {
             return kind
         }
         let text = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)

@@ -1,18 +1,18 @@
-// The line on a choice the organisation's policy refuses or caps (#998, spec 998 FR-020): "Set by
-// your organisation", and the rule's words in its tip and a detail line. The choice itself is shown,
+// The line on a choice a policy refuses or caps (#998, spec 998 FR-020): "Set by your organisation"
+// (or "Set by you", "Set by this folder": the layer that decided, #3150), and the rule's words in its tip and a detail line. The choice itself is shown,
 // dimmed, never hidden. The same as the window's and the Remote's (Shared/UI/OrgPolicyLine.swift).
 import type { CostState, PassThroughName, PolicyRefusal, PolicySetBy } from "../protocol/generated";
 import type { Store } from "../model/store";
-import { budgetFoot, budgetRows, line, refusalLine, runtimeName, setBy, startsNothing } from "../model/orgPolicy";
+import { budgetFoot, budgetRows, line, markTitle, refusalLine, runtimeName, startsNothing } from "../model/orgPolicy";
 import { money } from "../model/limits";
 import { StoppedStrip } from "./settings/Policy";
 
-/** Set by your organisation, with the rule's words under it. Nothing without a mark. */
+/** Its layer's title (Set by your organisation, you or this folder), with the rule's words under it. Nothing without a mark. */
 export function OrgPolicyLine({ mark }: { mark: PolicySetBy | undefined }) {
   if (!mark) return null;
   return (
     <span class="org-policy-line small" title={line(mark)} aria-label={line(mark)}>
-      <strong>{setBy}</strong> <span>{mark.words}</span>
+      <strong>{markTitle(mark)}</strong> <span>{mark.words}</span>
     </span>
   );
 }
@@ -25,7 +25,7 @@ export function OrgPolicyRefusal({ refusal }: { refusal: PolicyRefusal | null | 
 
 /** A choice's title with the mark after it, for a native <option>, which can hold only text. */
 export function optionLabel(name: string, mark: PolicySetBy | undefined): string {
-  return mark ? `${name} (${setBy})` : name;
+  return mark ? `${name} (${markTitle(mark)})` : name;
 }
 
 /**

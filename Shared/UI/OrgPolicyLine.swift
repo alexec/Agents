@@ -1,8 +1,8 @@
 import AgentsKitCore
 import SwiftUI
 
-/// The line on a choice the organisation's policy refuses or caps (#998, spec 998 FR-020):
-/// **Set by your organisation**, and the rule's words in a help tip on the Mac or a detail line on
+/// The line on a choice a policy refuses or caps (#998, spec 998 FR-020): **Set by your
+/// organisation** (or **Set by you**, **Set by this folder**: the layer that decided, #3150), and the rule's words in a help tip on the Mac or a detail line on
 /// the Remote. The choice itself is shown, dimmed, never hidden (US3 scenario 1). The web page's is
 /// `Web/src/views/OrgPolicyLine.tsx`.
 struct OrgPolicyLine: View {
@@ -10,7 +10,7 @@ struct OrgPolicyLine: View {
 
     var body: some View {
         #if os(macOS)
-        Label(OrgPolicyWords.setBy, systemImage: OrgPolicyWords.symbol)
+        Label(mark.title, systemImage: mark.symbol)
             .appText(.fine)
             .foregroundStyle(.secondary)
             .help(mark.words)
@@ -18,7 +18,7 @@ struct OrgPolicyLine: View {
             .accessibilityLabel(OrgPolicyWords.line(mark))
         #else
         VStack(alignment: .leading, spacing: 1) {
-            Label(OrgPolicyWords.setBy, systemImage: OrgPolicyWords.symbol)
+            Label(mark.title, systemImage: mark.symbol)
             Text(mark.words).fixedSize(horizontal: false, vertical: true)
         }
         .appText(.fine)
@@ -37,7 +37,7 @@ struct OrgPolicyRefusalLine: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
             if let title = refusal.title {
-                Label(title, systemImage: OrgPolicyWords.symbol).bold()
+                Label(title, systemImage: refusal.symbol).bold()
             }
             Text(refusal.words).fixedSize(horizontal: false, vertical: true)
         }

@@ -18,7 +18,7 @@ test("a policy with no rules says none", () => {
 
 test("each rule set is said in its order, as on the Mac and the Remote", () => {
   const rules = o.rules(policy({
-    modeCeiling: "acceptEdits", sandbox: "required",
+    permissionMode: "approveForMe", sandbox: "required",
     runtimes: { codex: {}, claude: { models: ["claude-sonnet-*"] } },
     marketplaces: { allowed: ["acme", "github"], customServers: "refuse" },
     budgets: { daily: 40, dailyTokens: 50000, perAgent: 2.5, allowUnmetered: ["cursor"], raises: [] },
@@ -30,7 +30,7 @@ test("each rule set is said in its order, as on the Mac and the Remote", () => {
   assert.deepEqual(rules.map((r) => r.title), ["Modes", "Command sandbox", "Runtimes", "Marketplaces", "MCP servers added by hand",
     "Budget", "Unmetered runtimes", "Helper sessions", "Variables passed to runtimes", "Antigravity’s terms", "Machines"]);
   assert.deepEqual(rules.map((r) => r.words), [
-    "Up to Accept Edits", "Required", "Only Claude (claude-sonnet-*), Codex", "Only acme, github", "Not allowed",
+    "Up to Approve for me", "Required", "Only Claude (claude-sonnet-*), Codex", "Only acme, github", "Not allowed",
     "$40 a day, 50,000 tokens a day, $2.50 an agent", "Allowed: Cursor", "At most 3 running and 10 not archived in a folder",
     "Only ANTHROPIC_*, OPENAI_*", "Antigravity is not allowed", "A machine that does not follow this policy starts no agent",
   ]);
@@ -61,8 +61,8 @@ test("the last change names who and when", () => {
 });
 
 test("a mark and a policyRefused error say the line", () => {
-  assert.equal(o.line({ by: "organisation", rule: "modeCeiling", words: "Your organisation allows modes up to Accept Edits." }),
-    "Set by your organisation. Your organisation allows modes up to Accept Edits.");
+  assert.equal(o.line({ by: "organisation", rule: "permissionMode", words: "Your organisation allows modes up to Approve for me." }),
+    "Set by your organisation. Your organisation allows modes up to Approve for me.");
   const refusal = o.refusalOf(new CallFailed(-32076, "x", { reason: "policy", rule: "runtimes", words: "Your organisation does not allow Gemini." }));
   assert.equal(refusal.rule, "runtimes");
   assert.equal(o.refusalLine(refusal), "Set by your organisation. Your organisation does not allow Gemini.");
@@ -70,6 +70,17 @@ test("a mark and a policyRefused error say the line", () => {
     "Agents Host has no policy from your organisation. Connect to the network.");
   assert.equal(o.refusalOf(new CallFailed(-32602, "no")), null);
   assert.equal(o.refusalOf(new Error("no")), null);
+});
+
+test("a limit from your own or a folder's layer says that layer, not the organisation (#3150)", () => {
+  const you = { kind: "you", name: "You" };
+  const folder = { kind: "folder", name: "web", folder: "/src/web" };
+  assert.equal(o.line({ by: "you", rule: "modeCeiling", words: "At most Approve.", layer: you }), "Set by you. At most Approve.");
+  assert.equal(o.line({ by: "folder", rule: "modeCeiling", words: "At most Approve.", layer: folder }), "Set by this folder. At most Approve.");
+  assert.equal(o.refusalLine({ reason: "policy", words: "At most Approve.", layer: you }), "Set by you. At most Approve.");
+  assert.equal(o.refusalLine({ reason: "policy", words: "At most Approve.", layer: folder }), "Set by this folder. At most Approve.");
+  assert.equal(o.refusalLine({ reason: "policy", words: "At most Approve.", layer: { kind: "organisation", name: "Acme" } }),
+    "Set by your organisation. At most Approve.");
 });
 
 test("no policy is a form that sets nothing, and back to a policy with no rules", () => {
@@ -82,7 +93,7 @@ test("no policy is a form that sets nothing, and back to a policy with no rules"
 
 test("a policy goes to the form and back unchanged, keeping what the form does not show", () => {
   const p = policy({
-    modeCeiling: "auto", sandbox: "required",
+    permissionMode: "bypassPermissions", sandbox: "required",
     runtimes: { claude: { models: ["claude-sonnet-*"], reach: ["orgKey", "gateway"] }, codex: {} },
     marketplaces: { allowed: ["acme"], customServers: "allow" },
     budgets: { daily: 40, dailyTokens: 50000, allowUnmetered: ["grok"], raises: [{ user: "u-sam", day: "2026-10-22", daily: 60, by: priya }] },
@@ -99,19 +110,19 @@ test("a policy goes to the form and back unchanged, keeping what the form does n
 test("edits in the form change the policy, and a field that is not a number is said", () => {
   const p = policy({ runtimes: { claude: {}, codex: {} } });
   const form = o.formOf(p);
-  form.mode = "acceptEdits";
+  form.mode = "approveForMe";
   form.runtimes.codex.on = false;
   form.runtimes.claude.models = "claude-sonnet-*, claude-haiku-*";
   form.daily = "$1,200.50";
   form.limitPassThrough = true;
   form.passThrough = "ANTHROPIC_*  OPENAI_API_KEY";
   const made = o.policyOf(form, p, priya).policy;
-  assert.equal(made.modeCeiling, "acceptEdits");
+  assert.equal(made.permissionMode, "approveForMe");
   assert.deepEqual(made.runtimes, { claude: { models: ["claude-sonnet-*", "claude-haiku-*"] } });
   assert.equal(made.budgets.daily, 1200.5);
   assert.deepEqual(made.environment.passThrough, ["ANTHROPIC_*", "OPENAI_API_KEY"]);
   assert.deepEqual(o.changes(p, made), [
-    "Modes: Up to Accept Edits",
+    "Modes: Up to Approve for me",
     "Runtimes: Only Claude, Codex → Only Claude (claude-sonnet-*, claude-haiku-*)",
     "Budget: $1200.50 a day",
     "Variables passed to runtimes: Only ANTHROPIC_*, OPENAI_API_KEY",

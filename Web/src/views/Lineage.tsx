@@ -12,7 +12,7 @@ import { Capability } from "../protocol/capabilities.generated";
 import { describe } from "../model/errors";
 import {
   box, costKey, costed, curve, currentStart, emptyHistory, goBack, goForward, goTo, kindWord, lineageDepth, lineageGraph,
-  lineageNote, lineagePageNote, noLineage, noLineageHere, resolvingAsks, sessionNode, startRow, typedNode, type GraphNode, type LineageGraphLayout,
+  lineageNote, lineagePageNote, noLineage, noLineageHere, readingTitles, resolvingAsks, sessionNode, startRow, typedNode, typedPullRequest, type GraphNode, type LineageGraphLayout,
   type LineageHistory, type LineageRow,
 } from "../model/lineage";
 import { go, route } from "../route";
@@ -22,9 +22,11 @@ function useWalk(store: Store, host: string | undefined, node: LineageNode | und
   const graph = useSignal<LineageGraph | null>(null);
   const costs = useSignal<ReadonlyMap<string, LineageCostRollup>>(new Map());
   const failed = useSignal<string | null>(null);
+  const reading = useSignal(false);
   useEffect(() => {
     let current = true;
     failed.value = null;
+    reading.value = false;
     graph.value = null;
     costs.value = new Map();
     if (!host || !node) return;
@@ -38,21 +40,27 @@ function useWalk(store: Store, host: string | undefined, node: LineageNode | und
           store.link.call("lineage/cost", { node: n }, host).catch(() => null)));
         if (current) costs.value = new Map(answers.flatMap((r) => r ? [[costKey(r.node), r] as const] : []));
         // The daemon resolves issues' and PRs' titles in the background (#3102): walk again while it says
-        // some are still to come.
+        // some are still to come. One failed walk keeps the graph that is shown and stops asking (#3154).
         let latest = walked;
-        for (let i = 0; current && latest.resolving && i < resolvingAsks; i++) {
-          await new Promise((done) => setTimeout(done, 1000));
-          if (!current) return;
-          latest = await store.link.call("lineage/walk", { node, depth: lineageDepth }, host);
-          if (current) graph.value = latest;
+        reading.value = !!latest.resolving;
+        try {
+          for (let i = 0; current && latest.resolving && i < resolvingAsks; i++) {
+            await new Promise((done) => setTimeout(done, 1000));
+            if (!current) return;
+            latest = await store.link.call("lineage/walk", { node, depth: lineageDepth }, host);
+            if (current) graph.value = latest;
+          }
+        } catch {
+          // Keep the last graph.
         }
+        if (current) reading.value = false;
       } catch (e) {
         if (current) { graph.value = null; failed.value = describe(e); }
       }
     })();
     return () => { current = false; };
   }, [host, node?.kind, node?.ref, asked]);
-  return { graph, costs, failed };
+  return { graph, costs, failed, reading };
 }
 
 const sessionTitle = (store: Store, host: string) => (n: LineageNode) =>
@@ -61,7 +69,7 @@ const sessionTitle = (store: Store, host: string) => (n: LineageNode) =>
 export function Lineage({ store, host, session }: { store: Store; host: string; session: string }) {
   const asked = useSignal(0);
   const me = sessionNode(session);
-  const { graph, costs, failed } = useWalk(store, host, me, asked.value);
+  const { graph, costs, failed, reading } = useWalk(store, host, me, asked.value);
 
   if (failed.value) return <p class="hint">{failed.value}</p>;
   if (!graph.value) return <p class="hint">Reading the links…</p>;
@@ -72,6 +80,7 @@ export function Lineage({ store, host, session }: { store: Store; host: string; 
     ? () => go({ ...route.value, host, session: row.session as UUID }) : undefined;
   const footer = (
     <>
+      {reading.value && <p class="quiet small">{readingTitles}</p>}
       {graph.value.limited && <p class="quiet small">The walk stopped at its limit: there are more links.</p>}
       {!empty && <p class="quiet small">{lineageNote}</p>}
     </>
@@ -89,6 +98,14 @@ export function Lineage({ store, host, session }: { store: Store; host: string; 
       {footer}
     </div>
   );
+}
+
+/** The start for "owner/repo#12" (#3148): the issue, unless it has no links and the pull request of that number has. */
+async function issueOrPullRequest(store: Store, host: string, issue: LineageNode, pr: LineageNode | undefined): Promise<LineageNode> {
+  if (!pr) return issue;
+  const linked = (node: LineageNode) => store.link.call("lineage/walk", { node, depth: 1 }, host)
+    .then((g) => g.links.length > 0, () => false);
+  return !(await linked(issue)) && await linked(pr) ? pr : issue;
 }
 
 /** A start of the Lineage page: a node, and the host whose links are walked from it. */
@@ -119,22 +136,23 @@ export function LineagePage({ store }: { store: Store }) {
     if (!currentStart(history.value) && r.host && r.session) history.value = goTo(history.value, { host: r.host, node: sessionNode(r.session) }, samePlace);
   }, []);
   const place = currentStart(history.value);
-  const { graph, costs, failed } = useWalk(store, place?.host, place?.node, asked.value);
+  const { graph, costs, failed, reading } = useWalk(store, place?.host, place?.node, asked.value);
   const startFrom = (p: Place) => { wrong.value = false; history.value = goTo(history.value, p, samePlace); };
   const sessions = store.hosts.value.flatMap((h) => (store.agents.value[h.id] ?? []).filter((a) => !a.archivedAt)
     .map((a) => ({ host: h.id, agent: a }))).sort((a, b) => b.agent.lastActivityAt - a.agent.lastActivityAt).slice(0, 15);
-  const submit = () => {
-    const node = typedNode(typed.value);
+  const submit = async () => {
+    const text = typed.value;
+    const node = typedNode(text);
     if (!node) { wrong.value = true; return; }
     const owner = node.kind === "session" ? sessions.find((s) => s.agent.id === node.ref.slice("session:".length))?.host : undefined;
     const host = owner ?? machine;
     if (!host) return;
-    startFrom({ host, node });
     typed.value = "";
+    startFrom({ host, node: await issueOrPullRequest(store, host, node, typedPullRequest(text)) });
   };
   const title = place ? sessionTitle(store, place.host) : () => undefined;
   const bar = (
-    <form class="lineage-bar" onSubmit={(e) => { e.preventDefault(); submit(); }}>
+    <form class="lineage-bar" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
       <button type="button" title="Back: the start before this one" aria-label="Back" disabled={history.value.at <= 0}
         onClick={() => { history.value = goBack(history.value); }}>‹</button>
       <button type="button" title="Forward" aria-label="Forward" disabled={history.value.at + 1 >= history.value.places.length}
@@ -178,7 +196,7 @@ export function LineagePage({ store }: { store: Store }) {
     body = (
       <>
         <div class="lineage-start">
-          <strong>{place.node.kind === "session" ? title(place.node) ?? "A session" : here.name}</strong>
+          <strong title={here.ref ?? here.name}>{place.node.kind === "session" ? title(place.node) ?? "A session" : here.name}</strong>
           <span class="quiet">{[kindWord(place.node.kind), ...here.cost ? [here.cost] : [], ...here.resolved ? [here.resolved] : []].join(" · ")}</span>
           {here.url ? <a class="link" href={here.url} target="_blank" rel="noopener noreferrer">Open on GitHub</a>
             : chat && <button class="link" onClick={() => go({ host: place.host, folder: chat.worktree?.folder || chat.cwd, session: chat.id })}>Show the chat</button>}
@@ -188,6 +206,7 @@ export function LineagePage({ store }: { store: Store }) {
             show={(row) => row.node.kind === place.node.kind && row.node.ref === place.node.ref ? undefined
               : () => startFrom({ host: row.session ? sessions.find((s) => s.agent.id === row.session)?.host ?? place.host : place.host, node: row.node })} />
         )}
+        {reading.value && <p class="quiet small">{readingTitles}</p>}
         {walked.limited && <p class="quiet small">The walk stopped at its limit: there are more links.</p>}
         {layout.nodes.length > 0 && <p class="quiet small">{lineagePageNote}</p>}
       </>
@@ -286,7 +305,7 @@ function Box({ node, show, verb }: { node: GraphNode; show: Show; verb: (row: Li
   const go = show(node.row);
   const inner = (
     <>
-      <title>{[node.row.name, ...node.row.links, ...go || node.row.url ? [verb(node.row)] : []].join("\n")}</title>
+      <title>{[node.row.name, ...node.row.ref ? [node.row.ref] : [], ...node.row.links, ...go || node.row.url ? [verb(node.row)] : []].join("\n")}</title>
       <rect class={node.here ? "box here" : "box"} width={box.width} height={box.height} rx={10} />
       <text class="name" x={10} y={20}>{clip(node.row.name, 28)}</text>
       <text class="detail" x={10} y={38}>{clip(node.detail, 34)}</text>
