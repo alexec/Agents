@@ -13,18 +13,18 @@ import (
 	"testing"
 )
 
-const searchAnswer = `{"data":{"search":{"pageInfo":{"hasNextPage":true,"endCursor":"Y3Vyc29y"},"nodes":[
- {"__typename":"PullRequest","number":12,"title":"Forge reads","url":"https://github.com/o/r/pull/12","pullState":"MERGED",
+const searchAnswer = `{"data":{"search":{"pageInfo":{"hasNextPage":true,"endCursor":"Y3Vyc29y"},"edges":[
+ {"cursor":"YzE=","node":{"__typename":"PullRequest","number":12,"title":"Forge reads","url":"https://github.com/o/r/pull/12","pullState":"MERGED",
   "updatedAt":"2026-11-01T10:00:00Z","author":{"login":"alexec","__typename":"User"},"repository":{"nameWithOwner":"o/r"},
   "labels":{"nodes":[{"name":"enhancement","color":"A2EEEF"},{"name":"odd","color":"red"}]},
   "assignees":{"nodes":[{"login":"alexec"}]},"milestone":{"title":"0.16"},"commentCount":{"totalCount":3},
   "isDraft":true,"mergeable":"CONFLICTING","reviewDecision":"APPROVED","autoMergeRequest":{"enabledAt":"x"},
-  "checkState":{"nodes":[{"commit":{"statusCheckRollup":{"state":"FAILURE"}}}]}},
- {"__typename":"PullRequest","number":13,"title":"Docs","url":"u","pullState":"OPEN","updatedAt":"2026-11-01T09:00:00Z",
+  "checkState":{"nodes":[{"commit":{"statusCheckRollup":{"state":"FAILURE"}}}]}}},
+ {"cursor":"YzI=","node":{"__typename":"PullRequest","number":13,"title":"Docs","url":"u","pullState":"OPEN","updatedAt":"2026-11-01T09:00:00Z",
   "author":null,"repository":{"nameWithOwner":"o/s"},"labels":{"nodes":[]},"assignees":{"nodes":[]},"milestone":null,
   "commentCount":{"totalCount":0},"isDraft":false,"mergeable":"UNKNOWN","reviewDecision":null,"autoMergeRequest":null,
-  "checkState":{"nodes":[{"commit":{"statusCheckRollup":null}}]}},
- {}]}}}`
+  "checkState":{"nodes":[{"commit":{"statusCheckRollup":null}}]}}},
+ {"cursor":"YzM=","node":{}}]}}}`
 
 const itemAnswer = `{"data":{"repository":{"issueOrPullRequest":{"__typename":"Issue","number":3,"title":"Mean is off by one",
  "url":"https://github.com/o/r/issues/3","issueState":"CLOSED","updatedAt":"2026-11-01T08:00:00Z",
@@ -94,7 +94,7 @@ func TestSearchListsManyReposInOneCall(t *testing.T) {
 	if vars := a.all(); len(vars) != 1 || vars[0]["q"] != `is:pr is:open repo:o/r repo:o/s label:"enhancement" sort:updated-desc` || vars[0]["first"] != float64(100) {
 		t.Fatalf("asked: %v", vars)
 	}
-	if p.Next != "Y3Vyc29y" || len(p.Items) != 2 {
+	if p.Next != "Y3Vyc29y" || len(p.Items) != 2 || !slices.Equal(p.Cursors, []string{"YzE=", "YzI="}) {
 		t.Fatalf("page: %+v", p)
 	}
 	first, b := p.Items[0], p.Items[1]

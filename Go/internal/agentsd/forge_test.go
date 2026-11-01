@@ -3,6 +3,8 @@ package agentsd
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -12,6 +14,8 @@ import (
 
 	"github.com/alexec/agents/Go/internal/connections"
 	"github.com/alexec/agents/Go/internal/githubmcp"
+	"github.com/alexec/agents/Go/internal/gitlabmcp"
+	"github.com/alexec/agents/Go/internal/linearmcp"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -183,7 +187,8 @@ func TestForgeListRefusals(t *testing.T) {
 
 // #3129: forge/pull is one pull request with its body, a page of comments and its cursor, its
 // checks, review threads and files; forge/issue on a pull request's number, an issue node to
-// forge/pull, a GitLab node and an item GitHub does not have are refused.
+// forge/pull, an item GitHub does not have, a forge it does not know and a Linear pull request
+// are refused.
 func TestForgePullReadsOne(t *testing.T) {
 	_, c, gh, _ := forgeDaemon(t)
 	pr := wire.LineageNode{Kind: "pr", Ref: "github:alexec/agents#12"}
@@ -209,12 +214,221 @@ func TestForgePullReadsOne(t *testing.T) {
 	}{
 		{"forge/issue", wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#12"}},
 		{"forge/pull", wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#13"}},
-		{"forge/pull", wire.LineageNode{Kind: "pr", Ref: "gitlab:group/project!4"}},
 		{"forge/pull", wire.LineageNode{Kind: "pr", Ref: "github:alexec/agents#404"}},
-		{"forge/issue", wire.LineageNode{Kind: "issue", Ref: "linear:ENG-4"}},
+		{"forge/issue", wire.LineageNode{Kind: "issue", Ref: "jira:ENG-4"}},
+		{"forge/pull", wire.LineageNode{Kind: "pr", Ref: "linear:ENG-4"}},
 	} {
 		if e := c.callError(t, 10+i, ask.method, wire.ForgeItemRequest{Node: ask.node}); e == nil || !strings.Contains(e.Message, ask.method) {
 			t.Fatalf("%s %s: %v", ask.method, ask.node.Ref, e)
 		}
+	}
+}
+
+// fakeForgeGitLab is GitLab's lists and item reads, and what each was asked.
+type fakeForgeGitLab struct {
+	mu       sync.Mutex
+	searches []string
+	items    []string
+}
+
+func (f *fakeForgeGitLab) Search(_ context.Context, projects []string, sf gitlabmcp.SearchFilter, after string, first int) (gitlabmcp.SearchPage, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.searches = append(f.searches, strings.Join(projects, ",")+" after="+after)
+	if after != "" {
+		return gitlabmcp.SearchPage{Items: []gitlabmcp.Item{}, Cursors: []string{}}, nil
+	}
+	return gitlabmcp.SearchPage{Next: "gl-end", Cursors: []string{"gl-1", "gl-2"}, Items: []gitlabmcp.Item{
+		{Project: "Group/App", Number: 4, MR: sf.MRs, State: "open", Title: "GitLab newest", UpdatedAt: "2026-11-01T11:00:00Z",
+			Labels: []string{"bug"}, LabelColors: map[string]string{"bug": "#d9534f"}, Draft: true, Review: "review_required", Mergeable: "mergeable"},
+		{Project: "Group/App", Number: 3, MR: sf.MRs, State: "open", Title: "GitLab oldest", UpdatedAt: "2026-11-01T07:00:00Z"},
+	}}, nil
+}
+
+func (f *fakeForgeGitLab) ItemPage(_ context.Context, project string, number int, mr bool, before string) (gitlabmcp.ItemDetail, error) {
+	f.mu.Lock()
+	f.items = append(f.items, project)
+	f.mu.Unlock()
+	if number == 404 {
+		return gitlabmcp.ItemDetail{}, &gitlabmcp.GitLabError{Kind: gitlabmcp.NotFound, Message: "not found on GitLab"}
+	}
+	return gitlabmcp.ItemDetail{Item: gitlabmcp.Item{Project: project, Number: number, MR: mr, State: "merged", Title: "A merge request",
+		UpdatedAt: "2026-11-01T10:00:00Z"}, Body: "The body.", Before: "2",
+		Thread:    []gitlabmcp.Comment{{Author: "kim", Body: "Fine.", At: "2026-11-01T10:05:00Z", URL: "u1"}},
+		CheckRuns: []gitlabmcp.Check{{Name: "check: test", State: "passing"}}, ReviewThreads: 1, FilesChanged: 3}, nil
+}
+
+// fakeForgeLinear is Linear's lists and item reads, and what each was asked.
+type fakeForgeLinear struct {
+	mu       sync.Mutex
+	searches []string
+	key      string
+}
+
+func (f *fakeForgeLinear) Search(_ context.Context, teams []string, _ linearmcp.SearchFilter, after string, _ int) (linearmcp.SearchPage, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.searches = append(f.searches, strings.Join(teams, ",")+" after="+after)
+	return linearmcp.SearchPage{Cursors: []string{"ln-1"}, Items: []linearmcp.Item{
+		{Identifier: "ENG-4", Team: "ENG", State: "open", Title: "Sync the billing export", UpdatedAt: "2026-11-01T09:00:00Z", Assignees: []string{"alex"}},
+	}}, nil
+}
+
+func (f *fakeForgeLinear) ItemPage(_ context.Context, identifier, before string) (linearmcp.ItemDetail, error) {
+	if identifier != "ENG-4" {
+		return linearmcp.ItemDetail{}, &linearmcp.LinearError{Kind: linearmcp.NotFound, Message: "Linear issue " + identifier + " was not found"}
+	}
+	return linearmcp.ItemDetail{Item: linearmcp.Item{Identifier: identifier, Team: "ENG", State: "closed", Title: "Sync the billing export",
+		UpdatedAt: "2026-11-01T09:00:00Z"}, Body: "Linear's body.",
+		Thread: []linearmcp.Comment{{Author: "GitHub", Body: "Linked.", Bot: true}}}, nil
+}
+
+// allForgesDaemon is forgeDaemon with a GitLab folder on the connected gitlab.com, one on a
+// GitLab it is not connected to, and Linear teams named by a folder's .agents/folder.json.
+func allForgesDaemon(t *testing.T) (*Daemon, *conn, *fakeForgeGitHub, *fakeForgeGitLab, *fakeForgeLinear, *connections.File) {
+	t.Helper()
+	d, c, gh, file := forgeDaemon(t)
+	gl, ln := &fakeForgeGitLab{}, &fakeForgeLinear{}
+	d.newForgeGitLab = func(root, token string) forgeGitLab {
+		if root != connections.GitLabCom || token != "gloas-secret" {
+			t.Errorf("GitLab %q token %q", root, token)
+		}
+		return gl
+	}
+	d.newForgeLinear = func(key string) forgeLinear {
+		ln.mu.Lock()
+		ln.key = key
+		ln.mu.Unlock()
+		return ln
+	}
+	app := gitFolder(t, "git@gitlab.com:Group/App.git")
+	os.MkdirAll(filepath.Join(app, ".agents"), 0o755)
+	os.WriteFile(filepath.Join(app, ".agents", "folder.json"), []byte(`{"linearTeams": ["eng", "not a team", "OPS"]}`), 0o644)
+	c.call(t, 200, "folders/add", map[string]any{"folder": "file://" + app})
+	c.call(t, 201, "folders/add", map[string]any{"folder": "file://" + gitFolder(t, "git@gitlab.example.com:ops/tool.git")})
+	file.Put(connections.Connection{Provider: connections.GitLab, Login: "kim", Access: "gloas-secret", URL: connections.GitLabCom,
+		AccessExpiresAt: time.Now().Add(time.Hour), ConnectedAt: time.Now()})
+	file.Put(connections.Connection{Provider: connections.Linear, Login: "kim", Access: "lin_oauth", AccessExpiresAt: time.Now().Add(time.Hour),
+		ConnectedAt: time.Now()})
+	return d, c, gh, gl, ln, file
+}
+
+// #3209: forge/issues reads GitHub, the projects on the connected GitLab (not one on another
+// GitLab) and the folders' Linear teams, merges them by updatedAt, keeps limit, and each forge's
+// cursor goes on after the last of its own kept; a forge whose list ended is not asked again.
+func TestForgeIssuesMergesEveryForgeByTime(t *testing.T) {
+	_, c, gh, gl, ln, _ := allForgesDaemon(t)
+	var list wire.ForgeList
+	json.Unmarshal(c.call(t, 1, "forge/issues", wire.ForgeListRequest{Limit: new(int64(3))}), &list)
+	var refs []string
+	for _, i := range list.Items {
+		refs = append(refs, i.Node.Ref)
+	}
+	// GitHub 10:00, GitLab 11:00 and 07:00, Linear 09:00: the newest three.
+	if strings.Join(refs, " ") != "gitlab:group/app#4 github:alexec/agents#12 linear:ENG-4" || len(list.Errors) != 0 || list.Cursor == nil {
+		t.Fatalf("list: %v %+v", refs, list.Errors)
+	}
+	if searches, _ := gh.asked(); len(searches) != 1 {
+		t.Fatalf("GitHub: %q", searches)
+	}
+	if len(gl.searches) != 1 || gl.searches[0] != "Group/App after=" || len(ln.searches) != 1 || ln.searches[0] != "ENG,OPS after=" ||
+		ln.key != "Bearer lin_oauth" {
+		t.Fatalf("GitLab %q, Linear %q %q", gl.searches, ln.searches, ln.key)
+	}
+	g, l := list.Items[0], list.Items[2]
+	if deref(g.Folder) == "" || len(g.Labels) != 1 || deref(g.Labels[0].Color) != "#d9534f" || g.Draft != nil {
+		t.Fatalf("GitLab item: %+v", g)
+	}
+	if l.Node.Kind != "issue" || deref(l.Folder) != deref(g.Folder) || len(l.Assignees) != 1 {
+		t.Fatalf("Linear item: %+v", l)
+	}
+	cursor, _ := cursorOf(list.Cursor)
+	if cursor.GitHub != "Y3Vyc29y" || cursor.GitLab != "gl-1" || cursor.Linear != "" || !slices.Equal(cursor.Done, []string{"linear"}) {
+		t.Fatalf("cursor: %+v", cursor)
+	}
+
+	var next wire.ForgeList
+	json.Unmarshal(c.call(t, 2, "forge/issues", wire.ForgeListRequest{Limit: new(int64(3)), Cursor: list.Cursor}), &next)
+	if len(ln.searches) != 1 || len(gl.searches) != 2 || gl.searches[1] != "Group/App after=gl-1" {
+		t.Fatalf("next page: GitLab %q, Linear %q", gl.searches, ln.searches)
+	}
+	if len(next.Items) != 1 || next.Items[0].Title != "Older" || next.Cursor != nil {
+		t.Fatalf("next page: %+v", next)
+	}
+}
+
+// forge/pulls asks no Linear: it has no pull requests. A GitLab merge request is a ! node with
+// a merge request's own fields.
+func TestForgePullsHasNoLinear(t *testing.T) {
+	_, c, _, _, ln, _ := allForgesDaemon(t)
+	var list wire.ForgeList
+	json.Unmarshal(c.call(t, 1, "forge/pulls", wire.ForgeListRequest{}), &list)
+	if len(ln.searches) != 0 || len(list.Items) != 3 || list.Items[0].Node != (wire.LineageNode{Kind: "pr", Ref: "gitlab:group/app!4"}) ||
+		!*list.Items[0].Draft || *list.Items[0].Review != "review_required" {
+		t.Fatalf("pulls: %+v (Linear %q)", list.Items, ln.searches)
+	}
+}
+
+// Without a GitLab connection a list says so for GitLab, and still lists the others.
+func TestForgeListSaysGitLabIsNotConnected(t *testing.T) {
+	_, c, _, gl, _, file := allForgesDaemon(t)
+	file.Delete(connections.GitLab)
+	var list wire.ForgeList
+	json.Unmarshal(c.call(t, 1, "forge/issues", wire.ForgeListRequest{}), &list)
+	if len(gl.searches) != 0 || len(list.Errors) != 1 || list.Errors[0].Forge != "gitlab" || list.Errors[0].Message != gitlabmcp.NotConnected ||
+		len(list.Items) != 2 {
+		t.Fatalf("list: %+v", list)
+	}
+}
+
+// #3209: forge/pull reads a GitLab merge request in its project on the connected GitLab, and
+// forge/issue a Linear issue, with the folder that names its team; ones the forge does not have,
+// and a project on another GitLab, are refused.
+func TestForgeReadsAGitLabAndALinearItem(t *testing.T) {
+	_, c, _, gl, _, _ := allForgesDaemon(t)
+	mr := wire.LineageNode{Kind: "pr", Ref: "gitlab:group/app!4"}
+	var p wire.ForgeItemDetail
+	json.Unmarshal(c.call(t, 1, "forge/pull", wire.ForgeItemRequest{Node: mr}), &p)
+	if p.Item.Node != mr || p.Body != "The body." || deref(p.Cursor) != "2" || p.Item.State != "merged" || deref(p.Item.Folder) == "" ||
+		len(p.Comments) != 1 || len(p.Checks) != 1 || *p.ReviewThreads != 1 || *p.FilesChanged != 3 {
+		t.Fatalf("merge request: %+v", p)
+	}
+	if len(gl.items) != 1 || gl.items[0] != "Group/App" {
+		t.Fatalf("GitLab asked: %q", gl.items)
+	}
+
+	var i wire.ForgeItemDetail
+	json.Unmarshal(c.call(t, 2, "forge/issue", wire.ForgeItemRequest{Node: wire.LineageNode{Kind: "issue", Ref: "linear:ENG-4"}}), &i)
+	if i.Body != "Linear's body." || i.Item.State != "closed" || deref(i.Item.Folder) != deref(p.Item.Folder) || len(i.Comments) != 1 ||
+		i.Comments[0].Bot == nil || i.Checks != nil {
+		t.Fatalf("Linear issue: %+v", i)
+	}
+
+	for n, ask := range []struct {
+		method string
+		node   wire.LineageNode
+	}{
+		{"forge/issue", wire.LineageNode{Kind: "issue", Ref: "gitlab:group/app#404"}},
+		{"forge/issue", wire.LineageNode{Kind: "issue", Ref: "gitlab:ops/tool#1"}},
+		{"forge/issue", wire.LineageNode{Kind: "issue", Ref: "gitlab:nobody/here#1"}},
+		{"forge/issue", wire.LineageNode{Kind: "issue", Ref: "linear:ENG-404"}},
+	} {
+		if e := c.callError(t, 10+n, ask.method, wire.ForgeItemRequest{Node: ask.node}); e == nil || !strings.Contains(e.Message, ask.method) {
+			t.Fatalf("%s %s: %v", ask.method, ask.node.Ref, e)
+		}
+	}
+}
+
+// mergeForgePages: a forge that failed is asked again from where it was, and with nothing else
+// going on there is no next page.
+func TestMergeForgePagesKeepsAFailedForgesPlace(t *testing.T) {
+	at := func(s string) wire.Date { return forgeDate(s) }
+	pages := []forgePage{
+		{forge: "github", items: []wire.ForgeItem{{UpdatedAt: at("2026-11-01T10:00:00Z")}}, cursors: []string{"g1"}},
+		{forge: "gitlab", err: errors.New("GitLab: HTTP 500")},
+	}
+	items, next, more := mergeForgePages(pages, forgeCursor{GitLab: "was"}, 10)
+	if len(items) != 1 || more || next.GitLab != "was" || !slices.Equal(next.Done, []string{"github"}) {
+		t.Fatalf("%v %+v %v", items, next, more)
 	}
 }
