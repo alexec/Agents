@@ -1,6 +1,7 @@
 package controlplane
 
 import (
+	"bytes"
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
@@ -13,6 +14,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controlplane/records"
@@ -33,9 +35,13 @@ import (
 // host of the same owner lists and restores every backup of the owner's, so a new server
 // restores a deleted one's.
 //
-// The store holds no transcript in clear: each part is sealed with AES-256-GCM, under a
-// key made from the control key (which a cloud control plane keeps sealed by its KMS),
-// bound to the part's own key in the store.
+// The store holds no transcript in clear: each part is sealed with AES-256-GCM, under the
+// backups' own random key, bound to the part's own key in the store. That key is kept at
+// v1/backups.key, sealed with the control key (which a cloud control plane keeps sealed
+// by its KMS), so a store copy and a store backup carry it. A rotation of the control key
+// seals it again with the new key (H20261031-1): it never seals a part, so no part has to
+// be sealed again. A part from before it was sealed with a key made from the control key,
+// and still opens with the current or the previous one.
 //
 // Bounded: the newest Keep of each host's (1–10, the host's own setting), parts left by a
 // backup cut off are deleted after a day, and the backups of a host that was removed go
@@ -50,6 +56,8 @@ const (
 	backupStrayAge  = 24 * time.Hour
 	backupNameTime  = "20060102T150405Z"
 	backupKeyInfo   = "agents backups v1"
+	backupDataKey   = "v1/backups.key"
+	backupDataInfo  = "agents backups data key v1"
 )
 
 var backupName = regexp.MustCompile(`^[0-9]{8}T[0-9]{6}Z$`)
@@ -69,12 +77,30 @@ type storedBackup struct {
 type backupStore struct {
 	store   store.Store
 	records *records.Records
-	seal    cipher.AEAD
+	keys    func() controlKeys
 	now     func() time.Time
+	sealMu  sync.Mutex
+	seal    cipher.AEAD // the backups' key, once read or made
 }
 
-func newBackupStore(s store.Store, r *records.Records, controlKey []byte) (*backupStore, error) {
-	key, err := hkdf.Key(sha256.New, controlKey, nil, backupKeyInfo, 32)
+// storedDataKey is v1/backups.key: the backups' key, sealed with the current control key
+// and, for previousKeyKept after a rotation, with the previous one.
+type storedDataKey struct {
+	Sealed []sealedDataKey `json:"sealed"`
+}
+
+type sealedDataKey struct {
+	ControlKey []byte `json:"controlKey"` // the public key whose private key seals it
+	Data       []byte `json:"data"`
+}
+
+func newBackupStore(s store.Store, r *records.Records, keys func() controlKeys) *backupStore {
+	return &backupStore{store: s, records: r, keys: keys, now: time.Now}
+}
+
+// sealWith is AES-256-GCM under a key made from secret for info.
+func sealWith(secret []byte, info string) (cipher.AEAD, error) {
+	key, err := hkdf.Key(sha256.New, secret, nil, info, 32)
 	if err != nil {
 		return nil, err
 	}
@@ -82,11 +108,128 @@ func newBackupStore(s store.Store, r *records.Records, controlKey []byte) (*back
 	if err != nil {
 		return nil, err
 	}
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, err
+	return cipher.NewGCM(block)
+}
+
+// dataKey is the backups' key: read from the store, or made when there is none and create
+// is set (else nil). It is sealed again with the current control key when it is not yet,
+// and only the seals of the current and the previous control keys are kept.
+func (b *backupStore) dataKey(ctx context.Context, create bool) (cipher.AEAD, error) {
+	b.sealMu.Lock()
+	defer b.sealMu.Unlock()
+	if b.seal != nil {
+		return b.seal, nil
 	}
-	return &backupStore{store: s, records: r, seal: gcm, now: time.Now}, nil
+	keys := b.keys()
+	for range 3 {
+		o, err := b.store.Get(ctx, backupDataKey)
+		if err != nil {
+			return nil, err
+		}
+		var (
+			key  []byte
+			held storedDataKey
+			when = store.Absent
+		)
+		if o == nil {
+			if !create {
+				return nil, nil
+			}
+			key = make32()
+		} else {
+			if err := json.Unmarshal(o.Data, &held); err != nil {
+				return nil, fmt.Errorf("the backups' key is unreadable: %w", err)
+			}
+			if key = openDataKey(held, keys); key == nil {
+				return nil, errors.New("the backups' key opens with neither this control plane's key nor the previous one")
+			}
+			when = store.Matching(o.ETag)
+		}
+		if next, changed, err := sealDataKey(held, key, keys); err != nil {
+			return nil, err
+		} else if changed {
+			data, _ := json.MarshalIndent(next, "", "  ")
+			if _, err := b.store.Put(ctx, backupDataKey, data, when); store.IsConflict(err) {
+				continue
+			} else if err != nil {
+				return nil, err
+			}
+		}
+		seal, err := sealWith(key, backupDataInfo)
+		if err != nil {
+			return nil, err
+		}
+		b.seal = seal
+		return seal, nil
+	}
+	return nil, errors.New("the backups' key kept changing under this copy")
+}
+
+// keepDataKey seals the backups' key with the control key as it is now, after a
+// rotation or at start. A store with no backups' key yet is left without one.
+func (b *backupStore) keepDataKey(ctx context.Context) error {
+	b.sealMu.Lock()
+	b.seal = nil
+	b.sealMu.Unlock()
+	_, err := b.dataKey(ctx, false)
+	return err
+}
+
+func make32() []byte {
+	key := make([]byte, 32)
+	rand.Read(key)
+	return key
+}
+
+// dataKeyAD binds a seal of the backups' key to its place and to the control key.
+func dataKeyAD(public []byte) []byte { return append([]byte(backupDataKey+"\x00"), public...) }
+
+// openDataKey opens the backups' key with the current control key, else the previous one.
+func openDataKey(held storedDataKey, keys controlKeys) []byte {
+	for _, k := range [][2][]byte{{keys.private, keys.public}, {keys.previousPrivate, keys.previousPublic}} {
+		if k[0] == nil {
+			continue
+		}
+		seal, err := sealWith(k[0], backupDataInfo)
+		if err != nil {
+			continue
+		}
+		for _, s := range held.Sealed {
+			if !bytes.Equal(s.ControlKey, k[1]) || len(s.Data) < seal.NonceSize() {
+				continue
+			}
+			n := seal.NonceSize()
+			if key, err := seal.Open(nil, s.Data[:n], s.Data[n:], dataKeyAD(k[1])); err == nil {
+				return key
+			}
+		}
+	}
+	return nil
+}
+
+// sealDataKey is held with key sealed by the current control key, and with only the seals
+// of the current and the previous keys. changed says it differs from held.
+func sealDataKey(held storedDataKey, key []byte, keys controlKeys) (storedDataKey, bool, error) {
+	next := storedDataKey{}
+	for _, s := range held.Sealed {
+		if bytes.Equal(s.ControlKey, keys.public) {
+			next.Sealed = append([]sealedDataKey{s}, next.Sealed...)
+		} else if keys.previousPublic != nil && bytes.Equal(s.ControlKey, keys.previousPublic) {
+			next.Sealed = append(next.Sealed, s)
+		}
+	}
+	if len(next.Sealed) == 0 || !bytes.Equal(next.Sealed[0].ControlKey, keys.public) {
+		seal, err := sealWith(keys.private, backupDataInfo)
+		if err != nil {
+			return held, false, err
+		}
+		nonce := make([]byte, seal.NonceSize())
+		rand.Read(nonce)
+		mine := sealedDataKey{ControlKey: keys.public, Data: seal.Seal(nonce, nonce, key, dataKeyAD(keys.public))}
+		next.Sealed = append([]sealedDataKey{mine}, next.Sealed...)
+	}
+	changed := len(next.Sealed) != len(held.Sealed) || !bytes.Equal(next.Sealed[0].ControlKey, held.Sealed[0].ControlKey)
+	return next, changed, nil
 }
 
 // owner is the folder of the host's owner: the host's record's, else the control plane's.
@@ -158,23 +301,43 @@ func (b *backupStore) upload(ctx context.Context, owner, host string, p wire.Bac
 	} else if o != nil {
 		return fail(invalidParams, "The backup %s is complete already.", p.Name)
 	}
+	seal, err := b.dataKey(ctx, true)
+	if err != nil {
+		return err
+	}
 	key := partKey(folder, p.Name, p.Part)
-	_, err := b.store.Put(ctx, key, b.sealPart(key, p.Data), store.Always)
+	nonce := make([]byte, seal.NonceSize())
+	rand.Read(nonce)
+	_, err = b.store.Put(ctx, key, seal.Seal(nonce, nonce, p.Data, []byte(key)), store.Always)
 	return err
 }
 
-func (b *backupStore) sealPart(key string, data []byte) []byte {
-	nonce := make([]byte, b.seal.NonceSize())
-	rand.Read(nonce)
-	return b.seal.Seal(nonce, nonce, data, []byte(key))
-}
-
-func (b *backupStore) openPart(key string, sealed []byte) ([]byte, error) {
-	n := b.seal.NonceSize()
-	if len(sealed) < n {
-		return nil, errors.New("too short")
+// openPart opens a part with the backups' key, else, for a part from before it, with the
+// key made from the current control key or the previous one.
+func (b *backupStore) openPart(ctx context.Context, key string, sealed []byte) ([]byte, error) {
+	seals := []cipher.AEAD{}
+	if seal, err := b.dataKey(ctx, false); err == nil && seal != nil {
+		seals = append(seals, seal)
 	}
-	return b.seal.Open(nil, sealed[:n], sealed[n:], []byte(key))
+	keys := b.keys()
+	for _, control := range [][]byte{keys.private, keys.previousPrivate} {
+		if control == nil {
+			continue
+		}
+		if seal, err := sealWith(control, backupKeyInfo); err == nil {
+			seals = append(seals, seal)
+		}
+	}
+	for _, seal := range seals {
+		n := seal.NonceSize()
+		if len(sealed) < n {
+			continue
+		}
+		if data, err := seal.Open(nil, sealed[:n], sealed[n:], []byte(key)); err == nil {
+			return data, nil
+		}
+	}
+	return nil, errors.New("no key opens it")
 }
 
 // commit writes the backup's .json once every part is there, then keeps the newest keep
@@ -311,7 +474,7 @@ func (b *backupStore) download(ctx context.Context, owner string, r wire.BackupS
 	if o == nil {
 		return wire.BackupStorePart{}, fail(invalidParams, "Part %d of the backup %s is missing.", r.Part, r.ID)
 	}
-	data, err := b.openPart(key, o.Data)
+	data, err := b.openPart(ctx, key, o.Data)
 	if err != nil {
 		return wire.BackupStorePart{}, fail(internalError, "Part %d of the backup %s does not open with this control plane's key.", r.Part, r.ID)
 	}

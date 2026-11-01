@@ -29,10 +29,12 @@ func backupPlane(t *testing.T) (*backupStore, *store.Memory, string) {
 			t.Fatal(err)
 		}
 	}
-	b, err := newBackupStore(st, r, controllink.NewPrivateKey())
+	private := controllink.NewPrivateKey()
+	public, err := controllink.PublicKey(private)
 	if err != nil {
 		t.Fatal(err)
 	}
+	b := newBackupStore(st, r, func() controlKeys { return controlKeys{private: private, public: public} })
 	return b, st, *settings.Owner
 }
 
@@ -238,5 +240,49 @@ func TestTheSweepPrunesBackupsNoHostPrunes(t *testing.T) {
 	b.pruneOrphans(context.Background())
 	if keys, _ := st.List(context.Background(), backupsPrefix); len(keys) != 0 {
 		t.Fatalf("left %v", keys)
+	}
+}
+
+// H20261031-1: a part sealed before the backups' key, with the key made from the control
+// key, still opens; and a store copy carries the backups' key, so its parts open there.
+func TestBackupsFromBeforeTheirOwnKeyStillOpen(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	b, st, owner := backupPlane(t)
+	if _, err := putBackup(t, b, "a", "20261020T120000Z", [][]byte{[]byte("new")}, 3); err != nil {
+		t.Fatal(err)
+	}
+	if o, _ := st.Get(ctx, backupDataKey); o == nil {
+		t.Fatal("no backups' key was kept")
+	}
+	// A part as a build before the backups' key sealed it.
+	old, err := sealWith(b.keys().private, backupKeyInfo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	folder := b.hostFolder(owner, "a")
+	key := partKey(folder, "20261019T120000Z", 0)
+	nonce := make([]byte, old.NonceSize())
+	st.Put(ctx, key, old.Seal(nonce, nonce, []byte("old"), []byte(key)), store.Always)
+	data, _ := json.Marshal(storedBackup{Host: "a", Name: "20261019T120000Z", Parts: 1})
+	st.Put(ctx, folder+"20261019T120000Z.json", data, store.Always)
+
+	to := store.NewMemory()
+	if _, _, err := CopyStore(ctx, st, to); err != nil {
+		t.Fatal(err)
+	}
+	copiedRecords := records.New(to)
+	if err := copiedRecords.Load(ctx); err != nil {
+		t.Fatal(err)
+	}
+	copied := newBackupStore(to, copiedRecords, b.keys)
+	for id, want := range map[string]string{"a/20261020T120000Z": "new", "a/20261019T120000Z": "old"} {
+		out, err := copied.said("backups/download", "b", raw(t, wire.BackupStorePartRequest{ID: id, Part: 0}))
+		if err != nil {
+			t.Fatalf("%s does not open in the copy: %v", id, err)
+		}
+		if got := string(out.(wire.BackupStorePart).Data); got != want {
+			t.Fatalf("%s came back %q", id, got)
+		}
 	}
 }

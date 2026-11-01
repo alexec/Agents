@@ -12,6 +12,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controlplane/kms"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // #997 (spec 736 US9 AS3): an admin rotates the control key, and every client and
@@ -134,4 +135,68 @@ func TestTheNewKeyProofIsTheClientsOwn(t *testing.T) {
 	if got := controllink.B64URL(controllink.NewKeyProof(shared, key)); got != "v9-kYG-84IN39u6AMjxueMV9PJ0RFPVWlUAghG140Wg" {
 		t.Fatal(got)
 	}
+}
+
+// H20261031-1: a rotation of the control key never makes a server's backup unreadable.
+// A backup made before the rotation, and one made after it and before the restart, open
+// after the restart with the new key, and still open once the previous key is let go.
+func TestBackupsOpenAfterTheControlKeyIsRotated(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	root := t.TempDir()
+	keeper := kms.File{Path: filepath.Join(root, "control-key")}
+	key, err := keeper.ControlKey(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	withKeeper := func(c *Config) { c.KeyKeeper = keeper }
+	p := startPlaneWith(t, store.NewFolder(filepath.Join(root, "store")), key, withKeeper)
+	_, window := p.client("Window")
+	before, after := []byte("made before the rotation"), []byte("made after the rotation")
+	first, err := putBackup(t, p.s.backups, "a", "20261020T120000Z", [][]byte{before}, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	call(t, window, "", "control/rotate", map[string]any{})
+	second, err := putBackup(t, p.s.backups, "a", "20261020T130000Z", [][]byte{after}, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	window.Close()
+	p.s.Stop()
+
+	restart := func() *plane {
+		t.Helper()
+		next, err := keeper.ControlKey(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return startPlaneWith(t, store.NewFolder(filepath.Join(root, "store")), next, withKeeper)
+	}
+	opens := func(q *plane, when string) {
+		t.Helper()
+		for _, b := range []struct {
+			id   string
+			data []byte
+		}{{first.ID, before}, {second.ID, after}} {
+			out, err := q.s.backups.said("backups/download", "b", raw(t, wire.BackupStorePartRequest{ID: b.id, Part: 0}))
+			if err != nil {
+				t.Fatalf("%s, %s does not open: %v", when, b.id, err)
+			}
+			if !bytes.Equal(out.(wire.BackupStorePart).Data, b.data) {
+				t.Fatalf("%s, %s came back changed", when, b.id)
+			}
+		}
+	}
+	q := restart()
+	opens(q, "after the restart")
+
+	// Thirty days on, the previous key goes; the backups do not.
+	month := records.At(time.Now().Add(-previousKeyKept - time.Hour))
+	if _, err := q.s.records.ChangeSettings(ctx, func(s *records.Settings) { s.RotatedAt = &month }); err != nil {
+		t.Fatal(err)
+	}
+	q.s.dropPreviousKey(ctx)
+	q.s.Stop()
+	opens(restart(), "with the previous key let go")
 }

@@ -133,6 +133,10 @@ func (s *Service) rotate(ctx context.Context, from Caller) error {
 	}
 	s.setKeys(controlKeys{private: next, public: nextPublic, previousPrivate: old.private, previousPublic: old.public})
 	s.log("the control key was rotated; the previous one is accepted for 30 days")
+	// The backups' key, sealed with the new key, so the backups outlive the previous one.
+	if err := s.backups.keepDataKey(ctx); err != nil {
+		s.log("the backups' key could not be sealed with the new control key, and is at the next start: " + err.Error())
+	}
 	// The policy, signed with the new key, which each member is given as it connects again.
 	s.resignPolicy(ctx)
 	// Each member connects again, with the previous key, and is given the new one. After
@@ -156,6 +160,11 @@ func (s *Service) dropPreviousKey(ctx context.Context) {
 	}
 	s.rotating.Lock()
 	defer s.rotating.Unlock()
+	// Not while the backups' key is sealed only with the previous key: it would be lost.
+	if err := s.backups.keepDataKey(ctx); err != nil {
+		s.log("the previous control key is kept: the backups' key could not be sealed with this one: " + err.Error())
+		return
+	}
 	if _, err := s.records.ChangeSettings(ctx, func(settings *records.Settings) { settings.PreviousKey = nil }); err != nil {
 		s.log("could not forget the previous control key: " + err.Error())
 		return
