@@ -272,35 +272,29 @@ private struct FolderGeneralPane: View {
                             }
                         }
                     }
-                    row("Helpers running") {
+                    // Rules of the policy now (#2957, FR-015, FR-023): what applies here, and where
+                    // to change it. Folder Settings ▸ Policy sets this folder's own (slice 5).
+                    row("Helpers") {
                         VStack(alignment: .leading, spacing: 6) {
-                            helperLimit(\.running, in: summary, default: HelperLimit.defaultRunning,
-                                        upTo: min(HelperLimit.maximumRunning, summary.helperLimits.notArchived),
-                                        cap: helperCaps(summary)?.mostRunning)
-                            // The organisation's cap is lower: it is the one used (#998).
+                            Text("\(summary.helperLimits.running) running, \(summary.helperLimits.notArchived) not archived")
+                                .monospacedDigit()
                             if let mark = summary.helperLimitsSetBy { OrgPolicyLine(mark: mark) }
-                        }
-                    }
-                    row("Helpers not archived") {
-                        VStack(alignment: .leading, spacing: 6) {
-                            helperLimit(\.notArchived, in: summary, default: HelperLimit.defaultNotArchived,
-                                        upTo: HelperLimit.maximumNotArchived,
-                                        from: summary.helperLimits.running,
-                                        cap: helperCaps(summary)?.mostNotArchived)
+                            Text("Set in Settings ▸ Agents ▸ Policy.")
+                                .appText(.fine)
+                                .foregroundStyle(.secondary)
                         }
                     }
                     row("Helpers queued") {
                         VStack(alignment: .leading, spacing: 6) {
                             helperLimit(\.queued, in: summary, default: HelperLimit.defaultQueued,
                                         upTo: HelperLimit.maximumQueued)
-                            Text("How many sessions that other sessions started may be running at once, how "
-                                 + "many may be kept until you archive them, and how many more may wait to "
-                                 + "start, oldest first, when a place frees. Agents can't change these.")
+                            Text("How many more sessions that other sessions started may wait to start, "
+                                 + "oldest first, when a place frees. Agents can't change this.")
                                 .appText(.fine)
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
                             // They go with the folder (#126), so say where.
-                            Text("These and Helpers archived are saved in .agents/folder.json, a file in "
+                            Text("This and Helpers archived are saved in .agents/folder.json, a file in "
                                  + "this folder you may commit.")
                                 .appText(.fine)
                                 .foregroundStyle(.secondary)
@@ -391,15 +385,8 @@ private struct FolderGeneralPane: View {
 
     /// One helper limit (#64) as a menu of the numbers it may be, its default marked and
     /// choosing it putting the folder back to the default.
-    /// The organisation's caps over a folder's helper limits (#998), as this Mac's host follows
-    /// them. A server says its own when it refuses a number.
-    private func helperCaps(_ summary: DaemonAPI.FolderSummary) -> DaemonAPI.PolicyHelpers? {
-        summary.host == .mac ? model.policyState?.policy?.helpers : nil
-    }
-
     private func helperLimit(_ key: WritableKeyPath<HelperLimits, Int?>, in summary: DaemonAPI.FolderSummary,
-                             default standard: Int, upTo maximum: Int, from minimum: Int = 1,
-                             cap: Int? = nil) -> some View {
+                             default standard: Int, upTo maximum: Int, from minimum: Int = 1) -> some View {
         let kept = summary.folder.helperLimits ?? HelperLimits()
         let current = kept[keyPath: key] ?? standard
         return Picker("", selection: Binding(get: { current }, set: { chosen in
@@ -408,9 +395,7 @@ private struct FolderGeneralPane: View {
             Task { await model.setHelperLimits(limits, for: summary.key) }
         })) {
             ForEach(Array(Swift.min(minimum, current)...Swift.max(maximum, current)), id: \.self) { number in
-                // Above the organisation's cap: shown, not chosen (#998).
                 Text(number == standard ? "\(number) (default)" : "\(number)").tag(number)
-                    .disabled(cap.map { number > $0 } ?? false)
             }
         }
         .labelsHidden()

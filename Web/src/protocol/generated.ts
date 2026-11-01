@@ -9205,6 +9205,11 @@ export interface YourPolicyState {
   policy: YourPolicy;
   keeper: PolicyKeeper;
   pinnedKeyID?: string;
+  /**
+   * The signed copy, when this machine keeps one (#2957): the Mac window passes it to a server over
+   * its direct link with policy/applyYours (research R3, path 2).
+   */
+  signed?: SignedYourPolicy;
 }
 
 /** Every method the web remote may call: its params and its result. */
@@ -10732,5 +10737,5 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorktreesSized: { required: ["sizes"], optional: [] },
   WriteFailure: { required: ["cause", "what", "message"], optional: ["path"] },
   YourPolicy: { required: ["rules", "revision", "changed", "person", "keeper"], optional: ["changedFrom"] },
-  YourPolicyState: { required: ["policy", "keeper"], optional: ["pinnedKeyID"] },
+  YourPolicyState: { required: ["policy", "keeper"], optional: ["pinnedKeyID", "signed"] },
 };

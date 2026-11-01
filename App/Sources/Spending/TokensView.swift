@@ -6,7 +6,7 @@ import SwiftUI
 /// look for one question.
 ///
 /// A page in the detail column, picked from Usage in the sidebar. Read-only: the limits
-/// are set in Settings ▸ Cost.
+/// are set in Settings ▸ Agents ▸ Policy (#2957).
 struct TokensView: View {
     @Environment(AppModel.self) private var model
 

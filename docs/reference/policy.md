@@ -14,6 +14,15 @@ The types are in `Packages/Wire/daemon.schema.json` (`OrgPolicy`, `SignedPolicy`
 `PolicySignature`, `PolicyRefusal`, `PolicySetBy`), and the methods in
 `Packages/Wire/control.openrpc.json`.
 
+The organisation's policy is the top layer of three: Organisation, You and Folder (#2957).
+Each layer can only make a rule tighter. See [Policy layers](../explanation/policy-layers.md).
+`policy/effective` (on a machine, `host.policy-layers/1`) gives each rule's effective value,
+every layer's value, the layer that decides, and, for the layer a client edits, its `cap`
+and `capLine` (such as `Your organisation: at most Approve for me`). With no folder, it
+also lists the folders that set rules of their own (`foldersWithRules`). `policy/yours`
+gives your layer and, on the machine that keeps it, its signed copy (`signed`), which the
+Mac window passes to a server with `policy/applyYours`.
+
 ## The rules
 
 | Field | Values | What it does |

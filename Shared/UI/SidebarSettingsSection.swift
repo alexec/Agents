@@ -2,7 +2,8 @@ import AgentsKitCore
 import SwiftUI
 
 /// Settings ▸ You ▸ Sidebar (#846, #2079): a switch for each smart group, and whether agents
-/// may archive the chats the person starts (#1802).
+/// may archive the chats the person starts (#1802). On the Mac the switch is a rule of Agents ▸
+/// Policy (#2957, FR-023); the Remote keeps it here until its Policy pane (FR-027).
 /// All are kept on the Mac's host, so every
 /// client shows the same (#1033). The Mac's Settings window and the Remote's Settings screen
 /// draw the same section; the web page has the same two sections under You.
@@ -12,6 +13,7 @@ struct SidebarSettingsSection: View {
     /// same; the host reads it when a chat you started ends (#1802).
     @AppStorage(DisplayPreference.agentsMayArchiveMyChats, store: WindowDefaults.store)
     private var mayArchive = DisplayPreference.agentsMayArchiveMyChatsDefault
+    var showsArchiveSwitch = true
 
     var body: some View {
         Section {
@@ -34,6 +36,10 @@ struct SidebarSettingsSection: View {
         }
         .paperListRow()
 
+        if showsArchiveSwitch { archiveSwitch }
+    }
+
+    private var archiveSwitch: some View {
         Section {
             Toggle("Agents may archive the chats I start", isOn: $mayArchive)
         } header: {

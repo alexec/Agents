@@ -14,7 +14,8 @@ export const setBy = "Set by your organisation";
 /** The titles of a limit from the person's own layer and from a folder's (#2957, #3150). */
 export const setByYou = "Set by you";
 export const setByFolder = "Set by this folder";
-export const title = "Policy";
+/** Was Policy: there are two policy panes now (#2957, FR-024). */
+export const title = "Organisation Policy";
 export const none = "Your organisation sets no policy.";
 export const editPolicy = "Edit Policy";
 export const editInPeople = "Edit in People";
