@@ -8859,6 +8859,264 @@
       ],
       "additionalProperties": false
     },
+    "ForgeCheck": {
+      "type": "object",
+      "description": "One of a pull request's checks (#3129): a check run or a commit status. state is passing, failing, running or skipped; url is its page on the forge.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeComment": {
+      "type": "object",
+      "description": "A comment on an issue or a pull request (#3129), as Markdown. bot says a bot or an app wrote it.",
+      "properties": {
+        "author": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "url": {
+          "type": "string"
+        },
+        "bot": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "author",
+        "body",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeItem": {
+      "type": "object",
+      "description": "An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for GitHub, GitLab and Linear, so one page draws each. node is its lineage node (kind issue or pr, ref github:alexec/Agents#12). state is open, closed or merged. folder is a folder on this machine on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own fields: draft; checks is passing, failing, running or none; review is approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown; autoMerge says auto-merge is on.",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "title": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "folder": {
+          "type": "string"
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ForgeLabel"
+          }
+        },
+        "author": {
+          "type": "string"
+        },
+        "assignees": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "milestone": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "comments": {
+          "type": "integer"
+        },
+        "draft": {
+          "type": "boolean"
+        },
+        "checks": {
+          "type": "string"
+        },
+        "review": {
+          "type": "string"
+        },
+        "mergeable": {
+          "type": "string"
+        },
+        "autoMerge": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "node",
+        "title",
+        "state",
+        "labels",
+        "assignees",
+        "updatedAt",
+        "comments"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeItemDetail": {
+      "type": "object",
+      "description": "forge/issue and forge/pull (#3129): one item with its body (Markdown) and a page of its comments, the newest page first and at most 50, oldest first in the page; cursor is the page before it, absent at the first comment. A pull request's checks, review threads (line comments, in threads) and files changed come with it.",
+      "properties": {
+        "item": {
+          "$ref": "#/definitions/ForgeItem"
+        },
+        "body": {
+          "type": "string"
+        },
+        "comments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ForgeComment"
+          }
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ForgeCheck"
+          }
+        },
+        "reviewThreads": {
+          "type": "integer"
+        },
+        "filesChanged": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "item",
+        "body",
+        "comments"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeItemRequest": {
+      "type": "object",
+      "description": "forge/issue and forge/pull (#3129): the item's lineage node, and for an older page of its comments the cursor of the page after it.",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "cursor": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "node"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeLabel": {
+      "type": "object",
+      "description": "A label on an issue or a pull request (#3129), with its #rrggbb colour where the forge gives one (#2956).",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "color": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeList": {
+      "type": "object",
+      "description": "forge/issues and forge/pulls (#3129): a page of items, the last updated first. cursor is the next page, absent at the end. errors says a forge that could not be read (not connected, a rate limit), and the items of the others still come.",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ForgeItem"
+          }
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ForgeListError"
+          }
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeListError": {
+      "type": "object",
+      "description": "A forge forge/issues or forge/pulls could not read (#3129): forge is github, gitlab or linear.",
+      "properties": {
+        "forge": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "forge",
+        "message"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeListRequest": {
+      "type": "object",
+      "description": "forge/issues and forge/pulls (#3129): the issues or pull requests of every folder on this machine, or of one folder's repo. state is open (when not said), closed or all; a closed pull request includes a merged one. label, assignee (a login) and query (words in the title or body) narrow the list. limit is 1 to 100, 50 when not said; cursor is the last page's.",
+      "properties": {
+        "folder": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "assignee": {
+          "type": "string"
+        },
+        "query": {
+          "type": "string"
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false
+    },
     "ForgeLogins": {
       "type": "object",
       "description": "people/setForgeLogins (#2951): the caller's own GitHub, GitLab and Linear logins, for Settings ▸ You, replacing what was kept; blank clears one.",

@@ -43,6 +43,7 @@ func (d *Daemon) register() {
 	d.registerEventWaits()
 	d.registerCost()
 	d.registerLineage()
+	d.registerForge()
 	d.registerDevices()
 	d.registerAllowances()
 	d.registerAccounts()

@@ -96,6 +96,7 @@ type Daemon struct {
 	localBook
 	connectionBook
 	setupBook
+	forgeBook
 	orgPolicyState
 	orgRouteState
 	// pageEdits is what the person changed on live pages since each agent's last turn.

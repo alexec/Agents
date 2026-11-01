@@ -3677,6 +3677,86 @@
       }
     },
     {
+      "name": "forge/issue",
+      "x-capability": "forge/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ForgeItemRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ForgeItemDetail"
+        }
+      }
+    },
+    {
+      "name": "forge/issues",
+      "x-capability": "forge/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ForgeListRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ForgeList"
+        }
+      }
+    },
+    {
+      "name": "forge/pull",
+      "x-capability": "forge/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ForgeItemRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ForgeItemDetail"
+        }
+      }
+    },
+    {
+      "name": "forge/pulls",
+      "x-capability": "forge/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ForgeListRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ForgeList"
+        }
+      }
+    },
+    {
       "name": "git/fill",
       "x-capability": "git/1",
       "description": "Asked by the control plane on the lending host's channel 0, for a lend a person allowed (#1122).",
