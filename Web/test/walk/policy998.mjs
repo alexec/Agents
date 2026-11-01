@@ -66,7 +66,7 @@ const admin = await paired(webURL, setterCode, "policy998 admin");
 const me = { user: "walk" };
 const policy = {
   version: 0, issued: 0, changedBy: me, requires: ["host.policy/1"],
-  modeCeiling: "acceptEdits",
+  permissionMode: "approveForMe",
   sandbox: "required",
   runtimes: { claude: { models: ["claude-sonnet-*"] }, codex: {} },
   marketplaces: { allowed: [], customServers: "refuse" },

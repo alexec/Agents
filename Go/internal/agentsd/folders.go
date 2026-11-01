@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -264,12 +265,28 @@ func configWriteError(err error) error {
 	return &Error{Code: CodeInternal, Message: ".agents/folder.json could not be written: " + err.Error()}
 }
 
-// helperLimitsProblem checks queued only: running and notArchived are rules now (#2957,
-// FR-015), set in the folder's own policy layer (policy/setFolder), and setHelperLimits
-// clears them before this runs.
+// helperLimitsProblem is why the limits may not be set. running and notArchived are rules
+// now (#2957, FR-015): setHelperLimits keeps them in the folder's own policy layer, not in
+// .agents/folder.json.
 func helperLimitsProblem(l wire.HelperLimits) string {
+	if l.Running != nil && (*l.Running < 1 || *l.Running > 10) {
+		return "Running helpers must be between 1 and 10."
+	}
+	if l.NotArchived != nil && (*l.NotArchived < 1 || *l.NotArchived > 20) {
+		return "Helpers not yet archived must be between 1 and 20."
+	}
 	if l.Queued != nil && (*l.Queued < 1 || *l.Queued > 20) {
 		return "Queued helpers must be between 1 and 20."
+	}
+	running, places := int64(defaultHelpersRunning), int64(defaultHelpersNotArchived)
+	if l.Running != nil {
+		running = *l.Running
+	}
+	if l.NotArchived != nil {
+		places = *l.NotArchived
+	}
+	if running > places {
+		return fmt.Sprintf("Running helpers (%d) cannot be more than helpers not yet archived (%d).", running, places)
 	}
 	return ""
 }
@@ -279,9 +296,6 @@ func (d *Daemon) setHelperLimits(r wire.SetHelperLimitsRequest) (wire.FolderSumm
 	if _, ok := d.summaryFor(folder); !ok {
 		return wire.FolderSummary{}, noSuchFolder(folder + " is not a folder.")
 	}
-	// running and notArchived are rules now, set in the folder's own policy layer
-	// (policy/setFolder, #2957, FR-015): this method no longer writes them.
-	r.Limits.Running, r.Limits.NotArchived = nil, nil
 	if why := helperLimitsProblem(r.Limits); why != "" {
 		return wire.FolderSummary{}, Invalid("%s", why)
 	}
@@ -294,9 +308,15 @@ func (d *Daemon) setHelperLimits(r wire.SetHelperLimitsRequest) (wire.FolderSumm
 	if !d.settled(folder, ".agents/folder.json") {
 		return wire.FolderSummary{}, guardedRefusal(".agents/folder.json", "The helper limits were not changed: ")
 	}
+	// running and notArchived are rules now (#2957, FR-015): they go to the folder's own
+	// policy layer (.agents/policy.json), and .agents/folder.json keeps the rest (#3149).
+	if err := d.setFolderHelperRules(folder, r.Limits.Running, r.Limits.NotArchived); err != nil {
+		return wire.FolderSummary{}, err
+	}
 	defer d.approveWrite(folder, ".agents/folder.json")
 	// HelperLimits.orNilIfDefault: the switch at its default is no choice at all.
 	l := r.Limits
+	l.Running, l.NotArchived = nil, nil
 	if l.AgentsMayArchive != nil && *l.AgentsMayArchive {
 		l.AgentsMayArchive = nil
 	}
@@ -321,6 +341,26 @@ func (d *Daemon) setHelperLimits(r wire.SetHelperLimitsRequest) (wire.FolderSumm
 		d.editRecord(folder, func(p *wire.Folder) { p.HelperLimits = nil })
 	}
 	return d.sendFolder(folder)
+}
+
+// setFolderHelperRules writes helpers.mostRunning and helpers.mostNotArchived into the
+// folder's own policy layer, leaving its other rules as they are; nil is no choice (the
+// default). Nothing is written when they are already so.
+func (d *Daemon) setFolderHelperRules(folder string, running, notArchived *int64) error {
+	rules := d.folderApprovedRules(folder)
+	var was wire.PolicyHelpers
+	if rules.Helpers != nil {
+		was = *rules.Helpers
+	}
+	if sameInt(was.MostRunning, running) && sameInt(was.MostNotArchived, notArchived) {
+		return nil
+	}
+	rules.Helpers = nil
+	if running != nil || notArchived != nil {
+		rules.Helpers = &wire.PolicyHelpers{MostRunning: running, MostNotArchived: notArchived}
+	}
+	_, err := d.setFolderPolicy(wire.SetFolderPolicyRequest{Folder: store.FolderURL(folder), Rules: rules})
+	return err
 }
 
 func diskSpaceProblem(t wire.DiskThresholds) string {

@@ -20,6 +20,8 @@ struct LineagePage: View {
     @State private var graph: DaemonAPI.LineageGraph?
     @State private var costs: [DaemonAPI.LineageNode: DaemonAPI.LineageCostRollup] = [:]
     @State private var failure: String?
+    /// The daemon is still resolving titles and the graph is walked again each second.
+    @State private var reading = false
     @State private var asked = 0
 
     private var place: LineagePlace? { model.lineageHistory.current }
@@ -78,8 +80,19 @@ struct LineagePage: View {
     private func startTyped() {
         guard let node = LineageList.node(typed: typed) else { typedWrong = true; return }
         let host = node.kind == "session" ? sessionHost(node) ?? model.lineageHost : model.lineageHost
-        model.lineageHistory.go(LineagePlace(host: host, node: node))
+        let pr = LineageList.pullRequest(typed: typed)
         typed = ""
+        guard let pr else { model.lineageHistory.go(LineagePlace(host: host, node: node)); return }
+        // "owner/repo#12" is an issue or a pull request (#3148): the pull request when only it has links.
+        Task {
+            var start = node
+            if await !linked(node, on: host), await linked(pr, on: host) { start = pr }
+            model.lineageHistory.go(LineagePlace(host: host, node: start))
+        }
+    }
+
+    private func linked(_ node: DaemonAPI.LineageNode, on host: MachineRef) async -> Bool {
+        (try? await model.lineageWalk(node, on: host).links.isEmpty == false) ?? false
     }
 
     @ViewBuilder
@@ -117,6 +130,7 @@ struct LineagePage: View {
                 .appText(.reading).fontWeight(.semibold)
                 .lineLimit(1)
                 .truncationMode(.middle)
+                .help(row.ref ?? row.name)
             Text(([LineageLayout.kindWord(row.node.kind)] + [row.cost, row.resolved].compactMap { $0 })
                 .joined(separator: " · "))
                 .appText(.supporting)
@@ -136,6 +150,10 @@ struct LineagePage: View {
 
     private var footer: some View {
         VStack(alignment: .leading, spacing: 2) {
+            if reading {
+                Text(LineageList.readingTitles)
+                    .appText(.fine).foregroundStyle(.secondary)
+            }
             if graph?.limited == true {
                 Text("The walk stopped at its limit: there are more links.")
                     .appText(.fine).foregroundStyle(.secondary)
@@ -170,6 +188,7 @@ struct LineagePage: View {
     }
 
     private func load() async {
+        reading = false
         graph = nil
         failure = nil
         costs = [:]
@@ -191,13 +210,21 @@ struct LineagePage: View {
             costs = found
             // The daemon resolves issues' and PRs' titles in the background (#3102): walk
             // again while it says some are still to come.
+            // One failed walk keeps the graph that is shown and stops asking (#3154).
             var latest = walked
+            reading = latest.resolving == true
             for _ in 0 ..< LineageList.resolvingAsks where latest.resolving == true {
-                try await Task.sleep(for: .seconds(1))
-                latest = try await model.lineageWalk(place.node, on: place.host)
+                do {
+                    try await Task.sleep(for: .seconds(1))
+                    latest = try await model.lineageWalk(place.node, on: place.host)
+                } catch {
+                    break
+                }
                 guard !Task.isCancelled else { return }
                 graph = latest
             }
+            guard !Task.isCancelled else { return }
+            reading = false
         } catch {
             guard !Task.isCancelled else { return }
             failure = "The links could not be read: \(error.localizedDescription)"

@@ -10,6 +10,8 @@ export const lineageDepth = 2;
 
 /** How many times, a second apart, the pane walks again while the daemon is still resolving titles (#3102). */
 export const resolvingAsks = 20;
+/** Under the graph while those walks go on (#3154). */
+export const readingTitles = "Reading titles…";
 
 export const sessionNode = (id: string): LineageNode => ({ kind: "session", ref: `session:${id}` });
 
@@ -18,8 +20,10 @@ const same = (a: LineageNode, b: LineageNode) => a.kind === b.kind && a.ref === 
 
 export interface LineageRow {
   node: LineageNode;
-  /** "alexec/agents#12", or the session's title. */
+  /** "alexec/agents#12", "#12 Fix the flaky test" once resolved (#3158), or the session's title. */
   name: string;
+  /** "alexec/agents#12", for a resolved node whose name is its title: the help shows it. */
+  ref?: string | undefined;
   /** One line per link to it: "This session works on it · from the branch". */
   links: string[];
   /** "$4.00 · 12m working · merged", for an issue or a PR whose cost has come. */
@@ -100,8 +104,19 @@ export function startRow(start: LineageNode, graph: LineageGraph, costs: Readonl
 }
 
 function names(start: LineageNode, graph: LineageGraph, title: (n: LineageNode) => string | undefined) {
-  return (n: LineageNode) => same(n, start) && n.kind === "session" ? "This session"
-    : title(n) ?? graph.resolved?.[n.ref]?.title ?? nodeName(n);
+  return (n: LineageNode) => {
+    if (same(n, start) && n.kind === "session") return "This session";
+    const own = title(n);
+    if (own !== undefined) return own;
+    const resolved = graph.resolved?.[n.ref]?.title;
+    return resolved ? `${refNumber(nodeName(n))} ${resolved}` : nodeName(n);
+  };
+}
+
+/** "#12" from "alexec/agents#12"; a ref with no number, such as "ENG-4", as it is (#3158). */
+function refNumber(ref: string): string {
+  const hash = ref.lastIndexOf("#");
+  return hash < 0 ? ref : ref.slice(hash);
 }
 
 function row(n: LineageNode, graph: LineageGraph, costs: ReadonlyMap<string, LineageCostRollup>, name: (n: LineageNode) => string,
@@ -109,6 +124,7 @@ function row(n: LineageNode, graph: LineageGraph, costs: ReadonlyMap<string, Lin
   const rollup = costs.get(key(n));
   return {
     node: n, name: name(n),
+    ref: graph.resolved?.[n.ref]?.title && name(n) !== nodeName(n) ? nodeName(n) : undefined,
     links: graph.links.filter((l) => same(l.from, n) || same(l.to, n)).map((l) => linkLine(l, n, start, name)),
     cost: rollup && costLine(rollup),
     resolved: resolvedLine(graph.resolved?.[n.ref]),
@@ -246,8 +262,8 @@ export const noLineageHere = "No links from here yet. Start from another session
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** The start a person typed on the Lineage page (#3087), as LineageList.node(typed:) has it: a GitHub address of
- * an issue, a pull request, a milestone or a release; "owner/repo#12" (an issue); "github:owner/repo#12"; or a
- * session's id. Undefined for anything else. */
+ * an issue, a pull request, a milestone or a release; "owner/repo#12" (an issue, or the pull request of
+ * typedPullRequest); "github:owner/repo#12"; or a session's id. Undefined for anything else. */
 export function typedNode(text: string): LineageNode | undefined {
   text = text.trim();
   const id = text.startsWith("session:") ? text.slice("session:".length) : text;
@@ -270,6 +286,16 @@ export function typedNode(text: string): LineageNode | undefined {
   }
   const bare = text.startsWith("github:") ? text.slice("github:".length) : text;
   return /^[^/#\s]+\/[^/#\s]+#\d+$/.test(bare) ? { kind: "issue", ref: `github:${bare}` } : undefined;
+}
+
+/** The pull request that "owner/repo#12" may be (#3148), as LineageList.pullRequest(typed:) has it: GitHub gives
+ * issues and pull requests one number space, so the bare form is either. The page walks it when the issue has no
+ * links. Undefined for any other start. */
+export function typedPullRequest(text: string): LineageNode | undefined {
+  text = text.trim();
+  if (text.includes("://")) return undefined;
+  const node = typedNode(text);
+  return node?.kind === "issue" ? { kind: "pr", ref: node.ref } : undefined;
 }
 
 /** Where the Lineage page's walk starts (#3087), and the starts before and after it, as a browser's Back and

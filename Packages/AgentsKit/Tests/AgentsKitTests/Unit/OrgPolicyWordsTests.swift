@@ -78,6 +78,28 @@ struct OrgPolicyWordsTests {
         #expect(OrgPolicyWords.line(mark) == "Set by your organisation. Your organisation allows modes up to Accept Edits.")
     }
 
+    @Test func aLimitFromYourOwnOrAFoldersLayerSaysThatLayer() throws {
+        // #3150: the title and symbol come from the layer that decided, not always the organisation.
+        let you = DaemonAPI.PolicyLayerRef(kind: "you", name: "You")
+        let folder = DaemonAPI.PolicyLayerRef(kind: "folder", name: "web", folder: "/src/web")
+        let mine = DaemonAPI.PolicySetBy(by: "you", rule: "modeCeiling", words: "At most Approve.", layer: you)
+        #expect(OrgPolicyWords.line(mine) == "Set by you. At most Approve.")
+        #expect(mine.symbol == "person")
+        let folders = DaemonAPI.PolicySetBy(by: "folder", rule: "modeCeiling", words: "At most Approve.", layer: folder)
+        #expect(OrgPolicyWords.line(folders) == "Set by this folder. At most Approve.")
+        #expect(folders.symbol == "folder")
+        #expect(DaemonAPI.PolicySetBy(rule: "modeCeiling", words: "x").symbol == OrgPolicyWords.symbol)
+
+        let error = JSONRPCError(code: -32076, message: "web: At most Approve.",
+                                 data: ["reason": "policy", "rule": "modeCeiling", "words": "At most Approve.",
+                                        "layer": ["kind": "folder", "name": "web", "folder": "/src/web"],
+                                        "value": "At most Approve."])
+        let refusal = try #require(DaemonAPI.PolicyRefusal(error: error))
+        #expect(refusal.line == "Set by this folder. At most Approve.")
+        #expect(refusal.symbol == "folder")
+        #expect(DaemonAPI.PolicyRefusal(reason: "policy", words: "x", layer: you).title == "Set by you")
+    }
+
     @Test func aPolicyRefusalIsReadFromItsError() {
         let error = JSONRPCError(code: -32076, message: "Set by your organisation. Your organisation does not allow Codex.",
                                  data: ["reason": "policy", "rule": "runtimes", "words": "Your organisation does not allow Codex."])

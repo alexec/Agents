@@ -108,8 +108,15 @@ public extension StatusShape {
     /// stopped agent says why, and a running one names its tool (#2261).
     static func words(_ shape: StatusShape, state: AgentState, isComingBack: Bool, outcome: WorkOutcome?,
                       isUnaccountedFor: Bool, ending: String?, isUnread: Bool,
-                      isWaitingForAllowance: Bool = false, tool: String? = nil) -> String {
+                      isWaitingForAllowance: Bool = false, tool: String? = nil,
+                      personLine: String? = nil) -> String {
         if isComingBack { return AgentsModel.comingBackDescription }
+        // A wait only the person can settle says what it asks of them (#3147), where an
+        // outcome's heading would say Finished. A question's own heading still wins.
+        if shape == .needsYou, state == .finished, !isUnaccountedFor, outcome?.needsAPerson != true,
+           let personLine {
+            return isUnread ? "Unread · \(personLine)" : personLine
+        }
         if isUnread && state == .finished { return "Unread · \(outcome?.heading ?? "Finished")" }
         if isWaitingForAllowance { return "Waiting for an allowance" }
         if state == .queued { return HelperLimit.queuedLabel(position: nil) }
@@ -133,11 +140,13 @@ public extension StatusShape {
               outcome: agent.report?.outcome, isUnaccountedFor: agent.endingIsUnaccountedFor,
               ending: agent.endedReason?.summary, isUnread: agent.isUnread,
               isWaitingForAllowance: agent.continueWhenBack != nil,
-              tool: agent.state == .running ? agent.runningTool : nil)
+              tool: agent.state == .running ? agent.runningTool : nil,
+              personLine: agent.eventWait?.personLine)
     }
 
     /// The single grey line for a session under Needs You: its pending question, why it
-    /// stopped, or why its finished turn has no report. The report returns when the row
+    /// stopped, why its finished turn has no report, or what a wait for the person asks
+    /// of them (#3147). The report returns when the row
     /// leaves Needs You (#1324).
     static func needsYouLine(row agent: Agent, isComingBack: Bool = false, question: String? = nil) -> String? {
         guard StatusShape(row: agent, isComingBack: isComingBack) == .needsYou else { return nil }
@@ -148,6 +157,7 @@ public extension StatusShape {
         }
         if agent.state == .stopped, let summary = agent.endedReason?.summary { return summary }
         if agent.endingIsUnaccountedFor { return "Finished without saying how it went" }
+        if agent.report?.outcome.needsAPerson != true, let line = agent.eventWait?.personLine { return line }
         return nil
     }
 

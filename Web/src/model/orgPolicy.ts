@@ -3,13 +3,17 @@
 // are OrgPolicyWords (Packages/AgentsKit/.../Model/OrgPolicy.swift) on the Mac and the Remote; the
 // same here, for Settings ▸ Policy and Console ▸ Policy. Below them, the Console's form: the policy
 // as fields an admin types in, back to a policy, and what a change does before it is saved.
-import type { AuditActor, CostLimits, FleetMachine, OrgPolicy, PolicyBudgets, PolicyReach, PolicyRefusal, PolicyRuntimeRule, PolicySetBy, PolicyState, PolicyStopAll,
+import type { AuditActor, CostLimits, FleetMachine, OrgPolicy, PolicyBudgets, PolicyLayerRef, PolicyReach, PolicyRefusal, PolicyRuntimeRule, PolicySetBy, PolicyState, PolicyStopAll,
   PolicyView, WireDate }
   from "../protocol/generated";
 import type { CallFailed } from "../wire/link";
 import { Failure } from "../protocol/generated";
+import { levelsOf, levelWords } from "./levels";
 
 export const setBy = "Set by your organisation";
+/** The titles of a limit from the person's own layer and from a folder's (#2957, #3150). */
+export const setByYou = "Set by you";
+export const setByFolder = "Set by this folder";
 export const title = "Policy";
 export const none = "Your organisation sets no policy.";
 export const editPolicy = "Edit Policy";
@@ -58,12 +62,10 @@ export function stoppedBy(stop: PolicyStopAll, at: Date, now: Date): string {
   return `Stopped by ${actorName(stop.by)} ${when(at, now)}.`;
 }
 
-export type ModeName = NonNullable<OrgPolicy["modeCeiling"]>;
-/** The modes by ModeLooseness rank, tightest first. */
-export const modes: readonly ModeName[] = ["ask", "default", "acceptEdits", "auto", "bypassPermissions"];
-export const modeNames: Record<ModeName, string> = {
-  ask: "Ask", default: "Default", acceptEdits: "Accept Edits", auto: "Auto", bypassPermissions: "Bypass Permissions",
-};
+export type ModeName = NonNullable<OrgPolicy["permissionMode"]>;
+/** The permission modes, tightest first, in the words Auto's permission field uses (#2658). */
+export const modes = levelsOf("permission") as readonly ModeName[];
+export const modeNames = Object.fromEntries(modes.map((m) => [m, levelWords("permission", m)])) as Record<ModeName, string>;
 
 /** RuntimeCatalog's runtimes, by name, for a runtime this page may not be told about. */
 export const runtimeNames: Record<string, string> = {
@@ -172,7 +174,7 @@ export function helperWords(h: { mostRunning?: number; mostNotArchived?: number 
 /** Each rule the policy sets, in words, in the pane's order. Empty for a policy that sets none. */
 export function rules(p: OrgPolicy): Rule[] {
   const out: Rule[] = [];
-  if (p.modeCeiling) out.push({ name: "modeCeiling", title: "Modes", words: `Up to ${modeNames[p.modeCeiling] ?? p.modeCeiling}` });
+  if (p.permissionMode) out.push({ name: "permissionMode", title: "Modes", words: `Up to ${modeNames[p.permissionMode] ?? p.permissionMode}` });
   if (p.sandbox === "required") out.push({ name: "sandbox", title: "Command sandbox", words: "Required" });
   if (p.runtimes) {
     out.push({ name: "runtimes", title: "Runtimes", words: runtimeWords(p.runtimes) });
@@ -212,9 +214,19 @@ export function viewOf(policy: OrgPolicy | undefined): PolicyView {
   return policy ? { policy } : {};
 }
 
-/** The line under a refused choice: the mark's words under **Set by your organisation**. */
+/** The title for the layer that decided (PolicyLayerRef.kind): the organisation's when none is named (#3150). */
+export function layerTitle(kind: PolicyLayerRef["kind"] | undefined): string {
+  return kind === "you" ? setByYou : kind === "folder" ? setByFolder : setBy;
+}
+
+/** A mark's title: **Set by you**, **Set by this folder** or **Set by your organisation**. */
+export function markTitle(mark: PolicySetBy): string {
+  return layerTitle(mark.layer?.kind ?? mark.by);
+}
+
+/** The line under a refused choice: the mark's words under its layer's title. */
 export function line(mark: PolicySetBy): string {
-  return `${setBy}. ${mark.words}`;
+  return `${markTitle(mark)}. ${mark.words}`;
 }
 
 /** The organisation's budgets in force for this person today (CostState.organisation), as rows on Cost. */
@@ -250,9 +262,9 @@ export function refusalOf(error: unknown): PolicyRefusal | null {
   return data as PolicyRefusal;
 }
 
-/** A refusal as one line: **Set by your organisation** first, except where the words say what to do. */
+/** A refusal as one line: its layer's title first (**Set by your organisation** when it names none), except where the words say what to do. */
 export function refusalLine(r: PolicyRefusal): string {
-  return r.reason === "noPolicy" || r.reason === "mustJoin" ? r.words : `${setBy}. ${r.words}`;
+  return r.reason === "noPolicy" || r.reason === "mustJoin" ? r.words : `${layerTitle(r.layer?.kind)}. ${r.words}`;
 }
 
 // Console ▸ Policy: the policy as the fields an admin types in.
@@ -303,7 +315,7 @@ export function formOf(p: OrgPolicy | undefined): PolicyForm {
     runtimes[id] = { on: !p?.runtimes || rule !== undefined, models: rule?.models?.join(", ") ?? "" };
   }
   return {
-    mode: p?.modeCeiling ?? "",
+    mode: p?.permissionMode ?? "",
     sandboxRequired: p?.sandbox === "required",
     limitRuntimes: p?.runtimes !== undefined,
     runtimes,
@@ -351,7 +363,7 @@ export function policyOf(form: PolicyForm, base: OrgPolicy | undefined, me: Audi
     if (value === undefined) delete p[key];
     else p[key] = value;
   };
-  set("modeCeiling", form.mode === "" ? undefined : form.mode);
+  set("permissionMode", form.mode === "" ? undefined : form.mode);
   set("sandbox", form.sandboxRequired ? "required" : undefined);
   // A runtime's ways to the model sit on its rule (#999), so a reach rule with no runtime list names every runtime.
   const reached = Object.entries(form.reach).some(([, c]) => c !== "any");

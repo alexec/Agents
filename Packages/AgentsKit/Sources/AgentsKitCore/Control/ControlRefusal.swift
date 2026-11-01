@@ -18,4 +18,16 @@ public struct ControlRefusal: Error, Sendable, CustomStringConvertible, Equatabl
     /// under it).
     public static let header = "Agents-Refusal"
     public static let maxLineLength = 200
+
+    /// The web address a refusal's line names, such as the account page where a plan is
+    /// upgraded or a suspension is explained (#3153), so a client can offer it as a link.
+    /// Only `https` addresses: the line comes from outside.
+    public static func link(in line: String) -> URL? {
+        guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else {
+            return nil
+        }
+        return detector.matches(in: line, range: NSRange(line.startIndex..., in: line))
+            .compactMap(\.url)
+            .first { $0.scheme == "https" }
+    }
 }

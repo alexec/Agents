@@ -143,6 +143,8 @@ public enum LineageList {
     /// How many times, a second apart, the pane walks again while the daemon is still
     /// resolving titles (#3102).
     public static let resolvingAsks = 20
+    /// Under the graph while those walks go on (#3154).
+    public static let readingTitles = "Reading titles…"
 
     public static func node(ofSession id: UUID) -> Node {
         Node(kind: "session", ref: "session:\(id.uuidString)")
@@ -151,8 +153,10 @@ public enum LineageList {
     /// One node in the list.
     public struct Row: Sendable, Hashable, Identifiable {
         public var node: Node
-        /// "alexec/agents#12", or the session's title.
+        /// "alexec/agents#12", "#12 Fix the flaky test" once resolved (#3158), or the session's title.
         public var name: String
+        /// "alexec/agents#12", for a resolved node whose name is its title: the help shows it.
+        public var ref: String?
         /// One line per link to it: "This session works on it · from the branch".
         public var links: [String]
         /// "$4.00 · 12m working · merged", for an issue or a PR whose cost has come.
@@ -192,13 +196,23 @@ public enum LineageList {
     static func names(of start: Node, graph: DaemonAPI.LineageGraph, title: @escaping (Node) -> String?) -> (Node) -> String {
         { n in
             if n == start, n.kind == "session" { return "This session" }
-            return title(n) ?? graph.resolved?[n.ref]?.title ?? ReportValueWords.name(n)
+            if let title = title(n) { return title }
+            let ref = ReportValueWords.name(n)
+            guard let resolved = graph.resolved?[n.ref]?.title else { return ref }
+            return "\(number(ref)) \(resolved)"
         }
+    }
+
+    /// "#12" from "alexec/agents#12"; a ref with no number, such as "ENG-4", as it is (#3158).
+    static func number(_ ref: String) -> String {
+        guard let hash = ref.lastIndex(of: "#") else { return ref }
+        return String(ref[hash...])
     }
 
     static func row(_ n: Node, graph: DaemonAPI.LineageGraph, costs: [Node: DaemonAPI.LineageCostRollup],
                     name: (Node) -> String, start: Node) -> Row {
         Row(node: n, name: name(n),
+            ref: graph.resolved?[n.ref]?.title != nil && name(n) != ReportValueWords.name(n) ? ReportValueWords.name(n) : nil,
             links: graph.links.filter { $0.from == n || $0.to == n }.map { line($0, of: n, session: start, name: name) },
             cost: costs[n].map { costLine($0) },
             resolved: resolvedLine(graph.resolved?[n.ref]),
@@ -285,8 +299,8 @@ public enum LineageList {
     public static let pageNone = "No links from here yet. Start from another session, or type an issue’s, a pull request’s, a milestone’s or a release’s address."
 
     /// The start a person typed on the Lineage page (#3087): a GitHub address of an issue, a pull
-    /// request, a milestone or a release; "owner/repo#12" (an issue); "github:owner/repo#12"; or a
-    /// session's id. Nil for anything else.
+    /// request, a milestone or a release; "owner/repo#12" (an issue, or the pull request of
+    /// `pullRequest(typed:)`); "github:owner/repo#12"; or a session's id. Nil for anything else.
     public static func node(typed text: String) -> Node? {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if let id = UUID(uuidString: text.hasPrefix("session:") ? String(text.dropFirst("session:".count)) : text) {
@@ -310,6 +324,15 @@ public enum LineageList {
         guard halves.count == 2, Int(halves[1]) != nil, halves[0].split(separator: "/").count == 2,
               !halves[0].contains(" ") else { return nil }
         return Node(kind: "issue", ref: "github:\(bare)")
+    }
+
+    /// The pull request that "owner/repo#12" may be (#3148): GitHub gives issues and pull requests
+    /// one number space, so the bare form is either. The page walks it when the issue has no links.
+    /// Nil for any other start.
+    public static func pullRequest(typed text: String) -> Node? {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.contains("://"), let node = node(typed: text), node.kind == "issue" else { return nil }
+        return Node(kind: "pr", ref: node.ref)
     }
 }
 

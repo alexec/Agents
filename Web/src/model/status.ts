@@ -1,7 +1,7 @@
 // The shape and words beside a session's title: StatusShape (UI/StatusShape.swift) as the Mac's
 // sessions list draws it, ported by hand and held to Fixtures/web/status (research R7).
 import type { Agent, AgentState, EndedReason, WorkOutcome } from "../protocol/generated";
-import { endingIsUnaccountedFor, isWaiting, outcomeNeedsAPerson, waitingForPerson, folderPath } from "./groups";
+import { endingIsUnaccountedFor, isWaiting, outcomeNeedsAPerson, personLine, waitingForPerson, folderPath } from "./groups";
 import { runningToolLabel } from "./sidebar";
 
 /** Working is a spinner; the rest are drawn. Only needsYou is ever in colour. */
@@ -77,6 +77,10 @@ export function statusWords(agent: Agent, isComingBack = false): string {
   const state: AgentState = agent.state;
   const outcome = agent.report?.outcome;
   if (isComingBack) return comingBackDescription;
+  // A wait only the person can settle says what it asks of them (#3147), where an outcome's
+  // heading would say Finished. A question's own heading still wins.
+  const asks = personAsked(agent, isComingBack);
+  if (asks) return agent.isUnread === true ? `Unread · ${asks}` : asks;
   if (agent.isUnread === true && state === "finished") return `Unread · ${outcome ? outcomeHeadings[outcome] : "Finished"}`;
   if (agent.continueWhenBack) return "Waiting for an allowance";
   if (state === "queued") return queuedLabel(null);
@@ -143,5 +147,12 @@ export function needsYouLine(agent: Agent, question?: string | null, isComingBac
   }
   if (agent.state === "stopped" && agent.endedReason) return endingSummaries[agent.endedReason];
   if (endingIsUnaccountedFor(agent)) return "Finished without saying how it went";
-  return null;
+  return personAsked(agent, isComingBack);
+}
+
+/** What puts a finished session under Needs you when it is a wait for the person (#3147), in words. */
+function personAsked(agent: Agent, isComingBack: boolean): string | null {
+  if (agent.state !== "finished" || shapeOf(agent, isComingBack) !== "needsYou" || endingIsUnaccountedFor(agent)) return null;
+  if (agent.report !== undefined && outcomeNeedsAPerson(agent.report.outcome)) return null;
+  return personLine(agent);
 }

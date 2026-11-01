@@ -17,6 +17,8 @@ struct LineagePane: View {
     @State private var graph: DaemonAPI.LineageGraph?
     @State private var costs: [DaemonAPI.LineageNode: DaemonAPI.LineageCostRollup] = [:]
     @State private var failure: String?
+    /// The daemon is still resolving titles and the graph is walked again each second.
+    @State private var reading = false
     @State private var asked = 0
 
     private var me: LineageList.Node { LineageList.node(ofSession: agent.id) }
@@ -66,6 +68,10 @@ struct LineagePane: View {
 
     private var footer: some View {
         VStack(alignment: .leading, spacing: 2) {
+            if reading {
+                Text(LineageList.readingTitles)
+                    .appText(.fine).foregroundStyle(.secondary)
+            }
             if graph?.limited == true {
                 Text("The walk stopped at its limit: there are more links.")
                     .appText(.fine).foregroundStyle(.secondary)
@@ -81,6 +87,7 @@ struct LineagePane: View {
     }
 
     private func load() async {
+        reading = false
         do {
             let walked = try await model.lineageWalk(of: agent.id)
             failure = nil
@@ -98,13 +105,21 @@ struct LineagePane: View {
             costs = found
             // The daemon resolves issues' and PRs' titles in the background (#3102): walk
             // again while it says some are still to come.
+            // One failed walk keeps the graph that is shown and stops asking (#3154).
             var latest = walked
+            reading = latest.resolving == true
             for _ in 0 ..< LineageList.resolvingAsks where latest.resolving == true {
-                try await Task.sleep(for: .seconds(1))
-                latest = try await model.lineageWalk(of: agent.id)
+                do {
+                    try await Task.sleep(for: .seconds(1))
+                    latest = try await model.lineageWalk(of: agent.id)
+                } catch {
+                    break
+                }
                 guard !Task.isCancelled else { return }
                 graph = latest
             }
+            guard !Task.isCancelled else { return }
+            reading = false
         } catch {
             guard !Task.isCancelled else { return }
             failure = "The links could not be read: \(error.localizedDescription)"
@@ -223,8 +238,8 @@ struct LineageGraphView: View {
     }
 }
 
-/// One box of the graph: the node's name, and its kind and cost; its name, the whole of that line
-/// and its links, one a line, in its help (#3159).
+/// One box of the graph: the node's name, and its kind and cost; its name, ref, the whole of that
+/// line and its links, one a line, in its help (#3159).
 private struct LineageBox: View {
     let node: LineageLayout.GraphNode
     let open: (() -> Void)?
@@ -234,10 +249,11 @@ private struct LineageBox: View {
         if let open {
             Button(action: open) { content }
                 .buttonStyle(.plain)
-                .help(([node.row.name, node.detail] + node.row.links + [verb])
+                .help(([node.row.name] + [node.row.ref].compactMap { $0 } + [node.detail] + node.row.links + [verb])
                     .joined(separator: "\n"))
         } else {
-            content.help(([node.row.name, node.detail] + node.row.links).joined(separator: "\n"))
+            content.help(([node.row.name] + [node.row.ref].compactMap { $0 } + [node.detail] + node.row.links)
+                .joined(separator: "\n"))
         }
     }
 

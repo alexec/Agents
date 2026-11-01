@@ -129,7 +129,7 @@ func TestAWaitEnds(t *testing.T) {
 	}
 	answered := wait(2)
 	c.call(t, 1, "events/cancelWait", map[string]any{"agentID": a.ID})
-	if text := <-answered; text != "The person cancelled your wait for lease.granted. Check whether lease.granted happened anyway before you stop: the person may only be telling you to carry on without waiting, not that it did not happen." {
+	if text := <-answered; text != "The person ended your wait for lease.granted. Do not carry on with what needed it, and do not wait for it again: end your turn. The person will tell you when to go on." {
 		t.Fatal(text)
 	}
 	if e := c.callError(t, 2, "events/cancelWait", map[string]any{"agentID": a.ID}); e.Message != "That agent is not waiting on anything." {

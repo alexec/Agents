@@ -89,6 +89,7 @@ struct AgentRow: View {
                        endedReason: agent.endedReason,
                        isUnread: agent.isUnread,
                        isWaitingForPerson: agent.isWaitingForPerson,
+                       personLine: agent.eventWait?.personLine,
                        tool: RunningToolWords.tool(agent))
                 .frame(width: isCompact ? 16 : nil)
                 .padding(.top, 1)
@@ -543,6 +544,8 @@ struct StatusIcon: View {
     var isWaitingForAllowance = false
     /// Only the connected person can carry this on (`Agent.isWaitingForPerson`, #3051).
     var isWaitingForPerson = false
+    /// What that wait asks of them, said in place of Finished (`EventWait.personLine`, #3147).
+    var personLine: String?
     /// The tool it runs, which tips the working ring (#2044, #2332).
     var tool: String?
     /// The well grows with the text beside it (#750), so the row keeps its shape.
@@ -585,7 +588,7 @@ struct StatusIcon: View {
     private var description: String {
         StatusShape.words(shape, state: state, isComingBack: isComingBack, outcome: outcome,
                           isUnaccountedFor: isUnaccountedFor, ending: ending, isUnread: isUnread,
-                          isWaitingForAllowance: isWaitingForAllowance, tool: tool)
+                          isWaitingForAllowance: isWaitingForAllowance, tool: tool, personLine: personLine)
     }
 }
 
