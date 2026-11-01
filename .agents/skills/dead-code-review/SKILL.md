@@ -3,6 +3,8 @@ name: dead-code-review
 description: Review changed Swift, Go and web code for unreachable code on each release with Periphery, deadcode and Knip, record false positives, and remove only code proven dead. Use when the Dead code review workflow runs in a release (#2161), or when Alex asks for a dead-code review.
 ---
 
+Paused until 1.0 (#3215).
+
 # Dead-code review
 
 This is the method of the Dead-code review workflow

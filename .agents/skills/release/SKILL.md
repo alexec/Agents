@@ -1,6 +1,6 @@
 ---
 name: release
-description: Take main to a new version with nobody watching (#914), started by Alex. Every release is a minor (x.y.0), with no patch after it (#3212). Run the eight reviews and checks once each on what changed since the last tag, have the high findings fixed through the Scrum Master's lanes (medium security advisories get one release of grace, then go to the Scrum Master as priority work), check the gate, choose the version, check its milestone, write the notes, tag and push, check the GitHub release and both TestFlight builds, deploy the live control plane, close the milestone, unpark the next one, and review how the release went. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
+description: Take main to a new version with nobody watching (#914), started by Alex. Every release is a minor (x.y.0), with no patch after it (#3212). Run the three checks once each (runtimes, competitors, the feature matrix; the five reviews are paused until 1.0, #3215), read the Dependabot alerts, have the high issues fixed through the Scrum Master's lanes, check the gate, choose the version, check its milestone, write the notes, tag and push, check the GitHub release and both TestFlight builds, deploy the live control plane, close the milestone, unpark the next one, and review how the release went. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
 ---
 
 # Release
@@ -19,16 +19,19 @@ Alex decided (2026-10-13, #914):
   1.0 and major versions only when Alex says. An enhancement counts only when its files
   change a client's UI, the host or daemon, or the capability list (#2857); the plan lists
   a tooling, workflow or docs enhancement as `[tooling]`.
-- **Every release runs the eight reviews and checks once each** (#1462, #1557, #2161):
-  security, performance, HADR, dead code, runtimes, usability, competitors and the feature
-  matrix.
-- **Scope is what changed** (#1462): the reviews read only `main` since the last tag.
-  Step 3 also carries forward open medium security advisories from earlier releases.
+- **Every release runs three checks once each** (#1462): runtimes, competitors and the
+  feature matrix, and reads the open Dependabot alerts. **The five reviews are paused
+  until 1.0** (Alex, 2026-11-01, #3215): security, performance, HADR, dead code and
+  usability. Before 1.0 the product changes too fast for release-time reviews to pay back
+  what they cost; #3216 brings them back at 1.0, at PR time. Their skills and workflows
+  stay, turned off.
+- **Scope is what changed** (#1462): the checks read only `main` since the last tag.
+  Step 3 also carries forward the draft security advisories that earlier reviews made.
   Older open issues are not this release's.
-- **Time is one day** (#1462), from the start of the run (T0): the reviews and the fixes
+- **Time is one day** (#1462), from the start of the run (T0): the checks and the fixes
   fit in it.
 - **Priority is a label:** `priority:high` and `priority:medium`. Within each, security
-  goes before performance, before HADR, before usability, before runtimes, before the rest.
+  goes before runtimes, before the rest.
 - **Only high blocks** (Alex, 2026-10-19, #1661). The release tags as soon as no high is
   open; it never waits for a medium fix. Other medium findings are filed with
   `priority:medium`, listed as known issues, and worked by the ordinary lanes after the
@@ -38,8 +41,10 @@ Alex decided (2026-10-13, #914):
   with `0.5 `. The milestone
   is done when its release has shipped, and this skill closes it then (step 9).
 - **Security findings stay private** until they ship: a draft GitHub security advisory
-  per finding, fixed on its private fork. Medium advisories get one release of grace,
-  then go to the Scrum Master as priority work. The notes say only "Security fixes".
+  per finding, fixed on its private fork. The paused security review made them; the
+  release no longer makes new ones, and hands the unfixed drafts to the Scrum Master as
+  priority work (step 3). A Dependabot alert is public already, so it gets an issue, not
+  an advisory. The notes say only "Security fixes".
 
 ## Rules for the whole run
 
@@ -80,28 +85,25 @@ calendar day in America/Los_Angeles, not 24 hours since the tag.
 2. `.agents/skills/release/scripts/release-plan.py`. It prints the last tag and the next
    version. If it says nothing merged since the last tag, end with `nothing_to_do`.
 
-## 2. Reviews and checks, once each
+## 2. Checks, once each
 
-Eight workflows run exactly once per release, and only here (#1462). None has a schedule.
+Three workflows run exactly once per release, and only here (#1462). None has a schedule.
+`security-review`, `performance-review`, `hadr-review`, `dead-code-review` and
+`usability-check` are paused until 1.0 (#3215): their files say `enabled: false`, and the
+release never starts them.
 
 | Order | Workflow | It writes |
 |---|---|---|
-| 1 | `security-review` | `.agents/reviews/security/` on `agents/reviews-security` |
-| 1 | `performance-review` | `.agents/reviews/performance/` on `agents/reviews-performance` |
-| 1 | `hadr-review` | `.agents/reviews/hadr/` on `agents/reviews-hadr` |
-| 1 | `dead-code-review` | `.agents/reviews/dead-code/` on `agents/reviews-dead-code` |
-| 2 | `nightly-runtimes` (Runtime check) | `~/Library/Caches/Agents Nightly Runtimes/runs/latest/report.md` |
-| 2 | `usability-check` | `.agents/reviews/usability/` on `agents/reviews-usability` |
-| 3 | `competitor-check` | `~/.agents/reviews/competitors/` |
-| 4 | `feature-matrix` | a pull request on `agents/feature-matrix-<date>` |
+| 1 | `nightly-runtimes` (Runtime check) | `~/Library/Caches/Agents Nightly Runtimes/runs/latest/report.md` |
+| 1 | `competitor-check` | `~/.agents/reviews/competitors/` |
+| 2 | `feature-matrix` | a pull request on `agents/feature-matrix-<date>` |
 
 Start every one of them once per release. The only one to skip is one that already ran
 for this release: its report (or pull request) is newer than the last tag, as when an
 earlier run of this skill ended `partly_done`. Never start one again in the same release.
 Run each with `manage_workflows run`. When that is refused (the workflow is turned off, or waits for Alex's OK), read the workflow with
 `manage_workflows read`, and call `start_session` with its prompt (the text under its front matter) and its `runtime:`, `model:` and `permission-mode:`.
-Start them by order, at most two at a time: the reviews take turns on the "build" lease,
-and the feature matrix reads the competitor check's report. Wait with `wait_for_event`,
+Start them by order, at most two at a time: the feature matrix reads the competitor check's report. Wait with `wait_for_event`,
 naming the sessions in `agents`, `until_minutes` 240 or the time left to T0 + 1 day,
 whichever is less. As each one finishes, archive it with `archive_session` and do step 3
 for its findings at once, so their fixes start while the others still run. One that
@@ -110,125 +112,84 @@ your report, not a reason to stop, and it is not started again until the next re
 
 ## 3. Have the high ones fixed, and file the medium ones
 
-Collect the open findings with severity high or critical (both are "high" here) or
-medium **that this release's runs recorded**: the ones in their run files (front matter
-`base:` is the last tag), not older lines of `findings.md`. In order:
+Collect, in order:
 
-- **Security:** lines in `.agents/reviews/security/findings.md` on
-  `agents/reviews-security` whose status is not `fixed` on main, `won't fix` or
-  `recorded` as low. These are private: see "Security findings" below. Also collect
-  carried-over draft medium advisories as described there.
-- **Performance:** the same in
-  `git show agents/reviews-performance:.agents/reviews/performance/findings.md`. A status
-  `fixed on <branch>` is fixed only when that branch is merged; until then it is open,
-  and the issue names the branch so the lane can push it.
-- **HADR:** the same in
-  `git show agents/reviews-hadr:.agents/reviews/hadr/findings.md` (#1557). A line that
-  says `filed #NNN` is that issue. A line that says `needs a decision` is for Alex (a
-  change that costs money or changes the live set-up): name it in the report, and file
-  it as for the others.
-- **Usability:** the same in `.agents/reviews/usability/findings.md` on
-  `agents/reviews-usability`. Most already say `filed #NNN`.
+- **Dependabot alerts** (#1910, #3215): every open alert,
+  `gh api --paginate 'repos/alexec/Agents/dependabot/alerts?state=open'`. An alert is public
+  already, so it gets an issue, not an advisory. Each **critical or high** alert gets a bug
+  for the bug lane (#3212), unless an issue is open for it already (`gh issue list --search
+  "<ghsa_id> in:body"`): title `Dependency (<severity>): <package> <advisory title>`, a body
+  with the alert's number and link, the advisory (`security_advisory.ghsa_id`), the
+  manifest, the first patched version, and Dependabot's own pull request if any (`gh pr
+  list --author app/dependabot --search <package>`); the labels `bug`, `security`,
+  `dependencies`, `priority:high`, and its `area:<name>` from `.agents/areas` when the
+  manifest has one. No milestone. A medium or low alert gets no issue: Dependabot's own
+  pull requests take it. Never dismiss an alert: that is Alex's.
+- **Draft security advisories** from earlier releases: see "Security findings" below.
 - **Runtimes:** open issues the runtime check filed in this release (their titles start with
   the cause it found); count each as medium.
 - **Issues:** every open issue labelled `priority:high` or `priority:medium` that was
-  opened since the last tag (`gh issue list --search "created:>=<the tag's date>"`).
+  opened since the last tag (`gh issue list --search "created:>=<the tag's date>"`), the
+  Dependabot bugs above too.
 
-For each finding that is not security:
-
-1. Search the issues, open and closed, for its id (`gh issue list --state all --search
-   "P20261011-1 in:body"`). If there is one, make sure it is open and has the label.
-2. If there is none, file one: title `Performance (high): <title>` (or `HADR`,
-   `Usability`, `Runtime`), the finding's fields in the body with its id, the label `priority:high` or
-   `priority:medium`, `bug`, and its `area:<name>` from `.agents/areas` when its files
-   have one.
+For each runtime finding with no issue yet, file one: title `Runtime (<severity>): <title>`,
+the finding's fields in the body, the label `priority:medium`, `bug`, and its
+`area:<name>` from `.agents/areas` when its files have one. No milestone.
 
 Then send the Scrum Master one message (`list_sessions`, then `message_session` to the
 session not archived whose title has "scrum master" in it, any case, and that is labelled
-`lead`): the high issues in priority order (security, performance, HADR, usability, runtimes,
-the rest), then carried-over medium security advisory URLs as priority work. Say that the
-release waits for high issues and never waits for a medium advisory. Other medium issues
-go to the ordinary lanes after the release as their label and milestone say (a bug to the
-bug lane).
+`lead`): the high issues in priority order (security, runtimes, the rest), then the
+unfixed draft security advisory URLs as priority work. Say that the release waits for
+high issues and never waits for a draft advisory. Other medium issues go to the ordinary
+lanes after the release as their label and milestone say (a bug to the bug lane).
 
 **No Scrum Master running, and work to hand over** (#1908; in v0.7.0 the highs sat
-40 minutes with no owner): start one when there are high issues or carried-over medium
+40 minutes with no owner): start one when there are high issues or unfixed draft
 security advisories. Call `start_session` with the persona in
 `.agents/personas/scrum-master.md` (its prompt, `runtime:` and `labels:`), the title
 `<x.y> scrum master` for the version being released, and a prompt that names the milestone,
-the high issues in the order above, then the carried-over medium security advisory URLs as
-priority work, that the release waits for high issues but not medium advisories, and that
-it reports to the release session (this one, by its id). The release still starts no fix
+the high issues in the order above, then the draft security advisory URLs as priority
+work, that the release waits for high issues but not for draft advisories, and that it
+reports to the release session (this one, by its id). The release still starts no fix
 lane itself: the Scrum Master does. With nothing to hand over, start none, and say so in
 the report.
 
 ### Security findings
 
-For each open high or medium security finding recorded by this release, and each
-carried-over draft medium advisory from an earlier release:
+The paused security review (#3215) left draft advisories behind. The release makes no new
+ones. For each draft advisory
+(`gh api --paginate 'repos/alexec/Agents/security-advisories?state=draft'`):
 
-1. Look for its advisory: `gh api --paginate 'repos/alexec/Agents/security-advisories?state=draft'`,
-   matching the finding's id in `summary`.
-2. Look for its fix on main (#1727): when `findings.md` says `fixed on <branch>` and
-   `git merge-base --is-ancestor <branch> origin/main` passes, or a merged pull request
-   came from that branch (`gh pr list --state merged --head <branch>`), the finding is
-   fixed. Make its advisory all the same (step 3), with `Fixed by <merge commit> on main.`
-   at the end of the description, and send the Scrum Master nothing for it. It does not
-   block. (In v0.6.0 both high fixes were on main an hour before their advisories.)
-3. If there is no advisory, make it, and its private fork. Write the JSON with a quoted
-   heredoc or from Python, never with `echo` (zsh's `echo` breaks the escapes). Use
-   `.agents/skills/release/scripts/advisory.py`, which sends only these fields.
-   `.claude/settings.json` allows it, and no other change to an advisory, so auto mode
-   does not refuse it:
+1. Look for its fix on main (#1727): its description ends with `Fixed by <commit>` and that
+   commit is on `origin/main`, or `findings.md` on `agents/reviews-security` says `fixed on
+   <branch>` and `git merge-base --is-ancestor <branch> origin/main` passes, or a merged
+   pull request came from that branch (`gh pr list --state merged --head <branch>`). If it
+   is fixed and the description does not say so yet, run
+   `python3 .agents/skills/release/scripts/advisory.py fixed <ghsa_id> <merge commit>`.
+   `.claude/settings.json` allows it, and no other change to an advisory. Do not hand it
+   off.
+2. Otherwise leave it a draft and send its URL only (it is private) to the Scrum Master as
+   priority work. Its lane fixes the finding on the advisory's private fork, then opens
+   the pull request on `main` with a title and body that name no attack ("Harden token
+   comparison"), and runs `advisory.py fixed <ghsa_id> <merge commit>`. A draft advisory
+   never blocks the release.
+3. In the report, list each advisory by its id only, and say whether it is fixed. Never
+   write a finding id, summary, title or attack details in a message or the report.
 
-   ```sh
-   python3 .agents/skills/release/scripts/advisory.py create <<'EOF'
-   {"summary": "<id>: <short title>", "description": "<the finding's fields, and its fix branch if the review made one>",
-    "severity": "<critical, high or medium>", "vulnerabilities": [{"package": {"ecosystem": "swift", "name": "Agents"}}]}
-   EOF
-   python3 .agents/skills/release/scripts/advisory.py fork <ghsa_id>
-   ```
-
-4. For a high one, send the Scrum Master the advisory's URL only (it is private). Its lane fixes the
-   finding on the advisory's private fork, then opens the pull request on `main` with a
-   title and body that name no attack ("Harden token comparison"), and writes
-   `Fixed by <merge commit> on main.` at the end of the advisory's description
-   (`python3 .agents/skills/release/scripts/advisory.py fixed <ghsa_id> <merge commit>`).
-
-5. Collect older draft medium advisories with
-   `gh api --paginate 'repos/alexec/Agents/security-advisories?state=draft'`. Match each
-   summary to its finding id. An advisory with `created_at` before this release's T0 is
-   from an earlier release. Skip advisories created in this run; a medium advisory gets
-   one release of grace and is collected here in a later release if it remains open.
-   For each older advisory, check for `Fixed by <commit>` and verify that commit is on
-   `origin/main`. Also check a recorded `fixed on <branch>` fix as in step 2: the branch
-   is fixed when it is an ancestor of `origin/main` or a merged pull request came from
-   it. If fixed, run `advisory.py fixed` with the merge commit and do not hand it off.
-   Leave an unfixed advisory as a draft, then send its URL to the Scrum Master as
-   priority work. Its lane fixes it on the advisory's private fork as in step 4. Never
-   include the finding or title in the message or report.
-
-6. In the report, list each carried-over advisory by advisory id only, and say whether it
-   is fixed. Do not include a finding id, summary, title or attack details. Do not send a
-   medium advisory made in this release to the Scrum Master until the next release.
-
-An advisory is fixed when its description says `Fixed by <commit>` and that commit is on
-`origin/main`, or its fix branch is merged to `origin/main`, directly or by a merged PR
-from that branch. Leave the advisory a draft: publishing it after the release is Alex's.
+Leave every advisory a draft: publishing it after the release is Alex's.
 
 ## 4. Wait for the fixes
 
 Until the gate can pass:
 
-- Recount what is still open of what step 3 collected: its issues, and its security
-  advisories without their fix on `origin/main`.
-- Go on as soon as nothing high is open. Never wait for a medium one: those still open
-  go into the notes as known issues.
+- Recount what is still open of what step 3 collected: its issues.
+- Go on as soon as nothing high is open. Never wait for a medium one or a draft advisory:
+  the medium issues still open go into the notes as known issues.
 - Otherwise wait with `wait_for_event` for `issue.closed` and `pr.merged`, with
   `until_minutes` at most the time left to T0 + 1 day.
 - High always blocks. At T0 + 1 day with a high one still open, end with `partly_done`,
-  naming what is open. The next run is a new day (a new T0); it skips the reviews that
-  already ran (step 2) and picks up the same findings.
+  naming what is open. The next run is a new day (a new T0); it skips the checks that
+  already ran (step 2) and picks up the same issues.
 
 ## 5. Gate
 
@@ -247,8 +208,6 @@ again and `origin/main` has moved, run `release-plan.py --after <sha>`:
   (`priority:high`), so the tag must hold
   it. Re-pick the newest main and start the gate over on it from item 1. A dry run on the
   old pin may go on or be cancelled; neither is a failure.
-- Also start over when a high security advisory's fix (`Fixed by <commit>` or its fix
-  branch) is on `origin/main` but not an ancestor of the pin.
 
 An issue whose closing PR merged after the pin is still open in what you tag: count it as
 open for item 2 and for the notes' known issues (`git merge-base --is-ancestor <merge commit>
@@ -265,8 +224,7 @@ open for item 2 and for the notes' known issues (`git merge-base --is-ancestor <
    one: when the pin's CI was replaced and never ran, start over on the newest main. If a
    run on `<sha>` failed, end with `partly_done`; main broken is fixed by its own PR,
    through the Scrum Master.
-2. **No open high:** none of step 3's high issues is open, and none of its high security
-   advisories is without its fix.
+2. **No open high:** none of step 3's high issues is open.
 3. **Walks:** `gh issue list --label needs-walk --state open` holds at most five.
    More than five: end with `partly_done`, naming them; walks are the Scrum Master's to start.
 4. **No tag today** (#2462): look again as in step 0. The release can run past midnight, so a
@@ -425,7 +383,7 @@ If step 8 failed, leave the milestone open and say so in the report.
 
 Decided in #1659: every release reviews itself, briefly, while its times are still in
 this session. Write `~/.agents/reviews/releases/v<version>.md` (outside the folder, so
-nothing is pushed): a timeline from T0 (reviews done, highs fixed, gate, tag, GitHub
+nothing is pushed): a timeline from T0 (checks done, highs fixed, gate, tag, GitHub
 release, TestFlight, milestone closed), and a table of each step where a person did
 something, why, and the issue that would make it run without one. Search the issues
 first (`gh issue list --state all --search "<words> in:title"`); file a new one, at most
@@ -435,6 +393,6 @@ finding. `.agents/reviews/releases/v0.6.0.md` is the first, and the model.
 ## 11. Report
 
 End with `done` and a short table: version, tag, the GitHub release URL, the iOS and
-macOS builds' states, the control plane deploy (healthz, the version served, its bug if it failed), the milestone and whether it is closed, the reviews you ran, the issues fixed for this release, the known
+macOS builds' states, the control plane deploy (healthz, the version served, its bug if it failed), the milestone and whether it is closed, the checks you ran, the issues fixed for this release, the known
 issues, the advisories that are fixed and ready for Alex to publish, the held PRs you
 released, and the release review's file and issues.
