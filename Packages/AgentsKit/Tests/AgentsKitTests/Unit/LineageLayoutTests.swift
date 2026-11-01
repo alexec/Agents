@@ -82,6 +82,20 @@ struct LineageLayoutTests {
         #expect(g.node(issue.ref)?.row.name == "Fix the flaky test")
     }
 
+    /// #3159: a merged PR's box says "merged" once: its cost line's state, not the forge's as well.
+    @Test func aPRsStateShowsOnceInItsBox() throws {
+        var resolvedGraph = graph
+        resolvedGraph.resolved = [pr.ref: .init(title: "Fix it", state: "merged", labels: ["bug"])]
+        let costs: [Node: DaemonAPI.LineageCostRollup] = [
+            pr: .init(node: pr, total: .init(cost: ["USD": 4], turns: 1),
+                      parts: [.init(node: pr, outcome: "merged", lastAt: at)]),
+        ]
+        let g = LineageLayout.graph(of: session, graph: resolvedGraph, costs: costs, title: title)
+        #expect(g.node(pr.ref)?.detail == "Pull request · $4.00 · merged · bug")
+        let unbanked = LineageLayout.graph(of: session, graph: resolvedGraph, costs: [:], title: title)
+        #expect(unbanked.node(pr.ref)?.detail == "Pull request · merged · bug")
+    }
+
     @Test func aTierFollowsTheOrderOfTheBoxesAboveIt() {
         let other = Node(kind: "issue", ref: "github:alexec/agents#1")
         let otherPR = Node(kind: "pr", ref: "github:alexec/agents#2")

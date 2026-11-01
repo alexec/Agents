@@ -223,7 +223,8 @@ struct LineageGraphView: View {
     }
 }
 
-/// One box of the graph: the node's name, and its kind and cost; its links, one a line, in its help.
+/// One box of the graph: the node's name, and its kind and cost; its name, the whole of that line
+/// and its links, one a line, in its help (#3159).
 private struct LineageBox: View {
     let node: LineageLayout.GraphNode
     let open: (() -> Void)?
@@ -233,10 +234,10 @@ private struct LineageBox: View {
         if let open {
             Button(action: open) { content }
                 .buttonStyle(.plain)
-                .help(([node.row.name] + node.row.links + [verb])
+                .help(([node.row.name, node.detail] + node.row.links + [verb])
                     .joined(separator: "\n"))
         } else {
-            content.help(([node.row.name] + node.row.links).joined(separator: "\n"))
+            content.help(([node.row.name, node.detail] + node.row.links).joined(separator: "\n"))
         }
     }
 
