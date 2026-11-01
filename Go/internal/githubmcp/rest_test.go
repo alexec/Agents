@@ -231,15 +231,17 @@ func TestPRCommentsLeavesOutIssuesAndAgentsAndJudgesTheCommenter(t *testing.T) {
 	})
 	g := api.github()
 	since := "2026-10-28T10:00:00.000Z"
-	comments, _, err := g.PRComments(context.Background(), repo, since)
+	comments, _, err := g.PRComments(context.Background(), repo, since, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	equal(t, len(comments), 2, "the agent's own and the plain issue's comment are left out")
-	equal(t, comments[0].PR.Branch, "agents/61", "its PR's branch")
-	equal(t, comments[0].Trusted, true, "alexec can approve")
-	equal(t, comments[1].Author, "stranger", "the stranger's comment")
-	equal(t, comments[1].Trusted, false, "a stranger is not trusted")
+	equal(t, len(comments), 4, "every comment, so the cursor moves past them all")
+	equal(t, comments[0], PRComment{ID: 60, At: "2026-10-28T10:05:00Z", Other: true}, "the agent's own is left out")
+	equal(t, comments[3], PRComment{ID: 63, At: "2026-10-28T10:02:00Z", Other: true}, "the plain issue's comment is left out")
+	equal(t, comments[1].PR.Branch, "agents/61", "its PR's branch")
+	equal(t, comments[1].Trusted, true, "alexec can approve")
+	equal(t, comments[2].Author, "stranger", "the stranger's comment")
+	equal(t, comments[2].Trusted, false, "a stranger is not trusted")
 }
 
 func TestAnUnchangedListingIsSharedThenAskedWithItsETag(t *testing.T) {

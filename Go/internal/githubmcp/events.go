@@ -648,18 +648,24 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 		return list, truncated, nil
 	}
 	if name == "pr.commented" {
-		comments, truncated, err := gh.PRComments(ctx, repo, since)
+		comments, truncated, err := gh.PRComments(ctx, repo, since, a.pr)
 		if err != nil {
 			return nil, false, err
 		}
+		// Every comment is a candidate, so the cursor moves past the ones left out (P20261031-1).
 		var list []candidate
 		for _, c := range comments {
 			at := normalized(c.At)
-			if at == "" || (a.pr != 0 && c.PR.Number != a.pr) || !(a.anyone || c.Trusted) {
+			if at == "" {
 				continue
 			}
 			list = append(list, candidate{eventID: fmt.Sprintf("pr.commented:%s:%d", repo, c.ID), time: at,
-				data: func() (map[string]any, error) { return c.data(), nil }})
+				data: func() (map[string]any, error) {
+					if c.Other || (a.pr != 0 && c.PR.Number != a.pr) || !(a.anyone || c.Trusted) {
+						return nil, nil
+					}
+					return c.data(), nil
+				}})
 		}
 		return list, truncated, nil
 	}
