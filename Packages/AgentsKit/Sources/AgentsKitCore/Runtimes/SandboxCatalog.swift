@@ -90,11 +90,6 @@ public enum SandboxCatalog {
         case .fixed: return []
         }
     }
-
-    /// Whether Off can be asked for, which is what **Continue without sandbox** needs.
-    public static func canTurnOff(_ runtimeID: String) -> Bool {
-        choices(for: runtimeID).contains(.off)
-    }
 }
 
 extension SandboxCatalog {

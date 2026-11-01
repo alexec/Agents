@@ -682,12 +682,6 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         return oneLine.count > 80 ? String(oneLine.prefix(79)) + "…" : oneLine
     }
 
-    /// The runtime, or a turn's end, names the session (#492, #479). Under a person's
-    /// rename it is kept aside, for when they clear theirs, and the title stays.
-    public mutating func takeRuntimeTitle(_ new: String) {
-        if titleIsPersons { runtimeTitle = new } else { title = new }
-    }
-
     /// What the runtime would call it now: its own title, under a rename or not.
     public var titleFromRuntime: String? { titleIsPersons ? runtimeTitle : title }
 
@@ -910,17 +904,6 @@ extension Agent {
         return slim
     }
 
-    /// This agent with the lists put back from the record on disk. Only the lists come
-    /// from `disk`: anything else changed in memory since it was slimmed is kept.
-    public func madeWhole(from disk: Agent) -> Agent {
-        var whole = self
-        whole.advertisedOptions = disk.advertisedOptions
-        whole.availableCommands = disk.availableCommands
-        whole.plans = disk.plans
-        whole.isSlim = false
-        return whole
-    }
-
     /// This agent as a lean `agents/list` sends it (#107): the slim lists, for a client's
     /// sessions column. Unlike `slimmed()` it is a copy on the wire, not a held state, so
     /// `isSlim` is not set; `listsLeftOut` is, so the reader knows the empty lists are not
@@ -932,13 +915,6 @@ extension Agent {
         lean.plans = []
         lean.listsLeftOut = true
         return lean
-    }
-
-    /// Whether the lists differ from `other`'s: what decides whether an `agent/changed`
-    /// carries them (#203). Cheap when they have not moved: copies share their storage.
-    public func listsDiffer(from other: Agent) -> Bool {
-        advertisedOptions != other.advertisedOptions || availableCommands != other.availableCommands
-            || plans != other.plans
     }
 
     /// This record as heard, keeping the lists `held` already had where it came without

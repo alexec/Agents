@@ -61,30 +61,6 @@ public enum TunnelPipe {
         }
     }
 
-    /// A connection to a port on this machine's loopback: the lending Mac's relay.
-    public static func connectLoopback(port: UInt16) throws -> Int32 {
-        #if canImport(Glibc) && !canImport(Musl)
-        let fd = socket(AF_INET, Int32(SOCK_STREAM.rawValue), 0)
-        #else
-        let fd = socket(AF_INET, SOCK_STREAM, 0)
-        #endif
-        guard fd >= 0 else { throw Failure("no socket: \(errno)") }
-        var address = sockaddr_in()
-        address.sin_family = sa_family_t(AF_INET)
-        address.sin_port = port.bigEndian
-        address.sin_addr.s_addr = inet_addr("127.0.0.1")
-        let connected = withUnsafePointer(to: &address) {
-            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                POSIX.connect(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
-            }
-        }
-        guard connected == 0 else {
-            _ = POSIX.close(fd)
-            throw Failure("the relay on port \(port) did not answer")
-        }
-        return fd
-    }
-
     public struct Failure: Error, CustomStringConvertible, Sendable {
         public var description: String
         public init(_ description: String) { self.description = description }

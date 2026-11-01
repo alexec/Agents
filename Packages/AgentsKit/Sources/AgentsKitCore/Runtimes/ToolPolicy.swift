@@ -375,14 +375,4 @@ public struct ToolPolicy: Hashable, Sendable {
         guard !names.isEmpty else { return extra }
         return extra + (repeatsFlag ? names.flatMap { [flag, $0] } : [flag] + names)
     }
-
-    /// The residual tool a given tool call is, if it is one.
-    ///
-    /// Matched on the end of the name and never whole, for the reason `AppService`
-    /// already gives about its own tools: a runtime is free to prefix a tool's name —
-    /// the Claude adapter shows ours as `mcp__agents__finish_turn` — and none
-    /// of them changes what follows the prefix.
-    public func residual(matching name: String) -> ResidualTool? {
-        residue.first { name.hasSuffix($0.name) }
-    }
 }
