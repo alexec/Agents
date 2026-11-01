@@ -176,6 +176,10 @@ func (d *Daemon) driveScreen(agent wire.UUID, args map[string]json.RawMessage) (
 	if d.Store.Agent(agent) == nil {
 		return "", &Error{Code: CodeNoSuchAgent, Message: leaseNoCall}
 	}
+	// Off by default (FR-004): refused before the lease is taken or agents-drive starts.
+	if !d.desktopControlOn() {
+		return "", &Error{Code: CodeNotPermitted, Message: desktopControlOffWords}
+	}
 	reply, err := d.leaseResource(agent, map[string]json.RawMessage{"name": json.RawMessage(`"screen"`)})
 	if err != nil {
 		return "", err

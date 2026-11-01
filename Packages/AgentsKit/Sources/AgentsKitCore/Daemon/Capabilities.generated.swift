@@ -225,6 +225,8 @@ public enum Capability {
         "daemon/policyState": "host.policy/1",
         "daemon/quit": "daemon/1",
         "daemon/status": "daemon/1",
+        "desktopControl/set": "host.desktop-control/1",
+        "desktopControl/state": "host.desktop-control/1",
         "devices/announce": "devices/1",
         "devices/forget": "devices/1",
         "devices/list": "devices/1",
