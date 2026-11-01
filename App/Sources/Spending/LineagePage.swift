@@ -78,8 +78,19 @@ struct LineagePage: View {
     private func startTyped() {
         guard let node = LineageList.node(typed: typed) else { typedWrong = true; return }
         let host = node.kind == "session" ? sessionHost(node) ?? model.lineageHost : model.lineageHost
-        model.lineageHistory.go(LineagePlace(host: host, node: node))
+        let pr = LineageList.pullRequest(typed: typed)
         typed = ""
+        guard let pr else { model.lineageHistory.go(LineagePlace(host: host, node: node)); return }
+        // "owner/repo#12" is an issue or a pull request (#3148): the pull request when only it has links.
+        Task {
+            var start = node
+            if await !linked(node, on: host), await linked(pr, on: host) { start = pr }
+            model.lineageHistory.go(LineagePlace(host: host, node: start))
+        }
+    }
+
+    private func linked(_ node: DaemonAPI.LineageNode, on host: MachineRef) async -> Bool {
+        (try? await model.lineageWalk(node, on: host).links.isEmpty == false) ?? false
     }
 
     @ViewBuilder

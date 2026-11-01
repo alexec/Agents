@@ -12,7 +12,7 @@ import { Capability } from "../protocol/capabilities.generated";
 import { describe } from "../model/errors";
 import {
   box, costKey, costed, curve, currentStart, emptyHistory, goBack, goForward, goTo, kindWord, lineageDepth, lineageGraph,
-  lineageNote, lineagePageNote, noLineage, noLineageHere, resolvingAsks, sessionNode, startRow, typedNode, type GraphNode, type LineageGraphLayout,
+  lineageNote, lineagePageNote, noLineage, noLineageHere, resolvingAsks, sessionNode, startRow, typedNode, typedPullRequest, type GraphNode, type LineageGraphLayout,
   type LineageHistory, type LineageRow,
 } from "../model/lineage";
 import { go, route } from "../route";
@@ -91,6 +91,14 @@ export function Lineage({ store, host, session }: { store: Store; host: string; 
   );
 }
 
+/** The start for "owner/repo#12" (#3148): the issue, unless it has no links and the pull request of that number has. */
+async function issueOrPullRequest(store: Store, host: string, issue: LineageNode, pr: LineageNode | undefined): Promise<LineageNode> {
+  if (!pr) return issue;
+  const linked = (node: LineageNode) => store.link.call("lineage/walk", { node, depth: 1 }, host)
+    .then((g) => g.links.length > 0, () => false);
+  return !(await linked(issue)) && await linked(pr) ? pr : issue;
+}
+
 /** A start of the Lineage page: a node, and the host whose links are walked from it. */
 interface Place { host: string; node: LineageNode }
 const samePlace = (a: Place, b: Place) => a.host === b.host && a.node.kind === b.node.kind && a.node.ref === b.node.ref;
@@ -123,18 +131,19 @@ export function LineagePage({ store }: { store: Store }) {
   const startFrom = (p: Place) => { wrong.value = false; history.value = goTo(history.value, p, samePlace); };
   const sessions = store.hosts.value.flatMap((h) => (store.agents.value[h.id] ?? []).filter((a) => !a.archivedAt)
     .map((a) => ({ host: h.id, agent: a }))).sort((a, b) => b.agent.lastActivityAt - a.agent.lastActivityAt).slice(0, 15);
-  const submit = () => {
-    const node = typedNode(typed.value);
+  const submit = async () => {
+    const text = typed.value;
+    const node = typedNode(text);
     if (!node) { wrong.value = true; return; }
     const owner = node.kind === "session" ? sessions.find((s) => s.agent.id === node.ref.slice("session:".length))?.host : undefined;
     const host = owner ?? machine;
     if (!host) return;
-    startFrom({ host, node });
     typed.value = "";
+    startFrom({ host, node: await issueOrPullRequest(store, host, node, typedPullRequest(text)) });
   };
   const title = place ? sessionTitle(store, place.host) : () => undefined;
   const bar = (
-    <form class="lineage-bar" onSubmit={(e) => { e.preventDefault(); submit(); }}>
+    <form class="lineage-bar" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
       <button type="button" title="Back: the start before this one" aria-label="Back" disabled={history.value.at <= 0}
         onClick={() => { history.value = goBack(history.value); }}>‹</button>
       <button type="button" title="Forward" aria-label="Forward" disabled={history.value.at + 1 >= history.value.places.length}

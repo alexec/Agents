@@ -168,6 +168,15 @@ test("a typed start: a GitHub address, owner/repo#12 or a session's id", () => {
   }
 });
 
+test("the bare form may also be a pull request", () => {
+  assert.deepEqual(l.typedPullRequest("alexec/Agents#12"), { kind: "pr", ref: "github:alexec/Agents#12" });
+  assert.deepEqual(l.typedPullRequest(" github:alexec/Agents#12 "), { kind: "pr", ref: "github:alexec/Agents#12" });
+  for (const no of ["https://github.com/alexec/Agents/issues/12", "https://github.com/alexec/Agents/pull/12",
+    "https://github.com/alexec/Agents/milestone/15", `session:${S}`, "alexec/Agents"]) {
+    assert.equal(l.typedPullRequest(no), undefined, no);
+  }
+});
+
 test("the starts go back and forward as a browser's", () => {
   const same = (a, b) => a === b;
   let h = l.emptyHistory();
