@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/alexec/agents/Go/wire"
 )
@@ -243,5 +244,64 @@ func TestDriveScreenRefusesAccessibilityNotGrantedUntilTrusted(t *testing.T) {
 	text, err = d.driveScreen(agent.ID, map[string]json.RawMessage{"app": json.RawMessage(`"TextEdit"`), "action": json.RawMessage(`"screenshot"`)})
 	if err != nil || text != "Screenshot of TextEdit." {
 		t.Fatalf("%v, %v", text, err)
+	}
+}
+
+// hangingDriveSource answers the Accessibility gate, then never answers anything else: an
+// agents-drive stuck in an AX call against an app paused in the debugger (#3109).
+const hangingDriveSource = `package main
+
+import (
+	"bufio"
+	"os"
+	"strings"
+	"time"
+)
+
+func main() {
+	r := bufio.NewReader(os.Stdin)
+	for {
+		frame, err := r.ReadBytes(0)
+		if err != nil {
+			return
+		}
+		if strings.Contains(string(frame), "access") {
+			os.Stdout.Write([]byte("{\"ok\":true,\"trusted\":true}\x00"))
+			continue
+		}
+		time.Sleep(time.Hour)
+	}
+}
+`
+
+// TestDriveScreenGivesUpOnAHelperThatNeverAnswers (#3109): a `read` whose helper never
+// answers fails within the deadline, and the helper is let go, so the next call starts a
+// fresh one rather than waiting on the stuck one.
+func TestDriveScreenGivesUpOnAHelperThatNeverAnswers(t *testing.T) {
+	fakeRuntimes(t)
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	enableDesktopControl(t, d)
+	agent := seeded(t, d, t.TempDir(), func(a *wire.Agent) { a.State, a.EndedReason = wire.AgentStateRunning, nil })
+
+	hanging := buildFakeDrive(t, hangingDriveSource)
+	old, oldDeadline := driveHelper, driveCallDeadline
+	driveHelper = func() string { return hanging }
+	driveCallDeadline = 500 * time.Millisecond
+	t.Cleanup(func() { driveHelper, driveCallDeadline = old, oldDeadline })
+
+	began := time.Now()
+	text, err := d.driveScreen(agent.ID, map[string]json.RawMessage{"app": json.RawMessage(`"TextEdit"`), "action": json.RawMessage(`"read"`)})
+	if err == nil || !strings.Contains(err.Error(), "no answer") {
+		t.Fatalf("%v, %v", text, err)
+	}
+	if took := time.Since(began); took > 10*time.Second {
+		t.Fatalf("gave up after %s, not within the deadline", took)
+	}
+	d.driveMu.Lock()
+	_, kept := d.drives[agent.ID]
+	d.driveMu.Unlock()
+	if kept {
+		t.Fatal("the stuck helper was kept for the next call")
 	}
 }
