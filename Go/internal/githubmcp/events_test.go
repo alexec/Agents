@@ -30,6 +30,10 @@ type fakeGitHub struct {
 	// reviews and assigned are what ask the connection's owner, alexec (#2034).
 	reviews  []OpenPR
 	assigned []Issue
+	// listed is the branch runs were last listed for; jobAsks counts RunDetails calls that want
+	// jobs (#3107).
+	listed  string
+	jobAsks int
 }
 
 func (f *fakeGitHub) Yours(context.Context, string) (Yours, error) {
@@ -135,6 +139,7 @@ func (f *fakeGitHub) runsWith(branch, since, conclusion string) ([]RunRef, bool,
 	if f.err != nil {
 		return nil, false, f.err
 	}
+	f.listed = branch
 	var out []RunRef
 	for _, r := range f.runs {
 		if r.conclusion == conclusion && (branch == "" || r.ref.Branch == branch) && !before(r.ref.UpdatedAt, since) {
@@ -144,9 +149,22 @@ func (f *fakeGitHub) runsWith(branch, since, conclusion string) ([]RunRef, bool,
 	return out, false, nil
 }
 
-func (f *fakeGitHub) RunDetails(_ context.Context, _ string, run RunRef) (*RunData, error) {
+func (f *fakeGitHub) PRBranch(_ context.Context, _ string, pr int) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	p, ok := f.prs[pr]
+	if !ok {
+		return "", &GitHubError{Kind: NotFound, Message: "not found"}
+	}
+	return p.pr.Branch, nil
+}
+
+func (f *fakeGitHub) RunDetails(_ context.Context, _ string, run RunRef, jobs bool) (*RunData, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if jobs {
+		f.jobAsks++
+	}
 	number := run.PRNumber
 	if number == 0 {
 		for _, p := range f.prs {
@@ -159,8 +177,11 @@ func (f *fakeGitHub) RunDetails(_ context.Context, _ string, run RunRef) (*RunDa
 	if !ok {
 		return nil, nil
 	}
-	return &RunData{PR: p.pr, HeadSHA: run.HeadSHA, Run: run,
-		FailedJobs: []Job{{Name: "test", URL: run.URL + "/job/1"}}, Trusted: p.trusted}, nil
+	var failed []Job
+	if jobs {
+		failed = []Job{{Name: "test", URL: run.URL + "/job/1"}}
+	}
+	return &RunData{PR: p.pr, HeadSHA: run.HeadSHA, Run: run, FailedJobs: failed, Trusted: p.trusted}, nil
 }
 
 func (f *fakeGitHub) ClosedPRs(_ context.Context, _, since string) ([]MergedPR, []ClosedPR, bool, error) {
@@ -414,6 +435,32 @@ func TestAPassedRunGivesOneChecksPassedWithNoFailedJobsAndAFailedRunDoesNotLeakI
 	// checks.failed still ignores the passed run.
 	firstFailed := h.poll("checks.failed", args, nil)
 	equal(t, ids(h.poll("checks.failed", args, firstFailed["cursor"])), []string{"checks.failed:" + repo + ":9105:1"}, "checks.failed ids")
+}
+
+func TestChecksWithAPRListOnlyItsBranchAndPassesFetchNoJobs(t *testing.T) {
+	h := newHarness(t)
+	h.fake.addPR(405, "agents/queue-helpers-2", nil)
+	h.fake.addPR(406, "agents/other", nil)
+	args := map[string]any{"repo": repo, "pr": float64(405)}
+	first := h.poll("checks.passed", args, nil)
+	h.fake.addPassedRun(9110, "agents/queue-helpers-2", h.at(5), 405, true)
+	h.fake.addPassedRun(9111, "agents/other", h.at(5), 406, true)
+	raised := h.poll("checks.passed", args, first["cursor"])
+	equal(t, ids(raised), []string{"checks.passed:" + repo + ":9110:1"}, "only the PR's run")
+	h.fake.mu.Lock()
+	equal(t, h.fake.listed, "agents/queue-helpers-2", "runs are listed for the PR's branch only (#3107)")
+	equal(t, h.fake.jobAsks, 0, "checks.passed fetches no jobs (#3107)")
+	h.fake.mu.Unlock()
+	firstFailed := h.poll("checks.failed", args, nil)
+	h.fake.addRun(9112, "agents/queue-helpers-2", h.at(6), 405, true)
+	equal(t, ids(h.poll("checks.failed", args, firstFailed["cursor"])), []string{"checks.failed:" + repo + ":9112:1"}, "checks.failed")
+	h.fake.mu.Lock()
+	equal(t, h.fake.jobAsks, 1, "checks.failed still fetches its jobs")
+	h.fake.mu.Unlock()
+	// A PR GitHub does not know still polls, as before, and raises nothing.
+	unknown := map[string]any{"repo": repo, "pr": float64(999)}
+	firstUnknown := h.poll("checks.passed", unknown, nil)
+	equal(t, ids(h.poll("checks.passed", unknown, firstUnknown["cursor"])), []string{}, "an unknown PR")
 }
 
 func TestPRMergedAndClosed(t *testing.T) {

@@ -112,30 +112,71 @@ func (s *Service) metricsAllowed(remote string) bool {
 	return false
 }
 
-func (s *Service) metricsText(ctx context.Context) (string, error) {
+// planState is an accounts gauge's labels.
+type planState struct{ plan, state string }
+
+// accountCounts are the gauges that read the store: the accounts by plan and state, the
+// storage their plans promise, and the waitlist's length. They change a few times a day,
+// so the sweep counts them each minute and a scrape reads no store (P20261031-6, #3106).
+type accountCounts struct {
+	at       time.Time
+	accounts map[planState]int
+	promised int64
+	waitlist int
+}
+
+// countsLife is how old the counts may be before a scrape counts again: the sweep's
+// minute, and one more for a sweep that is late.
+const countsLife = 2 * time.Minute
+
+// countAccounts reads every account and the waitlist's keys, and keeps the counts.
+func (s *Service) countAccounts(ctx context.Context) (*accountCounts, error) {
 	list, err := s.accounts.all(ctx)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	waiting, err := s.cfg.Store.List(ctx, waitlistFolder)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	type planState struct{ plan, state string }
-	accounts := map[planState]int{}
+	c := &accountCounts{at: s.cfg.Now(), accounts: map[planState]int{}, waitlist: len(waiting)}
 	for _, p := range plans {
-		accounts[planState{p.ID, "active"}] = 0
+		c.accounts[planState{p.ID, "active"}] = 0
 	}
 	for i := range list {
 		state := "active"
 		if list[i].Suspended != nil {
 			state = "suspended"
 		}
-		accounts[planState{PlanOf(&list[i]).ID, state}]++
+		plan := PlanOf(&list[i])
+		c.accounts[planState{plan.ID, state}]++
+		c.promised += plan.Storage
 	}
 	s.mu.Lock()
+	s.counts = c
+	s.mu.Unlock()
+	return c, nil
+}
+
+// sweepCounts counts again for the metrics, each minute.
+func (s *Service) sweepCounts(ctx context.Context) {
+	if _, err := s.countAccounts(ctx); err != nil {
+		s.log("metrics: " + err.Error())
+	}
+}
+
+func (s *Service) metricsText(ctx context.Context) (string, error) {
+	s.mu.Lock()
+	counts := s.counts
 	running := len(s.copies)
 	s.mu.Unlock()
+	if counts == nil || s.cfg.Now().Sub(counts.at) >= countsLife {
+		var err error
+		if counts, err = s.countAccounts(ctx); err != nil {
+			return "", err
+		}
+	}
+	accounts := counts.accounts
 
 	var b metricsWriter
 	b.head("agents_hosted_accounts", "gauge", "Accounts, by plan and state.")
@@ -150,7 +191,7 @@ func (s *Service) metricsText(ctx context.Context) (string, error) {
 		b.line(fmt.Sprintf(`agents_hosted_accounts{plan=%q,state=%q}`, k.plan, k.state), int64(accounts[k]))
 	}
 	b.head("agents_hosted_waitlist", "gauge", "People on the waitlist.")
-	b.line("agents_hosted_waitlist", int64(len(waiting)))
+	b.line("agents_hosted_waitlist", int64(counts.waitlist))
 	b.head("agents_hosted_copies_running", "gauge", "Control planes running now.")
 	b.line("agents_hosted_copies_running", int64(running))
 	if sp, ok := s.disk.space(); ok {
@@ -160,12 +201,8 @@ func (s *Service) metricsText(ctx context.Context) (string, error) {
 		b.head("agents_hosted_disk_high_water_bytes", "gauge", "Used bytes past which accounts' writes are refused.")
 		b.line("agents_hosted_disk_high_water_bytes", sp.Total/100*diskHighWater)
 	}
-	var promised int64
-	for i := range list {
-		promised += PlanOf(&list[i]).Storage
-	}
 	b.head("agents_hosted_storage_promised_bytes", "gauge", "The plans' storage, added up over all accounts.")
-	b.line("agents_hosted_storage_promised_bytes", promised)
+	b.line("agents_hosted_storage_promised_bytes", counts.promised)
 	if most, ok := s.storageTotal(); ok {
 		b.head("agents_hosted_storage_total_bytes", "gauge", "The most the plans' storage may add up to.")
 		b.line("agents_hosted_storage_total_bytes", most)

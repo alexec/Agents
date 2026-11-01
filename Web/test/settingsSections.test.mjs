@@ -14,8 +14,8 @@ test("each group's sections are in their subject's order", () => {
   assert.deepEqual(names("agents"), ["agentsPolicy"]);
   assert.deepEqual(names("machines"), ["gitAccess", "machines", "backups", "desktopControl", "serverBackups", "agentRuntimes", "secrets"]);
   assert.deepEqual(names("agentConfiguration"), ["skills", "personas", "workflows"]);
-  assert.deepEqual(names("controlPlane", "admin"), ["signIns", "people", "bots", "groups", "channels", "signInProviders", "policy", "providers"]);
-  assert.deepEqual(names("controlPlane", "member"), ["signIns", "people", "groups", "channels", "policy", "providers"]);
+  assert.deepEqual(names("controlPlane", "admin"), ["signIns", "forgeLogins", "people", "bots", "groups", "channels", "signInProviders", "policy", "providers"]);
+  assert.deepEqual(names("controlPlane", "member"), ["signIns", "forgeLogins", "people", "groups", "channels", "policy", "providers"]);
 });
 
 test("the list is sorted by name, a line each, and no two share a place", () => {

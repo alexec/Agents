@@ -125,6 +125,9 @@ export const forgottenCode = 4403;
 /** The close reason, with 4403, for a client of a suspended person (#1002, D13): not forgotten. */
 export const suspendedReason = "suspended";
 
+/** How long, in ms, the page waits on `/readyz` for a refusal's words (#3111). */
+const refusalWait = 5000;
+
 /** A call waiting for its reply, and the route it went on: a host, or null for the control plane. */
 type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void; route: string | null };
 
@@ -191,6 +194,8 @@ export class Link {
   private pending = new Map<number, Pending>();
   /** control/cutOff came (#1002): the 4403 after it is a suspension, not a forgetting. */
   private cutOff = false;
+  /** Counts dials, so a `/readyz` answer that comes after the next dial began is dropped. */
+  private dials = 0;
   private stateListeners = new Set<(state: LinkState) => void>();
   private noticeListeners = new Set<(method: string, params: unknown, host: string | null) => void>();
   state: LinkState = { kind: "connecting" };
@@ -286,6 +291,7 @@ export class Link {
 
   private async dial(): Promise<void> {
     this.clearTimers();
+    this.dials++;
     let record;
     try {
       record = await this.options.keys.load();
@@ -466,11 +472,15 @@ export class Link {
     this.retry = setTimeout(() => void this.dial(), delay);
   }
 
-  /** The socket closed before it opened: asks `/readyz` once for the words a refusal
-   * answered with, then goes down as any other failed try does. */
+  /** The socket closed before it opened: down at once, as any other failed try is, then
+   * `/readyz` is asked once for the words a refusal answered with, and they are put in
+   * while the link is still down from this try (#3111). An address that does not answer
+   * so never holds the page in "connecting", nor its first retry. */
   private async closedBeforeOpen(): Promise<void> {
+    this.down();
+    const dial = this.dials;
     const line = await this.refusalLine();
-    this.down(false, line);
+    if (line && !this.stopped && dial === this.dials && this.state.kind === "down" && !this.socket) this.down(false, line);
   }
 
   /** The words a refusal answered with, from `/readyz` next to this link's own
@@ -483,8 +493,9 @@ export class Link {
       url.pathname = "/readyz";
       // One same-origin GET, no credential of its own, read only for a refusal's words;
       // nothing it answers with is run (#2235).
+      // At most 5 s, as WebSocketLink's: a black-holed address never answers (#3111).
       // lint:allow fetch
-      const response = await fetch(url);
+      const response = await fetch(url, { signal: AbortSignal.timeout(refusalWait) });
       const kind = response.headers.get("Agents-Refusal");
       if (!kind) return undefined;
       const text = (await response.text()).trim();

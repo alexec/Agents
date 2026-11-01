@@ -2,6 +2,7 @@ package hosted
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -191,4 +192,48 @@ func TestBackupAndRestoreOneAccount(t *testing.T) {
 	if acc, _ := a.accounts().byGitHub(ctx, 2); acc != nil {
 		t.Fatal("the account is still there")
 	}
+}
+
+// #3106 P20261031-6: a scrape reads no store while the sweep's counts are fresh; the
+// sweep counts again, and a scrape counts when the sweep is late.
+func TestMetricsReadNoStorePerScrape(t *testing.T) {
+	ctx := context.Background()
+	st := &countingStore{Store: store.NewMemory()}
+	clk := &clock{now: time.Date(2026, 11, 1, 9, 0, 0, 0, time.UTC)}
+	s, _ := startWith(t, Config{Store: st, SignUp: SignUpOpen, Now: clk.Now})
+	for i := range 3 {
+		if _, _, err := s.accounts.make(ctx, GitHubID{ID: int64(600 + i), Login: "u"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	accounts := func(text string, n int) {
+		t.Helper()
+		if want := fmt.Sprintf(`agents_hosted_accounts{plan="free",state="active"} %d`, n); !strings.Contains(text, want) {
+			t.Fatalf("no %s in\n%s", want, text)
+		}
+	}
+	s.sweepCounts(ctx)
+	gets, lists := st.gets.Load(), st.lists.Load()
+	for range 4 {
+		_, text := scrape(s, "127.0.0.1:4000")
+		accounts(text, 3)
+	}
+	if st.gets.Load() != gets || st.lists.Load() != lists {
+		t.Fatalf("scrapes read the store: %d gets, %d lists", st.gets.Load()-gets, st.lists.Load()-lists)
+	}
+
+	if _, _, err := s.accounts.make(ctx, GitHubID{ID: 700, Login: "u"}); err != nil {
+		t.Fatal(err)
+	}
+	s.sweepCounts(ctx)
+	_, text := scrape(s, "127.0.0.1:4000")
+	accounts(text, 4)
+
+	// No sweep for countsLife: the scrape counts itself.
+	if _, _, err := s.accounts.make(ctx, GitHubID{ID: 701, Login: "u"}); err != nil {
+		t.Fatal(err)
+	}
+	clk.add(countsLife)
+	_, text = scrape(s, "127.0.0.1:4000")
+	accounts(text, 5)
 }

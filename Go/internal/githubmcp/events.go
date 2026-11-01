@@ -670,10 +670,10 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 		return list, truncated, nil
 	}
 	if name == "checks.failed" {
-		return checkRunCandidates(ctx, gh, name, a, yours, since, gh.FailedRuns, RunData.json)
+		return checkRunCandidates(ctx, gh, name, a, yours, since, gh.FailedRuns, true, RunData.json)
 	}
 	if name == "checks.passed" {
-		return checkRunCandidates(ctx, gh, name, a, yours, since, gh.PassedRuns, RunData.passedJSON)
+		return checkRunCandidates(ctx, gh, name, a, yours, since, gh.PassedRuns, false, RunData.passedJSON)
 	}
 	merged, closed, truncated, err := gh.ClosedPRs(ctx, repo, since)
 	if err != nil {
@@ -707,15 +707,25 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 }
 
 // checkRunCandidates is checks.failed's and checks.passed's candidates: listRuns finds the
-// finished runs, toJSON shapes each one's data (RunData.json keeps failedJobs, .passedJSON
-// drops it). A run that names another PR is skipped before its details are fetched; one that
+// finished runs, jobs says whether to fetch each one's jobs, toJSON shapes each one's data
+// (RunData.json keeps failedJobs, .passedJSON drops it). With a pr and no branch, only the PR's
+// branch is listed (#3107). A run that names another PR is skipped before its details are fetched; one that
 // names none is checked against the PR its details find. The cursor still moves past both.
 func checkRunCandidates(ctx context.Context, gh GitHub, name string, a args, yours *Yours, since string,
-	listRuns func(ctx context.Context, repo, branch, since string) ([]RunRef, bool, error),
+	listRuns func(ctx context.Context, repo, branch, since string) ([]RunRef, bool, error), jobs bool,
 	toJSON func(RunData) map[string]any,
 ) ([]candidate, bool, error) {
 	repo := a.repo
-	runs, truncated, err := listRuns(ctx, repo, a.branch, since)
+	branch := a.branch
+	if branch == "" && a.pr != 0 {
+		var err error
+		var missing *GitHubError
+		// A PR GitHub does not know lists the whole repo, as before; its runs never match.
+		if branch, err = gh.PRBranch(ctx, repo, a.pr); err != nil && !(errors.As(err, &missing) && missing.Kind == NotFound) {
+			return nil, false, err
+		}
+	}
+	runs, truncated, err := listRuns(ctx, repo, branch, since)
 	if err != nil {
 		return nil, false, err
 	}
@@ -730,7 +740,7 @@ func checkRunCandidates(ctx context.Context, gh GitHub, name string, a args, you
 				if (a.pr != 0 && ref.PRNumber != 0 && ref.PRNumber != a.pr) || (yours != nil && ref.PRNumber != 0 && !yours.owns(ref.PRNumber)) {
 					return nil, nil
 				}
-				details, err := gh.RunDetails(ctx, repo, ref)
+				details, err := gh.RunDetails(ctx, repo, ref, jobs)
 				if err != nil || details == nil {
 					return nil, err
 				}

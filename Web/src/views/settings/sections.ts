@@ -13,6 +13,7 @@ import { AgentRuntimesSection } from "./AgentRuntimes";
 import { AgentsPolicySection } from "./AgentsPolicy";
 import { BackupsSection, ServerBackupsSection } from "./Backups";
 import { DesktopControlSection } from "./DesktopControl";
+import { ForgeLoginsSection } from "./ForgeLogins";
 import { GitAccessSection } from "./GitAccess";
 import { VersionsSection } from "./Machines";
 import { NotificationsSection } from "./Notifications";
@@ -46,6 +47,8 @@ export const settingsSections: readonly SettingsSection[] = [
   { name: "channels", scope: "controlPlane", order: 30, Section: ChannelsSection },
   // The off-by-default switch for drive_screen (#3004, US2).
   { name: "desktopControl", scope: "machines", order: 35, Section: DesktopControlSection },
+  // Your GitHub, GitLab and Linear logins, for the Team section and "An agent is on it" (#2951, #3160).
+  { name: "forgeLogins", scope: "controlPlane", order: 7, Section: ForgeLoginsSection },
   { name: "gitAccess", scope: "machines", order: 10, Section: GitAccessSection },
   // Groups own machine providers (#1761).
   { name: "groups", scope: "controlPlane", order: 20, Section: GroupsSection },
