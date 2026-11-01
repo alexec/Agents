@@ -4,14 +4,14 @@
 // and lines (#3019). And Reports ▸ Lineage (#3087), as the window's LineagePage: the same graph
 // from any start, a click on a box starting from it, with Back and Forward along the starts.
 import { signal, useSignal } from "@preact/signals";
-import { useEffect, useRef } from "preact/hooks";
+import { useEffect, useMemo, useRef } from "preact/hooks";
 import type { LineageCostRollup, LineageGraph, LineageNode } from "../protocol/generated";
 import type { UUID } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { Capability } from "../protocol/capabilities.generated";
 import { describe } from "../model/errors";
 import {
-  box, costKey, costed, curve, currentStart, emptyHistory, goBack, goForward, goTo, kindWord, lineageDepth, lineageGraph,
+  box, costKey, costed, currentStart, emptyHistory, goBack, goForward, goTo, kindWord, lineageDepth, lineageGraph,
   lineageNote, lineagePageNote, noLineage, noLineageHere, readingTitles, resolvingAsks, sessionHost, sessionNode, startRow, typedNode, typedPullRequest, type GraphNode, type LineageGraphLayout,
   type LineageHistory, type LineageRow,
 } from "../model/lineage";
@@ -63,6 +63,15 @@ function useWalk(store: Store, host: string | undefined, node: LineageNode | und
   return { graph, costs, failed, reading };
 }
 
+/** The graph's layout, worked out again only when the walk, the costs, the start or the session titles change
+ * (#3182), not on each render. */
+function useLayout(store: Store, host: string | undefined, start: LineageNode | undefined, graph: LineageGraph | null,
+  costs: ReadonlyMap<string, LineageCostRollup>) {
+  const agents = store.agents.value;
+  return useMemo(() => host && start && graph ? lineageGraph(start, graph, costs, sessionTitle(store, host)) : undefined,
+    [host, start?.kind, start?.ref, graph, costs, agents]);
+}
+
 const sessionTitle = (store: Store, host: string) => (n: LineageNode) =>
   n.kind === "session" ? store.agent(host, n.ref.slice("session:".length))?.title ?? undefined : undefined;
 
@@ -70,6 +79,7 @@ export function Lineage({ store, host, session }: { store: Store; host: string; 
   const asked = useSignal(0);
   const me = sessionNode(session);
   const { graph, costs, failed, reading } = useWalk(store, host, me, asked.value);
+  const layout = useLayout(store, host, me, graph.value, costs.value);
 
   // The crumbs are always there (#3155): after a failed read, Refresh is how to read again.
   let body;
@@ -78,14 +88,13 @@ export function Lineage({ store, host, session }: { store: Store; host: string; 
   } else if (!graph.value) {
     body = <p class="hint">Reading the links…</p>;
   } else {
-    const title = sessionTitle(store, host);
     const empty = !graph.value.nodes.some((n) => n.kind !== me.kind || n.ref !== me.ref);
     // A session this page has goes to its chat; an issue, a PR or a milestone on GitHub opens there (row.url).
     const show = (row: LineageRow) => row.session && row.session !== session && store.agent(host, row.session)
       ? () => go({ ...route.value, host, session: row.session as UUID }) : undefined;
     body = (
       <>
-        {empty ? <p class="hint">{noLineage}</p> : <Graph layout={lineageGraph(me, graph.value, costs.value, title)} show={show}
+        {empty ? <p class="hint">{noLineage}</p> : <Graph layout={layout!} show={show}
           verb={(row) => row.url ? "Open it on GitHub" : "Show this session"} />}
         {reading.value && <p class="quiet small">{readingTitles}</p>}
         {graph.value.limited && <p class="quiet small">The walk stopped at its limit: there are more links.</p>}
@@ -143,6 +152,7 @@ export function LineagePage({ store }: { store: Store }) {
   }, []);
   const place = currentStart(history.value);
   const { graph, costs, failed, reading } = useWalk(store, place?.host, place?.node, asked.value);
+  const layout = useLayout(store, place?.host, place?.node, graph.value, costs.value);
   const startFrom = (p: Place) => { wrong.value = false; history.value = goTo(history.value, p, samePlace); };
   const sessions = store.hosts.value.flatMap((h) => (store.agents.value[h.id] ?? []).filter((a) => !a.archivedAt)
     .map((a) => ({ host: h.id, agent: a }))).sort((a, b) => b.agent.lastActivityAt - a.agent.lastActivityAt).slice(0, 15);
@@ -192,12 +202,11 @@ export function LineagePage({ store }: { store: Store }) {
     body = <p class="hint">Start from a session, or type an issue’s, a pull request’s, a milestone’s or a release’s address. Then click a box to start from it.</p>;
   } else if (failed.value) {
     body = <p class="hint">{failed.value}</p>;
-  } else if (!graph.value) {
+  } else if (!graph.value || !layout) {
     body = <p class="hint">Reading the links…</p>;
   } else {
     const walked = graph.value;
     const here = startRow(place.node, walked, costs.value, title);
-    const layout = lineageGraph(place.node, walked, costs.value, title);
     const chat = here.session ? store.agent(place.host, here.session) : undefined;
     body = (
       <>
@@ -249,6 +258,21 @@ function Graph({ layout, show, verb }: { layout: LineageGraphLayout; show: Show;
     view.value = { x: p.x - (p.x - x) * (next / was), y: p.y - (p.y - y) * (next / was), k: next };
   };
   const { x, y, k } = view.value;
+  // The boxes, lines and verbs are drawn once per layout (#3182): a pan or a zoom only moves the group they are in.
+  const drawing = useMemo(() => (
+    <>
+      {layout.edges.map((e) => (
+        <g key={`${e.from}\n${e.label}\n${e.to}`} class={`lineage-edge${e.ended ? " ended" : ""}`}>
+          <path d={`M${e.curve.start.x},${e.curve.start.y} C${e.curve.c1.x},${e.curve.c1.y} ${e.curve.c2.x},${e.curve.c2.y} ${e.curve.end.x},${e.curve.end.y}`}
+            marker-end="url(#lineage-arrow)" />
+        </g>
+      ))}
+      {layout.nodes.map((n) => <Box key={n.row.node.ref} node={n} show={show} verb={verb} />)}
+      {/* The verbs over the boxes: a line that skips a tier passes under one. */}
+      {layout.edges.map((e) => <text key={`${e.from}\n${e.label}\n${e.to}`} class="lineage-verb" x={e.curve.mid.x} y={e.curve.mid.y}
+        text-anchor="middle" dominant-baseline="central">{e.label}</text>)}
+    </>
+  ), [layout, show, verb]);
   return (
     <div class="lineage-graph">
       <div class="lineage-zoom" role="group" aria-label="Zoom">
@@ -283,22 +307,7 @@ function Graph({ layout, show, verb }: { layout: LineageGraphLayout; show: Show;
         </defs>
         <rect class="lineage-ground" width="100%" height="100%" />
         <g transform={`translate(${x},${y}) scale(${k})`}>
-          {layout.edges.map((e) => {
-            const c = curve(layout, e);
-            if (!c) return null;
-            return (
-              <g key={`${e.from}\n${e.label}\n${e.to}`} class={`lineage-edge${e.ended ? " ended" : ""}`}>
-                <path d={`M${c.start.x},${c.start.y} C${c.c1.x},${c.c1.y} ${c.c2.x},${c.c2.y} ${c.end.x},${c.end.y}`} marker-end="url(#lineage-arrow)" />
-              </g>
-            );
-          })}
-          {layout.nodes.map((n) => <Box key={n.row.node.ref} node={n} show={show} verb={verb} />)}
-          {/* The verbs over the boxes: a line that skips a tier passes under one. */}
-          {layout.edges.map((e) => {
-            const c = curve(layout, e);
-            return c && <text key={`${e.from}\n${e.label}\n${e.to}`} class="lineage-verb" x={c.mid.x} y={c.mid.y}
-              text-anchor="middle" dominant-baseline="central">{e.label}</text>;
-          })}
+          {drawing}
         </g>
       </svg>
     </div>
