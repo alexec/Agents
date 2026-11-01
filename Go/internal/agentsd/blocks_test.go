@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -216,4 +217,69 @@ func TestABlockClearedTwiceAtOnceResumesOnce(t *testing.T) {
 	if resumes != 1 {
 		t.Fatalf("resumed %d times: %q", resumes, userMessages(d, lead.ID))
 	}
+}
+
+// Another agent's message to an agent waiting on agents is answered in a turn, and the
+// wait goes on after it (#3173): the Scrum Master's message to a release cleared its wait
+// on two reviews, so the release was never woken when they finished or when its time came.
+func TestAWaitOutlivesAnotherAgentsMessage(t *testing.T) {
+	fakeRuntimes(t)
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := t.TempDir()
+	title := func(s string) *string { return &s }
+	review := seeded(t, d, dir, func(a *wire.Agent) { a.Title, a.State, a.EndedReason = title("Review"), wire.AgentStateRunning, nil })
+	check := seeded(t, d, dir, func(a *wire.Agent) { a.Title, a.State, a.EndedReason = title("Check"), wire.AgentStateRunning, nil })
+	master := seeded(t, d, dir, func(a *wire.Agent) { a.Title = title("Scrum master") })
+	lead := seeded(t, d, dir, func(a *wire.Agent) {
+		a.Title, a.State, a.EndedReason = title("Release"), wire.AgentStateFinished, reason(wire.EndedReasonEndTurn)
+		a.Report = &wire.WorkReport{Outcome: wire.WorkOutcomeWaiting, Message: "Waiting for the review and the check.", At: now(),
+			Block: &wire.Block{CheckAgainAt: new(wire.DateOf(time.Now().Add(time.Hour))), Waits: []wire.Wait{
+				{AgentID: review.ID, NameAtReport: "Review"}, {AgentID: check.ID, NameAtReport: "Check"},
+			}}}
+	})
+	turnOver := func(n int) func() bool {
+		return func() bool {
+			l := d.live(lead.ID)
+			l.mu.Lock()
+			busy := l.running || l.inTurn
+			l.mu.Unlock()
+			return !busy && d.Store.Agent(lead.ID).State == wire.AgentStateFinished && len(userMessages(d, lead.ID)) == n
+		}
+	}
+	message := func(text string) {
+		d.change(lead.ID, func(a *wire.Agent) {
+			a.QueuedPrompts = append(a.QueuedPrompts, wire.QueuedPrompt{ID: store.NewUUID(), Text: text, QueuedAt: now(),
+				From: wire.PromptOriginAgent, Sender: &wire.MessageSender{AgentID: master.ID, Title: "Scrum master"}, Attachments: []wire.Attachment{}})
+		})
+		d.live(lead.ID).kick()
+	}
+	message("Scrum master: a fix merged.")
+	waitFor(t, "the message answered", turnOver(1))
+	if r := d.Store.Agent(lead.ID).Report; !isOpenBlock(r) || r.Block == nil || len(r.Block.Waits) != 2 {
+		t.Fatalf("the wait was lost: %+v", r)
+	}
+	// The review ends while the next message is answered, when there is no block for
+	// closeWaits to find: the wait closes as the turn ends, and the release carries on.
+	d.change(review.ID, func(a *wire.Agent) {
+		a.State, a.EndedReason = wire.AgentStateFinished, reason(wire.EndedReasonEndTurn)
+		a.Report = &wire.WorkReport{Outcome: wire.WorkOutcomeDone, Message: "No dead code.", At: now()}
+	})
+	d.change(lead.ID, func(a *wire.Agent) {
+		b := *a.Report.Block
+		b.WakeOn = new(wire.BlockWakeOnAny)
+		r := *a.Report
+		r.Block = &b
+		a.Report = &r
+	})
+	message("Scrum master: another fix merged.")
+	waitFor(t, "the release resumed", func() bool {
+		for _, u := range userMessages(d, lead.ID) {
+			if strings.HasPrefix(u, "The wait you reported has cleared") && strings.Contains(u, "No dead code.") {
+				return true
+			}
+		}
+		return false
+	})
+	waitFor(t, "its turn over", turnOver(3))
 }

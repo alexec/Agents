@@ -669,6 +669,27 @@ func (d *Daemon) resumeBlocks() {
 	d.armBlockTimer()
 }
 
+// keptBlock closes the waits of a block a turn has given back (#3173) on those that ended
+// during the turn, when it had no block for closeWaits to find, and aims the timer again.
+// The resume, when it has cleared or is due, is the run's once the turn is over.
+func (d *Daemon) keptBlock(id wire.UUID) {
+	a := d.Store.Agent(id)
+	if a == nil || !isOpenBlock(a.Report) || a.Report.Block == nil {
+		return
+	}
+	for _, w := range a.Report.Block.Waits {
+		if w.Ending != nil {
+			continue
+		}
+		if t := d.Store.Agent(w.AgentID); t != nil {
+			if how := waitEndingHow(t); how != nil {
+				d.closeWaits(t.ID, *how)
+			}
+		}
+	}
+	d.armBlockTimer()
+}
+
 // agentEnded closes the waits on an agent that has ended, off the call that ended it.
 func (d *Daemon) agentEnded(id wire.UUID) {
 	a := d.Store.Agent(id)

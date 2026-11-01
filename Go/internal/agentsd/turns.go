@@ -47,6 +47,9 @@ type live struct {
 	// showedFile is whether this turn called show_file (#1802): ending 2, which no
 	// archive_session puts away unseen.
 	showedFile bool
+	// heldBlock is the open wait on agents a turn not the person's began over (#3173): a
+	// message from another agent does not end it, so the turn's end puts it back.
+	heldBlock *wire.WorkReport
 	// messageText is the text of the agent's last message this turn, for its report.
 	lastMessageID string
 	lastMessage   strings.Builder
@@ -484,6 +487,8 @@ func textBlock(text string) wire.ContentBlock {
 // run sends what is queued, one turn at a time, until the queue is empty or a turn was
 // stopped: a stop leaves the queue where it is (drainQueue).
 func (l *live) run() {
+	// A wait that cleared or came due in a turn could not resume it then (#3173).
+	defer l.d.resumeIfCleared(l.id)
 	for {
 		l.mu.Lock()
 		a := l.d.Store.Agent(l.id)
@@ -530,6 +535,7 @@ func (l *live) turn() bool {
 	l.stop = cancel
 	l.turnSeq++
 	l.inTurn, l.prompting, l.stopped, l.reported, l.showedFile = true, false, false, false, false
+	l.heldBlock = nil
 	l.mu.Unlock()
 	defer cancel()
 	defer func() {
@@ -736,6 +742,14 @@ func (l *live) turn() bool {
 		return false
 	}
 	l.forgetTools()
+	// Only the person's words carry an agent on past its wait (dropBlock); another agent's
+	// message, or the app's, is answered in a turn and the wait goes on after it (#3173).
+	if a := d.Store.Agent(l.id); a != nil && from != wire.PromptOriginPerson && isOpenBlock(a.Report) && a.Report.Block != nil {
+		held := *a.Report
+		l.mu.Lock()
+		l.heldBlock = &held
+		l.mu.Unlock()
+	}
 	d.moveState(l.id, wire.AgentStateRunning, true)
 	// What the person changed on a live page since this agent's last turn (022 FR-016),
 	// whoever sent the prompt, told once: the edit itself is in the file.
@@ -970,7 +984,8 @@ func (d *Daemon) moveState(id wire.UUID, s wire.AgentState, fromArchive bool) {
 // question, done with its first sentence otherwise.
 func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 	l.mu.Lock()
-	last, reported, showedFile := l.lastMessage.String(), l.reported, l.showedFile
+	last, reported, showedFile, held := l.lastMessage.String(), l.reported, l.showedFile, l.heldBlock
+	l.heldBlock = nil
 	l.mu.Unlock()
 	// The report says the last message as the transcript does: whole, so a token in it,
 	// or split across its chunks, is cut out (#1001).
@@ -998,7 +1013,7 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 	if adminStopped := d.takeAdminStop(l.id); adminStopped && s == wire.AgentStateStopped && why == wire.EndedReasonCancelled {
 		why = wire.EndedReasonStoppedByAdmin
 	}
-	var requested, archiveNow bool
+	var requested, archiveNow, keptBlock bool
 	l.forgetTools()
 	d.endScreenDrive(l.id)
 	d.change(l.id, func(a *wire.Agent) {
@@ -1022,10 +1037,18 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 				message = "Finished."
 			}
 			a.Report = &wire.WorkReport{Outcome: outcome, Message: message, At: now()}
+			// A turn another agent's message began over a wait on agents, which ended
+			// neither asking nor waiting anew, goes back to that wait (#3173).
+			if held != nil && outcome == wire.WorkOutcomeDone {
+				a.Report, keptBlock = held, true
+			}
 		}
 		requested, archiveNow = d.settleArchiveRequest(a, s, why, showedFile)
 	})
 	d.record(l.id, stateChanged(s, reason(why)))
+	if keptBlock {
+		d.keptBlock(l.id)
+	}
 	// A move asked for in this turn is made now, before the ending is heard and before an
 	// archive, so the worktree left is removed either way (053).
 	// An agent that moved itself and goes on in the new folder has not finished (#1955):
