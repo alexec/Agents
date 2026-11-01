@@ -110,7 +110,7 @@ func (m *Methods) groupsMethod(ctx context.Context, method string, params json.R
 			return nil, err
 		}
 		if m.s.providers == nil {
-			return nil, fail(providersNeedOneCopy, "Machine providers need a control plane with one copy, for now.")
+			return nil, m.s.providersOff()
 		}
 		if g := deref(request.Group); g != "" && m.records.Group(g) == nil {
 			return nil, fail(invalidParams, "There is no such group.")

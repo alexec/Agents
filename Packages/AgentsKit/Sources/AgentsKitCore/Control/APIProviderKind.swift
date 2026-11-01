@@ -159,7 +159,6 @@ public enum MachineProviderWords {
     public static let footer = "A provider starts and stops your machines: DigitalOcean Droplets, GitHub Codespaces, Coder workspaces, "
         + "Google Compute Engine VMs or AWS EC2 instances, through their API. It runs on the control plane, so it can start a machine that is down. "
         + "Docker, Cloud Workstations, your own commands and MCP servers are added in the Mac app."
-    public static let oneCopy = "Machine providers need a control plane with one copy, such as the one on your Mac. This one has several."
     public static let add = "Add Provider…"
     public static let secretsFoot = "Tokens and keys go to the control plane and are never shown again. This device does not keep them."
     public static let editSecret = "Leave empty to keep the one it has."

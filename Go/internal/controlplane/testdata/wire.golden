@@ -397,7 +397,7 @@ hosts/update refused
 providers/list refused
 {
   "code": -32064,
-  "message": "Machine providers need a control plane with one copy, for now."
+  "message": "Machine providers are off on this control plane, because it has no folder for their secrets (AGENTS_CONTROL_PROVIDER_HOME)."
 }
 
 nothing/here refused

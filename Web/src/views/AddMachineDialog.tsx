@@ -7,7 +7,6 @@ import type { ControlCodeShown } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { describe } from "../model/errors";
 import { makers } from "../model/machineFromRepository";
-import { providerWords } from "../model/machineProviders";
 import { addMachineWays, addMachineWords as words, type AddMachineWay } from "../model/addMachine";
 import { AddProviderDialog } from "./Providers";
 import { MachineDialog } from "./MachineDialog";
@@ -21,7 +20,7 @@ export function AddMachineDialog({ store, close, start = { kind: "choose" } }: {
   const [picked, setPicked] = useState<string>();
   const providers = store.providers.list.value;
   useEffect(() => { if (providers === null) void store.providers.load(); }, []);
-  const oneCopy = store.providers.problem.value === providerWords.oneCopy;
+  const off = store.providers.off.value;
   const admin = store.person.value?.role !== "member";
   const choices = makers(providers ?? []);
 
@@ -35,7 +34,7 @@ export function AddMachineDialog({ store, close, start = { kind: "choose" } }: {
     if (way === "provider") setStep({ kind: "provider", picked: picked ?? choices[0]?.id });
     else setStep({ kind: "code", command: way === "server" });
   };
-  const ready = way !== "provider" || (!oneCopy && choices.length > 0);
+  const ready = way !== "provider" || (!off && choices.length > 0);
   return (
     <Modal label={words.title} close={close}>
       <form class="sheet-body connect-sheet provider-sheet" onSubmit={(e) => { e.preventDefault(); if (ready) next(); }}>
@@ -45,11 +44,11 @@ export function AddMachineDialog({ store, close, start = { kind: "choose" } }: {
             <button key={w} type="button" role="radio" aria-checked={way === w} class={`add-machine-way${way === w ? " on" : ""}`}
               onClick={() => setWay(w)}>
               <span class="strong">{words.choice(w)}</span>
-              <span class="small quiet">{w === "provider" && oneCopy ? words.needsControlPlane : words.note(w)}</span>
+              <span class="small quiet">{w === "provider" && off ? off : words.note(w)}</span>
             </button>
           ))}
         </div>
-        {way === "provider" && !oneCopy && providers !== null && (choices.length === 0 ? (
+        {way === "provider" && !off && providers !== null && (choices.length === 0 ? (
           <p class="sheet-note">
             {admin ? words.noProviders : words.noProvidersAskAdmin}{" "}
             {admin && <button type="button" onClick={() => setStep({ kind: "addProvider" })}>{words.addProvider}</button>}

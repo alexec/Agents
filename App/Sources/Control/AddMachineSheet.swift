@@ -87,7 +87,7 @@ struct AddMachineSheet: View {
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(Words.choice(each)).appText(.reading).fontWeight(.semibold)
-                    Text(each == .provider && !control.providersHere ? Words.needsControlPlane : Words.note(each, ssh: true))
+                    Text(each == .provider ? control.providersOff ?? Words.note(each, ssh: true) : Words.note(each, ssh: true))
                         .appText(.supporting).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }

@@ -42,7 +42,7 @@ public enum AddMachine {
 
         public static let noProviders = "No provider here can make a machine yet."
         public static let noProvidersAskAdmin = "No provider here can make a machine. An admin adds one in Settings ▸ Machine Providers."
-        public static let needsControlPlane = "Needs a control plane with one copy, such as the one on your Mac."
+        public static let needsControlPlane = "Needs a control plane, such as the one on your Mac."
         /// Said where a provider is added outside Settings (#1787).
         public static let providersYours = "Your providers are yours in every folder."
         public static let existing = "Or add one it has already"

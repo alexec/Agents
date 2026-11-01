@@ -14,8 +14,10 @@ final class ControlSettingsModel {
     private(set) var hosts: [DaemonAPI.ControlMachine] = []
     /// Machine providers (#691), as the control plane last listed them.
     private(set) var providers: [DaemonAPI.ProviderSummary] = []
-    /// False on a control plane that can't run providers (several copies, research R4).
-    private(set) var providersHere = true
+    /// Why this control plane runs no providers, in its own words (several copies, research R4,
+    /// or no folder for their secrets, #3113); nil when it runs them.
+    private(set) var providersOff: String?
+    var providersHere: Bool { providersOff == nil }
     /// The groups providers are given to (#1761): every one for an admin, a member's own.
     /// Empty from a control plane before groups.
     private(set) var groups: [DaemonAPI.Group] = []
@@ -160,11 +162,13 @@ final class ControlSettingsModel {
         do {
             let answer = try await client.call(DaemonAPI.Method.providersList, DaemonAPI.Empty())
             providers = (try? answer["providers"]?.decode([DaemonAPI.ProviderSummary].self)) ?? []
-            providersHere = true
-        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.providersNeedOneCopy
-            || error.code == JSONRPCError.methodNotFound {
+            providersOff = nil
+        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.providersNeedOneCopy {
             providers = []
-            providersHere = false
+            providersOff = error.message
+        } catch let error as JSONRPCError where error.code == JSONRPCError.methodNotFound {
+            providers = []
+            providersOff = "This control plane runs no machine providers."
         } catch {}
     }
 

@@ -25,16 +25,24 @@ on the Mac that runs the control plane.
 
 ## Where to add one
 
-- **On the Mac:** **Settings ▸ Control plane ▸ Providers**, then **Add Provider…**. Choose
-  the cloud. For DigitalOcean, Codespaces and Coder, **Reach it with** offers **Its API**
-  (first) and **Its CLI**. The Mac also adds Docker, your own commands and MCP servers.
-- **On the iPhone or iPad:** **Settings ▸ Machine providers**, then **Add Provider…**.
+- **On the Mac:** **Settings ▸ Machine Providers**, in the Control plane group, then
+  **Add Provider…**. Choose the cloud. For DigitalOcean, Codespaces and Coder, **Reach it
+  with** offers **Its API** (first) and **Its CLI**. The Mac also adds Docker, your own
+  commands and MCP servers.
 - **On the web page:** the **Machine providers** section of Settings, then
   **Add Provider…**.
 
-The Remote and the web page offer only the API presets: DigitalOcean, Codespaces, Coder,
-AWS EC2 and Compute Engine. A CLI preset needs a shell where the control plane runs, to
-install and sign in the CLI, and a person on a phone or in a browser has none there.
+The iPhone and iPad do not add providers (#2798).
+
+The web page offers only the API presets: DigitalOcean, Codespaces, Coder, AWS EC2 and
+Compute Engine. A CLI preset needs a shell where the control plane runs, to install and
+sign in the CLI, and a person in a browser has none there.
+
+The control plane runs providers only when it has a folder for them (#3113): `--home`, or
+`AGENTS_CONTROL_PROVIDER_HOME`. The control plane on your Mac has one.
+`deploy/compose.public.yaml` sets `/data/providers`, in the data volume. A control plane
+with several copies runs no providers. When providers are off, the pane and the section
+stay, and say why.
 
 Each form fills in its own name, such as "AWS EC2 Instances". Change it in **Name** when
 you add more than one of a kind.

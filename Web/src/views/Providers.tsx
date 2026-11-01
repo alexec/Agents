@@ -24,17 +24,18 @@ export function ProvidersSection({ store }: { store: Store }) {
   const [said, setSaid] = useState<string | null>(null);
   // Lists every provider again when the page opens (FR-004).
   useEffect(() => { void store.providers.load(); }, []);
-  const oneCopy = problem === words.oneCopy;
+  const off = store.providers.off.value;
   return (
     <section aria-labelledby="settings-providers">
       <h3 class="section-head" id="settings-providers">{words.heading}</h3>
-      {problem && <p class={oneCopy ? "hint" : "hint failure"}>{problem}</p>}
+      {off && <p class="hint">{off}</p>}
+      {problem && <p class="hint failure">{problem}</p>}
       {said && <p class="hint failure">{said}</p>}
-      {!oneCopy && providers?.map((p) => (
+      {!off && providers?.map((p) => (
         <ProviderCard key={p.id} store={store} provider={p} say={setSaid} edit={() => setEditing(p)}
           link={(workspace) => setLinking({ provider: p, workspace })} />
       ))}
-      {!oneCopy && (
+      {!off && (
         <>
           {/* Only an admin adds one (#1761). */}
           {store.person.value?.role !== "member" && (

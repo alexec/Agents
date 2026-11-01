@@ -22,7 +22,6 @@ export const addMachineWords = {
   })[way],
   noProviders: "No provider here can make a machine yet.",
   noProvidersAskAdmin: "No provider here can make a machine. An admin adds one in Settings ▸ Machine Providers.",
-  needsControlPlane: "Needs a control plane with one copy, such as the one on your Mac.",
   providersYours: "Your providers are yours in every folder.",
   next: "Next",
   machineTitle: "New Machine",

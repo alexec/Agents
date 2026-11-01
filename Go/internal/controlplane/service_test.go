@@ -729,7 +729,9 @@ func TestProvidersAnswerWhereTheyCanRun(t *testing.T) {
 	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, window := p.client("Window")
-	if e := callError(t, window, "", "providers/list", nil); !strings.Contains(e, "-32064") {
+	// One copy with no home says that, not that it has several (#3113).
+	if e := callError(t, window, "", "providers/list", nil); !strings.Contains(e, "-32064") ||
+		!strings.Contains(e, "AGENTS_CONTROL_PROVIDER_HOME") || strings.Contains(e, "several") {
 		t.Fatal(e)
 	}
 

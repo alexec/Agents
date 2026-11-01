@@ -80,7 +80,7 @@ function plane({ oneCopy = true, working = false } = {}) {
     call: async (method, params) => {
       asked.push({ method, params });
       if (method === "providers/list") {
-        if (!oneCopy) throw new w.CallFailed(w.Failure.providersNeedOneCopy, "several");
+        if (!oneCopy) throw new w.CallFailed(w.Failure.providersNeedOneCopy, "Machine providers are off on this control plane, because it has no folder for their secrets.");
         return { providers: [summary()] };
       }
       if (method === "providers/refresh") return {};
@@ -112,10 +112,11 @@ test("the model lists, asks for a fresh list, adds, removes, and takes the notic
   assert.ok(!JSON.stringify(p.list.value).includes("\"s\""));
 });
 
-test("a control plane with several copies says so", async () => {
+test("a control plane that runs no providers says why, in its own words (#3113)", async () => {
   const p = new w.Providers(plane({ oneCopy: false }));
   await p.load();
-  assert.equal(p.problem.value, w.providerWords.oneCopy);
+  assert.equal(p.off.value, "Machine providers are off on this control plane, because it has no folder for their secrets.");
+  assert.equal(p.problem.value, null);
 });
 
 test("Stop asks first while agents work there, then stops with confirmRunning", async () => {
