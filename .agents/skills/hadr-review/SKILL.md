@@ -49,11 +49,10 @@ is a release check, so that the bugs are found before GA, not by a full disk or 
 
 1. Move into the review worktree, on the local branch `agents/reviews-hadr`, through the
    app, so it shows where you work (#615):
-   - `.agents/worktrees/reviews-hadr` is there: move_worktree with its absolute path.
-   - Only the branch `agents/reviews-hadr` is there: `git worktree add
-     .agents/worktrees/reviews-hadr agents/reviews-hadr`, then move_worktree with its
-     absolute path.
-   - Neither: move_worktree with worktree `reviews-hadr`.
+   - The branch `agents/reviews-hadr` is there: move_worktree with worktree
+     `agents/reviews-hadr`. The app moves you into its worktree, or makes one on it.
+     Never run `git worktree add` (#3174).
+   - It is not there: move_worktree with worktree `reviews-hadr`.
 
    End your turn; you are started again in it. There, `git merge --no-edit main`. This
    branch holds `.agents/reviews/hadr/` and nothing else of its own; it is never pushed.

@@ -399,7 +399,7 @@
           "type": "string"
         },
         "worktree": {
-          "description": "A name for a new worktree, or the absolute path of one already there.",
+          "description": "A name for a new worktree, the absolute path of one already there, or a local branch (in its worktree, or a new one on it).",
           "type": "string"
         }
       },

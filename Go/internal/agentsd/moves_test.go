@@ -90,6 +90,38 @@ func TestAnAgentMovesIntoAnExistingWorktreeAtOnce(t *testing.T) {
 	}
 }
 
+// A local branch's name moves into a new worktree on it, then into that worktree, and the
+// folder's own branch is refused (#3174): no agent runs git worktree add by hand.
+func TestAnAgentMovesOntoALocalBranch(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := repo(t)
+	run(t, dir, "git", "branch", "agents/reviews-usability")
+	a := seeded(t, d, dir, nil)
+	m := appClient(t, d, a.ID)
+	m.post("initialize", map[string]any{}, 1)
+	root := filepath.Join(dir, ".agents", "worktrees", "reviews-usability")
+	text, isError := m.tool(2, "move_worktree", map[string]any{"worktree": "agents/reviews-usability"})
+	if isError || !strings.HasPrefix(text, "Moved.") {
+		t.Fatal(text)
+	}
+	got := d.Store.Agent(a.ID)
+	if got.Worktree == nil || store.FolderPath(got.Cwd) != root || *got.Worktree.Branch != "agents/reviews-usability" {
+		t.Fatalf("%+v %+v", got.Cwd, got.Worktree)
+	}
+	// Back to the folder, then the branch again: the worktree there now, not a second one.
+	if text, isError := m.tool(3, "move_worktree", map[string]any{"leave_worktree": "keep"}); isError {
+		t.Fatal(text)
+	}
+	text, isError = m.tool(4, "move_worktree", map[string]any{"worktree": "agents/reviews-usability"})
+	if isError || text != "Moved. Now working in the worktree reviews-usability on agents/reviews-usability, at "+root+"." {
+		t.Fatal(text)
+	}
+	if text, isError := m.tool(5, "move_worktree", map[string]any{"worktree": "main"}); !isError || !strings.Contains(text, "checked out in the folder itself") {
+		t.Fatal(text)
+	}
+}
+
 // inAppWorktree is an agent in a worktree the app made, with a remote to push to.
 func inAppWorktree(t *testing.T, d *Daemon) (wire.Agent, string, string) {
 	t.Helper()

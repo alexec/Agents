@@ -165,6 +165,20 @@ func (d *Daemon) askMove(id wire.UUID, move wire.PendingMove) (string, error) {
 	if e := move.Target.Existing; e != nil && canonical(store.FolderPath(e.Value)) == canonical(repo.toplevel) {
 		move.Target = wire.MoveTarget{FolderPath: &struct{}{}}
 	}
+	// A local branch's name moves to the worktree it is checked out in, or to a new
+	// worktree on it, so an agent never runs git worktree add by hand (#3174).
+	if n := move.Target.NewWorktree; n != nil && n.Name != nil && isLocalBranch(folder, *n.Name) {
+		list, _ := worktreeList(folder)
+		for _, e := range list {
+			if e.branch != *n.Name {
+				continue
+			}
+			if canonical(e.root) == canonical(repo.toplevel) {
+				return "", Invalid("Nothing was moved: %s is checked out in the folder itself. Name another branch, or a new worktree.", *n.Name)
+			}
+			move.Target = wire.MoveTarget{Existing: &wire.MoveTargetExisting{Value: store.FolderURL(e.root)}}
+		}
+	}
 	switch t := move.Target; {
 	case t.FolderPath != nil:
 		if a.Worktree == nil {
@@ -198,6 +212,9 @@ func (d *Daemon) askMove(id wire.UUID, move wire.PendingMove) (string, error) {
 		given := ""
 		if t.NewWorktree.Name != nil {
 			given = *t.NewWorktree.Name
+		}
+		if isLocalBranch(folder, given) {
+			break
 		}
 		name := moveName(given, a)
 		move.Target.NewWorktree = &wire.MoveTargetNewWorktree{Name: &name}
@@ -320,6 +337,8 @@ func (d *Daemon) applyPendingMove(id wire.UUID) bool {
 	cwd := folder
 	var err error
 	switch t := move.Target; {
+	case t.NewWorktree != nil && isLocalBranch(folder, deref(t.NewWorktree.Name)):
+		wt, cwd, err = d.prepareWorktree(folder, wire.WorktreeChoice{Branch: &wire.WorktreeChoiceBranch{Value: *t.NewWorktree.Name}}, "")
 	case t.NewWorktree != nil:
 		name := moveName(deref(t.NewWorktree.Name), a)
 		wt, cwd, err = d.prepareWorktreeFrom(folder, old, wire.WorktreeChoice{Named: &wire.WorktreeChoiceNamed{Value: name}}, "")
@@ -612,4 +631,13 @@ func uncommittedWords(lines []string, count int64) string {
 		}
 	}
 	return words
+}
+
+// isLocalBranch says whether name is a branch of folder's repository.
+func isLocalBranch(folder, name string) bool {
+	if name == "" || strings.HasPrefix(name, "-") {
+		return false
+	}
+	_, err := git(folder, "show-ref", "--verify", "-q", "refs/heads/"+name)
+	return err == nil
 }
