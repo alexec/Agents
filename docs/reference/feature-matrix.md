@@ -38,7 +38,7 @@ down for a runtime that has none. [Overall score](#overall-score), after the
 tables, adds every feature up.
 
 The matrix was filled in on 2026-10-12 from each app's own docs, changelog, README,
-releases and, where open, source. Agents' row was last brought up to date on 2026-10-30. Every app is held to the same bar, Agents included: a ●
+releases and, where open, source. Agents' row was last brought up to date on 2026-11-01. Every app is held to the same bar, Agents included: a ●
 needs the whole feature, documented by the app itself, and a ○ needs evidence, such as an
 app that ships for macOS alone having no Android app. Once per release, after the
 Competitor check, the Feature matrix workflow (`.agents/workflows/feature-matrix.md`)
@@ -58,7 +58,9 @@ Agents' ◐ cells, and why:
   limit. See [Limit spending](../how-to/limit-spending.md).
 - **A browser the agent drives:** through the Playwright server from the MCP marketplace,
   with nothing shown in the app, or with **Use Chrome** (#1837), which drives the person's
-  own Chrome for Claude alone, once its extension is installed.
+  own Chrome for Claude alone, once its extension is installed. Desktop control's
+  `drive_screen` (#3004) lets an agent of any runtime drive a browser by its screen,
+  mouse and keyboard, but the app does not show it yet: the live tile is still to come.
 - **Several accounts per runtime:** for Claude and Codex alone (#840). The person picks
   the account when a session starts. See
   [More than one account](runtimes.md#more-than-one-account).
@@ -195,6 +197,7 @@ Agents has none of these at all:
 | VibeiDE | ● | ○ | ○ | ● | ● | ?⃝ | 50% |
 | Agentastic | ○ | ◐ | ○ | ○ | ● | ● | 42% |
 | Paradev (was Superset) | ◐ | ● | ○ | ○ | ?⃝ | ● | 42% |
+| Ace | ● | ○ | ○ | ● | ?⃝ | ?⃝ | 33% |
 | DockTerm | ● | ○ | ○ | ○ | ○ | ● | 33% |
 | Emdash | ● | ○ | ○ | ○ | ○ | ● | 33% |
 | Helicon | ● | ○ | ○ | ● | ○ | ?⃝ | 33% |
@@ -202,7 +205,6 @@ Agents has none of these at all:
 | Sculptor | ● | ○ | ○ | ?⃝ | ○ | ● | 33% |
 | tuios | ○ | ○ | ○ | ● | ○ | ● | 33% |
 | Conductor | ○ | ◐ | ?⃝ | ?⃝ | ○ | ● | 25% |
-| Ace | ● | ○ | ○ | ?⃝ | ?⃝ | ?⃝ | 17% |
 | ReevesAgents | ○ | ○ | ○ | ● | ○ | ○ | 17% |
 | Atelier (was Acepe) | ◐ | ○ | ○ | ○ | ○ | ?⃝ | 8% |
 | Claude Squad | ○ | ○ | ○ | ○ | ○ | ○ | 0% |
@@ -355,8 +357,8 @@ Agents has none of these at all:
 | Sculptor | ?⃝ | ?⃝ | ● | ◐ | ?⃝ | ● | ○ | ◐ | ○ | 33% |
 | tuios | ?⃝ | ?⃝ | ?⃝ | ◐ | ● | ● | ○ | ◐ | ○ | 33% |
 | Vibe Kanban | ○ | ?⃝ | ◐ | ?⃝ | ● | ● | ○ | ○ | ○ | 28% |
+| Ace | ○ | ?⃝ | ?⃝ | ?⃝ | ● | ● | ?⃝ | ?⃝ | ?⃝ | 22% |
 | ReevesAgents | ?⃝ | ○ | ?⃝ | ○ | ● | ● | ○ | ○ | ○ | 22% |
-| Ace | ○ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 11% |
 | Roamgate | ?⃝ | ?⃝ | ?⃝ | ◐ | ◐ | ?⃝ | ○ | ○ | ○ | 11% |
 | VibeiDE | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 11% |
 | Helicon | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ○ | ◐ | ○ | 6% |
@@ -382,7 +384,7 @@ Agents has none of these at all:
 | Paseo | ?⃝ | ● | ● | ?⃝ | ● | ?⃝ | 60% |
 | Pragma | ?⃝ | ● | ● | ?⃝ | ● | ● | 60% |
 | Threadlines | ?⃝ | ● | ● | ?⃝ | ● | ?⃝ | 60% |
-| Ace | ?⃝ | ?⃝ | ● | ?⃝ | ● | ◐ | 40% |
+| Ace | ?⃝ | ?⃝ | ● | ?⃝ | ● | ● | 40% |
 | Codeg | ● | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 40% |
 | Emdash | ● | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 40% |
 | Happy | ?⃝ | ?⃝ | ● | ?⃝ | ● | ● | 40% |
@@ -473,9 +475,9 @@ Each app's score in every table, and overall: its points over the 50 scored feat
 | 23 | CodeAgentSwarm | 67% | 58% | 31% | 30% | 30% | 39% | 80% | 17% | **43%** |
 | 25 | tuios | 83% | 33% | 44% | 60% | 20% | 33% | 30% | 33% | **42%** |
 | 25 | Vibe Kanban | 67% | 50% | 25% | 60% | 30% | 28% | 20% | 67% | **42%** |
-| 27 | Sculptor | 58% | 33% | 25% | 80% | 20% | 33% | 20% | 33% | **37%** |
-| 28 | Roamgate | 67% | 50% | 25% | 80% | 20% | 11% | 0% | 50% | **36%** |
-| 29 | Ace | 33% | 17% | 75% | 20% | 40% | 11% | 40% | 33% | **34%** |
+| 27 | Ace | 33% | 33% | 75% | 20% | 40% | 22% | 40% | 33% | **38%** |
+| 28 | Sculptor | 58% | 33% | 25% | 80% | 20% | 33% | 20% | 33% | **37%** |
+| 29 | Roamgate | 67% | 50% | 25% | 80% | 20% | 11% | 0% | 50% | **36%** |
 | 30 | Helicon | 42% | 33% | 38% | 20% | 0% | 6% | 40% | 67% | **30%** |
 | 31 | VibeiDE | 50% | 50% | 25% | 40% | 30% | 11% | 20% | 8% | **28%** |
 | 32 | DockTerm | 17% | 33% | 44% | 20% | 40% | 0% | 20% | 33% | **25%** |
