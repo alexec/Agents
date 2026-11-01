@@ -13,13 +13,16 @@ import Testing
 @Suite("A refused connect's words", .timeLimit(.minutes(1)))
 struct WebSocketLinkRefusalTests {
     /// A server that refuses every `/v1/connect` upgrade with `kind` and `body`, and
-    /// answers `/readyz` with `readyz` (nil for a server that refuses that too).
-    private func refusingServer(kind: String, body: String, readyz: String?) async throws -> RefusingServer {
+    /// answers `/readyz` with `readyz` (nil for a server that refuses that too), with
+    /// `Agents-Refusal` on it when `readyzRefuses`.
+    private func refusingServer(kind: String, body: String, readyz: String?,
+                                readyzRefuses: Bool = true) async throws -> RefusingServer {
         let channel = try await ServerBootstrap(group: ControlDial.group)
             .childChannelInitializer { channel in
                 ControlWebSocketServer.configure(channel, tls: nil, reply: { head in
                     if head.uri == "/readyz", let readyz {
-                        return PlainReply(.ok, Data(readyz.utf8), contentType: "text/plain; charset=utf-8")
+                        return PlainReply(.ok, Data(readyz.utf8), contentType: "text/plain; charset=utf-8",
+                                          headers: readyzRefuses ? [(ControlRefusal.header, kind)] : [])
                     }
                     if head.uri == "/readyz" { return PlainReply(.serviceUnavailable, Data()) }
                     return PlainReply(.forbidden, Data(body.utf8), contentType: "text/plain; charset=utf-8",
@@ -48,6 +51,17 @@ struct WebSocketLinkRefusalTests {
 
     @Test func theKindStandsInWhenReadyzDoesNotAnswer() async throws {
         let server = try await refusingServer(kind: "limit", body: "Your Free plan allows 2 machines.", readyz: nil)
+        defer { server.stop() }
+        await #expect(throws: ControlRefusal(line: "limit")) {
+            _ = try await WebSocketLink.connect(URL(string: "http://127.0.0.1:\(server.port)")!, pin: nil)
+        }
+    }
+
+    /// An account host's `/readyz` that reaches the running copy says "ready" (#3146):
+    /// without `Agents-Refusal` on it, that is not the refusal's line.
+    @Test func aReadyzWithoutTheHeaderIsNotTheLine() async throws {
+        let server = try await refusingServer(kind: "limit", body: "Your Free plan allows 2 connections at once.",
+                                               readyz: "ready\n", readyzRefuses: false)
         defer { server.stop() }
         await #expect(throws: ControlRefusal(line: "limit")) {
             _ = try await WebSocketLink.connect(URL(string: "http://127.0.0.1:\(server.port)")!, pin: nil)
