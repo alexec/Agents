@@ -1,7 +1,11 @@
 package agentsd
 
 import (
+	"context"
+	"encoding/json"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/alexec/agents/Go/wire"
 )
@@ -30,7 +34,7 @@ func TestAgentOnByNumber(t *testing.T) {
 		a.Labels = []wire.SessionLabel{{Value: "#12"}}
 	})
 
-	prs, issues := d.agentOnByNumber(folder)
+	prs, issues, _ := d.agentOnIt(folder)
 	if len(prs) != 1 || prs["40"] != title {
 		t.Errorf("prs: %+v", prs)
 	}
@@ -38,7 +42,7 @@ func TestAgentOnByNumber(t *testing.T) {
 		t.Errorf("issues: %+v", issues)
 	}
 
-	if prs, issues := d.agentOnByNumber(t.TempDir()); len(prs) != 0 || len(issues) != 0 {
+	if prs, issues, _ := d.agentOnIt(t.TempDir()); len(prs) != 0 || len(issues) != 0 {
 		t.Errorf("a folder with no repo: %+v %+v", prs, issues)
 	}
 }
@@ -61,8 +65,67 @@ func TestAgentOnByLinearKey(t *testing.T) {
 		a.Labels = []wire.SessionLabel{{Value: "ENG-9"}}
 	})
 
-	got := d.agentOnByLinearKey()
+	_, _, got := d.agentOnIt(folderA)
 	if len(got) != 1 || got["ENG-4"] != title {
 		t.Errorf("got %+v", got)
+	}
+}
+
+// The people are asked of the control plane once a minute, not on every view call (#3108):
+// a call inside the minute is given the kept answer, one after it is given the kept answer
+// while a fresh one is asked for, and a new control-plane link asks again at once.
+func TestTeamPeopleIsKept(t *testing.T) {
+	clock := atTime(t, time.Date(2026, 11, 1, 9, 0, 0, 0, time.UTC))
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	var asked atomic.Int32
+	name := atomic.Value{}
+	name.Store("Ann")
+	ask := func(_ context.Context, method string, _ any) (json.RawMessage, error) {
+		if method != wire.CallPeopleForViews.Name {
+			return nil, context.Canceled // askThereWaits, on a new link
+		}
+		asked.Add(1)
+		return json.Marshal(wire.PeopleForViews{People: []wire.TeamPerson{{Name: name.Load().(string), Kind: "person"}}})
+	}
+	d.SetControlAsk(ask)
+	named := func() string {
+		list := d.cachedTeamPeople(context.Background())
+		if len(list) != 1 {
+			t.Fatalf("people: %+v", list)
+		}
+		return list[0]["name"].(string)
+	}
+
+	if got := named(); got != "Ann" || asked.Load() != 1 {
+		t.Fatalf("first: %s, asked %d", got, asked.Load())
+	}
+	name.Store("Bea")
+	clock.add(30 * time.Second)
+	if got := named(); got != "Ann" || asked.Load() != 1 {
+		t.Fatalf("inside the minute: %s, asked %d", got, asked.Load())
+	}
+	clock.add(time.Minute)
+	if got := named(); got != "Ann" {
+		t.Fatalf("stale is still given: %s", got)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for asked.Load() != 2 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	for named() != "Bea" && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if got := named(); got != "Bea" || asked.Load() != 2 {
+		t.Fatalf("after the refresh: %s, asked %d", got, asked.Load())
+	}
+
+	d.SetControlAsk(ask)
+	if named(); asked.Load() != 3 {
+		t.Fatalf("a new link asks again: asked %d", asked.Load())
+	}
+	d.SetControlAsk(nil)
+	if list := d.cachedTeamPeople(context.Background()); list != nil {
+		t.Fatalf("no control plane: %+v", list)
 	}
 }
