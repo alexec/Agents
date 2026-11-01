@@ -325,3 +325,44 @@ test("refused as crowded is down, says so, keeps the key, and opens once a tab c
   assert.equal(net.made.length, 3);
   l.stop();
 });
+
+/** Sockets that close before they open, as a refused or unreachable address's do. */
+function refusedSockets() {
+  const made = [];
+  return {
+    made,
+    open() {
+      const socket = { onopen: null, onmessage: null, onclose: null, onerror: null, send() {}, close() {} };
+      made.push(socket);
+      queueMicrotask(() => socket.onclose?.({ code: 1006, reason: "" }));
+      return socket;
+    },
+  };
+}
+
+test("a dial that closes before it opens is down at once, while /readyz never answers (#3111)", async (t) => {
+  const asked = [];
+  t.mock.method(globalThis, "fetch", (url, init) => { asked.push(init?.signal); return new Promise(() => {}); });
+  const net = refusedSockets();
+  const l = link(paired(), net);
+  const states = await opened(l);
+  assert.deepEqual(states.slice(0, 2), ["connecting", "down"]);
+  await wait(40);
+  assert.ok(net.made.length >= 2, "it retried without waiting on /readyz");
+  assert.ok(asked[0] instanceof AbortSignal, "the /readyz fetch has a time limit");
+  l.stop();
+});
+
+test("a refusal's words from /readyz are put in while the link is still down (#2235, #3111)", async (t) => {
+  t.mock.method(globalThis, "fetch", async () => new Response("This hosted account is suspended.", { headers: { "Agents-Refusal": "suspended" } }));
+  const net = refusedSockets();
+  const seen = [];
+  const l = link(paired(), net, { backoff: [10] });
+  l.onState((state) => seen.push(state));
+  l.start();
+  await wait(20);
+  assert.deepEqual(seen.map((s) => s.kind), ["connecting", "down", "down"]);
+  assert.equal(seen.at(-1).refusalLine, "This hosted account is suspended.");
+  assert.equal(net.made.length, 1);
+  l.stop();
+});
