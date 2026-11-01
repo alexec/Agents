@@ -835,9 +835,17 @@ function LeaseLine({ store, host, agent }: { store: Store; host: string; agent: 
   );
 }
 
+/** WaitCard.carryOn and the rest in WaitCard.swift: one name for "carry on now" on both cards (#3152). */
+const waitWords = {
+  carryOn: "Carry On",
+  carryOnHelp: "Carry on now, without waiting any longer.",
+  endWait: "End Wait",
+  endWaitHelp: "End this wait. Nothing will start the agent again for it.",
+};
+
 /**
  * The agent's wait on events, as a card under the questions (WaitCard.swift, #1995): what, since
- * when, until when, Continue and Cancel (#3052). Not tinted.
+ * when, until when, Carry On and End Wait (#3052, #3152). Not tinted.
  */
 function WaitCard({ agent, title, disabled, continueNow, stop }: { agent: Agent; title: (id: string) => string | undefined;
   disabled: boolean; continueNow: () => Promise<void>; stop: () => Promise<void> }) {
@@ -874,10 +882,10 @@ function WaitCard({ agent, title, disabled, continueNow, stop }: { agent: Agent;
           </div>}
         </>}
         <p class="wait-answers">
-          <button disabled={disabled || busy.value} title="Carry on now, without waiting for the event."
-            onClick={() => { busy.value = true; void continueNow().finally(() => (busy.value = false)); }}>Continue</button>
-          <button disabled={disabled || busy.value} title="Cancel this wait. Nothing will start it again for this wait."
-            onClick={() => { busy.value = true; void stop().finally(() => (busy.value = false)); }}>Cancel</button>
+          <button disabled={disabled || busy.value} title={waitWords.carryOnHelp}
+            onClick={() => { busy.value = true; void continueNow().finally(() => (busy.value = false)); }}>{waitWords.carryOn}</button>
+          <button class="destructive" disabled={disabled || busy.value} title={waitWords.endWaitHelp}
+            onClick={() => { busy.value = true; void stop().finally(() => (busy.value = false)); }}>{waitWords.endWait}</button>
         </p>
       </div>
     </div>
@@ -886,7 +894,7 @@ function WaitCard({ agent, title, disabled, continueNow, stop }: { agent: Agent;
 
 /**
  * A wait on sessions or on a time (BlockWaitCard in WaitCard.swift, #2750), drawn as WaitCard is:
- * what it waits on, since when, when it checks again, and Stop Waiting, which carries it on now.
+ * what it waits on, since when, when it checks again, and Carry On, which carries it on now (#3152).
  */
 function BlockWaitCard({ store, host, agent, disabled }: { store: Store; host: string; agent: Agent; disabled: boolean }) {
   const busy = useSignal(false);
@@ -916,7 +924,7 @@ function BlockWaitCard({ store, host, agent, disabled }: { store: Store; host: s
           aria-valuemin={0} aria-valuemax={100} aria-valuenow={share}><span style={{ width: `${share}%` }} /></div>}
         <p class="wait-answers">
           <button disabled={disabled || busy.value} title={carryOnHelp(agent)}
-            onClick={() => { busy.value = true; void store.prompt(host, agent.id, carryOnPrompt, []).finally(() => (busy.value = false)); }}>Stop Waiting</button>
+            onClick={() => { busy.value = true; void store.prompt(host, agent.id, carryOnPrompt, []).finally(() => (busy.value = false)); }}>{waitWords.carryOn}</button>
         </p>
       </div>
     </div>

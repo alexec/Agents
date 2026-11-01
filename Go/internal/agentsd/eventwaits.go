@@ -568,7 +568,9 @@ func endedWords(w *wire.EventWait, by wire.EventWaitEndingCanceller) string {
 	l := waitLabel(w)
 	switch by {
 	case "person":
-		return "The person cancelled your wait for " + l + ". Check whether " + l + " happened anyway before you stop: the person may only be telling you to carry on without waiting, not that it did not happen."
+		// End Wait means the same whether this call is still open or not (#3152): nothing
+		// starts the agent again for it. Carry On is the person's way to say carry on.
+		return "The person ended your wait for " + l + ". Do not carry on with what needed it, and do not wait for it again: end your turn. The person will tell you when to go on."
 	case "prompt":
 		return "The person sent you a message, which cancelled your wait for " + l + "."
 	case "stopped":

@@ -343,7 +343,7 @@ private struct WaitingNow: View {
                             }
                             .buttonStyle(.plain)
                             .foregroundStyle(.secondary)
-                            .help("Stop waiting. Nothing will start it again for this wait.")
+                            .help("End this wait. Nothing will start the agent again for it.")
                         }
                     }
                     .padding(.horizontal, 14)
