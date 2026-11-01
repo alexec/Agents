@@ -642,6 +642,10 @@ func (l *live) turn() bool {
 			// A new process is a new MCP server, with a token of its own.
 			if ours {
 				d.dropAppTokens(l.id)
+				// The folder of a route taken away while this ran goes now (#3127).
+				if a := d.Store.Agent(l.id); a != nil && orgRouteOf(a.AccountID) != "" {
+					d.sweepOrgAccountFolders()
+				}
 			}
 		})
 		// The start options the window chose (model, mode) go first. What the runtime

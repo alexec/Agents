@@ -2,6 +2,7 @@ package agentsd
 
 import (
 	"encoding/json"
+	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -175,4 +176,65 @@ func (d *Daemon) withOrgAccount(env []string, runtimeID string, account *wire.Ac
 // person's own way to the model may reach it (D9).
 func (d *Daemon) signInRefusedHere(runtimeID string) bool {
 	return !reachAllows(d.orgPolicy(), runtimeID, wire.PolicyReachSignIn)
+}
+
+// orgFoldersRoot is where each org account's folders are, a folder per runtime.
+func (d *Daemon) orgFoldersRoot() string { return filepath.Join(d.Store.Loc.Root, "runtimes", "org") }
+
+// sweepOrgAccountFolders removes each org account's folder whose route this machine no
+// longer keeps, with the runtime's state and sessions in it (#3127): when a delivery takes
+// a route away, when a session's runtime ends, and at start. A route is kept while its
+// file is in org-routes, so the sweep opens no secret. A folder that a session still runs
+// in stays until that runtime ends.
+func (d *Daemon) sweepOrgAccountFolders() {
+	runtimes, err := os.ReadDir(d.orgFoldersRoot())
+	if err != nil {
+		return
+	}
+	for _, rt := range runtimes {
+		if !rt.IsDir() {
+			continue
+		}
+		routes, err := os.ReadDir(filepath.Join(d.orgFoldersRoot(), rt.Name()))
+		if err != nil {
+			continue
+		}
+		for _, route := range routes {
+			name := route.Name()
+			if _, err := os.Stat(filepath.Join(d.orgRoutesDir(), name+".json")); err == nil {
+				continue
+			}
+			if d.orgRouteInUse(name) {
+				continue
+			}
+			log.Printf("org routes: %s's folder for %s has no route; removed", name, rt.Name())
+			os.RemoveAll(filepath.Join(d.orgFoldersRoot(), rt.Name(), name))
+		}
+	}
+}
+
+// orgRouteInUse says a session on a route's account holds its runtime, or a runtime of it
+// is still running.
+func (d *Daemon) orgRouteInUse(route string) bool {
+	for _, a := range d.Store.Agents() {
+		if orgRouteOf(a.AccountID) != route {
+			continue
+		}
+		if holdsRuntime(a.State) {
+			return true
+		}
+		d.mu.Lock()
+		l := d.lives[a.ID]
+		d.mu.Unlock()
+		if l == nil {
+			continue
+		}
+		l.mu.Lock()
+		running := l.session != nil
+		l.mu.Unlock()
+		if running {
+			return true
+		}
+	}
+	return false
 }

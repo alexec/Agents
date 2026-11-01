@@ -1272,3 +1272,41 @@ func TestTheRelayIsQuick(t *testing.T) {
 		t.Fatalf("the relay adds %v at p95", best)
 	}
 }
+
+// #3127: a route's account folder, where Codex keeps its state and sessions, goes with the
+// route; at start, a folder with no route goes too, and one with a route stays.
+func TestARemovedRoutesFolderGoes(t *testing.T) {
+	fakeRuntimes(t)
+	root := t.TempDir()
+	t.Setenv("AGENTS_PERSONAL_HOME", t.TempDir())
+	d, _, public := orgMachine(t, root, newControlKeys(t))
+	route := testRoute(t, public, "xkey", 1, wire.OrgRouteKindKey, wire.OrgRouteVendorOpenai, "", map[string]string{"apiKey": "k"}, "codex")
+	deliver(t, d, route)
+	l, err := d.launchAs(runtimeByID("codex"), root, d.accountProfile("codex", "org:xkey"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	folder := envOf(l.Env)["CODEX_HOME"]
+	if folder != filepath.Join(root, "runtimes", "org", "codex", "xkey") {
+		t.Fatalf("%s", folder)
+	}
+	os.WriteFile(filepath.Join(folder, "session.jsonl"), []byte("{}"), 0o600)
+	deliver(t, d)
+	if _, err := os.Stat(folder); !os.IsNotExist(err) {
+		t.Fatalf("the folder stayed: %v", err)
+	}
+
+	deliver(t, d, route)
+	if _, err := d.launchAs(runtimeByID("codex"), root, d.accountProfile("codex", "org:xkey")); err != nil {
+		t.Fatal(err)
+	}
+	left := filepath.Join(root, "runtimes", "org", "opencode", "old")
+	os.MkdirAll(left, 0o700)
+	d.sweepOrgAccountFolders()
+	if _, err := os.Stat(left); !os.IsNotExist(err) {
+		t.Fatalf("a folder with no route stayed: %v", err)
+	}
+	if _, err := os.Stat(folder); err != nil {
+		t.Fatalf("a held route's folder went: %v", err)
+	}
+}

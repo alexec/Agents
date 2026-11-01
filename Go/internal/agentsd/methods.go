@@ -47,6 +47,7 @@ func (d *Daemon) register() {
 	d.registerDevices()
 	d.registerAllowances()
 	d.registerAccounts()
+	d.sweepOrgAccountFolders()
 	d.registerContinueWhenBack()
 	d.registerMCP()
 	d.registerOptions()

@@ -305,6 +305,9 @@ func (d *Daemon) toldOrgRoutes(params json.RawMessage) {
 	log.Printf("host/orgRoutes: %d kept, %d removed", len(next), len(gone))
 	d.stopRemovedOrgSessions(gone)
 	d.dropStandInsOfGoneRoutes()
+	if len(gone) > 0 {
+		d.sweepOrgAccountFolders()
+	}
 	if tell := d.tellControl.Load(); tell != nil {
 		(*tell)(wire.NewMethodName(wire.CallHostOrgRoutesApplied.Name), applied)
 	}
