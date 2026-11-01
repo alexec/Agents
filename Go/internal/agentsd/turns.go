@@ -1109,6 +1109,9 @@ func toolCall(v any) wire.ToolCall {
 	if raw, ok := u["content"]; ok {
 		var c []wire.ToolCallContent
 		if json.Unmarshal(raw, &c) == nil && c != nil {
+			for i := range c {
+				c[i] = withoutMedia(c[i])
+			}
 			tc.Content = c
 		}
 	}
@@ -1122,7 +1125,7 @@ func toolCall(v any) wire.ToolCall {
 		tc.RawInput = raw
 	}
 	if raw, ok := u["rawOutput"]; ok && string(raw) != "null" {
-		tc.RawOutput = raw
+		tc.RawOutput = rawWithoutMedia(raw)
 	}
 	trimmed := map[string]json.RawMessage{}
 	for k, v := range u {
@@ -1136,6 +1139,81 @@ func toolCall(v any) wire.ToolCall {
 	}
 	tc.Raw, _ = json.Marshal(trimmed)
 	return tc
+}
+
+// mediaBound is the most base64 a tool call keeps in turns.jsonl (#3110): a bigger image,
+// audio clip or blob (a drive_screen screenshot is 100-300 KB) becomes a one-line stand-in.
+const mediaBound = 16 << 10
+
+func mediaStandIn(kind string, n int) string {
+	return fmt.Sprintf("%s, %d KB", kind, (n+1023)/1024)
+}
+
+// withoutMedia is c with an image, audio clip or blob over mediaBound left out.
+func withoutMedia(c wire.ToolCallContent) wire.ToolCallContent {
+	b := c.Content
+	if b == nil {
+		return c
+	}
+	n, kind := 0, b.Type
+	switch {
+	case b.Data != nil:
+		n = len(*b.Data)
+	case b.Resource != nil && b.Resource.Blob != nil:
+		n, kind = len(*b.Resource.Blob), "blob"
+	}
+	if n <= mediaBound {
+		return c
+	}
+	text := mediaStandIn(kind, n)
+	c.Content = &wire.ContentBlock{Type: "text", Text: &text}
+	return c
+}
+
+// rawWithoutMedia is a tool's raw output with each image or audio block, and each blob,
+// over mediaBound left out, wherever the runtime put it.
+func rawWithoutMedia(raw json.RawMessage) json.RawMessage {
+	if len(raw) <= mediaBound {
+		return raw
+	}
+	var v any
+	if json.Unmarshal(raw, &v) != nil {
+		return raw
+	}
+	changed := false
+	var walk func(any) any
+	walk = func(v any) any {
+		switch x := v.(type) {
+		case []any:
+			for i := range x {
+				x[i] = walk(x[i])
+			}
+		case map[string]any:
+			if data, ok := x["data"].(string); ok && len(data) > mediaBound {
+				if t, _ := x["type"].(string); t == "image" || t == "audio" {
+					changed = true
+					return map[string]any{"type": "text", "text": mediaStandIn(t, len(data))}
+				}
+			}
+			if blob, ok := x["blob"].(string); ok && len(blob) > mediaBound {
+				changed = true
+				x["blob"] = mediaStandIn("blob", len(blob))
+			}
+			for k := range x {
+				x[k] = walk(x[k])
+			}
+		}
+		return v
+	}
+	v = walk(v)
+	if !changed {
+		return raw
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		return raw
+	}
+	return b
 }
 
 func configOptions(v any) []wire.ConfigOption {
