@@ -125,6 +125,9 @@ final class AppModel {
     /// The organisation's policy as this Mac's host follows it (#998): the red strip and the
     /// composer's reason while the kill switch is on. Nil from a host without a policy capability.
     private(set) var policyState: DaemonAPI.PolicyState?
+    /// Moves each time this Mac's host says a layer of the policy changed (#2957,
+    /// `policy/effectiveChanged`): Agents ▸ Policy reads it again.
+    private(set) var policyRevision = 0
     /// The person's own pass-through names, each marked when the policy refuses it (#998).
     private(set) var passThrough = DaemonAPI.PassThroughState()
 
@@ -144,9 +147,6 @@ final class AppModel {
     /// How this Mac's host updates Agents Host by itself (#2178). Nil from a host that
     /// cannot (a test's, or one older than the method), and Settings draws nothing for it.
     private(set) var selfUpdate: DaemonAPI.SelfUpdate?
-    /// How many workflows turned on may run in each folder (#506): the Mac's,
-    /// copied to every server.
-    private(set) var workflowLimit: WorkflowLimitSettings?
 
     /// Which folder this window is looking at.
     ///
@@ -1044,6 +1044,9 @@ final class AppModel {
         guard let mine = macHostElsewhere, let reached = controlHosts[mine] else { return client }
         return reached
     }
+
+    /// The machine that keeps the person's layer of the policy (#2957): this Mac's host.
+    var policyHost: DaemonClient { macClient }
 
     /// This Mac's host when it is one of the control plane's hosts with an id other than
     /// `.mac` (#1481, #1496). Its work is that host's, by its id; nil when it is `.mac`.
@@ -2220,24 +2223,6 @@ final class AppModel {
         }
     }
 
-    func refreshWorkflowLimit() async {
-        workflowLimit = try? await macClient.call(DaemonAPI.Method.workflowsLimit, Optional<String>.none,
-                                               returning: WorkflowLimitSettings.self)
-    }
-
-    /// The person changing the total (#506): here, then on every server, which keeps to
-    /// the Mac's settings the way it keeps to its retention.
-    func setWorkflowLimit(_ settings: WorkflowLimitSettings) async {
-        await attempt {
-            self.workflowLimit = try await self.macClient.call(DaemonAPI.Method.workflowsSetLimit, settings,
-                                                            returning: WorkflowLimitSettings.self)
-        }
-        for host in hosts.hosts.all where !hosts.isOffline(host.id) {
-            _ = try? await client(for: host.id).call(DaemonAPI.Method.workflowsSetLimit, settings,
-                                                     returning: WorkflowLimitSettings.self)
-        }
-    }
-
     func refreshClientPermissions() async {
         guard let settings = try? await macClient.call(DaemonAPI.Method.clientPermissionsState,
                                                     Optional<String>.none,
@@ -2482,33 +2467,21 @@ final class AppModel {
         }
     }
 
-    func setCostLimits(perAgent: Cost?? = nil, daily: Cost?? = nil,
-                       perAgentTokens: Int?? = nil, dailyTokens: Int?? = nil) async {
-        // Cost limits belong to the person (#2410), so a paired Mac writes the user setting.
-        var limits = (try? userScope.settings?.costLimits?.decode(CostLimits.self)) ?? costLimits
-        if let perAgent { limits.perAgent = perAgent }
-        if let daily { limits.daily = daily }
-        if let perAgentTokens { limits.perAgentTokens = perAgentTokens }
-        if let dailyTokens { limits.dailyTokens = dailyTokens }
-        if controlRequests != nil {
-            if let refused = await setUserPart(.costLimits, limits) { problem = refused }
-            return
-        }
-        var set: DaemonAPI.CostState?
-        await attempt {
-            set = try await self.macClient.call(DaemonAPI.Method.costSetLimits,
-                                                DaemonAPI.SetLimitsRequest(perAgent: perAgent, daily: daily,
-                                                                           perAgentTokens: perAgentTokens,
-                                                                           dailyTokens: dailyTokens),
-                                                returning: DaemonAPI.CostState.self)
-        }
-        guard let state = set else { return }
-        work.replaceCostState(state)
+    /// The person's layer of the policy as this Mac's host signed it (#2957); nil from a host
+    /// before policy layers, or with no layer saved yet.
+    private func signedYours() async -> DaemonAPI.SignedYourPolicy? {
+        (try? await macClient.call(DaemonAPI.Method.policyYours, DaemonAPI.Empty(),
+                                   returning: DaemonAPI.YourPolicyState.self))?.signed
+    }
+
+    /// A change to the person's layer reaches each server this window links to directly
+    /// (research R3, path 2); one that is not newer, or that is its own, is refused and kept
+    /// as it is.
+    private func applyYoursOnServers() async {
+        guard let signed = await signedYours() else { return }
         for host in hosts.hosts.all where !hosts.isOffline(host.id) {
-            serverCosts[host.id] = try? await client(for: host.id).call(
-                DaemonAPI.Method.costSetLimits,
-                DaemonAPI.SetLimitsRequest(copying: state.limits),
-                returning: DaemonAPI.CostState.self)
+            _ = try? await client(for: host.id).call(DaemonAPI.Method.policyApplyYours, signed,
+                                                     returning: DaemonAPI.PolicyApplyYoursResult.self)
         }
     }
 
@@ -3192,6 +3165,10 @@ final class AppModel {
                 }
             }
 
+        case DaemonAPI.Notification.policyEffectiveChanged:
+            policyRevision += 1
+            Task { await applyYoursOnServers() }
+
         case DaemonAPI.Notification.daemonPolicyStateChanged:
             guard let state = try? params?.decode(DaemonAPI.PolicyState.self) else { return }
             policyState = state
@@ -3710,10 +3687,12 @@ final class AppModel {
         // And Cursor/Grok permission mode (061).
         _ = try? await server.call(DaemonAPI.Method.clientPermissionsSet, clientPermissions,
                                    returning: ClientPermissionSettings.self)
-        // And how many workflows may run (#506).
-        if let workflowLimit {
-            _ = try? await server.call(DaemonAPI.Method.workflowsSetLimit, workflowLimit,
-                                       returning: WorkflowLimitSettings.self)
+        // And the person's own layer of the policy, signed on this Mac's host (#2957,
+        // research R3 path 2): its limits, how many workflows may run and the rest. A server
+        // with no control plane gets it only this way.
+        if let signed = await signedYours() {
+            _ = try? await server.call(DaemonAPI.Method.policyApplyYours, signed,
+                                       returning: DaemonAPI.PolicyApplyYoursResult.self)
         }
         // And what agents call the person, as this Mac resolves it (#121).
         if let person {
@@ -3733,15 +3712,7 @@ final class AppModel {
                                            DaemonAPI.ApplyAllowances(states: shared), returning: Bool.self)
             }
         }
-        // The Mac's limits hold on every server too; each keeps to them on its own.
-        if let limits = work.costState?.limits {
-            serverCosts[host] = try? await server.call(
-                DaemonAPI.Method.costSetLimits,
-                DaemonAPI.SetLimitsRequest(copying: limits),
-                returning: DaemonAPI.CostState.self)
-        } else {
-            serverCosts[host] = try? await server.call(DaemonAPI.Method.costState, returning: DaemonAPI.CostState.self)
-        }
+        serverCosts[host] = try? await server.call(DaemonAPI.Method.costState, returning: DaemonAPI.CostState.self)
         if let listed = try? await server.listAgents(DaemonAPI.ListRequest(includeArchived: false, lean: true)) {
             let live = Set(listed.map(\.id))
             work.replaceAgents(listed + work.agents.filter { $0.host == host && $0.state == .archived && !live.contains($0.id) },

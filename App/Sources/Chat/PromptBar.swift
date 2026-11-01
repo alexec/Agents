@@ -288,9 +288,11 @@ struct PromptBar: View {
         if let agent {
             CostLimitBanner(agent: agent, limits: model.costLimits, costState: model.costState,
                             goOn: { Task { await model.letThisAgentGoOn(agent) } }) {
+                // The limits are rules of Agents ▸ Policy (#2957): open Settings there.
                 SettingsLink { Text("Raise the limit") }
                     .buttonStyle(.paper)
                     .appText(.fine)
+                    .simultaneousGesture(TapGesture().onEnded { model.settingsPaneAsked = .agentsPolicy })
             }
         }
     }

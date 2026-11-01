@@ -476,6 +476,8 @@ export class Work {
   readonly passThrough = signal<Record<string, PassThroughName[]>>({});
   /** Counts each control/orgRoutesChanged (#999): Console ▸ Model Access and Settings ▸ Policy load the routes again. */
   readonly orgRoutesChanges = signal(0);
+  /** Counts each policy/effectiveChanged (#2957): Agents ▸ Policy loads the layers again. */
+  readonly policyChanges = signal(0);
   /** The last machine of the person's removed with secrets on it (#1760, control/secretsLeft), until read. */
   readonly secretsLeft = signal<SecretsLeft | null>(null);
   /** The mode last chosen for each runtime, by host (029). */
@@ -1282,6 +1284,10 @@ export class Store extends Work {
       if (method === "control/groupsChanged") {
         // Settings ▸ Groups, and each provider's group's name (#1761).
         void this.providers.loadGroups().then(() => { this.keepCapsTrue(); this.peopleChanges.value += 1; });
+        return;
+      }
+      if (method === "policy/effectiveChanged") {
+        this.policyChanges.value += 1;
         return;
       }
       if (method === "control/orgRoutesChanged") {

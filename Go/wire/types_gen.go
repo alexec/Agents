@@ -11578,4 +11578,7 @@ type YourPolicyState struct {
 	Keeper PolicyKeeper `json:"keeper"`
 
 	PinnedKeyID *string `json:"pinnedKeyID,omitzero"`
+
+	// The signed copy, when this machine keeps one (#2957): the Mac window passes it to a server over its direct link with policy/applyYours (research R3, path 2).
+	Signed *SignedYourPolicy `json:"signed,omitzero"`
 }

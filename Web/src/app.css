@@ -1283,6 +1283,15 @@ button.remove:hover { opacity: 1; }
 .org-policy-line strong { font-weight: 600; }
 .set-by-org { opacity: 0.5; }
 .org-policy-refusal { margin: 4px 0; color: var(--tint-failure); }
+/* Agents ▸ Policy (#2957): the banner, a rule's lines, and Where this comes from with the deciding layer lit. */
+.policy-banner { max-width: 596px; margin: 4px 0 8px; }
+.policy-banner p { margin: 0 0 2px; }
+.policy-rule { max-width: 596px; margin-bottom: 6px; }
+.settings-body .policy-rule .hint { margin: 0; padding: 2px 12px; }
+.policy-source { list-style: none; margin: 4px 0 8px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.policy-source li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 8px; border-radius: 6px; }
+.policy-source-lit { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.policy-source-value { text-align: right; }
 .policy-kill { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; margin-top: 8px; }
 .org-policy { display: flex; flex-direction: column; gap: 4px; max-width: 520px; }
 .org-policy .sheet-actions { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }

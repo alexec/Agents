@@ -26819,6 +26819,10 @@
         },
         "pinnedKeyID": {
           "type": "string"
+        },
+        "signed": {
+          "$ref": "#/definitions/SignedYourPolicy",
+          "description": "The signed copy, when this machine keeps one (#2957): the Mac window passes it to a server over its direct link with policy/applyYours (research R3, path 2)."
         }
       },
       "required": [

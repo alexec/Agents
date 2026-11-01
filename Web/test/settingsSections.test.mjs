@@ -8,8 +8,10 @@ const store = (role) => ({ person: { value: role ? { role } : null } });
 
 test("each group's sections are in their subject's order", () => {
   const names = (scope, role) => sectionsIn(scope, store(role)).map((s) => s.name);
-  // By subject (#2157): Sidebar, Finished chats and Notifications are how this app works, though the Mac's host keeps them (#2079, #2805).
-  assert.deepEqual(names("thisApp"), ["sidebar", "finishedChats", "notifications"]);
+  // By subject (#2157): Sidebar and Notifications are how this app works, though the Mac's host keeps the sidebar (#2079).
+  assert.deepEqual(names("thisApp"), ["sidebar", "notifications"]);
+  // What agents may do (#2957): the archive switch and the notice limits are rules of the policy now.
+  assert.deepEqual(names("agents"), ["agentsPolicy"]);
   assert.deepEqual(names("machines"), ["gitAccess", "machines", "backups", "desktopControl", "serverBackups", "agentRuntimes", "secrets"]);
   assert.deepEqual(names("agentConfiguration"), ["skills", "personas", "workflows"]);
   assert.deepEqual(names("controlPlane", "admin"), ["signIns", "forgeLogins", "people", "bots", "groups", "channels", "signInProviders", "policy", "providers"]);

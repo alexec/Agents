@@ -39,28 +39,33 @@ work.
 
 **Set a limit**
 
-1. Choose **Agents ▸ Settings…** and click **Cost** in the rail.
-2. Under **Per agent** (*The most one agent may spend*), type an amount, choose the
-   currency, and click **Set**.
+1. Choose **Agents ▸ Settings…** and click **Policy** in the rail's **Agents** group. On the
+   web page, open **Settings** and find **Agents ▸ Policy**.
+2. Under **Money**, type an amount in US dollars in **Per agent** and press Return.
 
    An agent that reaches it finishes the turn it is in and takes no further prompt, so it
    may end a little over.
-3. For a runtime that reports no price, type a number of tokens under **Tokens per agent**
-   and click **Set**. A token limit counts the fresh input and the output of each turn;
+3. For a runtime that reports no price, type a number of tokens in **Tokens per agent**
+   and press Return. A token limit counts the fresh input and the output of each turn;
    it does not count what the model reads back from a cache.
-4. Under **Per day** and **Tokens per day** (*The most a day may spend*), do the same.
+4. Do the same in **Per day** and **Tokens per day**.
 
    When a day reaches it, nothing new starts and no prompt is sent, in any folder,
    including scheduled workflows. What is working finishes its turn and holds. What you
-   typed waits until the day rolls over. **Today** shows what is left, in money and in
-   tokens.
-5. To remove a limit, click **No limit**.
+   typed waits until the day rolls over. **Spending** shows what is left today, in money
+   and in tokens.
+5. To remove a limit, empty the field and press Return. An empty field is no limit, never
+   a zero.
+
+A limit that your organisation caps shows 🔒 and the organisation's value. Your own value
+is kept, not used, until the organisation's value is higher. See
+[Policy layers](../explanation/policy-layers.md).
 
 **When an agent reaches a limit**
 
 It moves to **Stopped** with **Reached its cost limit**, and **Raise the limit** above the
-prompt opens Settings. Raise it, then send a prompt to carry on. **What the limits have
-stopped**, in the same pane, lists every agent a limit has stopped.
+prompt opens Settings. Raise it in **Policy**, then send a prompt to carry on. **What the
+limits have stopped**, in **Spending**, lists every agent a limit has stopped.
 
 Each server keeps to the per-day limit on its own. For every control in the pane, see
 [Settings and the Resources page](../reference/settings.md).

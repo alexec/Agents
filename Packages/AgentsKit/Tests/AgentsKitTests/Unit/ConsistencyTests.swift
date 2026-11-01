@@ -398,12 +398,12 @@ struct ConsistencyTests {
             """)
     }
 
-    /// "Agents may archive the chats I start" says, on every client, that another machine does not
-    /// read it (#1872), in the docs' words, so a chat on another machine that archives
-    /// itself with the switch off is not a surprise.
+    /// "Agents may archive the chats I start" says, where it is still a switch of its own (the
+    /// Remote's Sidebar settings), that another machine does not read it (#1872), in the docs'
+    /// words. On the Mac and the web page it is a rule of Agents ▸ Policy (#2957).
     @Test func theArchiveSwitchSaysOtherMachinesDoNotReadIt() async throws {
         let sentence = "Another machine does not read this switch, so a chat in a folder on another machine may still archive itself."
-        for path in ["Shared/UI/SidebarSettingsSection.swift", "Web/src/model/fileToSeeWords.ts"] {
+        for path in ["Shared/UI/SidebarSettingsSection.swift"] {
             let text = try String(contentsOf: Self.root.appending(path: path), encoding: .utf8)
             #expect(text.contains(sentence), "\(path) does not say that another machine ignores the switch")
         }

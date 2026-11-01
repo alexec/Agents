@@ -359,7 +359,14 @@ func (d *Daemon) yourPolicyState() wire.YourPolicyState {
 		id := controllink.KeyID(public)
 		pinnedKeyID = &id
 	}
-	return wire.YourPolicyState{Policy: policy, Keeper: wire.PolicyKeeper{Host: policy.Keeper, Name: policy.Keeper}, PinnedKeyID: pinnedKeyID}
+	state := wire.YourPolicyState{Policy: policy, Keeper: wire.PolicyKeeper{Host: policy.Keeper, Name: policy.Keeper}, PinnedKeyID: pinnedKeyID}
+	// The signed copy, for the Mac window to pass to a server over its direct link
+	// (policy/applyYours, research R3 path 2).
+	if d.yoursNow != nil && len(d.yoursNow.Policy) > 0 {
+		state.Signed = &wire.SignedYourPolicy{Policy: base64.StdEncoding.EncodeToString(d.yoursNow.Policy),
+			Signature: d.yoursNow.Signature, Key: d.yoursPublicKeyLocked()}
+	}
+	return state
 }
 
 // forbiddenCallerRefusal is why policy/setYours refuses this caller (FR-010, SC-004): only

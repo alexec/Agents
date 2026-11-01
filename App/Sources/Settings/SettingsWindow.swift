@@ -5,7 +5,7 @@ import SwiftUI
 /// The Settings window (055, look/ frames A–G): one rail down the left and the chosen pane
 /// beside it. It opens at one size for every pane, so choosing another never makes the
 /// window jump, and it can be resized larger than that. The rail has one row for each pane
-/// (#1076), grouped by subject (#2157): This app, Machines and Control plane. Agent Runtimes,
+/// (#1076), grouped by subject (#2157): This app, Agents (#2957), Machines and Control plane. Agent Runtimes,
 /// Agent Configuration and Machines list their own pages in a column inside the pane.
 struct SettingsWindow: View {
     @Environment(AppModel.self) private var model
@@ -161,7 +161,7 @@ struct SettingsWindow: View {
     /// The part this pane edits, so it can state its fixed scope (#2410).
     private var scopeOnEveryMachine: Bool? {
         return switch pane.wrappedValue {
-        case .spending, .runtimes: true
+        case .agentsPolicy, .spending, .runtimes: true
         case .resources: false
         case .agentConfiguration: nil
         default: nil
@@ -179,8 +179,13 @@ struct SettingsWindow: View {
     private var content: some View {
         switch pane.wrappedValue {
         case .appearance: FormColumn { Form { AppearanceSettingsView() }.paperForm() }
-        case .sidebar: FormColumn { Form { SidebarSettingsSection() }.paperForm() }
-        case .notifications: FormColumn { Form { NotificationLimitsSection() }.paperForm() }
+        // The archive switch is a rule of Agents ▸ Policy now (#2957, FR-023).
+        case .sidebar: FormColumn { Form { SidebarSettingsSection(showsArchiveSwitch: false) }.paperForm() }
+        case .agentsPolicy:
+            FormColumn {
+                PolicyPane(host: model.policyHost, revision: model.policyRevision,
+                           openOrganisationPolicy: control == nil ? nil : { pane.wrappedValue = .policy })
+            }
         case .voice: FormColumn { Form { VoiceSettingsSection() }.paperForm() }
         case .account: FormColumn { AccountSettingsView() }
         case .signIns:
@@ -254,8 +259,11 @@ extension SettingsScope {
         switch self {
         // How this app draws: Sidebar is kept on the Mac's host so every client draws the
         // same (#1033, #2079), but its subject is the app (#2157).
-        case .thisApp: [.appearance, .sidebar, .notifications, .voice]
-        case .machines: [.machines, .runtimes, .agentConfiguration, .spending, .resources, .secrets]
+        // Notifications' limits are rules of Agents ▸ Policy now (#2957, FR-023).
+        case .thisApp: [.appearance, .sidebar, .voice]
+        // What agents may do, what they spend and what they take (#2957, FR-018).
+        case .agents: [.agentsPolicy, .spending, .resources]
+        case .machines: [.machines, .runtimes, .agentConfiguration, .secrets]
         // The person's account first, shown with no control plane too (#2157).
         case .controlPlane: [.account, .signIns, .people, .bots, .groups, .channels, .signIn, .policy, .providers, .clients, .controlPlane]
         }
@@ -266,8 +274,9 @@ enum SettingsPane: String, Hashable, CaseIterable {
     /// Was General (#846), split in four: its raw value is what a window left open on it kept.
     case appearance = "general"
     case sidebar, account
-    /// How many notices agents may send (#2805), kept on the Mac's host.
-    case notifications
+    /// Agents ▸ Policy (#2957): the person's own layer of what agents may do. Took in
+    /// Notifications' limits (#2805), whose window left open on it opens Appearance.
+    case agentsPolicy
     /// Voice mode, its voice and its sounds (Alex, 2026-10-29): was in Appearance.
     case voice
     /// Every machine, and this Mac's own settings (#1759). Was the Mac pane: its raw value is
@@ -289,7 +298,8 @@ enum SettingsPane: String, Hashable, CaseIterable {
     case channels
     /// Which providers people sign in with (#995).
     case signIn
-    /// The organisation's policy, read only, and the kill switch for an admin (#998).
+    /// Organisation Policy (#998, FR-024): the organisation's rules, read only, and the kill
+    /// switch for an admin.
     case policy
     /// How this person signs in on their other clients (#995): Control plane ▸ Sign-ins, as
     /// the Remote and the page have it and every client's words name it (#2197, #2256). Was
@@ -307,7 +317,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
     var isThisMacs: Bool {
         switch self {
         case .runtimes, .agentConfiguration, .spending, .resources: true
-        case .appearance, .sidebar, .notifications, .voice, .account, .machines, .controlPlane, .providers, .clients, .people, .bots, .groups,
+        case .appearance, .sidebar, .agentsPolicy, .voice, .account, .machines, .controlPlane, .providers, .clients, .people, .bots, .groups,
              .channels, .signIn, .signIns, .secrets, .policy: false
         }
     }
@@ -323,13 +333,13 @@ enum SettingsPane: String, Hashable, CaseIterable {
         switch self {
         case .appearance: "Appearance"
         case .sidebar: "Sidebar"
-        case .notifications: "Notifications"
+        case .agentsPolicy: PolicyLayersWords.title
         case .voice: "Voice"
         case .account: "Account"
         case .machines: "Machines"
         case .runtimes: "Agent Runtimes"
         case .agentConfiguration: "Agent Configuration"
-        case .spending: "Cost"
+        case .spending: "Spending"
         case .resources: "Resources"
         case .controlPlane: "Overview"
         case .providers: "Machine Providers"
@@ -349,7 +359,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
         switch self {
         case .appearance: "paintbrush"
         case .sidebar: "sidebar.left"
-        case .notifications: "bell"
+        case .agentsPolicy: PolicyLayersWords.symbol
         case .voice: "waveform"
         case .account: "person.crop.circle"
         case .machines: "desktopcomputer"

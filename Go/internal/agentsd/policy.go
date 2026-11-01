@@ -1760,6 +1760,44 @@ func (d *Daemon) registerPolicy() {
 		if r.Folder != nil {
 			folder = string(*r.Folder)
 		}
-		return d.effective(folder), nil
+		return d.effectiveForClient(folder), nil
 	})
+}
+
+// effectiveForClient is policy/effective's answer (#2957): the effective policy, with each
+// rule's cap against the layer the client edits there (your layer with no folder, the
+// folder's own with one), and, with no folder, the folders that set rules of their own for
+// the Agents ▸ Policy banner (FR-021). Kept apart from effective, which every refusal
+// calls and which needs neither.
+func (d *Daemon) effectiveForClient(folder string) wire.EffectivePolicy {
+	org := d.orgPolicy()
+	above := []policylayers.Layer{{Ref: orgLayerRef(org), Rules: orgRulesFrom(org)}}
+	if folder != "" {
+		above = append(above, policylayers.Layer{Ref: youLayerRef(), Rules: d.yourPolicyRules()})
+	}
+	eff := policylayers.WithCaps(d.effective(folder), above)
+	if folder == "" {
+		eff.FoldersWithRules = d.foldersWithRules()
+	}
+	return eff
+}
+
+// foldersWithRules is every known folder whose approved .agents/policy.json sets at least
+// one rule, with how many it sets, by name.
+func (d *Daemon) foldersWithRules() []wire.PolicyFolderWithRules {
+	out := []wire.PolicyFolderWithRules{}
+	for _, folder := range d.folderPaths() {
+		ref := folderLayerRef(folder)
+		count := 0
+		for _, r := range policylayers.Resolve([]policylayers.Layer{{Ref: ref, Rules: d.folderApprovedRules(folder)}}).Rules {
+			if r.Decides != nil {
+				count++
+			}
+		}
+		if count > 0 {
+			out = append(out, wire.PolicyFolderWithRules{Folder: folder, Name: ref.Name, Count: int64(count)})
+		}
+	}
+	slices.SortFunc(out, func(a, b wire.PolicyFolderWithRules) int { return strings.Compare(a.Name, b.Name) })
+	return out
 }

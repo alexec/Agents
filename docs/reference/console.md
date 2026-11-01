@@ -44,7 +44,7 @@ requests and cap notices come to them as cards.
 
 ## Asking for an MCP server or skill
 
-A person asks in Settings ▸ Policy: the kind, the name, and why (`governance/request`). Each admin sees the request in Console ▸ Requests. An admin approves it for the person, or for a group. A group approval holds for each member: a member who asks later is approved at once, and members who already wait are approved with it.
+A person asks in Settings ▸ Organisation Policy: the kind, the name, and why (`governance/request`). Each admin sees the request in Console ▸ Requests. An admin approves it for the person, or for a group. A group approval holds for each member: a member who asks later is approved at once, and members who already wait are approved with it.
 
 An approval answers the request and keeps a record of it. The Policy's marketplaces still say what a machine may add.
 

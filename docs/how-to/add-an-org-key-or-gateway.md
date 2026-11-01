@@ -102,7 +102,7 @@ member: **Show the notice**, **Reviewed by your organisation** (members do not s
 
 ## What members see
 
-Every person sees the routes that they may use in Settings ▸ Policy, on the Mac, the iPhone,
+Every person sees the routes that they may use in Settings ▸ Organisation Policy, on the Mac, the iPhone,
 the iPad and the web page: each route's name, its kind, its runtimes and **From your
 organisation**. They never see a key, a fingerprint, a region or an address.
 

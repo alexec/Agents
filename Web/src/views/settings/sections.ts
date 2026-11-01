@@ -10,9 +10,9 @@ import { ProvidersSection } from "../Providers";
 import { SignInSection, SignInsSection } from "../SignInSection";
 import { SecretsSection } from "../UserScope";
 import { AgentRuntimesSection } from "./AgentRuntimes";
+import { AgentsPolicySection } from "./AgentsPolicy";
 import { BackupsSection, ServerBackupsSection } from "./Backups";
 import { DesktopControlSection } from "./DesktopControl";
-import { FinishedChatsSection } from "./FinishedChats";
 import { ForgeLoginsSection } from "./ForgeLogins";
 import { GitAccessSection } from "./GitAccess";
 import { VersionsSection } from "./Machines";
@@ -21,9 +21,9 @@ import { PolicySection } from "./Policy";
 import { SidebarGroupsSection } from "./SidebarGroups";
 import { PersonasConfigSection, SkillsConfigSection, WorkflowsConfigSection } from "../AgentConfigEditor";
 
-/** Settings' groups by subject (#2157, was by scope #1759): this browser, the machines that run agents, and
- * what the control plane keeps (the person's sign-ins first). */
-export type SettingsScope = "thisApp" | "machines" | "agentConfiguration" | "controlPlane";
+/** Settings' groups by subject (#2157, was by scope #1759): this browser, what agents may do (#2957), the machines
+ * that run agents, and what the control plane keeps (the person's sign-ins first). */
+export type SettingsScope = "thisApp" | "agents" | "machines" | "agentConfiguration" | "controlPlane";
 
 export interface SettingsSection {
   name: string;
@@ -38,6 +38,8 @@ export interface SettingsSection {
 export const settingsSections: readonly SettingsSection[] = [
   // Auto's order and Mappings (#2658), kept on the Mac's host.
   { name: "agentRuntimes", scope: "machines", order: 50, Section: AgentRuntimesSection },
+  // Your layer of what agents may do (#2957): the limits of Spending, Notifications and the archive switch moved here.
+  { name: "agentsPolicy", scope: "agents", order: 10, Section: AgentsPolicySection },
   { name: "backups", scope: "machines", order: 30, Section: BackupsSection },
   // The bots that run the team's workflows, apart from the people (#2132): an admin's.
   { name: "bots", scope: "controlPlane", order: 15, Section: BotsSection, shows: (store) => store.person.value?.role === "admin" },
@@ -45,20 +47,18 @@ export const settingsSections: readonly SettingsSection[] = [
   { name: "channels", scope: "controlPlane", order: 30, Section: ChannelsSection },
   // The off-by-default switch for drive_screen (#3004, US2).
   { name: "desktopControl", scope: "machines", order: 35, Section: DesktopControlSection },
-  { name: "finishedChats", scope: "thisApp", order: 30, Section: FinishedChatsSection },
   // Your GitHub, GitLab and Linear logins, for the Team section and "An agent is on it" (#2951, #3160).
   { name: "forgeLogins", scope: "controlPlane", order: 7, Section: ForgeLoginsSection },
   { name: "gitAccess", scope: "machines", order: 10, Section: GitAccessSection },
   // Groups own machine providers (#1761).
   { name: "groups", scope: "controlPlane", order: 20, Section: GroupsSection },
   { name: "machines", scope: "machines", order: 20, Section: VersionsSection },
-  // How many notices agents may send you (#2805), kept on the Mac's host, the same on every client;
-  // headed "What agents tell you", as the window's and the Remote's, with a hint that they are not this browser's (#2895).
+  // Whether this page shows notices (#2860, #1486); how many agents may send is in Agents ▸ Policy (#2957).
   { name: "notifications", scope: "thisApp", order: 40, Section: NotificationsSection },
   // Who belongs to the control plane, and their machines and clients (#994).
   { name: "people", scope: "controlPlane", order: 10, Section: PeopleSection },
   { name: "personas", scope: "agentConfiguration", order: 20, Section: PersonasConfigSection },
-  // The organisation's rules, read only, and the kill switch for an admin (#998).
+  // Organisation Policy (#2957, was Policy): the organisation's rules, read only, and the kill switch for an admin (#998).
   { name: "policy", scope: "controlPlane", order: 45, Section: PolicySection },
   { name: "providers", scope: "controlPlane", order: 50, Section: ProvidersSection },
   // The secrets the control plane keeps for you and sends to each machine of yours (#1760, #2157).

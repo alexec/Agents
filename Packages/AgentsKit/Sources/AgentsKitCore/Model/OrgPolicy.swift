@@ -405,7 +405,8 @@ public extension DaemonAPI.Notification {
 /// (`PolicyRefusal`, `PolicySetBy`); these are the pane's.
 public enum OrgPolicyWords {
     public static let setBy = "Set by your organisation"
-    public static let title = "Policy"
+    /// Was Policy: there are two policy panes now (#2957, FR-024).
+    public static let title = "Organisation Policy"
     public static let symbol = "building.columns"
     /// The titles of a limit from the person's own layer and from a folder's (#2957, #3150).
     public static let setByYou = "Set by you"

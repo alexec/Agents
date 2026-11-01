@@ -183,3 +183,41 @@ func TestAFolderValueLooserThanYoursIsKept(t *testing.T) {
 		t.Fatalf("helperLimitsIn did not use the tighter effective value: %d", running)
 	}
 }
+
+// TestPolicyEffectiveForAClient covers what Agents ▸ Policy draws (#2957, FR-019, FR-021):
+// with no folder, the folders that set their own rules, with a count; with a folder, each
+// rule capped by your layer, named "Your policy"; and policy/yours carries the signed copy
+// the Mac window passes to a server.
+func TestPolicyEffectiveForAClient(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := folder(t, c, 1)
+	var yours wire.YourPolicyState
+	json.Unmarshal(c.call(t, 2, "policy/yours", map[string]any{}), &yours)
+	tight := int64(2)
+	c.call(t, 3, "policy/setYours", map[string]any{"rules": wire.PolicyRules{Helpers: &wire.PolicyHelpers{MostRunning: &tight}}, "revision": yours.Policy.Revision})
+	off := false
+	c.call(t, 4, "policy/setFolder", map[string]any{"folder": store.FolderURL(dir),
+		"rules": wire.PolicyRules{ArchiveMyChats: &off}})
+
+	var none wire.EffectivePolicy
+	json.Unmarshal(c.call(t, 5, "policy/effective", map[string]any{}), &none)
+	if len(none.FoldersWithRules) != 1 || none.FoldersWithRules[0].Count != 1 || none.FoldersWithRules[0].Name != filepath.Base(dir) {
+		t.Fatalf("foldersWithRules: %+v", none.FoldersWithRules)
+	}
+	if r := effectiveRule(none, wire.PolicyRuleNameHelpersMostRunning); r == nil || r.CapLine != nil {
+		t.Fatalf("your own rule has no layer above it to cap it: %+v", r)
+	}
+
+	var inFolder wire.EffectivePolicy
+	json.Unmarshal(c.call(t, 6, "policy/effective", map[string]any{"folder": store.FolderURL(dir)}), &inFolder)
+	r := effectiveRule(inFolder, wire.PolicyRuleNameHelpersMostRunning)
+	if r == nil || r.CapLine == nil || *r.CapLine != "Your policy: at most 2 running at once" {
+		t.Fatalf("a folder's row is capped by yours: %+v", r)
+	}
+
+	json.Unmarshal(c.call(t, 7, "policy/yours", map[string]any{}), &yours)
+	if yours.Signed == nil || yours.Signed.Policy == "" || yours.Signed.Key == nil {
+		t.Fatalf("policy/yours carries the signed copy: %+v", yours.Signed)
+	}
+}

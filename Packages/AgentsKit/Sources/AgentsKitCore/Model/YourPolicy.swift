@@ -75,11 +75,15 @@ public extension DaemonAPI {
         public var policy: YourPolicy
         public var keeper: PolicyKeeper
         public var pinnedKeyID: String?
+        /// The signed copy, when this machine keeps one: the Mac window passes it to a server
+        /// over its direct link with `policy/applyYours` (research R3, path 2).
+        public var signed: SignedYourPolicy?
 
-        public init(policy: YourPolicy, keeper: PolicyKeeper, pinnedKeyID: String? = nil) {
+        public init(policy: YourPolicy, keeper: PolicyKeeper, pinnedKeyID: String? = nil, signed: SignedYourPolicy? = nil) {
             self.policy = policy
             self.keeper = keeper
             self.pinnedKeyID = pinnedKeyID
+            self.signed = signed
         }
     }
 
@@ -121,11 +125,15 @@ public extension DaemonAPI {
         public var signature: PolicySignature
         /// Present only on the first copy after a new person key.
         public var rotation: PersonKeyRotation?
+        /// The person key's public half (X9.63), for a machine with no pin yet to check the
+        /// signature and pin it (trust on first use, research R3).
+        public var key: Data?
 
-        public init(policy: String, signature: PolicySignature, rotation: PersonKeyRotation? = nil) {
+        public init(policy: String, signature: PolicySignature, rotation: PersonKeyRotation? = nil, key: Data? = nil) {
             self.policy = policy
             self.signature = signature
             self.rotation = rotation
+            self.key = key
         }
     }
 
