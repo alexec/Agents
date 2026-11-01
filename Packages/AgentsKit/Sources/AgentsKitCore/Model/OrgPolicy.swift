@@ -123,8 +123,8 @@ public extension DaemonAPI {
         public var issued: Date
         public var changedBy: AuditActor
         public var requires: [String]
-        /// `ask`, `default`, `acceptEdits`, `auto` or `bypassPermissions`.
-        public var modeCeiling: String?
+        /// The loosest permission level, on Auto's four levels (#2957; it replaced `modeCeiling`, #3171).
+        public var permissionMode: PermissionLevel?
         /// `required`, or absent for the person's choice.
         public var sandbox: String?
         public var runtimes: [String: PolicyRuntimeRule]?
@@ -137,7 +137,7 @@ public extension DaemonAPI {
         public var groups: JSONValue?
         public var notices: PolicyNotices?
 
-        public init(version: Int, issued: Date, changedBy: AuditActor, requires: [String] = [], modeCeiling: String? = nil,
+        public init(version: Int, issued: Date, changedBy: AuditActor, requires: [String] = [], permissionMode: PermissionLevel? = nil,
                     sandbox: String? = nil, runtimes: [String: PolicyRuntimeRule]? = nil,
                     marketplaces: PolicyMarketplaces? = nil, budgets: PolicyBudgets? = nil, helpers: PolicyHelpers? = nil,
                     environment: PolicyEnvironment? = nil, stopAll: PolicyStopAll? = nil, requireFollowing: Bool? = nil,
@@ -146,7 +146,7 @@ public extension DaemonAPI {
             self.issued = issued
             self.changedBy = changedBy
             self.requires = requires
-            self.modeCeiling = modeCeiling
+            self.permissionMode = permissionMode
             self.sandbox = sandbox
             self.runtimes = runtimes
             self.marketplaces = marketplaces
@@ -228,7 +228,7 @@ public extension DaemonAPI {
     struct PolicySetBy: Codable, Sendable, Hashable {
         /// `organisation`, `you` or `folder`: the layer that decided (#2957, R8).
         public var by: String
-        /// The rule's name, such as `modeCeiling` or `runtimes.codex.models`.
+        /// The rule's name, such as `permissionMode` or `runtimes.codex.models`.
         public var rule: String
         public var words: String
         /// The layer that decided, with its name (#2957, R8).
@@ -462,12 +462,6 @@ public enum OrgPolicyWords {
         return "on \(day) at \(time)"
     }
 
-    /// The clients' names of the modes, by ModeLooseness rank.
-    public static let modeNames: [String: String] = [
-        "ask": "Ask", "default": "Default", "acceptEdits": "Accept Edits", "auto": "Auto",
-        "bypassPermissions": "Bypass Permissions",
-    ]
-
     /// RuntimeCatalog's names, for a runtime this client may not be told about.
     public static let runtimeNames: [String: String] = [
         "claude": "Claude", "codex": "Codex", "cursor": "Cursor", "copilot": "Copilot",
@@ -497,8 +491,8 @@ public enum OrgPolicyWords {
     /// Each rule the policy sets, in the pane's order. Empty for a policy that sets none.
     public static func rules(_ policy: DaemonAPI.OrgPolicy) -> [Rule] {
         var out: [Rule] = []
-        if let mode = policy.modeCeiling {
-            out.append(Rule(name: "modeCeiling", title: "Modes", words: "Up to \(modeNames[mode] ?? mode)"))
+        if let mode = policy.permissionMode {
+            out.append(Rule(name: "permissionMode", title: "Modes", words: "Up to \(LevelWords.permission(mode))"))
         }
         if policy.sandbox == "required" {
             out.append(Rule(name: "sandbox", title: "Command sandbox", words: "Required"))
