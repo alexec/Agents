@@ -52,4 +52,5 @@ func TestAnOldPersonKeyFileMovesIntoTheKeychain(t *testing.T) {
 	if _, had, _ := s.File.Load(); had {
 		t.Fatal("the old file is still there")
 	}
+	noFileHolds(t, root, old)
 }
