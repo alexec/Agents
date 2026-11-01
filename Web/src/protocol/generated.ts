@@ -9295,6 +9295,8 @@ export interface Methods {
   "cost/state": { params: Empty; result: CostState };
   "credentials/offer": { params: CredentialsOffer; result: Empty };
   "daemon/policyState": { params: Empty; result: PolicyState };
+  "desktopControl/set": { params: DesktopControlSettings; result: DesktopControlSettings };
+  "desktopControl/state": { params: Empty; result: DesktopControlSettings };
   "disk/state": { params: Empty; result: DiskState };
   "dropbox/put": { params: DropboxPutRequest; result: DropboxPutResponse };
   "elicitations/answer": { params: AnswerElicitationRequest; result: Empty };
@@ -9593,6 +9595,8 @@ export const MethodTarget = {
   "cost/state": "host",
   "credentials/offer": "host",
   "daemon/policyState": "host",
+  "desktopControl/set": "host",
+  "desktopControl/state": "host",
   "disk/state": "host",
   "dropbox/put": "host",
   "elicitations/answer": "host",

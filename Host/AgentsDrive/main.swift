@@ -8,6 +8,7 @@
 // NUL-terminated frames, carrying a JSON payload here since a typed field can hold any
 // text, including a NUL-free label or a typed sentence with its own punctuation):
 //
+//   {"action":"access"}
 //   {"action":"screenshot"}
 //   {"action":"click","app":"TextEdit","label":"Save"}
 //   {"action":"click","app":"TextEdit","x":120,"y":80}
@@ -20,6 +21,9 @@
 //
 // Each answered with {"ok":true, ...} or {"ok":false,"error":"..."}. It ends when its
 // standard input closes, which is when the agent's lease on "screen" is let go.
+// "access" (#3004, US2) is the Accessibility gate: it reports whether this process is
+// trusted, triggering macOS's own grant prompt on first use if not, before the daemon
+// ever takes the "screen" lease (FR-005).
 import Foundation
 
 signal(SIGPIPE, SIG_IGN)
@@ -53,6 +57,11 @@ readFrames { frame in
     }
     let app = json["app"] as? String ?? ""
     switch action {
+    case "access":
+        // Desktop control's Accessibility gate (#3004, US2, FR-005): triggers macOS's own
+        // grant prompt on first use if not already granted.
+        reply(["ok": true, "trusted": axIsTrusted()])
+
     case "screenshot":
         guard let image = captureScreenshotBase64() else {
             reply(["ok": false, "error": "could not capture the screen."])

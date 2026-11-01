@@ -2421,6 +2421,11 @@
     {
       "name": "desktopControl/set",
       "x-capability": "host.desktop-control/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "description": "Turn desktop control on or off for this Mac (#3004, FR-004). Refused notPermitted from any caller but the person's own clients: never an agent, an MCP tool or a workflow.",
       "paramStructure": "by-name",
       "params": [
@@ -2442,6 +2447,11 @@
     {
       "name": "desktopControl/state",
       "x-capability": "host.desktop-control/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "description": "Whether desktop control is on for this Mac (#3004). Off when never set.",
       "paramStructure": "by-name",
       "params": [

@@ -181,11 +181,15 @@ it; after approval, confirm a second call succeeds with no further prompt (spec 
       returning `DesktopControlRefusal{reason: "off" | "accessibilityNotGranted", words}` before taking
       the lease — in `Go/internal/agentsd/screencalls.go`. Names the process T002 found (Agents Host, or
       `agents-drive` by its own path) in `words`. Depends on T015, T020. `[machines]`
-- [ ] T022 [P] [US2] `Shared/UI/Chat/DesktopControlRefusalCard.swift` (new): the Off / Accessibility-
-      not-granted card, naming the rule and where to turn it on or grant Accessibility — drawn by the Mac
-      window and the Remote. `[chat]`
-- [ ] T023 [P] [US2] Web twin of the refusal card in `Web/src/views/chat/` (new file alongside the other
-      chat-card components). `[chat]`
+- [x] T022, T023 **Dropped** (research.md's R5 amendment, US2's build): no
+      `DesktopControlRefusalCard.swift` or web twin. `drive_screen` is an app tool; a failed
+      call's `Error.Data` never crosses into the runtime over MCP (only `Error.Message`
+      does, `apptools.go:449-452`), so no client ever sees `DesktopControlRefusal`'s
+      structured `reason` to draw a dedicated card from — the same boundary every other app
+      tool's refusal already crosses with plain text alone. The refusal's `words` is a
+      clear, complete sentence (naming the rule and where to fix it), which already reaches
+      the person however the runtime renders its failed tool call, satisfying FR-004/FR-005
+      without an unreachable card. `[chat]`
 - [ ] T024 [P] [US2] `App/Sources/Settings/`: the desktop-control switch, off by default, with a line
       explaining what it allows and that macOS will ask for Accessibility on first use; calls
       `desktopControl/set`. `[settings]`
@@ -366,7 +370,7 @@ every phase has shipped.
 - T003, T004, T005 (independent sections of the wire schema) in parallel.
 - Within Phase 3: T010, T011, T012 in parallel (different files, each self-contained before T013 ties
   them together).
-- Within Phase 4: T022, T023, T024, T025 in parallel (four independent UI files).
+- Within Phase 4: T024, T025 in parallel (T022, T023 dropped, research.md's R5 amendment).
 - Within Phase 5: T031, T032 in parallel. Within Phase 6: T035, T036 in parallel.
 - Phase 7 (T040–T042) in parallel with Phases 3–6 once Phase 2 lands, per plan.md.
 

@@ -166,6 +166,35 @@ func (d *Daemon) desktopControlAvailable() bool {
 
 var driveScreenActions = map[string]bool{"screenshot": true, "click": true, "type": true, "key": true, "read": true}
 
+// desktopControlAccessibilityWords is drive_screen's refusal while Accessibility is not
+// granted: the rule, and where to grant it.
+const desktopControlAccessibilityWords = "Nothing was driven: Agents Host needs the Accessibility permission. " +
+	"Grant it in System Settings ▸ Privacy & Security ▸ Accessibility."
+
+// desktopControlGate is drive_screen's entry gate (#3004, US2): Off, then Accessibility,
+// checked before the "screen" lease is ever taken (FR-004, FR-005). The Accessibility
+// check starts (or reuses) this agent's agents-drive to ask it, since only the helper can
+// call AXIsProcessTrustedWithOptions (Go has no cgo access to ApplicationServices, research
+// R1); it triggers macOS's own grant prompt on first use.
+func (d *Daemon) desktopControlGate(agent wire.UUID) error {
+	if !d.desktopControlOn() {
+		return &Error{Code: CodeNotPermitted, Message: desktopControlOffWords}
+	}
+	p, err := d.screenDriveFor(agent)
+	if err != nil {
+		return &Error{Message: "drive_screen: " + err.Error()}
+	}
+	res, err := p.call(map[string]any{"action": "access"})
+	if err != nil {
+		d.releaseScreenDrive(agent)
+		return &Error{Message: "drive_screen: " + err.Error()}
+	}
+	if trusted, _ := res["trusted"].(bool); !trusted {
+		return &Error{Code: CodeNotPermitted, Message: desktopControlAccessibilityWords}
+	}
+	return nil
+}
+
 // driveScreen is drive_screen.
 func (d *Daemon) driveScreen(agent wire.UUID, args map[string]json.RawMessage) (string, error) {
 	app := argString(args, "app")
@@ -176,9 +205,10 @@ func (d *Daemon) driveScreen(agent wire.UUID, args map[string]json.RawMessage) (
 	if d.Store.Agent(agent) == nil {
 		return "", &Error{Code: CodeNoSuchAgent, Message: leaseNoCall}
 	}
-	// Off by default (FR-004): refused before the lease is taken or agents-drive starts.
-	if !d.desktopControlOn() {
-		return "", &Error{Code: CodeNotPermitted, Message: desktopControlOffWords}
+	// Off, then Accessibility (FR-004, FR-005): refused before the lease is taken or
+	// agents-drive starts for real driving.
+	if err := d.desktopControlGate(agent); err != nil {
+		return "", err
 	}
 	reply, err := d.leaseResource(agent, map[string]json.RawMessage{"name": json.RawMessage(`"screen"`)})
 	if err != nil {

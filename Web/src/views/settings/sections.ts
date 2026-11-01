@@ -11,6 +11,7 @@ import { SignInSection, SignInsSection } from "../SignInSection";
 import { SecretsSection } from "../UserScope";
 import { AgentRuntimesSection } from "./AgentRuntimes";
 import { BackupsSection, ServerBackupsSection } from "./Backups";
+import { DesktopControlSection } from "./DesktopControl";
 import { FinishedChatsSection } from "./FinishedChats";
 import { GitAccessSection } from "./GitAccess";
 import { VersionsSection } from "./Machines";
@@ -41,6 +42,8 @@ export const settingsSections: readonly SettingsSection[] = [
   { name: "bots", scope: "controlPlane", order: 15, Section: BotsSection, shows: (store) => store.person.value?.role === "admin" },
   // Channel identities linked to people (#1762).
   { name: "channels", scope: "controlPlane", order: 30, Section: ChannelsSection },
+  // The off-by-default switch for drive_screen (#3004, US2).
+  { name: "desktopControl", scope: "machines", order: 35, Section: DesktopControlSection },
   { name: "finishedChats", scope: "thisApp", order: 30, Section: FinishedChatsSection },
   { name: "gitAccess", scope: "machines", order: 10, Section: GitAccessSection },
   // Groups own machine providers (#1761).

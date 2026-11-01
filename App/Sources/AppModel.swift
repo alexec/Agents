@@ -137,6 +137,10 @@ final class AppModel {
     /// The switch and the hours (Settings ▸ Machines ▸ This Mac ▸ Sleep). Nil until the daemon has
     /// said, including a daemon too old to know the method.
     private(set) var wakeSettings: WakeSettings?
+    /// Desktop control's own off-by-default switch (#3004, US2, Settings ▸ Machines ▸
+    /// This Mac). Nil until the daemon has said, including a daemon too old to know the
+    /// method, which Settings draws as Off.
+    private(set) var desktopControlSettings: DesktopControlSettings?
     /// How this Mac's host updates Agents Host by itself (#2178). Nil from a host that
     /// cannot (a test's, or one older than the method), and Settings draws nothing for it.
     private(set) var selfUpdate: DaemonAPI.SelfUpdate?
@@ -1890,6 +1894,23 @@ final class AppModel {
         await attempt {
             self.wakeSettings = try await self.macClient.call(DaemonAPI.Method.wakeSet, settings,
                                                            returning: WakeSettings.self)
+        }
+    }
+
+    /// The saved desktop-control switch (#3004, US2). A daemon too old to know the method
+    /// leaves this nil, and Settings draws it as Off.
+    func refreshDesktopControlSettings() async {
+        desktopControlSettings = try? await macClient.call(DaemonAPI.Method.desktopControlState,
+                                                        Optional<String>.none,
+                                                        returning: DesktopControlSettings.self)
+    }
+
+    /// The person turned desktop control on or off (#3004, US2, FR-004).
+    func setDesktopControlEnabled(_ on: Bool) async {
+        await attempt {
+            self.desktopControlSettings = try await self.macClient.call(DaemonAPI.Method.desktopControlSet,
+                                                                     DesktopControlSettings(enabled: on),
+                                                                     returning: DesktopControlSettings.self)
         }
     }
 

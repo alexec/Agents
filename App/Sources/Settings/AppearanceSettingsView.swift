@@ -77,6 +77,7 @@ struct MacSettingsView: View {
     var body: some View {
         Form {
             WakeSettingsSection()
+            DesktopControlSettingsSection()
             SelfUpdateSection()
             ArchiveSettingsSection()
             if let backups = model.work.backupState {
@@ -87,6 +88,7 @@ struct MacSettingsView: View {
         .paperForm()
         .task {
             await model.refreshWakeSettings()
+            await model.refreshDesktopControlSettings()
             await model.refreshSelfUpdate()
             await model.refreshRetentionState()
             await model.refreshBackupState()

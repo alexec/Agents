@@ -14,7 +14,7 @@ import type {
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, PolicySetBy, RuntimeAllowances,
   GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
-  BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
+  BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, DesktopControlSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
   PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, RemoveRequest, ClientPermissionSettings, PRCostComment } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
@@ -371,6 +371,9 @@ export class Work {
   /** The person's Mac's backups (#1810), for Settings ▸ Backups: null until it has said, or from a
    * host too old to keep backups, which leaves the section out. */
   readonly backups = signal<BackupState | null>(null);
+  /** Desktop control's own off-by-default switch (#3004, US2), for Settings: null until it has
+   * said, or from a host too old to know the method, which leaves the section out. */
+  readonly desktopControl = signal<DesktopControlSettings | null>(null);
   /** Each host's folders' worktrees (#790), as `worktrees/all` last answered: asked when Activity ▸
    * Worktrees is shown, not kept up by the host. */
   readonly worktreeLists = signal<Record<string, FolderWorktrees[]>>({});
@@ -2097,6 +2100,27 @@ export class Store extends Work {
 
   async makeBackup(host = this.macHostID.value): Promise<BackupState | null> {
     return this.keepBackups(host, () => this.link.call("backups/make", {}, host));
+  }
+
+  /** Settings ▸ Desktop control (#3004, US2), asked when Settings is shown. Null from a host too
+   * old to know the method, which leaves the section out. */
+  loadDesktopControl(): void {
+    void this.link.call("desktopControl/state", {}, this.macHostID.value).then(
+      (settings) => { this.desktopControl.value = settings; },
+      () => { /* too old to know the method: the section stays out. */ },
+    );
+  }
+
+  /** The person turned desktop control on or off (#3004, US2, FR-004). */
+  async setDesktopControlEnabled(enabled: boolean): Promise<void> {
+    const before = this.desktopControl.value;
+    this.desktopControl.value = { enabled };
+    try {
+      this.desktopControl.value = await this.link.call("desktopControl/set", { enabled }, this.macHostID.value);
+    } catch (error) {
+      this.desktopControl.value = before;
+      this.say(describe(error));
+    }
   }
 
   private async keepBackups(host: string, call: () => Promise<BackupState>): Promise<BackupState | null> {

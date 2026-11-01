@@ -47,6 +47,16 @@ func axWalk(_ element: AXUIElement, depth: Int, limit: Int, visit: (AXUIElement,
     for child in axChildren(element) { axWalk(child, depth: depth + 1, limit: limit, visit: visit) }
 }
 
+/// Whether this process (Agents Host, by #3004's research R1) has the Accessibility
+/// permission, triggering macOS's own grant prompt on first use if not (FR-005).
+///
+/// The option's own key, not `kAXTrustedCheckOptionPrompt` (a non-`Sendable` `CFStringRef`
+/// global that fails this build's strict concurrency check): its value is documented and
+/// stable, `"AXTrustedCheckOptionPrompt"`.
+func axIsTrusted() -> Bool {
+    AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
+}
+
 /// The running app named on the menu bar, by NSRunningApplication.localizedName (what a
 /// person reads there, and what `app` in a drive_screen call names).
 func pid(ofApp name: String) -> pid_t? {
