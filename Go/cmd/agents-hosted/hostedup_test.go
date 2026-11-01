@@ -126,3 +126,32 @@ func TestHostedUpMakesTheVM(t *testing.T) {
 		t.Fatal("a secret was printed or passed to gcloud")
 	}
 }
+
+// #3124: the image it builds is tagged as compose.hosted.yaml names it, so compose runs that
+// one and pulls no release, and once /healthz answers the old images are pruned.
+func TestHostedUpRunsTheImageItBuiltAndPrunes(t *testing.T) {
+	compose, err := os.ReadFile("../../../deploy/compose.hosted.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(compose), "image: ghcr.io/alexec/agents-control:${AGENTS_VERSION:-latest}") {
+		t.Fatal("compose.hosted.yaml names another image; change the test and hosted-up.sh with it")
+	}
+	env := ready(t)
+	env["AGENTS_VERSION"] = "0.15.0+abc123"
+	out, _, err := hostedUp(t, env, "--dry-run")
+	if err != nil {
+		t.Fatal(out, err)
+	}
+	image := "ghcr.io/alexec/agents-control:0.15.0-abc123"
+	build := strings.Index(out, "docker build --platform linux/amd64 --build-arg VERSION=0.15.0+abc123")
+	save := strings.Index(out, "docker save "+image+" ")
+	healthz := strings.Index(out, "/healthz")
+	prune := strings.Index(out, `docker\ image\ prune\ -af`)
+	if build < 0 || !strings.Contains(out, "-t "+image+" ") || save < 0 || healthz < 0 || prune < healthz {
+		t.Fatalf("build %d, save %d, healthz %d, prune %d in\n%s", build, save, healthz, prune, out)
+	}
+	if strings.Contains(out, "agents-control:latest") {
+		t.Fatal("it still builds or loads agents-control:latest:\n" + out)
+	}
+}
