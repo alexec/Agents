@@ -75,7 +75,9 @@ struct LineageListTests {
             pr.ref: .init(title: "Fix it", state: "merged"),
         ]
         let rows = LineageList.rows(of: session, graph: resolved, costs: [:]) { $0 == helper ? "Helper" : nil }
-        #expect(rows.map(\.name) == ["Fix the flaky test", "Helper", "Fix it"])
+        // #3158: the number before the title, and the whole ref in the help.
+        #expect(rows.map(\.name) == ["#12 Fix the flaky test", "Helper", "#34 Fix it"])
+        #expect(rows.map(\.ref) == ["alexec/agents#12", nil, "alexec/agents#34"])
         #expect(rows.map(\.resolved) == ["open · bug, area:lineage", nil, "merged"])
 
         let costs: [Node: DaemonAPI.LineageCostRollup] = [issue: .init(node: issue, total: Self.cost(10))]
@@ -114,6 +116,15 @@ struct LineageListTests {
         #expect(LineageList.node(typed: "session:\(Self.s.uuidString)") == session)
         for no in ["", "#12", "alexec/Agents", "https://gitlab.com/a/b/-/issues/1", "https://github.com/alexec/Agents/issues/x", "a b/c#1"] {
             #expect(LineageList.node(typed: no) == nil, "\(no)")
+        }
+    }
+
+    @Test func theBareFormMayAlsoBeAPullRequest() {
+        #expect(LineageList.pullRequest(typed: "alexec/Agents#12") == Node(kind: "pr", ref: "github:alexec/Agents#12"))
+        #expect(LineageList.pullRequest(typed: " github:alexec/Agents#12 ") == Node(kind: "pr", ref: "github:alexec/Agents#12"))
+        for no in ["https://github.com/alexec/Agents/issues/12", "https://github.com/alexec/Agents/pull/12",
+                   "https://github.com/alexec/Agents/milestone/15", "session:\(Self.s.uuidString)", "alexec/Agents"] {
+            #expect(LineageList.pullRequest(typed: no) == nil, "\(no)")
         }
     }
 

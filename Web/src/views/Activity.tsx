@@ -437,8 +437,8 @@ function EventsList({ store, hostName }: { store: Store; hostName: (host: string
               <button class="event-waiting" onClick={() => navigate({ host, folder: w.folder, session: w.agentID })}>
                 <span class="strong">{w.title}</span><span class="quiet small">{w.status.line}</span>
               </button>
-              {w.status.cancellable && <button class="event-stop" aria-label={`Stop ${w.title} waiting`}
-                title="Stop waiting. Nothing will start it again for this wait."
+              {w.status.cancellable && <button class="event-stop" aria-label={`End ${w.title}’s wait`}
+                title="End this wait. Nothing will start the agent again for it."
                 onClick={() => void store.cancelWait(host, w.agentID)}>✕</button>}
             </li>)}
           </ul>

@@ -42,7 +42,7 @@ import { BackToList } from "./BackToList";
 import { orderedFolders, folderLabel } from "./Sidebar";
 import { GuardedChangeCards } from "./GuardedChange";
 import { KeptBubbles } from "./Kept";
-import { composerReason, line, setBy as setByWords } from "../model/orgPolicy";
+import { composerReason, line, markTitle } from "../model/orgPolicy";
 import { optionLabel } from "./OrgPolicyLine";
 
 type Where = { kind: "folder" } | { kind: "new" } | { kind: "existing"; root: string } | { kind: "branch"; name: string }
@@ -571,8 +571,8 @@ export function NewAgent({ store, host, folder, folderName, down }: {
                   const id = (e.currentTarget as HTMLSelectElement).value;
                   accountID.value = id === ownSignInID ? choices.ownChoice : id;
                 }}>
-                <option value={ownSignInID} disabled={!!choices.ownSetBy}>{defaultAccountName}{choices.ownSetBy ? ` (${setByWords})` : accountNote(undefined)}</option>
-                {choices.accounts.map((a) => <option key={a.id} value={a.id} disabled={!!a.setBy}>{a.name}{a.setBy ? ` (${setByWords})` : accountNote(a)}</option>)}
+                <option value={ownSignInID} disabled={!!choices.ownSetBy}>{defaultAccountName}{choices.ownSetBy ? ` (${markTitle(choices.ownSetBy)})` : accountNote(undefined)}</option>
+                {choices.accounts.map((a) => <option key={a.id} value={a.id} disabled={!!a.setBy}>{a.name}{a.setBy ? ` (${markTitle(a.setBy)})` : accountNote(a)}</option>)}
               </select>
             </label>}
           </>)}>

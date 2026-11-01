@@ -73,7 +73,7 @@ in its hands. If you have sent it something in the meantime, the event's message
 that turn is over.
 
 The wait shows as the wait card at the end of the agent's chat: "Waiting for build · held by
-“Fix login” until 14:12 · 2nd in line". **Stop Waiting** on the card, or `cancel_wait`, takes
+“Fix login” until 14:12 · 2nd in line". **End Wait** on the card, or `cancel_wait`, takes
 the agent out of the line. If the agent waits for something else instead, it keeps its place,
 and the app starts it again when its turn comes. The line and the wait both outlive a restart
 of Agents.

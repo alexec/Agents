@@ -272,6 +272,17 @@ func TestConnectionsHoldToThePlan(t *testing.T) {
 		!strings.Contains(buf.String(), "Your Free plan allows 2 connections at once. Close one") {
 		t.Fatal(res.StatusCode, res.Header.Get("Agents-Refusal"), buf.String())
 	}
+	// The clients read the refusal's words back from /readyz (#3146).
+	ready, err := b.client.Get("https://" + to.Host + "/readyz")
+	if err != nil {
+		t.Fatal(err)
+	}
+	buf.Reset()
+	buf.ReadFrom(ready.Body)
+	ready.Body.Close()
+	if ready.Header.Get("Agents-Refusal") != "limit" || !strings.Contains(buf.String(), "Your Free plan allows 2 connections at once. Close one") {
+		t.Fatal(ready.StatusCode, ready.Header.Get("Agents-Refusal"), buf.String())
+	}
 	// The account page shows the plan and its use.
 	if _, page := b.get("https://" + domain + "/account"); !strings.Contains(page, "Free Plan") || !strings.Contains(page, "0 of 2") {
 		t.Fatal(page)

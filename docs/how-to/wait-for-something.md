@@ -62,9 +62,11 @@ and then carry on.
 
 ## Stop a wait
 
-- **In the chat, anywhere**: choose **Stop Waiting** on the wait card. On the Mac and the
-  web page, **Show in Events** opens the Events page at **Waiting now**, where ✕ on the
-  agent's line does the same.
+- **In the chat, anywhere**: choose **End Wait** on the wait card (on iPhone and iPad it
+  asks first). Nothing starts the agent again for that wait. On the Events page, ✕ on the
+  agent's line under **Waiting now** does the same.
+- **Carry the agent on now**: choose **Carry On** on the wait card. The agent stops waiting
+  and goes on without the event.
 - **Send the agent a prompt.** The agent is told its wait was cancelled by your message, and
   can wait again if it still needs to.
 
