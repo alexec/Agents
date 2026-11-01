@@ -20,23 +20,29 @@ const (
 	defaultHelpersQueued      = 5
 )
 
-// helperLimitsIn is the folder's limits as enforced: each the person's, or its default.
+// helperLimitsIn is the folder's limits as enforced: queued stays a folder setting
+// (.agents/folder.json); running and notArchived are rules now (#2957, FR-015), read from
+// the effective policy (the organisation's, the person's and the folder's own layer,
+// tightest wins), not from .agents/folder.json's own helperLimits.running/notArchived,
+// which are no longer read.
 func (d *Daemon) helperLimitsIn(folder string) (running, notArchived, queued int64) {
 	running, notArchived, queued = defaultHelpersRunning, defaultHelpersNotArchived, defaultHelpersQueued
-	if s, ok := d.summaryFor(folder); ok && s.Folder.HelperLimits != nil {
-		l := s.Folder.HelperLimits
-		if l.Running != nil {
-			running = *l.Running
-		}
-		if l.NotArchived != nil {
-			notArchived = *l.NotArchived
-		}
-		if l.Queued != nil {
-			queued = *l.Queued
+	if s, ok := d.summaryFor(folder); ok && s.Folder.HelperLimits != nil && s.Folder.HelperLimits.Queued != nil {
+		queued = *s.Folder.HelperLimits.Queued
+	}
+	eff := d.effective(folder)
+	if r := effectiveRule(eff, wire.PolicyRuleNameHelpersMostRunning); r != nil && r.Decides != nil {
+		var v int64
+		if json.Unmarshal(r.Value, &v) == nil {
+			running = v
 		}
 	}
-	// The organisation's caps over the folder's own (#998): the lower number is used.
-	running, notArchived, _ = d.helperCaps(running, notArchived)
+	if r := effectiveRule(eff, wire.PolicyRuleNameHelpersMostNotArchived); r != nil && r.Decides != nil {
+		var v int64
+		if json.Unmarshal(r.Value, &v) == nil {
+			notArchived = v
+		}
+	}
 	return
 }
 

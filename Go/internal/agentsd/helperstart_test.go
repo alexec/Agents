@@ -16,7 +16,7 @@ func TestALeadStartsSessionsAndTheyQueue(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
 	dir := folder(t, c, 1)
-	c.call(t, 2, "folders/setHelperLimits", map[string]any{"folder": "file://" + dir + "/", "limits": map[string]any{"running": 1}})
+	c.call(t, 2, "policy/setFolder", map[string]any{"folder": "file://" + dir + "/", "rules": map[string]any{"helpers": map[string]any{"mostRunning": 1}}})
 	title := "Lead"
 	lead := seeded(t, d, dir, func(a *wire.Agent) { a.Title = &title })
 	m := appClient(t, d, lead.ID)
@@ -100,7 +100,7 @@ func TestStartSessionInheritsCallerRuntimeWhenQueued(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
 	dir := folder(t, c, 1)
-	c.call(t, 2, "folders/setHelperLimits", map[string]any{"folder": "file://" + dir + "/", "limits": map[string]any{"running": 1}})
+	c.call(t, 2, "policy/setFolder", map[string]any{"folder": "file://" + dir + "/", "rules": map[string]any{"helpers": map[string]any{"mostRunning": 1}}})
 	title := "Lead"
 	lead := seeded(t, d, dir, func(a *wire.Agent) { a.Title = &title; a.RuntimeID = "codex" })
 	startedBy := lead.ID

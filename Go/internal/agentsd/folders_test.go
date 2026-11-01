@@ -55,12 +55,11 @@ func TestAFoldersSettingsAreItsFile(t *testing.T) {
 	defer d.Shutdown()
 	dir := folder(t, c, 1)
 	folder := store.FolderURL(dir)
-	if e := c.callError(t, 2, "folders/setHelperLimits", map[string]any{"folder": folder, "limits": map[string]any{"running": 6, "notArchived": 4}}); e.Message != "Running helpers (6) cannot be more than helpers not yet archived (4)." {
-		t.Fatal(e.Message)
-	}
+	// running and notArchived are rules now (#2957, FR-015), set in the folder's own
+	// policy layer (policy/setFolder): this method ignores them rather than writing them.
 	var s wire.FolderSummary
 	json.Unmarshal(c.call(t, 3, "folders/setHelperLimits", map[string]any{"folder": folder, "limits": map[string]any{"running": 4, "agentsMayArchive": true}}), &s)
-	if s.Folder.HelperLimits == nil || *s.Folder.HelperLimits.Running != 4 || s.Folder.HelperLimits.AgentsMayArchive != nil {
+	if s.Folder.HelperLimits != nil && (s.Folder.HelperLimits.Running != nil || s.Folder.HelperLimits.AgentsMayArchive != nil) {
 		t.Fatalf("%+v", s.Folder.HelperLimits)
 	}
 	if e := c.callError(t, 4, "folders/setDiskSpace", map[string]any{"folder": folder, "diskSpace": map[string]any{"lowGB": 1, "criticalGB": 5}}); e.Message != "Critical disk space can't be more than low disk space." {
@@ -69,7 +68,7 @@ func TestAFoldersSettingsAreItsFile(t *testing.T) {
 	c.call(t, 5, "folders/setDiskSpace", map[string]any{"folder": folder, "diskSpace": map[string]any{"lowGB": 50, "criticalGB": 2}})
 	b, _ := os.ReadFile(filepath.Join(dir, ".agents", "folder.json"))
 	// The project id that adding the folder wrote (#2317) stays beside them.
-	if s.Project == nil || string(b) != "{\n  \"diskSpace\" : {\n    \"lowGB\" : 50\n  },\n  \"helperLimits\" : {\n    \"running\" : 4\n  },\n  \"project\" : \""+*s.Project+"\"\n}\n" {
+	if s.Project == nil || string(b) != "{\n  \"diskSpace\" : {\n    \"lowGB\" : 50\n  },\n  \"project\" : \""+*s.Project+"\"\n}\n" {
 		t.Fatalf("%s", b)
 	}
 	os.WriteFile(filepath.Join(dir, ".agents", "folder.json"), []byte("[1]"), 0o644)

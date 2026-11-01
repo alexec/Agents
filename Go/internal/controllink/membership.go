@@ -178,5 +178,13 @@ func Enroll(ctx context.Context, root string, code *Code, private []byte, hello 
 		return nil, fmt.Errorf("machines/announce: %s", line)
 	}
 	m := &Membership{Host: string(*reply.Result.Host), ControlKey: code.ControlKey, Addresses: []string{}, Name: code.Name, URL: code.URL, Pin: code.Pin}
+	if len(code.PersonKey) > 0 {
+		// A host code the person's own Mac window made carries the person key (#2957,
+		// research R3 path 1): pin it now, so a later copy from the control plane (path 3)
+		// never has to be trusted on first use on this machine.
+		if _, err := PinPersonKey(root, code.PersonKey, PinFromJoinCode, time.Now()); err != nil {
+			return nil, fmt.Errorf("enrol: pin the person key: %w", err)
+		}
+	}
 	return m, m.Save(root)
 }

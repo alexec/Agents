@@ -17,6 +17,7 @@ import (
 	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
 	"github.com/alexec/agents/Go/internal/agentsd/skillcatalog"
 	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -120,11 +121,10 @@ func (d *Daemon) ApplyUserSettings(u wire.MachineUserSettings) error {
 	if partSent(s.Runtimes) {
 		note(wire.UserSettingsPartNameRuntimes, d.writeRuntimeChoices(s.Runtimes))
 	}
-	if partSent(s.CostLimits) {
-		note(wire.UserSettingsPartNameCostLimits, d.writeCostLimits(s.CostLimits))
-	}
-	if partSent(s.Notifications) {
-		note(wire.UserSettingsPartNameNotifications, d.writeNoticeLimits(s.Notifications))
+	// costLimits and notifications go (#2957, research R11): their rules now come from
+	// your layer, sent in the part policy instead and applied by applyYoursFromControlPlane.
+	if partSent(s.Policy) {
+		note(wire.UserSettingsPartNamePolicy, d.applyYoursFromControlPlane(s.Policy))
 	}
 	names, err := writeSecrets(home, u.Secrets, before.Secrets)
 	if err != nil {
@@ -359,23 +359,19 @@ func (d *Daemon) writeRuntimeChoices(raw wire.JSONValue) error {
 	return nil
 }
 
-// writeCostLimits sets every limit as the part has it: one it leaves out is no limit.
-func (d *Daemon) writeCostLimits(raw wire.JSONValue) error {
-	var given map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &given); err != nil {
-		return errors.New("not cost limits")
+// applyYoursFromControlPlane is the part policy from the control plane (#2957, research
+// R11): a copy of your layer, applied as a non-keeper machine does (applySignedYours),
+// pinning the person key on first use when this machine has none pinned yet.
+func (d *Daemon) applyYoursFromControlPlane(raw wire.JSONValue) error {
+	var signed wire.SignedYourPolicy
+	if err := json.Unmarshal(raw, &signed); err != nil {
+		return errors.New("not a signed policy")
 	}
-	whole := map[string]json.RawMessage{}
-	for _, k := range []string{"perAgent", "daily", "perAgentTokens", "dailyTokens"} {
-		if v, ok := given[k]; ok {
-			whole[k] = v
-		} else {
-			whole[k] = json.RawMessage("null")
-		}
+	_, err := d.applySignedYours(signed, controllink.PinFromControlPlane)
+	if err != nil {
+		log.Printf("policy: the control plane's copy of your layer: %v", err)
 	}
-	b, _ := json.Marshal(whole)
-	_, err := d.setLimits(b)
-	return err
+	return nil // never fails the whole delivery: a bad copy is logged and ignored (FR-011)
 }
 
 // writeSecrets sets each secret in secrets.env, and takes out the ones the control plane

@@ -22,7 +22,14 @@ import (
 // agent works there, or by a pull, waits for the person to keep or undo it, and the app
 // goes on using the copy last approved, kept in <root>/guarded-files.json.
 
-var guardedFiles = map[string]string{".agents/folder.json": "the helper limits, disk space lines and cost on pull requests", ".agents/pins.json": "the pins"}
+var guardedFiles = map[string]string{".agents/folder.json": "the helper limits, disk space lines and cost on pull requests",
+	".agents/pins.json": "the pins", folderPolicyFile: "the folder's own policy layer"}
+
+// folderPolicyFile is .agents/policy.json (#2957, FR-014, policyfolder.go): a folder's own
+// layer, committed with the folder's code. Its guard is checkFolderPolicyGuarded
+// (policyfolder.go), not checkGuarded's own switch below: a tighter-only change applies at
+// once (research R10), which does not depend on whether an agent is working there.
+const folderPolicyFile = ".agents/policy.json"
 
 type guardedPending struct {
 	Digest       *string     `json:"digest,omitempty"`
@@ -136,6 +143,10 @@ func inRepository(folder string) bool {
 // pull, it waits; changed by the person with nothing running, it is approved. ended is
 // the agent whose turn just ended, if any.
 func (d *Daemon) checkGuarded(folder, path string, ended *wire.UUID) {
+	if path == folderPolicyFile {
+		d.checkFolderPolicyGuarded(folder)
+		return
+	}
 	digest, data := diskRead(folder, path)
 	d.guardedMu.Lock()
 	s, known := d.stateOf(folder, path)

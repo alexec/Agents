@@ -133,7 +133,7 @@ func TestAnAdminSavesASignedPolicy(t *testing.T) {
 
 	// Out of bounds, refused in words, and nothing kept.
 	for _, bad := range []wire.OrgPolicy{
-		{ModeCeiling: optional("yolo")},
+		{PermissionMode: optional(wire.PermissionLevel("yolo"))},
 		{Sandbox: optional("sometimes")},
 		{Budgets: &wire.PolicyBudgets{Daily: optional(2_000_000.0)}},
 		{Budgets: &wire.PolicyBudgets{DailyTokens: optional(int64(-1))}},
@@ -155,7 +155,7 @@ func TestAnAdminSavesASignedPolicy(t *testing.T) {
 	}
 
 	rules := wire.OrgPolicy{
-		ModeCeiling: optional("acceptEdits"), Sandbox: optional("required"),
+		PermissionMode: optional(wire.PermissionLevelApproveForMe), Sandbox: optional("required"),
 		Runtimes:    map[string]wire.PolicyRuntimeRule{"claude": {Models: []string{"claude-sonnet-*"}}, "codex": {}},
 		Budgets:     &wire.PolicyBudgets{Daily: optional(40.0), DailyTokens: optional(int64(500_000))},
 		Environment: &wire.PolicyEnvironment{PassThrough: []string{"AWS_*", "HTTPS_PROXY"}},
@@ -164,14 +164,14 @@ func TestAnAdminSavesASignedPolicy(t *testing.T) {
 	}
 	first := setPolicy(t, window, rules, nil)
 	if first.Policy == nil || first.Policy.Version != 1 || first.Rev == nil || first.Policy.StopAll != nil ||
-		!slices.Equal(first.Policy.Requires, []string{CapHostPolicy}) || first.Policy.ChangedBy.User != p.s.localOwner() {
+		!slices.Equal(first.Policy.Requires, []string{CapHostPolicy, wire.CapHostPolicyLayers1}) || first.Policy.ChangedBy.User != p.s.localOwner() {
 		t.Fatalf("%+v", first.Policy)
 	}
 
 	// Two admins read the same rev; the second to save is told to load it again.
 	var priyaRead wire.PolicyKept
 	json.Unmarshal(call(t, priya.window, "", "policy/get", nil), &priyaRead)
-	second := setPolicy(t, window, wire.OrgPolicy{ModeCeiling: optional("default")}, first.Rev)
+	second := setPolicy(t, window, wire.OrgPolicy{PermissionMode: optional(wire.PermissionLevelAsk)}, first.Rev)
 	if second.Policy.Version != 2 {
 		t.Fatalf("%+v", second.Policy)
 	}
@@ -197,7 +197,7 @@ func TestAnAdminSavesASignedPolicy(t *testing.T) {
 	if !controllink.VerifyPolicy(p.s.publicKey(), line.Policy, line.Signature.Sig) {
 		t.Fatal("the signature does not check with the control key")
 	}
-	changed := []byte(strings.Replace(string(line.Policy), `"acceptEdits"`, `"bypassPermissions"`, 1))
+	changed := []byte(strings.Replace(string(line.Policy), `"approveForMe"`, `"bypassPermissions"`, 1))
 	if string(changed) == string(line.Policy) || controllink.VerifyPolicy(p.s.publicKey(), changed, line.Signature.Sig) {
 		t.Fatal("a changed policy checks")
 	}
@@ -231,7 +231,7 @@ func TestAnAdminSavesASignedPolicy(t *testing.T) {
 	// Sam reads the rules in force.
 	var view wire.PolicyView
 	json.Unmarshal(call(t, sam.window, "", "policy/mine", nil), &view)
-	if view.Policy == nil || view.Policy.Version != 3 || deref(view.Policy.ModeCeiling) != "acceptEdits" {
+	if view.Policy == nil || view.Policy.Version != 3 || deref(view.Policy.PermissionMode) != wire.PermissionLevelApproveForMe {
 		t.Fatalf("%+v", view)
 	}
 }
@@ -252,7 +252,7 @@ func TestAPolicyReachesEveryMachineOnEveryCopy(t *testing.T) {
 		a.waitFor(func() bool { _, ok := told.last(m.member.Host); return ok }, "each machine told at its join")
 	}
 
-	kept := setPolicy(t, window, wire.OrgPolicy{ModeCeiling: optional("auto")}, nil)
+	kept := setPolicy(t, window, wire.OrgPolicy{PermissionMode: optional(wire.PermissionLevelApproveForMe)}, nil)
 	saved := time.Now()
 	for _, m := range machines {
 		a.waitFor(func() bool { return told.version(m.member.Host) == 1 }, "each machine told version 1")
@@ -264,7 +264,7 @@ func TestAPolicyReachesEveryMachineOnEveryCopy(t *testing.T) {
 		t.Fatal("an older machine was told the policy")
 	}
 
-	setPolicy(t, window, wire.OrgPolicy{ModeCeiling: optional("acceptEdits")}, kept.Rev)
+	setPolicy(t, window, wire.OrgPolicy{PermissionMode: optional(wire.PermissionLevelAsk)}, kept.Rev)
 	later := b.hostSaying(policyHello("MACHINE-6"), nil)
 	a.waitFor(func() bool { return told.version(later.member.Host) == 2 }, "a later machine told the newest")
 	line, _ := told.last(later.member.Host)
@@ -303,7 +303,7 @@ func TestTheKillSwitchReachesEveryone(t *testing.T) {
 	}, "the machine told the switch is on")
 
 	// A save keeps the switch as it is.
-	kept = setPolicy(t, window, wire.OrgPolicy{ModeCeiling: optional("auto")}, kept.Rev)
+	kept = setPolicy(t, window, wire.OrgPolicy{PermissionMode: optional(wire.PermissionLevelApproveForMe)}, kept.Rev)
 	if kept.Policy.StopAll == nil || !kept.Policy.StopAll.On {
 		t.Fatalf("%+v", kept.Policy)
 	}
@@ -415,7 +415,7 @@ func TestARotationSignsThePolicyAgain(t *testing.T) {
 	}
 	p := startPlaneWith(t, store.NewMemory(), key, func(c *Config) { c.KeyKeeper = keeper })
 	_, window := p.client("Window")
-	setPolicy(t, window, wire.OrgPolicy{ModeCeiling: optional("auto")}, nil)
+	setPolicy(t, window, wire.OrgPolicy{PermissionMode: optional(wire.PermissionLevelApproveForMe)}, nil)
 	call(t, window, "", "control/rotate", map[string]any{})
 	kept, err := p.s.readPolicy(t.Context())
 	if err != nil || kept.signature == nil {
@@ -424,5 +424,46 @@ func TestARotationSignsThePolicyAgain(t *testing.T) {
 	if kept.signature.Version != 1 || kept.signature.KeyID != controllink.KeyID(p.s.publicKey()) ||
 		!controllink.VerifyPolicy(p.s.publicKey(), kept.raw, kept.signature.Sig) {
 		t.Fatalf("%+v", kept.signature)
+	}
+}
+
+// TestAStoredModeCeilingIsReadOnceIntoPermissionMode covers #2957, T026: a policy stored
+// before this change, with the old modeCeiling field and no permissionMode, is migrated the
+// first time it is read, signed as a new version, and never migrated again (research R5:
+// each mode-ceiling value maps onto Auto's four permission levels, the same or tighter).
+func TestAStoredModeCeilingIsReadOnceIntoPermissionMode(t *testing.T) {
+	t.Parallel()
+	private := controllink.NewPrivateKey()
+	public, err := controllink.PublicKey(private)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st := store.NewMemory()
+	legacy := []byte(`{"version":1,"issued":1767225600,"changedBy":{"user":"admin"},"requires":["host.policy/1"],"modeCeiling":"acceptEdits"}`)
+	canon, err := controllink.CanonicalJSON(legacy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.Put(t.Context(), policyKey, canon, store.Absent); err != nil {
+		t.Fatal(err)
+	}
+	sig, err := controllink.SignPolicy(private, canon)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sigBytes, _ := json.Marshal(wire.PolicySignature{Version: 1, KeyID: controllink.KeyID(public), Alg: controllink.PolicyAlg, Sig: sig})
+	if _, err := st.Put(t.Context(), policySigKey, sigBytes, store.Absent); err != nil {
+		t.Fatal(err)
+	}
+
+	p := startPlane(t, st, private)
+	_, window := p.client("Alex's Mac")
+	kept := getPolicy(t, window)
+	if kept.Policy == nil || kept.Policy.Version != 2 || deref(kept.Policy.PermissionMode) != wire.PermissionLevelApproveForMe {
+		t.Fatalf("the migration did not run as expected: %+v", kept.Policy)
+	}
+	again := getPolicy(t, window)
+	if again.Policy == nil || again.Policy.Version != 2 {
+		t.Fatalf("reading the migrated policy again migrated it a second time: %+v", again.Policy)
 	}
 }

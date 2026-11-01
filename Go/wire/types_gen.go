@@ -6058,10 +6058,13 @@ type OrgPolicy struct {
 	// The capabilities a machine needs to follow this policy: host.policy/1, and one for each later rule (FR-014). A machine that lacks one starts no agent.
 	Requires []string `json:"requires"`
 
-	// The loosest mode, by ModeLooseness rank 0 to 4. A mode a machine does not know counts as rank 4.
-	ModeCeiling *string `json:"modeCeiling,omitzero"`
+	// #2957: the loosest permission level, on Auto's four levels (research R5). The control plane reads modeCeiling into this once and drops modeCeiling.
+	PermissionMode *PermissionLevel `json:"permissionMode,omitzero"`
 
-	// Required refuses the choice off and the states none and runtimeControlled. Absent is the person's choice.
+	// #2957: alwaysApprove or default (Ask me), the loosest answer to a permission request.
+	PermissionRequests *ClientPermissionMode `json:"permissionRequests,omitzero"`
+
+	// Required refuses the choice off and the states none and runtimeControlled. runtime (#2957) refuses only off. Absent is the person's choice.
 	Sandbox *string `json:"sandbox,omitzero"`
 
 	// The runtimes allowed, by runtime id. Absent allows every runtime.
@@ -6074,6 +6077,15 @@ type OrgPolicy struct {
 	Helpers *PolicyHelpers `json:"helpers,omitzero"`
 
 	Environment *PolicyEnvironment `json:"environment,omitzero"`
+
+	// #2957: the most workflows on at once, in each folder.
+	Workflows *PolicyWorkflows `json:"workflows,omitzero"`
+
+	// #2957: how many notices a burst allows, and how long to wait after one.
+	NoticeLimits *PolicyNoticeLimits `json:"noticeLimits,omitzero"`
+
+	// #2957: whether agents may archive the person's finished chats. false is tighter.
+	ArchiveMyChats *bool `json:"archiveMyChats,omitzero"`
 
 	StopAll *PolicyStopAll `json:"stopAll,omitzero"`
 
@@ -6953,6 +6965,11 @@ type PolicyApplied struct {
 	Version int64 `json:"version"`
 }
 
+// policy/applyYours's result (#2957): the revision now applied here.
+type PolicyApplyYoursResult struct {
+	Revision int64 `json:"revision"`
+}
+
 // A machine of the person's that does not say host.policy-layers/1 (#2957, EffectivePolicy.behind, Edge Cases "A machine of an older version").
 type PolicyBehindMachine struct {
 	Host string `json:"host"`
@@ -6987,6 +7004,21 @@ type PolicyEnvironment struct {
 	PassThrough []string `json:"passThrough"`
 
 	Runtimes map[string][]string `json:"runtimes,omitzero"`
+}
+
+// policy/folder (#2957): the folder's own layer, from .agents/policy.json.
+type PolicyFolderRequest struct {
+	Folder URL `json:"folder"`
+}
+
+// policy/folder's result (#2957, data-model.md "A folder's layer"): the approved copy, and a waiting change when one is pending.
+type PolicyFolderState struct {
+	Rules PolicyRules `json:"rules"`
+
+	Pending *GuardedChange `json:"pending,omitzero"`
+
+	// Why the file on disk cannot be read as a layer (not JSON, or a value out of range), when that is why a change is pending.
+	Invalid *string `json:"invalid,omitzero"`
 }
 
 // One folder that sets its own rules, for the Agents ▸ Policy banner (#2957, EffectivePolicy.foldersWithRules).
@@ -8911,6 +8943,13 @@ type SetDiskSpaceRequest struct {
 	DiskSpace DiskThresholds `json:"diskSpace"`
 }
 
+// policy/setFolder (#2957): writes .agents/policy.json in a stable order and approves it. A value looser than the person's own effective value is kept, and the result shows it capped.
+type SetFolderPolicyRequest struct {
+	Folder URL `json:"folder"`
+
+	Rules PolicyRules `json:"rules"`
+}
+
 // folders/setProject (#2317): the project id to write into the folder's .agents/folder.json.
 type SetFolderProjectRequest struct {
 	Folder URL `json:"folder"`
@@ -9564,6 +9603,9 @@ type SignedYourPolicy struct {
 
 	// Present only on the first copy after a new person key.
 	Rotation *PersonKeyRotation `json:"rotation,omitzero"`
+
+	// #2957, research R3: the person key's public half (X9.63), so a machine that has not pinned one yet can check the signature and pin it (trust on first use) or match it against a join code's key. Sent every time; cheap, and no secret.
+	Key Data `json:"key,omitzero"`
 }
 
 // An iOS simulator on a Mac host (#842): its UDID, its name, its system and whether it is booted.
@@ -10550,6 +10592,9 @@ type UserSettings struct {
 	// The person's notice limits (#2859), as a NoticeLimits.
 	Notifications JSONValue `json:"notifications,omitzero"`
 
+	// #2957, research R11: your layer, as a SignedYourPolicy. Only the keeper sets it (user/setPolicy); a client cannot (user/setSettings refuses this part).
+	Policy JSONValue `json:"policy,omitzero"`
+
 	// When a part last changed.
 	Updated *string `json:"updated,omitzero"`
 }
@@ -10571,7 +10616,7 @@ type UserSettingsPart struct {
 	Value JSONValue `json:"value"`
 }
 
-// A part of a person's user settings (#1760, #2410). Each part has one fixed scope: MCP servers, agent configuration, runtimes, cost limits and notices (#2859) follow the person. Resources belong to each machine.
+// A part of a person's user settings (#1760, #2410). Each part has one fixed scope: MCP servers, agent configuration, runtimes, cost limits and notices (#2859) follow the person. Resources belong to each machine. policy (#2957) is set only by the keeper, through user/setPolicy; user/setSettings refuses it.
 type UserSettingsPartName string
 
 const UserSettingsPartNameMcpServers UserSettingsPartName = "mcpServers"
@@ -10579,6 +10624,7 @@ const UserSettingsPartNameAgentConfig UserSettingsPartName = "agentConfig"
 const UserSettingsPartNameRuntimes UserSettingsPartName = "runtimes"
 const UserSettingsPartNameCostLimits UserSettingsPartName = "costLimits"
 const UserSettingsPartNameNotifications UserSettingsPartName = "notifications"
+const UserSettingsPartNamePolicy UserSettingsPartName = "policy"
 
 // user/suspended (#1002, FR-018): to each machine of a suspended person, at hello before its settings and within 5 seconds of a change; off: true ends it.
 type UserSuspended struct {

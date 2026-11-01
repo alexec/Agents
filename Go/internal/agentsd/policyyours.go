@@ -2,16 +2,19 @@ package agentsd
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"log"
 	"os"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/policylayers"
+	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -120,10 +123,11 @@ func (d *Daemon) readYoursLocked() {
 	d.yoursRulesCache.Store(&rules)
 }
 
-// trustsYoursLocked checks a layer's signature against this machine's own person key
-// (slice 2's scope: this machine is always its own keeper, research R4's "a person with no
-// Mac" case included). A non-keeper machine verifying a copy against a pinned key of
-// another machine's is slice 3's work (research R3, T030).
+// trustsYoursLocked checks a layer's signature: against this machine's own person key when
+// the layer names this machine as keeper, or against the key this machine has pinned
+// otherwise (#2957, research R3/R4). A non-keeper machine with no pin yet trusts nothing on
+// disk here: FR-011's "keep the last good copy" has no copy to keep until one is pinned, by
+// a join code, policy/applyYours, or the control plane's first push (applySignedYours).
 func (d *Daemon) trustsYoursLocked(k *keptYourPolicy) bool {
 	if len(k.Policy) == 0 || k.Signature.Alg != controllink.PolicyAlg {
 		return false
@@ -131,7 +135,12 @@ func (d *Daemon) trustsYoursLocked(k *keptYourPolicy) bool {
 	if json.Unmarshal(k.Policy, &k.policy) != nil || k.policy.Revision < 1 || k.Signature.Version != k.policy.Revision {
 		return false
 	}
-	public := d.yoursPublicKeyLocked()
+	var public []byte
+	if k.policy.Keeper == d.machineID() {
+		public = d.yoursPublicKeyLocked()
+	} else if pinned, err := controllink.LoadPinnedPersonKey(d.Store.Loc.Root); err == nil && pinned != nil {
+		public = pinned.Key
+	}
 	if public == nil {
 		return false
 	}
@@ -188,7 +197,122 @@ func (d *Daemon) saveYoursLocked(next wire.YourPolicy) error {
 	d.yoursRulesCache.Store(&rules)
 	d.yoursWas = yourPolicySeen{Revision: next.Revision, Moved: true}
 	d.saveYoursSeenLocked()
+	d.pushYoursAsync(kept)
 	return nil
+}
+
+// pushYoursAsync tells this machine's control plane that your layer changed (#2957,
+// research R11, user/setPolicy): best effort, and never while yoursMu is held, since it is
+// a network call. The control plane checks the revision goes up, keeps it as the part
+// policy of the user settings, and pushes it on to the person's other machines within 5
+// seconds (SC-005). Nothing here blocks a save: with no control plane, or one that cannot
+// be reached, the layer stays local to this machine, as it always has.
+func (d *Daemon) pushYoursAsync(kept keptYourPolicy) {
+	ask := d.askControl.Load()
+	if ask == nil {
+		return
+	}
+	signed := wire.SignedYourPolicy{Policy: base64.StdEncoding.EncodeToString(kept.Policy), Signature: kept.Signature, Key: d.yoursPublicKeyLocked()}
+	safe.Go("user/setPolicy", func() {
+		ctx, cancel := context.WithTimeout(d.ctx, 15*time.Second)
+		defer cancel()
+		if _, err := (*ask)(ctx, wire.CallUserSetPolicy.Name, signed); err != nil {
+			log.Printf("user/setPolicy: kept on this machine only: %v", err)
+		}
+	})
+}
+
+// applySignedYours applies a copy of your layer this machine did not sign itself: the
+// control plane's push to a non-keeper machine, or the Mac window's direct link
+// (policy/applyYours, research R3 paths 2 and 3). It pins the person key on first use when
+// none is pinned yet, moves the pin on a rotation that checks against it, and refuses
+// signature (no trusted key, or the signature does not check) or older (not a higher
+// revision than the one already here). This machine's own writes (editYoursLocked,
+// setYourPolicy, firstStartMoveLocked) go through saveYoursLocked directly, never here.
+func (d *Daemon) applySignedYours(signed wire.SignedYourPolicy, source string) (int64, error) {
+	raw, err := base64.StdEncoding.DecodeString(signed.Policy)
+	if err != nil {
+		return 0, &Error{Code: wire.FailureSignature, Message: "The policy is not base64."}
+	}
+	var policy wire.YourPolicy
+	if json.Unmarshal(raw, &policy) != nil || policy.Revision < 1 {
+		return 0, &Error{Code: wire.FailureSignature, Message: "Not a signed policy."}
+	}
+	if signed.Signature.Alg != controllink.PolicyAlg || signed.Signature.Version != policy.Revision {
+		return 0, &Error{Code: wire.FailureSignature, Message: "The signature does not match the policy."}
+	}
+	d.yoursMu.Lock()
+	defer d.yoursMu.Unlock()
+	d.readYoursLocked()
+	if policy.Keeper == d.machineID() {
+		// This machine is the keeper: its own write is the truth. A copy of it, such as an
+		// echo of what this machine itself just sent, changes nothing.
+		current := int64(0)
+		if d.yoursNow != nil {
+			current = d.yoursNow.policy.Revision
+		}
+		return current, nil
+	}
+	public, err := d.resolveTrustedPersonKeyLocked(signed, source)
+	if err != nil {
+		return 0, err
+	}
+	if !controllink.VerifyPolicy(public, raw, signed.Signature.Sig) {
+		return 0, &Error{Code: wire.FailureSignature, Message: "The signature does not check."}
+	}
+	current := int64(0)
+	if d.yoursNow != nil {
+		current = d.yoursNow.policy.Revision
+	}
+	if policy.Revision <= current {
+		return current, &Error{Code: wire.FailureOlder, Message: "This copy is not newer than the one already here."}
+	}
+	kept := keptYourPolicy{Policy: raw, Signature: signed.Signature, policy: policy}
+	b, err := json.Marshal(kept)
+	if err != nil {
+		return 0, err
+	}
+	if err := store.WriteAtomically(d.yourPolicyPath(), b, 0o600); err != nil {
+		return 0, err
+	}
+	d.yoursNow = &kept
+	rules := policy.Rules
+	d.yoursRulesCache.Store(&rules)
+	d.yoursWas = yourPolicySeen{Revision: policy.Revision, Moved: true}
+	d.saveYoursSeenLocked()
+	d.policyChanged()
+	return policy.Revision, nil
+}
+
+// resolveTrustedPersonKeyLocked is the public key to check signed's signature against: the
+// key this machine already has pinned (moved first by a rotation that checks against it),
+// or, with no pin yet, signed's own key field, pinned now from source (research R3 paths 2
+// and 3: the window's direct link, or trust on first use from the control plane). Called
+// with yoursMu held.
+func (d *Daemon) resolveTrustedPersonKeyLocked(signed wire.SignedYourPolicy, source string) ([]byte, error) {
+	root := d.Store.Loc.Root
+	pinned, err := controllink.LoadPinnedPersonKey(root)
+	if err != nil {
+		return nil, err
+	}
+	if pinned != nil {
+		if signed.Rotation != nil && controllink.PersonKeyRotationValid(pinned.Key, *signed.Rotation) {
+			moved, err := controllink.AcceptPersonKeyRotation(root, *signed.Rotation, nowFunc())
+			if err != nil {
+				return nil, err
+			}
+			return moved.Key, nil
+		}
+		return pinned.Key, nil
+	}
+	if len(signed.Key) == 0 || controllink.KeyID(signed.Key) != signed.Signature.KeyID {
+		return nil, &Error{Code: wire.FailureSignature, Message: "No person key is pinned yet, and this copy carries none to pin."}
+	}
+	newlyPinned, err := controllink.PinPersonKey(root, signed.Key, source, nowFunc())
+	if err != nil {
+		return nil, err
+	}
+	return newlyPinned.Key, nil
 }
 
 func (d *Daemon) saveYoursSeenLocked() {
@@ -330,6 +454,16 @@ func (d *Daemon) registerPolicyYours() {
 	})
 	On(d, wire.CallPolicySetYours, func(_ context.Context, c *Client, r wire.SetYourPolicyRequest) (wire.YourPolicy, error) {
 		return d.setYourPolicy(c, r)
+	})
+	On(d, wire.CallPolicyApplyYours, func(_ context.Context, c *Client, r wire.SignedYourPolicy) (wire.PolicyApplyYoursResult, error) {
+		if err := forbiddenCallerRefusal(c); err != nil {
+			return wire.PolicyApplyYoursResult{}, err
+		}
+		revision, err := d.applySignedYours(r, controllink.PinFromWindow)
+		if err != nil {
+			return wire.PolicyApplyYoursResult{}, err
+		}
+		return wire.PolicyApplyYoursResult{Revision: revision}, nil
 	})
 }
 

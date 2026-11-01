@@ -196,6 +196,52 @@ public extension DaemonAPI {
             self.folder = folder
         }
     }
+
+    /// `policy/folder` (#2957): a folder's own layer, from `.agents/policy.json`.
+    struct PolicyFolderRequest: Codable, Sendable, Hashable {
+        public var folder: String
+
+        public init(folder: String) {
+            self.folder = folder
+        }
+    }
+
+    /// `policy/folder`'s result (#2957, data-model.md "A folder's layer"): the approved copy,
+    /// and a waiting change when one is pending.
+    struct PolicyFolderState: Codable, Sendable, Hashable {
+        public var rules: PolicyRules
+        public var pending: GuardedChange?
+        /// Why the file on disk cannot be read as a layer, when that is why a change is pending.
+        public var invalid: String?
+
+        public init(rules: PolicyRules, pending: GuardedChange? = nil, invalid: String? = nil) {
+            self.rules = rules
+            self.pending = pending
+            self.invalid = invalid
+        }
+    }
+
+    /// `policy/setFolder` (#2957): writes `.agents/policy.json` in a stable order and approves
+    /// it. A value looser than the person's own effective value is kept, and the result shows
+    /// it capped.
+    struct SetFolderPolicyRequest: Codable, Sendable, Hashable {
+        public var folder: String
+        public var rules: PolicyRules
+
+        public init(folder: String, rules: PolicyRules) {
+            self.folder = folder
+            self.rules = rules
+        }
+    }
+
+    /// `policy/applyYours`'s result (#2957): the revision now applied here.
+    struct PolicyApplyYoursResult: Codable, Sendable, Hashable {
+        public var revision: Int
+
+        public init(revision: Int) {
+            self.revision = revision
+        }
+    }
 }
 
 public extension DaemonAPI.Method {
@@ -205,4 +251,15 @@ public extension DaemonAPI.Method {
     static let policyYours = "policy/yours"
     /// `SetYourPolicyRequest` → `YourPolicy` (#2957).
     static let policySetYours = "policy/setYours"
+    /// `PolicyFolderRequest` → `PolicyFolderState` (#2957).
+    static let policyFolder = "policy/folder"
+    /// `SetFolderPolicyRequest` → `PolicyRules` (#2957).
+    static let policySetFolder = "policy/setFolder"
+    /// `SignedYourPolicy` → `PolicyApplyYoursResult` (#2957, the Mac window's direct link only).
+    static let policyApplyYours = "policy/applyYours"
+}
+
+public extension DaemonAPI.Notification {
+    /// `PolicyEffectiveRequest` (#2957): a layer changed; clients call `policy/effective` again.
+    static let policyEffectiveChanged = "policy/effectiveChanged"
 }

@@ -274,6 +274,9 @@ func (d *Daemon) policyChanged() {
 	d.tellCost()
 	// An org account's mark, and the default account, follow the policy's reach (#999).
 	d.tellAccountProfiles()
+	// The organisation's or your own layer changed: every folder's effective policy may
+	// have (#2957, contracts/policy-layers-api.md "policy/effectiveChanged").
+	Broadcast(d, wire.NotifyPolicyEffectiveChanged, wire.PolicyEffectiveRequest{})
 }
 
 // orgPolicy is the policy in force here, or nil when none applies.
@@ -596,16 +599,34 @@ func (d *Daemon) modelRefusalIn(p *wire.OrgPolicy, runtimeID, model string, choi
 
 // MARK: modes
 
-// modeCeiling is the policy's loosest mode and its rank, when it sets one.
+// orgPermissionModeToModeCeiling reads the organisation's permissionMode rule (Auto's four
+// levels, #2957) back onto a raw mode name's rank (research R5, reversed): the tightest raw
+// name whose own forward mapping (orgModeCeilingMap, kept in policyyours.go's history as
+// the one-time migration research R5 describes) reaches this level, so reading it back here
+// never allows more than the level itself does. approveForMe reverses to acceptEdits (rank
+// 2), the tighter of acceptEdits and auto, both of which forward-map to it.
+var orgPermissionModeToModeCeiling = map[wire.PermissionLevel]string{
+	wire.PermissionLevelPlan:              "plan",
+	wire.PermissionLevelAsk:               "default",
+	wire.PermissionLevelApproveForMe:      "acceptEdits",
+	wire.PermissionLevelBypassPermissions: "bypassPermissions",
+}
+
+// modeCeiling is the policy's loosest mode and its rank, when it sets one, from the
+// organisation's permissionMode rule (#2957; modeCeiling itself is gone, research R5).
 func modeCeiling(p *wire.OrgPolicy) (string, int, bool) {
-	if p == nil || p.ModeCeiling == nil {
+	if p == nil || p.PermissionMode == nil {
 		return "", 0, false
 	}
-	r, ok := modeRanks[*p.ModeCeiling]
+	ceiling, ok := orgPermissionModeToModeCeiling[*p.PermissionMode]
+	if !ok {
+		ceiling = "bypassPermissions"
+	}
+	r, ok := modeRanks[ceiling]
 	if !ok {
 		r = 0
 	}
-	return *p.ModeCeiling, r, true
+	return ceiling, r, true
 }
 
 // orgModeRank is a mode's rank; one this machine does not know counts as the loosest.
@@ -630,7 +651,7 @@ func modeRefusal(p *wire.OrgPolicy, mode string) error {
 	if !ok || mode == "" || orgModeRank(mode) <= rank {
 		return nil
 	}
-	return policyRefusal("policy", "modeCeiling", modeWords(ceiling), nil)
+	return policyRefusal("policy", "permissionMode", modeWords(ceiling), nil)
 }
 
 // approveAllID is the id of an option that approves every tool, path and web request
@@ -680,7 +701,7 @@ func approveAllRefusal(p *wire.OrgPolicy, value string) error {
 	if !ok || !approvesAll(value, rank) {
 		return nil
 	}
-	return policyRefusal("policy", "modeCeiling", modeWords(ceiling), nil)
+	return policyRefusal("policy", "permissionMode", modeWords(ceiling), nil)
 }
 
 // approveAllOff is the option's value within a ceiling of this rank: "off" when it lists none.
@@ -790,20 +811,28 @@ func agentModel(a *wire.Agent) string {
 // handles its absence, an empty layer that sets nothing.
 
 // orgRulesFrom is the organisation's layer as PolicyRules, for Resolve: the fields OrgPolicy
-// and PolicyRules share directly as they are, and permissionMode mapped once from
-// modeCeiling (research R5), until slice 3 (T035) moves the organisation's own field over.
+// and PolicyRules share directly as they are (#2957, T035: modeCeiling is gone, the
+// organisation signs permissionMode itself, on Auto's four levels, the control plane having
+// read an old modeCeiling into it once per research R5).
 func orgRulesFrom(p *wire.OrgPolicy) wire.PolicyRules {
 	var r wire.PolicyRules
 	if p == nil {
 		return r
 	}
-	if p.ModeCeiling != nil {
-		level := orgModeCeilingAsPermissionLevel(*p.ModeCeiling)
-		r.PermissionMode = &level
-	}
-	if p.Sandbox != nil && *p.Sandbox == "required" {
-		on := wire.SandboxChoiceOn
-		r.Sandbox = &on
+	r.PermissionMode = p.PermissionMode
+	r.PermissionRequests = p.PermissionRequests
+	r.Workflows = p.Workflows
+	r.NoticeLimits = p.NoticeLimits
+	r.ArchiveMyChats = p.ArchiveMyChats
+	if p.Sandbox != nil {
+		switch *p.Sandbox {
+		case "required":
+			on := wire.SandboxChoiceOn
+			r.Sandbox = &on
+		case "runtime":
+			rt := wire.SandboxChoiceRuntime
+			r.Sandbox = &rt
+		}
 	}
 	r.Runtimes = p.Runtimes
 	r.Marketplaces = p.Marketplaces
@@ -827,26 +856,6 @@ func orgRulesFrom(p *wire.OrgPolicy) wire.PolicyRules {
 	return r
 }
 
-// orgModeCeilingMap is research R5's map: each of today's five mode-ceiling values onto
-// Auto's four permission levels, the same or a tighter one, so no organisation loosens by
-// this reading.
-var orgModeCeilingMap = map[string]wire.PermissionLevel{
-	"ask":               wire.PermissionLevelPlan,
-	"default":           wire.PermissionLevelAsk,
-	"acceptEdits":       wire.PermissionLevelApproveForMe,
-	"auto":              wire.PermissionLevelApproveForMe,
-	"bypassPermissions": wire.PermissionLevelBypassPermissions,
-}
-
-// orgModeCeilingAsPermissionLevel reads research R5's map each time, until slice 3 (T035)
-// moves the organisation's own permissionMode field over and signs it once instead.
-func orgModeCeilingAsPermissionLevel(ceiling string) wire.PermissionLevel {
-	if l, ok := orgModeCeilingMap[ceiling]; ok {
-		return l
-	}
-	return wire.PermissionLevelBypassPermissions // an unknown ceiling counts as the loosest (R6)
-}
-
 // effective is the effective policy for folder ("" for no folder): the organisation's and
 // your layers, merged by policylayers.Resolve (R7, R12). A folder's own layer is slice 3's
 // work.
@@ -855,6 +864,9 @@ func (d *Daemon) effective(folder string) wire.EffectivePolicy {
 	layers := []policylayers.Layer{
 		{Ref: orgLayerRef(org), Rules: orgRulesFrom(org)},
 		{Ref: youLayerRef(), Rules: d.yourPolicyRules()},
+	}
+	if folder != "" {
+		layers = append(layers, policylayers.Layer{Ref: folderLayerRef(folder), Rules: d.folderApprovedRules(folder)})
 	}
 	eff := policylayers.Resolve(layers)
 	if folder != "" {
@@ -866,6 +878,13 @@ func (d *Daemon) effective(folder string) wire.EffectivePolicy {
 		eff.Organisation = &name
 	}
 	return eff
+}
+
+// folderLayerRef is a folder's own layer reference (#2957, R8), named by its base name as
+// the UI shows it elsewhere (guardedHeadline), with its path for the client to open it.
+func folderLayerRef(folder string) wire.PolicyLayerRef {
+	f := folder
+	return wire.PolicyLayerRef{Kind: "folder", Name: filepath.Base(folder), Folder: &f}
 }
 
 // effectiveRule is one rule of eff, or nil (every PolicyRuleName is in Resolve's output, so
@@ -1567,7 +1586,7 @@ func (d *Daemon) markOptions(runtimeID string, options []wire.ConfigOption) []wi
 			}
 			refuse = func(v string) *wire.PolicySetBy {
 				if orgModeRank(v) > rank {
-					return setBy(orgLayerRef(p), "modeCeiling", modeWords(ceiling))
+					return setBy(orgLayerRef(p), "permissionMode", modeWords(ceiling))
 				}
 				return nil
 			}
@@ -1589,7 +1608,7 @@ func (d *Daemon) markOptions(runtimeID string, options []wire.ConfigOption) []wi
 			}
 			refuse = func(v string) *wire.PolicySetBy {
 				if approvesAll(v, rank) {
-					return setBy(orgLayerRef(p), "modeCeiling", modeWords(ceiling))
+					return setBy(orgLayerRef(p), "permissionMode", modeWords(ceiling))
 				}
 				return nil
 			}

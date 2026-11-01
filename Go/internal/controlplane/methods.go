@@ -1095,23 +1095,32 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 			return nil, fail(notSupported, "This control plane keeps no user settings.")
 		}
 		return m.s.users.TakeNotice(ctx, m.s.ownerOf(host), limits)
-	case "user/setNoticeLimits":
-		// The one part a machine may set (#2859): its person's Burst and Cool-down, which
-		// run nothing on the person's other machines.
-		limits, err := require[wire.NoticeLimits](params, "NoticeLimits")
+	case "user/setPolicy":
+		// Your layer changed on its keeper (#2957, research R11): stored as the part
+		// policy, and pushed on to the person's other machines. Only the keeper may set
+		// it: a machine named elsewhere in the signed layer is refused notKeeper.
+		signed, err := require[wire.SignedYourPolicy](params, "SignedYourPolicy")
 		if err != nil {
 			return nil, err
 		}
 		if m.s.users == nil {
 			return nil, fail(notSupported, "This control plane keeps no user settings.")
 		}
+		decoded, derr := base64.StdEncoding.DecodeString(signed.Policy)
+		var policy wire.YourPolicy
+		if derr != nil || json.Unmarshal(decoded, &policy) != nil {
+			return nil, fail(invalidParams, "The policy is not a signed YourPolicy.")
+		}
+		if policy.Keeper != host {
+			return nil, fail(notKeeper, "Only %s keeps your policy.", policy.Keeper)
+		}
 		user := m.s.ownerOf(host)
-		changed, err := m.s.users.SetNoticeLimits(ctx, user, limits)
+		changed, err := m.s.users.SetPolicy(ctx, user, signed)
 		if err != nil {
 			return nil, userFailure(err)
 		}
 		if changed {
-			m.s.userChanged(user, []wire.UserSettingsPartName{wire.UserSettingsPartNameNotifications}, false, host)
+			m.s.userChanged(user, []wire.UserSettingsPartName{wire.UserSettingsPartNamePolicy}, false, host)
 		}
 		return map[string]any{}, nil
 	case "host/policyApplied":

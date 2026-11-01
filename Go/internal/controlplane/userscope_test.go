@@ -315,3 +315,84 @@ func TestADeliveryFitsTheMachinesLink(t *testing.T) {
 		t.Fatalf("the machine was told its settings %d times: it rejoined", n)
 	}
 }
+
+// notTakingPolicyLayersHello says CapHostUserSettings (so it takes host/userSettings) but
+// not host.policy-layers/1: the part policy is withheld from it (contracts/policy-layers-
+// api.md), the way the parts a machine does not ask for always are.
+func notTakingPolicyLayersHello(name string) controllink.MachineHello {
+	hello := takingHello(name)
+	hello.Capabilities = slices.DeleteFunc(slices.Clone(hello.Capabilities), func(c string) bool { return c == wire.CapHostPolicyLayers1 })
+	return hello
+}
+
+// TestYourLayerPushesToYourMachinesWithinFiveSeconds covers #2957, research R11 and T025:
+// the keeper's user/setPolicy is stored as the part policy and pushed, within 5 seconds, to
+// every machine of the person's that says host.policy-layers/1 and takes user settings; a
+// machine without the capability is skipped; only the keeper may set it; a revision that
+// does not go up changes nothing.
+func TestYourLayerPushesToYourMachinesWithinFiveSeconds(t *testing.T) {
+	t.Parallel()
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	told := &deliveries{got: map[string][]wire.MachineUserSettings{}}
+	p.told = told.heard
+	_, window := p.client("Alex's Mac")
+	alex := &person{id: p.s.localOwner(), window: window}
+	keeper := p.machineSaying(alex, takingHello("KEEPER"))
+	other := p.machineSaying(alex, takingHello("OTHER"))
+	older := p.machineSaying(alex, notTakingPolicyLayersHello("OLDER"))
+	p.waitFor(func() bool { _, ok := told.last(other.member.Host); return ok }, "the other machine told at join")
+
+	personPrivate := controllink.NewPrivateKey()
+	personPublic, err := controllink.PublicKey(personPrivate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signPolicy := func(policy wire.YourPolicy) wire.SignedYourPolicy {
+		raw, _ := json.Marshal(policy)
+		sig, err := controllink.SignPolicy(personPrivate, raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return wire.SignedYourPolicy{Policy: base64.StdEncoding.EncodeToString(raw),
+			Signature: wire.PolicySignature{Version: policy.Revision, KeyID: controllink.KeyID(personPublic), Alg: controllink.PolicyAlg, Sig: sig}, Key: personPublic}
+	}
+	tokens := int64(5000)
+	policy := wire.YourPolicy{Rules: wire.PolicyRules{Budgets: &wire.PolicyRuleBudgets{DailyTokens: &tokens}}, Revision: 1, Person: alex.id, Keeper: keeper.member.Host}
+
+	// Only the keeper may set it.
+	if _, err := other.uplink.Ask(t.Context(), wire.CallUserSetPolicy.Name, signPolicy(policy)); err == nil {
+		t.Fatal("a machine named elsewhere set the policy")
+	}
+
+	saved := time.Now()
+	if _, err := keeper.uplink.Ask(t.Context(), wire.CallUserSetPolicy.Name, signPolicy(policy)); err != nil {
+		t.Fatal(err)
+	}
+	p.waitFor(func() bool {
+		u, ok := told.last(other.member.Host)
+		return ok && len(u.Settings.Policy) > 0
+	}, "the other machine told the policy")
+	if took := time.Since(saved); took > 5*time.Second {
+		t.Fatalf("took %v", took)
+	}
+	if u, _ := told.last(older.member.Host); len(u.Settings.Policy) > 0 {
+		t.Fatal("a machine without host.policy-layers/1 was told the policy")
+	}
+
+	// A revision that does not go up changes nothing kept.
+	var before wire.UserSettings
+	json.Unmarshal(call(t, window, "", "user/settings", nil), &before)
+	if _, err := keeper.uplink.Ask(t.Context(), wire.CallUserSetPolicy.Name, signPolicy(policy)); err != nil {
+		t.Fatal(err)
+	}
+	var after wire.UserSettings
+	json.Unmarshal(call(t, window, "", "user/settings", nil), &after)
+	if string(before.Policy) != string(after.Policy) {
+		t.Fatalf("a resend of the same revision changed the stored policy")
+	}
+
+	// A client cannot set the part policy directly.
+	if e := callError(t, window, "", "user/setSettings", map[string]any{"part": "policy", "value": map[string]any{}}); !strings.Contains(e, "there is no part called") {
+		t.Fatal(e)
+	}
+}

@@ -66,6 +66,7 @@ export const Failure = {
   notPermitted: -32045,
   notSupported: -32009,
   notYours: -32027,
+  older: -32102,
   orgProviderUnavailable: -32082,
   orgRouteMissing: -32099,
   orgRouteRemoved: -32100,
@@ -84,6 +85,7 @@ export const Failure = {
   shellNotLive: -32011,
   shellWillNotStart: -32010,
   signInWanted: -32070,
+  signature: -32103,
   storeUnavailable: -32094,
   tooManyRequests: -32075,
   updateToJoinTeam: -32074,
@@ -4853,21 +4855,29 @@ export interface OrgPolicy {
    */
   requires: string[];
   /**
-   * The loosest mode, by ModeLooseness rank 0 to 4. A mode a machine does not know counts as rank
-   * 4.
+   * #2957: the loosest permission level, on Auto's four levels (research R5). The control plane
+   * reads modeCeiling into this once and drops modeCeiling.
    */
-  modeCeiling?: "ask" | "default" | "acceptEdits" | "auto" | "bypassPermissions";
+  permissionMode?: PermissionLevel;
+  /** #2957: alwaysApprove or default (Ask me), the loosest answer to a permission request. */
+  permissionRequests?: ClientPermissionMode;
   /**
-   * Required refuses the choice off and the states none and runtimeControlled. Absent is the
-   * person's choice.
+   * Required refuses the choice off and the states none and runtimeControlled. runtime (#2957)
+   * refuses only off. Absent is the person's choice.
    */
-  sandbox?: "required";
+  sandbox?: "required" | "runtime";
   /** The runtimes allowed, by runtime id. Absent allows every runtime. */
   runtimes?: Record<string, PolicyRuntimeRule>;
   marketplaces?: PolicyMarketplaces;
   budgets?: PolicyBudgets;
   helpers?: PolicyHelpers;
   environment?: PolicyEnvironment;
+  /** #2957: the most workflows on at once, in each folder. */
+  workflows?: PolicyWorkflows;
+  /** #2957: how many notices a burst allows, and how long to wait after one. */
+  noticeLimits?: PolicyNoticeLimits;
+  /** #2957: whether agents may archive the person's finished chats. false is tighter. */
+  archiveMyChats?: boolean;
   stopAll?: PolicyStopAll;
   /**
    * The control plane refuses agent starts and prompts on a machine that has not applied this
@@ -5619,6 +5629,11 @@ export interface PolicyApplied {
   version: number;
 }
 
+/** policy/applyYours's result (#2957): the revision now applied here. */
+export interface PolicyApplyYoursResult {
+  revision: number;
+}
+
 /**
  * A machine of the person's that does not say host.policy-layers/1 (#2957, EffectivePolicy.behind,
  * Edge Cases "A machine of an older version").
@@ -5661,6 +5676,25 @@ export interface PolicyEffectiveRequest {
 export interface PolicyEnvironment {
   passThrough: string[];
   runtimes?: Record<string, string[]>;
+}
+
+/** policy/folder (#2957): the folder's own layer, from .agents/policy.json. */
+export interface PolicyFolderRequest {
+  folder: URLString;
+}
+
+/**
+ * policy/folder's result (#2957, data-model.md "A folder's layer"): the approved copy, and a
+ * waiting change when one is pending.
+ */
+export interface PolicyFolderState {
+  rules: PolicyRules;
+  pending?: GuardedChange;
+  /**
+   * Why the file on disk cannot be read as a layer (not JSON, or a value out of range), when that
+   * is why a change is pending.
+   */
+  invalid?: string;
 }
 
 /**
@@ -7272,6 +7306,15 @@ export interface SetDiskSpaceRequest {
   diskSpace: DiskThresholds;
 }
 
+/**
+ * policy/setFolder (#2957): writes .agents/policy.json in a stable order and approves it. A value
+ * looser than the person's own effective value is kept, and the result shows it capped.
+ */
+export interface SetFolderPolicyRequest {
+  folder: URLString;
+  rules: PolicyRules;
+}
+
 /** folders/setProject (#2317): the project id to write into the folder's .agents/folder.json. */
 export interface SetFolderProjectRequest {
   folder: URLString;
@@ -7854,6 +7897,12 @@ export interface SignedYourPolicy {
   signature: PolicySignature;
   /** Present only on the first copy after a new person key. */
   rotation?: PersonKeyRotation;
+  /**
+   * #2957, research R3: the person key's public half (X9.63), so a machine that has not pinned one
+   * yet can check the signature and pin it (trust on first use) or match it against a join code's
+   * key. Sent every time; cheap, and no secret.
+   */
+  key?: Base64;
 }
 
 /**
@@ -8567,6 +8616,11 @@ export interface UserSettings {
   costLimits?: JSONValue;
   /** The person's notice limits (#2859), as a NoticeLimits. */
   notifications?: JSONValue;
+  /**
+   * #2957, research R11: your layer, as a SignedYourPolicy. Only the keeper sets it
+   * (user/setPolicy); a client cannot (user/setSettings refuses this part).
+   */
+  policy?: JSONValue;
   /** When a part last changed. */
   updated?: string;
 }
@@ -8591,14 +8645,16 @@ export interface UserSettingsPart {
 /**
  * A part of a person's user settings (#1760, #2410). Each part has one fixed scope: MCP servers,
  * agent configuration, runtimes, cost limits and notices (#2859) follow the person. Resources
- * belong to each machine.
+ * belong to each machine. policy (#2957) is set only by the keeper, through user/setPolicy;
+ * user/setSettings refuses it.
  */
 export type UserSettingsPartName =
   | "mcpServers"
   | "agentConfig"
   | "runtimes"
   | "costLimits"
-  | "notifications";
+  | "notifications"
+  | "policy";
 
 /**
  * user/suspended (#1002, FR-018): to each machine of a suspended person, at hello before its
@@ -9327,10 +9383,12 @@ export interface Methods {
   "pins/unpinWorkflow": { params: WorkflowRequest; result: Empty };
   "pins/write": { params: PinWriteRequest; result: Empty };
   "policy/effective": { params: PolicyEffectiveRequest; result: EffectivePolicy };
+  "policy/folder": { params: PolicyFolderRequest; result: PolicyFolderState };
   "policy/get": { params: Empty; result: PolicyKept };
   "policy/mine": { params: Empty; result: PolicyView };
   "policy/raise": { params: PolicyRaiseRequest; result: PolicyKept };
   "policy/set": { params: PolicySet; result: PolicyKept };
+  "policy/setFolder": { params: SetFolderPolicyRequest; result: PolicyRules };
   "policy/setYours": { params: SetYourPolicyRequest; result: YourPolicy };
   "policy/stopAll": { params: PolicyStopAllRequest; result: PolicyKept };
   "policy/yours": { params: Empty; result: YourPolicyState };
@@ -9623,10 +9681,12 @@ export const MethodTarget = {
   "pins/unpinWorkflow": "host",
   "pins/write": "host",
   "policy/effective": "host",
+  "policy/folder": "host",
   "policy/get": "control",
   "policy/mine": "control",
   "policy/raise": "control",
   "policy/set": "control",
+  "policy/setFolder": "host",
   "policy/setYours": "host",
   "policy/stopAll": "control",
   "policy/yours": "host",
@@ -9774,6 +9834,7 @@ export interface Notifications {
   "modes/changed": Record<string, JSONValue>;
   "pages/changed": PagesChangedNotification;
   "pins/changed": PinsChangedNotification;
+  "policy/effectiveChanged": PolicyEffectiveRequest;
   "preferences/changed": Record<string, JSONValue>;
   "resources/changed": LeaseSnapshot;
   "runtimes/accountProfilesChanged": AccountProfile[];
@@ -10228,7 +10289,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   OTLPExport: { required: ["endpoint", "every"], optional: ["lastSent", "lastFailure", "failedAt"] },
   OptionsRequest: { required: ["runtimeID", "cwd", "mcpServers"], optional: [] },
   OptionsResponse: { required: ["draftID", "options", "commands"], optional: [] },
-  OrgPolicy: { required: ["version", "issued", "changedBy", "requires"], optional: ["modeCeiling", "sandbox", "runtimes", "marketplaces", "budgets", "helpers", "environment", "stopAll", "requireFollowing", "groups", "notices"] },
+  OrgPolicy: { required: ["version", "issued", "changedBy", "requires"], optional: ["permissionMode", "permissionRequests", "sandbox", "runtimes", "marketplaces", "budgets", "helpers", "environment", "workflows", "noticeLimits", "archiveMyChats", "stopAll", "requireFollowing", "groups", "notices"] },
   OrgProvider: { required: ["id", "name", "preset", "issuer", "clientID"], optional: ["accountClaim", "tenant", "scopes", "join", "on", "order", "secret", "version", "created", "changed", "redirectURI", "scim"] },
   OrgProviderCheck: { required: ["ok", "missing", "jwksKeys", "redirectURI"], optional: [] },
   OrgProviderKept: { required: ["provider", "rev"], optional: [] },
@@ -10303,10 +10364,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PluginsList: { required: ["folder", "plugins"], optional: [] },
   PluginsListRequest: { required: ["folder"], optional: [] },
   PolicyApplied: { required: ["version"], optional: [] },
+  PolicyApplyYoursResult: { required: ["revision"], optional: [] },
   PolicyBehindMachine: { required: ["host", "name"], optional: [] },
   PolicyBudgets: { required: ["allowUnmetered", "raises"], optional: ["daily", "dailyTokens", "perAgent", "perAgentTokens"] },
   PolicyEffectiveRequest: { required: [], optional: ["folder"] },
   PolicyEnvironment: { required: ["passThrough"], optional: ["runtimes"] },
+  PolicyFolderRequest: { required: ["folder"], optional: [] },
+  PolicyFolderState: { required: ["rules"], optional: ["pending", "invalid"] },
   PolicyFolderWithRules: { required: ["folder", "name", "count"], optional: [] },
   PolicyHelpers: { required: [], optional: ["mostRunning", "mostNotArchived"] },
   PolicyKeeper: { required: ["host", "name"], optional: [] },
@@ -10462,6 +10526,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SetCeilingRequest: { required: ["agentID"], optional: ["ceiling", "tokenCeiling"] },
   SetClientPermissionRequest: { required: ["agentID"], optional: ["mode"] },
   SetDiskSpaceRequest: { required: ["folder", "diskSpace"], optional: [] },
+  SetFolderPolicyRequest: { required: ["folder", "rules"], optional: [] },
   SetFolderProjectRequest: { required: ["folder", "project"], optional: [] },
   SetHelperLimitsRequest: { required: ["folder", "limits"], optional: [] },
   SetLabelsRequest: { required: ["agentID", "add", "remove"], optional: [] },
@@ -10526,7 +10591,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SignInTicketResult: { required: [], optional: ["client", "signIn"] },
   SignInWaiting: { required: ["code", "expires"], optional: [] },
   SignedPolicy: { required: ["policy", "signature"], optional: [] },
-  SignedYourPolicy: { required: ["policy", "signature"], optional: ["rotation"] },
+  SignedYourPolicy: { required: ["policy", "signature"], optional: ["rotation", "key"] },
   Simulator: { required: ["udid", "name", "os", "booted"], optional: [] },
   SimulatorList: { required: ["simulators"], optional: ["reason"] },
   SimulatorRequest: { required: ["udid"], optional: [] },
@@ -10593,7 +10658,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   UserSecretNames: { required: ["secrets", "sealing"], optional: [] },
   UserSecretRequest: { required: ["name"], optional: [] },
   UserSecretRow: { required: ["name", "updated", "machines"], optional: ["leftOn"] },
-  UserSettings: { required: [], optional: ["mcpServers", "agentConfig", "agentConfigFiles", "runtimes", "costLimits", "notifications", "updated"] },
+  UserSettings: { required: [], optional: ["mcpServers", "agentConfig", "agentConfigFiles", "runtimes", "costLimits", "notifications", "policy", "updated"] },
   UserSettingsChanged: { required: [], optional: ["parts", "agentConfigFiles", "secrets"] },
   UserSettingsPart: { required: ["part", "value"], optional: [] },
   UserSuspended: { required: ["user", "provider", "at"], optional: ["off"] },

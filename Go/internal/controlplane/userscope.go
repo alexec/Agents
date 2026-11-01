@@ -163,6 +163,12 @@ func (s *Service) sendUserSettings(host string, always bool) {
 		s.log("user settings for " + host + " could not be read: " + err.Error())
 		return
 	}
+	// The part policy goes only to a machine that says host.policy-layers/1 (#2957,
+	// contracts/policy-layers-api.md): an older machine would keep a layer it has no
+	// resolver for.
+	if h := s.records.Host(host); h == nil || !slices.Contains(hostCapabilities(*h), wire.CapHostPolicyLayers1) {
+		delivery.Settings.Policy = nil
+	}
 	if len(skipped) > 0 {
 		s.log(fmt.Sprintf("user settings for %s: %d secrets do not open with this control plane's key and were not sent: %s",
 			host, len(skipped), strings.Join(skipped, ", ")))
