@@ -454,9 +454,9 @@ var toolPolicyEnv = map[string]map[string]any{
 
 // toolPolicyArgs is the launchArguments lever (#1445): Copilot is not given the person's
 // software-factory server (a second copy of the app's whole remit) or its built-in MCP
-// servers, and session_store_sql is excluded.
+// servers, and session_store_sql and its own workflow tools are excluded (#3139).
 var toolPolicyArgs = map[string][]string{
-	"copilot": {"--disable-mcp-server", "software-factory", "--disable-builtin-mcps", "--excluded-tools", "session_store_sql"},
+	"copilot": {"--disable-mcp-server", "software-factory", "--disable-builtin-mcps", "--excluded-tools", "session_store_sql", "dynamic_workflows_manage", "run_dynamic_workflow"},
 }
 
 // withToolPolicy is the launch with the runtime's tool policy in its arguments and

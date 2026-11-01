@@ -64,10 +64,10 @@ func TestGroksToolPolicy(t *testing.T) {
 }
 
 // Copilot is launched without the person's software-factory server or its built-in MCP
-// servers, and without session_store_sql; it has no _meta.
+// servers, and without session_store_sql or its own workflow tools; it has no _meta.
 func TestCopilotsToolPolicy(t *testing.T) {
 	l, _ := launchOf(t, "copilot")
-	want := []string{"--disable-mcp-server", "software-factory", "--disable-builtin-mcps", "--excluded-tools", "session_store_sql"}
+	want := []string{"--disable-mcp-server", "software-factory", "--disable-builtin-mcps", "--excluded-tools", "session_store_sql", "dynamic_workflows_manage", "run_dynamic_workflow"}
 	if !slices.Equal(l.Args, want) {
 		t.Fatalf("%q", l.Args)
 	}

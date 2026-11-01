@@ -170,10 +170,16 @@ public enum ToolPolicyCatalog {
     /// `semantic_search` — so nobody needs to re-run that experiment (Research R5). The
     /// general subagent tool, `task`, used to be excluded too; on 2026-09-29 sub-agents
     /// came back for every runtime, so the flag is down to one name.
+    ///
+    /// Copilot 1.0.105 added `dynamic_workflows_manage` and `run_dynamic_workflow`: workflows
+    /// of its own, which run without the app seeing them, as Claude's `Workflow` does. The
+    /// app owns standing arrangements (`manage_workflows`), so the flag takes both (#3139).
     public static let copilot = ToolPolicy(
         runtimeID: RuntimeCatalog.copilot.id,
         removed: [
             RemovedTool(name: "session_store_sql", category: .artefacts),
+            RemovedTool(name: "dynamic_workflows_manage", category: .standingArrangements),
+            RemovedTool(name: "run_dynamic_workflow", category: .standingArrangements),
         ],
         kept: [
             KeptTool(name: "its own question flow",

@@ -278,7 +278,7 @@ on Linux).
 | **Grok** | Asks, whatever you saved in its own config | `--permission-mode default` | The app's **Request cards** or **Yes to all** in the prompt permission capsule decides. |
 | | Its scheduler, workflow, monitor and feedback tools off; its subagents and question tool stay; the app's rules | `_meta.agentProfile.disallowedTools`, `_meta.rules` | Its `--disallowed-tools` does nothing here, so the list is in a profile of the app's. It was an allowlist until Grok 1.0.52 stopped giving the subagent tools it named (#1447). |
 | | Image and video generation off | `GROK_CONFIG_PATH`, a file of the app's | Its config file is the only place for them, and yours is yours. |
-| **Copilot** | Its session-store tool, your `software-factory` server and its built-in MCP servers off | `--excluded-tools`, `--disable-mcp-server`, `--disable-builtin-mcps` | The work stays where the app can see it. |
+| **Copilot** | Its session-store and workflow tools, your `software-factory` server and its built-in MCP servers off | `--excluded-tools`, `--disable-mcp-server`, `--disable-builtin-mcps` | The work stays where the app can see it. |
 | **Cursor** | Nothing | | It has no lever: its config folder also holds its sign-in. |
 
 ### Every option, by runtime
