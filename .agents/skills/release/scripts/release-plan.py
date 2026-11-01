@@ -7,31 +7,25 @@
     release-plan.py --after <sha>  whether a PR merged after the gate's commit makes it start over
     release-plan.py --selftest
 
-The version (Alex, 2026-10-13): minor (0.x+1.0) when a merged pull request since the last
-tag is labelled `enhancement` or fixes an issue labelled `enhancement`; otherwise patch
-(0.x.y+1). 1.0 and major versions only when Alex says, so this never makes one.
+The version (Alex, 2026-11-01, #3212): every release is a minor (0.x+1.0). There are no
+patch releases or patch milestones any more (#3212 replaces #2801 and #2779). 1.0 and major versions
+only when Alex says, so this never makes one.
 
 An enhancement counts only when its files change what a person gets (#2857): a client's UI,
 the host or daemon, or the capability list (SEEN). An enhancement to release tooling,
-workflows, skills or docs is listed as `[tooling]` and does not make a minor.
+workflows, skills or docs is listed as `[tooling]`, so the notes put it under "Changed".
 
 The open milestone (the earliest open one by the version its title starts with, #1340) has a
-version too. When it differs from `next:`, the plan says why (#2779): an enhancement merged,
-or a capability was removed, which a patch may not hold. The release skill then asks Alex.
-
-The path (#2801) is the release skill's: `minor` (x.y.0) runs the reviews and checks, `patch`
-(x.y.z, z > 0) skips them. It follows the open milestone's version, or `next:` with none open.
+version too. When it differs from `next:`, the plan says why. The release skill then asks Alex.
 
 The gate's commit (#3045) stays the same while lanes land after it: `--after` names only the
-pull requests merged after it that fix a blocking issue (`priority:high`, and on the patch path
-`priority:medium` too). Only those make the gate start over on the newer main.
+pull requests merged after it that fix a blocking issue (`priority:high`). Only those make the
+gate start over on the newer main.
 
 It reads origin/main and the v* tags (fetched first) and asks GitHub through `gh` for the
 pull requests and their issues. It changes nothing.
 """
-import importlib.util
 import json
-import pathlib
 import re
 import subprocess
 import sys
@@ -51,9 +45,10 @@ def last_tag():
     return tags[0] if tags else None
 
 
-def bump(tag, minor):
-    major, mid, patch = (int(n) for n in tag[1:].split("."))
-    return f"{major}.{mid + 1}.0" if minor else f"{major}.{mid}.{patch + 1}"
+def bump(tag):
+    """The next version after a tag: always the next minor (#3212)."""
+    major, mid, _ = (int(n) for n in tag[1:].split("."))
+    return f"{major}.{mid + 1}.0"
 
 
 def milestone_version(title):
@@ -84,36 +79,17 @@ def open_milestone(titles):
     return (found[0][1], found[0][0]) if found else None
 
 
-def path(version):
-    """The release skill's path for a version (#2801): a patch skips the reviews and checks."""
-    return "minor" if version.endswith(".0") else "patch"
-
-
-def removed_capabilities(tag, ref="origin/main"):
-    path = pathlib.Path(__file__).with_name("capability-changes.py")
-    spec = importlib.util.spec_from_file_location("capability_changes", path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return sorted(module.at(tag)[0] - module.at(ref)[0])
-
-
-def differs(version, planned, enhancements, removed):
+def differs(version, planned):
     """Why the plan's version is not the milestone's, or None when they agree."""
     if version == planned:
         return None
-    why = []
-    if enhancements:
-        why.append("enhancements merged")
-    if removed:
-        why.append("capabilities removed: " + ", ".join(removed))
-    if not why:
-        why.append("no enhancement merged" if key(version) < key(planned) else "the milestone is behind the tag")
-    return f"plan v{version}, milestone v{planned} ({'; '.join(why)}); ask Alex which version"
+    why = "the milestone is ahead of the tag" if key(version) < key(planned) else "the milestone is behind the tag"
+    return f"plan v{version}, milestone v{planned} ({why}); ask Alex which version"
 
 
-def blocking(labels, patch):
+def blocking(labels):
     """Whether an issue with these labels holds the release, so its fix must be in the tag (#3045)."""
-    return "priority:high" in labels or (patch and "priority:medium" in labels and "bug" in labels)
+    return "priority:high" in labels
 
 
 def selftest():
@@ -124,27 +100,24 @@ def selftest():
     assert open_milestone(["0.15 Hosted", "1.0 Public release", "0.9 x", "0.12.3 Bug fixes", "Later"]) == ("0.9 x", "0.9.0")
     assert open_milestone(["0.13 A", "0.12.3 B"]) == ("0.12.3 B", "0.12.3")
     assert open_milestone([]) is None
-    assert path("0.13.0") == "minor"
-    assert path("0.12.3") == "patch"
-    assert path("1.0.0") == "minor"
+    assert bump("v0.15.0") == "0.16.0"
+    assert bump("v0.14.1") == "0.15.0"
     assert seen(["Web/src/App.tsx", "docs/a.md"])
     assert seen(["Go/cmd/agentsd/main.go"])
     assert seen(["Packages/Wire/daemon.openrpc.json"])
     assert not seen([".agents/skills/release/SKILL.md", "AGENTS.md", "docs/reference/x.md"])
     assert not seen([".github/workflows/ci.yml", "scripts/lint.sh", "specs/071-web-remote/walks/parity.md"])
     assert not seen([])
-    assert differs("0.12.0", "0.12.0", [1], []) is None
-    assert differs("0.12.0", "0.11.2", [2700], ["files/1"]) == (
-        "plan v0.12.0, milestone v0.11.2 (enhancements merged; capabilities removed: files/1); ask Alex which version")
-    assert differs("0.11.2", "0.12.0", [], []) == (
-        "plan v0.11.2, milestone v0.12.0 (no enhancement merged); ask Alex which version")
-    assert blocking({"bug", "priority:high"}, patch=False)
-    assert blocking({"priority:high"}, patch=True)
-    assert blocking({"bug", "priority:medium"}, patch=True)
-    assert not blocking({"bug", "priority:medium"}, patch=False)
-    assert not blocking({"enhancement", "priority:medium"}, patch=True)
-    assert not blocking({"bug", "priority:low"}, patch=True)
-    assert not blocking(set(), patch=True)
+    assert differs("0.16.0", "0.16.0") is None
+    assert differs("0.16.0", "0.15.1") == (
+        "plan v0.16.0, milestone v0.15.1 (the milestone is behind the tag); ask Alex which version")
+    assert differs("0.16.0", "0.17.0") == (
+        "plan v0.16.0, milestone v0.17.0 (the milestone is ahead of the tag); ask Alex which version")
+    assert blocking({"bug", "priority:high"})
+    assert blocking({"priority:high"})
+    assert not blocking({"bug", "priority:medium"})
+    assert not blocking({"bug", "priority:low"})
+    assert not blocking(set())
     print("release-plan selftest: ok")
 
 
@@ -168,18 +141,14 @@ def after(pin):
         sys.exit(f"{pin[:12]} is not on origin/main")
     subjects = run("git", "log", "--format=%s", f"{pin}..origin/main").splitlines()
     prs = {int(n[-1]) for n in (re.findall(r"\(#(\d+)\)", s) for s in subjects) if n}
-    milestone = open_milestone(run("gh", "api", "repos/{owner}/{repo}/milestones?state=open", "--paginate",
-                                   "--jq", ".[].title").splitlines())
-    patch = bool(milestone) and path(milestone[1]) == "patch"
-    print(f"pin: {pin[:12]}; merged after it: {len(subjects)} commits, {len(prs)} pull requests; "
-          f"path: {'patch' if patch else 'minor'}")
+    print(f"pin: {pin[:12]}; merged after it: {len(subjects)} commits, {len(prs)} pull requests")
     restart = []
     for pr in sorted(prs):
         fixed = gh_json("pr", "view", str(pr), "--json", "closingIssuesReferences",
                         "--jq", "[.closingIssuesReferences[].number]")
         for n in fixed:
             issue = gh_json("issue", "view", str(n), "--json", "labels")
-            if blocking(labels(issue), patch):
+            if blocking(labels(issue)):
                 restart.append(f"#{pr} fixes #{n} ({', '.join(sorted(l for l in labels(issue) if l.startswith('priority:')))})")
     for line in restart:
         print(f"restart: {line}")
@@ -240,27 +209,25 @@ def main():
         rows.append(f"#{pr['number']} [{kind}] {pr['title']} | issues: "
                     f"{', '.join(f'#{n}' for n in fixed) or '-'}")
 
-    version = bump(tag, bool(enhancements))
+    version = bump(tag)
     if only_version:
         print(version)
         return
-    why = (f"minor: enhancements {', '.join(f'#{n}' for n in enhancements[:8])}"
-           f"{' …' if len(enhancements) > 8 else ''}") if enhancements else "patch: no enhancement merged"
+    why = (f"enhancements {', '.join(f'#{n}' for n in enhancements[:8])}"
+           f"{' …' if len(enhancements) > 8 else ''}") if enhancements else "no enhancement merged"
     if tooling:
-        why += f"; tooling only, not counted: {', '.join(f'#{n}' for n in tooling)}"
+        why += f"; tooling: {', '.join(f'#{n}' for n in tooling)}"
     milestone = open_milestone(run("gh", "api", "repos/{owner}/{repo}/milestones?state=open", "--paginate",
                                    "--jq", ".[].title").splitlines())
     print(f"last: {tag} ({since[:10]})")
     if milestone:
         title, planned = milestone
         print(f"next: v{version} ({why}); milestone: v{planned} ({title})")
-        mismatch = differs(version, planned, enhancements, removed_capabilities(tag, ref))
+        mismatch = differs(version, planned)
         if mismatch:
             print(f"differs: {mismatch}")
-        print(f"path: {path(planned)} (the milestone's version)")
     else:
         print(f"next: v{version} ({why}); milestone: none open")
-        print(f"path: {path(version)}")
     print(f"commits: {len(subjects)}, pull requests: {len(rows)}")
     print("pull requests:")
     for row in rows:
