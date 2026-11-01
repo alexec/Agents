@@ -15,6 +15,12 @@ export const readingTitles = "Reading titles…";
 
 export const sessionNode = (id: string): LineageNode => ({ kind: "session", ref: `session:${id}` });
 
+/** The machine a session is on, from every machine's sessions, archived ones too, as the window's
+ * LineagePage.sessionHost (#3156): not only the menu's newest. */
+export function sessionHost(agents: Readonly<Record<string, readonly { id: string }[]>>, id: string): string | undefined {
+  return Object.keys(agents).find((host) => agents[host]?.some((a) => a.id === id));
+}
+
 const key = (n: LineageNode) => `${n.kind}\n${n.ref}`;
 const same = (a: LineageNode, b: LineageNode) => a.kind === b.kind && a.ref === b.ref;
 
