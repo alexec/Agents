@@ -75,7 +75,7 @@ agents, use `wait_for_agents`. Each shows:
 
 - `agent`, the agent's id;
 - `labels`, the agent's labels;
-- `runtime`, its runtime: `claude`, `codex`, `gemini`, `grok` and the others this version knows;
+- `runtime`, its runtime: `claude`, `codex`, `grok` and the others this version knows;
 - `started_by`: `person` (you, on the Mac, the phone or the web page), `workflow` (a workflow
   started it or resumes it), or `agent` (another agent started it as its helper).
 

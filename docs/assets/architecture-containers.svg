@@ -65,7 +65,7 @@
 <text class="t" x="480.0" y="906">Agent runtimes</text>
 <text class="k" x="480.0" y="923">[External Software System]</text>
 <text class="d" x="480.0" y="944">Claude Code, Codex, Copilot, OpenCode,</text>
-<text class="d" x="480.0" y="959">Cursor, Grok, Gemini, run by agentsd</text>
+<text class="d" x="480.0" y="959">Cursor, Grok, Antigravity, run by agentsd</text>
 <rect x="700" y="880" width="280" height="120" rx="8" fill="#8a8a8a" stroke="#8a8a8a"/>
 <text class="t" x="840.0" y="906">MCP servers</text>
 <text class="k" x="840.0" y="923">[External Software System]</text>

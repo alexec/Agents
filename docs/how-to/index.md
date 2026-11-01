@@ -105,7 +105,7 @@ something particular done.
 - [Mute the notifications for a session](mute-notifications.md): no alerts for a session
   or a workflow's runs, which still go under Needs You and on the badge.
 - [Sign a runtime in](sign-a-runtime-in.md): sign Claude Code, Codex, Copilot, Cursor, Grok
-  or Antigravity in or out from the app, and give Gemini its key.
+  or Antigravity in or out from the app.
 - [Assess a runtime](assess-a-runtime.md): have an agent on a runtime work through the app's
   tools, and read the app's own score of it.
 - [Share skills, instructions and connectors with every agent](share-skills-across-agents.md):

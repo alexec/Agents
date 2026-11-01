@@ -21,7 +21,7 @@ how every agent in the app works.
 - One coding agent signed in on this Mac. This tutorial uses **Claude Code**, signed in
   with `claude` and `/login` in Terminal. The app talks to Claude through a small adapter:
   it runs it with your own Node if you have one, and otherwise installs its own copy in
-  step 1. Codex, Gemini, Antigravity, Grok, Copilot and Cursor work too; see
+  step 1. Codex, Antigravity, Grok, Copilot and Cursor work too; see
   [Runtimes](../reference/runtimes.md) for what each needs.
 
 ## 1. Install and open Agents
