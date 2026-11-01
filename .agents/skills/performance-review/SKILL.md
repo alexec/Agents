@@ -39,10 +39,10 @@ at the keyboard, that is true only of a run of the workflow.
 
 1. Move into the review worktree, on the local branch `agents/reviews-performance`, through the app, so it
    shows where you work (#615):
-   - `.agents/worktrees/reviews-performance` is there: move_worktree with its absolute path.
-   - Only the branch `agents/reviews-performance` is there: `git worktree add .agents/worktrees/reviews-performance
-     agents/reviews-performance`, then move_worktree with its absolute path.
-   - Neither: move_worktree with worktree `reviews-performance`.
+   - The branch `agents/reviews-performance` is there: move_worktree with worktree
+     `agents/reviews-performance`. The app moves you into its worktree, or makes one on it.
+     Never run `git worktree add` (#3174).
+   - It is not there: move_worktree with worktree `reviews-performance`.
 
    End your turn; you are started again in it. There, `git merge --no-edit main`. This branch
    holds `.agents/reviews/performance/` and nothing else of its own; it is never pushed.

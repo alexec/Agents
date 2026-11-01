@@ -48,10 +48,10 @@ at the keyboard, that is true only of a run of the workflow.
 
 1. Move into the review worktree, on the local branch `agents/reviews-usability`, through the app, so it
    shows where you work (#615):
-   - `.agents/worktrees/reviews-usability` is there: move_worktree with its absolute path.
-   - Only the branch `agents/reviews-usability` is there: `git worktree add .agents/worktrees/reviews-usability
-     agents/reviews-usability`, then move_worktree with its absolute path.
-   - Neither: move_worktree with worktree `reviews-usability`.
+   - The branch `agents/reviews-usability` is there: move_worktree with worktree
+     `agents/reviews-usability`. The app moves you into its worktree, or makes one on it.
+     Never run `git worktree add` (#3174).
+   - It is not there: move_worktree with worktree `reviews-usability`.
 
    End your turn; you are started again in it. There, `git merge --no-edit main`. It is never pushed.
 2. Read every file in `.agents/reviews/usability/`. The newest run file (`YYYY-MM-DD.md`)

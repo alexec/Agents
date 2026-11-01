@@ -60,8 +60,9 @@ the keyboard, that is true only of a workflow run.
 ## 1. Set up and scope
 
 1. Move to `.agents/worktrees/reviews-dead-code` through `move_worktree`, on the local
-   branch `agents/reviews-dead-code`. If it exists, move into it. If only the branch
-   exists, create its worktree through the app. Otherwise, ask the app for a new worktree
+   branch `agents/reviews-dead-code`. If the branch exists, call `move_worktree` with
+   worktree `agents/reviews-dead-code`: the app moves you into its worktree, or makes one
+   on it. Never run `git worktree add` (#3174). Otherwise, ask the app for a new worktree
    named `reviews-dead-code`. End the turn after the move. Merge `main` in that worktree.
 2. Read every file in `.agents/reviews/dead-code/`. The newest run file has
    `reviewed-through:` with the last reviewed `main` commit. If no run file exists,
