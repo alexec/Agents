@@ -230,10 +230,15 @@ func (d *Daemon) alwaysApproveCeiling() (string, int, bool) {
 	return ceiling, rank, true
 }
 
-// alwaysApproveRefusal is why the policy does not allow Always-approve, or nil.
+// alwaysApproveRefusal is why the policy does not allow Always-approve, by your layer's
+// permissionRequests rule (#2957, FR-002: tighter is Ask me) or the organisation's mode
+// ceiling, or nil.
 func (d *Daemon) alwaysApproveRefusal() error {
+	if yr := d.yourPolicyRules().PermissionRequests; yr != nil && *yr == wire.ClientPermissionModeDefault {
+		return policyRefusal("policy", "permissionRequests", "Your policy allows at most Ask me.", nil, youLayerRef())
+	}
 	if ceiling, _, ok := d.alwaysApproveCeiling(); ok {
-		return policyRefusal("policy", "modeCeiling", modeWords(ceiling), nil)
+		return policyRefusal("policy", "modeCeiling", modeWords(ceiling), nil, orgLayerRef(d.orgPolicy()))
 	}
 	return nil
 }
@@ -244,6 +249,9 @@ func (d *Daemon) alwaysApproveRefusal() error {
 // does the same for Copilot's). A helper or a workflow's agent follows its own choice
 // only: the person's in Settings is for the agents they start.
 func (d *Daemon) agentAlwaysApproves(a *wire.Agent) bool {
+	if yr := d.yourPolicyRules().PermissionRequests; yr != nil && *yr == wire.ClientPermissionModeDefault {
+		return false
+	}
 	if _, _, capped := d.alwaysApproveCeiling(); capped {
 		return false
 	}

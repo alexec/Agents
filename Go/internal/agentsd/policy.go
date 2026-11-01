@@ -879,44 +879,6 @@ func effectiveRule(eff wire.EffectivePolicy, rule wire.PolicyRuleName) *wire.Eff
 	return nil
 }
 
-// effectiveInt, effectiveFloat and effectiveBool decode one rule's effective value, with
-// the layer that decides it; nil, nil when no layer sets it (today's default applies).
-func effectiveInt(eff wire.EffectivePolicy, rule wire.PolicyRuleName) (*int64, *wire.PolicyLayerRef) {
-	r := effectiveRule(eff, rule)
-	if r == nil || r.Decides == nil {
-		return nil, nil
-	}
-	var v int64
-	if json.Unmarshal(r.Value, &v) != nil {
-		return nil, nil
-	}
-	return &v, r.Decides
-}
-
-func effectiveFloat(eff wire.EffectivePolicy, rule wire.PolicyRuleName) (*float64, *wire.PolicyLayerRef) {
-	r := effectiveRule(eff, rule)
-	if r == nil || r.Decides == nil {
-		return nil, nil
-	}
-	var v float64
-	if json.Unmarshal(r.Value, &v) != nil {
-		return nil, nil
-	}
-	return &v, r.Decides
-}
-
-func effectiveBool(eff wire.EffectivePolicy, rule wire.PolicyRuleName) (*bool, *wire.PolicyLayerRef) {
-	r := effectiveRule(eff, rule)
-	if r == nil || r.Decides == nil {
-		return nil, nil
-	}
-	var v bool
-	if json.Unmarshal(r.Value, &v) != nil {
-		return nil, nil
-	}
-	return &v, r.Decides
-}
-
 // effectiveSandboxOn is the effective sandbox rule as "must be on" (FR-002's new rule for
 // your layer, merged with the organisation's today's-only required), with the layer that
 // decides it, when one does.

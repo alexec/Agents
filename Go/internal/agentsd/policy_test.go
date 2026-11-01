@@ -833,3 +833,109 @@ func TestAlwaysApproveIsUnderTheModeCeiling(t *testing.T) {
 		t.Fatal("bypassPermissions allows it")
 	}
 }
+
+// policy/setYours (#2957, T013, FR-010, FR-011, SC-004): refused forbidden from the agent
+// socket role, an MCP tool and a workflow (which, in this codebase, all reach a host method
+// only over the agent socket role, since no app tool or workflow action calls policy/setYours);
+// refused conflict when revision is not the current one; refused notKeeper with the
+// keeper's name on a machine that is not the keeper; refused invalid when the rules fail
+// policylayers.Validate.
+
+// TestSetYoursRefusesTheAgentSocketRole covers the agent socket role directly, and
+// documents that an MCP tool call and a workflow run both ride that same role here (there
+// is no app tool or workflow action that reaches policy/setYours at all): the handler's own
+// forbiddenCallerRefusal is the one gate for all three.
+func TestSetYoursRefusesTheAgentSocketRole(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	d.SettingsDir = t.TempDir()
+	for _, role := range []Role{RoleAgent, RolePairing, RoleHostApp, RoleStranger} {
+		agent := &Client{Role: role, d: d}
+		_, err := d.setYourPolicy(agent, wire.SetYourPolicyRequest{Rules: wire.PolicyRules{}, Revision: 0})
+		e := asError(err)
+		if e == nil || e.Code != CodeNotPermitted {
+			t.Fatalf("%s: %+v, wanted notPermitted", role, err)
+		}
+	}
+	// The dispatch table itself never lets the agent socket role reach the method (defence
+	// in depth, SC-004): it is not in agentMethods, so Role.Allows refuses it first.
+	if RoleAgent.Allows("policy/setYours") {
+		t.Fatal("the agent socket role may call policy/setYours")
+	}
+}
+
+// TestSetYoursRefusesAConflictingRevision: a revision that is not the one on this machine
+// now is refused conflict, so the client reloads before it overwrites a change it has not
+// seen (Edge Cases, "Two clients change your layer at once").
+func TestSetYoursRefusesAConflictingRevision(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	d.SettingsDir = t.TempDir()
+	// The first start makes revision 1 (no old files here, so empty rules).
+	json.Unmarshal(c.call(t, 1, "policy/yours", nil), new(wire.YourPolicyState))
+	e := c.callError(t, 2, "policy/setYours", wire.SetYourPolicyRequest{Rules: wire.PolicyRules{}, Revision: 0})
+	if e == nil || e.Code != wire.FailureChangedElsewhere {
+		t.Fatalf("%+v, wanted changedElsewhere", e)
+	}
+	// The right revision goes through.
+	var set wire.YourPolicy
+	json.Unmarshal(c.call(t, 3, "policy/setYours", wire.SetYourPolicyRequest{Rules: wire.PolicyRules{}, Revision: 1}), &set)
+	if set.Revision != 2 {
+		t.Fatalf("%+v", set)
+	}
+}
+
+// TestSetYoursRefusesANonKeeperMachine: a machine that holds a copy of your layer with a
+// different keeper (today only reachable by a copy from elsewhere; slice 3 wires the
+// transport) refuses to change it itself, naming the keeper (research R4).
+func TestSetYoursRefusesANonKeeperMachine(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	d.SettingsDir = t.TempDir()
+	os.MkdirAll(d.SettingsDir, 0o700)
+
+	// A copy signed by this machine's own person key (so it is trusted), but naming
+	// another host as the keeper: as if it arrived from that other machine.
+	other := wire.YourPolicy{Rules: wire.PolicyRules{}, Revision: 1, Changed: now(), Person: "local", Keeper: "another-host"}
+	raw, _ := json.Marshal(other)
+	private, err := controllink.PersonPrivateKey(d.PersonKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	public, err := controllink.PublicKey(private)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sig, err := controllink.SignPolicy(private, raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kept := map[string]any{"policy": json.RawMessage(raw), "signature": wire.PolicySignature{
+		Version: 1, KeyID: controllink.KeyID(public), Alg: controllink.PolicyAlg, Sig: sig,
+	}}
+	b, _ := json.Marshal(kept)
+	if err := os.WriteFile(filepath.Join(d.SettingsDir, yourPolicyFile), b, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	e := c.callError(t, 1, "policy/setYours", wire.SetYourPolicyRequest{Rules: wire.PolicyRules{}, Revision: 1})
+	if e == nil || e.Code != wire.FailureNotKeeper || !strings.Contains(e.Message, "another-host") {
+		t.Fatalf("%+v, wanted notKeeper naming another-host", e)
+	}
+}
+
+// TestSetYoursRefusesInvalidRules: a value out of policylayers.Validate's range is refused
+// invalid, and nothing is saved.
+func TestSetYoursRefusesInvalidRules(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	d.SettingsDir = t.TempDir()
+	tooMany := int64(99)
+	e := c.callError(t, 1, "policy/setYours", wire.SetYourPolicyRequest{
+		Rules: wire.PolicyRules{Helpers: &wire.PolicyHelpers{MostRunning: &tooMany}}, Revision: 0,
+	})
+	if e == nil || e.Code != CodeInvalidParams {
+		t.Fatalf("%+v, wanted invalidParams", e)
+	}
+	var state wire.YourPolicyState
+	json.Unmarshal(c.call(t, 2, "policy/yours", nil), &state)
+	if state.Policy.Rules.Helpers != nil {
+		t.Fatalf("the invalid rules were saved anyway: %+v", state.Policy.Rules)
+	}
+}
