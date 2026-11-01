@@ -291,12 +291,19 @@ func TestTheSweepRemovesOrphans(t *testing.T) {
 	s.Put(ctx, orgSecretKey("r1"), []byte(`{}`), store.Always)
 	s.Put(ctx, orgRouteKey("r2"), []byte(`{"id":"r2","name":"live"}`), store.Always)
 	s.Put(ctx, orgSecretKey("r2"), []byte(`{}`), store.Always)
+	// A removed machine's folder list goes (#3125); one whose record this copy has not
+	// read yet stays.
+	s.Put(ctx, projectFoldersKey("KNOWN"), []byte(`{"folders":[]}`), store.Always)
+	s.Put(ctx, projectFoldersKey("GONE"), []byte(`{"folders":[]}`), store.Always)
+	s.Put(ctx, projectFoldersKey("ELSEWHERE"), []byte(`{"folders":[]}`), store.Always)
+	s.Put(ctx, records.HostKey("ELSEWHERE"), []byte(`{"id":"ELSEWHERE"}`), store.Always)
 	report, err := sweep(ctx, rs, now, mostPerSweep, nil)
-	if err != nil || report.orphans != 2 {
+	if err != nil || report.orphans != 3 {
 		t.Fatalf("%+v %v", report, err)
 	}
 	for key, kept := range map[string]bool{leaseKey("KNOWN"): true, leaseKey("GONE"): false, leaseKey("GOING"): true,
-		orgRouteKey("r1"): false, orgSecretKey("r1"): false, orgRouteKey("r2"): true, orgSecretKey("r2"): true} {
+		orgRouteKey("r1"): false, orgSecretKey("r1"): false, orgRouteKey("r2"): true, orgSecretKey("r2"): true,
+		projectFoldersKey("KNOWN"): true, projectFoldersKey("GONE"): false, projectFoldersKey("ELSEWHERE"): true} {
 		if o, _ := s.Get(ctx, key); (o != nil) != kept {
 			t.Errorf("%s kept %v", key, o != nil)
 		}

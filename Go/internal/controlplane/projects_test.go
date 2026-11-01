@@ -67,6 +67,14 @@ func TestAMachinesFolderIdsAreAdopted(t *testing.T) {
 	if _, err := p.s.methods.HostSaid(mac.member.Host, "projects/joined", params); err == nil {
 		t.Fatal("a bad id was kept")
 	}
+	// A removed machine's folder list goes with it (#3125).
+	call(t, owner, "", "hosts/remove", map[string]string{"host": box.member.Host})
+	if o, _ := p.store.Get(context.Background(), projectFoldersKey(box.member.Host)); o != nil {
+		t.Fatal("a removed machine's folders stayed")
+	}
+	if o, _ := p.store.Get(context.Background(), projectFoldersKey(mac.member.Host)); o == nil {
+		t.Fatal("another machine's folders went")
+	}
 }
 
 // US2, US3 (#2317): make, rename and remove; removal is refused while a folder names the

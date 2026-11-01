@@ -703,6 +703,8 @@ func (m *Methods) removeHost(ctx context.Context, host string, from Caller) (boo
 	m.s.copies.forget(host)
 	// What it said it had from a catalogue (#2019, M5).
 	_ = m.s.cfg.Store.Delete(ctx, governanceHostKey(host))
+	// Its folders, which no list shows again (#3125); the sweep deletes one this misses.
+	_ = m.s.cfg.Store.Delete(ctx, projectFoldersKey(host))
 	if m.s.providers != nil && m.s.providers.Kept() != nil {
 		m.s.providers.Kept().Forget(host)
 	}
