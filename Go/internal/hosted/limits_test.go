@@ -188,6 +188,52 @@ func TestEventsPastThePlanGo(t *testing.T) {
 	}
 }
 
+// readsOf counts every read of an object.
+type readsOf struct {
+	store.Store
+	gets atomic.Int64
+}
+
+func (r *readsOf) Get(ctx context.Context, key string) (*store.Object, error) {
+	r.gets.Add(1)
+	return r.Store.Get(ctx, key)
+}
+
+// #3105: an event write, a rewrite of a record this store wrote, and the sweep's deletes
+// read no old object, and the bytes still come out right.
+func TestWritesReadNoOldObject(t *testing.T) {
+	s, _, now, _ := idleService(t, 0)
+	ctx := context.Background()
+	st := &readsOf{Store: store.NewMemory()}
+	l := &limitedStore{Store: st, plan: plans[PlanFree]}
+	old := now.Now().Add(-8 * day).Format("2006-01-02")
+	for i := range 1000 {
+		if _, err := l.Put(ctx, "v1/events/"+old+"/"+itoa(i)+".json", []byte(`{}`), store.Absent); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, n := range []int{10, 30, 20} {
+		if _, err := l.Put(ctx, "v1/copies/a.json", make([]byte, n), store.Always); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := st.gets.Load(); n != 1 {
+		t.Fatal("reads of old objects:", n)
+	}
+	if l.used() != 2000+20 {
+		t.Fatal(l.used())
+	}
+	if n, err := s.sweepEvents(ctx, l); err != nil || n != 1000 {
+		t.Fatal(n, err)
+	}
+	if err := l.Delete(ctx, "v1/copies/a.json"); err != nil {
+		t.Fatal(err)
+	}
+	if n := st.gets.Load(); n != 1 || l.used() != 0 {
+		t.Fatal("reads:", n, "bytes:", l.used())
+	}
+}
+
 // #2224 US5: a machine joining a running copy over the plan is refused, and the control
 // plane's error carries the words; the size survives the copy stopping.
 func TestARunningCopyHoldsToItsPlan(t *testing.T) {

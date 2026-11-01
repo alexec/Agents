@@ -53,6 +53,10 @@ type limitedStore struct {
 	bytes int64
 	// The bytes as last kept, so the sweep writes only a change.
 	kept int64
+	// The size of each record this store last wrote or read, so a rewrite needs no read
+	// of the old one first (#3105). Events are not in it: each is written once, Absent,
+	// and the sweep deletes them by the listing's sizes, so it holds only records.
+	sizes map[string]int
 }
 
 // The folders whose live records a plan counts.
@@ -116,10 +120,59 @@ func (l *limitedStore) refuse(p Plan, limit, allows, do string) *LimitError {
 	return &LimitError{Plan: p, Limit: limit, Allows: allows, Do: do, Account: l.account}
 }
 
+// Get reads, and remembers the size of a record it knew, so a rewrite after a read uses
+// the size read.
+func (l *limitedStore) Get(ctx context.Context, key string) (*store.Object, error) {
+	o, err := l.Store.Get(ctx, key)
+	if err == nil {
+		l.mu.Lock()
+		if _, known := l.sizes[key]; known {
+			l.remember(key, o)
+		}
+		l.mu.Unlock()
+	}
+	return o, err
+}
+
+// remember keeps the size of key's object, or forgets it when there is none. l.mu is held.
+func (l *limitedStore) remember(key string, o *store.Object) {
+	if o == nil {
+		delete(l.sizes, key)
+		return
+	}
+	if l.sizes == nil {
+		l.sizes = map[string]int{}
+	}
+	l.sizes[key] = len(o.Data)
+}
+
+// old is the object a write replaces, as far as Put needs it (#3105): nothing for an
+// Absent write, which only succeeds where there is none; the remembered size for a record
+// this store wrote or read; else a read. The record itself is read only in a counted
+// folder, where a tombstone under it decides whether the write is a new one.
+func (l *limitedStore) old(ctx context.Context, key string, when store.Condition) (*store.Object, error) {
+	if when.IsAbsent() {
+		return nil, nil
+	}
+	counted := false
+	for folder := range countedFolders {
+		counted = counted || strings.HasPrefix(key, folder)
+	}
+	if !counted {
+		l.mu.Lock()
+		n, known := l.sizes[key]
+		l.mu.Unlock()
+		if known {
+			return &store.Object{Data: make([]byte, n)}, nil
+		}
+	}
+	return l.Store.Get(ctx, key)
+}
+
 // Put refuses a new machine or client over the plan, and a write that grows the store past
 // it. A rewrite that grows nothing is never refused.
 func (l *limitedStore) Put(ctx context.Context, key string, data []byte, when store.Condition) (string, error) {
-	old, err := l.Store.Get(ctx, key)
+	old, err := l.old(ctx, key, when)
 	if err != nil {
 		return "", err
 	}
@@ -155,6 +208,9 @@ func (l *limitedStore) Put(ctx context.Context, key string, data []byte, when st
 	if err == nil {
 		l.mu.Lock()
 		l.bytes += grow
+		if !strings.HasPrefix(key, eventsFolder) {
+			l.remember(key, &store.Object{Data: data})
+		}
 		l.mu.Unlock()
 	}
 	return tag, err
@@ -162,21 +218,33 @@ func (l *limitedStore) Put(ctx context.Context, key string, data []byte, when st
 
 // Delete deletes, and counts the bytes it frees.
 func (l *limitedStore) Delete(ctx context.Context, key string) error {
-	old, err := l.Store.Get(ctx, key)
-	if err != nil {
-		return err
+	l.mu.Lock()
+	n, known := l.sizes[key]
+	l.mu.Unlock()
+	if !known {
+		old, err := l.Store.Get(ctx, key)
+		if err != nil {
+			return err
+		}
+		if old != nil {
+			n = len(old.Data)
+		}
 	}
+	return l.deleteSized(ctx, key, int64(n))
+}
+
+// deleteSized deletes an object whose size is known, from a listing, with no read.
+func (l *limitedStore) deleteSized(ctx context.Context, key string, size int64) error {
 	if err := l.Store.Delete(ctx, key); err != nil {
 		return err
 	}
-	if old != nil {
-		l.mu.Lock()
-		l.bytes -= int64(len(old.Data))
-		if l.bytes < 0 {
-			l.bytes = 0
-		}
-		l.mu.Unlock()
+	l.mu.Lock()
+	delete(l.sizes, key)
+	l.bytes -= size
+	if l.bytes < 0 {
+		l.bytes = 0
 	}
+	l.mu.Unlock()
 	return nil
 }
 
@@ -305,7 +373,11 @@ func (s *Service) sweepEvents(ctx context.Context, l *limitedStore) (int, error)
 		if !ok || len(day) != len("2006-01-02") || day >= cutoff {
 			continue
 		}
-		if err := l.Delete(ctx, k.Key); err != nil {
+		del := l.Delete
+		if k.Size >= 0 {
+			del = func(ctx context.Context, key string) error { return l.deleteSized(ctx, key, k.Size) }
+		}
+		if err := del(ctx, k.Key); err != nil {
 			return n, err
 		}
 		n++
