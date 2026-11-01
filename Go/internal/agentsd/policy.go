@@ -1053,17 +1053,29 @@ func helperWords(who string, h *wire.PolicyHelpers) string {
 	return who + " allows at most " + strings.Join(parts, " and ") + " helper sessions in a folder."
 }
 
-// markHelperLimits marks a folder whose helper limits the policy caps.
+// markHelperLimits shows the folder's helper limits as its own policy layer keeps them
+// (#2957, FR-015, #3149), not .agents/folder.json's old running/notArchived, and marks a
+// folder whose limits the organisation's or your layer caps.
 func (d *Daemon) markHelperLimits(s *wire.FolderSummary) {
 	s.HelperLimitsSetBy = nil
+	var own wire.PolicyHelpers
+	if h := d.folderApprovedRules(store.FolderPath(s.Folder.Folder)).Helpers; h != nil {
+		own = *h
+	}
+	if l := s.Folder.HelperLimits; l != nil || own != (wire.PolicyHelpers{}) {
+		limits := wire.HelperLimits{}
+		if l != nil {
+			limits = *l
+		}
+		limits.Running, limits.NotArchived = own.MostRunning, own.MostNotArchived
+		s.Folder.HelperLimits = &limits
+	}
 	running, notArchived := int64(defaultHelpersRunning), int64(defaultHelpersNotArchived)
-	if l := s.Folder.HelperLimits; l != nil {
-		if l.Running != nil {
-			running = *l.Running
-		}
-		if l.NotArchived != nil {
-			notArchived = *l.NotArchived
-		}
+	if own.MostRunning != nil {
+		running = *own.MostRunning
+	}
+	if own.MostNotArchived != nil {
+		notArchived = *own.MostNotArchived
 	}
 	_, _, s.HelperLimitsSetBy = d.helperCaps(running, notArchived)
 }
