@@ -142,3 +142,52 @@ func assertMoved(t testing.TB, path string) {
 		t.Fatalf("%s.moved is not there: %v", path, err)
 	}
 }
+
+// TestAnUntrustedLayerIsKeptAsideNotWrittenOver (#3122): a layer signed with key A, read by
+// a daemon whose key store is empty (the root moved to another Mac), fails the check; the
+// next edit (cost/setLimits) keeps the old file, byte for byte, as
+// policy-yours.json.untrusted-<time> before it writes a new layer.
+func TestAnUntrustedLayerIsKeptAsideNotWrittenOver(t *testing.T) {
+	root := t.TempDir()
+	d, c := start(t, root)
+	d.SettingsDir = t.TempDir()
+
+	var set wire.YourPolicy
+	json.Unmarshal(c.call(t, 1, "policy/setYours", wire.SetYourPolicyRequest{Rules: wire.PolicyRules{
+		Budgets: &wire.PolicyRuleBudgets{Daily: &wire.Cost{Amount: 40, Currency: "USD"}},
+	}, Revision: 1}), &set)
+	if set.Revision != 2 {
+		t.Fatalf("%+v", set)
+	}
+	signedWithA, err := os.ReadFile(filepath.Join(d.SettingsDir, yourPolicyFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Another Mac: key store B is empty, so the next key it makes is not A.
+	if err := os.Remove(filepath.Join(root, "person-key")); err != nil {
+		t.Fatal(err)
+	}
+	d.yoursRead = false
+	d.yoursRulesCache.Store(nil)
+
+	c.call(t, 2, "cost/setLimits", map[string]any{"daily": map[string]any{"amount": 5, "currency": "USD"}})
+
+	aside, _ := filepath.Glob(filepath.Join(d.SettingsDir, yourPolicyFile+".untrusted-*"))
+	if len(aside) != 1 {
+		t.Fatalf("the untrusted layer was not kept aside: %v", aside)
+	}
+	kept, err := os.ReadFile(aside[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(kept) != string(signedWithA) {
+		t.Fatalf("the kept copy changed:\n%s\nwas\n%s", kept, signedWithA)
+	}
+	// The new layer is this Mac's own and is trusted again.
+	var state wire.YourPolicyState
+	json.Unmarshal(c.call(t, 3, "policy/yours", nil), &state)
+	if b := state.Policy.Rules.Budgets; b == nil || b.Daily == nil || b.Daily.Amount != 5 {
+		t.Fatalf("%+v", state.Policy.Rules)
+	}
+}

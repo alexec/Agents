@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -43,6 +44,10 @@ type yourPolicyBook struct {
 	// yoursWas is the highest revision ever saved here, and whether the first-start move
 	// has already run, kept across a lost or untrusted file (FR-012: it runs at most once).
 	yoursWas yourPolicySeen
+	// yoursUntrusted is whether policy-yours.json is on disk but fails the check (signed on
+	// another Mac, or by a key this machine has not pinned, #3122): the next write keeps it
+	// aside first (keepUntrustedAsideLocked), never writes over it.
+	yoursUntrusted bool
 	// yoursRulesCache is the current trusted layer's rules, kept for lock-free reads from
 	// another lock's critical section (cost.go's costMu, in particular, T019): stored under
 	// yoursMu whenever yoursNow changes, read without any lock by yourPolicyRules. The last
@@ -99,6 +104,7 @@ func (d *Daemon) readYoursLocked() {
 	d.yoursRead = true
 	d.yoursNow = nil
 	d.yoursWas = yourPolicySeen{}
+	d.yoursUntrusted = false
 	if b, err := os.ReadFile(d.yourPolicySeenPath()); err == nil {
 		json.Unmarshal(b, &d.yoursWas)
 	}
@@ -111,7 +117,8 @@ func (d *Daemon) readYoursLocked() {
 	}
 	var kept keptYourPolicy
 	if json.Unmarshal(b, &kept) != nil || !d.trustsYoursLocked(&kept) {
-		log.Printf("policy: %s fails the signature check; the last good copy applies", yourPolicyFile)
+		log.Printf("policy: %s fails the signature check (signed on another Mac?); the last good copy applies, and the next change keeps the file aside as %s.untrusted-<time>", yourPolicyFile, yourPolicyFile)
+		d.yoursUntrusted = true
 		return
 	}
 	if kept.policy.Revision < d.yoursWas.Revision {
@@ -163,6 +170,25 @@ func (d *Daemon) yoursPublicKeyLocked() []byte {
 	return public
 }
 
+// keepUntrustedAsideLocked renames a policy-yours.json that fails the check to
+// policy-yours.json.untrusted-<time> before a new layer is written (#3122): after the root
+// moves to another Mac, that file holds the person's rules, signed by a key this Mac does
+// not have, and an edit here must not write over it. An error means nothing may be
+// written. Called with yoursMu held.
+func (d *Daemon) keepUntrustedAsideLocked() error {
+	if !d.yoursUntrusted {
+		return nil
+	}
+	path := d.yourPolicyPath()
+	aside := fmt.Sprintf("%s.untrusted-%d", path, nowFunc().Unix())
+	if err := os.Rename(path, aside); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("keep the untrusted %s aside: %w", yourPolicyFile, err)
+	}
+	log.Printf("policy: %s was signed by a key this machine does not trust; kept as %s", yourPolicyFile, filepath.Base(aside))
+	d.yoursUntrusted = false
+	return nil
+}
+
 // saveYoursLocked signs next with this machine's person key and keeps it. Called with
 // yoursMu held.
 func (d *Daemon) saveYoursLocked(next wire.YourPolicy) error {
@@ -187,6 +213,9 @@ func (d *Daemon) saveYoursLocked(next wire.YourPolicy) error {
 	}, policy: next}
 	b, err := json.Marshal(kept)
 	if err != nil {
+		return err
+	}
+	if err := d.keepUntrustedAsideLocked(); err != nil {
 		return err
 	}
 	if err := store.WriteAtomically(d.yourPolicyPath(), b, 0o600); err != nil {
@@ -281,6 +310,9 @@ func (d *Daemon) takeSignedYours(signed wire.SignedYourPolicy, source string) (i
 	kept := keptYourPolicy{Policy: raw, Signature: signed.Signature, policy: policy}
 	b, err := json.Marshal(kept)
 	if err != nil {
+		return 0, nil, err
+	}
+	if err := d.keepUntrustedAsideLocked(); err != nil {
 		return 0, nil, err
 	}
 	if err := store.WriteAtomically(d.yourPolicyPath(), b, 0o600); err != nil {
