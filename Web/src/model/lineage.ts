@@ -8,6 +8,9 @@ import { costWords, nodeName, nodeUrl, spent } from "./value";
 /** How far the pane walks: issue, its sessions, their PRs. */
 export const lineageDepth = 2;
 
+/** How many times, a second apart, the pane walks again while the daemon is still resolving titles (#3102). */
+export const resolvingAsks = 20;
+
 export const sessionNode = (id: string): LineageNode => ({ kind: "session", ref: `session:${id}` });
 
 const key = (n: LineageNode) => `${n.kind}\n${n.ref}`;

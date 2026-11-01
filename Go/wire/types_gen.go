@@ -4556,13 +4556,15 @@ type LineageEndRequest struct {
 	Rel string `json:"rel"`
 }
 
-// lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the walk stopped at its limit on nodes, so there is more. resolved is each node's title, state and labels from its connector, by ref, for the nodes a connector could resolve (#3089).
+// lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the walk stopped at its limit on nodes, so there is more. resolved is each node's title, state and labels from its connector, by ref, for the nodes a connector could resolve (#3089). resolving says some nodes are still being resolved in the background, so walk again shortly for them (#3102).
 type LineageGraph struct {
 	Nodes []LineageNode `json:"nodes"`
 
 	Links []LineageLink `json:"links"`
 
 	Limited *bool `json:"limited,omitzero"`
+
+	Resolving *bool `json:"resolving,omitzero"`
 
 	Resolved map[string]LineageResolved `json:"resolved,omitzero"`
 }
