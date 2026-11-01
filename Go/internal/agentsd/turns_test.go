@@ -566,6 +566,35 @@ func TestAToolCallIsRecordedAsSwiftRecordsIt(t *testing.T) {
 	}
 }
 
+func TestAToolCallLeavesBigImagesOutOfTheTranscript(t *testing.T) {
+	shot := strings.Repeat("A", 200<<10)
+	small := strings.Repeat("B", 100)
+	tc := toolCall(sdk.SessionToolCallUpdate{ToolCallId: "c1", Status: sdk.Ptr(sdk.ToolCallStatusCompleted),
+		Content: []sdk.ToolCallContent{
+			sdk.ToolContent(sdk.ImageBlock(shot, "image/jpeg")),
+			sdk.ToolContent(sdk.ImageBlock(small, "image/png")),
+			sdk.ToolContent(sdk.TextBlock("done")),
+		},
+		RawOutput: []any{
+			map[string]any{"type": "image", "data": shot, "mimeType": "image/jpeg"},
+			map[string]any{"type": "text", "text": "done"},
+			map[string]any{"type": "resource", "resource": map[string]any{"uri": "file:///x", "blob": shot}},
+		}})
+	if c := tc.Content[0].Content; c.Type != "text" || *c.Text != "image, 200 KB" {
+		t.Fatalf("big image kept: %+v", c)
+	}
+	if c := tc.Content[1].Content; c.Type != "image" || *c.Data != small {
+		t.Fatalf("small image lost: %+v", c)
+	}
+	if *tc.Content[2].Content.Text != "done" {
+		t.Fatalf("text lost: %+v", tc.Content[2])
+	}
+	raw := string(tc.RawOutput)
+	if len(raw) > 1024 || !strings.Contains(raw, `"image, 200 KB"`) || !strings.Contains(raw, `"blob":"blob, 200 KB"`) || !strings.Contains(raw, `"done"`) {
+		t.Fatalf("raw output %d bytes: %.300s", len(raw), raw)
+	}
+}
+
 // callTheModel is the fake runtime's model request: to ANTHROPIC_BASE_URL with
 // ANTHROPIC_AUTH_TOKEN, trusting NODE_EXTRA_CA_CERTS, as Claude Code does.
 func callTheModel() string {
