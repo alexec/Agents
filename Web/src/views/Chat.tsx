@@ -51,7 +51,7 @@ import { comingBackDescription, footStatusWords } from "../model/status";
 import { ArchiveCard } from "./ArchiveCard";
 import { showsThoughts, shownItems } from "../model/thoughts";
 import { hasTurnInFlight, promptPlaceholder, willQueue } from "../model/promptWords";
-import { eventCarryOnPrompt, eventWaitLine, eventWaitMinutes, eventWaitSummaryLines, leaseMark, lineResource, triggerURL } from "../model/rowLines";
+import { eventCarryOnPrompt, eventWaitLine, eventWaitMinutes, eventWaitSummaryLines, leaseMark, lineCarryOnPrompt, lineResource, triggerURL } from "../model/rowLines";
 import { routeHash } from "../route";
 import { sessionRuntimeName } from "../model/runtimes";
 import { GuardedChangeCard } from "./GuardedChange";
@@ -626,7 +626,12 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
             wait only the person can settle, which the card tints and says (#3147). Only while the
             wait is open: an ended one stays on the record until the agent goes on (#2749). */}
         {agent?.eventWait && agent.eventWait.ending === undefined && <WaitCard agent={agent} title={(id) => store.agent(host, id)?.title}
-          disabled={down} continueNow={async () => { await store.prompt(host, agent.id, eventCarryOnPrompt, []); }}
+          disabled={down} continueNow={async () => {
+            // On a place in a line, Carry On leaves it: a prompt alone keeps the place (#3151).
+            const resource = lineResource(agent);
+            if (resource !== undefined) await store.cancelWait(host, agent.id);
+            await store.prompt(host, agent.id, resource === undefined ? eventCarryOnPrompt : lineCarryOnPrompt(resource), []);
+          }}
           stop={() => store.cancelWait(host, agent.id)} />}
         {agent && !store.isComingBack(host, agent.id) && agent.state !== "running" && agent.state !== "starting" && (
           <QuietLine since={lastEntryAt(store.entries.value, store.turns.value) ?? fromWireDate(agent.lastActivityAt)} />
@@ -848,6 +853,7 @@ const waitWords = {
  * The agent's wait on events, as a card under the questions (WaitCard.swift, #1995): what, since
  * when, until when, Carry On and End Wait (#3052, #3152). Not tinted, except a wait only the person
  * can settle (#3147): tinted, headed with what it asks of them, and Open on the PR or issue it names.
+ * On a place in a line, Carry On is "Carry on without build" and leaves the line (#3151).
  */
 function WaitCard({ agent, title, disabled, continueNow, stop }: { agent: Agent; title: (id: string) => string | undefined;
   disabled: boolean; continueNow: () => Promise<void>; stop: () => Promise<void> }) {
@@ -861,7 +867,8 @@ function WaitCard({ agent, title, disabled, continueNow, stop }: { agent: Agent;
   const line = eventWaitLine(agent, title);
   if (!wait || wait.ending !== undefined || (!line && wait.patterns.length === 0)) return null;
   const { elapsed, total, percent } = eventWaitMinutes(wait, new Date(now.value));
-  const isLine = lineResource(agent) !== undefined;
+  const resource = lineResource(agent);
+  const isLine = resource !== undefined;
   const asks = isLine ? null : personLine(agent);
   const trigger = asks ? personTriggerOf(agent) : undefined;
   const url = trigger ? triggerURL(trigger) : undefined;
@@ -892,8 +899,10 @@ function WaitCard({ agent, title, disabled, continueNow, stop }: { agent: Agent;
         <p class="wait-answers">
           {url && <a class="button prominent" href={url} target="_blank" rel="noopener noreferrer"
             title={`Open ${url} in the browser.`}>Open</a>}
-          <button disabled={disabled || busy.value} title={waitWords.carryOnHelp}
-            onClick={() => { busy.value = true; void continueNow().finally(() => (busy.value = false)); }}>{waitWords.carryOn}</button>
+          <button disabled={disabled || busy.value}
+            title={resource === undefined ? waitWords.carryOnHelp : `Leave the line for ${resource} and carry on now, without it.`}
+            onClick={() => { busy.value = true; void continueNow().finally(() => (busy.value = false)); }}>
+            {resource === undefined ? waitWords.carryOn : `Carry on without ${resource}`}</button>
           <button class="destructive" disabled={disabled || busy.value} title={waitWords.endWaitHelp}
             onClick={() => { busy.value = true; void stop().finally(() => (busy.value = false)); }}>{waitWords.endWait}</button>
         </p>

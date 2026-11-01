@@ -8,7 +8,8 @@ import SwiftUI
 /// line went. Carry On sends that prompt itself (`EventWait.carryOnPrompt`), carrying the
 /// agent on now without the event, as the block card's Carry On does; End Wait ends the
 /// wait with nothing to start it again, the same whether the agent's call is still open
-/// or not, and on iOS asks first (no hover there to say what it does).
+/// or not, and on iOS asks first (no hover there to say what it does). On a place in a line,
+/// Carry On is "Carry on without build", and leaves the line (#3151).
 ///
 /// The question cards' shape, under them, since an agent waiting on an event is very like
 /// one waiting for an answer. Not tinted: nothing has gone wrong, and the chat is already
@@ -25,7 +26,6 @@ struct WaitCard: View {
 
     let status: WaitStatus
     let eventWait: EventWait?
-    let isLineWait: Bool
     /// `AgentsModel.waitEventLines`: its events in words, sessions by their titles (#2747).
     var lines: [WaitEventLine] = []
     let continueNow: () async -> Void
@@ -54,7 +54,7 @@ struct WaitCard: View {
                         .help("Open \(url.absoluteString) in the browser.")
                 }
                 if status.cancellable {
-                    Button(Self.carryOn) {
+                    Button(lineResource.map(EventWait.lineCarryOnLabel) ?? Self.carryOn) {
                         busy = true
                         Task {
                             await continueNow()
@@ -62,7 +62,8 @@ struct WaitCard: View {
                         }
                     }
                     .buttonStyle(.paper)
-                    .help(Self.carryOnHelp)
+                    .help(lineResource.map { "Leave the line for \($0.key) and carry on now, without it." }
+                        ?? Self.carryOnHelp)
                     .disabled(busy || isDisabled)
                     Button(Self.endWait, role: .destructive) {
                         #if os(iOS)
@@ -93,6 +94,10 @@ struct WaitCard: View {
     }
 
     /// What a wait for the person asks of them (`EventWait.personLine`, #3147).
+    /// The resource whose line this wait is a place in (#2361): Carry On then names it and
+    /// leaves the line (#3151).
+    private var lineResource: ResourceName? { eventWait?.lineResource }
+    private var isLineWait: Bool { lineResource != nil }
     private var personLine: String? { isLineWait ? nil : eventWait?.personLine }
     private var personURL: URL? { isLineWait ? nil : eventWait?.personURL }
 

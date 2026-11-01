@@ -83,6 +83,9 @@ struct WaitStatusTests {
             "agent": DetailFilter(waiting.id.uuidString), "resource": DetailFilter("build")])], from: 0, deadline: until, since: since)
         waiting.eventWait = wait
         #expect(wait.lineResource == ResourceName("build"))
+        // Continue on it names the lease, and says the agent is out of the line (#3151).
+        #expect(EventWait.lineCarryOnLabel(ResourceName("build")!) == "Carry on without build")
+        #expect(EventWait.lineCarryOnPrompt(ResourceName("build")!) == "I've taken you out of the line for build. Carry on without it.")
         #expect(WaitStatus.of(waiting, names: { _ in nil })?.line == "◷ Waiting for your turn with build")
 
         let build = ResourceName("build")!
