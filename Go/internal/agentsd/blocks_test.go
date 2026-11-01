@@ -2,6 +2,7 @@ package agentsd
 
 import (
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -164,5 +165,55 @@ func TestOnlyOneWaitAtATime(t *testing.T) {
 	}
 	if r := d.Store.Agent(a.ID).Report; r == nil || !isOpenBlock(r) {
 		t.Fatalf("no open block: %+v", r)
+	}
+}
+
+// Two waits closing at once resume the waiting agent once (#3099): the kill switch stopped
+// both reviews a release waited on, each stop cleared the release's block, and the second
+// resume woke the release's next wait on them at once, saying they were stopped.
+func TestABlockClearedTwiceAtOnceResumesOnce(t *testing.T) {
+	fakeRuntimes(t)
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := t.TempDir()
+	title := func(s string) *string { return &s }
+	stopped := func(a *wire.Agent) { a.State, a.EndedReason = wire.AgentStateStopped, reason(wire.EndedReasonCancelled) }
+	one := seeded(t, d, dir, func(a *wire.Agent) { a.Title = title("Security review"); stopped(a) })
+	two := seeded(t, d, dir, func(a *wire.Agent) { a.Title = title("Performance review"); stopped(a) })
+	ending := &wire.WaitEnding{At: now(), How: wire.WaitEndingHow{Stopped: &wire.WaitEndingHowStopped{Value: reason(wire.EndedReasonCancelled)}}}
+	anyOf := wire.BlockWakeOnAny
+	lead := seeded(t, d, dir, func(a *wire.Agent) {
+		a.Title, a.State, a.EndedReason = title("Release"), wire.AgentStateFinished, reason(wire.EndedReasonEndTurn)
+		a.Report = &wire.WorkReport{Outcome: wire.WorkOutcomeWaiting, Message: "Waiting for the reviews.", At: now(),
+			Block: &wire.Block{WakeOn: &anyOf, CheckAgainAt: new(wire.DateOf(time.Now().Add(time.Hour))), Waits: []wire.Wait{
+				{AgentID: one.ID, NameAtReport: "Security review", Ending: ending},
+				{AgentID: two.ID, NameAtReport: "Performance review", Ending: ending},
+			}}}
+	})
+	gate := make(chan struct{})
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Go(func() {
+			<-gate
+			d.resumeIfCleared(lead.ID)
+		})
+	}
+	close(gate)
+	wg.Wait()
+	waitFor(t, "its turn over", func() bool {
+		l := d.live(lead.ID)
+		l.mu.Lock()
+		busy := l.running || l.inTurn
+		l.mu.Unlock()
+		return !busy && len(d.Store.Agent(lead.ID).QueuedPrompts) == 0 && len(userMessages(d, lead.ID)) > 0
+	})
+	resumes := 0
+	for _, u := range userMessages(d, lead.ID) {
+		if strings.HasPrefix(u, "The wait you reported has cleared") {
+			resumes++
+		}
+	}
+	if resumes != 1 {
+		t.Fatalf("resumed %d times: %q", resumes, userMessages(d, lead.ID))
 	}
 }

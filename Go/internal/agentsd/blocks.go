@@ -509,19 +509,36 @@ func (d *Daemon) resumeIfCleared(id wire.UUID) {
 	if busy {
 		return
 	}
-	why := wire.BlockClearingTime
-	if waitsCleared(&b) {
-		why = wire.BlockClearingWaits
-	}
-	prompt := wire.QueuedPrompt{ID: store.NewUUID(), Text: d.resumePrompt(&b, a.Report.Message, why), QueuedAt: t,
-		From: wire.PromptOriginApp, Attachments: []wire.Attachment{}}
-	b.ClearedAt, b.ClearedBy = &t, &why
-	d.change(id, func(a *wire.Agent) {
+	// The block is looked at again, and cleared, in the one change (#3099): two waits that
+	// close at once (a kill switch stopping both) each come here, and a block read before
+	// the other cleared it was cleared again, queueing a second resume for a wait the agent
+	// had already carried on from, which then woke its next wait at once.
+	var prompt *wire.QueuedPrompt
+	d.changeAgent(id, false, func(a *wire.Agent) {
+		if a.State != wire.AgentStateFinished || !isOpenBlock(a.Report) || a.Report.Block == nil || len(a.QueuedPrompts) > 0 {
+			return
+		}
+		b := *a.Report.Block
+		cleared := waitsCleared(&b)
+		if !cleared && !(b.CheckAgainAt != nil && !b.CheckAgainAt.Time().After(t.Time())) {
+			return
+		}
+		why := wire.BlockClearingTime
+		if cleared {
+			why = wire.BlockClearingWaits
+		}
+		prompt = &wire.QueuedPrompt{ID: store.NewUUID(), Text: d.resumePrompt(&b, a.Report.Message, why), QueuedAt: t,
+			From: wire.PromptOriginApp, Attachments: []wire.Attachment{}}
+		b.ClearedAt, b.ClearedBy = &t, &why
 		r := *a.Report
 		r.Block = &b
 		a.Report = &r
-		a.QueuedPrompts = append(append([]wire.QueuedPrompt{}, a.QueuedPrompts...), prompt)
+		a.QueuedPrompts = append(append([]wire.QueuedPrompt{}, a.QueuedPrompts...), *prompt)
+		a.LastActivityAt = now()
 	})
+	if prompt == nil {
+		return
+	}
 	if err := d.refuseToRun(a); err != nil {
 		_, msg := errMessage(err)
 		d.couldNotCarryOn(id, prompt.ID, msg)
