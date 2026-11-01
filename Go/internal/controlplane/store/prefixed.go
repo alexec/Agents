@@ -44,7 +44,7 @@ func (p *Prefixed) List(ctx context.Context, prefix string) ([]Key, error) {
 	}
 	out := make([]Key, 0, len(keys))
 	for _, k := range keys {
-		out = append(out, Key{Key: strings.TrimPrefix(k.Key, p.prefix), ETag: k.ETag})
+		out = append(out, Key{Key: strings.TrimPrefix(k.Key, p.prefix), ETag: k.ETag, Size: k.Size})
 	}
 	return out, nil
 }

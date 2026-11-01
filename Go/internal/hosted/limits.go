@@ -201,7 +201,9 @@ func forgottenRecord(data []byte) bool {
 	return json.Unmarshal(data, &r) == nil && r.Forgotten
 }
 
-// count counts the store's bytes by reading every object.
+// count counts the store's bytes from one listing (#3103): a start must not read the
+// whole store on the request path. Only an object whose size the listing does not say
+// is read.
 func count(ctx context.Context, st store.Store) (int64, error) {
 	keys, err := st.List(ctx, "")
 	if err != nil {
@@ -209,6 +211,10 @@ func count(ctx context.Context, st store.Store) (int64, error) {
 	}
 	var n int64
 	for _, k := range keys {
+		if k.Size >= 0 {
+			n += k.Size
+			continue
+		}
 		o, err := st.Get(ctx, k.Key)
 		if err != nil {
 			return 0, err

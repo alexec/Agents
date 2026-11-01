@@ -244,7 +244,7 @@ func (s *Store) List(ctx context.Context, prefix string) ([]store.Key, error) {
 		}
 		for _, o := range page.Contents {
 			if len(o.Key) >= strip {
-				found = append(found, store.Key{Key: o.Key[strip:], ETag: o.ETag})
+				found = append(found, store.Key{Key: o.Key[strip:], ETag: o.ETag, Size: o.Size})
 			}
 		}
 		if !page.IsTruncated || page.NextContinuationToken == "" {
@@ -261,6 +261,7 @@ type listPage struct {
 	Contents []struct {
 		Key  string
 		ETag string
+		Size int64
 	}
 	IsTruncated           bool
 	NextContinuationToken string

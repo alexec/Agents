@@ -100,6 +100,7 @@ func (f *Bucket) list(w http.ResponseWriter, r *http.Request) {
 	type content struct {
 		Key  string
 		ETag string
+		Size int
 	}
 	page := struct {
 		XMLName               xml.Name `xml:"http://s3.amazonaws.com/doc/2006-03-01/ ListBucketResult"`
@@ -108,7 +109,7 @@ func (f *Bucket) list(w http.ResponseWriter, r *http.Request) {
 		NextContinuationToken string `xml:",omitempty"`
 	}{IsTruncated: end < len(keys)}
 	for _, k := range keys[min(start, len(keys)):end] {
-		page.Contents = append(page.Contents, content{k, etag(f.objects[k])})
+		page.Contents = append(page.Contents, content{k, etag(f.objects[k]), len(f.objects[k])})
 	}
 	if page.IsTruncated {
 		page.NextContinuationToken = strconv.Itoa(end)
