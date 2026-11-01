@@ -19,12 +19,13 @@ func TestAdminVerbs(t *testing.T) {
 	if err := runAdmin(ctx, a, []string{"invite", "3"}, &out); err != nil || !strings.HasPrefix(out.String(), "https://hosted.test/?invite=") {
 		t.Fatal(out.String(), err)
 	}
-	for _, args := range [][]string{{"allow", "ana"}, {"admit", "bo"}, {"disallow", "bo"}, {"waitlist"}, {"accounts"}, {"unblock", "7"}} {
+	backups := t.TempDir() + "/2026-11-01"
+	for _, args := range [][]string{{"backup", "--keep", "2", backups}, {"backup", "--keep=2", backups}, {"allow", "ana"}, {"admit", "bo"}, {"disallow", "bo"}, {"waitlist"}, {"accounts"}, {"unblock", "7"}} {
 		if err := runAdmin(ctx, a, args, &out); err != nil {
 			t.Fatal(args, err)
 		}
 	}
-	for _, args := range [][]string{{"nothing"}, {"allow"}, {"suspend", "abcdefghij"}, {"unblock", "x"}, {"invite", "-1"}} {
+	for _, args := range [][]string{{"nothing"}, {"allow"}, {"suspend", "abcdefghij"}, {"unblock", "x"}, {"invite", "-1"}, {"backup", "--keep", "0", "d"}, {"backup", "--keep=x", "d"}, {"backup", "--keep"}, {"backup", "--keep", "2"}} {
 		if err := runAdmin(ctx, a, args, &out); !errors.Is(err, errUsage) {
 			t.Fatal(args, err)
 		}

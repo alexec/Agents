@@ -51,6 +51,63 @@ func (a Admin) Backup(ctx context.Context, dir string, ids []string) ([]string, 
 	return done, nil
 }
 
+// PruneBackups keeps the newest keep backups beside dir, dir among them, and deletes the
+// rest (#3123): each backup holds the whole store, on the disk the store is on. Backups are
+// the folders in dir's parent that hold only accounts' folders, each with its account.json;
+// they are named by date, so their names sort oldest first. It gives the folders it deleted.
+func PruneBackups(dir string, keep int) ([]string, error) {
+	if keep < 1 {
+		return nil, errors.New("keep at least the backup just made")
+	}
+	dir = filepath.Clean(dir)
+	parent := filepath.Dir(dir)
+	entries, err := os.ReadDir(parent)
+	if err != nil {
+		return nil, err
+	}
+	var older []string // ReadDir sorts by name
+	for _, e := range entries {
+		p := filepath.Join(parent, e.Name())
+		if p == dir || !e.IsDir() || !isBackup(p) {
+			continue
+		}
+		if e.Name() > filepath.Base(dir) {
+			// A backup named after this one is newer: keep it, and count it.
+			keep--
+			continue
+		}
+		older = append(older, p)
+	}
+	keep-- // dir itself
+	var gone []string
+	for len(older) > max(keep, 0) {
+		if err := os.RemoveAll(older[0]); err != nil {
+			return gone, err
+		}
+		gone = append(gone, older[0])
+		older = older[1:]
+	}
+	return gone, nil
+}
+
+// isBackup is whether dir is what Backup writes: one or more accounts' folders, and
+// nothing else.
+func isBackup(dir string) bool {
+	entries, err := os.ReadDir(dir)
+	if err != nil || len(entries) == 0 {
+		return false
+	}
+	for _, e := range entries {
+		if !e.IsDir() || !validID(e.Name()) {
+			return false
+		}
+		if _, err := os.Stat(filepath.Join(dir, e.Name(), "account.json")); err != nil {
+			return false
+		}
+	}
+	return true
+}
+
 func (a Admin) backUp(ctx context.Context, dir, id string) error {
 	if !validID(id) {
 		return fmt.Errorf("%q is not an account's id", id)
