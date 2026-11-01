@@ -180,7 +180,13 @@ public enum LineageList {
         var seen = Set<Node>()
         let nodes = graph.nodes.filter { $0 != session && seen.insert($0).inserted }
         let name = names(of: session, graph: graph, title: title)
-        return nodes.map { row($0, graph: graph, costs: costs, name: name, start: session) }
+        // Each node's links, found once: a filter of every link per node is O(nodes × links) (#3112).
+        var links: [Node: [DaemonAPI.LineageLink]] = [:]
+        for link in graph.links {
+            links[link.from, default: []].append(link)
+            if link.to != link.from { links[link.to, default: []].append(link) }
+        }
+        return nodes.map { row($0, graph: graph, costs: costs, name: name, start: session, links: links[$0] ?? []) }
     }
 
     /// The row for the start itself, a box of the graph: "This session", or the issue's or PR's
@@ -210,10 +216,10 @@ public enum LineageList {
     }
 
     static func row(_ n: Node, graph: DaemonAPI.LineageGraph, costs: [Node: DaemonAPI.LineageCostRollup],
-                    name: (Node) -> String, start: Node) -> Row {
+                    name: (Node) -> String, start: Node, links: [DaemonAPI.LineageLink]? = nil) -> Row {
         Row(node: n, name: name(n),
             ref: graph.resolved?[n.ref]?.title != nil && name(n) != ReportValueWords.name(n) ? ReportValueWords.name(n) : nil,
-            links: graph.links.filter { $0.from == n || $0.to == n }.map { line($0, of: n, session: start, name: name) },
+            links: (links ?? graph.links.filter { $0.from == n || $0.to == n }).map { line($0, of: n, session: start, name: name) },
             cost: costs[n].map { costLine($0) },
             resolved: resolvedLine(graph.resolved?[n.ref]),
             url: ReportValueWords.url(n).map { pullRequest(n, $0) },
