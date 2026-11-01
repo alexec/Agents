@@ -132,3 +132,20 @@ func TestAPRCommentedWaitFetchesNoOtherIssueAndMovesItsCursorPastThem(t *testing
 		}
 	}
 }
+
+// A wait on every PR asks whether an issue is a pull request once, not on every poll.
+func TestPRCommentsAsksWhetherAnIssueIsAPullOnce(t *testing.T) {
+	api := newCommentAPI(t)
+	g := NewRealGitHub(api.URL, func() string { return "token" }, func(context.Context) (string, error) { return repo, nil })
+	since := "2026-10-28T10:00:00.000Z"
+	for i := range 10 {
+		api.comment(i+1, 1000+i, fmt.Sprintf("2026-10-28T10:%02d:00Z", i+1))
+	}
+	for range 2 {
+		if _, _, err := g.PRComments(context.Background(), repo, since, 0); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_, items := api.taken()
+	equal(t, items, 10+5+5, "10 issues once, and the 5 pulls each time")
+}

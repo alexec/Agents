@@ -39,6 +39,9 @@ type RealGitHub struct {
 	recent    map[string]sharedBody
 	running   map[string]*fetch
 	sharing   time.Duration
+	// pulls says, by issue path, whether an issue is a pull request: that never changes, so
+	// pr.commented asks once, not on every poll (P20261031-1). At most pullsCount.
+	pulls map[string]bool
 }
 
 type etagged struct{ etag, body string }
@@ -66,6 +69,8 @@ const (
 	etagLargest = 256 << 10
 	// rerunWindow is how far back past since a run may have been created and still be rerun into view.
 	rerunWindow = 24 * time.Hour
+	// pullsCount bounds RealGitHub.pulls; when full it starts again.
+	pullsCount = 2000
 )
 
 // NewRealGitHub reads api (https://api.github.com/ when empty) with token's answer.
@@ -899,7 +904,7 @@ func (g *RealGitHub) PRLabelActivity(ctx context.Context, repo string, kind PRLa
 
 // PRComments is the pr.commented event's reads: the repo's issues/comments endpoint carries a
 // pull request's conversation comments too (GitHub treats a PR as an issue underneath), so the
-// issue each one names (cached) says whether it is a pull request; the pull itself (cached too)
+// issue each one names (kept across polls) says whether it is a pull request; the pull itself (cached too)
 // gives its branch and whether it is the repo's own. With pr not 0, a comment on another number
 // fetches nothing: the number is in its issue_url (P20261031-1).
 func (g *RealGitHub) PRComments(ctx context.Context, repo, since string, pr int) ([]PRComment, bool, error) {
@@ -919,7 +924,6 @@ func (g *RealGitHub) PRComments(ctx context.Context, repo, since string, pr int)
 		return nil, false, err
 	}
 	var out []PRComment
-	issues := map[string]issueJSON{}
 	pulls := map[string]pull{}
 	for _, c := range items {
 		issuePath := strings.TrimPrefix(strings.TrimPrefix(c.IssueURL, g.API), "https://api.github.com/")
@@ -928,14 +932,11 @@ func (g *RealGitHub) PRComments(ctx context.Context, repo, since string, pr int)
 			out = append(out, other)
 			continue
 		}
-		i, ok := issues[issuePath]
-		if !ok {
-			if err := g.get(ctx, issuePath, false, &i); err != nil {
-				return nil, false, err
-			}
-			issues[issuePath] = i
+		isPR, err := g.isPR(ctx, issuePath)
+		if err != nil {
+			return nil, false, err
 		}
-		if !i.isPR() {
+		if !isPR {
 			out = append(out, other)
 			continue
 		}
@@ -951,6 +952,27 @@ func (g *RealGitHub) PRComments(ctx context.Context, repo, since string, pr int)
 			Trusted: isTrusted(c.Association, c.User.Login, c.User.Type)})
 	}
 	return out, truncated, nil
+}
+
+// isPR says whether the issue at path is a pull request, asking GitHub only the first time.
+func (g *RealGitHub) isPR(ctx context.Context, path string) (bool, error) {
+	g.mu.Lock()
+	known, ok := g.pulls[path]
+	g.mu.Unlock()
+	if ok {
+		return known, nil
+	}
+	var i issueJSON
+	if err := g.get(ctx, path, false, &i); err != nil {
+		return false, err
+	}
+	g.mu.Lock()
+	if g.pulls == nil || len(g.pulls) >= pullsCount {
+		g.pulls = map[string]bool{}
+	}
+	g.pulls[path] = i.isPR()
+	g.mu.Unlock()
+	return i.isPR(), nil
 }
 
 // issueNumber is the number at the end of an issue's API path, 0 when there is none.
