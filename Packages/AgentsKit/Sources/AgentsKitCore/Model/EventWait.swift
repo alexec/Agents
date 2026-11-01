@@ -92,6 +92,18 @@ public struct EventWait: Codable, Hashable, Sendable {
     /// always does (`EventWaitEnding.Canceller.prompt`), carrying the agent on without
     /// the event (#3052).
     public static let carryOnPrompt = "I've stopped waiting for the event. Carry on."
+
+    /// What Continue sends on a place in a line (#3151), after it cancels the wait as the
+    /// person, which leaves the line: a prompt alone keeps the place (#2361), so the agent
+    /// would work on without the lease and still be granted it later.
+    public static func lineCarryOnPrompt(_ resource: ResourceName) -> String {
+        "I've taken you out of the line for \(resource). Carry on without it."
+    }
+
+    /// Continue's words on a place in a line (#3151): "Carry on without build".
+    public static func lineCarryOnLabel(_ resource: ResourceName) -> String {
+        "Carry on without \(resource)"
+    }
 }
 
 /// One of a wait's servers' events (#577): the subscription it makes, as a trigger

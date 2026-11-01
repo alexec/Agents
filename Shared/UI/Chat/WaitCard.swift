@@ -7,7 +7,8 @@ import SwiftUI
 /// sending cancels the wait; a prompt ends a wait as it does everywhere else, so that
 /// line went. Continue sends that prompt itself (`EventWait.carryOnPrompt`), carrying
 /// the agent on now without the event; Cancel ends the wait with nothing to start it
-/// again.
+/// again. On a place in a line, Continue is "Carry on without build", and leaves the line
+/// (#3151).
 ///
 /// The question cards' shape, under them, since an agent waiting on an event is very like
 /// one waiting for an answer. Not tinted: nothing has gone wrong, and the chat is already
@@ -15,7 +16,6 @@ import SwiftUI
 struct WaitCard: View {
     let status: WaitStatus
     let eventWait: EventWait?
-    let isLineWait: Bool
     /// `AgentsModel.waitEventLines`: its events in words, sessions by their titles (#2747).
     var lines: [WaitEventLine] = []
     let continueNow: () async -> Void
@@ -25,8 +25,9 @@ struct WaitCard: View {
     @State private var busy = false
 
     var body: some View {
+        let line = eventWait?.lineResource
         VStack(alignment: .leading, spacing: 10) {
-            if let eventWait, eventWait.isOpen, !isLineWait {
+            if let eventWait, eventWait.isOpen, line == nil {
                 TimelineView(.periodic(from: .now, by: 20)) { context in
                     eventContent(eventWait, now: context.date)
                 }
@@ -38,7 +39,7 @@ struct WaitCard: View {
             HStack(spacing: 10) {
                 Spacer()
                 if status.cancellable {
-                    Button("Continue") {
+                    Button(line.map(EventWait.lineCarryOnLabel) ?? "Continue") {
                         busy = true
                         Task {
                             await continueNow()
@@ -46,7 +47,8 @@ struct WaitCard: View {
                         }
                     }
                     .buttonStyle(.paper)
-                    .help("Carry on now, without waiting for the event.")
+                    .help(line.map { "Leave the line for \($0.key) and carry on now, without it." }
+                        ?? "Carry on now, without waiting for the event.")
                     .disabled(busy || isDisabled)
                     Button("Cancel") {
                         busy = true

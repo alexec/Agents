@@ -158,6 +158,7 @@ test("a place in a lease's line is its wait card, said once (#2361)", () => {
   const agent = { id: "me", state: "finished", eventWait: { id: "w", from: 0, since: 0,
     patterns: [{ name: "lease.granted", filters: { agent: "me", resource: "build" } }] } };
   assert.equal(lines.lineResource(agent), "build");
+  assert.equal(lines.lineCarryOnPrompt("build"), "I've taken you out of the line for build. Carry on without it.");
   assert.equal(lines.lineResource({ ...agent, eventWait: { ...agent.eventWait, ending: { timedOut: {} } } }), undefined);
   assert.equal(lines.eventWaitLine(agent, title, snapshot), "◷ Waiting for Build · held by “Fix login” until 14:12 · 2nd in line");
   assert.equal(lines.eventWaitLine(agent, title), "◷ Waiting for your turn with build");

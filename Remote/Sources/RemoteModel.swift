@@ -1694,7 +1694,10 @@ final class RemoteModel {
     func carryOn(_ agentID: UUID) async { _ = await send(Block.carryOnPrompt, to: agentID) }
 
     /// Continue, on an event wait (#3052). See the Mac's `continueWaiting`.
-    func continueWaiting(of agentID: UUID) async { _ = await send(EventWait.carryOnPrompt, to: agentID) }
+    func continueWaiting(of agentID: UUID, line: ResourceName? = nil) async {
+        if line != nil { await cancelWait(of: agentID) }
+        _ = await send(line.map(EventWait.lineCarryOnPrompt) ?? EventWait.carryOnPrompt, to: agentID)
+    }
 
     /// What a guarded file was and is (#502), for the person deciding.
     func readGuardedChange(_ change: GuardedChange, for key: FolderKey) async -> GuardedChangeReading? {

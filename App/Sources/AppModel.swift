@@ -2039,11 +2039,14 @@ final class AppModel {
     }
 
     /// Continue, on an event wait (#3052): an ordinary prompt, as Carry on sends on a
-    /// block (039), which ends the wait itself.
-    func continueWaiting(of agentID: UUID) async {
+    /// block (039), which ends the wait itself. On a place in a line it cancels the wait
+    /// first, which leaves the line, since a prompt keeps the place (#3151).
+    func continueWaiting(of agentID: UUID, line: ResourceName? = nil) async {
+        if line != nil { await cancelWait(of: agentID) }
         await attempt(on: host(ofAgent: agentID)) {
             try await self.client(forAgent: agentID).call(DaemonAPI.Method.agentsPrompt,
-                                       DaemonAPI.PromptRequest(agentID: agentID, text: EventWait.carryOnPrompt))
+                                       DaemonAPI.PromptRequest(agentID: agentID,
+                                                               text: line.map(EventWait.lineCarryOnPrompt) ?? EventWait.carryOnPrompt))
         }
     }
 
