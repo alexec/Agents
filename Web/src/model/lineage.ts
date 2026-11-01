@@ -99,14 +99,15 @@ export function lineageRows(session: LineageNode, graph: LineageGraph, costs: Re
   const seen = new Set<string>();
   const nodes = graph.nodes.filter((n) => !same(n, session) && !seen.has(key(n)) && (seen.add(key(n)), true));
   const name = names(session, graph, title);
-  return nodes.map((n) => row(n, graph, costs, name, session));
+  const links = linksByNode(graph);
+  return nodes.map((n) => row(n, graph, costs, name, session, links));
 }
 
 /** The row for the start itself, a box of the graph: "This session", or the issue's or PR's name, its cost and
  * where it is (#3087). */
 export function startRow(start: LineageNode, graph: LineageGraph, costs: ReadonlyMap<string, LineageCostRollup>,
   title: (n: LineageNode) => string | undefined): LineageRow {
-  return { ...row(start, graph, costs, names(start, graph, title), start), links: [] };
+  return { ...row(start, graph, costs, names(start, graph, title), start, new Map()), links: [] };
 }
 
 function names(start: LineageNode, graph: LineageGraph, title: (n: LineageNode) => string | undefined) {
@@ -125,13 +126,21 @@ function refNumber(ref: string): string {
   return hash < 0 ? ref : ref.slice(hash);
 }
 
+/** Each node's links, either way, found once for every row (#3182): not a filter of every link per node. */
+function linksByNode(graph: LineageGraph): Map<string, LineageLink[]> {
+  const by = new Map<string, LineageLink[]>();
+  const add = (n: LineageNode, l: LineageLink) => { const list = by.get(key(n)) ?? []; list.push(l); by.set(key(n), list); };
+  for (const l of graph.links) { add(l.from, l); if (!same(l.from, l.to)) add(l.to, l); }
+  return by;
+}
+
 function row(n: LineageNode, graph: LineageGraph, costs: ReadonlyMap<string, LineageCostRollup>, name: (n: LineageNode) => string,
-  start: LineageNode): LineageRow {
+  start: LineageNode, links: ReadonlyMap<string, readonly LineageLink[]>): LineageRow {
   const rollup = costs.get(key(n));
   return {
     node: n, name: name(n),
     ref: graph.resolved?.[n.ref]?.title && name(n) !== nodeName(n) ? nodeName(n) : undefined,
-    links: graph.links.filter((l) => same(l.from, n) || same(l.to, n)).map((l) => linkLine(l, n, start, name)),
+    links: (links.get(key(n)) ?? []).map((l) => linkLine(l, n, start, name)),
     cost: rollup && costLine(rollup),
     resolved: resolvedLine(graph.resolved?.[n.ref]),
     session: n.kind === "session" ? n.ref.slice("session:".length) : undefined,
@@ -157,8 +166,9 @@ export interface GraphNode {
   /** The box's second line: "Issue · $4.00 · 12m working · merged". */
   detail: string;
 }
-/** One line of the graph: a link, from one box to another (by ref), named by its verb. */
-export interface GraphEdge { from: string; to: string; label: string; ended: boolean }
+/** One line of the graph: a link, from one box to another (by ref), named by its verb, and where its line goes,
+ * worked out once with the layout (#3182), not on each draw. */
+export interface GraphEdge { from: string; to: string; label: string; ended: boolean; curve: Curve }
 export interface LineageGraphLayout { nodes: GraphNode[]; edges: GraphEdge[]; width: number; height: number }
 
 /** A box's size and the room between them, as LineageLayout's. */
@@ -176,11 +186,9 @@ export interface Point { x: number; y: number }
 /** A cubic curve, and the point halfway along it. */
 export interface Curve { start: Point; c1: Point; c2: Point; end: Point; mid: Point }
 
-/** Where an edge's line goes: from the bottom or top of one box to the top or bottom of the other, or below a
- * tier for two boxes in it, with `mid` the point halfway for its label. */
-export function curve(g: LineageGraphLayout, edge: GraphEdge): Curve | undefined {
-  const a = g.nodes.find((n) => n.row.node.ref === edge.from), b = g.nodes.find((n) => n.row.node.ref === edge.to);
-  if (!a || !b) return undefined;
+/** Where a line from box a to box b goes: from the bottom or top of one box to the top or bottom of the other, or
+ * below a tier for two boxes in it, with `mid` the point halfway for its label. */
+function curve(a: Point, b: Point): Curve {
   const ax = a.x + box.width / 2, bx = b.x + box.width / 2;
   let start: Point, end: Point, c1: Point, c2: Point;
   if (a.y === b.y) {
@@ -241,16 +249,19 @@ export function lineageGraph(session: LineageNode, walked: LineageGraph, costs: 
     row: r, x: box.margin + (wide - span(row.length)) / 2 + i * (box.width + box.gap), y: box.margin + t * (box.height + box.tierGap),
     here: same(r.node, session), detail: detail(r, walked.resolved?.[r.node.ref]),
   })));
+  const at = new Map(nodes.map((n) => [key(n.row.node), n]));
+  // A line below the last tier needs room for its bend.
+  const lastY = nodes.at(-1)!.y;
+  let bends = false;
   const seen = new Set<string>();
   const edges = walked.links.flatMap((l) => {
     const id = `${l.from.ref}\n${l.rel}\n${l.to.ref}`;
-    if (!index.has(key(l.from)) || !index.has(key(l.to)) || seen.has(id)) return [];
+    const a = at.get(key(l.from)), b = at.get(key(l.to));
+    if (!a || !b || seen.has(id)) return [];
     seen.add(id);
-    return [{ from: l.from.ref, to: l.to.ref, label: l.rel.replaceAll("-", " "), ended: l.endedAt !== undefined }];
+    if (a.y === lastY && b.y === lastY) bends = true;
+    return [{ from: l.from.ref, to: l.to.ref, label: l.rel.replaceAll("-", " "), ended: l.endedAt !== undefined, curve: curve(a, b) }];
   });
-  // A line below the last tier needs room for its bend.
-  const last = tiers.at(-1)!;
-  const bends = edges.some((e) => [e.from, e.to].every((ref) => last.some((r) => r.node.ref === ref)));
   return { nodes, edges, width: 2 * box.margin + wide,
     height: 2 * box.margin + tiers.length * box.height + (tiers.length - 1) * box.tierGap + (bends ? box.arc : 0) };
 }

@@ -123,9 +123,9 @@ test("a line goes from tier to tier, or below its tier", () => {
   const g = l.lineageGraph(session, graph, new Map([[l.costKey(pr), rollup(pr, cost(4))]]), title);
   const p = (x, y) => ({ x, y });
   // This session (below) works on the issue (above): from its top to the issue's bottom.
-  assert.deepEqual(l.curve(g, g.edges[0]), { start: p(106, 124), c1: p(106, 96), c2: p(204, 96), end: p(204, 68), mid: p(155, 96) });
+  assert.deepEqual(g.edges[0].curve, { start: p(106, 124), c1: p(106, 96), c2: p(204, 96), end: p(204, 68), mid: p(155, 96) });
   // This session started the helper, beside it in its tier: below them.
-  assert.deepEqual(l.curve(g, g.edges[1]), { start: p(106, 176), c1: p(106, 216), c2: p(302, 216), end: p(302, 176), mid: p(204, 206) });
+  assert.deepEqual(g.edges[1].curve, { start: p(106, 176), c1: p(106, 216), c2: p(302, 216), end: p(302, 176), mid: p(204, 206) });
   assert.equal(g.nodes.find((n) => n.row.node.ref === pr.ref).detail, "Pull request · $4.00 · open");
   // With no PR, the sessions are the last tier, and the bend needs room.
   const noPR = l.lineageGraph(session, { nodes: [session, helper], links: [{ from: session, to: helper, rel: "started", source: "helper", at }] },
