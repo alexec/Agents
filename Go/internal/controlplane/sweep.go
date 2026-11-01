@@ -239,7 +239,8 @@ func sweep(ctx context.Context, rs *records.Records, now time.Time, most int, ev
 
 // sweepOrphans deletes, at most most, what outlived what it belonged to (#2293): the lease
 // of a host that has no record, once it has run out (an expired lease fences no copy),
-// and an org route's tombstone, with its secret, that its removal could not delete.
+// a host's folder list once its record is gone from the store too (#3125), and an org
+// route's tombstone, with its secret, that its removal could not delete.
 func sweepOrphans(ctx context.Context, rs *records.Records, now time.Time, most int) (int, error) {
 	s := rs.Store
 	deleted := 0
@@ -261,6 +262,30 @@ func sweepOrphans(ctx context.Context, rs *records.Records, now time.Time, most 
 		}
 		var lease hostLease
 		if object == nil || (json.Unmarshal(object.Data, &lease) == nil && lease.Expires.After(now)) {
+			continue
+		}
+		if err := s.Delete(ctx, k.Key); err != nil {
+			return deleted, err
+		}
+		deleted++
+	}
+	folders, err := s.List(ctx, projectFoldersPrefix)
+	if err != nil {
+		return deleted, err
+	}
+	for _, k := range folders {
+		if deleted >= most {
+			return deleted, nil
+		}
+		host := joinedHost(k.Key)
+		if rs.Host(host) != nil {
+			continue
+		}
+		// A machine that joined at another copy has a record this one has not read yet,
+		// and a removed one keeps its tombstone a while: either keeps its list.
+		if record, err := s.Get(ctx, records.HostKey(host)); err != nil {
+			return deleted, err
+		} else if record != nil {
 			continue
 		}
 		if err := s.Delete(ctx, k.Key); err != nil {
