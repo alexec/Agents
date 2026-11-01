@@ -37,11 +37,13 @@ type Item struct {
 	Checks, Review, Mergeable string
 }
 
-// SearchPage is a page of a search, the last updated first; Next is the cursor of the page
-// after it, "" at the end.
+// SearchPage is a page of a search, the last updated first. Cursors[i] goes on after Items[i],
+// so a caller that keeps only some of the page (the daemon, merging forges by time, #3209) goes
+// on from the last it kept; Next is the cursor of the page after it, "" at the end.
 type SearchPage struct {
-	Items []Item
-	Next  string
+	Items   []Item
+	Cursors []string
+	Next    string
 }
 
 // Comment is a comment on an item, as Markdown.
@@ -76,9 +78,9 @@ const pullFields = `isDraft mergeable reviewDecision autoMergeRequest { enabledA
   checkState: commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }`
 
 const searchQuery = `query($q: String!, $first: Int!, $after: String) {
-  search(query: $q, type: ISSUE, first: $first, after: $after) { pageInfo { hasNextPage endCursor } nodes {
+  search(query: $q, type: ISSUE, first: $first, after: $after) { pageInfo { hasNextPage endCursor } edges { cursor node {
     __typename ... on Issue { issueState: state ` + itemFields + ` }
-    ... on PullRequest { pullState: state ` + itemFields + ` ` + pullFields + ` } } } }`
+    ... on PullRequest { pullState: state ` + itemFields + ` ` + pullFields + ` } } } } }`
 
 // commentFields are the newest page of an item's comments, before $before.
 const commentFields = `comments(last: 50, before: $before) { pageInfo { hasPreviousPage startCursor }
@@ -194,7 +196,7 @@ func SearchQuery(repos []string, f SearchFilter) string {
 // the cursor after ("" for the first page).
 func (g *RealGitHub) Search(ctx context.Context, repos []string, f SearchFilter, after string, first int) (SearchPage, error) {
 	if len(repos) == 0 {
-		return SearchPage{Items: []Item{}}, nil
+		return SearchPage{Items: []Item{}, Cursors: []string{}}, nil
 	}
 	vars := map[string]any{"q": SearchQuery(repos, f), "first": max(1, min(first, perPage))}
 	if after != "" {
@@ -206,17 +208,21 @@ func (g *RealGitHub) Search(ctx context.Context, repos []string, f SearchFilter,
 				HasNextPage bool   `json:"hasNextPage"`
 				EndCursor   string `json:"endCursor"`
 			} `json:"pageInfo"`
-			Nodes []gqlItem `json:"nodes"`
+			Edges []struct {
+				Cursor string  `json:"cursor"`
+				Node   gqlItem `json:"node"`
+			} `json:"edges"`
 		} `json:"search"`
 	}
 	if err := g.graphql(ctx, searchQuery, vars, &data); err != nil {
 		return SearchPage{}, err
 	}
-	p := SearchPage{Items: []Item{}}
-	for _, n := range data.Search.Nodes {
+	p := SearchPage{Items: []Item{}, Cursors: []string{}}
+	for _, e := range data.Search.Edges {
 		// A search for issues can find nothing else, but a node it cannot read is empty.
-		if n.Number > 0 && n.Repository.NameWithOwner != "" {
+		if n := e.Node; n.Number > 0 && n.Repository.NameWithOwner != "" {
 			p.Items = append(p.Items, n.item())
+			p.Cursors = append(p.Cursors, e.Cursor)
 		}
 	}
 	if data.Search.PageInfo.HasNextPage {

@@ -104,6 +104,8 @@ var (
 	issueLabel  = regexp.MustCompile(`^#([0-9]{1,9})$`)
 	prLabel     = regexp.MustCompile(`^P#([0-9]{1,9})$`)
 	linearLabel = regexp.MustCompile(`^[A-Z][A-Z0-9]{0,9}-[0-9]{1,9}$`)
+	// linearTeam is a Linear team's key, as ENG.
+	linearTeam = regexp.MustCompile(`^[A-Z][A-Z0-9]{0,9}$`)
 )
 
 // labelNode is the issue or PR a label names, in the folder's repo: #n, P#n, or a Linear
