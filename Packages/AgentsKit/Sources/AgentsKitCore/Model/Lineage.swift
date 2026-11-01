@@ -37,16 +37,37 @@ public extension DaemonAPI {
     }
 
     /// `lineage/walk`'s answer: the nodes reached and the links gone along. `limited` says the
-    /// walk stopped at its limit on nodes.
+    /// walk stopped at its limit on nodes. `resolved` is each node's title, state and labels from
+    /// its connector, by ref, for the nodes a connector could resolve (#3089).
     struct LineageGraph: Codable, Sendable, Hashable {
         public var nodes: [LineageNode]
         public var links: [LineageLink]
         public var limited: Bool?
+        public var resolved: [String: LineageResolved]?
 
-        public init(nodes: [LineageNode] = [], links: [LineageLink] = [], limited: Bool? = nil) {
+        public init(nodes: [LineageNode] = [], links: [LineageLink] = [], limited: Bool? = nil,
+                    resolved: [String: LineageResolved]? = nil) {
             self.nodes = nodes
             self.links = links
             self.limited = limited
+            self.resolved = resolved
+        }
+    }
+
+    /// A node's title, state and labels from its connector (#3089), resolved and cached on the
+    /// daemon: `github:alexec/Agents#12` becomes its real title, not a guess from the ref.
+    /// `state` is open, closed or merged (a pull request's; an issue's is open or closed); nil
+    /// when the connector did not say. `labels` is empty when it has none. Resolved for a GitHub
+    /// or GitLab issue or pull request only; Linear, milestones and releases are not resolved yet.
+    struct LineageResolved: Codable, Sendable, Hashable {
+        public var title: String
+        public var state: String?
+        public var labels: [String]?
+
+        public init(title: String, state: String? = nil, labels: [String]? = nil) {
+            self.title = title
+            self.state = state
+            self.labels = labels
         }
     }
 
@@ -129,6 +150,8 @@ public enum LineageList {
         public var links: [String]
         /// "$4.00 · 12m working · merged", for an issue or a PR whose cost has come.
         public var cost: String?
+        /// "open · bug, area:lineage", its state and labels from its connector (#3089).
+        public var resolved: String?
         /// Where it is on its tracker, for a GitHub issue or PR.
         public var url: URL?
         /// The session it is, for a session node.
@@ -145,15 +168,26 @@ public enum LineageList {
         var seen = Set<Node>()
         let nodes = graph.nodes.filter { $0 != session && seen.insert($0).inserted }
         let name = { (n: Node) -> String in
-            n == session ? "This session" : title(n) ?? ReportValueWords.name(n)
+            if n == session { return "This session" }
+            return title(n) ?? graph.resolved?[n.ref]?.title ?? ReportValueWords.name(n)
         }
         return nodes.map { n in
             Row(node: n, name: name(n),
                 links: graph.links.filter { $0.from == n || $0.to == n }.map { line($0, of: n, session: session, name: name) },
                 cost: costs[n].map { costLine($0) },
+                resolved: resolvedLine(graph.resolved?[n.ref]),
                 url: ReportValueWords.url(n).map { pullRequest(n, $0) },
                 session: n.kind == "session" ? UUID(uuidString: String(n.ref.dropFirst("session:".count))) : nil)
         }
+    }
+
+    /// "open · bug, area:lineage", from a node's resolved state and labels; nil with neither.
+    static func resolvedLine(_ r: DaemonAPI.LineageResolved?) -> String? {
+        guard let r else { return nil }
+        var parts: [String] = []
+        if let state = r.state { parts.append(state) }
+        if let labels = r.labels, !labels.isEmpty { parts.append(labels.joined(separator: ", ")) }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     /// A PR's page, not its issue's: GitHub sends /issues/ to /pull/ but not the other way.

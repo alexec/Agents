@@ -73,6 +73,15 @@ struct LineageLayoutTests {
         #expect(g.node(release.ref)?.detail == "Release")
     }
 
+    /// #3089: a resolved node's state and labels show in its box when nothing is banked on it.
+    @Test func aResolvedNodeShowsInItsBox() throws {
+        var resolvedGraph = graph
+        resolvedGraph.resolved = [issue.ref: .init(title: "Fix the flaky test", state: "open", labels: ["bug"])]
+        let g = LineageLayout.graph(of: session, graph: resolvedGraph, costs: [:], title: title)
+        #expect(g.node(issue.ref)?.detail == "Issue · open · bug")
+        #expect(g.node(issue.ref)?.row.name == "Fix the flaky test")
+    }
+
     @Test func aTierFollowsTheOrderOfTheBoxesAboveIt() {
         let other = Node(kind: "issue", ref: "github:alexec/agents#1")
         let otherPR = Node(kind: "pr", ref: "github:alexec/agents#2")

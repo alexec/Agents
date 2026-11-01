@@ -3714,12 +3714,14 @@ export interface LineageEndRequest {
 
 /**
  * lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the
- * walk stopped at its limit on nodes, so there is more.
+ * walk stopped at its limit on nodes, so there is more. resolved is each node's title, state and
+ * labels from its connector, by ref, for the nodes a connector could resolve (#3089).
  */
 export interface LineageGraph {
   nodes: LineageNode[];
   links: LineageLink[];
   limited?: boolean;
+  resolved?: Record<string, LineageResolved>;
 }
 
 /**
@@ -3775,6 +3777,19 @@ export interface LineageNode {
 export interface LineageNodeRequest {
   node: LineageNode;
   depth?: number;
+}
+
+/**
+ * A node's title, state and labels from its connector (#3089), resolved and cached on the daemon so
+ * a lineage renderer shows "Fix flaky test" rather than its ref. state is open, closed or merged (a
+ * pull request's; an issue's is open or closed); absent when the connector does not say. labels is
+ * empty when it has none. Resolved for a GitHub or GitLab issue or pull request only; Linear,
+ * milestones and releases are not resolved yet.
+ */
+export interface LineageResolved {
+  title: string;
+  state?: string;
+  labels?: string[];
 }
 
 export interface ListCursor {
@@ -10003,12 +10018,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["project", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "endedAt"] },
   LineageCostRollup: { required: ["node", "own", "total", "waste", "unlinked", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "parts"], optional: ["limited"] },
   LineageEndRequest: { required: ["from", "to", "rel"], optional: [] },
-  LineageGraph: { required: ["nodes", "links"], optional: ["limited"] },
+  LineageGraph: { required: ["nodes", "links"], optional: ["limited", "resolved"] },
   LineageLink: { required: ["from", "to", "rel", "source", "at"], optional: ["endedAt"] },
   LineageLinkRequest: { required: ["from", "to", "rel", "source"], optional: [] },
   LineageLinks: { required: ["links"], optional: ["limited"] },
   LineageNode: { required: ["kind", "ref"], optional: [] },
   LineageNodeRequest: { required: ["node"], optional: ["depth"] },
+  LineageResolved: { required: ["title"], optional: ["state", "labels"] },
   ListCursor: { required: ["lastActivityAt", "id"], optional: ["archivedAt"] },
   ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query"] },
   ListedSkill: { required: ["name", "folder"], optional: ["description", "managed"] },

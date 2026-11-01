@@ -1,7 +1,7 @@
 // A session's Lineage pane (#2940), as LineageList has it on the window: the nodes the session is
 // linked to, from lineage/walk (depth 2), each with its links and, for an issue or a PR, what
 // lineage/cost says was banked on it.
-import type { LineageCostRollup, LineageGraph, LineageLink, LineageNode } from "../protocol/generated";
+import type { LineageCostRollup, LineageGraph, LineageLink, LineageNode, LineageResolved } from "../protocol/generated";
 import { timeWords } from "./time";
 import { costWords, nodeName, nodeUrl, spent } from "./value";
 
@@ -21,6 +21,8 @@ export interface LineageRow {
   links: string[];
   /** "$4.00 · 12m working · merged", for an issue or a PR whose cost has come. */
   cost?: string | undefined;
+  /** "open · bug, area:lineage", its state and labels from its connector (#3089). */
+  resolved?: string | undefined;
   /** The session it is, for a session node. */
   session?: string | undefined;
   /** Where a GitHub issue, PR or milestone is, as LineageList.Row.url has it. */
@@ -70,18 +72,26 @@ export function costLine(r: LineageCostRollup): string {
   return parts.length === 0 ? "Nothing banked yet" : parts.join(" · ");
 }
 
+/** "open · bug, area:lineage", from a node's resolved state and labels; undefined with neither. */
+function resolvedLine(r: LineageResolved | undefined): string | undefined {
+  if (!r) return undefined;
+  const parts = [...r.state ? [r.state] : [], ...r.labels && r.labels.length > 0 ? [r.labels.join(", ")] : []];
+  return parts.length === 0 ? undefined : parts.join(" · ");
+}
+
 /** A row for each node the walk reached, once, in the walk's order, the session itself left out. */
 export function lineageRows(session: LineageNode, graph: LineageGraph, costs: ReadonlyMap<string, LineageCostRollup>,
   title: (n: LineageNode) => string | undefined): LineageRow[] {
   const seen = new Set<string>();
   const nodes = graph.nodes.filter((n) => !same(n, session) && !seen.has(key(n)) && (seen.add(key(n)), true));
-  const name = (n: LineageNode) => same(n, session) ? "This session" : title(n) ?? nodeName(n);
+  const name = (n: LineageNode) => same(n, session) ? "This session" : title(n) ?? graph.resolved?.[n.ref]?.title ?? nodeName(n);
   const rows: LineageRow[] = nodes.map((n) => {
     const rollup = costs.get(key(n));
     return {
       node: n, name: name(n),
       links: graph.links.filter((l) => same(l.from, n) || same(l.to, n)).map((l) => linkLine(l, n, session, name)),
       cost: rollup && costLine(rollup),
+      resolved: resolvedLine(graph.resolved?.[n.ref]),
       session: n.kind === "session" ? n.ref.slice("session:".length) : undefined,
       url: lineageUrl(n),
     };
@@ -184,7 +194,7 @@ export function lineageGraph(session: LineageNode, walked: LineageGraph, costs: 
   const wide = span(Math.max(...tiers.map((t) => t.length)));
   const nodes = tiers.flatMap((row, t) => row.map((r, i) => ({
     row: r, x: box.margin + (wide - span(row.length)) / 2 + i * (box.width + box.gap), y: box.margin + t * (box.height + box.tierGap),
-    here: same(r.node, session), detail: [kindWord(r.node.kind), ...r.cost ? [r.cost] : []].join(" · "),
+    here: same(r.node, session), detail: [kindWord(r.node.kind), ...r.cost ? [r.cost] : [], ...r.resolved ? [r.resolved] : []].join(" · "),
   })));
   const seen = new Set<string>();
   const edges = walked.links.flatMap((l) => {

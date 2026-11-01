@@ -23,6 +23,7 @@ type lineageBook struct {
 	prCommentBook
 	issueMilestoneBook
 	releaseTagsBook
+	lineageResolveBook
 }
 
 func (d *Daemon) lineagePath() string { return filepath.Join(d.Store.Loc.Root, "lineage.jsonl") }
@@ -56,11 +57,11 @@ func (d *Daemon) registerLineage() {
 	On(d, wire.CallLineageLinks, func(_ context.Context, _ *Client, r wire.LineageNodeRequest) (wire.LineageLinks, error) {
 		return d.lineage().Links(r.Node), nil
 	})
-	On(d, wire.CallLineageWalk, func(_ context.Context, _ *Client, r wire.LineageNodeRequest) (wire.LineageGraph, error) {
+	On(d, wire.CallLineageWalk, func(ctx context.Context, _ *Client, r wire.LineageNodeRequest) (wire.LineageGraph, error) {
 		depth := 0
 		if r.Depth != nil {
 			depth = int(*r.Depth)
 		}
-		return d.lineage().Walk(r.Node, depth), nil
+		return d.resolvedGraph(ctx, d.lineage().Walk(r.Node, depth)), nil
 	})
 }

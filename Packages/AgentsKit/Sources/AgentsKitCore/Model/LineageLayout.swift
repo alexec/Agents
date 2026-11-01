@@ -8,7 +8,7 @@ public enum LineageLayout {
 
     /// The row for this session itself, a box of the graph.
     public static func here(_ session: Node) -> LineageList.Row {
-        LineageList.Row(node: session, name: "This session", links: [], cost: nil, url: nil, session: nil)
+        LineageList.Row(node: session, name: "This session", links: [], cost: nil, resolved: nil, url: nil, session: nil)
     }
 
     /// One box of the graph, its top-left corner in points.
@@ -143,7 +143,8 @@ public enum LineageLayout {
                 nodes.append(GraphNode(row: row, x: margin + (wide - span(tier.count)) / 2 + Double(i) * (boxWidth + gap),
                                        y: margin + Double(t) * (boxHeight + tierGap),
                                        here: row.node == session,
-                                       detail: ([kindWord(row.node.kind)] + (row.cost.map { [$0] } ?? [])).joined(separator: " · ")))
+                                       detail: ([kindWord(row.node.kind)] + (row.cost.map { [$0] } ?? [])
+                                           + (row.resolved.map { [$0] } ?? [])).joined(separator: " · ")))
             }
         }
         var seen = Set<String>()
