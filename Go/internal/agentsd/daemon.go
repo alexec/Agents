@@ -99,6 +99,7 @@ type Daemon struct {
 	forgeBook
 	orgPolicyState
 	orgRouteState
+	teamPeopleCache
 	// pageEdits is what the person changed on live pages since each agent's last turn.
 	pageEdits  pageEdits
 	policyOnce sync.Once

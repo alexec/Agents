@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/connections"
+	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -23,34 +26,86 @@ var teamFeedingTools = map[string]bool{"show_pull_requests": true, "show_issues"
 
 // teamMeta is the feeding tool's _meta: nil with no control plane, or it could not say.
 func (d *Daemon) teamMeta(ctx context.Context, folder string) map[string]any {
-	people := d.teamPeople(ctx)
+	people := d.cachedTeamPeople(ctx)
 	if people == nil {
 		return nil
 	}
 	meta := map[string]any{"people": people}
-	if prs, issues := d.agentOnByNumber(folder); len(prs) > 0 || len(issues) > 0 {
-		if len(prs) > 0 {
-			meta["agentOnPR"] = prs
-		}
-		if len(issues) > 0 {
-			meta["agentOnIssue"] = issues
-		}
+	prs, issues, linear := d.agentOnIt(folder)
+	if len(prs) > 0 {
+		meta["agentOnPR"] = prs
 	}
-	// A Linear key (ENG-4) is not a folder's repo's own: any of this machine's own sessions
-	// labelled one is on it, whichever folder it is in.
-	if linear := d.agentOnByLinearKey(); len(linear) > 0 {
+	if len(issues) > 0 {
+		meta["agentOnIssue"] = issues
+	}
+	if len(linear) > 0 {
 		meta["agentOnLinear"] = linear
 	}
 	return meta
 }
 
-// teamPeople is people/forViews, with the viewer's own entry's blank forge logins filled
-// in from this machine's own connection, when it is signed in (#2951's open question).
-func (d *Daemon) teamPeople(ctx context.Context) []map[string]any {
+// The people a view call is given are kept for teamPeopleFresh (#3108): a person opens and
+// refreshes these views many times a day, and each call asked the control plane and read
+// the Keychain before the server was called at all. An answer older than that is still
+// given, and a fresh one is asked for behind it; only the first call waits, for at most
+// teamPeopleWait. A new control-plane link (join, leave, rejoin) starts again.
+const (
+	teamPeopleFresh = time.Minute
+	teamPeopleWait  = 5 * time.Second
+)
+
+// teamPeopleCache is cachedTeamPeople's answer and which control-plane link it came from.
+type teamPeopleCache struct {
+	teamPeopleMu     sync.Mutex
+	teamPeopleAsk    *askControl
+	teamPeopleList   []map[string]any
+	teamPeopleAt     time.Time
+	teamPeopleAsking bool
+}
+
+// cachedTeamPeople is teamPeople, kept for teamPeopleFresh.
+func (d *Daemon) cachedTeamPeople(ctx context.Context) []map[string]any {
 	ask := d.askControl.Load()
 	if ask == nil {
 		return nil
 	}
+	d.teamPeopleMu.Lock()
+	if d.teamPeopleAsk == ask && d.teamPeopleList != nil {
+		list := d.teamPeopleList
+		if nowFunc().Sub(d.teamPeopleAt) >= teamPeopleFresh && !d.teamPeopleAsking {
+			d.teamPeopleAsking = true
+			safe.Go("ask the control plane's people for views", func() {
+				ctx, cancel := context.WithTimeout(d.ctx, teamPeopleWait)
+				defer cancel()
+				d.keepTeamPeople(ask, d.teamPeople(ctx, ask))
+			})
+		}
+		d.teamPeopleMu.Unlock()
+		return list
+	}
+	d.teamPeopleMu.Unlock()
+	ctx, cancel := context.WithTimeout(ctx, teamPeopleWait)
+	defer cancel()
+	list := d.teamPeople(ctx, ask)
+	d.keepTeamPeople(ask, list)
+	return list
+}
+
+// keepTeamPeople keeps an answer from ask's link; nil (it could not say) keeps what was
+// kept, to be asked again next call.
+func (d *Daemon) keepTeamPeople(ask *askControl, list []map[string]any) {
+	d.teamPeopleMu.Lock()
+	defer d.teamPeopleMu.Unlock()
+	d.teamPeopleAsking = false
+	if list == nil {
+		return
+	}
+	d.teamPeopleAsk, d.teamPeopleList, d.teamPeopleAt = ask, list, nowFunc()
+}
+
+// teamPeople is people/forViews, with the viewer's own entry's blank forge logins filled
+// in from this machine's own connection, when it is signed in (#2951's open question).
+func (d *Daemon) teamPeople(ctx context.Context, ask *askControl) []map[string]any {
 	raw, err := (*ask)(ctx, wire.CallPeopleForViews.Name, wire.Empty{})
 	if err != nil {
 		return nil
@@ -112,42 +167,15 @@ func connectionLogin(s connections.Store, provider string) string {
 	return c.Login
 }
 
-// agentOnByNumber is "An agent is on it" (#2951): this folder's repo's own sessions
-// labelled #n or P#n, by number, never another person's machines (this daemon's own Store
-// is this machine's own). An archived session is not on it any more.
-func (d *Daemon) agentOnByNumber(folder string) (prs, issues map[string]string) {
+// agentOnIt is "An agent is on it" (#2951), from one pass over this machine's own
+// sessions (#3108); an archived session is not on it any more.
+//   - prs and issues: this folder's repo's own sessions labelled #n or P#n, by number,
+//     never another person's machines (this daemon's own Store is this machine's own).
+//   - linear: sessions labelled a Linear key (ENG-4), by key, in whichever folder they are
+//     in: a Linear issue is not one folder's own.
+func (d *Daemon) agentOnIt(folder string) (prs, issues, linear map[string]string) {
 	repo := d.folderRepo(folder)
-	if repo.forge == "" {
-		return nil, nil
-	}
-	prs, issues = map[string]string{}, map[string]string{}
-	for _, a := range d.Store.Agents() {
-		if a.State == wire.AgentStateArchived {
-			continue
-		}
-		if d.folderRepo(folderPath(&a)) != repo {
-			continue
-		}
-		title := "an agent"
-		if a.Title != nil && strings.TrimSpace(*a.Title) != "" {
-			title = strings.TrimSpace(*a.Title)
-		}
-		for _, l := range a.Labels {
-			if m := issueLabel.FindStringSubmatch(l.Value); m != nil {
-				issues[m[1]] = title
-			} else if m := prLabel.FindStringSubmatch(l.Value); m != nil {
-				prs[m[1]] = title
-			}
-		}
-	}
-	return prs, issues
-}
-
-// agentOnByLinearKey is "An agent is on it" for Linear (#2951): this machine's own
-// sessions labelled a Linear key (ENG-4), by key, in whichever folder they are in: a Linear
-// issue is not one folder's own. An archived session is not on it any more.
-func (d *Daemon) agentOnByLinearKey() map[string]string {
-	out := map[string]string{}
+	prs, issues, linear = map[string]string{}, map[string]string{}, map[string]string{}
 	for _, a := range d.Store.Agents() {
 		if a.State == wire.AgentStateArchived {
 			continue
@@ -156,11 +184,32 @@ func (d *Daemon) agentOnByLinearKey() map[string]string {
 		if a.Title != nil && strings.TrimSpace(*a.Title) != "" {
 			title = strings.TrimSpace(*a.Title)
 		}
+		// The folder's repo only when a label could use it.
+		inRepo, asked := false, false
 		for _, l := range a.Labels {
 			if linearLabel.MatchString(l.Value) {
-				out[l.Value] = title
+				linear[l.Value] = title
+				continue
+			}
+			if repo.forge == "" {
+				continue
+			}
+			im, pm := issueLabel.FindStringSubmatch(l.Value), prLabel.FindStringSubmatch(l.Value)
+			if im == nil && pm == nil {
+				continue
+			}
+			if !asked {
+				inRepo, asked = d.folderRepo(folderPath(&a)) == repo, true
+			}
+			if !inRepo {
+				continue
+			}
+			if im != nil {
+				issues[im[1]] = title
+			} else {
+				prs[pm[1]] = title
 			}
 		}
 	}
-	return out
+	return prs, issues, linear
 }
