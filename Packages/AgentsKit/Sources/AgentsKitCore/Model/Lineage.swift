@@ -143,6 +143,8 @@ public enum LineageList {
     /// How many times, a second apart, the pane walks again while the daemon is still
     /// resolving titles (#3102).
     public static let resolvingAsks = 20
+    /// Under the graph while those walks go on (#3154).
+    public static let readingTitles = "Reading titles…"
 
     public static func node(ofSession id: UUID) -> Node {
         Node(kind: "session", ref: "session:\(id.uuidString)")

@@ -10,6 +10,8 @@ export const lineageDepth = 2;
 
 /** How many times, a second apart, the pane walks again while the daemon is still resolving titles (#3102). */
 export const resolvingAsks = 20;
+/** Under the graph while those walks go on (#3154). */
+export const readingTitles = "Reading titles…";
 
 export const sessionNode = (id: string): LineageNode => ({ kind: "session", ref: `session:${id}` });
 
