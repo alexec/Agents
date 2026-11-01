@@ -219,6 +219,25 @@ exists.
   role, an MCP tool, or a workflow — the same restriction `policy/setYours` already places on
   changing **your** policy layer (FR-004's own intent: an agent cannot turn on its own
   permission to drive the screen).
+- **Decided (US2's build, amending this row's card): no `DesktopControlRefusalCard.swift`
+  or web twin. The refusal's words reach the person as `drive_screen`'s own plain error
+  text, not a dedicated card. Alex can overrule.** `drive_screen` is an app tool: a failed
+  call's result crosses into the runtime over MCP's `tools/call`
+  (`Go/internal/agentsd/apptools.go:449-452`), which keeps only `Error.Message` and drops
+  `Error.Data` — the same boundary every other app tool's refusal already crosses (`Invalid`,
+  `leaseRefused`, `notPermitted`; confirmed no app-tool refusal anywhere in this repo reaches
+  a client as a dedicated card). `DesktopControlRefusal`'s `words` is still written as a
+  clear, complete sentence naming the rule and where to fix it (FR-004, FR-005), so the
+  runtime's own rendering of a failed tool call already satisfies both FRs; a Swift struct
+  and card that decode `error.data` would be unreachable dead code, since no client ever
+  sees that structured payload for a tool call this shape. `wire.DesktopControlRefusal`
+  itself is kept (data-model.md's contract, and the Go handler's own test,
+  `screensettings_test.go`), since it still documents the shape and reason cleanly on the Go
+  side even though it crosses no further. A later story (the live tile, US4) already adds
+  its own notifications (`desktopControl/liveFrame`, `desktopControl/stateChanged`)
+  specifically because the ordinary tool pipeline cannot carry rich state (R7); if a visual
+  card for this refusal is wanted later, it would ride a notification of that shape, not the
+  tool call's own result.
 
 ### R6. One tool, `drive_screen`, with an action field — not one tool per verb
 

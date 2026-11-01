@@ -444,6 +444,10 @@ public enum DaemonAPI {
         /// "Use runtime default (Off)"; setting is the Mac's alone.
         public static let sandboxState = "sandbox/state"
         public static let sandboxSet = "sandbox/set"
+        /// Desktop control's own off-by-default switch (#3004, US2): whether `drive_screen`
+        /// may run at all. Setting is the person's own clients only.
+        public static let desktopControlState = "desktopControl/state"
+        public static let desktopControlSet = "desktopControl/set"
         /// One agent's override (nil clears it), and the card's recovery (064).
         public static let agentsSetSandbox = "agents/setSandbox"
         public static let agentsAnswerSandbox = "agents/answerSandbox"

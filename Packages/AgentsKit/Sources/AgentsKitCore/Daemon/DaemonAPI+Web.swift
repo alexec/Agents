@@ -61,6 +61,10 @@ public extension DaemonAPI {
                 Row(Method.runtimesAccountProfiles, params: Empty.self, result: [AccountProfile].self, kind: .hostRequest),
                 // Each runtime's sandbox default, for the new session's "Use runtime default (…)" (#257).
                 Row(Method.sandboxState, params: Empty.self, result: SandboxSettings.self, kind: .hostRequest),
+                // Desktop control's own off-by-default switch (#3004, US2), for Settings.
+                Row(Method.desktopControlState, params: Empty.self, result: DesktopControlSettings.self, kind: .hostRequest),
+                Row(Method.desktopControlSet, params: DesktopControlSettings.self, result: DesktopControlSettings.self,
+                    kind: .hostRequest),
                 // Auto (#2658): the order and cells, what it would pick now.
                 Row(Method.autoState, params: Empty.self, result: AutoSettings.self, kind: .hostRequest),
                 Row(Method.autoSet, params: AutoSettings.self, result: AutoSettings.self, kind: .hostRequest),
