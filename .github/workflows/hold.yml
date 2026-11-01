@@ -1,10 +1,10 @@
 # Fails while a pull request has a `hold:v*` label (#2931), so a held PR cannot merge.
 #
-# While a patch milestone is open, only bug fixes merge: an enhancement PR gets
-# `hold:v<x.y.z>` with auto-merge off, and the release lifts the hold when the patch ships
-# (AGENTS.md, "A minor release is followed by a patch"; release skill, step 9, item 4).
-# Nothing checked the label: in v0.13.1, #2888 had auto-merge turned on again under its
-# hold and merged during the patch.
+# Patch milestones held enhancement PRs with `hold:v<x.y.z>` until the patch shipped (#2801),
+# and in v0.13.1 #2888 merged under its hold because nothing checked the label. #3212 ended
+# patch milestones, so nothing labels a PR this way as a rule any more. The check stays
+# because `main`'s ruleset requires it, and a hold set by hand still stops a merge; the
+# release takes any `hold:v*` label off (release skill, step 9, item 3).
 #
 # The `hold` job fails while the label is on and passes when it comes off; `main`'s
 # ruleset requires it. When auto-merge is turned on under a hold, the job also turns it

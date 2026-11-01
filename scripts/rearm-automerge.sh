@@ -18,7 +18,8 @@
 # re-armed before at the same head is listed for a person to look at.
 #
 # A PR labelled `hold:v*` waits for that release to ship (#2931): this script never arms it.
-# Only the release takes the label off and turns auto-merge on.
+# Only the release takes the label off and turns auto-merge on. Since #3212 there are no patch
+# milestones, so nothing labels a PR this way as a rule; a hold set by hand still works.
 #
 # GH_REPO picks the repository, as for gh; by default it is this checkout's.
 set -euo pipefail

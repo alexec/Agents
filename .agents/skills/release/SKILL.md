@@ -1,6 +1,6 @@
 ---
 name: release
-description: Take main to a new version with nobody watching (#914), started by Alex. A minor (x.y.0) is followed by a bugs-only patch (x.y.1) that skips the reviews (#2801). For a minor, run the eight reviews and checks once each on what changed since the last tag, have the high findings fixed through the Scrum Master's lanes (medium security advisories get one release of grace, then go to the Scrum Master as priority work), check the gate, choose the version, check its milestone, write the notes, tag and push, check the GitHub release and both TestFlight builds, deploy the live control plane, close the milestone, make the patch milestone after a minor or unpark the next minor after a patch, and review how the release went. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
+description: Take main to a new version with nobody watching (#914), started by Alex. Every release is a minor (x.y.0), with no patch after it (#3212). Run the eight reviews and checks once each on what changed since the last tag, have the high findings fixed through the Scrum Master's lanes (medium security advisories get one release of grace, then go to the Scrum Master as priority work), check the gate, choose the version, check its milestone, write the notes, tag and push, check the GitHub release and both TestFlight builds, deploy the live control plane, close the milestone, unpark the next one, and review how the release went. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
 ---
 
 # Release
@@ -13,19 +13,15 @@ is pushed. This skill decides when the tag is pushed, and what it says.
 Alex decided (2026-10-13, #914):
 
 - **When the gate passes, push the tag.** Do not ask for approval. Alex has already started the release.
-- **Version:** minor when an `enhancement` merged since the last tag, otherwise patch.
+- **Version:** every release is a minor, x.y.0 (Alex, 2026-11-01, #3212). There are no
+  patch releases and no patch milestones (#3212 replaces #2801 and #2779): bugs have no
+  milestone, a standing bug lane fixes them, and a release ships what is on `main`.
   1.0 and major versions only when Alex says. An enhancement counts only when its files
   change a client's UI, the host or daemon, or the capability list (#2857); the plan lists
-  a tooling, workflow or docs enhancement as `[tooling]`, and it does not make a minor.
-- **Every minor release runs the eight reviews and checks once each** (#1462, #1557, #2161):
+  a tooling, workflow or docs enhancement as `[tooling]`.
+- **Every release runs the eight reviews and checks once each** (#1462, #1557, #2161):
   security, performance, HADR, dead code, runtimes, usability, competitors and the feature
   matrix.
-- **Two paths: minor and patch** (Alex, 2026-10-27, #2801). `release-plan.py`'s `path:` says
-  which. A **minor** (x.y.0) does every step. A **patch** (x.y.z, z > 0) only fixes bugs: it
-  skips steps 2, 3 and 4 (the reviews and checks, and their fixes), and keeps the rest: one
-  release a day, the gate, the notes, the tag, the GitHub release, both TestFlight builds,
-  the control plane deploy, closing the milestone and the release review. Every minor is
-  followed by one patch, x.y.1 (step 9).
 - **Scope is what changed** (#1462): the reviews read only `main` since the last tag.
   Step 3 also carries forward open medium security advisories from earlier releases.
   Older open issues are not this release's.
@@ -36,10 +32,10 @@ Alex decided (2026-10-13, #914):
 - **Only high blocks** (Alex, 2026-10-19, #1661). The release tags as soon as no high is
   open; it never waits for a medium fix. Other medium findings are filed with
   `priority:medium`, listed as known issues, and worked by the ordinary lanes after the
-  release (a bug in the next milestone, the rest as labelled). Low is recorded and not
+  release (a bug with no milestone, for the bug lane; the rest as labelled). Low is recorded and not
   worked.
 - **A version has a milestone** (#1348): `0.5.0` is the milestone whose title starts
-  with `0.5 `, and `0.12.3` the one whose title starts with `0.12.3 ` (#2801). The milestone
+  with `0.5 `. The milestone
   is done when its release has shipped, and this skill closes it then (step 9).
 - **Security findings stay private** until they ship: a draft GitHub security advisory
   per finding, fixed on its private fork. Medium advisories get one release of grace,
@@ -81,12 +77,8 @@ calendar day in America/Los_Angeles, not 24 hours since the tag.
 ## 1. Is a release due?
 
 1. Note the time T0, then `git fetch --quiet --tags origin main`.
-2. `.agents/skills/release/scripts/release-plan.py`. It prints the last tag, the next
-   version and the path. If it says nothing merged since the last tag, end with
-   `nothing_to_do`.
-3. **A patch** (`path: patch`, #2801): go to step 5. It runs no reviews or checks, and has
-   no findings to fix. When the plan prints `differs:` because an enhancement merged, ask
-   Alex now, as in step 6; when Alex picks the minor version, take the minor path.
+2. `.agents/skills/release/scripts/release-plan.py`. It prints the last tag and the next
+   version. If it says nothing merged since the last tag, end with `nothing_to_do`.
 
 ## 2. Reviews and checks, once each
 
@@ -156,7 +148,8 @@ session not archived whose title has "scrum master" in it, any case, and that is
 `lead`): the high issues in priority order (security, performance, HADR, usability, runtimes,
 the rest), then carried-over medium security advisory URLs as priority work. Say that the
 release waits for high issues and never waits for a medium advisory. Other medium issues
-go to the ordinary lanes after the release as their label and milestone say.
+go to the ordinary lanes after the release as their label and milestone say (a bug to the
+bug lane).
 
 **No Scrum Master running, and work to hand over** (#1908; in v0.7.0 the highs sat
 40 minutes with no owner): start one when there are high issues or carried-over medium
@@ -251,7 +244,7 @@ again and `origin/main` has moved, run `release-plan.py --after <sha>`:
 - `verdict: keep the pin`: go on with the same `<sha>`. What merged after it goes out in the
   next release.
 - `verdict: start over on origin/main`: a PR after the pin fixes a blocking issue
-  (`priority:high`, and on the patch path `priority:medium` bugs too), so the tag must hold
+  (`priority:high`), so the tag must hold
   it. Re-pick the newest main and start the gate over on it from item 1. A dry run on the
   old pin may go on or be cancelled; neither is a failure.
 - Also start over when a high security advisory's fix (`Fixed by <commit>` or its fix
@@ -273,11 +266,7 @@ open for item 2 and for the notes' known issues (`git merge-base --is-ancestor <
    run on `<sha>` failed, end with `partly_done`; main broken is fixed by its own PR,
    through the Scrum Master.
 2. **No open high:** none of step 3's high issues is open, and none of its high security
-   advisories is without its fix. **For a patch** (#2801), instead: no `priority:high` or
-   `priority:medium` bug is open in its milestone. Two days after the last tag
-   (America/Los_Angeles), the patch goes out with what is still open, as known issues; a low
-   bug never holds it. Before then, wait as in step 4 for `issue.closed` and `pr.merged`,
-   until the two days are up.
+   advisories is without its fix.
 3. **Walks:** `gh issue list --label needs-walk --state open` holds at most five.
    More than five: end with `partly_done`, naming them; walks are the Scrum Master's to start.
 4. **No tag today** (#2462): look again as in step 0. The release can run past midnight, so a
@@ -299,9 +288,9 @@ open for item 2 and for the notes' known issues (`git merge-base --is-ancestor <
 
 1. Run `release-plan.py --ref <sha>` again, so the plan lists what the pin holds and nothing
    merged after it. Its `next:` is the version, when it agrees with the open
-   milestone's version beside it. When the plan prints `differs:` (#2779), stop before the
-   tag and ask Alex by form which version to use, with the `differs:` line's reason (an
-   enhancement merged, a capability removed). Renumber the milestones only when Alex says.
+   milestone's version beside it. When the plan prints `differs:`, stop before the
+   tag and ask Alex by form which version to use, with the `differs:` line's reason.
+   Renumber the milestones only when Alex says.
 2. **Milestone:** find the version's milestone
    (`gh api 'repos/alexec/Agents/milestones?state=open' --jq '.[]|[.number,.title]|@tsv'`)
    and its open issues (`gh issue list --milestone "<title>" --state open`). Open issues
@@ -321,8 +310,7 @@ open for item 2 and for the notes' known issues (`git merge-base --is-ancestor <
    - `## Capabilities`, as `python3 .agents/skills/release/scripts/capability-changes.py
      <last tag> <sha>` writes it: the capabilities added, deprecated and removed (#1748,
      `docs/explanation/versions.md`). Nothing when it writes nothing. A minor before 1.0 may
-     remove a capability number; a patch never does: a patch whose list has `Removed` stops
-     the release with `partly_done`.
+     remove a capability number.
 
 ## 7. Tag and push
 
@@ -384,7 +372,7 @@ A tag that already exists for this version means another release ran: end with
 
    If `up.sh` or a check fails, never roll back the store and never run `down.sh`. File a
    bug: title `Release v<version>: the control plane deploy failed`, labels `bug`,
-   `priority:high`, `area:control-plane`, in the next milestone, with the step and its first
+   `priority:high`, `area:control-plane`, with no milestone, with the step and its first
    error (never a secret). Say it in the report. It does not hold step 9: the release is
    out.
 6. **Remove the scratch worktree** when the deploy and its checks are done, also when they
@@ -400,46 +388,35 @@ A tag that already exists for this version means another release ran: end with
 When step 8 found the GitHub release and both TestFlight builds, close the version's
 milestone:
 
-0. **The next milestone** (#2801):
-   - **After a minor** (x.y.0), it is the patch milestone `x.y.1 Bug fixes`. Make it when it
-     is not there:
-     `gh api repos/alexec/Agents/milestones -f title="x.y.1 Bug fixes" -f description="Patch: the bugs found in and after vx.y.0, and nothing else (#2801)"`.
-   - **After a patch** (x.y.z), it is the next minor milestone: the open one with the next
-     lowest version. Only when a `priority:high` bug is still open in this milestone, make
-     `x.y.<z+1> Bug fixes` as above, and that is the next milestone instead.
-1. Move its open bugs to the next milestone first (#1570):
-   `gh issue list --milestone "<title>" --state open --label bug --json number --jq '.[].number'`,
-   then `gh issue edit N --milestone "<next>"` for each one.
-2. Move every other open issue to the backlog (#2455):
+0. **The next milestone** is the open one with the next lowest version. Make no patch
+   milestone (#3212).
+1. Take every open issue out of it (#2455, #3212):
    `gh issue list --milestone "<title>" --state open --json number --jq '.[].number'`,
    then `gh issue edit N --remove-milestone` for each one. A milestone never closes with
-   open issues: nothing schedules an issue in a closed milestone. A non-bug goes to the
-   backlog, not the next milestone, because an issue gets a milestone only when it serves
-   that milestone's goal (#1340). Alex starts the release by hand, so a non-bug can still
-   be open here.
-3. Look again: the list in 2 is empty. Then close it:
+   open issues: nothing schedules an issue in a closed milestone. A bug goes to no
+   milestone, where the standing bug lane takes it. A non-bug goes to the backlog, not the
+   next milestone, because an issue gets a milestone only when it serves that milestone's
+   goal (#1340). Alex starts the release by hand, so an issue can still be open here.
+2. Look again: the list in 1 is empty. Then close it:
    `gh api -X PATCH repos/alexec/Agents/milestones/<number> -f state=closed`.
 
 Then the next milestone becomes the
 open one and its work can start (#2309), and you open the gate for it yourself (#1729). The Scrum Master may not read a message
 from you until Alex speaks to it (#1728), so do not leave this to it:
 
-4. **Lift the hold:** for a minor there should be none, as nobody works the next milestone
-   before this one ships (#2309). For a patch, the enhancement PRs that waited for it are
-   labelled `hold:v<version>` (for v0.12.3, `hold:v0.12.3`, #2801). For each open pull
-   request still labelled `hold:v<major.minor>` (for v0.6.0, `hold:v0.6`) or
-   `hold:v<version>`: `gh pr edit N --remove-label <the label>`. A PR that still carries
+3. **Lift a hold:** there should be none, as nobody works the next milestone before this
+   one ships (#2309) and nothing is held for a patch (#3212). For each open pull request
+   still labelled `hold:v<major.minor>` (for v0.6.0, `hold:v0.6`) or `hold:v<version>`:
+   `gh pr edit N --remove-label <the label>`. A PR that still carries
    `needs-approval` (AGENTS.md, "A UI enhancement waits for Alex") is still waiting on
    Alex's screenshot approval: leave its auto-merge off, and name it in the report
    instead. For every other one, `gh pr merge N --auto --squash`. Turning auto-merge on
    is not merging: CI and the branch rules still decide. A stacked PR whose base is not
    `main` refuses auto-merge; leave it, and name it in the report.
-5. **Unpark the new open milestone:** the open milestone is now the next milestone of item 0
+4. **Unpark the new open milestone:** the open milestone is now the next milestone of item 0
    (AGENTS.md, "Work by milestone"). Take `parked` off its open issues, and only its:
    `gh issue edit N --remove-label parked`. Every later milestone keeps `parked` (#2309).
-   After a minor, that is the patch milestone, and the next minor keeps `parked` until the
-   patch ships (#2801).
-6. Tell the Scrum Master (`message_session`) that the release shipped, which PRs you
+5. Tell the Scrum Master (`message_session`) that the release shipped, which PRs you
    released and which you could not.
 
 If step 8 failed, leave the milestone open and say so in the report.
