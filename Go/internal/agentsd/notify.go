@@ -119,6 +119,40 @@ func (d *Daemon) setYourNoticeLimits(burst int64, cooldown time.Duration) error 
 	})
 }
 
+// mirrorYoursToDisplay writes your layer's notice limits and archive switch into the
+// display preferences, the keys every client still shows them from (#3161), when the layer
+// changed without them: a copy pushed from another machine, or policy/setYours. A rule
+// that is not set takes its key away, so clients show the default the host uses. Never
+// call with yoursMu held.
+func (d *Daemon) mirrorYoursToDisplay(rules wire.PolicyRules) {
+	change := map[string]wire.JSONValue{
+		noticeBurstKey: nil, noticeCooldownKey: nil, agentsMayArchiveMyChatsKey: nil,
+	}
+	if n := rules.NoticeLimits; n != nil {
+		var burst int64
+		var cooldown float64
+		if n.Burst != nil {
+			burst = *n.Burst
+		}
+		if n.WaitMinutes != nil {
+			cooldown = float64(*n.WaitMinutes)
+		}
+		b, c := noticebucket.Limits(burst, cooldown)
+		if n.Burst != nil {
+			change[noticeBurstKey] = asJSON(b)
+		}
+		if n.WaitMinutes != nil {
+			change[noticeCooldownKey] = asJSON(max(int(math.Round(c.Minutes())), 1))
+		}
+	}
+	if rules.ArchiveMyChats != nil {
+		change[agentsMayArchiveMyChatsKey] = asJSON(*rules.ArchiveMyChats)
+	}
+	if _, err := d.setPreferences(change); err != nil {
+		log.Printf("policy: your layer's notice and archive keys into display.json: %v", err)
+	}
+}
+
 // setYourArchiveMyChats saves the archive switch into your layer's archiveMyChats rule
 // (#2957), which agentsMayArchiveMyChats() now reads.
 func (d *Daemon) setYourArchiveMyChats(on bool) error {

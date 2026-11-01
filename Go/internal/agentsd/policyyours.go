@@ -230,16 +230,27 @@ func (d *Daemon) pushYoursAsync(kept keptYourPolicy) {
 // revision than the one already here). This machine's own writes (editYoursLocked,
 // setYourPolicy, firstStartMoveLocked) go through saveYoursLocked directly, never here.
 func (d *Daemon) applySignedYours(signed wire.SignedYourPolicy, source string) (int64, error) {
+	revision, rules, err := d.takeSignedYours(signed, source)
+	if rules != nil {
+		// Done after yoursMu is let go: setPreferences takes settingsMu (#3161).
+		d.mirrorYoursToDisplay(*rules)
+	}
+	return revision, err
+}
+
+// takeSignedYours is applySignedYours's check and save: the new rules when it kept them,
+// else nil.
+func (d *Daemon) takeSignedYours(signed wire.SignedYourPolicy, source string) (int64, *wire.PolicyRules, error) {
 	raw, err := base64.StdEncoding.DecodeString(signed.Policy)
 	if err != nil {
-		return 0, &Error{Code: wire.FailureSignature, Message: "The policy is not base64."}
+		return 0, nil, &Error{Code: wire.FailureSignature, Message: "The policy is not base64."}
 	}
 	var policy wire.YourPolicy
 	if json.Unmarshal(raw, &policy) != nil || policy.Revision < 1 {
-		return 0, &Error{Code: wire.FailureSignature, Message: "Not a signed policy."}
+		return 0, nil, &Error{Code: wire.FailureSignature, Message: "Not a signed policy."}
 	}
 	if signed.Signature.Alg != controllink.PolicyAlg || signed.Signature.Version != policy.Revision {
-		return 0, &Error{Code: wire.FailureSignature, Message: "The signature does not match the policy."}
+		return 0, nil, &Error{Code: wire.FailureSignature, Message: "The signature does not match the policy."}
 	}
 	d.yoursMu.Lock()
 	defer d.yoursMu.Unlock()
@@ -251,29 +262,29 @@ func (d *Daemon) applySignedYours(signed wire.SignedYourPolicy, source string) (
 		if d.yoursNow != nil {
 			current = d.yoursNow.policy.Revision
 		}
-		return current, nil
+		return current, nil, nil
 	}
 	public, err := d.resolveTrustedPersonKeyLocked(signed, source)
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 	if !controllink.VerifyPolicy(public, raw, signed.Signature.Sig) {
-		return 0, &Error{Code: wire.FailureSignature, Message: "The signature does not check."}
+		return 0, nil, &Error{Code: wire.FailureSignature, Message: "The signature does not check."}
 	}
 	current := int64(0)
 	if d.yoursNow != nil {
 		current = d.yoursNow.policy.Revision
 	}
 	if policy.Revision <= current {
-		return current, &Error{Code: wire.FailureOlder, Message: "This copy is not newer than the one already here."}
+		return current, nil, &Error{Code: wire.FailureOlder, Message: "This copy is not newer than the one already here."}
 	}
 	kept := keptYourPolicy{Policy: raw, Signature: signed.Signature, policy: policy}
 	b, err := json.Marshal(kept)
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 	if err := store.WriteAtomically(d.yourPolicyPath(), b, 0o600); err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 	d.yoursNow = &kept
 	rules := policy.Rules
@@ -281,7 +292,7 @@ func (d *Daemon) applySignedYours(signed wire.SignedYourPolicy, source string) (
 	d.yoursWas = yourPolicySeen{Revision: policy.Revision, Moved: true}
 	d.saveYoursSeenLocked()
 	d.policyChanged()
-	return policy.Revision, nil
+	return policy.Revision, &rules, nil
 }
 
 // resolveTrustedPersonKeyLocked is the public key to check signed's signature against: the
@@ -445,6 +456,7 @@ func (d *Daemon) setYourPolicy(c *Client, r wire.SetYourPolicyRequest) (wire.You
 	}
 	// policyChanged re-marks every agent and tells clients; done after the lock is let go.
 	d.policyChanged()
+	d.mirrorYoursToDisplay(next.Rules)
 	return next, nil
 }
 

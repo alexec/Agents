@@ -1,6 +1,7 @@
 package agentsd
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -937,5 +938,50 @@ func TestSetYoursRefusesInvalidRules(t *testing.T) {
 	json.Unmarshal(c.call(t, 2, "policy/yours", nil), &state)
 	if state.Policy.Rules.Helpers != nil {
 		t.Fatalf("the invalid rules were saved anyway: %+v", state.Policy.Rules)
+	}
+}
+
+// TestAPushedLayerReachesDisplay: your layer pushed from the keeper (the control plane's
+// copy, or the window's direct link) writes its notice limits and archive switch into
+// display.json, where every client reads them (#3161); a rule the copy leaves unset takes
+// its key away, so clients show the default the host uses.
+func TestAPushedLayerReachesDisplay(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	d.SettingsDir = t.TempDir()
+	private := controllink.NewPrivateKey()
+	public, err := controllink.PublicKey(private)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := controllink.PinPersonKey(d.Store.Loc.Root, public, controllink.PinFromWindow, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	push := func(revision int64, rules wire.PolicyRules) {
+		t.Helper()
+		raw, _ := json.Marshal(wire.YourPolicy{Rules: rules, Revision: revision, Changed: now(), Person: "local", Keeper: "another-host"})
+		sig, err := controllink.SignPolicy(private, raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		signed := wire.SignedYourPolicy{Policy: base64.StdEncoding.EncodeToString(raw), Signature: wire.PolicySignature{
+			Version: revision, KeyID: controllink.KeyID(public), Alg: controllink.PolicyAlg, Sig: sig,
+		}}
+		if _, err := d.applySignedYours(signed, controllink.PinFromControlPlane); err != nil {
+			t.Fatal(err)
+		}
+	}
+	burst, wait, archive := int64(3), int64(20), false
+	push(100, wire.PolicyRules{NoticeLimits: &wire.PolicyNoticeLimits{Burst: &burst, WaitMinutes: &wait}, ArchiveMyChats: &archive})
+	prefs := d.preferences()
+	if string(prefs[noticeBurstKey]) != "3" || string(prefs[noticeCooldownKey]) != "20" || string(prefs[agentsMayArchiveMyChatsKey]) != "false" {
+		t.Fatalf("display.json does not say the pushed layer's rules: %s", prefs)
+	}
+	push(101, wire.PolicyRules{})
+	prefs = d.preferences()
+	for _, key := range []string{noticeBurstKey, noticeCooldownKey, agentsMayArchiveMyChatsKey} {
+		if _, ok := prefs[key]; ok {
+			t.Fatalf("display.json kept %s after the layer dropped it: %s", key, prefs)
+		}
 	}
 }
