@@ -71,31 +71,37 @@ export function Lineage({ store, host, session }: { store: Store; host: string; 
   const me = sessionNode(session);
   const { graph, costs, failed, reading } = useWalk(store, host, me, asked.value);
 
-  if (failed.value) return <p class="hint">{failed.value}</p>;
-  if (!graph.value) return <p class="hint">Reading the links…</p>;
-  const title = sessionTitle(store, host);
-  const empty = !graph.value.nodes.some((n) => n.kind !== me.kind || n.ref !== me.ref);
-  // A session this page has goes to its chat; an issue, a PR or a milestone on GitHub opens there (row.url).
-  const show = (row: LineageRow) => row.session && row.session !== session && store.agent(host, row.session)
-    ? () => go({ ...route.value, host, session: row.session as UUID }) : undefined;
-  const footer = (
-    <>
-      {reading.value && <p class="quiet small">{readingTitles}</p>}
-      {graph.value.limited && <p class="quiet small">The walk stopped at its limit: there are more links.</p>}
-      {!empty && <p class="quiet small">{lineageNote}</p>}
-    </>
-  );
+  // The crumbs are always there (#3155): after a failed read, Refresh is how to read again.
+  let body;
+  if (failed.value) {
+    body = <p class="hint">{failed.value}</p>;
+  } else if (!graph.value) {
+    body = <p class="hint">Reading the links…</p>;
+  } else {
+    const title = sessionTitle(store, host);
+    const empty = !graph.value.nodes.some((n) => n.kind !== me.kind || n.ref !== me.ref);
+    // A session this page has goes to its chat; an issue, a PR or a milestone on GitHub opens there (row.url).
+    const show = (row: LineageRow) => row.session && row.session !== session && store.agent(host, row.session)
+      ? () => go({ ...route.value, host, session: row.session as UUID }) : undefined;
+    body = (
+      <>
+        {empty ? <p class="hint">{noLineage}</p> : <Graph layout={lineageGraph(me, graph.value, costs.value, title)} show={show}
+          verb={(row) => row.url ? "Open it on GitHub" : "Show this session"} />}
+        {reading.value && <p class="quiet small">{readingTitles}</p>}
+        {graph.value.limited && <p class="quiet small">The walk stopped at its limit: there are more links.</p>}
+        {!empty && <p class="quiet small">{lineageNote}</p>}
+      </>
+    );
+  }
   return (
     <div class="lineage">
       <div class="crumbs">
         <span class="title">Lineage</span>
         <button class="link" title="Open it on Reports ▸ Lineage, where a click on a box starts from it"
           onClick={() => { exploreFrom({ host, node: me }); }}>Explore</button>
-        <button class="link" onClick={() => { asked.value++; }}>Refresh</button>
+        <button class="link" title="Read the links and the costs again" onClick={() => { asked.value++; }}>Refresh</button>
       </div>
-      {empty ? <p class="hint">{noLineage}</p> : <Graph layout={lineageGraph(me, graph.value, costs.value, title)} show={show}
-        verb={(row) => row.url ? "Open it on GitHub" : "Show this session"} />}
-      {footer}
+      {body}
     </div>
   );
 }
