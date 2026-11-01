@@ -54,6 +54,7 @@ public enum Capability {
     public static let folder1 = "folder/1"
     public static let foldersToMachine1 = "folders.to-machine/1"
     public static let folders1 = "folders/1"
+    public static let forge1 = "forge/1"
     public static let git1 = "git/1"
     public static let governance1 = "governance/1"
     public static let groups1 = "groups/1"
@@ -274,6 +275,10 @@ public enum Capability {
         "folders/setProject": "projects/1",
         "folders/unarchive": "folders/1",
         "folders/undoGuardedChange": "folders/1",
+        "forge/issue": "forge/1",
+        "forge/issues": "forge/1",
+        "forge/pull": "forge/1",
+        "forge/pulls": "forge/1",
         "git/fill": "git/1",
         "lineage/cost": "lineage/1",
         "lineage/end": "lineage/1",

@@ -3267,6 +3267,124 @@ export interface FoldersListRequest {
 }
 
 /**
+ * One of a pull request's checks (#3129): a check run or a commit status. state is passing,
+ * failing, running or skipped; url is its page on the forge.
+ */
+export interface ForgeCheck {
+  name: string;
+  state: string;
+  url?: string;
+}
+
+/**
+ * A comment on an issue or a pull request (#3129), as Markdown. bot says a bot or an app wrote it.
+ */
+export interface ForgeComment {
+  author: string;
+  body: string;
+  at: WireDate;
+  url?: string;
+  bot?: boolean;
+}
+
+/**
+ * An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for
+ * GitHub, GitLab and Linear, so one page draws each. node is its lineage node (kind issue or pr,
+ * ref github:alexec/Agents#12). state is open, closed or merged. folder is a folder on this machine
+ * on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The
+ * pull request's own fields: draft; checks is passing, failing, running or none; review is
+ * approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown;
+ * autoMerge says auto-merge is on.
+ */
+export interface ForgeItem {
+  node: LineageNode;
+  title: string;
+  state: string;
+  url?: string;
+  folder?: string;
+  labels: ForgeLabel[];
+  author?: string;
+  assignees: string[];
+  milestone?: string;
+  updatedAt: WireDate;
+  comments: number;
+  draft?: boolean;
+  checks?: string;
+  review?: string;
+  mergeable?: string;
+  autoMerge?: boolean;
+}
+
+/**
+ * forge/issue and forge/pull (#3129): one item with its body (Markdown) and a page of its comments,
+ * the newest page first and at most 50, oldest first in the page; cursor is the page before it,
+ * absent at the first comment. A pull request's checks, review threads (line comments, in threads)
+ * and files changed come with it.
+ */
+export interface ForgeItemDetail {
+  item: ForgeItem;
+  body: string;
+  comments: ForgeComment[];
+  cursor?: string;
+  checks?: ForgeCheck[];
+  reviewThreads?: number;
+  filesChanged?: number;
+}
+
+/**
+ * forge/issue and forge/pull (#3129): the item's lineage node, and for an older page of its
+ * comments the cursor of the page after it.
+ */
+export interface ForgeItemRequest {
+  node: LineageNode;
+  cursor?: string;
+}
+
+/**
+ * A label on an issue or a pull request (#3129), with its #rrggbb colour where the forge gives one
+ * (#2956).
+ */
+export interface ForgeLabel {
+  name: string;
+  color?: string;
+}
+
+/**
+ * forge/issues and forge/pulls (#3129): a page of items, the last updated first. cursor is the next
+ * page, absent at the end. errors says a forge that could not be read (not connected, a rate
+ * limit), and the items of the others still come.
+ */
+export interface ForgeList {
+  items: ForgeItem[];
+  cursor?: string;
+  errors?: ForgeListError[];
+}
+
+/**
+ * A forge forge/issues or forge/pulls could not read (#3129): forge is github, gitlab or linear.
+ */
+export interface ForgeListError {
+  forge: string;
+  message: string;
+}
+
+/**
+ * forge/issues and forge/pulls (#3129): the issues or pull requests of every folder on this
+ * machine, or of one folder's repo. state is open (when not said), closed or all; a closed pull
+ * request includes a merged one. label, assignee (a login) and query (words in the title or body)
+ * narrow the list. limit is 1 to 100, 50 when not said; cursor is the last page's.
+ */
+export interface ForgeListRequest {
+  folder?: string;
+  state?: string;
+  label?: string;
+  assignee?: string;
+  query?: string;
+  cursor?: string;
+  limit?: number;
+}
+
+/**
  * people/setForgeLogins (#2951): the caller's own GitHub, GitLab and Linear logins, for Settings ▸
  * You, replacing what was kept; blank clears one.
  */
@@ -10152,6 +10270,15 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FolderWorktrees: { required: ["worktrees", "folder"], optional: [] },
   FoldersFindRequest: { required: [], optional: ["paths", "folders"] },
   FoldersListRequest: { required: ["includeArchived"], optional: [] },
+  ForgeCheck: { required: ["name", "state"], optional: ["url"] },
+  ForgeComment: { required: ["author", "body", "at"], optional: ["url", "bot"] },
+  ForgeItem: { required: ["node", "title", "state", "labels", "assignees", "updatedAt", "comments"], optional: ["url", "folder", "author", "milestone", "draft", "checks", "review", "mergeable", "autoMerge"] },
+  ForgeItemDetail: { required: ["item", "body", "comments"], optional: ["cursor", "checks", "reviewThreads", "filesChanged"] },
+  ForgeItemRequest: { required: ["node"], optional: ["cursor"] },
+  ForgeLabel: { required: ["name"], optional: ["color"] },
+  ForgeList: { required: ["items"], optional: ["cursor", "errors"] },
+  ForgeListError: { required: ["forge", "message"], optional: [] },
+  ForgeListRequest: { required: [], optional: ["folder", "state", "label", "assignee", "query", "cursor", "limit"] },
   ForgeLogins: { required: [], optional: ["github", "gitlab", "linear"] },
   FoundFolder: { required: ["folder", "exists", "isRepository", "isFolder"], optional: ["typed"] },
   GitAsk: { required: ["server", "from"], optional: [] },

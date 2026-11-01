@@ -4004,6 +4004,127 @@ type FoldersListRequest struct {
 	IncludeArchived bool `json:"includeArchived"`
 }
 
+// One of a pull request's checks (#3129): a check run or a commit status. state is passing, failing, running or skipped; url is its page on the forge.
+type ForgeCheck struct {
+	Name string `json:"name"`
+
+	State string `json:"state"`
+
+	URL *string `json:"url,omitzero"`
+}
+
+// A comment on an issue or a pull request (#3129), as Markdown. bot says a bot or an app wrote it.
+type ForgeComment struct {
+	Author string `json:"author"`
+
+	Body string `json:"body"`
+
+	At Date `json:"at"`
+
+	URL *string `json:"url,omitzero"`
+
+	Bot *bool `json:"bot,omitzero"`
+}
+
+// An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for GitHub, GitLab and Linear, so one page draws each. node is its lineage node (kind issue or pr, ref github:alexec/Agents#12). state is open, closed or merged. folder is a folder on this machine on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own fields: draft; checks is passing, failing, running or none; review is approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown; autoMerge says auto-merge is on.
+type ForgeItem struct {
+	Node LineageNode `json:"node"`
+
+	Title string `json:"title"`
+
+	State string `json:"state"`
+
+	URL *string `json:"url,omitzero"`
+
+	Folder *string `json:"folder,omitzero"`
+
+	Labels []ForgeLabel `json:"labels"`
+
+	Author *string `json:"author,omitzero"`
+
+	Assignees []string `json:"assignees"`
+
+	Milestone *string `json:"milestone,omitzero"`
+
+	UpdatedAt Date `json:"updatedAt"`
+
+	Comments int64 `json:"comments"`
+
+	Draft *bool `json:"draft,omitzero"`
+
+	Checks *string `json:"checks,omitzero"`
+
+	Review *string `json:"review,omitzero"`
+
+	Mergeable *string `json:"mergeable,omitzero"`
+
+	AutoMerge *bool `json:"autoMerge,omitzero"`
+}
+
+// forge/issue and forge/pull (#3129): one item with its body (Markdown) and a page of its comments, the newest page first and at most 50, oldest first in the page; cursor is the page before it, absent at the first comment. A pull request's checks, review threads (line comments, in threads) and files changed come with it.
+type ForgeItemDetail struct {
+	Item ForgeItem `json:"item"`
+
+	Body string `json:"body"`
+
+	Comments []ForgeComment `json:"comments"`
+
+	Cursor *string `json:"cursor,omitzero"`
+
+	Checks []ForgeCheck `json:"checks,omitzero"`
+
+	ReviewThreads *int64 `json:"reviewThreads,omitzero"`
+
+	FilesChanged *int64 `json:"filesChanged,omitzero"`
+}
+
+// forge/issue and forge/pull (#3129): the item's lineage node, and for an older page of its comments the cursor of the page after it.
+type ForgeItemRequest struct {
+	Node LineageNode `json:"node"`
+
+	Cursor *string `json:"cursor,omitzero"`
+}
+
+// A label on an issue or a pull request (#3129), with its #rrggbb colour where the forge gives one (#2956).
+type ForgeLabel struct {
+	Name string `json:"name"`
+
+	Color *string `json:"color,omitzero"`
+}
+
+// forge/issues and forge/pulls (#3129): a page of items, the last updated first. cursor is the next page, absent at the end. errors says a forge that could not be read (not connected, a rate limit), and the items of the others still come.
+type ForgeList struct {
+	Items []ForgeItem `json:"items"`
+
+	Cursor *string `json:"cursor,omitzero"`
+
+	Errors []ForgeListError `json:"errors,omitzero"`
+}
+
+// A forge forge/issues or forge/pulls could not read (#3129): forge is github, gitlab or linear.
+type ForgeListError struct {
+	Forge string `json:"forge"`
+
+	Message string `json:"message"`
+}
+
+// forge/issues and forge/pulls (#3129): the issues or pull requests of every folder on this machine, or of one folder's repo. state is open (when not said), closed or all; a closed pull request includes a merged one. label, assignee (a login) and query (words in the title or body) narrow the list. limit is 1 to 100, 50 when not said; cursor is the last page's.
+type ForgeListRequest struct {
+	Folder *string `json:"folder,omitzero"`
+
+	State *string `json:"state,omitzero"`
+
+	Label *string `json:"label,omitzero"`
+
+	Assignee *string `json:"assignee,omitzero"`
+
+	Query *string `json:"query,omitzero"`
+
+	Cursor *string `json:"cursor,omitzero"`
+
+	Limit *int64 `json:"limit,omitzero"`
+}
+
 // people/setForgeLogins (#2951): the caller's own GitHub, GitLab and Linear logins, for Settings ▸ You, replacing what was kept; blank clears one.
 type ForgeLogins struct {
 	Github *string `json:"github,omitzero"`
