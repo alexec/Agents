@@ -75,7 +75,9 @@ struct LineageListTests {
             pr.ref: .init(title: "Fix it", state: "merged"),
         ]
         let rows = LineageList.rows(of: session, graph: resolved, costs: [:]) { $0 == helper ? "Helper" : nil }
-        #expect(rows.map(\.name) == ["Fix the flaky test", "Helper", "Fix it"])
+        // #3158: the number before the title, and the whole ref in the help.
+        #expect(rows.map(\.name) == ["#12 Fix the flaky test", "Helper", "#34 Fix it"])
+        #expect(rows.map(\.ref) == ["alexec/agents#12", nil, "alexec/agents#34"])
         #expect(rows.map(\.resolved) == ["open · bug, area:lineage", nil, "merged"])
 
         let costs: [Node: DaemonAPI.LineageCostRollup] = [issue: .init(node: issue, total: Self.cost(10))]

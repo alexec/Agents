@@ -66,7 +66,9 @@ test("a resolved node shows its title, state and labels", () => {
     [pr.ref]: { title: "Fix it", state: "merged" },
   } };
   const rows = l.lineageRows(session, resolved, new Map(), (n) => n.ref === helper.ref ? "Helper" : undefined);
-  assert.deepEqual(rows.map((r) => r.name), ["Fix the flaky test", "Helper", "Fix it"]);
+  // #3158: the number before the title, and the whole ref in the help.
+  assert.deepEqual(rows.map((r) => r.name), ["#12 Fix the flaky test", "Helper", "#34 Fix it"]);
+  assert.deepEqual(rows.map((r) => r.ref), ["alexec/agents#12", undefined, "alexec/agents#34"]);
   assert.deepEqual(rows.map((r) => r.resolved), ["open · bug, area:lineage", undefined, "merged"]);
 
   const costs = new Map([[l.costKey(issue), rollup(issue, cost(10))]]);
@@ -75,6 +77,7 @@ test("a resolved node shows its title, state and labels", () => {
 
   const g = l.lineageGraph(session, resolved, new Map(), title);
   assert.equal(g.nodes.find((n) => n.row.node.ref === issue.ref).detail, "Issue · open · bug, area:lineage");
+  assert.equal(g.nodes.find((n) => n.row.node.ref === issue.ref).row.name, "#12 Fix the flaky test");
 });
 
 test("an issue, a PR, a milestone or a release on GitHub has its address; a session has none", () => {

@@ -130,6 +130,7 @@ struct LineagePage: View {
                 .appText(.reading).fontWeight(.semibold)
                 .lineLimit(1)
                 .truncationMode(.middle)
+                .help(row.ref ?? row.name)
             Text(([LineageLayout.kindWord(row.node.kind)] + [row.cost, row.resolved].compactMap { $0 })
                 .joined(separator: " · "))
                 .appText(.supporting)
