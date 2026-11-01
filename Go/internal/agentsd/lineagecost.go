@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"sort"
 	"strings"
@@ -34,6 +35,8 @@ const (
 	costNodesKept = 5_000
 	// costNodesSent bounds one send.
 	costNodesSent = 1_000
+	// costSessionsSent bounds a node's sessions as they are sent.
+	costSessionsSent = 20
 	costNodeKeep  = lineage.KeepEnded
 )
 
@@ -198,15 +201,20 @@ func (d *Daemon) notePROutcome(pr wire.LineageNode, event, title string) {
 	d.costChangedLocked()
 }
 
-// refreshCostLinksLocked sets each node's fixes and partOf from the graph, marking the
-// nodes whose links changed unsent. Ended links count: a PR closed without a merge stays
-// against its issue, as waste.
+// refreshCostLinksLocked sets each node's fixes, partOf and sessions from the graph, marking
+// the nodes whose links changed unsent. Ended links count: a PR closed without a merge stays
+// against its issue, as waste, and a session that worked on a node stays one of its sessions.
 func (d *Daemon) refreshCostLinksLocked() {
 	f := d.costLedgerLocked()
 	for k, c := range f.Nodes {
-		var fixes, partOf []string
+		var fixes, partOf, sessions []string
 		seen := map[string]bool{}
 		for _, l := range d.lineage().Links(c.Node).Links {
+			if l.To == c.Node && l.From.Kind == lineage.KindSession && !seen["session "+l.From.Ref] &&
+				(l.Rel == lineage.RelWorksOn || l.Rel == lineage.RelOpens || l.Rel == lineage.RelReviews) {
+				seen["session "+l.From.Ref] = true
+				sessions = append(sessions, l.From.Ref)
+			}
 			if l.From != c.Node || seen[l.Rel+" "+l.To.Ref] {
 				continue
 			}
@@ -220,10 +228,33 @@ func (d *Daemon) refreshCostLinksLocked() {
 		}
 		sort.Strings(fixes)
 		sort.Strings(partOf)
-		if slices.Equal(fixes, c.Fixes) && slices.Equal(partOf, c.PartOf) {
+		sort.Strings(sessions)
+		// reports/nodes counts them (#3118); a node more sessions worked on says the first.
+		sessions = sessions[:min(len(sessions), costSessionsSent)]
+		if slices.Equal(fixes, c.Fixes) && slices.Equal(partOf, c.PartOf) && slices.Equal(sessions, c.Sessions) {
 			continue
 		}
-		c.Fixes, c.PartOf = fixes, partOf
+		c.Fixes, c.PartOf, c.Sessions = fixes, partOf, sessions
+		f.Nodes[k] = c
+		f.Seq++
+		f.Unsent[k] = f.Seq
+	}
+}
+
+// refreshCostResolvedLocked puts on each issue and PR node the title, state and labels the
+// resolve cache has for it (#3118), for reports/nodes, marking the nodes whose answer
+// changed unsent. It asks no forge: a node is resolved when a lineage walk asks for it.
+func (d *Daemon) refreshCostResolvedLocked() {
+	f := d.costLedgerLocked()
+	d.resolveMu.Lock()
+	defer d.resolveMu.Unlock()
+	for k, c := range f.Nodes {
+		e, ok := d.resolveCache[c.Node]
+		if !ok || !e.ok || c.Resolved != nil && reflect.DeepEqual(*c.Resolved, e.resolved) {
+			continue
+		}
+		r := e.resolved
+		c.Resolved = &r
 		f.Nodes[k] = c
 		f.Seq++
 		f.Unsent[k] = f.Seq
@@ -301,6 +332,7 @@ func (d *Daemon) unsentCost() ([]wire.LineageCostNode, map[string]int64) {
 	d.workMu.Lock()
 	defer d.workMu.Unlock()
 	d.refreshCostLinksLocked()
+	d.refreshCostResolvedLocked()
 	f := d.costLedgerLocked()
 	keys := make([]string, 0, len(f.Unsent))
 	for k := range f.Unsent {

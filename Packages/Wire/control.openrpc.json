@@ -4016,6 +4016,32 @@
       }
     },
     {
+      "name": "reports/nodes",
+      "x-capability": "reports.nodes/1",
+      "description": "The lineage nodes of one kind in a scope (#3118): issues, PRs, milestones or releases, with their cost, sessions and lead time, filtered, sorted and in pages of at most 100, from the machines' lineage nodes as reports/value reads them.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ReportNodesQuery"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ReportNodes"
+        }
+      }
+    },
+    {
       "name": "reports/policy",
       "x-capability": "reports.scope/1",
       "description": "Who sees what in Reports (#1804). Admins only.",

@@ -189,3 +189,51 @@ func TestPruneCost(t *testing.T) {
 		t.Fatal("the oldest stayed")
 	}
 }
+
+// #3118: the nodes sent say the sessions that worked on them, and the title, state and
+// labels the resolve cache has; a node resolved after it was sent is sent again.
+func TestSentCostSaysSessionsAndResolved(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	folder := t.TempDir()
+	d.repos = map[string]forgeRepo{folder: {"github", "alexec/agents"}}
+	a := seeded(t, d, folder, func(a *wire.Agent) {
+		a.Labels = []wire.SessionLabel{{Value: "#12", Owner: wire.SessionLabelOwnerPerson}}
+	})
+	d.noteLineage(nil, a)
+	d.bankSessionCost(a.ID, wire.Cost{Amount: 1, Currency: "USD"})
+	d.lineageSettle(2 * time.Second)
+
+	issue := wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#12"}
+	sentNode := func() (wire.LineageCostNode, bool) {
+		t.Helper()
+		work, sent := d.unsentCost()
+		d.costSent(sent)
+		for _, n := range work {
+			if n.Node == issue {
+				return n, true
+			}
+		}
+		return wire.LineageCostNode{}, false
+	}
+	n, ok := sentNode()
+	if !ok || n.Resolved != nil || len(n.Sessions) != 1 || n.Sessions[0] != sessionNode(a.ID).Ref {
+		t.Fatalf("%v %+v", ok, n)
+	}
+	if _, again := sentNode(); again {
+		t.Fatal("sent again with nothing changed")
+	}
+
+	state := "open"
+	d.resolveMu.Lock()
+	d.resolveCache = map[wire.LineageNode]resolvedEntry{issue: {
+		resolved: wire.LineageResolved{Title: "Fix it", State: &state, Labels: []string{"bug"}}, ok: true, at: time.Now()}}
+	d.resolveMu.Unlock()
+	n, ok = sentNode()
+	if !ok || n.Resolved == nil || n.Resolved.Title != "Fix it" || *n.Resolved.State != "open" {
+		t.Fatalf("%v %+v", ok, n)
+	}
+	if _, again := sentNode(); again {
+		t.Fatal("sent again with the same answer")
+	}
+}

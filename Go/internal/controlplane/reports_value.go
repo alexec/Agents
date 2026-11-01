@@ -97,7 +97,7 @@ func (s *Service) scopeLineage(ctx context.Context, keep func(person string) boo
 			c := n
 			c.Banked = wire.LineageCost{Cost: map[string]float64{}}
 			lineage.AddCost(&c.Banked, n.Banked)
-			c.Fixes, c.PartOf = slices.Clone(n.Fixes), slices.Clone(n.PartOf)
+			c.Fixes, c.PartOf, c.Sessions = slices.Clone(n.Fixes), slices.Clone(n.PartOf), slices.Clone(n.Sessions)
 			byNode[n.Node] = &c
 		}
 	}
@@ -114,8 +114,8 @@ func (s *Service) scopeLineage(ctx context.Context, keep func(person string) boo
 	return out, nil
 }
 
-// mergeNode adds another machine's copy of a node to have: the cost adds up, the links
-// join, and the newest copy says how a PR ended. Failed checks are the most any machine
+// mergeNode adds another machine's copy of a node to have: the cost adds up, the links and
+// sessions join, and the newest copy says how a PR ended and its title, state and labels. Failed checks are the most any machine
 // heard, as each machine that listens hears the same rounds.
 func mergeNode(have *wire.LineageCostNode, n wire.LineageCostNode) {
 	lineage.AddCost(&have.Banked, n.Banked)
@@ -129,8 +129,17 @@ func mergeNode(have *wire.LineageCostNode, n wire.LineageCostNode) {
 			have.PartOf = append(have.PartOf, p)
 		}
 	}
+	for _, id := range n.Sessions {
+		if !slices.Contains(have.Sessions, id) {
+			have.Sessions = append(have.Sessions, id)
+		}
+	}
 	if have.Project == nil {
 		have.Project = n.Project
+	}
+	// The newest title, state and labels any machine resolved (#3118).
+	if n.Resolved != nil && (have.Resolved == nil || n.LastAt > have.LastAt) {
+		have.Resolved = n.Resolved
 	}
 	if n.Outcome != nil && (have.Outcome == nil || n.LastAt > have.LastAt) {
 		have.Outcome = n.Outcome

@@ -4528,6 +4528,12 @@ type LineageCostNode struct {
 	EndedAt *Date `json:"endedAt,omitzero"`
 
 	LastAt Date `json:"lastAt"`
+
+	// An issue's or PR's title, state and labels as the machine's resolve cache has them (#3118), for reports/nodes. The machine asks no forge to fill it; absent until a lineage walk resolved the node.
+	Resolved *LineageResolved `json:"resolved,omitzero"`
+
+	// The sessions linked to the node (works-on, opens, reviews), by ref, at most 20 (#3118).
+	Sessions []string `json:"sessions,omitzero"`
 }
 
 // lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total adds its parts: an issue's PRs (the PRs that fix it); a milestone's issues, their PRs and the PRs part of it; a project's every node (kind project, ref github:alexec/agents). waste is the parts' PRs closed without a merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is the nodes added up, newest first, at most 500; limited says there are more.
@@ -7947,6 +7953,79 @@ type ReportFormat string
 
 const ReportFormatCsv ReportFormat = "csv"
 const ReportFormatJsonl ReportFormat = "jsonl"
+
+// One row of reports/nodes (#3118): an issue, PR, milestone or release, its cost rolled up from every machine in the scope as reports/value adds it up. own is what was banked on the node itself; total adds its parts (an issue's PRs; a milestone's or release's issues and PRs); waste is the parts' PRs closed without a merge or reverted. sessions is how many sessions worked on it and its parts, each once. leadTimeSeconds is from the first work on it to its last PR merged, absent before a merge. resolved is the newest title, state and labels any machine sent; absent when none had them.
+type ReportNode struct {
+	Node LineageNode `json:"node"`
+
+	// The repo or tracker the node is in, as LineageCostNode's.
+	Project *string `json:"project,omitzero"`
+
+	Resolved *LineageResolved `json:"resolved,omitzero"`
+
+	Cost ReportNodeCost `json:"cost"`
+
+	Sessions int64 `json:"sessions"`
+
+	LeadTimeSeconds *float64 `json:"leadTimeSeconds,omitzero"`
+
+	// A PR's end, as LineageCostNode's; absent while open.
+	Outcome *string `json:"outcome,omitzero"`
+
+	// The last change to it or any of its parts.
+	LastAt Date `json:"lastAt"`
+}
+
+// A reports/nodes row's cost (#3118).
+type ReportNodeCost struct {
+	Own LineageCost `json:"own"`
+
+	Total LineageCost `json:"total"`
+
+	Waste LineageCost `json:"waste"`
+}
+
+// reports/nodes' answer (#3118): a page of at most 100 nodes. cursor asks for the next page; absent on the last. limited says there are more pages. unresolved is how many nodes of the kind no machine sent a title, state or labels for: a state or label filter matches none of them.
+type ReportNodes struct {
+	Nodes []ReportNode `json:"nodes"`
+
+	Cursor *string `json:"cursor,omitzero"`
+
+	Limited bool `json:"limited"`
+
+	Unresolved int64 `json:"unresolved"`
+}
+
+// reports/nodes (#3118): the lineage nodes of one kind in a scope, with filters and pages. The scope is as reports/value's. state is open, closed or merged, from the node's resolved state (a PR with none falls back to its outcome); milestones and releases have no state in v1. repo is a ref prefix (github:alexec/Agents). since is on the node's last change. limit is 1 to 100, 50 when absent. cursor is the last page's, opaque.
+type ReportNodesQuery struct {
+	// issue, pr, milestone or release.
+	Kind string `json:"kind"`
+
+	State *string `json:"state,omitzero"`
+
+	Repo *string `json:"repo,omitzero"`
+
+	Label *string `json:"label,omitzero"`
+
+	Since *Date `json:"since,omitzero"`
+
+	Sort *ReportNodesSort `json:"sort,omitzero"`
+
+	Cursor *string `json:"cursor,omitzero"`
+
+	Limit *int64 `json:"limit,omitzero"`
+
+	// Me, a group or the organisation (#1804).
+	Scope *ReportScope `json:"scope,omitzero"`
+}
+
+// newest (the last change first; the default), cost (total, the most first), waste (the most first) or leadTime (the longest first; nodes with none last).
+type ReportNodesSort string
+
+const ReportNodesSortNewest ReportNodesSort = "newest"
+const ReportNodesSortCost ReportNodesSort = "cost"
+const ReportNodesSortWaste ReportNodesSort = "waste"
+const ReportNodesSortLeadTime ReportNodesSort = "leadTime"
 
 // A page of Reports (#1804, #2019).
 type ReportPage string

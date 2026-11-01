@@ -85,9 +85,14 @@ public extension DaemonAPI {
         public var outcome: String?
         public var failedChecks: Int?
         public var lastAt: Date
+        /// An issue's or PR's title, state and labels as the machine's resolve cache had them (#3118).
+        public var resolved: LineageResolved?
+        /// The sessions that worked on it, by ref, at most 20 (#3118).
+        public var sessions: [String]?
 
         public init(node: LineageNode, project: String? = nil, banked: LineageCost = .init(), fixes: [String]? = nil,
-                    partOf: [String]? = nil, outcome: String? = nil, failedChecks: Int? = nil, lastAt: Date) {
+                    partOf: [String]? = nil, outcome: String? = nil, failedChecks: Int? = nil, lastAt: Date,
+                    resolved: LineageResolved? = nil, sessions: [String]? = nil) {
             self.node = node
             self.project = project
             self.banked = banked
@@ -96,6 +101,8 @@ public extension DaemonAPI {
             self.outcome = outcome
             self.failedChecks = failedChecks
             self.lastAt = lastAt
+            self.resolved = resolved
+            self.sessions = sessions
         }
     }
 

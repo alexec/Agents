@@ -558,6 +558,7 @@ var CallReadApiRevoke = Method[ReadTokenRevoke, ReadAPI]{"readApi/revoke"}
 var CallRelaySwitch = Method[RelaySwitch, Empty]{"relay/switch"}
 var CallReportsDeleteView = Method[ReportViewID, ReportViews]{"reports/deleteView"}
 var CallReportsExport = Method[ReportQuery, ReportExport]{"reports/export"}
+var CallReportsNodes = Method[ReportNodesQuery, ReportNodes]{"reports/nodes"}
 var CallReportsPolicy = Method[Empty, ReportPolicy]{"reports/policy"}
 var CallReportsSaveView = Method[ReportView, ReportViews]{"reports/saveView"}
 var CallReportsScopes = Method[Empty, ReportScopes]{"reports/scopes"}

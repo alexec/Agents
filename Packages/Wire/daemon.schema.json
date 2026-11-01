@@ -10082,6 +10082,17 @@
         },
         "lastAt": {
           "$ref": "#/definitions/WireDate"
+        },
+        "resolved": {
+          "$ref": "#/definitions/LineageResolved",
+          "description": "An issue's or PR's title, state and labels as the machine's resolve cache has them (#3118), for reports/nodes. The machine asks no forge to fill it; absent until a lineage walk resolved the node."
+        },
+        "sessions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The sessions linked to the node (works-on, opens, reviews), by ref, at most 20 (#3118)."
         }
       },
       "required": [
@@ -18029,6 +18040,143 @@
         "csv",
         "jsonl"
       ]
+    },
+    "ReportNode": {
+      "type": "object",
+      "description": "One row of reports/nodes (#3118): an issue, PR, milestone or release, its cost rolled up from every machine in the scope as reports/value adds it up. own is what was banked on the node itself; total adds its parts (an issue's PRs; a milestone's or release's issues and PRs); waste is the parts' PRs closed without a merge or reverted. sessions is how many sessions worked on it and its parts, each once. leadTimeSeconds is from the first work on it to its last PR merged, absent before a merge. resolved is the newest title, state and labels any machine sent; absent when none had them.",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "project": {
+          "type": "string",
+          "description": "The repo or tracker the node is in, as LineageCostNode's."
+        },
+        "resolved": {
+          "$ref": "#/definitions/LineageResolved"
+        },
+        "cost": {
+          "$ref": "#/definitions/ReportNodeCost"
+        },
+        "sessions": {
+          "type": "integer"
+        },
+        "leadTimeSeconds": {
+          "type": "number"
+        },
+        "outcome": {
+          "type": "string",
+          "description": "A PR's end, as LineageCostNode's; absent while open."
+        },
+        "lastAt": {
+          "$ref": "#/definitions/WireDate",
+          "description": "The last change to it or any of its parts."
+        }
+      },
+      "required": [
+        "node",
+        "cost",
+        "sessions",
+        "lastAt"
+      ],
+      "additionalProperties": false
+    },
+    "ReportNodeCost": {
+      "type": "object",
+      "description": "A reports/nodes row's cost (#3118).",
+      "properties": {
+        "own": {
+          "$ref": "#/definitions/LineageCost"
+        },
+        "total": {
+          "$ref": "#/definitions/LineageCost"
+        },
+        "waste": {
+          "$ref": "#/definitions/LineageCost"
+        }
+      },
+      "required": [
+        "own",
+        "total",
+        "waste"
+      ],
+      "additionalProperties": false
+    },
+    "ReportNodes": {
+      "type": "object",
+      "description": "reports/nodes' answer (#3118): a page of at most 100 nodes. cursor asks for the next page; absent on the last. limited says there are more pages. unresolved is how many nodes of the kind no machine sent a title, state or labels for: a state or label filter matches none of them.",
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ReportNode"
+          }
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "limited": {
+          "type": "boolean"
+        },
+        "unresolved": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "nodes",
+        "limited",
+        "unresolved"
+      ],
+      "additionalProperties": false
+    },
+    "ReportNodesQuery": {
+      "type": "object",
+      "description": "reports/nodes (#3118): the lineage nodes of one kind in a scope, with filters and pages. The scope is as reports/value's. state is open, closed or merged, from the node's resolved state (a PR with none falls back to its outcome); milestones and releases have no state in v1. repo is a ref prefix (github:alexec/Agents). since is on the node's last change. limit is 1 to 100, 50 when absent. cursor is the last page's, opaque.",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "issue, pr, milestone or release."
+        },
+        "state": {
+          "type": "string"
+        },
+        "repo": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "since": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "sort": {
+          "$ref": "#/definitions/ReportNodesSort"
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer"
+        },
+        "scope": {
+          "$ref": "#/definitions/ReportScope",
+          "description": "Me, a group or the organisation (#1804)."
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "ReportNodesSort": {
+      "type": "string",
+      "enum": [
+        "newest",
+        "cost",
+        "waste",
+        "leadTime"
+      ],
+      "description": "newest (the last change first; the default), cost (total, the most first), waste (the most first) or leadTime (the longest first; nodes with none last)."
     },
     "ReportPage": {
       "type": "string",
