@@ -1656,7 +1656,8 @@ final class RemoteModel {
     /// What this runtime says it will take in a prompt, as the Mac reads it. Nothing
     /// is refused on a guess: unknown is the protocol's baseline.
     func promptCapabilities(for runtimeID: String?) -> ACP.PromptCapabilities {
-        runtimeID.flatMap { accounts[$0]?.promptCapabilities } ?? ACP.PromptCapabilities()
+        let resolved = runtimeID == LevelWords.autoID ? (startAutoPreview?.runtimeID ?? runtimeID) : runtimeID
+        return resolved.flatMap { accounts[$0]?.promptCapabilities } ?? ACP.PromptCapabilities()
     }
 
     /// Whether this runtime is signed in, as the window's runtime list says it (#538):

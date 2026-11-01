@@ -5154,7 +5154,8 @@ final class AppModel {
     }
 
     func promptCapabilities(for runtimeID: String?) -> ACP.PromptCapabilities {
-        runtimeID.flatMap { accounts[$0]?.promptCapabilities } ?? ACP.PromptCapabilities()
+        let resolved = runtimeID == LevelWords.autoID ? (draftAutoPreview?.runtimeID ?? runtimeID) : runtimeID
+        return resolved.flatMap { accounts[$0]?.promptCapabilities } ?? ACP.PromptCapabilities()
     }
 
     func refreshAccounts() async {
