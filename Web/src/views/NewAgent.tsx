@@ -342,7 +342,8 @@ export function NewAgent({ store, host, folder, folderName, down }: {
   const autoNote = runtimes.length && runtimes.every((r) => excluded.includes(r.runtime.id)) ? noneIncluded
     : picksWords(autoPreview.value?.runtimeID ? runtimeNameOf(autoPreview.value.runtimeID) : undefined);
 
-  const capabilities = chosenRuntime ? store.account(host, chosenRuntime)?.promptCapabilities : undefined;
+  const capabilityRuntime = isAuto ? autoPreview.value?.runtimeID : chosenRuntime;
+  const capabilities = capabilityRuntime ? store.account(host, capabilityRuntime)?.promptCapabilities : undefined;
   // The runtime's accounts beyond its own sign-in (#840), the organisation's included (#999): the
   // picker shows only when there is one. Undefined is the runtime's account for new sessions.
   // This Mac's only, as on the other two: no client signs in a server's account (#2257).
