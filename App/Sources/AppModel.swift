@@ -866,6 +866,17 @@ final class AppModel {
     var draftClientPermission: ClientPermissionMode?
     /// What Auto would pick now for the draft (#2658), for "Picks Claude now".
     private(set) var draftAutoPreview: AutoPreview?
+    /// What the draft's attachments need its runtime to take (#3162): Auto's preview picks a
+    /// runtime that takes them, as the start does.
+    private(set) var draftAttachmentNeeds: ACP.PromptCapabilities?
+
+    /// The draft's attachments moved: on Auto, ask again what it would pick.
+    func draftAttachmentsChanged(_ attachments: [Attachment]) {
+        let needs = Attachment.needs(attachments)
+        guard needs != draftAttachmentNeeds else { return }
+        draftAttachmentNeeds = needs
+        if isAutoDraft { Task { await refreshDraftAutoPreview() } }
+    }
     /// Why the last start on Auto did not happen: each runtime and why (FR-011). The prompt
     /// stays in the field.
     var draftAutoRefusal: String?
@@ -2350,7 +2361,7 @@ final class AppModel {
     /// What Auto would pick now for the draft, on the draft's machine.
     func refreshDraftAutoPreview() async {
         guard isAutoDraft, let cwd = draftCwd else { draftAutoPreview = nil; return }
-        let request = AutoPreviewRequest(cwd: cwd, levels: draftLevels, sandbox: draftSandbox)
+        let request = AutoPreviewRequest(cwd: cwd, levels: draftLevels, sandbox: draftSandbox, needs: draftAttachmentNeeds)
         draftAutoPreview = try? await draftHostClient.call(DaemonAPI.Method.autoPreview, request, returning: AutoPreview.self)
     }
 
@@ -5186,9 +5197,19 @@ final class AppModel {
         promptCapabilities(for: selectedAgent?.runtimeID ?? draftRuntimeID)
     }
 
+    /// On Auto it is the runtime Auto would pick now; before that is known, nothing is
+    /// refused, as on the Remote and the web page: the host picks one that takes what is
+    /// attached, or says why none can (#3162).
     func promptCapabilities(for runtimeID: String?) -> ACP.PromptCapabilities {
-        let resolved = runtimeID == LevelWords.autoID ? (draftAutoPreview?.runtimeID ?? runtimeID) : runtimeID
+        let resolved = runtimeID == LevelWords.autoID ? draftAutoPreview?.runtimeID : runtimeID
+        if runtimeID == LevelWords.autoID, resolved == nil { return .anything }
         return resolved.flatMap { accounts[$0]?.promptCapabilities } ?? ACP.PromptCapabilities()
+    }
+
+    /// The runtime a refusal names (#3162): on Auto, the one it would pick now.
+    func promptRuntimeName(for runtimeID: String?) -> String? {
+        let resolved = runtimeID == LevelWords.autoID ? draftAutoPreview?.runtimeID : runtimeID
+        return resolved.flatMap { RuntimeCatalog.runtime(id: $0)?.name ?? $0 }
     }
 
     func refreshAccounts() async {

@@ -949,6 +949,11 @@ export interface AutoPreviewRequest {
   cwd: URLString;
   levels?: Levels;
   sandbox?: SandboxChoice;
+  /**
+   * What the draft's attachments need the runtime to take (#3162): Auto passes by a runtime that
+   * said it does not.
+   */
+  needs?: ACPPromptCapabilities;
 }
 
 /**
@@ -9933,7 +9938,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AutoOverride: { required: ["runtimeID", "field", "level", "native"], optional: [] },
   AutoPick: { required: ["runtimeID", "levels", "native", "skipped"], optional: [] },
   AutoPreview: { required: ["skipped"], optional: ["runtimeID", "native"] },
-  AutoPreviewRequest: { required: ["cwd"], optional: ["levels", "sandbox"] },
+  AutoPreviewRequest: { required: ["cwd"], optional: ["levels", "sandbox", "needs"] },
   AutoSettings: { required: ["order", "excluded", "overrides"], optional: ["setBy"] },
   AutoSkip: { required: ["runtimeID", "reason"], optional: [] },
   BackgroundItem: { required: ["id", "kind", "name", "state", "canStop", "isStopping", "startedAt"], optional: ["taskType", "detail", "command", "parentID", "toolCallID", "outputFilePath", "summary", "lastToolName", "endedAt"] },

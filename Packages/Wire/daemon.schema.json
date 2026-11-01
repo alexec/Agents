@@ -2240,6 +2240,10 @@
         },
         "sandbox": {
           "$ref": "#/definitions/SandboxChoice"
+        },
+        "needs": {
+          "$ref": "#/definitions/ACPPromptCapabilities",
+          "description": "What the draft's attachments need the runtime to take (#3162): Auto passes by a runtime that said it does not."
         }
       },
       "required": [

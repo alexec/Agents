@@ -1082,6 +1082,9 @@ type AutoPreviewRequest struct {
 	Levels *Levels `json:"levels,omitzero"`
 
 	Sandbox *SandboxChoice `json:"sandbox,omitzero"`
+
+	// What the draft's attachments need the runtime to take (#3162): Auto passes by a runtime that said it does not.
+	Needs *ACPPromptCapabilities `json:"needs,omitzero"`
 }
 
 // The person's Auto settings (#2658, FR-017), in <settings>/auto.json: the order Auto tries the runtimes in (one not named goes last, in the shipped order), the runtimes it never uses, and their own values for cells.

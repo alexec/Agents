@@ -264,6 +264,10 @@ public enum ACP {
             self.embeddedContext = embeddedContext
         }
 
+        /// Everything: what a client assumes of Auto before it knows the pick (#3162), as the
+        /// host then picks a runtime that takes what is attached, or says why none can.
+        public static let anything = PromptCapabilities(image: true, audio: true, embeddedContext: true)
+
         public func allows(_ requirement: ContentBlock.Requirement?) -> Bool {
             switch requirement {
             case nil: return true

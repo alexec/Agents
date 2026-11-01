@@ -89,16 +89,28 @@ function requirement(block: ContentBlock): "image" | "audio" | "embeddedContext"
   }
 }
 
-/** Why this runtime won't take it (Attachment.refusal and PhoneAttachment.refusal), or null. */
-export function refusal(attachment: Attachment, capabilities: ACPPromptCapabilities | undefined): string | null {
+/** Why this runtime won't take it (Attachment.refusal and PhoneAttachment.refusal), in its name
+ * when that is known (#3162), or null. */
+export function refusal(attachment: Attachment, capabilities: ACPPromptCapabilities | undefined, runtime?: string): string | null {
   if (!capabilities) return null;
   const needs = requirement(attachment.block);
   if (needs === null || capabilities[needs] === true) return null;
+  const name = runtime ?? "This runtime";
   switch (needs) {
-    case "image": return "This runtime does not take pictures";
-    case "audio": return "This runtime does not take audio";
-    case "embeddedContext": return "This runtime does not take file contents, so this can only be attached on the Mac";
+    case "image": return `${name} does not take pictures`;
+    case "audio": return `${name} does not take audio`;
+    case "embeddedContext": return `${name} does not take file contents, so this can only be attached on the Mac`;
   }
+}
+
+/** What these need a runtime to take, for Auto's pick (Attachment.needs, #3162), or undefined. */
+export function attachmentNeeds(attachments: readonly Attachment[]): ACPPromptCapabilities | undefined {
+  const out: ACPPromptCapabilities = {};
+  for (const a of attachments) {
+    const needs = requirement(a.block);
+    if (needs) out[needs] = true;
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 function inlineBytes(attachment: Attachment): number {

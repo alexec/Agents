@@ -851,6 +851,17 @@ final class RemoteModel {
     var startClientPermission: ClientPermissionMode?
     /// What Auto would pick now for the page, for "Auto (Claude)".
     private(set) var startAutoPreview: AutoPreview?
+    /// What the page's attachments need its runtime to take (#3162): Auto's preview picks a
+    /// runtime that takes them, as the start does.
+    private(set) var startAttachmentNeeds: ACP.PromptCapabilities?
+
+    /// The page's attachments moved: on Auto, ask again what it would pick.
+    func startAttachmentsChanged(_ attachments: [Attachment]) {
+        let needs = Attachment.needs(attachments)
+        guard needs != startAttachmentNeeds else { return }
+        startAttachmentNeeds = needs
+        if isAutoStart { Task { await refreshStartAutoPreview() } }
+    }
     var isAutoStart: Bool { startRuntimeID == LevelWords.autoID }
     /// Every runtime's cells for the shared words (#2658), as the Mac's host has them. Auto's
     /// own settings are Mac + web (#2923).
@@ -1214,7 +1225,7 @@ final class RemoteModel {
     /// What Auto would pick now, on the page's machine.
     func refreshStartAutoPreview() async {
         guard isAutoStart, let folder = startOptionsFolder else { startAutoPreview = nil; return }
-        let request = AutoPreviewRequest(cwd: folder, levels: startLevels, sandbox: startSandbox)
+        let request = AutoPreviewRequest(cwd: folder, levels: startLevels, sandbox: startSandbox, needs: startAttachmentNeeds)
         startAutoPreview = try? await askForStart(DaemonAPI.Method.autoPreview, request, returning: AutoPreview.self)
     }
 
@@ -1384,8 +1395,9 @@ final class RemoteModel {
         // Before sending, and in the Mac's words: a runtime that will not take what is
         // attached would refuse the whole prompt after the agent had started.
         let capabilities = promptCapabilities(for: runtimeID)
+        let runtime = promptRuntimeName(for: runtimeID)
         if let refused = attachments.first(where: { PhoneAttachment.refusal(for: $0, from: capabilities) != nil }),
-           let reason = PhoneAttachment.refusal(for: refused, from: capabilities) {
+           let reason = PhoneAttachment.refusal(for: refused, from: capabilities, runtime: runtime) {
             startRefusal = "\(refused.displayName): \(reason)."
             return false
         }
@@ -1654,10 +1666,19 @@ final class RemoteModel {
     }
 
     /// What this runtime says it will take in a prompt, as the Mac reads it. Nothing
-    /// is refused on a guess: unknown is the protocol's baseline.
+    /// is refused on a guess: unknown is the protocol's baseline. On Auto it is the runtime
+    /// Auto would pick now; before that is known, nothing is refused, as on the Mac and the
+    /// web page: the host picks one that takes what is attached, or says why none can (#3162).
     func promptCapabilities(for runtimeID: String?) -> ACP.PromptCapabilities {
-        let resolved = runtimeID == LevelWords.autoID ? (startAutoPreview?.runtimeID ?? runtimeID) : runtimeID
+        let resolved = runtimeID == LevelWords.autoID ? startAutoPreview?.runtimeID : runtimeID
+        if runtimeID == LevelWords.autoID, resolved == nil { return .anything }
         return resolved.flatMap { accounts[$0]?.promptCapabilities } ?? ACP.PromptCapabilities()
+    }
+
+    /// The runtime a refusal names (#3162): on Auto, the one it would pick now.
+    func promptRuntimeName(for runtimeID: String?) -> String? {
+        let resolved = runtimeID == LevelWords.autoID ? startAutoPreview?.runtimeID : runtimeID
+        return resolved.flatMap { RuntimeCatalog.runtime(id: $0)?.name ?? $0 }
     }
 
     /// Whether this runtime is signed in, as the window's runtime list says it (#538):
@@ -4360,8 +4381,10 @@ final class RemoteModel {
             problem = notAnswering(host, "that was not sent.")
             return false
         }
-        let capabilities = promptCapabilities(for: work.agent(agentID)?.runtimeID)
-        if let refused = attachments.lazy.compactMap({ PhoneAttachment.refusal(for: $0, from: capabilities) }).first {
+        let runtimeID = work.agent(agentID)?.runtimeID
+        let capabilities = promptCapabilities(for: runtimeID)
+        let runtime = promptRuntimeName(for: runtimeID)
+        if let refused = attachments.lazy.compactMap({ PhoneAttachment.refusal(for: $0, from: capabilities, runtime: runtime) }).first {
             problem = refused
             return false
         }
