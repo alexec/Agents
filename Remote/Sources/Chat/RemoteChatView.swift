@@ -408,6 +408,11 @@ struct RemoteChatView: View {
                 // Kept on an archived chat, as on the window and the page (#242): what is
                 // typed there brings it back ("Say what next, and this comes back").
                 PromptBar(agent: agent, isQuestionUp: isQuestionUp)
+                    // The conversation scrolls under the bar, as on the Mac (#3196): one
+                    // material across the block, so its words blur behind the pills and
+                    // between them. On down to the screen's foot, under the home indicator.
+                    .frame(maxWidth: .infinity)
+                    .background(.bar, ignoresSafeAreaEdges: .bottom)
             }
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { formHeight = $0 }

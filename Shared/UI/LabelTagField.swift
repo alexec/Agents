@@ -229,6 +229,10 @@ private extension View {
         let fill = isChosen ? hue.opacity(0.35) : label.owner == .person ? hue.opacity(0.16) : .clear
         return foregroundStyle(label.kind == .plain ? AnyShapeStyle(.primary) : AnyShapeStyle(hue))
             .background(fill)
+            // On the page's paper first (#3196): a chip over the transcript (the prompt
+            // bar's row) let its words show through the tint, or through nothing at all
+            // for an agent's label.
+            .background(Paper.ground)
             .clipShape(Capsule())
             .overlay(Capsule().strokeBorder(hue.opacity(isChosen ? 1 : 0.5)))
     }
