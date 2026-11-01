@@ -3,6 +3,8 @@ name: security-audit
 description: Review what changed on main since the last release tag for security threats (tokens, socket roles, servers, foreign files, git, Keychain, logs) and read the open Dependabot alerts, write the findings under .agents/reviews/security/ and never publish them (an alert, which is public already, goes to an issue), and have helpers fix the critical and high ones on branches for Alex. Use when the Security review workflow runs in a release (#1462), or when Alex asks for this folder's security audit. It is not the general security-review skill, but it uses the method of that skill.
 ---
 
+Paused until 1.0 (#3215).
+
 # Security audit
 
 This is the method of the Security review workflow

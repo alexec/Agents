@@ -3,6 +3,8 @@ name: hadr-review
 description: Review what changed on main since the last release tag (the whole system in the first run) for high availability, disaster recovery and bounded data (store bounds, safe writes, backup and restore, single points of failure, store copies and handovers, several copies over a bucket, the docs), try a restore on a scratch set-up, write the findings under .agents/reviews/hadr/, and have a helper fix the most severe critical or high one on a branch for Alex. Use when the HADR review workflow runs in a release (#1557), or when Alex asks for an HA/DR or bounded-data review.
 ---
 
+Paused until 1.0 (#3215).
+
 # HADR review
 
 This is the method of the HADR review workflow (`.agents/workflows/hadr-review.md`,

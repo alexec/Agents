@@ -252,8 +252,10 @@ To try it without opening anything:
 ./scripts/nightly-runtimes.py report --home /tmp/nightly --dry-run
 ```
 
-Three reviews (#42, #1557) run once per release, started by the Release workflow (#1462). They look
-for new problems only in what changed on `main` since the last tag, and have the critical
+**Paused until 1.0 (#3215):** the security, performance, dead-code, HADR and usability
+reviews. Their workflows say `enabled: false`, and the release no longer starts them; #3216
+brings them back at 1.0, at PR time. When they ran, they ran once per release, started by the Release workflow (#1462). They looked
+for new problems only in what changed on `main` since the last tag, and had the critical
 and high findings fixed by helper agents on branches of their own (failing test first, proven, left unmerged for you):
 
 - **Security review** (`.agents/workflows/security-review.md`): the

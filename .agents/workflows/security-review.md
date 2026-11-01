@@ -1,4 +1,5 @@
 ---
+enabled: false
 name: Security review
 on: manual
 agent: new
@@ -8,6 +9,8 @@ when-done: archive
 permission-mode: approve-for-me
 model: smart
 ---
+
+Paused until 1.0 (#3215): the release no longer starts this workflow. #3216 brings it back, at PR time.
 
 You are the security review of this folder (issue #42). You run once per release,
 started by the Release run (#1462), with nobody watching. Review only what changed on

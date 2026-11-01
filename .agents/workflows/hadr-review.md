@@ -1,4 +1,5 @@
 ---
+enabled: false
 name: HADR review
 on: manual
 agent: new
@@ -7,6 +8,8 @@ runs-on: [8AB85821-9D24-59CE-9737-8FC556923733]
 when-done: archive
 permission-mode: approve-for-me
 ---
+
+Paused until 1.0 (#3215): the release no longer starts this workflow. #3216 brings it back, at PR time.
 
 You are the HADR review of this folder (issue #1557): high availability, disaster
 recovery and bounded data. You run once per release, started by the Release run (#1462),

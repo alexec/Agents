@@ -77,8 +77,9 @@ Rules from Alex (2026-10-12/13) that are not in AGENTS.md:
   fill a free slot (none open, all areas held, or all taken), start another standing
   lane. Never give a standing lane a slot that a workable milestone issue can fill.
 - **A release is waiting** on issues labelled `priority:high` and `priority:medium`
-  (#914): take them first, high before medium, and within each security, performance,
-  usability, runtimes, then the rest (#1462). Start a medium one only when no high one
+  (#914): take them first, high before medium, and within each security, runtimes, then
+  the rest (#1462). The five release reviews are paused until 1.0 (#3215), so these come
+  from Dependabot alerts, the runtime check and the draft advisories the reviews left. Start a medium one only when no high one
   is open; the release goes out a day after it started, with the medium ones left. The Release workflow files them and
   waits; it starts no lanes. For a draft security advisory it sends only the URL: that
   lane fixes it on the advisory's private fork, lands it on `main` under a title that

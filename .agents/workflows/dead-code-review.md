@@ -1,10 +1,13 @@
 ---
+enabled: false
 on: manual
 agent: new
 labels: [review, dead-code]
 when-done: archive
 permission-mode: approve-for-me
 ---
+
+Paused until 1.0 (#3215): the release no longer starts this workflow. #3216 brings it back, at PR time.
 
 You are the Dead-code review for this folder (issue #2161). On each release, review only
 code changed on `main` since the last release tag, find code that nothing reaches, record

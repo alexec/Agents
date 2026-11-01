@@ -3,6 +3,8 @@ name: performance-review
 description: Review what changed on main since the last release tag for performance costs (main thread, growth, descriptors, polling, transcripts, start-up, reconnects), write the findings under .agents/reviews/performance/, and have a helper fix the most severe critical or high one on a branch for Alex. Use when the Performance review workflow runs in a release (#1462), or when Alex asks for a performance review.
 ---
 
+Paused until 1.0 (#3215).
+
 # Performance review
 
 This is the method of the Performance review workflow

@@ -3,6 +3,8 @@ name: usability-check
 description: Look at the UI changes on main since the last release tag on the Mac window, the Remote and the web page for usability, consistency, parity and iOS design. Write the findings under .agents/reviews/usability/, keep the parity table true, and file at most five issues. Use when the Usability check workflow runs in a release (#1462), or when Alex asks for a usability check.
 ---
 
+Paused until 1.0 (#3215).
+
 # Usability check
 
 This is the method of the Usability check workflow
