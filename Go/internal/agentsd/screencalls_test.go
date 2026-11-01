@@ -100,6 +100,9 @@ func TestDriveScreenTakesTheScreenLeaseAndQueuesBehindAnotherAgent(t *testing.T)
 	second := appClient(t, d, secondAgent.ID)
 	firstClient.post("initialize", map[string]any{}, 1)
 	second.post("initialize", map[string]any{}, 1)
+	if _, err := d.setDesktopControl(&Client{Role: RoleControl, d: d}, wire.DesktopControlSettings{Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
 
 	// First call takes the lease and drives at once.
 	if text, isErr := firstClient.tool(2, "drive_screen", map[string]any{"app": "TextEdit", "action": "screenshot"}); isErr || text != "Screenshot of TextEdit." {

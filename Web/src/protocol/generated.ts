@@ -2462,6 +2462,14 @@ export interface DeliveredRoute {
   expires?: WireDate;
 }
 
+/**
+ * Whether agents on this Mac may drive its apps through drive_screen (#3004, FR-004). Kept in
+ * <settings>/desktop-control.json; Off when unset. Only the person's own clients may change it.
+ */
+export interface DesktopControlSettings {
+  enabled: boolean;
+}
+
 export type DestinationState =
   | { free: Record<string, never> }
   | { sameSkill: { update: boolean } }
@@ -9983,6 +9991,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DeletePreview: { required: ["count", "bytes"], optional: [] },
   DeleteSessionRequest: { required: ["runtimeID", "sessionID"], optional: ["confirmed"] },
   DeliveredRoute: { required: ["id", "name", "kind", "runtimes", "defaultFor", "secretFields", "version", "sealed"], optional: ["vendor", "settings", "models", "expires"] },
+  DesktopControlSettings: { required: ["enabled"], optional: [] },
   DestinationStateAnswer: { required: ["destinationState"], optional: [] },
   DestinationStateRequest: { required: ["previewID", "destination"], optional: [] },
   DetectedServer: { required: ["alias", "resolved", "outcome"], optional: ["detail"] },

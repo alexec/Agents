@@ -55,6 +55,29 @@ func pid(ofApp name: String) -> pid_t? {
         .map { $0.processIdentifier }
 }
 
+/// Brings the app named to the front and says why not when it cannot: the
+/// synthetic mouse and keyboard post to the whole session (InputSynthesis.swift), so they
+/// land in whatever app is frontmost. `type`, `key` and `click x,y` go only after this
+/// returns nil, so they reach the app the call names and the transcript's words are true.
+func frontmost(app name: String) -> String? {
+    guard let pid = pid(ofApp: name),
+          let running = NSRunningApplication(processIdentifier: pid) else {
+        return "no running app named \"\(name)\"."
+    }
+    if NSWorkspace.shared.frontmostApplication?.processIdentifier != pid {
+        running.activate()
+        // Activation lands through the run loop: wait for it, briefly.
+        let deadline = Date().addingTimeInterval(1)
+        while NSWorkspace.shared.frontmostApplication?.processIdentifier != pid, Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        }
+    }
+    guard NSWorkspace.shared.frontmostApplication?.processIdentifier == pid else {
+        return "\(name) is not frontmost, so nothing was sent: another app would have had it."
+    }
+    return nil
+}
+
 /// The accessibility tree, indented, for `read`: role, label and frame, as ui.swift's
 /// `dump` prints it.
 func axDump(pid: pid_t, limit: Int = 20) -> String {

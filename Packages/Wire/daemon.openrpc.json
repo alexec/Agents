@@ -34,7 +34,7 @@
     {
       "name": "host.desktop-control/1",
       "by": "host",
-      "description": "The host serves the app tool drive_screen (#3004, US1): an agent drives an app on this Mac through its own screen, mouse and keyboard, holding the screen lease while it does. An app tool, not a method, so declared, the same shape as agents.move-worktree/1. Mac only."
+      "description": "The host serves the app tool drive_screen (#3004, US1): an agent drives an app on this Mac through its own screen, mouse and keyboard, holding the screen lease while it does, only while the person has turned desktop control on (desktopControl/state, desktopControl/set; Off by default). Mac only."
     }
   ],
   "methods": [
@@ -2415,6 +2415,48 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/DaemonStatus"
+        }
+      }
+    },
+    {
+      "name": "desktopControl/set",
+      "x-capability": "host.desktop-control/1",
+      "description": "Turn desktop control on or off for this Mac (#3004, FR-004). Refused notPermitted from any caller but the person's own clients: never an agent, an MCP tool or a workflow.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/DesktopControlSettings"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/DesktopControlSettings"
+        }
+      }
+    },
+    {
+      "name": "desktopControl/state",
+      "x-capability": "host.desktop-control/1",
+      "description": "Whether desktop control is on for this Mac (#3004). Off when never set.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/DesktopControlSettings"
         }
       }
     },

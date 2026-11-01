@@ -380,7 +380,8 @@ func offeredTools(movesItself, bot, desktopControl bool) []json.RawMessage {
 		var name string
 		json.Unmarshal(t["name"], &name)
 		// A bot's machine has no ask tools: nobody answers there (#1761, FR-032). A host
-		// with no agents-drive beside it has no drive_screen (#3004, host.desktop-control/1).
+		// with no agents-drive beside it, or with desktop control Off, has no drive_screen
+		// (#3004, host.desktop-control/1, FR-004).
 		if !done[name] || name == "move_worktree" && !movesItself || askTools[name] && bot ||
 			name == "drive_screen" && !desktopControl {
 			continue
@@ -409,7 +410,7 @@ func (d *Daemon) appToolsHandle(ctx context.Context, g *appGrant, method string,
 	case "ping":
 		return map[string]any{}, nil
 	case "tools/list":
-		return map[string]any{"tools": offeredTools(g.movesItself, d.isBot(), d.desktopControlAvailable())}, nil
+		return map[string]any{"tools": offeredTools(g.movesItself, d.isBot(), d.offersDriveScreen())}, nil
 	case "resources/list":
 		return map[string]any{"resources": []any{}}, nil
 	case "resources/read":

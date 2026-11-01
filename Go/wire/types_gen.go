@@ -2909,6 +2909,11 @@ type DeliveredRoute struct {
 	Expires *Date `json:"expires,omitzero"`
 }
 
+// Whether agents on this Mac may drive its apps through drive_screen (#3004, FR-004). Kept in <settings>/desktop-control.json; Off when unset. Only the person's own clients may change it.
+type DesktopControlSettings struct {
+	Enabled bool `json:"enabled"`
+}
+
 type DestinationState struct {
 	Free *struct{} `json:"free,omitzero"`
 

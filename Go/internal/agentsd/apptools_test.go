@@ -83,12 +83,13 @@ func TestTheAppsToolsAreServedToEachRuntime(t *testing.T) {
 		} `json:"tools"`
 	}
 	json.Unmarshal(list["result"], &tools)
-	// drive_screen is the one tool this host may not offer at all, on a host with no
-	// agents-drive beside it (#3004, host.desktop-control/1): this runner has none.
-	want := len(appToolCalls())
-	if !d.desktopControlAvailable() {
-		want--
+	// drive_screen is the one tool this host may not offer at all: on a host with no
+	// agents-drive beside it (#3004, host.desktop-control/1), and on every host while desktop
+	// control is Off, as it is until the person turns it on (FR-004).
+	if d.desktopControlOn() || d.offersDriveScreen() {
+		t.Fatal("desktop control is on before anyone turned it on")
 	}
+	want := len(appToolCalls()) - 1
 	if len(tools.Tools) != want || tools.Tools[0].Name != "show_file" || tools.Tools[0].Description == "" ||
 		!strings.Contains(string(tools.Tools[0].InputSchema["properties"]), `"description"`) {
 		t.Fatalf("%s", list["result"])
@@ -130,5 +131,24 @@ func TestTheAppsToolsAreServedToEachRuntime(t *testing.T) {
 	req.Header.Set("Origin", "https://example.com")
 	if res, _ := http.DefaultClient.Do(req); res.StatusCode != 403 {
 		t.Fatal(res.StatusCode)
+	}
+}
+
+// offeredTools leaves drive_screen out unless desktop control is both available on this host
+// and turned on (#3004, FR-004): an agent never sees a tool it cannot use.
+func TestDriveScreenIsOfferedOnlyWhileDesktopControlIsOn(t *testing.T) {
+	offers := func(desktopControl bool) bool {
+		for _, raw := range offeredTools(false, false, desktopControl) {
+			if strings.Contains(string(raw), `"name":"drive_screen"`) {
+				return true
+			}
+		}
+		return false
+	}
+	if offers(false) {
+		t.Fatal("drive_screen offered while desktop control is off")
+	}
+	if !offers(true) {
+		t.Fatal("drive_screen not offered while desktop control is on")
 	}
 }

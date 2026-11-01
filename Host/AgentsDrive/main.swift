@@ -15,6 +15,9 @@
 //   {"action":"key","app":"TextEdit","keyName":"return"}
 //   {"action":"read","app":"TextEdit"}
 //
+// The mouse and keyboard post to the whole session, so `type`, `key` and `click` by x,y
+// first bring `app` to the front and refuse when it does not get there (frontmost(app:)).
+//
 // Each answered with {"ok":true, ...} or {"ok":false,"error":"..."}. It ends when its
 // standard input closes, which is when the agent's lease on "screen" is let go.
 import Foundation
@@ -69,6 +72,10 @@ readFrames { frame in
             }
             reply(["ok": true])
         } else if let x = json["x"] as? Double, let y = json["y"] as? Double {
+            if let refused = frontmost(app: app) {
+                reply(["ok": false, "error": refused])
+                return
+            }
             synthesizeClick(x: x, y: y)
             reply(["ok": true])
         } else {
@@ -80,11 +87,23 @@ readFrames { frame in
             reply(["ok": false, "error": "type needs text."])
             return
         }
+        if let refused = frontmost(app: app) {
+            reply(["ok": false, "error": refused])
+            return
+        }
         synthesizeType(text)
         reply(["ok": true])
 
     case "key":
-        guard let keyName = json["keyName"] as? String, synthesizeKey(keyName) else {
+        guard let keyName = json["keyName"] as? String, !keyName.isEmpty else {
+            reply(["ok": false, "error": "key needs a keyName it knows."])
+            return
+        }
+        if let refused = frontmost(app: app) {
+            reply(["ok": false, "error": refused])
+            return
+        }
+        guard synthesizeKey(keyName) else {
             reply(["ok": false, "error": "key needs a keyName it knows."])
             return
         }
