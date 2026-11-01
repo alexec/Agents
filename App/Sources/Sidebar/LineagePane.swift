@@ -16,6 +16,8 @@ struct LineagePane: View {
 
     @State private var graph: DaemonAPI.LineageGraph?
     @State private var costs: [DaemonAPI.LineageNode: DaemonAPI.LineageCostRollup] = [:]
+    /// The graph laid out, each time `graph` or `costs` is set, not in `body` (#3112).
+    @State private var layout: LineageLayout.Graph?
     @State private var failure: String?
     /// The daemon is still resolving titles and the graph is walked again each second.
     @State private var reading = false
@@ -36,9 +38,8 @@ struct LineagePane: View {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let graph, !graph.nodes.contains(where: { $0 != me }) {
                 message(LineageList.none)
-            } else if let graph {
-                LineageGraphView(graph: LineageLayout.graph(of: me, graph: graph, costs: costs, title: title),
-                                 open: action(for:))
+            } else if let layout {
+                LineageGraphView(graph: layout, open: action(for:))
                     .safeAreaInset(edge: .bottom, spacing: 0) {
                         footer.padding(.horizontal, 12).padding(.vertical, 6)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -92,6 +93,7 @@ struct LineagePane: View {
             let walked = try await model.lineageWalk(of: agent.id)
             failure = nil
             graph = walked
+            lay()
             var found: [DaemonAPI.LineageNode: DaemonAPI.LineageCostRollup] = [:]
             await withTaskGroup(of: DaemonAPI.LineageCostRollup?.self) { group in
                 for node in walked.nodes where LineageList.costed(node) {
@@ -103,6 +105,7 @@ struct LineagePane: View {
             }
             guard !Task.isCancelled else { return }
             costs = found
+            lay()
             // The daemon resolves issues' and PRs' titles in the background (#3102): walk
             // again while it says some are still to come.
             // One failed walk keeps the graph that is shown and stops asking (#3154).
@@ -117,6 +120,7 @@ struct LineagePane: View {
                 }
                 guard !Task.isCancelled else { return }
                 graph = latest
+                lay()
             }
             guard !Task.isCancelled else { return }
             reading = false
@@ -124,6 +128,10 @@ struct LineagePane: View {
             guard !Task.isCancelled else { return }
             failure = "The links could not be read: \(error.localizedDescription)"
         }
+    }
+
+    private func lay() {
+        layout = graph.map { LineageLayout.graph(of: me, graph: $0, costs: costs, title: title) }
     }
 
     /// A GitHub issue or PR opens in the browser; a session in this window goes to its chat.
@@ -167,34 +175,11 @@ struct LineageGraphView: View {
 
     private func canvas(scale: Double, fit: Double) -> some View {
         ScrollView([.horizontal, .vertical]) {
-            ZStack(alignment: .topLeading) {
-                Canvas { context, _ in lines(&context) }
-                    .frame(width: graph.width, height: graph.height)
-                    .accessibilityHidden(true)
-                ForEach(graph.nodes) { node in
-                    LineageBox(node: node, open: open(node.row), verb: verb(node.row))
-                        .frame(width: LineageLayout.boxWidth, height: LineageLayout.boxHeight)
-                        .offset(x: node.x, y: node.y)
-                }
-                // The verbs over the boxes: a line that skips a tier passes under one.
-                ForEach(graph.edges) { edge in
-                    if let mid = graph.curve(edge)?.mid {
-                        Text(edge.label)
-                            .appText(.fine)
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 3)
-                            .background(Paper.ground, in: RoundedRectangle(cornerRadius: 3))
-                            .fixedSize()
-                            .position(x: mid.x, y: mid.y)
-                    }
-                }
+            LineageDrawing(graph: graph, open: open, verb: verb)
+                .equatable()
                 .frame(width: graph.width, height: graph.height, alignment: .topLeading)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
-            }
-            .frame(width: graph.width, height: graph.height, alignment: .topLeading)
-            .scaleEffect(scale, anchor: .topLeading)
-            .frame(width: graph.width * scale, height: graph.height * scale, alignment: .topLeading)
+                .scaleEffect(scale, anchor: .topLeading)
+                .frame(width: graph.width * scale, height: graph.height * scale, alignment: .topLeading)
         }
         .gesture(MagnifyGesture()
             .updating($pinch) { value, pinch, _ in pinch = value.magnification }
@@ -213,6 +198,44 @@ struct LineageGraphView: View {
             .padding(6)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Paper.Radius.control))
             .padding(8)
+        }
+    }
+}
+
+/// The boxes, lines and verbs of the graph at actual size. Equatable on the graph alone, so a
+/// pinch, which only scales it, does not draw it again on each frame (#3112).
+private struct LineageDrawing: View, Equatable {
+    let graph: LineageLayout.Graph
+    let open: (LineageList.Row) -> (() -> Void)?
+    let verb: (LineageList.Row) -> String
+
+    nonisolated static func == (a: Self, b: Self) -> Bool { a.graph == b.graph }
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            Canvas { context, _ in lines(&context) }
+                .frame(width: graph.width, height: graph.height)
+                .accessibilityHidden(true)
+            ForEach(graph.nodes) { node in
+                LineageBox(node: node, open: open(node.row), verb: verb(node.row))
+                    .frame(width: LineageLayout.boxWidth, height: LineageLayout.boxHeight)
+                    .offset(x: node.x, y: node.y)
+            }
+            // The verbs over the boxes: a line that skips a tier passes under one.
+            ForEach(graph.edges) { edge in
+                if let mid = graph.curve(edge)?.mid {
+                    Text(edge.label)
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 3)
+                        .background(Paper.ground, in: RoundedRectangle(cornerRadius: 3))
+                        .fixedSize()
+                        .position(x: mid.x, y: mid.y)
+                }
+            }
+            .frame(width: graph.width, height: graph.height, alignment: .topLeading)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
         }
     }
 

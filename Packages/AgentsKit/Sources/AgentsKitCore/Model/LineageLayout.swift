@@ -30,17 +30,35 @@ public enum LineageLayout {
     }
 
     public struct Graph: Sendable, Hashable {
-        public var nodes: [GraphNode]
-        public var edges: [GraphEdge]
+        /// Let, not var: `curves` is worked out from them.
+        public let nodes: [GraphNode]
+        public let edges: [GraphEdge]
         public var width: Double
         public var height: Double
+
+        /// Each edge's line, by its id, worked out once with the layout (#3112): the view draws
+        /// them on each frame of a pinch.
+        var curves: [String: Curve] = [:]
+
+        public init(nodes: [GraphNode], edges: [GraphEdge], width: Double, height: Double) {
+            self.nodes = nodes
+            self.edges = edges
+            self.width = width
+            self.height = height
+            let byID = Dictionary(nodes.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            for edge in edges {
+                guard let a = byID[edge.from], let b = byID[edge.to] else { continue }
+                curves[edge.id] = Self.curve(from: a, to: b)
+            }
+        }
 
         public func node(_ id: String) -> GraphNode? { nodes.first { $0.id == id } }
 
         /// Where an edge's line goes: from the bottom or top of one box to the top or bottom of the
         /// other, or below a tier for two boxes in it, with `mid` the point halfway for its label.
-        public func curve(_ edge: GraphEdge) -> Curve? {
-            guard let a = node(edge.from), let b = node(edge.to) else { return nil }
+        public func curve(_ edge: GraphEdge) -> Curve? { curves[edge.id] }
+
+        static func curve(from a: GraphNode, to b: GraphNode) -> Curve {
             let h = LineageLayout.boxHeight, ax = a.x + LineageLayout.boxWidth / 2, bx = b.x + LineageLayout.boxWidth / 2
             let start: Point, end: Point, c1: Point, c2: Point
             if a.y == b.y {
@@ -150,9 +168,8 @@ public enum LineageLayout {
         }
         // A line below the last tier needs room for its bend.
         let last = tiers.count - 1
-        let bends = edges.contains { e in
-            [e.from, e.to].allSatisfy { id in tiers[last].contains { $0.id == id } }
-        }
+        let bottom = Set(tiers[last].map(\.id))
+        let bends = edges.contains { bottom.contains($0.from) && bottom.contains($0.to) }
         let height = 2 * margin + Double(tiers.count) * boxHeight + Double(last) * tierGap + (bends ? arc : 0)
         return Graph(nodes: nodes, edges: edges, width: 2 * margin + wide, height: height)
     }

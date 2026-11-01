@@ -19,6 +19,8 @@ struct LineagePage: View {
     @State private var typedWrong = false
     @State private var graph: DaemonAPI.LineageGraph?
     @State private var costs: [DaemonAPI.LineageNode: DaemonAPI.LineageCostRollup] = [:]
+    /// The graph laid out, each time `graph` or `costs` is set, not in `body` (#3112).
+    @State private var layout: LineageLayout.Graph?
     @State private var failure: String?
     /// The daemon is still resolving titles and the graph is walked again each second.
     @State private var reading = false
@@ -104,8 +106,7 @@ struct LineagePage: View {
                 HostNeedsUpdateView()
             } else if let failure {
                 message(failure)
-            } else if let graph {
-                let layout = LineageLayout.graph(of: place.node, graph: graph, costs: costs, title: title)
+            } else if let graph, let layout {
                 VStack(spacing: 0) {
                     heading(LineageList.start(place.node, graph: graph, costs: costs, title: title))
                     if layout.nodes.isEmpty {
@@ -190,6 +191,7 @@ struct LineagePage: View {
     private func load() async {
         reading = false
         graph = nil
+        layout = nil
         failure = nil
         costs = [:]
         guard let place, model.host(place.host, has: Capability.lineage1) else { return }
@@ -197,6 +199,7 @@ struct LineagePage: View {
             let walked = try await model.lineageWalk(place.node, on: place.host)
             guard !Task.isCancelled else { return }
             graph = walked
+            lay(place)
             var found: [DaemonAPI.LineageNode: DaemonAPI.LineageCostRollup] = [:]
             await withTaskGroup(of: DaemonAPI.LineageCostRollup?.self) { group in
                 for node in walked.nodes where LineageList.costed(node) {
@@ -208,6 +211,7 @@ struct LineagePage: View {
             }
             guard !Task.isCancelled else { return }
             costs = found
+            lay(place)
             // The daemon resolves issues' and PRs' titles in the background (#3102): walk
             // again while it says some are still to come.
             // One failed walk keeps the graph that is shown and stops asking (#3154).
@@ -222,6 +226,7 @@ struct LineagePage: View {
                 }
                 guard !Task.isCancelled else { return }
                 graph = latest
+                lay(place)
             }
             guard !Task.isCancelled else { return }
             reading = false
@@ -229,6 +234,10 @@ struct LineagePage: View {
             guard !Task.isCancelled else { return }
             failure = "The links could not be read: \(error.localizedDescription)"
         }
+    }
+
+    private func lay(_ place: LineagePlace) {
+        layout = graph.map { LineageLayout.graph(of: place.node, graph: $0, costs: costs, title: title) }
     }
 
     private func message(_ text: String) -> some View {
