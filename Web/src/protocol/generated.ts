@@ -3813,6 +3813,14 @@ export interface LineageCostNode {
   /** When a PR ended (#2351): merged, closed or reverted. Absent while open. */
   endedAt?: WireDate;
   lastAt: WireDate;
+  /**
+   * An issue's or PR's title, state and labels as the machine's resolve cache has them (#3118), for
+   * reports/nodes. The machine asks no forge to fill it; absent until a lineage walk resolved the
+   * node.
+   */
+  resolved?: LineageResolved;
+  /** The sessions linked to the node (works-on, opens, reviews), by ref, at most 20 (#3118). */
+  sessions?: string[];
 }
 
 /**
@@ -6653,6 +6661,79 @@ export interface ReportExport {
 export type ReportFormat =
   | "csv"
   | "jsonl";
+
+/**
+ * One row of reports/nodes (#3118): an issue, PR, milestone or release, its cost rolled up from
+ * every machine in the scope as reports/value adds it up. own is what was banked on the node
+ * itself; total adds its parts (an issue's PRs; a milestone's or release's issues and PRs); waste
+ * is the parts' PRs closed without a merge or reverted. sessions is how many sessions worked on it
+ * and its parts, each once. leadTimeSeconds is from the first work on it to its last PR merged,
+ * absent before a merge. resolved is the newest title, state and labels any machine sent; absent
+ * when none had them.
+ */
+export interface ReportNode {
+  node: LineageNode;
+  /** The repo or tracker the node is in, as LineageCostNode's. */
+  project?: string;
+  resolved?: LineageResolved;
+  cost: ReportNodeCost;
+  sessions: number;
+  leadTimeSeconds?: number;
+  /** A PR's end, as LineageCostNode's; absent while open. */
+  outcome?: string;
+  /** The last change to it or any of its parts. */
+  lastAt: WireDate;
+}
+
+/** A reports/nodes row's cost (#3118). */
+export interface ReportNodeCost {
+  own: LineageCost;
+  total: LineageCost;
+  waste: LineageCost;
+}
+
+/**
+ * reports/nodes' answer (#3118): a page of at most 100 nodes. cursor asks for the next page; absent
+ * on the last. limited says there are more pages. unresolved is how many nodes of the kind no
+ * machine sent a title, state or labels for: a state or label filter matches none of them.
+ */
+export interface ReportNodes {
+  nodes: ReportNode[];
+  cursor?: string;
+  limited: boolean;
+  unresolved: number;
+}
+
+/**
+ * reports/nodes (#3118): the lineage nodes of one kind in a scope, with filters and pages. The
+ * scope is as reports/value's. state is open, closed or merged, from the node's resolved state (a
+ * PR with none falls back to its outcome); milestones and releases have no state in v1. repo is a
+ * ref prefix (github:alexec/Agents). since is on the node's last change. limit is 1 to 100, 50 when
+ * absent. cursor is the last page's, opaque.
+ */
+export interface ReportNodesQuery {
+  /** issue, pr, milestone or release. */
+  kind: string;
+  state?: string;
+  repo?: string;
+  label?: string;
+  since?: WireDate;
+  sort?: ReportNodesSort;
+  cursor?: string;
+  limit?: number;
+  /** Me, a group or the organisation (#1804). */
+  scope?: ReportScope;
+}
+
+/**
+ * newest (the last change first; the default), cost (total, the most first), waste (the most first)
+ * or leadTime (the longest first; nodes with none last).
+ */
+export type ReportNodesSort =
+  | "newest"
+  | "cost"
+  | "waste"
+  | "leadTime";
 
 /** A page of Reports (#1804, #2019). */
 export type ReportPage =
@@ -9554,6 +9635,7 @@ export interface Methods {
   "reports/deleteView": { params: ReportViewID; result: ReportViews };
   "reports/export": { params: ReportQuery; result: ReportExport };
   "reports/features": { params: Empty; result: FeatureUsage };
+  "reports/nodes": { params: ReportNodesQuery; result: ReportNodes };
   "reports/policy": { params: Empty; result: ReportPolicy };
   "reports/saveView": { params: ReportView; result: ReportViews };
   "reports/scopes": { params: Empty; result: ReportScopes };
@@ -9854,6 +9936,7 @@ export const MethodTarget = {
   "reports/deleteView": "control",
   "reports/export": "control",
   "reports/features": "host",
+  "reports/nodes": "control",
   "reports/policy": "control",
   "reports/saveView": "control",
   "reports/scopes": "control",
@@ -10329,7 +10412,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Levels: { required: [], optional: ["model", "permission", "permissionRequests"] },
   LineMember: { required: ["agentID", "askedAt", "isCallOpen"], optional: [] },
   LineageCost: { required: ["cost", "inputTokens", "outputTokens", "turns", "workingSeconds", "waitingSeconds"], optional: ["limitTokens"] },
-  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["project", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "endedAt"] },
+  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["project", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "endedAt", "resolved", "sessions"] },
   LineageCostRollup: { required: ["node", "own", "total", "waste", "unlinked", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "parts"], optional: ["limited"] },
   LineageEndRequest: { required: ["from", "to", "rel"], optional: [] },
   LineageGraph: { required: ["nodes", "links"], optional: ["limited", "resolving", "resolved"] },
@@ -10608,6 +10691,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RenameRequest: { required: ["agentID", "title"], optional: [] },
   ReportCounts: { required: ["sessions", "failedSessions", "prsOpened", "prsMerged", "prsReverted", "mergeSeconds", "waits", "waitBuckets", "workflowRuns", "workflowFailures"], optional: [] },
   ReportExport: { required: ["text", "count", "format"], optional: [] },
+  ReportNode: { required: ["node", "cost", "sessions", "lastAt"], optional: ["project", "resolved", "leadTimeSeconds", "outcome"] },
+  ReportNodeCost: { required: ["own", "total", "waste"], optional: [] },
+  ReportNodes: { required: ["nodes", "limited", "unresolved"], optional: ["cursor"] },
+  ReportNodesQuery: { required: ["kind"], optional: ["state", "repo", "label", "since", "sort", "cursor", "limit", "scope"] },
   ReportPolicy: { required: ["totalsOnly", "leads", "budgetsUSD"], optional: [] },
   ReportQuery: { required: ["range"], optional: ["format", "scope"] },
   ReportRow: { required: ["at", "person", "personName", "host", "hostName", "runtime", "cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds", "folder"], optional: ["workflow", "groups", "counts", "project", "projectName"] },
