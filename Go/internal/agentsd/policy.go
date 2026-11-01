@@ -15,6 +15,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/internal/controllink"
+	"github.com/alexec/agents/Go/internal/policylayers"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -302,8 +303,12 @@ func (d *Daemon) missingCapabilities(p *wire.OrgPolicy) []string {
 	return missing
 }
 
-// policyRefusal is a policyRefused error, with the words the clients show (FR-010).
-func policyRefusal(reason, rule, words string, until *time.Time) error {
+// policyRefusal is a policyRefused error, with the words the clients show (FR-010). layer
+// is optional (#2957, R8): most refusals here are still the organisation's own (stopAll,
+// noPolicy, mustJoin, update, the unmetered allowlist, Antigravity's terms, account and
+// model routing), which name no layer, as before. A caller that knows which layer decided
+// passes it, so PolicyRefusal.layer and .value carry it (T019, T020).
+func policyRefusal(reason, rule, words string, until *time.Time, layer ...wire.PolicyLayerRef) error {
 	r := wire.PolicyRefusal{Reason: reason, Words: words}
 	if rule != "" {
 		r.Rule = &rule
@@ -317,12 +322,33 @@ func policyRefusal(reason, rule, words string, until *time.Time) error {
 	case "policy", "budget", "stopAll":
 		message = orgSetBy + " " + words
 	}
+	if len(layer) > 0 {
+		l := layer[0]
+		r.Layer = &l
+		r.Value = &words
+		if l.Kind != "organisation" {
+			message = l.Name + ": " + words
+		}
+	}
 	return &Error{Code: wire.FailurePolicyRefused, Message: message, Data: r}
 }
 
-// setBy is the mark on a choice the policy refuses or caps.
-func setBy(rule, words string) *wire.PolicySetBy {
-	return &wire.PolicySetBy{By: "organisation", Rule: rule, Words: words}
+// setBy is the mark on a choice the policy refuses or caps, naming the layer that decided
+// (#2957, R8).
+func setBy(layer wire.PolicyLayerRef, rule, words string) *wire.PolicySetBy {
+	l := layer
+	return &wire.PolicySetBy{By: l.Kind, Rule: rule, Words: words, Layer: &l}
+}
+
+// orgLayerRef is the organisation's layer reference, for a mark or a refusal the
+// organisation's own rules cause (R8).
+func orgLayerRef(p *wire.OrgPolicy) wire.PolicyLayerRef {
+	return wire.PolicyLayerRef{Kind: "organisation", Name: "Your organisation"}
+}
+
+// youLayerRef is the person's own layer reference (#2957, R8).
+func youLayerRef() wire.PolicyLayerRef {
+	return wire.PolicyLayerRef{Kind: "you", Name: "You"}
 }
 
 // workRefusal is why this machine starts no work at all now: no policy it can trust
@@ -358,21 +384,28 @@ func (d *Daemon) workRefusal() error {
 
 // MARK: runtimes and models
 
-// runtimeRefusal is why the policy does not allow a runtime here, or nil.
+// runtimeRefusal is why the policy does not allow a runtime here, by the organisation's or
+// your own layer (#2957, FR-002's new rule: "runtimes and models allowed"), or nil. Your
+// layer's own allowlist is checked whether or not there is an organisation (T019).
 func (d *Daemon) runtimeRefusal(p *wire.OrgPolicy, runtimeID string) error {
+	if yr := d.yourPolicyRules().Runtimes; yr != nil {
+		if _, ok := yr[runtimeID]; !ok {
+			return policyRefusal("policy", "runtimes", "Your policy does not allow "+runtimeName(runtimeID)+".", nil, youLayerRef())
+		}
+	}
 	if p == nil {
 		return nil
 	}
 	if p.Runtimes != nil {
 		if _, ok := p.Runtimes[runtimeID]; !ok {
-			return policyRefusal("policy", "runtimes", "Your organisation does not allow "+runtimeName(runtimeID)+".", nil)
+			return policyRefusal("policy", "runtimes", "Your organisation does not allow "+runtimeName(runtimeID)+".", nil, orgLayerRef(p))
 		}
 	}
 	if err := noticeRefusal(p, runtimeID); err != nil {
 		return err
 	}
 	if b := p.Budgets; b != nil && budgetSet(b) && unmeteredRuntimes[runtimeID] && !slices.Contains(b.AllowUnmetered, runtimeID) {
-		return policyRefusal("policy", "budgets.allowUnmetered", orgUnmeteredWords, nil)
+		return policyRefusal("policy", "budgets.allowUnmetered", orgUnmeteredWords, nil, orgLayerRef(p))
 	}
 	return nil
 }
@@ -751,10 +784,183 @@ func agentModel(a *wire.Agent) string {
 	return ""
 }
 
-// MARK: sandbox
+// MARK: the effective policy (#2957, T018): the organisation's and your layer, merged by
+// policylayers.Resolve, in place of the organisation-only ceiling above for the rules this
+// slice newly enforces. A folder's own layer is slice 3's work (T027); Resolve already
+// handles its absence, an empty layer that sets nothing.
 
-func sandboxRequired(p *wire.OrgPolicy) bool {
-	return p != nil && p.Sandbox != nil && *p.Sandbox == "required"
+// orgRulesFrom is the organisation's layer as PolicyRules, for Resolve: the fields OrgPolicy
+// and PolicyRules share directly as they are, and permissionMode mapped once from
+// modeCeiling (research R5), until slice 3 (T035) moves the organisation's own field over.
+func orgRulesFrom(p *wire.OrgPolicy) wire.PolicyRules {
+	var r wire.PolicyRules
+	if p == nil {
+		return r
+	}
+	if p.ModeCeiling != nil {
+		level := orgModeCeilingAsPermissionLevel(*p.ModeCeiling)
+		r.PermissionMode = &level
+	}
+	if p.Sandbox != nil && *p.Sandbox == "required" {
+		on := wire.SandboxChoiceOn
+		r.Sandbox = &on
+	}
+	r.Runtimes = p.Runtimes
+	r.Marketplaces = p.Marketplaces
+	r.Environment = p.Environment
+	r.Helpers = p.Helpers
+	if p.Budgets != nil {
+		b := p.Budgets
+		budgets := wire.PolicyRuleBudgets{PerAgentTokens: b.PerAgentTokens, DailyTokens: b.DailyTokens}
+		if b.Daily != nil {
+			daily := wire.Cost{Amount: *b.Daily, Currency: "USD"}
+			budgets.Daily = &daily
+		}
+		if b.PerAgent != nil {
+			perAgent := wire.Cost{Amount: *b.PerAgent, Currency: "USD"}
+			budgets.PerAgent = &perAgent
+		}
+		if budgets != (wire.PolicyRuleBudgets{}) {
+			r.Budgets = &budgets
+		}
+	}
+	return r
+}
+
+// orgModeCeilingMap is research R5's map: each of today's five mode-ceiling values onto
+// Auto's four permission levels, the same or a tighter one, so no organisation loosens by
+// this reading.
+var orgModeCeilingMap = map[string]wire.PermissionLevel{
+	"ask":               wire.PermissionLevelPlan,
+	"default":           wire.PermissionLevelAsk,
+	"acceptEdits":       wire.PermissionLevelApproveForMe,
+	"auto":              wire.PermissionLevelApproveForMe,
+	"bypassPermissions": wire.PermissionLevelBypassPermissions,
+}
+
+// orgModeCeilingAsPermissionLevel reads research R5's map each time, until slice 3 (T035)
+// moves the organisation's own permissionMode field over and signs it once instead.
+func orgModeCeilingAsPermissionLevel(ceiling string) wire.PermissionLevel {
+	if l, ok := orgModeCeilingMap[ceiling]; ok {
+		return l
+	}
+	return wire.PermissionLevelBypassPermissions // an unknown ceiling counts as the loosest (R6)
+}
+
+// effective is the effective policy for folder ("" for no folder): the organisation's and
+// your layers, merged by policylayers.Resolve (R7, R12). A folder's own layer is slice 3's
+// work.
+func (d *Daemon) effective(folder string) wire.EffectivePolicy {
+	org := d.orgPolicy()
+	layers := []policylayers.Layer{
+		{Ref: orgLayerRef(org), Rules: orgRulesFrom(org)},
+		{Ref: youLayerRef(), Rules: d.yourPolicyRules()},
+	}
+	eff := policylayers.Resolve(layers)
+	if folder != "" {
+		f := folder
+		eff.Folder = &f
+	}
+	if org != nil {
+		name := orgLayerRef(org).Name
+		eff.Organisation = &name
+	}
+	return eff
+}
+
+// effectiveRule is one rule of eff, or nil (every PolicyRuleName is in Resolve's output, so
+// this is only nil for a name Resolve does not know).
+func effectiveRule(eff wire.EffectivePolicy, rule wire.PolicyRuleName) *wire.EffectiveRule {
+	for i := range eff.Rules {
+		if eff.Rules[i].Rule == rule {
+			return &eff.Rules[i]
+		}
+	}
+	return nil
+}
+
+// effectiveInt, effectiveFloat and effectiveBool decode one rule's effective value, with
+// the layer that decides it; nil, nil when no layer sets it (today's default applies).
+func effectiveInt(eff wire.EffectivePolicy, rule wire.PolicyRuleName) (*int64, *wire.PolicyLayerRef) {
+	r := effectiveRule(eff, rule)
+	if r == nil || r.Decides == nil {
+		return nil, nil
+	}
+	var v int64
+	if json.Unmarshal(r.Value, &v) != nil {
+		return nil, nil
+	}
+	return &v, r.Decides
+}
+
+func effectiveFloat(eff wire.EffectivePolicy, rule wire.PolicyRuleName) (*float64, *wire.PolicyLayerRef) {
+	r := effectiveRule(eff, rule)
+	if r == nil || r.Decides == nil {
+		return nil, nil
+	}
+	var v float64
+	if json.Unmarshal(r.Value, &v) != nil {
+		return nil, nil
+	}
+	return &v, r.Decides
+}
+
+func effectiveBool(eff wire.EffectivePolicy, rule wire.PolicyRuleName) (*bool, *wire.PolicyLayerRef) {
+	r := effectiveRule(eff, rule)
+	if r == nil || r.Decides == nil {
+		return nil, nil
+	}
+	var v bool
+	if json.Unmarshal(r.Value, &v) != nil {
+		return nil, nil
+	}
+	return &v, r.Decides
+}
+
+// effectiveSandboxOn is the effective sandbox rule as "must be on" (FR-002's new rule for
+// your layer, merged with the organisation's today's-only required), with the layer that
+// decides it, when one does.
+func (d *Daemon) effectiveSandboxOn(folder string) (bool, *wire.PolicyLayerRef) {
+	r := effectiveRule(d.effective(folder), wire.PolicyRuleNameSandbox)
+	if r == nil || r.Decides == nil {
+		return false, nil
+	}
+	var v wire.SandboxChoice
+	json.Unmarshal(r.Value, &v)
+	return v == wire.SandboxChoiceOn, r.Decides
+}
+
+// effectivePermissionMode is the effective permissionMode rule (#2957, FR-008): both what
+// Auto gives a new agent, and the loosest level a person, an agent, a helper or a workflow
+// may choose, merging the organisation's modeCeiling (mapped once, research R5) and your
+// layer's own permissionMode (autopick.go). ok is false when no layer sets it: a new agent
+// gets Ask, and any level may be chosen, as today.
+func (d *Daemon) effectivePermissionMode() (wire.PermissionLevel, *wire.PolicyLayerRef, bool) {
+	r := effectiveRule(d.effective(""), wire.PolicyRuleNamePermissionMode)
+	if r == nil || r.Decides == nil {
+		return "", nil, false
+	}
+	var v wire.PermissionLevel
+	if json.Unmarshal(r.Value, &v) != nil {
+		return "", nil, false
+	}
+	return v, r.Decides, true
+}
+
+// sandboxRequired is whether the effective policy requires the command sandbox, outside any
+// folder (sandboxRequired kept its name for its many callers; sandboxfailure.go etc).
+func (d *Daemon) sandboxRequired() bool {
+	on, _ := d.effectiveSandboxOn("")
+	return on
+}
+
+// sandboxRequiredWordsFor is the words for a sandbox refusal, naming the layer that decided,
+// when it is not the organisation (whose words already name it, as orgSetBy does).
+func sandboxRequiredWordsFor(layer *wire.PolicyLayerRef) string {
+	if layer != nil && layer.Kind != "organisation" {
+		return "Your policy requires the command sandbox."
+	}
+	return sandboxRequiredWords
 }
 
 const sandboxRequiredWords = "Your organisation requires the command sandbox."
@@ -773,59 +979,89 @@ func requiredSandbox(runtimeID string) (wire.SandboxChoice, bool) {
 
 // MARK: marketplaces
 
-// marketplaceAllowed is whether the policy allows a marketplace: named by its id, or by
-// its address alone, so that an admin names a marketplace once for every person and
-// folder that lists it. An id of "" is a marketplace not named, which an allowlist refuses.
-func (d *Daemon) marketplaceAllowed(id, url string) bool {
-	p := d.orgPolicy()
-	if p == nil || p.Marketplaces == nil {
-		return true
-	}
-	if id == "" && url == "" {
-		return false
-	}
+// marketplaceRefusal is why a marketplace, named by its id or by its address alone (so an
+// admin names it once for every person and folder that lists it), may not be added or
+// turned on: the organisation's allowlist or your layer's (#2957, FR-002's new rule),
+// whichever excludes it, named in the refusal (T019, T020); nil when both allow it. An id
+// of "" and an address of "" is a marketplace not named, which an allowlist refuses.
+func (d *Daemon) marketplaceRefusal(id, url string) error {
 	if url == "" {
 		if _, rest, ok := strings.Cut(id, ":"); ok {
 			url = rest
 		}
 	}
-	return slices.ContainsFunc(p.Marketplaces.Allowed, func(a string) bool {
+	matches := func(a string) bool {
 		return a == id || url != "" && strings.TrimRight(a, "/") == strings.TrimRight(url, "/")
-	})
+	}
+	org := d.orgPolicy()
+	youMarketplaces := d.yourPolicyRules().Marketplaces
+	if id == "" && url == "" {
+		switch {
+		case org != nil && org.Marketplaces != nil:
+			return policyRefusal("policy", "marketplaces", "Your organisation does not allow this marketplace.", nil, orgLayerRef(org))
+		case youMarketplaces != nil:
+			return policyRefusal("policy", "marketplaces", "Your policy does not allow this marketplace.", nil, youLayerRef())
+		default:
+			return policyRefusal("policy", "marketplaces", marketplaceRefusalWords(), nil)
+		}
+	}
+	if org != nil && org.Marketplaces != nil && !slices.ContainsFunc(org.Marketplaces.Allowed, matches) {
+		return policyRefusal("policy", "marketplaces", "Your organisation does not allow this marketplace.", nil, orgLayerRef(org))
+	}
+	if youMarketplaces != nil && !slices.ContainsFunc(youMarketplaces.Allowed, matches) {
+		return policyRefusal("policy", "marketplaces", "Your policy does not allow this marketplace.", nil, youLayerRef())
+	}
+	return nil
 }
+
+// marketplaceAllowed is whether the policy allows a marketplace (marketplaceRefusal).
+func (d *Daemon) marketplaceAllowed(id, url string) bool { return d.marketplaceRefusal(id, url) == nil }
 
 func marketplaceRefusalWords() string { return "Your organisation does not allow this marketplace." }
 
-// customServerRefusal is why an MCP server added by hand is refused, or nil.
+// customServerRefusal is why an MCP server added by hand is refused, by the organisation's
+// or your own layer (#2957, FR-002's new rule), or nil.
 func (d *Daemon) customServerRefusal() error {
-	p := d.orgPolicy()
-	if p == nil || p.Marketplaces == nil || p.Marketplaces.CustomServers != "refuse" {
-		return nil
+	if p := d.orgPolicy(); p != nil && p.Marketplaces != nil && p.Marketplaces.CustomServers == "refuse" {
+		return policyRefusal("policy", "marketplaces.customServers", "Your organisation does not allow MCP servers added by hand.", nil, orgLayerRef(p))
 	}
-	return policyRefusal("policy", "marketplaces.customServers", "Your organisation does not allow MCP servers added by hand.", nil)
+	if ym := d.yourPolicyRules().Marketplaces; ym != nil && ym.CustomServers == "refuse" {
+		return policyRefusal("policy", "marketplaces.customServers", "Your policy does not allow MCP servers added by hand.", nil, youLayerRef())
+	}
+	return nil
 }
 
 // MARK: helpers
 
-// helperCaps caps a folder's helper limits by the policy's, and marks them when it does.
+// helperCaps caps a folder's helper limits by the organisation's and your layer's (#2957,
+// FR-002: helpers.mostRunning/mostNotArchived are a new rule of your layer too), tightest
+// wins, and marks them with whichever layer decided.
 func (d *Daemon) helperCaps(running, notArchived int64) (int64, int64, *wire.PolicySetBy) {
-	p := d.orgPolicy()
-	if p == nil || p.Helpers == nil {
-		return running, notArchived, nil
-	}
 	var mark *wire.PolicySetBy
-	if h := p.Helpers.MostRunning; h != nil && *h < running {
-		running = *h
-		mark = setBy("helpers.mostRunning", helperWords(p.Helpers))
+	if p := d.orgPolicy(); p != nil && p.Helpers != nil {
+		if h := p.Helpers.MostRunning; h != nil && *h < running {
+			running = *h
+			mark = setBy(orgLayerRef(p), "helpers.mostRunning", helperWords("Your organisation", p.Helpers))
+		}
+		if h := p.Helpers.MostNotArchived; h != nil && *h < notArchived {
+			notArchived = *h
+			mark = setBy(orgLayerRef(p), "helpers.mostNotArchived", helperWords("Your organisation", p.Helpers))
+		}
 	}
-	if h := p.Helpers.MostNotArchived; h != nil && *h < notArchived {
-		notArchived = *h
-		mark = setBy("helpers.mostNotArchived", helperWords(p.Helpers))
+	if yh := d.yourPolicyRules().Helpers; yh != nil {
+		if h := yh.MostRunning; h != nil && *h < running {
+			running = *h
+			mark = setBy(youLayerRef(), "helpers.mostRunning", helperWords("Your policy", yh))
+		}
+		if h := yh.MostNotArchived; h != nil && *h < notArchived {
+			notArchived = *h
+			mark = setBy(youLayerRef(), "helpers.mostNotArchived", helperWords("Your policy", yh))
+		}
 	}
 	return running, notArchived, mark
 }
 
-func helperWords(h *wire.PolicyHelpers) string {
+func helperWords(who string, h *wire.PolicyHelpers) string {
 	var parts []string
 	if h.MostRunning != nil {
 		parts = append(parts, fmt.Sprintf("%d running", *h.MostRunning))
@@ -833,7 +1069,7 @@ func helperWords(h *wire.PolicyHelpers) string {
 	if h.MostNotArchived != nil {
 		parts = append(parts, fmt.Sprintf("%d not archived", *h.MostNotArchived))
 	}
-	return "Your organisation allows at most " + strings.Join(parts, " and ") + " helper sessions in a folder."
+	return who + " allows at most " + strings.Join(parts, " and ") + " helper sessions in a folder."
 }
 
 // markHelperLimits marks a folder whose helper limits the policy caps.
@@ -851,17 +1087,24 @@ func (d *Daemon) markHelperLimits(s *wire.FolderSummary) {
 	_, _, s.HelperLimitsSetBy = d.helperCaps(running, notArchived)
 }
 
-// helperLimitsRefusal is why the folder's own helper limits may not be set this high.
+// helperLimitsRefusal is why the folder's own helper limits may not be set this high, by
+// the organisation's or your own layer, whichever is tighter.
 func (d *Daemon) helperLimitsRefusal(l wire.HelperLimits) error {
-	p := d.orgPolicy()
-	if p == nil || p.Helpers == nil {
-		return nil
+	if p := d.orgPolicy(); p != nil && p.Helpers != nil {
+		if h := p.Helpers.MostRunning; h != nil && l.Running != nil && *l.Running > *h {
+			return policyRefusal("policy", "helpers.mostRunning", helperWords("Your organisation", p.Helpers), nil, orgLayerRef(p))
+		}
+		if h := p.Helpers.MostNotArchived; h != nil && l.NotArchived != nil && *l.NotArchived > *h {
+			return policyRefusal("policy", "helpers.mostNotArchived", helperWords("Your organisation", p.Helpers), nil, orgLayerRef(p))
+		}
 	}
-	if h := p.Helpers.MostRunning; h != nil && l.Running != nil && *l.Running > *h {
-		return policyRefusal("policy", "helpers.mostRunning", helperWords(p.Helpers), nil)
-	}
-	if h := p.Helpers.MostNotArchived; h != nil && l.NotArchived != nil && *l.NotArchived > *h {
-		return policyRefusal("policy", "helpers.mostNotArchived", helperWords(p.Helpers), nil)
+	if yh := d.yourPolicyRules().Helpers; yh != nil {
+		if h := yh.MostRunning; h != nil && l.Running != nil && *l.Running > *h {
+			return policyRefusal("policy", "helpers.mostRunning", helperWords("Your policy", yh), nil, youLayerRef())
+		}
+		if h := yh.MostNotArchived; h != nil && l.NotArchived != nil && *l.NotArchived > *h {
+			return policyRefusal("policy", "helpers.mostNotArchived", helperWords("Your policy", yh), nil, youLayerRef())
+		}
 	}
 	return nil
 }
@@ -960,7 +1203,7 @@ func (d *Daemon) dayBudgetRefusal() error {
 		return nil
 	}
 	if until, capped := d.personCapped(nowFunc()); capped {
-		return policyRefusal("budget", "budgets", "You have used today's budget, set by your organisation, on your machines. It starts again at 00:00 UTC.", &until)
+		return policyRefusal("budget", "budgets", "You have used today's budget, set by your organisation, on your machines. It starts again at 00:00 UTC.", &until, orgLayerRef(p))
 	}
 	b := d.orgBudgets(p)
 	if b == nil {
@@ -970,11 +1213,11 @@ func (d *Daemon) dayBudgetRefusal() error {
 	until := endOfUTCDay(nowFunc())
 	if b.Daily != nil && st.Today["USD"] >= b.Daily.Amount {
 		return policyRefusal("budget", "budgets.daily", "You have used today's "+costWords(b.Daily.Amount, "USD")+
-			" budget, set by your organisation. It starts again at 00:00 UTC.", &until)
+			" budget, set by your organisation. It starts again at 00:00 UTC.", &until, orgLayerRef(p))
 	}
 	if b.DailyTokens != nil && st.TokensToday >= *b.DailyTokens {
 		return policyRefusal("budget", "budgets.dailyTokens", fmt.Sprintf("You have used today's budget of %d tokens, set by your organisation. "+
-			"It starts again at 00:00 UTC.", *b.DailyTokens), &until)
+			"It starts again at 00:00 UTC.", *b.DailyTokens), &until, orgLayerRef(p))
 	}
 	return nil
 }
@@ -982,17 +1225,18 @@ func (d *Daemon) dayBudgetRefusal() error {
 // agentBudgetRefusal is why this agent takes no new turn for the organisation's budget for
 // each agent, or nil.
 func (d *Daemon) agentBudgetRefusal(a *wire.Agent) error {
-	b := d.orgBudgets(d.orgPolicy())
+	p := d.orgPolicy()
+	b := d.orgBudgets(p)
 	if b == nil {
 		return nil
 	}
 	if b.PerAgent != nil && a.CostToDate["USD"] >= b.PerAgent.Amount {
 		return policyRefusal("budget", "budgets.perAgent", "This agent has used the "+costWords(b.PerAgent.Amount, "USD")+
-			" your organisation allows each agent.", nil)
+			" your organisation allows each agent.", nil, orgLayerRef(p))
 	}
 	if b.PerAgentTokens != nil && a.TokensToDate != nil && *a.TokensToDate >= *b.PerAgentTokens {
 		return policyRefusal("budget", "budgets.perAgentTokens", fmt.Sprintf("This agent has used the %d tokens your organisation allows each agent.",
-			*b.PerAgentTokens), nil)
+			*b.PerAgentTokens), nil, orgLayerRef(p))
 	}
 	return nil
 }
@@ -1029,11 +1273,18 @@ func (d *Daemon) policyStartNote(r *wire.StartRequest, by startedBy) (note strin
 		return "", err
 	}
 	p := d.orgPolicy()
-	if p == nil {
-		return "", nil
-	}
+	// Your layer's own runtimes allowlist (T019) applies whether or not there is an
+	// organisation; runtimeRefusal checks it first, as it did before your layer existed.
 	if err := d.runtimeRefusal(p, r.RuntimeID); err != nil {
 		return "", err
+	}
+	// The effective sandbox rule (org and your layer merged, T019): checked next, still
+	// before the organisation-only checks below, which return at once with no organisation.
+	if err := d.sandboxResolutionRefusal(r.RuntimeID, r.Sandbox, stringValue(r.StartOptions.Values["mode"])); err != nil {
+		return "", err
+	}
+	if p == nil {
+		return "", nil
 	}
 	if err := d.modelRefusal(p, r.RuntimeID, stringValue(r.StartOptions.Values["model"]), d.runtimeOffers(r.RuntimeID)); err != nil {
 		return "", err
@@ -1076,18 +1327,31 @@ func (d *Daemon) policyStartNote(r *wire.StartRequest, by startedBy) (note strin
 		ceiling, _, _ := modeCeiling(p)
 		note = strings.TrimSpace(note + " It asked to approve all requests. " + orgSetBy + " " + modeWords(ceiling) + " It asks.")
 	}
-	if sandboxRequired(p) {
-		if r.Sandbox != nil && *r.Sandbox == wire.SandboxChoiceOff {
-			return "", policyRefusal("policy", "sandbox", sandboxRequiredWords, nil)
-		}
-		if _, ok := requiredSandbox(r.RuntimeID); !ok {
-			return "", policyRefusal("policy", "sandbox", sandboxRequiredWords+" "+runtimeName(r.RuntimeID)+" has no command sandbox that the app can turn on.", nil)
-		}
-		if r.RuntimeID == "codex" && mode == codexFullAccess {
-			return "", policyRefusal("policy", "sandbox", sandboxRequiredWords, nil)
-		}
-	}
 	return note, nil
+}
+
+// sandboxResolutionRefusal is why this start, or a mode change on an already-running agent,
+// is refused by the effective sandbox rule (FR-007 "sandbox resolution"), merging the
+// organisation's required flag and your layer's sandbox rule (T019, FR-002); nil when it
+// allows this. chosen is the start's own sandbox choice, when it made one; codexMode is the
+// mode value being started or set, so Codex's full access while the sandbox is required is
+// still refused.
+func (d *Daemon) sandboxResolutionRefusal(runtimeID string, chosen *wire.SandboxChoice, codexMode string) error {
+	on, layer := d.effectiveSandboxOn("")
+	if !on {
+		return nil
+	}
+	words := sandboxRequiredWordsFor(layer)
+	if chosen != nil && *chosen == wire.SandboxChoiceOff {
+		return policyRefusal("policy", "sandbox", words, nil, *layer)
+	}
+	if _, ok := requiredSandbox(runtimeID); !ok {
+		return policyRefusal("policy", "sandbox", words+" "+runtimeName(runtimeID)+" has no command sandbox that the app can turn on.", nil, *layer)
+	}
+	if runtimeID == "codex" && codexMode == codexFullAccess {
+		return policyRefusal("policy", "sandbox", words, nil, *layer)
+	}
+	return nil
 }
 
 // policyTurn is the policy at the start of each turn (FR-012, FR-013, FR-015): no turn
@@ -1099,11 +1363,14 @@ func (d *Daemon) policyTurn(l *live, a *wire.Agent) string {
 		return policyWords(err)
 	}
 	p := d.orgPolicy()
-	if p == nil {
-		return ""
-	}
 	if err := d.runtimeRefusal(p, a.RuntimeID); err != nil {
 		return policyWords(err)
+	}
+	if err := d.sandboxResolutionRefusal(a.RuntimeID, nil, ""); err != nil {
+		return policyWords(err)
+	}
+	if p == nil {
+		return ""
 	}
 	if err := d.sessionReachRefusal(a); err != nil {
 		return policyWords(err)
@@ -1116,11 +1383,6 @@ func (d *Daemon) policyTurn(l *live, a *wire.Agent) string {
 	}
 	if err := d.agentBudgetRefusal(a); err != nil {
 		return policyWords(err)
-	}
-	if sandboxRequired(p) {
-		if _, ok := requiredSandbox(a.RuntimeID); !ok {
-			return policyWords(policyRefusal("policy", "sandbox", sandboxRequiredWords, nil))
-		}
 	}
 	d.capAgentMode(l, a, p)
 	d.capApproveAll(l, a, p)
@@ -1200,21 +1462,26 @@ func (d *Daemon) capApproveAll(l *live, a *wire.Agent, p *wire.OrgPolicy) {
 // ceiling (approving every request among them), a model not allowed, or Codex's full
 // access while the sandbox is required.
 func (d *Daemon) optionRefusal(a *wire.Agent, optionID, value string) error {
-	p := d.orgPolicy()
-	if p == nil || value == "" {
+	if value == "" {
 		return nil
 	}
 	modeID := "mode"
 	if o := modeOption(a.AdvertisedOptions); o != nil {
 		modeID = o.ID
 	}
+	if optionID == modeID && a.RuntimeID == "codex" && value == codexFullAccess {
+		if on, layer := d.effectiveSandboxOn(""); on {
+			return policyRefusal("policy", "sandbox", sandboxRequiredWordsFor(layer), nil, *layer)
+		}
+	}
+	p := d.orgPolicy()
+	if p == nil {
+		return nil
+	}
 	switch optionID {
 	case modeID:
 		if err := modeRefusal(p, value); err != nil {
 			return err
-		}
-		if sandboxRequired(p) && a.RuntimeID == "codex" && value == codexFullAccess {
-			return policyRefusal("policy", "sandbox", sandboxRequiredWords, nil)
 		}
 	case modelOptionID(a.AdvertisedOptions):
 		return d.modelRefusal(p, a.RuntimeID, value, a.AdvertisedOptions)
@@ -1338,7 +1605,7 @@ func (d *Daemon) markOptions(runtimeID string, options []wire.ConfigOption) []wi
 			}
 			refuse = func(v string) *wire.PolicySetBy {
 				if orgModeRank(v) > rank {
-					return setBy("modeCeiling", modeWords(ceiling))
+					return setBy(orgLayerRef(p), "modeCeiling", modeWords(ceiling))
 				}
 				return nil
 			}
@@ -1349,7 +1616,7 @@ func (d *Daemon) markOptions(runtimeID string, options []wire.ConfigOption) []wi
 			choices := runtimeModelChoices(runtimeID, options)
 			refuse = func(v string) *wire.PolicySetBy {
 				if err := d.modelRefusalIn(p, runtimeID, v, choices); err != nil {
-					return setBy("runtimes."+runtimeID+".models", err.(*Error).Data.(wire.PolicyRefusal).Words)
+					return setBy(orgLayerRef(p), "runtimes."+runtimeID+".models", err.(*Error).Data.(wire.PolicyRefusal).Words)
 				}
 				return nil
 			}
@@ -1360,7 +1627,7 @@ func (d *Daemon) markOptions(runtimeID string, options []wire.ConfigOption) []wi
 			}
 			refuse = func(v string) *wire.PolicySetBy {
 				if approvesAll(v, rank) {
-					return setBy("modeCeiling", modeWords(ceiling))
+					return setBy(orgLayerRef(p), "modeCeiling", modeWords(ceiling))
 				}
 				return nil
 			}
@@ -1437,7 +1704,11 @@ func (d *Daemon) markRuntimes(list []wire.RuntimeStatus) []wire.RuntimeStatus {
 		list[i].SetBy = nil
 		if err := d.runtimeRefusal(p, list[i].Runtime.ID); err != nil {
 			r := err.(*Error).Data.(wire.PolicyRefusal)
-			list[i].SetBy = setBy(*r.Rule, r.Words)
+			layer := orgLayerRef(p)
+			if r.Layer != nil {
+				layer = *r.Layer
+			}
+			list[i].SetBy = setBy(layer, *r.Rule, r.Words)
 		}
 	}
 	return list
@@ -1490,5 +1761,12 @@ func (d *Daemon) registerPolicy() {
 	})
 	On(d, wire.CallSettingsPassThrough, func(context.Context, *Client, wire.Empty) (wire.PassThroughState, error) {
 		return d.passThroughState(), nil
+	})
+	On(d, wire.CallPolicyEffective, func(ctx context.Context, c *Client, r wire.PolicyEffectiveRequest) (wire.EffectivePolicy, error) {
+		folder := ""
+		if r.Folder != nil {
+			folder = string(*r.Folder)
+		}
+		return d.effective(folder), nil
 	})
 }

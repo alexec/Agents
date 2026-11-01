@@ -28,8 +28,6 @@ const (
 	spendDaysKept  = 7
 	usageHoursKept = 168
 	usageDaysKept  = 90
-	// limitsUnreadableWords is CostWords.limitsUnreadable.
-	limitsUnreadableWords = "The spending limits could not be read, so nothing new starts until they are set again in Settings ▸ Cost. What was in the file is kept."
 )
 
 type spendFile struct {
@@ -44,14 +42,10 @@ type usageFile struct {
 }
 
 type costBook struct {
-	costMu       sync.Mutex
-	spend        *spendFile
-	spendNote    string
-	usage        *usageFile
-	limits       wire.CostLimits
-	limitsStamp  string
-	limitsBroken bool
-	limitsNote   string
+	costMu    sync.Mutex
+	spend     *spendFile
+	spendNote string
+	usage     *usageFile
 	// reader's running total of a session's cost, by currency (usage_update says a total)
 	sessionCost map[wire.UUID]map[string]float64
 	held        map[wire.UUID]bool // agents whose queue waits for a limit, told once
@@ -223,29 +217,17 @@ func (d *Daemon) recordUsageLocked(runtime string, add wire.UsageBucket) {
 	}
 }
 
-// The limits, read again when the file changes.
-
+// The limits: your layer's budgets rule (#2957, FR-002), moved from limits.json on the
+// first start (FR-012) and not read again. limitsLocked keeps its name for its many
+// callers under costMu, but needs no lock itself: yourPolicyRules is lock-free once warmed
+// (WarmYourPolicy), so there is no risk of a lock-order deadlock with policy/setYours
+// (which takes yoursMu, then this package's costMu through policyChanged -> tellCost).
 func (d *Daemon) limitsLocked() wire.CostLimits {
-	path := d.limitsPath()
-	st, err := os.Stat(path)
-	stamp := ""
-	if err == nil {
-		stamp = fmt.Sprintf("%d-%d", st.Size(), st.ModTime().UnixNano())
+	r := d.yourPolicyRules().Budgets
+	if r == nil {
+		return wire.CostLimits{}
 	}
-	if stamp == d.limitsStamp && (d.limitsStamp != "" || d.limitsBroken || err != nil) {
-		return d.limits
-	}
-	d.limitsStamp, d.limits, d.limitsBroken, d.limitsNote = stamp, wire.CostLimits{}, false, ""
-	if err != nil {
-		return d.limits
-	}
-	b, rerr := os.ReadFile(path)
-	if rerr != nil || diskjson.Unmarshal(b, &d.limits) != nil {
-		// Fails closed: nothing new starts until the limits are set again here.
-		d.limits, d.limitsBroken = wire.CostLimits{}, true
-		d.limitsNote = "limits.json could not be read. Nothing new starts until the limits are set again here."
-	}
-	return d.limits
+	return wire.CostLimits{PerAgent: r.PerAgent, Daily: r.Daily, PerAgentTokens: r.PerAgentTokens, DailyTokens: r.DailyTokens}
 }
 
 // costStateLocked is currentCostState.
@@ -259,12 +241,14 @@ func (d *Daemon) costStateLocked() wire.CostState {
 	}
 	st := wire.CostState{Limits: limits, Today: spent, Day: today, TokensToday: s.Tokens[today]}
 	// The organisation's budgets over the person's own limits (#998, FR-016).
-	if org := d.orgBudgets(d.orgPolicy()); org != nil {
-		st.Organisation = org
-		st.SetBy = setBy("budgets", budgetWords(*org))
+	if p := d.orgPolicy(); p != nil {
+		if org := d.orgBudgets(p); org != nil {
+			st.Organisation = org
+			st.SetBy = setBy(orgLayerRef(p), "budgets", budgetWords(*org))
+		}
 	}
 	var notes []string
-	for _, n := range []string{d.limitsNote, d.spendNote} {
+	for _, n := range []string{d.spendNote} {
 		if n != "" {
 			notes = append(notes, n)
 		}
@@ -436,11 +420,11 @@ func (d *Daemon) setLimits(raw json.RawMessage) (wire.CostState, error) {
 	if len(raw) > 0 && json.Unmarshal(raw, &keys) != nil {
 		return wire.CostState{}, Invalid("cost/setLimits: the limits are not an object")
 	}
-	d.costMu.Lock()
-	limits := d.limitsLocked()
-	if d.limitsBroken {
-		limits = wire.CostLimits{}
-	}
+	// cost/setLimits is the old way to change the person's own budgets (#2957); it now
+	// writes your layer (policy-yours.json) instead of limits.json, which is not read again
+	// (FR-012). Kept so an older client, or the window before slice 4 ships Agents ▸ Policy,
+	// still changes the limit it shows, not a method it cannot reach any more.
+	var budgets wire.PolicyRuleBudgets
 	var err error
 	cost := func(k string, to **wire.Cost) {
 		v, ok := keys[k]
@@ -474,22 +458,30 @@ func (d *Daemon) setLimits(raw json.RawMessage) (wire.CostState, error) {
 		}
 		*to = &n
 	}
-	cost("perAgent", &limits.PerAgent)
-	cost("daily", &limits.Daily)
-	count("perAgentTokens", &limits.PerAgentTokens)
-	count("dailyTokens", &limits.DailyTokens)
-	if err != nil {
-		d.costMu.Unlock()
-		return wire.CostState{}, err
+	saveErr := d.editYoursLocked(func(rules *wire.PolicyRules) error {
+		if rules.Budgets != nil {
+			budgets = *rules.Budgets
+		}
+		cost("perAgent", &budgets.PerAgent)
+		cost("daily", &budgets.Daily)
+		count("perAgentTokens", &budgets.PerAgentTokens)
+		count("dailyTokens", &budgets.DailyTokens)
+		if err != nil {
+			return err
+		}
+		rules.Budgets = &budgets
+		if budgets == (wire.PolicyRuleBudgets{}) {
+			rules.Budgets = nil
+		}
+		return nil
+	})
+	if saveErr != nil {
+		if _, ok := saveErr.(*Error); ok {
+			return wire.CostState{}, saveErr
+		}
+		return wire.CostState{}, &Error{Code: wire.FailureCouldNotSave, Message: "The spending limit could not be saved: " + saveErr.Error()}
 	}
-	os.MkdirAll(d.SettingsDir, 0o755)
-	if werr := writeStore(d.limitsPath(), limits); werr != nil {
-		d.costMu.Unlock()
-		return wire.CostState{}, &Error{Code: wire.FailureCouldNotSave, Message: "The spending limit could not be saved: " + werr.Error()}
-	}
-	d.limitsStamp = "" // read again, as written
-	st := d.costStateLocked()
-	d.costMu.Unlock()
+	st := d.costState()
 	Broadcast(d, wire.NotifyCostChanged, st)
 	// A limit raised lets what waited go now.
 	d.drainHeld()

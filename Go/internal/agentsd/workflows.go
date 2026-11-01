@@ -454,36 +454,41 @@ func (d *Daemon) approvalOf(folder, id string, f *workflowFile) (awaiting, denie
 	return &wire.WorkflowApproval{Digest: f.digest, IsNew: st == nil || approved(st) == nil}, nil
 }
 
+// workflowTotal is the effective workflows.mostOn rule (#2957, FR-002's new rule for your
+// layer, moved from workflow-limit.json on the first start, FR-012), or today's default.
 func (d *Daemon) workflowTotal() int64 {
-	var l struct {
-		Total int64 `json:"total"`
-	}
-	if b, err := os.ReadFile(filepath.Join(d.SettingsDir, "workflow-limit.json")); err == nil && diskjson.Unmarshal(b, &l) == nil && l.Total >= 1 && l.Total <= workflowsTotalMax {
-		return l.Total
+	if w := d.yourPolicyRules().Workflows; w != nil && w.MostOn != nil && *w.MostOn >= 1 && *w.MostOn <= workflowsTotalMax {
+		return *w.MostOn
 	}
 	return workflowsTotalDefault
 }
 
-// workflowLimitSettings is workflows/limit. No total is the default.
+// workflowLimitSettings is workflows/limit: your layer's workflows.mostOn (#2957), moved
+// from workflow-limit.json on the first start (FR-012). No total is the default.
 func (d *Daemon) workflowLimitSettings() wire.WorkflowLimitSettings {
-	var l struct {
-		Total *int64 `json:"total"`
+	if w := d.yourPolicyRules().Workflows; w != nil && w.MostOn != nil && *w.MostOn >= 1 && *w.MostOn <= workflowsTotalMax {
+		return wire.WorkflowLimitSettings{Total: w.MostOn}
 	}
-	b, err := os.ReadFile(filepath.Join(d.SettingsDir, "workflow-limit.json"))
-	if err != nil || diskjson.Unmarshal(b, &l) != nil || l.Total == nil || *l.Total < 1 || *l.Total > workflowsTotalMax {
-		return wire.WorkflowLimitSettings{}
-	}
-	return wire.WorkflowLimitSettings{Total: l.Total}
+	return wire.WorkflowLimitSettings{}
 }
 
 // setWorkflowLimit is workflows/setLimit. A total outside 1 to 100 is refused in the
-// words the window already shows.
+// words the window already shows. It writes your layer (#2957); workflow-limit.json is not
+// read again (FR-012). Kept so an older client, or the window before slice 4 ships
+// Agents ▸ Policy, still changes the limit it shows.
 func (d *Daemon) setWorkflowLimit(s wire.WorkflowLimitSettings) (wire.WorkflowLimitSettings, error) {
 	if s.Total != nil && (*s.Total < 1 || *s.Total > workflowsTotalMax) {
 		return wire.WorkflowLimitSettings{}, Invalid("Workflows turned on must be between 1 and 100.")
 	}
-	if err := d.writeSetting("workflow-limit.json", s); err != nil {
-		return wire.WorkflowLimitSettings{}, &Error{Code: wire.FailureCouldNotSave, Message: "workflow-limit.json: " + err.Error()}
+	err := d.editYoursLocked(func(rules *wire.PolicyRules) error {
+		rules.Workflows = nil
+		if s.Total != nil {
+			rules.Workflows = &wire.PolicyWorkflows{MostOn: s.Total}
+		}
+		return nil
+	})
+	if err != nil {
+		return wire.WorkflowLimitSettings{}, &Error{Code: wire.FailureCouldNotSave, Message: "your policy: " + err.Error()}
 	}
 	return d.workflowLimitSettings(), nil
 }

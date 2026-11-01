@@ -157,8 +157,8 @@ func (d *Daemon) writeSetting(name string, v any) error {
 // organisation's policy does.
 func (d *Daemon) sandboxState() wire.SandboxSettings {
 	st := d.sandboxSettings()
-	if sandboxRequired(d.orgPolicy()) {
-		st.SetBy = setBy("sandbox", sandboxRequiredWords)
+	if on, layer := d.effectiveSandboxOn(""); on {
+		st.SetBy = setBy(*layer, "sandbox", sandboxRequiredWordsFor(layer))
 	}
 	return st
 }
@@ -215,7 +215,7 @@ func (d *Daemon) setClientPermissions(in wire.ClientPermissionSettings) (wire.Cl
 func (d *Daemon) clientPermissionsState() wire.ClientPermissionSettings {
 	s := d.clientPermissions()
 	if ceiling, _, ok := d.alwaysApproveCeiling(); ok {
-		s.SetBy = setBy("modeCeiling", modeWords(ceiling))
+		s.SetBy = setBy(orgLayerRef(d.orgPolicy()), "modeCeiling", modeWords(ceiling))
 	}
 	return s
 }

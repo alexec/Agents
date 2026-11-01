@@ -63,14 +63,11 @@ func (d *Daemon) agentAtLimit(a *wire.Agent) string {
 	return ""
 }
 
-// dayAtLimit says how the day has reached its limit ("money", "tokens", or "unreadable").
+// dayAtLimit says how the day has reached its limit ("money" or "tokens").
 func (d *Daemon) dayAtLimit() string {
 	d.costMu.Lock()
 	defer d.costMu.Unlock()
 	limits := d.limitsLocked()
-	if d.limitsBroken {
-		return "unreadable"
-	}
 	st := d.costStateLocked()
 	if limits.DailyTokens != nil && st.TokensToday >= *limits.DailyTokens {
 		return "tokens"
@@ -82,27 +79,36 @@ func (d *Daemon) dayAtLimit() string {
 }
 
 // startRefusal is why no new agent starts now, or nil.
+// yourBudgetRefusalData is the PolicyRefusal that rides beside the day/agent limit errors
+// below (#2957, FR-010's rule and layer, on an error code older clients already know).
+func yourBudgetRefusalData(rule, words string) wire.PolicyRefusal {
+	layer := youLayerRef()
+	return wire.PolicyRefusal{Reason: "budget", Rule: &rule, Words: words, Layer: &layer, Value: &words}
+}
+
 func (d *Daemon) startRefusal() error {
 	switch d.dayAtLimit() {
-	case "unreadable":
-		return &Error{Code: wire.FailureDayLimitReached, Message: limitsUnreadableWords}
 	case "tokens":
 		st := d.costState()
-		return &Error{Code: wire.FailureDayLimitReached, Message: fmt.Sprintf("Today has used %d tokens, which reaches the %d you allowed for a day. "+
-			"Nothing new starts until the day rolls over, or until you raise the limit.", st.TokensToday, *st.Limits.DailyTokens)}
+		words := fmt.Sprintf("Today has used %d tokens, which reaches the %d you allowed for a day. "+
+			"Nothing new starts until the day rolls over, or until you raise the limit.", st.TokensToday, *st.Limits.DailyTokens)
+		return &Error{Code: wire.FailureDayLimitReached, Message: words, Data: yourBudgetRefusalData("budgets.dailyTokens", words)}
 	case "money":
 		st := d.costState()
-		return &Error{Code: wire.FailureDayLimitReached, Message: "Today has cost " + spentWords(st.Today) + ", which reaches the " +
-			costWords(st.Limits.Daily.Amount, st.Limits.Daily.Currency) + " you allowed for a day. Nothing new starts until the day rolls over, or until you raise the limit."}
+		words := "Today has cost " + spentWords(st.Today) + ", which reaches the " +
+			costWords(st.Limits.Daily.Amount, st.Limits.Daily.Currency) + " you allowed for a day. Nothing new starts until the day rolls over, or until you raise the limit."
+		return &Error{Code: wire.FailureDayLimitReached, Message: words, Data: yourBudgetRefusalData("budgets.daily", words)}
 	}
 	d.costMu.Lock()
 	limits := d.limitsLocked()
 	d.costMu.Unlock()
 	if limits.PerAgent != nil && limits.PerAgent.Amount <= 0 {
-		return &Error{Code: wire.FailureAgentLimitReached, Message: "The limit for each agent is set to nothing, so no agent can start. Raise it to start this one."}
+		words := "The limit for each agent is set to nothing, so no agent can start. Raise it to start this one."
+		return &Error{Code: wire.FailureAgentLimitReached, Message: words, Data: yourBudgetRefusalData("budgets.perAgent", words)}
 	}
 	if limits.PerAgentTokens != nil && *limits.PerAgentTokens <= 0 {
-		return &Error{Code: wire.FailureAgentLimitReached, Message: "The token limit for each agent is set to none, so no agent can start. Raise it to start this one."}
+		words := "The token limit for each agent is set to none, so no agent can start. Raise it to start this one."
+		return &Error{Code: wire.FailureAgentLimitReached, Message: words, Data: yourBudgetRefusalData("budgets.perAgentTokens", words)}
 	}
 	return nil
 }
@@ -119,8 +125,6 @@ func (d *Daemon) holdsForLimit(id wire.UUID) bool {
 		note = "What you sent is waiting: this agent has reached its cost limit. Raise the limit, or let this one agent go on, and it will go."
 	} else {
 		switch day := d.dayAtLimit(); day {
-		case "unreadable":
-			note = "What you sent is waiting. " + limitsUnreadableWords
 		case "tokens", "money":
 			d.raiseCostLimit("day", nil)
 			kind := "spending"

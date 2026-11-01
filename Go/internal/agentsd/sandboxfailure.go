@@ -186,7 +186,7 @@ func (d *Daemon) recordSandboxFailure(id wire.UUID, detail string, completed int
 		return
 	}
 	rec := wire.SandboxFailureRecord{RuntimeID: a.RuntimeID, Detail: detail,
-		RecoveryOffered: slices.Contains(sandboxChoices(a.RuntimeID), wire.SandboxChoiceOff) && !sandboxRequired(d.orgPolicy()),
+		RecoveryOffered: slices.Contains(sandboxChoices(a.RuntimeID), wire.SandboxChoiceOff) && !d.sandboxRequired(),
 		CompletedToolCalls: completed}
 	d.change(id, func(a *wire.Agent) { r := rec; a.PendingSandboxFailure = &r })
 	d.record(id, wire.TranscriptEntryKind{SandboxFailure: &wire.TranscriptEntryKindSandboxFailure{Value: rec}})
@@ -205,8 +205,10 @@ func (d *Daemon) answerSandbox(ctx context.Context, r wire.AnswerSandboxRequest)
 	if pending == nil {
 		return wire.Agent{}, &Error{Code: wire.FailureNotAllowed, Message: "That has been answered already."}
 	}
-	if r.CarryOn && sandboxRequired(d.orgPolicy()) {
-		return wire.Agent{}, policyRefusal("policy", "sandbox", sandboxRequiredWords, nil)
+	if r.CarryOn {
+		if on, layer := d.effectiveSandboxOn(""); on {
+			return wire.Agent{}, policyRefusal("policy", "sandbox", sandboxRequiredWordsFor(layer), nil, *layer)
+		}
 	}
 	if r.CarryOn && !pending.RecoveryOffered {
 		return wire.Agent{}, &Error{Code: wire.FailureNotAllowed, Message: "The app cannot turn this runtime’s sandbox off."}

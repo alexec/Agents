@@ -601,7 +601,7 @@ func reachRefusal(p *wire.OrgPolicy, runtimeID string, account *wire.AccountProf
 	if words != nil {
 		line = *words
 	}
-	return policyRefusal("policy", "runtimes."+runtimeID+".reach", line, nil)
+	return policyRefusal("policy", "runtimes."+runtimeID+".reach", line, nil, orgLayerRef(p))
 }
 
 // reachWordsFor is the line of a refused account: the org route the person must use, by
@@ -677,7 +677,11 @@ func (d *Daemon) markAccounts(list []wire.AccountProfile) []wire.AccountProfile 
 		list[i].SetBy, list[i].IsDefault = nil, nil
 		if err := reachRefusal(p, list[i].RuntimeID, &list[i], d.reachWordsFor(list[i].RuntimeID)); err != nil {
 			r := err.(*Error).Data.(wire.PolicyRefusal)
-			list[i].SetBy = setBy(*r.Rule, r.Words)
+			layer := orgLayerRef(p)
+			if r.Layer != nil {
+				layer = *r.Layer
+			}
+			list[i].SetBy = setBy(layer, *r.Rule, r.Words)
 		}
 		if defaults[list[i].RuntimeID] == list[i].ID {
 			list[i].IsDefault = new(true)

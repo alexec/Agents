@@ -12,8 +12,10 @@ import (
 )
 
 // Ports SpendLedgerTests, LimitStoreTests and UsageLedgerTests: a session's running cost
-// banked by what it rose, a turn's tokens on the day and the charts, limits set, kept and
-// taken away, and a limits file that cannot be read failing closed.
+// banked by what it rose, a turn's tokens on the day and the charts, and limits set, kept
+// and taken away. cost/setLimits now writes your layer, not limits.json (#2957, FR-012):
+// limits.json is not read for enforcement any more, so a corrupt copy of it no longer
+// fails anything closed (policy_test.go covers your layer's own signature checks instead).
 
 func TestCostIsBankedAndLimitsKept(t *testing.T) {
 	root := t.TempDir()
@@ -54,19 +56,10 @@ func TestCostIsBankedAndLimitsKept(t *testing.T) {
 	if st.Limits.Daily != nil || st.Limits.PerAgentTokens == nil {
 		t.Fatalf("%+v", st.Limits)
 	}
-	// A file that cannot be read fails closed, and says so.
-	os.WriteFile(filepath.Join(d.SettingsDir, "limits.json"), []byte("{not json"), 0o644)
-	future := time.Now().Add(time.Second)
-	os.Chtimes(filepath.Join(d.SettingsDir, "limits.json"), future, future)
-	st = wire.CostState{}
-	json.Unmarshal(c.call(t, 5, "cost/state", nil), &st)
-	if st.Note == nil || !strings.Contains(*st.Note, "Nothing new starts until the limits are set again here.") {
-		t.Fatalf("%+v", st)
-	}
 	var m wire.Milestones
-	json.Unmarshal(c.call(t, 6, "milestones/state", nil), &m)
+	json.Unmarshal(c.call(t, 5, "milestones/state", nil), &m)
 	var th wire.TimeHistory
-	json.Unmarshal(c.call(t, 7, "time/history", nil), &th)
+	json.Unmarshal(c.call(t, 6, "time/history", nil), &th)
 	if m.Earned == nil || th.Hours == nil || th.Now == "" || !sameZone(th.TimeZone) {
 		t.Fatalf("%+v %+v", m, th)
 	}

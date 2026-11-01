@@ -53,17 +53,20 @@ type postedNotice struct {
 	to      wire.NoticeDevice
 }
 
-// noticeLimits are the person's burst and cool-down, or the defaults.
+// noticeLimits are the person's burst and cool-down, from your layer (#2957, FR-002's new
+// rule, moved from display.json on the first start, FR-012), or the defaults.
 func (d *Daemon) noticeLimits() (int, time.Duration) {
-	prefs := d.preferences()
-	var burst, cooldown float64
-	if v, ok := prefs[noticeBurstKey]; ok {
-		json.Unmarshal(v, &burst)
+	var burst int64
+	var cooldown float64
+	if n := d.yourPolicyRules().NoticeLimits; n != nil {
+		if n.Burst != nil {
+			burst = *n.Burst
+		}
+		if n.WaitMinutes != nil {
+			cooldown = float64(*n.WaitMinutes)
+		}
 	}
-	if v, ok := prefs[noticeCooldownKey]; ok {
-		json.Unmarshal(v, &cooldown)
-	}
-	return noticebucket.Limits(int64(burst), cooldown)
+	return noticebucket.Limits(burst, cooldown)
 }
 
 // noticeLimitsWire is the limits as the control plane takes them.
@@ -113,19 +116,53 @@ func (d *Daemon) noticeLimitsChanged(change map[string]wire.JSONValue) {
 	})
 }
 
-// writeNoticeLimits is the notifications part from the control plane, written into the
-// display preferences, so this host and every client of it use the person's limits.
+// writeNoticeLimits is the notifications part from the control plane, written into your
+// layer (#2957), so this host and every client of it use the person's limits. display.json
+// is also written, unchanged, so the window's old Notifications pane keeps working until
+// slice 4 moves it to Agents ▸ Policy (FR-023).
 func (d *Daemon) writeNoticeLimits(raw wire.JSONValue) error {
 	var limits wire.NoticeLimits
 	if err := json.Unmarshal(raw, &limits); err != nil {
 		return errors.New("not notice limits")
 	}
 	burst, cooldown := noticebucket.Limits(limits.Burst, limits.CooldownMinutes)
-	_, err := d.setPreferences(map[string]wire.JSONValue{
+	if _, err := d.setPreferences(map[string]wire.JSONValue{
 		noticeBurstKey:    asJSON(burst),
 		noticeCooldownKey: asJSON(max(int(math.Round(cooldown.Minutes())), 1)),
+	}); err != nil {
+		return err
+	}
+	return d.setYourNoticeLimits(int64(burst), cooldown)
+}
+
+// mirrorNoticeLimitsFrom reads noticeBurst and noticeCooldownMinutes out of m (the display
+// preferences, just written by setPreferences) and saves them into your layer (#2957).
+func (d *Daemon) mirrorNoticeLimitsFrom(m map[string]wire.JSONValue) {
+	var burst, cooldown float64
+	if v, ok := m[noticeBurstKey]; ok {
+		json.Unmarshal(v, &burst)
+	}
+	if v, ok := m[noticeCooldownKey]; ok {
+		json.Unmarshal(v, &cooldown)
+	}
+	b, c := noticebucket.Limits(int64(burst), cooldown)
+	d.setYourNoticeLimits(int64(b), c)
+}
+
+// setYourNoticeLimits saves burst and cooldown into your layer's noticeLimits rule
+// (#2957), which noticeLimits() now reads.
+func (d *Daemon) setYourNoticeLimits(burst int64, cooldown time.Duration) error {
+	wait := int64(math.Round(cooldown.Minutes()))
+	return d.editYoursLocked(func(rules *wire.PolicyRules) error {
+		rules.NoticeLimits = &wire.PolicyNoticeLimits{Burst: &burst, WaitMinutes: &wait}
+		return nil
 	})
-	return err
+}
+
+// setYourArchiveMyChats saves the archive switch into your layer's archiveMyChats rule
+// (#2957), which agentsMayArchiveMyChats() now reads.
+func (d *Daemon) setYourArchiveMyChats(on bool) error {
+	return d.editYoursLocked(func(rules *wire.PolicyRules) error { rules.ArchiveMyChats = &on; return nil })
 }
 
 // noticeNeedsLocked is every notice still posted, as needs; a notice whose chat is in

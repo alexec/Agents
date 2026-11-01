@@ -353,6 +353,21 @@ func (d *Daemon) registerSettings() {
 		m, err := d.setPreferences(r)
 		if err == nil {
 			d.noticeLimitsChanged(r)
+			// The old notice-limit and archive-switch keys also change your layer (#2957,
+			// FR-023): display.json is kept too, so the window's old panes keep working
+			// until slice 4 moves them to Agents ▸ Policy. m is what setPreferences just
+			// wrote, so the fresh values, not your layer's stale ones, go in.
+			_, burstChanged := r[noticeBurstKey]
+			_, cooldownChanged := r[noticeCooldownKey]
+			if burstChanged || cooldownChanged {
+				d.mirrorNoticeLimitsFrom(m)
+			}
+			if v, ok := r[agentsMayArchiveMyChatsKey]; ok {
+				var on bool
+				if json.Unmarshal(v, &on) == nil {
+					d.setYourArchiveMyChats(on)
+				}
+			}
 		}
 		return m, err
 	})

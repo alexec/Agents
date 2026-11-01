@@ -224,7 +224,7 @@ func (d *Daemon) startFor(r wire.StartRequest, by startedBy) (wire.UUID, error) 
 	if by.agent != nil {
 		d.helperRequests(&r, d.Store.Agent(*by.agent))
 	}
-	pick, client, err := d.resolveLevels(&r, by)
+	pick, client, levelsNote, err := d.resolveLevels(&r, by)
 	if err != nil {
 		return "", err
 	}
@@ -233,6 +233,7 @@ func (d *Daemon) startFor(r wire.StartRequest, by startedBy) (wire.UUID, error) 
 	if err != nil {
 		return "", err
 	}
+	policyNote = strings.TrimSpace(levelsNote + " " + policyNote)
 	if err := d.startRefusal(); err != nil {
 		return "", err
 	}

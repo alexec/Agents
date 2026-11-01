@@ -110,6 +110,11 @@ type Daemon struct {
 	// HostKey keeps this machine's private key: control-host-key in the root unless the
 	// command sets the platform's store (controllink.HostKeyFor, the Keychain on a Mac).
 	HostKey controllink.HostKeyStore
+	// PersonKey keeps the person key (#2957, research R1): person-key in the root unless the
+	// command sets the platform's store (controllink.PersonKeyFor, the Keychain on a Mac).
+	// Only the keeper signs with it.
+	PersonKey controllink.PersonKeyStore
+	yourPolicyBook
 }
 
 // New opens the root and registers every method this host serves.
@@ -121,7 +126,8 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	d := &Daemon{ctx: ctx, Store: st, handlers: map[string]Handler{}, clients: map[int64]*Client{}, unknown: map[string]int{},
 		lives: map[wire.UUID]*live{}, relays: map[string]*relay{}, sent: map[wire.UUID]bool{},
 		watches: map[string]*folderWatch{}, interests: map[string][]interest{}, shells: map[shellKey]*shell{},
-		SettingsDir: filepath.Join(st.Loc.Root, "settings"), HostKey: controllink.HostKeyFile{Root: st.Loc.Root}}
+		SettingsDir: filepath.Join(st.Loc.Root, "settings"), HostKey: controllink.HostKeyFile{Root: st.Loc.Root},
+		PersonKey: controllink.PersonKeyFile{Root: st.Loc.Root}}
 	d.setToolsHome()
 	d.register()
 	d.loadAttention()
