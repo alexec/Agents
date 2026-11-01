@@ -69,6 +69,10 @@ services:
       # The right to use that key. An empty file: the machine's own service account.
       GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp-service-account
       AGENTS_CONTROL_NAME: ${AGENTS_CONTROL_NAME:-${AGENTS_DOMAIN}}
+      # Machine providers' folder (#691, #3113): without it, Settings ▸ Machine Providers says
+      # they are off. Their tokens and keys are sealed in the store by AGENTS_CONTROL_KMS; the
+      # folder keeps only what a provider's command writes.
+      AGENTS_CONTROL_PROVIDER_HOME: ${AGENTS_CONTROL_PROVIDER_HOME:-/data/providers}
       # The web page at https://AGENTS_DOMAIN/ (#1459), built into the image with the control
       # plane, so the two are one version. A browser pairs there by a code from Add a
       # Browser… on a paired Mac, iPhone or iPad. Empty serves no page.

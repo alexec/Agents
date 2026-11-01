@@ -600,7 +600,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 	}
 	if workspaceMethods[method] {
 		if m.s.providers == nil {
-			return nil, fail(providersNeedOneCopy, "Machine providers need a control plane with one copy, for now.")
+			return nil, m.s.providersOff()
 		}
 		return m.s.providers.Answer(method, params, providersCaller(from))
 	}
@@ -1198,7 +1198,7 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 			if method == "host/status" {
 				return map[string]any{}, nil
 			}
-			return nil, fail(providersNeedOneCopy, "Machine providers need a control plane with one copy, for now.")
+			return nil, m.s.providersOff()
 		}
 		return m.s.providers.HostSaid(host, method, params)
 	case "backups/stored", "backups/upload", "backups/commit", "backups/download":

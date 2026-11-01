@@ -141,20 +141,19 @@ struct SettingsWindow: View {
         pane.wrappedValue.isThisMacs || (pane.wrappedValue == .machines && (control == nil || machinesPage == .thisMac))
     }
 
-    /// Whether the rail lists a pane: those of the control plane need one, and Workspace
-    /// Providers one that can run them (#691).
+    /// Whether the rail lists a pane: those of the control plane need one. Machine Providers
+    /// stays when they are off there, and says why (#3113).
     private func shows(_ each: SettingsPane) -> Bool {
         switch each {
         // A person's own sign-ins (#995), a pane of its own as on the Remote (#2197).
         // People with no control plane would say it can't be reached: it lists Account only (#2258).
-        case .controlPlane, .clients, .secrets, .people, .channels, .signIns, .policy: control != nil
+        case .controlPlane, .clients, .secrets, .people, .channels, .signIns, .policy, .providers: control != nil
         // An admin's, and a member's in a group, who sees the groups they are in (#1761, #2076).
         case .groups: control != nil && model.people.showsGroups
         // An admin's: which providers people sign in with (#995).
         case .signIn: control != nil && model.people.you?.isAdmin == true
         // An admin's: a member sees only themselves, so no bots (#2132).
         case .bots: control != nil && model.people.you?.isAdmin == true
-        case .providers: control?.providersHere ?? false
         default: true
         }
     }

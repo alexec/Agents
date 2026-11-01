@@ -20,8 +20,8 @@ struct ControlProvidersPage: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            if !control.providersHere {
-                Text("Machine providers need a control plane with one copy, such as the one on your Mac. This one has several.")
+            if let off = control.providersOff {
+                Text(off)
                     .appText(.supporting).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {

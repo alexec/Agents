@@ -18,8 +18,10 @@ export interface StopAsk {
 export class Providers {
   /** As last listed; null before the first list. */
   readonly list = signal<ProviderSummary[] | null>(null);
-  /** Why there are none to show: a control plane with several copies, or a list that failed. */
+  /** Why there are none to show: a list that failed. */
   readonly problem = signal<string | null>(null);
+  /** Why this control plane runs no providers, in its own words (several copies, or no folder for their secrets, #3113). */
+  readonly off = signal<string | null>(null);
   /** The groups providers are given to (#1761): every one for an admin, a member's own. Empty from a control plane before groups. */
   readonly groups = signal<Group[]>([]);
 
@@ -36,10 +38,12 @@ export class Providers {
     try {
       this.list.value = (await this.caller.call("providers/list", {})).providers;
       this.problem.value = null;
+      this.off.value = null;
       await this.loadGroups();
     } catch (error) {
       this.list.value = [];
-      this.problem.value = error instanceof CallFailed && error.code === Failure.providersNeedOneCopy ? providerWords.oneCopy : describe(error);
+      if (error instanceof CallFailed && error.code === Failure.providersNeedOneCopy) this.off.value = error.message || providerWords.off;
+      else this.problem.value = describe(error);
       return;
     }
     await this.refresh();

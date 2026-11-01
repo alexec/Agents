@@ -18,6 +18,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"os"
 	"slices"
 	"sort"
 	"strings"
@@ -344,6 +345,10 @@ func New(cfg Config) (*Service, error) {
 			return names
 		}}
 	if cfg.ProviderHome != "" && s.mesh == nil {
+		// A command provider runs in it, also when the store keeps their secrets (#3113).
+		if err := os.MkdirAll(cfg.ProviderHome, 0o700); err != nil {
+			s.log(fmt.Sprintf("providers: no folder at %s: %v", cfg.ProviderHome, err))
+		}
 		s.providers = s.makeProviders(cfg.ProviderHome)
 	}
 	if cfg.PublicWeb != "" {
@@ -363,6 +368,15 @@ func New(cfg Config) (*Service, error) {
 }
 
 func (s *Service) log(line string) { s.cfg.Log("agents-control[" + s.copyID + "]: " + line) }
+
+// providersOff is why this control plane runs no machine providers, in words a client shows
+// in their place (#3113): several copies, or no folder for their secrets.
+func (s *Service) providersOff() *RPCError {
+	if s.mesh != nil {
+		return fail(providersNeedOneCopy, "Machine providers need a control plane with one copy, such as the one on your Mac. This one has several.")
+	}
+	return fail(providersNeedOneCopy, "Machine providers are off on this control plane, because it has no folder for their secrets (AGENTS_CONTROL_PROVIDER_HOME).")
+}
 
 // Router is the service's router, for tests.
 func (s *Service) Router() *Router { return s.router }

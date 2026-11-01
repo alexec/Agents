@@ -217,7 +217,7 @@ public extension DaemonAPI.Notification {
 }
 
 public extension DaemonAPI.Failure {
-    /// Providers run only on a control plane with one copy, for now (research R4).
+    /// Providers are off on this control plane: several copies (research R4), or no folder for their secrets (#3113). The message says which.
     static let providersNeedOneCopy = -32064
     /// A start or stop for a host that isn't linked to a workspace.
     static let notLinked = -32065
