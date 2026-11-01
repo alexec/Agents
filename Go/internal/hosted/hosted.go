@@ -62,6 +62,12 @@ type Config struct {
 	// The most new certificates an hour and a week. 0 is 10 and 40.
 	CertsPerHour, CertsPerWeek int
 
+	// The disk the store is on (#3121), DiskOf a file store's folder; nil for a bucket.
+	Disk func() (Space, error)
+	// The most bytes the plans' storage may add up to over all accounts. 0 is the disk's
+	// size to its high-water mark; with no Disk, no total.
+	StorageTotal int64
+
 	// Billing (#2225): Stripe's secret key; "" is billing off (FR-031). With it, the Pro
 	// plan's price and the webhook's signing secret are needed too.
 	StripeKey, StripePrice, StripeWebhookSecret string
@@ -95,6 +101,7 @@ type Service struct {
 	// When the Stripe events acted on were last swept (billing.go).
 	stripeSwept time.Time
 	metrics     metrics
+	disk        *disk
 }
 
 // New makes the service: its session key comes from its own key, sealed in the store
@@ -151,7 +158,8 @@ func New(ctx context.Context, cfg Config) (*Service, error) {
 		sessions: sessions{key: controllink.HKDF(own, []byte("agents-hosted-session-v1"), nil, 32), now: cfg.Now},
 		github: gitHub{clientID: cfg.GitHubClientID, secret: cfg.GitHubSecret, web: cfg.GitHubWeb, api: cfg.GitHubAPI,
 			redirect: "https://" + cfg.Domain + "/signin/callback"},
-		stripe: stripe, copies: map[string]*copyRunning{}, starting: map[string]chan struct{}{}, stop: make(chan struct{})}
+		stripe: stripe, copies: map[string]*copyRunning{}, starting: map[string]chan struct{}{}, stop: make(chan struct{}),
+		disk: &disk{read: cfg.Disk, now: cfg.Now}}
 	go s.sweepIdleEvery(time.Minute)
 	return s, nil
 }
