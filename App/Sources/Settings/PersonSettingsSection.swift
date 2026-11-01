@@ -13,7 +13,8 @@ import SwiftUI
 /// A second section (#2951) keeps the person's GitHub, GitLab and Linear logins: named on
 /// the Pull requests, Merge requests and Issues pages' Team section, and used to say an
 /// agent is on one of the viewer's own rows. Filled in from this Mac's own connection
-/// (Activity ▸ Connectors) when it is signed in; given here only when it is not.
+/// (Activity ▸ Connectors) when it is signed in; given here only when it is not. Shown only
+/// with a control plane, which keeps them, and a save that fails says so (#3160).
 struct PersonSettingsSection: View {
     @Environment(AppModel.self) private var model
     @State private var name = ""
@@ -24,6 +25,7 @@ struct PersonSettingsSection: View {
     @State private var connectionLogins: [DaemonAPI.ConnectionProvider: String] = [:]
     /// False until loadLogins answers, so a save before then cannot clear what is kept.
     @State private var loginsLoaded = false
+    @State private var loginsNotSaved = false
     @FocusState private var focused: Field?
 
     private enum Field { case name, pronouns, github, gitlab, linear }
@@ -52,26 +54,35 @@ struct PersonSettingsSection: View {
             .onChange(of: person) { _, fresh in if focused == nil { fill(from: fresh) } }
             .onChange(of: focused) { _, now in if now == nil { save() } }
 
-            Section {
-                TextField("GitHub login", text: $github, prompt: Text(connectionLogins[.github] ?? "Not given"))
-                    .focused($focused, equals: .github)
-                    .onSubmit(saveLogins)
-                TextField("GitLab login", text: $gitlab, prompt: Text(connectionLogins[.gitlab] ?? "Not given"))
-                    .focused($focused, equals: .gitlab)
-                    .onSubmit(saveLogins)
-                TextField("Linear login", text: $linear, prompt: Text(connectionLogins[.linear] ?? "Not given"))
-                    .focused($focused, equals: .linear)
-                    .onSubmit(saveLogins)
-            } header: {
-                Text("GitHub, GitLab and Linear")
-            } footer: {
-                Text("Named on the Pull requests, Merge requests and Issues pages’ Team section, and used to say an agent is on one of your own. Filled in from this Mac’s own connection (Activity ▸ Connectors) when it is signed in; given here only when it is not.")
-                    .appText(.fine)
-                    .foregroundStyle(.secondary)
+            if model.controlRequests != nil {
+                Section {
+                    TextField("GitHub login", text: $github, prompt: Text(connectionLogins[.github] ?? "Not given"))
+                        .focused($focused, equals: .github)
+                        .onSubmit(saveLogins)
+                    TextField("GitLab login", text: $gitlab, prompt: Text(connectionLogins[.gitlab] ?? "Not given"))
+                        .focused($focused, equals: .gitlab)
+                        .onSubmit(saveLogins)
+                    TextField("Linear login", text: $linear, prompt: Text(connectionLogins[.linear] ?? "Not given"))
+                        .focused($focused, equals: .linear)
+                        .onSubmit(saveLogins)
+                } header: {
+                    Text("GitHub, GitLab and Linear")
+                } footer: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        if loginsNotSaved {
+                            Text("Your logins were not saved.")
+                                .appText(.fine)
+                                .foregroundStyle(.red)
+                        }
+                        Text("Named on the Pull requests, Merge requests and Issues pages’ Team section, and used to say an agent is on one of your own. Filled in from this Mac’s own connection (Activity ▸ Connectors) when it is signed in; given here only when it is not.")
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .paperListRow()
+                .onAppear { Task { await loadLogins(); await loadConnections() } }
+                .onChange(of: focused) { _, now in if now == nil { saveLogins() } }
             }
-            .paperListRow()
-            .onAppear { Task { await loadLogins(); await loadConnections() } }
-            .onChange(of: focused) { _, now in if now == nil { saveLogins() } }
         }
     }
 
@@ -111,7 +122,14 @@ struct PersonSettingsSection: View {
     private func saveLogins() {
         guard loginsLoaded, let control = model.controlRequests else { return }
         let logins = DaemonAPI.ForgeLogins(github: Self.kept(github) ?? "", gitlab: Self.kept(gitlab) ?? "", linear: Self.kept(linear) ?? "")
-        Task { _ = try? await control.call(DaemonAPI.Method.peopleSetForgeLogins, logins) }
+        Task {
+            do {
+                _ = try await control.call(DaemonAPI.Method.peopleSetForgeLogins, logins)
+                loginsNotSaved = false
+            } catch {
+                loginsNotSaved = true
+            }
+        }
     }
 
     private static func kept(_ text: String) -> String? {
