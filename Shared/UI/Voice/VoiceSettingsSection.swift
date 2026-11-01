@@ -163,6 +163,7 @@ private struct VoiceTuningSections: View {
         } label: {
             if sample.isMaking {
                 ProgressView().controlSize(.small)
+                    .accessibilityLabel("Making a sample")
             } else {
                 Label("Play a Sample", systemImage: "play.circle")
             }
@@ -183,15 +184,22 @@ private struct VoiceTuningSections: View {
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
             }
-            Slider(value: value, in: range, step: step)
+            // The slider says the words above it, so VoiceOver reads them once (#3164).
+            .accessibilityHidden(true)
+            Slider(value: value, in: range, step: step) { Text(title) }
+                .accessibilityValue(shows)
         }
         #else
         LabeledContent(title) {
             HStack {
-                Slider(value: value, in: range, step: step)
+                // Named itself: LabeledContent's label does not reach a slider in an HStack (#3164).
+                Slider(value: value, in: range, step: step) { Text(title) }
+                    .labelsHidden()
+                    .accessibilityValue(shows)
                 Text(shows)
                     .monospacedDigit()
                     .frame(minWidth: 56, alignment: .trailing)
+                    .accessibilityHidden(true)
             }
         }
         #endif
