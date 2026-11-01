@@ -18,3 +18,16 @@ test("the report line returns when the session no longer needs you", () => {
   assert.equal(status.needsYouLine({ state: "finished", report: { outcome: "done" } }), null);
   assert.equal(status.needsYouLine({ state: "waitingOnUser" }, "  \n "), null);
 });
+
+test("a wait only the person can settle says what it asks of them (#3147)", () => {
+  const wait = { id: "w", from: 4, since: 0, forPerson: true, patterns: [{ name: "review.requested", filters: {} }],
+    serverEvents: [{ servers: ["github"], trigger: { event: "review.requested", arguments: { repo: "alexec/Agents", pr: 123 } } }] };
+  const agent = { state: "finished", endedReason: "endTurn", eventWait: wait };
+  assert.equal(status.needsYouLine(agent), "Review requested: alexec/Agents#123");
+  assert.equal(status.statusWords(agent), "Review requested: alexec/Agents#123");
+  assert.equal(status.statusWords({ ...agent, isUnread: true }), "Unread · Review requested: alexec/Agents#123");
+  assert.equal(status.needsYouLine({ ...agent, eventWait: { ...wait, serverEvents: undefined, patterns: [{ name: "issue.assigned", filters: {} }] } }),
+    "Issue assigned");
+  assert.equal(status.needsYouLine({ ...agent, eventWait: { ...wait, ending: { timedOut: {} } } }), null);
+  assert.equal(status.statusWords({ ...agent, report: { outcome: "needs_answer" } }), "Waiting on your answer");
+});

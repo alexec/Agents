@@ -11,7 +11,10 @@ import SwiftUI
 ///
 /// The question cards' shape, under them, since an agent waiting on an event is very like
 /// one waiting for an answer. Not tinted: nothing has gone wrong, and the chat is already
-/// under Waiting. One view for both apps; the web page's is `WaitCard` in `Chat.tsx`.
+/// under Waiting. A wait only the person can settle (#3051) is the exception (#3147): its
+/// session is under Needs you, so the card is tinted as a question is, heads with what it
+/// asks of them ("Review requested: alexec/Agents#123"), and opens the PR or issue as its
+/// main action. One view for both apps; the web page's is `WaitCard` in `Chat.tsx`.
 struct WaitCard: View {
     let status: WaitStatus
     let eventWait: EventWait?
@@ -37,6 +40,11 @@ struct WaitCard: View {
             }
             HStack(spacing: 10) {
                 Spacer()
+                if let url = personURL {
+                    Link("Open", destination: url)
+                        .buttonStyle(.paperProminent)
+                        .help("Open \(url.absoluteString) in the browser.")
+                }
                 if status.cancellable {
                     Button("Continue") {
                         busy = true
@@ -63,9 +71,16 @@ struct WaitCard: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.secondary.opacity(0.25)))
+        .background((personLine == nil ? nil : StateTint.attention.color?.opacity(0.07)) ?? .clear,
+                    in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10)
+            .strokeBorder(((personLine == nil ? nil : StateTint.attention.color) ?? .secondary).opacity(0.25)))
         .accessibilityElement(children: .contain)
     }
+
+    /// What a wait for the person asks of them (`EventWait.personLine`, #3147).
+    private var personLine: String? { isLineWait ? nil : eventWait?.personLine }
+    private var personURL: URL? { isLineWait ? nil : eventWait?.personURL }
 
     @ViewBuilder
     private func eventContent(_ wait: EventWait, now: Date) -> some View {
@@ -73,9 +88,17 @@ struct WaitCard: View {
         let elapsed = max(0, Int(now.timeIntervalSince(wait.since) / 60))
         VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 7) {
-                // The waiting mark's beacon, breathing as it does everywhere else (#2657).
-                WaitingBeacon(size: 14)
-                Text("Waiting for event").fontWeight(.semibold)
+                if let personLine {
+                    // Needs you's mark and words, as the session's row has them (#3147).
+                    Image(systemName: StatusShape.needsYou.symbol ?? "exclamationmark.circle.fill")
+                        .tinted(.attention)
+                        .accessibilityHidden(true)
+                    Text(personLine).fontWeight(.semibold).tinted(.attention)
+                } else {
+                    // The waiting mark's beacon, breathing as it does everywhere else (#2657).
+                    WaitingBeacon(size: 14)
+                    Text("Waiting for event").fontWeight(.semibold)
+                }
                 Spacer(minLength: 6)
                 Text(total.map { "\(elapsed) / \($0) min" } ?? "\(elapsed) min")
                     .appText(.fine).foregroundStyle(.secondary).monospacedDigit()
