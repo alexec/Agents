@@ -148,11 +148,6 @@ public struct ServerFacts: Codable, Hashable, Sendable {
     /// The toolset a runtime's `current` points at on this server, when it is whole.
     public func toolsetID(for runtimeID: String) -> String? { toolsetIDs[runtimeID] }
 
-    /// Whether the server signs `runtimeID` in by itself (043 for Claude, 046 for the rest).
-    public func hasOwnSignIn(_ runtimeID: String) -> Bool {
-        runtimeID == RuntimeCatalog.claude.id ? hasOwnClaudeSignIn : ownSignIns.contains(runtimeID)
-    }
-
     /// Node's official Linux builds need glibc 2.28 or later; musl has none (043, R2). Every
     /// toolset is Node and a package, so this is whether any of them can go on (046).
     public var canInstallClaude: Bool { canInstallToolsets }

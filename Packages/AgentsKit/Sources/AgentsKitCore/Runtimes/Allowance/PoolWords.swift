@@ -138,10 +138,6 @@ public enum PoolWords {
         return ranOut(runtimeID, returnsAt: nil, now: now)
     }
 
-    public static func overageBegan(_ runtimeID: String) -> String {
-        "\(runtimeName(runtimeID)) started using paid extra usage, so it is treated as out."
-    }
-
     public static func creditGone(_ runtimeID: String) -> String {
         "\(runtimeName(runtimeID))’s credit is used up."
     }
@@ -163,9 +159,5 @@ public enum PoolWords {
         default:
             return "\(name) is out."
         }
-    }
-
-    public static func stillRateLimited(_ runtimeID: String) -> String {
-        "\(runtimeName(runtimeID)) is still rate limited after retrying, so it is treated as out for an hour."
     }
 }

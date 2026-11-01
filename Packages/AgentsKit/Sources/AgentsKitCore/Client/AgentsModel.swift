@@ -814,11 +814,6 @@ public final class AgentsModel {
         for folder in folders { refillWorkflowShelf(folder) }
     }
 
-    /// Replace the user's Settings list without dropping folder workflows from other shelves.
-    public func replaceUserWorkflows(_ summaries: [WorkflowSummary]) {
-        replaceWorkflows(workflows.filter { !($0.scope == "user" && $0.content != nil) } + summaries)
-    }
-
     private static func workflowName(_ a: WorkflowSummary, _ b: WorkflowSummary) -> Bool {
         a.workflow.name.localizedCaseInsensitiveCompare(b.workflow.name) == .orderedAscending
     }

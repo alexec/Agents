@@ -157,13 +157,6 @@ public enum ControlWire {
         return (id, method)
     }
 
-    /// Whether a message is a request at all, including one too broken to read: those
-    /// are refused rather than passed on, since nobody could say what they ask.
-    public static func isNotification(_ message: String) -> Bool {
-        if case .notification? = try? JSONRPCCodec.decode(line: message) { return true }
-        return false
-    }
-
     /// A host id as `MachineRef.make` makes them, or `mac`: nothing that needs escaping.
     public static func isHostID(_ string: String) -> Bool {
         !string.isEmpty && string.count <= 64

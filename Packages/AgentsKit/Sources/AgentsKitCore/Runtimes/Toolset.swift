@@ -131,11 +131,6 @@ public struct Toolset: Hashable, Sendable {
                 #"PATH="$d/node/bin:$PATH" exec "$d/node/bin/node" "$d/"# + manifest.entryPath + #"""# + forwards]
     }
 
-    /// Where a server keeps one runtime's toolsets, relative to its home.
-    public static func serverFolder(runtimeID: String) -> String {
-        ".agents-server/tools/\(runtimeID)"
-    }
-
     #if canImport(CryptoKit)
     /// Read a toolset folder from the app's bundle.
     public static func load(from folder: URL) throws -> Toolset {
