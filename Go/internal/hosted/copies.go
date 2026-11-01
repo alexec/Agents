@@ -256,13 +256,26 @@ func (s *Service) toAccount(w http.ResponseWriter, r *http.Request, id string) {
 // serve passes a request to a running copy, and a WebSocket only under the plan's
 // connections (#2224).
 func (s *Service) serve(w http.ResponseWriter, r *http.Request, c *copyRunning) {
+	if r.URL.Path == "/readyz" && c.limits != nil {
+		// A refused connect asks /readyz for its words (#3146): while the copy is at its
+		// connections, that is the refusal's line, not the copy's own "ready".
+		p := c.limits.planNow()
+		s.mu.Lock()
+		full := c.sockets >= p.Connections
+		s.mu.Unlock()
+		if full {
+			w.Header().Set("Agents-Refusal", "limit")
+			plain(w, http.StatusTooManyRequests, connectionsRefusal(c.limits, p).Error()+"\n")
+			return
+		}
+	}
 	if isWebSocket(r.Header) && c.limits != nil {
 		p := c.limits.planNow()
 		s.mu.Lock()
 		if c.sockets >= p.Connections {
 			s.mu.Unlock()
 			w.Header().Set("Agents-Refusal", "limit")
-			plain(w, http.StatusTooManyRequests, c.limits.refuse(p, "connections", plural(p.Connections, "connection", "connections")+" at once", "Close one").Error()+"\n")
+			plain(w, http.StatusTooManyRequests, c.limits.refuse(p, "connections", connectionsAllowed(p), "Close one").Error()+"\n")
 			return
 		}
 		c.sockets++
@@ -274,6 +287,17 @@ func (s *Service) serve(w http.ResponseWriter, r *http.Request, c *copyRunning) 
 		}()
 	}
 	c.proxy.ServeHTTP(w, r)
+}
+
+// connectionsAllowed is what a plan's connections limit allows, as its refusal says it.
+func connectionsAllowed(p Plan) string {
+	return plural(p.Connections, "connection", "connections") + " at once"
+}
+
+// connectionsRefusal is the connections refusal's line, read back without counting a
+// second refusal.
+func connectionsRefusal(l *limitedStore, p Plan) *LimitError {
+	return &LimitError{Plan: p, Limit: "connections", Allows: connectionsAllowed(p), Do: "Close one", Account: l.account}
 }
 
 // inUse is an account's copy when it is running, in use until done is called with it.
