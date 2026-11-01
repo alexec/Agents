@@ -789,6 +789,8 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
   background: var(--paper-well);
   border-bottom: 1px solid var(--paper-rule);
 }
+/* A refusal's account page beside Try Now (#3153). */
+.banner-actions { flex: none; display: flex; align-items: center; gap: 12px; }
 
 /* Greyed, with what was shown still readable and scrollable, and the prompt still typable. */
 .down .columns { opacity: 0.55; }
