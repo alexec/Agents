@@ -46,6 +46,11 @@ struct LineagePane: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             HStack {
                 Spacer()
+                if popped == nil {
+                    Button("Explore") { model.showLineage(from: LineagePlace(host: agent.host, node: me)) }
+                        .buttonStyle(.link)
+                        .help("Open it on the Lineage page, where a click on a box starts from it")
+                }
                 Button("Refresh") { asked += 1 }
                     .buttonStyle(.link)
                     .help("Read the links and the costs again")
@@ -108,6 +113,7 @@ struct LineagePane: View {
 
     /// A GitHub issue or PR opens in the browser; a session in this window goes to its chat.
     private func action(for row: LineageList.Row) -> (() -> Void)? {
+        if row.node == me { return nil }
         if let url = row.url { return { openURL(url) } }
         if popped == nil, let id = row.session, model.work.agent(id) != nil { return { model.selection = id } }
         return nil
@@ -126,9 +132,11 @@ struct LineagePane: View {
 /// The graph (#3019): a box for each node, in a tier per kind, a line for each link named by its
 /// verb, a box's cost on its second line. It starts as wide as the pane, at most actual size.
 /// Scroll to move about; pinch or the buttons to zoom.
-private struct LineageGraphView: View {
+struct LineageGraphView: View {
     let graph: LineageLayout.Graph
     let open: (LineageList.Row) -> (() -> Void)?
+    /// What a box's help says a click does: "Open it on GitHub", "Start from it".
+    var verb: (LineageList.Row) -> String = { $0.url != nil ? "Open it on GitHub" : "Show this session" }
     /// Nil: as wide as the pane.
     @State private var zoom: Double?
     @GestureState private var pinch = 1.0
@@ -149,7 +157,7 @@ private struct LineageGraphView: View {
                     .frame(width: graph.width, height: graph.height)
                     .accessibilityHidden(true)
                 ForEach(graph.nodes) { node in
-                    LineageBox(node: node, open: open(node.row))
+                    LineageBox(node: node, open: open(node.row), verb: verb(node.row))
                         .frame(width: LineageLayout.boxWidth, height: LineageLayout.boxHeight)
                         .offset(x: node.x, y: node.y)
                 }
@@ -219,12 +227,13 @@ private struct LineageGraphView: View {
 private struct LineageBox: View {
     let node: LineageLayout.GraphNode
     let open: (() -> Void)?
+    let verb: String
 
     var body: some View {
         if let open {
             Button(action: open) { content }
                 .buttonStyle(.plain)
-                .help(([node.row.name] + node.row.links + [node.row.url != nil ? "Open it on GitHub" : "Show this session"])
+                .help(([node.row.name] + node.row.links + [verb])
                     .joined(separator: "\n"))
         } else {
             content.help(([node.row.name] + node.row.links).joined(separator: "\n"))

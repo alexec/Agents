@@ -50,7 +50,7 @@ const sourceWords: Record<string, string> = {
 /** "This session works on it · from the branch", or "Fixes alexec/agents#12 · from the PR's text · ended". */
 export function linkLine(link: LineageLink, of: LineageNode, session: LineageNode, name: (n: LineageNode) => string): string {
   const verb = link.rel.replaceAll("-", " ");
-  const parts = [same(link.to, of) ? `${name(link.from)} ${verb} it` : `${verb.charAt(0).toUpperCase()}${verb.slice(1)} ${same(link.to, session) ? "this session" : name(link.to)}`];
+  const parts = [same(link.to, of) ? `${name(link.from)} ${verb} it` : `${verb.charAt(0).toUpperCase()}${verb.slice(1)} ${same(link.to, session) && session.kind === "session" ? "this session" : name(link.to)}`];
   parts.push(sourceWords[link.source] ?? `from ${link.source}`);
   if (link.endedAt !== undefined) parts.push("ended");
   return parts.join(" · ");
@@ -82,32 +82,44 @@ function resolvedLine(r: LineageResolved | undefined): string | undefined {
   return parts.length === 0 ? undefined : parts.join(" · ");
 }
 
-/** A row for each node the walk reached, once, in the walk's order, the session itself left out. */
+/** A row for each node the walk reached, once, in the walk's order, the start itself left out. The start is
+ * "This session" when it is one; any other start (#3087) has its own name. */
 export function lineageRows(session: LineageNode, graph: LineageGraph, costs: ReadonlyMap<string, LineageCostRollup>,
   title: (n: LineageNode) => string | undefined): LineageRow[] {
   const seen = new Set<string>();
   const nodes = graph.nodes.filter((n) => !same(n, session) && !seen.has(key(n)) && (seen.add(key(n)), true));
-  const name = (n: LineageNode) => same(n, session) ? "This session" : title(n) ?? graph.resolved?.[n.ref]?.title ?? nodeName(n);
-  const rows: LineageRow[] = nodes.map((n) => {
-    const rollup = costs.get(key(n));
-    return {
-      node: n, name: name(n),
-      links: graph.links.filter((l) => same(l.from, n) || same(l.to, n)).map((l) => linkLine(l, n, session, name)),
-      cost: rollup && costLine(rollup),
-      resolved: resolvedLine(graph.resolved?.[n.ref]),
-      session: n.kind === "session" ? n.ref.slice("session:".length) : undefined,
-      url: lineageUrl(n),
-    };
-  });
-  return rows;
+  const name = names(session, graph, title);
+  return nodes.map((n) => row(n, graph, costs, name, session));
 }
 
-// The pane as a graph of boxes and lines (#3019), as LineageLayout has it on the window: this
-// session and the nodes it is linked to, a line for every link. The links are not a tree: a session
-// that works on an issue and on the PR that fixes it makes a triangle.
+/** The row for the start itself, a box of the graph: "This session", or the issue's or PR's name, its cost and
+ * where it is (#3087). */
+export function startRow(start: LineageNode, graph: LineageGraph, costs: ReadonlyMap<string, LineageCostRollup>,
+  title: (n: LineageNode) => string | undefined): LineageRow {
+  return { ...row(start, graph, costs, names(start, graph, title), start), links: [] };
+}
 
-/** The row for this session itself, a box of the graph. */
-export const hereRow = (session: LineageNode): LineageRow => ({ node: session, name: "This session", links: [] });
+function names(start: LineageNode, graph: LineageGraph, title: (n: LineageNode) => string | undefined) {
+  return (n: LineageNode) => same(n, start) && n.kind === "session" ? "This session"
+    : title(n) ?? graph.resolved?.[n.ref]?.title ?? nodeName(n);
+}
+
+function row(n: LineageNode, graph: LineageGraph, costs: ReadonlyMap<string, LineageCostRollup>, name: (n: LineageNode) => string,
+  start: LineageNode): LineageRow {
+  const rollup = costs.get(key(n));
+  return {
+    node: n, name: name(n),
+    links: graph.links.filter((l) => same(l.from, n) || same(l.to, n)).map((l) => linkLine(l, n, start, name)),
+    cost: rollup && costLine(rollup),
+    resolved: resolvedLine(graph.resolved?.[n.ref]),
+    session: n.kind === "session" ? n.ref.slice("session:".length) : undefined,
+    url: lineageUrl(n),
+  };
+}
+
+// The pane, and the Lineage page (#3087), as a graph of boxes and lines (#3019), as LineageLayout has it on
+// the window: the start and the nodes it is linked to, a line for every link. The links are not a tree: a session
+// that works on an issue and on the PR that fixes it makes a triangle.
 
 /** Each node's links, either way, in the order the walk gave them. */
 function neighbours(graph: LineageGraph): Map<string, LineageNode[]> {
@@ -182,7 +194,7 @@ export function lineageGraph(session: LineageNode, walked: LineageGraph, costs: 
   title: (n: LineageNode) => string | undefined): LineageGraphLayout {
   const rows = lineageRows(session, walked, costs, title);
   if (rows.length === 0) return { nodes: [], edges: [], width: 0, height: 0 };
-  const all = [hereRow(session), ...rows];
+  const all = [startRow(session, walked, costs, title), ...rows];
   const next = neighbours(walked);
   const index = new Map<string, number>();
   const tiers = [...new Set(all.map((r) => tier(r.node.kind)))].sort((a, b) => a - b).map((t) => {
@@ -217,3 +229,59 @@ export const costKey = key;
 
 export const noLineage = "No links yet. A session is linked to an issue when it has a label such as #12, to a pull request when it opens one on its branch, and to the helpers and workflow runs it starts.";
 export const lineageNote = "Linked within two steps of this session. An issue’s cost is its own and its pull requests’.";
+
+/** The Lineage page's note (#3087), for any start. */
+export const lineagePageNote = "Linked within two steps. Click a box to start from it. An issue’s cost is its own and its pull requests’.";
+/** The Lineage page with nothing to start from yet. */
+export const noLineageHere = "No links from here yet. Start from another session, or type an issue’s, a pull request’s, a milestone’s or a release’s address.";
+
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The start a person typed on the Lineage page (#3087), as LineageList.node(typed:) has it: a GitHub address of
+ * an issue, a pull request, a milestone or a release; "owner/repo#12" (an issue); "github:owner/repo#12"; or a
+ * session's id. Undefined for anything else. */
+export function typedNode(text: string): LineageNode | undefined {
+  text = text.trim();
+  const id = text.startsWith("session:") ? text.slice("session:".length) : text;
+  if (uuid.test(id)) return sessionNode(id.toUpperCase());
+  let url: URL | undefined;
+  try { url = /^https?:/i.test(text) ? new URL(text) : undefined; } catch { url = undefined; }
+  if (url) {
+    if (url.hostname.toLowerCase() !== "github.com" && url.hostname.toLowerCase() !== "www.github.com") return undefined;
+    const parts = url.pathname.split("/").filter((p) => p !== "");
+    if (parts.length < 4) return undefined;
+    const repo = `${parts[0]}/${parts[1]}`;
+    const number = /^\d+$/.test(parts[3]!);
+    if (parts[2] === "issues" && number) return { kind: "issue", ref: `github:${repo}#${parts[3]}` };
+    if (parts[2] === "pull" && number) return { kind: "pr", ref: `github:${repo}#${parts[3]}` };
+    if (parts[2] === "milestone") return { kind: "milestone", ref: `github:${repo}/milestone/${parts[3]}` };
+    if (parts[2] === "releases" && parts[3] === "tag" && parts.length >= 5) {
+      return { kind: "release", ref: `github:${repo}/release/${parts.slice(4).join("/")}` };
+    }
+    return undefined;
+  }
+  const bare = text.startsWith("github:") ? text.slice("github:".length) : text;
+  return /^[^/#\s]+\/[^/#\s]+#\d+$/.test(bare) ? { kind: "issue", ref: `github:${bare}` } : undefined;
+}
+
+/** Where the Lineage page's walk starts (#3087), and the starts before and after it, as a browser's Back and
+ * Forward, as LineageHistory has it on the window. */
+export interface LineageHistory<P> { places: readonly P[]; at: number }
+
+/** How many starts a history keeps: the oldest go first. */
+export const mostStarts = 50;
+
+export const emptyHistory = <P>(): LineageHistory<P> => ({ places: [], at: -1 });
+
+export const currentStart = <P>(h: LineageHistory<P>): P | undefined => h.places[h.at];
+
+/** Start from a place: the starts after this one are dropped, as a browser drops them. */
+export function goTo<P>(h: LineageHistory<P>, place: P, same: (a: P, b: P) => boolean): LineageHistory<P> {
+  const now = currentStart(h);
+  if (now !== undefined && same(now, place)) return h;
+  const places = [...h.places.slice(0, h.at + 1), place].slice(-mostStarts);
+  return { places, at: places.length - 1 };
+}
+
+export const goBack = <P>(h: LineageHistory<P>): LineageHistory<P> => h.at > 0 ? { ...h, at: h.at - 1 } : h;
+export const goForward = <P>(h: LineageHistory<P>): LineageHistory<P> => h.at + 1 < h.places.length ? { ...h, at: h.at + 1 } : h;

@@ -174,6 +174,11 @@ struct FolderListView: View {
                     .appText(.supporting).sidebarInk(.tokens).tag(SidebarItem.tokens)
                 TimeRow().activityIcon("clock")
                     .appText(.supporting).sidebarInk(.time).tag(SidebarItem.time)
+                // The work's cost and links from any start (#3087), the Cost page's Lineage pane.
+                HStack { Text("Lineage").foregroundStyle(.primary); Spacer() }
+                    .help("The work’s cost, time and links, from a session, an issue, a pull request or a milestone")
+                    .activityIcon("point.3.connected.trianglepath.dotted")
+                    .appText(.supporting).sidebarInk(.lineage).tag(SidebarItem.lineage)
                 // The newcomer's checklist (#1067), only while a milestone is still to earn,
                 // as an empty smart group hides (#507). Then the list is under Time's charts.
                 if model.work.milestones?.isComplete == false {

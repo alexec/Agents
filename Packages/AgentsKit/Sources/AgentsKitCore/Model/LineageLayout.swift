@@ -1,15 +1,10 @@
 import Foundation
 
-/// A session's Lineage pane as a graph of boxes and lines (#3019), as `Web/src/model/lineage.ts`
-/// has it: this session and the nodes it is linked to, a line for every link. The links are not a
+/// A session's Lineage pane, and the Lineage page (#3087), as a graph of boxes and lines (#3019), as
+/// `Web/src/model/lineage.ts` has it: the start and the nodes it is linked to, a line for every link. The links are not a
 /// tree: a session that works on an issue and on the PR that fixes it makes a triangle.
 public enum LineageLayout {
     public typealias Node = DaemonAPI.LineageNode
-
-    /// The row for this session itself, a box of the graph.
-    public static func here(_ session: Node) -> LineageList.Row {
-        LineageList.Row(node: session, name: "This session", links: [], cost: nil, resolved: nil, url: nil, session: nil)
-    }
 
     /// One box of the graph, its top-left corner in points.
     public struct GraphNode: Sendable, Hashable, Identifiable {
@@ -122,7 +117,7 @@ public enum LineageLayout {
                              title: @escaping (Node) -> String?) -> Graph {
         let rows = LineageList.rows(of: session, graph: walked, costs: costs, title: title)
         guard !rows.isEmpty else { return Graph(nodes: [], edges: [], width: 0, height: 0) }
-        let all = [here(session)] + rows
+        let all = [LineageList.start(session, graph: walked, costs: costs, title: title)] + rows
         let next = neighbours(walked)
         var index: [Node: Int] = [:]
         var tiers: [[LineageList.Row]] = []

@@ -1781,6 +1781,12 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .agent-config-project { min-width: min(760px, 90vw); max-height: 85vh; overflow: auto; }
 /* A session's Lineage tab (#2940): the nodes it is linked to, as a graph (#3019). */
 .lineage .crumbs .link { margin-left: auto; }
+/* Reports ▸ Lineage (#3087): Back, Forward and where to start, above the start's name and the graph. */
+.lineage-bar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+.lineage-bar input { flex: 1 1 260px; min-width: 0; }
+.lineage-bar > button:not(.link) { min-width: 28px; }
+.lineage-start { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; margin: 4px 0; }
+.lineage-start .link { margin-left: auto; }
 /* Its graph (#3019): boxes and lines in an SVG, dragged or scrolled to move, zoomed by the buttons. */
 .lineage-graph { position: relative; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); overflow: hidden; margin: 4px 0 8px; }
 .lineage-graph svg { display: block; cursor: grab; touch-action: none; }
