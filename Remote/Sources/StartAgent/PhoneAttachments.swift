@@ -146,6 +146,8 @@ struct PastedPicture: Transferable {
 struct AttachmentStrip: View {
     @Binding var attachments: [Attachment]
     let capabilities: ACP.PromptCapabilities
+    /// The runtime's name, for the refusal (#3162).
+    var runtime: String?
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -169,7 +171,7 @@ struct AttachmentStrip: View {
                             .accessibilityLabel("Remove \(attachment.displayName)")
                         }
                         .appText(.supporting)
-                        if let refusal = PhoneAttachment.refusal(for: attachment, from: capabilities) {
+                        if let refusal = PhoneAttachment.refusal(for: attachment, from: capabilities, runtime: runtime) {
                             Text(refusal).appText(.fine).tinted(.failure)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .frame(maxWidth: 220, alignment: .leading)

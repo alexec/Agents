@@ -69,6 +69,12 @@ struct PromptBar: View {
         model.promptCapabilities(for: agent?.runtimeID ?? model.draftRuntimeID)
     }
 
+    /// Why the runtime will not take this one, in its name (#3162), or nil.
+    private func refusal(_ attachment: Attachment) -> String? {
+        attachment.refusal(from: promptCapabilities,
+                           runtime: model.promptRuntimeName(for: agent?.runtimeID ?? model.draftRuntimeID))
+    }
+
     /// Which conversation the words in this bar belong to, and are kept against. A folder
     /// page's bar is that folder's; the chat's is its agent's.
     private var draftKey: DraftKey {
@@ -477,7 +483,7 @@ struct PromptBar: View {
         VStack(alignment: .leading, spacing: 8) {
             if !attachments.isEmpty {
                 AttachmentStrip(attachments: attachments,
-                                refusal: { $0.refusal(from: promptCapabilities) },
+                                refusal: { refusal($0) },
                                 remove: { attachment in attachments.removeAll { $0.id == attachment.id } })
             }
             // Voice mode (#2322) takes only the field's place: the pills stay, to change an
@@ -703,6 +709,12 @@ struct PromptBar: View {
         .onPasteCommand(of: [.fileURL] + PromptPaste.pictureTypes + [.image]) { providers in
             for provider in providers { paste(provider) }
         }
+        // Auto's preview picks a runtime that takes what the draft has attached (#3162).
+        .onChange(of: attachments, initial: true) { draftAttachmentsChanged() }
+    }
+
+    private func draftAttachmentsChanged() {
+        if isNew { model.draftAttachmentsChanged(attachments) }
     }
 
     // MARK: Said instead of typed
@@ -1269,7 +1281,7 @@ struct PromptBar: View {
     private func send() {
         guard canSend else { return }
         // Nothing the runtime cannot take is sent, and the prompt is not lost.
-        if let refused = attachments.compactMap({ $0.refusal(from: promptCapabilities) }).first {
+        if let refused = attachments.compactMap({ refusal($0) }).first {
             model.show(problem: refused)
             return
         }

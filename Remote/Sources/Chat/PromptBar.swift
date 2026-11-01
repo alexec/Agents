@@ -181,7 +181,8 @@ struct PromptBar: View {
         VStack(alignment: .leading, spacing: 8) {
             if !attachments.isEmpty {
                 AttachmentStrip(attachments: $attachments,
-                                capabilities: model.promptCapabilities(for: agent.runtimeID))
+                                capabilities: model.promptCapabilities(for: agent.runtimeID),
+                                runtime: model.promptRuntimeName(for: agent.runtimeID))
             }
             // Voice mode (#2322) takes only the field's place: the options stay, to change
             // one while it listens, as on the Mac (Alex, 2026-10-29).

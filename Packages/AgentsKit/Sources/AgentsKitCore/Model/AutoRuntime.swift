@@ -216,11 +216,14 @@ public struct AutoPreviewRequest: Codable, Sendable, Hashable {
     public var cwd: URL
     public var levels: Levels?
     public var sandbox: SandboxChoice?
+    /// What the draft's attachments need the runtime to take (#3162).
+    public var needs: ACP.PromptCapabilities?
 
-    public init(cwd: URL, levels: Levels? = nil, sandbox: SandboxChoice? = nil) {
+    public init(cwd: URL, levels: Levels? = nil, sandbox: SandboxChoice? = nil, needs: ACP.PromptCapabilities? = nil) {
         self.cwd = cwd
         self.levels = levels
         self.sandbox = sandbox
+        self.needs = needs
     }
 }
 

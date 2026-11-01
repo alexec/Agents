@@ -163,6 +163,48 @@ func TestAutoWhenNoRuntimeCan(t *testing.T) {
 	}
 }
 
+// A picture goes to a runtime that takes pictures (#3162): one that said it does not is passed
+// by, at the start and in the preview; one not started yet is not passed by on a guess.
+func TestAutoPassesByARuntimeThatTakesNoPictures(t *testing.T) {
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	d.SettingsDir = t.TempDir()
+	dir := "file://" + t.TempDir()
+	yes, no := true, false
+	d.noteAccount("claude", false, wire.ACPPromptCapabilities{Image: &no})
+	d.noteAccount("codex", false, wire.ACPPromptCapabilities{Image: &yes})
+	picture := []map[string]any{{"id": "00000000-0000-0000-0000-000000000001", "displayName": "shot.png",
+		"block": map[string]any{"type": "image", "mimeType": "image/png", "data": "iVBORw0KGgo="}}}
+	var p wire.AutoPreview
+	json.Unmarshal(c.call(t, 1, "auto/preview", map[string]any{"cwd": dir, "needs": map[string]any{"image": true}}), &p)
+	if p.RuntimeID == nil || *p.RuntimeID != "codex" || len(p.Skipped) != 1 || p.Skipped[0].Reason != "takes no pictures" {
+		t.Fatalf("%+v", p)
+	}
+	json.Unmarshal(c.call(t, 2, "auto/preview", map[string]any{"cwd": dir}), &p)
+	if p.RuntimeID == nil || *p.RuntimeID != "claude" {
+		t.Fatalf("without a picture: %+v", p)
+	}
+	var agent wire.UUID
+	json.Unmarshal(c.call(t, 3, "agents/start", map[string]any{"runtimeID": "auto", "cwd": dir, "prompt": "look", "attachments": picture}), &agent)
+	if a := d.Store.Agent(agent); a.RuntimeID != "codex" || a.Auto == nil || a.Auto.Skipped[0].Reason != "takes no pictures" {
+		t.Fatalf("%s %+v", a.RuntimeID, a.Auto)
+	}
+	// None that takes pictures: the prompt stays, and the refusal says why.
+	d.noteAccount("codex", false, wire.ACPPromptCapabilities{Image: &no})
+	var rest []string
+	for _, r := range catalog {
+		if r.ID != "claude" && r.ID != "codex" {
+			rest = append(rest, r.ID)
+		}
+	}
+	c.call(t, 4, "auto/set", map[string]any{"order": []string{}, "excluded": rest, "overrides": []any{}})
+	err := c.callError(t, 5, "agents/start", map[string]any{"runtimeID": "auto", "cwd": dir, "prompt": "look", "attachments": picture})
+	if err == nil || !strings.Contains(err.Message, "Claude: takes no pictures") || !strings.Contains(err.Message, "Codex: takes no pictures") {
+		t.Fatalf("%+v", err)
+	}
+}
+
 // The person's own cell wins, on Auto and on a named runtime (FR-016, FR-018); a native value
 // in the start wins over a level (the ⋯ own menu).
 func TestTheMappingsAreThePersons(t *testing.T) {

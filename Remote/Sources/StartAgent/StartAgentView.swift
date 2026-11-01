@@ -82,6 +82,8 @@ struct StartAgentView: View {
             if let range = DictationCursor.range(of: selection, in: text) { dictation.selected(range) }
         }
         .onChange(of: attachments) { keep() }
+        // Auto's preview picks a runtime that takes what is attached (#3162).
+        .onChange(of: attachments, initial: true) { model.startAttachmentsChanged(attachments) }
         .onDisappear {
             dictation.stop()
             StartDraftKeeper.shared.flush()
@@ -271,7 +273,8 @@ struct StartAgentView: View {
             VStack(alignment: .leading, spacing: 8) {
                 if !attachments.isEmpty {
                     AttachmentStrip(attachments: $attachments,
-                                    capabilities: model.promptCapabilities(for: model.startRuntimeID))
+                                    capabilities: model.promptCapabilities(for: model.startRuntimeID),
+                                    runtime: model.promptRuntimeName(for: model.startRuntimeID))
                 }
                 // Voice mode (#2375) in a new session, as on the Mac: its first words start it,
                 // and the options stay (Alex, 2026-10-29).

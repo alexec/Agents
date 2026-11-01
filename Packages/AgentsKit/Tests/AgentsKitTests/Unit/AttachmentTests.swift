@@ -22,6 +22,17 @@ struct AttachmentTests {
         #expect(attachment.refusal(from: takesEverything) == nil)
         let refusal = attachment.refusal(from: takesNothingExtra)
         #expect(refusal == "This runtime does not take pictures")
+        // In the runtime's name where it is known, Auto's pick too (#3162).
+        #expect(attachment.refusal(from: takesNothingExtra, runtime: "Codex") == "Codex does not take pictures")
+    }
+
+    /// What Auto is asked to find a runtime for (#3162): only what was attached.
+    @Test func whatAttachmentsNeed() throws {
+        #expect(Attachment.needs([]) == nil)
+        #expect(Attachment.needs([.file(URL(filePath: "/tmp/notes.txt"))]) == nil)
+        let picture = Attachment.image(Data([1]), mimeType: "image/png", name: "shot")
+        #expect(Attachment.needs([picture, .file(URL(filePath: "/tmp/notes.txt"))]) == ACP.PromptCapabilities(image: true))
+        #expect(ACP.PromptCapabilities.anything == takesEverything)
     }
 
     @Test func fileContentsNeedEmbeddedContext() throws {

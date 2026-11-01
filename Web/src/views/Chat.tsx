@@ -659,6 +659,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
             goOn={() => void store.letAgentGoOn(host, agent)} />}
           recipient={store.recipient(host)}
           capabilities={agent ? store.account(host, agent.runtimeID)?.promptCapabilities : undefined}
+          runtimeName={agent ? runtimeNameOn(store, host, agent.runtimeID) : undefined}
           sent={agent ? sentPrompts(store.turns.value, store.entries.value) : []}
           send={(text, attachments) => {
             // Sending is asking for the end, as the window's prompt does (#378).

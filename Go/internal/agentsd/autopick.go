@@ -11,8 +11,9 @@ import (
 )
 
 // Auto (#2658): a runtime choice that is not a runtime. At agents/start the daemon picks the
-// first runtime in the person's order that is included, installed, signed in, not out and
-// can honour every value asked for; a rate-limited one is tried after the others (FR-006).
+// first runtime in the person's order that is included, installed, signed in, not out, can
+// honour every value asked for and takes what is attached (#3162); a rate-limited one is tried
+// after the others (FR-006).
 // The pick and the native settings it gave are kept on the agent, and its runtime never
 // changes in the session (FR-007, FR-008).
 
@@ -192,9 +193,50 @@ func (d *Daemon) credentialState(runtimeID string) (wire.AllowanceState, bool) {
 	return s, ok
 }
 
-// pickRuntime is Auto's pick for the levels and sandbox, or "" and why each runtime was not
-// used. A helper of a sandboxed agent still gets no No sandbox, at its start (FR-021).
-func (d *Daemon) pickRuntime(l wire.Levels, sandbox *wire.SandboxChoice) (string, wire.NativeSetting, []wire.AutoSkip) {
+// needsOf is what attachments need the runtime to take (#3162): a picture, audio or a file's
+// contents.
+func needsOf(attachments []wire.Attachment) wire.ACPPromptCapabilities {
+	var n wire.ACPPromptCapabilities
+	yes := true
+	for _, a := range attachments {
+		switch a.Block.Type {
+		case "image":
+			n.Image = &yes
+		case "audio":
+			n.Audio = &yes
+		case "resource":
+			n.EmbeddedContext = &yes
+		}
+	}
+	return n
+}
+
+// refusesNeeds is why a runtime will not take what the attachments need, in short, or "". Only
+// what the runtime said at its last start counts: one not started yet is not passed by on a guess.
+func (d *Daemon) refusesNeeds(id string, needs wire.ACPPromptCapabilities) string {
+	d.allowMu.Lock()
+	a, ok := d.accounts[id]
+	d.allowMu.Unlock()
+	if !ok {
+		return ""
+	}
+	said := a.PromptCapabilities
+	no := func(need, takes *bool) bool { return need != nil && *need && (takes == nil || !*takes) }
+	switch {
+	case no(needs.Image, said.Image):
+		return "takes no pictures"
+	case no(needs.Audio, said.Audio):
+		return "takes no audio"
+	case no(needs.EmbeddedContext, said.EmbeddedContext):
+		return "takes no file contents"
+	}
+	return ""
+}
+
+// pickRuntime is Auto's pick for the levels, sandbox and what the attachments need, or "" and
+// why each runtime was not used. A helper of a sandboxed agent still gets no No sandbox, at its
+// start (FR-021).
+func (d *Daemon) pickRuntime(l wire.Levels, sandbox *wire.SandboxChoice, needs wire.ACPPromptCapabilities) (string, wire.NativeSetting, []wire.AutoSkip) {
 	settings := d.autoSettings()
 	skipped := []wire.AutoSkip{}
 	type candidate struct {
@@ -219,6 +261,10 @@ func (d *Daemon) pickRuntime(l wire.Levels, sandbox *wire.SandboxChoice) (string
 		}
 		if err := d.accountRefusal(id, d.defaultAccount(id)); err != nil {
 			skip(id, "not allowed")
+			continue
+		}
+		if why := d.refusesNeeds(id, needs); why != "" {
+			skip(id, why)
 			continue
 		}
 		cells := levelCells(id, l, sandbox, settings, d.runtimeOffers(id))
@@ -462,7 +508,11 @@ func (d *Daemon) setClientPermission(r wire.SetClientPermissionRequest) (wire.Ag
 // autoPreview is auto/preview: what Auto would pick now, for the chooser's "Picks Claude
 // now" and the menus' "Balanced: Sonnet on Claude".
 func (d *Daemon) autoPreview(r wire.AutoPreviewRequest) wire.AutoPreview {
-	id, native, skipped := d.pickRuntime(d.autoLevels(r.Levels), r.Sandbox)
+	var needs wire.ACPPromptCapabilities
+	if r.Needs != nil {
+		needs = *r.Needs
+	}
+	id, native, skipped := d.pickRuntime(d.autoLevels(r.Levels), r.Sandbox, needs)
 	out := wire.AutoPreview{Skipped: skipped}
 	if id != "" {
 		out.RuntimeID, out.Native = &id, &native
@@ -533,7 +583,7 @@ func (d *Daemon) resolveLevels(r *wire.StartRequest, by startedBy) (pick *wire.A
 		return nil, nil, "", err
 	}
 	if auto {
-		id, native, skipped := d.pickRuntime(levels, r.Sandbox)
+		id, native, skipped := d.pickRuntime(levels, r.Sandbox, needsOf(r.Attachments))
 		if id == "" {
 			return nil, nil, "", noRuntime(skipped)
 		}

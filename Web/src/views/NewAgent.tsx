@@ -26,7 +26,8 @@ import { personaChoices, withPersonaLabels } from "../model/personas";
 import { sandboxCardTitle, sandboxChoiceWords, sandboxChoices, sandboxExplanation, sandboxOverrideWords, sandboxState,
   sandboxStateWords, sandboxWhy, startWithout, fixedSandbox, sandboxRefusedBy } from "../model/sandbox";
 import { autoID, autoWords, cellOf, fieldWords, followsSettings, levelMeaning, levelWords, matchLevel, noneIncluded, picksWords, sandboxValues } from "../model/levels";
-import type { AutoPreview, ClientPermissionMode, Levels } from "../protocol/generated";
+import type { ACPPromptCapabilities, AutoPreview, ClientPermissionMode, Levels } from "../protocol/generated";
+import { attachmentNeeds } from "../model/attachments";
 import { accepted } from "../model/labels";
 import type { Start } from "./chat/appViewBridge";
 import { go } from "../route";
@@ -103,6 +104,8 @@ export function NewAgent({ store, host, folder, folderName, down }: {
   const clientPermission = useSignal<ClientPermissionMode | undefined>(undefined);
   /** What Auto would pick now, and why the last start on Auto did not happen. */
   const autoPreview = useSignal<AutoPreview | null>(null);
+  /** What the attachments need the runtime to take (#3162): Auto's preview picks one that does. */
+  const needs = useSignal<ACPPromptCapabilities | undefined>(undefined);
   const autoRefusal = useSignal<string | null>(null);
   const refusal = useSignal<SandboxWillNotStart | null>(null);
   /** What was last sent, for Start without sandbox to send again. */
@@ -300,10 +303,11 @@ export function NewAgent({ store, host, folder, folderName, down }: {
   useEffect(() => {
     if (!chosenRuntime) return;
     let current = true;
-    void store.autoPreview(host, { cwd: cwd as never, levels: levels.value, ...(sandbox.value ? { sandbox: sandbox.value } : {}) })
+    void store.autoPreview(host, { cwd: cwd as never, levels: levels.value, ...(sandbox.value ? { sandbox: sandbox.value } : {}),
+      ...(needs.value ? { needs: needs.value } : {}) })
       .then((p) => { if (current) autoPreview.value = p; });
     return () => { current = false; };
-  }, [host, cwd, isAuto, levels.value, sandbox.value, store.autoSettings.value]);
+  }, [host, cwd, isAuto, levels.value, sandbox.value, needs.value, store.autoSettings.value]);
   const mappings = store.autoMappings.value[store.macHostID.value];
   /** The options a value sets on the chosen runtime, where it offers them. */
   function levelOptions(options: ConfigOption[], only?: "model" | "permission"): Record<string, JSONValue> {
@@ -488,7 +492,12 @@ export function NewAgent({ store, host, folder, folderName, down }: {
         {/* A change to the folder's own files that no session can be asked about (#531). */}
         <GuardedChangeCards store={store} host={host} where={{ folder }} down={down || !store.hostIsOnline(host)} />
         <Prompt key={filled.value} store={store} draftKey={draftKey} placeholder={refusedHere ?? "What should it do?"}
-          capabilities={capabilities} disabled={down || !chosenRuntime || refusedHere !== null
+          capabilities={capabilities} runtimeName={capabilityRuntime ? runtimeNameOf(capabilityRuntime) : undefined}
+          onAttachments={(attached) => {
+            const wanted = attachmentNeeds(attached);
+            if (JSON.stringify(wanted) !== JSON.stringify(needs.peek())) needs.value = wanted;
+          }}
+          disabled={down || !chosenRuntime || refusedHere !== null
             || (!store.hostIsOnline(host) && !store.startsWhenUsed(host))} send={start}
           recipient={store.recipient(host)} starting commands={form.value.commands}
           where={(

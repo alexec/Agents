@@ -29,13 +29,17 @@ const slowSend = 400;
 /** A word typed quickly is one question to the host, not six, as the Remote's. */
 const mentionPause = 150;
 
-export function Prompt({ store, draftKey, placeholder, capabilities, disabled, send, recipient, starting = false, where, runtime, onTyping, children,
+export function Prompt({ store, draftKey, placeholder, capabilities, runtimeName, onAttachments, disabled, send, recipient, starting = false, where, runtime, onTyping, children,
   stop, acting, queues = false, suggestion, commands = [], findFiles, banner, sent = [] }: {
   store: Store;
   /** Where the draft is kept: a session, or a new-agent form. */
   draftKey: string;
   placeholder: string;
   capabilities: ACPPromptCapabilities | undefined;
+  /** The runtime a refusal names (#3162): on Auto, the one it would pick now. */
+  runtimeName?: string | undefined;
+  /** What is attached moved: Auto's preview picks a runtime that takes it (#3162). */
+  onAttachments?: ((attachments: Attachment[]) => void) | undefined;
   disabled: boolean;
   /** Sending and attaching are off; typing never is. */
   /** Answers whether it went, so a refused prompt keeps what was typed. */
@@ -193,7 +197,8 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
   const chosenIndex = Math.min(selected.value, Math.max(0, listLength - 1));
 
   const tooMuch = totalRefusal(attachments.value);
-  const refused = attachments.value.map((a) => refusal(a, capabilities)).find((r) => r !== null) ?? null;
+  const refused = attachments.value.map((a) => refusal(a, capabilities, runtimeName)).find((r) => r !== null) ?? null;
+  useEffect(() => { onAttachments?.(attachments.value); }, [attachments.value]);
   const canSend = !disabled && !sending.value && text.value.trim() !== "" && !tooMuch && !refused;
 
   useEffect(() => {
@@ -254,7 +259,7 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
         {attachments.value.length > 0 && (
           <ul class="attachments" aria-label="Attached">
             {attachments.value.map((attachment) => {
-              const why = refusal(attachment, capabilities);
+              const why = refusal(attachment, capabilities, runtimeName);
               return (
                 <li key={attachment.id}>
                   <span>{attachment.block.type === "image" ? "🖼" : "📄"} {attachment.displayName}</span>

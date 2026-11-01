@@ -27,6 +27,16 @@ test("a runtime that won't take it says so before it is sent", () => {
   assert.equal(a.refusal(picture, { image: true }), null);
   assert.equal(a.refusal(text, {}), "This runtime does not take file contents, so this can only be attached on the Mac");
   assert.equal(a.refusal(text, undefined), null);
+  // In the runtime's name where it is known, Auto's pick too (#3162).
+  assert.equal(a.refusal(picture, { image: false }, "Codex"), "Codex does not take pictures");
+});
+
+test("what attachments need Auto's pick to take (#3162)", () => {
+  const picture = a.pictureAttachment(new Uint8Array([1, 2, 3]), "shot.png");
+  const text = a.textAttachment(utf8("x"), "x.txt", "text/plain").ok;
+  assert.equal(a.attachmentNeeds([]), undefined);
+  assert.deepEqual(a.attachmentNeeds([picture]), { image: true });
+  assert.deepEqual(a.attachmentNeeds([picture, text]), { image: true, embeddedContext: true });
 });
 
 test("900 KB in all", () => {

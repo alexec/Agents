@@ -75,10 +75,11 @@ public enum PhoneAttachment {
 
     /// The Mac's reason, with a way out that exists on a phone. The Mac tells you to
     /// attach the file itself; a phone has no file itself to attach.
-    public static func refusal(for attachment: Attachment, from capabilities: ACP.PromptCapabilities) -> String? {
-        guard let said = attachment.refusal(from: capabilities) else { return nil }
+    public static func refusal(for attachment: Attachment, from capabilities: ACP.PromptCapabilities,
+                               runtime: String? = nil) -> String? {
+        guard let said = attachment.refusal(from: capabilities, runtime: runtime) else { return nil }
         if attachment.block.requirement == .embeddedContext {
-            return "This runtime does not take file contents, so this can only be attached on the Mac"
+            return "\(runtime ?? "This runtime") does not take file contents, so this can only be attached on the Mac"
         }
         return said
     }

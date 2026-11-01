@@ -48,14 +48,24 @@ public struct Attachment: Codable, Hashable, Sendable, Identifiable {
     }
 
     /// Why this runtime will not take it, said before the prompt is sent rather than
-    /// after. Nil means it will.
-    public func refusal(from capabilities: ACP.PromptCapabilities) -> String? {
+    /// after, in the runtime's name when it is known (#3162). Nil means it will.
+    public func refusal(from capabilities: ACP.PromptCapabilities, runtime: String? = nil) -> String? {
         guard !capabilities.allows(block.requirement) else { return nil }
+        let name = runtime ?? "This runtime"
         switch block.requirement {
-        case .image: return "This runtime does not take pictures"
-        case .audio: return "This runtime does not take audio"
-        case .embeddedContext: return "This runtime does not take file contents. Attach the file itself"
+        case .image: return "\(name) does not take pictures"
+        case .audio: return "\(name) does not take audio"
+        case .embeddedContext: return "\(name) does not take file contents. Attach the file itself"
         case nil: return nil
         }
+    }
+
+    /// What these need a runtime to take, for Auto's pick (#3162); nil when they need nothing.
+    public static func needs(_ attachments: [Attachment]) -> ACP.PromptCapabilities? {
+        let wanted = Set(attachments.compactMap(\.block.requirement))
+        guard !wanted.isEmpty else { return nil }
+        return ACP.PromptCapabilities(image: wanted.contains(.image) ? true : nil,
+                                      audio: wanted.contains(.audio) ? true : nil,
+                                      embeddedContext: wanted.contains(.embeddedContext) ? true : nil)
     }
 }
