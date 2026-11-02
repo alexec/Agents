@@ -414,9 +414,13 @@ final class AppModel {
     /// Work's places (#3119): the list or the item's page open, and the ones before and after it,
     /// for Back and Forward. Kept while the window is open, as the Lineage page's starts are.
     var workHistory = LineageHistory<WorkPlace>()
+    /// Each Work list's filters, sort and rows (#3257), so a page goes through its list and Back finds it as left.
+    let workLists = WorkLists()
 
     /// Open Work at a place: a list, or an item's page.
     func showWork(_ place: WorkPlace) {
+        // The list Work opens on is no place yet: a page opened from it puts it first, so Back finds it (#3257).
+        if place.fromList, workHistory.current == nil { workHistory.go(WorkPlace(kind: place.kind)) }
         if place != workHistory.current { workHistory.go(place) }
         showsWork = true
     }

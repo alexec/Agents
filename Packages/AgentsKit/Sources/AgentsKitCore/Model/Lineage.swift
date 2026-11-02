@@ -371,6 +371,14 @@ public struct LineageHistory<Place: Hashable & Sendable>: Hashable, Sendable {
         at = places.count - 1
     }
 
+    /// Put a place where the current one is, as the browser's `replaceState` (#3257): Previous and
+    /// Next on a Work page, so Back goes to the list and not through each item.
+    public mutating func replace(_ place: Place) {
+        guard places.indices.contains(at) else { return go(place) }
+        places[at] = place
+        places = Array(places.prefix(at + 1))
+    }
+
     public mutating func back() { if canGoBack { at -= 1 } }
     public mutating func forward() { if canGoForward { at += 1 } }
 }

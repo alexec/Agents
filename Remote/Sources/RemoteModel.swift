@@ -316,6 +316,8 @@ final class RemoteModel {
     /// Work's places (#3256), as the window keeps them: the list or the item's page open, and
     /// the ones before and after it, for Back and Forward.
     var workHistory = LineageHistory<WorkPlace>()
+    /// Each Work list's filters, sort and rows (#3257), so a page goes through its list and Back finds it as left.
+    let workLists = WorkLists()
     /// What `control/status` last said: its version and capabilities, for Settings (#1748).
     private(set) var controlStatus: DaemonAPI.ControlStatus?
 

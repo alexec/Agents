@@ -27,6 +27,8 @@ ITEMS = {
          "comments": [comment("kim", "Seen on iOS too.", "2026-11-01T16:00:00Z")]},
     17: {"pr": False, "title": "Document the coupon field", "state": "OPEN", "labels": ["docs"], "author": "kim",
          "body": "The README says nothing about coupons.", "comments": []},
+    19: {"pr": False, "title": "Coupon codes are case-sensitive", "state": "OPEN", "labels": ["checkout"], "author": "sam",
+         "body": "SAVE10 works and save10 does not.", "comments": []},
     21: {"pr": True, "title": "Keep the cart in local storage", "state": "OPEN", "labels": ["bug"], "author": "sam", "head": "c0ffee21",
          "body": "Fixes #12.\n\nThe cart is saved on each change and read on load.", "comments": [comment("kim", "Looks right to me.", "2026-11-01T17:00:00Z")],
          "checks": [("build", "SUCCESS"), ("test", "FAILURE"), ("lint", "SUCCESS")]},
