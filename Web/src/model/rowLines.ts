@@ -334,8 +334,10 @@ export function eventWaitMark(agent: Agent, title: (id: string) => string | unde
     const id = p.name === "agent.finished" && Object.keys(p.anyOf ?? p.filters).length === 1 ? single(p, "agent") : undefined;
     return id === undefined ? undefined : title(id) ?? id;
   });
+  // An agent finishing is said by its name, also beside other patterns (#3236).
   const what = agents.length > 0 && agents.every((a) => a !== undefined)
-    ? finishing(agents as string[]) : wait.patterns.map(patternLabel).join(" or ");
+    ? finishing(agents as string[])
+    : wait.patterns.map((p, i) => agents[i] === undefined ? patternLabel(p) : finishing([agents[i]!])).join(" or ");
   return `◷ Waiting for ${what}`;
 }
 
