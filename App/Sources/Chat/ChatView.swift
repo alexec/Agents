@@ -385,11 +385,11 @@ struct ChatView: View {
 
     private var form: some View {
         PromptBar()
-            // The transcript scrolls under the bar (#3196): one material across the
-            // whole block, so its words blur behind the pills and between them rather
-            // than read through them. Kept to the bar's own bounds, as the top strip's.
+            // The transcript scrolls under the bar (#3196): the page's own paper across
+            // the whole block, so its words do not read through the pills or between
+            // them, and the bar is the same colour as the page. Kept to its own bounds.
             .frame(maxWidth: .infinity)
-            .background(.bar, ignoresSafeAreaEdges: [])
+            .background(Paper.ground, ignoresSafeAreaEdges: [])
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { formHeight = $0 }
     }
 }
