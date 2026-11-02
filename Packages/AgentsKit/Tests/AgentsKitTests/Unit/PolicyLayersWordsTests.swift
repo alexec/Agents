@@ -85,4 +85,61 @@ struct PolicyLayersWordsTests {
         #expect(PolicyLayersWords.tokensValue("0") == nil)
         #expect(PolicyLayersWords.amountWords(.object(["amount": .double(40), "currency": .string("USD")])) == "40")
     }
+
+    // MARK: Stopped by a policy (FR-025)
+
+    @Test func theStopCardOffersAChangeOnlyForALayerThePersonEdits() {
+        let you = DaemonAPI.PolicyLayerRef(kind: "you", name: "You")
+        let folder = DaemonAPI.PolicyLayerRef(kind: "folder", name: "payments-api", folder: "/src/payments-api")
+        let org = DaemonAPI.PolicyLayerRef(kind: "organisation", name: "Acme")
+        func stop(_ layer: DaemonAPI.PolicyLayerRef, _ reason: String = "policy") -> PolicyLayersWords.StopAction {
+            PolicyLayersWords.stopAction(.init(reason: reason, rule: "permissionMode", words: "w", layer: layer))
+        }
+        #expect(stop(you) == .changeYours)
+        #expect(stop(folder) == .changeFolder("/src/payments-api"))
+        #expect(stop(org, "budget") == .openSpending)
+        #expect(stop(org) == .seeOrganisation)
+        #expect(PolicyLayersWords.stopAction(.init(reason: "update", words: "w")) == .seeOrganisation)
+        #expect(PolicyLayersWords.stopActionTitle(.changeYours) == "Change in Agents ▸ Policy")
+        #expect(PolicyLayersWords.stopActionTitle(.changeFolder("/x")) == "Change in Folder Settings ▸ Policy")
+    }
+
+    @Test func theStopCardNamesTheRuleAndTheLayersValue() {
+        #expect(PolicyLayersWords.ruleTitle("budgets.daily") == "Per day")
+        #expect(PolicyLayersWords.ruleTitle("budgets") == "Budget")
+        let r = DaemonAPI.PolicyRefusal(reason: "budget", rule: "budgets.daily", words: "What you sent is waiting.",
+                                        layer: .init(kind: "you", name: "You"), value: "at most $1.00 a day")
+        #expect(PolicyLayersWords.stopLine(r) == "Your policy: at most $1.00 a day")
+        var same = r
+        same.value = same.words
+        #expect(PolicyLayersWords.stopLine(same) == nil)
+    }
+
+    @Test func aFolderRowStartsAtSameAsYours() {
+        #expect(PolicyLayersWords.sameAsYours("Ask") == "Same as yours (Ask)")
+        let rule = DaemonAPI.EffectiveRule(rule: "permissionMode", value: .string("ask"), words: "Ask",
+                                           layers: [.init(layer: .init(kind: "you", name: "You"), value: .string("ask"), words: "Ask"),
+                                                    .init(layer: .init(kind: "folder", name: "f"), value: .string("bypassPermissions"),
+                                                          words: "Bypass Permissions", kept: true)])
+        #expect(PolicyLayersWords.folderIsCapped(rule))
+        #expect(!PolicyLayersWords.yoursIsKept(rule))
+    }
+
+    @Test func aWaitingPolicyChangeSaysWhatItKeeps() {
+        #expect(GuardedChange.Policy(looser: ["permissionMode"], words: "Permission mode: Ask → Bypass Permissions", was: "Ask")
+            .keepTitle == "Keep Ask")
+        #expect(GuardedChange.Policy(looser: ["permissionMode", "sandbox"], words: "…").keepTitle == "Keep Old Rules")
+    }
+
+    @Test func aPolicyStopIsReadAndWrittenAsTheWireHasIt() throws {
+        let raw = #"{"policyStopped":{"_0":{"reason":"budget","rule":"budgets.daily","words":"w","layer":{"kind":"you","name":"You"},"value":"v"}}}"#
+        let kind = try JSONDecoder().decode(TranscriptEntry.Kind.self, from: Data(raw.utf8))
+        guard case .policyStopped(let refusal) = kind else {
+            Issue.record("read as \(kind)")
+            return
+        }
+        #expect(refusal.layer?.kind == "you" && refusal.value == "v")
+        let again = try JSONDecoder().decode(TranscriptEntry.Kind.self, from: JSONEncoder().encode(kind))
+        #expect(again == kind)
+    }
 }

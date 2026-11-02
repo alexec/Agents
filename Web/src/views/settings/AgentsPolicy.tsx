@@ -3,27 +3,59 @@
 // when your value is capped, and Where this comes from. The machine resolves the layers (policy/effective) and keeps
 // your layer on the Mac's host (policy/yours, policy/setYours). The window's is Shared/UI/PolicyPane.swift. Listed
 // in ./sections.ts.
+// A folder's layer opens in the same pane (T057, research R13; FR-022), from the banner's list of folders with their
+// own rules or any folder of the Mac's: each row starts "Same as yours" with your value, and a value above yours is
+// "Capped by yours" (policy/folder, policy/setFolder). The route's item names it: #/settings/settings/policy:<folder>.
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../../model/store";
-import type { EffectivePolicy, EffectiveRule, JSONValue, YourPolicyState } from "../../protocol/generated";
+import type {
+  EffectivePolicy, EffectiveRule, JSONValue, PolicyFolderState, PolicyFolderWithRules, URLString, YourPolicyState,
+} from "../../protocol/generated";
 import { describe } from "../../model/errors";
+import { absolutePath } from "../../model/fileWatch";
 import {
-  banner, behindLine, choice, count, foldersLine, foot, isLooser, keptNotUsed, moneyValue, notSet, organisationTitle, rowsIn,
-  sections, sectionTitles, setting, title, tokensValue, toolsFoot, ruleValue, whereFrom, yoursIsKept, type Row,
+  backToYours, banner, behindLine, cappedByYours, choice, count, folderFile, folderIsKept, folderName, foldersLine, folderWaits, foot,
+  isLooser, keptNotUsed, layerLine, moneyValue, notSet, openFolder, organisationItem, organisationTitle, policyFolderOf, policyItem,
+  rowsIn, rulesCount, sameAsYoursLine, sections, sectionTitles, setting, title, tokensValue, toolsFoot, ruleValue, whereFrom,
+  yoursIsKept, type Row,
 } from "../../model/policyLayers";
+import { go, route } from "../../route";
 import { PolicySource } from "./PolicySource";
 
 export function AgentsPolicySection({ store, down }: { store: Store; down: boolean }) {
+  const item = route.value.nav === "settings" ? route.value.item : undefined;
+  const folder = policyFolderOf(item);
+  // A Stopped by a policy card's Change or See Organisation Policy opens Settings at its section.
+  useEffect(() => {
+    const id = item === organisationItem ? "settings-policy" : item?.startsWith("policy") ? "settings-agents-policy" : undefined;
+    if (id) document.getElementById(id)?.scrollIntoView();
+  }, [item]);
+  return (
+    <section aria-labelledby="settings-agents-policy">
+      <h3 class="section-head" id="settings-agents-policy">{title}</h3>
+      <Layer key={folder ?? ""} store={store} down={down} folder={folder} />
+    </section>
+  );
+}
+
+/** Your layer, or a folder's when folder is set. */
+function Layer({ store, down, folder }: { store: Store; down: boolean; folder: string | undefined }) {
   const effective = useSignal<EffectivePolicy | null>(null);
   const yours = useSignal<YourPolicyState | null>(null);
+  const folderState = useSignal<PolicyFolderState | null>(null);
   const problem = useSignal<string | null>(null);
   const saving = useSignal(false);
   const host = store.macHostID.value;
   const load = async () => {
     try {
-      effective.value = await store.link.call("policy/effective", {}, host);
-      yours.value = await store.link.call("policy/yours", {}, host);
+      if (folder === undefined) {
+        effective.value = await store.link.call("policy/effective", {}, host);
+        yours.value = await store.link.call("policy/yours", {}, host);
+      } else {
+        effective.value = await store.link.call("policy/effective", { folder: folder as URLString }, host);
+        folderState.value = await store.link.call("policy/folder", { folder: folder as URLString }, host);
+      }
       problem.value = null;
     } catch (error) {
       problem.value = describe(error);
@@ -31,12 +63,18 @@ export function AgentsPolicySection({ store, down }: { store: Store; down: boole
   };
   const changes = store.policyChanges.value;
   useEffect(() => { if (!down) void load(); }, [down, host, changes]);
+  // The rules this layer sets, and nothing else (FR-014).
+  const own = folder === undefined ? yours.value?.policy.rules : folderState.value?.rules;
   const save = async (rule: string, value: JSONValue | undefined) => {
     const kept = yours.value;
-    if (!kept) return;
+    if (!own || (folder === undefined && !kept)) return;
     saving.value = true;
     try {
-      await store.link.call("policy/setYours", { rules: setting(kept.policy.rules, rule, value), revision: kept.policy.revision }, host);
+      if (folder === undefined) {
+        await store.link.call("policy/setYours", { rules: setting(own, rule, value), revision: kept!.policy.revision }, host);
+      } else {
+        await store.link.call("policy/setFolder", { folder: folder as URLString, rules: setting(own, rule, value) }, host);
+      }
       problem.value = null;
     } catch (error) {
       problem.value = describe(error);
@@ -46,28 +84,39 @@ export function AgentsPolicySection({ store, down }: { store: Store; down: boole
     await load();
   };
   const eff = effective.value;
+  const pending = folderState.value?.pending;
+  const invalid = folderState.value?.invalid;
   return (
-    <section aria-labelledby="settings-agents-policy">
-      <h3 class="section-head" id="settings-agents-policy">{title}</h3>
+    <>
       {!eff && !problem.value && <p class="hint">Loading…</p>}
       {problem.value && <p class="hint" role="alert">{problem.value}</p>}
       {eff && (
         <>
-          <div class="policy-banner">
-            <p class="strong">{banner(eff)}</p>
-            {eff.organisation
-              // The Organisation Policy section of this page, below in Control plane.
-              ? <button type="button" class="link" onClick={() => document.getElementById("settings-policy")?.scrollIntoView()}>{organisationTitle}</button>
-              : <p class="hint">{foldersLine(eff.foldersWithRules.length)}</p>}
-            {behindLine(eff.behind) && <p class="hint" role="status">{behindLine(eff.behind)}</p>}
-          </div>
+          {folder === undefined ? (
+            <div class="policy-banner">
+              <p class="strong">{banner(eff)}</p>
+              {eff.organisation && (
+                // The Organisation Policy section of this page, below in Control plane.
+                <button type="button" class="link" onClick={() => document.getElementById("settings-policy")?.scrollIntoView()}>{organisationTitle}</button>
+              )}
+              <FolderList store={store} host={host} folders={eff.foldersWithRules} />
+              {behindLine(eff.behind) && <p class="hint" role="status">{behindLine(eff.behind)}</p>}
+            </div>
+          ) : (
+            <div class="policy-banner">
+              <button type="button" class="link" onClick={() => go({ nav: "settings", section: "settings", item: policyItem() })}>{backToYours}</button>
+              <p class="strong">{layerLine({ kind: "folder", name: folderName(folder), folder })}</p>
+              <p class="hint">{folderFile}</p>
+              {pending && <p class="hint" role="status">{invalid ?? folderWaits}</p>}
+            </div>
+          )}
           {sections.map((section) => (
             <div key={section} class="policy-section">
               <h4 class="section-head">{sectionTitles[section]}</h4>
               {rowsIn(section).map((row) => (
-                <RuleRow key={row.rule} row={row} rule={eff.rules.find((r) => r.rule === row.rule)}
-                  yours={yours.value ? ruleValue(yours.value.policy.rules, row.rule) : undefined}
-                  editable={!down && yours.value !== null && !saving.value} set={(v) => void save(row.rule, v)} />
+                <RuleRow key={row.rule} row={row} rule={eff.rules.find((r) => r.rule === row.rule)} folder={folder !== undefined}
+                  yours={own ? ruleValue(own, row.rule) : undefined}
+                  editable={!down && own !== undefined && !saving.value} set={(v) => void save(row.rule, v)} />
               ))}
               {section === "tools" && <p class="hint">{toolsFoot}</p>}
             </div>
@@ -75,22 +124,62 @@ export function AgentsPolicySection({ store, down }: { store: Store; down: boole
           <p class="hint">{foot}</p>
         </>
       )}
-    </section>
+    </>
   );
 }
 
-function RuleRow({ row, rule, yours, editable, set }: { row: Row; rule: EffectiveRule | undefined; yours: JSONValue | undefined;
-  editable: boolean; set: (value: JSONValue | undefined) => void }) {
+/** The banner's "<n> folders have their own rules" (R13): opens the list, each folder to its layer, and a menu of the
+ * Mac's other folders, to open one that sets nothing yet. */
+function FolderList({ store, host, folders }: { store: Store; host: string; folders: PolicyFolderWithRules[] }) {
+  const open = useSignal(false);
+  const show = (folder: string) => go({ nav: "settings", section: "settings", item: policyItem(folder) });
+  const listed = new Set(folders.map((f) => absolutePath(f.folder)));
+  const others = (store.folders.value[host] ?? [])
+    .filter((s) => s.exists && !s.folder.archivedAt && !listed.has(absolutePath(s.folder.folder)))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  return (
+    <>
+      <button type="button" class="link" aria-expanded={open.value} onClick={() => { open.value = !open.value; }}>
+        {foldersLine(folders.length)}
+      </button>
+      {open.value && (
+        <>
+          {folders.length > 0 && (
+            <ul class="policy-folders">
+              {folders.map((f) => (
+                <li key={f.folder}>
+                  <button type="button" class="link" onClick={() => show(f.folder)}>{f.name}</button>
+                  {" "}<span class="quiet small">{rulesCount(f.count)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {others.length > 0 && (
+            <select aria-label={openFolder} value="" onChange={(e) => { const v = e.currentTarget.value; if (v) show(v); }}>
+              <option value="">{openFolder}</option>
+              {others.map((s) => <option key={s.folder.folder} value={absolutePath(s.folder.folder)}>{s.name}</option>)}
+            </select>
+          )}
+        </>
+      )}
+    </>
+  );
+}
+
+function RuleRow({ row, rule, folder, yours, editable, set }: { row: Row; rule: EffectiveRule | undefined; folder: boolean;
+  yours: JSONValue | undefined; editable: boolean; set: (value: JSONValue | undefined) => void }) {
   const open = useSignal(false);
   const id = `policy-${row.rule.replace(".", "-")}`;
+  // Your value under a cap is kept, not used (FR-006); a folder's value above yours is capped by yours (US3 scenario 6).
+  const kept = rule && (folder ? folderIsKept(rule) : yoursIsKept(rule));
   return (
     <div class="policy-rule">
       <label class="setting" for={id}>
         <span>{row.title}</span>
-        <Control id={id} row={row} rule={rule} yours={yours} editable={editable} set={set} />
+        <Control id={id} row={row} rule={rule} folder={folder} yours={yours} editable={editable} set={set} />
       </label>
       {rule?.capLine && <p class="hint"><span aria-hidden="true">🔒 </span>{rule.capLine}</p>}
-      {rule && yoursIsKept(rule) && <p class="hint">{keptNotUsed}. {rule.words} applies.</p>}
+      {rule && kept && <p class="hint">{folder ? cappedByYours : keptNotUsed}. {rule.words} applies.</p>}
       <button type="button" class="link small" aria-expanded={open.value} disabled={!rule} onClick={() => { open.value = !open.value; }}>
         {whereFrom}
       </button>
@@ -99,9 +188,12 @@ function RuleRow({ row, rule, yours, editable, set }: { row: Row; rule: Effectiv
   );
 }
 
-function Control({ id, row, rule, yours, editable, set }: { id: string; row: Row; rule: EffectiveRule | undefined;
-  yours: JSONValue | undefined; editable: boolean; set: (value: JSONValue | undefined) => void }) {
-  const unset = `${notSet} (${row.unset})`;
+function Control({ id, row, rule, folder, yours, editable, set }: { id: string; row: Row; rule: EffectiveRule | undefined;
+  folder: boolean; yours: JSONValue | undefined; editable: boolean; set: (value: JSONValue | undefined) => void }) {
+  // A folder row that sets nothing gets your value (FR-022).
+  const unset = folder ? sameAsYoursLine(row, rule) : `${notSet} (${row.unset})`;
+  // The reason on a dimmed value, but not on the layer's own, whose cap line is under the row.
+  const reason = (v: JSONValue) => isLooser(row, v, rule?.cap) && rule?.capLine && v !== yours ? ` — ${rule.capLine}` : "";
   switch (row.kind.kind) {
     case "choice":
     case "count": {
@@ -115,12 +207,9 @@ function Control({ id, row, rule, yours, editable, set }: { id: string; row: Row
             set(raw === "" ? undefined : row.kind.kind === "count" ? Number(raw) : raw);
           }}>
           <option value="">{unset}</option>
-          {all.map((v) => {
-            const looser = isLooser(row, v, rule?.cap);
-            // The reason on a dimmed value, but not on your own, whose cap line is under the row.
-            const reason = looser && rule?.capLine && v !== yours ? ` — ${rule.capLine}` : "";
-            return <option key={String(v)} value={String(v)} disabled={looser}>{words(v)}{reason}</option>;
-          })}
+          {all.map((v) => (
+            <option key={String(v)} value={String(v)} disabled={isLooser(row, v, rule?.cap)}>{words(v)}{reason(v)}</option>
+          ))}
         </select>
       );
     }
@@ -129,7 +218,7 @@ function Control({ id, row, rule, yours, editable, set }: { id: string; row: Row
       const money = row.kind.kind === "money";
       const shown = yours === undefined ? "" : money ? String((yours as { amount: number }).amount) : String(yours);
       return (
-        <input id={id} type="text" inputMode="decimal" placeholder="No limit" disabled={!editable} value={shown}
+        <input id={id} type="text" inputMode="decimal" placeholder={folder ? unset : "No limit"} disabled={!editable} value={shown}
           onChange={(e) => {
             const v = money ? moneyValue(e.currentTarget.value) : tokensValue(e.currentTarget.value);
             if (v !== null) set(v);
@@ -137,9 +226,21 @@ function Control({ id, row, rule, yours, editable, set }: { id: string; row: Row
       );
     }
     case "toggle":
+      // A folder's switch can also be left to yours, so it is a menu, as the window's.
+      if (folder) {
+        return (
+          <select id={id} disabled={!editable} value={yours === undefined ? "" : String(yours)}
+            onChange={(e) => { const raw = e.currentTarget.value; set(raw === "" ? undefined : raw === "true"); }}>
+            <option value="">{unset}</option>
+            {[true, false].map((v) => (
+              <option key={String(v)} value={String(v)} disabled={isLooser(row, v, rule?.cap)}>{v ? "On" : "Off"}{reason(v)}</option>
+            ))}
+          </select>
+        );
+      }
       return <input id={id} type="checkbox" role="switch" disabled={!editable} checked={yours !== false}
         onChange={(e) => set(e.currentTarget.checked)} />;
     case "list":
-      return <span id={id} class="quiet">{rule?.decides ? rule.words : row.unset}</span>;
+      return <span id={id} class="quiet">{rule?.decides ? rule.words : folder ? unset : row.unset}</span>;
   }
 }

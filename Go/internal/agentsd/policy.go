@@ -1782,7 +1782,8 @@ func (d *Daemon) registerPolicy() {
 	On(d, wire.CallPolicyEffective, func(ctx context.Context, c *Client, r wire.PolicyEffectiveRequest) (wire.EffectivePolicy, error) {
 		folder := ""
 		if r.Folder != nil {
-			folder = string(*r.Folder)
+			// A URL or a plain path (foldersWithRules' own): the folder layer is kept by path.
+			folder = store.FolderPath(*r.Folder)
 		}
 		return d.effectiveForClient(folder), nil
 	})

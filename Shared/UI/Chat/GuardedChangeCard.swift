@@ -9,7 +9,9 @@ import SwiftUI
 /// Asked in the session of the agent that made it, over the prompt as a form is, or on
 /// the folder's page when no agent did; and in Folder Settings on the Mac. The client
 /// says how to read the change and how to answer it, so the card holds no model of its own.
-/// A workflow waiting for an OK is asked the same way, by its file's path (#569).
+/// A workflow waiting for an OK is asked the same way, by its file's path (#569). A folder's
+/// policy (#2957, frame D) says which rules it makes looser, and asks **Allow**, **Keep
+/// <old value>** or **Show Change**.
 struct GuardedChangeCard: View {
     let change: GuardedChange
     /// What the file was and is; nil when it could not be read, which the client has said.
@@ -28,6 +30,12 @@ struct GuardedChangeCard: View {
             Label(change.headline, systemImage: "exclamationmark.shield")
                 .appText(.reading).fontWeight(.semibold)
                 .tinted(.attention)
+            // A folder's policy (#2957, frame D): which rules the change makes looser.
+            if let policy = change.policy {
+                Text(policy.words)
+                    .appText(.reading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             HStack(spacing: 10) {
                 if let counts = reading?.counts {
                     Text("+\(counts.added) −\(counts.removed)")
@@ -39,12 +47,12 @@ struct GuardedChangeCard: View {
                     ProgressView().controlSize(.small)
                 }
                 Spacer()
-                Button("Review…", action: review)
+                Button(change.policy == nil ? "Review…" : "Show Change", action: review)
                     .buttonStyle(.paper)
                 Group {
-                    Button("Undo") { answer(keep: false) }
+                    Button(change.policy?.keepTitle ?? "Undo") { answer(keep: false) }
                         .buttonStyle(.paper)
-                    Button("Keep") { answer(keep: true) }
+                    Button(change.policy == nil ? "Keep" : "Allow") { answer(keep: true) }
                         .buttonStyle(.paperProminent)
                 }
                 .disabled(reading == nil || busy || isOffline)

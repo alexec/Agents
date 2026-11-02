@@ -146,7 +146,7 @@ function entryIsPassing(entry: TranscriptEntry): boolean {
 const knownKinds = new Set(["userMessage", "agentMessage", "agentThought", "toolCall", "toolCallUpdate", "planUpdated",
   "usageRecorded", "servedRequest", "elicitationAsked", "elicitationAnswered", "compaction", "notice", "permissionAsked",
   "permissionAnswered", "optionChanged", "stateChanged", "background", "workReported", "runtimeNote",
-  "sandboxFailure", "fileShown", "notified"]);
+  "sandboxFailure", "policyStopped", "fileShown", "notified"]);
 
 function isDrawn(item: Item): boolean {
   return item.kind === "run" || knownKinds.has(kindOf(item.entry));
@@ -520,7 +520,7 @@ function isAgentMessage(item: Item): boolean {
 export function isOutcome(item: Item): boolean {
   if (item.kind !== "entry") return false;
   const kind = kindOf(item.entry);
-  if (kind === "elicitationAnswered" || kind === "workReported" || kind === "sandboxFailure") return true;
+  if (kind === "elicitationAnswered" || kind === "workReported" || kind === "sandboxFailure" || kind === "policyStopped") return true;
   // A view is what its call is for (#187): drawn at every level, as a reply is.
   if (kind === "appView") return true;
   // So is a file shown (#836): the chart or the page is what the work made.

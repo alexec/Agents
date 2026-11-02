@@ -1,5 +1,6 @@
 // Agents ▸ Policy's words and rows (#2957, T039), as PolicyLayersWordsTests checks them in Swift: the banner, which
-// values a cap dims, and setting a rule on your layer.
+// values a cap dims, and setting a rule on your layer; a folder's layer, the Stopped by a policy card and a waiting
+// folder change's buttons (slice 5).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "./load.mjs";
@@ -71,4 +72,61 @@ test("an empty field is no limit and text that is no amount saves nothing", () =
   assert.equal(p.moneyValue("forty"), null);
   assert.equal(p.tokensValue("2,000,000"), 2000000);
   assert.equal(p.tokensValue("0"), null);
+});
+
+test("a folder row that sets nothing is the same as yours, with your value", () => {
+  const mode = row("permissionMode");
+  const rule = { rule: "permissionMode", value: "ask", words: "Ask", cap: "ask", capLine: "Your policy: at most Ask", layers: [
+    { layer: { kind: "organisation", name: "Acme" }, value: "approveForMe", words: "Approve for me", kept: false },
+    { layer: { kind: "you", name: "You" }, value: "ask", words: "Ask", kept: false },
+    { layer: { kind: "folder", name: "payments-api", folder: "/p" }, words: "Not set", kept: false },
+  ] };
+  assert.equal(p.sameAsYoursLine(mode, rule), "Same as yours (Ask)");
+  assert.equal(p.sameAsYoursLine(mode, { ...rule, cap: undefined }), "Same as yours (Ask, and any mode may be chosen)");
+  assert.equal(p.sameAsYoursLine(mode, undefined), "Same as yours (Ask, and any mode may be chosen)");
+  assert.ok(!p.folderIsKept(rule));
+  const above = { ...rule, layers: [rule.layers[1], { ...rule.layers[2], value: "bypassPermissions", words: "Bypass Permissions", kept: true }] };
+  assert.ok(p.folderIsKept(above));
+});
+
+test("a folder opens in Agents ▸ Policy by the route's item", () => {
+  assert.equal(p.policyItem(), "policy");
+  assert.equal(p.policyItem("/src/payments-api"), "policy:/src/payments-api");
+  assert.equal(p.policyFolderOf("policy:/src/payments-api"), "/src/payments-api");
+  assert.equal(p.policyFolderOf("policy"), undefined);
+  assert.equal(p.policyFolderOf(p.organisationItem), undefined);
+  assert.equal(p.policyFolderOf(undefined), undefined);
+  assert.equal(p.folderName("/src/payments-api/"), "payments-api");
+  assert.equal(p.folderName("file:///src/my%20app"), "my app");
+  assert.equal(p.rulesCount(1), "1 rule");
+  assert.equal(p.rulesCount(2), "2 rules");
+});
+
+test("the stop card names the rule and the layer, and offers Change only for a layer the person can edit", () => {
+  const you = { kind: "you", name: "You" };
+  const budget = { reason: "budget", rule: "budgets.daily", words: "What you sent is waiting: the day's spending limit has been reached.",
+    layer: you, value: "at most $40.00 a day" };
+  assert.equal(p.stoppedTitle, "Stopped by a policy");
+  assert.equal(p.stopRuleTitle("budgets.daily"), "Per day");
+  assert.equal(p.stopRuleTitle("budgets"), "Budget");
+  assert.equal(p.stopRuleTitle("models"), "models");
+  assert.equal(p.stopRuleTitle(undefined), undefined);
+  assert.equal(p.stopLayerLine(budget), "Your policy: at most $40.00 a day");
+  assert.equal(p.stopLayerLine({ ...budget, value: budget.words }), undefined);
+  assert.equal(p.stopLayerLine({ ...budget, value: undefined }), undefined);
+  assert.deepEqual(p.stopAction(budget), { kind: "yours", label: "Change in Agents ▸ Policy" });
+  const folder = { reason: "policy", rule: "permissionMode", words: "payments-api allows at most Ask.",
+    layer: { kind: "folder", name: "payments-api", folder: "/src/payments-api" }, value: "Ask" };
+  assert.equal(p.stopLayerLine(folder), "payments-api: Ask");
+  assert.deepEqual(p.stopAction(folder), { kind: "folder", label: "Change in payments-api’s Policy", folder: "/src/payments-api" });
+  const acme = { kind: "organisation", name: "Acme" };
+  assert.deepEqual(p.stopAction({ reason: "budget", rule: "budgets", words: "w", layer: acme }), { kind: "spending", label: "Open Spending" });
+  assert.deepEqual(p.stopAction({ reason: "policy", rule: "sandbox", words: "w", layer: acme }),
+    { kind: "organisation", label: "See Organisation Policy" });
+});
+
+test("a waiting change to a folder's policy asks Allow, Keep the old value, or Show Change", () => {
+  assert.deepEqual(p.policyChangeButtons({ looser: ["permissionMode"], words: "Permission mode: Ask → Bypass Permissions", was: "Ask" }),
+    { allow: "Allow", undo: "Keep Ask", review: "Show Change" });
+  assert.equal(p.policyChangeButtons({ looser: ["permissionMode", "sandbox"], words: "w" }).undo, "Keep Old Rules");
 });

@@ -480,6 +480,9 @@ button.link.reading:hover { text-decoration: underline; }
 .note { display: flex; flex-direction: column; gap: 3px; }
 .sandbox-failure p { margin: 0; }
 .sandbox-failure .answers { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
+/* Stopped by a policy (#2957, FR-025): the rule, the layer, the words, and where to change it. */
+.policy-stop p { margin: 0; }
+.policy-stop .answers { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
 /* A change to a folder's own files, asked over the prompt or on the folder's page (#531). */
 .guarded-change { border-color: color-mix(in srgb, var(--tint-attention) 25%, transparent); }
 .guarded-change p { margin: 0; }
@@ -1287,6 +1290,8 @@ button.remove:hover { opacity: 1; }
 /* Agents ▸ Policy (#2957): the banner, a rule's lines, and Where this comes from with the deciding layer lit. */
 .policy-banner { max-width: 596px; margin: 4px 0 8px; }
 .policy-banner p { margin: 0 0 2px; }
+/* The folders with their own rules (#2957, R13): each opens its layer in the same pane. */
+.policy-folders { list-style: none; margin: 4px 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .policy-rule { max-width: 596px; margin-bottom: 6px; }
 .settings-body .policy-rule .hint { margin: 0; padding: 2px 12px; }
 .policy-source { list-style: none; margin: 4px 0 8px; padding: 0; display: flex; flex-direction: column; gap: 2px; }

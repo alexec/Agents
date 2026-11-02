@@ -15,6 +15,7 @@ struct ChatView: View {
     @Environment(SidebarStates.self) private var states
     @Environment(\.openURL) private var openURL
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
     /// Set in a window of its own (#826): this session, not the selection.
     @Environment(\.poppedChat) private var popped
     /// Whether this window has an inspector: not a session's own window (#826), but a
@@ -267,7 +268,31 @@ struct ChatView: View {
             leaseStatus: { [model] agentID in model.work.leaseStatus(of: agentID) },
             // Resources at the resource, as the line names it (036 FR-011).
             openLease: { [model] name in model.showResources(at: name) },
-            fromLine: { [model] sender in model.work.fromLine(sender) })
+            fromLine: { [model] sender in model.work.fromLine(sender) },
+            openPolicy: { [model, requests, openSettings] action in
+                Self.openPolicy(action, model: model, requests: requests, openSettings: openSettings)
+            })
+    }
+
+    /// A Stopped by a policy card's button (#2957, FR-025): the pane of the layer that
+    /// decides. A folder's opens its Folder Settings at Policy, on that folder.
+    private static func openPolicy(_ action: PolicyLayersWords.StopAction, model: AppModel,
+                                   requests: WindowRequests, openSettings: OpenSettingsAction) {
+        switch action {
+        case .changeYours:
+            model.settingsPaneAsked = .agentsPolicy
+            openSettings()
+        case .changeFolder(let path):
+            let folder = URL(filePath: path)
+            if model.selectedFolder?.standardizedFileURL != folder.standardizedFileURL { model.selectedFolder = folder }
+            requests.folderSettings = .policy
+        case .openSpending:
+            model.settingsPaneAsked = .spending
+            openSettings()
+        case .seeOrganisation:
+            model.settingsPaneAsked = .policy
+            openSettings()
+        }
     }
 
     /// The sandbox card's answer for the open agent (064).

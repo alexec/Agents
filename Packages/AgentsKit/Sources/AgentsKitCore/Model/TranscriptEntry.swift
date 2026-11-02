@@ -101,6 +101,11 @@ public struct TranscriptEntry: Codable, Hashable, Sendable, Identifiable {
         /// A runtime's sandbox could not be set up (064). The card, until answered.
         case sandboxFailure(SandboxFailureRecord)
 
+        /// A rule of the policy stopped this agent (#2957, FR-025): a prompt that waits, or a
+        /// turn that ended at a budget. Drawn as the Stopped by a policy card, with the rule,
+        /// the layer that decides and the value.
+        case policyStopped(DaemonAPI.PolicyRefusal)
+
         /// A call of a tool that has a view (#187): drawn as the view, where the call began.
         /// Written by the daemon as the call arrives and again as it ends, under one id.
         case appView(AppViewCall)

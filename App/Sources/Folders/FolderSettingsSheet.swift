@@ -6,7 +6,10 @@ import SwiftUI
 /// has too (#754), which the rail shows as one row with the pages listed in its pane (#1076). Worktrees moved to Activity
 /// (#790): they change on their own, and settings are what a person sets.
 enum FolderSettingsPane: String, Hashable, CaseIterable, Identifiable {
-    case general, overview, instructions, skills, personas, workflows, mcp, plugins, other
+    case general
+    /// The folder's own layer of the policy (#2957, FR-022): `.agents/policy.json`.
+    case policy
+    case overview, instructions, skills, personas, workflows, mcp, plugins, other
 
     var id: String { rawValue }
 
@@ -26,7 +29,7 @@ enum FolderSettingsPane: String, Hashable, CaseIterable, Identifiable {
     /// The Agent Configuration page it is, if it is one.
     var page: AgentConfigurationPage? {
         switch self {
-        case .general: nil
+        case .general, .policy: nil
         case .overview: .overview
         case .instructions: .instructions
         case .skills: .skills
@@ -41,11 +44,12 @@ enum FolderSettingsPane: String, Hashable, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .general: "General"
+        case .policy: PolicyLayersWords.title
         default: page?.title ?? ""
         }
     }
 
-    var symbol: String { "gearshape" }
+    var symbol: String { self == .policy ? PolicyLayersWords.symbol : "gearshape" }
 }
 
 /// One folder's settings, as a sheet over the window (066, look/ frame C): a rail down
@@ -83,8 +87,9 @@ struct FolderSettingsSheet: View {
     @State private var unsaved = false
     @State private var leaving: UnsavedLeave?
 
+    /// Policy goes through the folder's own machine, so a server's folder has it too.
     private var panes: [FolderSettingsPane] {
-        isOnMac ? FolderSettingsPane.allCases : [.general]
+        isOnMac ? FolderSettingsPane.allCases : [.general, .policy]
     }
 
     private var chosen: FolderSettingsPane {
@@ -157,6 +162,8 @@ struct FolderSettingsSheet: View {
                 .padding(.bottom, 6)
             paneItem(.general, title: FolderSettingsPane.general.title, symbol: FolderSettingsPane.general.symbol,
                      lit: chosen == .general, waiting: !(summary?.guardedChanges ?? []).isEmpty)
+            paneItem(.policy, title: FolderSettingsPane.policy.title, symbol: FolderSettingsPane.policy.symbol,
+                     lit: chosen == .policy, waiting: (summary?.guardedChanges ?? []).contains { $0.policy != nil })
             if isOnMac {
                 paneItem(chosen.page == nil ? .overview : chosen, title: SettingsPane.agentConfiguration.title,
                          symbol: SettingsPane.agentConfiguration.symbol,
@@ -201,6 +208,8 @@ struct FolderSettingsSheet: View {
                                    page: Binding(get: { page }, set: { pane = FolderSettingsPane($0) }),
                                    waiting: waitingPlugins > 0 ? [.plugins] : [],
                                    refresh: { await refreshSnapshot() }, unsaved: $unsaved)
+        } else if chosen == .policy, let summary {
+            FolderPolicyPane(summary: summary)
         } else {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {

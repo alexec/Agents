@@ -320,7 +320,7 @@ extension TranscriptItem {
         switch entry.kind {
         // An answer to a question is the person's say in how it went. A permission
         // choice is a step: "You chose Yes" says nothing about the outcome.
-        case .elicitationAnswered, .workReported, .sandboxFailure:
+        case .elicitationAnswered, .workReported, .sandboxFailure, .policyStopped:
             return true
         // A view is what the call is for (#187): drawn at every level, as a reply is.
         case .appView:
