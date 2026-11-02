@@ -159,8 +159,8 @@ You see no new step. A folder that names no project gets one of its own name whe
 or when its machine next starts. The Add Folder sheet has a **Project** menu that starts on
 **Its Own Project**; pick another there, and the machine writes that id as it adds the folder
 (#2671). Later, you pick another project in Folder Settings ▸ General ▸ Project on the Mac,
-or with **Project…** in the folder's menu on the iPhone, iPad and web page. An admin sees
-every project, its owner and its folders in Console ▸ Projects on the web page.
+or with **Project…** in the folder's menu on the web page (the Remote has none, #2798). Every
+project, its owner and its folders are on the web page's **Projects** page (Console ▸ Projects).
 
 A project is not a repository. The repository only carries `.agents/` between clones. Later,
 a project's reports belong to the project, not to one clone (#2670).
