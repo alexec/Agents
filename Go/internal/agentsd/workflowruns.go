@@ -370,6 +370,19 @@ func (d *Daemon) fire(fr fireRequest) {
 			return
 		}
 	}
+	// The daily summary is the person's, not a machine's (#3192): of their machines, the one
+	// that claims its schedule first writes it.
+	if fr.dueAt != nil && !fr.fromQueue && fr.folder == d.personalHome() && oneMachineWorkflows[fr.id] {
+		d.workflowMu.Unlock()
+		if !d.claimRun(personalWorkflowFolder, fr.id, triggerID(fr, fr.event)) {
+			return
+		}
+		d.workflowMu.Lock()
+		if f = d.fileLocked(fr.folder, fr.id); f == nil {
+			d.workflowMu.Unlock()
+			return
+		}
+	}
 	if fr.byHand && fr.byAgent == nil {
 		// An agent can end before fire attaches its ID to the run. Only a person's
 		// next Run now clears the orphan; an agent still starting or working keeps

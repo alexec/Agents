@@ -455,6 +455,25 @@ file once, so a folder's files may change then.
 Off is for a workflow you still use but want quiet for a while: while a test is flaky,
 or while you are away. Archive is for one you are putting away.
 
+## The daily summary
+
+**Daily summary** is one of your ready-made workflows (#3192), in `~/.agents/workflows/daily-summary.md`.
+It is off until you turn it on in **Settings ▸ Agent Configuration ▸ Workflows**: change its
+`enabled: false` line to `enabled: true`. Change its `schedule:` to move it; it runs at 08:00
+on weekdays.
+
+- It runs in your home folder, in plan mode, on the Auto runtime. It is never copied into a
+  project's workflows.
+- Of your machines that have it on, only one writes each summary: the first to claim that
+  morning's run from your control plane. A machine with no control plane writes its own.
+- Its agent calls [`write_daily_summary`](agent-tools.md) for the facts. These are every folder on
+  that machine since the last summary (at most a week back): sessions done and pull requests
+  merged, sessions and workflows that failed or stopped, what waits on you (oldest first),
+  and suggestions nobody took. The agent writes one short page from them, with a link on each
+  line. `agents://agent/…` links open their session on the iPhone and iPad.
+- The page is saved in `~/.agents/summaries/`, where the last 3 stay. It opens in the files
+  pane, and one notice goes to the Mac and the phone. Its session stays until you archive it.
+
 ## See also
 
 - [Set up a workflow](../how-to/set-up-a-workflow.md)

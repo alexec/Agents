@@ -306,7 +306,7 @@ func (d *Daemon) scanLocked() {
 			continue
 		}
 		for _, id := range workflowIDs(home) {
-			if files[folder][id] != nil || files[home][id] == nil {
+			if files[folder][id] != nil || files[home][id] == nil || oneMachineWorkflows[id] {
 				continue
 			}
 			user := *files[home][id]

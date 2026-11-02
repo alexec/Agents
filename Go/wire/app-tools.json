@@ -895,5 +895,38 @@
     },
     "name": "drive_screen",
     "title": "Drive an app through its own screen"
+  },
+  {
+    "description": "The daily summary's own tool (#3192), offered only to the Daily summary workflow's session. collect says what happened since the last summary in every folder on this machine: what landed (sessions done, pull requests merged), what failed or stopped (sessions, workflows), what waits on the person (oldest first), and the suggestions nobody took, each with its link. save keeps your page under ~/.agents/summaries (the last 3 stay), shows it and sends the person one notice.",
+    "inputSchema": {
+      "properties": {
+        "action": {
+          "description": "collect, for the facts; save, for your page.",
+          "enum": [
+            "collect",
+            "save"
+          ],
+          "type": "string"
+        },
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
+        },
+        "headline": {
+          "description": "With save: the notice's one line, e.g. \"3 PRs landed, 2 things wait on you\".",
+          "type": "string"
+        },
+        "markdown": {
+          "description": "With save: the page, in Markdown.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "type": "object"
+    },
+    "name": "write_daily_summary",
+    "title": "Collect and save the daily summary"
   }
 ]

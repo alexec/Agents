@@ -18,7 +18,7 @@ import (
 // events that mcpcatalog counts for the Workflows level.
 func TestReadyMadeWorkflowsRead(t *testing.T) {
 	ids := readyMadeIDs()
-	if !slices.Equal(ids, []string{"address-review-comments", "answer-a-sign-up-code", "fix-failed-checks", "work-a-linear-issue", "work-an-issue"}) {
+	if !slices.Equal(ids, []string{"address-review-comments", "answer-a-sign-up-code", "daily-summary", "fix-failed-checks", "work-a-linear-issue", "work-an-issue"}) {
 		t.Fatal(ids)
 	}
 	var events []string
@@ -32,7 +32,9 @@ func TestReadyMadeWorkflowsRead(t *testing.T) {
 			t.Fatalf("%s: the skill's name is not its id", id)
 		}
 		for _, tr := range w.Triggers {
-			events = append(events, triggerName(tr))
+			if tr.Schedule == nil {
+				events = append(events, triggerName(tr))
+			}
 		}
 	}
 	slices.Sort(events)
@@ -129,7 +131,8 @@ func TestReadyMadeWorkflowsLiveInUserFolderAndFoldersUseThem(t *testing.T) {
 	if len(list) != 0 {
 		t.Fatalf("%+v", list)
 	}
-	// A forge folder lists all built-ins as user workflows, off by default.
+	// A forge folder lists the built-ins as user workflows, off by default: all but the daily
+	// summary, which is the person's, not a folder's (#3192).
 	json.Unmarshal(c.call(t, 4, "workflows/list", map[string]any{"folder": folderURL}), &list)
 	if len(list) != 5 || list[0].IsEnabled || list[0].AwaitingApproval != nil || list[4].Workflow.Name != "Work an issue" || list[0].Scope == nil || *list[0].Scope != "user" {
 		t.Fatalf("%+v", list)
@@ -141,7 +144,7 @@ func TestReadyMadeWorkflowsLiveInUserFolderAndFoldersUseThem(t *testing.T) {
 	}
 	var userList []wire.WorkflowSummary
 	json.Unmarshal(c.call(t, 5, "workflows/list", map[string]any{"scope": "user"}), &userList)
-	if len(userList) != 5 || userList[0].Content == nil || userList[0].Scope == nil || *userList[0].Scope != "user" {
+	if len(userList) != 6 || userList[0].Content == nil || userList[0].Scope == nil || *userList[0].Scope != "user" {
 		t.Fatalf("user workflows: %+v", userList)
 	}
 

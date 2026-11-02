@@ -98,6 +98,7 @@ func appToolCalls() []appTool {
 		{"bring_back", (*Daemon).bringBackTool},
 		{"move_worktree", (*Daemon).moveWorktree},
 		{"drive_screen", (*Daemon).driveScreen},
+		{"write_daily_summary", (*Daemon).dailySummary},
 	}
 }
 
@@ -365,7 +366,7 @@ func writeJSON(w http.ResponseWriter, v any, session string) {
 
 // offeredTools is the tools this host lists to a session: the Swift host's, those it does,
 // each with the optional description AppService adds to every schema.
-func offeredTools(movesItself, bot, desktopControl bool) []json.RawMessage {
+func offeredTools(movesItself, bot, desktopControl, summarizes bool) []json.RawMessage {
 	var all []map[string]json.RawMessage
 	if err := json.Unmarshal(wire.AppTools, &all); err != nil {
 		log.Printf("app tools: %v", err)
@@ -381,9 +382,10 @@ func offeredTools(movesItself, bot, desktopControl bool) []json.RawMessage {
 		json.Unmarshal(t["name"], &name)
 		// A bot's machine has no ask tools: nobody answers there (#1761, FR-032). A host
 		// with no agents-drive beside it, or with desktop control Off, has no drive_screen
-		// (#3004, host.desktop-control/1, FR-004).
+		// (#3004, host.desktop-control/1, FR-004). Only a session in the person's home
+		// folder, as the Daily summary's is, has write_daily_summary (#3192).
 		if !done[name] || name == "move_worktree" && !movesItself || askTools[name] && bot ||
-			name == "drive_screen" && !desktopControl {
+			name == "drive_screen" && !desktopControl || name == "write_daily_summary" && !summarizes {
 			continue
 		}
 		b, _ := json.Marshal(t)
@@ -410,7 +412,7 @@ func (d *Daemon) appToolsHandle(ctx context.Context, g *appGrant, method string,
 	case "ping":
 		return map[string]any{}, nil
 	case "tools/list":
-		return map[string]any{"tools": offeredTools(g.movesItself, d.isBot(), d.offersDriveScreen())}, nil
+		return map[string]any{"tools": offeredTools(g.movesItself, d.isBot(), d.offersDriveScreen(), d.inPersonalHome(g.agent))}, nil
 	case "resources/list":
 		return map[string]any{"resources": []any{}}, nil
 	case "resources/read":
