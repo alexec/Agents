@@ -202,6 +202,7 @@ final class AppModel {
             showsMilestones = false
             showsTokens = false
             showsWorktrees = false
+            showsWork = false
             // The same rule as picking a folder: what you picked is what you see,
             // and a conversation or a workflow left open underneath would be waiting
             // to reappear when the bill is closed, which is a place nobody chose to
@@ -227,6 +228,7 @@ final class AppModel {
             showsMilestones = false
             showsTokens = false
             showsWorktrees = false
+            showsWork = false
             selection = nil
             openWorkflow = nil
             folderPage = nil
@@ -247,6 +249,7 @@ final class AppModel {
             showsMilestones = false
             showsTokens = false
             showsWorktrees = false
+            showsWork = false
             selection = nil
             openWorkflow = nil
             folderPage = nil
@@ -270,6 +273,7 @@ final class AppModel {
             showsMilestones = false
             showsTokens = false
             showsWorktrees = false
+            showsWork = false
             selection = nil
             openWorkflow = nil
             folderPage = nil
@@ -291,6 +295,7 @@ final class AppModel {
             showsMilestones = false
             showsTokens = false
             showsWorktrees = false
+            showsWork = false
             selection = nil
             openWorkflow = nil
             folderPage = nil
@@ -311,6 +316,7 @@ final class AppModel {
             showsMilestones = false
             showsTokens = false
             showsWorktrees = false
+            showsWork = false
             selection = nil
             openWorkflow = nil
             folderPage = nil
@@ -331,6 +337,7 @@ final class AppModel {
             showsTime = false
             showsTokens = false
             showsWorktrees = false
+            showsWork = false
             selection = nil
             openWorkflow = nil
             folderPage = nil
@@ -351,6 +358,7 @@ final class AppModel {
             showsTime = false
             showsMilestones = false
             showsWorktrees = false
+            showsWork = false
             selection = nil
             openWorkflow = nil
             folderPage = nil
@@ -364,6 +372,7 @@ final class AppModel {
     var showsWorktrees = false {
         didSet {
             guard showsWorktrees, showsWorktrees != oldValue else { return }
+            showsWork = false
             showsSpending = false
             showsResources = false
             showsEvents = false
@@ -377,6 +386,40 @@ final class AppModel {
             folderPage = nil
             composing = false
         }
+    }
+
+    /// Whether the window is showing Work (#3119): every issue and pull request from the forges,
+    /// with lineage on top, and the milestones and releases lineage knows. A page like Cost, and
+    /// not persisted for the same reason.
+    var showsWork = false {
+        didSet {
+            guard showsWork, showsWork != oldValue else { return }
+            showsSpending = false
+            showsResources = false
+            showsEvents = false
+            showsRuntimes = false
+            showsMCPServers = false
+            showsTime = false
+            showsMilestones = false
+            showsTokens = false
+            showsWorktrees = false
+            selection = nil
+            openWorkflow = nil
+            folderPage = nil
+            composing = false
+        }
+    }
+
+    /// Work's places (#3119): the list or the item's page open, and the ones before and after it,
+    /// for Back and Forward. Kept while the window is open, as the Lineage page's starts are.
+    var workHistory = LineageHistory<WorkPlace>()
+    /// Where Work is: Issues until something else is opened.
+    var workPlace: WorkPlace { workHistory.current ?? WorkPlace(kind: .issue) }
+
+    /// Open Work at a place: a list, or an item's page.
+    func showWork(_ place: WorkPlace) {
+        if place != workHistory.current { workHistory.go(place) }
+        showsWork = true
     }
 
     /// The event a workflow row asked to be shown. Scrolled to, once.
@@ -424,6 +467,7 @@ final class AppModel {
         showsMilestones = false
         showsTokens = false
         showsWorktrees = false
+        showsWork = false
         if let agent = agents.first(where: { $0.id == agentID }) {
             pendingOpen = nil
             select(FolderKey(host: agent.host, folder: agent.folderPath))
@@ -448,6 +492,7 @@ final class AppModel {
         showsMilestones = false
         showsTokens = false
         showsWorktrees = false
+        showsWork = false
         // Not listed yet: settling the selection would pick another, so it waits (#1055).
         pendingOpen = liveFolders.contains { $0.key == key } ? nil : .folder(key)
         select(key)
@@ -491,6 +536,7 @@ final class AppModel {
             if showsTokens { return .tokens }
             if showsTime { return .time }
             if showsMilestones { return .milestones }
+            if showsWork { return .work }
             guard let key = selectedFolderKey else { return nil }
             if let id = openWorkflow { return .workflow(id, in: key) }
             if case .review(let id)? = folderPage { return .review(id, in: key) }
@@ -516,6 +562,7 @@ final class AppModel {
                 showsMilestones = false
                 showsTokens = false
                 showsWorktrees = false
+                showsWork = false
                 select(key)
                 openWorkflow = id
             case .pin(let path, let key):
@@ -537,6 +584,8 @@ final class AppModel {
                 showsTime = true
             case .milestones:
                 showsMilestones = true
+            case .work:
+                showsWork = true
             case .resources:
                 showResources()
             case .events:
@@ -557,6 +606,7 @@ final class AppModel {
                 showsMilestones = false
                 showsTokens = false
                 showsWorktrees = false
+                showsWork = false
                 showFolder(key)
             case nil:
                 // A list that clears its own selection — which macOS does while rows
@@ -578,6 +628,7 @@ final class AppModel {
         showsMilestones = false
         showsTokens = false
         showsWorktrees = false
+        showsWork = false
         select(key)
         folderPage = page
     }
@@ -607,6 +658,7 @@ final class AppModel {
         showsMilestones = false
         showsTokens = false
         showsWorktrees = false
+        showsWork = false
         select(key)
         // A new session in it (#366): the folder's own page is where a session starts,
         // as New Session has it. The folder's row in the sidebar only folds (#375).
@@ -797,6 +849,7 @@ final class AppModel {
         showsMilestones = false
         showsTokens = false
         showsWorktrees = false
+        showsWork = false
         select(key)
         openPin = path
     }
@@ -5719,6 +5772,37 @@ final class AppModel {
             .filter { $0.runsAgents && $0.has(Capability.lineage1) }
             .map { (id: $0.id, name: $0.id == mine ? "This Mac" : $0.name) }
             .sorted { ($0.id == mine ? 0 : 1, $0.name) < ($1.id == mine ? 0 : 1, $1.name) }
+    }
+
+    /// The machines that read their forges (#3119), This Mac first: Work's issues and PRs come from each.
+    var forgeMachines: [(id: MachineRef, name: String)] {
+        let mine = thisMacHostID
+        return (controlPlaneHosts ?? [])
+            .filter { $0.runsAgents && $0.has(Capability.forge1) && $0.state != "offline" }
+            .map { (id: $0.id, name: $0.id == mine ? "This Mac" : $0.name) }
+            .sorted { ($0.id == mine ? 0 : 1, $0.name) < ($1.id == mine ? 0 : 1, $1.name) }
+    }
+
+    /// A page of a machine's issues or pull requests (#3129), as Work lists them.
+    func forgeList(_ kind: WorkList.Kind, _ request: DaemonAPI.ForgeListRequest,
+                   on host: MachineRef) async throws -> DaemonAPI.ForgeList {
+        try await client(for: host).call(kind == .pr ? DaemonAPI.Method.forgePulls : DaemonAPI.Method.forgeIssues,
+                                         request, returning: DaemonAPI.ForgeList.self)
+    }
+
+    /// One issue or pull request with its body and a page of its comments (#3129), for its Work page.
+    func forgeItem(_ node: DaemonAPI.LineageNode, cursor: String? = nil,
+                   on host: MachineRef) async throws -> DaemonAPI.ForgeItemDetail {
+        try await client(for: host).call(node.kind == "pr" ? DaemonAPI.Method.forgePull : DaemonAPI.Method.forgeIssue,
+                                         DaemonAPI.ForgeItemRequest(node: node, cursor: cursor),
+                                         returning: DaemonAPI.ForgeItemDetail.self)
+    }
+
+    /// A page of the lineage nodes of a kind (#3118), from the control plane: Work's figures; nil
+    /// with no control plane.
+    func reportNodes(_ query: DaemonAPI.ReportNodesQuery) async throws -> DaemonAPI.ReportNodes? {
+        guard let controlRequests else { return nil }
+        return try await controlRequests.call(DaemonAPI.Method.reportsNodes, query, returning: DaemonAPI.ReportNodes.self)
     }
 
     /// Open the Lineage page (#3087), from a place or from where it was.

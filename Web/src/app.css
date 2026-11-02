@@ -1825,3 +1825,34 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .lineage-box .detail { font-size: 10.5px; fill: currentColor; fill-opacity: 0.6; font-variant-numeric: tabular-nums; }
 .lineage-box.link { cursor: pointer; }
 .lineage-box.link:hover .box, .lineage-box:focus-visible .box, .lineage-box a:focus-visible .box { stroke: var(--accent); }
+
+/* Work (#3119): the lists of issues, pull requests, milestones and releases, a row each, and its page. */
+.work-filters { display: flex; gap: 8px 12px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.work-filters label { display: inline-flex; gap: 4px; align-items: center; }
+.work-filters input[type="search"] { flex: 1 1 160px; min-width: 0; }
+.work-rows { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--paper-rule); }
+.work-rows li { border-bottom: 1px solid var(--paper-rule); }
+.work-row { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 8px 4px; text-align: left; background: none; border: none;
+  border-radius: 0; color: inherit; font: inherit; cursor: pointer; }
+.work-row:hover { background: var(--paper-wash); }
+.work-row-head { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+.work-ref { color: var(--accent); font-variant-numeric: tabular-nums; }
+.work-title { font-weight: 600; }
+.work-figures { padding-left: 2px; }
+.work-label { display: inline-block; padding: 0 7px; border: 1px solid var(--paper-rule); border-radius: 99px; font-size: 0.8em; line-height: 1.6; }
+.work-state { display: inline-block; padding: 0 7px; border-radius: 99px; font-size: 0.8em; line-height: 1.6; color: #fff; background: #59636e; }
+.work-state.open { background: #1f883d; }
+.work-state.merged { background: #8250df; }
+.work-state.closed { background: #cf222e; }
+.work-state.draft { background: #59636e; }
+.work-page-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.work-page-bar > button:not(.link) { min-width: 28px; }
+.work-page-head h2 { margin: 0 0 4px; }
+.work-page-head .work-ref { font-weight: normal; }
+.work-page section { margin-top: 16px; }
+.work-body { border-top: 1px solid var(--paper-rule); padding-top: 8px; }
+.work-comment { border-top: 1px solid var(--paper-rule); padding: 6px 0; }
+.work-links { display: grid; gap: 6px; margin: 8px 0; }
+.work-links > div { display: grid; grid-template-columns: 9em 1fr; gap: 2px 12px; }
+.work-links dt { color: var(--paper-ink); opacity: 0.7; }
+.work-links dd { margin: 0; grid-column: 2; }

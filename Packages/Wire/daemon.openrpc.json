@@ -3679,6 +3679,11 @@
     {
       "name": "forge/issue",
       "x-capability": "forge/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -3699,6 +3704,11 @@
     {
       "name": "forge/issues",
       "x-capability": "forge/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -3719,6 +3729,11 @@
     {
       "name": "forge/pull",
       "x-capability": "forge/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -3739,6 +3754,11 @@
     {
       "name": "forge/pulls",
       "x-capability": "forge/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {

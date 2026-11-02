@@ -145,6 +145,14 @@ struct FolderListView: View {
                 NewSessionTopRow()
             }
 
+            // Work (#3119): the issues and pull requests from the forges, lineage on top.
+            Section {
+                HStack { Text("Work").foregroundStyle(.primary); Spacer() }
+                    .help("Every issue and pull request in your folders’ repos, and what agents spent on each")
+                    .activityIcon("checklist")
+                    .appText(.supporting).sidebarInk(.work).tag(SidebarItem.work)
+            }
+
             // The pages about all the work, a group like a folder's, above the smart
             // groups (Alex, #495): rows of
             // the list, so they take its selection and keys, each with its icon in the

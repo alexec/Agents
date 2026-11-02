@@ -4,13 +4,14 @@
 // use is left out for a member; the control plane still checks each call's role itself.
 import type { ActivityPage } from "../route";
 import { reportSections, type Section } from "./console";
+import { workKinds, workKindTitle, type WorkKind } from "./work";
 
-export type NavSection = "overview" | "agents" | "machines" | "workflows" | "reports" | "requests" | "people" | "settings";
+export type NavSection = "overview" | "agents" | "work" | "machines" | "workflows" | "reports" | "requests" | "people" | "settings";
 
-export const navSections: readonly NavSection[] = ["overview", "agents", "machines", "workflows", "reports", "requests", "people", "settings"];
+export const navSections: readonly NavSection[] = ["overview", "agents", "work", "machines", "workflows", "reports", "requests", "people", "settings"];
 
 export const navTitle: Record<NavSection, string> = {
-  overview: "Overview", agents: "Agents", machines: "Machines", workflows: "Workflows", reports: "Reports",
+  overview: "Overview", agents: "Agents", work: "Work", machines: "Machines", workflows: "Workflows", reports: "Reports",
   requests: "Requests", people: "People", settings: "Settings",
 };
 
@@ -22,6 +23,7 @@ export type PageDraw =
   | { kind: "activity"; page: ActivityPage }
   | { kind: "console"; id: string }
   | { kind: "report"; section: Section }
+  | { kind: "work"; work: WorkKind }
   | { kind: "usage" | "lineage" | "machines" | "workflows" | "settings" };
 
 export interface NavPage {
@@ -44,6 +46,9 @@ export const navPages: Record<NavSection, readonly NavPage[]> = {
     adminPage("live", "Live Now", "Agents"),
     { id: "projects", title: "Projects", group: "Agents", draw: { kind: "console", id: "projects" } },
   ],
+  // Every issue and pull request from the forges, with lineage on top, and the milestones and releases
+  // lineage knows (#3119). The page's id is the lineage kind, so #/work/pr/<ref> is a PR's page.
+  work: workKinds.map((k): NavPage => ({ id: k, title: workKindTitle[k], group: "Work", draw: { kind: "work", work: k } })),
   machines: [
     { id: "machines", title: "Machines", group: "Machines", draw: { kind: "machines" } },
     { id: "runtimes", title: "Runtimes", group: "On them", draw: { kind: "activity", page: "runtimes" } },
@@ -134,5 +139,5 @@ export function movedPage(app: "console" | "a", page: string | undefined): { nav
 
 /** The g-then-letter key for each section. */
 export const sectionKeys: Record<string, NavSection> = {
-  o: "overview", a: "agents", m: "machines", w: "workflows", r: "reports", q: "requests", p: "people", s: "settings",
+  o: "overview", a: "agents", i: "work", m: "machines", w: "workflows", r: "reports", q: "requests", p: "people", s: "settings",
 };

@@ -2,7 +2,8 @@
 // /w/<workflow> for a workflow's page in the chat's place (#98), /ar/1 for the folder's archive (#499),
 // /rv/<kind:key> for a change waiting for an OK, on its Review page (#1472),
 // The page is by section (#2141): #/ is the Overview, #/agents the sidebar with nothing chosen, and
-// #/<section>/<page> a page of another section (#/machines/runtimes, #/reports/spend, #/settings/policy).
+// #/<section>/<page> a page of another section (#/machines/runtimes, #/reports/spend, #/settings/policy),
+// and #/<section>/<page>/<item> one item on it: #/work/pr/github%3Aalexec%2FAgents%2399 is PR #99 (#3119).
 // The addresses before it, #/console/<page> (#1804) and #/a/<page> (#151), are read as their new place.
 // A tab holding one folder alone (#1089) starts #/o/1/…: Open in New Tab on its heading. It keeps
 // to that folder until ‹ All.
@@ -17,6 +18,8 @@ export interface Route {
   nav?: Exclude<NavSection, "overview"> | undefined;
   /** The page of the section; its first when absent. In Agents, Live Now or Projects in the chat's place. */
   section?: string | undefined;
+  /** One item of a section's page: in Work, an issue's or a PR's lineage ref, #/work/pr/<ref> (#3119). */
+  item?: string | undefined;
   host?: string | undefined;
   /** The folder URL, as the host writes it. */
   folder?: string | undefined;
@@ -51,7 +54,7 @@ export const usageAsked = signal<UsagePane | undefined>(undefined);
 
 export function parseRoute(hash: string): Route {
   const path = hash.replace(/^#\/?/, "");
-  const [first, section] = path.split("/");
+  const [first, section, item] = path.split("/");
   if (first === "console" || first === "a") {
     const moved = movedPage(first, section === undefined ? undefined : decodeURIComponent(section));
     if (moved.usage) usageAsked.value = moved.usage;
@@ -62,7 +65,8 @@ export function parseRoute(hash: string): Route {
   }
   if (first && first !== "overview" && (navSections as readonly string[]).includes(first)) {
     const nav = first as Exclude<NavSection, "overview">;
-    return section ? { nav, section: decodeURIComponent(section) } : { nav };
+    if (!section) return { nav };
+    return item ? { nav, section: decodeURIComponent(section), item: decodeURIComponent(item) } : { nav, section: decodeURIComponent(section) };
   }
   const parts = path.split("/").map((part) => decodeURIComponent(part));
   const route: Route = {};
@@ -119,7 +123,8 @@ export function aloneFolder(r: Route): AloneFolder | undefined {
 
 /** A section's page's address: #/reports/spend; #/ for the Overview. */
 function sectionHash(r: Route): string {
-  return r.nav ? `#/${r.nav}` + (r.section ? "/" + encodeURIComponent(r.section) : "") : "#/";
+  if (!r.nav) return "#/";
+  return `#/${r.nav}` + (r.section ? "/" + encodeURIComponent(r.section) + (r.item ? "/" + encodeURIComponent(r.item) : "") : "");
 }
 
 /** Whether an address is one from before #2141, which the page writes again as its new place. */

@@ -517,7 +517,12 @@ func (d *Daemon) forgeGitHub() (forgeGitHub, error) {
 		return d.newForgeGitHub(c.Access), nil
 	}
 	token := c.Access
-	return githubmcp.NewRealGitHub("", func() string { return token }, nil), nil
+	// A walk points GitHub at its fixture server (AGENTS_TEST_GITHUB_URL), as the skill catalogue does.
+	api := ""
+	if e := d.catalogEndpoints(); !e.IsLive() {
+		api = e.API
+	}
+	return githubmcp.NewRealGitHub(api, func() string { return token }, nil), nil
 }
 
 // forgeGitLab is the GitLab at root as the person's connection; the caller has checked there is one.

@@ -9533,6 +9533,10 @@ export interface Methods {
   "folders/setProject": { params: SetFolderProjectRequest; result: FolderSummary };
   "folders/unarchive": { params: FolderRequest; result: FolderSummary };
   "folders/undoGuardedChange": { params: GuardedChangeRequest; result: FolderSummary };
+  "forge/issue": { params: ForgeItemRequest; result: ForgeItemDetail };
+  "forge/issues": { params: ForgeListRequest; result: ForgeList };
+  "forge/pull": { params: ForgeItemRequest; result: ForgeItemDetail };
+  "forge/pulls": { params: ForgeListRequest; result: ForgeList };
   "governance/approvals": { params: Empty; result: CatalogApprovalList };
   "governance/decide": { params: CatalogDecide; result: CatalogRequest };
   "governance/request": { params: CatalogAsk; result: CatalogRequest };
@@ -9834,6 +9838,10 @@ export const MethodTarget = {
   "folders/setProject": "host",
   "folders/unarchive": "host",
   "folders/undoGuardedChange": "host",
+  "forge/issue": "host",
+  "forge/issues": "host",
+  "forge/pull": "host",
+  "forge/pulls": "host",
   "governance/approvals": "control",
   "governance/decide": "control",
   "governance/request": "control",
