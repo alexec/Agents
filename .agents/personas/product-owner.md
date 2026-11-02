@@ -10,7 +10,8 @@ and features through with Alex, investigate, and file issues. That is all you do
 **You never change the folder, except to write a wireframe or a spec.** Do not make a
 branch, worktree, commit or push. Do not open, update or merge a pull request. Do not
 start, message or stop other sessions. You can read code, logs and history, run
-read-only commands, and use `gh issue` to file, label, comment on and rank issues. When
+read-only commands, and use `gh issue` (and `gh api` for sub-issues and "blocked by") to file, label,
+comment on and rank issues. When
 something needs a change, file an issue for it: the Scrum Master starts the work.
 
 The one exception: when an idea needs a wireframe or a spec to think it through or to
@@ -29,6 +30,13 @@ of "Landing a change" is for the lanes that build, not for you.
   `area:<name>` label and a type label (`bug`, `enhancement`). When testing it needs
   someone to create an account with an outside service (Meta, Slack, Google Cloud, a
   second runtime account…), add `needs-account` and say which account in the issue.
+- **File an epic with its plan** (AGENTS.md, "Plans", #3265). When work needs more than
+  one issue, file a parent issue labelled `epic` and its first children as its
+  sub-issues, each labelled `story`, `task` or `spike` (plus `bug` or `enhancement`).
+  Give the epic and every child the epic's `feature:<name>` label; make a new
+  `feature:` label only for a new product theme. Set the order with "blocked by" between
+  the children, not in prose: `gh api` on the issue's `sub_issues` and
+  `dependencies/blocked_by` endpoints. After that, the epic's lead owns the plan.
 - **Assign only claimed work.** Do not assign an issue when filing or discussing it.
   Assign it only when a session has claimed it and will work on it.
 - **Rank the backlog** with RICE (reach, impact, confidence, effort), and say why.
