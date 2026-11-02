@@ -128,6 +128,31 @@ struct WorkItemPage: View {
         Button("All \(place.kind.title.lowercased())") { model.showWork(WorkPlace(kind: place.kind)) }
             .linkStyle()
         Button("Refresh") { asked += 1 }.linkStyle()
+        stepper
+    }
+
+    /// Previous and Next through the list the page was opened from (#3257), and where it stands
+    /// in it. None on a page opened from a link or an address.
+    @ViewBuilder
+    private var stepper: some View {
+        if let n = model.workNeighbours {
+            let list = model.workLists[place.kind]
+            HStack(spacing: 8) {
+                Button { Task { await model.stepWork(forward: false) } } label: { Image(systemName: "chevron.up") }
+                    .disabled(n.previous == nil)
+                    .help("Previous item (⌥⌘↑)")
+                    .accessibilityLabel("Previous")
+                Text(WorkList.positionWords(n, more: list.hasMore))
+                    .appText(.supporting).foregroundStyle(.secondary).monospacedDigit()
+                Button { Task { await model.stepWork(forward: true) } } label: {
+                    if list.loadingMore { ProgressView().controlSize(.small) } else { Image(systemName: "chevron.down") }
+                }
+                .disabled(!model.workHasNext || list.loadingMore)
+                .help("Next item (⌥⌘↓)")
+                .accessibilityLabel("Next")
+            }
+            .buttonStyle(.borderless)
+        }
     }
 
     // MARK: Body and comments

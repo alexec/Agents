@@ -21,7 +21,7 @@ struct WorkView: View {
             if place.ref != nil {
                 WorkItemPage(model: model, place: place).id(place)
             } else {
-                WorkListPane(model: model, kind: place.kind).id(place.kind)
+                WorkListPane(model: model, kind: place.kind, list: model.workLists[place.kind]).id(place.kind)
             }
         }
         .navigationTitle(place.ref == nil ? "Work" : place.kind.title)
@@ -79,43 +79,17 @@ private struct WorkListPane: View {
     private let compact = false
     #endif
 
-    @State private var filter = WorkList.Filter()
-    @State private var sort = WorkList.Sort.updated
-    @State private var lists: [(host: MachineRef, list: DaemonAPI.ForgeList)]?
-    @State private var lineage: [DaemonAPI.ReportNode] = []
-    @State private var lineageCursor: String?
-    @State private var problem: String?
-    @State private var loadingMore = false
-    @State private var asked = 0
-
-    /// How many pages of `reports/nodes` a list reads for its lineage: at most 500 nodes.
-    private static let lineagePages = 5
-
-    /// An issue's or a PR's lineage is joined by ref, in any order; a milestone's or a release's list is lineage's own.
-    private var nodesSort: DaemonAPI.ReportNodesSort { !kind.fromForge && sort == .cost ? .cost : .newest }
-
-    private var all: [WorkList.Row] {
-        kind.fromForge ? WorkList.merge((lists ?? []).map { (host: $0.host, items: $0.list.items) }, lineage: lineage)
-            : lineage.map(WorkList.Row.init)
-    }
-
-    private var rows: [WorkList.Row] {
-        var f = filter
-        // Milestones and releases have no state in v1.
-        if !kind.fromForge { f.state = .all }
-        return WorkList.sort(WorkList.filter(all, f), by: sort)
-    }
+    /// The list's state lives in the model (#3257), so an item's page can go through it and Back finds it as it was.
+    @Bindable var list: WorkListState
 
     private var errors: [String] {
         let machines = model.forgeMachines
-        return (lists ?? []).flatMap { entry in
+        return (list.lists ?? []).flatMap { entry in
             (entry.list.errors ?? []).map { e in
                 WorkList.errorWords(e, machine: machines.count > 1 ? machines.first { $0.id == entry.host }?.name : nil)
             }
         }
     }
-
-    private var hasMore: Bool { kind.fromForge ? (lists ?? []).contains { $0.list.cursor != nil } : lineageCursor != nil }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -123,15 +97,7 @@ private struct WorkListPane: View {
             Divider()
             content
         }
-        .workTask(id: ask) { await load() }
-    }
-
-    private var ask: Ask { Ask(state: filter.state.forge, sort: nodesSort, asked: asked) }
-
-    private struct Ask: Equatable {
-        var state: String
-        var sort: DaemonAPI.ReportNodesSort
-        var asked: Int
+        .workTask(id: list.ask) { await list.load(model: model) }
     }
 
     /// One row of them on the Mac and an iPad; on a phone the choices scroll sideways over
@@ -150,35 +116,35 @@ private struct WorkListPane: View {
             HStack(spacing: 12) {
                 choices
                 filterField
-                Button("Refresh") { asked += 1 }
+                Button("Refresh") { list.asked += 1 }
                     .linkStyle()
             }
         }
     }
 
     private var filterField: some View {
-        TextField("Filter", text: $filter.text)
+        TextField("Filter", text: $list.filter.text)
             .textFieldStyle(.roundedBorder)
             .accessibilityLabel("Filter by words")
     }
 
     @ViewBuilder
     private var choices: some View {
-        let offered = WorkList.choices(all)
+        let offered = WorkList.choices(list.all)
         if kind.fromForge {
-            named("State", filter.state.title) {
-                Picker("State", selection: $filter.state) {
+            named("State", list.filter.state.title) {
+                Picker("State", selection: $list.filter.state) {
                     ForEach(kind.states, id: \.self) { Text($0.title).tag($0) }
                 }
             }
         }
-        choice("Repo", any: "All", selection: $filter.repo, options: offered.repos, words: WorkList.repoName)
-        choice("Label", any: "Any", selection: $filter.label, options: offered.labels)
+        choice("Repo", any: "All", selection: $list.filter.repo, options: offered.repos, words: WorkList.repoName)
+        choice("Label", any: "Any", selection: $list.filter.label, options: offered.labels)
         if kind.fromForge {
-            choice("Assignee", any: "Any", selection: $filter.assignee, options: offered.assignees)
+            choice("Assignee", any: "Any", selection: $list.filter.assignee, options: offered.assignees)
         }
-        named("Sort", sort.title) {
-            Picker("Sort", selection: $sort) {
+        named("Sort", list.sort.title) {
+            Picker("Sort", selection: $list.sort) {
                 ForEach(kind.sorts, id: \.self) { Text($0.title).tag($0) }
             }
         }
@@ -218,37 +184,45 @@ private struct WorkListPane: View {
     private var content: some View {
         if kind.fromForge, model.forgeMachines.isEmpty {
             message(WorkList.noForgeHere)
-        } else if lists == nil {
+        } else if list.lists == nil {
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            let shown = rows
-            let several = Set(all.map(\.repo)).count > 1
-            List {
-                ForEach([problem].compactMap { $0 } + errors, id: \.self) { line in
-                    Label(line, systemImage: "exclamationmark.triangle").foregroundStyle(.secondary)
-                }
-                if shown.isEmpty {
-                    Text(WorkList.noWork(kind)).foregroundStyle(.secondary)
-                }
-                ForEach(shown) { row in
-                    Button { model.showWork(WorkPlace(kind: kind, ref: row.id)) } label: {
-                        WorkRowView(row: row, several: several, compact: compact)
+            let shown = list.rows
+            let several = Set(list.all.map(\.repo)).count > 1
+            ScrollViewReader { reader in
+                List {
+                    ForEach([list.problem].compactMap { $0 } + errors, id: \.self) { line in
+                        Label(line, systemImage: "exclamationmark.triangle").foregroundStyle(.secondary)
                     }
-                    .buttonStyle(.plain)
+                    if shown.isEmpty {
+                        Text(WorkList.noWork(kind)).foregroundStyle(.secondary)
+                    }
+                    ForEach(shown) { row in
+                        Button {
+                            list.opened = row.id
+                            model.showWork(WorkPlace(kind: kind, ref: row.id, fromList: true))
+                        } label: {
+                            WorkRowView(row: row, several: several, compact: compact)
+                        }
+                        .buttonStyle(.plain)
+                        .id(row.id)
+                    }
+                    if list.hasMore {
+                        Button(list.loadingMore ? "Loading…" : "More") { Task { await list.loadMore(model: model) } }
+                            .linkStyle()
+                            .disabled(list.loadingMore)
+                    }
+                    if !kind.fromForge {
+                        Text(WorkList.lineageOnlyNote).appText(.fine).foregroundStyle(.tertiary)
+                    }
                 }
-                if hasMore {
-                    Button(loadingMore ? "Loading…" : "More") { Task { await loadMore() } }
-                        .linkStyle()
-                        .disabled(loadingMore)
-                }
-                if !kind.fromForge {
-                    Text(WorkList.lineageOnlyNote).appText(.fine).foregroundStyle(.tertiary)
-                }
+                .listStyle(.inset)
+                #if os(iOS)
+                .refreshable { list.asked += 1 }
+                #endif
+                // Back from an item's page: the list where it was left, at the row last opened.
+                .onAppear { if let opened = list.opened { reader.scrollTo(opened, anchor: .center) } }
             }
-            .listStyle(.inset)
-            #if os(iOS)
-            .refreshable { asked += 1 }
-            #endif
         }
     }
 
@@ -259,78 +233,6 @@ private struct WorkListPane: View {
             .multilineTextAlignment(.center)
             .padding(24)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    /// The lineage of the kind, at most `lineagePages` pages; none from a control plane that does not list nodes.
-    private func readLineage(from cursor: String? = nil) async throws -> (nodes: [DaemonAPI.ReportNode], cursor: String?) {
-        var nodes: [DaemonAPI.ReportNode] = []
-        var next = cursor
-        for _ in 0 ..< Self.lineagePages {
-            guard let page = try await model.reportNodes(.init(kind: kind.rawValue, sort: nodesSort, cursor: next, limit: 100)) else {
-                return (nodes, nil)
-            }
-            nodes += page.nodes
-            next = page.cursor
-            if next == nil || !kind.fromForge { break }
-        }
-        return (nodes, next)
-    }
-
-    private func load() async {
-        let mine = ask
-        lists = nil
-        lineage = []
-        problem = nil
-        do {
-            let known = try await readLineage()
-            guard ask == mine else { return }
-            lineage = known.nodes
-            lineageCursor = known.cursor
-        } catch {
-            guard ask == mine else { return }
-            // A control plane that does not list nodes yet leaves the issues and PRs without figures.
-            if !kind.fromForge { problem = ReportValueWords.sentence(error) }
-        }
-        guard kind.fromForge else { lists = []; return }
-        let state = filter.state.forge
-        var read: [(host: MachineRef, list: DaemonAPI.ForgeList)] = []
-        await withTaskGroup(of: (MachineRef, DaemonAPI.ForgeList).self) { group in
-            for machine in model.forgeMachines {
-                group.addTask {
-                    do {
-                        return (machine.id, try await model.forgeList(kind, .init(state: state, limit: 100), on: machine.id))
-                    } catch {
-                        return (machine.id, .init(errors: [.init(forge: "", message: error.localizedDescription)]))
-                    }
-                }
-            }
-            for await (host, list) in group { read.append((host, list)) }
-        }
-        guard ask == mine else { return }
-        lists = read
-    }
-
-    private func loadMore() async {
-        loadingMore = true
-        defer { loadingMore = false }
-        do {
-            if kind.fromForge {
-                var next: [(host: MachineRef, list: DaemonAPI.ForgeList)] = []
-                for entry in lists ?? [] {
-                    guard let cursor = entry.list.cursor else { next.append(entry); continue }
-                    let page = try await model.forgeList(kind, .init(state: filter.state.forge, cursor: cursor, limit: 100),
-                                                         on: entry.host)
-                    next.append((entry.host, .init(items: entry.list.items + page.items, cursor: page.cursor, errors: page.errors)))
-                }
-                lists = next
-            } else if let cursor = lineageCursor {
-                let page = try await readLineage(from: cursor)
-                lineage += page.nodes
-                lineageCursor = page.cursor
-            }
-        } catch {
-            problem = ReportValueWords.sentence(error)
-        }
     }
 }
 

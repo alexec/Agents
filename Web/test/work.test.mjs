@@ -153,3 +153,17 @@ test("a write says what it did", () => {
   assert.equal(w.closeTitle("open"), "Close");
   assert.equal(w.closeTitle("closed"), "Reopen");
 });
+
+test("previous and next are the rows above and below in the list shown (#3257)", () => {
+  const rows = w.sortRows(w.mergeForge([{ host: "mac", items: [item(1), item(2), item(3)] }], []), "newest");
+  const refs = rows.map((r) => r.node.ref);
+  const first = w.neighbours(refs[0], rows);
+  assert.deepEqual(first, { previous: undefined, next: refs[1], position: 1, count: 3 });
+  const last = w.neighbours(refs[2], rows);
+  assert.equal(last.next, undefined);
+  assert.equal(last.previous, refs[1]);
+  assert.equal(w.positionWords(last, true), "3 of 3+");
+  assert.equal(w.positionWords(w.neighbours(refs[1], rows), false), "2 of 3");
+  // A row the filters leave out has no place in the list.
+  assert.equal(w.neighbours(refs[1], w.filterRows(rows, { ...w.anyFilter, text: "Issue 3" })), undefined);
+});

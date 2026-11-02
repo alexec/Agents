@@ -180,4 +180,41 @@ struct WorkPageTests {
         #expect(WorkPlace(kind: .pr).node == nil)
         #expect(WorkPlace(kind: .pr, ref: pr.ref).node == pr)
     }
+
+    @Test func previousAndNextAreTheRowsAboveAndBelowInTheListShown() {
+        let items: [DaemonAPI.ForgeItem] = (1 ... 3).map { n in
+            .init(node: Node(kind: "issue", ref: "github:alexec/Agents#\(n)"), title: "Issue \(n)", state: "open", labels: [],
+                  assignees: [], updatedAt: at)
+        }
+        let rows: [WorkList.Row] = WorkList.sort(WorkList.merge([(host: MachineRef.mac, items: items)], lineage: []), by: .newest)
+        let refs: [String] = rows.map { $0.node.ref }
+        let first = WorkList.neighbours(of: refs[0], in: rows)
+        #expect(first?.previous == nil && first?.next == refs[1] && first?.position == 1 && first?.count == 3)
+        let middle = WorkList.neighbours(of: refs[1], in: rows)
+        #expect(middle?.previous == refs[0] && middle?.next == refs[2])
+        let last = WorkList.neighbours(of: refs[2], in: rows)
+        #expect(last?.next == nil && last?.position == 3)
+        #expect(last.map { WorkList.positionWords($0, more: true) } == "3 of 3+")
+        #expect(middle.map { WorkList.positionWords($0, more: false) } == "2 of 3")
+        // A row the filters leave out has no place in the list.
+        #expect(WorkList.neighbours(of: refs[1], in: WorkList.filter(rows, .init(text: "Issue 3"))) == nil)
+    }
+
+    @Test func onlyAPageOpenedFromItsListGoesThroughIt() {
+        #expect(WorkPlace(kind: .pr, ref: pr.ref, fromList: true).fromList)
+        #expect(!WorkPlace(kind: .pr, ref: pr.ref).fromList)
+        #expect(!WorkPlace(kind: .pr, fromList: true).fromList)
+    }
+
+    @Test func previousAndNextReplaceThePlaceSoBackGoesToTheList() {
+        var h = LineageHistory<WorkPlace>()
+        h.go(WorkPlace(kind: .issue))
+        h.go(WorkPlace(kind: .issue, ref: "a", fromList: true))
+        h.replace(WorkPlace(kind: .issue, ref: "b", fromList: true))
+        h.replace(WorkPlace(kind: .issue, ref: "c", fromList: true))
+        #expect(h.places.count == 2 && h.current?.ref == "c")
+        h.back()
+        #expect(h.current == WorkPlace(kind: .issue))
+        #expect(h.canGoForward)
+    }
 }
