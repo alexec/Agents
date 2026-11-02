@@ -58,6 +58,13 @@ Rules from Alex (2026-10-12/13) that are not in AGENTS.md:
   https://github.com/alexec/Agents/pulls?q=is%3Aopen+label%3Aneeds-approval.
 - **Priority:** build speed and PR throughput, then bugs, then enhancements; `expedite`
   first within each. Take the next issue whose `area:` is free.
+- **One lead per epic (#3265).** An issue labelled `epic` gets one place, for its lead,
+  not one per child: start a session on the epic with the prompt from the `lead` skill
+  (`.agents/skills/lead/SKILL.md`, "Starting a lead"), labels `#<epic>` and `lead`, and
+  start no lane on its children yourself. The lead does not count as a lane; its lanes
+  count towards the lane and open-PR limits. An epic's place in the order is the place
+  of its earliest open child (milestone, UI change, priority). Never start a second lead
+  on an epic that a session labelled `#<epic>` and `lead` holds.
 - **One agent per issue (#2504).** Every issue gets its own agent, worktree and pull
   request. A follow-up in an area a running lane holds waits until that lane's PR has
   auto-merge on, then a new agent starts on it; the parts of one spec and a change's
