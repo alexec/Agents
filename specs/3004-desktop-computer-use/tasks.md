@@ -217,31 +217,39 @@ every client; confirm each choice does what it says (spec US3 Acceptance Scenari
 
 ### Tests for User Story 3
 
-- [ ] T027 [P] [US3] Go test: the pause/resume/takeOver state transitions (data-model.md's "Pause on
+- [x] T027 [P] [US3] Go test: the pause/resume/takeOver state transitions (data-model.md's "Pause on
       touch" diagram), including `notPaused`/`notHeld` refusals, in
       `Go/internal/agentsd/screenpause_test.go`.
 
 ### Implementation for User Story 3
 
-- [ ] T028 [US3] `agents-drive`: a global, listen-only `CGEventTap` (tap point `.cghidEventTap`) that
+- [x] T028 [US3] `agents-drive`: a global, listen-only `CGEventTap` (tap point `.cghidEventTap`) that
       filters out any event carrying the `agentsDriveMarker` from T011 and reports every other real
       mouse/key event to `agentsd` over the protocol as `touch` the instant it arrives (research R2) —
       in `Host/AgentsDrive/TouchFilter.swift`. Depends on T011. `[machines]`
-- [ ] T029 [US3] Go: `DesktopControlState` kept per agent holding the `screen` lease; `desktopControl/
+- [x] T029 [US3] Go: `DesktopControlState` kept per agent holding the `screen` lease; `desktopControl/
       resume` (refused `notPaused` when not paused) and `desktopControl/takeOver` (refused `notHeld` when
       the agent does not hold the lease; releases it at once through R4's internal path) handlers;
       raises `desktopControl.paused`/`desktopControl.resumed`/`desktopControl.takenOver` events and
       pushes `desktopControl/stateChanged` on every change — in `Go/internal/agentsd/screenpause.go`.
       Depends on T015. `[machines]`
-- [ ] T030 [US3] Go: wire the `touch` word from `agents-drive` (T028) into T029's pause transition — in
+- [x] T030 [US3] Go: wire the `touch` word from `agents-drive` (T028) into T029's pause transition — in
       `Go/internal/agentsd/screencalls.go` and `Go/internal/agentsd/screenpause.go`. Depends on T028,
       T029. `[machines]`
-- [ ] T031 [P] [US3] `Shared/UI/Chat/DesktopControlPauseCard.swift` (new): Resume and Take Over —
+- [x] T031 [P] [US3] `Shared/UI/Chat/DesktopControlPauseCard.swift` (new): Resume and Take Over —
       drawn by both the Mac window and the Remote. `[chat]`
-- [ ] T032 [P] [US3] `Web/src/views/chat/DesktopControlPauseCard.tsx` (new): the web twin. `[chat]`
+- [x] T032 [P] [US3] `Web/src/views/chat/DesktopControlPauseCard.tsx` (new): the web twin. `[chat]`
 
 **Checkpoint**: a real touch always pauses the run within a second, and Resume/Take Over both work from
 every client.
+
+**Built (US3's PR)**: the pause is a field on the agent's record, `Agent.desktopControlPause`, pushed by
+the existing `agent/changed`, rather than the contract's `desktopControl/stateChanged` notification, so a
+client that opens the session later sees the card with no new push. The card sits with the other
+waiting cards at the end of the chat (`Web/src/views/DesktopControlPauseCard.tsx`, not under
+`views/chat/`). The `desktopControl.paused`/`resumed`/`takenOver` events wait for US4, whose notice
+needs them. Take Over also refuses `drive_screen` for the rest of the turn, so the agent does not take
+the screen straight back.
 
 **Parity**: Core (all three clients); this phase's own commit needs no follow-up `remote:`/`web:` line
 since all three ship together.
