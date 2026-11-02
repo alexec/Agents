@@ -126,7 +126,12 @@ func (g *RealGitLab) request(ctx context.Context, method, path string, body any,
 		}
 		reader = bytes.NewReader(data)
 	}
-	req, err := http.NewRequestWithContext(ctx, method, g.Base+"api/v4/"+path, reader)
+	// A path from the root (/api/graphql) is not under REST's.
+	at := g.Base + "api/v4/" + path
+	if rest, ok := strings.CutPrefix(path, "/"); ok {
+		at = g.Base + rest
+	}
+	req, err := http.NewRequestWithContext(ctx, method, at, reader)
 	if err != nil {
 		return nil, &GitLabError{Kind: Failed, Message: "GitLab: " + err.Error()}
 	}

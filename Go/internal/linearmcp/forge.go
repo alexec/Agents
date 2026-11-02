@@ -13,10 +13,11 @@ import (
 // Linear has issues only: no pull requests.
 
 // SearchFilter is what a list lists: issues in state open, closed or all (open when ""),
-// narrowed by a label, an assignee's display name and words in the title or description.
+// narrowed by a label, an assignee's display name, words in the title or description, and a
+// feature: the name of a feature:<name> label (#3267).
 type SearchFilter struct {
-	State                  string
-	Label, Assignee, Query string
+	State                           string
+	Label, Assignee, Query, Feature string
 }
 
 // Item is an issue as the forge reads list it, by its identifier (ENG-4).
@@ -29,6 +30,11 @@ type Item struct {
 	Assignees                                       []string
 	// Comments is how many, at most 50: Linear does not count them.
 	Comments int
+	// Parent is the issue it is a child of, by identifier (#3267). SubTotal and SubDone are its
+	// children and the closed ones, read on an issue's own read and in a plan only: a list
+	// would cost Linear's query budget a page of children for each issue.
+	Parent            string
+	SubTotal, SubDone int
 }
 
 // SearchPage is a page of a list, the last updated first. Cursors[i] goes on after Items[i],
@@ -60,14 +66,17 @@ const forgeComments = 50
 
 const forgeFields = `identifier title url updatedAt team { key } state { type } projectMilestone { name }
   labels { nodes { name color } } assignee { displayName } creator { displayName } botActor { name }
-  commentCount: comments(first: 50) { nodes { id } }`
+  commentCount: comments(first: 50) { nodes { id } } parent { identifier }`
+
+// forgeChildren are an issue's children's states, to count them (#3267).
+const forgeChildren = `children(first: 100) { nodes { state { type } } }`
 
 const forgeSearch = `query ForgeIssues($filter: IssueFilter, $first: Int, $after: String) {
   issues(filter: $filter, first: $first, after: $after, orderBy: updatedAt) {
     edges { cursor node { ` + forgeFields + ` } } pageInfo { hasNextPage endCursor } } }`
 
 // Linear's pages go newest first, so the page before a comment is the one after it.
-const forgeItem = `query ForgeIssue($id: String!, $comments: Int, $before: String) { issue(id: $id) { ` + forgeFields + ` description
+const forgeItem = `query ForgeIssue($id: String!, $comments: Int, $before: String) { issue(id: $id) { ` + forgeFields + ` ` + forgeChildren + ` description
   comments(first: $comments, after: $before) { pageInfo { hasNextPage endCursor }
     nodes { body createdAt url user { displayName } botActor { name } } } } }`
 
@@ -101,6 +110,16 @@ type forgeNode struct {
 	CommentCount struct {
 		Nodes []struct{} `json:"nodes"`
 	} `json:"commentCount"`
+	Parent *struct {
+		Identifier string `json:"identifier"`
+	} `json:"parent"`
+	Children *struct {
+		Nodes []struct {
+			State *struct {
+				Type string `json:"type"`
+			} `json:"state"`
+		} `json:"nodes"`
+	} `json:"children"`
 }
 
 func (n forgeNode) item() Item {
@@ -130,6 +149,17 @@ func (n forgeNode) item() Item {
 	case n.BotActor != nil:
 		i.Author = n.BotActor.Name
 	}
+	if n.Parent != nil {
+		i.Parent = n.Parent.Identifier
+	}
+	if n.Children != nil {
+		for _, c := range n.Children.Nodes {
+			i.SubTotal++
+			if c.State != nil && isClosed(c.State.Type) {
+				i.SubDone++
+			}
+		}
+	}
 	return i
 }
 
@@ -142,8 +172,18 @@ func SearchFilterOf(teams []string, f SearchFilter) map[string]any {
 	case "closed":
 		filter["state"] = map[string]any{"type": map[string]any{"in": []string{"completed", "canceled"}}}
 	}
-	if f.Label != "" {
-		filter["labels"] = map[string]any{"name": map[string]any{"eq": f.Label}}
+	// Each label is a filter of its own: an issue has them all.
+	var labels []any
+	for _, name := range []string{f.Label, featureLabel(f.Feature)} {
+		if name != "" {
+			labels = append(labels, map[string]any{"labels": map[string]any{"name": map[string]any{"eq": name}}})
+		}
+	}
+	switch len(labels) {
+	case 1:
+		filter["labels"] = labels[0].(map[string]any)["labels"]
+	case 2:
+		filter["and"] = labels
 	}
 	if f.Assignee != "" {
 		filter["assignee"] = map[string]any{"displayName": map[string]any{"eqIgnoreCase": f.Assignee}}
@@ -242,4 +282,81 @@ func (l *RealLinear) ItemPage(ctx context.Context, identifier, before string) (I
 		d.Before = out.Issue.Comments.PageInfo.EndCursor
 	}
 	return d, nil
+}
+
+func featureLabel(name string) string {
+	if name == "" {
+		return ""
+	}
+	return "feature:" + name
+}
+
+// Ref is an issue another names, as a blocker, by identifier: open says it is not closed.
+type Ref struct {
+	Identifier string
+	Open       bool
+}
+
+// PlanChild is a child issue with the issues that block it (#3267).
+type PlanChild struct {
+	Item
+	BlockedBy []Ref
+}
+
+// Plan is an issue (an epic) and its children, in Linear's order (#3267).
+type Plan struct {
+	Epic     Item
+	Children []PlanChild
+}
+
+// A "blocks" relation is said on the issue that blocks: on the blocked one, it is an inverse
+// relation, whose issue is the blocker.
+const forgePlan = `query ForgePlan($id: String!) { issue(id: $id) { ` + forgeFields + ` ` + forgeChildren + `
+  plan: children(first: 50) { nodes { ` + forgeFields + ` ` + forgeChildren + `
+    inverseRelations(first: 20) { nodes { type issue { identifier state { type } } } } } } } }`
+
+// Plan is the issue identifier names, its children (at most 50) and each one's blockers (at most
+// 20), in one query.
+func (l *RealLinear) Plan(ctx context.Context, identifier string) (Plan, error) {
+	var out struct {
+		Issue *struct {
+			forgeNode
+			Plan struct {
+				Nodes []struct {
+					forgeNode
+					InverseRelations struct {
+						Nodes []struct {
+							Type  string `json:"type"`
+							Issue *struct {
+								Identifier string `json:"identifier"`
+								State      *struct {
+									Type string `json:"type"`
+								} `json:"state"`
+							} `json:"issue"`
+						} `json:"nodes"`
+					} `json:"inverseRelations"`
+				} `json:"nodes"`
+			} `json:"plan"`
+		} `json:"issue"`
+	}
+	if err := l.query(ctx, forgePlan, map[string]any{"id": identifier}, &out); err != nil {
+		return Plan{}, err
+	}
+	if out.Issue == nil {
+		return Plan{}, &LinearError{Kind: NotFound, Message: fmt.Sprintf("Linear issue %s was not found", identifier)}
+	}
+	p := Plan{Epic: out.Issue.item(), Children: []PlanChild{}}
+	for _, c := range out.Issue.Plan.Nodes {
+		if c.Identifier == "" {
+			continue
+		}
+		child := PlanChild{Item: c.item(), BlockedBy: []Ref{}}
+		for _, r := range c.InverseRelations.Nodes {
+			if r.Type == "blocks" && r.Issue != nil && r.Issue.Identifier != "" {
+				child.BlockedBy = append(child.BlockedBy, Ref{Identifier: r.Issue.Identifier, Open: r.Issue.State == nil || !isClosed(r.Issue.State.Type)})
+			}
+		}
+		p.Children = append(p.Children, child)
+	}
+	return p, nil
 }
