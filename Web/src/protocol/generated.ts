@@ -6413,6 +6413,19 @@ export interface ProjectFolder {
   name: string;
 }
 
+/**
+ * machines/projectFolders (#3277): the project's folders on each of the person's machines, as they
+ * joined it, so start_session with machine alone picks the project's folder there.
+ */
+export interface ProjectFolders {
+  machines: ProjectMachineFolders[];
+}
+
+/** machines/projectFolders (#3277): the project. */
+export interface ProjectFoldersRequest {
+  project: string;
+}
+
 /** projects/list (#2317): the organisation's projects, by name. */
 export interface ProjectList {
   projects: Project[];
@@ -6422,6 +6435,16 @@ export interface ProjectList {
 export interface ProjectMachine {
   machine: MachineRef;
   machineName: string;
+}
+
+/**
+ * One machine of machines/projectFolders (#3277): its id and name, and the absolute paths of its
+ * folders in the project.
+ */
+export interface ProjectMachineFolders {
+  machine: MachineRef;
+  machineName: string;
+  folders: string[];
 }
 
 /** projects/remove (#2317): the project. Refused while a folder names it. */
@@ -7760,6 +7783,17 @@ export interface SessionCall {
    * With op message: replace the message of the starter's that waits, as message_session's replace.
    */
   replace?: boolean;
+  /**
+   * The asking agent's project (#3277). The host also answers status, read and message for a
+   * session that from did not start, when its folder is in this project now; stop and archive stay
+   * the starter's. The control plane checks that the asking machine has a folder of it.
+   */
+  project?: string;
+  /**
+   * With op status and project (#3277): the asker waits on it with wait_for_agents, so the host
+   * tells the asker's machine when it ends, as it tells a starter.
+   */
+  watch?: boolean;
 }
 
 /**
@@ -10995,8 +11029,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PrewarmRequest: { required: ["agentID", "why"], optional: [] },
   Project: { required: ["id", "name", "owner", "folders", "mayChange"], optional: ["slots"] },
   ProjectFolder: { required: ["machine", "folder", "name"], optional: [] },
+  ProjectFolders: { required: ["machines"], optional: [] },
+  ProjectFoldersRequest: { required: ["project"], optional: [] },
   ProjectList: { required: ["projects"], optional: [] },
   ProjectMachine: { required: ["machine", "machineName"], optional: [] },
+  ProjectMachineFolders: { required: ["machine", "machineName", "folders"], optional: [] },
   ProjectRequest: { required: ["id"], optional: [] },
   ProjectSession: { required: ["machine", "machineName", "session"], optional: [] },
   ProjectSessions: { required: ["sessions", "unreached"], optional: [] },
@@ -11123,7 +11160,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SentNotice: { required: ["title", "outcome"], optional: ["body", "nextAt", "to"] },
   ServedRequest: { required: ["kind", "outcome"], optional: [] },
   ServerReachabilityChange: { required: ["server", "online"], optional: [] },
-  SessionCall: { required: ["from", "session", "op"], optional: ["message", "replace"] },
+  SessionCall: { required: ["from", "session", "op"], optional: ["message", "replace", "project", "watch"] },
   SessionCallReply: { required: ["said"], optional: ["title", "ended"] },
   SessionEnded: { required: ["machine", "session", "starter", "how"], optional: ["title"] },
   SessionLabel: { required: ["value", "owner", "addedAt"], optional: [] },

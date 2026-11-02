@@ -17507,6 +17507,35 @@
         ],
         "additionalProperties": false
       },
+      "ProjectFolders": {
+        "type": "object",
+        "description": "machines/projectFolders (#3277): the project's folders on each of the person's machines, as they joined it, so start_session with machine alone picks the project's folder there.",
+        "properties": {
+          "machines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/ProjectMachineFolders"
+            }
+          }
+        },
+        "required": [
+          "machines"
+        ],
+        "additionalProperties": false
+      },
+      "ProjectFoldersRequest": {
+        "type": "object",
+        "description": "machines/projectFolders (#3277): the project.",
+        "properties": {
+          "project": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "project"
+        ],
+        "additionalProperties": false
+      },
       "ProjectList": {
         "type": "object",
         "description": "projects/list (#2317): the organisation's projects, by name.",
@@ -17537,6 +17566,30 @@
         "required": [
           "machine",
           "machineName"
+        ],
+        "additionalProperties": false
+      },
+      "ProjectMachineFolders": {
+        "type": "object",
+        "description": "One machine of machines/projectFolders (#3277): its id and name, and the absolute paths of its folders in the project.",
+        "properties": {
+          "machine": {
+            "$ref": "#/definitions/MachineRef"
+          },
+          "machineName": {
+            "type": "string"
+          },
+          "folders": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "machine",
+          "machineName",
+          "folders"
         ],
         "additionalProperties": false
       },
@@ -21165,6 +21218,14 @@
         },
         "replace": {
           "description": "With op message: replace the message of the starter's that waits, as message_session's replace.",
+          "type": "boolean"
+        },
+        "project": {
+          "description": "The asking agent's project (#3277). The host also answers status, read and message for a session that from did not start, when its folder is in this project now; stop and archive stay the starter's. The control plane checks that the asking machine has a folder of it.",
+          "type": "string"
+        },
+        "watch": {
+          "description": "With op status and project (#3277): the asker waits on it with wait_for_agents, so the host tells the asker's machine when it ends, as it tells a starter.",
           "type": "boolean"
         }
       },

@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"slices"
 	"strings"
 	"sync"
@@ -69,6 +70,32 @@ func (s *Service) joinedFolders(ctx context.Context) (map[string][]wire.JoinedFo
 		out[joinedHost(k.Key)] = kept.Folders
 	}
 	return out, nil
+}
+
+// projectFolderPaths is the absolute paths of each machine's folders in project, by
+// machine id, as the machines joined them (#3277); empty when they can't be read.
+func (s *Service) projectFolderPaths(project string) map[string][]string {
+	joined, err := s.joinedFolders(context.Background())
+	out := map[string][]string{}
+	if err != nil {
+		return out
+	}
+	for host, folders := range joined {
+		for _, f := range folders {
+			if f.Project != project {
+				continue
+			}
+			path := string(f.Folder)
+			if u, err := url.Parse(path); err == nil && u.Scheme == "file" {
+				path = u.Path
+			}
+			if len(path) > 1 {
+				path = strings.TrimSuffix(path, "/")
+			}
+			out[host] = append(out[host], path)
+		}
+	}
+	return out
 }
 
 func joinedHost(key string) string {
