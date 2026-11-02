@@ -22,6 +22,7 @@ import {
 } from "../../model/policyLayers";
 import { go, route } from "../../route";
 import { PolicySource } from "./PolicySource";
+import { GuardedChangeCard } from "../GuardedChange";
 
 export function AgentsPolicySection({ store, down }: { store: Store; down: boolean }) {
   const item = route.value.nav === "settings" ? route.value.item : undefined;
@@ -108,6 +109,13 @@ function Layer({ store, down, folder }: { store: Store; down: boolean; folder: s
               <p class="strong">{layerLine({ kind: "folder", name: folderName(folder), folder })}</p>
               <p class="hint">{folderFile}</p>
               {pending && <p class="hint" role="status">{invalid ?? folderWaits}</p>}
+            </div>
+          )}
+          {folder !== undefined && pending && (
+            // The waiting change itself (frame D): Allow, Keep <old value>, Show Change.
+            <div class="cards">
+              <GuardedChangeCard store={store} host={host} change={pending} down={down}
+                folder={(store.folders.value[host] ?? []).find((f) => absolutePath(f.folder.folder) === absolutePath(folder))?.folder.folder ?? folder} />
             </div>
           )}
           {sections.map((section) => (

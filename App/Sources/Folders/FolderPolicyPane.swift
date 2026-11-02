@@ -63,7 +63,7 @@ struct FolderPolicyPane: View {
                             PolicyRuleRow(row: row, rule: effective.rules.first { $0.rule == row.rule },
                                           yours: PolicyLayersWords.value(layer.rules, row.rule),
                                           editable: !isSaving && !model.hosts.isOffline(summary.host),
-                                          yourValue: yours?.rules.first { $0.rule == row.rule }?.words ?? row.unset) { value in
+                                          yourValue: yourWords(row)) { value in
                                 Task { await save(row.rule, value) }
                             }
                         }
@@ -82,6 +82,14 @@ struct FolderPolicyPane: View {
         }
         .paperForm()
         .task(id: Reload(folder: folder, revision: model.policyRevision, waiting: summary.guardedChanges ?? [])) { await load() }
+    }
+
+    /// Your value for a row, or its default when no layer above the folder sets it.
+    private func yourWords(_ row: PolicyLayersWords.Row) -> String {
+        guard let rule = yours?.rules.first(where: { $0.rule == row.rule }), rule.decides != nil, !rule.words.isEmpty else {
+            return row.unset
+        }
+        return rule.words
     }
 
     private func load() async {
