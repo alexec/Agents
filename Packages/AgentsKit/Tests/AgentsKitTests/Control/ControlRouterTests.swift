@@ -257,16 +257,31 @@ struct ControlRouterTests {
         theirs.close()
     }
 
-    /// A client older than v0.13.0 never wraps its lines (#111, #2981 D2): the control
-    /// plane no longer guesses it is the home host's, and refuses the line as unreadable.
-    @Test func aBareLineIsRefusedAsUnreadable() async throws {
+    /// The Remote's own connection never wraps its lines: a bare line is the home host's,
+    /// and its reply comes back bare. Refusing it as unreadable left every device unable to
+    /// connect (#3225).
+    @Test func aBareLineIsTheHomeHostsAndItsReplyComesBackBare() async throws {
         let router = ControlRouter(handler: StubControl(), homeHost: home)
         let host = await connectHost(router, home)
         let remote = await connectClient(router, client(.iPhone))
-        try remote.send(#"{"jsonrpc":"2.0","id":3,"method":"agents/list"}"#)
+        await eventually { host.openChannels.count == 1 }
+        let bare = #"{"jsonrpc":"2.0","id":3,"method":"agents/list"}"#
+        try remote.send(bare)
+        await eventually { !remote.lines.isEmpty }
+        #expect(host.messages.first?.message == bare)
+        try #require(!remote.lines.isEmpty)
+        #expect(!remote.lines[0].hasPrefix(#"{"h""#))
+        host.stop()
+    }
+
+    @Test func aBareLineForTheControlPlanesOwnMethodIsAnsweredThere() async throws {
+        let router = ControlRouter(handler: StubControl(), homeHost: home)
+        let host = await connectHost(router, home)
+        let remote = await connectClient(router, client(.iPhone))
+        try remote.send(#"{"jsonrpc":"2.0","id":4,"method":"hosts/list"}"#)
         await eventually { !remote.lines.isEmpty }
         try #require(!remote.lines.isEmpty)
-        #expect(remote.lines[0].contains("\(JSONRPCError.parseError)"))
+        #expect(remote.lines[0].contains("control"))
         #expect(host.messages.isEmpty)
         host.stop()
     }

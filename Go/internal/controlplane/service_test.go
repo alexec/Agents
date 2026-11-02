@@ -325,6 +325,59 @@ func TestAHostAndAWindowThroughTheControlPlane(t *testing.T) {
 	}
 }
 
+// The Remote's own connection never wraps its lines: a bare line is the home host's, or the
+// control plane's for its own methods, and the reply comes back bare. Refusing it as
+// unreadable left every iPhone and iPad unable to connect (#3225).
+func TestADevicesBareLinesReachTheHomeHost(t *testing.T) {
+	t.Parallel()
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	p.host("MACHINE-1")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	m, err := controllink.PairClientAs(ctx, p.code(false), "Test iPhone", "iPhone")
+	if err != nil {
+		t.Fatal(err)
+	}
+	key, err := controllink.ClientKey(m.Private, m.ControlKey, m.Client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	l, _, err := controllink.Join(ctx, m.URL, m.Pin, controllink.Credentials{Identity: "c:" + m.Client, Key: key, Kind: "iPhone",
+		ControlKey: m.ControlKey, Capabilities: wire.DeclaredCapabilities["client"]})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(l.Close)
+	// The answer to id, skipping the notifications that come between.
+	answer := func(id int) string {
+		t.Helper()
+		for {
+			line, err := l.Read(ctx)
+			if err != nil {
+				t.Fatalf("no answer to %d: %v", id, err)
+			}
+			var r struct {
+				ID *int `json:"id"`
+			}
+			if json.Unmarshal([]byte(line), &r) == nil && r.ID != nil && *r.ID == id {
+				return line
+			}
+		}
+	}
+	if err := l.Write(ctx, `{"jsonrpc":"2.0","id":1,"method":"daemon/ping"}`); err != nil {
+		t.Fatal(err)
+	}
+	if line := answer(1); !strings.Contains(line, `"pong":"mac"`) || strings.HasPrefix(line, `{"h"`) {
+		t.Fatalf("the home host's answer, bare: %s", line)
+	}
+	if err := l.Write(ctx, `{"jsonrpc":"2.0","id":2,"method":"hosts/list"}`); err != nil {
+		t.Fatal(err)
+	}
+	if line := answer(2); !strings.Contains(line, `"result":[`) || strings.HasPrefix(line, `{"m"`) {
+		t.Fatalf("the control plane's answer, bare: %s", line)
+	}
+}
+
 // A code works once; the same key spending it again is the same join (#212).
 func TestACodeIsUsedOnce(t *testing.T) {
 	t.Parallel()
