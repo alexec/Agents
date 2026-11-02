@@ -15,7 +15,8 @@ import {
   lineageNote, lineagePageNote, noLineage, noLineageHere, readingTitles, resolvingAsks, sessionHost, sessionNode, startRow, typedNode, typedPullRequest, type GraphNode, type LineageGraphLayout,
   type LineageHistory, type LineageRow,
 } from "../model/lineage";
-import { go, route } from "../route";
+import { go, route, routeHash } from "../route";
+import { hasPage } from "../model/work";
 
 /** The walk and the costs from a node on a host, asked again when either or `asked` changes. */
 export function useWalk(store: Store, host: string | undefined, node: LineageNode | undefined, asked: number) {
@@ -89,13 +90,17 @@ export function Lineage({ store, host, session }: { store: Store; host: string; 
     body = <p class="hint">Reading the links…</p>;
   } else {
     const empty = !graph.value.nodes.some((n) => n.kind !== me.kind || n.ref !== me.ref);
-    // A session this page has goes to its chat; an issue, a PR or a milestone on GitHub opens there (row.url).
-    const show = (row: LineageRow) => row.session && row.session !== session && store.agent(host, row.session)
-      ? () => go({ ...route.value, host, session: row.session as UUID }) : undefined;
+    // A session this page has goes to its chat; an issue, a PR, a milestone or a release opens its Work page (#3088).
+    const show = (row: LineageRow) => {
+      const n = row.node;
+      if (hasPage(n)) return () => go({ nav: "work", section: n.kind, item: n.ref });
+      return row.session && row.session !== session && store.agent(host, row.session)
+        ? () => go({ ...route.value, host, session: row.session as UUID }) : undefined;
+    };
     body = (
       <>
         {empty ? <p class="hint">{noLineage}</p> : <Graph layout={layout!} show={show}
-          verb={(row) => row.url ? "Open it on GitHub" : "Show this session"} />}
+          verb={(row) => hasPage(row.node) ? "Open its page" : row.url ? "Open it on GitHub" : "Show this session"} />}
         {reading.value && <p class="quiet small">{readingTitles}</p>}
         {graph.value.limited && <p class="quiet small">The walk stopped at its limit: there are more links.</p>}
         {!empty && <p class="quiet small">{lineageNote}</p>}
@@ -222,7 +227,8 @@ export function LineagePage({ store }: { store: Store }) {
           <strong title={here.ref ?? here.name}>{place.node.kind === "session" ? title(place.node) ?? "A session" : here.name}</strong>
           <span class="quiet">{[kindWord(place.node.kind), ...here.cost ? [here.cost] : [], ...here.resolved ? [here.resolved] : [],
             ...on ? [`on ${on}`] : []].join(" · ")}</span>
-          {here.url ? <a class="link" href={here.url} target="_blank" rel="noopener noreferrer">Open on GitHub</a>
+          {hasPage(place.node) ? <a class="link" href={routeHash({ nav: "work", section: place.node.kind, item: place.node.ref })}>Open its page</a>
+            : here.url ? <a class="link" href={here.url} target="_blank" rel="noopener noreferrer">Open on GitHub</a>
             : chat && <button class="link" onClick={() => go({ host: place.host, folder: chat.worktree?.folder || chat.cwd, session: chat.id })}>Show the chat</button>}
         </div>
         {layout.nodes.length === 0 ? <p class="hint">{noLineageHere}</p> : (
