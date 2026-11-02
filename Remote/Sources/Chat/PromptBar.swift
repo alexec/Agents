@@ -311,7 +311,7 @@ struct PromptBar: View {
                     .disabled(acting != nil && acting != .stop)
                     .help(PromptWords.stopHelp)
                     .accessibilityLabel("Stop")
-                    .accessibilityValue(acting == .stop ? Telling.words(doing: "Stopping", host: "your Mac") : "")
+                    .accessibilityValue(acting == .stop ? Telling.words(doing: "Stopping", host: model.answerRecipient(agent.id)) : "")
                 } else {
                     Button(action: send) {
                         Group {
