@@ -369,7 +369,6 @@ App/Sources/Hosts/                                     machines
 App/Sources/AppModel+MacHost.swift                     machines
 App/Sources/WakeAndNetwork.swift                       machines
 App/Sources/Settings/WakeSettingsSection.swift         machines
-App/Sources/Settings/ServerCredentials.swift           machines
 App/Sources/Control/ControlAddServerSheet.swift        machines
 App/Sources/Control/ThisMacHost.swift                  machines
 App/Sources/Control/HostFoldersPicker.swift           machines

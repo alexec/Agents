@@ -40,8 +40,9 @@ public struct PoolEntry: Codable, Hashable, Sendable, Identifiable {
     public var id: UUID
     public var runtimeID: String
     public var payment: Payment
-    /// Which lent credential it runs on: a `CredentialKind` raw value. `nil` is the
-    /// runtime's own sign-in.
+    /// Which lent credential it runs on. `nil` is the runtime's own sign-in. No runtime
+    /// takes a pasted key now that Gemini is retired (#3043, #3137), so this is kept on the
+    /// wire only as a name.
     public var credentialRef: String?
 
     public init(id: UUID = UUID(), runtimeID: String, payment: Payment,
@@ -51,9 +52,4 @@ public struct PoolEntry: Codable, Hashable, Sendable, Identifiable {
         self.payment = payment
         self.credentialRef = credentialRef
     }
-
-    public var credentialKind: CredentialKind? { credentialRef.flatMap(CredentialKind.init(rawValue:)) }
-
-    /// Runs on a key rather than a sign-in. Every kind Settings still takes is a key (056).
-    public var isKeyed: Bool { credentialKind != nil }
 }

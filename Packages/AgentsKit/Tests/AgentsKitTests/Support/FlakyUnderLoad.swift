@@ -59,8 +59,6 @@ extension Trait where Self == ConditionTrait {
     /// - RelayCarryingTests.aBusyTurnIsAFewPostsASecond — 329 s on the shared runner.
     /// - RebuiltServerTests.aWipedServerIsSetUpAgainWithoutAsking — took 322 s on the
     ///   shared runner before failing to observe the rebuilt server's connected state.
-    /// - CredentialStoreTests.replacingKeepsOnlyTheNewOne — 45 s writing twice to the
-    ///   real login Keychain in a completed CI run.
     static var flakyUnderLoad: Self {
         let environment = ProcessInfo.processInfo.environment
         return .disabled(if: (environment["CI"] != nil || environment["AGENTS_QUARANTINE"] == "1")
