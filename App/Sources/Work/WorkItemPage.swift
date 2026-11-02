@@ -65,10 +65,10 @@ struct WorkItemPage: View {
         return VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(title)
-                    .font(.title2).fontWeight(.semibold)
+                    .appText(.title).fontWeight(.semibold)
                     .textSelection(.enabled)
                 if !WorkList.titleSaysRef(title, node.ref) {
-                    Text(WorkList.shortRef(node.ref)).font(.title2).foregroundStyle(.secondary)
+                    Text(WorkList.shortRef(node.ref)).appText(.title).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button("All \(place.kind.title.lowercased())") { model.showWork(WorkPlace(kind: place.kind)) }
@@ -109,7 +109,7 @@ struct WorkItemPage: View {
             MarkdownText(markdown: got.body)
         }
         if !got.comments.isEmpty || got.cursor != nil {
-            Text("Comments").font(.headline).padding(.top, 8)
+            Text("Comments").appText(.reading).fontWeight(.semibold).padding(.top, 8)
             if got.cursor != nil {
                 Button(olderLoading ? "Loading…" : "Older comments") { Task { await readOlder() } }
                     .buttonStyle(.link)
@@ -131,7 +131,7 @@ struct WorkItemPage: View {
     @ViewBuilder
     private var lineage: some View {
         Divider()
-        Text("Lineage").font(.headline)
+        Text("Lineage").appText(.reading).fontWeight(.semibold)
         if lineageHost == nil {
             Text("No machine keeps links yet. Update Agents on a machine to see them.").foregroundStyle(.secondary)
         } else if graph == nil, !linksFailed {

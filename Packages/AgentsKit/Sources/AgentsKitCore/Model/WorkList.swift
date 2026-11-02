@@ -270,7 +270,7 @@ public enum WorkList {
     }
 
     /// A label's colour (#2956) as red, green and blue from 0 to 1; nil when the forge gave none.
-    public static func rgb(_ color: String?) -> (red: Double, green: Double, blue: Double)? {
+    public static func rgb(_ color: String?) -> (r: Double, g: Double, b: Double)? {
         guard let color else { return nil }
         let hex = color.hasPrefix("#") ? String(color.dropFirst()) : color
         guard hex.count == 6, let v = Int(hex, radix: 16) else { return nil }
@@ -280,7 +280,7 @@ public enum WorkList {
     /// Whether dark text reads on a label's colour: light colours take dark text.
     public static func isLight(_ color: String?) -> Bool {
         guard let c = rgb(color) else { return true }
-        return 0.299 * c.red + 0.587 * c.green + 0.114 * c.blue > 0.6
+        return 0.299 * c.r + 0.587 * c.g + 0.114 * c.b > 0.6
     }
 
     public static let noAgentYet = "No agent yet"
