@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"maps"
@@ -127,7 +128,12 @@ func (d *Daemon) recordEntry(id, entryID wire.UUID, kind wire.TranscriptEntryKin
 	n, e, err := d.Store.AppendOne(id, e)
 	if err != nil {
 		log.Printf("agent %s: could not record an entry: %v", id, err)
-		return
+		d.tellRefused(id, err)
+		if !errors.Is(err, store.ErrHeld) {
+			return
+		}
+	} else {
+		d.refusalsOver()
 	}
 	d.tellEntry(id, e, n)
 	// Where the turn's time went (#852), banked when it ends.
