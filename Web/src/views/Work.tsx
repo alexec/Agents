@@ -24,6 +24,8 @@ import { fromWireDate } from "../protocol/dates";
 import { Markdown } from "../render/markdown";
 import { Graph, useLayout, useWalk } from "./Lineage";
 import { WorkActions, WorkCommentBox } from "./WorkActions";
+import { WorkPlan } from "./WorkPlan";
+import { hasPlan } from "../model/epicPlan";
 import { go } from "../route";
 
 /** How many pages of reports/nodes a list reads for its lineage: at most 500 nodes. */
@@ -325,6 +327,9 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
       </header>
       {forgeProblem.value && <p class="hint">{forgeProblem.value}</p>}
       {fromForge(kind) && !detail.value && !forgeProblem.value && <p class="hint">Loading…</p>}
+      {detail.value && hasPlan(detail.value.got.item) && (
+        <WorkPlan store={store} host={detail.value.host} lineageHost={lineageHost} detail={detail.value.got} asked={asked.value} />
+      )}
       {detail.value && (
         <section class="work-body" aria-label="Description">
           {detail.value.got.body.trim() ? <Markdown text={detail.value.got.body} /> : <p class="quiet">No description.</p>}

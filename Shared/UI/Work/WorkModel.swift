@@ -28,6 +28,8 @@ protocol WorkModel: AnyObject, Sendable {
     func lineageCost(_ node: DaemonAPI.LineageNode, on host: MachineRef) async -> DaemonAPI.LineageCostRollup?
     /// A session's title, or nil when this app does not know the session.
     func workSessionTitle(_ id: UUID) -> String?
+    /// A session's state, or nil when this app does not know the session (#3268, a plan's marks).
+    func workSessionState(_ id: UUID) -> AgentState?
     /// Show a session's chat.
     func openWorkSession(_ id: UUID)
     /// The new-session form in a folder, filled in. Why it did not open, or nil.
