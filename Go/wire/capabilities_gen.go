@@ -121,6 +121,7 @@ const CapRuntimes1 = "runtimes/1"
 const CapSandbox1 = "sandbox/1"
 const CapSessionsElsewhere1 = "sessions.elsewhere/1"
 const CapSessionsOnMachine1 = "sessions.on-machine/1"
+const CapSessionsProject1 = "sessions.project/1"
 const CapSessions1 = "sessions/1"
 const CapShell1 = "shell/1"
 const CapSigninAsk1 = "signin.ask/1"
@@ -642,6 +643,8 @@ var ControlCapabilities = pairs([][2]string{
 	{"links/remove", "links/1"},
 	{"links/requests", "links/1"},
 	{"machines/forAgent", "machines/1"},
+	{"machines/projectFolders", "sessions.project/1"},
+	{"machines/projectSessions", "sessions.project/1"},
 	{"machines/sendFolder", "folders.to-machine/1"},
 	{"machines/sessionCall", "sessions.elsewhere/1"},
 	{"machines/sessionEnded", "sessions.elsewhere/1"},

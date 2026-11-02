@@ -14,7 +14,8 @@ import (
 
 // list_sessions, read_session and message_session, as DaemonCore+Sessions and +Messages
 // answer them on the Swift host, in SessionLookup's and SessionHistory's words: any agent
-// may read and message any session in its own folder.
+// may read and message any session in its own folder, and since #3277 in its project
+// (projecttools.go).
 
 const (
 	sessionPageSize    = 30
@@ -67,6 +68,11 @@ func (d *Daemon) folderSessions(folder string) []wire.Agent {
 			out = append(out, a)
 		}
 	}
+	return latestFirst(out)
+}
+
+// latestFirst is the sessions, most recent activity first.
+func latestFirst(out []wire.Agent) []wire.Agent {
 	sort.SliceStable(out, func(i, j int) bool {
 		if out[i].LastActivityAt != out[j].LastActivityAt {
 			return out[i].LastActivityAt > out[j].LastActivityAt
@@ -89,7 +95,7 @@ func (d *Daemon) findSession(value, folder string) (*wire.Agent, string) {
 	if value == "" {
 		return nil, "Give a session id or exact title."
 	}
-	live := d.folderSessions(folder)
+	live := d.projectSessionsHere(folder)
 	for i := range live {
 		if strings.EqualFold(string(live[i].ID), value) && isUUID(value) {
 			return &live[i], ""
@@ -111,7 +117,7 @@ func (d *Daemon) findSession(value, folder string) (*wire.Agent, string) {
 		}
 		return nil, "More than one session is named “" + value + "”: " + strings.Join(matches, "; ") + ". Read one by id."
 	}
-	return nil, "There is no session named “" + value + "” in this folder."
+	return nil, "There is no session named “" + value + "” in " + scopeWords(folder) + "."
 }
 
 func labelsLine(a *wire.Agent) string {
@@ -141,11 +147,38 @@ func (d *Daemon) listSessions(caller wire.UUID, args map[string]json.RawMessage)
 	size = min(max(1, size), sessionLargestPage)
 	after := strings.TrimSpace(argString(args, "after"))
 	folder := folderPath(me)
-	sorted := d.folderSessions(folder)
-	if len(sorted) == 0 {
-		return "There are no sessions in this folder.", nil
+	scope := scopeWords(folder)
+	// The project's sessions on this machine, then on the person's other machines (#3277).
+	var sorted []listedSession
+	for _, a := range d.projectSessionsHere(folder) {
+		sorted = append(sorted, listedSession{Agent: a})
 	}
-	var all []wire.Agent
+	elsewhere, unreached, asked, err := d.projectElsewhere(me, true)
+	for _, s := range elsewhere {
+		sorted = append(sorted, listedSession{Agent: s.Session, machine: s.MachineName})
+	}
+	sort.SliceStable(sorted, func(i, j int) bool {
+		if sorted[i].LastActivityAt != sorted[j].LastActivityAt {
+			return sorted[i].LastActivityAt > sorted[j].LastActivityAt
+		}
+		return sorted[i].ID < sorted[j].ID
+	})
+	notReached := ""
+	switch {
+	case asked && err != nil:
+		_, msg := errMessage(err)
+		notReached = "\n\nSessions on your other machines are not listed: " + strings.TrimSuffix(msg, ".") + "."
+	case len(unreached) > 0:
+		var names []string
+		for _, m := range unreached {
+			names = append(names, m.MachineName)
+		}
+		notReached = "\n\nNot reached, so their sessions are not listed: " + strings.Join(names, ", ") + "."
+	}
+	if len(sorted) == 0 {
+		return "There are no sessions in " + scope + "." + notReached, nil
+	}
+	var all []listedSession
 	for _, a := range sorted {
 		if a.State != wire.AgentStateArchived {
 			all = append(all, a)
@@ -165,14 +198,14 @@ func (d *Daemon) listSessions(caller wire.UUID, args map[string]json.RawMessage)
 			}
 		}
 		if at < 0 {
-			return "No session in this folder has the id “" + after + "” any more. Call list_sessions without `after` to start again.", nil
+			return "No session in " + scope + " has the id “" + after + "” any more. Call list_sessions without `after` to start again.", nil
 		}
 		from = at + 1
 	}
 	end := min(from+size, len(all))
 	page := all[from:end]
 	if len(page) == 0 {
-		return "There are no more sessions in this folder.", nil
+		return "There are no more sessions in " + scope + ".", nil
 	}
 	d.leaseMu.Lock()
 	loaded := d.loadLeases()
@@ -184,13 +217,19 @@ func (d *Daemon) listSessions(caller wire.UUID, args map[string]json.RawMessage)
 	}
 	d.leaseMu.Unlock()
 	d.settle(loaded)
-	lines := []string{"Sessions in this folder, not archived first, most recent first. Read one with read_session, by id or exact title."}
-	for _, a := range page {
+	lines := []string{"Sessions in " + scope + ", not archived first, most recent first. Read one with read_session, by id or exact title."}
+	for _, l := range page {
+		a := l.Agent
 		name := quoted(a.Title)
 		if a.ID == caller {
 			name += " (you)"
 		}
 		line := "- " + string(a.ID) + ": " + name + " — " + runtimeName(a.RuntimeID) + ", " + sessionStatus(&a) + ", last active " + isoWhen(a.LastActivityAt) + "."
+		if l.machine != "" {
+			line += " On " + l.machine + ", in " + store.FolderPath(a.Cwd) + "."
+		} else if f := folderPath(&a); f != folder {
+			line += " In " + f + "."
+		}
 		if w := a.Worktree; w != nil {
 			line += " Worktree: " + store.FolderPath(w.Root)
 			if w.Branch != nil {
@@ -224,7 +263,14 @@ func (d *Daemon) listSessions(caller wire.UUID, args map[string]json.RawMessage)
 		}
 		text += more + ". For the next page, call list_sessions with after: \"" + string(page[len(page)-1].ID) + "\"."
 	}
-	return text, nil
+	return text + notReached, nil
+}
+
+// listedSession is one line of list_sessions: a session, and the machine it is on when it
+// is not this one (#3277).
+type listedSession struct {
+	wire.Agent
+	machine string
 }
 
 // historyPiece is a line, a reply, or a tool call of one turn.
@@ -460,6 +506,12 @@ func (d *Daemon) readSession(caller wire.UUID, args map[string]json.RawMessage) 
 		if s := d.thereNamed(caller, argString(args, "session")); s != nil {
 			return d.thereOp(caller, s, "read")
 		}
+		// One of the project on another machine (#3277).
+		if s, ambiguous := d.elsewhereNamed(me, argString(args, "session")); s != nil {
+			return d.readElsewhere(me, s)
+		} else if ambiguous != "" {
+			return ambiguous, nil
+		}
 		return refused, nil
 	}
 	entries, _, err := d.Store.Transcript(a.ID, 0)
@@ -576,6 +628,12 @@ func (d *Daemon) messageSession(caller wire.UUID, args map[string]json.RawMessag
 	if target == nil {
 		if s := d.thereNamed(caller, argString(args, "to")); s != nil {
 			return d.messageThere(me, s, text, argBool(args, "replace"))
+		}
+		// One of the project on another machine (#3277).
+		if s, ambiguous := d.elsewhereNamed(me, argString(args, "to")); s != nil {
+			return d.messageElsewhere(me, s, text, argBool(args, "replace"))
+		} else if ambiguous != "" {
+			refused = ambiguous
 		}
 		return "", refusedMessage(strings.ReplaceAll(refused, "Read one by id.", "Message one by id."))
 	}

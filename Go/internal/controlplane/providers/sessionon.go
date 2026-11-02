@@ -3,6 +3,7 @@ package providers
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -58,11 +59,15 @@ func (p *Providers) startSessionOn(fromName, agent string, params json.RawMessag
 // sessionCall is machines/sessionCall (#2927): an agent on fromName reads, messages, stops
 // or archives a session it started on another machine, or asks how it stands. It goes as
 // that machine's agents/fromStarter, which answers only the agent that started it; from
-// says which, in the control plane's words.
-func (p *Providers) sessionCall(fromName, agent string, params json.RawMessage, caller Caller) (any, error) {
+// says which, in the control plane's words. With project (#3277), that machine also
+// answers for a session of the project, so the asking machine must have a folder of it.
+func (p *Providers) sessionCall(from, fromName, agent string, params json.RawMessage, caller Caller) (any, error) {
 	var request wire.MachineSessionCall
 	if err := requireParams(params, &request, "MachineSessionCall", "host", "call"); err != nil {
 		return nil, err
+	}
+	if project := request.Call.Project; project != nil && !p.inProject(from, *project) {
+		return nil, fail(CodeNotPermitted, "%s has no folder in that project.", fromName)
 	}
 	host, name := request.Host, request.Host
 	if h := p.records.Host(host); h != nil {
@@ -179,4 +184,51 @@ func (p *Providers) sendFolder(fromName, agent string, params json.RawMessage, c
 		return nil, fail(CodeHostOffline, "%s's answer could not be read.", name)
 	}
 	return out, nil
+}
+
+// inProject says host has a folder in project, as it joined it (#3277).
+func (p *Providers) inProject(host, project string) bool {
+	if p.hooks.ProjectFolders == nil || project == "" {
+		return false
+	}
+	return len(p.hooks.ProjectFolders(project)[host]) > 0
+}
+
+// projectFolders is machines/projectFolders (#3277): the project's folders on each of the
+// person's machines, so start_session with machine alone starts in the project's folder.
+func (p *Providers) projectFolders(params json.RawMessage, caller Caller) (any, error) {
+	var request wire.ProjectFoldersRequest
+	if err := requireParams(params, &request, "ProjectFoldersRequest", "project"); err != nil {
+		return nil, err
+	}
+	out := wire.ProjectFolders{Machines: []wire.ProjectMachineFolders{}}
+	if p.hooks.ProjectFolders == nil {
+		return out, nil
+	}
+	for host, folders := range p.hooks.ProjectFolders(request.Project) {
+		// Another user's machine is not there for this agent (FR-038).
+		if p.hooks.OwnerOf(host) != caller.Person || len(folders) == 0 {
+			continue
+		}
+		name := host
+		if h := p.records.Host(host); h != nil {
+			name = h.Name
+		}
+		out.Machines = append(out.Machines, wire.ProjectMachineFolders{Machine: wire.MachineRef(host), MachineName: name, Folders: folders})
+	}
+	slices.SortFunc(out.Machines, func(a, b wire.ProjectMachineFolders) int { return strings.Compare(a.MachineName, b.MachineName) })
+	return out, nil
+}
+
+// projectSessions is machines/projectSessions (#3277): projects/sessions for an agent on
+// host, which must have a folder of the project.
+func (p *Providers) projectSessions(host string, params json.RawMessage, caller Caller) (any, error) {
+	var request wire.ProjectSessionsRequest
+	if err := requireParams(params, &request, "ProjectSessionsRequest", "project"); err != nil {
+		return nil, err
+	}
+	if p.hooks.ProjectSessions == nil || !p.inProject(host, request.Project) {
+		return nil, fail(CodeNotPermitted, "This machine has no folder in that project.")
+	}
+	return p.hooks.ProjectSessions(request, caller)
 }

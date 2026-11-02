@@ -64,14 +64,14 @@ func agentListing(as []wire.Agent) string {
 	return strings.Join(each, ", ")
 }
 
-// waitTarget is the agent a name means, in the caller's folder.
+// waitTarget is the agent a name means, in the caller's folder or project (#3277).
 func (d *Daemon) waitTarget(name string, caller *wire.Agent) (*wire.Agent, error) {
 	folder := folderPath(caller)
 	var target *wire.Agent
 	if isUUID(name) {
 		if found := d.Store.Agent(wire.UUID(strings.ToUpper(name))); found != nil {
-			if folderPath(found) != folder {
-				return nil, blockRefusal(name + " is in another folder. You can only wait on agents in this one.")
+			if !sameProject(folder, found) {
+				return nil, blockRefusal(name + " is in another folder, not in " + scopeWords(folder) + ". You can only wait on agents in " + scopeWords(folder) + ".")
 			}
 			target = found
 		}
@@ -82,10 +82,16 @@ func (d *Daemon) waitTarget(name string, caller *wire.Agent) (*wire.Agent, error
 			return there, err
 		}
 	}
+	// One of the project on another machine (#3277), when none here has that name.
+	if target == nil && !d.namedHere(name, caller) {
+		if there, err := d.waitElsewhere(name, caller); there != nil || err != nil {
+			return there, err
+		}
+	}
 	if target == nil {
 		var here, matches []wire.Agent
-		for _, a := range d.Store.Agents() {
-			if folderPath(&a) == folder && a.State != wire.AgentStateArchived {
+		for _, a := range d.projectSessionsHere(folder) {
+			if a.State != wire.AgentStateArchived {
 				here = append(here, a)
 				if a.Title != nil && strings.EqualFold(strings.TrimSpace(*a.Title), name) {
 					matches = append(matches, a)
@@ -107,9 +113,9 @@ func (d *Daemon) waitTarget(name string, caller *wire.Agent) (*wire.Agent, error
 				}
 			}
 			if len(known) == 0 {
-				return nil, blockRefusal("no agent in this folder is called “" + name + "”. There are no other agents here.")
+				return nil, blockRefusal("no agent in " + scopeWords(folder) + " is called “" + name + "”. There are no other agents here.")
 			}
-			return nil, blockRefusal("no agent in this folder is called “" + name + "”. The agents here are: " + agentListing(byAge(known)) + ".")
+			return nil, blockRefusal("no agent in " + scopeWords(folder) + " is called “" + name + "”. The agents here are: " + agentListing(byAge(known)) + ".")
 		default:
 			return nil, blockRefusal("“" + name + "” could be any of " + agentListing(byAge(matches)) + ". Use the id.")
 		}
@@ -121,6 +127,17 @@ func (d *Daemon) waitTarget(name string, caller *wire.Agent) (*wire.Agent, error
 		return nil, blockRefusal(quotedTitle(target.Title) + " has already ended (" + how + "). Use what it said rather than waiting on it.")
 	}
 	return target, nil
+}
+
+// namedHere says a session of caller's project on this machine, not archived, has name as
+// its id or title.
+func (d *Daemon) namedHere(name string, caller *wire.Agent) bool {
+	for _, a := range d.projectSessionsHere(folderPath(caller)) {
+		if strings.EqualFold(string(a.ID), name) || a.State != wire.AgentStateArchived && a.Title != nil && strings.EqualFold(strings.TrimSpace(*a.Title), name) {
+			return true
+		}
+	}
+	return false
 }
 
 // circle is a path from the targets back to the caller through open blocks, or nil.

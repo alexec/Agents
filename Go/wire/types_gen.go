@@ -7722,6 +7722,16 @@ type ProjectFolder struct {
 	Name string `json:"name"`
 }
 
+// machines/projectFolders (#3277): the project's folders on each of the person's machines, as they joined it, so start_session with machine alone picks the project's folder there.
+type ProjectFolders struct {
+	Machines []ProjectMachineFolders `json:"machines"`
+}
+
+// machines/projectFolders (#3277): the project.
+type ProjectFoldersRequest struct {
+	Project string `json:"project"`
+}
+
 // projects/list (#2317): the organisation's projects, by name.
 type ProjectList struct {
 	Projects []Project `json:"projects"`
@@ -7732,6 +7742,15 @@ type ProjectMachine struct {
 	Machine MachineRef `json:"machine"`
 
 	MachineName string `json:"machineName"`
+}
+
+// One machine of machines/projectFolders (#3277): its id and name, and the absolute paths of its folders in the project.
+type ProjectMachineFolders struct {
+	Machine MachineRef `json:"machine"`
+
+	MachineName string `json:"machineName"`
+
+	Folders []string `json:"folders"`
 }
 
 // projects/remove (#2317): the project. Refused while a folder names it.
@@ -9355,6 +9374,12 @@ type SessionCall struct {
 
 	// With op message: replace the message of the starter's that waits, as message_session's replace.
 	Replace *bool `json:"replace,omitzero"`
+
+	// The asking agent's project (#3277). The host also answers status, read and message for a session that from did not start, when its folder is in this project now; stop and archive stay the starter's. The control plane checks that the asking machine has a folder of it.
+	Project *string `json:"project,omitzero"`
+
+	// With op status and project (#3277): the asker waits on it with wait_for_agents, so the host tells the asker's machine when it ends, as it tells a starter.
+	Watch *bool `json:"watch,omitzero"`
 }
 
 // What agents/fromStarter says (#2927): the words for the agent, the session's title, and how it ended, absent while it goes on.

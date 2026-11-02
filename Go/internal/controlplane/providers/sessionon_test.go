@@ -242,3 +242,65 @@ func TestAnAgentSendsAFolderToAnotherMachine(t *testing.T) {
 		t.Fatal("sent to an offline machine")
 	}
 }
+
+// The agent tools scoped to the project (#3277): an agent's machine reaches a session of
+// its project on another machine only when it has a folder of that project, and is told the
+// project's folders and sessions on its person's machines alone.
+func TestAnAgentReachesItsProjectOnOtherMachines(t *testing.T) {
+	h := newHarness(t)
+	h.router.mu.Lock()
+	h.router.answer = func(host, method string, params json.RawMessage) *Reply {
+		return &Reply{Result: rawOf(wire.SessionCallReply{Said: "read"})}
+	}
+	h.router.mu.Unlock()
+	h.router.setOnline(devbox, true)
+	folders := map[string][]string{devbox: {"/home/me/app"}, other: {"/Users/me/app"}}
+	h.providers.hooks.ProjectFolders = func(project string) map[string][]string {
+		if project != "p-app" {
+			return map[string][]string{}
+		}
+		return folders
+	}
+	var asked []wire.ProjectSessionsRequest
+	h.providers.hooks.ProjectSessions = func(request wire.ProjectSessionsRequest, caller Caller) (wire.ProjectSessions, error) {
+		asked = append(asked, request)
+		return wire.ProjectSessions{Sessions: []wire.ProjectSession{}, Unreached: []wire.ProjectMachine{}}, nil
+	}
+	call := func(project string) map[string]any {
+		return map[string]any{"host": "devbox", "call": map[string]any{"session": "11111111-2222-3333-4444-555555555555", "op": "read",
+			"project": project, "from": map[string]any{"machine": "", "agent": "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE", "who": ""}}}
+	}
+	if out, err := h.agentCall(MethodSessionCall, call("p-app")); err != nil || out.(wire.SessionCallReply).Said != "read" {
+		t.Fatalf("%v %+v", err, out)
+	}
+	var sent wire.SessionCall
+	if d := h.router.deliveries(); len(d) != 1 || json.Unmarshal(d[0].params, &sent) != nil || deref(sent.Project) != "p-app" {
+		t.Fatalf("%+v", d)
+	}
+	// Not a project this machine has a folder of.
+	if _, err := h.agentCall(MethodSessionCall, call("p-other")); failureOf(err) == nil || failureOf(err).Code != CodeNotPermitted {
+		t.Fatalf("%v", err)
+	}
+	if _, err := h.agentCall(MethodProjectSessions, map[string]any{"project": "p-other"}); failureOf(err) == nil || failureOf(err).Code != CodeNotPermitted {
+		t.Fatalf("%v", err)
+	}
+	if _, err := h.agentCall(MethodProjectSessions, map[string]any{"project": "p-app"}); err != nil || len(asked) != 1 || asked[0].Project != "p-app" {
+		t.Fatalf("%v %+v", err, asked)
+	}
+
+	out, err := h.agentCall(MethodProjectFolders, map[string]any{"project": "p-app"})
+	if m := out.(wire.ProjectFolders).Machines; err != nil || len(m) != 2 || m[0].MachineName != "devbox" || m[0].Folders[0] != "/home/me/app" {
+		t.Fatalf("%v %+v", err, out)
+	}
+	// Another person's machine is not there.
+	h.providers.hooks.OwnerOf = func(host string) string {
+		if host == devbox {
+			return "kim"
+		}
+		return "lee"
+	}
+	out, _ = h.agentCall(MethodProjectFolders, map[string]any{"project": "p-app"})
+	if m := out.(wire.ProjectFolders).Machines; len(m) != 1 || m[0].MachineName != "other" {
+		t.Fatalf("%+v", m)
+	}
+}

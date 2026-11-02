@@ -12,7 +12,8 @@ import (
 
 // start_session on another machine (#2887): the session goes to another of the person's
 // machines, by its name, through the control plane (machines/startSession), which sends
-// that machine's own agents/start. The person says yes first, unless the folder's switch
+// that machine's own agents/start. With machine alone, it starts in the project's folder
+// there (#3277). The person says yes first, unless the folder's switch
 // says agents may start them without asking (#2928). The session is not in this folder,
 // but this folder's limits count it, and the tools for an agent's own sessions reach it
 // through the control plane (elsewhere.go, #2927). With send, the branch the agent is on
@@ -31,8 +32,17 @@ func onMachine(args map[string]json.RawMessage) string {
 func (d *Daemon) startOnMachine(me *wire.Agent, args map[string]json.RawMessage, r wire.StartRequest) (string, error) {
 	machine := onMachine(args)
 	folder := strings.TrimSpace(argString(args, "folder"))
+	// Checked before the card: the person is never asked about what can't be done (#855).
+	if d.askControl.Load() == nil {
+		return "", &Error{Code: wire.FailureNotSupported, Message: "Nothing was started: this machine isn’t on a control plane, so it has no other machines."}
+	}
 	if folder == "" {
-		return "", Invalid("Nothing was started: say which folder on %s, as an absolute path.", machine)
+		// Machine alone: the project's folder there (#3277).
+		there, err := d.projectFolderOn(me, machine)
+		if err != nil {
+			return "", err
+		}
+		folder = there
 	}
 	if !strings.HasPrefix(folder, "/") {
 		return "", Invalid("Nothing was started: the folder on %s is an absolute path, such as /home/me/project, not %s.", machine, folder)
@@ -44,10 +54,6 @@ func (d *Daemon) startOnMachine(me *wire.Agent, args map[string]json.RawMessage,
 		r.Worktree = &wire.WorktreeChoice{New: &struct{}{}}
 	default:
 		r.Worktree = &wire.WorktreeChoice{Branch: &wire.WorktreeChoiceBranch{Value: w}}
-	}
-	// Checked before the card: the person is never asked about what can't be done (#855).
-	if d.askControl.Load() == nil {
-		return "", &Error{Code: wire.FailureNotSupported, Message: "Nothing was started: this machine isn’t on a control plane, so it has no other machines."}
 	}
 	// This folder's limits count it (#2927); with no queue there, a full one refuses.
 	here := folderPath(me)

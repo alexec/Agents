@@ -122,6 +122,7 @@ public enum Capability {
     public static let sandbox1 = "sandbox/1"
     public static let sessionsElsewhere1 = "sessions.elsewhere/1"
     public static let sessionsOnMachine1 = "sessions.on-machine/1"
+    public static let sessionsProject1 = "sessions.project/1"
     public static let sessions1 = "sessions/1"
     public static let shell1 = "shell/1"
     public static let signinAsk1 = "signin.ask/1"
@@ -591,6 +592,8 @@ public enum Capability {
         "links/remove": "links/1",
         "links/requests": "links/1",
         "machines/forAgent": "machines/1",
+        "machines/projectFolders": "sessions.project/1",
+        "machines/projectSessions": "sessions.project/1",
         "machines/sendFolder": "folders.to-machine/1",
         "machines/sessionCall": "sessions.elsewhere/1",
         "machines/sessionEnded": "sessions.elsewhere/1",
