@@ -64,7 +64,7 @@ public struct RuntimeAllowances: Codable, Hashable, Sendable {
     }
 
     public struct Row: Codable, Hashable, Sendable, Identifiable {
-        /// `runtime:sign-in`, or `runtime:‹CredentialKind›` for a key the Mac lends.
+        /// `runtime:sign-in`, or `runtime:‹credentialRef›` for a lent credential.
         public var credentialKey: String
         public var state: AllowanceState
         /// Why it cannot be used at all: not signed in, not installed. Nil when it can.

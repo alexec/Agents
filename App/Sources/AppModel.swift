@@ -1069,8 +1069,6 @@ final class AppModel {
     private(set) var needsFirstRun = ControlConfig.needsFirstRun
     /// The servers (037). This Mac is `client`, as it always was.
     let hosts = HostSet(locations: .default)
-    /// What this window may lend to servers (043). Never to this Mac's own daemon (D5).
-    let credentials = ServerCredentials(locations: .default)
     /// The Export… or Import Agents… on its way, drawn as a busy sheet with Cancel (#2437).
     var exportImport: ExportImportProgress?
     /// A server asked for a sign-in this Mac relays; the window asks the person (T091).
@@ -3053,10 +3051,6 @@ final class AppModel {
             hosts.macDownSince = nil
             missesWithHostUp = 0
             problem = nil
-            await client.setCredentialLender { [weak self] wanted in
-                await self?.answerMacCredentialWanted(wanted) ?? false
-            }
-            await lendToThisMac()
             listen()
             // A new connection watches nothing; what the files pane was watching is asked
             // for again, and what it shows is read again (#62).
@@ -3295,9 +3289,8 @@ final class AppModel {
             // One that works with no sign-in goes wherever this Mac has it (049: OpenCode's free
             // models); on an "own sign-in only" server too, since nothing is lent to install it.
             if RuntimeLaunchCatalog.launch(for: runtimeID).lentSignIn != nil { return self.hasOnThisMac(runtimeID) }
-            guard !(self.hosts.host(id)?.ownSignInOnly ?? false) else { return false }
-            // A key in Settings, or this Mac's own sign-in relayed (047).
-            return self.credentials.record(runtimeID) != nil
+            // No runtime takes a pasted key from Settings now that Gemini is retired (#3043).
+            return false
         }
         hosts.onConnected = { [weak self] host in
             await self?.refreshServer(host)
@@ -3677,9 +3670,7 @@ final class AppModel {
             // These describe the Mac's shared resources and event feed in this window.
             return
         case DaemonAPI.Notification.credentialRefused:
-            // The key in Settings was refused: Settings turns red, and says why (043).
             if let refused = try? params?.decode(DaemonAPI.CredentialRefused.self) {
-                if refused.lent { credentials.markRefused(refused.runtime) }
                 // This Mac's own sign-in was refused through the relay (056): sign in here.
                 if refused.relayed == true { signInRuntimeID = refused.runtime }
                 // A key this Mac's sign-in file lent (049): its sheet names the command.
