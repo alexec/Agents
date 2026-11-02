@@ -197,8 +197,9 @@ func (d *Daemon) stopScreenDrives() {
 // other app tool's state on an ending (turns.go's end). A pause ends with the turn, and so
 // does the person's Take Over: the next turn may drive again.
 func (d *Daemon) endScreenDrive(agent wire.UUID) {
-	d.endScreenPause(agent, "ended")
+	// The screen first: a call the pause's end lets go on finds it let go (#3295).
 	d.letGoOfScreen(agent)
+	d.endScreenPause(agent, "ended")
 	d.driveMu.Lock()
 	delete(d.takenOver, agent)
 	delete(d.screenApps, agent)
@@ -313,9 +314,10 @@ func (d *Daemon) driveScreen(agent wire.UUID, args map[string]json.RawMessage) (
 	}
 	d.noteScreenApp(agent, app)
 	var res map[string]any
+	touched := false
 	for {
 		// Paused by the person's touch (US3): held here until Resume or Take Over.
-		if err := d.waitWhilePaused(agent); err != nil {
+		if err := d.waitWhilePaused(agent, touched); err != nil {
 			return "", err
 		}
 		if res, err = p.call(req); err != nil {
@@ -327,7 +329,7 @@ func (d *Daemon) driveScreen(agent wire.UUID, args map[string]json.RawMessage) (
 			d.releaseScreenDrive(agent)
 			return "", &Error{Message: "drive_screen: " + err.Error()}
 		}
-		touched, _ := res["touched"].(bool)
+		touched, _ = res["touched"].(bool)
 		if !touched {
 			break
 		}

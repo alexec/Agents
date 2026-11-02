@@ -28,6 +28,7 @@ const (
 		"Do not drive the screen again in this turn; say what is left to do, and let the person carry on."
 	desktopControlNotPausedWords = "That agent is not paused, so there is nothing to resume."
 	desktopControlNotHeldWords   = "That agent does not hold the screen, so there is nothing to take over."
+	desktopControlEndedWords     = "Nothing more was driven: the turn ended while the screen was paused."
 )
 
 // noteScreenApp keeps the app this agent last drove, for the pause its next touch makes.
@@ -82,7 +83,9 @@ func (d *Daemon) endScreenPause(agent wire.UUID, outcome string) bool {
 
 // waitWhilePaused holds a drive_screen call while its agent is paused: nil once the person
 // resumes it, the take-over refusal once they take over, and an error when the turn ends.
-func (d *Daemon) waitWhilePaused(agent wire.UUID) error {
+// After a touched reply the pause can be over before the call gets here (#3295): the turn
+// ended then if the agent no longer holds the screen.
+func (d *Daemon) waitWhilePaused(agent wire.UUID, touched bool) error {
 	d.driveMu.Lock()
 	taken := d.takenOver[agent]
 	p := d.pauses[agent]
@@ -91,6 +94,9 @@ func (d *Daemon) waitWhilePaused(agent wire.UUID) error {
 		return &Error{Code: CodeNotPermitted, Message: desktopControlTakenOverWords}
 	}
 	if p == nil {
+		if touched && !d.holdsScreen(agent) {
+			return &Error{Message: desktopControlEndedWords}
+		}
 		return nil
 	}
 	<-p.done
@@ -100,7 +106,7 @@ func (d *Daemon) waitWhilePaused(agent wire.UUID) error {
 	case "takenOver":
 		return &Error{Code: CodeNotPermitted, Message: desktopControlTakenOverWords}
 	default:
-		return &Error{Message: "Nothing more was driven: the turn ended while the screen was paused."}
+		return &Error{Message: desktopControlEndedWords}
 	}
 }
 
