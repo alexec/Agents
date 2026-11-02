@@ -331,9 +331,11 @@ func (d *Daemon) driveScreen(agent wire.UUID, args map[string]json.RawMessage) (
 		if !touched {
 			break
 		}
-		// Touched part way (only typing takes long enough): paused, and on Resume it types
-		// what is left, from where it stopped.
-		d.pauseScreen(agent)
+		// Touched part way (only typing takes long enough): on Resume it types what is left,
+		// from where it stopped. Not paused again here: agents-drive said the touch before
+		// this reply, and the reader paused on it then (read hands frames on in order). A
+		// second pause here would outlive a Resume that came in between, with nobody to
+		// answer it.
 		if typed, ok := res["typed"].(float64); ok && action == "type" {
 			if text, _ := req["text"].(string); int(typed) < len([]rune(text)) {
 				req["text"] = string([]rune(text)[int(typed):])
