@@ -1349,37 +1349,37 @@ func (d *Daemon) sandboxResolutionRefusal(runtimeID string, chosen *wire.Sandbox
 
 // policyTurn is the policy at the start of each turn (FR-012, FR-013, FR-015): no turn
 // while the machine starts no work, or on a runtime or model now refused, or at a budget;
-// a mode looser than the ceiling goes down to it first. It is the line for the chat when
-// the turn waits, "" when it goes.
-func (d *Daemon) policyTurn(l *live, a *wire.Agent) string {
+// a mode looser than the ceiling goes down to it first. It is why the turn waits, nil when
+// it goes.
+func (d *Daemon) policyTurn(l *live, a *wire.Agent) error {
 	if err := d.workRefusal(); err != nil {
-		return policyWords(err)
+		return err
 	}
 	p := d.orgPolicy()
 	if err := d.runtimeRefusal(p, a.RuntimeID); err != nil {
-		return policyWords(err)
+		return err
 	}
 	if err := d.sandboxResolutionRefusal(a.RuntimeID, nil, ""); err != nil {
-		return policyWords(err)
+		return err
 	}
 	if p == nil {
-		return ""
+		return nil
 	}
 	if err := d.sessionReachRefusal(a); err != nil {
-		return policyWords(err)
+		return err
 	}
 	if err := d.modelRefusal(p, a.RuntimeID, agentModel(a), a.AdvertisedOptions); err != nil {
-		return policyWords(err)
+		return err
 	}
 	if err := d.dayBudgetRefusal(); err != nil {
-		return policyWords(err)
+		return err
 	}
 	if err := d.agentBudgetRefusal(a); err != nil {
-		return policyWords(err)
+		return err
 	}
 	d.capAgentMode(l, a, p)
 	d.capApproveAll(l, a, p)
-	return ""
+	return nil
 }
 
 // capAgentMode lowers an agent's mode to the ceiling, with a line in its chat, before
@@ -1530,7 +1530,11 @@ func (d *Daemon) holdsForPolicy(l *live) bool {
 	if a == nil {
 		return false
 	}
-	note := d.policyTurn(l, a)
+	refused := d.policyTurn(l, a)
+	note := ""
+	if refused != nil {
+		note = policyWords(refused)
+	}
 	d.orgMu.Lock()
 	if d.orgHeld == nil {
 		d.orgHeld = map[wire.UUID]string{}
@@ -1543,9 +1547,29 @@ func (d *Daemon) holdsForPolicy(l *live) bool {
 	}
 	d.orgMu.Unlock()
 	if note != "" && note != was {
-		d.record(l.id, runtimeNote("What you sent is waiting. "+note))
+		d.recordPolicyStop(l.id, refused, "What you sent is waiting. ", "What you sent is waiting. "+note)
 	}
 	return note != ""
+}
+
+// policyStopped is the chat's Stopped by a policy card (#2957, FR-025): the refusal, with
+// the rule, the layer that decides and the value.
+func policyStopped(r wire.PolicyRefusal) wire.TranscriptEntryKind {
+	return wire.TranscriptEntryKind{PolicyStopped: &wire.TranscriptEntryKindPolicyStopped{Value: r}}
+}
+
+// recordPolicyStop writes why a rule stopped an agent into its chat: the card, its words
+// after lead, when the refusal names its layer; line alone when it does not (no work at all,
+// a machine that must update, which no layer decides).
+func (d *Daemon) recordPolicyStop(id wire.UUID, err error, lead, line string) {
+	if e, ok := err.(*Error); ok {
+		if r, ok := e.Data.(wire.PolicyRefusal); ok && r.Layer != nil {
+			r.Words = lead + r.Words
+			d.record(id, policyStopped(r))
+			return
+		}
+	}
+	d.record(id, runtimeNote(line))
 }
 
 // stopAllForPolicy is the kill switch turned on: every running turn stops, as Stop does.

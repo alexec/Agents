@@ -4426,6 +4426,19 @@ type GuardedChange struct {
 	Since Date `json:"since"`
 
 	AskedIn *UUID `json:"askedIn,omitzero"`
+
+	// Set when the guarded file is a folder's .agents/policy.json (#2957, frame D): the rules the change makes looser, and the words for the card.
+	Policy *GuardedChangePolicy `json:"policy,omitzero"`
+}
+
+// What a waiting change to a folder's .agents/policy.json does (#2957, contracts/policy-layers-api.md): the rules it makes looser, and one line that says so, such as "Permission mode: Ask → Bypass Permissions".
+type GuardedChangePolicy struct {
+	Looser []PolicyRuleName `json:"looser"`
+
+	Words string `json:"words"`
+
+	// The approved value's words when the change loosens one rule, for the card's Keep <was> (frame D): "Ask".
+	Was *string `json:"was,omitzero"`
 }
 
 type GuardedChangeReading struct {
@@ -10441,6 +10454,8 @@ type TranscriptEntryKind struct {
 
 	SandboxFailure *TranscriptEntryKindSandboxFailure `json:"sandboxFailure,omitzero"`
 
+	PolicyStopped *TranscriptEntryKindPolicyStopped `json:"policyStopped,omitzero"`
+
 	AppView *TranscriptEntryKindAppView `json:"appView,omitzero"`
 
 	FileShown *TranscriptEntryKindFileShown `json:"fileShown,omitzero"`
@@ -10466,7 +10481,7 @@ func (v TranscriptEntryKind) MarshalJSON() ([]byte, error) {
 func (v *TranscriptEntryKind) UnmarshalJSON(b []byte) error {
 	type plain TranscriptEntryKind
 	var p plain
-	if err := json.Unmarshal(b, &p); err != nil || (p.UserMessage == nil && p.AgentMessage == nil && p.AgentThought == nil && p.ToolCall == nil && p.ToolCallUpdate == nil && p.PlanUpdated == nil && p.UsageRecorded == nil && p.ServedRequest == nil && p.ElicitationAsked == nil && p.ElicitationAnswered == nil && p.Compaction == nil && p.Notice == nil && p.PermissionAsked == nil && p.PermissionAnswered == nil && p.OptionChanged == nil && p.StateChanged == nil && p.Background == nil && p.WorkReported == nil && p.RuntimeNote == nil && p.SandboxFailure == nil && p.AppView == nil && p.FileShown == nil && p.Notified == nil && p.NoticeDelivered == nil) {
+	if err := json.Unmarshal(b, &p); err != nil || (p.UserMessage == nil && p.AgentMessage == nil && p.AgentThought == nil && p.ToolCall == nil && p.ToolCallUpdate == nil && p.PlanUpdated == nil && p.UsageRecorded == nil && p.ServedRequest == nil && p.ElicitationAsked == nil && p.ElicitationAnswered == nil && p.Compaction == nil && p.Notice == nil && p.PermissionAsked == nil && p.PermissionAnswered == nil && p.OptionChanged == nil && p.StateChanged == nil && p.Background == nil && p.WorkReported == nil && p.RuntimeNote == nil && p.SandboxFailure == nil && p.PolicyStopped == nil && p.AppView == nil && p.FileShown == nil && p.Notified == nil && p.NoticeDelivered == nil) {
 		*v = TranscriptEntryKind{Unrecognised: append(JSONValue(nil), b...)}
 		return nil
 	}
@@ -10578,6 +10593,11 @@ type TranscriptEntryKindRuntimeNote struct {
 
 type TranscriptEntryKindSandboxFailure struct {
 	Value SandboxFailureRecord `json:"_0"`
+}
+
+// A rule of the policy stopped this agent (#2957, FR-025): a prompt that waits, or a turn that ended at a budget. The chat draws it as the Stopped by a policy card, with the rule, the layer that decides and the value.
+type TranscriptEntryKindPolicyStopped struct {
+	Value PolicyRefusal `json:"_0"`
 }
 
 type TranscriptEntryKindAppView struct {

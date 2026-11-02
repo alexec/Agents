@@ -44,6 +44,10 @@ func notes(d *Daemon, id wire.UUID) []string {
 		if e.Kind.RuntimeNote != nil {
 			out = append(out, e.Kind.RuntimeNote.Value)
 		}
+		// A Stopped by a policy card's words are its line in the chat (#2957, FR-025).
+		if e.Kind.PolicyStopped != nil {
+			out = append(out, e.Kind.PolicyStopped.Value.Words)
+		}
 	}
 	return out
 }

@@ -724,6 +724,11 @@ func TestMachineBudgets(t *testing.T) {
 	if !d.holdsForPolicy(d.live(a.ID)) {
 		t.Fatal("the turn was not held at the budget")
 	}
+	// The chat says which rule and layer held it (#2957, FR-025): the Stopped by a policy card.
+	if stop := policyStops(d, a.ID); len(stop) != 1 || stop[0].Layer == nil || stop[0].Layer.Kind != "organisation" ||
+		stop[0].Rule == nil || *stop[0].Rule != "budgets.daily" || !strings.HasPrefix(stop[0].Words, "What you sent is waiting. ") {
+		t.Fatalf("policy stops = %+v, want one for the organisation's budgets.daily", stop)
+	}
 	// The control plane's count across machines wins (capReachedUntil).
 	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 3, map[string]any{"budgets": map[string]any{"daily": 100, "allowUnmetered": []string{}, "raises": []any{}}}))
 	c.call(t, 5, "agents/start", startParams(dir, "claude", nil))
@@ -984,4 +989,16 @@ func TestAPushedLayerReachesDisplay(t *testing.T) {
 			t.Fatalf("display.json kept %s after the layer dropped it: %s", key, prefs)
 		}
 	}
+}
+
+// policyStops is every Stopped by a policy card in an agent's chat (#2957, FR-025).
+func policyStops(d *Daemon, id wire.UUID) []wire.PolicyRefusal {
+	entries, _, _ := d.Store.Transcript(id, 0)
+	var out []wire.PolicyRefusal
+	for _, e := range entries {
+		if e.Kind.PolicyStopped != nil {
+			out = append(out, e.Kind.PolicyStopped.Value)
+		}
+	}
+	return out
 }

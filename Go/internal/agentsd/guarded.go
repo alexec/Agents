@@ -286,6 +286,9 @@ func (d *Daemon) guardedFileChanges(folder string) []wire.GuardedChange {
 				break
 			}
 		}
+		if s.Path == folderPolicyFile {
+			c.Policy = folderPolicyChange(folder, s.ApprovedContent)
+		}
 		out = append(out, c)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Path < out[j].Path })

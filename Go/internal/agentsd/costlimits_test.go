@@ -26,12 +26,17 @@ func TestLimitsHoldTheWork(t *testing.T) {
 	c.call(t, 3, "agents/prompt", map[string]any{"agentID": a.ID, "text": "go on", "from": "person"})
 	waitFor(t, "the hold said", func() bool {
 		for _, k := range kinds(d, a.ID) {
-			if k == "runtimeNote" {
+			if k == "policyStopped" {
 				return true
 			}
 		}
 		return false
 	})
+	// The card names the rule and your layer (#2957, FR-025).
+	if stop := policyStops(d, a.ID); len(stop) != 1 || *stop[0].Rule != "budgets.daily" || stop[0].Layer.Kind != "you" ||
+		stop[0].Value == nil || *stop[0].Value != "at most $1.00 a day" {
+		t.Fatalf("%+v", stop)
+	}
 	if q := d.Store.Agent(a.ID).QueuedPrompts; len(q) != 1 {
 		t.Fatalf("%+v", q)
 	}

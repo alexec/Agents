@@ -3652,6 +3652,26 @@ export interface GuardedChange {
   byGit: boolean;
   since: WireDate;
   askedIn?: UUID;
+  /**
+   * Set when the guarded file is a folder's .agents/policy.json (#2957, frame D): the rules the
+   * change makes looser, and the words for the card.
+   */
+  policy?: GuardedChangePolicy;
+}
+
+/**
+ * What a waiting change to a folder's .agents/policy.json does (#2957,
+ * contracts/policy-layers-api.md): the rules it makes looser, and one line that says so, such as
+ * "Permission mode: Ask → Bypass Permissions".
+ */
+export interface GuardedChangePolicy {
+  looser: PolicyRuleName[];
+  words: string;
+  /**
+   * The approved value's words when the change loosens one rule, for the card's Keep <was> (frame
+   * D): "Ask".
+   */
+  was?: string;
 }
 
 export interface GuardedChangeReading {
@@ -8661,6 +8681,7 @@ export type TranscriptEntryKind =
   | { workReported: { _0: WorkReport } }
   | { runtimeNote: { _0: string } }
   | { sandboxFailure: { _0: SandboxFailureRecord } }
+  | { policyStopped: { _0: PolicyRefusal } }
   | { appView: { _0: AppViewCall } }
   | { fileShown: { _0: ShownFile } }
   | { notified: { _0: SentNotice } }
@@ -10552,7 +10573,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   GroupSet: { required: ["name"], optional: ["id", "everyone", "members", "caps"] },
   GroupSource: { required: ["scim", "displayName"], optional: ["externalId"] },
   GroupsChanged: { required: [], optional: ["id", "removed"] },
-  GuardedChange: { required: ["path", "changedBy", "changedByIDs", "byGit", "since"], optional: ["digest", "askedIn"] },
+  GuardedChange: { required: ["path", "changedBy", "changedByIDs", "byGit", "since"], optional: ["digest", "askedIn", "policy"] },
+  GuardedChangePolicy: { required: ["looser", "words"], optional: ["was"] },
   GuardedChangeReading: { required: ["path", "lines"], optional: ["digest", "approved", "current"] },
   GuardedChangeRequest: { required: ["folder", "path"], optional: ["digest"] },
   GuardedDiffLine: { required: ["kind", "text"], optional: [] },

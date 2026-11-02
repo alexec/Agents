@@ -86,6 +86,48 @@ func yourBudgetRefusalData(rule, words string) wire.PolicyRefusal {
 	return wire.PolicyRefusal{Reason: "budget", Rule: &rule, Words: words, Layer: &layer, Value: &words}
 }
 
+// yourBudgetStop is the Stopped by a policy card for one of your own budgets (#2957,
+// FR-025): the rule, your layer, and the limit as the Policy pane says it ("$40.00 a
+// day"); words is the chat's line. An agent's own ceiling, set by Let This One Go On, is
+// still yours.
+func (d *Daemon) yourBudgetStop(a *wire.Agent, rule, words string) wire.PolicyRefusal {
+	r := yourBudgetRefusalData(rule, words)
+	d.costMu.Lock()
+	limits := d.limitsLocked()
+	d.costMu.Unlock()
+	value := ""
+	switch rule {
+	case "budgets.perAgent":
+		c := a.CostCeiling
+		if c == nil {
+			c = limits.PerAgent
+		}
+		if c != nil {
+			value = "at most " + costWords(c.Amount, c.Currency) + " for each agent"
+		}
+	case "budgets.perAgentTokens":
+		n := a.TokenCeiling
+		if n == nil {
+			n = limits.PerAgentTokens
+		}
+		if n != nil {
+			value = fmt.Sprintf("at most %d tokens for each agent", *n)
+		}
+	case "budgets.daily":
+		if limits.Daily != nil {
+			value = "at most " + costWords(limits.Daily.Amount, limits.Daily.Currency) + " a day"
+		}
+	case "budgets.dailyTokens":
+		if limits.DailyTokens != nil {
+			value = fmt.Sprintf("at most %d tokens a day", *limits.DailyTokens)
+		}
+	}
+	if value != "" {
+		r.Value = &value
+	}
+	return r
+}
+
 func (d *Daemon) startRefusal() error {
 	switch d.dayAtLimit() {
 	case "tokens":
@@ -119,19 +161,22 @@ func (d *Daemon) holdsForLimit(id wire.UUID) bool {
 	if a == nil {
 		return false
 	}
-	note := ""
-	if d.agentAtLimit(a) != "" {
+	note, rule := "", ""
+	if at := d.agentAtLimit(a); at != "" {
 		d.raiseCostLimit("agent", a)
-		note = "What you sent is waiting: this agent has reached its cost limit. Raise the limit, or let this one agent go on, and it will go."
+		note, rule = "What you sent is waiting: this agent has reached its cost limit. Raise the limit, or let this one agent go on, and it will go.", "budgets.perAgent"
+		if at == "tokens" {
+			rule = "budgets.perAgentTokens"
+		}
 	} else {
 		switch day := d.dayAtLimit(); day {
 		case "tokens", "money":
 			d.raiseCostLimit("day", nil)
-			kind := "spending"
+			kind, r := "spending", "budgets.daily"
 			if day == "tokens" {
-				kind = "token"
+				kind, r = "token", "budgets.dailyTokens"
 			}
-			note = "What you sent is waiting: the day's " + kind + " limit has been reached. It will go when the day rolls over, or when you raise the limit."
+			note, rule = "What you sent is waiting: the day's "+kind+" limit has been reached. It will go when the day rolls over, or when you raise the limit.", r
 		}
 	}
 	d.costMu.Lock()
@@ -146,7 +191,7 @@ func (d *Daemon) holdsForLimit(id wire.UUID) bool {
 	}
 	d.costMu.Unlock()
 	if note != "" && !was {
-		d.record(id, runtimeNote(note))
+		d.record(id, policyStopped(d.yourBudgetStop(a, rule, note)))
 	}
 	return note != ""
 }
