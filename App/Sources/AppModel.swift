@@ -414,8 +414,6 @@ final class AppModel {
     /// Work's places (#3119): the list or the item's page open, and the ones before and after it,
     /// for Back and Forward. Kept while the window is open, as the Lineage page's starts are.
     var workHistory = LineageHistory<WorkPlace>()
-    /// Where Work is: Issues until something else is opened.
-    var workPlace: WorkPlace { workHistory.current ?? WorkPlace(kind: .issue) }
 
     /// Open Work at a place: a list, or an item's page.
     func showWork(_ place: WorkPlace) {
@@ -5770,7 +5768,7 @@ final class AppModel {
     }
 
     /// One issue or pull request with its body and a page of its comments (#3129), for its Work page.
-    func forgeItem(_ node: DaemonAPI.LineageNode, cursor: String? = nil,
+    func forgeItem(_ node: DaemonAPI.LineageNode, cursor: String?,
                    on host: MachineRef) async throws -> DaemonAPI.ForgeItemDetail {
         try await client(for: host).call(node.kind == "pr" ? DaemonAPI.Method.forgePull : DaemonAPI.Method.forgeIssue,
                                          DaemonAPI.ForgeItemRequest(node: node, cursor: cursor),
@@ -5788,6 +5786,11 @@ final class AppModel {
                              on host: MachineRef) async throws -> R {
         try await client(for: host).call(method, params, returning: R.self)
     }
+
+    /// A session's title for Work's links (#3256).
+    func workSessionTitle(_ id: UUID) -> String? { work.agent(id)?.title }
+
+    func openWorkSession(_ id: UUID) { openAgent(id) }
 
     /// A page of the lineage nodes of a kind (#3118), from the control plane: Work's figures; nil
     /// with no control plane.
@@ -6188,3 +6191,6 @@ struct FolderGoneAsk: Identifiable, Equatable {
     let text: String
     let attachments: [Attachment]
 }
+
+/// Work (#3119) is drawn by `Shared/UI/Work`, for the window and the Remote (#3256).
+extension AppModel: WorkModel {}

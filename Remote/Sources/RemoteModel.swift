@@ -313,6 +313,9 @@ final class RemoteModel {
     private var gitAsksAnswered: Set<String> = []
     /// The host this phone's own connection reaches. Its folders are stamped `.mac`.
     private(set) var controlHome: MachineRef?
+    /// Work's places (#3256), as the window keeps them: the list or the item's page open, and
+    /// the ones before and after it, for Back and Forward.
+    var workHistory = LineageHistory<WorkPlace>()
     /// What `control/status` last said: its version and capabilities, for Settings (#1748).
     private(set) var controlStatus: DaemonAPI.ControlStatus?
 
@@ -606,7 +609,7 @@ final class RemoteModel {
                 openWorkflow = nil
                 openArchive = false
                 openReview = id
-            case .resources, .events, .runtimes, .worktrees:
+            case .resources, .events, .runtimes, .worktrees, .work:
                 openActivity = newValue
             case .archive(let key):
                 // The folder's archive page (#495, #498), with what is opened from it
@@ -617,8 +620,8 @@ final class RemoteModel {
                 openWorkflow = nil
                 openReview = nil
                 openArchive = true
-            case .spending, .tokens, .time, .lineage, .milestones, .mcpServers, .folderMCPServers, .work:
-                // Usage, connectors and Work are Mac + web (#2798, #3119): the Remote opens none of them.
+            case .spending, .tokens, .time, .lineage, .milestones, .mcpServers, .folderMCPServers:
+                // Usage and connectors are Mac + web (#2798): the Remote opens none of them.
                 break
             }
         }
@@ -5075,3 +5078,6 @@ extension RemoteModel {
         work.prepend(page)
     }
 }
+
+/// Work (#3256): `RemoteModel+Work.swift`. Declared here, as Sendable conformance must be.
+extension RemoteModel: WorkModel {}

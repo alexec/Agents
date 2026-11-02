@@ -7,7 +7,7 @@ import SwiftUI
 /// to the machine that read the item (`forge/*`), as the person: their own click, so no approval
 /// card. `wrote` reads the page again after a write.
 struct WorkItemActions: View {
-    @Environment(AppModel.self) private var model
+    let model: any WorkModel
     @Environment(\.openURL) private var openURL
     let host: MachineRef
     let detail: DaemonAPI.ForgeItemDetail
@@ -25,7 +25,8 @@ struct WorkItemActions: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
+            // Wraps, so a phone's narrow page keeps every action.
+            WrappingHStack(spacing: 8) {
                 if isPR { pullActions } else { issueActions }
                 if item.state == "open" || item.state == "closed" {
                     Button(WorkList.closeTitle(item.state)) {
@@ -37,6 +38,9 @@ struct WorkItemActions: View {
                 if busy != nil { ProgressView().controlSize(.small) }
             }
             .disabled(busy != nil)
+            #if os(iOS)
+            .buttonStyle(.bordered)
+            #endif
             if isPR, !WorkList.failedChecks(detail).isEmpty { failedChecks }
             if let said {
                 Text(said.words).appText(.supporting).foregroundStyle((said.failed ? StateTint.failure : .none).style(or: .secondary))
@@ -105,11 +109,11 @@ struct WorkItemActions: View {
     }
 
     private var failedChecks: some View {
-        HStack(spacing: 6) {
+        WrappingHStack(spacing: 6) {
             Text("Failed:").appText(.supporting).foregroundStyle(.secondary)
             ForEach(WorkList.failedChecks(detail), id: \.name) { check in
                 Button("\(check.name) log") { Task { await readLog(check.name) } }
-                    .buttonStyle(.link)
+                    .linkStyle()
                     .help("The end of this check's log")
             }
         }
@@ -157,7 +161,7 @@ struct WorkItemActions: View {
             }
         }
         .fixedSize()
-        .task(id: node) { await loadLabels() }
+        .workTask(id: node) { await loadLabels() }
     }
 
     private func loadLabels() async {
@@ -189,7 +193,7 @@ struct WorkItemActions: View {
 
 /// A comment box under an item's comments (#3130): Markdown, sent as the person.
 struct WorkCommentBox: View {
-    @Environment(AppModel.self) private var model
+    let model: any WorkModel
     let host: MachineRef
     let node: DaemonAPI.LineageNode
     let wrote: () -> Void
@@ -256,6 +260,8 @@ private struct WorkLogSheet: View {
             }
         }
         .padding(20)
+        #if os(macOS)
         .frame(minWidth: 640, minHeight: 420)
+        #endif
     }
 }
