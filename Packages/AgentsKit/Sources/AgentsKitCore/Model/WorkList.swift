@@ -389,12 +389,13 @@ public enum WorkList {
     }
 
     /// What a write did, for the line under the actions.
-    public static func doneWords(_ method: String, _ done: DaemonAPI.ForgeDone) -> String {
+    public static func doneWords(_ method: String, _ done: DaemonAPI.ForgeDone, reopened: Bool = false) -> String {
         switch method {
         case DaemonAPI.Method.forgeComment: "Commented."
         case DaemonAPI.Method.forgeLabel: "Labels changed."
         case DaemonAPI.Method.forgeMerge: done.auto == true ? "Auto-merge is on: it merges when its checks pass." : "Merged."
         case DaemonAPI.Method.forgeApprove: "Approved."
+        case DaemonAPI.Method.forgeClose: reopened ? "Reopened." : "Closed."
         case DaemonAPI.Method.forgeRerun:
             done.reran.map { $0 == 1 ? "1 run started again." : "\($0) runs started again." } ?? "Started again."
         default: "Done."

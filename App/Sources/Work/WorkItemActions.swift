@@ -94,7 +94,7 @@ struct WorkItemActions: View {
                 act(DaemonAPI.Method.forgeApprove, DaemonAPI.ForgeApproveRequest(node: node, sha: head))
             }
         }
-        if !WorkList.failedChecks(detail).isEmpty {
+        if item.state == "open", !WorkList.failedChecks(detail).isEmpty {
             Button("Rerun failed") { act(DaemonAPI.Method.forgeRerun, DaemonAPI.ForgeNodeRequest(node: node)) }
         }
         Button("Show Diff") { Task { await showDiff() } }
@@ -177,7 +177,8 @@ struct WorkItemActions: View {
             defer { busy = nil }
             do {
                 let done = try await model.forge(method, params, returning: DaemonAPI.ForgeDone.self, on: host)
-                said = (WorkList.doneWords(method, done), false)
+                let reopened = (params as? DaemonAPI.ForgeCloseRequest)?.reopen == true
+                said = (WorkList.doneWords(method, done, reopened: reopened), false)
                 wrote()
             } catch {
                 said = (error.localizedDescription, true)
@@ -203,7 +204,7 @@ struct WorkCommentBox: View {
                 .appText(.reading)
                 .frame(minHeight: 70, maxHeight: 160)
                 .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.separator))
-                .accessibilityLabel("Comment")
+                .accessibilityLabel("New comment")
             HStack {
                 if let failure { Text(failure).appText(.supporting).tinted(.failure) }
                 Spacer()

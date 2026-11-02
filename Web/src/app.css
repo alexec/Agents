@@ -1866,7 +1866,8 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .split-button > button:last-child { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: 1px; padding: 0 8px; }
 .work-comment-box { display: grid; gap: 6px; margin-top: 12px; }
 .work-comment-box textarea { width: 100%; box-sizing: border-box; font: inherit; resize: vertical; }
-.work-log { display: grid; gap: 8px; width: min(800px, 90vw); }
+dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
+.work-log { display: grid; gap: 8px; min-width: 0; }
 .work-log header { display: flex; align-items: center; }
 .work-log header .spacer { flex: 1; }
-.work-log pre { max-height: 60vh; overflow: auto; margin: 0; white-space: pre-wrap; }
+.work-log pre { max-height: 60vh; overflow: auto; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }

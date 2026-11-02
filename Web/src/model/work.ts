@@ -306,12 +306,13 @@ export const mergeWaits = (d: ForgeItemDetail) => d.item.checks === "running" ||
 export const failedChecks = (d: ForgeItemDetail) => (d.checks ?? []).filter((c) => c.state === "failing");
 
 /** What a write did, for the line under the actions. */
-export function doneWords(method: string, done: ForgeDone): string {
+export function doneWords(method: string, done: ForgeDone, reopened = false): string {
   switch (method) {
     case "forge/comment": return "Commented.";
     case "forge/label": return "Labels changed.";
     case "forge/merge": return done.auto ? "Auto-merge is on: it merges when its checks pass." : "Merged.";
     case "forge/approve": return "Approved.";
+    case "forge/close": return reopened ? "Reopened." : "Closed.";
     case "forge/rerun": return done.reran === undefined ? "Started again." : done.reran === 1 ? "1 run started again." : `${done.reran} runs started again.`;
     default: return "Done.";
   }

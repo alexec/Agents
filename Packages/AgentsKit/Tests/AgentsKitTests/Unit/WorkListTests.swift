@@ -158,6 +158,7 @@ struct WorkPageTests {
         #expect(WorkList.failedChecks(running).map(\.name) == ["b"])
         #expect(WorkList.doneWords(DaemonAPI.Method.forgeMerge, .init(auto: true)) == "Auto-merge is on: it merges when its checks pass.")
         #expect(WorkList.doneWords(DaemonAPI.Method.forgeRerun, .init(reran: 2)) == "2 runs started again.")
+        #expect(WorkList.doneWords(DaemonAPI.Method.forgeClose, .init(), reopened: true) == "Reopened.")
         #expect(WorkList.closeTitle("open") == "Close")
         #expect(WorkList.closeTitle("closed") == "Reopen")
     }

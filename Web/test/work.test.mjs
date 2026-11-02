@@ -148,6 +148,8 @@ test("a write says what it did", () => {
   assert.equal(w.doneWords("forge/merge", { auto: true }), "Auto-merge is on: it merges when its checks pass.");
   assert.equal(w.doneWords("forge/merge", {}), "Merged.");
   assert.equal(w.doneWords("forge/rerun", { reran: 2 }), "2 runs started again.");
+  assert.equal(w.doneWords("forge/close", {}), "Closed.");
+  assert.equal(w.doneWords("forge/close", {}, true), "Reopened.");
   assert.equal(w.closeTitle("open"), "Close");
   assert.equal(w.closeTitle("closed"), "Reopen");
 });

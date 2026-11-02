@@ -44,7 +44,7 @@ export function WorkActions({ store, host, detail, wrote }: {
     busy.value = true;
     try {
       const done = await store.link.call(method, params as never, host) as ForgeDone;
-      said.value = { words: doneWords(method, done), failed: false };
+      said.value = { words: doneWords(method, done, method === "forge/close" && (params as { reopen?: boolean }).reopen === true), failed: false };
       wrote();
     } catch (e) {
       said.value = { words: describe(e), failed: true };
@@ -100,7 +100,7 @@ export function WorkActions({ store, host, detail, wrote }: {
         {isPR && item.state === "open" && detail.head && (
           <button type="button" disabled={busy.value} onClick={() => void act("forge/approve", { node, sha: detail.head })}>Approve</button>
         )}
-        {failed.length > 0 && <button type="button" disabled={busy.value} onClick={() => void act("forge/rerun", { node })}>Rerun failed</button>}
+        {item.state === "open" && failed.length > 0 && <button type="button" disabled={busy.value} onClick={() => void act("forge/rerun", { node })}>Rerun failed</button>}
         {isPR && <button type="button" disabled={busy.value} onClick={() => void read(() => store.link.call("forge/diff", { node }, host), (d) => {
           diff.value = { title: `${shortRef(node.ref)} ${item.title}`, url: d.url, files: d.files, cut: d.cut };
         })}>Show Diff</button>}
@@ -154,7 +154,7 @@ export function WorkCommentBox({ store, host, node, wrote }: { store: Store; hos
   };
   return (
     <form class="work-comment-box" onSubmit={(e) => { e.preventDefault(); void send(); }}>
-      <textarea aria-label="Comment" rows={3} value={text.value} placeholder="Comment, in Markdown"
+      <textarea aria-label="New comment" rows={3} value={text.value} placeholder="Comment, in Markdown"
         onInput={(e) => { text.value = e.currentTarget.value; }}
         onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void send(); } }} />
       <div class="work-actions-bar">
