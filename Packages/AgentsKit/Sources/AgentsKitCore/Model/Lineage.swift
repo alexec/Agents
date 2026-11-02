@@ -77,7 +77,7 @@ public extension DaemonAPI {
     /// One node's banked cost on a machine, with what its rollups need.
     struct LineageCostNode: Codable, Sendable, Hashable {
         public var node: LineageNode
-        public var project: String?
+        public var repo: String?
         public var banked: LineageCost
         public var fixes: [String]?
         public var partOf: [String]?
@@ -90,11 +90,11 @@ public extension DaemonAPI {
         /// The sessions that worked on it, by ref, at most 20 (#3118).
         public var sessions: [String]?
 
-        public init(node: LineageNode, project: String? = nil, banked: LineageCost = .init(), fixes: [String]? = nil,
+        public init(node: LineageNode, repo: String? = nil, banked: LineageCost = .init(), fixes: [String]? = nil,
                     partOf: [String]? = nil, outcome: String? = nil, failedChecks: Int? = nil, lastAt: Date,
                     resolved: LineageResolved? = nil, sessions: [String]? = nil) {
             self.node = node
-            self.project = project
+            self.repo = repo
             self.banked = banked
             self.fixes = fixes
             self.partOf = partOf

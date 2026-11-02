@@ -56,7 +56,7 @@ public extension DaemonAPI {
     /// sessions that worked on it and its parts, and the title, state and labels a machine sent.
     struct ReportNode: Codable, Sendable, Hashable, Identifiable {
         public var node: LineageNode
-        public var project: String?
+        public var repo: String?
         public var resolved: LineageResolved?
         public var cost: ReportNodeCost
         public var sessions: Int
@@ -68,11 +68,11 @@ public extension DaemonAPI {
 
         public var id: String { node.ref }
 
-        public init(node: LineageNode, project: String? = nil, resolved: LineageResolved? = nil,
+        public init(node: LineageNode, repo: String? = nil, resolved: LineageResolved? = nil,
                     cost: ReportNodeCost = .init(), sessions: Int = 0, leadTimeSeconds: Double? = nil,
                     outcome: String? = nil, lastAt: Date) {
             self.node = node
-            self.project = project
+            self.repo = repo
             self.resolved = resolved
             self.cost = cost
             self.sessions = sessions

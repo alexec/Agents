@@ -4046,18 +4046,18 @@ export interface LineageCost {
 }
 
 /**
- * One node's banked cost on a machine (#2350), whole, with what its rollups need: the project its
- * ref is in, the issues a PR fixes (ended links too: a PR closed without a merge still counts
- * against its issue, as waste), the milestones it is part of, and how a PR ended. A session's own
- * cost is its turns that had no active link.
+ * One node's banked cost on a machine (#2350), whole, with what its rollups need: the repo or
+ * tracker its ref is in, the issues a PR fixes (ended links too: a PR closed without a merge still
+ * counts against its issue, as waste), the milestones it is part of, and how a PR ended. A
+ * session's own cost is its turns that had no active link.
  */
 export interface LineageCostNode {
   node: LineageNode;
   /**
    * The repo or tracker the node is in: github:alexec/agents, linear, or for a session its folder's
-   * repo (folder:<name> without one).
+   * repo (folder:<name> without one). Not a project (#3275).
    */
-  project?: string;
+  repo?: string;
   banked: LineageCost;
   /** A PR's issues, by ref. */
   fixes?: string[];
@@ -4091,9 +4091,9 @@ export interface LineageCostNode {
 /**
  * lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total
  * adds its parts: an issue's PRs (the PRs that fix it); a milestone's issues, their PRs and the PRs
- * part of it; a project's every node (kind project, ref github:alexec/agents). waste is the parts'
- * PRs closed without a merge or reverted. unlinked is the parts' sessions: turns with no active
- * link. parts is the nodes added up, newest first, at most 500; limited says there are more.
+ * part of it; a repo's every node (kind repo, ref github:alexec/agents). waste is the parts' PRs
+ * closed without a merge or reverted. unlinked is the parts' sessions: turns with no active link.
+ * parts is the nodes added up, newest first, at most 500; limited says there are more.
  */
 export interface LineageCostRollup {
   node: LineageNode;
@@ -6976,7 +6976,7 @@ export type ReportFormat =
 export interface ReportNode {
   node: LineageNode;
   /** The repo or tracker the node is in, as LineageCostNode's. */
-  project?: string;
+  repo?: string;
   resolved?: LineageResolved;
   cost: ReportNodeCost;
   sessions: number;
@@ -10774,7 +10774,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Levels: { required: [], optional: ["model", "permission", "permissionRequests"] },
   LineMember: { required: ["agentID", "askedAt", "isCallOpen"], optional: [] },
   LineageCost: { required: ["cost", "inputTokens", "outputTokens", "turns", "workingSeconds", "waitingSeconds"], optional: ["limitTokens"] },
-  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["project", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "endedAt", "resolved", "sessions"] },
+  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["repo", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "endedAt", "resolved", "sessions"] },
   LineageCostRollup: { required: ["node", "own", "total", "waste", "unlinked", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "parts"], optional: ["limited"] },
   LineageEndRequest: { required: ["from", "to", "rel"], optional: [] },
   LineageGraph: { required: ["nodes", "links"], optional: ["limited", "resolving", "resolved"] },
@@ -11057,7 +11057,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RenameRequest: { required: ["agentID", "title"], optional: [] },
   ReportCounts: { required: ["sessions", "failedSessions", "prsOpened", "prsMerged", "prsReverted", "mergeSeconds", "waits", "waitBuckets", "workflowRuns", "workflowFailures"], optional: [] },
   ReportExport: { required: ["text", "count", "format"], optional: [] },
-  ReportNode: { required: ["node", "cost", "sessions", "lastAt"], optional: ["project", "resolved", "leadTimeSeconds", "outcome"] },
+  ReportNode: { required: ["node", "cost", "sessions", "lastAt"], optional: ["repo", "resolved", "leadTimeSeconds", "outcome"] },
   ReportNodeCost: { required: ["own", "total", "waste"], optional: [] },
   ReportNodes: { required: ["nodes", "limited", "unresolved"], optional: ["cursor"] },
   ReportNodesQuery: { required: ["kind"], optional: ["state", "repo", "label", "since", "sort", "cursor", "limit", "scope"] },

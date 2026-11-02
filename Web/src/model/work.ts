@@ -88,7 +88,7 @@ export function forgeRow(item: ForgeItem, host: string, lineage?: ReportNode): W
 export function lineageRow(n: ReportNode): WorkRow {
   return {
     node: n.node, title: n.resolved?.title ?? nodeName(n.node), state: n.resolved?.state ?? (n.outcome === "merged" ? "merged" : ""),
-    labels: (n.resolved?.labels ?? []).map((name) => ({ name })), repo: n.project ?? repoOf(n.node.ref), assignees: [],
+    labels: (n.resolved?.labels ?? []).map((name) => ({ name })), repo: n.repo ?? repoOf(n.node.ref), assignees: [],
     updated: unix(n.lastAt), url: lineageUrl(n.node), lineage: n,
   };
 }

@@ -4862,12 +4862,12 @@ type LineageCost struct {
 	WaitingSeconds float64 `json:"waitingSeconds"`
 }
 
-// One node's banked cost on a machine (#2350), whole, with what its rollups need: the project its ref is in, the issues a PR fixes (ended links too: a PR closed without a merge still counts against its issue, as waste), the milestones it is part of, and how a PR ended. A session's own cost is its turns that had no active link.
+// One node's banked cost on a machine (#2350), whole, with what its rollups need: the repo or tracker its ref is in, the issues a PR fixes (ended links too: a PR closed without a merge still counts against its issue, as waste), the milestones it is part of, and how a PR ended. A session's own cost is its turns that had no active link.
 type LineageCostNode struct {
 	Node LineageNode `json:"node"`
 
-	// The repo or tracker the node is in: github:alexec/agents, linear, or for a session its folder's repo (folder:<name> without one).
-	Project *string `json:"project,omitzero"`
+	// The repo or tracker the node is in: github:alexec/agents, linear, or for a session its folder's repo (folder:<name> without one). Not a project (#3275).
+	Repo *string `json:"repo,omitzero"`
 
 	Banked LineageCost `json:"banked"`
 
@@ -4898,7 +4898,7 @@ type LineageCostNode struct {
 	Sessions []string `json:"sessions,omitzero"`
 }
 
-// lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total adds its parts: an issue's PRs (the PRs that fix it); a milestone's issues, their PRs and the PRs part of it; a project's every node (kind project, ref github:alexec/agents). waste is the parts' PRs closed without a merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is the nodes added up, newest first, at most 500; limited says there are more.
+// lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total adds its parts: an issue's PRs (the PRs that fix it); a milestone's issues, their PRs and the PRs part of it; a repo's every node (kind repo, ref github:alexec/agents). waste is the parts' PRs closed without a merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is the nodes added up, newest first, at most 500; limited says there are more.
 type LineageCostRollup struct {
 	Node LineageNode `json:"node"`
 
@@ -8354,7 +8354,7 @@ type ReportNode struct {
 	Node LineageNode `json:"node"`
 
 	// The repo or tracker the node is in, as LineageCostNode's.
-	Project *string `json:"project,omitzero"`
+	Repo *string `json:"repo,omitzero"`
 
 	Resolved *LineageResolved `json:"resolved,omitzero"`
 
