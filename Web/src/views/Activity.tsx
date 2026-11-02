@@ -211,6 +211,8 @@ const pageTitles: Record<ActivityPage, string> = { events: "Events", resources: 
 /** An Activity page in the chat's place. */
 export function ActivityPageView({ store, page }: { store: Store; page: ActivityPage }) {
   const hosts = onlineHosts(store);
+  // Opened by its address, the page draws before any machine answers: load again as each one comes online (#3242).
+  const online = hosts.map((h) => h.id).join(",");
   useEffect(() => {
     for (const host of hosts) {
       if (page === "events") void store.loadEvents(host.id, 100);
@@ -218,7 +220,7 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
       if (page === "spending" || page === "tokens") void store.loadRuntimes(host.id);
       if (page === "runtimes") void store.loadRuntimes(host.id);
     }
-  }, [page]);
+  }, [page, online]);
   const several = store.hosts.value.length > 1;
   const hostName = (host: string) => (store.isMac(host) ? "This Mac" : store.hosts.value.find((h) => h.id === host)?.name ?? host);
   // Events, or Audit: who did what through the control plane (#996).
