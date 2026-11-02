@@ -9,15 +9,19 @@ import { go, usageAsked } from "../../route";
 function open(action: StopAction): void {
   switch (action.kind) {
     case "yours":
-      return go({ nav: "settings", section: "settings", item: policyItem() });
+      go({ nav: "settings", section: "settings", item: policyItem() });
+      break;
     case "folder":
-      return go({ nav: "settings", section: "settings", item: policyItem(action.folder) });
+      go({ nav: "settings", section: "settings", item: policyItem(action.folder) });
+      break;
     case "spending":
       // Usage's Cost pane, the web page's Spending.
       usageAsked.value = "spending";
-      return go({ nav: "reports", section: "usage" });
+      go({ nav: "reports", section: "usage" });
+      break;
     case "organisation":
-      return go({ nav: "settings", section: "settings", item: organisationItem });
+      go({ nav: "settings", section: "settings", item: organisationItem });
+      break;
   }
 }
 
