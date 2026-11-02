@@ -29,7 +29,7 @@ import { log } from "../log";
 import { knowPublicViews } from "../place";
 import { folderKey, folderPath as agentFolderPath, folderView, type FolderView } from "./groups";
 import { decideMacHostNotice, type MacHostNotice } from "./macHostNotice";
-import { DisplayBuilder, keepingTurns, storedTurn, turns, type ChatTurn, type Item } from "./turns";
+import { DisplayBuilder, isPersonsAsk, keepingTurns, storedTurn, turns, type ChatTurn, type Item } from "./turns";
 import { sortedRuntimes } from "./runtimes";
 import { personPrompts } from "./sessionPrompts";
 import { shownItems } from "./thoughts";
@@ -526,6 +526,12 @@ export class Work {
   }
   private display = new DisplayBuilder();
   private entryIDs = new Set<string>();
+  /**
+   * The prompt of the turn the held entries start in, when it is not among them: a long turn
+   * trimmed at the front, or opened from its end. Drawn above them, so the turn keeps its prompt
+   * whatever is trimmed (#3249).
+   */
+  private leadAsk: TranscriptEntry | null = null;
   /** What was heard while a page is on its way, to lay over it; null when none is (#214). */
   protected heardSincePage: TranscriptEntry[] | null = [];
 
@@ -890,6 +896,7 @@ export class Work {
     const wanted = starts.find((start) => start >= entries.length - entriesKept) ?? latest;
     const cut = Math.min(wanted, latest);
     if (cut > 0) {
+      this.keepLeadAsk(entries.slice(0, cut), entries.slice(cut));
       entries = entries.slice(cut);
       this.firstEntryIndex.value += cut;
       this.hasMoreBefore.value = true;
@@ -903,6 +910,7 @@ export class Work {
     if (entries.length > entriesTrimmedAt) {
       const drop = entries.length - entriesKept;
       for (let i = 0; i < drop; i++) this.entryIDs.delete(entries[i]!.id);
+      this.keepLeadAsk(entries.slice(0, drop), entries.slice(drop));
       entries = entries.slice(drop);
       this.firstEntryIndex.value += drop;
       this.hasMoreBefore.value = true;
@@ -913,6 +921,14 @@ export class Work {
     }
     this.entries.value = entries;
     this.nextTrimAt = Math.max(entriesTrimmedAt, entries.length + entriesTrimmedAt - entriesKept);
+  }
+
+  /** The prompt of the turn `kept` starts in, from what goes before it, unless `kept` starts with one (#3249). */
+  private keepLeadAsk(dropped: readonly TranscriptEntry[], kept: readonly TranscriptEntry[]): void {
+    if (kept[0] && isAskEntry(kept[0])) { this.leadAsk = null; return; }
+    for (let i = dropped.length - 1; i >= 0; i--) {
+      if (isAskEntry(dropped[i]!)) { this.leadAsk = dropped[i]!; return; }
+    }
   }
 
   /** Asks for the open chat's end, counted so two in a row both land: its sidebar row clicked again (#1349). */
@@ -954,10 +970,14 @@ export class Work {
     });
   }
 
-  /** The first page of the conversation, with what was heard and is not on it laid after it. */
-  replaceTranscript(page: TranscriptPage): void {
+  /**
+   * The first page of the conversation, with what was heard and is not on it laid after it.
+   * `ask` is the open turn's prompt, read on its own when the page starts after it (#3249).
+   */
+  replaceTranscript(page: TranscriptPage, ask?: TranscriptEntry): void {
     const entries = keepingLatestByID([...page.entries, ...(this.heardSincePage ?? [])]);
     this.heardSincePage = null;
+    this.leadAsk = page.firstIndex > this.openTurnStart.value && ask && isAskEntry(ask) ? ask : null;
     batch(() => {
       this.firstEntryIndex.value = page.firstIndex;
       this.hasMoreBefore.value = page.firstIndex > this.openTurnStart.value;
@@ -987,12 +1007,16 @@ export class Work {
     this.firstTurn.value = 0;
     this.firstPrompt.value = null;
     this.openTurnStart.value = 0;
+    this.leadAsk = null;
     this.refold([]);
   }
 
   private refold(entries: TranscriptEntry[]): void {
     this.entryIDs = new Set(entries.map((e) => e.id));
     this.display = new DisplayBuilder();
+    // Paged back in, the prompt is drawn from among the entries.
+    if (this.leadAsk && this.entryIDs.has(this.leadAsk.id)) this.leadAsk = null;
+    if (this.leadAsk) this.display.add(this.leadAsk);
     for (const entry of entries) this.display.add(entry);
     this.entries.value = entries;
     this.items.value = this.display.items;
@@ -1967,9 +1991,16 @@ export class Store extends Work {
       this.transcriptLoadFailure.value = { nothingLoaded: true, reason: failed.page ?? "no answer." };
       return gone;
     }
+    // A long open turn's page starts after its prompt: the prompt is read on its own (#3249).
+    const ask = page.firstIndex > turns.openStart
+      ? (await this.link.call("agents/transcript", { agentID, before: turns.openStart + 1, limit: 1, from: turns.openStart }, host)
+        .catch(() => null))?.entries[0]
+      : undefined;
+    const still = this.watching.value;
+    if (still?.host !== host || still.session !== session || load !== this.transcriptLoads) return false;
     batch(() => {
       this.replaceTurns(turns);
-      this.replaceTranscript(page);
+      this.replaceTranscript(page, ask);
       if (failed.turns) this.transcriptLoadFailure.value = { nothingLoaded: false, reason: failed.turns };
     });
     return true;
@@ -3242,4 +3273,9 @@ export class Store extends Work {
     const history = await this.link.call("time/history", {}, host).catch(() => null);
     if (history) this.time.value = { ...this.time.value, [host]: history };
   }
+}
+
+/** Whether an entry starts a turn as the person's prompt does (#3249). */
+function isAskEntry(entry: TranscriptEntry): boolean {
+  return isPersonsAsk({ kind: "entry", id: entry.id, entry });
 }
