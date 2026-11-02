@@ -2017,13 +2017,17 @@ final class RemoteModel {
             note("link: settled after \(ContinuousClock.now - began); still connected \(isConnected)")
             return true
         } catch {
-            note("link: attempt failed after \(ContinuousClock.now - began): \(error)")
+            let why = await client.lastOpenFailure
+            note("link: attempt failed after \(ContinuousClock.now - began): \(error)\(why.map { " (\($0))" } ?? "")")
             let reason = ControlPlaneLink.refused.take()
+            // Said every time: a refusal that forgets nothing was not in the log (#3225).
+            if let reason { note("link: the control plane refused: \(reason.rawValue)") }
             // Suspended by the organisation (#1002): only that, with the pairing kept.
             signIn.refused(reason)
             // The address itself refused (suspended, over a plan's limit, #2235): its
             // words replace the stale banner's, and trying again soon is pointless.
             if let line = ControlPlaneLink.hostedRefusal.take() {
+                note("link: the address refused: \(line)")
                 controlPlaneRefusalLine = line
                 backoff.holdOff()
             }

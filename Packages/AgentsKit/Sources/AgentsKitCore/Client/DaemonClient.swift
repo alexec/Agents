@@ -108,15 +108,29 @@ public actor DaemonClient {
     /// The waits while something just started comes up.
     static let startWait = ReconnectSchedule(first: .milliseconds(100), longest: .seconds(2))
 
+    /// Why the last connection failed to open, in words for a log: the dial's error, or
+    /// what the first ping got. `couldNotConnect` alone hid a control plane that answered
+    /// every ping with an error in 0.2 s (#3225). Nil once one opens.
+    public private(set) var lastOpenFailure: String?
+
     private func open() async throws -> JSONRPCConnection {
-        let connection = JSONRPCConnection(transport: try await link.transport())
+        let transport: any LineTransport
+        do {
+            transport = try await link.transport()
+        } catch {
+            lastOpenFailure = "dial: \(error)"
+            throw error
+        }
+        let connection = JSONRPCConnection(transport: transport)
         await connection.start()
         // Up is not answering: the bridge finishes the handshake before it has reached
         // the daemon, and a daemon that never answers would hold this here for ever.
-        guard await Self.answers(connection, within: pingPatience) else {
+        if let failure = await Self.ping(connection, within: pingPatience) {
+            lastOpenFailure = "ping: \(failure)"
             await connection.close()
             throw ConnectError.couldNotConnect
         }
+        lastOpenFailure = nil
         return connection
     }
 
@@ -139,14 +153,27 @@ public actor DaemonClient {
     /// waiting on an answer does not hear cancellation, and a task group waits for every
     /// child before it returns, so a race that only cancelled waited for the ping anyway.
     private static func answers(_ connection: JSONRPCConnection, within patience: Duration) async -> Bool {
-        await withTaskGroup(of: Bool.self) { group in
-            group.addTask { (try? await connection.call(DaemonAPI.Method.ping)) != nil }
+        await ping(connection, within: patience) == nil
+    }
+
+    /// `answers`, saying why not: nil when the ping was answered, else its error or that
+    /// nothing came within `patience`.
+    private static func ping(_ connection: JSONRPCConnection, within patience: Duration) async -> String? {
+        await withTaskGroup(of: String?.self) { group in
+            group.addTask {
+                do {
+                    _ = try await connection.call(DaemonAPI.Method.ping)
+                    return nil
+                } catch {
+                    return "\(error)"
+                }
+            }
             group.addTask {
                 try? await Task.sleep(for: patience)
                 if !Task.isCancelled { await connection.close() }
-                return false
+                return "no answer in \(patience)"
             }
-            let first = await group.next() ?? false
+            let first = await group.next() ?? "no answer"
             group.cancelAll()
             return first
         }

@@ -20,6 +20,10 @@ public enum ControlWire {
         case toHost(MachineRef, message: String)
         /// For the control plane itself.
         case toControl(message: String)
+        /// A bare JSON-RPC line: the Remote's own connection to its home host never wraps
+        /// (#3225). It is the home host's, unless it is a method the control plane answers
+        /// (R7).
+        case bare(message: String)
     }
 
     /// A line on a host's uplink, taken apart.
@@ -86,6 +90,7 @@ public enum ControlWire {
             return .toHost(MachineRef(rawValue: host), message: String(rest.dropFirst(5).dropLast()))
         }
         guard let object = try? JSONValue.parse(Data(line.utf8)).objectValue else { throw WireError.notAnObject }
+        if object["jsonrpc"] != nil { return .bare(message: line) }
         guard let m = object["m"] else { throw WireError.noMessage }
         let message = try encode(m)
         switch object["h"] {

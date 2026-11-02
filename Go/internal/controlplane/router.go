@@ -1376,6 +1376,10 @@ const (
 	frameBad = iota
 	frameControl
 	frameHost
+	// A bare JSON-RPC line: the Remote's own connection to its home host never wraps
+	// (#3225). #3054 took this out as a shim for old clients, and every device's first
+	// ping was then refused as unreadable.
+	frameBare
 )
 
 // readClientFrame is ControlWire.readClient.
@@ -1392,6 +1396,9 @@ func readClientFrame(line string) (host, msg string, kind int) {
 	var o map[string]json.RawMessage
 	if json.Unmarshal([]byte(line), &o) != nil {
 		return "", "", frameBad
+	}
+	if _, ok := o["jsonrpc"]; ok {
+		return "", line, frameBare
 	}
 	m, ok := o["m"]
 	if !ok {
@@ -1450,6 +1457,20 @@ func (r *Router) clientLine(line, sessionID string) {
 			s.wrapped = true
 		}
 		r.toHostLocked(host, msg, sessionID)
+		r.mu.Unlock()
+	case frameBare:
+		// The control plane's own methods, or else the home host's.
+		m, ok := decode(msg)
+		if ok && m.isRequest() && r.handler.Handles(m.Method) {
+			r.toControl(msg, sessionID, false)
+			return
+		}
+		r.mu.Lock()
+		if r.homeHost != "" {
+			r.toHostLocked(r.homeHost, msg, sessionID)
+		} else if ok && m.isRequest() {
+			r.writeLocked(sessionID, replyError(m.ID, fail(noSuchHost, "This control plane has no home machine.")))
+		}
 		r.mu.Unlock()
 	}
 }
