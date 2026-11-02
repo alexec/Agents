@@ -49,6 +49,7 @@ import { offerStart } from "./NewAgent";
 import { BackToList } from "./BackToList";
 import { comingBackDescription, footStatusWords } from "../model/status";
 import { ArchiveCard } from "./ArchiveCard";
+import { DesktopControlPauseCard } from "./DesktopControlPauseCard";
 import { showsThoughts, shownItems } from "../model/thoughts";
 import { hasTurnInFlight, promptPlaceholder, willQueue } from "../model/promptWords";
 import { eventCarryOnPrompt, eventWaitLine, eventWaitMinutes, eventWaitSummaryLines, leaseMark, lineCarryOnPrompt, lineResource, triggerURL } from "../model/rowLines";
@@ -463,6 +464,11 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       node: <div class="cards"><GuardedChangeCard store={store} host={host} folder={folder} change={change} down={down} /></div>,
     })),
     ...asked,
+    // Its drive_screen paused by the person's touch (#3004, US3): Resume or Take Over.
+    ...(agent?.desktopControlPause ? [{
+      key: `screen:${agent.id}`,
+      node: <DesktopControlPauseCard store={store} host={host} agent={agent} disabled={down} />,
+    }] : []),
     // An ask to be archived waits the same way (#827).
     ...(agent && asksToArchive(agent) ? [{
       key: `archive:${agent.id}`,

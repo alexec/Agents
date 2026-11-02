@@ -266,6 +266,12 @@ export interface Agent {
   sandboxOverride?: SandboxChoice;
   effectiveSandbox?: EffectiveSandbox;
   pendingSandboxFailure?: SandboxFailureRecord;
+  /**
+   * Set while this agent holds the screen lease and the person's own touch on the mouse or keyboard
+   * paused its drive_screen (#3004, US3, FR-007): every client offers Resume and Take Over
+   * (desktopControl/resume, desktopControl/takeOver). Cleared by either, and when the turn ends.
+   */
+  desktopControlPause?: DesktopControlPause;
   missingFolder?: MissingFolder;
   listsLeftOut?: boolean;
   titleIsPersons?: boolean;
@@ -2467,6 +2473,15 @@ export interface DeliveredRoute {
   /** Each secret value, or token, by field. */
   sealed: Record<string, SealedEnvelope>;
   expires?: WireDate;
+}
+
+/**
+ * An agent's drive_screen paused by the person's own touch (#3004, US3): the app it was driving,
+ * and when.
+ */
+export interface DesktopControlPause {
+  app: string;
+  pausedAt: WireDate;
 }
 
 /**
@@ -9636,8 +9651,10 @@ export interface Methods {
   "cost/state": { params: Empty; result: CostState };
   "credentials/offer": { params: CredentialsOffer; result: Empty };
   "daemon/policyState": { params: Empty; result: PolicyState };
+  "desktopControl/resume": { params: AgentRequest; result: Empty };
   "desktopControl/set": { params: DesktopControlSettings; result: DesktopControlSettings };
   "desktopControl/state": { params: Empty; result: DesktopControlSettings };
+  "desktopControl/takeOver": { params: AgentRequest; result: Empty };
   "disk/state": { params: Empty; result: DiskState };
   "dropbox/put": { params: DropboxPutRequest; result: DropboxPutResponse };
   "elicitations/answer": { params: AnswerElicitationRequest; result: Empty };
@@ -9950,8 +9967,10 @@ export const MethodTarget = {
   "cost/state": "host",
   "credentials/offer": "host",
   "daemon/policyState": "host",
+  "desktopControl/resume": "host",
   "desktopControl/set": "host",
   "desktopControl/state": "host",
+  "desktopControl/takeOver": "host",
   "disk/state": "host",
   "dropbox/put": "host",
   "elicitations/answer": "host",
@@ -10241,7 +10260,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AddFolderRequest: { required: ["folder"], optional: ["project"] },
   Admitted: { required: [], optional: ["client", "host"] },
   AdoptRequest: { required: ["runtimeID", "sessionID", "cwd"], optional: [] },
-  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID", "auto", "clientPermission", "levels", "voiceHungUpAt", "goal"] },
+  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "desktopControlPause", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID", "auto", "clientPermission", "levels", "voiceHungUpAt", "goal"] },
   AgentConfigEditorFile: { required: ["path", "content"], optional: [] },
   AgentConfigEditorRequest: { required: ["kind"], optional: ["folder"] },
   AgentConfigEditorSaveRequest: { required: ["kind", "path", "content"], optional: ["folder", "delete"] },
@@ -10428,6 +10447,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DeletePreview: { required: ["count", "bytes"], optional: [] },
   DeleteSessionRequest: { required: ["runtimeID", "sessionID"], optional: ["confirmed"] },
   DeliveredRoute: { required: ["id", "name", "kind", "runtimes", "defaultFor", "secretFields", "version", "sealed"], optional: ["vendor", "settings", "models", "expires"] },
+  DesktopControlPause: { required: ["app", "pausedAt"], optional: [] },
   DesktopControlSettings: { required: ["enabled"], optional: [] },
   DestinationStateAnswer: { required: ["destinationState"], optional: [] },
   DestinationStateRequest: { required: ["previewID", "destination"], optional: [] },

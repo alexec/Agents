@@ -65,6 +65,9 @@ public extension DaemonAPI {
                 Row(Method.desktopControlState, params: Empty.self, result: DesktopControlSettings.self, kind: .hostRequest),
                 Row(Method.desktopControlSet, params: DesktopControlSettings.self, result: DesktopControlSettings.self,
                     kind: .hostRequest),
+                // Pause on touch's two answers (#3004, US3).
+                Row(Method.desktopControlResume, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
+                Row(Method.desktopControlTakeOver, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
                 // Auto (#2658): the order and cells, what it would pick now.
                 Row(Method.autoState, params: Empty.self, result: AutoSettings.self, kind: .hostRequest),
                 Row(Method.autoSet, params: AutoSettings.self, result: AutoSettings.self, kind: .hostRequest),

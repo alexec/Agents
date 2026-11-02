@@ -24,15 +24,25 @@
 // "access" (#3004, US2) is the Accessibility gate: it reports whether this process is
 // trusted, triggering macOS's own grant prompt on first use if not, before the daemon
 // ever takes the "screen" lease (FR-005).
+//
+// Pause on touch (#3004, US3): besides its replies, it says {"touch":true} by itself the
+// moment the person touches the real mouse or keyboard (TouchFilter.swift), once per
+// command. A `type` the person touched part way stops there and answers
+// {"ok":false,"touched":true,"typed":<characters typed>}; the daemon sends the rest on
+// Resume.
 import Foundation
 
 signal(SIGPIPE, SIG_IGN)
 
 let out = FileHandle.standardOutput
+/// The tap's thread says a touch while a reply may be on its way: one frame at a time.
+let outLock = NSLock()
 func reply(_ body: [String: Any]) {
     guard var data = try? JSONSerialization.data(withJSONObject: body) else { return }
     data.append(0)
+    outLock.lock()
     out.write(data)
+    outLock.unlock()
 }
 
 func readFrames(_ body: (Data) -> Void) {
@@ -56,6 +66,7 @@ readFrames { frame in
         return
     }
     let app = json["app"] as? String ?? ""
+    touchWatch.arm()
     switch action {
     case "access":
         // Desktop control's Accessibility gate (#3004, US2, FR-005): triggers macOS's own
@@ -100,7 +111,11 @@ readFrames { frame in
             reply(["ok": false, "error": refused])
             return
         }
-        synthesizeType(text)
+        let typed = synthesizeType(text)
+        if typed < text.unicodeScalars.count {
+            reply(["ok": false, "touched": true, "typed": typed])
+            return
+        }
         reply(["ok": true])
 
     case "key":

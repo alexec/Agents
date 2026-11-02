@@ -9,6 +9,19 @@ import Foundation
 /// reaches the runtime over MCP (`Go/internal/agentsd/apptools.go`'s `tools/call`, which
 /// keeps `Error.Message` and drops `Error.Data`); no client ever sees the structured
 /// reason to draw a dedicated card from (research.md's R5 amendment).
+/// An agent's `drive_screen` paused by the person's own touch on the mouse or keyboard
+/// (#3004, US3, FR-007): the app it was driving, and when. On `Agent.desktopControlPause`
+/// while it waits for Resume or Take Over (`desktopControl/resume`, `desktopControl/takeOver`).
+public struct DesktopControlPause: Codable, Sendable, Hashable {
+    public var app: String
+    public var pausedAt: Date
+
+    public init(app: String, pausedAt: Date) {
+        self.app = app
+        self.pausedAt = pausedAt
+    }
+}
+
 public struct DesktopControlSettings: Codable, Sendable, Hashable {
     public var enabled: Bool
 

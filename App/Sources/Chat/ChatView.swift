@@ -355,6 +355,17 @@ struct ChatView: View {
                     .help(selectedHostOffline ? offlineHelp : "")
             })
         }
+        // Its drive_screen paused by the person's touch (#3004, US3): Resume or Take Over.
+        if let pause = agent.desktopControlPause {
+            cards.append(WaitingCard(id: "screen:" + agent.id.uuidString) {
+                DesktopControlPauseCard(pause: pause,
+                                        resume: { await model.resumeDesktopControl(agent.id) },
+                                        takeOver: { await model.takeOverDesktopControl(agent.id) },
+                                        isDisabled: selectedHostOffline)
+                    .chatColumn()
+                    .help(selectedHostOffline ? offlineHelp : "")
+            })
+        }
         // A wait on sessions or on a time, the same card in the same place (#2750): it was
         // a strip under the chat's head with Carry on.
         if let (report, block) = model.work.openBlock(agent) {

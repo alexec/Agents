@@ -2419,6 +2419,32 @@
       }
     },
     {
+      "name": "desktopControl/resume",
+      "x-capability": "host.desktop-control/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Let an agent paused by the person's touch drive again (#3004, US3): its drive_screen goes on from where it stopped. Refused notPaused when it is not paused; refused notPermitted from any caller but the person's own clients.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/AgentRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "desktopControl/set",
       "x-capability": "host.desktop-control/1",
       "tags": [
@@ -2467,6 +2493,32 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/DesktopControlSettings"
+        }
+      }
+    },
+    {
+      "name": "desktopControl/takeOver",
+      "x-capability": "host.desktop-control/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Take the screen back from an agent (#3004, US3, FR-008): its screen lease is let go at once, and its drive_screen call answers that the person took over. Refused notHeld when it does not hold the screen lease; refused notPermitted from any caller but the person's own clients.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/AgentRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
         }
       }
     },

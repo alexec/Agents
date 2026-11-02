@@ -2653,6 +2653,11 @@ export class Store extends Work {
   }
 
   /** Carry on when the allowance is back, or no longer (#1859); the row follows from `agent/changed`. */
+  /** Pause on touch's two answers (#3004, US3): Resume drives on; Take Over lets go of the screen. */
+  async answerDesktopControlPause(host: string, agentID: string, method: "desktopControl/resume" | "desktopControl/takeOver"): Promise<void> {
+    await this.act(method, { agentID: agentID as UUID }, host);
+  }
+
   async continueWhenBack(host: string, agentID: string, on: boolean): Promise<void> {
     const agent = await this.act(on ? "agents/continueWhenBack" : "agents/cancelContinue", { agentID: agentID as UUID }, host);
     if (agent) this.apply("agent/changed", agent, host);
