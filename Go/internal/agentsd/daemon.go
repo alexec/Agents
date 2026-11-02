@@ -130,6 +130,7 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 		watches: map[string]*folderWatch{}, interests: map[string][]interest{}, shells: map[shellKey]*shell{},
 		SettingsDir: filepath.Join(st.Loc.Root, "settings"), HostKey: controllink.HostKeyFile{Root: st.Loc.Root},
 		PersonKey: controllink.PersonKeyFile{Root: st.Loc.Root}}
+	st.OnGap = d.tellEntry
 	d.setToolsHome()
 	d.register()
 	d.loadAttention()
@@ -251,6 +252,8 @@ func (d *Daemon) Shutdown() {
 	d.stopPins()
 	d.stopSignInRelays()
 	d.stopModelRelay()
+	// The last chance for chat lines the disk refused: they live only in memory (#3245).
+	d.writeHeld()
 }
 
 // once is true the first time a sendID is seen: a window sends a prompt again for 30 s

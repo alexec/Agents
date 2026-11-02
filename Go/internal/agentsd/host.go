@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -29,6 +30,9 @@ type quitState struct {
 	diskMu     sync.Mutex
 	diskLevels map[string]wire.DiskLevel
 	diskAlarms []wire.DiskAlarm
+	// toldRefused is set once storage/writeFailed has said the disk refused a chat's
+	// lines, and cleared when every held line is written (#3245): one alert an outage.
+	toldRefused atomic.Bool
 }
 
 func (d *Daemon) registerHost() {
@@ -382,6 +386,8 @@ func nextDiskLevel(was wire.DiskLevel, free, low, critical int64) wire.DiskLevel
 // checkDisk looks at the root's and every folder's disk, and says disk/changed when the
 // alarms change.
 func (d *Daemon) checkDisk() {
+	// Chat lines the disk refused go first: there may be space now (#3245).
+	d.writeHeld()
 	// The first look after a restart: a crossing it finds happened in the gap (#1219).
 	noticed := d.noticedAfterRestart()
 	type mount struct {

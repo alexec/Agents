@@ -36,6 +36,11 @@ type Store struct {
 	lines map[wire.UUID]int
 	// ib is where the lines of the transcripts read most recently end (lineindex.go).
 	ib indexBook
+	// held is each agent's lines the disk refused, waiting for space (held.go, #3245).
+	held map[wire.UUID]*heldLines
+	// OnGap is told the notice written where lines a full hold let go would have been, so
+	// the clients showing the agent see it.
+	OnGap func(id wire.UUID, e wire.TranscriptEntry, index int)
 }
 
 // Open reads the root, making what is missing.
@@ -46,7 +51,7 @@ func Open(root string) (*Store, error) {
 			return nil, err
 		}
 	}
-	s := &Store{Loc: loc, agents: map[wire.UUID]*wire.Agent{}, lines: map[wire.UUID]int{}}
+	s := &Store{Loc: loc, agents: map[wire.UUID]*wire.Agent{}, lines: map[wire.UUID]int{}, held: map[wire.UUID]*heldLines{}}
 	id, adopts := loadOrMakeRootID(loc.RootIdentity(), loc.Root)
 	s.RootID = id
 	s.folders = s.loadFolders()
@@ -202,6 +207,7 @@ func (s *Store) Delete(id wire.UUID) error {
 	s.mu.Lock()
 	delete(s.agents, id)
 	delete(s.lines, id)
+	delete(s.held, id)
 	s.mu.Unlock()
 	s.ib.mu.Lock()
 	delete(s.ib.indexes, id)
@@ -299,13 +305,18 @@ func (s *Store) Append(id wire.UUID, e wire.TranscriptEntry) (int, error) {
 
 // AppendOne is Append that also gives back the entry as it was written: redacted when it
 // held a known token shape (#1001).
+//
+// A line the disk refuses is held (held.go, #3245): the index and the entry are given back
+// with an error that is ErrHeld, and the line is written ahead of the next one, or at the
+// next WriteHeld. A line past the hold's bound is let go, with an error that is not.
 func (s *Store) AppendOne(id wire.UUID, e wire.TranscriptEntry) (int, wire.TranscriptEntry, error) {
 	es := []wire.TranscriptEntry{e}
-	n, err := s.AppendMany(id, es)
+	n, err := s.appendEntries(id, es, true)
 	return n, es[0], err
 }
 
-// openTranscript opens a transcript to append to; a test counts the opens through it.
+// openTranscript opens a transcript to append to; a test counts the opens through it, or
+// refuses them as a full disk does.
 var openTranscript = func(file string) (*os.File, error) {
 	return os.OpenFile(file, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 }
@@ -315,8 +326,14 @@ var openTranscript = func(file string) (*os.File, error) {
 // store's lock, which every agent lookup takes, is held once rather than for each.
 //
 // Each line is written with its known token shapes redacted (#1001), and an entry that
-// held one is changed in es to what was written, for the caller to send on.
+// held one is changed in es to what was written, for the caller to send on. Lines the
+// agent has held are written first; entries the disk refuses here are not held, for the
+// caller says the refusal.
 func (s *Store) AppendMany(id wire.UUID, es []wire.TranscriptEntry) (int, error) {
+	return s.appendEntries(id, es, false)
+}
+
+func (s *Store) appendEntries(id wire.UUID, es []wire.TranscriptEntry, hold bool) (int, error) {
 	var buf []byte
 	for i, e := range es {
 		b, err := diskjson.Marshal(e)
@@ -333,28 +350,43 @@ func (s *Store) AppendMany(id wire.UUID, es []wire.TranscriptEntry) (int, error)
 		buf = append(append(buf, b...), '\n')
 	}
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	n, ok := s.lines[id]
 	if !ok {
 		n = countLines(s.Loc.Transcript(string(id)))
+		s.lines[id] = n
 	}
 	if len(es) == 0 {
-		return n, nil
+		s.mu.Unlock()
+		return n + s.held[id].count(), nil
 	}
+	n, gap, err := s.writeLocked(id, buf, len(es), hold)
+	s.mu.Unlock()
+	s.tellGap(id, gap)
+	return n, err
+}
+
+// writeTranscript appends whole lines to a transcript. A write the disk cut short is
+// taken back, so the next line is never glued to half of this one.
+func (s *Store) writeTranscript(id wire.UUID, buf []byte) error {
 	if err := os.MkdirAll(s.Loc.Agent(string(id)), 0o755); err != nil {
-		return 0, err
+		return err
 	}
 	f, err := openTranscript(s.Loc.Transcript(string(id)))
 	if err != nil {
-		return 0, err
+		return err
 	}
-	_, err = f.Write(buf)
-	f.Close()
-	if err != nil {
-		return 0, err
+	defer f.Close()
+	var size int64 = -1
+	if info, err := f.Stat(); err == nil {
+		size = info.Size()
 	}
-	s.lines[id] = n + len(es)
-	return n, nil
+	if _, err := f.Write(buf); err != nil {
+		if size >= 0 {
+			f.Truncate(size)
+		}
+		return err
+	}
+	return nil
 }
 
 func countLines(file string) int {
