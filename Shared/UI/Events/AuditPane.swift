@@ -16,7 +16,7 @@ struct AuditPane: View {
 
     @State private var list: DaemonAPI.AuditList?
     @State private var problem: String?
-    @State private var export: ReportFile?
+    @State private var export: ExportFile?
     /// For an admin: the people to narrow the entries to, and whose are shown ("" for everyone).
     @State private var people: [DaemonAPI.PersonRow] = []
     @State private var user = ""
@@ -187,7 +187,7 @@ struct AuditPane: View {
         do {
             let got = try await control.call(DaemonAPI.Method.auditExport, query(),
                                              returning: DaemonAPI.AuditExport.self)
-            export = ReportFile(text: csv ? AuditWords.csv(got.lines, hostName: hostName) : got.lines,
+            export = ExportFile(text: csv ? AuditWords.csv(got.lines, hostName: hostName) : got.lines,
                                 format: csv ? .csv : .jsonl, name: AuditWords.exportName(csv: csv))
             isExporting = true
         } catch {
@@ -237,7 +237,32 @@ struct AuditRow: View {
     }
 }
 
-/// The JSON lines file type; an export is saved as a `ReportFile`.
+/// The JSON lines file type; an export is saved as an `ExportFile`.
 enum AuditFile {
     static let type = UTType(filenameExtension: "jsonl", conformingTo: .plainText) ?? .plainText
+}
+
+/// An export, as the file it is saved as.
+struct ExportFile: FileDocument {
+    static var readableContentTypes: [UTType] { [.commaSeparatedText, AuditFile.type] }
+
+    var text: String
+    var type: UTType
+    var name: String
+
+    init(text: String, format: DaemonAPI.ReportFormat, name: String) {
+        self.text = text
+        self.type = format == .csv ? .commaSeparatedText : AuditFile.type
+        self.name = name
+    }
+
+    init(configuration: ReadConfiguration) throws {
+        text = String(decoding: configuration.file.regularFileContents ?? Data(), as: UTF8.self)
+        type = configuration.contentType
+        name = configuration.file.filename ?? "report"
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: Data(text.utf8))
+    }
 }
