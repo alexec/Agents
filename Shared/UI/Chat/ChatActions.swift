@@ -88,6 +88,9 @@ struct ChatActions {
     /// A press on that line: the Mac opens Resources at the resource, the Remote its
     /// Resources page. Nil draws the words alone.
     var openLease: (@MainActor (ResourceName) -> Void)? = nil
+    /// "From" another agent's message (#560), its sender by its title as it is now (#3240,
+    /// `AgentsModel.fromLine`). The default names it as it was when it was sent.
+    var fromLine: @MainActor (MessageSender?) -> String = { AgentsModel.fromLine($0?.title) }
 }
 
 extension EnvironmentValues {
