@@ -54,16 +54,22 @@ public struct WaitStatus: Codable, Hashable, Sendable {
     }
 
     /// A wait's patterns in words. `agent.finished` narrowed to one agent is written as
-    /// that agent finishing, which is how a block says it.
+    /// that agent finishing, which is how a block says it, also beside other patterns
+    /// (#3236): "“Tidy tests” to finish or ci.finished".
     static func described(_ wait: EventWait, names: (UUID) -> String?) -> String {
-        let patterns = wait.patterns
-        let agents = patterns.compactMap { pattern -> String? in
-            guard pattern.name == "agent.finished", pattern.filters.count == 1,
-                  let id = pattern.filters["agent"]?.single else { return nil }
-            return UUID(uuidString: id).flatMap(names) ?? id
-        }
-        if agents.count == patterns.count, !agents.isEmpty { return finishing(agents) }
-        return wait.label
+        let agents = wait.patterns.map { finishedAgent($0, names: names) }
+        let named = agents.compactMap { $0 }
+        if named.count == agents.count, !named.isEmpty { return finishing(named) }
+        return zip(agents, wait.labels).map { agent, label in agent.map { finishing([$0]) } ?? label }
+            .joined(separator: " or ")
+    }
+
+    /// The agent's name, or its id, when the pattern is `agent.finished` narrowed to one
+    /// agent. Nil for any other pattern.
+    static func finishedAgent(_ pattern: EventPattern, names: (UUID) -> String?) -> String? {
+        guard pattern.name == "agent.finished", pattern.filters.count == 1,
+              let id = pattern.filters["agent"]?.single else { return nil }
+        return UUID(uuidString: id).flatMap(names) ?? id
     }
 
     /// What an event wait waits for, one thing a pattern (#582): an agent finishing by
@@ -78,9 +84,7 @@ public struct WaitStatus: Codable, Hashable, Sendable {
 
     static func things(_ patterns: [EventPattern], names: (UUID) -> String?) -> [String] {
         patterns.map { pattern in
-            guard pattern.name == "agent.finished", pattern.filters.count == 1,
-                  let id = pattern.filters["agent"]?.single else { return pattern.label }
-            return "\u{201C}\(UUID(uuidString: id).flatMap(names) ?? id)\u{201D}"
+            finishedAgent(pattern, names: names).map { "\u{201C}\($0)\u{201D}" } ?? pattern.label
         }
     }
 

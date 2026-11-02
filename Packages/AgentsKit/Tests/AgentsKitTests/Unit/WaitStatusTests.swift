@@ -74,6 +74,17 @@ struct WaitStatusTests {
         #expect(WaitStatus.things(patterns, names: { $0 == fixLogin ? "Fix login" : nil }) == ["“Fix login”", "mac.wake"])
     }
 
+    /// An agent beside another event is still said by its name, not its id (#3236).
+    @Test func anAgentBesideAnotherEventIsSaidByItsName() {
+        let tidy = UUID()
+        var waiting = agent()
+        waiting.eventWait = EventWait(patterns: [EventPattern("agent.finished", filters: ["agent": DetailFilter(tidy.uuidString)]),
+                                                 EventPattern("ci.finished")],
+                                      from: 0, deadline: until, since: since)
+        let status = WaitStatus.of(waiting, names: { $0 == tidy ? "Tidy tests" : nil })
+        #expect(status?.line == "◷ Waiting for “Tidy tests” to finish or ci.finished · since 23:30 · until 09:00")
+    }
+
     /// A place in a lease's line is a wait on its own grant (#2361), said as the line says it,
     /// and left out of the lease row so it is said once.
     @Test func aPlaceInLineIsSaidAsTheLineSaysIt() throws {

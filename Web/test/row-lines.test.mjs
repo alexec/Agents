@@ -54,6 +54,9 @@ test("a wait on agents finishing reads as a block does; any other wait by its pa
     "◷ Waiting for “Fix login” and “Ship it” to finish");
   assert.equal(lines.eventWaitMark(wait([{ name: "workflow.completed", filters: { workflow: "nightly", outcome: "done|failed" },
     anyOf: { outcome: ["done", "failed"] } }]), title), "◷ Waiting for workflow.completed outcome done|failed workflow nightly");
+  // An agent beside another event is said by its name, not its id (#3236).
+  assert.equal(lines.eventWaitMark(wait([{ name: "agent.finished", filters: { agent: "a" } }, { name: "ci.finished", filters: {} }]), title),
+    "◷ Waiting for “Fix login” to finish or ci.finished");
   assert.equal(lines.eventWaitMark(wait([{ name: "agent.finished", filters: { agent: "a" } }], { timedOut: {} }), title), null);
   assert.equal(lines.eventWaitMark({ state: "running" }, title), null);
 });
