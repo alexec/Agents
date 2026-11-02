@@ -4,15 +4,18 @@ package controlplane
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controllink"
+	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 	"github.com/alexec/agents/Go/wire"
 	"github.com/coder/websocket"
@@ -327,5 +330,61 @@ func TestSignInPlacesAreFair(t *testing.T) {
 	case <-sixth.Done():
 	case <-time.After(5 * time.Second):
 		t.Fatal("a sixth sign-in from one address was let in")
+	}
+}
+
+// A store that refuses a new machine or client, as a hosted plan's limit does (#1003 T071).
+type refusingStore struct {
+	store.Store
+	refuse atomic.Bool
+}
+
+type planRefusal struct{}
+
+func (planRefusal) Error() string {
+	return "Your Free plan allows 2 machines. Remove one, or upgrade at https://hosted.test/account."
+}
+
+func (s *refusingStore) Put(ctx context.Context, key string, data []byte, when store.Condition) (string, error) {
+	if s.refuse.Load() && (strings.HasPrefix(key, records.MachinesPrefix) || strings.HasPrefix(key, records.ClientsPrefix)) {
+		return "", planRefusal{}
+	}
+	return s.Store.Put(ctx, key, data, when)
+}
+
+// #1003 T071: a store's refusal of a new machine or client reaches the machine that joins
+// and the client that pairs in its own words, so a hosted plan's limit says what to do.
+func TestAStoreRefusalReachesAJoinAndAPairingInItsWords(t *testing.T) {
+	t.Parallel()
+	st := &refusingStore{Store: store.NewMemory()}
+	p := startPlane(t, st, controllink.NewPrivateKey())
+	ctx := context.Background()
+	hostCode, clientCode := p.code(true), p.code(false)
+	st.refuse.Store(true)
+	words := planRefusal{}.Error()
+
+	l, _, err := controllink.Join(ctx, hostCode.URL, "", controllink.Credentials{Identity: "e:" + hostCode.ID(),
+		Key: controllink.CodeKey(hostCode.Secret), Kind: "host", ControlKey: hostCode.ControlKey})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	public, _ := controllink.PublicKey(controllink.NewPrivateKey())
+	params, _ := json.Marshal(wire.MachineAnnounce{PublicKey: public, Name: "Build box", Platform: "linux amd64",
+		Version: "1", MachineID: "BOX-1"})
+	l.Write(ctx, `{"jsonrpc":"2.0","id":1,"method":"hosts/announce","params":`+string(params)+`}`)
+	line, err := l.Read(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var answer struct {
+		Error *RPCError `json:"error"`
+	}
+	if json.Unmarshal([]byte(line), &answer); answer.Error == nil || answer.Error.Message != words {
+		t.Fatal("the joining machine was told:", line)
+	}
+
+	if _, err := controllink.PairClient(ctx, clientCode, "Phone"); err == nil || !strings.Contains(err.Error(), words) {
+		t.Fatal("the pairing client was told:", err)
 	}
 }
