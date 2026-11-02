@@ -36,6 +36,16 @@ enum WalkText {
     private static func field(of element: WalkAX, in window: NSWindow) -> NSView? {
         if let view = element.object as? NSTextView, !view.isFieldEditor { return view }
         if let view = element.object as? NSTextField, view.isEditable { return view }
+        // SwiftUI's element for a field can be its cell (#3237): the field is the cell's view.
+        if let view = (element.object as? NSCell)?.controlView as? NSTextField, view.isEditable { return view }
+        // A sheet's field is found in the sheet, which is its own window over this one (#3237).
+        for window in [window.attachedSheet, window].compactMap({ $0 }) {
+            if let view = field(at: element, in: window) { return view }
+        }
+        return nil
+    }
+
+    private static func field(at element: WalkAX, in window: NSWindow) -> NSView? {
         let box = element.frame(in: window)
         guard box != .zero, let root = window.contentView?.superview else { return nil }
         let middle = CGPoint(x: box.midX, y: window.frame.height - box.midY)
