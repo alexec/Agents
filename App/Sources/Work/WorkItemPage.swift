@@ -5,7 +5,8 @@ import SwiftUI
 /// `#/work/<kind>/<ref>`: the item from its forge (`forge/issue`, `forge/pull`) on the first
 /// machine that reads it, and what lineage knows on a machine that keeps links: its cost, its
 /// links by relation and the graph centred here (#3087). It opens for any item, also one no agent
-/// touched. A link opens that node's page; a session's opens its chat. Read-only in this slice.
+/// touched. A link opens that node's page; a session's opens its chat. An issue's and a pull
+/// request's actions (#3130, `WorkItemActions`) go to the machine that read it.
 struct WorkItemPage: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openURL) private var openURL
@@ -34,12 +35,15 @@ struct WorkItemPage: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 header
+                if let detail, model.forgeWrites(on: detail.host) {
+                    WorkItemActions(host: detail.host, detail: detail.got, wrote: { Task { await reread() } })
+                }
                 if let forgeProblem {
                     Label(forgeProblem, systemImage: "exclamationmark.triangle").foregroundStyle(.secondary)
                 } else if place.kind.fromForge, detail == nil {
                     ProgressView()
                 }
-                if let detail { bodyAndComments(detail.got) }
+                if let detail { bodyAndComments(detail.got, on: detail.host) }
                 lineage
             }
             .padding(20)
@@ -101,7 +105,7 @@ struct WorkItemPage: View {
     // MARK: Body and comments
 
     @ViewBuilder
-    private func bodyAndComments(_ got: DaemonAPI.ForgeItemDetail) -> some View {
+    private func bodyAndComments(_ got: DaemonAPI.ForgeItemDetail, on host: MachineRef) -> some View {
         Divider()
         if got.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             Text("No description.").foregroundStyle(.secondary)
@@ -123,6 +127,10 @@ struct WorkItemPage: View {
                     MarkdownText(markdown: c.body)
                 }
             }
+        }
+        if model.forgeWrites(on: host) {
+            WorkCommentBox(host: host, node: got.item.node, wrote: { Task { await reread() } })
+                .padding(.top, 8)
         }
     }
 
@@ -218,6 +226,18 @@ struct WorkItemPage: View {
         }
         guard !Task.isCancelled else { return }
         forgeProblem = last ?? WorkList.notReadHere
+    }
+
+    /// The item again after a write (#3130), from the machine that read it, keeping the page
+    /// as it is until the new one comes.
+    private func reread() async {
+        guard let had = detail else { return }
+        do {
+            let got = try await model.forgeItem(node, on: had.host)
+            detail = (had.host, got)
+        } catch {
+            forgeProblem = error.localizedDescription
+        }
     }
 
     private func readOlder() async {

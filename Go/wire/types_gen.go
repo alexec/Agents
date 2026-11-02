@@ -4004,6 +4004,13 @@ type FoldersListRequest struct {
 	IncludeArchived bool `json:"includeArchived"`
 }
 
+// forge/approve (#3130): approve a pull request at sha, the head commit its page shows (refused when the head moved).
+type ForgeApproveRequest struct {
+	Node LineageNode `json:"node"`
+
+	Sha string `json:"sha"`
+}
+
 // One of a pull request's checks (#3129): a check run or a commit status. state is passing, failing, running or skipped; url is its page on the forge.
 type ForgeCheck struct {
 	Name string `json:"name"`
@@ -4011,6 +4018,13 @@ type ForgeCheck struct {
 	State string `json:"state"`
 
 	URL *string `json:"url,omitzero"`
+}
+
+// forge/close (#3130): close an issue or a pull request, or with reopen open it again.
+type ForgeCloseRequest struct {
+	Node LineageNode `json:"node"`
+
+	Reopen *bool `json:"reopen,omitzero"`
 }
 
 // A comment on an issue or a pull request (#3129), as Markdown. bot says a bot or an app wrote it.
@@ -4024,6 +4038,57 @@ type ForgeComment struct {
 	URL *string `json:"url,omitzero"`
 
 	Bot *bool `json:"bot,omitzero"`
+}
+
+// forge/comment (#3130): a comment, as Markdown, on an issue or a pull request, as the person whose machine it is.
+type ForgeCommentRequest struct {
+	Node LineageNode `json:"node"`
+
+	Body string `json:"body"`
+}
+
+// forge/diff (#3130): a pull request's changed files at its head, as the app's own diff draws them (#1341); cut says some files are listed with no hunks; url is its files on the forge.
+type ForgeDiff struct {
+	URL *string `json:"url,omitzero"`
+
+	Files []ForgeDiffFile `json:"files"`
+
+	Cut bool `json:"cut"`
+}
+
+// One file a pull request changes (#3130): change is added, removed, modified or renamed; note says why it has no hunks, when it has none.
+type ForgeDiffFile struct {
+	Path string `json:"path"`
+
+	PreviousPath *string `json:"previousPath,omitzero"`
+
+	Change string `json:"change"`
+
+	Additions int64 `json:"additions"`
+
+	Deletions int64 `json:"deletions"`
+
+	Hunks []ForgeDiffHunk `json:"hunks"`
+
+	Note *string `json:"note,omitzero"`
+}
+
+// One @@ block of a file's diff (#3130).
+type ForgeDiffHunk struct {
+	OldStart int64 `json:"oldStart"`
+
+	NewStart int64 `json:"newStart"`
+
+	Lines []DiffLine `json:"lines"`
+}
+
+// What a forge write did (#3130): url is the comment or the item on the forge; auto says a merge waits for the checks; reran is how many runs or pipelines were run again.
+type ForgeDone struct {
+	URL *string `json:"url,omitzero"`
+
+	Auto *bool `json:"auto,omitzero"`
+
+	Reran *int64 `json:"reran,omitzero"`
 }
 
 // An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for GitHub, GitLab and Linear, so one page draws each. node is its lineage node (kind issue or pr, ref github:alexec/Agents#12). state is open, closed or merged. folder is a folder on this machine on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own fields: draft; checks is passing, failing, running or none; review is approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown; autoMerge says auto-merge is on.
@@ -4061,7 +4126,7 @@ type ForgeItem struct {
 	AutoMerge *bool `json:"autoMerge,omitzero"`
 }
 
-// forge/issue and forge/pull (#3129): one item with its body (Markdown) and a page of its comments, the newest page first and at most 50, oldest first in the page; cursor is the page before it, absent at the first comment. A pull request's checks, review threads (line comments, in threads) and files changed come with it.
+// forge/issue and forge/pull (#3129): one item with its body (Markdown) and a page of its comments, the newest page first and at most 50, oldest first in the page; cursor is the page before it, absent at the first comment. A pull request's checks, review threads (line comments, in threads) and files changed come with it. head is a pull request's head commit, which forge/merge and forge/approve name (#3130); mergeMethods are the ways its repo allows, the repo's default first; start is the new-agent form for an issue.
 type ForgeItemDetail struct {
 	Item ForgeItem `json:"item"`
 
@@ -4076,6 +4141,12 @@ type ForgeItemDetail struct {
 	ReviewThreads *int64 `json:"reviewThreads,omitzero"`
 
 	FilesChanged *int64 `json:"filesChanged,omitzero"`
+
+	Head *string `json:"head,omitzero"`
+
+	MergeMethods []ForgeMergeMethod `json:"mergeMethods,omitzero"`
+
+	Start *ForgeStart `json:"start,omitzero"`
 }
 
 // forge/issue and forge/pull (#3129): the item's lineage node, and for an older page of its comments the cursor of the page after it.
@@ -4090,6 +4161,20 @@ type ForgeLabel struct {
 	Name string `json:"name"`
 
 	Color *string `json:"color,omitzero"`
+}
+
+// forge/label (#3130): labels to add to an issue or a pull request, and labels to take off it, by name.
+type ForgeLabelRequest struct {
+	Node LineageNode `json:"node"`
+
+	Add []string `json:"add,omitzero"`
+
+	Remove []string `json:"remove,omitzero"`
+}
+
+// forge/labels (#3130): the labels an issue or a pull request can have, at most 100, by name.
+type ForgeLabels struct {
+	Labels []ForgeLabel `json:"labels"`
 }
 
 // forge/issues and forge/pulls (#3129): a page of items, the last updated first. cursor is the next page, absent at the end. errors says a forge that could not be read (not connected, a rate limit), and the items of the others still come.
@@ -4125,6 +4210,18 @@ type ForgeListRequest struct {
 	Limit *int64 `json:"limit,omitzero"`
 }
 
+// forge/log (#3130): the last lines of each failed check's log, as plain text.
+type ForgeLog struct {
+	Text string `json:"text"`
+}
+
+// forge/log (#3130): the end of a pull request's failed checks' logs, or of one check by name.
+type ForgeLogRequest struct {
+	Node LineageNode `json:"node"`
+
+	Check *string `json:"check,omitzero"`
+}
+
 // people/setForgeLogins (#2951): the caller's own GitHub, GitLab and Linear logins, for Settings ▸ You, replacing what was kept; blank clears one.
 type ForgeLogins struct {
 	Github *string `json:"github,omitzero"`
@@ -4132,6 +4229,38 @@ type ForgeLogins struct {
 	Gitlab *string `json:"gitlab,omitzero"`
 
 	Linear *string `json:"linear,omitzero"`
+}
+
+// How forge/merge merges a pull request (#3130): a merge commit, one squashed commit, or its commits rebased onto the base.
+type ForgeMergeMethod string
+
+const ForgeMergeMethodMerge ForgeMergeMethod = "merge"
+const ForgeMergeMethodSquash ForgeMergeMethod = "squash"
+const ForgeMergeMethodRebase ForgeMergeMethod = "rebase"
+
+// forge/merge (#3130): merge a pull request at sha, the head commit its page shows (refused when the head moved), by method (the repo's default when absent); with auto, the forge merges it once its checks pass.
+type ForgeMergeRequest struct {
+	Node LineageNode `json:"node"`
+
+	Sha string `json:"sha"`
+
+	Method *ForgeMergeMethod `json:"method,omitzero"`
+
+	Auto *bool `json:"auto,omitzero"`
+}
+
+// forge/labels, forge/rerun and forge/diff (#3130): the issue or pull request.
+type ForgeNodeRequest struct {
+	Node LineageNode `json:"node"`
+}
+
+// The new-agent form for an issue (#3130, Start Agent), as a view's agents/start-agent fills it (#834): the prompt, the session's labels, and a new worktree's name.
+type ForgeStart struct {
+	Prompt string `json:"prompt"`
+
+	Labels []string `json:"labels"`
+
+	Worktree *string `json:"worktree,omitzero"`
 }
 
 type FoundFolder struct {

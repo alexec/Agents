@@ -24,6 +24,8 @@ type fakeForgeGitHub struct {
 	mu       sync.Mutex
 	searches []string
 	items    int
+	// wrote are the writes asked for (#3130).
+	wrote []string
 }
 
 func (f *fakeForgeGitHub) Search(_ context.Context, repos []string, sf githubmcp.SearchFilter, after string, first int) (githubmcp.SearchPage, error) {
@@ -53,7 +55,7 @@ func (f *fakeForgeGitHub) ItemPage(_ context.Context, repo string, number int, b
 		Body: "The body.", Before: "b2xkZXI=",
 		Thread:        []githubmcp.Comment{{Author: "coderabbitai", Body: "Looks fine.", At: "2026-11-01T10:05:00Z", URL: "u1", Bot: true}},
 		CheckRuns:     []githubmcp.Check{{Name: "test", State: "failing", URL: "https://github.com/alexec/agents/actions/runs/1"}},
-		ReviewThreads: 2, FilesChanged: 5,
+		ReviewThreads: 2, FilesChanged: 5, Head: "abc", MergeMethods: []string{"squash", "merge", "rebase"},
 	}, nil
 }
 
@@ -229,6 +231,8 @@ type fakeForgeGitLab struct {
 	mu       sync.Mutex
 	searches []string
 	items    []string
+	// wrote are the writes asked for (#3130).
+	wrote []string
 }
 
 func (f *fakeForgeGitLab) Search(_ context.Context, projects []string, sf gitlabmcp.SearchFilter, after string, first int) (gitlabmcp.SearchPage, error) {
@@ -255,7 +259,7 @@ func (f *fakeForgeGitLab) ItemPage(_ context.Context, project string, number int
 	return gitlabmcp.ItemDetail{Item: gitlabmcp.Item{Project: project, Number: number, MR: mr, State: "merged", Title: "A merge request",
 		UpdatedAt: "2026-11-01T10:00:00Z"}, Body: "The body.", Before: "2",
 		Thread:    []gitlabmcp.Comment{{Author: "kim", Body: "Fine.", At: "2026-11-01T10:05:00Z", URL: "u1"}},
-		CheckRuns: []gitlabmcp.Check{{Name: "check: test", State: "passing"}}, ReviewThreads: 1, FilesChanged: 3}, nil
+		CheckRuns: []gitlabmcp.Check{{Name: "check: test", State: "passing"}}, ReviewThreads: 1, FilesChanged: 3, Head: "head4", Pipeline: 99}, nil
 }
 
 // fakeForgeLinear is Linear's lists and item reads, and what each was asked.
@@ -263,6 +267,8 @@ type fakeForgeLinear struct {
 	mu       sync.Mutex
 	searches []string
 	key      string
+	// wrote are the writes asked for (#3130).
+	wrote []string
 }
 
 func (f *fakeForgeLinear) Search(_ context.Context, teams []string, _ linearmcp.SearchFilter, after string, _ int) (linearmcp.SearchPage, error) {

@@ -23,6 +23,7 @@ import { ago } from "../model/connectorSetup";
 import { fromWireDate } from "../protocol/dates";
 import { Markdown } from "../render/markdown";
 import { Graph, useLayout, useWalk } from "./Lineage";
+import { WorkActions, WorkCommentBox } from "./WorkActions";
 import { go } from "../route";
 
 /** How many pages of reports/nodes a list reads for its lineage: at most 500 nodes. */
@@ -203,7 +204,8 @@ function WorkRowView({ row, several, open }: { row: WorkRow; several: boolean; o
 
 /** The page of one issue, PR, milestone or release (#3119): the item from its forge (forge/issue,
  * forge/pull) on the first machine that reads it, and what lineage knows about it on a machine that
- * keeps links: its cost, its links by relation, and the graph centred here. Read-only in this slice. */
+ * keeps links: its cost, its links by relation, and the graph centred here. An issue's and a pull
+ * request's actions (#3130, WorkActions) go to the machine that read it. */
 export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; ref: string }) {
   const node = useMemo(() => ({ kind, ref }), [kind, ref]);
   const asked = useSignal(0);
@@ -247,6 +249,19 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
   const { graph, costs, failed, reading } = useWalk(store, lineageHost, node, asked.value);
   const links: readonly LineageLink[] | null = failed.value ? [] : graph.value?.links ?? null;
   const layout = useLayout(store, lineageHost, node, graph.value, costs.value);
+
+  // The item again after a write (#3130), from the machine that read it, keeping the page until it comes.
+  const reread = async () => {
+    const had = detail.value;
+    if (!had) return;
+    try {
+      const got = await store.link.call(kind === "pr" ? "forge/pull" : "forge/issue", { node }, had.host);
+      detail.value = { host: had.host, got };
+    } catch (e) {
+      forgeProblem.value = describe(e);
+    }
+  };
+  const writes = detail.value !== null && store.has(detail.value.host, Capability.forgeWrite1);
 
   const readOlder = async () => {
     const had = detail.value;
@@ -306,6 +321,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
           {url && <> · <a href={url} target="_blank" rel="noopener noreferrer">{openOnWords(ref)}</a></>}
         </p>
         {(checks || review) && <p class="small">{[checks, review].filter(Boolean).join(" · ")}</p>}
+        {writes && detail.value && <WorkActions store={store} host={detail.value.host} detail={detail.value.got} wrote={() => void reread()} />}
       </header>
       {forgeProblem.value && <p class="hint">{forgeProblem.value}</p>}
       {fromForge(kind) && !detail.value && !forgeProblem.value && <p class="hint">Loading…</p>}
@@ -327,6 +343,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
           ))}
         </section>
       )}
+      {writes && detail.value && <WorkCommentBox store={store} host={detail.value.host} node={node} wrote={() => void reread()} />}
       <section class="work-lineage" aria-label="Lineage">
         <h3>Lineage</h3>
         {!lineageHost ? <p class="hint">No machine keeps links yet. Update Agents on a machine to see them.</p>

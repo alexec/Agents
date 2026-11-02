@@ -8859,6 +8859,23 @@
       ],
       "additionalProperties": false
     },
+    "ForgeApproveRequest": {
+      "type": "object",
+      "description": "forge/approve (#3130): approve a pull request at sha, the head commit its page shows (refused when the head moved).",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "sha": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "node",
+        "sha"
+      ],
+      "additionalProperties": false
+    },
     "ForgeCheck": {
       "type": "object",
       "description": "One of a pull request's checks (#3129): a check run or a commit status. state is passing, failing, running or skipped; url is its page on the forge.",
@@ -8876,6 +8893,22 @@
       "required": [
         "name",
         "state"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeCloseRequest": {
+      "type": "object",
+      "description": "forge/close (#3130): close an issue or a pull request, or with reopen open it again.",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "reopen": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "node"
       ],
       "additionalProperties": false
     },
@@ -8904,6 +8937,125 @@
         "body",
         "at"
       ],
+      "additionalProperties": false
+    },
+    "ForgeCommentRequest": {
+      "type": "object",
+      "description": "forge/comment (#3130): a comment, as Markdown, on an issue or a pull request, as the person whose machine it is.",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "body": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "node",
+        "body"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeDiff": {
+      "type": "object",
+      "description": "forge/diff (#3130): a pull request's changed files at its head, as the app's own diff draws them (#1341); cut says some files are listed with no hunks; url is its files on the forge.",
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ForgeDiffFile"
+          }
+        },
+        "cut": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "files",
+        "cut"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeDiffFile": {
+      "type": "object",
+      "description": "One file a pull request changes (#3130): change is added, removed, modified or renamed; note says why it has no hunks, when it has none.",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "previousPath": {
+          "type": "string"
+        },
+        "change": {
+          "type": "string"
+        },
+        "additions": {
+          "type": "integer"
+        },
+        "deletions": {
+          "type": "integer"
+        },
+        "hunks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ForgeDiffHunk"
+          }
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "change",
+        "additions",
+        "deletions",
+        "hunks"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeDiffHunk": {
+      "type": "object",
+      "description": "One @@ block of a file's diff (#3130).",
+      "properties": {
+        "oldStart": {
+          "type": "integer"
+        },
+        "newStart": {
+          "type": "integer"
+        },
+        "lines": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DiffLine"
+          }
+        }
+      },
+      "required": [
+        "oldStart",
+        "newStart",
+        "lines"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeDone": {
+      "type": "object",
+      "description": "What a forge write did (#3130): url is the comment or the item on the forge; auto says a merge waits for the checks; reran is how many runs or pipelines were run again.",
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "auto": {
+          "type": "boolean"
+        },
+        "reran": {
+          "type": "integer"
+        }
+      },
+      "required": [],
       "additionalProperties": false
     },
     "ForgeItem": {
@@ -8978,7 +9130,7 @@
     },
     "ForgeItemDetail": {
       "type": "object",
-      "description": "forge/issue and forge/pull (#3129): one item with its body (Markdown) and a page of its comments, the newest page first and at most 50, oldest first in the page; cursor is the page before it, absent at the first comment. A pull request's checks, review threads (line comments, in threads) and files changed come with it.",
+      "description": "forge/issue and forge/pull (#3129): one item with its body (Markdown) and a page of its comments, the newest page first and at most 50, oldest first in the page; cursor is the page before it, absent at the first comment. A pull request's checks, review threads (line comments, in threads) and files changed come with it. head is a pull request's head commit, which forge/merge and forge/approve name (#3130); mergeMethods are the ways its repo allows, the repo's default first; start is the new-agent form for an issue.",
       "properties": {
         "item": {
           "$ref": "#/definitions/ForgeItem"
@@ -9006,6 +9158,18 @@
         },
         "filesChanged": {
           "type": "integer"
+        },
+        "head": {
+          "type": "string"
+        },
+        "mergeMethods": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ForgeMergeMethod"
+          }
+        },
+        "start": {
+          "$ref": "#/definitions/ForgeStart"
         }
       },
       "required": [
@@ -9044,6 +9208,47 @@
       },
       "required": [
         "name"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeLabelRequest": {
+      "type": "object",
+      "description": "forge/label (#3130): labels to add to an issue or a pull request, and labels to take off it, by name.",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "add": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "remove": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "node"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeLabels": {
+      "type": "object",
+      "description": "forge/labels (#3130): the labels an issue or a pull request can have, at most 100, by name.",
+      "properties": {
+        "labels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ForgeLabel"
+          }
+        }
+      },
+      "required": [
+        "labels"
       ],
       "additionalProperties": false
     },
@@ -9117,6 +9322,35 @@
       },
       "additionalProperties": false
     },
+    "ForgeLog": {
+      "type": "object",
+      "description": "forge/log (#3130): the last lines of each failed check's log, as plain text.",
+      "properties": {
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeLogRequest": {
+      "type": "object",
+      "description": "forge/log (#3130): the end of a pull request's failed checks' logs, or of one check by name.",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "check": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "node"
+      ],
+      "additionalProperties": false
+    },
     "ForgeLogins": {
       "type": "object",
       "description": "people/setForgeLogins (#2951): the caller's own GitHub, GitLab and Linear logins, for Settings ▸ You, replacing what was kept; blank clears one.",
@@ -9131,6 +9365,74 @@
           "type": "string"
         }
       },
+      "additionalProperties": false
+    },
+    "ForgeMergeMethod": {
+      "type": "string",
+      "enum": [
+        "merge",
+        "squash",
+        "rebase"
+      ],
+      "description": "How forge/merge merges a pull request (#3130): a merge commit, one squashed commit, or its commits rebased onto the base."
+    },
+    "ForgeMergeRequest": {
+      "type": "object",
+      "description": "forge/merge (#3130): merge a pull request at sha, the head commit its page shows (refused when the head moved), by method (the repo's default when absent); with auto, the forge merges it once its checks pass.",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "sha": {
+          "type": "string"
+        },
+        "method": {
+          "$ref": "#/definitions/ForgeMergeMethod"
+        },
+        "auto": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "node",
+        "sha"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeNodeRequest": {
+      "type": "object",
+      "description": "forge/labels, forge/rerun and forge/diff (#3130): the issue or pull request.",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        }
+      },
+      "required": [
+        "node"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeStart": {
+      "type": "object",
+      "description": "The new-agent form for an issue (#3130, Start Agent), as a view's agents/start-agent fills it (#834): the prompt, the session's labels, and a new worktree's name.",
+      "properties": {
+        "prompt": {
+          "type": "string"
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "worktree": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "prompt",
+        "labels"
+      ],
       "additionalProperties": false
     },
     "FoundFolder": {

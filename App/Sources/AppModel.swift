@@ -5798,6 +5798,18 @@ final class AppModel {
                                          returning: DaemonAPI.ForgeItemDetail.self)
     }
 
+    /// Whether a machine takes the Work pages' writes (#3130): comment, labels, close, merge,
+    /// approve, rerun, and a pull request's logs and diff.
+    func forgeWrites(on host: MachineRef) -> Bool {
+        controlPlaneHosts?.first { $0.id == host }?.has(Capability.forgeWrite1) ?? false
+    }
+
+    /// One of the Work pages' writes or reads (#3130), on the machine that read the item.
+    func forge<R: Decodable & Sendable>(_ method: String, _ params: some Encodable & Sendable, returning: R.Type,
+                             on host: MachineRef) async throws -> R {
+        try await client(for: host).call(method, params, returning: R.self)
+    }
+
     /// A page of the lineage nodes of a kind (#3118), from the control plane: Work's figures; nil
     /// with no control plane.
     func reportNodes(_ query: DaemonAPI.ReportNodesQuery) async throws -> DaemonAPI.ReportNodes? {
