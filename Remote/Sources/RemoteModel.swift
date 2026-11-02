@@ -4675,6 +4675,10 @@ final class RemoteModel {
     func continueWhenBack(_ agentID: UUID) async { await waitForAllowance(agentID, DaemonAPI.Method.agentsContinueWhenBack) }
     func cancelContinue(_ agentID: UUID) async { await waitForAllowance(agentID, DaemonAPI.Method.agentsCancelContinue) }
 
+    /// Pause on touch's two answers (#3004, US3), as on the Mac.
+    func resumeDesktopControl(_ agentID: UUID) async { await waitForAllowance(agentID, DaemonAPI.Method.desktopControlResume) }
+    func takeOverDesktopControl(_ agentID: UUID) async { await waitForAllowance(agentID, DaemonAPI.Method.desktopControlTakeOver) }
+
     private func waitForAllowance(_ agentID: UUID, _ method: String) async {
         guard !isStale(on: work.agent(agentID)?.host ?? .mac) else {
             problem = "Your Mac is not answering, so that could not be sent."

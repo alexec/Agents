@@ -24,6 +24,8 @@ import (
 // sibling helper that does the actual driving (research R1), one process per agent
 // holding the lease, talked to over a NUL-delimited JSON request/reply protocol on its
 // stdin/stdout, started on first use and ended when the lease is let go or the turn ends.
+// Besides its replies, agents-drive says {"touch":true} by itself the moment the person
+// touches the real mouse or keyboard (US3, research R2); screenpause.go pauses on it.
 
 // driveHelper is agents-drive's path: beside this binary, mirroring watchHelper
 // (watch_darwin.go). A var so a test can swap it for one it built itself.
@@ -35,19 +37,52 @@ var driveHelper = func() string {
 	return filepath.Join(filepath.Dir(exe), "agents-drive")
 }
 
-// driveProcess is one running agents-drive, talked to one request at a time.
+// driveProcess is one running agents-drive, talked to one request at a time. One reader
+// takes every frame it writes: a touch goes to onTouch, anything else is the reply.
 type driveProcess struct {
-	cmd   *exec.Cmd
-	stdin io.WriteCloser
-	out   *bufio.Reader
-	mu    sync.Mutex
+	cmd     *exec.Cmd
+	stdin   io.WriteCloser
+	replies chan driveReply
+	mu      sync.Mutex
+}
+
+type driveReply struct {
+	res map[string]any
+	err error
 }
 
 // screenDriveState is the Daemon's own agents-drive processes, one per agent holding the
-// "screen" lease. Under driveMu.
+// "screen" lease, and what pause on touch keeps for each (screenpause.go). Under driveMu.
 type screenDriveState struct {
-	driveMu sync.Mutex
-	drives  map[wire.UUID]*driveProcess
+	driveMu    sync.Mutex
+	drives     map[wire.UUID]*driveProcess
+	screenApps map[wire.UUID]string
+	pauses     map[wire.UUID]*screenPause
+	takenOver  map[wire.UUID]bool
+}
+
+// read takes agents-drive's frames until it ends.
+func (p *driveProcess) read(out *bufio.Reader, onTouch func()) {
+	for {
+		frame, err := out.ReadBytes(0)
+		if err != nil {
+			select {
+			case p.replies <- driveReply{err: err}:
+			default:
+			}
+			return
+		}
+		var res map[string]any
+		if err := json.Unmarshal(frame[:len(frame)-1], &res); err != nil {
+			p.replies <- driveReply{err: err}
+			continue
+		}
+		if touch, _ := res["touch"].(bool); touch {
+			onTouch()
+			continue
+		}
+		p.replies <- driveReply{res: res}
+	}
 }
 
 // driveCallDeadline is how long one agents-drive request may take (#3109): a helper stuck
@@ -63,37 +98,31 @@ func (p *driveProcess) call(req map[string]any) (map[string]any, error) {
 		return nil, err
 	}
 	b = append(b, 0)
-	type read struct {
-		frame []byte
-		err   error
-	}
-	got := make(chan read, 1)
-	go func() {
-		if _, err := p.stdin.Write(b); err != nil {
-			got <- read{err: err}
-			return
-		}
-		frame, err := p.out.ReadBytes(0)
-		got <- read{frame, err}
-	}()
-	var r read
+	wrote := make(chan error, 1)
+	go func() { _, err := p.stdin.Write(b); wrote <- err }()
+	deadline := time.After(driveCallDeadline)
+	var r driveReply
 	select {
-	case r = <-got:
-	case <-time.After(driveCallDeadline):
-		// Killed, so the read above ends too; every caller drops this helper on an error
+	case err := <-wrote:
+		if err != nil {
+			return nil, fmt.Errorf("agents-drive: %w", err)
+		}
+		select {
+		case r = <-p.replies:
+		case <-deadline:
+			p.cmd.Process.Kill()
+			return nil, fmt.Errorf("agents-drive: no answer to %v in %s, so it was stopped", req["action"], driveCallDeadline)
+		}
+	case <-deadline:
+		// Killed, so the write above ends too; every caller drops this helper on an error
 		// (releaseScreenDrive), and the next call starts a fresh one.
 		p.cmd.Process.Kill()
 		return nil, fmt.Errorf("agents-drive: no answer to %v in %s, so it was stopped", req["action"], driveCallDeadline)
 	}
-	frame, err := r.frame, r.err
-	if err != nil {
-		return nil, fmt.Errorf("agents-drive: %w", err)
+	if r.err != nil {
+		return nil, fmt.Errorf("agents-drive: %w", r.err)
 	}
-	var res map[string]any
-	if err := json.Unmarshal(frame[:len(frame)-1], &res); err != nil {
-		return nil, fmt.Errorf("agents-drive: %w", err)
-	}
-	return res, nil
+	return r.res, nil
 }
 
 func (p *driveProcess) stop() {
@@ -134,7 +163,8 @@ func (d *Daemon) screenDriveFor(agent wire.UUID) (*driveProcess, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
-	p := &driveProcess{cmd: cmd, stdin: stdin, out: bufio.NewReader(stdout)}
+	p := &driveProcess{cmd: cmd, stdin: stdin, replies: make(chan driveReply, 1)}
+	go p.read(bufio.NewReader(stdout), func() { d.pauseScreen(agent) })
 	d.drives[agent] = p
 	return p, nil
 }
@@ -164,16 +194,24 @@ func (d *Daemon) stopScreenDrives() {
 
 // endScreenDrive is what Stop, and every other turn ending, does to a "screen" lease and
 // its agents-drive: both let go at once, the same shape dropAppTokens already gives every
-// other app tool's state on an ending (turns.go's end).
+// other app tool's state on an ending (turns.go's end). A pause ends with the turn, and so
+// does the person's Take Over: the next turn may drive again.
 func (d *Daemon) endScreenDrive(agent wire.UUID) {
+	d.endScreenPause(agent, "ended")
+	d.letGoOfScreen(agent)
+	d.driveMu.Lock()
+	delete(d.takenOver, agent)
+	delete(d.screenApps, agent)
+	d.driveMu.Unlock()
+}
+
+// letGoOfScreen ends this agent's agents-drive and gives back its "screen" lease, if held:
+// the turn's end, and the person's Take Over.
+func (d *Daemon) letGoOfScreen(agent wire.UUID) {
 	d.releaseScreenDrive(agent)
-	d.leaseMu.Lock()
-	d.loadLeases() // every other turn ends without ever leasing anything: d.book may be nil.
-	e := d.book.Entries[wire.ResourceName("screen")]
-	held := e != nil && holderIndex(e, agent) >= 0
-	d.leaseMu.Unlock()
-	if held {
-		d.releaseResource(agent, map[string]json.RawMessage{"name": json.RawMessage(`"screen"`)})
+	// holdsScreen loads the book: every other turn ends without ever leasing anything.
+	if d.holdsScreen(agent) {
+		d.releaseResource(agent, screenLeaseName)
 	}
 }
 
@@ -229,20 +267,20 @@ func (d *Daemon) driveScreen(agent wire.UUID, args map[string]json.RawMessage) (
 	if d.Store.Agent(agent) == nil {
 		return "", &Error{Code: CodeNoSuchAgent, Message: leaseNoCall}
 	}
+	// The person took the screen back in this turn (US3, FR-008): not taken again.
+	if d.tookOver(agent) {
+		return "", &Error{Code: CodeNotPermitted, Message: desktopControlTakenOverWords}
+	}
 	// Off, then Accessibility (FR-004, FR-005): refused before the lease is taken or
 	// agents-drive starts for real driving.
 	if err := d.desktopControlGate(agent); err != nil {
 		return "", err
 	}
-	reply, err := d.leaseResource(agent, map[string]json.RawMessage{"name": json.RawMessage(`"screen"`)})
+	reply, err := d.leaseResource(agent, screenLeaseName)
 	if err != nil {
 		return "", err
 	}
-	d.leaseMu.Lock()
-	e := d.book.Entries[wire.ResourceName("screen")]
-	held := e != nil && holderIndex(e, agent) >= 0
-	d.leaseMu.Unlock()
-	if !held {
+	if !d.holdsScreen(agent) {
 		// Queued behind another agent: told its place, started again on lease.granted.
 		return reply, nil
 	}
@@ -250,7 +288,7 @@ func (d *Daemon) driveScreen(agent wire.UUID, args map[string]json.RawMessage) (
 	if err != nil {
 		// Can never work this turn either: give back the lease rather than leave it held
 		// uselessly.
-		d.endScreenDrive(agent)
+		d.letGoOfScreen(agent)
 		return "", &Error{Message: "drive_screen: " + err.Error()}
 	}
 	req := map[string]any{"action": action, "app": app}
@@ -273,11 +311,34 @@ func (d *Daemon) driveScreen(agent wire.UUID, args map[string]json.RawMessage) (
 	if keyName := argString(args, "keyName"); keyName != "" {
 		req["keyName"] = keyName
 	}
-	res, err := p.call(req)
-	if err != nil {
-		// A dead helper takes nothing else with it: drop it so the next call starts fresh.
-		d.releaseScreenDrive(agent)
-		return "", &Error{Message: "drive_screen: " + err.Error()}
+	d.noteScreenApp(agent, app)
+	var res map[string]any
+	for {
+		// Paused by the person's touch (US3): held here until Resume or Take Over.
+		if err := d.waitWhilePaused(agent); err != nil {
+			return "", err
+		}
+		if res, err = p.call(req); err != nil {
+			if d.tookOver(agent) {
+				// Take Over ended this helper under the call.
+				return "", &Error{Code: CodeNotPermitted, Message: desktopControlTakenOverWords}
+			}
+			// A dead helper takes nothing else with it: drop it so the next call starts fresh.
+			d.releaseScreenDrive(agent)
+			return "", &Error{Message: "drive_screen: " + err.Error()}
+		}
+		touched, _ := res["touched"].(bool)
+		if !touched {
+			break
+		}
+		// Touched part way (only typing takes long enough): paused, and on Resume it types
+		// what is left, from where it stopped.
+		d.pauseScreen(agent)
+		if typed, ok := res["typed"].(float64); ok && action == "type" {
+			if text, _ := req["text"].(string); int(typed) < len([]rune(text)) {
+				req["text"] = string([]rune(text)[int(typed):])
+			}
+		}
 	}
 	ok, _ := res["ok"].(bool)
 	if !ok {

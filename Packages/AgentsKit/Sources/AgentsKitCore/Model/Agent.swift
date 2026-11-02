@@ -223,6 +223,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     public var effectiveSandbox: EffectiveSandbox?
     /// The sandbox card waiting for the person's answer, if one is (064, FR-007a).
     public var pendingSandboxFailure: SandboxFailureRecord?
+    /// Its `drive_screen` paused by the person's own touch (#3004, US3): every client
+    /// offers Resume and Take Over while it is set. Nil when not paused.
+    public var desktopControlPause: DesktopControlPause?
     /// Its `cwd` was not there when the daemon last looked (#119): a worktree removed
     /// after a merge, a folder moved, a disk ejected. Written by the daemon, which looks
     /// again on its heartbeat and before every send, so rows and the header say so
@@ -416,6 +419,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         sandboxOverride = try c.decodeIfPresent(SandboxChoice.self, forKey: .sandboxOverride)
         effectiveSandbox = (try? c.decodeIfPresent(EffectiveSandbox.self, forKey: .effectiveSandbox)) ?? nil
         pendingSandboxFailure = (try? c.decodeIfPresent(SandboxFailureRecord.self, forKey: .pendingSandboxFailure)) ?? nil
+        desktopControlPause = (try? c.decodeIfPresent(DesktopControlPause.self, forKey: .desktopControlPause)) ?? nil
         missingFolder = (try? c.decodeIfPresent(MissingFolder.self, forKey: .missingFolder)) ?? nil
         listsLeftOut = try c.decodeIfPresent(Bool.self, forKey: .listsLeftOut) ?? false
         // New in #751. Absent on everything written before it and on any never renamed.
@@ -502,6 +506,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(sandboxOverride, forKey: .sandboxOverride)
         try c.encodeIfPresent(effectiveSandbox, forKey: .effectiveSandbox)
         try c.encodeIfPresent(pendingSandboxFailure, forKey: .pendingSandboxFailure)
+        try c.encodeIfPresent(desktopControlPause, forKey: .desktopControlPause)
         try c.encodeIfPresent(missingFolder, forKey: .missingFolder)
         if listsLeftOut { try c.encode(listsLeftOut, forKey: .listsLeftOut) }
         if titleIsPersons { try c.encode(titleIsPersons, forKey: .titleIsPersons) }
@@ -551,7 +556,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case afterTurn
         case background
         case archivedAt
-        case sandboxOverride, effectiveSandbox, pendingSandboxFailure
+        case sandboxOverride, effectiveSandbox, pendingSandboxFailure, desktopControlPause
         case missingFolder
         case listsLeftOut
         case titleIsPersons, runtimeTitle

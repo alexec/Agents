@@ -5082,6 +5082,20 @@ final class AppModel {
     func continueWhenBack(_ agentID: UUID) async { await waitForAllowance(agentID, DaemonAPI.Method.agentsContinueWhenBack) }
     func cancelContinue(_ agentID: UUID) async { await waitForAllowance(agentID, DaemonAPI.Method.agentsCancelContinue) }
 
+    /// Pause on touch's two answers (#3004, US3): Resume lets the agent drive on from where
+    /// it stopped; Take Over lets go of the screen at once.
+    func resumeDesktopControl(_ agentID: UUID) async { await answerPause(agentID, DaemonAPI.Method.desktopControlResume) }
+    func takeOverDesktopControl(_ agentID: UUID) async { await answerPause(agentID, DaemonAPI.Method.desktopControlTakeOver) }
+
+    private func answerPause(_ agentID: UUID, _ method: String) async {
+        let host = host(ofAgent: agentID)
+        let went = await attempt(on: host) {
+            _ = try await self.client(forAgent: agentID).call(method, DaemonAPI.AgentRequest(agentID: agentID), returning: DaemonAPI.Empty.self)
+        }
+        guard went else { return }
+        if host == .mac { await refreshAgents() } else { await refreshServer(host) }
+    }
+
     private func waitForAllowance(_ agentID: UUID, _ method: String) async {
         let host = host(ofAgent: agentID)
         let went = await attempt(on: host) {

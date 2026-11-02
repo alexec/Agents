@@ -17,12 +17,15 @@ import (
 // enough to test drive_screen's lease, queue and Stop plumbing without Accessibility or
 // Screen Recording granted to anything (mirroring lease_resource's own queuing test,
 // TestAgentsTakeTurnsWithAResource).
+// A `type` whose text starts "touch:" plays the person touching the keyboard part way
+// (US3): it says {"touch":true} by itself, then answers touched after 3 characters.
 const fakeDriveSource = `package main
 
 import (
 	"bufio"
 	"encoding/json"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -35,6 +38,10 @@ func main() {
 		var req map[string]any
 		json.Unmarshal(frame[:len(frame)-1], &req)
 		res := map[string]any{"ok": true, "trusted": true}
+		if text, _ := req["text"].(string); req["action"] == "type" && strings.HasPrefix(text, "touch:") {
+			os.Stdout.Write([]byte("{\"touch\":true}\x00"))
+			res = map[string]any{"ok": false, "touched": true, "typed": 3}
+		}
 		switch req["action"] {
 		case "screenshot":
 			res["image"] = "ZmFrZQ=="

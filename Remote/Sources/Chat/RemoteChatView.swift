@@ -372,6 +372,17 @@ struct RemoteChatView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             })
         }
+        // Its drive_screen paused by the person's touch (#3004, US3), as on the Mac.
+        if let pause = agent.desktopControlPause {
+            cards.append(WaitingCard(id: "screen:" + agent.id.uuidString) {
+                DesktopControlPauseCard(pause: pause,
+                                        resume: { await model.resumeDesktopControl(agent.id) },
+                                        takeOver: { await model.takeOverDesktopControl(agent.id) },
+                                        isDisabled: model.isStale(agent))
+                    .chatColumn()
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            })
+        }
         // A wait on sessions or on a time, the same card in the same place (#2750): it was
         // lines under the chat's head, with Carry on in the toolbar.
         if let (report, block) = model.work.openBlock(agent) {

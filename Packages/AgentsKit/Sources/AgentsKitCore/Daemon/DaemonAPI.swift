@@ -448,6 +448,8 @@ public enum DaemonAPI {
         /// may run at all. Setting is the person's own clients only.
         public static let desktopControlState = "desktopControl/state"
         public static let desktopControlSet = "desktopControl/set"
+        public static let desktopControlResume = "desktopControl/resume"
+        public static let desktopControlTakeOver = "desktopControl/takeOver"
         /// One agent's override (nil clears it), and the card's recovery (064).
         public static let agentsSetSandbox = "agents/setSandbox"
         public static let agentsAnswerSandbox = "agents/answerSandbox"

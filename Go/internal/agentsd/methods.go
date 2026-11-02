@@ -54,6 +54,7 @@ func (d *Daemon) register() {
 	d.registerInstall()
 	d.registerSandbox()
 	d.registerDesktopControl()
+	d.registerDesktopControlPause()
 	d.registerAuto()
 	d.registerMoves()
 	d.registerRuntimeSessions()

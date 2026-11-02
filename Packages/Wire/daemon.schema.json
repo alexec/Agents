@@ -489,6 +489,10 @@
         "pendingSandboxFailure": {
           "$ref": "#/definitions/SandboxFailureRecord"
         },
+        "desktopControlPause": {
+          "$ref": "#/definitions/DesktopControlPause",
+          "description": "Set while this agent holds the screen lease and the person's own touch on the mouse or keyboard paused its drive_screen (#3004, US3, FR-007): every client offers Resume and Take Over (desktopControl/resume, desktopControl/takeOver). Cleared by either, and when the turn ends."
+        },
         "missingFolder": {
           "$ref": "#/definitions/MissingFolder"
         },
@@ -6214,6 +6218,23 @@
         "secretFields",
         "version",
         "sealed"
+      ],
+      "additionalProperties": false
+    },
+    "DesktopControlPause": {
+      "type": "object",
+      "description": "An agent's drive_screen paused by the person's own touch (#3004, US3): the app it was driving, and when.",
+      "properties": {
+        "app": {
+          "type": "string"
+        },
+        "pausedAt": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "app",
+        "pausedAt"
       ],
       "additionalProperties": false
     },

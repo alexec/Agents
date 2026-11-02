@@ -241,6 +241,9 @@ type Agent struct {
 
 	PendingSandboxFailure *SandboxFailureRecord `json:"pendingSandboxFailure,omitzero"`
 
+	// Set while this agent holds the screen lease and the person's own touch on the mouse or keyboard paused its drive_screen (#3004, US3, FR-007): every client offers Resume and Take Over (desktopControl/resume, desktopControl/takeOver). Cleared by either, and when the turn ends.
+	DesktopControlPause *DesktopControlPause `json:"desktopControlPause,omitzero"`
+
 	MissingFolder *MissingFolder `json:"missingFolder,omitzero"`
 
 	ListsLeftOut *bool `json:"listsLeftOut,omitzero"`
@@ -2910,6 +2913,13 @@ type DeliveredRoute struct {
 	Sealed map[string]SealedEnvelope `json:"sealed"`
 
 	Expires *Date `json:"expires,omitzero"`
+}
+
+// An agent's drive_screen paused by the person's own touch (#3004, US3): the app it was driving, and when.
+type DesktopControlPause struct {
+	App string `json:"app"`
+
+	PausedAt Date `json:"pausedAt"`
 }
 
 // Whether agents on this Mac may drive its apps through drive_screen (#3004, FR-004). Kept in <settings>/desktop-control.json; Off when unset. Only the person's own clients may change it.
