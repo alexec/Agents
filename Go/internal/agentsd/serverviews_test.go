@@ -155,4 +155,9 @@ func TestOurViewsShowWhereTheRepoFits(t *testing.T) {
 		!oursFits(gitlab, "git.acme.dev") || oursFits(gitlab, "github.com") || !oursFits(linear, "") {
 		t.Fatal("fits")
 	}
+	// #3131: Work lists GitHub's and GitLab's issues and pull requests, so their rows go
+	// where they fit; Linear's stays, as Work has only the teams linearTeams names.
+	if !inWork(github) || !inWork(gitlab) || inWork(linear) {
+		t.Fatal("in Work")
+	}
 }

@@ -84,6 +84,12 @@ a view may call feeds with no required argument: the `github` server's
 `ui://github/pulls` and `ui://github/issues`, but not `ui://github/pr`, which needs a
 pull request's number. **This is our extension of MCP Apps (SEP-1865)**, as pins are.
 
+The GitHub and GitLab connectors' list views show no row for the folder's own repo:
+**Work** lists its issues and pull requests (merge requests), with their actions, on every
+client (#3119, #3131). They show only when the folder's project points them at another repo
+(#2669), which Work does not list. The connectors stay: agents use their tools, an agent's
+`show_*` call still draws its view in the chat, and a pinned view stays pinned.
+
 - **Where.** In the folder's group, after its pinned pages and before its sessions.
 - **Its name.** The service, then the view: **GitHub · Pull requests**, **GitHub · Issues**,
   **Linear · Issues**. The service is the catalogue's title for a connector Agents makes, else
@@ -92,7 +98,8 @@ pull request's number. **This is our extension of MCP Apps (SEP-1865)**, as pins
 - **Which servers.** Each server set up and approved for the folder that can show views
   here, as for a pin. A server waiting for approval, missing a secret or run over stdio shows
   no row. The GitHub connector's views show only in a folder whose `origin` is on
-  github.com, and GitLab's only where it is on another host.
+  github.com, and GitLab's only where it is on another host, and each only for a
+  project's other repo (above).
 - **Opening one.** As a pinned view opens: the host calls the feeding tool afresh.
 - **Its count.** The row ends in a grey count, such as **GitHub · Issues 23** (#2033). The
   host calls each shown view's feeding tool every 2 minutes, once for every client, and
