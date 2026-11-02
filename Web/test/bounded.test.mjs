@@ -175,7 +175,10 @@ test("a followed chat is trimmed at the front, and one scrolled up is not", () =
   assert.ok(work.entries.value.length <= 600, `trimmed to ${work.entries.value.length}`);
   assert.equal(work.firstEntryIndex.value + work.entries.value.length, 901, "where it starts is counted");
   assert.equal(work.hasMoreBefore.value, true);
-  assert.equal(work.items.value[0].id, work.entries.value[0].id, "cut where a row begins");
+  // Cut where a row begins, with the prompt of the turn it is in still drawn above it (#3249).
+  const first = work.items.value.findIndex((item) => item.id === work.entries.value[0].id);
+  assert.ok(first >= 0, "cut where a row begins");
+  assert.ok(work.items.value.slice(0, first).every((item) => item.entry?.kind.userMessage), "only its prompt above");
   feed(2000);
   assert.ok(work.entries.value.length <= 800, `held ${work.entries.value.length}`);
 });
@@ -416,6 +419,42 @@ test("a followed turn of few rows and many entries holds a bounded number of ent
   work.prepend({ entries: all.slice(0, before), firstIndex: 0 });
   assert.equal(work.entries.value.length, n, "nothing held twice");
   assert.equal(work.items.value[1].calls.length, 10);
+});
+
+test("a long turn keeps its prompt, trimmed at the front or opened from its end (#3249)", () => {
+  const work = new Work();
+  work.watch("mac", "s");
+  work.replaceTranscript({ entries: [], firstIndex: 0 });
+  let n = 0;
+  work.apply("agent/entry", { agentID: "s", entry: asked(n++) }, "mac");
+  const all = [asked(0)];
+  for (let u = 0; u < 3000; u++, n++) {
+    const e = ran(n, 1, { rawOutput: { out: `${n}` } });
+    all.push(e);
+    work.apply("agent/entry", { agentID: "s", entry: e }, "mac");
+  }
+  assert.ok(work.firstEntryIndex.value > 0, "trimmed");
+  // A page in front that does not reach the start folds the rows again: the prompt is still first.
+  const front = work.firstEntryIndex.value;
+  work.prepend({ entries: all.slice(front - 200, front), firstIndex: front - 200 });
+  assert.equal(work.items.value[0].id, "e0", "the prompt is drawn");
+  assert.equal(work.chatTurns.value.at(-1).ask?.id, "e0");
+  assert.ok(!work.entries.value.some((e) => e.id === "e0"));
+  // Paged back to the start, it is drawn once, from among the entries.
+  work.prepend({ entries: all.slice(0, front - 200), firstIndex: 0 });
+  assert.equal(work.items.value.filter((item) => item.id === "e0").length, 1);
+
+  // Opened again from its end: the page starts after the prompt, read on its own.
+  const opened = new Work();
+  opened.watch("mac", "s");
+  opened.replaceTurns({ turns: [], firstTurn: 0, openStart: 0 });
+  opened.replaceTranscript({ entries: all.slice(-200), firstIndex: all.length - 200 }, asked(0));
+  assert.equal(opened.items.value[0].id, "e0");
+  assert.equal(opened.chatTurns.value.length, 1, "one turn, with its prompt");
+  assert.equal(opened.chatTurns.value[0].ask?.id, "e0");
+  // A turn that starts with no prompt draws none.
+  opened.replaceTranscript({ entries: all.slice(-200), firstIndex: all.length - 200 }, said(0));
+  assert.notEqual(opened.items.value[0].id, "e0");
 });
 
 test("entries heard are kept for a page only while one is on its way (#214)", () => {

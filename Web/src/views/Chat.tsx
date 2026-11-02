@@ -247,6 +247,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   /** Following the end or not, told to the store: it trims the chat's front only while following. */
   // Away from the end, where Jump to end is shown whether or not anything new has come (#252).
   const away = useSignal(false);
+  /** Whether the chat is taller than its pane, so scrolling up can reach the top and page back. */
+  const fills = useSignal(true);
   const follow = (on: boolean) => {
     if (following.current === on) return;
     following.current = on;
@@ -266,7 +268,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     subagent.value = null;
     openedTurns.current = [];
     settled.current = false;
-    const timer = setTimeout(() => (settled.current = true), 400);
+    const timer = setTimeout(() => { settled.current = true; fill(); }, 400);
     return () => clearTimeout(timer);
   }, [session]);
   // A chat opens following its end, before the layout effects below: a line asked for as it
@@ -294,6 +296,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     const el = scroller.current;
     if (!el) return;
     const watcher = new ResizeObserver(() => {
+      fills.value = el.scrollHeight > el.clientHeight + 1;
       if (following.current) { if (!loadingEarlier.current) el.scrollTop = el.scrollHeight; return; }
       // Reading back: a turn above that grew (its steps came, a picture, code colour) moves
       // the turn held back to where it was on screen, in every browser, Safari before 27
@@ -357,9 +360,22 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     requestAnimationFrame(() => {
       if (following.current) el.scrollTop = el.scrollHeight - fromBottom;
       else keepHeld(el);
-      setTimeout(() => (loadingEarlier.current = false), 250);
+      setTimeout(() => { loadingEarlier.current = false; fill(); }, 250);
     });
   };
+
+  // A chat that does not fill its pane is never scrolled, so it pages back by itself until it
+  // does, or holds all it will (#3249). Not while a turn runs: a followed turn is trimmed at the
+  // front as it grows, and paging back each time would ask for the same entries again and again.
+  const fill = () => {
+    const el = scroller.current;
+    if (!el) return;
+    fills.value = el.scrollHeight > el.clientHeight + 1;
+    if (!fills.value && !liveNow.current) void earlier();
+  };
+  const liveNow = useRef(live);
+  liveNow.current = live;
+  useEffect(fill);
 
   const onScroll = (event: Event) => {
     const el = event.currentTarget as HTMLDivElement;
@@ -595,7 +611,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
             <button class="link" onClick={() => { void store.reloadTranscript(); }}>Try Again</button>
           </p>
         )}
-        {store.hasMoreOfTheConversation && <p class="more" aria-label="Loading earlier"><span class="spinner" /></p>}
+        {/* Only while more can come: by scrolling up, or by the chat paging back by itself (#3249). */}
+        {store.hasMoreOfTheConversation && (fills.value || !live) && <p class="more" aria-label="Loading earlier"><span class="spinner" /></p>}
         {rows.map((turn, i) => (
           <TurnView key={turn.id} turn={turn} focusedRun={focusedRun.value}
             fetched={fetched.value[turn.id] && shownItems(fetched.value[turn.id]!.items)} fetchFailed={!!failedTurns.value[turn.id]} hasEarlier={fetched.value[turn.id]?.hasEarlier ?? false}
