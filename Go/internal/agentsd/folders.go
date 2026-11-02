@@ -711,6 +711,11 @@ func (d *Daemon) dress(s *wire.FolderSummary) {
 	} else if problem != "" {
 		s.ProjectProblem = &problem
 	}
+	// The machine it is on, as the control plane names it (#3276).
+	if host := d.controlMachine(); host != "" {
+		machine := wire.MachineRef(host)
+		s.Machine = &machine
+	}
 	if err == nil {
 		if v, ok := m["helperLimits"]; ok {
 			var l wire.HelperLimits

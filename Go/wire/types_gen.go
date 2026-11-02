@@ -285,6 +285,9 @@ type Agent struct {
 
 	// The standing aim its runtime keeps working towards over many turns (#2742), as Codex's and Claude's adapters report it on a session_info_update under _meta.jetbrains.air.goal. Absent when the runtime reports none, or cleared it.
 	Goal *Goal `json:"goal,omitzero"`
+
+	// The project its folder is in (#3276), as the folder's .agents/folder.json names it now. Absent for a folder in no project.
+	Project *string `json:"project,omitzero"`
 }
 
 type AgentArchivedReason string
@@ -3976,6 +3979,9 @@ type FolderSummary struct {
 	// Why the folder is in no project (#2317): .agents/folder.json is not an object, names an id that is not valid, or .agents is a link.
 	ProjectProblem *string `json:"projectProblem,omitzero"`
 
+	// The machine the folder is on, as the control plane names it (#3276). Absent on a machine that has joined no control plane: the folder is on this one.
+	Machine *MachineRef `json:"machine,omitzero"`
+
 	// Set when the organisation's policy caps this folder's helper limits (#998, #64): the lower number is used.
 	HelperLimitsSetBy *PolicySetBy `json:"helperLimitsSetBy,omitzero"`
 
@@ -4940,6 +4946,9 @@ type ListRequest struct {
 	After *ListCursor `json:"after,omitzero"`
 
 	Query *string `json:"query,omitzero"`
+
+	// Only the sessions whose folder is in this project (#3276), as .agents/folder.json names it: the project's sessions on this machine.
+	Project *string `json:"project,omitzero"`
 }
 
 type ListedSkill struct {
@@ -7635,9 +7644,39 @@ type ProjectList struct {
 	Projects []Project `json:"projects"`
 }
 
+// A machine of projects/sessions (#3276) that has a folder of the project, by id and name.
+type ProjectMachine struct {
+	Machine MachineRef `json:"machine"`
+
+	MachineName string `json:"machineName"`
+}
+
 // projects/remove (#2317): the project. Refused while a folder names it.
 type ProjectRequest struct {
 	ID string `json:"id"`
+}
+
+// One session of projects/sessions (#3276): the machine it runs on, and the session as that machine lists it, lean.
+type ProjectSession struct {
+	Machine MachineRef `json:"machine"`
+
+	MachineName string `json:"machineName"`
+
+	Session Agent `json:"session"`
+}
+
+// projects/sessions (#3276): the project's sessions on each of the caller's machines that has a folder of it, newest activity first. unreached is the machines that have a folder of it but did not answer (offline, or too slow): their sessions are not in sessions.
+type ProjectSessions struct {
+	Sessions []ProjectSession `json:"sessions"`
+
+	Unreached []ProjectMachine `json:"unreached"`
+}
+
+// projects/sessions (#3276): the project, and whether to list archived sessions too.
+type ProjectSessionsRequest struct {
+	Project string `json:"project"`
+
+	IncludeArchived *bool `json:"includeArchived,omitzero"`
 }
 
 // projects/set (#2317): makes a project, or with id renames one.

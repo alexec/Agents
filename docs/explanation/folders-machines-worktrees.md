@@ -182,6 +182,22 @@ so a folder keeps its project's slots while the control plane is away.
 `.agents/mcp.json`, the Where agents run slot, helper limits, disk space, skills, personas
 and workflows stay with each folder.
 
+### A project's sessions on every machine
+
+Each session carries the project that its folder is in (#3276), as the folder's
+`.agents/folder.json` names it now. A machine's `agents/list` takes `project` and then gives
+only that project's sessions on that machine. Each folder in `folders/list` says its
+`machine`, the id that the control plane knows the machine by. A machine that has joined
+no control plane says none: its folders are on this machine.
+
+The control plane's `projects/sessions` gives a project's sessions on every machine. It asks
+each of your machines that has a folder in the project, at the same time, and gives each
+session with its machine, newest first. A machine that is offline, or that does not answer
+in 5 seconds, is in `unreached`. Only your own machines are asked, also when you are an
+admin: a session on another person's machine is theirs.
+
+Without a control plane, a project is the folders on this machine.
+
 ## Worktrees are never removed by accident
 
 Archiving an agent never throws work away. When you archive the last agent in a worktree

@@ -42,6 +42,47 @@ func projectIn(m map[string]any, readErr error) (id, problem string) {
 	return "", ".agents/folder.json names a project id that is not valid. Pick a project to write a good one."
 }
 
+// projectOfFolder is the project id the folder's .agents/folder.json names now, or "" for
+// a folder in no project.
+func projectOfFolder(folder string) string {
+	m, err := readFolderConfig(folder)
+	id, _ := projectIn(m, err)
+	return id
+}
+
+// projectsOfFolders is projectOfFolder for many agents, each folder read once (#3276).
+type projectsOfFolders map[string]string
+
+func (p projectsOfFolders) of(a *wire.Agent) string {
+	folder := folderPath(a)
+	id, ok := p[folder]
+	if !ok {
+		id = projectOfFolder(folder)
+		p[folder] = id
+	}
+	return id
+}
+
+// withProject is the agent with the project its folder is in now (#3276): a session
+// carries its project, so a list from many machines can be grouped by it.
+func withProject(a wire.Agent, id string) wire.Agent {
+	a.Project = nil
+	if id != "" {
+		a.Project = &id
+	}
+	return a
+}
+
+// controlMachine is this machine's id on the control plane it joined, or "" with none.
+func (d *Daemon) controlMachine() string {
+	d.machinePinMu.Lock()
+	defer d.machinePinMu.Unlock()
+	if d.machineMember == nil {
+		return ""
+	}
+	return d.machineMember.Host
+}
+
 // ensureProject writes a new project id into a folder that names none (FR-008). It leaves
 // alone a folder that is not there, an .agents that is a link, a file that is not an
 // object, one that names any project, and one with a change waiting for Keep or Undo.
@@ -170,6 +211,10 @@ func (d *Daemon) setProject(r wire.SetFolderProjectRequest) (wire.FolderSummary,
 	defer d.approveWrite(folder, folderConfig)
 	if err := setFolderConfig(folder, "project", r.Project); err != nil {
 		return wire.FolderSummary{}, configWriteError(err)
+	}
+	// Its sessions carry the project they are in now (#3276).
+	for _, a := range d.agentsOf(folder) {
+		d.tellChanged(a, &a)
 	}
 	return d.sendFolder(folder)
 }
