@@ -111,8 +111,8 @@
   .console .activity-body { padding: 4px 14px 18px; }
 }
 
-/* The console's buttons: one height, small corners; the primary in the accent; danger in the failure tint. */
-.console button:not(.link):not(.sort):not(.sub-app-row):not(.nav-item), .person-list .confirm button {
+/* The console's buttons: one height, small corners; the primary in the accent; danger in the failure tint. The Events rows' buttons are text (#3241). */
+.console button:not(.link):not(.sort):not(.sub-app-row):not(.nav-item):not(.event-open):not(.event-waiting):not(.event-stop), .person-list .confirm button {
   min-height: var(--console-control); border-radius: var(--radius-console); padding: 0 12px; }
 .console button.prominent { font-weight: 600; }
 .console button.destructive, .console button.danger, .person-list button.danger { color: var(--tint-failure);
