@@ -137,6 +137,7 @@ var own = methodSet(
 	"policy/stopAll",
 	"projects/list",
 	"projects/remove",
+	"projects/sessions",
 	"projects/set",
 	"projects/setSlot",
 	"providers/setGroup",
@@ -328,7 +329,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return m.peopleMethod(ctx, method, params, from)
 	case "groups/list", "groups/set", "groups/remove", "groups/setRole", "providers/setGroup":
 		return m.groupsMethod(ctx, method, params, from)
-	case "projects/list", "projects/set", "projects/remove", "projects/setSlot":
+	case "projects/list", "projects/set", "projects/remove", "projects/setSlot", "projects/sessions":
 		return m.projectsMethod(ctx, method, params, from)
 	case "scim/set", "scim/tokens/list", "scim/tokens/make", "scim/tokens/revoke":
 		return m.scimMethod(ctx, method, params, from)

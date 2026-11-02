@@ -323,6 +323,11 @@ export interface Agent {
    * when the runtime reports none, or cleared it.
    */
   goal?: Goal;
+  /**
+   * The project its folder is in (#3276), as the folder's .agents/folder.json names it now. Absent
+   * for a folder in no project.
+   */
+  project?: string;
 }
 
 export type AgentArchivedReason =
@@ -3260,6 +3265,11 @@ export interface FolderSummary {
    */
   projectProblem?: string;
   /**
+   * The machine the folder is on, as the control plane names it (#3276). Absent on a machine that
+   * has joined no control plane: the folder is on this one.
+   */
+  machine?: MachineRef;
+  /**
    * Set when the organisation's policy caps this folder's helper limits (#998, #64): the lower
    * number is used.
    */
@@ -4121,6 +4131,11 @@ export interface ListRequest {
   agentID?: UUID;
   after?: ListCursor;
   query?: string;
+  /**
+   * Only the sessions whose folder is in this project (#3276), as .agents/folder.json names it: the
+   * project's sessions on this machine.
+   */
+  project?: string;
 }
 
 export interface ListedSkill {
@@ -6315,9 +6330,41 @@ export interface ProjectList {
   projects: Project[];
 }
 
+/** A machine of projects/sessions (#3276) that has a folder of the project, by id and name. */
+export interface ProjectMachine {
+  machine: MachineRef;
+  machineName: string;
+}
+
 /** projects/remove (#2317): the project. Refused while a folder names it. */
 export interface ProjectRequest {
   id: string;
+}
+
+/**
+ * One session of projects/sessions (#3276): the machine it runs on, and the session as that machine
+ * lists it, lean.
+ */
+export interface ProjectSession {
+  machine: MachineRef;
+  machineName: string;
+  session: Agent;
+}
+
+/**
+ * projects/sessions (#3276): the project's sessions on each of the caller's machines that has a
+ * folder of it, newest activity first. unreached is the machines that have a folder of it but did
+ * not answer (offline, or too slow): their sessions are not in sessions.
+ */
+export interface ProjectSessions {
+  sessions: ProjectSession[];
+  unreached: ProjectMachine[];
+}
+
+/** projects/sessions (#3276): the project, and whether to list archived sessions too. */
+export interface ProjectSessionsRequest {
+  project: string;
+  includeArchived?: boolean;
 }
 
 /** projects/set (#2317): makes a project, or with id renames one. */
@@ -10281,7 +10328,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AddFolderRequest: { required: ["folder"], optional: ["project"] },
   Admitted: { required: [], optional: ["client", "host"] },
   AdoptRequest: { required: ["runtimeID", "sessionID", "cwd"], optional: [] },
-  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "desktopControlPause", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID", "auto", "clientPermission", "levels", "voiceHungUpAt", "goal"] },
+  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "desktopControlPause", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID", "auto", "clientPermission", "levels", "voiceHungUpAt", "goal", "project"] },
   AgentConfigEditorFile: { required: ["path", "content"], optional: [] },
   AgentConfigEditorRequest: { required: ["kind"], optional: ["folder"] },
   AgentConfigEditorSaveRequest: { required: ["kind", "path", "content"], optional: ["folder", "delete"] },
@@ -10553,7 +10600,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FolderPlugin: { required: ["folder", "name", "carries", "folderPath"], optional: ["awaitingApproval"] },
   FolderRemovedNotification: { required: ["folder"], optional: [] },
   FolderRequest: { required: ["folder"], optional: [] },
-  FolderSummary: { required: ["name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "folder"], optional: ["guardedChanges", "approvals", "project", "projectProblem", "helperLimitsSetBy"] },
+  FolderSummary: { required: ["name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "folder"], optional: ["guardedChanges", "approvals", "project", "projectProblem", "machine", "helperLimitsSetBy"] },
   FolderWorktrees: { required: ["worktrees", "folder"], optional: [] },
   FoldersFindRequest: { required: [], optional: ["paths", "folders"] },
   FoldersListRequest: { required: ["includeArchived"], optional: [] },
@@ -10637,7 +10684,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineageNodeRequest: { required: ["node"], optional: ["depth"] },
   LineageResolved: { required: ["title"], optional: ["state", "labels"] },
   ListCursor: { required: ["lastActivityAt", "id"], optional: ["archivedAt"] },
-  ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query"] },
+  ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query", "project"] },
   ListedSkill: { required: ["name", "folder"], optional: ["description", "managed"] },
   LiveAgent: { required: ["host", "hostName", "owner", "ownerName", "bot", "agent", "runtime", "state"], optional: ["waitsOnOthers", "workflow", "since", "costToDate", "heardAt"] },
   LiveBoard: { required: ["agents"], optional: [] },
@@ -10848,7 +10895,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Project: { required: ["id", "name", "owner", "folders", "mayChange"], optional: ["slots"] },
   ProjectFolder: { required: ["machine", "folder", "name"], optional: [] },
   ProjectList: { required: ["projects"], optional: [] },
+  ProjectMachine: { required: ["machine", "machineName"], optional: [] },
   ProjectRequest: { required: ["id"], optional: [] },
+  ProjectSession: { required: ["machine", "machineName", "session"], optional: [] },
+  ProjectSessions: { required: ["sessions", "unreached"], optional: [] },
+  ProjectSessionsRequest: { required: ["project"], optional: ["includeArchived"] },
   ProjectSet: { required: ["name"], optional: ["id"] },
   ProjectSlot: { required: ["slot"], optional: ["forge", "repository", "site", "skipped"] },
   ProjectSlotSet: { required: ["id", "slot"], optional: ["value"] },

@@ -553,6 +553,7 @@ var CallPolicyStopAll = Method[PolicyStopAllRequest, PolicyKept]{"policy/stopAll
 var CallProjectsJoined = Method[ProjectsJoined, MachineProjects]{"projects/joined"}
 var CallProjectsList = Method[Empty, ProjectList]{"projects/list"}
 var CallProjectsRemove = Method[ProjectRequest, Empty]{"projects/remove"}
+var CallProjectsSessions = Method[ProjectSessionsRequest, ProjectSessions]{"projects/sessions"}
 var CallProjectsSet = Method[ProjectSet, Project]{"projects/set"}
 var CallProjectsSetSlot = Method[ProjectSlotSet, Project]{"projects/setSlot"}
 var CallProvidersAdd = Method[ProviderAdd, ProviderSummary]{"providers/add"}

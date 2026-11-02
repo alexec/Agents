@@ -51,6 +51,7 @@ func (d *Daemon) tellChanged(a wire.Agent, before *wire.Agent) {
 	if a.Purpose != nil {
 		return
 	}
+	a = withProject(a, projectOfFolder(folderPath(&a)))
 	lean := leaned(a)
 	showers := d.showers(a.ID)
 	if len(showers) == 0 || before != nil && !listsDiffer(&a, before) {
