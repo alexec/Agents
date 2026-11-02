@@ -39,7 +39,7 @@ struct LineagePane: View {
             } else if let graph, !graph.nodes.contains(where: { $0 != me }) {
                 message(LineageList.none)
             } else if let layout {
-                LineageGraphView(graph: layout, open: action(for:))
+                LineageGraphView(graph: layout, open: action(for:), verb: verb(for:))
                     .safeAreaInset(edge: .bottom, spacing: 0) {
                         footer.padding(.horizontal, 12).padding(.vertical, 6)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -134,12 +134,21 @@ struct LineagePane: View {
         layout = graph.map { LineageLayout.graph(of: me, graph: $0, costs: costs, title: title) }
     }
 
-    /// A GitHub issue or PR opens in the browser; a session in this window goes to its chat.
+    /// An issue, a PR, a milestone or a release opens its Work page (#3088), else on GitHub; a
+    /// session in this window goes to its chat.
     private func action(for row: LineageList.Row) -> (() -> Void)? {
         if row.node == me { return nil }
+        if popped == nil, let kind = WorkList.kind(of: row.node) {
+            return { model.showWork(WorkPlace(kind: kind, ref: row.node.ref)) }
+        }
         if let url = row.url { return { openURL(url) } }
         if popped == nil, let id = row.session, model.work.agent(id) != nil { return { model.selection = id } }
         return nil
+    }
+
+    private func verb(for row: LineageList.Row) -> String {
+        if popped == nil, WorkList.kind(of: row.node) != nil { return "Open its page" }
+        return row.url != nil ? "Open it on GitHub" : "Show this session"
     }
 
     private func message(_ text: String) -> some View {

@@ -4,7 +4,8 @@
 // has a scope, Me, a group or the organisation, and names it.
 import { useEffect, useMemo, useRef } from "preact/hooks";
 import { signal, useSignal } from "@preact/signals";
-import { go } from "../route";
+import { go, routeHash } from "../route";
+import { hasPage } from "../model/work";
 import type { Store } from "../model/store";
 import type { FeatureUsage, ReportFormat, ReportPage, ReportRange, ReportRow, ReportScope, ReportScopeOption, ReportValue, ReportValueRow, ReportView,
   UsageReport } from "../protocol/generated";
@@ -16,7 +17,7 @@ import { adoption, adoptionLine, barCaption, adoptionNote, budgetWords, dimensio
 import type { OutcomeGroup, OutcomeOrder, ReportDimension, ReportGroup } from "../model/reports";
 import { featureLine, featureUnused, featuresNote, mergeFeatures, noFeatures } from "../model/features";
 import { hostAnswers } from "../model/capabilities";
-import { leadLine, noValue, noValueHere, nodeName, nodeUrl, rowLine, unlinkedLine, valueHeadline, valueNote, wasteLine } from "../model/value";
+import { leadLine, noValue, noValueHere, nodeName, rowLine, unlinkedLine, valueHeadline, valueNote, wasteLine } from "../model/value";
 import type { Section } from "../model/console";
 import { Choice } from "./Choice";
 
@@ -377,12 +378,12 @@ function ValuePane({ store, scope, initial }: { store: Store; scope: ReportScope
     });
   }, [range.value, scope && scopeKey(scope)]);
   const shown = value.value?.range === range.value && sameScope(value.value.scope, asked.scope) ? value.value : null;
-  // An issue or a milestone on GitHub opens there, as the window's Link does.
+  // An issue, a milestone or a release opens its Work page (#3088), its lineage and its forge's link there.
   const row = (r: ReportValueRow) => {
-    const url = nodeUrl(r.node);
+    const n = r.node;
     return (
-      <li key={r.node.ref}>
-        {url ? <a href={url} target="_blank" rel="noopener noreferrer">{nodeName(r.node)}</a> : <span>{nodeName(r.node)}</span>}
+      <li key={n.ref}>
+        {hasPage(n) ? <a href={routeHash({ nav: "work", section: n.kind, item: n.ref })}>{nodeName(n)}</a> : <span>{nodeName(n)}</span>}
         <span class="quiet small">{rowLine(r)}</span>
       </li>
     );

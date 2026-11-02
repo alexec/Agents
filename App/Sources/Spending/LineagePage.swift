@@ -160,7 +160,8 @@ struct LineagePage: View {
         }
     }
 
-    /// The start's name and what it is, the machine it is walked on (#3157), and where to open it: on GitHub, or its chat.
+    /// The start's name and what it is, the machine it is walked on (#3157), and where to open it:
+    /// its Work page (#3088), on GitHub, or its chat.
     private func heading(_ row: LineageList.Row, on host: MachineRef) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(row.node.kind == "session" ? title(row.node) ?? "A session" : row.name)
@@ -175,7 +176,11 @@ struct LineagePage: View {
                 .monospacedDigit()
                 .lineLimit(1)
             Spacer()
-            if let url = row.url {
+            if let kind = WorkList.kind(of: row.node) {
+                Button("Open its page") { model.showWork(WorkPlace(kind: kind, ref: row.node.ref)) }
+                    .buttonStyle(.link)
+                    .help("Its Work page: what its forge says, its links and its cost")
+            } else if let url = row.url {
                 Button("Open on GitHub") { openURL(url) }.buttonStyle(.link)
             } else if let id = row.session, model.work.agent(id) != nil {
                 Button("Show the Chat") { model.openAgent(id) }.buttonStyle(.link)
