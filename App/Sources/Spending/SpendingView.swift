@@ -21,24 +21,10 @@ struct SpendingView: View {
     private var spending: Spending { Spending(model.folders) }
 
     var body: some View {
-        @Bindable var model = model
-        Group {
-            switch model.costPane {
-            case .cost: cost
-            case .reports: ReportsPane(control: model.controlRequests, features: { await model.featureUsage() })
-            case .lineage: LineagePage()
-            }
-        }
-        .navigationTitle(model.costPane.rawValue)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Picker("Show", selection: $model.costPane) {
-                    ForEach(CostPane.allCases) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
-            }
+        if model.showsLineage {
+            LineagePage().navigationTitle("Lineage")
+        } else {
+            cost.navigationTitle("Cost")
         }
     }
 
@@ -123,16 +109,6 @@ struct SpendingView: View {
             .foregroundStyle(.secondary)
             .padding(.top, 4)
     }
-}
-
-/// The Cost page's panes (#1811), and Lineage: the work's cost, time and tokens along its links,
-/// from any start (#3087).
-enum CostPane: String, CaseIterable, Identifiable {
-    case cost = "Cost"
-    case reports = "Reports"
-    case lineage = "Lineage"
-
-    var id: Self { self }
 }
 
 /// One folder's share of the bill.

@@ -65,7 +65,7 @@ Open issues: `is:open label:integration allowance`.
 | Grok billing | Mac, Remote, web | built | — | `Packages/AgentsKit/Sources/AgentsKitCore/Runtimes/Allowance/AllowanceReading.swift` | |
 | Limits recognised from error text (Codex, Copilot, Cursor) | Mac, Remote, web | built | — | `Packages/AgentsKit/Sources/AgentsKitCore/Runtimes/Allowance/LimitRecognition.swift`, `Go/internal/agentsd/limits.go` | |
 | Codex token refresh (auth.openai.com) | Mac, server | built | — | `Go/internal/mac/signin/codex.go` | |
-| Gemini key check (generativelanguage.googleapis.com) | Mac | retired | 2026-10-31: the runtime was retired (#3043) | `Packages/AgentsKit/Sources/AgentsKitCore/Credentials/CredentialCheck.swift` | |
+| Gemini key check (generativelanguage.googleapis.com) | Mac | removed | 2026-11-02: the runtime was retired (#3043) and the key check removed (#3137) | — | |
 | OpenCode borrows the Mac's provider keys | Mac, server | built | — | `Packages/AgentsKit/Sources/AgentsKitCore/Runtimes/LentFileSignIn.swift` | |
 | More than one Claude account (`CLAUDE_CONFIG_DIR`) | Mac, Remote, web | built (walked on a scratch set-up with an account not signed in; not tested on a real second account) | 2026-10-21 | `Go/internal/agentsd/accounts.go` | Alex to test with two real sign-ins (#840) |
 | More than one Codex account (`CODEX_HOME`) | Mac, Remote, web | built (not walked: no Codex on the walk's Mac) | 2026-10-21 | `Go/internal/agentsd/accounts.go` | Alex to test with two real sign-ins (#840) |

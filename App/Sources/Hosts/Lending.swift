@@ -77,13 +77,13 @@ extension AppModel {
         ask.answer.resume(returning: allowed)
     }
 
-    /// What a server may be lent from here, sent on every connect (043). Names only.
+    /// What a server may be lent from here, sent on every connect (043). Names only. No
+    /// runtime takes a pasted key now that Gemini is retired (#3043), so it names none.
     func credentialOffer(_ id: MachineRef) -> DaemonAPI.CredentialsOffer {
         let ownOnly = hosts.host(id)?.ownSignInOnly ?? false
-        let runtimes = ownOnly ? [] : ServerCredentials.runtimes.filter { credentials.record($0) != nil }
         // The window relays no sign-in and lends no sign-in file: Agents Host does, on its
         // Mac (T091).
-        return DaemonAPI.CredentialsOffer(runtimes: runtimes, ownSignInOnly: ownOnly, notRelayed: nil, signIns: nil)
+        return DaemonAPI.CredentialsOffer(runtimes: [], ownSignInOnly: ownOnly, notRelayed: nil, signIns: nil)
     }
 
     /// A server's daemon wants a credential to start a runtime (043, R6): a sign-in this
@@ -93,26 +93,5 @@ extension AppModel {
     func answerCredentialWanted(_ wanted: DaemonAPI.CredentialWanted, on id: MachineRef) async -> Bool {
         guard id != .mac, !(hosts.host(id)?.ownSignInOnly ?? false) else { return false }
         return await relaySignInThroughControl(wanted, to: id) ?? false
-    }
-
-    /// What this Mac's own agents are lent (046, D3): no runtime takes a pasted key now
-    /// that Gemini, the last one that did, is retired (#3043), so this always offers none.
-    /// Offered then lent on every connect and whenever a key is saved or removed; an offer
-    /// without it tells the daemon to stop lending it.
-    func lendToThisMac() async {
-        let runtimes = ServerCredentials.runtimes.filter { id in
-            credentials.record(id) != nil && CredentialKind.kinds(for: id).contains(where: \.isLentOnTheMac)
-        }
-        _ = try? await client(for: .mac).call(DaemonAPI.Method.credentialsOffer,
-                                   DaemonAPI.CredentialsOffer(runtimes: runtimes, ownSignInOnly: false))
-    }
-
-    /// This Mac's daemon wants a key it was not lent (a start raced the connect's lend, or
-    /// the key was just added): lend what Settings has. With none, the start's refusal says
-    /// where to add one.
-    func answerMacCredentialWanted(_ wanted: DaemonAPI.CredentialWanted) async -> Bool {
-        guard credentials.secretToLend(wanted.runtime) != nil else { return false }
-        await lendToThisMac()
-        return true
     }
 }

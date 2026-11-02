@@ -185,8 +185,9 @@ final class AppModel {
     /// Not persisted, unlike the selected folder. Spending is somewhere you go to
     /// answer a question — what has this cost — and a window that reopens on the bill
     /// rather than on the work would be answering a question nobody asked twice.
-    /// The Cost page's pane (#1811), or Lineage (#3087). Not persisted, as the page is not.
-    var costPane: CostPane = .cost
+    /// Whether the Cost page's place shows the Lineage page (#3087) instead of the cost. Not
+    /// persisted, as the page is not.
+    var showsLineage = false
     /// Where the Lineage page's walk starts, and the starts before and after it (#3087). Kept
     /// while the window is open, so going back to the page goes back to where it was.
     var lineageHistory = LineageHistory<LineagePlace>()
@@ -532,7 +533,7 @@ final class AppModel {
             if showsRuntimes { return .runtimes }
             if showsMCPServers { return .mcpServers }
             if showsWorktrees { return .worktrees }
-            if showsSpending { return costPane == .lineage ? .lineage : .spending }
+            if showsSpending { return showsLineage ? .lineage : .spending }
             if showsTokens { return .tokens }
             if showsTime { return .time }
             if showsMilestones { return .milestones }
@@ -574,7 +575,7 @@ final class AppModel {
             case .review(let id, let key):
                 showFolderPage(.review(id), of: key)
             case .spending:
-                if costPane == .lineage { costPane = .cost }
+                showsLineage = false
                 showsSpending = true
             case .lineage:
                 showLineage()
@@ -1069,8 +1070,6 @@ final class AppModel {
     private(set) var needsFirstRun = ControlConfig.needsFirstRun
     /// The servers (037). This Mac is `client`, as it always was.
     let hosts = HostSet(locations: .default)
-    /// What this window may lend to servers (043). Never to this Mac's own daemon (D5).
-    let credentials = ServerCredentials(locations: .default)
     /// The Export… or Import Agents… on its way, drawn as a busy sheet with Cancel (#2437).
     var exportImport: ExportImportProgress?
     /// A server asked for a sign-in this Mac relays; the window asks the person (T091).
@@ -2040,19 +2039,6 @@ final class AppModel {
             }
         }
         return histories.isEmpty ? nil : .merged(histories)
-    }
-
-    /// Which features were used (#2165), for Reports ▸ Features: this Mac's counts and every
-    /// connected server's, added up. Nil when no host knows the method.
-    func featureUsage() async -> DaemonAPI.FeatureUsage? {
-        var all: [DaemonAPI.FeatureUsage] = []
-        for host in chartHosts {
-            if let usage = try? await client(for: host).call(DaemonAPI.Method.reportsFeatures, DaemonAPI.Empty(),
-                                                              returning: DaemonAPI.FeatureUsage.self) {
-                all.append(usage)
-            }
-        }
-        return all.isEmpty ? nil : .merged(all)
     }
 
     /// This Mac first, then every server that has said what it spends.
@@ -3053,10 +3039,6 @@ final class AppModel {
             hosts.macDownSince = nil
             missesWithHostUp = 0
             problem = nil
-            await client.setCredentialLender { [weak self] wanted in
-                await self?.answerMacCredentialWanted(wanted) ?? false
-            }
-            await lendToThisMac()
             listen()
             // A new connection watches nothing; what the files pane was watching is asked
             // for again, and what it shows is read again (#62).
@@ -3295,9 +3277,8 @@ final class AppModel {
             // One that works with no sign-in goes wherever this Mac has it (049: OpenCode's free
             // models); on an "own sign-in only" server too, since nothing is lent to install it.
             if RuntimeLaunchCatalog.launch(for: runtimeID).lentSignIn != nil { return self.hasOnThisMac(runtimeID) }
-            guard !(self.hosts.host(id)?.ownSignInOnly ?? false) else { return false }
-            // A key in Settings, or this Mac's own sign-in relayed (047).
-            return self.credentials.record(runtimeID) != nil
+            // No runtime takes a pasted key from Settings now that Gemini is retired (#3043).
+            return false
         }
         hosts.onConnected = { [weak self] host in
             await self?.refreshServer(host)
@@ -3677,9 +3658,7 @@ final class AppModel {
             // These describe the Mac's shared resources and event feed in this window.
             return
         case DaemonAPI.Notification.credentialRefused:
-            // The key in Settings was refused: Settings turns red, and says why (043).
             if let refused = try? params?.decode(DaemonAPI.CredentialRefused.self) {
-                if refused.lent { credentials.markRefused(refused.runtime) }
                 // This Mac's own sign-in was refused through the relay (056): sign in here.
                 if refused.relayed == true { signInRuntimeID = refused.runtime }
                 // A key this Mac's sign-in file lent (049): its sheet names the command.
@@ -5834,7 +5813,7 @@ final class AppModel {
     /// Open the Lineage page (#3087), from a place or from where it was.
     func showLineage(from place: LineagePlace? = nil) {
         if let place { lineageHistory.go(place) }
-        costPane = .lineage
+        showsLineage = true
         showsSpending = true
     }
 

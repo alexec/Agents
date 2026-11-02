@@ -134,7 +134,7 @@ func Open(l Locator) (Store, error) {
 	return nil, fmt.Errorf("%s is not a place for connections", EnvName)
 }
 
-// KeychainService is the root's own service, as CredentialStore's: the first four bytes of
+// KeychainService is the root's own service: the first four bytes of
 // the root path's SHA-256, so a scratch root never reads or writes the real one's items.
 func KeychainService(root string) string {
 	sum := sha256.Sum256([]byte(filepath.Clean(root)))

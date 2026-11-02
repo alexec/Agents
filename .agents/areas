@@ -369,7 +369,6 @@ App/Sources/Hosts/                                     machines
 App/Sources/AppModel+MacHost.swift                     machines
 App/Sources/WakeAndNetwork.swift                       machines
 App/Sources/Settings/WakeSettingsSection.swift         machines
-App/Sources/Settings/ServerCredentials.swift           machines
 App/Sources/Control/ControlAddServerSheet.swift        machines
 App/Sources/Control/ThisMacHost.swift                  machines
 App/Sources/Control/HostFoldersPicker.swift           machines
@@ -564,11 +563,8 @@ Go/internal/controlplane/console*                      reports
 Go/internal/agentsd/reportledger*.go                   reports
 Packages/AgentsKit/Sources/AgentsKitCore/Model/EventAudit.swift  reports
 Packages/AgentsKit/Sources/AgentsKitCore/Model/Reports.swift  reports
-Packages/AgentsKit/Sources/AgentsKitCore/Model/ReportTotals.swift  reports
 Packages/AgentsKit/Tests/AgentsKitTests/Unit/EventAuditTests.swift  reports
-Packages/AgentsKit/Tests/AgentsKitTests/Unit/ReportTotalsTests.swift  reports
 Shared/UI/Events/AuditPane.swift                       reports
-Shared/UI/ReportsPane.swift                            reports
 Shared/UI/Console/                                     reports
 Web/src/model/audit.ts                                 reports
 Web/src/model/reports.ts                               reports
