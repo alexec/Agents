@@ -162,7 +162,7 @@ a node from this machine's totals. Each part counts once.
 | A PR, a session, any other node | itself |
 | An issue | itself, and the PRs that fix it (ended `fixes` links too) |
 | A milestone | the issues and PRs `part-of` it, and the PRs that fix those issues |
-| A project (`kind` `project`, `ref` `github:alexec/agents`) | every node in that repo or tracker |
+| A repo (`kind` `repo`, `ref` `github:alexec/agents`; was `project` before #3275) | every node in that repo or tracker |
 
 - `own` is what was banked on the node itself, `total` adds its parts, `waste` is the
   parts' PRs closed without a merge or reverted, and `unlinked` is the parts' sessions:

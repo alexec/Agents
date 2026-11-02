@@ -23,7 +23,7 @@ import (
 //   - A helper with no work of its own works for its parent: the session that started it,
 //     and so on up, at most lineage.MostDepth sessions.
 //   - A turn with no work at all goes under the session itself, so every turn is
-//     somewhere; a project's rollup says those as unlinked.
+//     somewhere; a repo's rollup says those as unlinked.
 //   - What is banked stays: a label changed later moves nothing (#829).
 //
 // The banking is done on the linker's goroutine, after the links given before it, so the
@@ -83,9 +83,9 @@ func (d *Daemon) bankWork(a *wire.Agent, add wire.LineageCost) {
 	at := nowFunc()
 	d.lineageDo(func() {
 		work := d.workOf(id)
-		project := ""
+		repo := ""
 		if len(work) == 1 && work[0].Kind == lineage.KindSession {
-			project = d.sessionProject(folder)
+			repo = d.sessionRepo(folder)
 		}
 		shares := lineage.Split(add, len(work))
 		// After the unlock: a merged PR's comment says the new total (#2352).
@@ -94,8 +94,8 @@ func (d *Daemon) bankWork(a *wire.Agent, add wire.LineageCost) {
 		defer d.workMu.Unlock()
 		for i, n := range work {
 			d.noteCostLocked(n, at, func(c *wire.LineageCostNode) {
-				if project != "" {
-					c.Project = &project
+				if repo != "" {
+					c.Repo = &repo
 				}
 				lineage.AddCost(&c.Banked, shares[i])
 			})
@@ -104,8 +104,8 @@ func (d *Daemon) bankWork(a *wire.Agent, add wire.LineageCost) {
 	})
 }
 
-// sessionProject is a session's project: its folder's repo, or folder:<name> without one.
-func (d *Daemon) sessionProject(folder string) string {
+// sessionRepo is a session's repo: its folder's repo, or folder:<name> without one.
+func (d *Daemon) sessionRepo(folder string) string {
 	if r := d.folderRepo(folder); r.forge != "" {
 		return r.forge + ":" + r.path
 	}
@@ -155,8 +155,8 @@ func (d *Daemon) noteCostLocked(n wire.LineageNode, at time.Time, change func(*w
 	c, ok := f.Nodes[k]
 	if !ok {
 		c = wire.LineageCostNode{Node: n, Banked: wire.LineageCost{Cost: map[string]float64{}}}
-		if p := lineage.ProjectOf(n); p != "" {
-			c.Project = &p
+		if p := lineage.RepoOf(n); p != "" {
+			c.Repo = &p
 		}
 		// The start of the work on it, for Reports ▸ Value's lead time (#2351).
 		first := wire.DateOf(at)

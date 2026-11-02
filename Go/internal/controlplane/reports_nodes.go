@@ -284,11 +284,11 @@ func nodeRow(of wire.LineageNode, byNode map[wire.LineageNode]wire.LineageCostNo
 		Total: sum.Total, Waste: sum.Waste}, LeadTimeSeconds: sum.LeadTimeSeconds}
 	if own, ok := byNode[of]; ok {
 		lineage.AddCost(&row.Cost.Own, own.Banked)
-		row.Project, row.Resolved, row.Outcome = own.Project, own.Resolved, own.Outcome
+		row.Repo, row.Resolved, row.Outcome = own.Repo, own.Resolved, own.Outcome
 	}
-	if row.Project == nil {
-		if p := lineage.ProjectOf(of); p != "" {
-			row.Project = &p
+	if row.Repo == nil {
+		if p := lineage.RepoOf(of); p != "" {
+			row.Repo = &p
 		}
 	}
 	sessions := map[string]bool{}

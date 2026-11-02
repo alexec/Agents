@@ -134,8 +134,8 @@ func mergeNode(have *wire.LineageCostNode, n wire.LineageCostNode) {
 			have.Sessions = append(have.Sessions, id)
 		}
 	}
-	if have.Project == nil {
-		have.Project = n.Project
+	if have.Repo == nil {
+		have.Repo = n.Repo
 	}
 	// The newest title, state and labels any machine resolved (#3118).
 	if n.Resolved != nil && (have.Resolved == nil || n.LastAt > have.LastAt) {
