@@ -1,5 +1,5 @@
 import AgentsKitCore
-import Foundation
+import SwiftUI
 
 /// What the Work views (#3119, #3130) ask of the app that draws them: the Mac's `AppModel` and
 /// the Remote's `RemoteModel` (#3256). Each reaches the machines its own way: the Mac through the
@@ -37,4 +37,14 @@ protocol WorkModel: AnyObject, Sendable {
 extension WorkModel {
     /// Where Work is: Issues until something else is opened.
     var workPlace: WorkPlace { workHistory.current ?? WorkPlace(kind: .issue) }
+}
+
+extension View {
+    /// `.task(id:)` for Work's loads, run to their end. On the Remote a collapsing split view
+    /// says a page disappeared while it stays on screen (#3256): a cancelled load was never
+    /// started again, and the page waited for ever. A load checks that its id is still the
+    /// current one before it shows what it read, so a newer one wins.
+    func workTask<ID: Equatable>(id: ID, _ work: @escaping @MainActor () async -> Void) -> some View {
+        task(id: id) { await Task { await work() }.value }
+    }
 }

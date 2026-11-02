@@ -25,6 +25,10 @@ struct WorkView: View {
             }
         }
         .navigationTitle(place.ref == nil ? "Work" : place.kind.title)
+        #if os(iOS)
+        // The kind is in the bar already: no large title over the filters.
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
         .toolbar {
             ToolbarItemGroup(placement: Self.historyPlacement) {
                 Button { model.workHistory.back() } label: { Image(systemName: "chevron.left") }
@@ -119,8 +123,10 @@ private struct WorkListPane: View {
             Divider()
             content
         }
-        .task(id: Ask(state: filter.state.forge, sort: nodesSort, asked: asked)) { await load() }
+        .workTask(id: ask) { await load() }
     }
+
+    private var ask: Ask { Ask(state: filter.state.forge, sort: nodesSort, asked: asked) }
 
     private struct Ask: Equatable {
         var state: String
@@ -271,16 +277,17 @@ private struct WorkListPane: View {
     }
 
     private func load() async {
+        let mine = ask
         lists = nil
         lineage = []
         problem = nil
         do {
             let known = try await readLineage()
-            guard !Task.isCancelled else { return }
+            guard ask == mine else { return }
             lineage = known.nodes
             lineageCursor = known.cursor
         } catch {
-            guard !Task.isCancelled else { return }
+            guard ask == mine else { return }
             // A control plane that does not list nodes yet leaves the issues and PRs without figures.
             if !kind.fromForge { problem = ReportValueWords.sentence(error) }
         }
@@ -299,7 +306,7 @@ private struct WorkListPane: View {
             }
             for await (host, list) in group { read.append((host, list)) }
         }
-        guard !Task.isCancelled else { return }
+        guard ask == mine else { return }
         lists = read
     }
 

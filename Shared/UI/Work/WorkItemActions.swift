@@ -161,7 +161,7 @@ struct WorkItemActions: View {
             }
         }
         .fixedSize()
-        .task(id: node) { await loadLabels() }
+        .workTask(id: node) { await loadLabels() }
     }
 
     private func loadLabels() async {

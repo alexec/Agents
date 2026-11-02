@@ -58,8 +58,8 @@ struct WorkItemPage: View {
         #if os(iOS)
         .refreshable { asked += 1 }
         #endif
-        .task(id: asked) { await loadForge() }
-        .task(id: LineageAsk(host: lineageHost, asked: asked)) { await loadLineage() }
+        .workTask(id: asked) { await loadForge() }
+        .workTask(id: LineageAsk(host: lineageHost, asked: asked)) { await loadLineage() }
     }
 
     private struct LineageAsk: Equatable {
@@ -236,6 +236,7 @@ struct WorkItemPage: View {
     // MARK: Loading
 
     private func loadForge() async {
+        let mine = asked
         detail = nil
         forgeProblem = nil
         guard place.kind.fromForge else { return }
@@ -245,14 +246,14 @@ struct WorkItemPage: View {
         for machine in machines {
             do {
                 let got = try await model.forgeItem(node, cursor: nil, on: machine.id)
-                guard !Task.isCancelled else { return }
+                guard asked == mine else { return }
                 detail = (machine.id, got)
                 return
             } catch {
                 last = error.localizedDescription
             }
         }
-        guard !Task.isCancelled else { return }
+        guard asked == mine else { return }
         forgeProblem = last ?? WorkList.notReadHere
     }
 
@@ -290,9 +291,10 @@ struct WorkItemPage: View {
         linksFailed = false
         reading = false
         guard let host = lineageHost else { return }
+        let mine = LineageAsk(host: host, asked: asked)
         do {
             var walked = try await model.lineageWalk(node, on: host)
-            guard !Task.isCancelled else { return }
+            guard LineageAsk(host: lineageHost, asked: asked) == mine else { return }
             graph = walked
             lay()
             var found: [DaemonAPI.LineageNode: DaemonAPI.LineageCostRollup] = [:]
@@ -304,7 +306,7 @@ struct WorkItemPage: View {
                     if let rollup { found[rollup.node] = rollup }
                 }
             }
-            guard !Task.isCancelled else { return }
+            guard LineageAsk(host: lineageHost, asked: asked) == mine else { return }
             costs = found
             lay()
             // The daemon resolves titles in the background (#3102): walk again while it says some are to come.
@@ -316,13 +318,13 @@ struct WorkItemPage: View {
                 } catch {
                     break
                 }
-                guard !Task.isCancelled else { return }
+                guard LineageAsk(host: lineageHost, asked: asked) == mine else { return }
                 graph = walked
                 lay()
             }
             reading = false
         } catch {
-            guard !Task.isCancelled else { return }
+            guard LineageAsk(host: lineageHost, asked: asked) == mine else { return }
             linksFailed = true
         }
     }
