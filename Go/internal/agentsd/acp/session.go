@@ -114,7 +114,7 @@ func handshake(ctx context.Context, l Launch, sink Sink) (_ *Session, silent boo
 		return nil, false, fmt.Errorf("start %s: %w", l.Command, err)
 	}
 	s := &Session{cmd: cmd, stderr: stderr, done: make(chan struct{})}
-	s.client = &client{sink: sink, dir: l.Dir, env: l.Env, runtime: l.Name, terminals: map[string]*terminal{}}
+	s.client = &client{sink: sink, dir: l.Dir, env: l.Env, runtime: l.Name, terminals: map[string]*terminal{}, updates: newUpdateGate()}
 	s.conn = sdk.NewClientSideConnection(s.client, &sessionPromptWriter{w: stdin, c: s.client}, &rawElicitations{r: bufio.NewReader(stdout), c: s.client})
 	safe.Go("runtime wait", func() { _ = cmd.Wait(); close(s.done) })
 
@@ -353,6 +353,9 @@ type client struct {
 	// replaying is set while a session/load replays the conversation, which is already on
 	// the record.
 	replaying atomic.Bool
+	// updates holds the runtime's output while the SDK's queue is full (#3250); nil
+	// holds nothing.
+	updates *updateGate
 	// raw is each elicitation/create's params as the runtime sent them, oldest first. The
 	// SDK's typed request drops what the form is drawn from (propertyOrder, requestId).
 	raw []json.RawMessage
@@ -493,10 +496,12 @@ var (
 
 func (e *rawElicitations) Read(b []byte) (int, error) {
 	if len(e.pending) == 0 {
+		e.c.updates.wait()
 		line, err := e.r.ReadBytes('\n')
 		if len(line) == 0 {
 			return 0, err
 		}
+		e.c.updates.read(line)
 		e.keep(line)
 		e.pending = line
 	}
@@ -665,6 +670,7 @@ func isSessionLifecycle(line []byte) bool {
 
 func (c *client) SessionUpdate(ctx context.Context, n sdk.SessionNotification) (err error) {
 	defer safe.Err("acp SessionUpdate", &err)
+	defer c.updates.done()
 	if c.replaying.Load() {
 		return nil
 	}
