@@ -76,6 +76,9 @@ extension TranscriptEntry.Kind {
         case "sandboxFailure":
             guard let record = try? payload["_0"]?.decode(SandboxFailureRecord.self) else { return nil }
             return .sandboxFailure(record)
+        case "policyStopped":
+            guard let refusal = try? payload["_0"]?.decode(DaemonAPI.PolicyRefusal.self) else { return nil }
+            return .policyStopped(refusal)
         case "background":
             guard let item = try? payload["_0"]?.decode(BackgroundItem.self) else { return nil }
             return .background(item)
@@ -166,6 +169,8 @@ extension TranscriptEntry.Kind {
             return ["workReported": ["_0": (try? JSONValue.encoding(report)) ?? .null]]
         case .sandboxFailure(let record):
             return ["sandboxFailure": ["_0": (try? JSONValue.encoding(record)) ?? .null]]
+        case .policyStopped(let refusal):
+            return ["policyStopped": ["_0": (try? JSONValue.encoding(refusal)) ?? .null]]
         case .appView(let call):
             return ["appView": ["_0": (try? JSONValue.encoding(call)) ?? .null]]
         case .fileShown(let file):

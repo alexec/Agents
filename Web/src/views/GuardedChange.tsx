@@ -2,13 +2,15 @@
 // the question every client asks (#531; Shared/UI/Chat/GuardedChangeCard.swift): who made it, how many
 // lines changed, Review… for the whole change on its own page (#1472), and Keep or Undo for a quick answer. Asked over the prompt of the agent that made it, or on the
 // folder's page when no agent did. Until then the host goes on with the copy last approved. A workflow
-// waiting for an OK is asked the same way, by its file's path (#569).
+// waiting for an OK is asked the same way, by its file's path (#569). A folder's policy (#2957, frame D) says which
+// rules the change makes looser, and asks Allow, Keep <old value> or Show Change.
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { GuardedChange, GuardedChangeReading } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { go } from "../route";
 import { readingCounts } from "./Review";
+import { policyChangeButtons } from "../model/policyLayers";
 
 /** Every guarded change asked here: in `session`, or of the folder `folder` when there is none. */
 export function GuardedChangeCards({ store, host, where, down = false }: {
@@ -69,16 +71,18 @@ export function GuardedChangeCard({ store, host, folder, change, down }: {
   };
   const held = !reading.value || busy.value || down;
   const counts = reading.value ? readingCounts(reading.value) : undefined;
+  const words = change.policy ? policyChangeButtons(change.policy) : { allow: "Keep", undo: "Undo", review: "Review…" };
   return (
     <div class="card guarded-change" role="alert" aria-label={`Keep the change to ${change.path}?`}>
       <p class="strong">{guardedHeadline(change)}</p>
+      {change.policy && <p>{change.policy.words}</p>}
       <p class="guarded-answers">
         {counts ? <span class="quiet small counts" aria-label={`${counts.added} lines added, ${counts.removed} removed`}>
           +{counts.added} −{counts.removed}</span> : <span class="quiet small">Reading the change…</span>}
         <span class="spacer" />
-        <button onClick={() => go({ host, folder: folder, review: guardedApprovalID(change) })}>Review…</button>
-        <button disabled={held} onClick={() => answer(false)}>Undo</button>
-        <button class="prominent" disabled={held} onClick={() => answer(true)}>Keep</button>
+        <button onClick={() => go({ host, folder: folder, review: guardedApprovalID(change) })}>{words.review}</button>
+        <button disabled={held} onClick={() => answer(false)}>{words.undo}</button>
+        <button class="prominent" disabled={held} onClick={() => answer(true)}>{words.allow}</button>
       </p>
     </div>
   );

@@ -55,6 +55,69 @@ public enum PolicyLayersWords {
         }
     }
 
+    // MARK: Stopped by a policy (FR-025, frame E)
+
+    public static let stopTitle = "Stopped by a policy"
+    public static let stopSymbol = "hand.raised"
+
+    /// What a Stopped by a policy card offers, by the layer that decides: a change where the
+    /// person can make it, or where the organisation's rules are.
+    public enum StopAction: Hashable, Sendable {
+        /// Your layer: Settings ▸ Agents ▸ Policy.
+        case changeYours
+        /// A folder's layer: its Folder Settings ▸ Policy, by the folder's path.
+        case changeFolder(String)
+        /// An organisation budget: the Spending report. Ask for More waits for its request
+        /// (#3262).
+        case openSpending
+        /// Any other organisation rule, or a refusal that names no layer.
+        case seeOrganisation
+    }
+
+    public static func stopAction(_ refusal: DaemonAPI.PolicyRefusal) -> StopAction {
+        switch refusal.layer?.kind {
+        case "you": return .changeYours
+        case "folder": return refusal.layer?.folder.map(StopAction.changeFolder) ?? .seeOrganisation
+        default: return refusal.reason == "budget" ? .openSpending : .seeOrganisation
+        }
+    }
+
+    public static func stopActionTitle(_ action: StopAction) -> String {
+        switch action {
+        case .changeYours: "Change in \(groupTitle) ▸ \(title)"
+        case .changeFolder: "Change in Folder Settings ▸ \(title)"
+        case .openSpending: "Open Spending"
+        case .seeOrganisation: "See \(organisationTitle)"
+        }
+    }
+
+    /// A rule's name on the card: the row's title, or "Budget" for the organisation's whole
+    /// budget across machines.
+    public static func ruleTitle(_ rule: String) -> String {
+        if rule == "budgets" { return "Budget" }
+        return rows.first { $0.rule == rule }?.title ?? rule
+    }
+
+    /// The card's line under the rule: "<layer>: <value>", when the value says more than
+    /// the words do.
+    public static func stopLine(_ refusal: DaemonAPI.PolicyRefusal) -> String? {
+        guard let layer = refusal.layer, let value = refusal.value, value != refusal.words else { return nil }
+        return "\(layer.kind == "you" ? "Your policy" : layer.name): \(value)"
+    }
+
+    // MARK: A folder's layer (FR-022, frame D)
+
+    /// Folder Settings ▸ Policy's line under its title.
+    public static let folderIntro = "These rules apply to agents in this folder. They are kept in .agents/policy.json, committed with the folder’s code, so each person who opens the folder gets them. A rule here can only be tighter than yours."
+
+    /// A folder row's Not set: the person's value applies. "Same as yours (Ask)".
+    public static func sameAsYours(_ yours: String) -> String { "\(sameAsYours) (\(yours))" }
+
+    /// A folder value looser than yours is kept in the file and capped (US3 scenario 6).
+    public static func folderIsCapped(_ rule: DaemonAPI.EffectiveRule) -> Bool {
+        rule.layers.contains { $0.layer.kind == "folder" && $0.kept }
+    }
+
     // MARK: The rows
 
     public enum Section: String, CaseIterable, Sendable {

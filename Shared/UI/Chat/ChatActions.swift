@@ -91,6 +91,9 @@ struct ChatActions {
     /// "From" another agent's message (#560), its sender by its title as it is now (#3240,
     /// `AgentsModel.fromLine`). The default names it as it was when it was sent.
     var fromLine: @MainActor (MessageSender?) -> String = { AgentsModel.fromLine($0?.title) }
+    /// A Stopped by a policy card's button (#2957, FR-025): the pane of the layer that
+    /// decides. Nil draws the card without it.
+    var openPolicy: (@MainActor (PolicyLayersWords.StopAction) -> Void)? = nil
 }
 
 extension EnvironmentValues {

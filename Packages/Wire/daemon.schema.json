@@ -9819,6 +9819,10 @@
         },
         "askedIn": {
           "$ref": "#/definitions/UUID"
+        },
+        "policy": {
+          "$ref": "#/definitions/GuardedChangePolicy",
+          "description": "Set when the guarded file is a folder's .agents/policy.json (#2957, frame D): the rules the change makes looser, and the words for the card."
         }
       },
       "required": [
@@ -9827,6 +9831,30 @@
         "changedByIDs",
         "byGit",
         "since"
+      ],
+      "additionalProperties": false
+    },
+    "GuardedChangePolicy": {
+      "type": "object",
+      "description": "What a waiting change to a folder's .agents/policy.json does (#2957, contracts/policy-layers-api.md): the rules it makes looser, and one line that says so, such as \"Permission mode: Ask → Bypass Permissions\".",
+      "properties": {
+        "looser": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PolicyRuleName"
+          }
+        },
+        "words": {
+          "type": "string"
+        },
+        "was": {
+          "type": "string",
+          "description": "The approved value's words when the change loosens one rule, for the card's Keep <was> (frame D): \"Ask\"."
+        }
+      },
+      "required": [
+        "looser",
+        "words"
       ],
       "additionalProperties": false
     },
@@ -24279,6 +24307,28 @@
           },
           "required": [
             "sandboxFailure"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "policyStopped": {
+              "type": "object",
+              "description": "A rule of the policy stopped this agent (#2957, FR-025): a prompt that waits, or a turn that ended at a budget. The chat draws it as the Stopped by a policy card, with the rule, the layer that decides and the value.",
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/PolicyRefusal"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "policyStopped"
           ],
           "additionalProperties": false
         },

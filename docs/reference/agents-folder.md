@@ -67,6 +67,10 @@ sends its own settings to each server when it connects.
 These are not in `~/.agents`, because they belong to one machine, or because an agent must
 not be able to change them:
 
+- **A folder's own rules:** `.agents/policy.json` in the folder, the folder's layer of the
+  policy (#2957). Commit it with the folder's code. Set it in **Folder Settings ▸ Policy**
+  on the Mac, or **Settings ▸ Agents ▸ Policy** on the web page
+  ([Set rules for a folder](../how-to/set-rules-for-a-folder.md)).
 - **Secrets:** `~/.agents-secrets`, a separate folder that only you can read.
 - **This Mac's data:** agents, transcripts, and the sleep, resource, approval and
   retention-clock files, in `~/Library/Application Support/Agents`

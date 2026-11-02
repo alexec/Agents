@@ -47,11 +47,36 @@ public struct GuardedChange: Codable, Hashable, Sendable, Identifiable {
     /// there, unarchived. nil asks it of the folder, on its own page: a change git
     /// brought, or one whose agents are gone.
     public var askedIn: UUID?
+    /// What a waiting change to a folder's `.agents/policy.json` does (#2957, frame D): the
+    /// rules it makes looser, and the words for the card. nil for any other file.
+    public var policy: Policy?
+
+    /// A waiting policy change's rules and words, as the machine says them.
+    public struct Policy: Codable, Hashable, Sendable {
+        /// The rules the change makes looser, by name (`permissionMode`, `budgets.daily`).
+        public var looser: [String]
+        /// "Permission mode: Ask → Bypass Permissions", or why the file is not a valid policy.
+        public var words: String
+        /// The approved value when the change loosens one rule, for **Keep <was>**.
+        public var was: String?
+
+        public init(looser: [String], words: String, was: String? = nil) {
+            self.looser = looser
+            self.words = words
+            self.was = was
+        }
+
+        /// The undo button's title (frame D): **Keep Ask**, or **Keep Old Rules** when the
+        /// change loosens more than one rule or is not valid.
+        public var keepTitle: String {
+            was.map { "Keep \($0)" } ?? "Keep Old Rules"
+        }
+    }
 
     public var id: String { path }
 
     public init(path: String, digest: String?, changedBy: [String], changedByIDs: [UUID],
-                byGit: Bool, since: Date, askedIn: UUID? = nil) {
+                byGit: Bool, since: Date, askedIn: UUID? = nil, policy: Policy? = nil) {
         self.path = path
         self.digest = digest
         self.changedBy = changedBy
@@ -59,6 +84,7 @@ public struct GuardedChange: Codable, Hashable, Sendable, Identifiable {
         self.byGit = byGit
         self.since = since
         self.askedIn = askedIn
+        self.policy = policy
     }
 
     /// The question's title, as a card and a notification put it.

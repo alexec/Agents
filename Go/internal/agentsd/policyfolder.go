@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/internal/policylayers"
@@ -92,6 +93,47 @@ func (d *Daemon) checkFolderPolicyGuarded(folder string) {
 		tellPolicyEffectiveChanged(d, folder)
 	}
 	d.guardedFilesMoved(folder)
+}
+
+// folderPolicyChange is what a waiting change to .agents/policy.json does, for the card
+// (#2957, frame D): the rules it loosens, each as "<rule>: <approved> → <next>", and the
+// approved value alone when it loosens one rule, for Keep <was>. A file that is not a
+// valid layer says why instead.
+func folderPolicyChange(folder string, approvedContent []byte) *wire.GuardedChangePolicy {
+	var approved wire.PolicyRules
+	if len(approvedContent) > 0 {
+		approved, _ = policylayers.Validate(approvedContent)
+	}
+	var next wire.PolicyRules
+	if _, data := diskRead(folder, folderPolicyFile); data != nil {
+		var err error
+		if next, err = policylayers.Validate(data); err != nil {
+			return &wire.GuardedChangePolicy{Looser: []wire.PolicyRuleName{},
+				Words: "This is not a valid policy, so the last approved rules apply: " + err.Error()}
+		}
+	}
+	looser := policylayers.LooserRules(approved, next)
+	was := policylayers.Resolve([]policylayers.Layer{{Ref: folderLayerRef(folder), Rules: approved}})
+	is := policylayers.Resolve([]policylayers.Layer{{Ref: folderLayerRef(folder), Rules: next}})
+	words := make([]string, 0, len(looser))
+	for _, rule := range looser {
+		words = append(words, policylayers.RuleTitle(rule)+": "+layerWords(was, rule)+" → "+layerWords(is, rule))
+	}
+	out := &wire.GuardedChangePolicy{Looser: append([]wire.PolicyRuleName{}, looser...), Words: strings.Join(words, "; ")}
+	if len(looser) == 1 {
+		w := layerWords(was, looser[0])
+		out.Was = &w
+	}
+	return out
+}
+
+// layerWords is one rule's value as a single layer sets it, or "Not set".
+func layerWords(eff wire.EffectivePolicy, rule wire.PolicyRuleName) string {
+	r := effectiveRule(eff, rule)
+	if r == nil || r.Decides == nil {
+		return "Not set"
+	}
+	return r.Words
 }
 
 // folderPolicyState is policy/folder: the folder's approved layer, a waiting change, and

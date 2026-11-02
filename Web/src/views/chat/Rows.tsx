@@ -26,6 +26,7 @@ import { fromWireDate } from "../../protocol/dates";
 import type { Shown } from "../../model/shownFile";
 import { continueWithout, keepStopped, sandboxCard } from "../../model/sandboxWords";
 import { OrgPolicyLine } from "../OrgPolicyLine";
+import { PolicyStopCard } from "./PolicyStopCard";
 import { memo } from "../../render/memo";
 
 /** The text of a message's blocks: text blocks as Markdown, anything else named. */
@@ -427,6 +428,9 @@ function entryBody(entry: TranscriptEntry, from: (sender: MessageSender | undefi
       return <p class="quiet">{fields(entry, "runtimeNote")!._0}</p>;
     case "sandboxFailure":
       return <SandboxFailureCard record={fields(entry, "sandboxFailure")!._0} />;
+    case "policyStopped":
+      // A rule stopped this agent (#2957, FR-025): the rule, the layer that decides, and where to change it.
+      return <PolicyStopCard refusal={fields(entry, "policyStopped")!._0} />;
     case "appView":
       return <AppView call={fields(entry, "appView")!._0} />;
     case "fileShown":

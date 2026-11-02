@@ -67,3 +67,24 @@ func TestLooserRuntimesAddingARuntimeIsLooser(t *testing.T) {
 		t.Fatal("allowing an extra runtime must be looser")
 	}
 }
+
+// LooserRules names each looser rule, so a waiting folder change says what it loosens
+// (#2957, frame D).
+func TestLooserRulesNamesOnlyTheLooserRules(t *testing.T) {
+	two, three := int64(2), int64(3)
+	approved := wire.PolicyRules{
+		PermissionMode: permissionLevel(wire.PermissionLevelAsk),
+		Helpers:        &wire.PolicyHelpers{MostRunning: &three},
+	}
+	next := wire.PolicyRules{
+		PermissionMode: permissionLevel(wire.PermissionLevelBypassPermissions),
+		Helpers:        &wire.PolicyHelpers{MostRunning: &two},
+	}
+	got := LooserRules(approved, next)
+	if len(got) != 1 || got[0] != wire.PolicyRuleNamePermissionMode {
+		t.Fatalf("LooserRules = %v, want only permissionMode", got)
+	}
+	if RuleTitle(got[0]) != "Permission mode" {
+		t.Fatalf("RuleTitle = %q", RuleTitle(got[0]))
+	}
+}

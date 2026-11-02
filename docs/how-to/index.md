@@ -59,6 +59,8 @@ something particular done.
   checkout and branch.
 - [Give an agent more folders and connectors](give-an-agent-more-folders.md): let one
   agent work across two repositories, or reach a connector only it needs.
+- [Set rules for a folder](set-rules-for-a-folder.md): make the policy tighter for one
+  folder's agents, committed with its code.
 
 ### Agents
 

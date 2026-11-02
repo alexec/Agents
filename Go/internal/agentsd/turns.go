@@ -916,7 +916,11 @@ func (l *live) turn() bool {
 		if a := d.Store.Agent(l.id); a != nil {
 			if note := d.crossedLimit(a); note != "" {
 				d.raiseCostLimit("agent", a)
-				d.record(l.id, runtimeNote(note))
+				rule := "budgets.perAgent"
+				if d.agentAtLimit(a) == "tokens" {
+					rule = "budgets.perAgentTokens"
+				}
+				d.record(l.id, policyStopped(d.yourBudgetStop(a, rule, note)))
 				d.end(l, wire.AgentStateStopped, wire.EndedReasonCostLimit)
 				return false
 			}

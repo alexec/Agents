@@ -13,6 +13,9 @@ struct PolicyRuleRow: View {
     /// Your layer's value, or nil when you do not set it.
     let yours: JSONValue?
     let editable: Bool
+    /// The person's own value for a folder's row (FR-022): nil on your own layer. A folder
+    /// row that sets nothing says "Same as yours (<value>)", and a value above it is capped.
+    var yourValue: String? = nil
     let set: (JSONValue?) -> Void
 
     @State private var showsSource = false
@@ -29,8 +32,8 @@ struct PolicyRuleRow: View {
                     .appText(.fine).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            if let rule, PolicyLayersWords.yoursIsKept(rule) {
-                Text("\(PolicyLayersWords.keptNotUsed). \(rule.words) applies.")
+            if let rule, isFolder ? PolicyLayersWords.folderIsCapped(rule) : PolicyLayersWords.yoursIsKept(rule) {
+                Text("\(isFolder ? PolicyLayersWords.cappedByYours : PolicyLayersWords.keptNotUsed). \(rule.words) applies.")
                     .appText(.fine).foregroundStyle(.secondary)
             }
             Button(PolicyLayersWords.whereFrom) { showsSource = true }
@@ -53,13 +56,17 @@ struct PolicyRuleRow: View {
             menu(countChoices(numbers)) { PolicyLayersWords.count(row.rule, $0.intValue ?? 0) }
         case .money:
             PolicyAmountField(value: yours.flatMap { PolicyLayersWords.amountWords($0) } ?? "", prefix: "$",
-                              editable: editable) { text in
+                              editable: editable, empty: yourValue.map(PolicyLayersWords.sameAsYours)) { text in
                 if let value = PolicyLayersWords.moneyValue(text) { set(value) }
             }
         case .tokens:
-            PolicyAmountField(value: yours?.intValue.map { "\($0)" } ?? "", prefix: nil, editable: editable) { text in
+            PolicyAmountField(value: yours?.intValue.map { "\($0)" } ?? "", prefix: nil, editable: editable,
+                              empty: yourValue.map(PolicyLayersWords.sameAsYours)) { text in
                 if let value = PolicyLayersWords.tokensValue(text) { set(value) }
             }
+        case .toggle where isFolder:
+            // A folder's switch can also be left to yours, so it is a menu.
+            menu([.bool(true), .bool(false)]) { $0.boolValue == false ? "Off" : "On" }
         case .toggle:
             Toggle(row.title, isOn: Binding(get: { yours?.boolValue ?? true }, set: { set(.bool($0)) }))
                 .labelsHidden()
@@ -108,7 +115,12 @@ struct PolicyRuleRow: View {
         .accessibilityValue(yours.map(words) ?? notSetWords)
     }
 
-    private var notSetWords: String { "\(PolicyLayersWords.notSet) (\(row.unset))" }
+    private var isFolder: Bool { yourValue != nil }
+
+    private var notSetWords: String {
+        if let yourValue { return PolicyLayersWords.sameAsYours(yourValue) }
+        return "\(PolicyLayersWords.notSet) (\(row.unset))"
+    }
 }
 
 /// A money or token limit: typed, set on Return; empty is no limit, which is never a zero.
@@ -116,6 +128,8 @@ private struct PolicyAmountField: View {
     let value: String
     let prefix: String?
     let editable: Bool
+    /// What an empty field says: "No limit", or a folder's "Same as yours".
+    var empty: String? = nil
     let save: (String) -> Void
 
     @State private var text = ""
@@ -123,11 +137,11 @@ private struct PolicyAmountField: View {
     var body: some View {
         HStack(spacing: 4) {
             if let prefix { Text(prefix).foregroundStyle(.secondary) }
-            TextField("Limit", text: $text, prompt: Text("No limit"))
+            TextField("Limit", text: $text, prompt: Text(empty ?? "No limit"))
                 .labelsHidden()
                 .multilineTextAlignment(.trailing)
                 .monospacedDigit()
-                .frame(width: 110)
+                .frame(width: empty == nil ? 110 : 180)
                 .onSubmit { save(text) }
                 .disabled(!editable)
         }

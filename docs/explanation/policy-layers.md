@@ -50,6 +50,10 @@ value or **Not set**, and lights the layer that decides.
   rules tighter applies at once. A change that makes a rule looser waits for your OK, as a
   change to `.agents/folder.json` does.
 
+When a rule stops an agent, the chat shows a **Stopped by a policy** card with the rule, the
+layer that decides and its value. It offers a change only where you can make it: your layer,
+or the folder's ([Set rules for a folder](../how-to/set-rules-for-a-folder.md)).
+
 ## What moved
 
 The limits that were in Settings ▸ Cost, Settings ▸ Notifications, the archive switch of

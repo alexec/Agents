@@ -2,7 +2,10 @@
 // PolicyLayersWordsTests checks them in Swift (Packages/AgentsKit/.../PolicyLayersWords.swift). The machine resolves
 // the layers and sends each rule's words and cap line; these are the page's own: the sections, the titles, what a
 // menu offers, and which of its values a cap dims.
-import type { EffectivePolicy, EffectiveRule, JSONValue, PolicyBehindMachine, PolicyLayerRef, PolicyRules } from "../protocol/generated";
+import type {
+  EffectivePolicy, EffectiveRule, GuardedChangePolicy, JSONValue, PolicyBehindMachine, PolicyLayerRef, PolicyRefusal, PolicyRules,
+} from "../protocol/generated";
+import { absolutePath } from "./fileWatch";
 
 export const groupTitle = "Agents";
 export const title = "Policy";
@@ -27,6 +30,11 @@ export function foldersLine(count: number): string {
   if (count === 0) return "No folder has its own rules.";
   if (count === 1) return "1 folder has its own rules.";
   return `${count} folders have their own rules.`;
+}
+
+/** How many rules a folder in the banner's list sets. */
+export function rulesCount(count: number): string {
+  return count === 1 ? "1 rule" : `${count} rules`;
 }
 
 /** The machines that do not follow the layers yet; null with none. */
@@ -207,4 +215,97 @@ export function tokensValue(text: string): JSONValue | undefined | null {
   if (digits === "") return undefined;
   const v = Number(digits);
   return Number.isInteger(v) && v >= 1 ? v : null;
+}
+
+// A folder's layer, opened from the banner's list in the same pane (#2957, T057, research R13): the web page has no
+// Folder Settings, so Agents ▸ Policy edits it, as the window's Folder Settings ▸ Policy does (FR-022).
+
+export const backToYours = "‹ Your policy";
+export const openFolder = "Open a folder…";
+export const folderWaits = "A change to .agents/policy.json waits for your OK. The last approved rules apply until then.";
+
+/** A folder's name: the last part of its path, from a path or a file URL. */
+export function folderName(folder: string): string {
+  const parts = absolutePath(folder).split("/");
+  return parts[parts.length - 1] || folder;
+}
+
+/** The person's effective value of a rule, as a folder that sets nothing gets it: the words of the layer above the
+ * folder whose value is the cap, or what applies when no layer sets it. */
+export function yoursWords(row: Row, rule: EffectiveRule | undefined): string {
+  if (!rule || rule.cap === undefined) return row.unset;
+  const cap = JSON.stringify(rule.cap);
+  return rule.layers.find((l) => l.layer.kind !== "folder" && l.value !== undefined && JSON.stringify(l.value) === cap)?.words ?? row.unset;
+}
+
+/** A folder row's "not set" choice (FR-022): Same as yours, with your value. */
+export function sameAsYoursLine(row: Row, rule: EffectiveRule | undefined): string {
+  return `${sameAsYours} (${yoursWords(row, rule)})`;
+}
+
+/** The folder's value is looser than yours, so yours applies (spec US3 scenario 6). */
+export function folderIsKept(rule: EffectiveRule): boolean {
+  return rule.layers.some((l) => l.layer.kind === "folder" && l.kept);
+}
+
+/** Where Agents ▸ Policy is in Settings' route item: your layer, or a folder's (#/settings/settings/policy:<folder>). */
+export function policyItem(folder?: string): string {
+  return folder === undefined ? "policy" : `policy:${folder}`;
+}
+
+/** Organisation Policy's route item in Settings. */
+export const organisationItem = "organisationPolicy";
+
+/** The folder a route item opens in Agents ▸ Policy; undefined for your own layer. */
+export function policyFolderOf(item: string | undefined): string | undefined {
+  return item?.startsWith("policy:") ? item.slice("policy:".length) || undefined : undefined;
+}
+
+// The Stopped by a policy card (#2957, FR-025, T060, frame E), as Shared/UI/Chat/PolicyStopCard.swift draws it.
+
+export const stoppedTitle = "Stopped by a policy";
+
+/** A refusal's rule by its row's title, "Budget" for the organisation's whole budget across machines, and any other
+ * by its name. */
+export function stopRuleTitle(rule: string | undefined): string | undefined {
+  if (rule === undefined) return undefined;
+  if (rule === "budgets") return "Budget";
+  return rows.find((r) => r.rule === rule)?.title ?? rule;
+}
+
+/** How a line names a layer, as the machine's capLine does: "Your policy" for the person's. */
+export function layerName(layer: PolicyLayerRef): string {
+  return layer.kind === "you" ? "Your policy" : layer.name;
+}
+
+/** The card's line under the rule: "<layer>: <value>", when the value says more than the words do. */
+export function stopLayerLine(refusal: PolicyRefusal): string | undefined {
+  if (!refusal.layer || refusal.value === undefined || refusal.value === refusal.words) return undefined;
+  return `${layerName(refusal.layer)}: ${refusal.value}`;
+}
+
+/** What the card offers: Change for a layer the person can edit, Open Spending for an organisation budget (no
+ * client asks for more yet: only an admin's policy/raise), See Organisation Policy for another organisation rule. */
+export type StopAction =
+  | { kind: "yours"; label: string }
+  | { kind: "folder"; label: string; folder: string }
+  | { kind: "spending"; label: string }
+  | { kind: "organisation"; label: string };
+
+export function stopAction(refusal: PolicyRefusal): StopAction {
+  const layer = refusal.layer;
+  if (layer?.kind === "you") return { kind: "yours", label: `Change in ${groupTitle} ▸ ${title}` };
+  // The web page has no Folder Settings (research R13): the folder's layer opens in Agents ▸ Policy.
+  if (layer?.kind === "folder" && layer.folder !== undefined) {
+    return { kind: "folder", label: `Change in ${layer.name}’s ${title}`, folder: layer.folder };
+  }
+  if (refusal.reason === "budget") return { kind: "spending", label: "Open Spending" };
+  return { kind: "organisation", label: `See ${organisationTitle}` };
+}
+
+// A waiting change to a folder's .agents/policy.json (#2957, T058, frame D): the guarded-change card's words.
+
+/** The card's three answers: Allow keeps the change, Keep <was> undoes it, Show Change reviews it. */
+export function policyChangeButtons(policy: GuardedChangePolicy): { allow: string; undo: string; review: string } {
+  return { allow: "Allow", undo: policy.was ? `Keep ${policy.was}` : "Keep Old Rules", review: "Show Change" };
 }
