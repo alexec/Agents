@@ -13,11 +13,12 @@ import (
 // repos costs one call a refresh.
 
 // SearchFilter is what a search lists: pull requests or issues, in state open, closed or all
-// (open when ""), narrowed by a label, an assignee's login and words.
+// (open when ""), narrowed by a label, an assignee's login and words, and by a feature: the
+// name of a feature:<name> label (#3267).
 type SearchFilter struct {
-	PRs                    bool
-	State                  string
-	Label, Assignee, Query string
+	PRs                             bool
+	State                           string
+	Label, Assignee, Query, Feature string
 }
 
 // Item is an issue or a pull request as the forge reads list it.
@@ -35,6 +36,11 @@ type Item struct {
 	// changes_requested, review_required or ""; Mergeable is mergeable, conflicting or unknown.
 	Draft, AutoMerge          bool
 	Checks, Review, Mergeable string
+	// An issue's place in the hierarchy (#3267): the issue it is a sub-issue of (ParentRepo ""
+	// for none), and its sub-issues, SubDone of them closed.
+	ParentRepo        string
+	ParentNumber      int
+	SubTotal, SubDone int
 }
 
 // SearchPage is a page of a search, the last updated first. Cursors[i] goes on after Items[i],
@@ -76,13 +82,16 @@ type ItemDetail struct {
 const itemFields = `number title url updatedAt author { login __typename } repository { nameWithOwner }
   ` + labelFields + ` assignees(first: 20) { nodes { login } } milestone { title } commentCount: comments { totalCount }`
 
+// issueFields are an issue's own: its parent and how many of its sub-issues are closed (#3267).
+const issueFields = `parent { number repository { nameWithOwner } } subIssuesSummary { total completed }`
+
 // pullFields are a pull request's own, for a list: its checks in one word, not each of them.
 const pullFields = `isDraft mergeable reviewDecision autoMergeRequest { enabledAt }
   checkState: commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }`
 
 const searchQuery = `query($q: String!, $first: Int!, $after: String) {
   search(query: $q, type: ISSUE, first: $first, after: $after) { pageInfo { hasNextPage endCursor } edges { cursor node {
-    __typename ... on Issue { issueState: state ` + itemFields + ` }
+    __typename ... on Issue { issueState: state ` + itemFields + ` ` + issueFields + ` }
     ... on PullRequest { pullState: state ` + itemFields + ` ` + pullFields + ` } } } } }`
 
 // commentFields are the newest page of an item's comments, before $before.
@@ -91,7 +100,7 @@ const commentFields = `comments(last: 50, before: $before) { pageInfo { hasPrevi
 
 const itemQuery = `query($owner: String!, $name: String!, $number: Int!, $before: String) {
   repository(owner: $owner, name: $name) { issueOrPullRequest(number: $number) {
-    __typename ... on Issue { issueState: state ` + itemFields + ` body ` + commentFields + ` }
+    __typename ... on Issue { issueState: state ` + itemFields + ` ` + issueFields + ` body ` + commentFields + ` }
     ... on PullRequest { pullState: state ` + itemFields + ` ` + pullFields + ` body ` + commentFields + `
       reviewThreads { totalCount } changedFiles headRefOid ` + rollupFields + ` } }
     viewerDefaultMergeMethod squashMergeAllowed mergeCommitAllowed rebaseMergeAllowed } }`
@@ -131,6 +140,16 @@ type gqlItem struct {
 			} `json:"commit"`
 		} `json:"nodes"`
 	} `json:"checkState"`
+	Parent *struct {
+		Number     int `json:"number"`
+		Repository struct {
+			NameWithOwner string `json:"nameWithOwner"`
+		} `json:"repository"`
+	} `json:"parent"`
+	SubIssues *struct {
+		Total     int `json:"total"`
+		Completed int `json:"completed"`
+	} `json:"subIssuesSummary"`
 }
 
 func (n gqlItem) item() Item {
@@ -146,6 +165,12 @@ func (n gqlItem) item() Item {
 	}
 	if n.Milestone != nil {
 		i.Milestone = n.Milestone.Title
+	}
+	if n.Parent != nil && n.Parent.Number > 0 {
+		i.ParentRepo, i.ParentNumber = n.Parent.Repository.NameWithOwner, n.Parent.Number
+	}
+	if n.SubIssues != nil {
+		i.SubTotal, i.SubDone = n.SubIssues.Total, n.SubIssues.Completed
 	}
 	if !i.PR {
 		return i
@@ -186,6 +211,9 @@ func SearchQuery(repos []string, f SearchFilter) string {
 	}
 	if f.Label != "" {
 		words = append(words, fmt.Sprintf("label:%q", f.Label))
+	}
+	if f.Feature != "" {
+		words = append(words, fmt.Sprintf("label:%q", "feature:"+f.Feature))
 	}
 	if f.Assignee != "" {
 		words = append(words, "assignee:"+f.Assignee)
@@ -298,4 +326,82 @@ func (g *RealGitHub) ItemPage(ctx context.Context, repo string, number int, befo
 		}
 	}
 	return d, nil
+}
+
+// Ref is an issue another names, as a blocker: open says it is not closed.
+type Ref struct {
+	Repo   string
+	Number int
+	Open   bool
+}
+
+// PlanChild is a sub-issue with the issues it is blocked by (#3267).
+type PlanChild struct {
+	Item
+	BlockedBy []Ref
+}
+
+// Plan is an issue (an epic) and its sub-issues, in GitHub's order (#3267).
+type Plan struct {
+	Epic     Item
+	Children []PlanChild
+}
+
+const planQuery = `query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) { issue(number: $number) { issueState: state ` + itemFields + ` ` + issueFields + `
+    subIssues(first: 100) { nodes { issueState: state ` + itemFields + ` ` + issueFields + `
+      blockedBy(first: 50) { nodes { number state repository { nameWithOwner } } } } } } } }`
+
+// Plan is the issue number of repo, its sub-issues (at most 100) and each one's blockers (at most
+// 50), in one query.
+func (g *RealGitHub) Plan(ctx context.Context, repo string, number int) (Plan, error) {
+	owner, name, err := ownerName(repo)
+	if err != nil {
+		return Plan{}, err
+	}
+	var data struct {
+		Repository *struct {
+			Issue *struct {
+				gqlItem
+				SubIssues struct {
+					Nodes []struct {
+						gqlItem
+						BlockedBy struct {
+							Nodes []struct {
+								Number     int    `json:"number"`
+								State      string `json:"state"`
+								Repository struct {
+									NameWithOwner string `json:"nameWithOwner"`
+								} `json:"repository"`
+							} `json:"nodes"`
+						} `json:"blockedBy"`
+					} `json:"nodes"`
+				} `json:"subIssues"`
+			} `json:"issue"`
+		} `json:"repository"`
+	}
+	if err := g.graphql(ctx, planQuery, map[string]any{"owner": owner, "name": name, "number": number}, &data); err != nil {
+		return Plan{}, err
+	}
+	if data.Repository == nil || data.Repository.Issue == nil {
+		return Plan{}, &GitHubError{Kind: NotFound, Message: fmt.Sprintf("no issue #%d in %s", number, repo)}
+	}
+	n := data.Repository.Issue
+	p := Plan{Epic: n.item(), Children: []PlanChild{}}
+	if p.Epic.Repo == "" {
+		p.Epic.Repo = repo
+	}
+	for _, c := range n.SubIssues.Nodes {
+		if c.Number < 1 || c.Repository.NameWithOwner == "" {
+			continue
+		}
+		child := PlanChild{Item: c.item(), BlockedBy: []Ref{}}
+		for _, b := range c.BlockedBy.Nodes {
+			if b.Number > 0 && b.Repository.NameWithOwner != "" {
+				child.BlockedBy = append(child.BlockedBy, Ref{Repo: b.Repository.NameWithOwner, Number: b.Number, Open: b.State != "CLOSED"})
+			}
+		}
+		p.Children = append(p.Children, child)
+	}
+	return p, nil
 }

@@ -49,6 +49,7 @@ const (
 type forgeGitHub interface {
 	Search(ctx context.Context, repos []string, f githubmcp.SearchFilter, after string, first int) (githubmcp.SearchPage, error)
 	ItemPage(ctx context.Context, repo string, number int, before string) (githubmcp.ItemDetail, error)
+	Plan(ctx context.Context, repo string, number int) (githubmcp.Plan, error)
 	forgeGitHubWrites
 }
 
@@ -56,6 +57,7 @@ type forgeGitHub interface {
 type forgeGitLab interface {
 	Search(ctx context.Context, projects []string, f gitlabmcp.SearchFilter, after string, first int) (gitlabmcp.SearchPage, error)
 	ItemPage(ctx context.Context, project string, number int, mr bool, before string) (gitlabmcp.ItemDetail, error)
+	Plan(ctx context.Context, project string, number int) (gitlabmcp.Plan, error)
 	forgeGitLabWrites
 }
 
@@ -63,6 +65,7 @@ type forgeGitLab interface {
 type forgeLinear interface {
 	Search(ctx context.Context, teams []string, f linearmcp.SearchFilter, after string, first int) (linearmcp.SearchPage, error)
 	ItemPage(ctx context.Context, identifier, before string) (linearmcp.ItemDetail, error)
+	Plan(ctx context.Context, identifier string) (linearmcp.Plan, error)
 	forgeLinearWrites
 }
 
@@ -70,6 +73,13 @@ type forgeAnswer struct {
 	at   time.Time
 	list *wire.ForgeList
 	item *wire.ForgeItemDetail
+	plan *forgePlanAnswer
+}
+
+// forgePlanAnswer is an epic and its children as the forge said them (#3267).
+type forgePlanAnswer struct {
+	epic     wire.ForgeItem
+	children []planChild
 }
 
 type forgeBook struct {
@@ -101,6 +111,7 @@ func (d *Daemon) registerForge() {
 	On(d, wire.CallForgePulls, list(true))
 	On(d, wire.CallForgeIssue, item(lineage.KindIssue))
 	On(d, wire.CallForgePull, item(lineage.KindPR))
+	d.registerForgePlans()
 	d.registerForgeWrites()
 }
 
@@ -161,7 +172,7 @@ func (d *Daemon) forgeList(ctx context.Context, prs bool, r wire.ForgeListReques
 		folders = []string{f}
 	}
 	sources := d.forgeSources(ctx, prs, folders)
-	key, _ := json.Marshal([]any{method, sources.key(), r.State, r.Label, r.Assignee, r.Query, cursor, limit})
+	key, _ := json.Marshal([]any{method, sources.key(), r.State, r.Label, r.Assignee, r.Query, r.Feature, cursor, limit})
 	if a, ok := d.forgeCached(string(key)); ok && a.list != nil {
 		return *a.list, nil
 	}
@@ -173,7 +184,7 @@ func (d *Daemon) forgeList(ctx context.Context, prs bool, r wire.ForgeListReques
 		if err == nil {
 			var page githubmcp.SearchPage
 			page, err = gh.Search(ctx, sources.repos, githubmcp.SearchFilter{PRs: prs, State: state, Label: deref(r.Label),
-				Assignee: deref(r.Assignee), Query: deref(r.Query)}, cursor.GitHub, limit)
+				Assignee: deref(r.Assignee), Query: deref(r.Query), Feature: deref(r.Feature)}, cursor.GitHub, limit)
 			for _, i := range page.Items {
 				p.items = append(p.items, forgeItemOf(i, sources.folderOf[forgeRepo{"github", strings.ToLower(i.Repo)}]))
 			}
@@ -187,7 +198,7 @@ func (d *Daemon) forgeList(ctx context.Context, prs bool, r wire.ForgeListReques
 		if p.err == nil {
 			var page gitlabmcp.SearchPage
 			page, p.err = d.forgeGitLab(sources.root).Search(ctx, sources.gitlab, gitlabmcp.SearchFilter{MRs: prs, State: state,
-				Label: deref(r.Label), Assignee: deref(r.Assignee), Query: deref(r.Query)}, cursor.GitLab, limit)
+				Label: deref(r.Label), Assignee: deref(r.Assignee), Query: deref(r.Query), Feature: deref(r.Feature)}, cursor.GitLab, limit)
 			for _, i := range page.Items {
 				p.items = append(p.items, gitlabItemOf(i, sources.folderOf[forgeRepo{"gitlab", strings.ToLower(i.Project)}]))
 			}
@@ -201,7 +212,7 @@ func (d *Daemon) forgeList(ctx context.Context, prs bool, r wire.ForgeListReques
 		if err == nil {
 			var page linearmcp.SearchPage
 			page, err = l.Search(ctx, sources.teams, linearmcp.SearchFilter{State: state, Label: deref(r.Label),
-				Assignee: deref(r.Assignee), Query: deref(r.Query)}, cursor.Linear, limit)
+				Assignee: deref(r.Assignee), Query: deref(r.Query), Feature: deref(r.Feature)}, cursor.Linear, limit)
 			for _, i := range page.Items {
 				p.items = append(p.items, linearItemOf(i, sources.teamFolder[i.Team]))
 			}
@@ -598,7 +609,13 @@ func forgeItemOf(i githubmcp.Item, folder string) wire.ForgeItem {
 	if i.PR {
 		out.Draft, out.AutoMerge = new(i.Draft), new(i.AutoMerge)
 		out.Checks, out.Review, out.Mergeable = optional(i.Checks), optional(i.Review), optional(i.Mergeable)
+		return out
 	}
+	var parent *wire.LineageNode
+	if i.ParentRepo != "" {
+		parent = new(forgeRepo{"github", strings.ToLower(i.ParentRepo)}.issue(i.ParentNumber))
+	}
+	withHierarchy(&out, parent, i.SubTotal, i.SubDone)
 	return out
 }
 
@@ -618,7 +635,13 @@ func gitlabItemOf(i gitlabmcp.Item, folder string) wire.ForgeItem {
 	if i.MR {
 		out.Draft, out.AutoMerge = new(i.Draft), new(i.AutoMerge)
 		out.Checks, out.Review, out.Mergeable = optional(i.Checks), optional(i.Review), optional(i.Mergeable)
+		return out
 	}
+	var parent *wire.LineageNode
+	if i.ParentProject != "" {
+		parent = new(forgeRepo{"gitlab", strings.ToLower(i.ParentProject)}.issue(i.ParentNumber))
+	}
+	withHierarchy(&out, parent, i.SubTotal, i.SubDone)
 	return out
 }
 
@@ -630,6 +653,11 @@ func linearItemOf(i linearmcp.Item, folder string) wire.ForgeItem {
 	if out.Assignees == nil {
 		out.Assignees = []string{}
 	}
+	var parent *wire.LineageNode
+	if i.Parent != "" {
+		parent = &wire.LineageNode{Kind: lineage.KindIssue, Ref: "linear:" + i.Parent}
+	}
+	withHierarchy(&out, parent, i.SubTotal, i.SubDone)
 	return out
 }
 

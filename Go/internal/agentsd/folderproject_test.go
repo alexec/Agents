@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -147,5 +148,69 @@ func TestAnOlderFolderGetsAProjectAtStart(t *testing.T) {
 	// Once is enough.
 	if d.ensureProject(dir) {
 		t.Fatal("written again")
+	}
+}
+
+// #3276: a session carries the project its folder is in; agents/list with project gives
+// the project's sessions on this machine; and a folder says its machine once this one has
+// joined a control plane.
+func TestSessionsCarryTheirProject(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+
+	inProject := func(project string) string {
+		dir := t.TempDir()
+		os.MkdirAll(filepath.Join(dir, ".agents"), 0o755)
+		os.WriteFile(filepath.Join(dir, ".agents", "folder.json"), []byte(`{"project": "`+project+`"}`), 0o644)
+		return dir
+	}
+	agents, clone, other, none := inProject("p-agents"), inProject("p-agents"), inProject("p-other"), t.TempDir()
+	a := seeded(t, d, agents, nil)
+	b := seeded(t, d, clone, nil)
+	o := seeded(t, d, other, nil)
+	n := seeded(t, d, none, nil)
+
+	var all []wire.Agent
+	json.Unmarshal(c.call(t, 1, "agents/list", map[string]any{"lean": true}), &all)
+	projects := map[wire.UUID]string{}
+	for _, x := range all {
+		projects[x.ID] = deref(x.Project)
+	}
+	if projects[a.ID] != "p-agents" || projects[b.ID] != "p-agents" || projects[o.ID] != "p-other" || projects[n.ID] != "" {
+		t.Fatalf("%+v", projects)
+	}
+
+	var listed []wire.Agent
+	json.Unmarshal(c.call(t, 2, "agents/list", map[string]any{"lean": true, "project": "p-agents"}), &listed)
+	got := map[wire.UUID]bool{}
+	for _, x := range listed {
+		got[x.ID] = true
+	}
+	if len(listed) != 2 || !got[a.ID] || !got[b.ID] {
+		t.Fatalf("%+v", listed)
+	}
+	listed = nil
+	json.Unmarshal(c.call(t, 3, "agents/list", map[string]any{"lean": true, "agentID": o.ID}), &listed)
+	if len(listed) != 1 || deref(listed[0].Project) != "p-other" {
+		t.Fatalf("%+v", listed)
+	}
+
+	// No control plane: a folder says no machine; joined to one, its machine.
+	machineOf := func() map[string]string {
+		out := map[string]string{}
+		for _, s := range d.folders(false) {
+			if s.Machine != nil {
+				out[store.FolderPath(s.Folder.Folder)] = string(*s.Machine)
+			}
+		}
+		return out
+	}
+	at := func(dir string) string { return store.FolderPath(store.FolderURL(dir)) }
+	if m := machineOf(); m[at(agents)] != "" {
+		t.Fatalf("%+v", m)
+	}
+	d.SetMember(&controllink.Membership{Host: "h-mac"})
+	if m := machineOf(); m[at(agents)] != "h-mac" || m[at(none)] != "h-mac" {
+		t.Fatalf("%+v", m)
 	}
 }

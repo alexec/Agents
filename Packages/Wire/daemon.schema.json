@@ -550,6 +550,10 @@
         "goal": {
           "$ref": "#/definitions/Goal",
           "description": "The standing aim its runtime keeps working towards over many turns (#2742), as Codex's and Claude's adapters report it on a session_info_update under _meta.jetbrains.air.goal. Absent when the runtime reports none, or cleared it."
+        },
+        "project": {
+          "type": "string",
+          "description": "The project its folder is in (#3276), as the folder's .agents/folder.json names it now. Absent for a folder in no project."
         }
       },
       "required": [
@@ -8811,6 +8815,10 @@
           "type": "string",
           "description": "Why the folder is in no project (#2317): .agents/folder.json is not an object, names an id that is not valid, or .agents is a link."
         },
+        "machine": {
+          "$ref": "#/definitions/MachineRef",
+          "description": "The machine the folder is on, as the control plane names it (#3276). Absent on a machine that has joined no control plane: the folder is on this one."
+        },
         "helperLimitsSetBy": {
           "$ref": "#/definitions/PolicySetBy",
           "description": "Set when the organisation's policy caps this folder's helper limits (#998, #64): the lower number is used."
@@ -9079,9 +9087,65 @@
       "required": [],
       "additionalProperties": false
     },
+    "ForgeFeature": {
+      "type": "object",
+      "description": "A feature (#3267): name is its label's after feature:, with the label's colour where the forge gives one; epics counts its epics, open the open ones.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "color": {
+          "type": "string"
+        },
+        "epics": {
+          "type": "integer"
+        },
+        "open": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "epics",
+        "open"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeFeatures": {
+      "type": "object",
+      "description": "forge/features (#3267): the feature:<name> labels of the epics (the issues labelled epic, open or closed, the newest 500), by name; errors says a forge that could not be read, as in ForgeList.",
+      "properties": {
+        "features": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ForgeFeature"
+          }
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ForgeListError"
+          }
+        }
+      },
+      "required": [
+        "features"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeFeaturesRequest": {
+      "type": "object",
+      "description": "forge/features (#3267): the features of every folder on this machine, or of one folder's repo.",
+      "properties": {
+        "folder": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
     "ForgeItem": {
       "type": "object",
-      "description": "An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for GitHub, GitLab and Linear, so one page draws each. node is its lineage node (kind issue or pr, ref github:alexec/Agents#12). state is open, closed or merged. folder is a folder on this machine on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own fields: draft; checks is passing, failing, running or none; review is approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown; autoMerge says auto-merge is on.",
+      "description": "An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for GitHub, GitLab and Linear, so one page draws each. node is its lineage node (kind issue or pr, ref github:alexec/Agents#12). state is open, closed or merged. folder is a folder on this machine on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own fields: draft; checks is passing, failing, running or none; review is approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown; autoMerge says auto-merge is on. The hierarchy (#3267): parent is the issue it is a sub-issue (a Linear or GitLab child) of; level is epic, story, task or spike, from its labels; feature is the name of its feature:<name> label; progress is a parent's closed children of all of them, where the forge says it: in a GitHub list, and on an issue's own read.",
       "properties": {
         "node": {
           "$ref": "#/definitions/LineageNode"
@@ -9136,6 +9200,18 @@
         },
         "autoMerge": {
           "type": "boolean"
+        },
+        "parent": {
+          "$ref": "#/definitions/LineageNode"
+        },
+        "level": {
+          "type": "string"
+        },
+        "feature": {
+          "type": "string"
+        },
+        "progress": {
+          "$ref": "#/definitions/ForgeProgress"
         }
       },
       "required": [
@@ -9273,6 +9349,26 @@
       ],
       "additionalProperties": false
     },
+    "ForgeLead": {
+      "type": "object",
+      "description": "An epic's lead session (#3267): its id, title and state.",
+      "properties": {
+        "session": {
+          "$ref": "#/definitions/UUID"
+        },
+        "title": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/definitions/AgentState"
+        }
+      },
+      "required": [
+        "session",
+        "state"
+      ],
+      "additionalProperties": false
+    },
     "ForgeList": {
       "type": "object",
       "description": "forge/issues and forge/pulls (#3129): a page of items, the last updated first. cursor is the next page, absent at the end. errors says a forge that could not be read (not connected, a rate limit), and the items of the others still come.",
@@ -9317,7 +9413,7 @@
     },
     "ForgeListRequest": {
       "type": "object",
-      "description": "forge/issues and forge/pulls (#3129): the issues or pull requests of every folder on this machine, or of one folder's repo. state is open (when not said), closed or all; a closed pull request includes a merged one. label, assignee (a login) and query (words in the title or body) narrow the list. limit is 1 to 100, 50 when not said; cursor is the last page's.",
+      "description": "forge/issues and forge/pulls (#3129): the issues or pull requests of every folder on this machine, or of one folder's repo. state is open (when not said), closed or all; a closed pull request includes a merged one. label, assignee (a login) and query (words in the title or body) narrow the list. limit is 1 to 100, 50 when not said; cursor is the last page's. feature (a name: work for the label feature:work) narrows it to one feature's items (#3267).",
       "properties": {
         "folder": {
           "type": "string"
@@ -9339,6 +9435,9 @@
         },
         "limit": {
           "type": "integer"
+        },
+        "feature": {
+          "type": "string"
         }
       },
       "additionalProperties": false
@@ -9430,6 +9529,116 @@
       },
       "required": [
         "node"
+      ],
+      "additionalProperties": false
+    },
+    "ForgePlan": {
+      "type": "object",
+      "description": "forge/plan (#3267): an epic and its plan. children are its sub-issues (at most 100), step by step, in the forge's order within a step. steps are the children of each step, the first first. lead is the session on this machine, not archived, that works on the epic in lineage (its label #<n>, or the Linear key) and is labelled lead.",
+      "properties": {
+        "item": {
+          "$ref": "#/definitions/ForgeItem"
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ForgePlanChild"
+          }
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ForgePlanStep"
+          }
+        },
+        "lead": {
+          "$ref": "#/definitions/ForgeLead"
+        }
+      },
+      "required": [
+        "item",
+        "children",
+        "steps"
+      ],
+      "additionalProperties": false
+    },
+    "ForgePlanChild": {
+      "type": "object",
+      "description": "A child of an epic in forge/plan (#3267). blockedBy are the issues it is blocked by, open or closed, in the plan or not. step is 1 for a child that no other child blocks, else one more than the last step of the children that block it; a blocker outside the plan adds no step, and children in a loop share the step after the rest. blockedOutside are its open blockers outside the plan (an issue of another epic). A forge with no dependencies (GitLab Free) puts every child in step 1.",
+      "properties": {
+        "item": {
+          "$ref": "#/definitions/ForgeItem"
+        },
+        "blockedBy": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LineageNode"
+          }
+        },
+        "blockedOutside": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LineageNode"
+          }
+        },
+        "step": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "item",
+        "blockedBy",
+        "step"
+      ],
+      "additionalProperties": false
+    },
+    "ForgePlanRequest": {
+      "type": "object",
+      "description": "forge/plan (#3267): the epic's lineage node, an issue on GitHub, GitLab or Linear.",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/LineageNode"
+        }
+      },
+      "required": [
+        "node"
+      ],
+      "additionalProperties": false
+    },
+    "ForgePlanStep": {
+      "type": "object",
+      "description": "A step of a plan (#3267): its number, from 1, and its children's nodes.",
+      "properties": {
+        "step": {
+          "type": "integer"
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LineageNode"
+          }
+        }
+      },
+      "required": [
+        "step",
+        "nodes"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeProgress": {
+      "type": "object",
+      "description": "A parent issue's children (#3267): done are closed, of total.",
+      "properties": {
+        "done": {
+          "type": "integer"
+        },
+        "total": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "done",
+        "total"
       ],
       "additionalProperties": false
     },
@@ -10647,14 +10856,14 @@
     },
     "LineageCostNode": {
       "type": "object",
-      "description": "One node's banked cost on a machine (#2350), whole, with what its rollups need: the project its ref is in, the issues a PR fixes (ended links too: a PR closed without a merge still counts against its issue, as waste), the milestones it is part of, and how a PR ended. A session's own cost is its turns that had no active link.",
+      "description": "One node's banked cost on a machine (#2350), whole, with what its rollups need: the repo or tracker its ref is in, the issues a PR fixes (ended links too: a PR closed without a merge still counts against its issue, as waste), the milestones it is part of, and how a PR ended. A session's own cost is its turns that had no active link.",
       "properties": {
         "node": {
           "$ref": "#/definitions/LineageNode"
         },
-        "project": {
+        "repo": {
           "type": "string",
-          "description": "The repo or tracker the node is in: github:alexec/agents, linear, or for a session its folder's repo (folder:<name> without one)."
+          "description": "The repo or tracker the node is in: github:alexec/agents, linear, or for a session its folder's repo (folder:<name> without one). Not a project (#3275)."
         },
         "banked": {
           "$ref": "#/definitions/LineageCost"
@@ -10713,7 +10922,7 @@
     },
     "LineageCostRollup": {
       "type": "object",
-      "description": "lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total adds its parts: an issue's PRs (the PRs that fix it); a milestone's issues, their PRs and the PRs part of it; a project's every node (kind project, ref github:alexec/agents). waste is the parts' PRs closed without a merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is the nodes added up, newest first, at most 500; limited says there are more.",
+      "description": "lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total adds its parts: an issue's PRs (the PRs that fix it); a milestone's issues, their PRs and the PRs part of it; a repo's every node (kind repo, ref github:alexec/agents). waste is the parts' PRs closed without a merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is the nodes added up, newest first, at most 500; limited says there are more.",
       "properties": {
         "node": {
           "$ref": "#/definitions/LineageNode"
@@ -11004,6 +11213,10 @@
         },
         "query": {
           "type": "string"
+        },
+        "project": {
+          "type": "string",
+          "description": "Only the sessions whose folder is in this project (#3276), as .agents/folder.json names it: the project's sessions on this machine."
         }
       },
       "required": [
@@ -17310,6 +17523,23 @@
         ],
         "additionalProperties": false
       },
+      "ProjectMachine": {
+        "type": "object",
+        "description": "A machine of projects/sessions (#3276) that has a folder of the project, by id and name.",
+        "properties": {
+          "machine": {
+            "$ref": "#/definitions/MachineRef"
+          },
+          "machineName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "machine",
+          "machineName"
+        ],
+        "additionalProperties": false
+      },
       "ProjectRequest": {
         "type": "object",
         "description": "projects/remove (#2317): the project. Refused while a folder names it.",
@@ -17320,6 +17550,66 @@
         },
         "required": [
           "id"
+        ],
+        "additionalProperties": false
+      },
+      "ProjectSession": {
+        "type": "object",
+        "description": "One session of projects/sessions (#3276): the machine it runs on, and the session as that machine lists it, lean.",
+        "properties": {
+          "machine": {
+            "$ref": "#/definitions/MachineRef"
+          },
+          "machineName": {
+            "type": "string"
+          },
+          "session": {
+            "$ref": "#/definitions/Agent"
+          }
+        },
+        "required": [
+          "machine",
+          "machineName",
+          "session"
+        ],
+        "additionalProperties": false
+      },
+      "ProjectSessions": {
+        "type": "object",
+        "description": "projects/sessions (#3276): the project's sessions on each of the caller's machines that has a folder of it, newest activity first. unreached is the machines that have a folder of it but did not answer (offline, or too slow): their sessions are not in sessions.",
+        "properties": {
+          "sessions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/ProjectSession"
+            }
+          },
+          "unreached": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/ProjectMachine"
+            }
+          }
+        },
+        "required": [
+          "sessions",
+          "unreached"
+        ],
+        "additionalProperties": false
+      },
+      "ProjectSessionsRequest": {
+        "type": "object",
+        "description": "projects/sessions (#3276): the project, and whether to list archived sessions too.",
+        "properties": {
+          "project": {
+            "type": "string"
+          },
+          "includeArchived": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "project"
         ],
         "additionalProperties": false
       },
@@ -18657,7 +18947,7 @@
         "node": {
           "$ref": "#/definitions/LineageNode"
         },
-        "project": {
+        "repo": {
           "type": "string",
           "description": "The repo or tracker the node is in, as LineageCostNode's."
         },

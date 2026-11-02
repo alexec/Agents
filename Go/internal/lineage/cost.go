@@ -11,16 +11,16 @@ import (
 // that are active when it is banked, split evenly, so the totals add up to the real spend.
 // What is banked stays where it went: a label changed later moves nothing. A node's banked
 // cost is a wire.LineageCostNode; Rollup adds them up to a PR, an issue, a milestone or a
-// project. The host and the control plane add up the same way.
+// repo. The host and the control plane add up the same way.
 
 // The outcomes of a PR. The list is open.
 const (
 	OutcomeMerged   = "merged"
 	OutcomeClosed   = "closed"
 	OutcomeReverted = "reverted"
-	// KindProject is a rollup's node only: a repo or tracker, as LineageCostNode.project
-	// names it.
-	KindProject = "project"
+	// KindRepo is a rollup's node only: a repo or tracker, as LineageCostNode.repo names it.
+	// It was project; a project is now only the record many folders join (#3275).
+	KindRepo = "repo"
 )
 
 // Wasted says a PR's cost is waste: closed without a merge, or a merged revert.
@@ -79,10 +79,10 @@ func Split(c wire.LineageCost, n int) []wire.LineageCost {
 	return out
 }
 
-// ProjectOf is the repo or tracker an issue's or PR's ref is in: github:alexec/agents for
+// RepoOf is the repo or tracker an issue's or PR's ref is in: github:alexec/agents for
 // github:alexec/agents#12, gitlab:group/repo for gitlab:group/repo!4, linear for
 // linear:ENG-4. Other refs have none.
-func ProjectOf(n wire.LineageNode) string {
+func RepoOf(n wire.LineageNode) string {
 	if n.Kind != KindIssue && n.Kind != KindPR {
 		return ""
 	}
@@ -111,7 +111,7 @@ func PartOfKind(ref string) string {
 //   - an issue: itself and the PRs that fix it;
 //   - a milestone: the issues and PRs part of it, and the PRs that fix those issues;
 //   - a release (#3023): the PRs part of it, and the issues those PRs fix;
-//   - a project (kind project, ref as LineageCostNode.project): every node in it.
+//   - a repo (kind repo, ref as LineageCostNode.repo): every node in it.
 //
 // Each part counts once. Waste is the parts' PRs closed without a merge or reverted, and
 // unlinked is the parts' sessions.
@@ -170,9 +170,9 @@ func Rollup(nodes []wire.LineageCostNode, of wire.LineageNode) wire.LineageCostR
 				in[n.Node] = true
 			}
 		}
-	case KindProject:
+	case KindRepo:
 		for _, n := range nodes {
-			if n.Project != nil && *n.Project == of.Ref {
+			if n.Repo != nil && *n.Repo == of.Ref {
 				in[n.Node] = true
 			}
 		}

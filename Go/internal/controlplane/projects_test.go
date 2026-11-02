@@ -359,3 +359,76 @@ func TestAPersonsProjectsAreBounded(t *testing.T) {
 		t.Fatal(e)
 	}
 }
+
+// #3276: projects/sessions asks each of the caller's machines that has a folder of the
+// project for its sessions in it, keeps only those that say the project, newest first,
+// each with its machine, and says which machines it could not reach.
+func TestAProjectsSessionsOnEveryMachine(t *testing.T) {
+	t.Parallel()
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	mac, box, off := p.host("MAC"), p.host("BOX"), p.host("OFF")
+	_, window := p.client("Window")
+	joinFolders(t, p, mac.member.Host, wire.JoinedFolder{Folder: "file:///Users/a/Agents/", Name: "Agents", Project: "p-agents"})
+	joinFolders(t, p, box.member.Host, wire.JoinedFolder{Folder: "file:///home/a/Agents/", Name: "Agents", Project: "p-agents"},
+		wire.JoinedFolder{Folder: "file:///home/a/www/", Name: "www", Project: "p-www"})
+	joinFolders(t, p, off.member.Host, wire.JoinedFolder{Folder: "file:///work/Agents/", Name: "Agents", Project: "p-agents"})
+	off.stop()
+
+	var asked []wire.ListRequest
+	var askedMu sync.Mutex
+	answer := func(list []map[string]any) func(json.RawMessage) any {
+		return func(params json.RawMessage) any {
+			var r wire.ListRequest
+			json.Unmarshal(params, &r)
+			askedMu.Lock()
+			asked = append(asked, r)
+			askedMu.Unlock()
+			return list
+		}
+	}
+	mac.mu.Lock()
+	mac.agents = answer([]map[string]any{{"id": "A1", "cwd": "file:///Users/a/Agents/", "state": "running", "lastActivityAt": 10, "project": "p-agents"}})
+	mac.mu.Unlock()
+	box.mu.Lock()
+	// B2 is in another project, and B3 is from a machine too old to say one: neither is listed.
+	box.agents = answer([]map[string]any{
+		{"id": "B1", "cwd": "file:///home/a/Agents/", "state": "finished", "lastActivityAt": 20, "project": "p-agents"},
+		{"id": "B2", "cwd": "file:///home/a/www/", "state": "running", "lastActivityAt": 30, "project": "p-www"},
+		{"id": "B3", "cwd": "file:///home/a/Agents/", "state": "running", "lastActivityAt": 40},
+	})
+	box.mu.Unlock()
+
+	var got wire.ProjectSessions
+	json.Unmarshal(call(t, window, "", "projects/sessions", map[string]any{"project": "p-agents"}), &got)
+	if len(got.Sessions) != 2 || got.Sessions[0].Session.ID != "B1" || got.Sessions[1].Session.ID != "A1" {
+		t.Fatalf("%+v", got.Sessions)
+	}
+	if got.Sessions[0].Machine != wire.MachineRef(box.member.Host) || got.Sessions[0].MachineName != "box BOX" ||
+		got.Sessions[1].Machine != wire.MachineRef(mac.member.Host) {
+		t.Fatalf("%+v", got.Sessions)
+	}
+	if len(got.Unreached) != 1 || got.Unreached[0].Machine != wire.MachineRef(off.member.Host) || got.Unreached[0].MachineName != "box OFF" {
+		t.Fatalf("%+v", got.Unreached)
+	}
+	// Each machine was asked once, lean, for the project's sessions alone.
+	askedMu.Lock()
+	defer askedMu.Unlock()
+	if len(asked) != 2 {
+		t.Fatalf("%+v", asked)
+	}
+	for _, r := range asked {
+		if !r.Lean || r.Project == nil || *r.Project != "p-agents" || r.IncludeArchived || r.Limit == nil {
+			t.Fatalf("%+v", r)
+		}
+	}
+
+	// A project no machine has a folder of: nothing, and nobody asked.
+	got = wire.ProjectSessions{}
+	json.Unmarshal(call(t, window, "", "projects/sessions", map[string]any{"project": "p-none"}), &got)
+	if len(got.Sessions) != 0 || len(got.Unreached) != 0 {
+		t.Fatalf("%+v", got)
+	}
+	if e := callError(t, window, "", "projects/sessions", map[string]any{"project": "not an id"}); !strings.Contains(e, "not a project id") {
+		t.Fatal(e)
+	}
+}

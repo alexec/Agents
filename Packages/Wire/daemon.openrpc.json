@@ -3829,6 +3829,31 @@
       }
     },
     {
+      "name": "forge/features",
+      "x-capability": "forge/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ForgeFeaturesRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ForgeFeatures"
+        }
+      }
+    },
+    {
       "name": "forge/issue",
       "x-capability": "forge/1",
       "tags": [
@@ -3975,6 +4000,31 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/ForgeDone"
+        }
+      }
+    },
+    {
+      "name": "forge/plan",
+      "x-capability": "forge/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ForgePlanRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ForgePlan"
         }
       }
     },

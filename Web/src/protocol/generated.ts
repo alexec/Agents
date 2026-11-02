@@ -323,6 +323,11 @@ export interface Agent {
    * when the runtime reports none, or cleared it.
    */
   goal?: Goal;
+  /**
+   * The project its folder is in (#3276), as the folder's .agents/folder.json names it now. Absent
+   * for a folder in no project.
+   */
+  project?: string;
 }
 
 export type AgentArchivedReason =
@@ -3260,6 +3265,11 @@ export interface FolderSummary {
    */
   projectProblem?: string;
   /**
+   * The machine the folder is on, as the control plane names it (#3276). Absent on a machine that
+   * has joined no control plane: the folder is on this one.
+   */
+  machine?: MachineRef;
+  /**
    * Set when the organisation's policy caps this folder's helper limits (#998, #64): the lower
    * number is used.
    */
@@ -3368,13 +3378,43 @@ export interface ForgeDone {
 }
 
 /**
+ * A feature (#3267): name is its label's after feature:, with the label's colour where the forge
+ * gives one; epics counts its epics, open the open ones.
+ */
+export interface ForgeFeature {
+  name: string;
+  color?: string;
+  epics: number;
+  open: number;
+}
+
+/**
+ * forge/features (#3267): the feature:<name> labels of the epics (the issues labelled epic, open or
+ * closed, the newest 500), by name; errors says a forge that could not be read, as in ForgeList.
+ */
+export interface ForgeFeatures {
+  features: ForgeFeature[];
+  errors?: ForgeListError[];
+}
+
+/**
+ * forge/features (#3267): the features of every folder on this machine, or of one folder's repo.
+ */
+export interface ForgeFeaturesRequest {
+  folder?: string;
+}
+
+/**
  * An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for
  * GitHub, GitLab and Linear, so one page draws each. node is its lineage node (kind issue or pr,
  * ref github:alexec/Agents#12). state is open, closed or merged. folder is a folder on this machine
  * on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The
  * pull request's own fields: draft; checks is passing, failing, running or none; review is
  * approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown;
- * autoMerge says auto-merge is on.
+ * autoMerge says auto-merge is on. The hierarchy (#3267): parent is the issue it is a sub-issue (a
+ * Linear or GitLab child) of; level is epic, story, task or spike, from its labels; feature is the
+ * name of its feature:<name> label; progress is a parent's closed children of all of them, where
+ * the forge says it: in a GitHub list, and on an issue's own read.
  */
 export interface ForgeItem {
   node: LineageNode;
@@ -3393,6 +3433,10 @@ export interface ForgeItem {
   review?: string;
   mergeable?: string;
   autoMerge?: boolean;
+  parent?: LineageNode;
+  level?: string;
+  feature?: string;
+  progress?: ForgeProgress;
 }
 
 /**
@@ -3449,6 +3493,13 @@ export interface ForgeLabels {
   labels: ForgeLabel[];
 }
 
+/** An epic's lead session (#3267): its id, title and state. */
+export interface ForgeLead {
+  session: UUID;
+  title?: string;
+  state: AgentState;
+}
+
 /**
  * forge/issues and forge/pulls (#3129): a page of items, the last updated first. cursor is the next
  * page, absent at the end. errors says a forge that could not be read (not connected, a rate
@@ -3472,7 +3523,8 @@ export interface ForgeListError {
  * forge/issues and forge/pulls (#3129): the issues or pull requests of every folder on this
  * machine, or of one folder's repo. state is open (when not said), closed or all; a closed pull
  * request includes a merged one. label, assignee (a login) and query (words in the title or body)
- * narrow the list. limit is 1 to 100, 50 when not said; cursor is the last page's.
+ * narrow the list. limit is 1 to 100, 50 when not said; cursor is the last page's. feature (a name:
+ * work for the label feature:work) narrows it to one feature's items (#3267).
  */
 export interface ForgeListRequest {
   folder?: string;
@@ -3482,6 +3534,7 @@ export interface ForgeListRequest {
   query?: string;
   cursor?: string;
   limit?: number;
+  feature?: string;
 }
 
 /** forge/log (#3130): the last lines of each failed check's log, as plain text. */
@@ -3529,6 +3582,51 @@ export interface ForgeMergeRequest {
 /** forge/labels, forge/rerun and forge/diff (#3130): the issue or pull request. */
 export interface ForgeNodeRequest {
   node: LineageNode;
+}
+
+/**
+ * forge/plan (#3267): an epic and its plan. children are its sub-issues (at most 100), step by
+ * step, in the forge's order within a step. steps are the children of each step, the first first.
+ * lead is the session on this machine, not archived, that works on the epic in lineage (its label
+ * #<n>, or the Linear key) and is labelled lead.
+ */
+export interface ForgePlan {
+  item: ForgeItem;
+  children: ForgePlanChild[];
+  steps: ForgePlanStep[];
+  lead?: ForgeLead;
+}
+
+/**
+ * A child of an epic in forge/plan (#3267). blockedBy are the issues it is blocked by, open or
+ * closed, in the plan or not. step is 1 for a child that no other child blocks, else one more than
+ * the last step of the children that block it; a blocker outside the plan adds no step, and
+ * children in a loop share the step after the rest. blockedOutside are its open blockers outside
+ * the plan (an issue of another epic). A forge with no dependencies (GitLab Free) puts every child
+ * in step 1.
+ */
+export interface ForgePlanChild {
+  item: ForgeItem;
+  blockedBy: LineageNode[];
+  blockedOutside?: LineageNode[];
+  step: number;
+}
+
+/** forge/plan (#3267): the epic's lineage node, an issue on GitHub, GitLab or Linear. */
+export interface ForgePlanRequest {
+  node: LineageNode;
+}
+
+/** A step of a plan (#3267): its number, from 1, and its children's nodes. */
+export interface ForgePlanStep {
+  step: number;
+  nodes: LineageNode[];
+}
+
+/** A parent issue's children (#3267): done are closed, of total. */
+export interface ForgeProgress {
+  done: number;
+  total: number;
 }
 
 /**
@@ -3948,18 +4046,18 @@ export interface LineageCost {
 }
 
 /**
- * One node's banked cost on a machine (#2350), whole, with what its rollups need: the project its
- * ref is in, the issues a PR fixes (ended links too: a PR closed without a merge still counts
- * against its issue, as waste), the milestones it is part of, and how a PR ended. A session's own
- * cost is its turns that had no active link.
+ * One node's banked cost on a machine (#2350), whole, with what its rollups need: the repo or
+ * tracker its ref is in, the issues a PR fixes (ended links too: a PR closed without a merge still
+ * counts against its issue, as waste), the milestones it is part of, and how a PR ended. A
+ * session's own cost is its turns that had no active link.
  */
 export interface LineageCostNode {
   node: LineageNode;
   /**
    * The repo or tracker the node is in: github:alexec/agents, linear, or for a session its folder's
-   * repo (folder:<name> without one).
+   * repo (folder:<name> without one). Not a project (#3275).
    */
-  project?: string;
+  repo?: string;
   banked: LineageCost;
   /** A PR's issues, by ref. */
   fixes?: string[];
@@ -3993,9 +4091,9 @@ export interface LineageCostNode {
 /**
  * lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total
  * adds its parts: an issue's PRs (the PRs that fix it); a milestone's issues, their PRs and the PRs
- * part of it; a project's every node (kind project, ref github:alexec/agents). waste is the parts'
- * PRs closed without a merge or reverted. unlinked is the parts' sessions: turns with no active
- * link. parts is the nodes added up, newest first, at most 500; limited says there are more.
+ * part of it; a repo's every node (kind repo, ref github:alexec/agents). waste is the parts' PRs
+ * closed without a merge or reverted. unlinked is the parts' sessions: turns with no active link.
+ * parts is the nodes added up, newest first, at most 500; limited says there are more.
  */
 export interface LineageCostRollup {
   node: LineageNode;
@@ -4121,6 +4219,11 @@ export interface ListRequest {
   agentID?: UUID;
   after?: ListCursor;
   query?: string;
+  /**
+   * Only the sessions whose folder is in this project (#3276), as .agents/folder.json names it: the
+   * project's sessions on this machine.
+   */
+  project?: string;
 }
 
 export interface ListedSkill {
@@ -6315,9 +6418,41 @@ export interface ProjectList {
   projects: Project[];
 }
 
+/** A machine of projects/sessions (#3276) that has a folder of the project, by id and name. */
+export interface ProjectMachine {
+  machine: MachineRef;
+  machineName: string;
+}
+
 /** projects/remove (#2317): the project. Refused while a folder names it. */
 export interface ProjectRequest {
   id: string;
+}
+
+/**
+ * One session of projects/sessions (#3276): the machine it runs on, and the session as that machine
+ * lists it, lean.
+ */
+export interface ProjectSession {
+  machine: MachineRef;
+  machineName: string;
+  session: Agent;
+}
+
+/**
+ * projects/sessions (#3276): the project's sessions on each of the caller's machines that has a
+ * folder of it, newest activity first. unreached is the machines that have a folder of it but did
+ * not answer (offline, or too slow): their sessions are not in sessions.
+ */
+export interface ProjectSessions {
+  sessions: ProjectSession[];
+  unreached: ProjectMachine[];
+}
+
+/** projects/sessions (#3276): the project, and whether to list archived sessions too. */
+export interface ProjectSessionsRequest {
+  project: string;
+  includeArchived?: boolean;
 }
 
 /** projects/set (#2317): makes a project, or with id renames one. */
@@ -6841,7 +6976,7 @@ export type ReportFormat =
 export interface ReportNode {
   node: LineageNode;
   /** The repo or tracker the node is in, as LineageCostNode's. */
-  project?: string;
+  repo?: string;
   resolved?: LineageResolved;
   cost: ReportNodeCost;
   sessions: number;
@@ -9707,12 +9842,14 @@ export interface Methods {
   "forge/close": { params: ForgeCloseRequest; result: ForgeDone };
   "forge/comment": { params: ForgeCommentRequest; result: ForgeDone };
   "forge/diff": { params: ForgeNodeRequest; result: ForgeDiff };
+  "forge/features": { params: ForgeFeaturesRequest; result: ForgeFeatures };
   "forge/issue": { params: ForgeItemRequest; result: ForgeItemDetail };
   "forge/issues": { params: ForgeListRequest; result: ForgeList };
   "forge/label": { params: ForgeLabelRequest; result: ForgeDone };
   "forge/labels": { params: ForgeNodeRequest; result: ForgeLabels };
   "forge/log": { params: ForgeLogRequest; result: ForgeLog };
   "forge/merge": { params: ForgeMergeRequest; result: ForgeDone };
+  "forge/plan": { params: ForgePlanRequest; result: ForgePlan };
   "forge/pull": { params: ForgeItemRequest; result: ForgeItemDetail };
   "forge/pulls": { params: ForgeListRequest; result: ForgeList };
   "forge/rerun": { params: ForgeNodeRequest; result: ForgeDone };
@@ -10023,12 +10160,14 @@ export const MethodTarget = {
   "forge/close": "host",
   "forge/comment": "host",
   "forge/diff": "host",
+  "forge/features": "host",
   "forge/issue": "host",
   "forge/issues": "host",
   "forge/label": "host",
   "forge/labels": "host",
   "forge/log": "host",
   "forge/merge": "host",
+  "forge/plan": "host",
   "forge/pull": "host",
   "forge/pulls": "host",
   "forge/rerun": "host",
@@ -10281,7 +10420,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AddFolderRequest: { required: ["folder"], optional: ["project"] },
   Admitted: { required: [], optional: ["client", "host"] },
   AdoptRequest: { required: ["runtimeID", "sessionID", "cwd"], optional: [] },
-  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "desktopControlPause", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID", "auto", "clientPermission", "levels", "voiceHungUpAt", "goal"] },
+  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "desktopControlPause", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID", "auto", "clientPermission", "levels", "voiceHungUpAt", "goal", "project"] },
   AgentConfigEditorFile: { required: ["path", "content"], optional: [] },
   AgentConfigEditorRequest: { required: ["kind"], optional: ["folder"] },
   AgentConfigEditorSaveRequest: { required: ["kind", "path", "content"], optional: ["folder", "delete"] },
@@ -10553,7 +10692,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FolderPlugin: { required: ["folder", "name", "carries", "folderPath"], optional: ["awaitingApproval"] },
   FolderRemovedNotification: { required: ["folder"], optional: [] },
   FolderRequest: { required: ["folder"], optional: [] },
-  FolderSummary: { required: ["name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "folder"], optional: ["guardedChanges", "approvals", "project", "projectProblem", "helperLimitsSetBy"] },
+  FolderSummary: { required: ["name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "folder"], optional: ["guardedChanges", "approvals", "project", "projectProblem", "machine", "helperLimitsSetBy"] },
   FolderWorktrees: { required: ["worktrees", "folder"], optional: [] },
   FoldersFindRequest: { required: [], optional: ["paths", "folders"] },
   FoldersListRequest: { required: ["includeArchived"], optional: [] },
@@ -10566,20 +10705,29 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeDiffFile: { required: ["path", "change", "additions", "deletions", "hunks"], optional: ["previousPath", "note"] },
   ForgeDiffHunk: { required: ["oldStart", "newStart", "lines"], optional: [] },
   ForgeDone: { required: [], optional: ["url", "auto", "reran"] },
-  ForgeItem: { required: ["node", "title", "state", "labels", "assignees", "updatedAt", "comments"], optional: ["url", "folder", "author", "milestone", "draft", "checks", "review", "mergeable", "autoMerge"] },
+  ForgeFeature: { required: ["name", "epics", "open"], optional: ["color"] },
+  ForgeFeatures: { required: ["features"], optional: ["errors"] },
+  ForgeFeaturesRequest: { required: [], optional: ["folder"] },
+  ForgeItem: { required: ["node", "title", "state", "labels", "assignees", "updatedAt", "comments"], optional: ["url", "folder", "author", "milestone", "draft", "checks", "review", "mergeable", "autoMerge", "parent", "level", "feature", "progress"] },
   ForgeItemDetail: { required: ["item", "body", "comments"], optional: ["cursor", "checks", "reviewThreads", "filesChanged", "head", "mergeMethods", "start"] },
   ForgeItemRequest: { required: ["node"], optional: ["cursor"] },
   ForgeLabel: { required: ["name"], optional: ["color"] },
   ForgeLabelRequest: { required: ["node"], optional: ["add", "remove"] },
   ForgeLabels: { required: ["labels"], optional: [] },
+  ForgeLead: { required: ["session", "state"], optional: ["title"] },
   ForgeList: { required: ["items"], optional: ["cursor", "errors"] },
   ForgeListError: { required: ["forge", "message"], optional: [] },
-  ForgeListRequest: { required: [], optional: ["folder", "state", "label", "assignee", "query", "cursor", "limit"] },
+  ForgeListRequest: { required: [], optional: ["folder", "state", "label", "assignee", "query", "cursor", "limit", "feature"] },
   ForgeLog: { required: ["text"], optional: [] },
   ForgeLogRequest: { required: ["node"], optional: ["check"] },
   ForgeLogins: { required: [], optional: ["github", "gitlab", "linear"] },
   ForgeMergeRequest: { required: ["node", "sha"], optional: ["method", "auto"] },
   ForgeNodeRequest: { required: ["node"], optional: [] },
+  ForgePlan: { required: ["item", "children", "steps"], optional: ["lead"] },
+  ForgePlanChild: { required: ["item", "blockedBy", "step"], optional: ["blockedOutside"] },
+  ForgePlanRequest: { required: ["node"], optional: [] },
+  ForgePlanStep: { required: ["step", "nodes"], optional: [] },
+  ForgeProgress: { required: ["done", "total"], optional: [] },
   ForgeStart: { required: ["prompt", "labels"], optional: ["worktree"] },
   FoundFolder: { required: ["folder", "exists", "isRepository", "isFolder"], optional: ["typed"] },
   GitAsk: { required: ["server", "from"], optional: [] },
@@ -10626,7 +10774,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Levels: { required: [], optional: ["model", "permission", "permissionRequests"] },
   LineMember: { required: ["agentID", "askedAt", "isCallOpen"], optional: [] },
   LineageCost: { required: ["cost", "inputTokens", "outputTokens", "turns", "workingSeconds", "waitingSeconds"], optional: ["limitTokens"] },
-  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["project", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "endedAt", "resolved", "sessions"] },
+  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["repo", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "endedAt", "resolved", "sessions"] },
   LineageCostRollup: { required: ["node", "own", "total", "waste", "unlinked", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "parts"], optional: ["limited"] },
   LineageEndRequest: { required: ["from", "to", "rel"], optional: [] },
   LineageGraph: { required: ["nodes", "links"], optional: ["limited", "resolving", "resolved"] },
@@ -10637,7 +10785,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineageNodeRequest: { required: ["node"], optional: ["depth"] },
   LineageResolved: { required: ["title"], optional: ["state", "labels"] },
   ListCursor: { required: ["lastActivityAt", "id"], optional: ["archivedAt"] },
-  ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query"] },
+  ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query", "project"] },
   ListedSkill: { required: ["name", "folder"], optional: ["description", "managed"] },
   LiveAgent: { required: ["host", "hostName", "owner", "ownerName", "bot", "agent", "runtime", "state"], optional: ["waitsOnOthers", "workflow", "since", "costToDate", "heardAt"] },
   LiveBoard: { required: ["agents"], optional: [] },
@@ -10848,7 +10996,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Project: { required: ["id", "name", "owner", "folders", "mayChange"], optional: ["slots"] },
   ProjectFolder: { required: ["machine", "folder", "name"], optional: [] },
   ProjectList: { required: ["projects"], optional: [] },
+  ProjectMachine: { required: ["machine", "machineName"], optional: [] },
   ProjectRequest: { required: ["id"], optional: [] },
+  ProjectSession: { required: ["machine", "machineName", "session"], optional: [] },
+  ProjectSessions: { required: ["sessions", "unreached"], optional: [] },
+  ProjectSessionsRequest: { required: ["project"], optional: ["includeArchived"] },
   ProjectSet: { required: ["name"], optional: ["id"] },
   ProjectSlot: { required: ["slot"], optional: ["forge", "repository", "site", "skipped"] },
   ProjectSlotSet: { required: ["id", "slot"], optional: ["value"] },
@@ -10905,7 +11057,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RenameRequest: { required: ["agentID", "title"], optional: [] },
   ReportCounts: { required: ["sessions", "failedSessions", "prsOpened", "prsMerged", "prsReverted", "mergeSeconds", "waits", "waitBuckets", "workflowRuns", "workflowFailures"], optional: [] },
   ReportExport: { required: ["text", "count", "format"], optional: [] },
-  ReportNode: { required: ["node", "cost", "sessions", "lastAt"], optional: ["project", "resolved", "leadTimeSeconds", "outcome"] },
+  ReportNode: { required: ["node", "cost", "sessions", "lastAt"], optional: ["repo", "resolved", "leadTimeSeconds", "outcome"] },
   ReportNodeCost: { required: ["own", "total", "waste"], optional: [] },
   ReportNodes: { required: ["nodes", "limited", "unresolved"], optional: ["cursor"] },
   ReportNodesQuery: { required: ["kind"], optional: ["state", "repo", "label", "since", "sort", "cursor", "limit", "scope"] },

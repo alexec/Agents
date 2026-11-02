@@ -442,7 +442,7 @@ func archivedOrder(a *wire.Agent) wire.Date {
 func (d *Daemon) listAgents(r wire.ListRequest) []wire.Agent {
 	if r.AgentID != nil {
 		if a := d.Store.Agent(*r.AgentID); a != nil {
-			return []wire.Agent{listed(*a, r)}
+			return []wire.Agent{withProject(listed(*a, r), projectOfFolder(folderPath(a)))}
 		}
 		return []wire.Agent{}
 	}
@@ -456,6 +456,7 @@ func (d *Daemon) listAgents(r wire.ListRequest) []wire.Agent {
 		query = *r.Query
 	}
 	read := 0
+	projects := projectsOfFolders{}
 	agents := d.Store.Agents()
 	if r.ArchivedOnly {
 		sort.SliceStable(agents, func(i, j int) bool {
@@ -474,6 +475,10 @@ func (d *Daemon) listAgents(r wire.ListRequest) []wire.Agent {
 			continue
 		}
 		if r.StartedByWorkflow != nil && (a.StartedByWorkflow == nil || *a.StartedByWorkflow != *r.StartedByWorkflow) {
+			continue
+		}
+		// The project's sessions on this machine (#3276): those whose folder names it.
+		if r.Project != nil && projects.of(&a) != *r.Project {
 			continue
 		}
 		if c := r.After; c != nil && !r.ArchivedOnly && (a.LastActivityAt > c.LastActivityAt || a.LastActivityAt == c.LastActivityAt && a.ID <= c.ID) {
@@ -495,7 +500,7 @@ func (d *Daemon) listAgents(r wire.ListRequest) []wire.Agent {
 				continue
 			}
 		}
-		out = append(out, listed(a, r))
+		out = append(out, withProject(listed(a, r), projects.of(&a)))
 		if int64(len(out)) == limit {
 			break
 		}

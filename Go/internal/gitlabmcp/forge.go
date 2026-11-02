@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 	"slices"
 	"strconv"
@@ -25,11 +26,12 @@ import (
 
 // SearchFilter is what a list lists: merge requests or issues, in state open, closed or all
 // (open when ""), narrowed by a label, an assignee's username and words in the title or
-// description. A closed merge request includes a merged one.
+// description, and a feature: the name of a feature:<name> label (#3267). A closed merge request
+// includes a merged one.
 type SearchFilter struct {
-	MRs                    bool
-	State                  string
-	Label, Assignee, Query string
+	MRs                             bool
+	State                           string
+	Label, Assignee, Query, Feature string
 }
 
 // Item is an issue or a merge request as the forge reads list it.
@@ -48,6 +50,12 @@ type Item struct {
 	// review_required or ""; Mergeable is mergeable, conflicting or unknown.
 	Draft, AutoMerge          bool
 	Checks, Review, Mergeable string
+	// An issue's place in the hierarchy of work items (#3267): the issue it is a child of
+	// (ParentProject "" for none), and its children, SubDone of them closed. Only an issue's own
+	// read and a plan say them: GitLab's REST lists do not.
+	ParentProject     string
+	ParentNumber      int
+	SubTotal, SubDone int
 }
 
 // SearchPage is a page of a list, the last updated first. Cursors[i] goes on after Items[i],
@@ -245,8 +253,16 @@ func listPath(project string, f SearchFilter, state, before string, first int) s
 		t, _ := parseTime(before)
 		q.Set("updated_before", timeString(t.Add(time.Millisecond)))
 	}
+	// GitLab's labels are all of them, by commas.
+	var labels []string
 	if f.Label != "" {
-		q.Set("labels", f.Label)
+		labels = append(labels, f.Label)
+	}
+	if f.Feature != "" {
+		labels = append(labels, "feature:"+f.Feature)
+	}
+	if len(labels) > 0 {
+		q.Set("labels", strings.Join(labels, ","))
 	}
 	if f.Assignee != "" {
 		q.Set("assignee_username", f.Assignee)
@@ -323,6 +339,12 @@ func (g *RealGitLab) ItemPage(ctx context.Context, project string, number int, m
 		return ItemDetail{}, err
 	}
 	d := ItemDetail{Item: j.item(project, mr), Body: j.Description, Thread: []Comment{}}
+	if !mr {
+		// The hierarchy is a nicety: a page still reads on a GitLab without work items.
+		if h, err := g.hierarchy(ctx, project, number); err == nil {
+			h.into(&d.Item)
+		}
+	}
 	var notes []noteJSON
 	path := fmt.Sprintf("projects/%s/%s/%d/notes?sort=desc&order_by=created_at&per_page=%d&page=%d", pid(project), kind, number, forgeComments, page)
 	if err := g.get(ctx, path, false, &notes); err != nil {
@@ -375,4 +397,196 @@ func (g *RealGitLab) ItemPage(ctx context.Context, project string, number int, m
 func IsNotFound(err error) bool {
 	e, ok := err.(*GitLabError)
 	return ok && e.Kind == NotFound
+}
+
+// Ref is a work item another names, a child or a blocker: open says it is not closed.
+type Ref struct {
+	Project string
+	Number  int
+	Open    bool
+}
+
+// PlanChild is a child issue with the issues that block it (#3267).
+type PlanChild struct {
+	Item
+	BlockedBy []Ref
+}
+
+// Plan is an issue (an epic) and its child issues, in GitLab's order (#3267).
+type Plan struct {
+	Epic     Item
+	Children []PlanChild
+}
+
+// Work items (GitLab 17 and later) say an issue's parent, its children, and its "blocked by"
+// links, which are GitLab Premium's: on Free, every link relates, and none blocks. REST says
+// none of them, so they are read with GraphQL.
+const hierarchyQuery = `query($path: ID!, $iid: String!) { project(fullPath: $path) { workItems(iids: [$iid], first: 1) { nodes {
+  widgets { __typename ... on WorkItemWidgetHierarchy {
+    parent { iid state namespace { fullPath } }
+    children(first: 100) { nodes { iid state namespace { fullPath }
+      widgets { __typename ... on WorkItemWidgetLinkedItems { linkedItems(first: 50) { nodes { linkType
+        workItem { iid state namespace { fullPath } } } } } } } } } } } } } }`
+
+type workItemRef struct {
+	IID       string `json:"iid"`
+	State     string `json:"state"`
+	Namespace *struct {
+		FullPath string `json:"fullPath"`
+	} `json:"namespace"`
+}
+
+func (w workItemRef) ref() (Ref, bool) {
+	n, err := strconv.Atoi(w.IID)
+	if err != nil || n < 1 || w.Namespace == nil || w.Namespace.FullPath == "" {
+		return Ref{}, false
+	}
+	return Ref{Project: w.Namespace.FullPath, Number: n, Open: w.State != "CLOSED"}, true
+}
+
+// hierarchyOf is an issue's parent and children, each child with its blockers.
+type hierarchyOf struct {
+	parent   *Ref
+	children []PlanChild
+}
+
+func (h hierarchyOf) into(i *Item) {
+	if h.parent != nil {
+		i.ParentProject, i.ParentNumber = h.parent.Project, h.parent.Number
+	}
+	i.SubTotal, i.SubDone = len(h.children), 0
+	for _, c := range h.children {
+		if c.State == "closed" {
+			i.SubDone++
+		}
+	}
+}
+
+func (g *RealGitLab) graphql(ctx context.Context, query string, vars map[string]any, into any) error {
+	body, err := g.do(ctx, http.MethodPost, "/api/graphql", map[string]any{"query": query, "variables": vars})
+	if err != nil {
+		return err
+	}
+	var out struct {
+		Data   json.RawMessage `json:"data"`
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	if json.Unmarshal(body, &out) != nil {
+		return &GitLabError{Kind: Failed, Message: "GitLab's answer is not JSON"}
+	}
+	if len(out.Errors) > 0 {
+		return &GitLabError{Kind: Failed, Message: "GitLab: " + out.Errors[0].Message}
+	}
+	if json.Unmarshal(out.Data, into) != nil {
+		return &GitLabError{Kind: Failed, Message: "GitLab's answer is not JSON"}
+	}
+	return nil
+}
+
+// hierarchy is issue number of project's parent and its children (at most 100), each with its
+// blockers (at most 50), as refs: the children's own fields are read by REST.
+func (g *RealGitLab) hierarchy(ctx context.Context, project string, number int) (hierarchyOf, error) {
+	var data struct {
+		Project *struct {
+			WorkItems struct {
+				Nodes []struct {
+					Widgets []struct {
+						Typename string       `json:"__typename"`
+						Parent   *workItemRef `json:"parent"`
+						Children struct {
+							Nodes []struct {
+								workItemRef
+								Widgets []struct {
+									LinkedItems struct {
+										Nodes []struct {
+											LinkType string      `json:"linkType"`
+											WorkItem workItemRef `json:"workItem"`
+										} `json:"nodes"`
+									} `json:"linkedItems"`
+								} `json:"widgets"`
+							} `json:"nodes"`
+						} `json:"children"`
+					} `json:"widgets"`
+				} `json:"nodes"`
+			} `json:"workItems"`
+		} `json:"project"`
+	}
+	if err := g.graphql(ctx, hierarchyQuery, map[string]any{"path": project, "iid": strconv.Itoa(number)}, &data); err != nil {
+		return hierarchyOf{}, err
+	}
+	if data.Project == nil || len(data.Project.WorkItems.Nodes) == 0 {
+		return hierarchyOf{}, &GitLabError{Kind: NotFound, Message: fmt.Sprintf("no issue #%d in %s", number, project)}
+	}
+	var h hierarchyOf
+	for _, w := range data.Project.WorkItems.Nodes[0].Widgets {
+		if w.Typename != "WorkItemWidgetHierarchy" {
+			continue
+		}
+		if w.Parent != nil {
+			if r, ok := w.Parent.ref(); ok {
+				h.parent = &r
+			}
+		}
+		for _, c := range w.Children.Nodes {
+			r, ok := c.ref()
+			if !ok {
+				continue
+			}
+			child := PlanChild{Item: Item{Project: r.Project, Number: r.Number, State: map[bool]string{true: "open", false: "closed"}[r.Open]}, BlockedBy: []Ref{}}
+			for _, cw := range c.Widgets {
+				for _, l := range cw.LinkedItems.Nodes {
+					if b, ok := l.WorkItem.ref(); ok && strings.EqualFold(l.LinkType, "is_blocked_by") {
+						child.BlockedBy = append(child.BlockedBy, b)
+					}
+				}
+			}
+			h.children = append(h.children, child)
+		}
+	}
+	return h, nil
+}
+
+// Plan is the issue number of project, its child issues and each one's blockers: one GraphQL
+// query, and a REST list for each project the children are in, for their fields.
+func (g *RealGitLab) Plan(ctx context.Context, project string, number int) (Plan, error) {
+	var j forgeJSON
+	if err := g.get(ctx, fmt.Sprintf("projects/%s/issues/%d", pid(project), number), false, &j); err != nil {
+		return Plan{}, err
+	}
+	p := Plan{Epic: j.item(project, false), Children: []PlanChild{}}
+	h, err := g.hierarchy(ctx, project, number)
+	if err != nil {
+		return Plan{}, err
+	}
+	h.into(&p.Epic)
+	read := map[string]Item{}
+	var projects []string
+	iids := map[string][]string{}
+	for _, c := range h.children {
+		if _, seen := iids[c.Project]; !seen {
+			projects = append(projects, c.Project)
+		}
+		iids[c.Project] = append(iids[c.Project], strconv.Itoa(c.Number))
+	}
+	for _, at := range projects {
+		q := url.Values{"iids[]": iids[at], "state": {"all"}, "with_labels_details": {"true"}, "per_page": {strconv.Itoa(perPage)}}
+		var list []forgeJSON
+		if err := g.get(ctx, fmt.Sprintf("projects/%s/issues?%s", pid(at), q.Encode()), false, &list); err != nil {
+			return Plan{}, err
+		}
+		for _, j := range list {
+			i := j.item(at, false)
+			read[i.key()] = i
+		}
+	}
+	for _, c := range h.children {
+		if i, ok := read[c.key()]; ok {
+			c.Item = i
+		}
+		c.ParentProject, c.ParentNumber = project, number
+		p.Children = append(p.Children, c)
+	}
+	return p, nil
 }

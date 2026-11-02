@@ -102,7 +102,7 @@ public enum WorkList {
             self.init(node: n.node, title: n.resolved?.title ?? ReportValueWords.name(n.node),
                       state: n.resolved?.state ?? (n.outcome == "merged" ? "merged" : ""),
                       labels: (n.resolved?.labels ?? []).map { DaemonAPI.ForgeLabel(name: $0) },
-                      repo: n.project ?? WorkList.repo(of: n.node.ref), updated: n.lastAt,
+                      repo: n.repo ?? WorkList.repo(of: n.node.ref), updated: n.lastAt,
                       url: WorkList.url(n.node), lineage: n)
         }
     }

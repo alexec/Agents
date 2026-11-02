@@ -86,6 +86,26 @@ Alex still decides, by a form: anything hard to undo (deleting data, rewriting h
 - **One release a day (Alex, 2026-10-22, #2462).** At most one tag per calendar day in America/Los_Angeles; the release skill's readiness check and gate wait for the next day.
 - **A milestone is done when its release has shipped** (the GitHub release and both TestFlight builds), not when GitHub closes it. No change for the next milestone merges to `main` before that (Alex, 2026-10-18). The release skill closes the milestone.
 
+## Plans: features, epics, stories, tasks and spikes (#3265)
+
+- **Work has one hierarchy** (`specs/3265-work-plans/spec.md`). The level is a label, used in addition to the type label (`bug`, `enhancement`), which the rules above and below still use:
+
+  | Level | On the forge | Worked by |
+  |---|---|---|
+  | **Feature** | the label `feature:<name>`, a product theme; spans epics and milestones | nobody directly |
+  | **Epic** | a parent issue, label `epic`; its children are its plan | one lead |
+  | **Story** | a sub-issue, label `story`: a person can see or use it (a client or a workflow changes) | a lane: one PR or one stack |
+  | **Task** | a sub-issue, label `task`: it changes no client (daemon, wire, tooling, docs) | a lane: one PR |
+  | **Spike** | a sub-issue, label `spike`: a question with a time limit; it ends in a decision in the issue or a spec, not product code | a lane, or the lead |
+  | **Bug** | label `bug`, as before; it can also be an epic's child | the bug lane, or the epic's lead |
+
+- **A feature is a label, not an issue,** because a feature outlasts its epics. An epic belongs to one feature, and its children get the same `feature:` label. Only open issues get `epic` and `feature:`; closed epics keep their labels.
+- **`feature:` is not `area:`.** `area:<name>` is the lock on a set of paths that CI sets from a PR's files (#873). `feature:<name>` is the product theme that the Product Owner sets when it files the issue. They often have the same name, but they do not have to.
+- **The order is in the forge, not in prose.** The children are the epic's sub-issues, and a child that must wait is "blocked by" the children it waits for. A **step** is the set of children whose blockers are all closed or in an earlier step; the children of one step can run at the same time, under the area and open-PR limits. A "Slices" table in the epic's body is optional prose: the sub-issues and their "blocked by" links are the plan.
+- **One lead per epic** (the `lead` skill, `.agents/skills/lead/`). The Product Owner files the epic and its first children; then the lead owns the plan: it starts a lane for each child whose blockers are closed, files the new children that its lanes find, and closes the epic when all its children are closed. The lead writes no code.
+- **The Scrum Master gives a place to the lead, not to each child.** The lead does not count as a lane; its lanes do, towards the folder's lane and open-PR limits (typically 5 to 7 at once, per project). The milestone order and "UI changes go early" apply to the epic as one unit.
+- **The app says "epic"** for every forge, also for Linear.
+
 ## Landing a change
 
 - **Every change has an issue and a pull request.** Work on a branch of your own, in a worktree you moved into with move_worktree (never one made by hand with `git worktree add`, which the app never sees: #615), push it, open the PR with `gh pr create`, turn on `gh pr merge --auto --squash` at once, and wait for it to land; fix what CI fails. Never push to `main`.

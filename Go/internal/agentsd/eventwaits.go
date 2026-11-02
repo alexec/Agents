@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	goruntime "runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -98,6 +99,13 @@ var forPersonEventNames = map[string]bool{"review.requested": true, "issue.assig
 // isForPersonEvent is whether a wait on this event name can only be settled by the
 // connected person.
 func isForPersonEvent(name string) bool { return forPersonEventNames[name] }
+
+// hostIsMac is whether this host runs on a Mac, where every Mac-only event is raised (#3288).
+// Tests set it to see what a Linux server says.
+var hostIsMac = goruntime.GOOS == "darwin"
+
+// neverRaisedHere is whether this host never raises the event: a Mac-only one on a server.
+func neverRaisedHere(name string) bool { return !hostIsMac && isMacOnly(name) }
 
 // isMacOnly is EventCatalogue.isMacOnly.
 func isMacOnly(name string) bool {
@@ -754,7 +762,7 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 	// A server never raises what only a Mac does: a wait on nothing else is refused.
 	var neverHere []string
 	for _, p := range patterns {
-		if isMacOnly(p.name) {
+		if neverRaisedHere(p.name) {
 			neverHere = append(neverHere, p.name)
 		}
 	}

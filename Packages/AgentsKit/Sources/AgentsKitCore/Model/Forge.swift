@@ -36,11 +36,19 @@ public extension DaemonAPI {
         public var review: String?
         public var mergeable: String?
         public var autoMerge: Bool?
+        /// The hierarchy (#3267): the issue it is a sub-issue of; its level (epic, story, task or
+        /// spike, from its labels); its feature (the name of its `feature:` label); and a
+        /// parent's closed children of all of them, where the forge says it.
+        public var parent: LineageNode?
+        public var level: String?
+        public var feature: String?
+        public var progress: ForgeProgress?
 
         public init(node: LineageNode, title: String, state: String, url: String? = nil, folder: String? = nil,
                     labels: [ForgeLabel] = [], author: String? = nil, assignees: [String] = [], milestone: String? = nil,
                     updatedAt: Date, comments: Int = 0, draft: Bool? = nil, checks: String? = nil, review: String? = nil,
-                    mergeable: String? = nil, autoMerge: Bool? = nil) {
+                    mergeable: String? = nil, autoMerge: Bool? = nil, parent: LineageNode? = nil, level: String? = nil,
+                    feature: String? = nil, progress: ForgeProgress? = nil) {
             self.node = node
             self.title = title
             self.state = state
@@ -57,11 +65,27 @@ public extension DaemonAPI {
             self.review = review
             self.mergeable = mergeable
             self.autoMerge = autoMerge
+            self.parent = parent
+            self.level = level
+            self.feature = feature
+            self.progress = progress
+        }
+    }
+
+    /// A parent issue's children (#3267): `done` are closed, of `total`.
+    struct ForgeProgress: Codable, Sendable, Hashable {
+        public var done: Int
+        public var total: Int
+
+        public init(done: Int, total: Int) {
+            self.done = done
+            self.total = total
         }
     }
 
     /// `forge/issues` and `forge/pulls`' question: every folder's on the machine, or one
-    /// folder's. `state` is open (when nil), closed or all; `limit` is 1 to 100, 50 when nil.
+    /// folder's. `state` is open (when nil), closed or all; `limit` is 1 to 100, 50 when nil;
+    /// `feature` (a name: work for the label feature:work) narrows it to one feature (#3267).
     struct ForgeListRequest: Codable, Sendable, Hashable {
         public var folder: String?
         public var state: String?
@@ -70,9 +94,10 @@ public extension DaemonAPI {
         public var query: String?
         public var cursor: String?
         public var limit: Int?
+        public var feature: String?
 
         public init(folder: String? = nil, state: String? = nil, label: String? = nil, assignee: String? = nil,
-                    query: String? = nil, cursor: String? = nil, limit: Int? = nil) {
+                    query: String? = nil, cursor: String? = nil, limit: Int? = nil, feature: String? = nil) {
             self.folder = folder
             self.state = state
             self.label = label
@@ -80,6 +105,7 @@ public extension DaemonAPI {
             self.query = query
             self.cursor = cursor
             self.limit = limit
+            self.feature = feature
         }
     }
 
@@ -370,6 +396,109 @@ public extension DaemonAPI {
     }
 }
 
+/// `forge/plan` and `forge/features` (#3267): an epic's children in steps, from the forge's
+/// sub-issues and "blocked by" links, with its lead; and the `feature:` labels on the epics.
+public extension DaemonAPI {
+    /// `forge/plan`'s question: the epic, an issue.
+    struct ForgePlanRequest: Codable, Sendable, Hashable {
+        public var node: LineageNode
+
+        public init(node: LineageNode) {
+            self.node = node
+        }
+    }
+
+    /// A child of an epic: the issues it is blocked by; its step (1 when no other child blocks
+    /// it); and its open blockers outside the plan.
+    struct ForgePlanChild: Codable, Sendable, Hashable {
+        public var item: ForgeItem
+        public var blockedBy: [LineageNode]
+        public var blockedOutside: [LineageNode]?
+        public var step: Int
+
+        public init(item: ForgeItem, blockedBy: [LineageNode] = [], blockedOutside: [LineageNode]? = nil, step: Int) {
+            self.item = item
+            self.blockedBy = blockedBy
+            self.blockedOutside = blockedOutside
+            self.step = step
+        }
+    }
+
+    /// A step of a plan: its number, from 1, and its children's nodes.
+    struct ForgePlanStep: Codable, Sendable, Hashable {
+        public var step: Int
+        public var nodes: [LineageNode]
+
+        public init(step: Int, nodes: [LineageNode]) {
+            self.step = step
+            self.nodes = nodes
+        }
+    }
+
+    /// An epic's lead session: the session labelled with the epic and `lead`.
+    struct ForgeLead: Codable, Sendable, Hashable {
+        public var session: UUID
+        public var title: String?
+        public var state: AgentState
+
+        public init(session: UUID, title: String? = nil, state: AgentState) {
+            self.session = session
+            self.title = title
+            self.state = state
+        }
+    }
+
+    /// An epic and its plan: its children, step by step; the steps; and its lead, if any.
+    struct ForgePlan: Codable, Sendable, Hashable {
+        public var item: ForgeItem
+        public var children: [ForgePlanChild]
+        public var steps: [ForgePlanStep]
+        public var lead: ForgeLead?
+
+        public init(item: ForgeItem, children: [ForgePlanChild] = [], steps: [ForgePlanStep] = [], lead: ForgeLead? = nil) {
+            self.item = item
+            self.children = children
+            self.steps = steps
+            self.lead = lead
+        }
+    }
+
+    /// `forge/features`' question: every folder's on the machine, or one folder's.
+    struct ForgeFeaturesRequest: Codable, Sendable, Hashable {
+        public var folder: String?
+
+        public init(folder: String? = nil) {
+            self.folder = folder
+        }
+    }
+
+    /// A feature: its label's name after `feature:`, with its colour; its epics, and the open ones.
+    struct ForgeFeature: Codable, Sendable, Hashable {
+        public var name: String
+        public var color: String?
+        public var epics: Int
+        public var open: Int
+
+        public init(name: String, color: String? = nil, epics: Int, open: Int) {
+            self.name = name
+            self.color = color
+            self.epics = epics
+            self.open = open
+        }
+    }
+
+    /// The features, by name; `errors` says a forge that could not be read.
+    struct ForgeFeatures: Codable, Sendable, Hashable {
+        public var features: [ForgeFeature]
+        public var errors: [ForgeListError]?
+
+        public init(features: [ForgeFeature] = [], errors: [ForgeListError]? = nil) {
+            self.features = features
+            self.errors = errors
+        }
+    }
+}
+
 public extension DaemonAPI.Method {
     /// `ForgeListRequest` → `ForgeList` (#3129).
     static let forgeIssues = "forge/issues"
@@ -389,4 +518,7 @@ public extension DaemonAPI.Method {
     static let forgeLabels = "forge/labels"
     static let forgeLog = "forge/log"
     static let forgeDiff = "forge/diff"
+    /// `ForgePlanRequest` → `ForgePlan`, `ForgeFeaturesRequest` → `ForgeFeatures` (#3267).
+    static let forgePlan = "forge/plan"
+    static let forgeFeatures = "forge/features"
 }

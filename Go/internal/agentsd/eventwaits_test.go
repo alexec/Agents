@@ -33,8 +33,6 @@ func TestAWaitSaysWhatIsWrongWithIt(t *testing.T) {
 			`agent.finished takes no arguments; "x" is not one of its arguments. To wait for particular agents, use wait_for_agents.`},
 		{map[string]any{"events": "person.away", "where": map[string]any{"why": "asleep"}, "until_minutes": 5},
 			"person.away: why is one of locked, idle, not asleep."},
-		{map[string]any{"events": []string{"mac.wake", "person.back"}, "until_minutes": 5},
-			"mac.wake, person.back are only raised on a Mac, and this machine is a Linux server, so they never happen here. Nothing is waiting."},
 		{map[string]any{"events": "pr.merged", "until_minutes": 5}, "No server here offers pr.merged. This folder has no MCP server that offers events."},
 	} {
 		text, isErr := m.tool(10+i, "wait_for_event", c.args)
@@ -43,6 +41,36 @@ func TestAWaitSaysWhatIsWrongWithIt(t *testing.T) {
 		}
 	}
 	if text, _ := m.tool(31, "cancel_wait", nil); text != "You weren't waiting on anything." {
+		t.Fatal(text)
+	}
+}
+
+// A Linux server refuses a wait on only what a Mac raises; a Mac holds it (#3288).
+func TestAMacOnlyWaitIsRefusedOnlyOnAServer(t *testing.T) {
+	was := hostIsMac
+	defer func() { hostIsMac = was }()
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	a := seeded(t, d, t.TempDir(), nil)
+	m := appClient(t, d, a.ID)
+	m.post("initialize", map[string]any{}, 1)
+	args := map[string]any{"events": []string{"mac.wake", "person.back"}, "until_minutes": 5}
+
+	hostIsMac = false
+	if text, isErr := m.tool(2, "wait_for_event", args); !isErr || text !=
+		"mac.wake, person.back are only raised on a Mac, and this machine is a Linux server, so they never happen here. Nothing is waiting." {
+		t.Fatal(text)
+	}
+
+	hostIsMac = true
+	answered := make(chan string, 1)
+	go func() {
+		text, _ := m.tool(3, "wait_for_event", args)
+		answered <- text
+	}()
+	waitFor(t, "the wait", func() bool { w := d.Store.Agent(a.ID).EventWait; return w != nil && w.Ending == nil })
+	d.raise(wire.EventDraft{Name: "mac.wake", At: now(), Scope: macScope(), Sentence: "This Mac woke up."})
+	if text := <-answered; !strings.HasPrefix(text, "mac.wake happened at ") || strings.Contains(text, "Linux server") {
 		t.Fatal(text)
 	}
 }

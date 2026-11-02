@@ -261,7 +261,7 @@ func outcomeWords(o wire.WorkflowOutcome) string {
 func neverHereWorkflow(w wire.Workflow) string {
 	var names []string
 	for _, t := range w.Triggers {
-		if p, ok := triggerPattern(t); ok && isMacOnly(p.name) {
+		if p, ok := triggerPattern(t); ok && neverRaisedHere(p.name) {
 			names = append(names, p.name)
 		}
 	}

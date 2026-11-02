@@ -122,6 +122,8 @@ type fakeHost struct {
 	uplink *controllink.Uplink
 	// private is the host's own P-256 key, which what is sealed to it opens with (#999).
 	private []byte
+	// agents is its agents/list answer, as a function of the request; nil answers [].
+	agents func(params json.RawMessage) any
 }
 
 func (p *plane) host(machine string) *fakeHost { return p.hostWith(machine, nil) }
@@ -174,8 +176,16 @@ func (p *plane) serveHost(root string, member *controllink.Membership, private [
 			var m struct {
 				ID     json.RawMessage `json:"id"`
 				Method string          `json:"method"`
+				Params json.RawMessage `json:"params"`
 			}
 			json.Unmarshal([]byte(line), &m)
+			h.mu.Lock()
+			agents := h.agents
+			h.mu.Unlock()
+			if m.Method == "agents/list" && agents != nil {
+				c.Write(reply(m.ID, agents(m.Params)))
+				continue
+			}
 			switch m.Method {
 			case "daemon/ping":
 				c.Write(reply(m.ID, map[string]any{"pong": member.Host}))

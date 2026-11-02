@@ -219,6 +219,8 @@ public extension DaemonAPI {
                 Row(Method.forgeRerun, params: ForgeNodeRequest.self, result: ForgeDone.self, kind: .hostRequest),
                 Row(Method.forgeLog, params: ForgeLogRequest.self, result: ForgeLog.self, kind: .hostRequest),
                 Row(Method.forgeDiff, params: ForgeNodeRequest.self, result: ForgeDiff.self, kind: .hostRequest),
+                Row(Method.forgePlan, params: ForgePlanRequest.self, result: ForgePlan.self, kind: .hostRequest),
+                Row(Method.forgeFeatures, params: ForgeFeaturesRequest.self, result: ForgeFeatures.self, kind: .hostRequest),
                 Row(Method.lineageWalk, params: LineageNodeRequest.self, result: LineageGraph.self, kind: .hostRequest),
                 Row(Method.lineageCost, params: LineageNodeRequest.self, result: LineageCostRollup.self,
                     kind: .hostRequest),

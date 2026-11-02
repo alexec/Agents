@@ -103,6 +103,7 @@ public enum Capability {
     public static let pool1 = "pool/1"
     public static let preferences1 = "preferences/1"
     public static let presence1 = "presence/1"
+    public static let projectsSessions1 = "projects.sessions/1"
     public static let projects1 = "projects/1"
     public static let providers1 = "providers/1"
     public static let readapi1 = "readapi/1"
@@ -283,12 +284,14 @@ public enum Capability {
         "forge/close": "forge-write/1",
         "forge/comment": "forge-write/1",
         "forge/diff": "forge-write/1",
+        "forge/features": "forge/1",
         "forge/issue": "forge/1",
         "forge/issues": "forge/1",
         "forge/label": "forge-write/1",
         "forge/labels": "forge-write/1",
         "forge/log": "forge-write/1",
         "forge/merge": "forge-write/1",
+        "forge/plan": "forge/1",
         "forge/pull": "forge/1",
         "forge/pulls": "forge/1",
         "forge/rerun": "forge-write/1",
@@ -615,6 +618,7 @@ public enum Capability {
         "projects/joined": "projects/1",
         "projects/list": "projects/1",
         "projects/remove": "projects/1",
+        "projects/sessions": "projects.sessions/1",
         "projects/set": "projects/1",
         "projects/setSlot": "projects/1",
         "providers/add": "providers/1",

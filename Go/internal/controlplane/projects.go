@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 	"unicode/utf8"
 
 	"github.com/alexec/agents/Go/internal/controlplane/records"
@@ -238,6 +239,12 @@ func (m *Methods) projectsMethod(ctx context.Context, method string, params json
 			return nil, err
 		}
 		return wire.Empty{}, m.removeProject(ctx, request.ID, user, admin)
+	case "projects/sessions":
+		request, err := require[wire.ProjectSessionsRequest](params, "ProjectSessionsRequest")
+		if err != nil {
+			return nil, err
+		}
+		return m.projectSessions(ctx, request, user, from)
 	}
 	return nil, notFound(method)
 }
@@ -343,6 +350,94 @@ func (m *Methods) removeProject(ctx context.Context, id, user string, admin bool
 	}
 	m.s.projectsChanged(id, true)
 	return nil
+}
+
+// A project's sessions on every machine (#3276, specs/3273-project-unit slice 3): a
+// session carries the project its folder is in, and the control plane asks each machine
+// that has a folder of the project for its sessions in it, now.
+
+const (
+	// mostProjectMachines bounds the machines one projects/sessions asks at once, each
+	// for at most projectSessionsPatience; the rest are said as not reached.
+	mostProjectMachines     = 50
+	projectSessionsPatience = 5 * time.Second
+	// mostProjectSessions bounds the sessions one machine's answer adds.
+	mostProjectSessions = 500
+)
+
+// projectSessions is projects/sessions: the project's sessions on each of the caller's
+// machines that has a folder of it, newest activity first, each with its machine. Only the
+// caller's own machines, for an admin too: a session on another person's machine is theirs
+// (FR-038). A machine that is offline, too old to say a session's project, or slower than
+// projectSessionsPatience is in unreached.
+func (m *Methods) projectSessions(ctx context.Context, request wire.ProjectSessionsRequest, user string, from Caller) (wire.ProjectSessions, error) {
+	if !wire.ValidProjectID(request.Project) {
+		return wire.ProjectSessions{}, fail(invalidParams, "%q is not a project id.", request.Project)
+	}
+	joined, err := m.s.joinedFolders(ctx)
+	if err != nil {
+		return wire.ProjectSessions{}, err
+	}
+	var hosts []string
+	for host, folders := range joined {
+		if m.s.ownerOf(host) != user {
+			continue
+		}
+		if slices.ContainsFunc(folders, func(f wire.JoinedFolder) bool { return f.Project == request.Project }) {
+			hosts = append(hosts, host)
+		}
+	}
+	slices.Sort(hosts)
+	asked := hosts[:min(len(hosts), mostProjectMachines)]
+	answers := make([][]wire.Agent, len(asked))
+	var wg sync.WaitGroup
+	for i, host := range asked {
+		wg.Go(func() { answers[i] = m.askProjectSessions(host, request, from) })
+	}
+	wg.Wait()
+	out := wire.ProjectSessions{Sessions: []wire.ProjectSession{}, Unreached: []wire.ProjectMachine{}}
+	for i, host := range hosts {
+		machine, name := wire.MachineRef(host), host
+		if h := m.records.Host(host); h != nil {
+			name = h.Name
+		}
+		if i >= len(answers) || answers[i] == nil {
+			out.Unreached = append(out.Unreached, wire.ProjectMachine{Machine: machine, MachineName: name})
+			continue
+		}
+		for _, a := range answers[i] {
+			// A machine from before #3276 does not narrow its list: only what says the project.
+			if a.Project != nil && *a.Project == request.Project {
+				out.Sessions = append(out.Sessions, wire.ProjectSession{Machine: machine, MachineName: name, Session: a})
+			}
+		}
+	}
+	slices.SortStableFunc(out.Sessions, func(a, b wire.ProjectSession) int {
+		if a.Session.LastActivityAt != b.Session.LastActivityAt {
+			if a.Session.LastActivityAt > b.Session.LastActivityAt {
+				return -1
+			}
+			return 1
+		}
+		return strings.Compare(string(a.Session.ID), string(b.Session.ID))
+	})
+	return out, nil
+}
+
+// askProjectSessions is one machine's agents/list of the project's sessions, lean; nil
+// when it does not answer, or not with a list.
+func (m *Methods) askProjectSessions(host string, request wire.ProjectSessionsRequest, from Caller) []wire.Agent {
+	list := wire.ListRequest{Lean: true, IncludeArchived: deref(request.IncludeArchived), Project: &request.Project,
+		Limit: new(int64(mostProjectSessions))}
+	answer := m.router.DeliverKept(wire.CallAgentsList.Name, list, from.Client, from.Kind, host, projectSessionsPatience)
+	if answer == nil || len(answer.Error) > 0 {
+		return nil
+	}
+	agents := []wire.Agent{}
+	if json.Unmarshal(answer.Result, &agents) != nil {
+		return nil
+	}
+	return agents
 }
 
 // projectsChanged tells this copy's clients and machines, and every other copy, that
