@@ -54,3 +54,11 @@ pane a phone draws afresh when it turns.
 `ConsistencyTests` fails if either app declares its own page, `MarkdownText`, passage
 editor or `ShellClient` again.
 
+## `Work/` (#3119, #3256)
+
+Work: the issue, pull request, milestone and release lists, an item's page with its
+lineage and graph, and its actions (#3130), for the window and the Remote. What each app
+does differently comes in through `WorkModel`, which `AppModel` and `RemoteModel` adopt:
+which machines read their forges and keep links, the client a call goes to, a session's
+title, and opening a chat or a new session. The Mac's layout is the one Alex approved in
+#3228; a compact width (an iPhone) gets its own, from the size class, inside the same views.

@@ -108,6 +108,14 @@ struct RemoteSidebar: View {
                     NewSessionTopRow()
                 }
 
+                // Work (#3119, #3256): the issues and pull requests from the forges, lineage on
+                // top, as the window has it, above Status.
+                Section {
+                    HStack { Text("Work"); Spacer() }
+                        .accessibilityHint("Opens Work: every issue and pull request in your folders’ repos")
+                        .activityIcon("checklist").appText(.supporting).tag(SidebarItem.work)
+                }
+
                 // Pages about all the work rather than one folder, above the smart
                 // groups, as the window has them (#495). Plain titles beside their icons
                 // in the accent (#155). It folds, as a folder does.

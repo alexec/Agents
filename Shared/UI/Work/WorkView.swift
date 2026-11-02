@@ -4,22 +4,29 @@ import SwiftUI
 /// Work (#3119, spec 3100), as the web page's Work section: Issues and Pull requests from every
 /// machine's forges (`forge/issues`, `forge/pulls`), one row per ref, with what lineage knows
 /// (`reports/nodes`) under each title; Milestones and Releases from lineage alone. A row opens the
-/// item's page; Back and Forward go along the places, as a browser's. Read-only in this slice.
+/// item's page; Back and Forward go along the places, as a browser's. One view for the Mac's
+/// window and the Remote (#3256): on a phone the filters scroll sideways and a row wraps.
 struct WorkView: View {
-    @Environment(AppModel.self) private var model
+    let model: any WorkModel
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    private var compact: Bool { sizeClass == .compact }
+    #else
+    private let compact = false
+    #endif
 
     var body: some View {
         let place = model.workPlace
         Group {
             if place.ref != nil {
-                WorkItemPage(place: place).id(place)
+                WorkItemPage(model: model, place: place).id(place)
             } else {
-                WorkListPane(kind: place.kind).id(place.kind)
+                WorkListPane(model: model, kind: place.kind).id(place.kind)
             }
         }
         .navigationTitle(place.ref == nil ? "Work" : place.kind.title)
         .toolbar {
-            ToolbarItemGroup(placement: .navigation) {
+            ToolbarItemGroup(placement: Self.historyPlacement) {
                 Button { model.workHistory.back() } label: { Image(systemName: "chevron.left") }
                     .disabled(!model.workHistory.canGoBack)
                     .help("Back")
@@ -31,18 +38,42 @@ struct WorkView: View {
                 Picker("Show", selection: Binding(get: { place.kind }, set: { model.showWork(WorkPlace(kind: $0)) })) {
                     ForEach(WorkList.Kind.allCases) { Text($0.title).tag($0) }
                 }
-                .pickerStyle(.segmented)
                 .labelsHidden()
+                .workKindPickerStyle(compact: compact)
                 .fixedSize()
             }
         }
+    }
+
+    /// Back and Forward: beside the window's title on the Mac, at the bar's end on the Remote,
+    /// whose start is its own way back to the sidebar.
+    private static var historyPlacement: ToolbarItemPlacement {
+        #if os(iOS)
+        .topBarTrailing
+        #else
+        .navigation
+        #endif
+    }
+}
+
+private extension View {
+    /// Work's kinds as segments, or as a menu where a phone has no room for four.
+    @ViewBuilder
+    func workKindPickerStyle(compact: Bool) -> some View {
+        if compact { pickerStyle(.menu) } else { pickerStyle(.segmented) }
     }
 }
 
 /// One Work list: its filters, and a row per item.
 private struct WorkListPane: View {
-    @Environment(AppModel.self) private var model
+    let model: any WorkModel
     let kind: WorkList.Kind
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    private var compact: Bool { sizeClass == .compact }
+    #else
+    private let compact = false
+    #endif
 
     @State private var filter = WorkList.Filter()
     @State private var sort = WorkList.Sort.updated
@@ -97,29 +128,53 @@ private struct WorkListPane: View {
         var asked: Int
     }
 
+    /// One row of them on the Mac and an iPad; on a phone the choices scroll sideways over
+    /// the words to filter by.
+    @ViewBuilder
     private var filters: some View {
+        if compact {
+            VStack(alignment: .leading, spacing: 8) {
+                ScrollView(.horizontal) {
+                    HStack(spacing: 12) { choices }
+                }
+                .scrollIndicators(.hidden)
+                filterField
+            }
+        } else {
+            HStack(spacing: 12) {
+                choices
+                filterField
+                Button("Refresh") { asked += 1 }
+                    .linkStyle()
+            }
+        }
+    }
+
+    private var filterField: some View {
+        TextField("Filter", text: $filter.text)
+            .textFieldStyle(.roundedBorder)
+            .accessibilityLabel("Filter by words")
+    }
+
+    @ViewBuilder
+    private var choices: some View {
         let offered = WorkList.choices(all)
-        return HStack(spacing: 12) {
-            if kind.fromForge {
+        if kind.fromForge {
+            named("State", filter.state.title) {
                 Picker("State", selection: $filter.state) {
                     ForEach(kind.states, id: \.self) { Text($0.title).tag($0) }
                 }
-                .fixedSize()
             }
-            choice("Repo", any: "All", selection: $filter.repo, options: offered.repos, words: WorkList.repoName)
-            choice("Label", any: "Any", selection: $filter.label, options: offered.labels)
-            if kind.fromForge {
-                choice("Assignee", any: "Any", selection: $filter.assignee, options: offered.assignees)
-            }
+        }
+        choice("Repo", any: "All", selection: $filter.repo, options: offered.repos, words: WorkList.repoName)
+        choice("Label", any: "Any", selection: $filter.label, options: offered.labels)
+        if kind.fromForge {
+            choice("Assignee", any: "Any", selection: $filter.assignee, options: offered.assignees)
+        }
+        named("Sort", sort.title) {
             Picker("Sort", selection: $sort) {
                 ForEach(kind.sorts, id: \.self) { Text($0.title).tag($0) }
             }
-            .fixedSize()
-            TextField("Filter", text: $filter.text)
-                .textFieldStyle(.roundedBorder)
-                .accessibilityLabel("Filter by words")
-            Button("Refresh") { asked += 1 }
-                .buttonStyle(.link)
         }
     }
 
@@ -127,12 +182,30 @@ private struct WorkListPane: View {
     private func choice(_ label: String, any: String, selection: Binding<String>, options: [String],
                         words: @escaping (String) -> String = { $0 }) -> some View {
         if !options.isEmpty || !selection.wrappedValue.isEmpty {
-            Picker(label, selection: selection) {
-                Text(any).tag("")
-                ForEach(options, id: \.self) { Text(words($0)).tag($0) }
+            let value = selection.wrappedValue
+            named(label, value.isEmpty ? any : words(value)) {
+                Picker(label, selection: selection) {
+                    Text(any).tag("")
+                    ForEach(options, id: \.self) { Text(words($0)).tag($0) }
+                }
             }
-            .fixedSize()
         }
+    }
+
+    /// A choice as the Mac draws it, its name beside its menu; on the Remote, whose menu shows
+    /// only the value, a button that says both ("Label: Any") and opens the choices.
+    @ViewBuilder
+    private func named(_ label: String, _ value: String, @ViewBuilder picker: () -> some View) -> some View {
+        #if os(iOS)
+        Menu { picker() } label: {
+            Text("\(label): \(value)").appText(.supporting).lineLimit(1)
+        }
+        .menuStyle(.button)
+        .buttonStyle(.bordered)
+        .fixedSize()
+        #else
+        picker().fixedSize()
+        #endif
     }
 
     @ViewBuilder
@@ -153,13 +226,13 @@ private struct WorkListPane: View {
                 }
                 ForEach(shown) { row in
                     Button { model.showWork(WorkPlace(kind: kind, ref: row.id)) } label: {
-                        WorkRowView(row: row, several: several)
+                        WorkRowView(row: row, several: several, compact: compact)
                     }
                     .buttonStyle(.plain)
                 }
                 if hasMore {
                     Button(loadingMore ? "Loading…" : "More") { Task { await loadMore() } }
-                        .buttonStyle(.link)
+                        .linkStyle()
                         .disabled(loadingMore)
                 }
                 if !kind.fromForge {
@@ -167,6 +240,9 @@ private struct WorkListPane: View {
                 }
             }
             .listStyle(.inset)
+            #if os(iOS)
+            .refreshable { asked += 1 }
+            #endif
         }
     }
 
@@ -255,8 +331,43 @@ private struct WorkListPane: View {
 private struct WorkRowView: View {
     let row: WorkList.Row
     let several: Bool
+    var compact = false
 
     var body: some View {
+        if compact { stacked } else { inline }
+    }
+
+    /// On a phone: the title on lines of its own, its state and labels wrapping under it.
+    private var stacked: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                if !WorkList.titleSaysRef(row.title, row.node.ref) {
+                    Text(WorkList.shortRef(row.node.ref)).foregroundStyle(.tint).monospacedDigit()
+                }
+                Text(row.title).fontWeight(.semibold).lineLimit(2)
+            }
+            WrappingHStack(spacing: 4) {
+                WorkStatePill(state: row.state, draft: row.draft)
+                ForEach(row.labels, id: \.name) { WorkLabelChip(label: $0) }
+                if several {
+                    Text(WorkList.repoName(row.repo)).appText(.fine).foregroundStyle(.secondary)
+                }
+            }
+            figures
+        }
+        .padding(.vertical, 3)
+        .contentShape(Rectangle())
+    }
+
+    private var figures: some View {
+        let figures = WorkList.lineageWords(row.lineage)
+        return Text(figures ?? WorkList.noAgentYet)
+            .appText(.fine)
+            .foregroundStyle(figures == nil ? .tertiary : .secondary)
+            .monospacedDigit()
+    }
+
+    private var inline: some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 if !WorkList.titleSaysRef(row.title, row.node.ref) {
@@ -270,11 +381,7 @@ private struct WorkRowView: View {
                 }
                 Spacer(minLength: 0)
             }
-            let figures = WorkList.lineageWords(row.lineage)
-            Text(figures ?? WorkList.noAgentYet)
-                .appText(.fine)
-                .foregroundStyle(figures == nil ? .tertiary : .secondary)
-                .monospacedDigit()
+            figures
         }
         .padding(.vertical, 3)
         .contentShape(Rectangle())

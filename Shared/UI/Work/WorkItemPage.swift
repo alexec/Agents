@@ -8,7 +8,13 @@ import SwiftUI
 /// touched. A link opens that node's page; a session's opens its chat. An issue's and a pull
 /// request's actions (#3130, `WorkItemActions`) go to the machine that read it.
 struct WorkItemPage: View {
-    @Environment(AppModel.self) private var model
+    let model: any WorkModel
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    private var compact: Bool { sizeClass == .compact }
+    #else
+    private let compact = false
+    #endif
     @Environment(\.openURL) private var openURL
     let place: WorkPlace
 
@@ -36,7 +42,7 @@ struct WorkItemPage: View {
             VStack(alignment: .leading, spacing: 16) {
                 header
                 if let detail, model.forgeWrites(on: detail.host) {
-                    WorkItemActions(host: detail.host, detail: detail.got, wrote: { Task { await reread() } })
+                    WorkItemActions(model: model, host: detail.host, detail: detail.got, wrote: { Task { await reread() } })
                 }
                 if let forgeProblem {
                     Label(forgeProblem, systemImage: "exclamationmark.triangle").foregroundStyle(.secondary)
@@ -46,9 +52,12 @@ struct WorkItemPage: View {
                 if let detail { bodyAndComments(detail.got, on: detail.host) }
                 lineage
             }
-            .padding(20)
+            .padding(compact ? 16 : 20)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        #if os(iOS)
+        .refreshable { asked += 1 }
+        #endif
         .task(id: asked) { await loadForge() }
         .task(id: LineageAsk(host: lineageHost, asked: asked)) { await loadLineage() }
     }
@@ -67,29 +76,29 @@ struct WorkItemPage: View {
         let url = item?.url.flatMap(URL.init(string:)) ?? WorkList.url(node)
         let title = item?.title ?? resolved?.title ?? ReportValueWords.name(node)
         return VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(title)
-                    .appText(.title).fontWeight(.semibold)
-                    .textSelection(.enabled)
-                if !WorkList.titleSaysRef(title, node.ref) {
-                    Text(WorkList.shortRef(node.ref)).appText(.title).foregroundStyle(.secondary)
+            if compact {
+                // A phone has no room beside the title: All and Refresh go above it.
+                HStack(spacing: 16) { pageLinks }
+                titleLine(title)
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    titleLine(title)
+                    Spacer()
+                    pageLinks
                 }
-                Spacer()
-                Button("All \(place.kind.title.lowercased())") { model.showWork(WorkPlace(kind: place.kind)) }
-                    .buttonStyle(.link)
-                Button("Refresh") { asked += 1 }.buttonStyle(.link)
             }
-            HStack(spacing: 6) {
+            WrappingHStack(spacing: 6) {
                 WorkStatePill(state: item?.state ?? resolved?.state ?? "", draft: item?.draft ?? false)
                 ForEach(labels, id: \.name) { WorkLabelChip(label: $0) }
             }
-            HStack(spacing: 6) {
+            // On a phone the ref takes the line, and "Open on …" goes under it.
+            (compact ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4)) : AnyLayout(HStackLayout(spacing: 6))) {
                 Text(([node.ref] + [item.map(WorkList.peopleWords)].compactMap { $0 }.filter { !$0.isEmpty })
                     .joined(separator: " · "))
                     .appText(.supporting).foregroundStyle(.secondary)
                     .textSelection(.enabled)
                 if let url {
-                    Button(WorkList.openOnWords(node.ref)) { openURL(url) }.buttonStyle(.link)
+                    Button(WorkList.openOnWords(node.ref)) { openURL(url) }.linkStyle()
                 }
             }
             if let item, item.node.kind == "pr" {
@@ -100,6 +109,25 @@ struct WorkItemPage: View {
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func titleLine(_ title: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(title)
+                .appText(.title).fontWeight(.semibold)
+                .textSelection(.enabled)
+            if !WorkList.titleSaysRef(title, node.ref) {
+                Text(WorkList.shortRef(node.ref)).appText(.title).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var pageLinks: some View {
+        Button("All \(place.kind.title.lowercased())") { model.showWork(WorkPlace(kind: place.kind)) }
+            .linkStyle()
+        Button("Refresh") { asked += 1 }.linkStyle()
     }
 
     // MARK: Body and comments
@@ -116,7 +144,7 @@ struct WorkItemPage: View {
             Text("Comments").appText(.reading).fontWeight(.semibold).padding(.top, 8)
             if got.cursor != nil {
                 Button(olderLoading ? "Loading…" : "Older comments") { Task { await readOlder() } }
-                    .buttonStyle(.link)
+                    .linkStyle()
                     .disabled(olderLoading)
             }
             ForEach(Array(got.comments.enumerated()), id: \.offset) { _, c in
@@ -129,7 +157,7 @@ struct WorkItemPage: View {
             }
         }
         if model.forgeWrites(on: host) {
-            WorkCommentBox(host: host, node: got.item.node, wrote: { Task { await reread() } })
+            WorkCommentBox(model: model, host: host, node: got.item.node, wrote: { Task { await reread() } })
                 .padding(.top, 8)
         }
     }
@@ -180,7 +208,7 @@ struct WorkItemPage: View {
         let words = name(other) + (other.kind == "session" ? "" : " (\(LineageLayout.kindWord(other.kind).lowercased()))")
             + (ended ? " · ended" : "")
         if let go = open(other) {
-            Button(words + (other.kind == "session" ? " ▸ chat" : " ▸"), action: go).buttonStyle(.link)
+            Button(words + (other.kind == "session" ? " ▸ chat" : " ▸"), action: go).linkStyle()
         } else {
             Text(words)
         }
@@ -191,7 +219,7 @@ struct WorkItemPage: View {
     }
 
     private func name(_ n: DaemonAPI.LineageNode) -> String {
-        if let id = sessionID(n) { return model.work.agent(id)?.title ?? "A session" }
+        if let id = sessionID(n) { return model.workSessionTitle(id) ?? "A session" }
         return graph?.resolved?[n.ref]?.title ?? ReportValueWords.name(n)
     }
 
@@ -199,7 +227,7 @@ struct WorkItemPage: View {
     private func open(_ n: DaemonAPI.LineageNode) -> (() -> Void)? {
         guard n != node else { return nil }
         if let id = sessionID(n) {
-            return model.work.agent(id) == nil ? nil : { model.openAgent(id) }
+            return model.workSessionTitle(id) == nil ? nil : { model.openWorkSession(id) }
         }
         guard let kind = WorkList.kind(of: n) else { return nil }
         return { model.showWork(WorkPlace(kind: kind, ref: n.ref)) }
@@ -216,7 +244,7 @@ struct WorkItemPage: View {
         var last: String?
         for machine in machines {
             do {
-                let got = try await model.forgeItem(node, on: machine.id)
+                let got = try await model.forgeItem(node, cursor: nil, on: machine.id)
                 guard !Task.isCancelled else { return }
                 detail = (machine.id, got)
                 return
@@ -233,7 +261,7 @@ struct WorkItemPage: View {
     private func reread() async {
         guard let had = detail else { return }
         do {
-            let got = try await model.forgeItem(node, on: had.host)
+            let got = try await model.forgeItem(node, cursor: nil, on: had.host)
             detail = (had.host, got)
         } catch {
             forgeProblem = error.localizedDescription
@@ -301,7 +329,7 @@ struct WorkItemPage: View {
 
     private func lay() {
         layout = graph.map { LineageLayout.graph(of: node, graph: $0, costs: costs, title: { n in
-            sessionID(n).flatMap { model.work.agent($0)?.title }
+            sessionID(n).flatMap { model.workSessionTitle($0) }
         }) }
     }
 }

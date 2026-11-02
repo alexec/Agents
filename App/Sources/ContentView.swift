@@ -121,7 +121,7 @@ struct ContentView: View {
         } else if model.showsMilestones {
             MilestonesView().paperGround()
         } else if model.showsWork {
-            WorkView().paperGround()
+            WorkView(model: model).paperGround()
         } else if let id = model.openWorkflow {
             // No files pane and no sidebar toggle: a workflow has no agent to have
             // asked about a file, so there would be nothing for either to show.
