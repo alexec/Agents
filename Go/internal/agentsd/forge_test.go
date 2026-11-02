@@ -26,12 +26,19 @@ type fakeForgeGitHub struct {
 	items    int
 	// wrote are the writes asked for (#3130).
 	wrote []string
+	// epics are what a list of the label epic gives, and plan what Plan gives (#3267).
+	epics []githubmcp.Item
+	plan  githubmcp.Plan
+	plans int
 }
 
 func (f *fakeForgeGitHub) Search(_ context.Context, repos []string, sf githubmcp.SearchFilter, after string, first int) (githubmcp.SearchPage, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.searches = append(f.searches, strings.Join(repos, ",")+" "+githubmcp.SearchQuery(repos, sf)+" after="+after)
+	if sf.Label == "epic" {
+		return githubmcp.SearchPage{Items: f.epics}, nil
+	}
 	if after != "" {
 		return githubmcp.SearchPage{Items: []githubmcp.Item{{Repo: "alexec/web", Number: 2, PR: sf.PRs, State: "open", Title: "Older"}}}, nil
 	}

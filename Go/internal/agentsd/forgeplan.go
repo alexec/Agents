@@ -1,0 +1,344 @@
+package agentsd
+
+import (
+	"cmp"
+	"context"
+	"encoding/json"
+	"errors"
+	"slices"
+	"strings"
+
+	"github.com/alexec/agents/Go/internal/githubmcp"
+	"github.com/alexec/agents/Go/internal/gitlabmcp"
+	"github.com/alexec/agents/Go/internal/lineage"
+	"github.com/alexec/agents/Go/internal/linearmcp"
+	"github.com/alexec/agents/Go/wire"
+)
+
+// Plans in Work (#3265, #3267): work has one hierarchy. A feature is the label feature:<name>; an
+// epic is a parent issue, labelled epic; its children are stories, tasks and spikes (labels
+// story, task and spike), in the order the forge's "blocked by" links say. forge/plan reads an
+// epic's children with their blockers and puts them in steps; forge/features lists the features
+// with their epics. The plan is the forge's own sub-issues and links, never a file of ours, so it
+// cannot go out of date, and other people and tools read it too.
+
+// forgeLevels are the levels a label can say, as the app says them on every forge.
+var forgeLevels = []string{"epic", "story", "task", "spike"}
+
+// featurePrefix starts a feature's label.
+const featurePrefix = "feature:"
+
+// Features are read from the newest epics, at most featureEpicPages pages of forgeListMost.
+const featureEpicPages = 5
+
+func (d *Daemon) registerForgePlans() {
+	On(d, wire.CallForgePlan, func(ctx context.Context, _ *Client, r wire.ForgePlanRequest) (wire.ForgePlan, error) {
+		return d.forgePlan(ctx, r)
+	})
+	On(d, wire.CallForgeFeatures, func(ctx context.Context, _ *Client, r wire.ForgeFeaturesRequest) (wire.ForgeFeatures, error) {
+		return d.forgeFeatures(ctx, r)
+	})
+}
+
+// withHierarchy sets an issue's level and feature from its labels, and its parent and progress.
+func withHierarchy(i *wire.ForgeItem, parent *wire.LineageNode, total, done int) {
+	for _, l := range i.Labels {
+		name := strings.TrimSpace(l.Name)
+		if level := strings.ToLower(name); i.Level == nil && slices.Contains(forgeLevels, level) {
+			i.Level = &level
+		}
+		if f, ok := featureName(name); ok && i.Feature == nil {
+			i.Feature = &f
+		}
+	}
+	i.Parent = parent
+	if total > 0 {
+		i.Progress = &wire.ForgeProgress{Done: int64(done), Total: int64(total)}
+	}
+}
+
+// featureName is the feature a label names: feature:work is work.
+func featureName(label string) (string, bool) {
+	if len(label) <= len(featurePrefix) || !strings.EqualFold(label[:len(featurePrefix)], featurePrefix) {
+		return "", false
+	}
+	name := strings.TrimSpace(label[len(featurePrefix):])
+	return name, name != ""
+}
+
+// planChild is a child as a forge says it, with its blockers, before it has a step.
+type planChild struct {
+	item      wire.ForgeItem
+	blockedBy []planRef
+}
+
+type planRef struct {
+	node wire.LineageNode
+	open bool
+}
+
+// forgePlan is an epic's plan: its children in steps, and its lead.
+func (d *Daemon) forgePlan(ctx context.Context, r wire.ForgePlanRequest) (wire.ForgePlan, error) {
+	const method = "forge/plan"
+	if r.Node.Kind != lineage.KindIssue {
+		return wire.ForgePlan{}, Invalid("%s: the node's kind is %s, not issue", method, r.Node.Kind)
+	}
+	key, _ := json.Marshal([]any{method, r.Node.Ref})
+	var epic wire.ForgeItem
+	var children []planChild
+	if a, ok := d.forgeCached(string(key)); ok && a.plan != nil {
+		epic, children = a.plan.epic, a.plan.children
+	} else {
+		var err error
+		if identifier, ok := strings.CutPrefix(r.Node.Ref, "linear:"); ok && linearLabel.MatchString(identifier) {
+			epic, children, err = d.linearPlan(ctx, method, identifier)
+		} else if repo, number, ok := nodeOfRepo(r.Node); !ok {
+			return wire.ForgePlan{}, Invalid("%s: %s is not an issue on GitHub, GitLab or Linear", method, r.Node.Ref)
+		} else if repo.forge == "gitlab" {
+			epic, children, err = d.gitlabPlan(ctx, method, repo, number)
+		} else {
+			epic, children, err = d.githubPlan(ctx, method, repo, number)
+		}
+		if err != nil {
+			return wire.ForgePlan{}, err
+		}
+		d.forgeRemember(string(key), forgeAnswer{plan: &forgePlanAnswer{epic: epic, children: children}})
+		items := []wire.ForgeItem{epic}
+		for _, c := range children {
+			items = append(items, c.item)
+		}
+		d.resolvedFromForge(items)
+	}
+	out := planOf(epic, children)
+	// The lead is this machine's, read each time: it starts and ends more often than a plan changes.
+	out.Lead = d.leadOf(r.Node)
+	return out, nil
+}
+
+// planOf puts children in steps: a child's step is one more than the last step of the children
+// that block it, 1 for a child no other child blocks. A blocker outside the plan adds no step,
+// but an open one is said. Children in a loop, and those after them, share the step after the
+// rest, so a loop in the forge's links still shows every child.
+func planOf(epic wire.ForgeItem, children []planChild) wire.ForgePlan {
+	in := map[wire.LineageNode]int{}
+	for n, c := range children {
+		in[c.item.Node] = n
+	}
+	step := make([]int, len(children))
+	for left := len(children); left > 0; {
+		placed := 0
+		for n, c := range children {
+			if step[n] > 0 {
+				continue
+			}
+			s, ready := 1, true
+			for _, b := range c.blockedBy {
+				if m, ok := in[b.node]; ok && m != n {
+					if step[m] == 0 {
+						ready = false
+						break
+					}
+					s = max(s, step[m]+1)
+				}
+			}
+			if ready {
+				step[n] = s
+				placed++
+			}
+		}
+		left -= placed
+		if placed == 0 {
+			last := slices.Max(append(slices.Clone(step), 0))
+			for n := range step {
+				if step[n] == 0 {
+					step[n] = last + 1
+				}
+			}
+			break
+		}
+	}
+	out := wire.ForgePlan{Item: epic, Children: []wire.ForgePlanChild{}, Steps: []wire.ForgePlanStep{}}
+	for n, c := range children {
+		child := wire.ForgePlanChild{Item: c.item, BlockedBy: []wire.LineageNode{}, Step: int64(step[n])}
+		for _, b := range c.blockedBy {
+			child.BlockedBy = append(child.BlockedBy, b.node)
+			if _, ok := in[b.node]; !ok && b.open {
+				child.BlockedOutside = append(child.BlockedOutside, b.node)
+			}
+		}
+		out.Children = append(out.Children, child)
+	}
+	slices.SortStableFunc(out.Children, func(a, b wire.ForgePlanChild) int { return cmp.Compare(a.Step, b.Step) })
+	for _, c := range out.Children {
+		if len(out.Steps) == 0 || out.Steps[len(out.Steps)-1].Step != c.Step {
+			out.Steps = append(out.Steps, wire.ForgePlanStep{Step: c.Step, Nodes: []wire.LineageNode{}})
+		}
+		s := &out.Steps[len(out.Steps)-1]
+		s.Nodes = append(s.Nodes, c.Item.Node)
+	}
+	return out
+}
+
+// leadOf is the session on this machine that leads the epic: it works on it (from lineage, which
+// its #<n> or Linear key label makes) and is labelled lead. A live one before one that ended, and
+// the newest of them.
+func (d *Daemon) leadOf(epic wire.LineageNode) *wire.ForgeLead {
+	var best *wire.Agent
+	for _, l := range d.lineage().Links(epic).Links {
+		if l.To != epic || l.From.Kind != lineage.KindSession || l.Rel != lineage.RelWorksOn || l.EndedAt != nil {
+			continue
+		}
+		id, ok := strings.CutPrefix(l.From.Ref, "session:")
+		if !ok {
+			continue
+		}
+		a := d.Store.Agent(wire.UUID(id))
+		if a == nil || a.State == wire.AgentStateArchived || !slices.ContainsFunc(a.Labels, func(s wire.SessionLabel) bool { return s.Value == "lead" }) {
+			continue
+		}
+		if best == nil || holdsRuntime(a.State) && !holdsRuntime(best.State) ||
+			holdsRuntime(a.State) == holdsRuntime(best.State) && a.CreatedAt > best.CreatedAt {
+			best = a
+		}
+	}
+	if best == nil {
+		return nil
+	}
+	return &wire.ForgeLead{Session: best.ID, Title: best.Title, State: best.State}
+}
+
+func (d *Daemon) githubPlan(ctx context.Context, method string, repo forgeRepo, number int) (wire.ForgeItem, []planChild, error) {
+	gh, err := d.forgeGitHub()
+	if err != nil {
+		return wire.ForgeItem{}, nil, err
+	}
+	p, err := gh.Plan(ctx, repo.path, number)
+	if err != nil {
+		var ge *githubmcp.GitHubError
+		if errors.As(err, &ge) && ge.Kind == githubmcp.NotFound {
+			return wire.ForgeItem{}, nil, Invalid("%s: %v", method, err)
+		}
+		return wire.ForgeItem{}, nil, err
+	}
+	epic := forgeItemOf(p.Epic, d.repoFolder(repo))
+	var children []planChild
+	for _, c := range p.Children {
+		child := forgeRepo{"github", strings.ToLower(c.Repo)}
+		pc := planChild{item: forgeItemOf(c.Item, d.repoFolder(child))}
+		for _, b := range c.BlockedBy {
+			pc.blockedBy = append(pc.blockedBy, planRef{node: forgeRepo{"github", strings.ToLower(b.Repo)}.issue(b.Number), open: b.Open})
+		}
+		children = append(children, pc)
+	}
+	return epic, children, nil
+}
+
+func (d *Daemon) gitlabPlan(ctx context.Context, method string, repo forgeRepo, number int) (wire.ForgeItem, []planChild, error) {
+	gl, project, folder, err := d.gitlabOf(ctx, method, repo)
+	if err != nil {
+		return wire.ForgeItem{}, nil, err
+	}
+	p, err := gl.Plan(ctx, project, number)
+	if err != nil {
+		if gitlabmcp.IsNotFound(err) {
+			return wire.ForgeItem{}, nil, Invalid("%s: %v", method, err)
+		}
+		return wire.ForgeItem{}, nil, err
+	}
+	epic := gitlabItemOf(p.Epic, folder)
+	var children []planChild
+	for _, c := range p.Children {
+		child := forgeRepo{"gitlab", strings.ToLower(c.Project)}
+		pc := planChild{item: gitlabItemOf(c.Item, d.repoFolder(child))}
+		for _, b := range c.BlockedBy {
+			pc.blockedBy = append(pc.blockedBy, planRef{node: forgeRepo{"gitlab", strings.ToLower(b.Project)}.issue(b.Number), open: b.Open})
+		}
+		children = append(children, pc)
+	}
+	return epic, children, nil
+}
+
+func (d *Daemon) linearPlan(ctx context.Context, method, identifier string) (wire.ForgeItem, []planChild, error) {
+	l, err := d.forgeLinear()
+	if err != nil {
+		return wire.ForgeItem{}, nil, err
+	}
+	p, err := l.Plan(ctx, identifier)
+	if err != nil {
+		var le *linearmcp.LinearError
+		if errors.As(err, &le) && le.Kind == linearmcp.NotFound {
+			return wire.ForgeItem{}, nil, Invalid("%s: %v", method, err)
+		}
+		return wire.ForgeItem{}, nil, err
+	}
+	folderOf := func(team string) string {
+		for _, f := range d.folderPaths() {
+			if slices.Contains(d.folderLinearTeams(f), team) {
+				return f
+			}
+		}
+		return ""
+	}
+	epic := linearItemOf(p.Epic, folderOf(p.Epic.Team))
+	var children []planChild
+	for _, c := range p.Children {
+		pc := planChild{item: linearItemOf(c.Item, folderOf(c.Team))}
+		for _, b := range c.BlockedBy {
+			pc.blockedBy = append(pc.blockedBy, planRef{node: wire.LineageNode{Kind: lineage.KindIssue, Ref: "linear:" + b.Identifier}, open: b.Open})
+		}
+		children = append(children, pc)
+	}
+	return epic, children, nil
+}
+
+// forgeFeatures are the features on the epics of r.folder, or of every folder: the newest epics,
+// open and closed (a closed epic keeps its labels), each counted under its feature:<name> label.
+func (d *Daemon) forgeFeatures(ctx context.Context, r wire.ForgeFeaturesRequest) (wire.ForgeFeatures, error) {
+	out := wire.ForgeFeatures{Features: []wire.ForgeFeature{}}
+	by := map[string]*wire.ForgeFeature{}
+	var cursor *string
+	for range featureEpicPages {
+		page, err := d.forgeList(ctx, false, wire.ForgeListRequest{Folder: r.Folder, State: new("all"), Label: new("epic"),
+			Limit: new(int64(forgeListMost)), Cursor: cursor})
+		if err != nil {
+			return wire.ForgeFeatures{}, Invalid("forge/features: %v", strings.TrimPrefix(err.Error(), "forge/issues: "))
+		}
+		for _, e := range page.Errors {
+			if !slices.Contains(out.Errors, e) {
+				out.Errors = append(out.Errors, e)
+			}
+		}
+		for _, i := range page.Items {
+			if i.Feature == nil {
+				continue
+			}
+			f := by[strings.ToLower(*i.Feature)]
+			if f == nil {
+				f = &wire.ForgeFeature{Name: *i.Feature}
+				by[strings.ToLower(*i.Feature)] = f
+			}
+			if f.Color == nil {
+				for _, l := range i.Labels {
+					if name, ok := featureName(l.Name); ok && strings.EqualFold(name, f.Name) {
+						f.Color = l.Color
+					}
+				}
+			}
+			f.Epics++
+			if i.State == "open" {
+				f.Open++
+			}
+		}
+		if page.Cursor == nil {
+			break
+		}
+		cursor = page.Cursor
+	}
+	for _, f := range by {
+		out.Features = append(out.Features, *f)
+	}
+	slices.SortFunc(out.Features, func(a, b wire.ForgeFeature) int {
+		return cmp.Or(cmp.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)), cmp.Compare(a.Name, b.Name))
+	})
+	return out, nil
+}

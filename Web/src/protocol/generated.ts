@@ -3368,13 +3368,43 @@ export interface ForgeDone {
 }
 
 /**
+ * A feature (#3267): name is its label's after feature:, with the label's colour where the forge
+ * gives one; epics counts its epics, open the open ones.
+ */
+export interface ForgeFeature {
+  name: string;
+  color?: string;
+  epics: number;
+  open: number;
+}
+
+/**
+ * forge/features (#3267): the feature:<name> labels of the epics (the issues labelled epic, open or
+ * closed, the newest 500), by name; errors says a forge that could not be read, as in ForgeList.
+ */
+export interface ForgeFeatures {
+  features: ForgeFeature[];
+  errors?: ForgeListError[];
+}
+
+/**
+ * forge/features (#3267): the features of every folder on this machine, or of one folder's repo.
+ */
+export interface ForgeFeaturesRequest {
+  folder?: string;
+}
+
+/**
  * An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for
  * GitHub, GitLab and Linear, so one page draws each. node is its lineage node (kind issue or pr,
  * ref github:alexec/Agents#12). state is open, closed or merged. folder is a folder on this machine
  * on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The
  * pull request's own fields: draft; checks is passing, failing, running or none; review is
  * approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown;
- * autoMerge says auto-merge is on.
+ * autoMerge says auto-merge is on. The hierarchy (#3267): parent is the issue it is a sub-issue (a
+ * Linear or GitLab child) of; level is epic, story, task or spike, from its labels; feature is the
+ * name of its feature:<name> label; progress is a parent's closed children of all of them, where
+ * the forge says it: in a GitHub list, and on an issue's own read.
  */
 export interface ForgeItem {
   node: LineageNode;
@@ -3393,6 +3423,10 @@ export interface ForgeItem {
   review?: string;
   mergeable?: string;
   autoMerge?: boolean;
+  parent?: LineageNode;
+  level?: string;
+  feature?: string;
+  progress?: ForgeProgress;
 }
 
 /**
@@ -3449,6 +3483,13 @@ export interface ForgeLabels {
   labels: ForgeLabel[];
 }
 
+/** An epic's lead session (#3267): its id, title and state. */
+export interface ForgeLead {
+  session: UUID;
+  title?: string;
+  state: AgentState;
+}
+
 /**
  * forge/issues and forge/pulls (#3129): a page of items, the last updated first. cursor is the next
  * page, absent at the end. errors says a forge that could not be read (not connected, a rate
@@ -3472,7 +3513,8 @@ export interface ForgeListError {
  * forge/issues and forge/pulls (#3129): the issues or pull requests of every folder on this
  * machine, or of one folder's repo. state is open (when not said), closed or all; a closed pull
  * request includes a merged one. label, assignee (a login) and query (words in the title or body)
- * narrow the list. limit is 1 to 100, 50 when not said; cursor is the last page's.
+ * narrow the list. limit is 1 to 100, 50 when not said; cursor is the last page's. feature (a name:
+ * work for the label feature:work) narrows it to one feature's items (#3267).
  */
 export interface ForgeListRequest {
   folder?: string;
@@ -3482,6 +3524,7 @@ export interface ForgeListRequest {
   query?: string;
   cursor?: string;
   limit?: number;
+  feature?: string;
 }
 
 /** forge/log (#3130): the last lines of each failed check's log, as plain text. */
@@ -3529,6 +3572,51 @@ export interface ForgeMergeRequest {
 /** forge/labels, forge/rerun and forge/diff (#3130): the issue or pull request. */
 export interface ForgeNodeRequest {
   node: LineageNode;
+}
+
+/**
+ * forge/plan (#3267): an epic and its plan. children are its sub-issues (at most 100), step by
+ * step, in the forge's order within a step. steps are the children of each step, the first first.
+ * lead is the session on this machine, not archived, that works on the epic in lineage (its label
+ * #<n>, or the Linear key) and is labelled lead.
+ */
+export interface ForgePlan {
+  item: ForgeItem;
+  children: ForgePlanChild[];
+  steps: ForgePlanStep[];
+  lead?: ForgeLead;
+}
+
+/**
+ * A child of an epic in forge/plan (#3267). blockedBy are the issues it is blocked by, open or
+ * closed, in the plan or not. step is 1 for a child that no other child blocks, else one more than
+ * the last step of the children that block it; a blocker outside the plan adds no step, and
+ * children in a loop share the step after the rest. blockedOutside are its open blockers outside
+ * the plan (an issue of another epic). A forge with no dependencies (GitLab Free) puts every child
+ * in step 1.
+ */
+export interface ForgePlanChild {
+  item: ForgeItem;
+  blockedBy: LineageNode[];
+  blockedOutside?: LineageNode[];
+  step: number;
+}
+
+/** forge/plan (#3267): the epic's lineage node, an issue on GitHub, GitLab or Linear. */
+export interface ForgePlanRequest {
+  node: LineageNode;
+}
+
+/** A step of a plan (#3267): its number, from 1, and its children's nodes. */
+export interface ForgePlanStep {
+  step: number;
+  nodes: LineageNode[];
+}
+
+/** A parent issue's children (#3267): done are closed, of total. */
+export interface ForgeProgress {
+  done: number;
+  total: number;
 }
 
 /**
@@ -9707,12 +9795,14 @@ export interface Methods {
   "forge/close": { params: ForgeCloseRequest; result: ForgeDone };
   "forge/comment": { params: ForgeCommentRequest; result: ForgeDone };
   "forge/diff": { params: ForgeNodeRequest; result: ForgeDiff };
+  "forge/features": { params: ForgeFeaturesRequest; result: ForgeFeatures };
   "forge/issue": { params: ForgeItemRequest; result: ForgeItemDetail };
   "forge/issues": { params: ForgeListRequest; result: ForgeList };
   "forge/label": { params: ForgeLabelRequest; result: ForgeDone };
   "forge/labels": { params: ForgeNodeRequest; result: ForgeLabels };
   "forge/log": { params: ForgeLogRequest; result: ForgeLog };
   "forge/merge": { params: ForgeMergeRequest; result: ForgeDone };
+  "forge/plan": { params: ForgePlanRequest; result: ForgePlan };
   "forge/pull": { params: ForgeItemRequest; result: ForgeItemDetail };
   "forge/pulls": { params: ForgeListRequest; result: ForgeList };
   "forge/rerun": { params: ForgeNodeRequest; result: ForgeDone };
@@ -10023,12 +10113,14 @@ export const MethodTarget = {
   "forge/close": "host",
   "forge/comment": "host",
   "forge/diff": "host",
+  "forge/features": "host",
   "forge/issue": "host",
   "forge/issues": "host",
   "forge/label": "host",
   "forge/labels": "host",
   "forge/log": "host",
   "forge/merge": "host",
+  "forge/plan": "host",
   "forge/pull": "host",
   "forge/pulls": "host",
   "forge/rerun": "host",
@@ -10566,20 +10658,29 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeDiffFile: { required: ["path", "change", "additions", "deletions", "hunks"], optional: ["previousPath", "note"] },
   ForgeDiffHunk: { required: ["oldStart", "newStart", "lines"], optional: [] },
   ForgeDone: { required: [], optional: ["url", "auto", "reran"] },
-  ForgeItem: { required: ["node", "title", "state", "labels", "assignees", "updatedAt", "comments"], optional: ["url", "folder", "author", "milestone", "draft", "checks", "review", "mergeable", "autoMerge"] },
+  ForgeFeature: { required: ["name", "epics", "open"], optional: ["color"] },
+  ForgeFeatures: { required: ["features"], optional: ["errors"] },
+  ForgeFeaturesRequest: { required: [], optional: ["folder"] },
+  ForgeItem: { required: ["node", "title", "state", "labels", "assignees", "updatedAt", "comments"], optional: ["url", "folder", "author", "milestone", "draft", "checks", "review", "mergeable", "autoMerge", "parent", "level", "feature", "progress"] },
   ForgeItemDetail: { required: ["item", "body", "comments"], optional: ["cursor", "checks", "reviewThreads", "filesChanged", "head", "mergeMethods", "start"] },
   ForgeItemRequest: { required: ["node"], optional: ["cursor"] },
   ForgeLabel: { required: ["name"], optional: ["color"] },
   ForgeLabelRequest: { required: ["node"], optional: ["add", "remove"] },
   ForgeLabels: { required: ["labels"], optional: [] },
+  ForgeLead: { required: ["session", "state"], optional: ["title"] },
   ForgeList: { required: ["items"], optional: ["cursor", "errors"] },
   ForgeListError: { required: ["forge", "message"], optional: [] },
-  ForgeListRequest: { required: [], optional: ["folder", "state", "label", "assignee", "query", "cursor", "limit"] },
+  ForgeListRequest: { required: [], optional: ["folder", "state", "label", "assignee", "query", "cursor", "limit", "feature"] },
   ForgeLog: { required: ["text"], optional: [] },
   ForgeLogRequest: { required: ["node"], optional: ["check"] },
   ForgeLogins: { required: [], optional: ["github", "gitlab", "linear"] },
   ForgeMergeRequest: { required: ["node", "sha"], optional: ["method", "auto"] },
   ForgeNodeRequest: { required: ["node"], optional: [] },
+  ForgePlan: { required: ["item", "children", "steps"], optional: ["lead"] },
+  ForgePlanChild: { required: ["item", "blockedBy", "step"], optional: ["blockedOutside"] },
+  ForgePlanRequest: { required: ["node"], optional: [] },
+  ForgePlanStep: { required: ["step", "nodes"], optional: [] },
+  ForgeProgress: { required: ["done", "total"], optional: [] },
   ForgeStart: { required: ["prompt", "labels"], optional: ["worktree"] },
   FoundFolder: { required: ["folder", "exists", "isRepository", "isFolder"], optional: ["typed"] },
   GitAsk: { required: ["server", "from"], optional: [] },

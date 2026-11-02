@@ -4101,7 +4101,30 @@ type ForgeDone struct {
 	Reran *int64 `json:"reran,omitzero"`
 }
 
-// An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for GitHub, GitLab and Linear, so one page draws each. node is its lineage node (kind issue or pr, ref github:alexec/Agents#12). state is open, closed or merged. folder is a folder on this machine on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own fields: draft; checks is passing, failing, running or none; review is approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown; autoMerge says auto-merge is on.
+// A feature (#3267): name is its label's after feature:, with the label's colour where the forge gives one; epics counts its epics, open the open ones.
+type ForgeFeature struct {
+	Name string `json:"name"`
+
+	Color *string `json:"color,omitzero"`
+
+	Epics int64 `json:"epics"`
+
+	Open int64 `json:"open"`
+}
+
+// forge/features (#3267): the feature:<name> labels of the epics (the issues labelled epic, open or closed, the newest 500), by name; errors says a forge that could not be read, as in ForgeList.
+type ForgeFeatures struct {
+	Features []ForgeFeature `json:"features"`
+
+	Errors []ForgeListError `json:"errors,omitzero"`
+}
+
+// forge/features (#3267): the features of every folder on this machine, or of one folder's repo.
+type ForgeFeaturesRequest struct {
+	Folder *string `json:"folder,omitzero"`
+}
+
+// An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for GitHub, GitLab and Linear, so one page draws each. node is its lineage node (kind issue or pr, ref github:alexec/Agents#12). state is open, closed or merged. folder is a folder on this machine on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own fields: draft; checks is passing, failing, running or none; review is approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown; autoMerge says auto-merge is on. The hierarchy (#3267): parent is the issue it is a sub-issue (a Linear or GitLab child) of; level is epic, story, task or spike, from its labels; feature is the name of its feature:<name> label; progress is a parent's closed children of all of them, where the forge says it: in a GitHub list, and on an issue's own read.
 type ForgeItem struct {
 	Node LineageNode `json:"node"`
 
@@ -4134,6 +4157,14 @@ type ForgeItem struct {
 	Mergeable *string `json:"mergeable,omitzero"`
 
 	AutoMerge *bool `json:"autoMerge,omitzero"`
+
+	Parent *LineageNode `json:"parent,omitzero"`
+
+	Level *string `json:"level,omitzero"`
+
+	Feature *string `json:"feature,omitzero"`
+
+	Progress *ForgeProgress `json:"progress,omitzero"`
 }
 
 // forge/issue and forge/pull (#3129): one item with its body (Markdown) and a page of its comments, the newest page first and at most 50, oldest first in the page; cursor is the page before it, absent at the first comment. A pull request's checks, review threads (line comments, in threads) and files changed come with it. head is a pull request's head commit, which forge/merge and forge/approve name (#3130); mergeMethods are the ways its repo allows, the repo's default first; start is the new-agent form for an issue.
@@ -4187,6 +4218,15 @@ type ForgeLabels struct {
 	Labels []ForgeLabel `json:"labels"`
 }
 
+// An epic's lead session (#3267): its id, title and state.
+type ForgeLead struct {
+	Session UUID `json:"session"`
+
+	Title *string `json:"title,omitzero"`
+
+	State AgentState `json:"state"`
+}
+
 // forge/issues and forge/pulls (#3129): a page of items, the last updated first. cursor is the next page, absent at the end. errors says a forge that could not be read (not connected, a rate limit), and the items of the others still come.
 type ForgeList struct {
 	Items []ForgeItem `json:"items"`
@@ -4203,7 +4243,7 @@ type ForgeListError struct {
 	Message string `json:"message"`
 }
 
-// forge/issues and forge/pulls (#3129): the issues or pull requests of every folder on this machine, or of one folder's repo. state is open (when not said), closed or all; a closed pull request includes a merged one. label, assignee (a login) and query (words in the title or body) narrow the list. limit is 1 to 100, 50 when not said; cursor is the last page's.
+// forge/issues and forge/pulls (#3129): the issues or pull requests of every folder on this machine, or of one folder's repo. state is open (when not said), closed or all; a closed pull request includes a merged one. label, assignee (a login) and query (words in the title or body) narrow the list. limit is 1 to 100, 50 when not said; cursor is the last page's. feature (a name: work for the label feature:work) narrows it to one feature's items (#3267).
 type ForgeListRequest struct {
 	Folder *string `json:"folder,omitzero"`
 
@@ -4218,6 +4258,8 @@ type ForgeListRequest struct {
 	Cursor *string `json:"cursor,omitzero"`
 
 	Limit *int64 `json:"limit,omitzero"`
+
+	Feature *string `json:"feature,omitzero"`
 }
 
 // forge/log (#3130): the last lines of each failed check's log, as plain text.
@@ -4262,6 +4304,47 @@ type ForgeMergeRequest struct {
 // forge/labels, forge/rerun and forge/diff (#3130): the issue or pull request.
 type ForgeNodeRequest struct {
 	Node LineageNode `json:"node"`
+}
+
+// forge/plan (#3267): an epic and its plan. children are its sub-issues (at most 100), step by step, in the forge's order within a step. steps are the children of each step, the first first. lead is the session on this machine, not archived, that works on the epic in lineage (its label #<n>, or the Linear key) and is labelled lead.
+type ForgePlan struct {
+	Item ForgeItem `json:"item"`
+
+	Children []ForgePlanChild `json:"children"`
+
+	Steps []ForgePlanStep `json:"steps"`
+
+	Lead *ForgeLead `json:"lead,omitzero"`
+}
+
+// A child of an epic in forge/plan (#3267). blockedBy are the issues it is blocked by, open or closed, in the plan or not. step is 1 for a child that no other child blocks, else one more than the last step of the children that block it; a blocker outside the plan adds no step, and children in a loop share the step after the rest. blockedOutside are its open blockers outside the plan (an issue of another epic). A forge with no dependencies (GitLab Free) puts every child in step 1.
+type ForgePlanChild struct {
+	Item ForgeItem `json:"item"`
+
+	BlockedBy []LineageNode `json:"blockedBy"`
+
+	BlockedOutside []LineageNode `json:"blockedOutside,omitzero"`
+
+	Step int64 `json:"step"`
+}
+
+// forge/plan (#3267): the epic's lineage node, an issue on GitHub, GitLab or Linear.
+type ForgePlanRequest struct {
+	Node LineageNode `json:"node"`
+}
+
+// A step of a plan (#3267): its number, from 1, and its children's nodes.
+type ForgePlanStep struct {
+	Step int64 `json:"step"`
+
+	Nodes []LineageNode `json:"nodes"`
+}
+
+// A parent issue's children (#3267): done are closed, of total.
+type ForgeProgress struct {
+	Done int64 `json:"done"`
+
+	Total int64 `json:"total"`
 }
 
 // The new-agent form for an issue (#3130, Start Agent), as a view's agents/start-agent fills it (#834): the prompt, the session's labels, and a new worktree's name.
