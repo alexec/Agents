@@ -204,6 +204,34 @@ struct WebFixturesTests {
         }
     }
 
+    // MARK: asker/from (#3240)
+
+    /// "From" another agent's message: the sender by its title as it is now, by the title it
+    /// sent with once it has gone or has no title, and with no sender at all.
+    @Test func fromLine() throws {
+        let sender = Self.agent(60, .running, title: "Message session tool test")
+        var untitled = Self.agent(61, .running)
+        untitled.title = "  "
+        let everyone = [sender, untitled]
+        let sent: [(String, MessageSender?)] = [
+            ("titled since it sent", MessageSender(agentID: sender.id, title: "Call the message_session tool once")),
+            ("gone", MessageSender(agentID: Self.id(999), title: "Plan the release")),
+            ("no title now", MessageSender(agentID: untitled.id, title: "Say ready")),
+            ("no sender", nil),
+        ]
+        let cases = try sent.map { name, sender in
+            Case(name: name, input: .object([
+                "agents": .array(try everyone.map(Self.encode)),
+                "sender": try sender.map(Self.encode) ?? .null]))
+        }
+        try pin("asker/from.json", cases) { input in
+            let model = AgentsModel()
+            model.replaceAgents(try input["agents"]!.decode([Agent].self))
+            let sender = input["sender"] == .null ? nil : try input["sender"]!.decode(MessageSender.self)
+            return .string(model.fromLine(sender))
+        }
+    }
+
     // MARK: disk/ (#196)
 
     /// The low disk space strip's line (#195), as `DiskAlarm.line` says it: low and critical,

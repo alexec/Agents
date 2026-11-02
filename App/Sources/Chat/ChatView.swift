@@ -266,7 +266,8 @@ struct ChatView: View {
             },
             leaseStatus: { [model] agentID in model.work.leaseStatus(of: agentID) },
             // Resources at the resource, as the line names it (036 FR-011).
-            openLease: { [model] name in model.showResources(at: name) })
+            openLease: { [model] name in model.showResources(at: name) },
+            fromLine: { [model] sender in model.work.fromLine(sender) })
     }
 
     /// The sandbox card's answer for the open agent (064).

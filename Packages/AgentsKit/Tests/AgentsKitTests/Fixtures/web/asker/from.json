@@ -1,0 +1,231 @@
+[
+  {
+    "expected" : "From “Message session tool test”",
+    "input" : {
+      "agents" : [
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/folder/",
+          "id" : "00000000-0000-0000-0000-000000000060",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "running",
+          "title" : "Message session tool test"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/folder/",
+          "id" : "00000000-0000-0000-0000-000000000061",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "running",
+          "title" : "  "
+        }
+      ],
+      "sender" : {
+        "agentID" : "00000000-0000-0000-0000-000000000060",
+        "title" : "Call the message_session tool once"
+      }
+    },
+    "name" : "titled since it sent"
+  },
+  {
+    "expected" : "From “Plan the release”",
+    "input" : {
+      "agents" : [
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/folder/",
+          "id" : "00000000-0000-0000-0000-000000000060",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "running",
+          "title" : "Message session tool test"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/folder/",
+          "id" : "00000000-0000-0000-0000-000000000061",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "running",
+          "title" : "  "
+        }
+      ],
+      "sender" : {
+        "agentID" : "00000000-0000-0000-0000-000000000999",
+        "title" : "Plan the release"
+      }
+    },
+    "name" : "gone"
+  },
+  {
+    "expected" : "From “Say ready”",
+    "input" : {
+      "agents" : [
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/folder/",
+          "id" : "00000000-0000-0000-0000-000000000060",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "running",
+          "title" : "Message session tool test"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/folder/",
+          "id" : "00000000-0000-0000-0000-000000000061",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "running",
+          "title" : "  "
+        }
+      ],
+      "sender" : {
+        "agentID" : "00000000-0000-0000-0000-000000000061",
+        "title" : "Say ready"
+      }
+    },
+    "name" : "no title now"
+  },
+  {
+    "expected" : "From “another agent”",
+    "input" : {
+      "agents" : [
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/folder/",
+          "id" : "00000000-0000-0000-0000-000000000060",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "running",
+          "title" : "Message session tool test"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/folder/",
+          "id" : "00000000-0000-0000-0000-000000000061",
+          "lastActivityAt" : 812500000,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "running",
+          "title" : "  "
+        }
+      ],
+      "sender" : null
+    },
+    "name" : "no sender"
+  }
+]

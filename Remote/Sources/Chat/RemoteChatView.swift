@@ -511,7 +511,8 @@ struct RemoteChatView: View {
                 return Image(uiImage: image)
             },
             leaseStatus: { [model] agentID in model.work.leaseStatus(of: agentID) },
-            openLease: openLease)
+            openLease: openLease,
+            fromLine: { [model] sender in model.work.fromLine(sender) })
     }
 
     /// What a view in the chat may ask of the phone (#187): the Mac it is on, the person's

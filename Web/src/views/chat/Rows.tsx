@@ -6,10 +6,11 @@ import { hostNeedsUpdate } from "../../model/capabilities";
 import { createContext } from "preact";
 import { useContext, useEffect, useRef } from "preact/hooks";
 import type {
-  AgentState, BackgroundItem, ContentBlock, EndedReason, FileReading, JSONValue, Plan, ToolCall, ToolCallContent, ToolCallLocation,
+  AgentState, BackgroundItem, ContentBlock, EndedReason, FileReading, JSONValue, MessageSender, Plan, ToolCall, ToolCallContent, ToolCallLocation,
   PolicySetBy, SandboxFailureRecord, TranscriptEntry, WorkReport,
 } from "../../protocol/generated";
 import { lineDiff } from "../../model/diff";
+import { fromLine } from "../../model/asker";
 import { Lines } from "../Changes";
 import { backgroundEntryLine } from "../../model/background";
 import { outcomeNeedsAPerson } from "../../model/groups";
@@ -151,6 +152,8 @@ export interface CallActions {
   branchFrom?: ((entryID: string, text: string) => void) | undefined;
   /** The host is too old to branch (#1748): Branch from Here stays, greyed, and says so (#1866). */
   branchNeedsUpdate?: boolean | undefined;
+  /** "From" another agent's message (ChatActions.fromLine, #3240): its sender by its title as it is now. */
+  fromLine?: ((sender: MessageSender | undefined) => string) | undefined;
 }
 export const CallActionsContext = createContext<CallActions | null>(null);
 
@@ -274,11 +277,6 @@ function SandboxFailureCard({ record }: { record: SandboxFailureRecord }) {
   );
 }
 
-/** Who another agent's message is from (#560), as the queued bubble says it too. */
-export function fromLine(title: string | undefined): string {
-  return `From \u201C${title ?? "another agent"}\u201D`;
-}
-
 /**
  * Copy Message (#519): the whole message, as written, onto the clipboard. Shown while the pointer
  * is on the message or the button has focus; the Mac and the phone have it on the message's menu.
@@ -343,10 +341,11 @@ function CopyMessage({ entry, quotes = false, branches = false }: { entry: Trans
 
 /** One entry, drawn as its kind is (EntryRow). Marked so Exchanged can bring it into view. */
 export function EntryRow({ entry }: { entry: TranscriptEntry }) {
-  return <div class="entry-mark" data-entry={entry.id}>{entryBody(entry)}</div>;
+  const from = useContext(CallActionsContext)?.fromLine ?? ((sender) => fromLine([], sender));
+  return <div class="entry-mark" data-entry={entry.id}>{entryBody(entry, from)}</div>;
 }
 
-function entryBody(entry: TranscriptEntry) {
+function entryBody(entry: TranscriptEntry, from: (sender: MessageSender | undefined) => string) {
   switch (kindOf(entry)) {
     case "userMessage": {
       const message = fields(entry, "userMessage")!;
@@ -355,7 +354,7 @@ function entryBody(entry: TranscriptEntry) {
       }
       if (message.from === "agent") {
         // Another agent's message (#560): the person's bubble, named as the sender's.
-        return <div class="from-agent"><p class="faint">{fromLine(entry.sender?.title)}</p><div class="bubble copyable"><Blocks blocks={message.blocks} text={message._0} /><CopyMessage entry={entry} /></div></div>;
+        return <div class="from-agent"><p class="faint">{from(entry.sender)}</p><div class="bubble copyable"><Blocks blocks={message.blocks} text={message._0} /><CopyMessage entry={entry} /></div></div>;
       }
       return <div class="bubble copyable"><Blocks blocks={message.blocks} text={message._0} /><CopyMessage entry={entry} branches /></div>;
     }

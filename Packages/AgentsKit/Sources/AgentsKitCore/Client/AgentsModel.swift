@@ -1480,6 +1480,19 @@ public final class AgentsModel {
         return "Started by " + name
     }
 
+    /// Who another agent's message is from (#560), sent or queued: the sender's title as it
+    /// is now (#3240), so a message sent before the sender had its title does not keep its
+    /// prompt's first line; the title it had when it sent, once it has gone.
+    public func fromLine(_ sender: MessageSender?) -> String {
+        let now = agent(sender?.agentID)?.title?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return Self.fromLine(now.flatMap { $0.isEmpty ? nil : $0 } ?? sender?.title)
+    }
+
+    /// That line for a title, or "another agent" with none.
+    public nonisolated static func fromLine(_ title: String?) -> String {
+        "From \u{201C}\(title ?? "another agent")\u{201D}"
+    }
+
     /// The symbol that mark is drawn with.
     public static let startedByAgentSymbol = "person.2"
 

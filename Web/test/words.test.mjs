@@ -81,6 +81,12 @@ for (const { name, input, expected } of cases("asker/line.json")) {
   });
 }
 
+for (const { name, input, expected } of cases("asker/from.json")) {
+  test(`from: ${name}`, () => {
+    assert.equal(asker.fromLine(input.agents, input.sender ?? undefined), expected);
+  });
+}
+
 const disk = await load("src/model/disk.ts");
 
 for (const { name, input, expected } of cases("disk/lines.json")) {

@@ -1,6 +1,6 @@
 // Who is asking, at the head of a question or permission card (#121), as AgentsKitCore's
 // AgentsModel.askerLine says it, so the page names the asker as the window and the Remote do.
-import type { Agent } from "../protocol/generated";
+import type { Agent, MessageSender } from "../protocol/generated";
 
 const quoted = (text: string) => `“${text}”`;
 
@@ -23,4 +23,13 @@ export function askerFor(agents: Agent[], agentID: string, runtimeName: (id: str
     startedBy = `started by ${title ? quoted(title) : "another agent"}`;
   }
   return askerLine(agent.title, runtimeName(agent.runtimeID) ?? agent.runtimeID, startedBy, subagent);
+}
+
+/**
+ * Who another agent's message is from (#560), sent or queued, as AgentsModel.fromLine says it: the
+ * sender's title as it is now (#3240), else the title it had when it sent, else "another agent".
+ */
+export function fromLine(agents: Agent[], sender: MessageSender | undefined): string {
+  const now = sender ? agents.find((a) => a.id === sender.agentID)?.title?.trim() : undefined;
+  return `From ${quoted(now || sender?.title || "another agent")}`;
 }

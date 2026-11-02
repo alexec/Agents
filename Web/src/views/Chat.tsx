@@ -36,7 +36,7 @@ import { sentPrompts } from "../model/promptHistory";
 import { sessionPrompts } from "../model/sessionPrompts";
 import { PromptList } from "./chat/PromptList";
 import { asksToArchive, folderPath, personLine, personTriggerOf } from "../model/groups";
-import { CallActionsContext, fromLine, ItemRow, TurnView, type CallActions } from "./chat/Rows";
+import { CallActionsContext, ItemRow, TurnView, type CallActions } from "./chat/Rows";
 import { Modal } from "./Modal";
 import { nameOf, pathOf, setPane } from "./files/paneState";
 import { FileSearch, isOpenFileKey } from "./files/FileSearch";
@@ -56,6 +56,7 @@ import { routeHash } from "../route";
 import { sessionRuntimeName } from "../model/runtimes";
 import { GuardedChangeCard } from "./GuardedChange";
 import { Capability } from "../protocol/capabilities.generated";
+import { fromLine } from "../model/asker";
 import { hostNeedsUpdate } from "../model/capabilities";
 import { WorkingMark } from "./SessionRow";
 import { runningTool } from "../model/sidebar";
@@ -192,6 +193,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       } : undefined,
       // On a host too old to branch, Branch from Here stays, greyed, and says so (#1866).
       branchNeedsUpdate: !!agent && agent.state !== "archived" && !store.has(host, Capability.chatBranch1),
+      // The sender by its title as it is now, not as it was when it sent (#3240).
+      fromLine: (sender) => fromLine(store.agents.value[host] ?? [], sender),
       // Answered only while the agent waits on it, and while its host answers (#253).
       waitingSandbox: agent?.pendingSandboxFailure,
       sandboxSetBy: store.sandboxSetBy.value[host],
@@ -794,9 +797,9 @@ function Queued({ store, host, agent, disabled, draftKey }: { store: Store; host
         // The person's bubble, dashed and dimmed, with what can be done to it underneath (#95).
         return (
         <div key={queued.id} class="queued">
-          {queued.from === "agent" && <p class="faint">{fromLine(queued.sender?.title)}</p>}
+          {queued.from === "agent" && <p class="faint">{fromLine(store.agents.value[host] ?? [], queued.sender)}</p>}
           <div class="queued-bubble" role="group"
-            aria-label={queued.from === "agent" ? `Queued, ${fromLine(queued.sender?.title)}: ${queued.text}` : `Queued: ${queued.text}`}>
+            aria-label={queued.from === "agent" ? `Queued, ${fromLine(store.agents.value[host] ?? [], queued.sender)}: ${queued.text}` : `Queued: ${queued.text}`}>
             <p>{queued.text}</p>
             {queued.attachments.length > 0 && <p class="small">📎 {queued.attachments.map((a) => a.displayName).join(", ")}</p>}
           </div>
