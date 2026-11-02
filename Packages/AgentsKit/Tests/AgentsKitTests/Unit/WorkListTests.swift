@@ -181,13 +181,14 @@ struct WorkPageTests {
         #expect(WorkPlace(kind: .pr, ref: pr.ref).node == pr)
     }
 
-    @Test func previousAndNextAreTheRowsAboveAndBelowInTheListShown() {
+    @Test func previousAndNextAreTheRowsAboveAndBelowInTheListShown() throws {
         let items: [DaemonAPI.ForgeItem] = (1 ... 3).map { n in
             .init(node: Node(kind: "issue", ref: "github:alexec/Agents#\(n)"), title: "Issue \(n)", state: "open", labels: [],
                   assignees: [], updatedAt: at)
         }
         let rows: [WorkList.Row] = WorkList.sort(WorkList.merge([(host: MachineRef.mac, items: items)], lineage: []), by: .newest)
         let refs: [String] = rows.map { $0.node.ref }
+        try #require(refs.count == 3)
         let first = WorkList.neighbours(of: refs[0], in: rows)
         #expect(first?.previous == nil && first?.next == refs[1] && first?.position == 1 && first?.count == 3)
         let middle = WorkList.neighbours(of: refs[1], in: rows)

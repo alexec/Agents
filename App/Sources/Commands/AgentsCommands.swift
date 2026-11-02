@@ -323,20 +323,19 @@ struct AgentsCommands: Commands {
                 .disabled(model.selectedAgent == nil)
             Divider()
             // ⌥⌘↓ and ⌥⌘↑ go through the list in front: a Work page's list while one opened
-            // from it is shown (#3257), else the folder's sessions.
+            // from it is shown (#3257), else the folder's sessions. One item per key, so the
+            // window never sees the key twice.
             let item = model.showsWork ? model.workNeighbours : nil
-            Button("Next Session") { step(by: 1) }
-                .keyboardShortcut(item == nil ? KeyboardShortcut(.downArrow, modifiers: [.command, .option]) : nil)
-                .disabled(sessionsHere.isEmpty)
-            Button("Previous Session") { step(by: -1) }
-                .keyboardShortcut(item == nil ? KeyboardShortcut(.upArrow, modifiers: [.command, .option]) : nil)
-                .disabled(sessionsHere.isEmpty)
-            Button("Next Item") { Task { await model.stepWork(forward: true) } }
-                .keyboardShortcut(item == nil ? nil : KeyboardShortcut(.downArrow, modifiers: [.command, .option]))
-                .disabled(item == nil || !model.workHasNext)
-            Button("Previous Item") { Task { await model.stepWork(forward: false) } }
-                .keyboardShortcut(item == nil ? nil : KeyboardShortcut(.upArrow, modifiers: [.command, .option]))
-                .disabled(item?.previous == nil)
+            Button(item == nil ? "Next Session" : "Next Item") {
+                if item == nil { step(by: 1) } else { Task { await model.stepWork(forward: true) } }
+            }
+            .keyboardShortcut(.downArrow, modifiers: [.command, .option])
+            .disabled(item == nil ? sessionsHere.isEmpty : !model.workHasNext)
+            Button(item == nil ? "Previous Session" : "Previous Item") {
+                if item == nil { step(by: -1) } else { Task { await model.stepWork(forward: false) } }
+            }
+            .keyboardShortcut(.upArrow, modifiers: [.command, .option])
+            .disabled(item == nil ? sessionsHere.isEmpty : item?.previous == nil)
             Button("Next Needing Attention") { nextNeedingAttention() }
                 .keyboardShortcut("j")
                 // Each folder's count, not the list itself: the menu bar is drawn again

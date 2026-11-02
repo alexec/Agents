@@ -2,7 +2,7 @@
 // every issue and pull request from forge/issues and forge/pulls on each machine, one row per ref, with
 // what lineage knows (reports/nodes: sessions, cost, lead time) under its title; the milestones and
 // releases lineage knows. A row opens its page.
-import { useSignal } from "@preact/signals";
+import { effect, useSignal } from "@preact/signals";
 import { useEffect, useMemo } from "preact/hooks";
 import type { ForgeItemDetail, ForgeLabel, LineageCostRollup, LineageLink, LineageNode } from "../protocol/generated";
 import type { Store } from "../model/store";
@@ -21,10 +21,13 @@ import { fromWireDate } from "../protocol/dates";
 import { Markdown } from "../render/markdown";
 import { Graph, useLayout, useWalk } from "./Lineage";
 import { WorkActions, WorkCommentBox } from "./WorkActions";
-import { go, replace } from "../route";
+import { go, replace, route } from "../route";
 import {
   allRows, askKey, forgeHosts, fromList, hasMore, loadList, loadMore, nextAfter, pageNeighbours, placeKey, shownRows, workList,
 } from "../model/workLists";
+
+// Back on a list, no page is opened from it yet: a pasted address of the last one opened has no Previous or Next.
+effect(() => { if (route.value.nav === "work" && !route.value.item) fromList.value = undefined; });
 
 export function WorkList({ store, kind }: { store: Store; kind: WorkKind }) {
   // The list's state lives for the tab (#3257), so an item's page can go through it and Back finds it as it was.

@@ -419,6 +419,8 @@ final class AppModel {
 
     /// Open Work at a place: a list, or an item's page.
     func showWork(_ place: WorkPlace) {
+        // The list Work opens on is no place yet: a page opened from it puts it first, so Back finds it (#3257).
+        if place.fromList, workHistory.current == nil { workHistory.go(WorkPlace(kind: place.kind)) }
         if place != workHistory.current { workHistory.go(place) }
         showsWork = true
     }

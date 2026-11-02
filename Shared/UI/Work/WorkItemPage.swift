@@ -138,14 +138,15 @@ struct WorkItemPage: View {
         if let n = model.workNeighbours {
             let list = model.workLists[place.kind]
             HStack(spacing: 8) {
-                Button { Task { await model.stepWork(forward: false) } } label: { Image(systemName: "chevron.up") }
+                Button { Task { await model.stepWork(forward: false) } } label: { stepLabel("chevron.up") }
                     .disabled(n.previous == nil)
                     .help("Previous item (⌥⌘↑)")
                     .accessibilityLabel("Previous")
                 Text(WorkList.positionWords(n, more: list.hasMore))
                     .appText(.supporting).foregroundStyle(.secondary).monospacedDigit()
+                    .lineLimit(1).fixedSize()
                 Button { Task { await model.stepWork(forward: true) } } label: {
-                    if list.loadingMore { ProgressView().controlSize(.small) } else { Image(systemName: "chevron.down") }
+                    if list.loadingMore { ProgressView().controlSize(.small) } else { stepLabel("chevron.down") }
                 }
                 .disabled(!model.workHasNext || list.loadingMore)
                 .help("Next item (⌥⌘↓)")
@@ -153,6 +154,16 @@ struct WorkItemPage: View {
             }
             .buttonStyle(.borderless)
         }
+    }
+
+    /// An arrow with a target a finger or a pointer finds: 44 points on the Remote, 24 on the Mac.
+    private func stepLabel(_ symbol: String) -> some View {
+        #if os(iOS)
+        let side: CGFloat = 44
+        #else
+        let side: CGFloat = 24
+        #endif
+        return Image(systemName: symbol).frame(width: side, height: side).contentShape(Rectangle())
     }
 
     // MARK: Body and comments
