@@ -132,3 +132,24 @@ test("a milestone's and a release's short name", () => {
   assert.equal(w.titleSaysRef({ title: "example/shop milestone 2", node: { kind: "milestone", ref: "github:example/shop/milestone/2" } }), true);
   assert.equal(w.titleSaysRef({ title: "1.2 Checkout", node: { kind: "milestone", ref: "github:example/shop/milestone/2" } }), false);
 });
+
+// #3130: the page's actions say what each does, as WorkListTests has it on the window.
+test("the merge button says its method, and waits while checks run", () => {
+  assert.equal(w.mergeButton("squash", false), "Squash and merge");
+  assert.equal(w.mergeButton(undefined, true), "Merge when checks pass");
+  const pr = (checks, list) => ({ item: { ...item(1), checks }, body: "", comments: [], checks: list });
+  assert.equal(w.mergeWaits(pr("running")), true);
+  assert.equal(w.mergeWaits(pr("passing", [{ name: "a", state: "running" }])), true);
+  assert.equal(w.mergeWaits(pr("passing", [{ name: "a", state: "passing" }])), false);
+  assert.deepEqual(w.failedChecks(pr("failing", [{ name: "a", state: "failing" }, { name: "b", state: "passing" }])).map((c) => c.name), ["a"]);
+});
+
+test("a write says what it did", () => {
+  assert.equal(w.doneWords("forge/merge", { auto: true }), "Auto-merge is on: it merges when its checks pass.");
+  assert.equal(w.doneWords("forge/merge", {}), "Merged.");
+  assert.equal(w.doneWords("forge/rerun", { reran: 2 }), "2 runs started again.");
+  assert.equal(w.doneWords("forge/close", {}), "Closed.");
+  assert.equal(w.doneWords("forge/close", {}, true), "Reopened.");
+  assert.equal(w.closeTitle("open"), "Close");
+  assert.equal(w.closeTitle("closed"), "Reopen");
+});

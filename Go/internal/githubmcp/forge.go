@@ -57,7 +57,8 @@ type Check struct{ Name, State, URL string }
 
 // ItemDetail is an item with its body and a page of its comments (Thread), oldest first in the
 // page. Before is the cursor of the page before it, "" at the first comment. CheckRuns are a pull
-// request's checks, each one.
+// request's checks, each one. Head is its head commit, which a merge or a review names (#3130);
+// MergeMethods are merge, squash or rebase, as the repo allows them, the default first.
 type ItemDetail struct {
 	Item
 	Body          string
@@ -66,6 +67,8 @@ type ItemDetail struct {
 	CheckRuns     []Check
 	ReviewThreads int
 	FilesChanged  int
+	Head          string
+	MergeMethods  []string
 }
 
 // itemFields are what an issue and a pull request both say, in a search and on their own. Their
@@ -90,7 +93,8 @@ const itemQuery = `query($owner: String!, $name: String!, $number: Int!, $before
   repository(owner: $owner, name: $name) { issueOrPullRequest(number: $number) {
     __typename ... on Issue { issueState: state ` + itemFields + ` body ` + commentFields + ` }
     ... on PullRequest { pullState: state ` + itemFields + ` ` + pullFields + ` body ` + commentFields + `
-      reviewThreads { totalCount } changedFiles ` + rollupFields + ` } } } }`
+      reviewThreads { totalCount } changedFiles headRefOid ` + rollupFields + ` } }
+    viewerDefaultMergeMethod squashMergeAllowed mergeCommitAllowed rebaseMergeAllowed } }`
 
 type gqlItem struct {
 	Typename   string    `json:"__typename"`
@@ -258,8 +262,10 @@ func (g *RealGitHub) ItemPage(ctx context.Context, repo string, number int, befo
 					TotalCount int `json:"totalCount"`
 				} `json:"reviewThreads"`
 				ChangedFiles int       `json:"changedFiles"`
+				HeadRefOid   string    `json:"headRefOid"`
 				Commits      gqlRollup `json:"commits"`
 			} `json:"issueOrPullRequest"`
+			mergeSettings
 		} `json:"repository"`
 	}
 	if err := g.graphql(ctx, itemQuery, vars, &data); err != nil {
@@ -280,7 +286,8 @@ func (g *RealGitHub) ItemPage(ctx context.Context, repo string, number int, befo
 		d.Before = n.Comments.PageInfo.StartCursor
 	}
 	if d.PR {
-		d.ReviewThreads, d.FilesChanged = n.ReviewThreads.TotalCount, n.ChangedFiles
+		d.ReviewThreads, d.FilesChanged, d.Head = n.ReviewThreads.TotalCount, n.ChangedFiles, n.HeadRefOid
+		d.MergeMethods = data.Repository.methods()
 		d.CheckRuns = []Check{}
 		for _, c := range n.Commits.items() {
 			name, link := c.Name, c.DetailsURL

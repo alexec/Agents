@@ -361,6 +361,50 @@ public enum WorkList {
         return "Checks: \(parts.joined(separator: ", "))"
     }
 
+    // MARK: Actions (#3130)
+
+    /// A merge method's button, as GitHub says it.
+    public static func mergeTitle(_ method: DaemonAPI.ForgeMergeMethod) -> String {
+        switch method {
+        case .merge: "Create a merge commit"
+        case .squash: "Squash and merge"
+        case .rebase: "Rebase and merge"
+        }
+    }
+
+    /// The merge button's own words: what its default method does, and "when checks pass" while
+    /// some still run, as the merge then waits for them.
+    public static func mergeButton(_ method: DaemonAPI.ForgeMergeMethod?, waits: Bool) -> String {
+        (method.map(mergeTitle) ?? "Merge") + (waits ? " when checks pass" : "")
+    }
+
+    /// Whether a merge waits for checks still running: auto-merge, as the forge does it.
+    public static func mergeWaits(_ detail: DaemonAPI.ForgeItemDetail) -> Bool {
+        detail.item.checks == "running" || (detail.checks ?? []).contains { $0.state == "running" }
+    }
+
+    /// The failed checks, which Rerun runs again and whose logs a person reads.
+    public static func failedChecks(_ detail: DaemonAPI.ForgeItemDetail) -> [DaemonAPI.ForgeCheck] {
+        (detail.checks ?? []).filter { $0.state == "failing" }
+    }
+
+    /// What a write did, for the line under the actions.
+    public static func doneWords(_ method: String, _ done: DaemonAPI.ForgeDone, reopened: Bool = false) -> String {
+        switch method {
+        case DaemonAPI.Method.forgeComment: "Commented."
+        case DaemonAPI.Method.forgeLabel: "Labels changed."
+        case DaemonAPI.Method.forgeMerge: done.auto == true ? "Auto-merge is on: it merges when its checks pass." : "Merged."
+        case DaemonAPI.Method.forgeApprove: "Approved."
+        case DaemonAPI.Method.forgeClose: reopened ? "Reopened." : "Closed."
+        case DaemonAPI.Method.forgeRerun:
+            done.reran.map { $0 == 1 ? "1 run started again." : "\($0) runs started again." } ?? "Started again."
+        default: "Done."
+        }
+    }
+
+    /// Close or Reopen, by the item's state.
+    public static func closeTitle(_ state: String) -> String { state == "open" ? "Close" : "Reopen" }
+
     public static func reviewWords(_ review: String?) -> String? {
         guard let review else { return nil }
         let title = ["approved": "Approved", "changes_requested": "Changes requested", "review_required": "Review required"]

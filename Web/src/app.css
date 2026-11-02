@@ -1856,3 +1856,18 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .work-links > div { display: grid; grid-template-columns: 9em 1fr; gap: 2px 12px; }
 .work-links dt { color: var(--paper-ink); opacity: 0.7; }
 .work-links dd { margin: 0; grid-column: 2; }
+/* The page's actions (#3130): a row of buttons, the merge button split for its other methods. */
+.work-actions { margin-top: 8px; }
+.work-actions-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.work-actions-bar .spacer { flex: 1; }
+.work-actions .failure { margin: 4px 0 0; }
+.split-button { display: inline-flex; }
+.split-button > button:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.split-button > button:last-child { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: 1px; padding: 0 8px; }
+.work-comment-box { display: grid; gap: 6px; margin-top: 12px; }
+.work-comment-box textarea { width: 100%; box-sizing: border-box; font: inherit; resize: vertical; }
+dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
+.work-log { display: grid; gap: 8px; min-width: 0; }
+.work-log header { display: flex; align-items: center; }
+.work-log header .spacer { flex: 1; }
+.work-log pre { max-height: 60vh; overflow: auto; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }

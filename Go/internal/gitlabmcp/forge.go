@@ -79,6 +79,10 @@ type ItemDetail struct {
 	CheckRuns     []Check
 	ReviewThreads int
 	FilesChanged  int
+	// A merge request's head commit and head pipeline (0 for none), which a merge, an approval,
+	// a retry and a log name (#3130).
+	Head     string
+	Pipeline int
 }
 
 // forgeComments is a page of an item's comments.
@@ -121,6 +125,7 @@ type forgeJSON struct {
 	MergeStatus               string `json:"merge_status"`
 	MergeWhenPipelineSucceeds bool   `json:"merge_when_pipeline_succeeds"`
 	ChangesCount              string `json:"changes_count"`
+	SHA                       string `json:"sha"`
 	HeadPipeline              *struct {
 		ID     int    `json:"id"`
 		Status string `json:"status"`
@@ -338,6 +343,7 @@ func (g *RealGitLab) ItemPage(ctx context.Context, project string, number int, m
 		return d, nil
 	}
 	d.FilesChanged, _ = strconv.Atoi(strings.TrimSuffix(j.ChangesCount, "+"))
+	d.Head = j.SHA
 	discussions, err := g.discussions(ctx, project, number)
 	if err != nil {
 		return ItemDetail{}, err
@@ -349,6 +355,7 @@ func (g *RealGitLab) ItemPage(ctx context.Context, project string, number int, m
 	}
 	d.CheckRuns = []Check{}
 	if p := j.HeadPipeline; p != nil {
+		d.Pipeline = p.ID
 		var jobs []jobJSON
 		if err := g.get(ctx, fmt.Sprintf("projects/%s/pipelines/%d/jobs?per_page=100", pid(project), p.ID), false, &jobs); err != nil {
 			return ItemDetail{}, err

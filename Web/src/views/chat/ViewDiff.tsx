@@ -8,9 +8,12 @@ import { hunkRows } from "../../model/fileDiff";
 import { FileDiff, type DiffLayout } from "../FileDiff";
 import type { ViewLayer } from "./viewLayer";
 
+/** What ViewDiff draws: a layer's diff, or a Work page's (#3130). */
+type DiffHolder = Pick<ViewLayer, "diff">;
+
 const layoutKey = "reviewDiffLayout";
 
-export function ViewDiff({ layer, openLink }: { layer: ViewLayer; openLink: (url: string) => void }) {
+export function ViewDiff({ layer, openLink }: { layer: DiffHolder; openLink: (url: string) => void }) {
   const diff = layer.diff.value;
   const layout = useSignal<DiffLayout>(globalThis.localStorage?.getItem(layoutKey) === "sideBySide" ? "sideBySide" : "unified");
   const wide = useSignal(typeof innerWidth === "number" && innerWidth >= 820);

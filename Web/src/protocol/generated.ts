@@ -3267,6 +3267,15 @@ export interface FoldersListRequest {
 }
 
 /**
+ * forge/approve (#3130): approve a pull request at sha, the head commit its page shows (refused
+ * when the head moved).
+ */
+export interface ForgeApproveRequest {
+  node: LineageNode;
+  sha: string;
+}
+
+/**
  * One of a pull request's checks (#3129): a check run or a commit status. state is passing,
  * failing, running or skipped; url is its page on the forge.
  */
@@ -3274,6 +3283,12 @@ export interface ForgeCheck {
   name: string;
   state: string;
   url?: string;
+}
+
+/** forge/close (#3130): close an issue or a pull request, or with reopen open it again. */
+export interface ForgeCloseRequest {
+  node: LineageNode;
+  reopen?: boolean;
 }
 
 /**
@@ -3285,6 +3300,56 @@ export interface ForgeComment {
   at: WireDate;
   url?: string;
   bot?: boolean;
+}
+
+/**
+ * forge/comment (#3130): a comment, as Markdown, on an issue or a pull request, as the person whose
+ * machine it is.
+ */
+export interface ForgeCommentRequest {
+  node: LineageNode;
+  body: string;
+}
+
+/**
+ * forge/diff (#3130): a pull request's changed files at its head, as the app's own diff draws them
+ * (#1341); cut says some files are listed with no hunks; url is its files on the forge.
+ */
+export interface ForgeDiff {
+  url?: string;
+  files: ForgeDiffFile[];
+  cut: boolean;
+}
+
+/**
+ * One file a pull request changes (#3130): change is added, removed, modified or renamed; note says
+ * why it has no hunks, when it has none.
+ */
+export interface ForgeDiffFile {
+  path: string;
+  previousPath?: string;
+  change: string;
+  additions: number;
+  deletions: number;
+  hunks: ForgeDiffHunk[];
+  note?: string;
+}
+
+/** One @@ block of a file's diff (#3130). */
+export interface ForgeDiffHunk {
+  oldStart: number;
+  newStart: number;
+  lines: DiffLine[];
+}
+
+/**
+ * What a forge write did (#3130): url is the comment or the item on the forge; auto says a merge
+ * waits for the checks; reran is how many runs or pipelines were run again.
+ */
+export interface ForgeDone {
+  url?: string;
+  auto?: boolean;
+  reran?: number;
 }
 
 /**
@@ -3319,7 +3384,9 @@ export interface ForgeItem {
  * forge/issue and forge/pull (#3129): one item with its body (Markdown) and a page of its comments,
  * the newest page first and at most 50, oldest first in the page; cursor is the page before it,
  * absent at the first comment. A pull request's checks, review threads (line comments, in threads)
- * and files changed come with it.
+ * and files changed come with it. head is a pull request's head commit, which forge/merge and
+ * forge/approve name (#3130); mergeMethods are the ways its repo allows, the repo's default first;
+ * start is the new-agent form for an issue.
  */
 export interface ForgeItemDetail {
   item: ForgeItem;
@@ -3329,6 +3396,9 @@ export interface ForgeItemDetail {
   checks?: ForgeCheck[];
   reviewThreads?: number;
   filesChanged?: number;
+  head?: string;
+  mergeMethods?: ForgeMergeMethod[];
+  start?: ForgeStart;
 }
 
 /**
@@ -3347,6 +3417,21 @@ export interface ForgeItemRequest {
 export interface ForgeLabel {
   name: string;
   color?: string;
+}
+
+/**
+ * forge/label (#3130): labels to add to an issue or a pull request, and labels to take off it, by
+ * name.
+ */
+export interface ForgeLabelRequest {
+  node: LineageNode;
+  add?: string[];
+  remove?: string[];
+}
+
+/** forge/labels (#3130): the labels an issue or a pull request can have, at most 100, by name. */
+export interface ForgeLabels {
+  labels: ForgeLabel[];
 }
 
 /**
@@ -3384,6 +3469,17 @@ export interface ForgeListRequest {
   limit?: number;
 }
 
+/** forge/log (#3130): the last lines of each failed check's log, as plain text. */
+export interface ForgeLog {
+  text: string;
+}
+
+/** forge/log (#3130): the end of a pull request's failed checks' logs, or of one check by name. */
+export interface ForgeLogRequest {
+  node: LineageNode;
+  check?: string;
+}
+
 /**
  * people/setForgeLogins (#2951): the caller's own GitHub, GitLab and Linear logins, for Settings ▸
  * You, replacing what was kept; blank clears one.
@@ -3392,6 +3488,42 @@ export interface ForgeLogins {
   github?: string;
   gitlab?: string;
   linear?: string;
+}
+
+/**
+ * How forge/merge merges a pull request (#3130): a merge commit, one squashed commit, or its
+ * commits rebased onto the base.
+ */
+export type ForgeMergeMethod =
+  | "merge"
+  | "squash"
+  | "rebase";
+
+/**
+ * forge/merge (#3130): merge a pull request at sha, the head commit its page shows (refused when
+ * the head moved), by method (the repo's default when absent); with auto, the forge merges it once
+ * its checks pass.
+ */
+export interface ForgeMergeRequest {
+  node: LineageNode;
+  sha: string;
+  method?: ForgeMergeMethod;
+  auto?: boolean;
+}
+
+/** forge/labels, forge/rerun and forge/diff (#3130): the issue or pull request. */
+export interface ForgeNodeRequest {
+  node: LineageNode;
+}
+
+/**
+ * The new-agent form for an issue (#3130, Start Agent), as a view's agents/start-agent fills it
+ * (#834): the prompt, the session's labels, and a new worktree's name.
+ */
+export interface ForgeStart {
+  prompt: string;
+  labels: string[];
+  worktree?: string;
 }
 
 export interface FoundFolder {
@@ -9533,10 +9665,19 @@ export interface Methods {
   "folders/setProject": { params: SetFolderProjectRequest; result: FolderSummary };
   "folders/unarchive": { params: FolderRequest; result: FolderSummary };
   "folders/undoGuardedChange": { params: GuardedChangeRequest; result: FolderSummary };
+  "forge/approve": { params: ForgeApproveRequest; result: ForgeDone };
+  "forge/close": { params: ForgeCloseRequest; result: ForgeDone };
+  "forge/comment": { params: ForgeCommentRequest; result: ForgeDone };
+  "forge/diff": { params: ForgeNodeRequest; result: ForgeDiff };
   "forge/issue": { params: ForgeItemRequest; result: ForgeItemDetail };
   "forge/issues": { params: ForgeListRequest; result: ForgeList };
+  "forge/label": { params: ForgeLabelRequest; result: ForgeDone };
+  "forge/labels": { params: ForgeNodeRequest; result: ForgeLabels };
+  "forge/log": { params: ForgeLogRequest; result: ForgeLog };
+  "forge/merge": { params: ForgeMergeRequest; result: ForgeDone };
   "forge/pull": { params: ForgeItemRequest; result: ForgeItemDetail };
   "forge/pulls": { params: ForgeListRequest; result: ForgeList };
+  "forge/rerun": { params: ForgeNodeRequest; result: ForgeDone };
   "governance/approvals": { params: Empty; result: CatalogApprovalList };
   "governance/decide": { params: CatalogDecide; result: CatalogRequest };
   "governance/request": { params: CatalogAsk; result: CatalogRequest };
@@ -9838,10 +9979,19 @@ export const MethodTarget = {
   "folders/setProject": "host",
   "folders/unarchive": "host",
   "folders/undoGuardedChange": "host",
+  "forge/approve": "host",
+  "forge/close": "host",
+  "forge/comment": "host",
+  "forge/diff": "host",
   "forge/issue": "host",
   "forge/issues": "host",
+  "forge/label": "host",
+  "forge/labels": "host",
+  "forge/log": "host",
+  "forge/merge": "host",
   "forge/pull": "host",
   "forge/pulls": "host",
+  "forge/rerun": "host",
   "governance/approvals": "control",
   "governance/decide": "control",
   "governance/request": "control",
@@ -10366,16 +10516,30 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FolderWorktrees: { required: ["worktrees", "folder"], optional: [] },
   FoldersFindRequest: { required: [], optional: ["paths", "folders"] },
   FoldersListRequest: { required: ["includeArchived"], optional: [] },
+  ForgeApproveRequest: { required: ["node", "sha"], optional: [] },
   ForgeCheck: { required: ["name", "state"], optional: ["url"] },
+  ForgeCloseRequest: { required: ["node"], optional: ["reopen"] },
   ForgeComment: { required: ["author", "body", "at"], optional: ["url", "bot"] },
+  ForgeCommentRequest: { required: ["node", "body"], optional: [] },
+  ForgeDiff: { required: ["files", "cut"], optional: ["url"] },
+  ForgeDiffFile: { required: ["path", "change", "additions", "deletions", "hunks"], optional: ["previousPath", "note"] },
+  ForgeDiffHunk: { required: ["oldStart", "newStart", "lines"], optional: [] },
+  ForgeDone: { required: [], optional: ["url", "auto", "reran"] },
   ForgeItem: { required: ["node", "title", "state", "labels", "assignees", "updatedAt", "comments"], optional: ["url", "folder", "author", "milestone", "draft", "checks", "review", "mergeable", "autoMerge"] },
-  ForgeItemDetail: { required: ["item", "body", "comments"], optional: ["cursor", "checks", "reviewThreads", "filesChanged"] },
+  ForgeItemDetail: { required: ["item", "body", "comments"], optional: ["cursor", "checks", "reviewThreads", "filesChanged", "head", "mergeMethods", "start"] },
   ForgeItemRequest: { required: ["node"], optional: ["cursor"] },
   ForgeLabel: { required: ["name"], optional: ["color"] },
+  ForgeLabelRequest: { required: ["node"], optional: ["add", "remove"] },
+  ForgeLabels: { required: ["labels"], optional: [] },
   ForgeList: { required: ["items"], optional: ["cursor", "errors"] },
   ForgeListError: { required: ["forge", "message"], optional: [] },
   ForgeListRequest: { required: [], optional: ["folder", "state", "label", "assignee", "query", "cursor", "limit"] },
+  ForgeLog: { required: ["text"], optional: [] },
+  ForgeLogRequest: { required: ["node"], optional: ["check"] },
   ForgeLogins: { required: [], optional: ["github", "gitlab", "linear"] },
+  ForgeMergeRequest: { required: ["node", "sha"], optional: ["method", "auto"] },
+  ForgeNodeRequest: { required: ["node"], optional: [] },
+  ForgeStart: { required: ["prompt", "labels"], optional: ["worktree"] },
   FoundFolder: { required: ["folder", "exists", "isRepository", "isFolder"], optional: ["typed"] },
   GitAsk: { required: ["server", "from"], optional: [] },
   GitCredential: { required: ["username", "password"], optional: [] },

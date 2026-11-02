@@ -2,7 +2,9 @@
 // forge/issues and forge/pulls on each machine, one row per ref, with what lineage knows about it
 // (reports/nodes: cost, sessions, lead time) on top. Milestones and releases come from reports/nodes
 // alone in v1. As WorkList has it on the window.
-import type { ForgeCheck, ForgeItem, ForgeLabel, ForgeListError, LineageCostRollup, LineageLink, LineageNode, ReportNode } from "../protocol/generated";
+import type {
+  ForgeCheck, ForgeDone, ForgeItem, ForgeItemDetail, ForgeLabel, ForgeListError, ForgeMergeMethod, LineageCostRollup, LineageLink, LineageNode, ReportNode,
+} from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import { costWords, nodeName, spent } from "./value";
 import { lineageUrl } from "./lineage";
@@ -287,3 +289,34 @@ export function peopleWords(item: Pick<ForgeItem, "author" | "assignees" | "mile
 
 export const noAgentOnIt = "No agent has worked on this yet.";
 export const notReadHere = "No machine could read this from its forge.";
+
+// Actions (#3130), as WorkList's on the Mac.
+
+/** A merge method's button, as GitHub says it. */
+export const mergeTitle: Record<ForgeMergeMethod, string> = { merge: "Create a merge commit", squash: "Squash and merge", rebase: "Rebase and merge" };
+
+/** The merge button's words: its method, and "when checks pass" while some still run, as the merge then waits for them. */
+export const mergeButton = (method: ForgeMergeMethod | undefined, waits: boolean) =>
+  (method ? mergeTitle[method] : "Merge") + (waits ? " when checks pass" : "");
+
+/** Whether a merge waits for checks still running: auto-merge, as the forge does it. */
+export const mergeWaits = (d: ForgeItemDetail) => d.item.checks === "running" || (d.checks ?? []).some((c) => c.state === "running");
+
+/** The failed checks, which Rerun runs again and whose logs a person reads. */
+export const failedChecks = (d: ForgeItemDetail) => (d.checks ?? []).filter((c) => c.state === "failing");
+
+/** What a write did, for the line under the actions. */
+export function doneWords(method: string, done: ForgeDone, reopened = false): string {
+  switch (method) {
+    case "forge/comment": return "Commented.";
+    case "forge/label": return "Labels changed.";
+    case "forge/merge": return done.auto ? "Auto-merge is on: it merges when its checks pass." : "Merged.";
+    case "forge/approve": return "Approved.";
+    case "forge/close": return reopened ? "Reopened." : "Closed.";
+    case "forge/rerun": return done.reran === undefined ? "Started again." : done.reran === 1 ? "1 run started again." : `${done.reran} runs started again.`;
+    default: return "Done.";
+  }
+}
+
+/** Close or Reopen, by the item's state. */
+export const closeTitle = (state: string) => state === "open" ? "Close" : "Reopen";

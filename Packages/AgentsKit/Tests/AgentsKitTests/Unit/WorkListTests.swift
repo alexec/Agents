@@ -147,6 +147,35 @@ struct WorkPageTests {
         #expect(WorkList.pageCostWords(none) == nil)
     }
 
+    /// #3130: the page's actions say what each does, as the web page's do.
+    @Test func theActionsSayWhatTheyDo() {
+        #expect(WorkList.mergeButton(.squash, waits: false) == "Squash and merge")
+        #expect(WorkList.mergeButton(nil, waits: true) == "Merge when checks pass")
+        let item = DaemonAPI.ForgeItem(node: pr, title: "T", state: "open", updatedAt: at, checks: "passing")
+        let running = DaemonAPI.ForgeItemDetail(item: item, checks: [.init(name: "a", state: "running"), .init(name: "b", state: "failing")])
+        #expect(WorkList.mergeWaits(running))
+        #expect(!WorkList.mergeWaits(DaemonAPI.ForgeItemDetail(item: item, checks: [.init(name: "a", state: "passing")])))
+        #expect(WorkList.failedChecks(running).map(\.name) == ["b"])
+        #expect(WorkList.doneWords(DaemonAPI.Method.forgeMerge, .init(auto: true)) == "Auto-merge is on: it merges when its checks pass.")
+        #expect(WorkList.doneWords(DaemonAPI.Method.forgeRerun, .init(reran: 2)) == "2 runs started again.")
+        #expect(WorkList.doneWords(DaemonAPI.Method.forgeClose, .init(), reopened: true) == "Reopened.")
+        #expect(WorkList.closeTitle("open") == "Close")
+        #expect(WorkList.closeTitle("closed") == "Reopen")
+    }
+
+    /// #3130: a pull request's diff from the forge is the diff a view gives the app's diff page.
+    @Test func aForgeDiffIsTheViewsDiff() throws {
+        let diff = DaemonAPI.ForgeDiff(url: "https://github.com/o/r/pull/1/files", files: [
+            .init(path: "a.go", additions: 1, hunks: [.init(oldStart: 0, newStart: 3, lines: [DiffLine(kind: .added, text: "x")])]),
+            .init(path: "b.png", note: "binary"),
+        ], cut: true)
+        let page = diff.appViewDiff(title: "#1 T")
+        #expect(page.title == "#1 T" && page.cut && page.url?.host == "github.com")
+        try #require(page.files.map(\.path) == ["a.go", "b.png"])
+        #expect(page.files[0].hunks.first?.oldStart == 1 && page.files[0].hunks.first?.lines.first?.kind == .added)
+        #expect(page.files[1].note == "binary")
+    }
+
     @Test func aPlaceIsAListOrAPage() {
         #expect(WorkPlace(kind: .pr).node == nil)
         #expect(WorkPlace(kind: .pr, ref: pr.ref).node == pr)

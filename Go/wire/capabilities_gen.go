@@ -53,6 +53,7 @@ const CapFiles1 = "files/1"
 const CapFolder1 = "folder/1"
 const CapFoldersToMachine1 = "folders.to-machine/1"
 const CapFolders1 = "folders/1"
+const CapForgeWrite1 = "forge-write/1"
 const CapForge1 = "forge/1"
 const CapGit1 = "git/1"
 const CapGovernance1 = "governance/1"
@@ -275,10 +276,19 @@ var HostCapabilities = pairs([][2]string{
 	{"folders/setProject", "projects/1"},
 	{"folders/unarchive", "folders/1"},
 	{"folders/undoGuardedChange", "folders/1"},
+	{"forge/approve", "forge-write/1"},
+	{"forge/close", "forge-write/1"},
+	{"forge/comment", "forge-write/1"},
+	{"forge/diff", "forge-write/1"},
 	{"forge/issue", "forge/1"},
 	{"forge/issues", "forge/1"},
+	{"forge/label", "forge-write/1"},
+	{"forge/labels", "forge-write/1"},
+	{"forge/log", "forge-write/1"},
+	{"forge/merge", "forge-write/1"},
 	{"forge/pull", "forge/1"},
 	{"forge/pulls", "forge/1"},
+	{"forge/rerun", "forge-write/1"},
 	{"git/fill", "git/1"},
 	{"lineage/cost", "lineage/1"},
 	{"lineage/end", "lineage/1"},

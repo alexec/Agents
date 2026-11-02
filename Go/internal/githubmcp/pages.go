@@ -775,40 +775,7 @@ func checkSha(sha string) error {
 // its checks pass. It never touches a local branch. sha is the head commit the person saw:
 // when the head is another commit, GitHub merges nothing.
 func (g *RealGitHub) MergePR(ctx context.Context, repo string, number int, sha string, auto bool) (map[string]any, error) {
-	if _, _, err := ownerName(repo); err != nil {
-		return nil, err
-	}
-	if err := checkSha(sha); err != nil {
-		return nil, err
-	}
-	var p struct {
-		NodeID string `json:"node_id"`
-		Head   ref    `json:"head"`
-	}
-	if err := g.get(ctx, fmt.Sprintf("repos/%s/pulls/%d", repo, number), false, &p); err != nil {
-		return nil, err
-	}
-	if p.Head.Sha != sha {
-		return nil, headChanged(number)
-	}
-	if auto {
-		const enable = `mutation($id: ID!, $sha: GitObjectID!) { enablePullRequestAutoMerge(input: {pullRequestId: $id,
-  mergeMethod: SQUASH, expectedHeadOid: $sha}) { pullRequest { number } } }`
-		var out struct{}
-		if err := g.graphql(ctx, enable, map[string]any{"id": p.NodeID, "sha": sha}, &out); err != nil {
-			return nil, err
-		}
-		return map[string]any{"merged": false, "auto": true, "url": prURL(repo, number)}, nil
-	}
-	body, _ := json.Marshal(map[string]string{"merge_method": "squash", "sha": sha})
-	if _, err := g.do(ctx, http.MethodPut, fmt.Sprintf("repos/%s/pulls/%d/merge", repo, number), body, false); err != nil {
-		return nil, err
-	}
-	// Its branch goes when it is this repo's own, as --delete-branch does.
-	if p.Head.Repo != nil && p.Head.Repo.FullName == repo && p.Head.Ref != "" {
-		_, _ = g.do(ctx, http.MethodDelete, fmt.Sprintf("repos/%s/git/refs/heads/%s", repo, p.Head.Ref), nil, false)
-	}
-	return map[string]any{"merged": true, "auto": false, "url": prURL(repo, number)}, nil
+	return g.MergeBy(ctx, repo, number, sha, "squash", auto)
 }
 
 // ReviewPR reviews the head commit the person saw (sha). When the head is another commit,
