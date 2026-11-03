@@ -62,6 +62,9 @@ public final class AgentsModel {
     /// Each folder's servers' list views (#2032), the hidden ones marked, kept current by
     /// `pins/changed`. A folder with none is absent.
     @ObservationIgnored public private(set) var serverViews: [URL: [PinView]] = [:]
+    /// Each folder's pull requests waiting for the person's approval (#3330), kept current by
+    /// `pins/changed`. A folder with none is absent.
+    @ObservationIgnored public private(set) var reviewPulls: [URL: [ReviewPull]] = [:]
     /// Bumped by `pages/changed`: a page a screen may be showing changed on disk. Whoever
     /// shows one reads it again, with its stamp, so an unchanged file costs nothing.
     public private(set) var pageRevisions: [URL: [String: Int]] = [:]
@@ -673,6 +676,9 @@ public final class AgentsModel {
             let views = notification.views ?? []
             serverViews[folder] = views.isEmpty ? nil : views
             pinShelves[folder]?.setViews(views)
+            let reviews = notification.reviews ?? []
+            reviewPulls[folder] = reviews.isEmpty ? nil : reviews
+            pinShelves[folder]?.setReviews(reviews)
             pinShelves[folder]?.setPins(notification.pins)
             pinShelves[folder]?.setSessions(sessions)
             pinShelves[folder]?.setWorkflows(flows)
@@ -855,6 +861,21 @@ public final class AgentsModel {
         pins(in: folder).first { $0.path == path } ?? serverViews(in: folder).first { $0.path == path }
     }
 
+    /// One folder's pull requests waiting for the person's approval (#3330), newest first.
+    public func reviewPulls(in folder: URL?) -> [ReviewPull] {
+        guard let folder else { return [] }
+        return pinShelf(folder).reviews
+    }
+
+    /// A pull request dismissed from For Review as a screen left it, before the host says so.
+    public func dismissReview(_ url: URL, in folder: URL) {
+        let key = Folder.standardize(folder)
+        guard var reviews = reviewPulls[key] else { return }
+        reviews.removeAll { $0.url == url }
+        reviewPulls[key] = reviews.isEmpty ? nil : reviews
+        pinShelves[key]?.setReviews(reviews)
+    }
+
     /// A server view hidden or shown as a screen left it, before the host says so.
     public func setViewHidden(_ uri: String, _ hidden: Bool, in folder: URL) {
         let key = Folder.standardize(folder)
@@ -879,8 +900,13 @@ public final class AgentsModel {
             listed.views.flatMap { $0.isEmpty ? nil : (Folder.standardize(listed.folder), $0) }
         }, uniquingKeysWith: { $1 })
         if serverViews != views { serverViews = views }
+        let reviews = Dictionary(listed.compactMap { listed in
+            listed.reviews.flatMap { $0.isEmpty ? nil : (Folder.standardize(listed.folder), $0) }
+        }, uniquingKeysWith: { $1 })
+        if reviewPulls != reviews { reviewPulls = reviews }
         for (folder, shelf) in pinShelves {
             shelf.setViews(serverViews[folder] ?? [])
+            shelf.setReviews(reviewPulls[folder] ?? [])
             shelf.setPins(pins[folder] ?? [])
             shelf.setSessions(sessionPins[folder] ?? [])
             shelf.setWorkflows(workflowPins[folder] ?? [])
@@ -929,6 +955,7 @@ public final class AgentsModel {
         if let shelf = pinShelves[key] { return shelf }
         let shelf = PinShelf()
         shelf.setViews(serverViews[key] ?? [])
+        shelf.setReviews(reviewPulls[key] ?? [])
         shelf.setPins(pins[key] ?? [])
         shelf.setSessions(sessionPins[key] ?? [])
         shelf.setWorkflows(workflowPins[key] ?? [])

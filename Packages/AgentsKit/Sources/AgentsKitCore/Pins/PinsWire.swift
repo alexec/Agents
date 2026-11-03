@@ -28,6 +28,8 @@ public extension DaemonAPI.Method {
     static let pinsUnpinWorkflow = "pins/unpinWorkflow"
     /// A person's drop or Move item among the pinned workflows: the whole new order.
     static let pinsArrangeWorkflows = "pins/arrangeWorkflows"
+    /// A person's Dismiss on a pull request in For Review (#3330): it is not listed again.
+    static let reviewsDismiss = "reviews/dismiss"
 }
 
 public extension DaemonAPI.Notification {
@@ -168,14 +170,28 @@ public extension DaemonAPI {
         public var workflows: [String]?
         /// The servers' list views (#2032), the hidden ones marked. Nil from a host with none.
         public var views: [PinView]?
+        /// Its pull requests waiting for the person's approval (#3330). Nil from a host with none.
+        public var reviews: [ReviewPull]?
 
         public init(folder: URL, pins: [PinView], sessions: [UUID] = [], workflows: [String] = [],
-                    views: [PinView] = []) {
+                    views: [PinView] = [], reviews: [ReviewPull] = []) {
             self.folder = folder
             self.pins = pins
             self.sessions = sessions.isEmpty ? nil : sessions
             self.workflows = workflows.isEmpty ? nil : workflows
             self.views = views.isEmpty ? nil : views
+            self.reviews = reviews.isEmpty ? nil : reviews
+        }
+    }
+
+    /// A person's Dismiss on a pull request in For Review (#3330), by its page's address.
+    struct ReviewDismissRequest: Codable, Sendable, Hashable {
+        public var folder: URL
+        public var url: URL
+
+        public init(folder: URL, url: URL) {
+            self.folder = folder
+            self.url = url
         }
     }
 

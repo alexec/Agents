@@ -6320,6 +6320,32 @@
       }
     },
     {
+      "name": "reviews/dismiss",
+      "x-capability": "reviews/1",
+      "description": "Take a pull request out of the sidebar's For Review (#3330) for good: the host keeps the dismissal.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ReviewDismissRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "runtime/account",
       "x-capability": "runtime/1",
       "x-notification": true,

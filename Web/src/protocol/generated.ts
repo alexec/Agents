@@ -3420,6 +3420,11 @@ export interface FolderPins {
   sessions?: UUID[];
   workflows?: string[];
   views?: PinView[];
+  /**
+   * Its open pull requests waiting for the person's approval (#3330), newest first. Nil from a host
+   * with none.
+   */
+  reviews?: ReviewPull[];
 }
 
 export interface FolderPlugin {
@@ -6230,6 +6235,11 @@ export interface PinsChangedNotification {
   sessions?: UUID[];
   workflows?: string[];
   views?: PinView[];
+  /**
+   * Its open pull requests waiting for the person's approval (#3330), newest first. Nil from a host
+   * with none.
+   */
+  reviews?: ReviewPull[];
 }
 
 export interface Plan {
@@ -7569,6 +7579,31 @@ export interface RetentionState {
   settings: RetentionSettings;
   archivedCount: number;
   archivedBytes: number;
+}
+
+/**
+ * reviews/dismiss (#3330): a person's Dismiss on a pull request in the sidebar's For Review. The
+ * host keeps it, so that pull request is not listed again.
+ */
+export interface ReviewDismissRequest {
+  folder: URLString;
+  /** The pull request's page, as its ReviewPull says it. */
+  url: URLString;
+}
+
+/**
+ * An open pull request labelled needs-approval, a UI change waiting for the person (#2811), in the
+ * sidebar's For Review (#3330) until it is labelled approved or changes-wanted, is closed, or is
+ * dismissed.
+ */
+export interface ReviewPull {
+  url: URLString;
+  number: number;
+  title: string;
+  /** owner/name. */
+  repo: string;
+  author?: string;
+  updatedAt: WireDate;
 }
 
 export interface Runtime {
@@ -10242,6 +10277,7 @@ export interface Methods {
   "reports/value": { params: ReportQuery; result: ReportValue };
   "reports/views": { params: Empty; result: ReportViews };
   "resources/snapshot": { params: Empty; result: LeaseSnapshot };
+  "reviews/dismiss": { params: ReviewDismissRequest; result: Empty };
   "runtimes/accountProfiles": { params: Empty; result: AccountProfile[] };
   "runtimes/accounts": { params: Empty; result: RuntimeAccount[] };
   "runtimes/addAccount": { params: AddAccountRequest; result: AccountProfile };
@@ -10565,6 +10601,7 @@ export const MethodTarget = {
   "reports/value": "control",
   "reports/views": "control",
   "resources/snapshot": "host",
+  "reviews/dismiss": "host",
   "runtimes/accountProfiles": "host",
   "runtimes/accounts": "host",
   "runtimes/addAccount": "host",
@@ -10982,7 +11019,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FolderDetection: { required: ["enabled", "paths"], optional: [] },
   FolderHunk: { required: ["oldStart", "newStart", "noNewlineAtEnd", "lines"], optional: [] },
   FolderMCPServer: { required: ["name", "summary", "approval", "missingSecrets", "secretNames", "entryDigest"], optional: ["managed", "signIn", "views"] },
-  FolderPins: { required: ["folder", "pins"], optional: ["sessions", "workflows", "views"] },
+  FolderPins: { required: ["folder", "pins"], optional: ["sessions", "workflows", "views", "reviews"] },
   FolderPlugin: { required: ["folder", "name", "carries", "folderPath"], optional: ["awaitingApproval"] },
   FolderRemovedNotification: { required: ["folder"], optional: [] },
   FolderRequest: { required: ["folder"], optional: [] },
@@ -11252,7 +11289,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PingResponse: { required: ["ok"], optional: [] },
   PinnedPersonKey: { required: ["key", "keyID", "from", "at"], optional: [] },
   PinnerView: { required: ["kind", "id", "name"], optional: [] },
-  PinsChangedNotification: { required: ["folder", "pins"], optional: ["sessions", "workflows", "views"] },
+  PinsChangedNotification: { required: ["folder", "pins"], optional: ["sessions", "workflows", "views", "reviews"] },
   Plan: { required: ["entries", "state", "at"], optional: ["planID"] },
   PlanEntry: { required: ["content", "priority", "status"], optional: [] },
   PluginApproveRequest: { required: ["plugin", "digest"], optional: [] },
@@ -11381,6 +11418,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RetentionSetResult: { required: ["applied"], optional: ["wouldDelete", "state"] },
   RetentionSettings: { required: ["keepFor"], optional: [] },
   RetentionState: { required: ["settings", "archivedCount", "archivedBytes"], optional: [] },
+  ReviewDismissRequest: { required: ["folder", "url"], optional: [] },
+  ReviewPull: { required: ["url", "number", "title", "repo", "updatedAt"], optional: ["author"] },
   Runtime: { required: ["id", "name", "executable", "arguments", "installPage", "usesAppCopyOnly"], optional: ["install", "accountFolderVariable"] },
   RuntimeAccount: { required: ["runtimeID", "state", "authMethods", "canLogOut", "providers", "promptCapabilities", "canSteer", "checkedAt"], optional: ["currentProviderID", "signedInAs"] },
   RuntimeAllowances: { required: ["rows", "at"], optional: ["shared"] },

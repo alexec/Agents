@@ -49,6 +49,9 @@ struct SmartFold: View {
                                             place: place(of: item.folder))
                         }
                     }
+                    ForEach(row.pulls(in: model.work, folders: folders, query: query), id: \.pull.id) { item in
+                        ReviewPullListRow(pull: item.pull, folder: item.folder, place: place(of: item.folder))
+                    }
                 }
             }
         } header: {
@@ -165,6 +168,44 @@ private struct ApprovalListRow: View {
     /// From the menu, of the version the row was drawn from: a later change is refused.
     private func answerNow(_ action: Approval.Action) {
         Task { await model.settleApproval(approval, action, for: folder) }
+    }
+}
+
+/// A pull request waiting for the person's approval, under For Review (#3330). A click opens
+/// its page, with its screenshots, in the browser; Dismiss, on hover and in its menu, takes
+/// it out for good.
+private struct ReviewPullListRow: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.openURL) private var openURL
+    let pull: ReviewPull
+    let folder: FolderKey
+    let place: String?
+    @State private var hovering = false
+
+    var body: some View {
+        ReviewPullRowLabel(pull: pull, place: place)
+            .opacity(hovering ? 0.35 : 1)
+            .overlay(alignment: .trailing) {
+                if hovering {
+                    Button("Dismiss", action: dismiss)
+                        .buttonStyle(.borderless)
+                        .appText(.fine)
+                        .help("Take this pull request out of For Review")
+                }
+            }
+            .help("\(pull.title) · Pull request #\(pull.number) · \(pull.repo)")
+            .onHover { hovering = $0 }
+            .onTapGesture { openURL(pull.url) }
+            .contextMenu {
+                Button("Open Pull Request") { openURL(pull.url) }
+                Button("Dismiss", action: dismiss)
+            }
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction(named: "Dismiss", dismiss)
+    }
+
+    private func dismiss() {
+        Task { await model.dismissReview(pull, in: folder) }
     }
 }
 

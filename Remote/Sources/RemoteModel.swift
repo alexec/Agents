@@ -3687,6 +3687,18 @@ final class RemoteModel {
     /// The folder's servers' list views (#2032), the hidden ones too.
     func serverViews(in folder: URL?) -> [PinView] { work.serverViews(in: folder) }
 
+    /// Dismiss on a pull request in For Review (#3330): gone at once, then the host told,
+    /// which keeps it out for good.
+    func dismissReview(_ pull: ReviewPull, in folder: URL) async {
+        work.dismissReview(pull.url, in: folder)
+        do {
+            try await client.call(DaemonAPI.Method.reviewsDismiss,
+                                  DaemonAPI.ReviewDismissRequest(folder: folder, url: pull.url))
+        } catch {
+            problem = sentence(for: error)
+        }
+    }
+
     /// Hide or Show on a server's list view (#2032): shown at once, then the host told.
     func setViewHidden(_ uri: String, _ hidden: Bool, in folder: URL) async {
         work.setViewHidden(uri, hidden, in: folder)

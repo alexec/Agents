@@ -525,6 +525,30 @@ struct SidebarModelTests {
         #expect(SidebarSmartRow.keptInUnread(read.id, in: model, on: noReview, keptBy: .forReview) == nil)
     }
 
+    /// For Review lists, after its sessions, each folder's pull requests waiting for the
+    /// person's approval (#3330), newest first, and counts them; a search matches their
+    /// title, repo and number; Dismiss takes one out at once.
+    @Test func forReviewListsPullRequestsWaitingForApproval() {
+        let model = AgentsModel()
+        let older = ReviewPull(url: URL(string: "https://github.com/alexec/agents/pull/1")!, number: 1,
+                               title: "Sidebar: For Review", repo: "alexec/agents", updatedAt: t0)
+        let newer = ReviewPull(url: URL(string: "https://github.com/alexec/agents/pull/2")!, number: 2,
+                               title: "Chat: a new prompt bar", repo: "alexec/agents", updatedAt: t0.addingTimeInterval(60))
+        model.replacePins([FolderPins(folder: api, pins: [], reviews: [older, newer])])
+        let folders = [key]
+
+        #expect(SidebarSmartRow.forReview.pulls(in: model, folders: folders).map(\.pull.number) == [2, 1])
+        #expect(SidebarSmartRow.forReview.count(in: model, folders: folders) == 2)
+        #expect(SidebarSmartRow.forReview.isShown(in: model, folders: folders))
+        #expect(SidebarSmartRow.needsYou.pulls(in: model, folders: folders).isEmpty)
+        #expect(SidebarSmartRow.forReview.pulls(in: model, folders: folders, query: "prompt").map(\.pull.number) == [2])
+        #expect(SidebarSmartRow.forReview.pulls(in: model, folders: folders, query: "#1").map(\.pull.number) == [1])
+
+        model.dismissReview(newer.url, in: api)
+        #expect(SidebarSmartRow.forReview.pulls(in: model, folders: folders).map(\.pull.number) == [1])
+        #expect(SidebarSmartRow.forReview.count(in: model, folders: folders) == 1)
+    }
+
     /// A smart group turned off (#846) is not drawn, and its sessions go to the next group
     /// they fit, or under their folder: still listed once, none left out.
     @Test func aGroupTurnedOffPassesItsSessionsOn() {
