@@ -57,6 +57,12 @@ struct WorkItemPage: View {
                 }
                 #endif
                 if let detail { bodyAndComments(detail.got, on: detail.host) }
+                #if os(macOS)
+                // The docs it names and those like it (#3322): Mac + web, so not on the Remote (#2796).
+                if let detail, detail.got.item.node.kind == "issue" || detail.got.item.node.kind == "pr" {
+                    WorkDocsSection(item: detail.got.item, text: detail.got.body, asked: asked)
+                }
+                #endif
                 lineage
             }
             .padding(compact ? 16 : 20)
