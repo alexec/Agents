@@ -36,9 +36,8 @@ func nextLiveFrame(t *testing.T, c *conn, wait time.Duration) *wire.DesktopContr
 func TestTheLiveTileGoesOnlyToClientsShowingTheAgent(t *testing.T) {
 	prepareDrive(t)
 	fakeRuntimes(t)
-	old := liveFrameIdle
-	liveFrameIdle = 50 * time.Millisecond
-	t.Cleanup(func() { liveFrameIdle = old })
+	old := liveFrameIdle.Swap(int64(50 * time.Millisecond))
+	t.Cleanup(func() { liveFrameIdle.Store(old) })
 	d, showing := start(t, t.TempDir())
 	defer d.Shutdown()
 	other := newConn()

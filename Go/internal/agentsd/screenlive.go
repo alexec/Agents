@@ -1,6 +1,7 @@
 package agentsd
 
 import (
+	"sync/atomic"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/safe"
@@ -17,12 +18,17 @@ import (
 // (FR-012): nothing is captured at all.
 
 // liveFrameIdle is how often the tile is refreshed while drive_screen is idle: under
-// FR-011's 5 seconds. A var so a test can shorten it.
-var liveFrameIdle = 4 * time.Second
+// FR-011's 5 seconds. Atomic, so a test can shorten it while an earlier test's watch
+// still reads it.
+var liveFrameIdle = func() *atomic.Int64 {
+	var v atomic.Int64
+	v.Store(int64(4 * time.Second))
+	return &v
+}()
 
 // watchLive sends this agent's idle frames until its agents-drive stops.
 func (d *Daemon) watchLive(agent wire.UUID, p *driveProcess) {
-	t := time.NewTicker(liveFrameIdle)
+	t := time.NewTicker(time.Duration(liveFrameIdle.Load()))
 	defer t.Stop()
 	for {
 		select {
