@@ -218,7 +218,10 @@ type Providers struct {
 	idleStopping map[string]int
 	// "Stopped by Agents after 30 minutes idle", until it is started again.
 	stoppedBy map[string]string
-	joining   map[string]*joining
+	// Codespaces whose host was started over ssh since they were last seen not running
+	// (#3348): one try each time one starts.
+	broughtBack map[string]bool
+	joining     map[string]*joining
 	done      chan struct{}
 	stopOnce  sync.Once
 }
@@ -262,7 +265,7 @@ func NewProviders(cfg Config) *Providers {
 		providers: map[string]heldProvider{}, connections: map[string]Provider{}, listed: map[string]*listed{},
 		activities: map[string]*activity{}, problems: map[string]string{}, statuses: map[string]MachineStatus{},
 		idleTimers: map[string]*time.Timer{}, idleStopping: map[string]int{}, stoppedBy: map[string]string{},
-		joining: map[string]*joining{}, done: make(chan struct{})}
+		broughtBack: map[string]bool{}, joining: map[string]*joining{}, done: make(chan struct{})}
 }
 
 // KeepWith keeps prompts and starts for this control plane's stopped hosts (US3).
@@ -1113,6 +1116,65 @@ func (p *Providers) Refresh(only string) {
 		p.mu.Unlock()
 	}
 	p.changed()
+	p.bringBack()
+}
+
+// startsNoHost is whether a preset's workspaces never start their host by themselves: a
+// codespace has no systemd, so after a stop and a start its host is down (#3348).
+func startsNoHost(preset string) bool { return preset == "codespaces" || preset == "codespaces-api" }
+
+// bringBack starts over ssh the host of each linked codespace that a list says is
+// running, while its host is offline and no start or stop is under way (#3348): one
+// started from GitHub, not from Agents, or whose start here ended before its host came
+// back. One try each time it starts: a codespace listed not running may be tried again.
+func (p *Providers) bringBack() {
+	type due struct {
+		host        records.MachineRecord
+		destination string
+	}
+	var all []due
+	for _, h := range p.records.Hosts() {
+		link := LinkOf(&h)
+		if link == nil {
+			continue
+		}
+		p.mu.Lock()
+		held, known := p.providers[link.Provider]
+		w := p.workspaceLocked(*link)
+		busy := p.activities[h.ID] != nil
+		if !known || !startsNoHost(held.record.preset()) || w == nil {
+			p.mu.Unlock()
+			continue
+		}
+		if w.State != string(workspacecommands.Running) {
+			delete(p.broughtBack, h.ID)
+			p.mu.Unlock()
+			continue
+		}
+		tried := p.broughtBack[h.ID]
+		p.mu.Unlock()
+		if tried || busy || p.router.Online(h.ID) || p.suspendedOwner(h.ID) {
+			continue
+		}
+		destination := p.sshDestination(*link, h.ID)
+		if destination == "" {
+			continue
+		}
+		p.mu.Lock()
+		p.broughtBack[h.ID] = true
+		p.mu.Unlock()
+		all = append(all, due{h, destination})
+	}
+	for _, d := range all {
+		go func() {
+			p.hooks.OpenTunnel(d.host.ID)
+			if err := p.hooks.SSHStart(d.host, d.destination, false); err != nil {
+				p.log(fmt.Sprintf("workspace: ssh start %s, running with its host offline: failed: %s", d.host.Name, errorWords(err)))
+				return
+			}
+			p.log(fmt.Sprintf("workspace: ssh start %s, running with its host offline: ok", d.host.Name))
+		}()
+	}
 }
 
 // connection is a provider's connection, made when there is none.

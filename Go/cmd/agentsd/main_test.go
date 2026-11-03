@@ -38,6 +38,31 @@ func TestOneHostPerRoot(t *testing.T) {
 	}
 }
 
+// A second --detach leaves a running host alone (#3348), and starts one once the lock is
+// free: no file, or a host that has stopped.
+func TestADetachedStartSeesARunningHost(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "daemon.lock")
+	if running(file, 0) {
+		t.Fatal("no lock file, but running")
+	}
+	a, err := takeLock(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !running(file, 0) {
+		t.Fatal("held, but not running")
+	}
+	a.Close()
+	if running(file, 0) {
+		t.Fatal("let go, but running")
+	}
+	if b, err := takeLock(file); err != nil {
+		t.Fatalf("running took the lock: %v", err)
+	} else {
+		b.Close()
+	}
+}
+
 // launchd starts the Mac's host with /dev/null for stdout: not a terminal, so the log goes
 // to the root's daemon.log (#1392).
 func TestDevNullIsNotATerminal(t *testing.T) {

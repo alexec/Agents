@@ -949,3 +949,56 @@ func TestADoctlProviderGivesNoCodespaceToken(t *testing.T) {
 		t.Errorf("%q %q", name, token)
 	}
 }
+
+// A codespace started from GitHub, not from Agents, has no host running: it has no systemd
+// (#3348). A list that finds it running with its host offline starts the host over ssh,
+// once each time it starts.
+func TestARunningCodespaceWithItsHostOfflineIsStartedOverSSH(t *testing.T) {
+	h := newHarness(t, func(o *harnessOptions) {
+		o.workspaces = []MachineInfo{{ID: "fuzzy-space", Name: "fuzzy", State: "running", SSH: new("cs.fuzzy-space.main")}}
+	})
+	out := h.must(MethodProvidersAdd, map[string]any{"name": "Codespaces", "kind": "commands",
+		"commands": map[string]any{"preset": "codespaces-api"}, "secrets": map[string]string{"GITHUB_TOKEN": "ghp_test"}})
+	id := string(out.(ProviderSummary).ID)
+	h.link(id, devbox, "fuzzy-space")
+	if !eventually(t, func() bool { return len(h.ssh.all()) == 1 }) {
+		t.Fatalf("ssh %v", h.ssh.all())
+	}
+	// Listed again, still running and offline: not tried again.
+	h.providers.Refresh(id)
+	time.Sleep(50 * time.Millisecond)
+	if got := h.ssh.all(); !reflect.DeepEqual(got, []string{"cs.fuzzy-space.main"}) {
+		t.Fatalf("ssh %v", got)
+	}
+	// Stopped and started again from GitHub: tried again.
+	h.provider.setStateLocked("fuzzy-space", "stopped")
+	h.providers.Refresh(id)
+	h.provider.setStateLocked("fuzzy-space", "running")
+	h.providers.Refresh(id)
+	if !eventually(t, func() bool { return len(h.ssh.all()) == 2 }) {
+		t.Fatalf("ssh %v", h.ssh.all())
+	}
+	// Online: nothing to start.
+	h.router.setOnline(devbox, true)
+	h.provider.setStateLocked("fuzzy-space", "stopped")
+	h.providers.Refresh(id)
+	h.provider.setStateLocked("fuzzy-space", "running")
+	h.providers.Refresh(id)
+	time.Sleep(50 * time.Millisecond)
+	if got := h.ssh.all(); len(got) != 2 {
+		t.Fatalf("ssh %v", got)
+	}
+}
+
+// A workspace that starts its own host (systemd, a boot script) is left to do it.
+func TestARunningWorkspaceThatStartsItsOwnHostIsNotStartedOverSSH(t *testing.T) {
+	h := newHarness(t, func(o *harnessOptions) {
+		o.workspaces = []MachineInfo{{ID: "ws-1", Name: "ws-1", State: "running", SSH: new("root@203.0.113.7")}}
+	})
+	h.link(h.add(), devbox, "ws-1")
+	h.waitFor("offline", devbox, 5, func(r row) bool { return r.Workspace.WorkspaceState == "running" })
+	time.Sleep(50 * time.Millisecond)
+	if got := h.ssh.all(); len(got) != 0 {
+		t.Fatalf("ssh %v", got)
+	}
+}
