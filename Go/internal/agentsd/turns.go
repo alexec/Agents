@@ -1001,6 +1001,7 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 	last, reported, showedFile, held := l.lastMessage.String(), l.reported, l.showedFile, l.heldBlock
 	l.heldBlock = nil
 	l.mu.Unlock()
+	d.noteDocLinks(l.id, last)
 	// The report says the last message as the transcript does: whole, so a token in it,
 	// or split across its chunks, is cut out (#1001).
 	last = redact.Text(last)
@@ -1296,13 +1297,17 @@ func (l *live) Update(n sdk.SessionNotification) {
 		if id != nil {
 			mid = *id
 		}
+		said := ""
 		if mid != l.lastMessageID {
+			said = l.lastMessage.String()
 			l.lastMessage.Reset()
 			l.lastMessageID = mid
 		}
 		l.lastMessage.WriteString(text)
 		l.evidence.takeReply(text)
 		l.mu.Unlock()
+		// The docs a message names, once it is whole (#3308).
+		d.noteDocLinks(l.id, said)
 		// The end that could start a token waits for the next chunk (#1001).
 		earlier, now := l.holdChunk(id, text)
 		if earlier != nil {
@@ -1315,17 +1320,21 @@ func (l *live) Update(n sdk.SessionNotification) {
 		call := toolCall(u.ToolCall)
 		d.record(l.id, wire.TranscriptEntryKind{ToolCall: &wire.TranscriptEntryKindToolCall{Value: call}})
 		d.noteAgentViewCall(l.id, call)
+		d.noteDocRead(l.id, call)
 		l.mu.Lock()
 		l.evidence.takeCall(call)
+		said := l.lastMessage.String()
 		l.lastMessageID, l.lastMessage = "", strings.Builder{}
 		l.toolCalls[string(u.ToolCall.ToolCallId)] = true
 		l.seen.Broadcast()
 		l.mu.Unlock()
 		l.noteToolCall(call, true)
+		d.noteDocLinks(l.id, said)
 	case u.ToolCallUpdate != nil:
 		call := toolCall(u.ToolCallUpdate)
 		d.record(l.id, wire.TranscriptEntryKind{ToolCallUpdate: &wire.TranscriptEntryKindToolCallUpdate{Value: call}})
 		d.noteAgentViewCall(l.id, call)
+		d.noteDocRead(l.id, call)
 		l.mu.Lock()
 		l.evidence.takeCall(call)
 		l.mu.Unlock()

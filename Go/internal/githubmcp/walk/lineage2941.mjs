@@ -5,6 +5,7 @@
 // scratch data, and agents_lineage as the Agents host does (Go/internal/agentsd/viewlineage.go,
 // whose tests prove those words). It proves the pages ask for the section with their own
 // address and draw what the host says, and that a host which refuses it is said plainly.
+// #3308 adds the docs the sessions read or linked to.
 //
 //   node Go/internal/githubmcp/walk/lineage2941.mjs <out dir>
 
@@ -45,14 +46,21 @@ const sessions = [
   { id: "A3", title: "Run the cart tests", how: "a helper of “Fix the cart totals”", words: "$0.40 · 51.2k tokens · 9m · archived" },
 ];
 const lineage = {
-  [ghIssue]: { ref: "github:example/shop#41", summary: "3 sessions · 2 pull requests (1 merged, 1 waste)",
+  [ghIssue]: { ref: "github:example/shop#41", summary: "3 sessions · 2 pull requests (1 merged, 1 waste) · 2 docs",
     total: "$4.75 · 540.2k in, 83.5k out · 1h 52m agent time", waste: "Waste: $1.30 · 150.1k in, 22.0k out · 31m agent time",
     sessions, issues: [], prs: [
       { ref: "github:example/shop#52", name: "#52", url: ghPR, outcome: "merged", words: "$2.10 · 230.0k in, 35.5k out · 48m agent time" },
       { ref: "github:example/shop#47", name: "#47", url: "https://github.com/example/shop/pull/47", outcome: "closed", waste: true,
-        words: "$1.30 · 150.1k in, 22.0k out · 31m agent time" }] },
-  [ghPR]: { ref: "github:example/shop#52", summary: "1 session", total: "$2.10 · 230.0k in, 35.5k out · 48m agent time",
-    sessions: [sessions[1]], prs: [], issues: [{ ref: "github:example/shop#41", name: "#41", url: ghIssue }] },
+        words: "$1.30 · 150.1k in, 22.0k out · 31m agent time" }],
+    docs: [
+      { ref: "github:example/shop/doc/specs/12-cart/spec.md", name: "specs/12-cart/spec.md",
+        url: "https://github.com/example/shop/blob/HEAD/specs/12-cart/spec.md", words: "read by 2 sessions" },
+      { ref: "https://www.notion.so/example/Rounding-rules-1a2b3c", name: "www.notion.so/example/Rounding-rules-1a2b3c",
+        url: "https://www.notion.so/example/Rounding-rules-1a2b3c", words: "linked by 1 session" }] },
+  [ghPR]: { ref: "github:example/shop#52", summary: "1 session · 1 doc", total: "$2.10 · 230.0k in, 35.5k out · 48m agent time",
+    sessions: [sessions[1]], prs: [], issues: [{ ref: "github:example/shop#41", name: "#41", url: ghIssue }],
+    docs: [{ ref: "github:example/shop/doc/specs/12-cart/spec.md", name: "specs/12-cart/spec.md",
+      url: "https://github.com/example/shop/blob/HEAD/specs/12-cart/spec.md", words: "read by 1 session" }] },
   [glIssue]: { ref: "gitlab:group/app#5", summary: "1 session · 1 pull request (1 open)",
     total: "$0.85 · 98.0k in, 12.4k out · 22m agent time",
     sessions: [{ id: "B1", title: "Divide by the count", how: "works on it", words: "$0.85 · 110.4k tokens · 25m" }], issues: [],
@@ -165,10 +173,13 @@ try {
   await expand(gh);
   await waitFor(gh, `d.querySelector(".lineage .lineage-row strong")`, "the issue's Lineage section");
   const l = await lineageText(gh);
-  check(/3 sessions · 2 pull requests \(1 merged, 1 waste\)/.test(l) && /Cost: \$4\.75/.test(l) && /Waste: \$1\.30/.test(l),
+  check(/3 sessions · 2 pull requests \(1 merged, 1 waste\) · 2 docs/.test(l) && /Cost: \$4\.75/.test(l) && /Waste: \$1\.30/.test(l),
     `GitHub issue: the summary, the cost and the waste: ${js(l)}`);
   check(/Fix the cart totals works on it · \$3\.10/.test(l) && /a helper of “Fix the cart totals”/.test(l) && /#52 Merged/.test(l) && /#47 Closed/.test(l),
     "GitHub issue: each session and pull request, with its end and cost");
+  check(/Doc specs\/12-cart\/spec\.md read by 2 sessions/.test(l) && /Doc www\.notion\.so\/example\/Rounding-rules-1a2b3c linked by 1 session/.test(l),
+    "GitHub issue: the docs its sessions read or linked to (#3308)");
+  check(await gh.eval(view(`[...d.querySelectorAll(".lineage a")].some((a) => a.textContent === "specs/12-cart/spec.md")`)), "GitHub issue: a doc is a link");
   check((await gh.eval("window.asked")).includes(`agents_lineage ${js({ url: ghIssue })}`), "it asks with the issue's own address");
   opened.push(gh);
   await gh.shot(`${out}/web-github-issue.png`);
@@ -179,7 +190,8 @@ try {
   await pr.eval(view(`[...d.querySelectorAll(".tabs button")].find((b) => b.textContent === "Lineage").click()`));
   await waitFor(pr, `d.querySelector(".lineage .lineage-row strong")`, "the PR's Lineage tab");
   const pl = await lineageText(pr);
-  check(/1 session/.test(pl) && /Round the totals again opened #52/.test(pl) && /Fixes #41/.test(pl), `GitHub PR: its session and the issue it fixes: ${js(pl)}`);
+  check(/1 session · 1 doc/.test(pl) && /Round the totals again opened #52/.test(pl) && /Fixes #41/.test(pl) && /Doc specs\/12-cart\/spec\.md read by 1 session/.test(pl),
+    `GitHub PR: its session, the issue it fixes and the doc: ${js(pl)}`);
   opened.push(pr);
   await pr.shot(`${out}/web-github-pr.png`);
 

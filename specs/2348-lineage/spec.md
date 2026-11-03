@@ -315,10 +315,54 @@ Part 2 (this): Reports ▸ Value's release rows and the release node in the Line
   published or the host noticed it. The time the person got it is a later `deploy`/`ships`
   node (a follow-up), not this. Alex can overrule.
 
+## Docs behind the work (#3308)
+
+An agent reads the docs behind an issue before it works on it (#3248). A doc that a session
+reads or links to is a node, so the issue's and the pull request's Lineage section shows the
+requirement or design behind a change. In `Go/internal/agentsd/lineagedocs.go`.
+
+| What happens | The link | `source` |
+| --- | --- | --- |
+| A tool call of kind `read` names a `*.md` file under `specs/` or `docs/` of the session's folder or worktree | session `reads` the doc | `agent` |
+| A tool call's input is a docs page's address (a docs connector's fetch, a web fetch) | session `reads` the page | `agent` |
+| What the agent says names such a file (it must be there), or a docs page's address | session `links-to` it | `agent` |
+| The session is archived | the links end, with its others | |
+
+- **The node:** kind `doc`. A file of the folder's forge repo is
+  `github:<owner>/<repo>/doc/<path>` (GitLab the same), so the same doc is one node from
+  every worktree and machine; in a folder with no forge it is `file:<path>`. A docs page
+  is its address, without its query or fragment.
+- **A docs page** is on Notion (`notion.so`, `*.notion.site`), Confluence (an Atlassian
+  site's `/wiki/`, or a host named confluence), or Google Docs and Drive.
+- **Bounds:** at most 20 docs from one message or tool call; the section names at most 50.
+- **A doc is a leaf of a walk.** Many sessions read the same doc; a walk reaches it but does
+  not go through it to those sessions' work, so an issue's section never names the work of
+  another issue whose session read the same spec.
+- **The section** (`agents_lineage`) has `docs`: each doc read or linked to by the sessions
+  it names (the sessions on it, on its pull requests, and their helpers), with its name (its
+  path, or the page's host and path), its address (the file on GitHub or GitLab at `HEAD`,
+  or the page), and "read by 2 sessions" or "linked by 1 session". The summary counts them.
+- **Cost:** a doc banks none. The session Lineage pane draws a doc as the open kind it is.
+
+### Decisions on the open questions
+
+- **Decided: a docs page is known by its address**, not by which MCP server fetched it,
+  because a tool call's server is not in what the runtimes send, and the same page fetched
+  by a docs connector or the web is the same doc. A connector that takes only a page id
+  (not an address) links nothing until #3307's map says where its pages are. Alex can
+  overrule.
+- **Decided: "links to" is what the agent says**, its messages, because that is where it
+  names the spec it follows; a path that is not in the folder links nothing. Alex can
+  overrule.
+- **Decided: only `specs/` and `docs/`, not the folder's top `*.md`**, because every
+  session reads README.md and AGENTS.md, and the issue asks for the requirement or design.
+  Alex can overrule.
+
 ## Clients
 
 mac: Reports ▸ Value (#2351), its release rows and the Lineage pane's release node
 (#3023); Folder Settings ▸ Cost on pull requests (#2352).
 remote: tier mac+web for all three.
+All three: the docs in the Lineage section (#3308), drawn by the servers' own `ui://` pages.
 web: Reports ▸ Value (#2351), its release rows and the Lineage pane's release node
 (#3023); Cost on Pull Requests… in the folder's menu (#2352).
