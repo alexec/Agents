@@ -92,6 +92,19 @@ func TestForgeSearchListsManyTeamsInOneQuery(t *testing.T) {
 	}
 }
 
+// #3311: no teams is the whole workspace, one query with no team in its filter.
+func TestForgeSearchListsTheWholeWorkspace(t *testing.T) {
+	l, asked := forgeLinear(t)
+	p, err := l.Search(context.Background(), nil, SearchFilter{}, "", 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	filter, _ := json.Marshal((*asked)[0]["filter"])
+	if len(*asked) != 1 || (*asked)[0]["first"] != float64(50) || strings.Contains(string(filter), `"team"`) || len(p.Items) != 2 {
+		t.Fatalf("asked %v, filter %s, page %+v", *asked, filter, p)
+	}
+}
+
 // One issue: its description and the newest page of its comments, oldest first, with the cursor
 // of the page before it; an issue Linear does not have says so.
 func TestForgeItemPage(t *testing.T) {

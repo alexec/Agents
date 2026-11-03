@@ -62,7 +62,7 @@ public enum WorkList {
         /// The tracker's own name for its step (a Jira status, #3260), shown in place of `state`.
         public var status: String?
         public var labels: [DaemonAPI.ForgeLabel]
-        /// The ref's repo or tracker: github:alexec/Agents, linear.
+        /// The ref's repo or tracker: github:alexec/Agents, linear:ENG (a Linear team, #3311), jira.
         public var repo: String
         public var author: String?
         public var assignees: [String]
@@ -109,19 +109,30 @@ public enum WorkList {
             self.init(node: n.node, title: n.resolved?.title ?? ReportValueWords.name(n.node),
                       state: n.resolved?.state ?? (n.outcome == "merged" ? "merged" : ""),
                       labels: (n.resolved?.labels ?? []).map { DaemonAPI.ForgeLabel(name: $0) },
-                      repo: n.repo ?? WorkList.repo(of: n.node.ref), updated: n.lastAt,
+                      repo: WorkList.repo(of: n), updated: n.lastAt,
                       url: WorkList.url(n.node), lineage: n)
         }
     }
 
-    /// The repo or tracker of a ref: "github:alexec/Agents" of "github:alexec/Agents#12", "linear" of "linear:ENG-4".
+    /// The repo or tracker of a ref: "github:alexec/Agents" of "github:alexec/Agents#12", the team "linear:ENG" of
+    /// "linear:ENG-4" (#3311), "jira" of "jira:PROJ-1".
     public static func repo(of ref: String) -> String {
         guard let colon = ref.firstIndex(of: ":") else { return ref }
         let forge = String(ref[..<colon])
-        if forge == "linear" || forge == "jira" { return forge }
         let id = ref[ref.index(after: colon)...]
+        if forge == "linear" {
+            guard id.wholeMatch(of: /[A-Z][A-Z0-9]*-\d+/) != nil, let dash = id.lastIndex(of: "-") else { return forge }
+            return "linear:\(id[..<dash])"
+        }
+        if forge == "jira" { return forge }
         guard let cut = id.range(of: #"[#!]|/milestone/|/release/"#, options: .regularExpression) else { return ref }
         return "\(forge):\(id[..<cut.lowerBound])"
+    }
+
+    /// A lineage node's repo: lineage says "linear" for every Linear issue, Work its team (#3311).
+    static func repo(of n: DaemonAPI.ReportNode) -> String {
+        if let repo = n.repo, repo != "linear" { return repo }
+        return repo(of: n.node.ref)
     }
 
     /// Where a node is on its forge, as far as its ref says: a PR's is its /pull/ page.
@@ -129,8 +140,9 @@ public enum WorkList {
         ReportValueWords.url(node).map { LineageList.pullRequest(node, $0) }
     }
 
-    /// "alexec/Agents" of "github:alexec/Agents"; "Jira" of "jira".
+    /// "alexec/Agents" of "github:alexec/Agents"; "Linear · ENG" of a Linear team (#3311); "Jira" of "jira".
     public static func repoName(_ repo: String) -> String {
+        if repo.hasPrefix("linear:") { return "Linear · \(repo.dropFirst("linear:".count))" }
         if let tracker = forgeTitle[repo], !repo.contains(":") { return tracker }
         return repo.replacingOccurrences(of: #"^[a-z][a-z0-9-]*:"#, with: "", options: .regularExpression)
     }

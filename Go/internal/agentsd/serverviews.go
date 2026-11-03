@@ -48,9 +48,9 @@ func (d *Daemon) serverViews(folder string, f pinsFile) []wire.PinView {
 			if !hostRead {
 				host, hostRead = originHost(folder), true
 			}
-			// Work has the folder's own repo's issues and pull requests (#3119, #3131), so
-			// GitHub's and GitLab's rows for it go. A project's other repo keeps its row
-			// (#2669): Work lists only the folders' own.
+			// Work has the folder's own repo's issues and pull requests (#3119, #3131) and
+			// Linear's (#3311), so GitHub's, GitLab's and Linear's rows for it go. A project's
+			// other repo keeps its row (#2669): Work lists only the folders' own.
 			fits = oursFits(ours, host) && !inWork(ours)
 		}
 		catalog := d.cachedViewCatalog(s)
@@ -123,10 +123,11 @@ func oursFits(o mcpcatalog.Ours, host string) bool {
 	return true
 }
 
-// inWork says Work lists what ours's list views list, in every folder they fit. Not
-// Linear's: Work has only the teams a folder's linearTeams names (#3131).
+// inWork says Work lists what ours's list views list, in every folder they fit: GitHub's
+// and GitLab's (#3131), and Linear's, the whole workspace when no folder names linearTeams
+// (#3311).
 func inWork(o mcpcatalog.Ours) bool {
-	return o.ID == "agents/github" || o.ID == "agents/gitlab"
+	return o.ID == "agents/github" || o.ID == "agents/gitlab" || o.ID == "agents/linear"
 }
 
 // serverTitle is the catalogue's title for one of ours, the server's own, or its name.

@@ -432,6 +432,46 @@ func TestForgeReadsAGitLabAndALinearItem(t *testing.T) {
 	}
 }
 
+// #3311: with no folder naming linearTeams, forge/issues lists the whole Linear workspace (no
+// teams), each issue acting from a folder here, as its forge/issue does; with no Linear
+// connection it leaves Linear out, with no error.
+func TestForgeIssuesListsTheLinearWorkspace(t *testing.T) {
+	d, c, _, file := forgeDaemon(t)
+	ln := &fakeForgeLinear{}
+	d.newForgeLinear = func(string) forgeLinear { return ln }
+	var list wire.ForgeList
+	json.Unmarshal(c.call(t, 1, "forge/issues", wire.ForgeListRequest{}), &list)
+	if len(ln.searches) != 0 || len(list.Errors) != 0 {
+		t.Fatalf("no Linear: %q %+v", ln.searches, list.Errors)
+	}
+
+	file.Put(connections.Connection{Provider: connections.Linear, Login: "kim", Access: "lin_oauth", AccessExpiresAt: time.Now().Add(time.Hour),
+		ConnectedAt: time.Now()})
+	json.Unmarshal(c.call(t, 2, "forge/issues", wire.ForgeListRequest{}), &list)
+	if len(ln.searches) != 1 || ln.searches[0] != " after=" || len(list.Errors) != 0 {
+		t.Fatalf("Linear asked %q, errors %+v", ln.searches, list.Errors)
+	}
+	var l wire.ForgeItem
+	for _, i := range list.Items {
+		if i.Node.Ref == "linear:ENG-4" {
+			l = i
+		}
+	}
+	if folders := d.folderPaths(); len(folders) == 0 || deref(l.Folder) != folders[0] {
+		t.Fatalf("Linear item: %+v (folders %v)", l, d.folderPaths())
+	}
+	var i wire.ForgeItemDetail
+	json.Unmarshal(c.call(t, 3, "forge/issue", wire.ForgeItemRequest{Node: wire.LineageNode{Kind: "issue", Ref: "linear:ENG-4"}}), &i)
+	if deref(i.Item.Folder) != deref(l.Folder) || i.Start == nil {
+		t.Fatalf("Linear issue: %+v", i)
+	}
+
+	json.Unmarshal(c.call(t, 4, "forge/pulls", wire.ForgeListRequest{}), &list)
+	if len(ln.searches) != 1 {
+		t.Fatalf("pulls asked Linear: %q", ln.searches)
+	}
+}
+
 // mergeForgePages: a forge that failed is asked again from where it was, and with nothing else
 // going on there is no next page.
 func TestMergeForgePagesKeepsAFailedForgesPlace(t *testing.T) {

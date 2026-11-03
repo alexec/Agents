@@ -87,12 +87,14 @@ pull request's number. **This is our extension of MCP Apps (SEP-1865)**, as pins
 The GitHub and GitLab connectors' list views show no row for the folder's own repo:
 **Work** lists its issues and pull requests (merge requests), with their actions, on every
 client (#3119, #3131). They show only when the folder's project points them at another repo
-(#2669), which Work does not list. The connectors stay: agents use their tools, an agent's
+(#2669), which Work does not list. The Linear connector's **Linear · Issues** shows no row
+at all: Work lists the Linear issues too, of the whole workspace when no folder names
+`linearTeams` (#3311), and a project has no Linear slot. The connectors stay: agents use their tools, an agent's
 `show_*` call still draws its view in the chat, and a pinned view stays pinned.
 
 - **Where.** In the folder's group, after its pinned pages and before its sessions.
 - **Its name.** The service, then the view: **GitHub · Pull requests**, **GitHub · Issues**,
-  **Linear · Issues**. The service is the catalogue's title for a connector Agents makes, else
+  **Jira · Issues**. The service is the catalogue's title for a connector Agents makes, else
   the server's own (`serverInfo.title`), else its name in `mcp.json`. A view title that
   starts with the service's ("Linear issues") loses it.
 - **Which servers.** Each server set up and approved for the folder that can show views

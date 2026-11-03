@@ -33,7 +33,7 @@ export interface WorkRow {
   /** The tracker's own name for its step (a Jira status, #3260), shown in place of state. */
   status?: string | undefined;
   labels: ForgeLabel[];
-  /** The ref's repo or tracker: github:alexec/Agents, linear. */
+  /** The ref's repo or tracker: github:alexec/Agents, linear:ENG (a Linear team, #3311), jira. */
   repo: string;
   author?: string | undefined;
   assignees: string[];
@@ -47,18 +47,24 @@ export interface WorkRow {
   lineage?: ReportNode | undefined;
 }
 
-/** The repo or tracker of a ref: "github:alexec/Agents" of "github:alexec/Agents#12", "linear" of "linear:ENG-4". */
+/** The repo or tracker of a ref: "github:alexec/Agents" of "github:alexec/Agents#12", the team "linear:ENG" of
+ * "linear:ENG-4" (#3311), "jira" of "jira:PROJ-1". */
 export function repoOf(ref: string): string {
   const scheme = /^([a-z][a-z0-9-]*):(.*)$/.exec(ref);
   if (!scheme) return ref;
   const [, forge, id = ""] = scheme;
-  if (forge === "linear" || forge === "jira") return forge!;
+  if (forge === "linear") return /^([A-Z][A-Z0-9]*)-\d+$/.test(id) ? `linear:${id.replace(/-\d+$/, "")}` : "linear";
+  if (forge === "jira") return forge;
   const cut = id.search(/[#!]|\/milestone\/|\/release\//);
   return cut < 0 ? ref : `${forge}:${id.slice(0, cut)}`;
 }
 
-/** "alexec/Agents" of "github:alexec/Agents", for a row's repo column; a tracker (linear, jira, #3260) by its own name. */
-export const repoName = (repo: string) => repo.includes(":") ? repo.replace(/^[a-z][a-z0-9-]*:/, "") : forgeTitle[repo] ?? repo;
+/** "alexec/Agents" of "github:alexec/Agents", for a row's repo column; "Linear · ENG" of a Linear team (#3311); a tracker
+ * (jira, #3260) by its own name. */
+export function repoName(repo: string): string {
+  if (repo.startsWith("linear:")) return `Linear · ${repo.slice("linear:".length)}`;
+  return repo.includes(":") ? repo.replace(/^[a-z][a-z0-9-]*:/, "") : forgeTitle[repo] ?? repo;
+}
 
 /** An issue's or PR's number in its repo, for Newest; 0 for one without. */
 export function refNumber(ref: string): number {
@@ -86,11 +92,14 @@ export function forgeRow(item: ForgeItem, host: string, lineage?: ReportNode): W
   };
 }
 
+/** A lineage node's repo: lineage says "linear" for every Linear issue, Work its team (#3311). */
+const repoOfNode = (n: ReportNode) => n.repo && n.repo !== "linear" ? n.repo : repoOf(n.node.ref);
+
 /** A row lineage alone knows: a milestone, a release, or an item no forge listed. */
 export function lineageRow(n: ReportNode): WorkRow {
   return {
     node: n.node, title: n.resolved?.title ?? nodeName(n.node), state: n.resolved?.state ?? (n.outcome === "merged" ? "merged" : ""),
-    labels: (n.resolved?.labels ?? []).map((name) => ({ name })), repo: n.repo ?? repoOf(n.node.ref), assignees: [],
+    labels: (n.resolved?.labels ?? []).map((name) => ({ name })), repo: repoOfNode(n), assignees: [],
     updated: unix(n.lastAt), url: lineageUrl(n.node), lineage: n,
   };
 }

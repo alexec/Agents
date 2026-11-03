@@ -7,10 +7,10 @@ import (
 	"strings"
 )
 
-// The daemon's forge reads (#3209, after GitHub's in #3129): the issues of many teams in one
-// query, the last updated first, and one issue with its description and a page of its comments.
-// The daemon puts them in the one model the Work pages draw for every forge (wire.ForgeItem).
-// Linear has issues only: no pull requests.
+// The daemon's forge reads (#3209, after GitHub's in #3129): the issues of many teams, or of
+// the whole workspace (#3311), in one query, the last updated first, and one issue with its
+// description and a page of its comments. The daemon puts them in the one model the Work
+// pages draw for every forge (wire.ForgeItem). Linear has issues only: no pull requests.
 
 // SearchFilter is what a list lists: issues in state open, closed or all (open when ""),
 // narrowed by a label, an assignee's display name, words in the title or description, and a
@@ -163,9 +163,13 @@ func (n forgeNode) item() Item {
 	return i
 }
 
-// SearchFilterOf is Linear's IssueFilter for teams (by key) and f.
+// SearchFilterOf is Linear's IssueFilter for teams (by key) and f; no teams is the whole
+// workspace (#3311).
 func SearchFilterOf(teams []string, f SearchFilter) map[string]any {
-	filter := map[string]any{"team": map[string]any{"key": map[string]any{"in": teams}}}
+	filter := map[string]any{}
+	if len(teams) > 0 {
+		filter["team"] = map[string]any{"key": map[string]any{"in": teams}}
+	}
 	switch f.State {
 	case "", "open":
 		filter["state"] = map[string]any{"type": map[string]any{"nin": []string{"completed", "canceled"}}}
@@ -195,13 +199,10 @@ func SearchFilterOf(teams []string, f SearchFilter) map[string]any {
 	return filter
 }
 
-// Search is one page of the issues of teams, at most first (1 to 100), after the cursor after
-// ("" for the first page), in one query.
+// Search is one page of the issues of teams (of the whole workspace for none, #3311), at most
+// first (1 to 100), after the cursor after ("" for the first page), in one query.
 func (l *RealLinear) Search(ctx context.Context, teams []string, f SearchFilter, after string, first int) (SearchPage, error) {
 	page := SearchPage{Items: []Item{}, Cursors: []string{}}
-	if len(teams) == 0 {
-		return page, nil
-	}
 	vars := map[string]any{"filter": SearchFilterOf(teams, f), "first": max(1, min(first, perPage))}
 	if after != "" {
 		vars["after"] = after
