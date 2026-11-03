@@ -1943,7 +1943,10 @@ export type ConnectorEventsState =
   | "taken"
   | "failed";
 
-/** The one real thing a slot read: the newest issue or pull request, or the last workflow run. */
+/**
+ * The one real thing a slot read: the newest issue or pull request, the last workflow run, or the
+ * newest doc in the folder (its path as the title).
+ */
 export interface ConnectorProof {
   /** The issue or pull request number. */
   number?: number;
@@ -2027,7 +2030,10 @@ export interface ConnectorSkipRequest {
  */
 export interface ConnectorSlot {
   slot: ConnectorSlotKind;
-  /** What fills it, in words: GitHub Issues, GitHub pull requests, GitHub Actions, This Mac. */
+  /**
+   * What fills it, in words: GitHub Issues, GitHub pull requests, GitHub Actions, This folder
+   * (docs), This Mac.
+   */
   choice: string;
   state: ConnectorSlotState;
   proof?: ConnectorProof;
@@ -2043,16 +2049,22 @@ export interface ConnectorSlot {
    * The folder's project sets this slot (#2669), so it is the same in every folder of the project.
    */
   fromProject?: boolean;
+  /**
+   * Docs only (#3248): the docs connectors that fill the slot beside this folder, by their names in
+   * the folder's or the person's mcp.json. Absent with none.
+   */
+  servers?: string[];
 }
 
 /**
  * One slot of a folder's set-up (#1336), in the page's order: tasks (the tracker), codeReview, ci,
- * and workspace (where agents run).
+ * docs (where the docs live, #3248), and workspace (where agents run).
  */
 export type ConnectorSlotKind =
   | "tasks"
   | "codeReview"
   | "ci"
+  | "docs"
   | "workspace";
 
 /**
@@ -10606,7 +10618,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConnectorSetup: { required: ["folder", "slots", "events", "done"], optional: ["repository", "forge", "site", "repositoryURL", "connection", "installed", "installURL", "repositories", "project", "projectName"] },
   ConnectorSetupRequest: { required: ["folder"], optional: ["reading"] },
   ConnectorSkipRequest: { required: ["folder", "slot", "skipped"], optional: [] },
-  ConnectorSlot: { required: ["slot", "choice", "state"], optional: ["proof", "readAt", "message", "repository", "fromProject"] },
+  ConnectorSlot: { required: ["slot", "choice", "state"], optional: ["proof", "readAt", "message", "repository", "fromProject", "servers"] },
   ConnectorWorkflow: { required: ["id", "name"], optional: [] },
   ConsoleStopAgent: { required: ["host", "agent"], optional: [] },
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },

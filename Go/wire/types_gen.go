@@ -2315,7 +2315,7 @@ const ConnectorEventsStateOff ConnectorEventsState = "off"
 const ConnectorEventsStateTaken ConnectorEventsState = "taken"
 const ConnectorEventsStateFailed ConnectorEventsState = "failed"
 
-// The one real thing a slot read: the newest issue or pull request, or the last workflow run.
+// The one real thing a slot read: the newest issue or pull request, the last workflow run, or the newest doc in the folder (its path as the title).
 type ConnectorProof struct {
 	// The issue or pull request number.
 	Number *int64 `json:"number,omitzero"`
@@ -2397,7 +2397,7 @@ type ConnectorSkipRequest struct {
 type ConnectorSlot struct {
 	Slot ConnectorSlotKind `json:"slot"`
 
-	// What fills it, in words: GitHub Issues, GitHub pull requests, GitHub Actions, This Mac.
+	// What fills it, in words: GitHub Issues, GitHub pull requests, GitHub Actions, This folder (docs), This Mac.
 	Choice string `json:"choice"`
 
 	State ConnectorSlotState `json:"state"`
@@ -2414,14 +2414,18 @@ type ConnectorSlot struct {
 
 	// The folder's project sets this slot (#2669), so it is the same in every folder of the project.
 	FromProject *bool `json:"fromProject,omitzero"`
+
+	// Docs only (#3248): the docs connectors that fill the slot beside this folder, by their names in the folder's or the person's mcp.json. Absent with none.
+	Servers []string `json:"servers,omitzero"`
 }
 
-// One slot of a folder's set-up (#1336), in the page's order: tasks (the tracker), codeReview, ci, and workspace (where agents run).
+// One slot of a folder's set-up (#1336), in the page's order: tasks (the tracker), codeReview, ci, docs (where the docs live, #3248), and workspace (where agents run).
 type ConnectorSlotKind string
 
 const ConnectorSlotKindTasks ConnectorSlotKind = "tasks"
 const ConnectorSlotKindCodeReview ConnectorSlotKind = "codeReview"
 const ConnectorSlotKindCi ConnectorSlotKind = "ci"
+const ConnectorSlotKindDocs ConnectorSlotKind = "docs"
 const ConnectorSlotKindWorkspace ConnectorSlotKind = "workspace"
 
 // notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach the provider; message says why. refused: the provider refused the read, so the person grants it on the provider's site. noRemote: the folder has no GitHub or GitLab remote. skipped: the person skipped it; it counts as done.
