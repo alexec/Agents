@@ -4324,13 +4324,15 @@ type ForgeLogRequest struct {
 	Check *string `json:"check,omitzero"`
 }
 
-// people/setForgeLogins (#2951): the caller's own GitHub, GitLab and Linear logins, for Settings ▸ You, replacing what was kept; blank clears one.
+// people/setForgeLogins (#2951): the caller's own GitHub, GitLab, Linear and Jira logins (#3313), for Settings ▸ You, replacing what was kept; blank clears one.
 type ForgeLogins struct {
 	Github *string `json:"github,omitzero"`
 
 	Gitlab *string `json:"gitlab,omitzero"`
 
 	Linear *string `json:"linear,omitzero"`
+
+	Jira *string `json:"jira,omitzero"`
 }
 
 // How forge/merge merges a pull request (#3130): a merge commit, one squashed commit, or its commits rebased onto the base.
@@ -6924,7 +6926,7 @@ type PeopleChanged struct {
 	Removed *bool `json:"removed,omitzero"`
 }
 
-// people/forViews (#2951): every person and bot on this control plane, with their forge logins and which is the caller, for the github, gitlab and linear servers' Team section and "An agent is on it". Narrower than PeopleList: open to a member as much as an admin, and holds no role, clients or machines.
+// people/forViews (#2951): every person and bot on this control plane, with their forge logins and which is the caller, for the github, gitlab, linear and jira servers' Team section and "An agent is on it". Narrower than PeopleList: open to a member as much as an admin, and holds no role, clients or machines.
 type PeopleForViews struct {
 	People []TeamPerson `json:"people"`
 }
@@ -10471,7 +10473,7 @@ type TeamBotRun struct {
 	Since *Date `json:"since,omitzero"`
 }
 
-// people/forViews (#2951): one person or bot on this control plane, as the github, gitlab and linear servers' feeding tools are fed it in their call's _meta, so a row can name them and Team can be told from Others.
+// people/forViews (#2951): one person or bot on this control plane, as the github, gitlab, linear and jira servers' feeding tools are fed it in their call's _meta, so a row can name them and Team can be told from Others.
 type TeamPerson struct {
 	ID string `json:"id"`
 
@@ -10484,6 +10486,9 @@ type TeamPerson struct {
 	GitlabLogin *string `json:"gitlabLogin,omitzero"`
 
 	LinearLogin *string `json:"linearLogin,omitzero"`
+
+	// Their Jira login (#3313): the Atlassian account's email, account id or display name.
+	JiraLogin *string `json:"jiraLogin,omitzero"`
 
 	You *bool `json:"you,omitzero"`
 }

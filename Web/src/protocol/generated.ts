@@ -3617,13 +3617,14 @@ export interface ForgeLogRequest {
 }
 
 /**
- * people/setForgeLogins (#2951): the caller's own GitHub, GitLab and Linear logins, for Settings ▸
- * You, replacing what was kept; blank clears one.
+ * people/setForgeLogins (#2951): the caller's own GitHub, GitLab, Linear and Jira logins (#3313),
+ * for Settings ▸ You, replacing what was kept; blank clears one.
  */
 export interface ForgeLogins {
   github?: string;
   gitlab?: string;
   linear?: string;
+  jira?: string;
 }
 
 /**
@@ -5738,9 +5739,9 @@ export interface PeopleChanged {
 
 /**
  * people/forViews (#2951): every person and bot on this control plane, with their forge logins and
- * which is the caller, for the github, gitlab and linear servers' Team section and "An agent is on
- * it". Narrower than PeopleList: open to a member as much as an admin, and holds no role, clients
- * or machines.
+ * which is the caller, for the github, gitlab, linear and jira servers' Team section and "An agent
+ * is on it". Narrower than PeopleList: open to a member as much as an admin, and holds no role,
+ * clients or machines.
  */
 export interface PeopleForViews {
   people: TeamPerson[];
@@ -8792,8 +8793,8 @@ export interface TeamBotRun {
 }
 
 /**
- * people/forViews (#2951): one person or bot on this control plane, as the github, gitlab and
- * linear servers' feeding tools are fed it in their call's _meta, so a row can name them and Team
+ * people/forViews (#2951): one person or bot on this control plane, as the github, gitlab, linear
+ * and jira servers' feeding tools are fed it in their call's _meta, so a row can name them and Team
  * can be told from Others.
  */
 export interface TeamPerson {
@@ -8803,6 +8804,8 @@ export interface TeamPerson {
   githubLogin?: string;
   gitlabLogin?: string;
   linearLogin?: string;
+  /** Their Jira login (#3313): the Atlassian account's email, account id or display name. */
+  jiraLogin?: string;
   you?: boolean;
 }
 
@@ -10833,7 +10836,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeListRequest: { required: [], optional: ["folder", "state", "label", "assignee", "query", "cursor", "limit", "feature"] },
   ForgeLog: { required: ["text"], optional: [] },
   ForgeLogRequest: { required: ["node"], optional: ["check"] },
-  ForgeLogins: { required: [], optional: ["github", "gitlab", "linear"] },
+  ForgeLogins: { required: [], optional: ["github", "gitlab", "linear", "jira"] },
   ForgeMergeRequest: { required: ["node", "sha"], optional: ["method", "auto"] },
   ForgeNodeRequest: { required: ["node"], optional: [] },
   ForgePlan: { required: ["item", "children", "steps"], optional: ["lead"] },
@@ -11345,7 +11348,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SurfaceIdentification: { required: ["id", "name", "kind"], optional: [] },
   TeamBot: { required: ["user", "name", "spentTodayUSD", "capped", "machines", "online", "workflows", "live"], optional: ["group", "groupName", "caps"] },
   TeamBotRun: { required: ["host", "hostName", "agent"], optional: ["workflow", "since"] },
-  TeamPerson: { required: ["id", "name", "kind"], optional: ["githubLogin", "gitlabLogin", "linearLogin", "you"] },
+  TeamPerson: { required: ["id", "name", "kind"], optional: ["githubLogin", "gitlabLogin", "linearLogin", "jiraLogin", "you"] },
   TeamTrigger: { required: ["workflow", "trigger", "runsOn"], optional: ["event", "dueAt"] },
   TeamTriggerFired: { required: ["ran"], optional: [] },
   TeamTriggerSent: { required: ["taken"], optional: [] },

@@ -32,11 +32,13 @@ func TestAnIssuesSection(t *testing.T) {
 	}
 }
 
-// With the control plane's people (#2951), Team is told from Others by email, not Jira's
-// account types: a user who is not on this control plane is Others, and a control-plane
-// person who is a customer is Team.
+// With the control plane's people (#2951), Team is told from Others by Jira login (#3313),
+// not Jira's account types: a user who is not on this control plane is Others, and a
+// control-plane person who is a customer is Team. A login is an email, an account id or a
+// display name: Jira Cloud often hides the email.
 func TestTeamIsTheControlPlanesPeopleWhenGiven(t *testing.T) {
-	people := teamMeta{"alex@example.com": teamPerson{Name: "Alex", You: true}}
+	people := teamMeta{"alex@example.com": teamPerson{Name: "Alex", You: true}, "557058:kim": teamPerson{Name: "Kim"},
+		"sam collins": teamPerson{Name: "Sam"}}
 	viewer := &Person{ID: "u1"}
 	for _, c := range []struct {
 		name  string
@@ -46,6 +48,8 @@ func TestTeamIsTheControlPlanesPeopleWhenGiven(t *testing.T) {
 		{"a user not on this control plane", Issue{Creator: &Person{ID: "u2", Email: "sam@example.com"}}, sectionOthers},
 		{"a customer who is on this control plane", Issue{Creator: &Person{ID: "u3", Email: "alex@example.com", Customer: true}}, sectionTeam},
 		{"no creator", Issue{}, sectionOthers},
+		{"by account id", Issue{Creator: &Person{ID: "557058:kim"}}, sectionTeam},
+		{"by display name, any case", Issue{Creator: &Person{ID: "u4", Name: "Sam Collins"}}, sectionTeam},
 	} {
 		if got := issueSection(c.issue, viewer, people); got != c.want {
 			t.Errorf("%s: %s, want %s", c.name, got, c.want)
