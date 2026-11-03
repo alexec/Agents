@@ -34,7 +34,7 @@ try {
   ok(`the header's button: ${head}`, head === "Start lead" || head === "Open lead");
   if (head === "Start lead") {
     await page.eval(`[...document.querySelectorAll(".work-plan-head button")].find((b) => b.textContent === "Start lead").click()`);
-    await page.waitFor(`[...document.querySelectorAll("textarea")].some((t) => t.value.includes("lead\` skill"))`, 30_000);
+    await page.waitFor(`[...document.querySelectorAll("textarea, [contenteditable]")].some((t) => (t.value ?? t.textContent).includes("Lead this epic"))`, 30_000);
     ok("Start lead opens the form filled in for a lead", true);
     await sleep(800);
     await page.shot(`${out}/${prefix}-start-lead.png`);

@@ -79,13 +79,14 @@ struct WorkPlanTests {
         #expect(WorkPlan.blockedWords(child(1, step: 1)) == nil)
     }
 
-    @Test func aStepSaysTheOpenChildrenItWaitsFor() {
+    @Test func aStepSaysTheOpenChildrenItWaitsFor() throws {
         let plan = DaemonAPI.ForgePlan(item: .init(node: issue(1), title: "Epic", state: "open", updatedAt: day), children: [
             child(2, step: 1, state: "closed"), child(3, step: 1),
             child(4, step: 2, blockedBy: [2, 3]), child(5, step: 2, blockedBy: [3]),
         ], steps: [.init(step: 1, nodes: [issue(2), issue(3)]), .init(step: 2, nodes: [issue(4), issue(5)])])
-        #expect(WorkPlan.stepTitle(plan.steps[0], in: plan) == "Step 1")
-        #expect(WorkPlan.stepTitle(plan.steps[1], in: plan) == "Step 2 · waits for #3")
+        let first = try #require(plan.steps.first), second = try #require(plan.steps.last)
+        #expect(WorkPlan.stepTitle(first, in: plan) == "Step 1")
+        #expect(WorkPlan.stepTitle(second, in: plan) == "Step 2 · waits for #3")
     }
 
     @Test func theHeaderCountsAndAddsUp() {
