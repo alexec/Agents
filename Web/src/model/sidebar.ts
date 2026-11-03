@@ -1,36 +1,48 @@
 // What the Things-style sidebar (#495, #499) gathers and in what order, as the window's and the
 // Remote's `SidebarSmartRow` and `SidebarFolderFold` (AgentsKitCore/Sidebar) work it out: the
-// smart groups at the top across every folder (Pinned, Needs You, Working, Unread), and each
+// smart groups at the top across every folder (Pinned, Needs You, For Review, Working, Unread), and each
 // folder's sessions as one list, newest started first, the state the row's mark. Each session is
 // listed once, in its first group (#587). Needs You holds everything waiting for the person (#773):
 // sessions asking or blocked, sessions asking to be archived (#584, #649, once a group of their own),
-// and each folder's approvals as rows of their own.
+// and each folder's approvals as rows of their own. For Review (#3194) holds what is ready to look at
+// but blocks no agent: a session done with a file it showed that nobody has opened.
 import type { Agent, Approval, WorkflowSummary } from "../protocol/generated";
 import { asksToArchive, byStart, folderKey, groupOf, showsUnread } from "./groups";
 import { queryMatches, type LabelQuery } from "./labels";
 import { isSessionApproval, kindWords } from "./approvals";
 
-export type SmartRow = "pinned" | "needsYou" | "working" | "unread";
+export type SmartRow = "pinned" | "needsYou" | "forReview" | "working" | "unread";
 
 /** In the sidebar's order: Pinned first, then by what they want. */
-export const smartRows: readonly SmartRow[] = ["pinned", "needsYou", "working", "unread"];
+export const smartRows: readonly SmartRow[] = ["pinned", "needsYou", "forReview", "working", "unread"];
 
 export const smartTitles: Record<SmartRow, string> = {
-  pinned: "Pinned", needsYou: "Needs You", working: "Working", unread: "Unread",
+  pinned: "Pinned", needsYou: "Needs You", forReview: "For Review", working: "Working", unread: "Unread",
 };
 
 /** Every group, on: as each browser starts until one is turned off (#846). */
 export const allSmartRows: ReadonlySet<SmartRow> = new Set(smartRows);
 
-/** Pinned and Needs You start open, so the first thing the page says is who is waiting; the others start folded. */
+/** Pinned, Needs You and For Review (#3194) start open, so the first thing the page says is who is waiting; the others start folded. */
 export function smartStartsOpen(row: SmartRow): boolean {
-  return row === "pinned" || row === "needsYou";
+  return row === "pinned" || row === "needsYou" || row === "forReview";
+}
+
+/** SidebarSmartRow.isForReview (#3194): done, with a file it showed that nobody has opened. */
+export function isForReview(agent: Agent): boolean {
+  return groupOf(agent) === "finished" && agent.fileToSee != null;
+}
+
+/** SidebarSmartRow.keeper: the group that keeps the session opened while it is open (#495),
+ *  For Review when it had a file to see and that group is on (#3194), else Unread. */
+export function keeper(fileToSee: boolean, on: ReadonlySet<SmartRow> = allSmartRows): "forReview" | "unread" {
+  return fileToSee && on.has("forReview") ? "forReview" : "unread";
 }
 
 /**
  * Where a live session is listed (#587), as `SidebarSmartRow.home`: once, in the first of the smart
- * groups it belongs to (Pinned, Needs You (asking, blocked, or asking to be archived, #773), Working,
- * Unread), or, in none of them, under its folder (null). A group turned off (#846) is passed over:
+ * groups it belongs to (Pinned, Needs You (asking, blocked, or asking to be archived, #773), For
+ * Review (#3194), Working, Unread), or, in none of them, under its folder (null). A group turned off (#846) is passed over:
  * its sessions go to the next one they fit, so one unread that asks to be archived goes to Unread
  * with Needs You off.
  */
@@ -40,6 +52,7 @@ export function home(agent: Agent, isPinned: boolean, on: ReadonlySet<SmartRow> 
   if (isPinned && on.has("pinned")) return "pinned";
   const waits = group === "needsAttention" || group === "blocked" || (group !== "running" && asksToArchive(agent));
   if (waits && on.has("needsYou")) return "needsYou";
+  if (isForReview(agent) && on.has("forReview")) return "forReview";
   if (group === "running" && on.has("working")) return "working";
   return showsUnread(agent) && on.has("unread") ? "unread" : null;
 }
@@ -103,10 +116,11 @@ export function folderSessions(live: readonly Agent[], pins: readonly string[], 
  * once it belongs elsewhere (archived, pinned, waiting, working or asking to be archived). Only
  * while Unread is on, and pinned only counts while Pinned is on (#846).
  */
-export function keepsInUnread(agent: Agent, pins: readonly string[], on: ReadonlySet<SmartRow> = allSmartRows): boolean {
-  if (!on.has("unread") || agent.state === "archived" || (on.has("pinned") && pins.includes(agent.id))) return false;
+export function keepsInUnread(agent: Agent, pins: readonly string[], on: ReadonlySet<SmartRow> = allSmartRows,
+  keptBy: SmartRow = "unread"): boolean {
+  if (!on.has(keptBy) || agent.state === "archived" || (on.has("pinned") && pins.includes(agent.id))) return false;
   const at = home(agent, false, on);
-  return at === null || at === "unread";
+  return at === null || at === "unread" || at === "forReview";
 }
 
 /**

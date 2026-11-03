@@ -1,4 +1,4 @@
-// Which smart groups at the top of the sidebar are on (#846): Pinned, Needs You, Working and
+// Which smart groups at the top of the sidebar are on (#846): Pinned, Needs You, For Review, Working and
 // Unread; with nothing kept, Working and Unread are off (#979). The person's, kept on their Mac
 // with the other display choices (#1033, SidebarSmartRow.offDefaultsKey): the groups turned
 // off, by name, comma-separated, so a new group starts on.

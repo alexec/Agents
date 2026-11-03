@@ -480,6 +480,51 @@ struct SidebarModelTests {
         #expect(SidebarSmartRow.keptInUnread(pinned.id, in: model) == nil)
     }
 
+    /// For Review (#3194) lists a session done with a file nobody has opened, not Unread;
+    /// one asking to be archived stays in Needs You, and a working one in Working. Opened, For
+    /// Review keeps it in its place until another is opened, as Unread does (#495).
+    @Test func forReviewListsDoneSessionsWithAFileToSee() {
+        let model = AgentsModel()
+        var report = started(api, .finished, "report", at: 1, unread: true)
+        report.fileToSee = ShownFile(path: "/tmp/summary.md")
+        var archiving = started(api, .finished, "archiving", at: 2, unread: true)
+        archiving.fileToSee = ShownFile(path: "/tmp/a.md")
+        archiving.archiveRequest = .requested(at: t0)
+        var working = started(api, .running, "working", at: 3)
+        working.fileToSee = ShownFile(path: "/tmp/w.md")
+        let unread = started(api, .finished, "unread", at: 4, unread: true)
+        var pinned = started(api, .finished, "pinned", at: 5, unread: true)
+        pinned.fileToSee = ShownFile(path: "/tmp/p.md")
+        model.replaceAgents([report, archiving, working, unread, pinned])
+        model.replacePins([FolderPins(folder: api, pins: [], sessions: [pinned.id])])
+        let folders = [key]
+
+        #expect(SidebarSmartRow.forReview.agents(in: model, folders: folders).map(\.id) == [report.id])
+        #expect(SidebarSmartRow.forReview.count(in: model, folders: folders) == 1)
+        #expect(SidebarSmartRow.unread.agents(in: model, folders: folders).map(\.id) == [unread.id])
+        #expect(SidebarSmartRow.unread.count(in: model, folders: folders) == 1)
+        #expect(SidebarSmartRow.needsYou.agents(in: model, folders: folders).map(\.id) == [archiving.id])
+        #expect(SidebarSmartRow.working.agents(in: model, folders: folders).map(\.id) == [working.id])
+        #expect(SidebarSmartRow.forReview.startsOpen)
+
+        // Off, it goes to Unread, which counts it then.
+        let noReview = SidebarSmartRow.all.subtracting([.forReview])
+        #expect(Set(SidebarSmartRow.unread.agents(in: model, folders: folders, on: noReview).map(\.id)) == [report.id, unread.id])
+
+        // Opened and read (the host clears the file), For Review keeps it, not its folder.
+        var read = report
+        read.isUnread = false
+        read.fileToSee = nil
+        model.replaceAgents([read, archiving, working, unread, pinned])
+        #expect(SidebarSmartRow.keeper(fileToSee: true) == .forReview)
+        #expect(SidebarSmartRow.keeper(fileToSee: true, on: noReview) == .unread)
+        #expect(SidebarSmartRow.keeper(fileToSee: false) == .unread)
+        #expect(SidebarSmartRow.keptInUnread(read.id, in: model, keptBy: .forReview)?.id == read.id)
+        let fold = SidebarFolderFold(key, label: "api", in: model, isOpen: true, keptInUnread: read.id, keptBy: .forReview)
+        #expect(!fold.sessions.contains { $0.id == read.id })
+        #expect(SidebarSmartRow.keptInUnread(read.id, in: model, on: noReview, keptBy: .forReview) == nil)
+    }
+
     /// A smart group turned off (#846) is not drawn, and its sessions go to the next group
     /// they fit, or under their folder: still listed once, none left out.
     @Test func aGroupTurnedOffPassesItsSessionsOn() {
@@ -541,9 +586,9 @@ struct SidebarModelTests {
     @Test func theGroupsOnRoundTripThroughDefaults() {
         #expect(SidebarSmartRow.on(off: "") == SidebarSmartRow.all)
         #expect(SidebarSmartRow.off(on: SidebarSmartRow.all) == "")
-        #expect(SidebarSmartRow.off(on: [.needsYou, .unread]) == "pinned,working")
-        #expect(SidebarSmartRow.on(off: "pinned,working,gone") == [.needsYou, .unread])
-        // Nothing kept (#979): Pinned and Needs You on.
-        #expect(SidebarSmartRow.on(off: SidebarSmartRow.offAtFirst) == [.pinned, .needsYou])
+        #expect(SidebarSmartRow.off(on: [.needsYou, .unread]) == "pinned,forReview,working")
+        #expect(SidebarSmartRow.on(off: "pinned,working,gone") == [.needsYou, .forReview, .unread])
+        // Nothing kept (#979): Pinned, Needs You and For Review (#3194) on.
+        #expect(SidebarSmartRow.on(off: SidebarSmartRow.offAtFirst) == [.pinned, .needsYou, .forReview])
     }
 }

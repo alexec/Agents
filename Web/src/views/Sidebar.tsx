@@ -27,7 +27,7 @@ import { macHostNoticeDetail, macHostNoticeTitle } from "../model/macHostNotice"
 import { hostAnswers } from "../model/capabilities";
 import { Capability } from "../protocol/capabilities.generated";
 import { parseQuery, queryMatches, type LabelQuery } from "../model/labels";
-import { keepsInUnread, newSessionFolder, pinnedSessions, pinnedWorkflows, folderSessions, rememberedFolder, rememberFolder,
+import { keeper, keepsInUnread, newSessionFolder, pinnedSessions, pinnedWorkflows, folderSessions, rememberedFolder, rememberFolder,
   smartAgents, smartApprovals, smartRows, smartTitles, withKept, type FolderKey, type SmartRow } from "../model/sidebar";
 import { updatedLine } from "../model/updated";
 import { namedRelative, workflowSummary } from "../model/workflows";
@@ -126,7 +126,7 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
   // message stays in Mail's Unread mailbox while it is selected.
   useEffect(() => {
     const agent = r.host && r.session ? store.agent(r.host, r.session) : undefined;
-    keptInUnread.value = agent && showsUnread(agent) ? { host: r.host!, id: agent.id } : null;
+    keptInUnread.value = agent && showsUnread(agent) ? { host: r.host!, id: agent.id, hadFile: agent.fileToSee != null } : null;
   }, [r.host, r.session]);
   // What is open, from anywhere (a link, Back), unfolds its folder so its row is there to light,
   // unless an open group at the top already shows it.
@@ -291,8 +291,9 @@ function AgentsPageRow({ id, title, icon }: { id: string; title: string; icon: s
 // Through window, so a test without a page reads nothing (Node warns on a bare localStorage).
 const storage = globalThis.window?.localStorage;
 
-/** The session opened while it was unread, which Unread keeps until another is opened (#495). */
-const keptInUnread = signal<{ host: string; id: string } | null>(null);
+/** The session opened while it was unread, which Unread keeps until another is opened (#495), or
+ *  For Review when it had a file to see (`hadFile`, #3194). */
+const keptInUnread = signal<{ host: string; id: string; hadFile: boolean } | null>(null);
 
 type Placed = { host: ControlMachine; folder: FolderSummary };
 
@@ -317,8 +318,9 @@ function inOpenSmartRow(store: Store, host: string, agent: Agent): boolean {
   const pins = store.sessionPinsIn(host, agentFolderPath(agent));
   if (on.has("pinned") && folds.isSmartOpen("pinned") && pins.includes(agent.id)) return true;
   const kept = keptInUnread.peek();
-  if (on.has("unread") && folds.isSmartOpen("unread") && kept?.host === host && kept.id === agent.id) return true;
-  return (["needsYou", "working", "unread"] as const).some((row) => folds.isSmartOpen(row) && smartAgents(row, [agent], undefined, pins, on).length > 0);
+  const keptBy = keeper(kept?.hadFile ?? false, on);
+  if (on.has(keptBy) && folds.isSmartOpen(keptBy) && kept?.host === host && kept.id === agent.id) return true;
+  return (["needsYou", "forReview", "working", "unread"] as const).some((row) => folds.isSmartOpen(row) && smartAgents(row, [agent], undefined, pins, on).length > 0);
 }
 
 /** A search narrows workflows by name and what they are; one asking for a label leaves them out. */
@@ -431,10 +433,10 @@ function SmartFold({ row, store, folders, query, linkDown, downSince }: {
       count += gathered().length;
       if (open || parsed) for (const agent of gathered(parsed)) found.set(agent, placed);
     }
-    // Unread keeps the session opened from it in its place, read now; none while searching.
-    const kept = row === "unread" && !parsed ? keptInUnread.value : null;
+    // Unread keeps the session opened from it in its place, read now, or For Review (#3194); none while searching.
+    const kept = !parsed && row === keeper(keptInUnread.value?.hadFile ?? false, on) ? keptInUnread.value : null;
     const keptAgent = kept ? store.agent(kept.host, kept.id) : undefined;
-    keptPlace = keptAgent && keepsInUnread(keptAgent, store.sessionPinsIn(kept!.host, agentFolderPath(keptAgent)), on) ? folders.find(({ host, folder }) =>
+    keptPlace = keptAgent && keepsInUnread(keptAgent, store.sessionPinsIn(kept!.host, agentFolderPath(keptAgent)), on, row) ? folders.find(({ host, folder }) =>
       host.id === kept!.host && folderKey(folder.folder.folder) === agentFolderPath(keptAgent)) : undefined;
     // Each under the session that started it when this group lists that too (#835).
     const listed = withKept([...found.keys()].sort(byStart), keptPlace ? keptAgent : undefined);
@@ -551,7 +553,7 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
   // The one Unread keeps while it is open is listed there, not here too (#689).
   const keptID = !parsed && keptInUnread.value?.host === host.id ? keptInUnread.value.id : undefined;
   const keptAgent = keptID ? live.find((a) => a.id === keptID) : undefined;
-  const kept = keptAgent && keepsInUnread(keptAgent, pins, on) ? keptAgent.id : undefined;
+  const kept = keptAgent && keepsInUnread(keptAgent, pins, on, keeper(keptInUnread.value?.hadFile ?? false, on)) ? keptAgent.id : undefined;
   const sessions = !unfolded ? [] : folderSessions(live, pins, parsed, kept, on);
   const recentArchived = !parsed ? recentlyArchived(view.archived, recentArchivedShown, toWireDate(new Date())) : [];
   const archived = !unfolded || !parsed ? [] : view.archived.filter((a) => queryMatches(parsed, a));

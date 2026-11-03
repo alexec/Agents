@@ -316,9 +316,11 @@ struct RemoteSmartFold: View {
         return agents
     }
 
-    /// The session Unread keeps, read, while it is the one open; none while searching.
+    /// The session Unread keeps, read, while it is the one open, or For Review when it had a
+    /// file to see (#3194); none while searching.
     private var keptUnread: Agent? {
-        row == .unread ? SidebarSmartRow.keptInUnread(model.keptInUnread, in: model.work, query: query, on: on) : nil
+        row == SidebarSmartRow.keeper(fileToSee: model.keptHadFile, on: on)
+            ? SidebarSmartRow.keptInUnread(model.keptInUnread, in: model.work, query: query, on: on, keptBy: row) : nil
     }
 
     /// One folder's pinned sessions (#180), then its pinned workflows (#432), each
@@ -506,9 +508,10 @@ struct RemoteFolderFold: View {
     private var key: FolderKey { summary.key }
 
     var body: some View {
+        let on = smartGroups ?? SidebarSmartRow.on(off: smartOff)
         let fold = SidebarFolderFold(key, label: label, in: model.work, query: query, isOpen: folds.isOpen(key),
                                       keptInUnread: model.keptInUnread,
-                                      on: smartGroups ?? SidebarSmartRow.on(off: smartOff))
+                                      keptBy: SidebarSmartRow.keeper(fileToSee: model.keptHadFile, on: on), on: on)
         let isOpen = fold.isUnfolded
         if fold.isShown {
             // A search holds every match open.

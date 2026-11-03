@@ -1,10 +1,10 @@
 import AgentsKitCore
 import SwiftUI
 
-/// One of the groups at the top of the sidebar (#495): Pinned, Needs You, Working or
-/// Unread, across every folder and host. Needs You lists, after its sessions, everything
-/// else waiting for an OK (#773). A section headed and folding as a folder's
-/// is, so its heading and rows line up with theirs. Folded, it reads its count off each
+/// One of the groups at the top of the sidebar (#495): Pinned, Needs You, For Review
+/// (#3194), Working or Unread, across every folder and host. Needs You lists, after its
+/// sessions, everything else waiting for an OK (#773). A section headed and folding as a
+/// folder's is, so its heading and rows line up with theirs. Folded, it reads its count off each
 /// folder's shelf and lists nothing (#356). Empty, it is not drawn (#507).
 struct SmartFold: View {
     @Environment(AppModel.self) private var model
@@ -74,9 +74,11 @@ struct SmartFold: View {
         return agents
     }
 
-    /// The session Unread keeps, read, while it is the one open; none while searching.
+    /// The session Unread keeps, read, while it is the one open, or For Review when it had a
+    /// file to see (#3194); none while searching.
     private var keptUnread: Agent? {
-        row == .unread ? SidebarSmartRow.keptInUnread(model.keptInUnread, in: model.work, query: query, on: on) : nil
+        row == SidebarSmartRow.keeper(fileToSee: model.keptHadFile, on: on)
+            ? SidebarSmartRow.keptInUnread(model.keptInUnread, in: model.work, query: query, on: on, keptBy: row) : nil
     }
 
     /// Every folder's pinned sessions, then its pinned workflows, each dragged into the

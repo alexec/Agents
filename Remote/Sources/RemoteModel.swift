@@ -88,6 +88,8 @@ final class RemoteModel {
             // Opened from Unread, it stays there until something else is opened (#495,
             // #498), as a read message stays in Mail's Unread mailbox while it is selected.
             keptInUnread = selection.flatMap { work.agent($0) }.flatMap { $0.showsUnread ? $0.id : nil }
+            // From For Review when it had a file to see (#3194): that group keeps it instead.
+            keptHadFile = selection.flatMap { work.agent($0) }?.fileToSee != nil
             letGoOfChats(keeping: selection)
             Task { await loadTranscript() }
         }
@@ -533,6 +535,8 @@ final class RemoteModel {
     /// The session opened while it was unread, kept in the sidebar's Unread until another
     /// is opened (#495), so it does not leave the list under the finger on the tap.
     private(set) var keptInUnread: UUID?
+    /// Whether `keptInUnread` had a file to see when opened, so For Review keeps it (#3194).
+    private(set) var keptHadFile = false
     /// One of the pages about all the work, from the sidebar's Activity (#226): Events,
     /// Resources, Runtimes or Spending. Nil, or one of those.
     var openActivity: SidebarItem? {
