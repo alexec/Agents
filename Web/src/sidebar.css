@@ -86,6 +86,8 @@
 .with-sidebar .sidebar .title.placed .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .with-sidebar .sidebar .title.placed :is(.place, .started-by) { flex: none; white-space: pre; }
 .with-sidebar .sidebar .title.placed .place { max-width: 40%; overflow: hidden; text-overflow: ellipsis; }
+/* A lead's epic progress (#3270), whole after its title, in the grey of the row's second line. */
+.with-sidebar .sidebar .title.placed .lead-progress { flex: none; white-space: pre; font-weight: 400; opacity: 0.6; }
 
 /* A session's mark in the sidebar (#495): an orange hand, the working ring (#2044, #2332), a list when queued,
    the breathing beacon (#2456, #2657), a pause mark (#630), a tick once done, read or not (#1323, #2363); every icon in the

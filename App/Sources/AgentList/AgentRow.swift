@@ -49,6 +49,10 @@ struct AgentRow: View {
             // Last known, not current: its host is not answering (037), or the control
             // plane that would carry the answer is away (058, frame H).
             .opacity(model.hostUnreachable(agent.host) ? 0.55 : 1)
+            // A lead asks for its epic's progress again each time it wakes (#3270).
+            .task(id: LeadProgress.turn(agent)) {
+                await model.loadLeadProgress(agent)
+            }
             .confirmationDialog(DeletionWords.confirmTitle(agent.title), isPresented: $deleting) {
                 Button("Delete", role: .destructive) {
                     Task {
@@ -126,6 +130,16 @@ struct AgentRow: View {
                                 .lineLimit(1)
                         }
                     }
+                    }
+                    // A lead's epic, done of all its children (#3270): whole after the
+                    // title, which is cut first.
+                    if let progress = model.leadProgress[agent.id] {
+                        Text("· \(progress)")
+                            .appText(isCompact ? .supporting : .reading)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .fixedSize()
+                            .accessibilityLabel(LeadProgress.spoken(progress))
                     }
                     // Started by a workflow rather than a person: the one thing about
                     // an agent's origin worth a mark, because it is the difference
