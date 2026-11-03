@@ -41,6 +41,7 @@ const CapDaemon1 = "daemon/1"
 const CapDevice1 = "device/1"
 const CapDevices1 = "devices/1"
 const CapDisk1 = "disk/1"
+const CapDocs1 = "docs/1"
 const CapDropbox1 = "dropbox/1"
 const CapElicitations1 = "elicitations/1"
 const CapEventsAudit1 = "events.audit/1"
@@ -239,6 +240,9 @@ var HostCapabilities = pairs([][2]string{
 	{"devices/startPairing", "devices/1"},
 	{"devices/stopPairing", "devices/1"},
 	{"disk/state", "disk/1"},
+	{"docs/list", "docs/1"},
+	{"docs/read", "docs/1"},
+	{"docs/search", "docs/1"},
 	{"dropbox/put", "dropbox/1"},
 	{"elicitations/answer", "elicitations/1"},
 	{"elicitations/pending", "elicitations/1"},

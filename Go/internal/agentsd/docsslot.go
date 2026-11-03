@@ -40,6 +40,19 @@ var docsKinds = []struct {
 // newestDoc is the folder's newest doc, relative to the folder, and when it changed.
 // Found is false when the folder has no docs.
 func newestDoc(folder string) (rel string, at time.Time, found bool) {
+	for _, f := range folderDocFiles(folder) {
+		if !found || f.at.After(at) {
+			rel, at, found = f.rel, f.at, true
+		}
+	}
+	return rel, at, found
+}
+
+// folderDocFiles is the folder's docs: the *.md files at its top and under specs/ and docs/
+// (in no hidden folder or node_modules), regular files only, looking at docsScanLimit files
+// at most.
+func folderDocFiles(folder string) []docFile {
+	var out []docFile
 	seen := 0
 	look := func(path string, d fs.DirEntry) {
 		seen++
@@ -50,13 +63,11 @@ func newestDoc(folder string) (rel string, at time.Time, found bool) {
 		if err != nil || !info.Mode().IsRegular() {
 			return
 		}
-		if !found || info.ModTime().After(at) {
-			r, err := filepath.Rel(folder, path)
-			if err != nil {
-				return
-			}
-			rel, at, found = filepath.ToSlash(r), info.ModTime(), true
+		r, err := filepath.Rel(folder, path)
+		if err != nil {
+			return
 		}
+		out = append(out, docFile{rel: filepath.ToSlash(r), at: info.ModTime(), size: info.Size()})
 	}
 	if entries, err := os.ReadDir(folder); err == nil {
 		for _, e := range entries {
@@ -79,7 +90,7 @@ func newestDoc(folder string) (rel string, at time.Time, found bool) {
 			return nil
 		})
 	}
-	return rel, at, found
+	return out
 }
 
 // readDocs is the Docs slot's read of the folder.
@@ -93,29 +104,44 @@ func readDocs(folder string, now time.Time) *slotRecord {
 	return s
 }
 
-// docsServers is the docs connectors that reach the folder (its own mcp.json, then the
-// person's): their names there, and the words the slot says for them, each once. A server
-// that its map says can search and read is one whatever its name (#3307).
-func (d *Daemon) docsServers(folder string, maps map[string]docsMap) (names, words []string) {
+// docsServerEntry is a docs connector that reaches a folder: its name in mcp.json, and the
+// words the slot says for it.
+type docsServerEntry struct{ name, word string }
+
+// docsServerEntries is the docs connectors that reach the folder (its own mcp.json, then the
+// person's), each once. A server that its map says can search and read is one whatever its
+// name (#3307).
+func (d *Daemon) docsServerEntries(folder string, maps map[string]docsMap) []docsServerEntry {
 	entries, _ := readMCPFile(filepath.Join(folder, ".agents", "mcp.json"))
 	if home := d.personalHome(); home != "" {
 		personal, _ := readMCPFile(filepath.Join(home, ".agents", "mcp.json"))
 		entries = append(entries, personal...)
 	}
-	seenName, seenWord := map[string]bool{}, map[string]bool{}
+	var out []docsServerEntry
+	seen := map[string]bool{}
 	for _, e := range entries {
 		word, ok := docsKindOf(e.name, mcpSummary(e))
 		if m, mapped := maps[e.name]; !ok && mapped && m.searchesAndReads() {
 			word, ok = e.name, true
 		}
-		if !ok || seenName[e.name] {
+		if !ok || seen[e.name] {
 			continue
 		}
-		seenName[e.name] = true
+		seen[e.name] = true
+		out = append(out, docsServerEntry{e.name, word})
+	}
+	return out
+}
+
+// docsServers is the docs connectors that reach the folder: their names in mcp.json, and the
+// words the slot says for them, each once.
+func (d *Daemon) docsServers(folder string, maps map[string]docsMap) (names, words []string) {
+	seenWord := map[string]bool{}
+	for _, e := range d.docsServerEntries(folder, maps) {
 		names = append(names, e.name)
-		if !seenWord[word] {
-			seenWord[word] = true
-			words = append(words, word)
+		if !seenWord[e.word] {
+			seenWord[e.word] = true
+			words = append(words, e.word)
 		}
 	}
 	return names, words

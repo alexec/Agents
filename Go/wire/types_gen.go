@@ -3133,6 +3133,99 @@ type DiskWorktree struct {
 	Partial bool `json:"partial"`
 }
 
+// One doc (#3319): a *.md file of a folder (at its top, or under specs/ or docs/), or a page of a docs connector. ref is its lineage ref, kind doc: <forge>:<owner>/<repo>/doc/<path> for a folder in a repo, folder:<machine>/<folder name>/doc/<path> for one with no forge remote, confluence:<site>/<page id>, notion:<page id>, gdrive:<file id>, or mcp:<server>/<id> for another mapped server. source is its DocsSource's id. path is a folder doc's, relative to folder; url a connector doc's.
+type Doc struct {
+	Ref string `json:"ref"`
+
+	// Its first # heading, or its file name; a connector doc's title.
+	Title string `json:"title"`
+
+	Source string `json:"source"`
+
+	// A folder doc's folder, or the folder whose mcp.json reaches the connector.
+	Folder *string `json:"folder,omitzero"`
+
+	Path *string `json:"path,omitzero"`
+
+	URL *string `json:"url,omitzero"`
+
+	Updated *Date `json:"updated,omitzero"`
+}
+
+// docs/list (#3319): a page of docs, the last updated first. sources are the sources it looked at, each with its state: one that failed or is not mapped is named here, and the docs of the others still come. cursor is the next page, absent at the end.
+type DocsList struct {
+	Docs []Doc `json:"docs"`
+
+	Sources []DocsSource `json:"sources"`
+
+	Cursor *string `json:"cursor,omitzero"`
+}
+
+// docs/list (#3319): the docs of every folder on this machine and of their docs connectors, or of one folder, or of one source (a DocsSource id). A connector lists its map's recent tool, else its search for nothing. limit is 1 to 500, 200 when not said; cursor is the last page's.
+type DocsListRequest struct {
+	Folder *string `json:"folder,omitzero"`
+
+	Source *string `json:"source,omitzero"`
+
+	Cursor *string `json:"cursor,omitzero"`
+
+	Limit *int64 `json:"limit,omitzero"`
+}
+
+// One place a search found in a doc: its line (1 is the first) and the line, cut short, for a folder doc; a snippet only for a connector doc.
+type DocsMatch struct {
+	Line *int64 `json:"line,omitzero"`
+
+	Snippet string `json:"snippet"`
+}
+
+// docs/read (#3319): a doc by its ref, lines from to to (1 is the first; both included). Absent from is 1; absent to reads as far as the read's limits allow.
+type DocsReadRequest struct {
+	Ref string `json:"ref"`
+
+	From *int64 `json:"from,omitzero"`
+
+	To *int64 `json:"to,omitzero"`
+}
+
+// docs/read (#3319): the doc's Markdown from line from to line to, and its total lines. next is the from of the next read when this one was cut short (by to, or by the line or byte limit), absent at the end. A connector doc is its read tool's answer turned into Markdown.
+type DocsReading struct {
+	Doc Doc `json:"doc"`
+
+	Text string `json:"text"`
+
+	From int64 `json:"from"`
+
+	To int64 `json:"to"`
+
+	Lines int64 `json:"lines"`
+
+	Next *int64 `json:"next,omitzero"`
+}
+
+// docs/search (#3319): the docs that match, the most matches first. sources are the sources it searched, each with its state: one that failed is named, and the results of the others still come.
+type DocsSearch struct {
+	Results []DocsSearchResult `json:"results"`
+
+	Sources []DocsSource `json:"sources"`
+}
+
+// docs/search (#3319): the words to find, in every source or in sources (DocsSource ids). A folder doc matches when a line has the words, in any case; a connector doc when its map's search tool finds it. limit is 1 to 100 docs, 20 when not said.
+type DocsSearchRequest struct {
+	Query string `json:"query"`
+
+	Sources []string `json:"sources,omitzero"`
+
+	Limit *int64 `json:"limit,omitzero"`
+}
+
+// A doc that docs/search found, with its matches (at most 5).
+type DocsSearchResult struct {
+	Doc Doc `json:"doc"`
+
+	Matches []DocsMatch `json:"matches"`
+}
+
 // One docs connector in the Docs slot (#3307): its name in mcp.json, and what its one real search found.
 type DocsServer struct {
 	Name string `json:"name"`
@@ -3153,6 +3246,34 @@ const DocsServerStateNoMap DocsServerState = "noMap"
 const DocsServerStateNotRead DocsServerState = "notRead"
 const DocsServerStateRead DocsServerState = "read"
 const DocsServerStateFailed DocsServerState = "failed"
+
+// Where docs come from (#3319): a folder, or a docs connector in a folder's Docs slot. id is the folder's path, or mcp:<server name> for a connector. name is the folder's name or the connector's. folder is the folder (for a connector, the first folder whose mcp.json reaches it). message says why, when state is failed.
+type DocsSource struct {
+	ID string `json:"id"`
+
+	Kind DocsSourceKind `json:"kind"`
+
+	Name string `json:"name"`
+
+	Folder *string `json:"folder,omitzero"`
+
+	State DocsSourceState `json:"state"`
+
+	Message *string `json:"message,omitzero"`
+}
+
+// folder: a folder's own *.md files. connector: a docs connector, through its map in .agents/docs-maps.json.
+type DocsSourceKind string
+
+const DocsSourceKindFolder DocsSourceKind = "folder"
+const DocsSourceKindConnector DocsSourceKind = "connector"
+
+// read: it answered. notMapped: a docs connector with no map of its search and read tools yet (the map-a-docs-server skill writes one). failed: it did not answer; message says why.
+type DocsSourceState string
+
+const DocsSourceStateRead DocsSourceState = "read"
+const DocsSourceStateNotMapped DocsSourceState = "notMapped"
+const DocsSourceStateFailed DocsSourceState = "failed"
 
 // A claimed email domain (#1002, D8, FR-010): proved by the TXT record `txtValue` at `txtName`, for one org provider. The control plane keeps it at v1/signin/domains/<domain>.json and checks it each day; 7 days of failures take it back to notProved. `sendHere` sends an email at the domain to the provider (signIn/discover); `require` refuses a built-in sign-in at the domain to join, pair or renew (D9).
 type DomainClaim struct {
