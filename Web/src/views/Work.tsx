@@ -108,11 +108,12 @@ export function LabelChip({ label }: { label: ForgeLabel }) {
   return <span class="work-label" style={bg ? { background: bg, color: labelInk(label.color), borderColor: bg } : undefined}>{label.name}</span>;
 }
 
-/** The state as a word in a pill: open, closed, merged, draft. */
-export function StatePill({ state, draft }: { state: string; draft?: boolean | undefined }) {
+/** The state as a word in a pill: open, closed, merged, draft; or the tracker's own status (a Jira
+ * status, #3260), in the colour of the state it is in. */
+export function StatePill({ state, draft, status }: { state: string; draft?: boolean | undefined; status?: string | undefined }) {
   if (!state) return null;
   const word = draft && state === "open" ? "draft" : state;
-  return <span class={`work-state ${word}`}>{word}</span>;
+  return <span class={`work-state ${word}`}>{status ?? word}</span>;
 }
 
 function WorkRowView({ row, several, open }: { row: WorkRow; several: boolean; open: () => void }) {
@@ -123,7 +124,7 @@ function WorkRowView({ row, several, open }: { row: WorkRow; several: boolean; o
         <span class="work-row-head">
           {!titleSaysRef(row) && <span class="work-ref">{shortRef(row.node.ref)}</span>}
           <span class="work-title">{row.title}</span>
-          <StatePill state={row.state} draft={row.draft} />
+          <StatePill state={row.state} draft={row.draft} status={row.status} />
           {row.labels.map((l) => <LabelChip key={l.name} label={l} />)}
           {several && <span class="quiet small">{repoName(row.repo)}</span>}
         </span>
@@ -245,7 +246,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
       <header class="work-page-head">
         <h2><span class="work-title">{title}</span> {!titleSaysRef({ title, node }) && <span class="work-ref">{shortRef(ref)}</span>}</h2>
         <div class="work-row-head">
-          <StatePill state={state} draft={item?.draft} />
+          <StatePill state={state} draft={item?.draft} status={item?.status} />
           {labels.map((l) => <LabelChip key={l.name} label={l} />)}
         </div>
         <p class="quiet small">

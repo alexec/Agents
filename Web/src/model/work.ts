@@ -30,6 +30,8 @@ export interface WorkRow {
   title: string;
   /** open, closed or merged; empty when nothing says. */
   state: string;
+  /** The tracker's own name for its step (a Jira status, #3260), shown in place of state. */
+  status?: string | undefined;
   labels: ForgeLabel[];
   /** The ref's repo or tracker: github:alexec/Agents, linear. */
   repo: string;
@@ -55,8 +57,8 @@ export function repoOf(ref: string): string {
   return cut < 0 ? ref : `${forge}:${id.slice(0, cut)}`;
 }
 
-/** "alexec/Agents" of "github:alexec/Agents", for a row's repo column. */
-export const repoName = (repo: string) => repo.replace(/^[a-z][a-z0-9-]*:/, "");
+/** "alexec/Agents" of "github:alexec/Agents", for a row's repo column; a tracker (linear, jira, #3260) by its own name. */
+export const repoName = (repo: string) => repo.includes(":") ? repo.replace(/^[a-z][a-z0-9-]*:/, "") : forgeTitle[repo] ?? repo;
 
 /** An issue's or PR's number in its repo, for Newest; 0 for one without. */
 export function refNumber(ref: string): number {
@@ -78,7 +80,7 @@ const unix = (at: number) => fromWireDate(at as never).getTime() / 1000;
 /** A row from the forge's item, with its lineage when there is any. */
 export function forgeRow(item: ForgeItem, host: string, lineage?: ReportNode): WorkRow {
   return {
-    node: item.node, title: item.title, state: item.state, labels: item.labels, repo: repoOf(item.node.ref),
+    node: item.node, title: item.title, state: item.state, status: item.status, labels: item.labels, repo: repoOf(item.node.ref),
     author: item.author, assignees: item.assignees, milestone: item.milestone, updated: unix(item.updatedAt),
     url: item.url, host, draft: item.draft, lineage,
   };
@@ -322,13 +324,13 @@ export const mergeWaits = (d: ForgeItemDetail) => d.item.checks === "running" ||
 export const failedChecks = (d: ForgeItemDetail) => (d.checks ?? []).filter((c) => c.state === "failing");
 
 /** What a write did, for the line under the actions. */
-export function doneWords(method: string, done: ForgeDone, reopened = false): string {
+export function doneWords(method: string, done: ForgeDone, reopened = false, moved = false): string {
   switch (method) {
     case "forge/comment": return "Commented.";
     case "forge/label": return "Labels changed.";
     case "forge/merge": return done.auto ? "Auto-merge is on: it merges when its checks pass." : "Merged.";
     case "forge/approve": return "Approved.";
-    case "forge/close": return reopened ? "Reopened." : "Closed.";
+    case "forge/close": return moved ? "Status changed." : reopened ? "Reopened." : "Closed.";
     case "forge/rerun": return done.reran === undefined ? "Started again." : done.reran === 1 ? "1 run started again." : `${done.reran} runs started again.`;
     default: return "Done.";
   }

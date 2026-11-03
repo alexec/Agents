@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/url"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -106,13 +107,16 @@ var (
 	linearLabel = regexp.MustCompile(`^[A-Z][A-Z0-9]{0,9}-[0-9]{1,9}$`)
 	// linearTeam is a Linear team's key, as ENG.
 	linearTeam = regexp.MustCompile(`^[A-Z][A-Z0-9]{0,9}$`)
+	// keyInText is a key in a PR's title or branch, in either case, not inside a longer word.
+	keyInText = regexp.MustCompile(`(?i)\b[A-Z][A-Z0-9]{0,9}-[0-9]{1,9}\b`)
 )
 
-// labelNode is the issue or PR a label names, in the folder's repo: #n, P#n, or a Linear
-// key such as ENG-4.
+// labelNode is the issue or PR a label names, in the folder's repo: #n, P#n, or a key such as
+// ENG-4: on Jira when the folder's .agents/folder.json names its project in "jiraProjects"
+// (#3260), else on Linear.
 func (d *Daemon) labelNode(folder, label string) (wire.LineageNode, bool) {
 	if linearLabel.MatchString(label) {
-		return wire.LineageNode{Kind: lineage.KindIssue, Ref: "linear:" + label}, true
+		return keyNode(label, d.folderJiraProjects(folder)), true
 	}
 	issue, pr := issueLabel.FindStringSubmatch(label), prLabel.FindStringSubmatch(label)
 	if issue == nil && pr == nil {
@@ -128,6 +132,27 @@ func (d *Daemon) labelNode(folder, label string) (wire.LineageNode, bool) {
 	}
 	n, _ := strconv.Atoi(pr[1])
 	return repo.pr(n), n > 0
+}
+
+// keyNode is the issue a key (ENG-4) names: on Jira when its project is one of jira, else on Linear.
+func keyNode(key string, jira []string) wire.LineageNode {
+	if project, _, _ := strings.Cut(key, "-"); slices.Contains(jira, project) {
+		return wire.LineageNode{Kind: lineage.KindIssue, Ref: "jira:" + key}
+	}
+	return wire.LineageNode{Kind: lineage.KindIssue, Ref: "linear:" + key}
+}
+
+// jiraKeys are the keys of the Jira projects jira that text names, each once: a PR's title or
+// branch, as ABC-123 or abc-123-fix-it (#3260).
+func jiraKeys(text string, jira []string) []string {
+	var keys []string
+	for _, m := range keyInText.FindAllString(text, -1) {
+		key := strings.ToUpper(m)
+		if project, _, _ := strings.Cut(key, "-"); slices.Contains(jira, project) && !slices.Contains(keys, key) {
+			keys = append(keys, key)
+		}
+	}
+	return keys
 }
 
 // folderRepo is the forge repo a folder pushes to, from its origin remote.
@@ -359,6 +384,16 @@ func (d *Daemon) lineageEvent(e wire.Event) {
 				if r, n, ok := issueOfNode(issue); ok {
 					d.noteIssueMilestone(folder, r, n)
 				}
+			}
+		}
+		// A Jira key in its title or branch, of a project its repo's folder names (#3260): a PR
+		// is never on the Jira site, so this is the way its cost reaches the Jira issue.
+		if jira := d.folderJiraProjects(d.repoFolder(repo)); len(jira) > 0 {
+			for _, key := range jiraKeys(p.PR.Title, jira) {
+				d.link(pr, wire.LineageNode{Kind: lineage.KindIssue, Ref: "jira:" + key}, lineage.RelFixes, lineage.SourcePRBody)
+			}
+			for _, key := range jiraKeys(p.PR.Branch, jira) {
+				d.link(pr, wire.LineageNode{Kind: lineage.KindIssue, Ref: "jira:" + key}, lineage.RelFixes, lineage.SourceBranch)
 			}
 		}
 		// How it ended, for its cost (#2350).

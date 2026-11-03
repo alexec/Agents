@@ -13,6 +13,7 @@ import (
 	"github.com/alexec/agents/Go/internal/connections"
 	"github.com/alexec/agents/Go/internal/githubmcp"
 	"github.com/alexec/agents/Go/internal/gitlabmcp"
+	"github.com/alexec/agents/Go/internal/jiramcp"
 	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/internal/linearmcp"
 	"github.com/alexec/agents/Go/wire"
@@ -30,7 +31,10 @@ import (
 // with the host's GitLab connection, only on its own GitLab, through gitlabmcp.RealGitLab: a
 // call per project, as GitLab has no list across chosen projects. Linear (#3209) is read with
 // the Linear connection, issues only, of the teams the folders' .agents/folder.json name in
-// "linearTeams": one query for every team.
+// "linearTeams": one query for every team. Jira (#3260) is read with the jira connector's
+// sign-in (JIRA_URL, JIRA_EMAIL and JIRA_API_TOKEN in the secrets) through jiramcp.RealJira,
+// issues only, of the projects the folders' .agents/folder.json name in "jiraProjects": one
+// search for every project.
 //
 // A list is one page of every forge, merged by updatedAt: each forge is asked for a page, the
 // newest of them all are kept, and each forge's cursor goes on after the last of its own kept.
@@ -59,6 +63,18 @@ type forgeGitLab interface {
 	ItemPage(ctx context.Context, project string, number int, mr bool, before string) (gitlabmcp.ItemDetail, error)
 	Plan(ctx context.Context, project string, number int) (gitlabmcp.Plan, error)
 	forgeGitLabWrites
+}
+
+// forgeJira is what the forge reads and writes ask of Jira; a test gives a fake.
+type forgeJira interface {
+	Search(ctx context.Context, projects []string, f jiramcp.SearchFilter, after string, first int) (jiramcp.SearchPage, error)
+	ItemPage(ctx context.Context, key, before string) (jiramcp.ItemDetail, error)
+	Comment(ctx context.Context, key, body string) (string, error)
+	SetLabels(ctx context.Context, key string, add, remove []string) error
+	Labels(ctx context.Context, key string) ([]string, map[string]string, error)
+	SetState(ctx context.Context, key string, closed bool) error
+	Transition(ctx context.Context, key, id string) error
+	Plan(ctx context.Context, key string) (jiramcp.Plan, error)
 }
 
 // forgeLinear is what the forge reads ask of Linear; a test gives a fake.
@@ -94,6 +110,8 @@ type forgeBook struct {
 	newForgeGitLab func(root, token string) forgeGitLab
 	// newForgeLinear is Linear with the Authorization header's value; a test gives a fake.
 	newForgeLinear func(key string) forgeLinear
+	// newForgeJira is Jira with the connector's sign-in; a test gives a fake.
+	newForgeJira func(auth jiramcp.Auth) forgeJira
 }
 
 func (d *Daemon) registerForge() {
@@ -121,11 +139,12 @@ type forgeCursor struct {
 	GitHub string   `json:"github,omitempty"`
 	GitLab string   `json:"gitlab,omitempty"`
 	Linear string   `json:"linear,omitempty"`
+	Jira   string   `json:"jira,omitempty"`
 	Done   []string `json:"done,omitempty"`
 }
 
 func (c *forgeCursor) of(forge string) *string {
-	return map[string]*string{"github": &c.GitHub, "gitlab": &c.GitLab, "linear": &c.Linear}[forge]
+	return map[string]*string{"github": &c.GitHub, "gitlab": &c.GitLab, "linear": &c.Linear, "jira": &c.Jira}[forge]
 }
 
 func (c forgeCursor) text() *string {
@@ -221,6 +240,21 @@ func (d *Daemon) forgeList(ctx context.Context, prs bool, r wire.ForgeListReques
 		p.err = err
 		pages = append(pages, p)
 	}
+	if len(sources.projects) > 0 && !slices.Contains(cursor.Done, "jira") {
+		p := forgePage{forge: "jira"}
+		j, err := d.forgeJira()
+		if err == nil {
+			var page jiramcp.SearchPage
+			page, err = j.Search(ctx, sources.projects, jiramcp.SearchFilter{State: state, Label: deref(r.Label),
+				Assignee: deref(r.Assignee), Query: deref(r.Query), Feature: deref(r.Feature)}, cursor.Jira, limit)
+			for _, i := range page.Items {
+				p.items = append(p.items, jiraItemOf(i, sources.projectFolder[i.Project]))
+			}
+			p.cursors, p.next = page.Cursors, page.Next
+		}
+		p.err = err
+		pages = append(pages, p)
+	}
 	var more bool
 	out.Items, cursor, more = mergeForgePages(pages, cursor, limit)
 	for _, p := range pages {
@@ -266,7 +300,7 @@ func mergeForgePages(pages []forgePage, from forgeCursor, limit int) ([]wire.For
 		items = append(items, pages[best].items[taken[best]])
 		taken[best]++
 	}
-	next := forgeCursor{GitHub: from.GitHub, GitLab: from.GitLab, Linear: from.Linear, Done: slices.Clone(from.Done)}
+	next := forgeCursor{GitHub: from.GitHub, GitLab: from.GitLab, Linear: from.Linear, Jira: from.Jira, Done: slices.Clone(from.Done)}
 	more := false
 	for n, p := range pages {
 		switch {
@@ -286,21 +320,23 @@ func mergeForgePages(pages []forgePage, from forgeCursor, limit int) ([]wire.For
 }
 
 // forgeSources are what a list reads: the GitHub repos, the GitLab projects on the connected
-// GitLab, and the Linear teams, each once, with a folder on each to act from.
+// GitLab, the Linear teams and the Jira projects, each once, with a folder on each to act from.
 type forgeSources struct {
-	repos      []string
-	gitlab     []string
-	root       string
-	gitlabErr  error
-	teams      []string
-	folderOf   map[forgeRepo]string
-	teamFolder map[string]string
+	repos         []string
+	gitlab        []string
+	root          string
+	gitlabErr     error
+	teams         []string
+	projects      []string
+	folderOf      map[forgeRepo]string
+	teamFolder    map[string]string
+	projectFolder map[string]string
 }
 
-func (s forgeSources) key() []any { return []any{s.repos, s.root, s.gitlab, s.teams} }
+func (s forgeSources) key() []any { return []any{s.repos, s.root, s.gitlab, s.teams, s.projects} }
 
 func (d *Daemon) forgeSources(ctx context.Context, prs bool, folders []string) forgeSources {
-	s := forgeSources{folderOf: map[forgeRepo]string{}, teamFolder: map[string]string{}}
+	s := forgeSources{folderOf: map[forgeRepo]string{}, teamFolder: map[string]string{}, projectFolder: map[string]string{}}
 	gl, glConnected := d.gitlabConnection()
 	if glConnected && gl.Usable(nowFunc()) {
 		s.root = gitlabmcp.BaseURL(gl.URL)
@@ -332,10 +368,17 @@ func (d *Daemon) forgeSources(ctx context.Context, prs bool, folders []string) f
 				s.teams = append(s.teams, team)
 			}
 		}
+		for _, project := range d.folderJiraProjects(f) {
+			if _, seen := s.projectFolder[project]; !seen {
+				s.projectFolder[project] = f
+				s.projects = append(s.projects, project)
+			}
+		}
 	}
 	slices.Sort(s.repos)
 	slices.Sort(s.gitlab)
 	slices.Sort(s.teams)
+	slices.Sort(s.projects)
 	if len(s.gitlab) == 0 && elsewhere {
 		// A page still says why GitLab's folders are not in it.
 		s.gitlabErr = errors.New(gitlabmcp.NotConnected)
@@ -373,19 +416,37 @@ func (d *Daemon) gitlabProjectAt(ctx context.Context, folder, connected string) 
 
 // folderLinearTeams is the Linear teams, by key, that a folder's .agents/folder.json names for
 // its tasks: "linearTeams": ["ENG"].
-func (d *Daemon) folderLinearTeams(folder string) []string {
+func (d *Daemon) folderLinearTeams(folder string) []string { return d.folderKeys(folder, "linearTeams") }
+
+// folderJiraProjects is the Jira projects, by key, that a folder's .agents/folder.json names
+// for its tasks: "jiraProjects": ["PROJ"] (#3260).
+func (d *Daemon) folderJiraProjects(folder string) []string { return d.folderKeys(folder, "jiraProjects") }
+
+// folderKeys is the team or project keys (ENG, PROJ) a folder's .agents/folder.json lists
+// under name, in capitals.
+func (d *Daemon) folderKeys(folder, name string) []string {
 	m, err := d.approvedConfig(folder)
 	if err != nil {
 		return nil
 	}
-	list, _ := m["linearTeams"].([]any)
-	var teams []string
+	list, _ := m[name].([]any)
+	var keys []string
 	for _, v := range list {
 		if t, ok := v.(string); ok && linearTeam.MatchString(strings.ToUpper(t)) {
-			teams = append(teams, strings.ToUpper(t))
+			keys = append(keys, strings.ToUpper(t))
 		}
 	}
-	return teams
+	return keys
+}
+
+// jiraFolder is the first folder whose .agents/folder.json names project, or "".
+func (d *Daemon) jiraFolder(project string) string {
+	for _, f := range d.folderPaths() {
+		if slices.Contains(d.folderJiraProjects(f), project) {
+			return f
+		}
+	}
+	return ""
 }
 
 // forgeItem is one issue or pull request, with its body and a page of its comments.
@@ -402,8 +463,10 @@ func (d *Daemon) forgeItem(ctx context.Context, kind string, r wire.ForgeItemReq
 	var err error
 	if identifier, ok := strings.CutPrefix(r.Node.Ref, "linear:"); ok && kind == lineage.KindIssue && linearLabel.MatchString(identifier) {
 		out, err = d.linearItem(ctx, method, identifier, deref(r.Cursor))
+	} else if key, ok := strings.CutPrefix(r.Node.Ref, "jira:"); ok && kind == lineage.KindIssue && linearLabel.MatchString(key) {
+		out, err = d.jiraItem(ctx, method, key, deref(r.Cursor))
 	} else if repo, number, ok := nodeOfRepo(r.Node); !ok {
-		return wire.ForgeItemDetail{}, Invalid("%s: %s is not an issue or a pull request on GitHub, GitLab or Linear", method, r.Node.Ref)
+		return wire.ForgeItemDetail{}, Invalid("%s: %s is not an issue or a pull request on GitHub, GitLab, Linear or Jira", method, r.Node.Ref)
 	} else if repo.forge == "gitlab" {
 		out, err = d.gitlabItem(ctx, method, kind, repo, number, deref(r.Cursor))
 	} else {
@@ -534,6 +597,31 @@ func (d *Daemon) linearItem(ctx context.Context, method, identifier, cursor stri
 	return out, nil
 }
 
+func (d *Daemon) jiraItem(ctx context.Context, method, key, cursor string) (wire.ForgeItemDetail, error) {
+	j, err := d.forgeJira()
+	if err != nil {
+		return wire.ForgeItemDetail{}, err
+	}
+	p, err := j.ItemPage(ctx, key, cursor)
+	if err != nil {
+		var je *jiramcp.JiraError
+		if errors.As(err, &je) && je.Kind == jiramcp.NotFound {
+			return wire.ForgeItemDetail{}, Invalid("%s: %v", method, err)
+		}
+		return wire.ForgeItemDetail{}, err
+	}
+	out := wire.ForgeItemDetail{Item: jiraItemOf(p.Item, d.jiraFolder(p.Project)), Body: p.Body, Comments: []wire.ForgeComment{},
+		Cursor: optional(p.Before), Transitions: []wire.ForgeTransition{}}
+	out.Start = forgeStartOf(out.Item)
+	for _, c := range p.Thread {
+		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Body, c.At, c.URL, c.Bot))
+	}
+	for _, t := range p.Transitions {
+		out.Transitions = append(out.Transitions, wire.ForgeTransition{ID: t.ID, Name: t.Name, Category: optional(t.Category)})
+	}
+	return out, nil
+}
+
 func forgeCommentOf(author, body, at, url string, bot bool) wire.ForgeComment {
 	c := wire.ForgeComment{Author: author, Body: body, At: forgeDate(at), URL: optional(url)}
 	if bot {
@@ -587,6 +675,19 @@ func (d *Daemon) forgeLinear() (forgeLinear, error) {
 		return d.newForgeLinear(key), nil
 	}
 	return linearmcp.NewRealLinear("", func() string { return key }), nil
+}
+
+// forgeJira is Jira as the jira connector's sign-in on this host (its secrets), or why there is none.
+func (d *Daemon) forgeJira() (forgeJira, error) {
+	secrets := d.secrets()
+	auth := jiramcp.TokenAuth(secrets["JIRA_URL"], secrets["JIRA_EMAIL"], secrets["JIRA_API_TOKEN"])
+	if auth.Site == "" || auth.Header == "" {
+		return nil, errors.New("Jira is not signed in: add the Jira connector in Connectors, with its site and API token")
+	}
+	if d.newForgeJira != nil {
+		return d.newForgeJira(auth), nil
+	}
+	return jiramcp.NewRealJira(func() jiramcp.Auth { return auth }), nil
 }
 
 // forgeItemOf is a GitHub item in the one model, from folder.
@@ -656,6 +757,23 @@ func linearItemOf(i linearmcp.Item, folder string) wire.ForgeItem {
 	var parent *wire.LineageNode
 	if i.Parent != "" {
 		parent = &wire.LineageNode{Kind: lineage.KindIssue, Ref: "linear:" + i.Parent}
+	}
+	withHierarchy(&out, parent, i.SubTotal, i.SubDone)
+	return out
+}
+
+// jiraItemOf is a Jira issue in the one model, from folder.
+func jiraItemOf(i jiramcp.Item, folder string) wire.ForgeItem {
+	out := wire.ForgeItem{Node: wire.LineageNode{Kind: lineage.KindIssue, Ref: "jira:" + i.Key}, Title: i.Title, State: i.State,
+		Status: optional(i.Status), URL: optional(i.URL), Folder: optional(folder), Labels: forgeLabelsOf(i.Labels, nil),
+		Author: optional(i.Author), Assignees: i.Assignees, Milestone: optional(i.Milestone), UpdatedAt: forgeDate(i.UpdatedAt),
+		Comments: int64(i.Comments)}
+	if out.Assignees == nil {
+		out.Assignees = []string{}
+	}
+	var parent *wire.LineageNode
+	if i.Parent != "" {
+		parent = &wire.LineageNode{Kind: lineage.KindIssue, Ref: "jira:" + i.Parent}
 	}
 	withHierarchy(&out, parent, i.SubTotal, i.SubDone)
 	return out

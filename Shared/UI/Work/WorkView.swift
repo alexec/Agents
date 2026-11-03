@@ -256,7 +256,7 @@ private struct WorkRowView: View {
                 Text(row.title).fontWeight(.semibold).lineLimit(2)
             }
             WrappingHStack(spacing: 4) {
-                WorkStatePill(state: row.state, draft: row.draft)
+                WorkStatePill(state: row.state, draft: row.draft, status: row.status)
                 ForEach(row.labels, id: \.name) { WorkLabelChip(label: $0) }
                 if several {
                     Text(WorkList.repoName(row.repo)).appText(.fine).foregroundStyle(.secondary)
@@ -283,7 +283,7 @@ private struct WorkRowView: View {
                     Text(WorkList.shortRef(row.node.ref)).foregroundStyle(.tint).monospacedDigit()
                 }
                 Text(row.title).fontWeight(.semibold).lineLimit(1)
-                WorkStatePill(state: row.state, draft: row.draft)
+                WorkStatePill(state: row.state, draft: row.draft, status: row.status)
                 ForEach(row.labels, id: \.name) { WorkLabelChip(label: $0) }
                 if several {
                     Text(WorkList.repoName(row.repo)).appText(.fine).foregroundStyle(.secondary)
@@ -313,15 +313,17 @@ struct WorkLabelChip: View {
     }
 }
 
-/// The state as a word in a pill: open, closed, merged or draft.
+/// The state as a word in a pill: open, closed, merged or draft; or the tracker's own status (a
+/// Jira status, #3260), in the colour of the state it is in.
 struct WorkStatePill: View {
     let state: String
     var draft = false
+    var status: String?
 
     var body: some View {
         if !state.isEmpty {
             let word = draft && state == "open" ? "draft" : state
-            Text(word)
+            Text(status ?? word)
                 .appText(.fine)
                 .foregroundStyle(.white)
                 .padding(.horizontal, 6)

@@ -3322,10 +3322,15 @@ export interface ForgeCheck {
   url?: string;
 }
 
-/** forge/close (#3130): close an issue or a pull request, or with reopen open it again. */
+/**
+ * forge/close (#3130): close an issue or a pull request, or with reopen open it again; with
+ * transition, move a Jira issue by that transition of its workflow, by its id from the page's
+ * transitions (#3260).
+ */
 export interface ForgeCloseRequest {
   node: LineageNode;
   reopen?: boolean;
+  transition?: string;
 }
 
 /**
@@ -3418,20 +3423,23 @@ export interface ForgeFeaturesRequest {
 
 /**
  * An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for
- * GitHub, GitLab and Linear, so one page draws each. node is its lineage node (kind issue or pr,
- * ref github:alexec/Agents#12). state is open, closed or merged. folder is a folder on this machine
- * on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The
- * pull request's own fields: draft; checks is passing, failing, running or none; review is
- * approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown;
- * autoMerge says auto-merge is on. The hierarchy (#3267): parent is the issue it is a sub-issue (a
- * Linear or GitLab child) of; level is epic, story, task or spike, from its labels; feature is the
- * name of its feature:<name> label; progress is a parent's closed children of all of them, where
- * the forge says it: in a GitHub list, and on an issue's own read.
+ * GitHub, GitLab, Linear and Jira (#3260), so one page draws each. node is its lineage node (kind
+ * issue or pr, ref github:alexec/Agents#12). state is open, closed or merged; status is the
+ * tracker's own name for its step, where its workflow has steps (a Jira status, as In Progress; one
+ * in Jira's Done category is closed). folder is a folder on this machine on its repo, to act from.
+ * labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own
+ * fields: draft; checks is passing, failing, running or none; review is approved, changes_requested
+ * or review_required; mergeable is mergeable, conflicting or unknown; autoMerge says auto-merge is
+ * on. The hierarchy (#3267): parent is the issue it is a sub-issue (a Linear or GitLab child) of;
+ * level is epic, story, task or spike, from its labels; feature is the name of its feature:<name>
+ * label; progress is a parent's closed children of all of them, where the forge says it: in a
+ * GitHub list, and on an issue's own read.
  */
 export interface ForgeItem {
   node: LineageNode;
   title: string;
   state: string;
+  status?: string;
   url?: string;
   folder?: string;
   labels: ForgeLabel[];
@@ -3457,7 +3465,8 @@ export interface ForgeItem {
  * absent at the first comment. A pull request's checks, review threads (line comments, in threads)
  * and files changed come with it. head is a pull request's head commit, which forge/merge and
  * forge/approve name (#3130); mergeMethods are the ways its repo allows, the repo's default first;
- * start is the new-agent form for an issue.
+ * start is the new-agent form for an issue. transitions are the moves an issue's workflow allows
+ * now (Jira, #3260), which forge/close takes in place of a close or a reopen.
  */
 export interface ForgeItemDetail {
   item: ForgeItem;
@@ -3470,6 +3479,7 @@ export interface ForgeItemDetail {
   head?: string;
   mergeMethods?: ForgeMergeMethod[];
   start?: ForgeStart;
+  transitions?: ForgeTransition[];
 }
 
 /**
@@ -3649,6 +3659,16 @@ export interface ForgeStart {
   prompt: string;
   labels: string[];
   worktree?: string;
+}
+
+/**
+ * A move an issue's workflow allows now (#3260): its id, which forge/close takes, and its name, as
+ * Start Progress. category is the status category it goes to: new, indeterminate or done.
+ */
+export interface ForgeTransition {
+  id: string;
+  name: string;
+  category?: string;
 }
 
 export interface FoundFolder {
@@ -10744,7 +10764,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FoldersListRequest: { required: ["includeArchived"], optional: [] },
   ForgeApproveRequest: { required: ["node", "sha"], optional: [] },
   ForgeCheck: { required: ["name", "state"], optional: ["url"] },
-  ForgeCloseRequest: { required: ["node"], optional: ["reopen"] },
+  ForgeCloseRequest: { required: ["node"], optional: ["reopen", "transition"] },
   ForgeComment: { required: ["author", "body", "at"], optional: ["url", "bot"] },
   ForgeCommentRequest: { required: ["node", "body"], optional: [] },
   ForgeDiff: { required: ["files", "cut"], optional: ["url"] },
@@ -10754,8 +10774,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeFeature: { required: ["name", "epics", "open"], optional: ["color"] },
   ForgeFeatures: { required: ["features"], optional: ["errors"] },
   ForgeFeaturesRequest: { required: [], optional: ["folder"] },
-  ForgeItem: { required: ["node", "title", "state", "labels", "assignees", "updatedAt", "comments"], optional: ["url", "folder", "author", "milestone", "draft", "checks", "review", "mergeable", "autoMerge", "parent", "level", "feature", "progress"] },
-  ForgeItemDetail: { required: ["item", "body", "comments"], optional: ["cursor", "checks", "reviewThreads", "filesChanged", "head", "mergeMethods", "start"] },
+  ForgeItem: { required: ["node", "title", "state", "labels", "assignees", "updatedAt", "comments"], optional: ["status", "url", "folder", "author", "milestone", "draft", "checks", "review", "mergeable", "autoMerge", "parent", "level", "feature", "progress"] },
+  ForgeItemDetail: { required: ["item", "body", "comments"], optional: ["cursor", "checks", "reviewThreads", "filesChanged", "head", "mergeMethods", "start", "transitions"] },
   ForgeItemRequest: { required: ["node"], optional: ["cursor"] },
   ForgeLabel: { required: ["name"], optional: ["color"] },
   ForgeLabelRequest: { required: ["node"], optional: ["add", "remove"] },
@@ -10775,6 +10795,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgePlanStep: { required: ["step", "nodes"], optional: [] },
   ForgeProgress: { required: ["done", "total"], optional: [] },
   ForgeStart: { required: ["prompt", "labels"], optional: ["worktree"] },
+  ForgeTransition: { required: ["id", "name"], optional: ["category"] },
   FoundFolder: { required: ["folder", "exists", "isRepository", "isFolder"], optional: ["typed"] },
   GitAsk: { required: ["server", "from"], optional: [] },
   GitCredential: { required: ["username", "password"], optional: [] },

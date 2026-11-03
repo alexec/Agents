@@ -11,6 +11,7 @@ import (
 	"github.com/alexec/agents/Go/internal/githubmcp"
 	"github.com/alexec/agents/Go/internal/gitlabmcp"
 	"github.com/alexec/agents/Go/internal/lineage"
+	"github.com/alexec/agents/Go/internal/jiramcp"
 	"github.com/alexec/agents/Go/internal/linearmcp"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -92,8 +93,10 @@ func (d *Daemon) forgePlan(ctx context.Context, r wire.ForgePlanRequest) (wire.F
 		var err error
 		if identifier, ok := strings.CutPrefix(r.Node.Ref, "linear:"); ok && linearLabel.MatchString(identifier) {
 			epic, children, err = d.linearPlan(ctx, method, identifier)
+		} else if key, ok := strings.CutPrefix(r.Node.Ref, "jira:"); ok && linearLabel.MatchString(key) {
+			epic, children, err = d.jiraPlan(ctx, method, key)
 		} else if repo, number, ok := nodeOfRepo(r.Node); !ok {
-			return wire.ForgePlan{}, Invalid("%s: %s is not an issue on GitHub, GitLab or Linear", method, r.Node.Ref)
+			return wire.ForgePlan{}, Invalid("%s: %s is not an issue on GitHub, GitLab, Linear or Jira", method, r.Node.Ref)
 		} else if repo.forge == "gitlab" {
 			epic, children, err = d.gitlabPlan(ctx, method, repo, number)
 		} else {
@@ -285,6 +288,33 @@ func (d *Daemon) linearPlan(ctx context.Context, method, identifier string) (wir
 		pc := planChild{item: linearItemOf(c.Item, folderOf(c.Team))}
 		for _, b := range c.BlockedBy {
 			pc.blockedBy = append(pc.blockedBy, planRef{node: wire.LineageNode{Kind: lineage.KindIssue, Ref: "linear:" + b.Identifier}, open: b.Open})
+		}
+		children = append(children, pc)
+	}
+	return epic, children, nil
+}
+
+// jiraPlan is a Jira epic or parent and its children (#3260), each blocked by the issues its
+// Blocks links say.
+func (d *Daemon) jiraPlan(ctx context.Context, method, key string) (wire.ForgeItem, []planChild, error) {
+	j, err := d.forgeJira()
+	if err != nil {
+		return wire.ForgeItem{}, nil, err
+	}
+	p, err := j.Plan(ctx, key)
+	if err != nil {
+		var je *jiramcp.JiraError
+		if errors.As(err, &je) && je.Kind == jiramcp.NotFound {
+			return wire.ForgeItem{}, nil, Invalid("%s: %v", method, err)
+		}
+		return wire.ForgeItem{}, nil, err
+	}
+	epic := jiraItemOf(p.Epic, d.jiraFolder(p.Epic.Project))
+	var children []planChild
+	for _, c := range p.Children {
+		pc := planChild{item: jiraItemOf(c.Item, d.jiraFolder(c.Project))}
+		for _, b := range c.BlockedBy {
+			pc.blockedBy = append(pc.blockedBy, planRef{node: wire.LineageNode{Kind: lineage.KindIssue, Ref: "jira:" + b.Key}, open: b.Open})
 		}
 		children = append(children, pc)
 	}

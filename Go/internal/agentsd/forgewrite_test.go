@@ -241,7 +241,7 @@ func TestForgePullWritesGoToGitHub(t *testing.T) {
 }
 
 // #3130: a write says what is wrong with it, and asks the forge nothing: an empty comment, no
-// label, a merge with no head, a pull request's action on an issue.
+// label, a merge with no head, a pull request's action on an issue, a forge it does not know.
 func TestForgeWritesRefuseWhatIsWrong(t *testing.T) {
 	_, c, gh, _ := forgeDaemon(t)
 	for i, ask := range []struct {
@@ -253,7 +253,7 @@ func TestForgeWritesRefuseWhatIsWrong(t *testing.T) {
 		{"forge/merge", wire.ForgeMergeRequest{Node: ghPull}},
 		{"forge/approve", wire.ForgeApproveRequest{Node: ghIssue, Sha: "abc"}},
 		{"forge/rerun", wire.ForgeNodeRequest{Node: ghIssue}},
-		{"forge/close", wire.ForgeCloseRequest{Node: wire.LineageNode{Kind: "issue", Ref: "jira:X-1"}}},
+		{"forge/close", wire.ForgeCloseRequest{Node: wire.LineageNode{Kind: "issue", Ref: "bitbucket:X-1"}}},
 	} {
 		if e := c.callError(t, 10+i, ask.method, ask.params); e == nil || !strings.Contains(e.Message, ask.method) {
 			t.Fatalf("%s: %v", ask.method, e)

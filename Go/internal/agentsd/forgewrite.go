@@ -13,10 +13,11 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// The forge writes (#3130): the actions of the GitHub, GitLab and Linear views, on the Work pages'
-// issue and pull request pages: comment, labels, close and reopen, and a pull request's merge,
-// approve, rerun of its failed checks, their logs and its diff. Next to the reads (forge.go), with
-// the same tokens and the connectors' own write code.
+// The forge writes (#3130): the actions of the GitHub, GitLab, Linear and Jira (#3260) views, on
+// the Work pages' issue and pull request pages: comment, labels, close and reopen (a Jira issue's
+// move by a transition of its workflow), and a pull request's merge, approve, rerun of its failed
+// checks, their logs and its diff. Next to the reads (forge.go), with the same tokens and the
+// connectors' own write code.
 //
 // Each write is a person's own click on their own page. Only a window or a device may call these
 // (Role.Allows: an agent's connection has none of them), and the control plane opens a channel to
@@ -96,7 +97,7 @@ func (d *Daemon) registerForgeWrites() {
 }
 
 // forgeTarget is the item a write is on, and the forge to write it with: one of github, gitlab
-// (with its project there) or linear (with its identifier).
+// (with its project there), linear (with its identifier) or jira (with its key, in identifier).
 type forgeTarget struct {
 	repo       forgeRepo
 	number     int
@@ -105,6 +106,7 @@ type forgeTarget struct {
 	gitlab     forgeGitLab
 	project    string
 	linear     forgeLinear
+	jira       forgeJira
 	identifier string
 }
 
@@ -120,9 +122,16 @@ func (d *Daemon) forgeTargetOf(ctx context.Context, method string, node wire.Lin
 		}
 		return forgeTarget{linear: l, identifier: identifier}, nil
 	}
+	if key, ok := strings.CutPrefix(node.Ref, "jira:"); ok && node.Kind == lineage.KindIssue && linearLabel.MatchString(key) {
+		j, err := d.forgeJira()
+		if err != nil {
+			return forgeTarget{}, err
+		}
+		return forgeTarget{jira: j, identifier: key}, nil
+	}
 	repo, number, ok := nodeOfRepo(node)
 	if !ok {
-		return forgeTarget{}, Invalid("%s: %s is not an issue or a pull request on GitHub, GitLab or Linear", method, node.Ref)
+		return forgeTarget{}, Invalid("%s: %s is not an issue or a pull request on GitHub, GitLab, Linear or Jira", method, node.Ref)
 	}
 	t := forgeTarget{repo: repo, number: number, pr: node.Kind == lineage.KindPR}
 	if repo.forge == "gitlab" {
@@ -165,6 +174,8 @@ func (d *Daemon) forgeComment(ctx context.Context, r wire.ForgeCommentRequest) (
 	switch {
 	case t.linear != nil:
 		url, err = t.linear.Comment(ctx, t.identifier, body)
+	case t.jira != nil:
+		url, err = t.jira.Comment(ctx, t.identifier, body)
 	case t.gitlab != nil:
 		err = t.gitlab.Comment(ctx, t.project, t.number, t.pr, body)
 	default:
@@ -213,6 +224,8 @@ func (d *Daemon) forgeLabel(ctx context.Context, r wire.ForgeLabelRequest) (wire
 	switch {
 	case t.linear != nil:
 		err = t.linear.SetLabels(ctx, t.identifier, add, remove)
+	case t.jira != nil:
+		err = t.jira.SetLabels(ctx, t.identifier, add, remove)
 	case t.gitlab != nil:
 		err = t.gitlab.SetLabels(ctx, t.project, t.number, t.pr, add, remove)
 	default:
@@ -235,6 +248,8 @@ func (d *Daemon) forgeLabels(ctx context.Context, r wire.ForgeNodeRequest) (wire
 	switch {
 	case t.linear != nil:
 		names, colors, err = t.linear.Labels(ctx, t.identifier)
+	case t.jira != nil:
+		names, colors, err = t.jira.Labels(ctx, t.identifier)
 	case t.gitlab != nil:
 		names, colors, err = t.gitlab.ProjectLabels(ctx, t.project)
 	default:
@@ -247,12 +262,21 @@ func (d *Daemon) forgeLabels(ctx context.Context, r wire.ForgeNodeRequest) (wire
 }
 
 func (d *Daemon) forgeClose(ctx context.Context, r wire.ForgeCloseRequest) (wire.ForgeDone, error) {
-	t, err := d.forgeTargetOf(ctx, "forge/close", r.Node, false)
+	const method = "forge/close"
+	t, err := d.forgeTargetOf(ctx, method, r.Node, false)
 	if err != nil {
 		return wire.ForgeDone{}, err
 	}
+	transition := strings.TrimSpace(deref(r.Transition))
+	if transition != "" && t.jira == nil {
+		return wire.ForgeDone{}, Invalid("%s: only a Jira issue moves by a transition", method)
+	}
 	closed := r.Reopen == nil || !*r.Reopen
 	switch {
+	case transition != "":
+		err = t.jira.Transition(ctx, t.identifier, transition)
+	case t.jira != nil:
+		err = t.jira.SetState(ctx, t.identifier, closed)
 	case t.linear != nil:
 		err = t.linear.SetState(ctx, t.identifier, closed)
 	case t.gitlab != nil:
@@ -502,6 +526,10 @@ func forgeStartOf(i wire.ForgeItem) *wire.ForgeStart {
 	if identifier, ok := strings.CutPrefix(i.Node.Ref, "linear:"); ok {
 		return &wire.ForgeStart{Prompt: fmt.Sprintf("%s: %s\n\nWork on this Linear issue: %s", identifier, i.Title, url),
 			Labels: []string{identifier}, Worktree: optional(identifier + " " + i.Title)}
+	}
+	if key, ok := strings.CutPrefix(i.Node.Ref, "jira:"); ok {
+		return &wire.ForgeStart{Prompt: fmt.Sprintf("%s: %s\n\nWork on this Jira issue: %s", key, i.Title, url),
+			Labels: []string{key}, Worktree: optional(key + " " + i.Title)}
 	}
 	repo, n, ok := nodeOfRepo(i.Node)
 	if !ok {

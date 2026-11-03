@@ -224,7 +224,7 @@ func TestForgePullReadsOne(t *testing.T) {
 		{"forge/issue", wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#12"}},
 		{"forge/pull", wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#13"}},
 		{"forge/pull", wire.LineageNode{Kind: "pr", Ref: "github:alexec/agents#404"}},
-		{"forge/issue", wire.LineageNode{Kind: "issue", Ref: "jira:ENG-4"}},
+		{"forge/issue", wire.LineageNode{Kind: "issue", Ref: "bitbucket:ENG-4"}},
 		{"forge/pull", wire.LineageNode{Kind: "pr", Ref: "linear:ENG-4"}},
 	} {
 		if e := c.callError(t, 10+i, ask.method, wire.ForgeItemRequest{Node: ask.node}); e == nil || !strings.Contains(e.Message, ask.method) {

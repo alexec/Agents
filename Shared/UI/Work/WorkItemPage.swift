@@ -94,7 +94,7 @@ struct WorkItemPage: View {
                 }
             }
             WrappingHStack(spacing: 6) {
-                WorkStatePill(state: item?.state ?? resolved?.state ?? "", draft: item?.draft ?? false)
+                WorkStatePill(state: item?.state ?? resolved?.state ?? "", draft: item?.draft ?? false, status: item?.status)
                 ForEach(labels, id: \.name) { WorkLabelChip(label: $0) }
             }
             // On a phone the ref takes the line, and "Open on …" goes under it.

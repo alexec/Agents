@@ -56,6 +56,8 @@ public enum WorkList {
         public var title: String
         /// open, closed or merged; empty when nothing says.
         public var state: String
+        /// The tracker's own name for its step (a Jira status, #3260), shown in place of `state`.
+        public var status: String?
         public var labels: [DaemonAPI.ForgeLabel]
         /// The ref's repo or tracker: github:alexec/Agents, linear.
         public var repo: String
@@ -74,10 +76,11 @@ public enum WorkList {
         public init(node: DaemonAPI.LineageNode, title: String, state: String, labels: [DaemonAPI.ForgeLabel] = [],
                     repo: String, author: String? = nil, assignees: [String] = [], milestone: String? = nil,
                     updated: Date, url: URL? = nil, host: MachineRef? = nil, draft: Bool = false,
-                    lineage: DaemonAPI.ReportNode? = nil) {
+                    lineage: DaemonAPI.ReportNode? = nil, status: String? = nil) {
             self.node = node
             self.title = title
             self.state = state
+            self.status = status
             self.labels = labels
             self.repo = repo
             self.author = author
@@ -94,7 +97,8 @@ public enum WorkList {
         public init(_ item: DaemonAPI.ForgeItem, on host: MachineRef, lineage: DaemonAPI.ReportNode? = nil) {
             self.init(node: item.node, title: item.title, state: item.state, labels: item.labels, repo: WorkList.repo(of: item.node.ref),
                       author: item.author, assignees: item.assignees, milestone: item.milestone, updated: item.updatedAt,
-                      url: item.url.flatMap(URL.init(string:)), host: host, draft: item.draft ?? false, lineage: lineage)
+                      url: item.url.flatMap(URL.init(string:)), host: host, draft: item.draft ?? false, lineage: lineage,
+                      status: item.status)
         }
 
         /// A row lineage alone knows: a milestone, a release.
@@ -122,9 +126,10 @@ public enum WorkList {
         ReportValueWords.url(node).map { LineageList.pullRequest(node, $0) }
     }
 
-    /// "alexec/Agents" of "github:alexec/Agents".
+    /// "alexec/Agents" of "github:alexec/Agents"; "Jira" of "jira".
     public static func repoName(_ repo: String) -> String {
-        repo.replacingOccurrences(of: #"^[a-z][a-z0-9-]*:"#, with: "", options: .regularExpression)
+        if let tracker = forgeTitle[repo], !repo.contains(":") { return tracker }
+        return repo.replacingOccurrences(of: #"^[a-z][a-z0-9-]*:"#, with: "", options: .regularExpression)
     }
 
     /// An issue's or a PR's number in its repo, for Newest; 0 for one without.
@@ -411,8 +416,9 @@ public enum WorkList {
     }
 
     /// What a write did, for the line under the actions.
-    public static func doneWords(_ method: String, _ done: DaemonAPI.ForgeDone, reopened: Bool = false) -> String {
+    public static func doneWords(_ method: String, _ done: DaemonAPI.ForgeDone, reopened: Bool = false, moved: Bool = false) -> String {
         switch method {
+        case DaemonAPI.Method.forgeClose where moved: "Status changed."
         case DaemonAPI.Method.forgeComment: "Commented."
         case DaemonAPI.Method.forgeLabel: "Labels changed."
         case DaemonAPI.Method.forgeMerge: done.auto == true ? "Auto-merge is on: it merges when its checks pass." : "Merged."
