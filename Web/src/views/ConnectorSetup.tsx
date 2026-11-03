@@ -221,7 +221,9 @@ function SlotCard({ slot, setup, folderName, reading, tryAgain, skip, linearConn
           {workspace ? place.line : words.line(slot, folderName, setup.repository, false, words.forgeOf(setup))}
         </p>
       )}
-      {words.docs.servers(slot.servers ?? []) && <p class="quiet small">{words.docs.servers(slot.servers ?? [])}</p>}
+      {slot.docsServers?.length
+        ? slot.docsServers.map((s) => <p key={s.name} class="quiet small">{words.docs.serverLine(s)}</p>)
+        : words.docs.servers(slot.servers ?? []) && <p class="quiet small">{words.docs.servers(slot.servers ?? [])}</p>}
       {fromProject && <p class="quiet small">{setByProject(setup.projectName ?? projectWords.title)}</p>}
       <p class="slot-actions small">
         {(slot.state === "notConnected" || slot.state === "noRemote") && slot.slot === "tasks" && (

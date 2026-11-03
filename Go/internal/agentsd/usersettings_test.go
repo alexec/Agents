@@ -183,7 +183,7 @@ func TestAPartIsTakenFromThisMachine(t *testing.T) {
 	json.Unmarshal(c.call(t, 1, "settings/userPart", wire.UserPartRequest{Part: wire.UserSettingsPartNameAgentConfig}), &got)
 	var config wire.UserAgentConfig
 	json.Unmarshal(got.Value, &config)
-	if config.Instructions == nil || *config.Instructions != "Be brief." || config.Skills["one"] != "one" || len(config.Skills) != 1+len(readyMadeIDs()) ||
+	if config.Instructions == nil || *config.Instructions != "Be brief." || config.Skills["one"] != "one" || len(config.Skills) != 1+len(readyMadeIDs())+len(readyMadeSkillIDs()) ||
 		len(got.LeftOut) != 1 || got.LeftOut[0] != "many" {
 		t.Fatalf("%+v %+v", got, config)
 	}

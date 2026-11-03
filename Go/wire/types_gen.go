@@ -2417,6 +2417,9 @@ type ConnectorSlot struct {
 
 	// Docs only (#3248): the docs connectors that fill the slot beside this folder, by their names in the folder's or the person's mcp.json. Absent with none.
 	Servers []string `json:"servers,omitzero"`
+
+	// Docs only (#3307): each docs connector's own read, in the order of servers: one real search through the map an agent wrote of its tools (.agents/docs-maps.json), and the first doc it found. Absent with none.
+	DocsServers []DocsServer `json:"docsServers,omitzero"`
 }
 
 // One slot of a folder's set-up (#1336), in the page's order: tasks (the tracker), codeReview, ci, docs (where the docs live, #3248), and workspace (where agents run).
@@ -3119,6 +3122,27 @@ type DiskWorktree struct {
 
 	Partial bool `json:"partial"`
 }
+
+// One docs connector in the Docs slot (#3307): its name in mcp.json, and what its one real search found.
+type DocsServer struct {
+	Name string `json:"name"`
+
+	State DocsServerState `json:"state"`
+
+	// The first doc the search found. Absent when it found none, or did not search.
+	Proof *ConnectorProof `json:"proof,omitzero"`
+
+	// failed: why, in a sentence.
+	Message *string `json:"message,omitzero"`
+}
+
+// noMap: no agent has written a map of its search and read tools yet. notRead: mapped, not searched yet. read: its one search worked. failed: the search did not work; message says why.
+type DocsServerState string
+
+const DocsServerStateNoMap DocsServerState = "noMap"
+const DocsServerStateNotRead DocsServerState = "notRead"
+const DocsServerStateRead DocsServerState = "read"
+const DocsServerStateFailed DocsServerState = "failed"
 
 // A claimed email domain (#1002, D8, FR-010): proved by the TXT record `txtValue` at `txtName`, for one org provider. The control plane keeps it at v1/signin/domains/<domain>.json and checks it each day; 7 days of failures take it back to notProved. `sendHere` sends an email at the domain to the provider (signIn/discover); `require` refuses a built-in sign-in at the domain to join, pair or renew (D9).
 type DomainClaim struct {
