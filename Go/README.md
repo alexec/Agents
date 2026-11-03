@@ -17,6 +17,7 @@ control exchange. The Mac window, the Remote, `Shared/UI`, the web page, Agents 
 | `internal/safe/` | Recover helpers: one panic never takes a host or the control plane down | build |
 | `cmd/github-mcp/`, `internal/githubmcp/` | The `github` MCP server (#1232): the official github-mcp-server's tools, as a library, and the ci server's events | ci-server |
 | `cmd/linear-mcp/`, `internal/linearmcp/` | The `linear` MCP server (#839): Linear's issue events, in github-mcp's shape (tools are Linear's own server's) | ci-server |
+| `cmd/jira-mcp/`, `internal/jiramcp/` | The `jira` MCP server (#3247): Jira's issue events and Issues page, in linear-mcp's shape (tools are Atlassian's own server's) | ci-server |
 | `cmd/email-mcp/`, `internal/emailmcp/` | The `email` MCP server (#1780): one IMAP mailbox's new mail as `email.received`, and tools that read it; it never sends | email |
 | `cmd/gitlab-mcp/`, `internal/gitlabmcp/` | The `gitlab` MCP server (#1629): merge requests, pipelines and issues on GitLab, tools and events on REST v4 | gitlab |
 | `cmd/workspace-commands/`, `internal/workspacecommands/` | The command machine provider (#691, in Go since #1364): workspaces as shell commands and presets, an MCP server the control plane runs | workspaces |
@@ -126,6 +127,28 @@ marketplace; this server runs beside agentsd with a personal API key in `LINEAR_
 It reads Linear's GraphQL API (`LINEAR_MCP_API_URL` moves it, for a fake). Agents Host carries
 it (`scripts/go-github-mcp.sh linear-mcp`) and every Linux host installs
 `linear-mcp-linux-<arch>`. See `docs/how-to/use-linear-issues.md`.
+
+## The jira MCP server (`jira-mcp`, #3247)
+
+The linear server's shape for Jira Cloud and Jira Data Center: a stdio front
+(`jiramcp.Front`) answers `events/list` and `events/poll`, and passes everything else to a
+go-sdk server with `show_issues` and `show_issue_details` and the `ui://jira/issues` page.
+The tools that change issues are Atlassian's own MCP server's (`https://mcp.atlassian.com/v1/mcp`,
+OAuth), added from the marketplace.
+
+- **Reads** Jira's REST API version 2 at `JIRA_URL`: with `JIRA_EMAIL` and `JIRA_API_TOKEN`,
+  Jira Cloud (Basic, search by `/search/jql`); with `JIRA_API_TOKEN` alone, a Data Center
+  personal access token (Bearer, search by `/search`). A description is Jira's rendered HTML,
+  made safe by `richtext.HTML`.
+- **Events**, polled every minute (Jira's webhooks need a Jira admin): `issue.opened`,
+  `issue.labelled` and `issue.assigned` (from the changelog), `issue.commented`, with the
+  linear server's cursor and paging. JQL's times are to the minute in the user's zone, so it
+  asks by minutes ago and checks the time itself. Arguments `project` (a key, as `PROJ`),
+  `label`, `issue` (as `PROJ-12`) and `anyone`; left out, only the site's own users count,
+  never a customer or an app (#728).
+
+Agents Host carries it (`scripts/go-github-mcp.sh jira-mcp`) and every Linux host installs
+`jira-mcp-linux-<arch>`. See `docs/how-to/use-jira-issues.md`.
 
 ## The gitlab MCP server (`gitlab-mcp`, #1629)
 

@@ -153,6 +153,8 @@ something particular done.
   token, set up a folder from it, and work with merge requests, issues and pipelines.
 - [Use Linear issues](use-linear-issues.md): Linear's own tools, and an agent when an
   issue is opened, labelled, commented on or closed.
+- [Use Jira issues](use-jira-issues.md): the Jira issues page with Start Agent, Atlassian's
+  own tools, and an agent when an issue is opened, labelled, commented on or assigned to you.
 - [Wait for mail](wait-for-mail.md): a mailbox for agents, the Mail page, and sign-up codes
   given to the session that waits for them.
 - [Pin a page to a folder](pin-a-page-to-a-folder.md): a document or an HTML page

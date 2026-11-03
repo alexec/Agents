@@ -8,6 +8,7 @@ import (
 	"github.com/alexec/agents/Go/internal/emailmcp"
 	"github.com/alexec/agents/Go/internal/githubmcp"
 	"github.com/alexec/agents/Go/internal/gitlabmcp"
+	"github.com/alexec/agents/Go/internal/jiramcp"
 	"github.com/alexec/agents/Go/internal/linearmcp"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -30,6 +31,10 @@ func TestOursDeclareWhatTheirServersDeclare(t *testing.T) {
 	email, _ := OursByID("agents/email")
 	if !reflect.DeepEqual(email.Declares.Events, emailmcp.EventNames()) || !email.Declares.Tools || !email.Declares.Views {
 		t.Fatalf("email: %v, the server's %v", email.Declares, emailmcp.EventNames())
+	}
+	jira, _ := OursByID("agents/jira")
+	if !reflect.DeepEqual(jira.Declares.Events, jiramcp.EventNames()) || !jira.Declares.Tools || !jira.Declares.Views {
+		t.Fatalf("jira: %v, the server's %v", jira.Declares, jiramcp.EventNames())
 	}
 	// linear-mcp has show_issues (TestTheViewListsOpenIssues); github-mcp has the official ones.
 	if !linear.Declares.Tools || !linear.Declares.Views || !github.Declares.Tools {
@@ -92,6 +97,37 @@ func TestOursAreAddedHostedWithNoSecretToAsk(t *testing.T) {
 		t.Fatalf("email built: %+v", built)
 	}
 	r := OursResult(linear, linear.Declares)
+	if r.Marketplace == nil || *r.Marketplace != AgentsMarketplace || r.Levels == nil || !r.Levels.Tools || !r.Levels.Views || !r.Levels.Events {
+		t.Fatalf("result: %+v", r)
+	}
+}
+
+// Jira has no connection yet (#3247): it asks for the site, the email and the API token, each
+// kept in secrets.env and named in the entry.
+func TestJiraAsksForItsSiteEmailAndToken(t *testing.T) {
+	jira, ok := OursByID("agents/jira")
+	if !ok || jira.Command != "jira-mcp" {
+		t.Fatalf("jira: %+v %v", jira, ok)
+	}
+	built := BuildOurs(jira, func(name string) bool { return name == "JIRA_URL" })
+	want := `{"command":"jira-mcp","hosted":true,"env":{"JIRA_URL":"${JIRA_URL}","JIRA_EMAIL":"${JIRA_EMAIL}","JIRA_API_TOKEN":"${JIRA_API_TOKEN}"}}`
+	if got := strings.Join(strings.Fields(built.Entry.Stringified()), ""); got != want {
+		t.Fatalf("entry: %s", got)
+	}
+	var names []string
+	for _, v := range built.Variables {
+		if v.Kind != wire.MCPVariableKindSecret || !v.Required || v.Description == "" || v.AlreadySet != (v.Name == "JIRA_URL") {
+			t.Errorf("variable %+v", v)
+		}
+		names = append(names, v.Name)
+	}
+	if strings.Join(names, ",") != "JIRA_URL,JIRA_EMAIL,JIRA_API_TOKEN" || built.NameHere != "jira" {
+		t.Fatalf("built: %+v", built)
+	}
+	r := OursResult(jira, jira.Declares)
+	if r.Levels == nil || !r.Levels.Workflows || r.Levels.Tested {
+		t.Fatalf("issue.labelled reaches Workflows; untested: %+v", r.Levels)
+	}
 	if r.Marketplace == nil || *r.Marketplace != AgentsMarketplace || r.Levels == nil || !r.Levels.Tools || !r.Levels.Views || !r.Levels.Events {
 		t.Fatalf("result: %+v", r)
 	}

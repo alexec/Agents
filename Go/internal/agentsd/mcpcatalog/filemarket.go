@@ -35,7 +35,8 @@ type connectorPart struct {
 		Events []string `json:"events"`
 		Views  bool     `json:"views"`
 	} `json:"declares"`
-	Tested string `json:"tested"`
+	Tested  string   `json:"tested"`
+	Secrets []Secret `json:"secrets"`
 }
 
 // ours is the entry as one of ours, when its _meta says how it runs.
@@ -49,7 +50,8 @@ func (e fileEntry) ours() (Ours, bool) {
 		title = *e.Server.Title
 	}
 	return Ours{ID: e.Server.Name, Title: title, Description: deref(e.Server.Description), Command: c.Command,
-		Declares: Declared{Tools: c.Declares.Tools, Events: c.Declares.Events, Views: c.Declares.Views}, Tested: c.Tested}, true
+		Declares: Declared{Tools: c.Declares.Tools, Events: c.Declares.Events, Views: c.Declares.Views}, Tested: c.Tested,
+		Secrets: c.Secrets}, true
 }
 
 // parseFileMarketplace reads the list shape or one server.json.

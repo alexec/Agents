@@ -255,8 +255,8 @@ func TestOursAreListedAndAddedLikeAnyConnector(t *testing.T) {
 
 	var ours wire.MCPSearchAnswer
 	json.Unmarshal(c.call(t, 2, "catalog/search", map[string]any{"query": "", "kind": "mcp", "marketplace": "provided:agents"}), &ours)
-	if len(ours.Results) != 4 || ours.Results[0].Title != "GitHub" || ours.Results[1].Title != "Linear" || ours.Results[2].Title != "GitLab" ||
-		ours.Results[3].Title != "Email" {
+	if len(ours.Results) != 5 || ours.Results[0].Title != "GitHub" || ours.Results[1].Title != "Linear" || ours.Results[2].Title != "Jira" ||
+		ours.Results[3].Title != "GitLab" || ours.Results[4].Title != "Email" {
 		t.Fatalf("%+v", ours)
 	}
 	github, linear := ours.Results[0], ours.Results[1]
