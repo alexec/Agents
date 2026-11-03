@@ -13,10 +13,10 @@ import (
 )
 
 // The Lineage section of the Issues and PR pages (#2941): the sessions that worked on an
-// issue or a pull request, and on its pull requests, with what each cost. The github, gitlab
-// and linear servers have no way to the host's record, so the host answers a view's
+// issue or a pull request, and on its pull requests, with what each cost. The github, gitlab,
+// linear and jira servers have no way to the host's record, so the host answers a view's
 // tools/call of lineageViewTool itself, with lineage/walk and lineage/cost, and never passes
-// it on. Only a view of one of those three servers may ask: the record names the person's
+// it on. Only a view of one of those four servers may ask: the record names the person's
 // sessions and what they spent.
 
 const (
@@ -26,7 +26,7 @@ const (
 )
 
 // lineageViewServers is the servers whose views may ask, by their mcpcatalog id.
-var lineageViewServers = map[string]bool{"agents/github": true, "agents/gitlab": true, "agents/linear": true}
+var lineageViewServers = map[string]bool{"agents/github": true, "agents/gitlab": true, "agents/linear": true, "agents/jira": true}
 
 type lineageView struct {
 	// Ref is the node, as lineage refs name it: github:owner/repo#12.
@@ -82,6 +82,13 @@ func (d *Daemon) lineageViewResult(s viewServer, args json.RawMessage) (wire.JSO
 		return toolError("No issue or pull request at " + strconv.Quote(a.URL) + ".")
 	}
 	v := d.lineageViewOf(node, base)
+	// A session labelled PROJ-12 is in the record as linear:PROJ-12: a key does not say which
+	// tracker it is on (#3260 tells them apart). A Jira issue with nothing of its own reads
+	// that one. Its pull requests are on GitHub or GitLab, never on the Jira site.
+	if key, ok := strings.CutPrefix(node.Ref, "jira:"); ok && len(v.Sessions) == 0 && len(v.PRs) == 0 {
+		v = d.lineageViewOf(wire.LineageNode{Kind: node.Kind, Ref: "linear:" + key}, "")
+		v.Ref = node.Ref
+	}
 	text, _ := json.Marshal(v)
 	return json.Marshal(map[string]any{
 		"content":           []map[string]string{{"type": "text", "text": string(text)}},
@@ -95,7 +102,8 @@ func toolError(words string) (wire.JSONValue, error) {
 
 // nodeOfURL is the issue or pull request at a web address, and the address's scheme and host
 // (for the links to its pull requests on a GitLab of its own): github.com/o/r/issues/5,
-// <gitlab>/group/project/-/issues/5, linear.app/<team>/issue/ENG-4/..., or a pull request's.
+// <gitlab>/group/project/-/issues/5, linear.app/<team>/issue/ENG-4/..., <jira>/browse/PROJ-12,
+// or a pull request's.
 func nodeOfURL(raw string) (wire.LineageNode, string, bool) {
 	u, err := url.Parse(raw)
 	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
@@ -112,6 +120,9 @@ func nodeOfURL(raw string) (wire.LineageNode, string, bool) {
 			return wire.LineageNode{Kind: lineage.KindIssue, Ref: "linear:" + strings.ToUpper(parts[2])}, base, true
 		}
 		return wire.LineageNode{}, "", false
+	}
+	if key, ok := strings.CutPrefix(path, "browse/"); ok && !strings.EqualFold(u.Host, "github.com") && linearLabel.MatchString(strings.ToUpper(key)) {
+		return wire.LineageNode{Kind: lineage.KindIssue, Ref: "jira:" + strings.ToUpper(key)}, "", true
 	}
 	for _, sep := range []string{"/-/issues/", "/issues/"} {
 		if repo, num, ok := strings.Cut(path, sep); ok {
@@ -323,9 +334,12 @@ func lineageCostZero(c wire.LineageCost) bool {
 }
 
 // refName is a node as the page names it: #7 or !4 in the page's own repo, owner/repo#7 in
-// another, ENG-4 on Linear.
+// another, ENG-4 on Linear, PROJ-12 on Jira.
 func refName(ref, page string) string {
 	if rest, ok := strings.CutPrefix(ref, "linear:"); ok {
+		return rest
+	}
+	if rest, ok := strings.CutPrefix(ref, "jira:"); ok {
 		return rest
 	}
 	return shortRef(ref, page)

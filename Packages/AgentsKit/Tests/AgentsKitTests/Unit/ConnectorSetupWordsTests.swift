@@ -38,6 +38,31 @@ struct ConnectorSetupWordsTests {
         #expect(ConnectorSetupWords.folderLine(setup) == "GitHub Issues, This Mac")
     }
 
+    /// The Docs slot (#3248): this folder's newest doc as its proof, its docs connectors under
+    /// it, and never a slot a project sets or one that a forge's disconnect takes.
+    @Test func theDocsSlot() throws {
+        let now = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        let json = """
+        {"slot":"docs","choice":"This folder and Notion","state":"read","servers":["notion"],
+         "proof":{"title":"specs/3248-docs/spec.md","at":\(now.addingTimeInterval(-7200).timeIntervalSinceReferenceDate)}}
+        """
+        let docs = try JSONDecoder().decode(DaemonAPI.ConnectorSlot.self, from: Data(json.utf8))
+        #expect(docs.slot == .docs && !docs.slot.isProjects)
+        #expect(ConnectorSetupWords.heading(.docs) == "Docs")
+        #expect(ConnectorSetupWords.title(docs) == "This folder and Notion")
+        #expect(ConnectorSetupWords.proof(docs, now: now) == "Newest: specs/3248-docs/spec.md 2 hours ago")
+        #expect(ConnectorSetupWords.Docs.servers(docs.servers ?? []) == "Connectors: notion")
+        #expect(ConnectorSetupWords.Docs.servers([]) == nil)
+        let empty = DaemonAPI.ConnectorSlot(slot: .docs, choice: "This folder", state: .read)
+        #expect(ConnectorSetupWords.line(empty, folder: "walk", repository: nil) == ConnectorSetupWords.Docs.none)
+        let skipped = DaemonAPI.ConnectorSlot(slot: .docs, choice: "This folder", state: .skipped)
+        #expect(ConnectorSetupWords.line(skipped, folder: "walk", repository: nil).hasPrefix("Agents won't look for docs"))
+
+        var setup = try JSONDecoder().decode(Setup.self, from: Data(Self.answer.utf8))
+        setup.slots.insert(docs, at: 3)
+        #expect(ConnectorSetupWords.disconnectMessage(.github, folders: [("walk", setup)]).hasPrefix("walk loses Tasks."))
+    }
+
     @Test func aRunSaysWhenItRan() {
         let now = Date(timeIntervalSinceReferenceDate: 800_000_000)
         let run = DaemonAPI.ConnectorProof(title: "CI on main", outcome: "passed", at: now.addingTimeInterval(-240))

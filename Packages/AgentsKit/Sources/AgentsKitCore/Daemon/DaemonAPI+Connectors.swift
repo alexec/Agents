@@ -179,9 +179,13 @@ extension DaemonAPI {
         public init(error: String? = nil) { self.error = error }
     }
 
-    /// One slot of a folder's set-up, in the page's order.
+    /// One slot of a folder's set-up, in the page's order. Docs is where the folder's docs live
+    /// (#3248).
     public enum ConnectorSlotKind: String, Codable, Sendable, Hashable, CaseIterable {
-        case tasks, codeReview, ci, workspace
+        case tasks, codeReview, ci, docs, workspace
+
+        /// A slot that a folder's project can set (#2669): the forge's three.
+        public var isProjects: Bool { [.tasks, .codeReview, .ci].contains(self) }
     }
 
     public enum ConnectorSlotState: String, Codable, Sendable, Hashable {
@@ -232,14 +236,18 @@ extension DaemonAPI {
         public var repository: String?
         /// The folder's project sets it, for every folder in the project (#2669).
         public var fromProject: Bool?
+        /// Docs only (#3248): the docs connectors beside this folder, by their mcp.json names.
+        public var servers: [String]?
 
         public var id: ConnectorSlotKind { slot }
         public var isFromProject: Bool { fromProject == true }
 
         public init(slot: ConnectorSlotKind, choice: String, state: ConnectorSlotState, proof: ConnectorProof? = nil,
-                    readAt: Date? = nil, message: String? = nil, repository: String? = nil, fromProject: Bool? = nil) {
+                    readAt: Date? = nil, message: String? = nil, repository: String? = nil, fromProject: Bool? = nil,
+                    servers: [String]? = nil) {
             self.slot = slot; self.choice = choice; self.state = state; self.proof = proof
             self.readAt = readAt; self.message = message; self.repository = repository; self.fromProject = fromProject
+            self.servers = servers
         }
     }
 

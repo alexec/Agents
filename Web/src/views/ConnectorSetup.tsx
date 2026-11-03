@@ -221,6 +221,7 @@ function SlotCard({ slot, setup, folderName, reading, tryAgain, skip, linearConn
           {workspace ? place.line : words.line(slot, folderName, setup.repository, false, words.forgeOf(setup))}
         </p>
       )}
+      {words.docs.servers(slot.servers ?? []) && <p class="quiet small">{words.docs.servers(slot.servers ?? [])}</p>}
       {fromProject && <p class="quiet small">{setByProject(setup.projectName ?? projectWords.title)}</p>}
       <p class="slot-actions small">
         {(slot.state === "notConnected" || slot.state === "noRemote") && slot.slot === "tasks" && (
@@ -255,12 +256,14 @@ function SlotCard({ slot, setup, folderName, reading, tryAgain, skip, linearConn
       )}
       {changing && !workspace && (
         <div class="slot-change">
+          {slot.slot === "docs" && <p class="strong">{words.docs.question}</p>}
           <button onClick={() => setChanging(false)}>{slot.choice}</button>
           {slot.slot === "tasks" && linearConnected === false && (
             <button onClick={() => { connectLinear(); setChanging(false); }}>{words.connectLinear}</button>
           )}
           <button onClick={() => { skip(true); setChanging(false); }}>None (skip)</button>
           <button class="link" onClick={() => setChanging(false)}>Cancel</button>
+          {slot.slot === "docs" && <p class="quiet small">{words.docs.addOnTheMac}</p>}
         </div>
       )}
     </div>
@@ -307,7 +310,7 @@ function ProjectSlots({ store, setup, changed }: { store: Store; setup: Connecto
   return (
     <div class="setup-card project-slots">
       <p class="quiet small">{slotsOwner(name)}</p>
-      {project?.mayChange && setup.slots.filter((s) => s.slot !== "workspace").map((slot) => {
+      {project?.mayChange && setup.slots.filter((s) => words.isProjects(s.slot)).map((slot) => {
         const value = projectSlotFrom(setup, slot);
         return (
           <p key={slot.slot} class="small project-slot">

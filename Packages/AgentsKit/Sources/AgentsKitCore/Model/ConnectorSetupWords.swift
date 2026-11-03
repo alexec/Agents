@@ -97,6 +97,7 @@ public enum ConnectorSetupWords {
         case .tasks: "Tasks"
         case .codeReview: "Code review"
         case .ci: "CI"
+        case .docs: "Docs"
         case .workspace: "Where agents run"
         }
     }
@@ -122,6 +123,7 @@ public enum ConnectorSetupWords {
             case .codeReview: gitlab ? "Agents won't use merge requests here. Nothing is turned on."
                 : "Agents won't use pull requests here. Nothing is turned on."
             case .ci: "Agents won't wait on checks here. Nothing is turned on."
+            case .docs: "Agents won't look for docs before they work. Nothing is turned on."
             case .workspace: "Agents run on this Mac."
             }
         case .noRemote:
@@ -130,6 +132,8 @@ public enum ConnectorSetupWords {
             return slot.message ?? "The read didn't work."
         case .notRead:
             return "Reading\u{2026}"
+        case .read where slot.slot == .docs:
+            return Docs.none
         case .read where slot.slot == .workspace:
             return "Nothing to set up. Other places are set up in Providers."
         case .read:
@@ -137,7 +141,7 @@ public enum ConnectorSetupWords {
             case .tasks: "No issues yet in \(repo)."
             case .codeReview: gitlab ? "No merge requests yet in \(repo)." : "No pull requests yet in \(repo)."
             case .ci: gitlab ? "No pipelines yet in \(repo)." : "No workflow runs yet in \(repo)."
-            case .workspace: ""
+            case .docs, .workspace: ""
             }
         case .notConnected:
             return switch slot.slot {
@@ -146,8 +150,35 @@ public enum ConnectorSetupWords {
                 : "Agents open pull requests and answer reviews. " + comesWith(forge)
             case .ci: gitlab ? "Agents see pipelines pass and fail, and wait on them. " + comesWith(forge)
                 : "Agents see checks pass and fail, and wait on them. " + comesWith(forge)
+            case .docs: Docs.none
             case .workspace: "Nothing to set up."
             }
+        }
+    }
+
+    /// The Docs slot (#3248): where the folder's docs live, so that agents read the requirements
+    /// and designs behind an issue before they work on it.
+    public enum Docs {
+        public static let question = "Where do your docs live?"
+        /// A read of this folder that found no docs.
+        public static let none = "No docs yet in specs/, docs/ or a *.md file at the top."
+        public static let thisFolderNote = "specs/, docs/ and the *.md files at the top. Nothing to connect."
+        public static let confluenceNote = "Atlassian's own connector, with the same sign-in as Jira."
+        public static let notionNote = "Notion's own connector."
+        public static let googleDriveNote = "A Google Drive connector."
+        public static let catalogueNote = "Any other connector that can search and read docs."
+        public static let noneNote = "Skip: agents won't look for docs here."
+        /// The web page has no catalogue: the connectors are added on the Mac.
+        public static let addOnTheMac = "Confluence, Notion, Google Drive and other docs connectors: add them on the Mac, in Add Connector\u{2026}."
+
+        /// The catalogue's search for each choice.
+        public static let confluenceSearch = "atlassian"
+        public static let notionSearch = "notion"
+        public static let googleDriveSearch = "google drive"
+
+        /// The docs connectors beside this folder, under the title.
+        public static func servers(_ names: [String]) -> String? {
+            names.isEmpty ? nil : "Connectors: " + names.joined(separator: ", ")
         }
     }
 
@@ -291,7 +322,7 @@ public enum ConnectorSetupWords {
         guard p == .github || p == .gitlab else { return disconnectNote(p) }
         let losing = folders.compactMap { folder -> String? in
             guard folder.setup.forgeOrGitHub == p else { return nil }
-            let slots = folder.setup.slots.filter { $0.slot != .workspace && $0.state == .read }.map { heading($0.slot) }
+            let slots = folder.setup.slots.filter { $0.slot.isProjects && $0.state == .read }.map { heading($0.slot) }
             return slots.isEmpty ? nil : "\(folder.name) loses \(slots.joined(separator: ", "))."
         }
         return (losing + [disconnectNote(p)]).joined(separator: " ")

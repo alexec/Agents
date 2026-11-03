@@ -64,6 +64,46 @@
     },
     {
       "server": {
+        "name": "agents/jira",
+        "title": "Jira",
+        "description": "Jira issues on Jira Cloud or Data Center: a page of open issues with Start Agent, and events when one is opened, labelled, commented on or assigned to you"
+      },
+      "_meta": {
+        "dev.agentloops/connector": {
+          "command": "jira-mcp",
+          "hosted": true,
+          "declares": {
+            "tools": true,
+            "events": [
+              "issue.opened",
+              "issue.labelled",
+              "issue.commented",
+              "issue.assigned"
+            ],
+            "views": true
+          },
+          "secrets": [
+            {
+              "name": "JIRA_URL",
+              "description": "The Jira site, as https://example.atlassian.net",
+              "required": true
+            },
+            {
+              "name": "JIRA_EMAIL",
+              "description": "Your Atlassian account's email, as you sign in to Jira Cloud with",
+              "required": true
+            },
+            {
+              "name": "JIRA_API_TOKEN",
+              "description": "An API token from id.atlassian.com ▸ Security ▸ API tokens, or a Data Center personal access token",
+              "required": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "server": {
         "name": "agents/gitlab",
         "title": "GitLab",
         "description": "Merge requests, pipelines and issues on gitlab.com or a self-managed GitLab: their pages, tools to read them and comment, and events"

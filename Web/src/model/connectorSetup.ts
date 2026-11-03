@@ -80,8 +80,21 @@ export function setUpHeading(setup: ConnectorSetup): string {
 }
 
 export function heading(kind: ConnectorSlotKind): string {
-  return { tasks: "Tasks", codeReview: "Code review", ci: "CI", workspace: "Where agents run" }[kind];
+  return { tasks: "Tasks", codeReview: "Code review", ci: "CI", docs: "Docs", workspace: "Where agents run" }[kind];
 }
+
+/** The slots a folder's project can set (#2669): the forge's three, not Docs or Where agents run. */
+export function isProjects(kind: ConnectorSlotKind): boolean {
+  return kind === "tasks" || kind === "codeReview" || kind === "ci";
+}
+
+/** The Docs slot (#3248), as the window's ConnectorSetupWords.Docs. */
+export const docs = {
+  question: "Where do your docs live?",
+  none: "No docs yet in specs/, docs/ or a *.md file at the top.",
+  addOnTheMac: "Confluence, Notion, Google Drive and other docs connectors: add them on the Mac, in Add Connector….",
+  servers: (names: string[]): string | undefined => names.length ? `Connectors: ${names.join(", ")}` : undefined,
+};
 
 export function title(slot: ConnectorSlot): string {
   if (slot.state === "skipped") return "Skipped";
@@ -99,6 +112,7 @@ export function line(slot: ConnectorSlot, folder: string, repository: string | u
         tasks: "Agents won't use issues here. Nothing is turned on.",
         codeReview: gitlab ? "Agents won't use merge requests here. Nothing is turned on." : "Agents won't use pull requests here. Nothing is turned on.",
         ci: "Agents won't wait on checks here. Nothing is turned on.",
+        docs: "Agents won't look for docs before they work. Nothing is turned on.",
         workspace: "Agents run on this Mac.",
       }[slot.slot];
     case "noRemote":
@@ -113,6 +127,7 @@ export function line(slot: ConnectorSlot, folder: string, repository: string | u
         tasks: `No issues yet in ${repo}.`,
         codeReview: gitlab ? `No merge requests yet in ${repo}.` : `No pull requests yet in ${repo}.`,
         ci: gitlab ? `No pipelines yet in ${repo}.` : `No workflow runs yet in ${repo}.`,
+        docs: docs.none,
         workspace: onMac ? "Nothing to set up. Other places are set up in Providers." : otherProvidersElsewhere,
       }[slot.slot];
     case "notConnected":
@@ -122,6 +137,7 @@ export function line(slot: ConnectorSlot, folder: string, repository: string | u
           : `Agents open pull requests and answer reviews. ${comesWith(forge)}`,
         ci: gitlab ? `Agents see pipelines pass and fail, and wait on them. ${comesWith(forge)}`
           : `Agents see checks pass and fail, and wait on them. ${comesWith(forge)}`,
+        docs: docs.none,
         workspace: "Nothing to set up.",
       }[slot.slot];
   }

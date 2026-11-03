@@ -20,7 +20,7 @@ import (
 // agent is on it. The github, gitlab and linear servers read it off the call; they make no
 // control-plane call of their own.
 
-// teamFeedingTools are the github, gitlab and linear servers' feeding tools that take the
+// teamFeedingTools are the github, gitlab, linear and jira servers' feeding tools that take the
 // control plane's people in their call's _meta (#2951).
 var teamFeedingTools = map[string]bool{"show_pull_requests": true, "show_issues": true, "show_merge_requests": true}
 
@@ -39,7 +39,8 @@ func (d *Daemon) teamMeta(ctx context.Context, folder string) map[string]any {
 		meta["agentOnIssue"] = issues
 	}
 	if len(linear) > 0 {
-		meta["agentOnLinear"] = linear
+		// A key (ENG-4) does not say whether it is Linear's or Jira's (#3247).
+		meta["agentOnLinear"], meta["agentOnJira"] = linear, linear
 	}
 	return meta
 }
