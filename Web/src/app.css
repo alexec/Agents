@@ -1844,6 +1844,20 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .work-ref { color: var(--accent); font-variant-numeric: tabular-nums; }
 .work-title { font-weight: 600; }
 .work-figures { padding-left: 2px; }
+/* Docs (#3321): a source's heading, its subfolders, and a search's matches under each doc. */
+.docs-source { margin-top: 14px; }
+.docs-source-head { display: flex; gap: 8px; align-items: baseline; margin: 0 0 4px; font-size: 0.8em; letter-spacing: 0.04em; text-transform: uppercase; }
+.docs-source-head .quiet, .docs-source-head button { text-transform: none; letter-spacing: normal; }
+.docs-shelf-head { margin: 8px 0 2px; font-weight: normal; font-size: 0.9em; color: var(--paper-ink); opacity: 0.75; }
+.docs-under .docs-row { padding-left: 18px; }
+.docs-row .work-row-head { flex-wrap: nowrap; }
+.docs-path { font-family: var(--mono, ui-monospace, monospace); font-size: 0.9em; }
+.docs-beside { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.docs-updated { margin-left: auto; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.docs-matches { list-style: none; margin: 0 0 8px; padding: 0 0 0 18px; }
+.docs-match { display: flex; gap: 8px; text-align: left; }
+.docs-line { min-width: 3em; text-align: right; opacity: 0.6; font-variant-numeric: tabular-nums; }
+.docs-text { margin-top: 12px; }
 .work-label { display: inline-block; padding: 0 7px; border: 1px solid var(--paper-rule); border-radius: 99px; font-size: 0.8em; line-height: 1.6; }
 .work-state { display: inline-block; padding: 0 7px; border-radius: 99px; font-size: 0.8em; line-height: 1.6; color: #fff; background: #59636e; }
 .work-state.open { background: #1f883d; }

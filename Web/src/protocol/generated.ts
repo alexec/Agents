@@ -10085,6 +10085,9 @@ export interface Methods {
   "desktopControl/state": { params: Empty; result: DesktopControlSettings };
   "desktopControl/takeOver": { params: AgentRequest; result: Empty };
   "disk/state": { params: Empty; result: DiskState };
+  "docs/list": { params: DocsListRequest; result: DocsList };
+  "docs/read": { params: DocsReadRequest; result: DocsReading };
+  "docs/search": { params: DocsSearchRequest; result: DocsSearch };
   "dropbox/put": { params: DropboxPutRequest; result: DropboxPutResponse };
   "elicitations/answer": { params: AnswerElicitationRequest; result: Empty };
   "elicitations/pending": { params: Empty; result: ElicitationRequest[] };
@@ -10405,6 +10408,9 @@ export const MethodTarget = {
   "desktopControl/state": "host",
   "desktopControl/takeOver": "host",
   "disk/state": "host",
+  "docs/list": "host",
+  "docs/read": "host",
+  "docs/search": "host",
   "dropbox/put": "host",
   "elicitations/answer": "host",
   "elicitations/pending": "host",

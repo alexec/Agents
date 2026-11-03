@@ -204,6 +204,7 @@ final class AppModel {
             showsTokens = false
             showsWorktrees = false
             showsWork = false
+            showsDocs = false
             // The same rule as picking a folder: what you picked is what you see,
             // and a conversation or a workflow left open underneath would be waiting
             // to reappear when the bill is closed, which is a place nobody chose to
@@ -230,6 +231,7 @@ final class AppModel {
             showsTokens = false
             showsWorktrees = false
             showsWork = false
+            showsDocs = false
             selection = nil
             openWorkflow = nil
             folderPage = nil
@@ -251,6 +253,7 @@ final class AppModel {
             showsTokens = false
             showsWorktrees = false
             showsWork = false
+            showsDocs = false
             selection = nil
             openWorkflow = nil
             folderPage = nil
@@ -275,6 +278,7 @@ final class AppModel {
             showsTokens = false
             showsWorktrees = false
             showsWork = false
+            showsDocs = false
             selection = nil
             openWorkflow = nil
             folderPage = nil
@@ -297,6 +301,7 @@ final class AppModel {
             showsTokens = false
             showsWorktrees = false
             showsWork = false
+            showsDocs = false
             selection = nil
             openWorkflow = nil
             folderPage = nil
@@ -318,6 +323,7 @@ final class AppModel {
             showsTokens = false
             showsWorktrees = false
             showsWork = false
+            showsDocs = false
             selection = nil
             openWorkflow = nil
             folderPage = nil
@@ -339,6 +345,7 @@ final class AppModel {
             showsTokens = false
             showsWorktrees = false
             showsWork = false
+            showsDocs = false
             selection = nil
             openWorkflow = nil
             folderPage = nil
@@ -360,6 +367,7 @@ final class AppModel {
             showsMilestones = false
             showsWorktrees = false
             showsWork = false
+            showsDocs = false
             selection = nil
             openWorkflow = nil
             folderPage = nil
@@ -374,6 +382,7 @@ final class AppModel {
         didSet {
             guard showsWorktrees, showsWorktrees != oldValue else { return }
             showsWork = false
+            showsDocs = false
             showsSpending = false
             showsResources = false
             showsEvents = false
@@ -395,6 +404,7 @@ final class AppModel {
     var showsWork = false {
         didSet {
             guard showsWork, showsWork != oldValue else { return }
+            showsDocs = false
             showsSpending = false
             showsResources = false
             showsEvents = false
@@ -409,6 +419,40 @@ final class AppModel {
             folderPage = nil
             composing = false
         }
+    }
+
+    /// Whether the window is showing Docs (#3321, spec 3319): every folder's docs and the docs
+    /// connectors', and a doc's page. A page like Work, and not persisted for the same reason.
+    var showsDocs = false {
+        didSet {
+            guard showsDocs, showsDocs != oldValue else { return }
+            showsSpending = false
+            showsResources = false
+            showsEvents = false
+            showsRuntimes = false
+            showsMCPServers = false
+            showsTime = false
+            showsMilestones = false
+            showsTokens = false
+            showsWorktrees = false
+            showsWork = false
+            selection = nil
+            openWorkflow = nil
+            folderPage = nil
+            composing = false
+        }
+    }
+
+    /// Docs' places: the list, or a doc's page, and the ones before and after it, for Back and Forward.
+    var docsHistory = LineageHistory<DocsPlace>()
+    /// The list's sources, sort, filter and search, kept while the window is open, so Back finds it as left.
+    let docsList = DocsListState()
+
+    /// Open Docs at a place: the list, or a doc's page.
+    func showDocs(_ place: DocsPlace = DocsPlace()) {
+        if place.ref != nil, docsHistory.current == nil { docsHistory.go(DocsPlace()) }
+        if place != docsHistory.current { docsHistory.go(place) }
+        showsDocs = true
     }
 
     /// Work's places (#3119): the list or the item's page open, and the ones before and after it,
@@ -471,6 +515,7 @@ final class AppModel {
         showsTokens = false
         showsWorktrees = false
         showsWork = false
+        showsDocs = false
         if let agent = agents.first(where: { $0.id == agentID }) {
             pendingOpen = nil
             select(FolderKey(host: agent.host, folder: agent.folderPath))
@@ -496,6 +541,7 @@ final class AppModel {
         showsTokens = false
         showsWorktrees = false
         showsWork = false
+        showsDocs = false
         // Not listed yet: settling the selection would pick another, so it waits (#1055).
         pendingOpen = liveFolders.contains { $0.key == key } ? nil : .folder(key)
         select(key)
@@ -540,6 +586,7 @@ final class AppModel {
             if showsTime { return .time }
             if showsMilestones { return .milestones }
             if showsWork { return .work }
+            if showsDocs { return .docs }
             guard let key = selectedFolderKey else { return nil }
             if let id = openWorkflow { return .workflow(id, in: key) }
             if case .review(let id)? = folderPage { return .review(id, in: key) }
@@ -566,6 +613,7 @@ final class AppModel {
                 showsTokens = false
                 showsWorktrees = false
                 showsWork = false
+                showsDocs = false
                 select(key)
                 openWorkflow = id
             case .pin(let path, let key):
@@ -589,6 +637,8 @@ final class AppModel {
                 showsMilestones = true
             case .work:
                 showsWork = true
+            case .docs:
+                showDocs(docsHistory.current ?? DocsPlace())
             case .resources:
                 showResources()
             case .events:
@@ -610,6 +660,7 @@ final class AppModel {
                 showsTokens = false
                 showsWorktrees = false
                 showsWork = false
+                showsDocs = false
                 showFolder(key)
             case nil:
                 // A list that clears its own selection — which macOS does while rows
@@ -632,6 +683,7 @@ final class AppModel {
         showsTokens = false
         showsWorktrees = false
         showsWork = false
+        showsDocs = false
         select(key)
         folderPage = page
     }
@@ -662,6 +714,7 @@ final class AppModel {
         showsTokens = false
         showsWorktrees = false
         showsWork = false
+        showsDocs = false
         select(key)
         // A new session in it (#366): the folder's own page is where a session starts,
         // as New Session has it. The folder's row in the sidebar only folds (#375).
@@ -857,6 +910,7 @@ final class AppModel {
         showsTokens = false
         showsWorktrees = false
         showsWork = false
+        showsDocs = false
         select(key)
         openPin = path
     }
@@ -5806,6 +5860,32 @@ final class AppModel {
             .filter { $0.runsAgents && $0.has(Capability.forge1) && $0.state != "offline" }
             .map { (id: $0.id, name: $0.id == mine ? "This Mac" : $0.name) }
             .sorted { ($0.id == mine ? 0 : 1, $0.name) < ($1.id == mine ? 0 : 1, $1.name) }
+    }
+
+    /// The machines that read docs (#3321), this Mac first.
+    var docsMachines: [(id: MachineRef, name: String)] {
+        let mine = thisMacHostID
+        return (controlPlaneHosts ?? [])
+            .filter { $0.runsAgents && $0.has(Capability.docs1) && $0.state != "offline" }
+            .map { (id: $0.id, name: $0.id == mine ? "This Mac" : $0.name) }
+            .sorted { ($0.id == mine ? 0 : 1, $0.name) < ($1.id == mine ? 0 : 1, $1.name) }
+    }
+
+    /// Open in Files on a doc's page (#3321): the file as its folder's own page, as a pinned page
+    /// opens. The folder as this window knows it, so the page finds it; false when it knows none.
+    func showDocFile(_ path: String, folder: String, on host: MachineRef) -> Bool {
+        let wanted = Folder.standardize(URL(fileURLWithPath: folder))
+        guard let known = folders.first(where: { $0.host == host && Folder.standardize($0.folder.folder) == wanted }) else {
+            return false
+        }
+        showPin(path, in: FolderKey(host: host, folder: known.folder.folder))
+        return true
+    }
+
+    /// One of Docs' reads (#3321): `docs/list`, `docs/search` or `docs/read`, on a machine.
+    func docs<R: Decodable & Sendable>(_ method: String, _ params: some Encodable & Sendable, returning: R.Type,
+                                       on host: MachineRef) async throws -> R {
+        try await client(for: host).call(method, params, returning: R.self)
     }
 
     /// A page of a machine's issues or pull requests (#3129), as Work lists them.

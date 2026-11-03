@@ -190,6 +190,7 @@ struct AgentsCommands: Commands {
             Button("Connectors") { model.showsMCPServers = true }
             Button("Worktrees") { model.showsWorktrees = true }
             Button("Work") { model.showsWork = true }
+            Button("Docs") { model.showDocs(model.docsHistory.current ?? DocsPlace()) }
             Button("Cost") { model.showsSpending = true }
                 .keyboardShortcut("s", modifiers: [.command, .option])
             Button("Lineage") { model.showLineage() }

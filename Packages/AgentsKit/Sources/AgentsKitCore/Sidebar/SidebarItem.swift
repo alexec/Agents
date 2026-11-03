@@ -33,6 +33,9 @@ public enum SidebarItem: Hashable, Sendable {
     /// Every issue and pull request from the forges, with lineage on top, and the milestones
     /// and releases lineage knows (#3119). Mac + web: the Remote has no row for it (#2796).
     case work
+    /// The folders' docs and the docs connectors', each doc a page (#3321, spec 3319). Mac + web:
+    /// the Remote has no row for it (#2796).
+    case docs
     /// Every resource an agent can lease, and who holds and waits for each (036).
     case resources
     /// What happened, and what came of it (042).

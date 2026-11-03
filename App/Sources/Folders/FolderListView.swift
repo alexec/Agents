@@ -151,6 +151,11 @@ struct FolderListView: View {
                     .help("Every issue and pull request in your folders’ repos, and what agents spent on each")
                     .activityIcon("checklist")
                     .appText(.supporting).sidebarInk(.work).tag(SidebarItem.work)
+                // Docs (#3321): the folders' docs and the docs connectors', below Work.
+                HStack { Text("Docs").foregroundStyle(.primary); Spacer() }
+                    .help("Every folder’s Markdown docs and your docs connectors’ pages, read only")
+                    .activityIcon("doc.text")
+                    .appText(.supporting).sidebarInk(.docs).tag(SidebarItem.docs)
             }
 
             // The pages about all the work, a group like a folder's, above the smart

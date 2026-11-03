@@ -3,7 +3,8 @@
 // /rv/<kind:key> for a change waiting for an OK, on its Review page (#1472),
 // The page is by section (#2141): #/ is the Overview, #/agents the sidebar with nothing chosen, and
 // #/<section>/<page> a page of another section (#/machines/runtimes, #/reports/spend, #/settings/policy),
-// and #/<section>/<page>/<item> one item on it: #/work/pr/github%3Aalexec%2FAgents%2399 is PR #99 (#3119).
+// and #/<section>/<page>/<item> one item on it: #/work/pr/github%3Aalexec%2FAgents%2399 is PR #99 (#3119),
+// and #/docs/<ref> a doc's page (#3321).
 // The addresses before it, #/console/<page> (#1804) and #/a/<page> (#151), are read as their new place.
 // A tab holding one folder alone (#1089) starts #/o/1/…: Open in New Tab on its heading. It keeps
 // to that folder until ‹ All.
@@ -66,6 +67,8 @@ export function parseRoute(hash: string): Route {
   if (first && first !== "overview" && (navSections as readonly string[]).includes(first)) {
     const nav = first as Exclude<NavSection, "overview">;
     if (!section) return { nav };
+    // A doc's page is #/docs/<ref> (spec 3319): Docs has one page, so the ref takes its place.
+    if (nav === "docs" && !item && section !== "docs") return { nav, section: "docs", item: decodeURIComponent(section) };
     return item ? { nav, section: decodeURIComponent(section), item: decodeURIComponent(item) } : { nav, section: decodeURIComponent(section) };
   }
   const parts = path.split("/").map((part) => decodeURIComponent(part));
@@ -124,6 +127,7 @@ export function aloneFolder(r: Route): AloneFolder | undefined {
 /** A section's page's address: #/reports/spend; #/ for the Overview. */
 function sectionHash(r: Route): string {
   if (!r.nav) return "#/";
+  if (r.nav === "docs" && r.item) return `#/docs/${encodeURIComponent(r.item)}`;
   return `#/${r.nav}` + (r.section ? "/" + encodeURIComponent(r.section) + (r.item ? "/" + encodeURIComponent(r.item) : "") : "");
 }
 
