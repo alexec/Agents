@@ -164,3 +164,16 @@ test("account words: a choice says it is not signed in, not usable or out (#2265
   assert.match(r.choiceNote(work, row({ out: {} }), now), /^Out since /);
   assert.equal(r.choiceNote(undefined, undefined, now), undefined);
 });
+
+test("runtimes: a server's Claude or Codex offers Sign In… only when it is not signed in there (#3349)", () => {
+  const on = (signIn) => ({ ...status("claude", "Claude"), signIn });
+  assert.equal(r.offersMachineSignIn(status("claude", "Claude")), false, "a Mac's runtime: no signIn");
+  assert.equal(r.offersMachineSignIn(on({ signedIn: false })), true);
+  assert.equal(r.offersMachineSignIn(on({ signedIn: true })), false);
+  assert.equal(r.offersMachineSignIn(on({ signedIn: false, relayed: true })), false, "the Mac lends it");
+  assert.equal(r.machineSignInLine(status("claude", "Claude")), undefined);
+  assert.equal(r.machineSignInLine(on({ signedIn: false })), "Not signed in on this machine");
+  assert.equal(r.machineSignInLine(on({ signedIn: true })), "Signed in on this machine");
+  assert.equal(r.machineSignInLine(on({ signedIn: false, relayed: true })), "Uses the Mac’s sign-in");
+  assert.equal(r.machineSignInWords.title("Claude", "codespace"), "Sign In to Claude on codespace");
+});

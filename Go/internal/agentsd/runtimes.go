@@ -255,7 +255,7 @@ func (d *Daemon) runtimeStatuses() []wire.RuntimeStatus {
 	out := []wire.RuntimeStatus{}
 	for i := range catalog {
 		r := &catalog[i]
-		path, _, looked := r.locate()
+		path, _, looked := locateFor(r)
 		s := wire.RuntimeStatus{Runtime: r.Runtime, CheckedAt: now()}
 		if path != "" {
 			s.Availability.Available = &wire.RuntimeAvailabilityAvailable{Path: path}
@@ -266,6 +266,7 @@ func (d *Daemon) runtimeStatuses() []wire.RuntimeStatus {
 			s.Availability.Missing = &wire.RuntimeAvailabilityMissing{LookedIn: looked}
 		}
 		d.overlay(&s)
+		d.noteSignIn(&s)
 		out = append(out, s)
 	}
 	return out
@@ -338,6 +339,11 @@ func (d *Daemon) launchOn(r *runtimeDef, dir string, account *wire.AccountProfil
 				"ANTHROPIC_BASE_URL", "CLAUDE_CODE_OAUTH_TOKEN", "NODE_EXTRA_CA_CERTS")
 			env = append(env, "ANTHROPIC_BASE_URL=https://127.0.0.1:"+strconv.Itoa(rl.port), "CLAUDE_CODE_OAUTH_TOKEN="+rl.standIn,
 				"NODE_EXTRA_CA_CERTS="+rl.caFile)
+		} else if account == nil && !d.signInRefusedHere(r.ID) && !hasVariable(env, "ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN") {
+			// A sign-in made here from a client (#3349).
+			if kv := d.storedClaudeSignIn(); kv != "" {
+				env = append(env, kv)
+			}
 		}
 	case "codex":
 		if rl := d.relayFor("codex"); rl != nil && account == nil {
@@ -413,7 +419,7 @@ func (d *Daemon) needsSignIn(runtimeID string) error {
 	}
 	switch runtimeID {
 	case "claude":
-		if ownClaudeSignIn() {
+		if ownClaudeSignIn() || d.storedClaudeSignIn() != "" {
 			return nil
 		}
 	case "codex":

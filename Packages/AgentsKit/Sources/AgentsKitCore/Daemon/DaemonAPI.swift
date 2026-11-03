@@ -20,6 +20,12 @@ public enum DaemonAPI {
         public static let runtimeSetProvider = "runtimes/setProvider"
         /// Takes a `SetProviderRequest`: the provider named is the one turned off.
         public static let runtimeDisableProvider = "runtimes/disableProvider"
+        /// A runtime signed in on a machine with no browser (#3349): `RuntimeRequest` →
+        /// `RuntimeSignInStep`, then `RuntimeSignInFinish` → `RuntimeStatus`; or an API key,
+        /// `RuntimeSignInKey` → `RuntimeStatus`.
+        public static let runtimesSignInStart = "runtimes/signInStart"
+        public static let runtimesSignInFinish = "runtimes/signInFinish"
+        public static let runtimesSignInKey = "runtimes/signInKey"
         public static let sessionsList = "sessions/list"
         public static let sessionsAdopt = "sessions/adopt"
         public static let sessionsDelete = "sessions/delete"
@@ -2242,6 +2248,46 @@ public enum DaemonAPI {
     public struct RuntimeRequest: Codable, Sendable {
         public var runtimeID: String
         public init(runtimeID: String) { self.runtimeID = runtimeID }
+    }
+
+    /// What the person does to sign a runtime in on a machine with no browser (#3349): open
+    /// `url` in a browser of their own, then type `userCode` there (Codex), or paste back the
+    /// code the page gives (`wantsCode`, Claude).
+    public struct RuntimeSignInStep: Codable, Sendable, Equatable {
+        public var signInID: String
+        public var runtimeID: String
+        public var url: URL
+        public var userCode: String?
+        public var wantsCode: Bool
+        public init(signInID: String, runtimeID: String, url: URL, userCode: String? = nil, wantsCode: Bool) {
+            self.signInID = signInID
+            self.runtimeID = runtimeID
+            self.url = url
+            self.userCode = userCode
+            self.wantsCode = wantsCode
+        }
+    }
+
+    /// The end of a sign-in `runtimes/signInStart` began (#3349): the code, or cancel.
+    public struct RuntimeSignInFinish: Codable, Sendable {
+        public var signInID: String
+        public var code: String?
+        public var cancel: Bool?
+        public init(signInID: String, code: String? = nil, cancel: Bool? = nil) {
+            self.signInID = signInID
+            self.code = code
+            self.cancel = cancel
+        }
+    }
+
+    /// An API key to sign a runtime in with on a machine (#3349).
+    public struct RuntimeSignInKey: Codable, Sendable {
+        public var runtimeID: String
+        public var key: String
+        public init(runtimeID: String, key: String) {
+            self.runtimeID = runtimeID
+            self.key = key
+        }
     }
 
     public struct AuthenticateRequest: Codable, Sendable {

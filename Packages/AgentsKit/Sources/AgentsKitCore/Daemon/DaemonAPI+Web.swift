@@ -192,6 +192,11 @@ public extension DaemonAPI {
                     kind: .hostRequest),
                 Row(Method.runtimesAddAccount, params: AddAccountRequest.self, result: AccountProfile.self, kind: .hostRequest),
                 Row(Method.runtimesRemoveAccount, params: AccountRequest.self, result: [UUID].self, kind: .hostRequest),
+                // A runtime signed in on a machine with no browser (#3349).
+                Row(Method.runtimesSignInStart, params: RuntimeRequest.self, result: RuntimeSignInStep.self, kind: .hostRequest),
+                Row(Method.runtimesSignInFinish, params: RuntimeSignInFinish.self, result: RuntimeStatus.self,
+                    kind: .hostRequest),
+                Row(Method.runtimesSignInKey, params: RuntimeSignInKey.self, result: RuntimeStatus.self, kind: .hostRequest),
                 // Reaches the Model By (#999), on the runtime's row.
                 Row(Method.runtimesSetDefaultAccount, params: DefaultAccountRequest.self, result: Empty.self,
                     kind: .hostRequest),

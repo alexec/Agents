@@ -187,6 +187,19 @@ public struct RuntimeStatus: Codable, Hashable, Sendable, Identifiable {
     /// Set when the organisation's policy does not allow this runtime here (#998, FR-010):
     /// the row is dimmed with **Set by your organisation**. Nil with no policy, or when allowed.
     public var setBy: DaemonAPI.PolicySetBy?
+    /// Whether it is signed in on the machine itself (#3349): Claude and Codex on a server,
+    /// which a client signs in there with no browser on the machine. Nil on a Mac.
+    public var signIn: SignIn?
+
+    public struct SignIn: Codable, Hashable, Sendable {
+        public var signedIn: Bool
+        /// A Mac lends it its own sign-in (056).
+        public var relayed: Bool?
+        public init(signedIn: Bool, relayed: Bool? = nil) {
+            self.signedIn = signedIn
+            self.relayed = relayed
+        }
+    }
 
     public var id: String { runtime.id }
 

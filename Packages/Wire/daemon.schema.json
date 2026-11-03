@@ -20735,6 +20735,89 @@
       ],
       "additionalProperties": false
     },
+    "RuntimeSignIn": {
+      "type": "object",
+      "description": "Whether a runtime is signed in on the machine itself (#3349), for one a client signs in there with no browser on the machine: Claude and Codex on a server. Absent on a Mac, which signs its runtimes in in Runtimes.",
+      "properties": {
+        "signedIn": {
+          "type": "boolean"
+        },
+        "relayed": {
+          "description": "A Mac lends it its own sign-in (056), so it runs without one of its own.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "signedIn"
+      ],
+      "additionalProperties": false
+    },
+    "RuntimeSignInFinish": {
+      "type": "object",
+      "description": "The end of a sign-in runtimes/signInStart began (#3349): the code the sign-in page gave, when the step wants one, or cancel to stop it.",
+      "properties": {
+        "signInID": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "cancel": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "signInID"
+      ],
+      "additionalProperties": false
+    },
+    "RuntimeSignInKey": {
+      "type": "object",
+      "description": "An API key to sign a runtime in with on the machine (#3349), when there is no account to sign in to.",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runtimeID",
+        "key"
+      ],
+      "additionalProperties": false
+    },
+    "RuntimeSignInStep": {
+      "type": "object",
+      "description": "What the person does to sign a runtime in on a machine with no browser (#3349): open url in a browser of their own, then type userCode there (Codex), or paste back the code the page gives (wantsCode, Claude).",
+      "properties": {
+        "signInID": {
+          "type": "string"
+        },
+        "runtimeID": {
+          "type": "string"
+        },
+        "url": {
+          "$ref": "#/definitions/URLString"
+        },
+        "userCode": {
+          "description": "The code to type on the page at url.",
+          "type": "string"
+        },
+        "wantsCode": {
+          "description": "The page gives a code to paste back with runtimes/signInFinish.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "signInID",
+        "runtimeID",
+        "url",
+        "wantsCode"
+      ],
+      "additionalProperties": false
+    },
     "RuntimeStatus": {
       "type": "object",
       "properties": {
@@ -20759,6 +20842,9 @@
         "setBy": {
           "$ref": "#/definitions/PolicySetBy",
           "description": "Set when the organisation's policy does not allow this runtime here (#998, FR-010)."
+        },
+        "signIn": {
+          "$ref": "#/definitions/RuntimeSignIn"
         }
       },
       "required": [
