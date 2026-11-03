@@ -162,7 +162,9 @@ admin (read and write), or a classic one with the `codespace` scope.
 3. In **Repository**, give `owner/name` for one repository's codespaces, or leave it empty
    for all of yours.
 4. On the Mac that runs the control plane, run
-   `gh codespace ssh --config >> ~/.ssh/config`.
+   `gh codespace ssh --config >> ~/.ssh/config`. A control plane in the `agents-control`
+   image needs nothing: the image has `ssh` and `gh`, and the control plane writes each
+   codespace's ssh host itself, with the provider's token (#3347).
 
 A codespace has no ssh port of its own, so ssh still goes through `gh`. The provider's card
 says "needs gh for ssh". It can make a codespace from a repository, but it can't install

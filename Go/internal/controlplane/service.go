@@ -314,6 +314,7 @@ func New(cfg Config) (*Service, error) {
 	// Tunnels belong to a single copy: its ssh is the person's on this machine.
 	if cfg.PeerURL == "" && !cfg.Hosted {
 		s.tunnels = hosttunnels.New(hosttunnels.Config{Store: cfg.Store, Port: cfg.Port, Log: s.log,
+			Prepare: s.prepareSSH,
 			Hosts:   func(context.Context) []records.MachineRecord { return s.records.Hosts() },
 			Changed: func(change hosttunnels.Changed) { s.router.BroadcastControl("control/tunnelChanged", change) },
 			// Made after the tunnels: read when a tunnel asks.
@@ -337,6 +338,7 @@ func New(cfg Config) (*Service, error) {
 			s.router.BroadcastControl("control/installProgress", map[string]string{"name": name, "step": step})
 		},
 		Tunnels: tunnels,
+		Prepare: s.prepareSSH,
 		KnownNames: func(context.Context) []string {
 			var names []string
 			for _, h := range s.records.Hosts() {

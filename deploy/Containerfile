@@ -21,6 +21,10 @@
 # Alpine rather than scratch (#806): the command provider (workspace-commands, #691) runs each
 # command with /bin/sh. An image of your own can `FROM` this one and `apk add` the CLIs your
 # commands call.
+#
+# ssh and gh are in it (#3347): Add as Machine… installs Agents over ssh, and a codespace has
+# no ssh port of its own, so its ssh goes through gh, with the codespaces-api provider's
+# token. The control user has a home for gh's ssh key and the ssh config it writes.
 
 # The Go its go.mod names; GO_IMAGE moves it, as Go/scripts/go.sh's does.
 ARG GO_IMAGE=golang:1.26
@@ -73,8 +77,8 @@ COPY Web/ ./
 RUN npm run build
 
 # Named base: deploy/demo builds its codes job from it.
-FROM alpine:3.20 AS base
-RUN apk add --no-cache ca-certificates && adduser -D -H -u 10001 control \
+FROM alpine:3.24 AS base
+RUN apk add --no-cache ca-certificates openssh-client github-cli && adduser -D -u 10001 control \
  && mkdir /data && chown control /data
 # workspace-commands sits beside agents-control, where it looks first.
 COPY --from=go /out/agents-control /out/workspace-commands /out/agents-hosted /

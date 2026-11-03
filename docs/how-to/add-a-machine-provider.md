@@ -23,7 +23,7 @@ in, as before.
 | --- | --- | --- | --- |
 | Docker Containers | — | `docker` | the containers you name, or the containers labelled `agents.machine` |
 | DigitalOcean Droplets | a token with custom scopes: droplet read and update (and create and delete, to make and delete droplets) | `doctl`, signed in | droplets with a tag |
-| GitHub Codespaces | a token: fine-grained with Codespaces lifecycle admin, or classic with `codespace`; and `gh` for ssh, after `gh codespace ssh --config >> ~/.ssh/config` | `gh`, signed in | your codespaces, or one repository's |
+| GitHub Codespaces | a token: fine-grained with Codespaces lifecycle admin, or classic with `codespace`; and `gh` for ssh, after `gh codespace ssh --config >> ~/.ssh/config` (the `agents-control` image has `gh` and does this itself) | `gh`, signed in | your codespaces, or one repository's |
 | Coder Machines | the deployment's address and a session token (`coder tokens create`); and `coder` for ssh, after `coder config-ssh` | `coder`, signed in, after `coder config-ssh` | your Coder machines |
 | Google Cloud Workstations | — | `gcloud`, signed in | one cluster and configuration's workstations |
 | AWS EC2 Instances | an IAM user's access key (the policy is below) | — | instances with a tag in one region |

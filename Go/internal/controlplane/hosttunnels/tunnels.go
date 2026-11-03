@@ -103,6 +103,9 @@ type Config struct {
 	// ssh takes, or "" for none (#1691). A VM can have a new address at each start: its
 	// tunnel dials the listed one, not the install's. Nil: none.
 	Listed func(host string) string
+	// Prepare readies ssh for a destination that needs more than the ssh config has, such
+	// as a codespace's gh (#3347), and says what ssh's environment needs for it. Nil: none.
+	Prepare func(ctx context.Context, destination string) ([]string, error)
 }
 
 // asleepCheck is how often a tunnel whose host is asleep asks again.
@@ -118,6 +121,7 @@ type Tunnels struct {
 	log     func(string)
 	asleep  func(host string) bool
 	listed  func(host string) string
+	prepare func(ctx context.Context, destination string) ([]string, error)
 	// folder is short: a control socket's path must fit in 104 bytes, with ssh's suffix.
 	folder string
 
@@ -171,6 +175,10 @@ func New(c Config) *Tunnels {
 	if listed == nil {
 		listed = func(string) string { return "" }
 	}
+	prepare := c.Prepare
+	if prepare == nil {
+		prepare = func(context.Context, string) ([]string, error) { return nil, nil }
+	}
 	return &Tunnels{
 		store:   c.Store,
 		ssh:     sshCommand{executable: executable, env: env, options: configFile(c.ConfigFile)},
@@ -180,6 +188,7 @@ func New(c Config) *Tunnels {
 		log:     log,
 		asleep:  asleep,
 		listed:  listed,
+		prepare: prepare,
 		folder:  fmt.Sprintf("/tmp/agents-tunnels-%d-%d", os.Getuid(), os.Getpid()),
 		records: map[string]Record{},
 		held:    map[string]*holding{},
@@ -560,7 +569,13 @@ func (t *Tunnels) holdLocked(record Record, after *holding) {
 				}
 			}
 			started := time.Now()
-			problem := session(ctx, record, ssh, t.folder, func() { t.sayState(ctx, record.ID, Tunnel{Up: true}) })
+			var problem string
+			if more, err := t.prepare(ctx, ssh.name); err != nil {
+				problem = err.Error()
+			} else {
+				ssh.env = append(append([]string{}, ssh.env...), more...)
+				problem = session(ctx, record, ssh, t.folder, func() { t.sayState(ctx, record.ID, Tunnel{Up: true}) })
+			}
 			if ctx.Err() != nil {
 				return
 			}

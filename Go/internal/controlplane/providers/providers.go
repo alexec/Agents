@@ -16,6 +16,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/internal/workspacecommands"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -2037,6 +2038,36 @@ func (p *Providers) Listed(host string) string {
 		return SSHDestination(*w.SSH)
 	}
 	return ""
+}
+
+// Codespace is the codespace a codespaces-api provider lists with the ssh destination, and
+// the provider's GitHub token, for gh to reach it (#3347). "" and "" when no such provider
+// lists it, or it has no token.
+func (p *Providers) Codespace(destination string) (name, token string) {
+	if !strings.HasPrefix(destination, "cs.") {
+		return "", ""
+	}
+	type found struct{ provider, workspace string }
+	var all []found
+	p.mu.Lock()
+	for id, held := range p.providers {
+		if held.record.preset() != "codespaces-api" || p.listed[id] == nil {
+			continue
+		}
+		for _, w := range p.listed[id].workspaces {
+			if deref(w.SSH) == destination {
+				all = append(all, found{id, w.ID})
+			}
+		}
+	}
+	p.mu.Unlock()
+	// Out of the lock: sealed secrets are read from the store.
+	for _, f := range all {
+		if t := p.secrets.Values(f.provider)[workspacecommands.GitHubSecret]; t != "" {
+			return f.workspace, t
+		}
+	}
+	return "", ""
 }
 
 // sshDestination is where agentsd is started over ssh: the provider's destination, or the
