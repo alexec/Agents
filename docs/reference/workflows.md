@@ -458,9 +458,15 @@ or while you are away. Archive is for one you are putting away.
 ## The daily summary
 
 **Daily summary** is one of your ready-made workflows (#3192), in `~/.agents/workflows/daily-summary.md`.
-It is off until you turn it on in **Settings ▸ Agent Configuration ▸ Workflows**: change its
-`enabled: false` line to `enabled: true`. Change its `schedule:` to move it; it runs at 08:00
-on weekdays.
+It is off until you turn it on. **Settings ▸ Agent Configuration ▸ Workflows** has one control
+for it, for all folders, on the Mac, the iPhone and iPad, and the web page (#3351):
+
+- **Daily summary:** **Off** or **Summary only**.
+- **Time:** when it runs, on the hour or the half hour. It is 08:00 by default.
+
+The control changes the workflow file itself: `enabled:`, and the schedule's `at:` and
+`between:`. A change to the file by hand shows in the control. It runs on weekdays. To change
+the days, edit the schedule's `days:`.
 
 - It runs in your home folder, in plan mode, on the Auto runtime. It is never copied into a
   project's workflows.

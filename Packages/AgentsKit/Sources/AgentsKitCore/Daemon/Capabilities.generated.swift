@@ -39,6 +39,7 @@ public enum Capability {
     public static let cost1 = "cost/1"
     public static let credentials1 = "credentials/1"
     public static let daemon1 = "daemon/1"
+    public static let dailySummary1 = "daily-summary/1"
     public static let device1 = "device/1"
     public static let devices1 = "devices/1"
     public static let disk1 = "disk/1"
@@ -231,6 +232,8 @@ public enum Capability {
         "daemon/policyState": "host.policy/1",
         "daemon/quit": "daemon/1",
         "daemon/status": "daemon/1",
+        "dailySummary/setSettings": "daily-summary/1",
+        "dailySummary/settings": "daily-summary/1",
         "desktopControl/resume": "host.desktop-control/1",
         "desktopControl/set": "host.desktop-control/1",
         "desktopControl/state": "host.desktop-control/1",
@@ -473,6 +476,7 @@ public enum Capability {
         "clone/changed": "clone/1",
         "cost/changed": "cost/1",
         "daemon/policyStateChanged": "host.policy/1",
+        "dailySummary/changed": "daily-summary/1",
         "device/changed": "device/1",
         "disk/changed": "disk/1",
         "events/changed": "events/1",

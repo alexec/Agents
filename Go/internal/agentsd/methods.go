@@ -61,6 +61,7 @@ func (d *Daemon) register() {
 	d.registerRuntimeSessions()
 	d.registerRuntimeAuth()
 	d.registerWorkflows()
+	d.registerDailySummary()
 	d.registerShells()
 	d.registerSkills()
 	d.registerAgentConfigEditor()

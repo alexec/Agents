@@ -68,6 +68,10 @@ public extension DaemonAPI {
                 // Pause on touch's two answers (#3004, US3).
                 Row(Method.desktopControlResume, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.desktopControlTakeOver, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
+                // The daily summary's Off / Summary control and its time (#3351), for Settings.
+                Row(Method.dailySummarySettings, params: Empty.self, result: DailySummarySettings.self, kind: .hostRequest),
+                Row(Method.dailySummarySetSettings, params: DailySummarySettings.self, result: DailySummarySettings.self,
+                    kind: .hostRequest),
                 // Auto (#2658): the order and cells, what it would pick now.
                 Row(Method.autoState, params: Empty.self, result: AutoSettings.self, kind: .hostRequest),
                 Row(Method.autoSet, params: AutoSettings.self, result: AutoSettings.self, kind: .hostRequest),
@@ -528,6 +532,8 @@ public extension DaemonAPI {
                     kind: .hostNotification),
                 Row(Notification.modesChanged, params: RememberedModes.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.preferencesChanged, params: DisplayPreferences.self, result: Empty.self,
+                    kind: .hostNotification),
+                Row(Notification.dailySummaryChanged, params: DailySummarySettings.self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.workflowChanged, params: WorkflowSummary.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.workflowRemoved, params: WorkflowRemovedNotification.self, result: Empty.self,

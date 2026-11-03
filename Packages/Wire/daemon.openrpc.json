@@ -2419,6 +2419,79 @@
       }
     },
     {
+      "name": "dailySummary/changed",
+      "x-capability": "daily-summary/1",
+      "description": "The daily summary's control changed (#3351): by dailySummary/setSettings, or by a change to the home folder's Daily summary workflow. Sent with every workflow change.",
+      "x-notification": true,
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/DailySummarySettings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "dailySummary/setSettings",
+      "x-capability": "daily-summary/1",
+      "description": "Sets the daily summary's control (#3351): turns the home folder's Daily summary workflow on or off and sets its time. It answers the settings as they now are.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/DailySummarySettings"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/DailySummarySettings"
+        }
+      }
+    },
+    {
+      "name": "dailySummary/settings",
+      "x-capability": "daily-summary/1",
+      "description": "The daily summary's control (#3351), read from the home folder's Daily summary workflow. dailySummary/changed says when it changes.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/DailySummarySettings"
+        }
+      }
+    },
+    {
       "name": "desktopControl/resume",
       "x-capability": "host.desktop-control/1",
       "tags": [

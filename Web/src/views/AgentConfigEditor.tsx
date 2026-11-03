@@ -2,6 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import type { AgentConfigEditorFile } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { Modal } from "./Modal";
+import { DailySummaryControl } from "./settings/DailySummary";
 import { agentConfigurationFollows, thisMacOnly } from "../model/userScope";
 
 export type AgentConfigKind = "skills" | "personas" | "workflows";
@@ -144,6 +145,7 @@ export function AgentConfigSettingsSection({ store, down, kind }: {
   return <section aria-label={title(kind)}>
     <h3 class="section-head">{title(kind)}</h3>
     <UserScopeLines />
+    {kind === "workflows" && <DailySummaryControl store={store} />}
     <AgentConfigEditor store={store} host={store.macHostID.value} kind={kind} down={down} />
   </section>;
 }
