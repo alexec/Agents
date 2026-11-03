@@ -99,6 +99,8 @@ func appToolCalls() []appTool {
 		{"move_worktree", (*Daemon).moveWorktree},
 		{"drive_screen", (*Daemon).driveScreen},
 		{"write_daily_summary", (*Daemon).dailySummary},
+		{"docs_search", (*Daemon).docsSearchTool},
+		{"docs_read", (*Daemon).docsReadTool},
 	}
 }
 

@@ -391,6 +391,12 @@ func connectorOf(cs []docsConnector, id string) docsConnector {
 }
 
 func (d *Daemon) docsSearch(ctx context.Context, r wire.DocsSearchRequest) (wire.DocsSearch, error) {
+	return d.docsSearchIn(ctx, d.docsSourcesOf(nil, r.Sources), r)
+}
+
+// docsSearchIn is docs/search over src: every folder's for the wire, one folder's for the
+// docs_search tool (#3317).
+func (d *Daemon) docsSearchIn(ctx context.Context, src docsSources, r wire.DocsSearchRequest) (wire.DocsSearch, error) {
 	const method = "docs/search"
 	limit, err := docsLimit(method, r.Limit, docsSearchDefault, docsSearchMost)
 	if err != nil {
@@ -400,7 +406,6 @@ func (d *Daemon) docsSearch(ctx context.Context, r wire.DocsSearchRequest) (wire
 	if len(words) == 0 {
 		return wire.DocsSearch{}, Invalid("%s: query has no words", method)
 	}
-	src := d.docsSourcesOf(nil, r.Sources)
 	out := wire.DocsSearch{Results: []wire.DocsSearchResult{}, Sources: []wire.DocsSource{}}
 	type hit struct {
 		result wire.DocsSearchResult
@@ -491,6 +496,12 @@ func cutSnippet(s string) string {
 }
 
 func (d *Daemon) docsRead(ctx context.Context, r wire.DocsReadRequest) (wire.DocsReading, error) {
+	return d.docsReadIn(ctx, d.docsSourcesOf(nil, nil), r)
+}
+
+// docsReadIn is docs/read over src: every folder's for the wire, one folder's for the
+// docs_read tool (#3317).
+func (d *Daemon) docsReadIn(ctx context.Context, src docsSources, r wire.DocsReadRequest) (wire.DocsReading, error) {
 	const method = "docs/read"
 	from, to := int64(1), int64(0)
 	if r.From != nil {
@@ -502,7 +513,6 @@ func (d *Daemon) docsRead(ctx context.Context, r wire.DocsReadRequest) (wire.Doc
 	if from < 1 || (r.To != nil && to < from) {
 		return wire.DocsReading{}, Invalid("%s: from is 1 or more, and to is from or more", method)
 	}
-	src := d.docsSourcesOf(nil, nil)
 	for _, f := range src.folders {
 		prefix := d.docRefPrefix(f)
 		if len(r.Ref) <= len(prefix) || !strings.EqualFold(r.Ref[:len(prefix)], prefix) {
