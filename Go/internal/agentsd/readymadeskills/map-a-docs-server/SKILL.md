@@ -40,7 +40,12 @@ searches, which tool reads one doc, and where the docs are in what the search an
      must also have, such as `{"limit": 5}` or a space key.
    - `results`: dotted paths in the search's answer (its structured content, or its text
      as JSON). `list` goes to the list of docs (empty when the answer is the list); `title`,
-     `id` and `url` go to each doc's fields, from the doc.
+     `id` and `url` go to each doc's fields, from the doc. `snippet` and `updated`
+     (optional) go to the text around a match and the time the doc last changed (an
+     RFC 3339 time), which Docs shows in its list and its search.
+   - `recent` (optional): a tool that lists the server's recent docs, such as
+     `{"tool": "list-recent-pages"}`, with its fixed `arguments`. Docs lists them; without
+     it, Docs lists what the search finds for no words.
    - `try` (optional): the words that the slot's search uses. The default is the folder's
      name. Use a word that finds a doc when the folder's name does not.
 

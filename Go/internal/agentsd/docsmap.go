@@ -47,8 +47,11 @@ const docsSearchLimit = 6
 
 // docsMap is one server's map.
 type docsMap struct {
-	Search docsCall    `json:"search"`
-	Read   docsCall    `json:"read"`
+	Search docsCall `json:"search"`
+	Read   docsCall `json:"read"`
+	// Recent is a tool that lists the server's recent docs, for docs/list (#3319); without it
+	// the list is the search for nothing.
+	Recent *docsCall   `json:"recent,omitempty"`
 	Result docsResults `json:"results"`
 	// Try is the words the slot's search sends; the folder's name when empty.
 	Try string `json:"try,omitempty"`
@@ -63,12 +66,15 @@ type docsCall struct {
 }
 
 // docsResults says where a search's docs are in its answer, as dotted paths: List to the
-// array (empty: the answer is the array), and each doc's Title, ID and URL.
+// array (empty: the answer is the array), and each doc's Title, ID and URL, and the Snippet
+// and Updated time that docs/search and docs/list show (#3319).
 type docsResults struct {
-	List  string `json:"list,omitempty"`
-	Title string `json:"title,omitempty"`
-	ID    string `json:"id,omitempty"`
-	URL   string `json:"url,omitempty"`
+	List    string `json:"list,omitempty"`
+	Title   string `json:"title,omitempty"`
+	ID      string `json:"id,omitempty"`
+	URL     string `json:"url,omitempty"`
+	Snippet string `json:"snippet,omitempty"`
+	Updated string `json:"updated,omitempty"`
 }
 
 // searchesAndReads is whether the map says the server can search and read.
@@ -187,30 +193,55 @@ func (e docsSearchError) Error() string { return string(e) }
 
 // searchDocsServer is one search of the server named name, as a session in folder reaches it.
 func (d *Daemon) searchDocsServer(ctx context.Context, name, folder string, secrets map[string]string, m docsMap, words string) (*wire.ConnectorProof, error) {
-	s, problem := d.eventServerNamed(name, folder, secrets)
-	switch problem {
-	case "waiting":
-		return nil, docsSearchError("This folder's mcp.json waits for your approval.")
-	case "missingSecret":
-		return nil, docsSearchError("It needs a secret that isn't set.")
-	case "oldTransport":
-		return nil, docsSearchError("It speaks SSE, which Agents doesn't.")
-	case "notSetUp":
-		return nil, docsSearchError("It isn't in mcp.json.")
-	}
-	signed := d.withSignIns([]sdk.McpServer{s.filled})
-	if len(signed) == 0 {
-		return nil, docsSearchError("It wants a sign-in first.")
+	s, cwd, err := d.docsServerFor(name, folder, secrets)
+	if err != nil {
+		return nil, err
 	}
 	if m.Try != "" {
 		words = m.Try
 	}
-	return searchDocs(ctx, signed[0], s.cwd, m, words, docsSearchTimeout)
+	return searchDocs(ctx, s, cwd, m, words, docsSearchTimeout)
+}
+
+// docsServerFor is the server named name as a session in folder reaches it, signed in, and
+// the folder it starts in.
+func (d *Daemon) docsServerFor(name, folder string, secrets map[string]string) (sdk.McpServer, string, error) {
+	s, problem := d.eventServerNamed(name, folder, secrets)
+	switch problem {
+	case "waiting":
+		return sdk.McpServer{}, "", docsSearchError("This folder's mcp.json waits for your approval.")
+	case "missingSecret":
+		return sdk.McpServer{}, "", docsSearchError("It needs a secret that isn't set.")
+	case "oldTransport":
+		return sdk.McpServer{}, "", docsSearchError("It speaks SSE, which Agents doesn't.")
+	case "notSetUp":
+		return sdk.McpServer{}, "", docsSearchError("It isn't in mcp.json.")
+	}
+	signed := d.withSignIns([]sdk.McpServer{s.filled})
+	if len(signed) == 0 {
+		return sdk.McpServer{}, "", docsSearchError("It wants a sign-in first.")
+	}
+	return signed[0], s.cwd, nil
 }
 
 // searchDocs connects, checks that the server has the map's tools, calls the search tool
 // once with words, and ends: the first doc found, or nil when it found none.
 func searchDocs(ctx context.Context, s sdk.McpServer, cwd string, m docsMap, words string, timeout time.Duration) (*wire.ConnectorProof, error) {
+	args := map[string]any{}
+	for k, v := range m.Search.Arguments {
+		args[k] = v
+	}
+	args[m.Search.Query] = words
+	raw, err := callDocsTool(ctx, s, cwd, m, m.Search.Tool, args, timeout)
+	if err != nil {
+		return nil, err
+	}
+	return firstDoc(raw, m.Result)
+}
+
+// callDocsTool connects, checks that the server has the map's tools and tool, calls tool once
+// with args, and ends: what the call answered.
+func callDocsTool(ctx context.Context, s sdk.McpServer, cwd string, m docsMap, tool string, args map[string]any, timeout time.Duration) (json.RawMessage, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	var c mcpConn
@@ -268,21 +299,16 @@ func searchDocs(ctx context.Context, s sdk.McpServer, cwd string, m docsMap, wor
 		}
 		cursor = page.NextCursor
 	}
-	for _, tool := range []string{m.Search.Tool, m.Read.Tool} {
-		if !has[tool] {
-			return nil, docsSearchError(fmt.Sprintf("Its map names %s, a tool it doesn't have.", tool))
+	for _, t := range []string{m.Search.Tool, m.Read.Tool, tool} {
+		if !has[t] {
+			return nil, docsSearchError(fmt.Sprintf("Its map names %s, a tool it doesn't have.", t))
 		}
 	}
-	args := map[string]any{}
-	for k, v := range m.Search.Arguments {
-		args[k] = v
-	}
-	args[m.Search.Query] = words
-	raw, err := c.call(ctx, id+1, "tools/call", map[string]any{"name": m.Search.Tool, "arguments": args})
+	raw, err := c.call(ctx, id+1, "tools/call", map[string]any{"name": tool, "arguments": args})
 	if err != nil {
 		return nil, failed(err)
 	}
-	return firstDoc(raw, m.Result)
+	return raw, nil
 }
 
 // docsTitleLimit is the most a proof's title holds, in characters.
@@ -292,6 +318,45 @@ const docsTitleLimit = 120
 // structured content, or its first text as JSON, or a resource link it gave; else the first
 // line of its text. Nil when the search found none.
 func firstDoc(raw json.RawMessage, r docsResults) (*wire.ConnectorProof, error) {
+	found, listed, text, err := docsFound(raw, r)
+	if err != nil {
+		return nil, err
+	}
+	if listed {
+		if len(found) == 0 {
+			return nil, nil
+		}
+		title := found[0].title
+		if title == "" {
+			title = found[0].id
+		}
+		if title == "" {
+			return nil, docsSearchError("Its map's results.title is not in the first doc the search found.")
+		}
+		return &wire.ConnectorProof{Title: cutTitle(title), URL: found[0].url}, nil
+	}
+	for _, f := range found {
+		if f.title != "" {
+			return &wire.ConnectorProof{Title: cutTitle(f.title), URL: f.url}, nil
+		}
+	}
+	if line := firstLine(text); line != "" {
+		return &wire.ConnectorProof{Title: line}, nil
+	}
+	return nil, nil
+}
+
+// foundDoc is one doc in what a search or a list answered, as the map finds it.
+type foundDoc struct {
+	title, id, snippet, updated string
+	// url is its web address, when it is one.
+	url *string
+}
+
+// docsFound is the docs in a tools/call result: listed is true when it was a list (in its
+// structured content, or its first text as JSON), at the map's paths; else the resource links
+// it gave, by their address. text is its first text.
+func docsFound(raw json.RawMessage, r docsResults) (found []foundDoc, listed bool, text string, err error) {
 	var result struct {
 		Content []struct {
 			Type  string `json:"type"`
@@ -304,9 +369,8 @@ func firstDoc(raw json.RawMessage, r docsResults) (*wire.ConnectorProof, error) 
 		IsError    bool `json:"isError"`
 	}
 	if json.Unmarshal(raw, &result) != nil {
-		return nil, docsSearchError("What came back was not MCP.")
+		return nil, false, "", docsSearchError("What came back was not MCP.")
 	}
-	text := ""
 	for _, c := range result.Content {
 		if c.Type == "text" && text == "" {
 			text = c.Text
@@ -315,9 +379,9 @@ func firstDoc(raw json.RawMessage, r docsResults) (*wire.ConnectorProof, error) 
 	if result.IsError {
 		why := firstLine(text)
 		if why == "" {
-			return nil, docsSearchError("Its search answered with an error.")
+			return nil, false, text, docsSearchError("Its search answered with an error.")
 		}
-		return nil, docsSearchError("Its search answered: " + why)
+		return nil, false, text, docsSearchError("Its search answered: " + why)
 	}
 	value := result.Structured
 	if value == nil && text != "" {
@@ -327,26 +391,23 @@ func firstDoc(raw json.RawMessage, r docsResults) (*wire.ConnectorProof, error) 
 		}
 	}
 	if value != nil {
-		list := pathIn(value, r.List)
-		items, isList := list.([]any)
+		items, isList := pathIn(value, r.List).([]any)
 		if !isList {
-			return nil, docsSearchError("Its map's results.list is not a list in what the search answered.")
+			return nil, false, text, docsSearchError("Its map's results.list is not a list in what the search answered.")
 		}
-		if len(items) == 0 {
-			return nil, nil
+		for _, item := range items {
+			f := foundDoc{
+				title:   stringAt(item, r.Title, "title", "name"),
+				id:      stringAt(item, r.ID, "id"),
+				snippet: stringAt(item, r.Snippet, "snippet", "excerpt", "highlight", "summary"),
+				updated: stringAt(item, r.Updated, "updated", "updatedAt", "updated_at", "lastModified", "last_edited_time", "modifiedTime"),
+			}
+			if u := stringAt(item, r.URL, "url"); webAddress(u) {
+				f.url = &u
+			}
+			found = append(found, f)
 		}
-		title := stringAt(items[0], r.Title, "title", "name")
-		if title == "" {
-			title = stringAt(items[0], r.ID, "id")
-		}
-		if title == "" {
-			return nil, docsSearchError("Its map's results.title is not in the first doc the search found.")
-		}
-		p := &wire.ConnectorProof{Title: cutTitle(title)}
-		if u := stringAt(items[0], r.URL, "url"); strings.HasPrefix(u, "https://") || strings.HasPrefix(u, "http://") {
-			p.URL = &u
-		}
-		return p, nil
+		return found, true, text, nil
 	}
 	for _, c := range result.Content {
 		if c.Type == "resource_link" {
@@ -354,19 +415,18 @@ func firstDoc(raw json.RawMessage, r docsResults) (*wire.ConnectorProof, error) 
 			if title == "" {
 				title = c.Name
 			}
-			p := &wire.ConnectorProof{Title: cutTitle(title)}
-			if strings.HasPrefix(c.URI, "https://") || strings.HasPrefix(c.URI, "http://") {
-				p.URL = &c.URI
+			f := foundDoc{title: title, id: c.URI}
+			if webAddress(c.URI) {
+				f.url = &c.URI
 			}
-			if title != "" {
-				return p, nil
-			}
+			found = append(found, f)
 		}
 	}
-	if line := firstLine(text); line != "" {
-		return &wire.ConnectorProof{Title: line}, nil
-	}
-	return nil, nil
+	return found, false, text, nil
+}
+
+func webAddress(u string) bool {
+	return strings.HasPrefix(u, "https://") || strings.HasPrefix(u, "http://")
 }
 
 // pathIn is the value at a dotted path; the value itself for "".

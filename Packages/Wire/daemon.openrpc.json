@@ -2686,6 +2686,69 @@
       }
     },
     {
+      "name": "docs/list",
+      "description": "The docs of this machine's folders and their docs connectors (#3319).",
+      "x-capability": "docs/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/DocsListRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/DocsList"
+        }
+      }
+    },
+    {
+      "name": "docs/read",
+      "description": "A doc's Markdown by its ref, a bounded part at a time (#3319).",
+      "x-capability": "docs/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/DocsReadRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/DocsReading"
+        }
+      }
+    },
+    {
+      "name": "docs/search",
+      "description": "The docs whose text has the words, with where (#3319).",
+      "x-capability": "docs/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/DocsSearchRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/DocsSearch"
+        }
+      }
+    },
+    {
       "name": "dropbox/put",
       "x-capability": "dropbox/1",
       "tags": [

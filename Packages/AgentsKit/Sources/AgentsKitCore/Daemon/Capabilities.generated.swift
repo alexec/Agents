@@ -42,6 +42,7 @@ public enum Capability {
     public static let device1 = "device/1"
     public static let devices1 = "devices/1"
     public static let disk1 = "disk/1"
+    public static let docs1 = "docs/1"
     public static let dropbox1 = "dropbox/1"
     public static let elicitations1 = "elicitations/1"
     public static let eventsAudit1 = "events.audit/1"
@@ -240,6 +241,9 @@ public enum Capability {
         "devices/startPairing": "devices/1",
         "devices/stopPairing": "devices/1",
         "disk/state": "disk/1",
+        "docs/list": "docs/1",
+        "docs/read": "docs/1",
+        "docs/search": "docs/1",
         "dropbox/put": "dropbox/1",
         "elicitations/answer": "elicitations/1",
         "elicitations/pending": "elicitations/1",

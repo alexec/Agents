@@ -2661,6 +2661,109 @@ export interface DiskWorktree {
 }
 
 /**
+ * One doc (#3319): a *.md file of a folder (at its top, or under specs/ or docs/), or a page of a
+ * docs connector. ref is its lineage ref, kind doc: <forge>:<owner>/<repo>/doc/<path> for a folder
+ * in a repo, folder:<machine>/<folder name>/doc/<path> for one with no forge remote,
+ * confluence:<site>/<page id>, notion:<page id>, gdrive:<file id>, or mcp:<server>/<id> for another
+ * mapped server. source is its DocsSource's id. path is a folder doc's, relative to folder; url a
+ * connector doc's.
+ */
+export interface Doc {
+  ref: string;
+  /** Its first # heading, or its file name; a connector doc's title. */
+  title: string;
+  source: string;
+  /** A folder doc's folder, or the folder whose mcp.json reaches the connector. */
+  folder?: string;
+  path?: string;
+  url?: string;
+  updated?: WireDate;
+}
+
+/**
+ * docs/list (#3319): a page of docs, the last updated first. sources are the sources it looked at,
+ * each with its state: one that failed or is not mapped is named here, and the docs of the others
+ * still come. cursor is the next page, absent at the end.
+ */
+export interface DocsList {
+  docs: Doc[];
+  sources: DocsSource[];
+  cursor?: string;
+}
+
+/**
+ * docs/list (#3319): the docs of every folder on this machine and of their docs connectors, or of
+ * one folder, or of one source (a DocsSource id). A connector lists its map's recent tool, else its
+ * search for nothing. limit is 1 to 500, 200 when not said; cursor is the last page's.
+ */
+export interface DocsListRequest {
+  folder?: string;
+  source?: string;
+  cursor?: string;
+  limit?: number;
+}
+
+/**
+ * One place a search found in a doc: its line (1 is the first) and the line, cut short, for a
+ * folder doc; a snippet only for a connector doc.
+ */
+export interface DocsMatch {
+  line?: number;
+  snippet: string;
+}
+
+/**
+ * docs/read (#3319): a doc by its ref, lines from to to (1 is the first; both included). Absent
+ * from is 1; absent to reads as far as the read's limits allow.
+ */
+export interface DocsReadRequest {
+  ref: string;
+  from?: number;
+  to?: number;
+}
+
+/**
+ * docs/read (#3319): the doc's Markdown from line from to line to, and its total lines. next is the
+ * from of the next read when this one was cut short (by to, or by the line or byte limit), absent
+ * at the end. A connector doc is its read tool's answer turned into Markdown.
+ */
+export interface DocsReading {
+  doc: Doc;
+  text: string;
+  from: number;
+  to: number;
+  lines: number;
+  next?: number;
+}
+
+/**
+ * docs/search (#3319): the docs that match, the most matches first. sources are the sources it
+ * searched, each with its state: one that failed is named, and the results of the others still
+ * come.
+ */
+export interface DocsSearch {
+  results: DocsSearchResult[];
+  sources: DocsSource[];
+}
+
+/**
+ * docs/search (#3319): the words to find, in every source or in sources (DocsSource ids). A folder
+ * doc matches when a line has the words, in any case; a connector doc when its map's search tool
+ * finds it. limit is 1 to 100 docs, 20 when not said.
+ */
+export interface DocsSearchRequest {
+  query: string;
+  sources?: string[];
+  limit?: number;
+}
+
+/** A doc that docs/search found, with its matches (at most 5). */
+export interface DocsSearchResult {
+  doc: Doc;
+  matches: DocsMatch[];
+}
+
+/**
  * One docs connector in the Docs slot (#3307): its name in mcp.json, and what its one real search
  * found.
  */
@@ -2681,6 +2784,38 @@ export type DocsServerState =
   | "noMap"
   | "notRead"
   | "read"
+  | "failed";
+
+/**
+ * Where docs come from (#3319): a folder, or a docs connector in a folder's Docs slot. id is the
+ * folder's path, or mcp:<server name> for a connector. name is the folder's name or the
+ * connector's. folder is the folder (for a connector, the first folder whose mcp.json reaches it).
+ * message says why, when state is failed.
+ */
+export interface DocsSource {
+  id: string;
+  kind: DocsSourceKind;
+  name: string;
+  folder?: string;
+  state: DocsSourceState;
+  message?: string;
+}
+
+/**
+ * folder: a folder's own *.md files. connector: a docs connector, through its map in
+ * .agents/docs-maps.json.
+ */
+export type DocsSourceKind =
+  | "folder"
+  | "connector";
+
+/**
+ * read: it answered. notMapped: a docs connector with no map of its search and read tools yet (the
+ * map-a-docs-server skill writes one). failed: it did not answer; message says why.
+ */
+export type DocsSourceState =
+  | "read"
+  | "notMapped"
   | "failed";
 
 /**
@@ -10741,7 +10876,17 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DiskState: { required: ["alarms"], optional: [] },
   DiskThresholds: { required: [], optional: ["lowGB", "lowPercent", "criticalGB"] },
   DiskWorktree: { required: ["name", "bytes", "partial"], optional: [] },
+  Doc: { required: ["ref", "title", "source"], optional: ["folder", "path", "url", "updated"] },
+  DocsList: { required: ["docs", "sources"], optional: ["cursor"] },
+  DocsListRequest: { required: [], optional: ["folder", "source", "cursor", "limit"] },
+  DocsMatch: { required: ["snippet"], optional: ["line"] },
+  DocsReadRequest: { required: ["ref"], optional: ["from", "to"] },
+  DocsReading: { required: ["doc", "text", "from", "to", "lines"], optional: ["next"] },
+  DocsSearch: { required: ["results", "sources"], optional: [] },
+  DocsSearchRequest: { required: ["query"], optional: ["sources", "limit"] },
+  DocsSearchResult: { required: ["doc", "matches"], optional: [] },
   DocsServer: { required: ["name", "state"], optional: ["proof", "message"] },
+  DocsSource: { required: ["id", "kind", "name", "state"], optional: ["folder", "message"] },
   DomainClaim: { required: ["domain", "provider", "state", "txtName", "txtValue", "sendHere", "require"], optional: ["lastGood", "failingSince", "claimed"] },
   DraftCheck: { required: ["passed"], optional: ["workspaces", "problem", "ssh", "noSSH"] },
   DraftOptionsNotification: { required: ["draftID", "options", "commands"], optional: ["failure"] },
