@@ -12,9 +12,11 @@ import { hostAnswers } from "../model/capabilities";
 import { fileURL } from "../model/completions";
 import { folderKey } from "../model/groups";
 import {
-  docsGroups, docsSortTitle, isFolderDoc, mapItPrompt, mergeResults, noDocs, noDocsHere, noResults, shortForm, sourceProblem,
-  titleBeside, underShelf, updatedWords, vendorName, windowAddress, type DocsSort, type HostDocs,
+  docStartHelp, docStartLabels, docStartPrompt, docStarts, docStartTitle, docsGroups, docsSortTitle, isFolderDoc, linkedRefs,
+  mapItPrompt, mergeResults, noDocs, noDocsHere, noResults, relatedDocs, searchWords, shortForm, sourceProblem, titleBeside,
+  underShelf, updatedWords, vendorName, windowAddress, type DocStart, type DocsSort, type HostDocs,
 } from "../model/docs";
+import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { LiveDocument, type PageSource } from "./LiveDocument";
 import { offerStart } from "./NewAgent";
 import { go, routeHash } from "../route";
@@ -203,6 +205,7 @@ export function DocPage({ store, docRef }: { store: Store; docRef: string }) {
   const problem = useSignal<string | null>(null);
   const tick = useSignal(0);
   const copied = useSignal<string | null>(null);
+  const startProblem = useSignal<string | null>(null);
   const line = openAt.value?.ref === docRef ? openAt.value.line : undefined;
 
   // The machine that listed it first, then this Mac, then the others.
@@ -268,12 +271,14 @@ export function DocPage({ store, docRef }: { store: Store; docRef: string }) {
           {[docRef, doc?.updated !== undefined ? `updated ${updatedWords(doc)}` : ""].filter(Boolean).join(" · ")}
         </p>
         <div class="work-actions-bar">
+          {doc && got.value && <StartMenu store={store} host={got.value.host} doc={doc} said={(why) => { startProblem.value = why; }} />}
           {doc?.url && !isFolderDoc(doc)
             ? <a class="button" href={doc.url} target="_blank" rel="noopener noreferrer">Open in {vendorName(docRef)}</a>
             : filesPlace && <button type="button" onClick={() => go(filesPlace)} title="Open this file as the folder's page">Open in Files</button>}
           <button type="button" onClick={() => void copy("link", link)} title={windowAddress(docRef)}>{copied.value === "link" ? "Copied" : "Copy link"}</button>
           <button type="button" onClick={() => void copy("ref", docRef)} title={docRef}>{copied.value === "ref" ? "Copied" : "Copy ref"}</button>
         </div>
+        {startProblem.value && <p class="hint failure small" role="status">{startProblem.value}</p>}
       </header>
       {problem.value && <p class="hint">{problem.value}</p>}
       {!got.value && !problem.value && <p class="hint">Reading {docRef}…</p>}
@@ -286,6 +291,108 @@ export function DocPage({ store, docRef }: { store: Store; docRef: string }) {
         </section>
       )}
     </article>
+  );
+}
+
+/** Start Agent ▾ (#3322): a new session from this doc, in its folder; a connector doc's asks for the
+ * folder, as a second menu of this machine's folders. */
+function StartMenu({ store, host, doc, said }: { store: Store; host: string; doc: Doc; said: (why: string | null) => void }) {
+  const folderDoc = isFolderDoc(doc);
+  const start = (s: DocStart, folder: string | undefined) => {
+    said(folder ? offerStart(store, host, folder, { prompt: docStartPrompt(s, doc.ref), labels: docStartLabels(s, doc), worktree: undefined })
+      : "This doc has no folder here.");
+  };
+  const folders = (s: DocStart): MenuItem[] => (store.folders.value[host] ?? []).map((f) => ({
+    label: f.name, run: () => start(s, f.folder.folder),
+  }));
+  const menu = (event: MouseEvent) => {
+    const at = { clientX: event.clientX, clientY: event.clientY };
+    openContextMenu(event, docStarts.map((s): MenuItem => ({
+      label: folderDoc ? docStartTitle[s] : `${docStartTitle[s]}…`,
+      help: docStartHelp[s],
+      run: () => {
+        if (folderDoc) { start(s, doc.folder); return; }
+        const items = folders(s);
+        if (items.length === 0) { said("No folder on this machine to start in."); return; }
+        // The folder to start in, once the first menu has closed.
+        setTimeout(() => openContextMenu(new MouseEvent("click", at), items), 0);
+      },
+    })));
+  };
+  return (
+    <button type="button" class="prominent" onClick={menu}
+      title={folderDoc ? "A new session in this doc's folder, working from it" : "A new session working from this doc, in a folder you choose"}>
+      Start Agent ▾</button>
+  );
+}
+
+/** The Docs section on an issue's and a PR's Work page (#3322), as the window's WorkDocsSection: the
+ * docs its body names, then the docs most like its title (docs/search, a search a word). Each opens
+ * the doc's page. */
+export function WorkDocs({ store, itemRef, title, body, asked }: { store: Store; itemRef: string; title: string; body: string; asked: number }) {
+  const hosts = docsHosts(store);
+  const hostKey = hosts.map((h) => h.id).join(",");
+  const got = useSignal<{ linked: Doc[]; related: Doc[] } | null>(null);
+  useEffect(() => {
+    let current = true;
+    got.value = null;
+    void (async () => {
+      // Each named doc from the first machine that has it; one it cannot find is left out.
+      const linked: Doc[] = [];
+      for (const ref of linkedRefs(body, itemRef)) {
+        for (const h of hosts) {
+          try {
+            const r = await store.link.call("docs/read", { ref, from: 1, to: 1 }, h.id);
+            if (!listedOn.has(r.doc.ref)) listedOn.set(r.doc.ref, h.id);
+            if (!linked.some((l) => l.ref === r.doc.ref)) linked.push(r.doc);
+            break;
+          } catch { /* the next machine */ }
+        }
+      }
+      const searches = await Promise.all(searchWords(title).map(async (word) => (await Promise.all(hosts.map(async (h) => {
+        try {
+          const r = await store.link.call("docs/search", { query: word, limit: 20 }, h.id);
+          for (const x of r.results) if (!listedOn.has(x.doc.ref)) listedOn.set(x.doc.ref, h.id);
+          return r.results;
+        } catch {
+          return [];
+        }
+      }))).flat()));
+      if (current) got.value = { linked, related: relatedDocs(searches, new Set(linked.map((l) => l.ref))) };
+    })();
+    return () => { current = false; };
+  }, [itemRef, body, title, hostKey, asked]);
+
+  if (hosts.length === 0) return null;
+  const g = got.value;
+  const row = (doc: Doc) => {
+    const beside = titleBeside(doc);
+    return (
+      <li key={doc.ref} data-ref={doc.ref}>
+        <button type="button" class="work-row docs-row" title={doc.ref} onClick={() => go({ nav: "docs", section: "docs", item: doc.ref })}>
+          <span class="work-row-head">
+            <span class={doc.path ? "docs-path" : "work-title"}>{shortForm(doc)}</span>
+            {beside && <span class="quiet docs-beside">{beside}</span>}
+          </span>
+        </button>
+      </li>
+    );
+  };
+  return (
+    <section class="work-docs" aria-label="Docs">
+      <h3>Docs</h3>
+      {!g ? <p class="hint">Finding its docs…</p>
+        : g.linked.length === 0 && g.related.length === 0 ? <p class="hint">No doc names this, and none is like it.</p>
+        : (
+          <>
+            {g.linked.length > 0 && <ul class="work-rows">{g.linked.map(row)}</ul>}
+            {g.related.length > 0 && <>
+              <p class="quiet small">{g.linked.length === 0 ? "Like this" : "Also like this"}</p>
+              <ul class="work-rows">{g.related.map(row)}</ul>
+            </>}
+          </>
+        )}
+    </section>
   );
 }
 
