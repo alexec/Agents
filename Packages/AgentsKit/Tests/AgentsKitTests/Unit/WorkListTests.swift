@@ -94,7 +94,13 @@ struct WorkListTests {
     @Test func refsRepoShortNameAndForge() {
         #expect(WorkList.repo(of: "github:alexec/Agents#12") == "github:alexec/Agents")
         #expect(WorkList.repo(of: "gitlab:group/repo!45") == "gitlab:group/repo")
-        #expect(WorkList.repo(of: "linear:ENG-4") == "linear")
+        // #3311: a Linear issue's repo is its team, a choice of the Repo filter of its own.
+        #expect(WorkList.repo(of: "linear:ENG-4") == "linear:ENG")
+        #expect(WorkList.repoName("linear:ENG") == "Linear · ENG")
+        var linear = node(0, 0)
+        linear.node = Node(kind: "issue", ref: "linear:OPS-2")
+        linear.repo = "linear"
+        #expect(WorkList.Row(linear).repo == "linear:OPS")
         #expect(WorkList.repo(of: "github:alexec/Agents/milestone/15") == "github:alexec/Agents")
         #expect(WorkList.shortRef("github:alexec/Agents#12") == "#12")
         #expect(WorkList.shortRef("linear:ENG-4") == "ENG-4")

@@ -82,7 +82,10 @@ test("sorts: last updated, newest by number, cost with no lineage last", () => {
 test("refs: repo, short name, and the forge to open on", () => {
   assert.equal(w.repoOf("github:alexec/Agents#12"), "github:alexec/Agents");
   assert.equal(w.repoOf("gitlab:group/repo!45"), "gitlab:group/repo");
-  assert.equal(w.repoOf("linear:ENG-4"), "linear");
+  // #3311: a Linear issue's repo is its team, a choice of the Repo filter of its own.
+  assert.equal(w.repoOf("linear:ENG-4"), "linear:ENG");
+  assert.equal(w.repoName("linear:ENG"), "Linear · ENG");
+  assert.equal(w.lineageRow(node(0, 0, { node: { kind: "issue", ref: "linear:OPS-2" }, repo: "linear" })).repo, "linear:OPS");
   assert.equal(w.repoOf("github:alexec/Agents/milestone/15"), "github:alexec/Agents");
   assert.equal(w.shortRef("github:alexec/Agents#12"), "#12");
   assert.equal(w.shortRef("linear:ENG-4"), "ENG-4");

@@ -274,14 +274,7 @@ func (d *Daemon) linearPlan(ctx context.Context, method, identifier string) (wir
 		}
 		return wire.ForgeItem{}, nil, err
 	}
-	folderOf := func(team string) string {
-		for _, f := range d.folderPaths() {
-			if slices.Contains(d.folderLinearTeams(f), team) {
-				return f
-			}
-		}
-		return ""
-	}
+	folderOf := d.linearFolder
 	epic := linearItemOf(p.Epic, folderOf(p.Epic.Team))
 	var children []planChild
 	for _, c := range p.Children {

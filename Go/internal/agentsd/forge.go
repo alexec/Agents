@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"os"
 	"slices"
 	"strings"
 	"sync"
@@ -31,7 +32,8 @@ import (
 // with the host's GitLab connection, only on its own GitLab, through gitlabmcp.RealGitLab: a
 // call per project, as GitLab has no list across chosen projects. Linear (#3209) is read with
 // the Linear connection, issues only, of the teams the folders' .agents/folder.json name in
-// "linearTeams": one query for every team. Jira (#3260) is read with the jira connector's
+// "linearTeams": one query for every team; when no folder names one, of the whole workspace,
+// as the Linear connector's view lists it (#3311). Jira (#3260) is read with the jira connector's
 // sign-in (JIRA_URL, JIRA_EMAIL and JIRA_API_TOKEN in the secrets) through jiramcp.RealJira,
 // issues only, of the projects the folders' .agents/folder.json name in "jiraProjects": one
 // search for every project.
@@ -47,6 +49,8 @@ const (
 	forgeCacheFor = time.Minute
 	// forgeCached bounds the answers kept: the oldest go first.
 	forgeCached = 200
+	// linearTestVariable is a fixture Linear's GraphQL endpoint, for a walk.
+	linearTestVariable = "AGENTS_TEST_LINEAR_URL"
 )
 
 // forgeGitHub is what the forge reads ask of GitHub; a test gives a fake.
@@ -225,7 +229,7 @@ func (d *Daemon) forgeList(ctx context.Context, prs bool, r wire.ForgeListReques
 		}
 		pages = append(pages, p)
 	}
-	if len(sources.teams) > 0 && !slices.Contains(cursor.Done, "linear") {
+	if (len(sources.teams) > 0 || sources.workspace) && !slices.Contains(cursor.Done, "linear") {
 		p := forgePage{forge: "linear"}
 		l, err := d.forgeLinear()
 		if err == nil {
@@ -233,7 +237,11 @@ func (d *Daemon) forgeList(ctx context.Context, prs bool, r wire.ForgeListReques
 			page, err = l.Search(ctx, sources.teams, linearmcp.SearchFilter{State: state, Label: deref(r.Label),
 				Assignee: deref(r.Assignee), Query: deref(r.Query), Feature: deref(r.Feature)}, cursor.Linear, limit)
 			for _, i := range page.Items {
-				p.items = append(p.items, linearItemOf(i, sources.teamFolder[i.Team]))
+				folder, named := sources.teamFolder[i.Team]
+				if !named {
+					folder = sources.linearHome
+				}
+				p.items = append(p.items, linearItemOf(i, folder))
 			}
 			p.cursors, p.next = page.Cursors, page.Next
 		}
@@ -322,18 +330,24 @@ func mergeForgePages(pages []forgePage, from forgeCursor, limit int) ([]wire.For
 // forgeSources are what a list reads: the GitHub repos, the GitLab projects on the connected
 // GitLab, the Linear teams and the Jira projects, each once, with a folder on each to act from.
 type forgeSources struct {
-	repos         []string
-	gitlab        []string
-	root          string
-	gitlabErr     error
-	teams         []string
+	repos     []string
+	gitlab    []string
+	root      string
+	gitlabErr error
+	teams     []string
+	// workspace is the whole Linear workspace, when no folder names a team (#3311); its
+	// issues act from linearHome.
+	workspace     bool
+	linearHome    string
 	projects      []string
 	folderOf      map[forgeRepo]string
 	teamFolder    map[string]string
 	projectFolder map[string]string
 }
 
-func (s forgeSources) key() []any { return []any{s.repos, s.root, s.gitlab, s.teams, s.projects} }
+func (s forgeSources) key() []any {
+	return []any{s.repos, s.root, s.gitlab, s.teams, s.workspace, s.linearHome, s.projects}
+}
 
 func (d *Daemon) forgeSources(ctx context.Context, prs bool, folders []string) forgeSources {
 	s := forgeSources{folderOf: map[forgeRepo]string{}, teamFolder: map[string]string{}, projectFolder: map[string]string{}}
@@ -374,6 +388,9 @@ func (d *Daemon) forgeSources(ctx context.Context, prs bool, folders []string) f
 				s.projects = append(s.projects, project)
 			}
 		}
+	}
+	if !prs && len(s.teams) == 0 && d.linearConnected() && !d.anyLinearTeams() {
+		s.workspace, s.linearHome = true, d.linearHome()
 	}
 	slices.Sort(s.repos)
 	slices.Sort(s.gitlab)
@@ -417,6 +434,50 @@ func (d *Daemon) gitlabProjectAt(ctx context.Context, folder, connected string) 
 // folderLinearTeams is the Linear teams, by key, that a folder's .agents/folder.json names for
 // its tasks: "linearTeams": ["ENG"].
 func (d *Daemon) folderLinearTeams(folder string) []string { return d.folderKeys(folder, "linearTeams") }
+
+// linearFolder is the first folder whose .agents/folder.json names team, or, when no folder
+// names any, the folder the whole workspace acts from (#3311); else "".
+func (d *Daemon) linearFolder(team string) string {
+	for _, f := range d.folderPaths() {
+		if slices.Contains(d.folderLinearTeams(f), team) {
+			return f
+		}
+	}
+	if d.anyLinearTeams() {
+		return ""
+	}
+	return d.linearHome()
+}
+
+// anyLinearTeams says some folder here names Linear teams: then Work lists only theirs.
+func (d *Daemon) anyLinearTeams() bool {
+	for _, f := range d.folderPaths() {
+		if len(d.folderLinearTeams(f)) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// linearHome is the folder a workspace's Linear issues act from (Start Agent): the first one
+// whose Linear connector is set up and approved, as the connector's row was (#2032), else the
+// first folder.
+func (d *Daemon) linearHome() string {
+	folders := d.folderPaths()
+	for _, f := range folders {
+		for _, name := range d.viewServerNames(f) {
+			if s, problem := d.viewServerFor(name, f); problem == 0 {
+				if ours, ok := oursForServer(s); ok && ours.ID == "agents/linear" {
+					return f
+				}
+			}
+		}
+	}
+	if len(folders) == 0 {
+		return ""
+	}
+	return folders[0]
+}
 
 // folderJiraProjects is the Jira projects, by key, that a folder's .agents/folder.json names
 // for its tasks: "jiraProjects": ["PROJ"] (#3260).
@@ -582,14 +643,7 @@ func (d *Daemon) linearItem(ctx context.Context, method, identifier, cursor stri
 		}
 		return wire.ForgeItemDetail{}, err
 	}
-	folder := ""
-	for _, f := range d.folderPaths() {
-		if slices.Contains(d.folderLinearTeams(f), p.Team) {
-			folder = f
-			break
-		}
-	}
-	out := wire.ForgeItemDetail{Item: linearItemOf(p.Item, folder), Body: p.Body, Comments: []wire.ForgeComment{}, Cursor: optional(p.Before)}
+	out := wire.ForgeItemDetail{Item: linearItemOf(p.Item, d.linearFolder(p.Team)), Body: p.Body, Comments: []wire.ForgeComment{}, Cursor: optional(p.Before)}
 	out.Start = forgeStartOf(out.Item)
 	for _, c := range p.Thread {
 		out.Comments = append(out.Comments, forgeCommentOf(c.Author, c.Body, c.At, c.URL, c.Bot))
@@ -674,7 +728,19 @@ func (d *Daemon) forgeLinear() (forgeLinear, error) {
 	if d.newForgeLinear != nil {
 		return d.newForgeLinear(key), nil
 	}
-	return linearmcp.NewRealLinear("", func() string { return key }), nil
+	// A walk points Linear at its fixture server (#3311), as AGENTS_TEST_GITHUB_URL does GitHub.
+	return linearmcp.NewRealLinear(os.Getenv(linearTestVariable), func() string { return key }), nil
+}
+
+// linearConnected says this host has a Linear connection, usable or not: a list without one
+// leaves Linear out, with no error, as most people have no Linear.
+func (d *Daemon) linearConnected() bool {
+	s, err := d.connectionStore()
+	if err != nil {
+		return false
+	}
+	_, ok, err := s.Get(connections.Linear)
+	return err == nil && ok
 }
 
 // forgeJira is Jira as the jira connector's sign-in on this host (its secrets), or why there is none.
