@@ -15,7 +15,9 @@ import (
 // its top (README.md and the like) and every *.md under specs/ and docs/. Its one read is the
 // newest of them. The docs connectors in the folder's or the person's mcp.json fill the slot
 // beside it: Confluence (Atlassian's server), Notion, Google Drive, or any whose name or
-// address says docs or wiki. Agents writes no server of its own for any of them.
+// address says docs or wiki, or any that a map says can search and read; each proves itself
+// with one real search through that map (docsmap.go, #3307). Agents writes no server of its
+// own for any of them.
 
 // docsScanLimit is the most files one read looks at, so a huge docs/ costs a bounded walk.
 const docsScanLimit = 5000
@@ -92,8 +94,9 @@ func readDocs(folder string, now time.Time) *slotRecord {
 }
 
 // docsServers is the docs connectors that reach the folder (its own mcp.json, then the
-// person's): their names there, and the words the slot says for them, each once.
-func (d *Daemon) docsServers(folder string) (names, words []string) {
+// person's): their names there, and the words the slot says for them, each once. A server
+// that its map says can search and read is one whatever its name (#3307).
+func (d *Daemon) docsServers(folder string, maps map[string]docsMap) (names, words []string) {
 	entries, _ := readMCPFile(filepath.Join(folder, ".agents", "mcp.json"))
 	if home := d.personalHome(); home != "" {
 		personal, _ := readMCPFile(filepath.Join(home, ".agents", "mcp.json"))
@@ -102,6 +105,9 @@ func (d *Daemon) docsServers(folder string) (names, words []string) {
 	seenName, seenWord := map[string]bool{}, map[string]bool{}
 	for _, e := range entries {
 		word, ok := docsKindOf(e.name, mcpSummary(e))
+		if m, mapped := maps[e.name]; !ok && mapped && m.searchesAndReads() {
+			word, ok = e.name, true
+		}
 		if !ok || seenName[e.name] {
 			continue
 		}
@@ -141,8 +147,9 @@ func docsChoice(words []string) string {
 	return strings.Join(all[:len(all)-1], ", ") + " and " + all[len(all)-1]
 }
 
-// docsSlot is the Docs slot from its last read.
-func docsSlot(rec *slotRecord, skipped bool, servers, words []string) wire.ConnectorSlot {
+// docsSlot is the Docs slot from its last read: each docs connector with its last search, or
+// with no map yet, or mapped and not searched yet.
+func docsSlot(rec *slotRecord, skipped bool, servers, words []string, maps map[string]docsMap) wire.ConnectorSlot {
 	s := wire.ConnectorSlot{Slot: wire.ConnectorSlotKindDocs, Choice: docsChoice(nil)}
 	switch {
 	case skipped:
@@ -158,6 +165,18 @@ func docsSlot(rec *slotRecord, skipped bool, servers, words []string) wire.Conne
 	s.Choice = docsChoice(words)
 	if len(servers) > 0 {
 		s.Servers = servers
+	}
+	for _, name := range servers {
+		m, mapped := maps[name]
+		r := findDocsRecord(rec, name)
+		switch {
+		case !mapped || !m.searchesAndReads():
+			s.DocsServers = append(s.DocsServers, wire.DocsServer{Name: name, State: wire.DocsServerStateNoMap})
+		case r == nil || r.Map != m.digest() || s.State != wire.ConnectorSlotStateRead:
+			s.DocsServers = append(s.DocsServers, wire.DocsServer{Name: name, State: wire.DocsServerStateNotRead})
+		default:
+			s.DocsServers = append(s.DocsServers, r.DocsServer)
+		}
 	}
 	return s
 }

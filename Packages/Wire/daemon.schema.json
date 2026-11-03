@@ -5042,6 +5042,13 @@
             "type": "string"
           },
           "description": "Docs only (#3248): the docs connectors that fill the slot beside this folder, by their names in the folder's or the person's mcp.json. Absent with none."
+        },
+        "docsServers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DocsServer"
+          },
+          "description": "Docs only (#3307): each docs connector's own read, in the order of servers: one real search through the map an agent wrote of its tools (.agents/docs-maps.json), and the first doc it found. Absent with none."
         }
       },
       "required": [
@@ -6733,6 +6740,41 @@
         "partial"
       ],
       "additionalProperties": false
+    },
+    "DocsServer": {
+      "type": "object",
+      "description": "One docs connector in the Docs slot (#3307): its name in mcp.json, and what its one real search found.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/definitions/DocsServerState"
+        },
+        "proof": {
+          "$ref": "#/definitions/ConnectorProof",
+          "description": "The first doc the search found. Absent when it found none, or did not search."
+        },
+        "message": {
+          "type": "string",
+          "description": "failed: why, in a sentence."
+        }
+      },
+      "required": [
+        "name",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "DocsServerState": {
+      "type": "string",
+      "description": "noMap: no agent has written a map of its search and read tools yet. notRead: mapped, not searched yet. read: its one search worked. failed: the search did not work; message says why.",
+      "enum": [
+        "noMap",
+        "notRead",
+        "read",
+        "failed"
+      ]
     },
     "DomainClaim": {
       "type": "object",

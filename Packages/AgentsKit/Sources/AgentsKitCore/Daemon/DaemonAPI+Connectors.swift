@@ -238,17 +238,45 @@ extension DaemonAPI {
         public var fromProject: Bool?
         /// Docs only (#3248): the docs connectors beside this folder, by their mcp.json names.
         public var servers: [String]?
+        /// Docs only (#3307): each docs connector's one real search, through its map.
+        public var docsServers: [DocsServer]?
 
         public var id: ConnectorSlotKind { slot }
         public var isFromProject: Bool { fromProject == true }
 
         public init(slot: ConnectorSlotKind, choice: String, state: ConnectorSlotState, proof: ConnectorProof? = nil,
                     readAt: Date? = nil, message: String? = nil, repository: String? = nil, fromProject: Bool? = nil,
-                    servers: [String]? = nil) {
+                    servers: [String]? = nil, docsServers: [DocsServer]? = nil) {
             self.slot = slot; self.choice = choice; self.state = state; self.proof = proof
             self.readAt = readAt; self.message = message; self.repository = repository; self.fromProject = fromProject
-            self.servers = servers
+            self.servers = servers; self.docsServers = docsServers
         }
+    }
+
+    /// One docs connector in the Docs slot (#3307): its mcp.json name, and what its one real
+    /// search, through the map an agent wrote of its tools, found.
+    public struct DocsServer: Codable, Sendable, Hashable {
+        public var name: String
+        public var state: DocsServerState
+        /// The first doc the search found.
+        public var proof: ConnectorProof?
+        /// failed: why, in a sentence.
+        public var message: String?
+
+        public init(name: String, state: DocsServerState, proof: ConnectorProof? = nil, message: String? = nil) {
+            self.name = name; self.state = state; self.proof = proof; self.message = message
+        }
+    }
+
+    public enum DocsServerState: String, Codable, Sendable, Hashable {
+        /// No agent has written a map of its search and read tools yet.
+        case noMap
+        /// Mapped, not searched yet.
+        case notRead
+        /// Its one search worked.
+        case read
+        /// The search did not work.
+        case failed
     }
 
     public enum ConnectorEventsState: String, Codable, Sendable, Hashable {

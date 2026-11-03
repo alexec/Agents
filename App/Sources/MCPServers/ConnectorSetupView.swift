@@ -333,7 +333,12 @@ private struct SlotCard: View {
             Text(slot.slot == .workspace ? place.title : ConnectorSetupWords.title(slot))
                 .appText(.supporting).fontWeight(.semibold)
             proofOrLine
-            if let servers = ConnectorSetupWords.Docs.servers(slot.servers ?? []) {
+            if let found = slot.docsServers, !found.isEmpty {
+                // Each docs connector with its one real search (#3307).
+                ForEach(found, id: \.name) { server in
+                    Text(ConnectorSetupWords.Docs.serverLine(server)).appText(.fine).foregroundStyle(.secondary).lineLimit(2)
+                }
+            } else if let servers = ConnectorSetupWords.Docs.servers(slot.servers ?? []) {
                 Text(servers).appText(.fine).foregroundStyle(.secondary).lineLimit(2)
             }
             if slot.isFromProject {

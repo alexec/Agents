@@ -1,7 +1,7 @@
 // The words of a folder's Connectors set-up and the one Connect sheet (#1336), ported from
 // ConnectorSetupWords in AgentsKitCore so the Mac, the Remote and the page say the same.
 import type {
-  Connection, ConnectionProvider, ConnectionSignIn, ConnectionSignInCompleteRequest, UUID, ConnectorEvents, ConnectorProof, ConnectorSetup, ConnectorSlot, ConnectorSlotKind,
+  Connection, ConnectionProvider, ConnectionSignIn, ConnectionSignInCompleteRequest, UUID, ConnectorEvents, ConnectorProof, ConnectorSetup, ConnectorSlot, ConnectorSlotKind, DocsServer,
 } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 
@@ -94,6 +94,13 @@ export const docs = {
   none: "No docs yet in specs/, docs/ or a *.md file at the top.",
   addOnTheMac: "Confluence, Notion, Google Drive and other docs connectors: add them on the Mac, in Add Connector….",
   servers: (names: string[]): string | undefined => names.length ? `Connectors: ${names.join(", ")}` : undefined,
+  /** One docs connector's line (#3307): the first doc its one search found, or why not. */
+  serverLine: (s: DocsServer): string => `${s.name}: ${{
+    read: s.proof ? `found “${s.proof.title}”` : "searched, and found no doc.",
+    notRead: "searching…",
+    noMap: "no map of its search yet. Ask an agent to map it (the map-a-docs-server skill).",
+    failed: s.message ?? "the search didn't work.",
+  }[s.state]}`,
 };
 
 export function title(slot: ConnectorSlot): string {
