@@ -9,7 +9,8 @@ import Observation
 /// Voice mode (#2322): the person talks to one chat and hears its replies.
 ///
 /// One chat at a time, for the whole app. While it is on, the microphone listens through
-/// `Dictation` (`SpeechTranscriber`, on the device, #2515). A pause of 2 seconds after some words sends them, with
+/// `Dictation` (`SpeechTranscriber`, on the device, #2515). A pause of 2 seconds after a
+/// sentence (3.5 after words that do not end one, #3340) sends the words, with
 /// `voice` set so the daemon asks for a short spoken reply. Words said while a turn runs
 /// are sent the same way, and wait on the chat's queue (#95). The reply
 /// (`TurnParts.replyText`, never the thoughts or the steps) is cleaned by `Speakable` and
@@ -86,6 +87,9 @@ final class VoiceMode {
     /// tried it (#2375).
     /// Settings ▸ Voice can make it longer or shorter (Alex, 2026-10-29).
     static var pause: Duration { .milliseconds(Int(VoiceSettings.wait * 1000)) }
+    /// How much longer the pause is when the words heard do not end a sentence: "Do we
+    /// have", or "Rather than looking at milestones," (#3340).
+    static let midSentence: Duration = .milliseconds(1_500)
 
     /// How often a tick says it is still listening, while nothing is heard (#2520).
     static let tickEvery: Duration = .seconds(8)
@@ -821,8 +825,11 @@ final class VoiceMode {
             return
         }
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        // Words that do not end a sentence wait longer: a short pause mid-sentence does not
+        // send half of it (#3340). An answer to a question is one word, and goes at the pause.
+        let wait = isAsking || VoiceModeWords.endsSentence(text) ? Self.pause : Self.pause + Self.midSentence
         pauseTimer = Task { [weak self] in
-            try? await Task.sleep(for: Self.pause)
+            try? await Task.sleep(for: wait)
             guard !Task.isCancelled else { return }
             await self?.sendHeard()
         }
@@ -946,27 +953,10 @@ final class VoiceMode {
 
     // MARK: Talking over the voice
 
-    /// What is said while the voice speaks that is only listening, not talking.
-    private static let backchannel: Set<String> = [
-        "mm", "mmm", "hmm", "mhm", "mm-hmm", "uh-huh", "uh", "um", "er", "ah", "oh",
-        "yeah", "yep", "yes", "ok", "okay", "right", "sure", "huh", "cool", "nice",
-    ]
-
-    /// Whether words heard over the voice are the person talking: two words that are not
-    /// backchannel ("mm-hmm", "yeah", a cough heard as "uh"), or one while a question is
-    /// read, as "two!". Words the voice is saying now are its own, heard back.
+    /// Whether words heard over the voice are the person talking, not the voice's own
+    /// sentences heard back (`VoiceModeWords.isBargeIn`, #3340).
     private func isBargeIn(_ text: String) -> Bool {
-        let meant = Self.words(text).filter { !Self.backchannel.contains($0) }
-        guard meant.count >= (isAsking ? 1 : 2) else { return false }
-        let own = Set(said.suffix(2).flatMap(Self.words))
-        let echoed = meant.filter(own.contains).count
-        return Double(echoed) < Double(meant.count) * 0.7
-    }
-
-    private static func words(_ text: String) -> [String] {
-        text.lowercased()
-            .split { !$0.isLetter && !$0.isNumber && $0 != "-" && $0 != "'" }
-            .map(String.init)
+        VoiceModeWords.isBargeIn(text, over: Array(said.suffix(3)), asking: isAsking)
     }
 
     // MARK: Speaking

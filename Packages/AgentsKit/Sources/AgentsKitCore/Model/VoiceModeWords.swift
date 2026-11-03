@@ -72,6 +72,83 @@ public enum VoiceModeWords {
         return String(rest.drop { !counts($0) }).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// Whether words heard end a sentence: their last mark, after any closing quote or
+    /// bracket, is a full stop, a question mark or an exclamation mark (#3340). The
+    /// transcriber writes these marks itself. "Do we have" and "Rather than looking at
+    /// milestones," do not end one, so voice mode waits longer before they go.
+    public static func endsSentence(_ text: String) -> Bool {
+        let closing: Set<Character> = ["\"", "'", "”", "’", ")", "]"]
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines).reversed().drop { closing.contains($0) }
+        guard let last = trimmed.first else { return false }
+        return [".", "?", "!", "…"].contains(last)
+    }
+
+    /// What is said over the voice that is only listening, not talking.
+    static let backchannel: Set<String> = [
+        "mm", "mmm", "hmm", "mhm", "mm-hmm", "uh-huh", "uh", "um", "er", "ah", "oh",
+        "yeah", "yep", "yes", "ok", "okay", "right", "sure", "huh", "cool", "nice",
+    ]
+
+    /// Whether words heard while the voice speaks are the person talking over it: two words
+    /// that are not backchannel ("mm-hmm", "yeah", a cough heard as "uh"), or one while a
+    /// question is read, as "two!". Words that are the voice's own sentences (`said`), heard
+    /// back through the microphone, are not: also when the microphone mishears them ("I hear
+    /// you: not by milestone." heard as "I hear you not my master", #3340), so a word that
+    /// is one letter off one of the voice's words counts as the voice's, in the same order.
+    public static func isBargeIn(_ heard: String, over said: [String], asking: Bool) -> Bool {
+        let meant = spokenWords(heard).filter { !backchannel.contains($0) }
+        guard meant.count >= (asking ? 1 : 2) else { return false }
+        let own = said.flatMap(spokenWords)
+        return Double(echoed(meant, in: own)) < Double(meant.count) * 0.6
+    }
+
+    /// Words as `isBargeIn` counts them: "mm-hmm" is one word.
+    private static func spokenWords(_ text: String) -> [String] {
+        text.lowercased()
+            .split { !$0.isLetter && !$0.isNumber && $0 != "-" && $0 != "'" }
+            .map(String.init)
+    }
+
+    /// How many of `heard`, in order, are near words of `own`, in order: the longest
+    /// common run of near words.
+    private static func echoed(_ heard: [String], in own: [String]) -> Int {
+        guard !own.isEmpty else { return 0 }
+        var row = [Int](repeating: 0, count: own.count + 1)
+        for word in heard {
+            var diagonal = 0
+            for (j, ownWord) in own.enumerated() {
+                let above = row[j + 1]
+                row[j + 1] = isNear(word, ownWord) ? diagonal + 1 : max(above, row[j])
+                diagonal = above
+            }
+        }
+        return row[own.count]
+    }
+
+    /// The same word, or one a microphone could mishear as it: one letter off ("my" for
+    /// "by"), or two in a long word.
+    static func isNear(_ a: String, _ b: String) -> Bool {
+        guard a != b else { return true }
+        let allowed = min(a.count, b.count) >= 5 ? 2 : 1
+        guard abs(a.count - b.count) <= allowed, min(a.count, b.count) >= 2 else { return false }
+        return distance(Array(a), Array(b)) <= allowed
+    }
+
+    /// The edit distance between two words, neither of them empty.
+    private static func distance(_ a: [Character], _ b: [Character]) -> Int {
+        var row = Array(0...b.count)
+        for i in 1...a.count {
+            var previous = row[0]
+            row[0] = i
+            for j in 1...b.count {
+                let current = row[j]
+                row[j] = a[i - 1] == b[j - 1] ? previous : min(previous, row[j], row[j - 1]) + 1
+                previous = current
+            }
+        }
+        return row[b.count]
+    }
+
     /// Dictation's problem, in voice mode's alert, which is titled "Voice mode": "Voice mode
     /// needs the microphone.", not "Dictation needs the microphone." (#2444).
     public static func problem(dictation message: String) -> String {
