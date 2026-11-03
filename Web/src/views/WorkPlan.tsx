@@ -182,7 +182,7 @@ export function WorkPlan({ store, host, lineageHost, detail, asked, writes, wrot
                 <select aria-label="Level" value={level.value} disabled={names}
                   title={names ? "An issue that is there keeps its labels" : "The new child's level"}
                   onChange={(e) => { level.value = (e.target as HTMLSelectElement).value; }}>
-                  {childLevels.map((l) => <option key={l} value={l}>{l ? l[0].toUpperCase() + l.slice(1) : "No level"}</option>)}
+                  {childLevels.map((l) => <option key={l} value={l}>{l ? l.charAt(0).toUpperCase() + l.slice(1) : "No level"}</option>)}
                 </select>
                 <button type="submit" disabled={busy.value || !newChild.value.trim()}
                   title={names ? "Make this issue a child of the epic" : "Open a new issue as a child of the epic, in its feature"}>Add child</button>
