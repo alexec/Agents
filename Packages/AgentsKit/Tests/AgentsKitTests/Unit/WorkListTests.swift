@@ -23,6 +23,16 @@ struct WorkListTests {
               leadTimeSeconds: lead, lastAt: day)
     }
 
+    @Test func aJiraIssuesRowHasItsStatusAndTheTrackerJira() {
+        let row = WorkList.Row(.init(node: Node(kind: "issue", ref: "jira:PROJ-7"), title: "Export", state: "open", updatedAt: day,
+                                     status: "In Review"), on: .mac)
+        #expect(row.status == "In Review")
+        #expect(row.state == "open")
+        #expect(row.repo == "jira")
+        #expect(WorkList.repoName(row.repo) == "Jira")
+        #expect(WorkList.repoName("github:alexec/Agents") == "alexec/Agents")
+    }
+
     @Test func oneRowPerRefTheLastUpdatedCopyWithItsLineage() {
         let rows = WorkList.merge([
             (host: .mac, items: [item(1), item(2, title: "Old")]),
@@ -159,6 +169,7 @@ struct WorkPageTests {
         #expect(WorkList.doneWords(DaemonAPI.Method.forgeMerge, .init(auto: true)) == "Auto-merge is on: it merges when its checks pass.")
         #expect(WorkList.doneWords(DaemonAPI.Method.forgeRerun, .init(reran: 2)) == "2 runs started again.")
         #expect(WorkList.doneWords(DaemonAPI.Method.forgeClose, .init(), reopened: true) == "Reopened.")
+        #expect(WorkList.doneWords(DaemonAPI.Method.forgeClose, .init(), moved: true) == "Status changed.")
         #expect(WorkList.closeTitle("open") == "Close")
         #expect(WorkList.closeTitle("closed") == "Reopen")
     }

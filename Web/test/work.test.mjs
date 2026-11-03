@@ -18,6 +18,15 @@ const node = (n, usd, extra = {}) => ({
   sessions: 2, lastAt: at("2026-10-30T10:00:00Z"), ...extra,
 });
 
+test("a Jira issue's row has its status and the tracker jira (#3260)", () => {
+  const row = w.forgeRow(item(0, { node: { kind: "issue", ref: "jira:PROJ-7" }, status: "In Review" }), "mac");
+  assert.equal(row.status, "In Review");
+  assert.equal(row.state, "open");
+  assert.equal(row.repo, "jira");
+  assert.equal(w.repoName(row.repo), "Jira");
+  assert.equal(w.repoName("github:alexec/Agents"), "alexec/Agents");
+});
+
 test("one row per ref, the last updated copy, with its lineage", () => {
   const rows = w.mergeForge([
     { host: "mac", items: [item(1), item(2, { title: "Old" })] },
@@ -150,6 +159,7 @@ test("a write says what it did", () => {
   assert.equal(w.doneWords("forge/rerun", { reran: 2 }), "2 runs started again.");
   assert.equal(w.doneWords("forge/close", {}), "Closed.");
   assert.equal(w.doneWords("forge/close", {}, true), "Reopened.");
+  assert.equal(w.doneWords("forge/close", {}, false, true), "Status changed.");
   assert.equal(w.closeTitle("open"), "Close");
   assert.equal(w.closeTitle("closed"), "Reopen");
 });

@@ -1,7 +1,8 @@
 // The actions on an issue's or a pull request's Work page (#3130), as the window's WorkItemActions:
-// Start Agent, labels and Close or Reopen on an issue; Merge, Approve, Rerun, the failed checks' logs
-// and Show Diff on a pull request; a comment on either. Each goes to the machine that read the item
-// (forge/*), as the person: their own click, so no approval card. `wrote` reads the page again.
+// Start Agent, labels and Close or Reopen on an issue (a Jira issue's status menu in their place,
+// #3260); Merge, Approve, Rerun, the failed checks' logs and Show Diff on a pull request; a comment
+// on either. Each goes to the machine that read the item (forge/*), as the person: their own click,
+// so no approval card. `wrote` reads the page again.
 import { signal, useSignal } from "@preact/signals";
 import { useEffect, useMemo } from "preact/hooks";
 import type { ForgeDone, ForgeItemDetail, ForgeLabel, ForgeMergeMethod, LineageNode } from "../protocol/generated";
@@ -44,7 +45,8 @@ export function WorkActions({ store, host, detail, wrote }: {
     busy.value = true;
     try {
       const done = await store.link.call(method, params as never, host) as ForgeDone;
-      said.value = { words: doneWords(method, done, method === "forge/close" && (params as { reopen?: boolean }).reopen === true), failed: false };
+      const close = method === "forge/close" ? params as { reopen?: boolean; transition?: string } : {};
+      said.value = { words: doneWords(method, done, close.reopen === true, close.transition !== undefined), failed: false };
       wrote();
     } catch (e) {
       said.value = { words: describe(e), failed: true };
@@ -80,6 +82,11 @@ export function WorkActions({ store, host, detail, wrote }: {
     ...methods.slice(1).map((m): MenuItem => ({ label: mergeButton(m, waits), run: () => merge(m, waits) })),
     ...waits ? [] : [{ label: "Merge when checks pass", run: () => merge(methods[0], true) }],
   ]);
+  // A Jira issue's status (#3260): the moves its workflow allows now, as Jira shows them.
+  const transitions = detail.transitions;
+  const statusMenu = (event: MouseEvent) => openContextMenu(event, (transitions ?? []).map((t): MenuItem => ({
+    label: t.name, run: () => void act("forge/close", { node, transition: t.id }),
+  })));
   const labelMenu = (event: MouseEvent) => openContextMenu(event, (labelChoices.value ?? []).map((l): MenuItem => {
     const on = item.labels.some((x) => x.name === l.name);
     return { label: `${on ? "✓ " : ""}${l.name}`, help: on ? "Take it off" : "Add it",
@@ -104,7 +111,9 @@ export function WorkActions({ store, host, detail, wrote }: {
         {isPR && <button type="button" disabled={busy.value} onClick={() => void read(() => store.link.call("forge/diff", { node }, host), (d) => {
           diff.value = { title: `${shortRef(node.ref)} ${item.title}`, url: d.url, files: d.files, cut: d.cut };
         })}>Show Diff</button>}
-        {(item.state === "open" || item.state === "closed") && (
+        {transitions && <button type="button" disabled={busy.value || transitions.length === 0} onClick={statusMenu}
+          title={transitions.length === 0 ? "No moves" : "Move it by its workflow"}>{item.status ?? "Status"} ▾</button>}
+        {!transitions && (item.state === "open" || item.state === "closed") && (
           <button type="button" disabled={busy.value}
             onClick={() => void act("forge/close", { node, ...item.state === "open" ? {} : { reopen: true } })}>{closeTitle(item.state)}</button>
         )}

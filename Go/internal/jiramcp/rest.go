@@ -237,6 +237,12 @@ type restIssue struct {
 			Comments []restComment `json:"comments"`
 			Total    int           `json:"total"`
 		} `json:"comment"`
+		// The forge reads' (forge.go): the milestone, the parent and the sub-tasks.
+		FixVersions []struct {
+			Name string `json:"name"`
+		} `json:"fixVersions"`
+		Parent   *restIssueRef  `json:"parent"`
+		Subtasks []restIssueRef `json:"subtasks"`
 	} `json:"fields"`
 	Changelog *struct {
 		Histories []restHistory `json:"histories"`

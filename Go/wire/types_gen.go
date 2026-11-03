@@ -4064,11 +4064,13 @@ type ForgeCheck struct {
 	URL *string `json:"url,omitzero"`
 }
 
-// forge/close (#3130): close an issue or a pull request, or with reopen open it again.
+// forge/close (#3130): close an issue or a pull request, or with reopen open it again; with transition, move a Jira issue by that transition of its workflow, by its id from the page's transitions (#3260).
 type ForgeCloseRequest struct {
 	Node LineageNode `json:"node"`
 
 	Reopen *bool `json:"reopen,omitzero"`
+
+	Transition *string `json:"transition,omitzero"`
 }
 
 // A comment on an issue or a pull request (#3129), as Markdown. bot says a bot or an app wrote it.
@@ -4158,13 +4160,15 @@ type ForgeFeaturesRequest struct {
 	Folder *string `json:"folder,omitzero"`
 }
 
-// An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for GitHub, GitLab and Linear, so one page draws each. node is its lineage node (kind issue or pr, ref github:alexec/Agents#12). state is open, closed or merged. folder is a folder on this machine on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own fields: draft; checks is passing, failing, running or none; review is approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown; autoMerge says auto-merge is on. The hierarchy (#3267): parent is the issue it is a sub-issue (a Linear or GitLab child) of; level is epic, story, task or spike, from its labels; feature is the name of its feature:<name> label; progress is a parent's closed children of all of them, where the forge says it: in a GitHub list, and on an issue's own read.
+// An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for GitHub, GitLab, Linear and Jira (#3260), so one page draws each. node is its lineage node (kind issue or pr, ref github:alexec/Agents#12). state is open, closed or merged; status is the tracker's own name for its step, where its workflow has steps (a Jira status, as In Progress; one in Jira's Done category is closed). folder is a folder on this machine on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own fields: draft; checks is passing, failing, running or none; review is approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown; autoMerge says auto-merge is on. The hierarchy (#3267): parent is the issue it is a sub-issue (a Linear or GitLab child) of; level is epic, story, task or spike, from its labels; feature is the name of its feature:<name> label; progress is a parent's closed children of all of them, where the forge says it: in a GitHub list, and on an issue's own read.
 type ForgeItem struct {
 	Node LineageNode `json:"node"`
 
 	Title string `json:"title"`
 
 	State string `json:"state"`
+
+	Status *string `json:"status,omitzero"`
 
 	URL *string `json:"url,omitzero"`
 
@@ -4201,7 +4205,7 @@ type ForgeItem struct {
 	Progress *ForgeProgress `json:"progress,omitzero"`
 }
 
-// forge/issue and forge/pull (#3129): one item with its body (Markdown) and a page of its comments, the newest page first and at most 50, oldest first in the page; cursor is the page before it, absent at the first comment. A pull request's checks, review threads (line comments, in threads) and files changed come with it. head is a pull request's head commit, which forge/merge and forge/approve name (#3130); mergeMethods are the ways its repo allows, the repo's default first; start is the new-agent form for an issue.
+// forge/issue and forge/pull (#3129): one item with its body (Markdown) and a page of its comments, the newest page first and at most 50, oldest first in the page; cursor is the page before it, absent at the first comment. A pull request's checks, review threads (line comments, in threads) and files changed come with it. head is a pull request's head commit, which forge/merge and forge/approve name (#3130); mergeMethods are the ways its repo allows, the repo's default first; start is the new-agent form for an issue. transitions are the moves an issue's workflow allows now (Jira, #3260), which forge/close takes in place of a close or a reopen.
 type ForgeItemDetail struct {
 	Item ForgeItem `json:"item"`
 
@@ -4222,6 +4226,8 @@ type ForgeItemDetail struct {
 	MergeMethods []ForgeMergeMethod `json:"mergeMethods,omitzero"`
 
 	Start *ForgeStart `json:"start,omitzero"`
+
+	Transitions []ForgeTransition `json:"transitions,omitzero"`
 }
 
 // forge/issue and forge/pull (#3129): the item's lineage node, and for an older page of its comments the cursor of the page after it.
@@ -4388,6 +4394,15 @@ type ForgeStart struct {
 	Labels []string `json:"labels"`
 
 	Worktree *string `json:"worktree,omitzero"`
+}
+
+// A move an issue's workflow allows now (#3260): its id, which forge/close takes, and its name, as Start Progress. category is the status category it goes to: new, indeterminate or done.
+type ForgeTransition struct {
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	Category *string `json:"category,omitzero"`
 }
 
 type FoundFolder struct {

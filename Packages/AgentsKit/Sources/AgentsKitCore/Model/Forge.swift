@@ -1,8 +1,8 @@
 import Foundation
 
 /// `forge/issues`, `forge/pulls`, `forge/issue` and `forge/pull` (#3129): a machine's issues and
-/// pull requests as its forges say them, one model for GitHub, GitLab and Linear, so one page
-/// draws each. The data behind Work ▸ Issues and Pull requests and their pages (#3119).
+/// pull requests as its forges say them, one model for GitHub, GitLab, Linear and Jira (#3260), so
+/// one page draws each. The data behind Work ▸ Issues and Pull requests and their pages (#3119).
 public extension DaemonAPI {
     /// A label, with its `#rrggbb` colour where the forge gives one (#2956).
     struct ForgeLabel: Codable, Sendable, Hashable {
@@ -16,13 +16,15 @@ public extension DaemonAPI {
     }
 
     /// An issue or a pull request (a GitLab merge request). `node` is its lineage node; `state`
-    /// is open, closed or merged; `folder` is a folder on the machine on its repo. A pull
+    /// is open, closed or merged; `status` is the tracker's own name for its step, where its
+    /// workflow has steps (a Jira status, as In Progress); `folder` is a folder on the machine on its repo. A pull
     /// request's own: `checks` is passing, failing, running or none; `review` is approved,
     /// changes_requested or review_required; `mergeable` is mergeable, conflicting or unknown.
     struct ForgeItem: Codable, Sendable, Hashable {
         public var node: LineageNode
         public var title: String
         public var state: String
+        public var status: String?
         public var url: String?
         public var folder: String?
         public var labels: [ForgeLabel]
@@ -48,10 +50,11 @@ public extension DaemonAPI {
                     labels: [ForgeLabel] = [], author: String? = nil, assignees: [String] = [], milestone: String? = nil,
                     updatedAt: Date, comments: Int = 0, draft: Bool? = nil, checks: String? = nil, review: String? = nil,
                     mergeable: String? = nil, autoMerge: Bool? = nil, parent: LineageNode? = nil, level: String? = nil,
-                    feature: String? = nil, progress: ForgeProgress? = nil) {
+                    feature: String? = nil, progress: ForgeProgress? = nil, status: String? = nil) {
             self.node = node
             self.title = title
             self.state = state
+            self.status = status
             self.url = url
             self.folder = folder
             self.labels = labels
@@ -109,7 +112,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// A forge a list could not read (not connected, a rate limit): github, gitlab or linear.
+    /// A forge a list could not read (not connected, a rate limit): github, gitlab, linear or jira.
     struct ForgeListError: Codable, Sendable, Hashable {
         public var forge: String
         public var message: String
@@ -193,10 +196,25 @@ public extension DaemonAPI {
         }
     }
 
+    /// A move an issue's workflow allows now (Jira, #3260): its `id`, which `forge/close` takes,
+    /// its `name` (as Start Progress), and the status `category` it goes to: new, indeterminate or done.
+    struct ForgeTransition: Codable, Sendable, Hashable {
+        public var id: String
+        public var name: String
+        public var category: String?
+
+        public init(id: String, name: String, category: String? = nil) {
+            self.id = id
+            self.name = name
+            self.category = category
+        }
+    }
+
     /// One item with its body and a page of its comments: the newest page first, at most 50,
     /// oldest first in the page. `cursor` is the page before it; nil at the first comment. A pull
     /// request's `head` is the commit a merge or an approval names, and `mergeMethods` its repo's,
-    /// the default first (#3130); an issue's `start` is its new-agent form.
+    /// the default first (#3130); an issue's `start` is its new-agent form, and `transitions` the
+    /// moves its workflow allows (Jira, #3260), in place of Close and Reopen.
     struct ForgeItemDetail: Codable, Sendable, Hashable {
         public var item: ForgeItem
         public var body: String
@@ -208,10 +226,12 @@ public extension DaemonAPI {
         public var head: String?
         public var mergeMethods: [ForgeMergeMethod]?
         public var start: ForgeStart?
+        public var transitions: [ForgeTransition]?
 
         public init(item: ForgeItem, body: String = "", comments: [ForgeComment] = [], cursor: String? = nil,
                     checks: [ForgeCheck]? = nil, reviewThreads: Int? = nil, filesChanged: Int? = nil,
-                    head: String? = nil, mergeMethods: [ForgeMergeMethod]? = nil, start: ForgeStart? = nil) {
+                    head: String? = nil, mergeMethods: [ForgeMergeMethod]? = nil, start: ForgeStart? = nil,
+                    transitions: [ForgeTransition]? = nil) {
             self.item = item
             self.body = body
             self.comments = comments
@@ -222,6 +242,7 @@ public extension DaemonAPI {
             self.head = head
             self.mergeMethods = mergeMethods
             self.start = start
+            self.transitions = transitions
         }
     }
 
@@ -258,14 +279,17 @@ public extension DaemonAPI {
         }
     }
 
-    /// `forge/close`: close it, or with `reopen` open it again.
+    /// `forge/close`: close it, or with `reopen` open it again; with `transition`, move a Jira
+    /// issue by that transition of its workflow, by its id (#3260).
     struct ForgeCloseRequest: Codable, Sendable, Hashable {
         public var node: LineageNode
         public var reopen: Bool?
+        public var transition: String?
 
-        public init(node: LineageNode, reopen: Bool? = nil) {
+        public init(node: LineageNode, reopen: Bool? = nil, transition: String? = nil) {
             self.node = node
             self.reopen = reopen
+            self.transition = transition
         }
     }
 

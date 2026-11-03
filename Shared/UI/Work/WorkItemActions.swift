@@ -2,10 +2,11 @@ import AgentsKitCore
 import SwiftUI
 
 /// The actions on an issue's or a pull request's Work page (#3130), as the GitHub, GitLab and
-/// Linear views have them: Start Agent, labels and Close or Reopen on an issue; Merge, Approve,
-/// Rerun, the failed checks' logs and Show Diff on a pull request; a comment on either. Each goes
-/// to the machine that read the item (`forge/*`), as the person: their own click, so no approval
-/// card. `wrote` reads the page again after a write.
+/// Linear views have them: Start Agent, labels and Close or Reopen on an issue (a Jira issue's
+/// status menu in their place, #3260); Merge, Approve, Rerun, the failed checks' logs and Show
+/// Diff on a pull request; a comment on either. Each goes to the machine that read the item
+/// (`forge/*`), as the person: their own click, so no approval card. `wrote` reads the page again
+/// after a write.
 struct WorkItemActions: View {
     let model: any WorkModel
     @Environment(\.openURL) private var openURL
@@ -28,7 +29,9 @@ struct WorkItemActions: View {
             // Wraps, so a phone's narrow page keeps every action.
             WrappingHStack(spacing: 8) {
                 if isPR { pullActions } else { issueActions }
-                if item.state == "open" || item.state == "closed" {
+                if let transitions = detail.transitions {
+                    statusMenu(transitions)
+                } else if item.state == "open" || item.state == "closed" {
                     Button(WorkList.closeTitle(item.state)) {
                         act(DaemonAPI.Method.forgeClose,
                             DaemonAPI.ForgeCloseRequest(node: node, reopen: item.state == "open" ? nil : true))
@@ -143,6 +146,23 @@ struct WorkItemActions: View {
         }
     }
 
+    // MARK: A Jira issue's status
+
+    /// The moves its workflow allows now, as Jira shows them (#3260): a status is a step of a
+    /// workflow, not open or closed.
+    private func statusMenu(_ transitions: [DaemonAPI.ForgeTransition]) -> some View {
+        Menu(item.status ?? "Status") {
+            if transitions.isEmpty { Text("No moves") }
+            ForEach(transitions, id: \.id) { transition in
+                Button(transition.name) {
+                    act(DaemonAPI.Method.forgeClose, DaemonAPI.ForgeCloseRequest(node: node, transition: transition.id))
+                }
+            }
+        }
+        .fixedSize()
+        .help("Move it by its workflow")
+    }
+
     // MARK: Labels
 
     private var labelsMenu: some View {
@@ -181,8 +201,8 @@ struct WorkItemActions: View {
             defer { busy = nil }
             do {
                 let done = try await model.forge(method, params, returning: DaemonAPI.ForgeDone.self, on: host)
-                let reopened = (params as? DaemonAPI.ForgeCloseRequest)?.reopen == true
-                said = (WorkList.doneWords(method, done, reopened: reopened), false)
+                let close = params as? DaemonAPI.ForgeCloseRequest
+                said = (WorkList.doneWords(method, done, reopened: close?.reopen == true, moved: close?.transition != nil), false)
                 wrote()
             } catch {
                 said = (error.localizedDescription, true)
