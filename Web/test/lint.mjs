@@ -57,6 +57,9 @@ const allowedURLs = new Set([
   // The wait card's link to the merge request or issue its arguments name (#3077): a link
   // the person opens in a new tab, never fetched.
   "https://gitlab.com/",
+  // Connect Jira (#3304): Make an API Token's page on Atlassian, a link the person opens in a
+  // new tab, never fetched.
+  "https://id.atlassian.com/manage-profile/security/api-tokens",
   // Connect Linear (#1343): the hand-back page, the one origin whose postMessage the page takes.
   "https://oauth.agentloops.dev",
   // Console ▸ Sign-In (#1002): each preset's issuer, as a field's example text; the control plane reads the

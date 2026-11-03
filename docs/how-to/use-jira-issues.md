@@ -23,10 +23,31 @@ Jira Cloud and with Jira Data Center.
 ## Before you start
 
 - A Jira site that you can sign in to, such as `https://example.atlassian.net`.
-- On Jira Cloud, an API token: go to **id.atlassian.com ▸ Security ▸ API tokens** and choose
-  **Create API token**.
-- On Jira Data Center, a personal access token: go to your profile ▸ **Personal Access
-  Tokens** and choose **Create token**.
+- To connect with a token: on Jira Cloud, an API token (**id.atlassian.com ▸ Security ▸ API
+  tokens ▸ Create API token**); on Jira Data Center, a personal access token (your profile ▸
+  **Personal Access Tokens ▸ Create token**).
+
+## Connect Jira
+
+Connect Jira once, for every folder on the machine. The one Atlassian connection serves
+Confluence too (the Docs slot). On the Mac, open a folder's **Connectors** page and choose
+**Jira…** in the Tasks slot, or **Connectors ▸ Connect… ▸ Jira and Confluence**. On the web
+page, choose **Connect Jira…** in the Tasks slot or on **Machines ▸ Connectors**.
+
+- **Atlassian Cloud** signs in on atlassian.com, where you choose the site. The machine keeps
+  the token and renews it. Atlassian has no public apps, so the machine needs the Agents app's
+  client ID and secret from the Atlassian developer console, in your
+  `~/.agents-secrets/secrets.env` as `ATLASSIAN_CLIENT_ID` and `ATLASSIAN_CLIENT_SECRET`. The
+  app has the callback `https://oauth.agentloops.dev/oauth/callback` and these scopes:
+  `read:jira-work`, `read:jira-user`, `read:confluence-content.all`,
+  `read:confluence-space.summary`, `search:confluence`, `read:me` and `offline_access`. Without
+  them, the sheet says to connect with an API token.
+- **API token** takes the site, the email (Jira Cloud only) and the token. The machine checks
+  them with the site. On Data Center, leave the email empty: the token goes as a bearer token.
+
+Either way, the sheet ends on the site's newest issue, the one real read that proves the
+connection. **Connectors ▸ Connections** shows it, with **Disconnect**. The tokens stay on the
+machine, never in a log.
 
 ## Add Atlassian's tools
 
@@ -37,25 +58,25 @@ Add Atlassian's own server from the registry, or by hand with the URL
 
 ## Add the page and the events
 
-1. Add **Jira** from the **Agents** marketplace in the catalogue. It asks for three secrets,
-   which it keeps in your own `~/.agents-secrets/secrets.env`, not in the folder:
+1. Add **Jira** from the **Agents** marketplace in the catalogue. It asks for no secret: it
+   reads your Atlassian connection (above). Or add it by hand in the folder's
+   `.agents/mcp.json`:
 
-   | Secret | What it is |
-   |--------|------------|
-   | `JIRA_URL` | The site, such as `https://example.atlassian.net` |
-   | `JIRA_EMAIL` | The email you sign in to Jira Cloud with |
-   | `JIRA_API_TOKEN` | The API token |
+   ```json
+   { "mcpServers": { "jira": { "command": "jira-mcp", "hosted": true } } }
+   ```
 
-   Or add it by hand in the folder's `.agents/mcp.json`:
+   **Without the connection**, give the server a token by hand. It goes before the connection.
+   Keep the values in `~/.agents-secrets/secrets.env`, and name them in the entry:
 
    ```json
    { "mcpServers": { "jira": { "command": "jira-mcp", "hosted": true,
        "env": { "JIRA_URL": "${JIRA_URL}", "JIRA_EMAIL": "${JIRA_EMAIL}", "JIRA_API_TOKEN": "${JIRA_API_TOKEN}" } } } }
    ```
 
-   **On Jira Data Center**, put the personal access token in `JIRA_API_TOKEN` and remove the
-   `JIRA_EMAIL` line from the entry. With no email, the server sends the token as a bearer
-   token.
+   `JIRA_URL` is the site, `JIRA_EMAIL` the email you sign in to Jira Cloud with, and
+   `JIRA_API_TOKEN` the API token. **On Jira Data Center**, put the personal access token in
+   `JIRA_API_TOKEN` and remove the `JIRA_EMAIL` line.
 
 2. In **Folder Settings ▸ Agent Configuration ▸ Connectors**, choose **Approve** on `jira`.
    See [Add a connector by hand](add-a-connector-by-hand.md).
@@ -119,8 +140,10 @@ The server asks Jira once a minute. Jira's webhooks would need a Jira admin, so 
 
 ## When it does not work
 
-- **"Jira is not signed in"**: `JIRA_URL` or `JIRA_API_TOKEN` is not set for the server. Add
-  them as secrets (above).
+- **"Jira is not signed in"**: there is no Atlassian connection, and `JIRA_URL` or
+  `JIRA_API_TOKEN` is not set for the server. Connect Jira (above).
+- **"This machine has no Agents app on Atlassian"**: `ATLASSIAN_CLIENT_ID` and
+  `ATLASSIAN_CLIENT_SECRET` are not in the machine's secrets. Connect with an API token.
 - **"Jira refused the token"**: the token was revoked, or `JIRA_EMAIL` is not the token's
   account. Make a new token. On Data Center, check that the entry has no `JIRA_EMAIL`.
 - **"Jira's rate limit is reached"**: too many waits use the one token. The server waits as

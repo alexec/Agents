@@ -55,7 +55,7 @@ func RefreshIfDue(ctx context.Context, s Store, f Refresher, provider string, no
 		return Unchanged, err
 	}
 	next := t.Connection(c.Provider, c.Login, c.ConnectedAt)
-	next.Workspace, next.URL = c.Workspace, c.URL
+	next.Workspace, next.URL, next.Resource, next.User = c.Workspace, c.URL, c.Resource, c.User
 	if next.Refresh == "" {
 		next.Refresh, next.RefreshExpiresAt = c.Refresh, c.RefreshExpiresAt
 	}
@@ -64,7 +64,8 @@ func RefreshIfDue(ctx context.Context, s Store, f Refresher, provider string, no
 
 // signInAgain is c with its tokens gone: the row stays and says "Sign in again".
 func signInAgain(c Connection) Connection {
-	return Connection{Provider: c.Provider, Login: c.Login, Workspace: c.Workspace, URL: c.URL, ConnectedAt: c.ConnectedAt, SignInAgain: true}
+	return Connection{Provider: c.Provider, Login: c.Login, Workspace: c.Workspace, URL: c.URL, Resource: c.Resource, User: c.User,
+		ConnectedAt: c.ConnectedAt, SignInAgain: true}
 }
 
 // TokenReader is a provider's access token as the host keeps it, read again after a

@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	goruntime "runtime"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/internal/connections"
 	"github.com/alexec/agents/Go/internal/emailmcp"
+	"github.com/alexec/agents/Go/internal/jiramcp"
 	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -35,6 +37,13 @@ import (
 // GitLab (#1630) signs in by the device flow on gitlab.com, as GitHub does, or by a personal
 // access token on any GitLab (connections/sign-in/token): the host checks the token with that
 // GitLab and keeps it with the GitLab's address. It has no refresh: the row says when it ends.
+//
+// Atlassian (#3304) is one sign-in for Jira and Confluence. Atlassian Cloud's OAuth 2.0 (3LO)
+// is Linear's code flow with the app's client secret, which Atlassian requires: the host reads
+// the app's client id and secret from the person's secrets (connections.AtlassianClientIDName),
+// never from a client. Or a token on one site (connections/sign-in/token): a Jira Cloud API
+// token with the account's email, or a Jira Data Center personal access token. Either way the
+// host reads the site's newest issue once, and the answer says it, to prove the connection.
 //
 // Email (#1780) has no sign-in page: the person gives an IMAP server, a user and an app
 // password (connections/sign-in/email). The host signs in once to check them, and keeps them
@@ -64,6 +73,8 @@ type connectionBook struct {
 	gitlabHTTP *http.Client
 	// emailCheck signs in to an IMAP server once; emailmcp.Check when nil.
 	emailCheck func(context.Context, emailmcp.Account) error
+	// jiraHTTP reads a Jira site; a test gives a fake Jira's client.
+	jiraHTTP *http.Client
 }
 
 // connectionFlow is one sign-in under way, read by every client that waits on it.
@@ -154,7 +165,12 @@ func (d *Daemon) registerConnections() {
 
 func knownProvider(p wire.ConnectionProvider) bool {
 	return p == wire.ConnectionProviderGithub || p == wire.ConnectionProviderLinear || p == wire.ConnectionProviderGitlab ||
-		p == wire.ConnectionProviderEmail
+		p == wire.ConnectionProviderEmail || p == wire.ConnectionProviderAtlassian
+}
+
+// codeFlowProvider is a provider whose sign-in is the authorization code with PKCE.
+func codeFlowProvider(p wire.ConnectionProvider) bool {
+	return p == wire.ConnectionProviderLinear || p == wire.ConnectionProviderAtlassian
 }
 
 // connectionLocator is this host's store, for the person whose home is personalHome.
@@ -186,12 +202,28 @@ func (d *Daemon) codeFlow(p wire.ConnectionProvider) *connections.CodeFlow {
 	if d.newCodeFlow != nil {
 		return d.newCodeFlow(p)
 	}
+	if p == wire.ConnectionProviderAtlassian {
+		id, secret := d.atlassianApp()
+		return connections.NewAtlassianFlow(id, secret)
+	}
 	return connections.NewLinearFlow()
+}
+
+// atlassianApp is the Atlassian app's client id and secret: AGENTS_ATLASSIAN_CLIENT_ID and
+// AGENTS_ATLASSIAN_CLIENT_SECRET in the host's environment (a scratch root's), else the
+// person's secrets.env. Empty when not set: Connect Jira then takes a token only.
+func (d *Daemon) atlassianApp() (id, secret string) {
+	id, secret = os.Getenv("AGENTS_"+connections.AtlassianClientIDName), os.Getenv("AGENTS_"+connections.AtlassianClientSecretName)
+	if id == "" || secret == "" {
+		kept := d.secrets()
+		id, secret = kept[connections.AtlassianClientIDName], kept[connections.AtlassianClientSecretName]
+	}
+	return strings.TrimSpace(id), strings.TrimSpace(secret)
 }
 
 // refresher is the flow that renews provider's tokens.
 func (d *Daemon) refresher(provider string) connections.Refresher {
-	if provider == connections.Linear {
+	if codeFlowProvider(wire.ConnectionProvider(provider)) {
 		return d.codeFlow(wire.ConnectionProvider(provider))
 	}
 	return d.deviceFlow(wire.ConnectionProvider(provider))
@@ -215,6 +247,9 @@ func wireConnection(c connections.Connection) wire.Connection {
 	}
 	if c.Refresh == "" && !c.AccessExpiresAt.IsZero() {
 		w.ExpiresAt = new(wire.DateOf(c.AccessExpiresAt))
+	}
+	if c.Provider == connections.Atlassian && c.Resource == "" {
+		w.ByToken = new(true)
 	}
 	return w
 }
@@ -281,7 +316,7 @@ func (d *Daemon) connectionSignIn(ctx context.Context, p wire.ConnectionProvider
 		}
 	}
 	d.connMu.Unlock()
-	if p == wire.ConnectionProviderLinear {
+	if codeFlowProvider(p) {
 		return d.startCodeFlow(p, origin, s)
 	}
 
@@ -359,6 +394,10 @@ func (d *Daemon) finishConnection(ctx context.Context, f *connectionFlow, flow *
 // expired when nobody completes it in time.
 func (d *Daemon) startCodeFlow(p wire.ConnectionProvider, origin string, s connections.Store) (wire.ConnectionSignIn, error) {
 	flow := d.codeFlow(p)
+	if flow.ClientID == "" || (p == wire.ConnectionProviderAtlassian && flow.ClientSecret == "") {
+		return wire.ConnectionSignIn{}, invalid("This machine has no Agents app on " + flow.Name + ": connect with an API token, " +
+			"or set " + connections.AtlassianClientIDName + " and " + connections.AtlassianClientSecretName + " in its secrets.")
+	}
 	pkce, err := connections.NewPKCE(origin)
 	if err != nil {
 		return wire.ConnectionSignIn{}, invalid("The sign-in could not start: " + err.Error() + ".")
@@ -440,14 +479,14 @@ func (d *Daemon) spendCode(ctx context.Context, f *connectionFlow, code string) 
 		f.end(wire.ConnectionSignInStatusFailed, nil, err.Error())
 		return
 	}
-	login, workspace, err := f.code.Account(ctx, t.Access)
+	who, err := f.code.Whose(ctx, t.Access)
 	if err != nil {
 		log.Printf("connections: %s account not read", p)
 		f.end(wire.ConnectionSignInStatusFailed, nil, err.Error())
 		return
 	}
-	c := t.Connection(string(p), login, time.Now())
-	c.Workspace = workspace
+	c := t.Connection(string(p), who.Login, time.Now())
+	c.Workspace, c.URL, c.Resource = who.Workspace, who.URL, who.Resource
 	d.connRenew.Lock()
 	err = f.store.Put(c)
 	d.connRenew.Unlock()
@@ -458,14 +497,20 @@ func (d *Daemon) spendCode(ctx context.Context, f *connectionFlow, code string) 
 	}
 	log.Printf("connections: %s connected", p)
 	w := wireConnection(c)
+	if p == wire.ConnectionProviderAtlassian {
+		w.Newest = d.newestJiraIssue(ctx, c)
+	}
 	f.end(wire.ConnectionSignInStatusConnected, &w, "")
 }
 
 // connectionSignInToken checks a personal access token with the GitLab at r.URL and keeps it.
 // The token is in no log and no answer; a failure says what failed, in words.
 func (d *Daemon) connectionSignInToken(ctx context.Context, r wire.ConnectionTokenRequest) (wire.ConnectionTokenAnswer, error) {
+	if r.Provider == wire.ConnectionProviderAtlassian {
+		return d.connectionSignInJiraToken(ctx, r)
+	}
 	if r.Provider != wire.ConnectionProviderGitlab {
-		return wire.ConnectionTokenAnswer{}, invalid("Agents takes an access token only for GitLab.")
+		return wire.ConnectionTokenAnswer{}, invalid("Agents takes an access token only for GitLab and Jira.")
 	}
 	fail := func(why string) (wire.ConnectionTokenAnswer, error) {
 		log.Printf("connections: %s token not taken", r.Provider)
@@ -503,6 +548,84 @@ func (d *Daemon) connectionSignInToken(ctx context.Context, r wire.ConnectionTok
 	log.Printf("connections: %s connected with a token", r.Provider)
 	w := wireConnection(c)
 	return wire.ConnectionTokenAnswer{Connection: &w}, nil
+}
+
+// connectionSignInJiraToken checks a token with the Jira site at r.URL and keeps it: with the
+// account's email, a Jira Cloud API token (Basic); without, a Data Center personal access token
+// (Bearer). The token is in no log and no answer; a failure says what failed, in words.
+func (d *Daemon) connectionSignInJiraToken(ctx context.Context, r wire.ConnectionTokenRequest) (wire.ConnectionTokenAnswer, error) {
+	fail := func(why string) (wire.ConnectionTokenAnswer, error) {
+		log.Printf("connections: %s token not taken", r.Provider)
+		return wire.ConnectionTokenAnswer{Error: &why}, nil
+	}
+	token, user := strings.TrimSpace(r.Token), strings.TrimSpace(deref(r.User))
+	if token == "" || strings.ContainsAny(token, " \t\r\n") {
+		return fail("Paste the API token: one word.")
+	}
+	if strings.ContainsAny(user, " \t\r\n:") {
+		return fail("Give the email you sign in to Jira with, or leave it out for a Data Center token.")
+	}
+	site, err := connections.JiraSite(deref(r.URL))
+	if err != nil {
+		return fail(sentence(err.Error()))
+	}
+	s, err := d.connectionStore()
+	if err != nil {
+		return wire.ConnectionTokenAnswer{}, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	c := connections.Connection{Provider: connections.Atlassian, URL: site, User: user, Access: token, ConnectedAt: time.Now()}
+	me, err := d.jira(c).Myself(ctx)
+	if err != nil {
+		return fail(sentence(err.Error()))
+	}
+	c.Login = user
+	if me != nil && me.Name != "" {
+		c.Login = me.Name
+	}
+	if u, err := url.Parse(site); err == nil {
+		c.Workspace = u.Host
+	}
+	d.connRenew.Lock()
+	err = s.Put(c)
+	d.connRenew.Unlock()
+	if err != nil {
+		return fail(sentence(err.Error()))
+	}
+	log.Printf("connections: %s connected with a token", r.Provider)
+	w := wireConnection(c)
+	w.Newest = d.newestJiraIssue(ctx, c)
+	return wire.ConnectionTokenAnswer{Connection: &w}, nil
+}
+
+// jira is the Jira site c reaches, as c.
+func (d *Daemon) jira(c connections.Connection) *jiramcp.RealJira {
+	j := jiramcp.NewRealJira(func() jiramcp.Auth { return jiramcp.ConnectionAuth(c) })
+	if d.jiraHTTP != nil {
+		j.Client = d.jiraHTTP
+	}
+	return j
+}
+
+// newestJiraIssue is the one real read that proves an Atlassian connection: the site's newest
+// issue, or nil when it has none or the read failed (the connection is kept either way).
+func (d *Daemon) newestJiraIssue(ctx context.Context, c connections.Connection) *wire.ConnectorProof {
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	i, err := d.jira(c).NewestIssue(ctx)
+	if err != nil {
+		log.Printf("connections: %s newest issue not read", c.Provider)
+		return nil
+	}
+	if i == nil {
+		return nil
+	}
+	p := &wire.ConnectorProof{Title: i.Key + " " + i.Title, URL: optional(i.URL)}
+	if t, ok := i.Created(); ok {
+		p.At = new(wire.DateOf(t))
+	}
+	return p
 }
 
 // connectionSignInEmail signs in to the IMAP server once with r's user and app password, and

@@ -203,6 +203,9 @@ export function workflowsLead(events: ConnectorEvents): string {
 /** The Tasks slot's way to Linear (#1682): the connection first, then its connector. */
 export const connectLinear = "Connect Linear…";
 
+/** The Tasks slot's way to Jira (#3304): the Atlassian connection first, then its connector. */
+export const connectJira = "Connect Jira…";
+
 /** The Tasks slot's other trackers: the page has no catalogue. */
 export function otherTrackers(linearConnected: boolean): string {
   return linearConnected ? "Linear and other trackers: Add Connector on the Mac."
@@ -210,26 +213,26 @@ export function otherTrackers(linearConnected: boolean): string {
 }
 
 /** The providers a person connects, in the order Connectors shows them. */
-export const providers: ConnectionProvider[] = ["github", "linear", "gitlab", "email"];
+export const providers: ConnectionProvider[] = ["github", "linear", "gitlab", "email", "atlassian"];
 
 /** The providers that host can connect: Email only when it has connections.email/1 (#1780). */
 export function providersFor(hasEmail: boolean): ConnectionProvider[] {
   return hasEmail ? providers : providers.filter((p) => p !== "email");
 }
 
-/** The provider's name: GitHub, Linear, GitLab, Email. */
+/** The provider's name: GitHub, Linear, GitLab, Email, Atlassian (Jira and Confluence, #3304). */
 export function name(p: ConnectionProvider): string {
-  return { github: "GitHub", linear: "Linear", gitlab: "GitLab", email: "Email" }[p];
+  return { github: "GitHub", linear: "Linear", gitlab: "GitLab", email: "Email", atlassian: jira.provider }[p];
 }
 
 /** The provider's letters on its mark. */
 export function letters(p: ConnectionProvider): string {
-  return { github: "GH", linear: "L", gitlab: "GL", email: "EM" }[p];
+  return { github: "GH", linear: "L", gitlab: "GL", email: "EM", atlassian: jira.letters }[p];
 }
 
 /** The device page's site, for "Open github.com Again". Email has no device page. */
 export function site(p: ConnectionProvider): string {
-  return { github: "github.com", linear: "linear.app", gitlab: "gitlab.com", email: "" }[p];
+  return { github: "github.com", linear: "linear.app", gitlab: "gitlab.com", email: "", atlassian: jira.site }[p];
 }
 
 export function connectionTitle(c: Connection): string {
@@ -243,7 +246,8 @@ export function connectionNote(c: Connection, now: Date = new Date()): string {
     return c.expiresAt === undefined ? `${name(c.provider)} refused the renewal: sign in again`
       : "The access token ended: connect again with a new one";
   }
-  const how = c.expiresAt === undefined ? "OAuth · renews by itself" : `Access token · ${tokenEnds(fromWireDate(c.expiresAt), now)}`;
+  const how = c.expiresAt !== undefined ? `Access token · ${tokenEnds(fromWireDate(c.expiresAt), now)}`
+    : c.byToken ? jira.tokenWay : "OAuth · renews by itself";
   return [c.workspace, how].filter((x): x is string => !!x).join(" · ");
 }
 
@@ -261,18 +265,20 @@ export function notConnectedNote(p: ConnectionProvider): string {
     linear: "Linear issues in every folder, and their events.",
     gitlab: "Merge requests, pipelines and issues on gitlab.com or your own GitLab.",
     email: "One mailbox for agents: they wait for mail, such as a sign-up code, and read it.",
+    atlassian: jira.notConnectedNote,
   }[p];
 }
 
 /** The button that opens the Connect sheet for a provider. */
 export function connectButtonFor(p: ConnectionProvider): string {
-  return `Connect ${name(p)}…`;
+  return p === "atlassian" ? connectJira : `Connect ${name(p)}…`;
 }
 
 export function disconnectNoteFor(p: ConnectionProvider): string {
   if (p === "github") return disconnectNote;
   if (p === "gitlab") return gitlab.disconnectNote;
   if (p === "email") return email.disconnectNote;
+  if (p === "atlassian") return jira.disconnectNote;
   return "Disconnect deletes the machine's tokens. Linear's events stop until you connect again or set LINEAR_API_KEY. To revoke Agents too, go to linear.app ▸ Settings ▸ Security & access.";
 }
 
@@ -363,6 +369,61 @@ export const email = {
   failed: "The mail server did not take the sign-in.",
 };
 
+/**
+ * Connect Jira (#3304): one Atlassian sign-in for Jira and Confluence (#3248), by Atlassian
+ * Cloud's page, or a token on one Jira site. The connection is Atlassian's; the sheet says Jira.
+ * The same words as the Mac's (ConnectorSetupWords.Jira).
+ */
+export const jira = {
+  provider: "Atlassian",
+  letters: "JI",
+  title: "Connect Jira",
+  site: "atlassian.com",
+  notConnectedNote: "Jira issues and Confluence docs, with one sign-in.",
+  subtitle: "For you, in every folder. One Atlassian sign-in for Jira and Confluence.",
+  abilities: [
+    "Read Jira issues, their comments and their history",
+    "Read Confluence pages and spaces, for the Docs slot",
+    "Know your account, to find the issues assigned to you",
+  ],
+  choose: "On atlassian.com you choose the site. You can take it back at id.atlassian.com ▸ Connected apps, or with Disconnect on Connectors.",
+  continueButton: "Continue on atlassian.com",
+  waiting: "Waiting for atlassian.com… Approve there, and Agents comes back by itself.",
+  signInWay: "Atlassian Cloud",
+  tokenWay: "API token",
+  tokenIntro: "For Jira Data Center, or Jira Cloud without the sign-in. On Jira Cloud, make an API token at id.atlassian.com and give your email. On Data Center, make a personal access token and leave the email empty.",
+  siteLabel: "Jira site",
+  sitePrompt: "example.atlassian.net",
+  emailLabel: "Email",
+  emailPrompt: "you@example.com (Jira Cloud only)",
+  tokenLabel: "Token",
+  tokenPrompt: "API token or personal access token",
+  tokenButton: "Connect",
+  newTokenURL: "https://id.atlassian.com/manage-profile/security/api-tokens",
+  newTokenButton: "Make an API Token on Atlassian",
+  checking: "Checking the token with Jira…",
+  disconnectNote: "Disconnect deletes the machine's tokens. Jira's events stop until you connect again or set JIRA_API_TOKEN. To revoke Agents too, go to id.atlassian.com ▸ Connected apps.",
+  tasksNote: "Connect Jira, then add its connector on the Mac.",
+  done: "Done",
+};
+
+/** The sheet's line once Jira is connected: where, and as whom. */
+export function jiraConnected(c: Connection): string {
+  return `Connected${c.workspace ? ` to ${c.workspace}` : ""} as ${c.login ?? "you"}.`;
+}
+
+/** The one real read that proves the Jira connection: the site's newest issue. */
+export function jiraProof(c: Connection, now: Date = new Date()): string {
+  return c.newest ? `Newest issue: ${proofText(c.newest, now)}` : "No issues read yet: the site has none, or the token cannot see them.";
+}
+
+/** The connections/sign-in/token request for Jira: the site and the token trimmed, the email only when given. */
+export function jiraTokenRequest(site: string, email: string, token: string): { provider: "atlassian"; url: string; user?: string; token: string } | undefined {
+  const url = site.trim(), user = email.trim(), typed = token.trim();
+  if (!url || !typed) return undefined;
+  return user ? { provider: "atlassian", url, user, token: typed } : { provider: "atlassian", url, token: typed };
+}
+
 /** The connections/sign-in/email request, with the server and the user trimmed. The password goes as typed. */
 export function emailRequest(server: string, user: string, password: string): { server: string; user: string; password: string } | undefined {
   const s = server.trim();
@@ -373,25 +434,26 @@ export function emailRequest(server: string, user: string, password: string): { 
 
 /** The sheet's subtitle, list and button, by provider. */
 export function sheetSubtitleFor(p: ConnectionProvider): string {
-  return { github: sheetSubtitle, linear: linear.subtitle, gitlab: gitlab.subtitle, email: email.subtitle }[p];
+  return { github: sheetSubtitle, linear: linear.subtitle, gitlab: gitlab.subtitle, email: email.subtitle, atlassian: jira.subtitle }[p];
 }
 
 export function abilitiesFor(p: ConnectionProvider): string[] {
-  return { github: abilities, linear: linear.abilities, gitlab: gitlab.abilities, email: email.abilities }[p];
+  return { github: abilities, linear: linear.abilities, gitlab: gitlab.abilities, email: email.abilities, atlassian: jira.abilities }[p];
 }
 
 export function sheetChooseFor(p: ConnectionProvider): string {
-  return { github: sheetChoose, linear: linear.choose, gitlab: gitlab.choose, email: email.choose }[p];
+  return { github: sheetChoose, linear: linear.choose, gitlab: gitlab.choose, email: email.choose, atlassian: jira.choose }[p];
 }
 
 export function continueButtonFor(p: ConnectionProvider): string {
-  return { github: continueButton, linear: linear.continueButton, gitlab: gitlab.continueButton, email: email.button }[p];
+  return { github: continueButton, linear: linear.continueButton, gitlab: gitlab.continueButton, email: email.button, atlassian: jira.continueButton }[p];
 }
 
 export function sheetStatus(s: ConnectionSignIn): string {
   switch (s.status) {
     case "waiting":
-      return s.grant === "authorizationCode" ? linear.waiting : `Waiting for ${site(s.provider)}… Type the code there, then approve.`;
+      if (s.grant === "authorizationCode") return s.provider === "atlassian" ? jira.waiting : linear.waiting;
+      return `Waiting for ${site(s.provider)}… Type the code there, then approve.`;
     case "connected": return "Connected.";
     case "expired": return s.message ?? "The code expired before it was approved. Try again.";
     case "denied": return s.message ?? `The sign-in was cancelled on ${name(s.provider)}.`;

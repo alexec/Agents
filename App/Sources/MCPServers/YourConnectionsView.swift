@@ -74,6 +74,7 @@ struct YourConnectionsView: View {
             case .linear: ConnectLinearSheet(host: .mac, onConnected: { Task { await load() } })
             case .gitlab: ConnectGitLabSheet(host: .mac, again: again, onConnected: { Task { await load() } })
             case .email: ConnectEmailSheet(host: .mac, onConnected: { Task { await load() } })
+            case .atlassian: ConnectJiraSheet(host: .mac, onConnected: { Task { await load() } })
             }
         }
         .confirmationDialog(disconnectTitle, isPresented: Binding(get: { disconnecting != nil },
@@ -140,7 +141,7 @@ struct YourConnectionsView: View {
 
     @ViewBuilder private var connectItems: some View {
         ForEach(unconnected, id: \.self) { p in
-            Button(ConnectorSetupWords.name(p)) { again = nil; connecting = p }
+            Button(ConnectorSetupWords.menuName(p)) { again = nil; connecting = p }
         }
     }
 

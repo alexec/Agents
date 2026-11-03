@@ -154,6 +154,28 @@ struct ConnectorSetupWordsTests {
         #expect(ConnectorSetupWords.noConnections.hasSuffix("and Email for the mail they wait for."))
     }
 
+    /// Connect Jira (#3304): the connection is Atlassian's, for Jira and Confluence; the sheet says
+    /// Jira, waits on atlassian.com, and ends on the newest issue.
+    @Test func jiraWords() {
+        let now = Date()
+        var c = DaemonAPI.Connection(provider: .atlassian, login: "Alex", connectedAt: now, workspace: "Acme",
+                                     newest: .init(title: "ACME-7 Fix the walk", at: now.addingTimeInterval(-7200)))
+        #expect(ConnectorSetupWords.connectionTitle(c) == "Atlassian \u{00B7} Alex")
+        #expect(ConnectorSetupWords.connectionNote(c) == "Acme \u{00B7} OAuth \u{00B7} renews by itself")
+        c.byToken = true
+        #expect(ConnectorSetupWords.connectionNote(c) == "Acme \u{00B7} API token")
+        #expect(ConnectorSetupWords.menuName(.atlassian) == "Jira and Confluence" && ConnectorSetupWords.menuName(.linear) == "Linear")
+        #expect(ConnectorSetupWords.Jira.connected(c) == "Connected to Acme as Alex.")
+        #expect(ConnectorSetupWords.Jira.proof(c, now: now) == "Newest issue: ACME-7 Fix the walk 2 hours ago")
+        c.newest = nil
+        #expect(ConnectorSetupWords.Jira.proof(c).hasPrefix("No issues read yet"))
+        let flow = DaemonAPI.ConnectionSignIn(flowID: UUID(), provider: .atlassian, status: .waiting, grant: .authorizationCode,
+                                              verificationURL: "https://auth.atlassian.com", expiresAt: now)
+        #expect(ConnectorSetupWords.sheetStatus(flow) == ConnectorSetupWords.Jira.waiting)
+        #expect(ConnectorSetupWords.continueButton(.atlassian) == "Continue on atlassian.com")
+        #expect(ConnectorSetupWords.disconnectNote(.atlassian).contains("JIRA_API_TOKEN"))
+    }
+
     /// Connect your tools with GitLab (#1632): the set-up's words follow its forge.
     @Test func gitlabSetUpWords() {
         let setup = DaemonAPI.ConnectorSetup(folder: "/p", repository: "group/app", forge: .gitlab, site: "gitlab.example.com",

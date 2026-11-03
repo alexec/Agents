@@ -249,6 +249,9 @@ public enum ConnectorSetupWords {
     /// The Tasks slot's way to Linear (#1682): the connection first, then its connector.
     public static let connectLinear = "Connect Linear\u{2026}"
 
+    /// The Tasks slot's way to Jira (#3304): the Atlassian connection first, then its connector.
+    public static let connectJira = "Connect Jira\u{2026}"
+
     /// The Tasks slot's other trackers, on the Remote and the web page, which have no catalogue.
     public static func otherTrackers(linearConnected: Bool) -> String {
         linearConnected ? "Linear and other trackers: Add Connector on the Mac."
@@ -257,7 +260,7 @@ public enum ConnectorSetupWords {
 
     // MARK: Connectors ▸ Connections
 
-    public static let noConnections = "No connections yet. Connect GitHub to give agents issues, pull requests and Actions in every folder, Linear for its issues, GitLab for merge requests, pipelines and issues, and Email for the mail they wait for."
+    public static let noConnections = "No connections yet. Connect GitHub to give agents issues, pull requests and Actions in every folder, Linear or Jira for their issues, GitLab for merge requests, pipelines and issues, and Email for the mail they wait for."
 
     /// The provider's name: GitHub, Linear.
     public static func name(_ p: DaemonAPI.ConnectionProvider) -> String {
@@ -266,7 +269,13 @@ public enum ConnectorSetupWords {
         case .linear: "Linear"
         case .gitlab: "GitLab"
         case .email: Email.name
+        case .atlassian: Jira.provider
         }
+    }
+
+    /// The provider in Connect…'s menu: Atlassian's connection says what it is for (#3304).
+    public static func menuName(_ p: DaemonAPI.ConnectionProvider) -> String {
+        p == .atlassian ? Jira.menuName : name(p)
     }
 
     /// The provider's two letters on its mark.
@@ -276,6 +285,7 @@ public enum ConnectorSetupWords {
         case .linear: "L"
         case .gitlab: "GL"
         case .email: Email.letters
+        case .atlassian: Jira.letters
         }
     }
 
@@ -290,7 +300,8 @@ public enum ConnectorSetupWords {
             return c.expiresAt == nil ? "\(name(c.provider)) refused the renewal: sign in again"
                 : "The access token ended: connect again with a new one"
         }
-        let how = c.expiresAt.map { "Access token \u{00B7} " + tokenEnds($0, now: now) } ?? "OAuth \u{00B7} renews by itself"
+        let how = c.expiresAt.map { "Access token \u{00B7} " + tokenEnds($0, now: now) }
+            ?? (c.byToken == true ? Jira.tokenWay : "OAuth \u{00B7} renews by itself")
         return [c.workspace, how].compactMap { $0 }.joined(separator: " \u{00B7} ")
     }
 
@@ -311,6 +322,7 @@ public enum ConnectorSetupWords {
         case .linear: "Linear issues in every folder, and their events."
         case .gitlab: "Merge requests, pipelines and issues on gitlab.com or your own GitLab."
         case .email: Email.notConnectedNote
+        case .atlassian: Jira.notConnectedNote
         }
     }
 
@@ -322,6 +334,7 @@ public enum ConnectorSetupWords {
         case .linear: "Disconnect deletes the machine's tokens. Linear's events stop until you connect again or set LINEAR_API_KEY. To revoke Agents too, go to linear.app \u{25B8} Settings \u{25B8} Security & access."
         case .gitlab: GitLab.disconnectNote
         case .email: Email.disconnectNote
+        case .atlassian: Jira.disconnectNote
         }
     }
 
@@ -403,6 +416,58 @@ public enum ConnectorSetupWords {
         }
     }
 
+    /// Connect Jira (#3304): one Atlassian sign-in for Jira and Confluence (#3248), by Atlassian
+    /// Cloud's page, or a token on one Jira site (Jira Data Center, or Cloud without the sign-in).
+    /// The connection is Atlassian's; the sheet and the Tasks slot say Jira.
+    public enum Jira {
+        /// The connection's name on Connectors: it serves Confluence too.
+        public static let provider = "Atlassian"
+        public static let menuName = "Jira and Confluence"
+        public static let letters = "JI"
+        public static let title = "Connect Jira"
+        public static let site = "atlassian.com"
+        public static let notConnectedNote = "Jira issues and Confluence docs, with one sign-in."
+        public static let subtitle = "For you, in every folder. One Atlassian sign-in for Jira and Confluence."
+        public static let abilities = [
+            "Read Jira issues, their comments and their history",
+            "Read Confluence pages and spaces, for the Docs slot",
+            "Know your account, to find the issues assigned to you",
+        ]
+        public static let choose = "On atlassian.com you choose the site. You can take it back at id.atlassian.com \u{25B8} Connected apps, or with Disconnect on Connectors."
+        public static let continueButton = "Continue on atlassian.com"
+        public static let waiting = "Waiting for atlassian.com\u{2026} Approve there, and Agents comes back by itself."
+        /// The two ways in, as the sheet's picker says them.
+        public static let signInWay = "Atlassian Cloud"
+        public static let tokenWay = "API token"
+        public static let tokenIntro = "For Jira Data Center, or Jira Cloud without the sign-in. On Jira Cloud, make an API token at id.atlassian.com and give your email. On Data Center, make a personal access token and leave the email empty."
+        public static let siteLabel = "Jira site"
+        public static let sitePrompt = "example.atlassian.net"
+        public static let emailLabel = "Email"
+        public static let emailPrompt = "you@example.com (Jira Cloud only)"
+        public static let tokenLabel = "Token"
+        public static let tokenPrompt = "API token or personal access token"
+        public static let tokenButton = "Connect"
+        public static let newTokenURL = "https://id.atlassian.com/manage-profile/security/api-tokens"
+        public static let newTokenButton = "Make an API Token on Atlassian"
+        public static let checking = "Checking the token with Jira\u{2026}"
+        public static let disconnectNote = "Disconnect deletes the machine's tokens. Jira's events stop until you connect again or set JIRA_API_TOKEN. To revoke Agents too, go to id.atlassian.com \u{25B8} Connected apps."
+        /// The Tasks slot's note on its Jira choice.
+        public static let tasksNote = "Connect Jira, then add its connector."
+        public static let done = "Done"
+
+        /// The sheet's line once connected: where, and as whom.
+        public static func connected(_ c: DaemonAPI.Connection) -> String {
+            let place = c.workspace.map { " to \($0)" } ?? ""
+            return "Connected\(place) as \(c.login ?? "you")."
+        }
+
+        /// The one real read that proves the connection: the site's newest issue.
+        public static func proof(_ c: DaemonAPI.Connection, now: Date = Date()) -> String {
+            guard let newest = c.newest else { return "No issues read yet: the site has none, or the token cannot see them." }
+            return "Newest issue: " + proofText(newest, now: now)
+        }
+    }
+
     /// Connect Email (#1780): one IMAP mailbox and its app password. No device page.
     public enum Email {
         public static let name = "Email"
@@ -440,6 +505,7 @@ public enum ConnectorSetupWords {
         case .linear: Linear.subtitle
         case .gitlab: GitLab.subtitle
         case .email: Email.subtitle
+        case .atlassian: Jira.subtitle
         }
     }
 
@@ -449,6 +515,7 @@ public enum ConnectorSetupWords {
         case .linear: Linear.abilities
         case .gitlab: GitLab.abilities
         case .email: Email.abilities
+        case .atlassian: Jira.abilities
         }
     }
 
@@ -458,6 +525,7 @@ public enum ConnectorSetupWords {
         case .linear: Linear.choose
         case .gitlab: GitLab.choose
         case .email: Email.choose
+        case .atlassian: Jira.choose
         }
     }
 
@@ -467,6 +535,7 @@ public enum ConnectorSetupWords {
         case .linear: Linear.continueButton
         case .gitlab: GitLab.continueButton
         case .email: Email.button
+        case .atlassian: Jira.continueButton
         }
     }
 
@@ -478,11 +547,13 @@ public enum ConnectorSetupWords {
         case .gitlab: "gitlab.com"
         // Email has no device page: the sheet never shows this.
         case .email: ""
+        case .atlassian: Jira.site
         }
     }
 
     public static func sheetStatus(_ s: DaemonAPI.ConnectionSignIn) -> String {
         switch s.status {
+        case .waiting where s.grant == .authorizationCode && s.provider == .atlassian: Jira.waiting
         case .waiting where s.grant == .authorizationCode: Linear.waiting
         case .waiting: "Waiting for \(site(s.provider))\u{2026} Type the code there, then approve."
         case .connected: "Connected."

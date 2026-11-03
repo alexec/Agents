@@ -34,7 +34,7 @@ test("the request has all three fields, or none", () => {
   assert.equal(c.emailRequest("imap.fastmail.com", "agents@example.com", ""), undefined);
 });
 
-test("Email is last, and only on a host with connections.email/1", () => {
-  assert.deepEqual(c.providersFor(true), ["github", "linear", "gitlab", "email"]);
-  assert.deepEqual(c.providersFor(false), ["github", "linear", "gitlab"]);
+test("Email comes before Atlassian, and only on a host with connections.email/1", () => {
+  assert.deepEqual(c.providersFor(true), ["github", "linear", "gitlab", "email", "atlassian"]);
+  assert.deepEqual(c.providersFor(false), ["github", "linear", "gitlab", "atlassian"]);
 });

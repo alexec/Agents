@@ -4505,6 +4505,14 @@
         "expiresAt": {
           "$ref": "#/definitions/WireDate",
           "description": "When a token the host cannot renew ends: a GitLab personal access token's expiry. The person makes a new one before then."
+        },
+        "byToken": {
+          "type": "boolean",
+          "description": "The connection is a token the person made and the host does not renew, with no end it knows: a Jira API token or Data Center personal access token (#3304). Left out for OAuth."
+        },
+        "newest": {
+          "$ref": "#/definitions/ConnectorProof",
+          "description": "Only in the answer that made the connection: the one real read that proves it, such as Jira's newest issue (#3304). Left out when the read found nothing or failed."
         }
       },
       "required": [
@@ -4550,12 +4558,13 @@
     },
     "ConnectionProvider": {
       "type": "string",
-      "description": "A tool the person connects to: GitHub (#1335) and Linear (#1343) with OAuth, GitLab (#1630) with OAuth on gitlab.com or a personal access token on any GitLab, and email (#1780): one IMAP mailbox with an app password.",
+      "description": "A tool the person connects to: GitHub (#1335) and Linear (#1343) with OAuth, GitLab (#1630) with OAuth on gitlab.com or a personal access token on any GitLab, email (#1780): one IMAP mailbox with an app password, and Atlassian (#3304): one sign-in for Jira and Confluence, with OAuth on Atlassian Cloud or a token on one site.",
       "enum": [
         "github",
         "linear",
         "gitlab",
-        "email"
+        "email",
+        "atlassian"
       ]
     },
     "ConnectionProviderRequest": {
@@ -4702,14 +4711,18 @@
     },
     "ConnectionTokenRequest": {
       "type": "object",
-      "description": "connections/sign-in/token (#1630): a personal access token the person made, for a provider with no Agents application there (a self-managed GitLab). The host checks it with the provider, keeps it in its own store, and never logs it or gives it back.",
+      "description": "connections/sign-in/token (#1630, #3304): a personal access token the person made, for a provider with no Agents application there (a self-managed GitLab, a Jira site). The host checks it with the provider, keeps it in its own store, and never logs it or gives it back.",
       "properties": {
         "provider": {
           "$ref": "#/definitions/ConnectionProvider"
         },
         "url": {
           "type": "string",
-          "description": "The provider's address, such as gitlab.example.com (https:// when it names no scheme). gitlab.com when left out."
+          "description": "The provider's address, such as gitlab.example.com or example.atlassian.net (https:// when it names no scheme). gitlab.com when left out; a Jira site must be given."
+        },
+        "user": {
+          "type": "string",
+          "description": "Atlassian only: the account's email, sent with a Jira Cloud API token. Left out for a Jira Data Center personal access token."
         },
         "token": {
           "type": "string"

@@ -136,6 +136,9 @@ go-sdk server with `show_issues` and `show_issue_details` and the `ui://jira/iss
 The tools that change issues are Atlassian's own MCP server's (`https://mcp.atlassian.com/v1/mcp`,
 OAuth), added from the marketplace.
 
+- **Signs in** with the person's Atlassian connection (`connections.Atlassian`, #3304): a 3LO
+  token goes to `api.atlassian.com/ex/jira/<cloud id>`, a site token to the site. A token set
+  by hand (below) goes first.
 - **Reads** Jira's REST API version 2 at `JIRA_URL`: with `JIRA_EMAIL` and `JIRA_API_TOKEN`,
   Jira Cloud (Basic, search by `/search/jql`); with `JIRA_API_TOKEN` alone, a Data Center
   personal access token (Bearer, search by `/search`). A description is Jira's rendered HTML,
