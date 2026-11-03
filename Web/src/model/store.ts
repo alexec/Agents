@@ -4,9 +4,10 @@
 import { preferencesSaid, sendPreferencesWith } from "./preferences";
 import { folderPath as hostedFolderPath } from "./hostedMCP";
 import type { ExportImportBusy } from "./exports";
+import type { HeardLiveFrame } from "./desktopControl";
 import { batch, computed, signal, type ReadonlySignal, type Signal } from "@preact/signals";
 import type {
-  Agent, AgentRemovedNotification, ResumingNotification, ControlMachine, MachineRef, MachineWorkspace, ElicitationNotification, ElicitationRequest, EntryNotification,
+  Agent, AgentRemovedNotification, ResumingNotification, DesktopControlLiveFrame, ControlMachine, MachineRef, MachineWorkspace, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, FolderSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, FolderRemovedNotification, DraftOptionsNotification, JSONValue, Methods, AccountProfile, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, AutoMappings, AutoPreview, AutoPreviewRequest, AutoSettings, ClientPermissionMode, Levels, ModelLevel, PermissionLevel, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
@@ -242,6 +243,11 @@ export class Work {
   /** The latest load of the open chat: an older answer landing after a newer one is dropped (#400). */
   protected transcriptLoads = 0;
 
+  /**
+   * The live tile's latest frame (#3004, US4, `desktopControl/liveFrame`): one, since a host sends
+   * frames only to the page showing that agent. Replaced by the next, never kept (FR-016).
+   */
+  readonly liveFrame = signal<HeardLiveFrame | null>(null);
   /** The last file an agent asked to be put in front of the person (`agent/showFile`). */
   readonly shownFile = signal<{ host: string; agentID: string; path: string; line?: number | undefined; at: number } | null>(null);
   /** A new agent a view filled in (#834, agents/start-agent), for the new-agent form on that
@@ -613,6 +619,9 @@ export class Work {
         if (held) this.writeWorkflows(key, held.filter((w) => w.workflow.workflowID !== note.workflowID));
         return true;
       }
+      case "desktopControl/liveFrame":
+        this.liveFrame.value = { host, frame: params as DesktopControlLiveFrame, heardAt: Date.now() };
+        return true;
       case "agent/showFile": {
         const note = params as ShowFileNotification;
         this.noteChartHint(host, note.file.path, note.file.chart);

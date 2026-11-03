@@ -493,6 +493,11 @@ button.link.reading:hover { text-decoration: underline; }
 .archive-card p { margin: 0; }
 .archive-card .strong { color: var(--tint-attention); }
 .archive-card .archive-answers { display: flex; justify-content: flex-end; gap: 10px; }
+/* An agent driving the Mac's screen (#3004, US4): the latest still, or "Mac is locked", and its last action. */
+.desktop-tile { display: flex; flex-direction: column; gap: 8px; }
+.desktop-tile p { margin: 0; }
+.desktop-tile-picture { display: block; width: 100%; height: auto; border-radius: var(--radius-control); border: 1px solid var(--paper-rule); }
+.desktop-tile-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 120px; padding: 20px; text-align: center; background: var(--paper-well); border-radius: var(--radius-control); }
 .wait-card p { margin: 0; }
 .wait-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .wait-card-title { display: flex; align-items: center; gap: 7px; min-width: 0; }

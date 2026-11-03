@@ -5009,6 +5009,7 @@ extension RemoteModel {
         switch update {
         case .entry(let note): popouts[note.agentID]?.work.apply(update)
         case .terminalOutput(let note): popouts[note.agentID]?.work.apply(update)
+        case .liveFrame(let frame): popouts[frame.agentID]?.work.apply(update)
         default: break
         }
     }

@@ -2935,6 +2935,22 @@ type DeliveredRoute struct {
 	Expires *Date `json:"expires,omitzero"`
 }
 
+// The live tile's latest look at the Mac's screen while an agent holds the screen lease (#3004, US4, FR-011): a downscaled JPEG of the whole screen, base64, or, while the screen is locked, locked and no image (FR-012). Sent only to the clients showing that agent, never recorded, never replayed (FR-016).
+type DesktopControlLiveFrame struct {
+	AgentID UUID `json:"agentID"`
+
+	// Base64 JPEG. Absent while the screen is locked.
+	Image *string `json:"image,omitzero"`
+
+	// The Mac's screen is locked: the tile says so and shows no picture.
+	Locked *bool `json:"locked,omitzero"`
+
+	// What the agent last did on the screen, in words: drive_screen's own reply, such as Clicked Save in TextEdit. Absent before its first action.
+	Narration *string `json:"narration,omitzero"`
+
+	CapturedAt Date `json:"capturedAt"`
+}
+
 // An agent's drive_screen paused by the person's own touch (#3004, US3): the app it was driving, and when.
 type DesktopControlPause struct {
 	App string `json:"app"`

@@ -20,6 +20,9 @@ every turn, from `<its folder>/<its name>.behaviour`:
           the turn calls the app's own tool by that name on the agents server it was given,
           as a model would, shows the call, and says what the tool answered: for seeing a
           card an app tool raises, such as ask_secret's (#2885).
+  toolhold <seconds> <name> <json arguments>
+          the same, then holds the turn open that long before it answers: for seeing what
+          shows while a tool's hold lasts, such as drive_screen's live tile (#3004).
   goal    the turn sends the goal in `<its folder>/<its name>.goal` (JSON: a snapshot, or
           null to clear it) on a session_info_update, as Codex's and Claude's adapters do
           for an AIR client, then answers: for seeing the goal card (#2742).
@@ -144,8 +147,13 @@ def prompt(request_id, params):
         say(session_id, "Done: the notes are read and the edit is planned.")
         reply(request_id, {"stopReason": "end_turn"})
         return
-    if how and how[0] == "tool":
-        _, name, arguments = behaviour().split(maxsplit=2)
+    if how and how[0] in ("tool", "toolhold"):
+        hold = 0.0
+        if how[0] == "toolhold":
+            _, hold_text, name, arguments = behaviour().split(maxsplit=3)
+            hold = float(hold_text)
+        else:
+            _, name, arguments = behaviour().split(maxsplit=2)
 
         def update(body):
             send({"jsonrpc": "2.0", "method": "session/update", "params": {"sessionId": session_id, "update": body}})
@@ -155,6 +163,7 @@ def prompt(request_id, params):
         text = call_tool(session_id, name, json.loads(arguments))
         update({"sessionUpdate": "tool_call_update", "toolCallId": "tool-1", "status": "completed",
                 "content": [{"type": "content", "content": {"type": "text", "text": text}}]})
+        time.sleep(hold)
         say(session_id, text)
         reply(request_id, {"stopReason": "end_turn"})
         return

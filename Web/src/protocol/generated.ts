@@ -2516,6 +2516,26 @@ export interface DeliveredRoute {
 }
 
 /**
+ * The live tile's latest look at the Mac's screen while an agent holds the screen lease (#3004,
+ * US4, FR-011): a downscaled JPEG of the whole screen, base64, or, while the screen is locked,
+ * locked and no image (FR-012). Sent only to the clients showing that agent, never recorded, never
+ * replayed (FR-016).
+ */
+export interface DesktopControlLiveFrame {
+  agentID: UUID;
+  /** Base64 JPEG. Absent while the screen is locked. */
+  image?: string;
+  /** The Mac's screen is locked: the tile says so and shows no picture. */
+  locked?: boolean;
+  /**
+   * What the agent last did on the screen, in words: drive_screen's own reply, such as Clicked Save
+   * in TextEdit. Absent before its first action.
+   */
+  narration?: string;
+  capturedAt: WireDate;
+}
+
+/**
  * An agent's drive_screen paused by the person's own touch (#3004, US3): the app it was driving,
  * and when.
  */
@@ -10670,6 +10690,7 @@ export interface Notifications {
   "control/stopAll": PolicyView;
   "control/userSettingsChanged": UserSettingsChanged;
   "daemon/policyStateChanged": PolicyState;
+  "desktopControl/liveFrame": DesktopControlLiveFrame;
   "disk/changed": DiskState;
   "files/changed": FilesChangedNotification;
   "folder/changed": FolderSummary;
@@ -10890,6 +10911,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DeletePreview: { required: ["count", "bytes"], optional: [] },
   DeleteSessionRequest: { required: ["runtimeID", "sessionID"], optional: ["confirmed"] },
   DeliveredRoute: { required: ["id", "name", "kind", "runtimes", "defaultFor", "secretFields", "version", "sealed"], optional: ["vendor", "settings", "models", "expires"] },
+  DesktopControlLiveFrame: { required: ["agentID", "capturedAt"], optional: ["image", "locked", "narration"] },
   DesktopControlPause: { required: ["app", "pausedAt"], optional: [] },
   DesktopControlSettings: { required: ["enabled"], optional: [] },
   DestinationStateAnswer: { required: ["destinationState"], optional: [] },
