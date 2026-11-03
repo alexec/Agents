@@ -17,7 +17,7 @@ iPhone, and on a narrow web page, it is the first screen, and what you open goes
 | **New Session** | Starts a session in the folder you last started one in. The page it opens can change the folder. |
 | **Status** | Pages about the work going on now: **Events**, **Resources**, **Runtimes**, **Connectors** and **Worktrees**. |
 | **Usage** | Pages about past work: **Cost**, **Tokens**, **Time**, and **Milestones** until you have done every first step. |
-| Smart groups | **Pinned**, **Needs You**, **Working** and **Unread**, each across every folder and host. See [Smart groups](#smart-groups). |
+| Smart groups | **Pinned**, **Needs You**, **For Review**, **Working** and **Unread**, each across every folder and host. See [Smart groups](#smart-groups). |
 | One group per folder | Each folder's own sessions and workflows. See [A folder's group](#a-folders-group). |
 | **Archived folders** | Folders you put away. The heading stays folded until you open it. Each has **Unarchive**. |
 | The foot | Lines about this Mac's host and the servers, when there is something to say. On iPhone and iPad, **Settings…**. On the web page, **Settings** and **Help**. |
@@ -40,6 +40,7 @@ you without opening each folder.
 | --- | --- | --- |
 | **Pinned** | The sessions and workflows you pinned, in the order you pinned them. | On, open |
 | **Needs You** | Sessions that asked you something, are blocked, or ask to be archived. Also each approval that waits for you: a connector, a workflow, a plugin, a guarded file, and a workflow that failed. | On, open |
+| **For Review** | Finished sessions that showed you a file you have not opened yet, such as a report or the daily summary. These do not block an agent. | On, open |
 | **Working** | Sessions with a turn in progress. | Off |
 | **Unread** | Finished sessions you have not opened since they finished. | Off |
 
@@ -51,8 +52,10 @@ you without opening each folder.
 - **A group with nothing in it is not shown.** While you search, a group shows only when
   something in it matches.
 - **A row in a smart group shows its folder's name** after its title, in grey.
-- **A session you open from Unread stays there,** read, until you open another one. This
-  keeps the row from moving away under the pointer.
+- **A session you open from Unread or For Review stays there,** read, until you open
+  another one. This keeps the row from moving away under the pointer.
+- **To dismiss a row in For Review,** use **Mark as Read**: right-click on the Mac and the
+  web page, swipe left on iPhone and iPad. Opening the session dismisses it too.
 
 ### Turn a smart group on or off
 

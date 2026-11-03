@@ -756,6 +756,8 @@ final class AppModel {
             // Opened from Unread, it stays there until something else is opened (#495),
             // as a read message stays in Mail's Unread mailbox while it is selected.
             keptInUnread = selection.flatMap { work.agent($0) }.flatMap { $0.showsUnread ? $0.id : nil }
+            // From For Review when it had a file to see (#3194): that group keeps it instead.
+            keptHadFile = selection.flatMap { work.agent($0) }?.fileToSee != nil
             // A session picked is the session shown, not a workflow left open over it.
             if selection != nil {
                 openWorkflow = nil
@@ -776,6 +778,8 @@ final class AppModel {
     /// The session opened while it was unread, kept in the sidebar's Unread until another
     /// is opened (#495), so it does not leave the list under the pointer on the click.
     private(set) var keptInUnread: UUID?
+    /// Whether `keptInUnread` had a file to see when opened, so For Review keeps it (#3194).
+    private(set) var keptHadFile = false
 
     /// The agent this window just started, until its chat is opened. A new chat starts
     /// with the sidebar shut, whatever the last one had open (#358).

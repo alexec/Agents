@@ -129,8 +129,8 @@ test("Needs You gathers what an agent asked to have archived, each listed once (
   assert.deepEqual(smartAgents("unread", live).map((a) => a.id), [], "asking unread is in Needs You alone");
   assert.deepEqual(smartAgents("working", live).map((a) => a.id), ["later"]);
   assert.deepEqual(live.map((a) => home(a, false)), ["needsYou", "needsYou", "working", "needsYou", null]);
-  assert.deepEqual(smartRows, ["pinned", "needsYou", "working", "unread"], "no Approve Archiving");
-  assert.deepEqual(Object.keys(smartTitles), ["pinned", "needsYou", "working", "unread"]);
+  assert.deepEqual(smartRows, ["pinned", "needsYou", "forReview", "working", "unread"], "no Approve Archiving");
+  assert.deepEqual(Object.keys(smartTitles), ["pinned", "needsYou", "forReview", "working", "unread"]);
   assert.deepEqual(live.map(sessionMark), ["asksToArchive", "asksToArchive", "working", "asksToArchive", "done"], "nothing to do asks too (#1916)");
 });
 
@@ -230,6 +230,31 @@ test("the session Unread keeps is not under its folder too, until another is ope
   assert.equal(keepsInUnread(agent("gone", 4, { state: "archived" }), []), false);
 });
 
+test("For Review lists a session done with a file nobody opened, not Unread, and keeps the one opened from it (#3194)", async () => {
+  const { home, smartAgents, smartRows, keeper, keepsInUnread, folderSessions, smartStartsOpen } = await load("src/model/sidebar.ts");
+  const file = { path: "/tmp/summary.md" };
+  const live = [
+    agent("report", 1, { isUnread: true, fileToSee: file }),
+    agent("archiving", 2, { isUnread: true, fileToSee: file, archiveRequest: { requested: { at: 1 } } }),
+    agent("working", 3, { state: "running", fileToSee: file }),
+    agent("unread", 4, { isUnread: true }),
+  ];
+  assert.deepEqual(live.map((a) => home(a, false)), ["forReview", "needsYou", "working", "unread"]);
+  assert.deepEqual(smartAgents("forReview", live).map((a) => a.id), ["report"]);
+  assert.deepEqual(smartAgents("unread", live).map((a) => a.id), ["unread"]);
+  assert.equal(smartStartsOpen("forReview"), true);
+  const noReview = new Set(smartRows.filter((row) => row !== "forReview"));
+  assert.deepEqual(smartAgents("unread", live, undefined, [], noReview).map((a) => a.id), ["unread", "report"], "off, it is Unread's");
+  // Opened and read, the host clears the file: For Review keeps it, not its folder.
+  const read = agent("report", 1);
+  assert.equal(keeper(true), "forReview");
+  assert.equal(keeper(true, noReview), "unread");
+  assert.equal(keeper(false), "unread");
+  assert.equal(keepsInUnread(read, [], undefined, "forReview"), true);
+  assert.deepEqual(folderSessions([read], [], undefined, "report").map((a) => a.id), []);
+  assert.equal(keepsInUnread(read, [], noReview, "forReview"), false, "off, it keeps nothing");
+});
+
 test("a group turned off is not drawn, and its sessions go to the next group they fit, or under their folder (#846)", async () => {
   const { smartAgents, smartRows, folderSessions, keepsInUnread, pinnedSessions } = await load("src/model/sidebar.ts");
   const live = [
@@ -275,14 +300,14 @@ test("a group turned off is not drawn, and its sessions go to the next group the
 
 test("the groups on round-trip through what this browser keeps: the groups off (#846)", async () => {
   const { smartRowsOn, smartRowsOff } = await load("src/model/smartGroups.ts");
-  const all = ["pinned", "needsYou", "working", "unread"];
+  const all = ["pinned", "needsYou", "forReview", "working", "unread"];
   assert.deepEqual([...smartRowsOn("")], all);
-  assert.deepEqual([...smartRowsOn(null)], ["pinned", "needsYou"], "nothing kept: Working and Unread off (#979)");
-  assert.deepEqual([...smartRowsOn(undefined)], ["pinned", "needsYou"]);
+  assert.deepEqual([...smartRowsOn(null)], ["pinned", "needsYou", "forReview"], "nothing kept: Working and Unread off (#979)");
+  assert.deepEqual([...smartRowsOn(undefined)], ["pinned", "needsYou", "forReview"]);
   assert.equal(smartRowsOff(new Set(all)), "");
-  assert.equal(smartRowsOff(new Set(["unread", "needsYou"])), "pinned,working", "in the sidebar's order");
-  assert.deepEqual([...smartRowsOn("pinned,working,gone")], ["needsYou", "unread"], "a name not a group's is passed over");
-  for (const off of ["", "pinned", "needsYou,unread", "pinned,needsYou,working,unread"]) {
+  assert.equal(smartRowsOff(new Set(["unread", "needsYou"])), "pinned,forReview,working", "in the sidebar's order");
+  assert.deepEqual([...smartRowsOn("pinned,working,gone")], ["needsYou", "forReview", "unread"], "a name not a group's is passed over");
+  for (const off of ["", "pinned", "needsYou,unread", "pinned,needsYou,forReview,working,unread"]) {
     assert.equal(smartRowsOff(smartRowsOn(off)), off);
   }
 });
@@ -535,7 +560,7 @@ test("the sidebar follows what the Mac says (#1033)", async () => {
   assert.equal(folds.showsStatus.value, false);
   assert.equal(folds.showsUsage.value, false);
   assert.equal(folds.showsArchivedFolders.value, true);
-  assert.equal(m.smartGroupsOn.value.size, 4, "every group on is a choice too");
+  assert.equal(m.smartGroupsOn.value.size, 5, "every group on is a choice too");
   m.preferencesSaid({});
   assert.equal(folds.showsStatus.value, true, "nothing said is the default");
   assert.equal(m.smartGroupsOn.value.has("working"), false, "Working is off at first (#979)");

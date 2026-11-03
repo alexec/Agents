@@ -495,9 +495,10 @@ struct FolderFold: View {
         // Folded, nothing under the row is drawn, so nothing is filed for it: the row
         // reads its own numbers off the folder's shelf (#165). What goes under which
         // heading is the shared model's, which the Remote draws too (#226).
+        let on = smartGroups ?? SidebarSmartRow.on(off: smartOff)
         let fold = SidebarFolderFold(key, label: label, in: model.work, query: query,
                                       isOpen: folds.isOpen(key), keptInUnread: model.keptInUnread,
-                                      on: smartGroups ?? SidebarSmartRow.on(off: smartOff))
+                                      keptBy: SidebarSmartRow.keeper(fileToSee: model.keptHadFile, on: on), on: on)
         let isOpen = fold.isUnfolded
         if fold.isShown {
             Section(isExpanded: Binding(

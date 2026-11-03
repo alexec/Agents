@@ -125,10 +125,11 @@ public struct SidebarFolderFold {
     /// row is drawn, so nothing is filed for it, and the row reads its own numbers off the
     /// folder's shelf (#165). A search unfolds every folder, and `label` is the name the
     /// row shows, which the search also matches. `keptInUnread` is the session Unread keeps
-    /// while it is open, listed there and not here (#689). `on` is the smart groups turned
+    /// while it is open, listed there and not here (#689), or For Review (`keptBy`, #3194). `on` is the smart groups turned
     /// on (#846): with Pinned off, the pinned are listed here as any other.
     public init(_ key: FolderKey, label: String, in work: AgentsModel, query: String = "", isOpen: Bool,
-                keptInUnread: UUID? = nil, on: Set<SidebarSmartRow> = SidebarSmartRow.all) {
+                keptInUnread: UUID? = nil, keptBy: SidebarSmartRow = .unread,
+                on: Set<SidebarSmartRow> = SidebarSmartRow.all) {
         self.key = key
         let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
         self.query = words
@@ -166,7 +167,7 @@ public struct SidebarFolderFold {
         }
         // Only those no smart group lists: each session is in the sidebar once (#587), the
         // one Unread keeps too (#689).
-        let kept = SidebarSmartRow.keptInUnread(keptInUnread, in: work, query: words, on: on)?.id
+        let kept = SidebarSmartRow.keptInUnread(keptInUnread, in: work, query: words, on: on, keptBy: keptBy)?.id
         sessions = groups.flatMap { group in
             group.agents.filter { SidebarSmartRow.home(of: $0, in: group.group, isPinned: false, on: on) == nil && $0.id != kept }
         }.sorted { $0.createdAt > $1.createdAt }
