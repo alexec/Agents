@@ -38,6 +38,8 @@ something particular done.
   your agents away from home through iCloud, and be notified, or stop it.
 - [Run the control plane in the cloud](run-the-control-plane-in-the-cloud.md): on a
   machine you rent, at your own domain with a public certificate.
+- [Run Agents with no Mac](run-agents-with-no-mac.md): a control plane in the cloud, the
+  web page and a GitHub Codespace that runs your agents.
 - [Run the control plane as several copies](run-several-copies.md): over one bucket,
   behind a load balancer, so it stays up when your Mac sleeps.
 - [Move an existing set-up across](move-an-existing-set-up.md): bring the earlier app's

@@ -37,7 +37,9 @@ copies](run-several-copies.md).
 
 On Google Cloud, three scripts do most of the steps below for you: they make the machine,
 its firewall, its address, the Cloud KMS key and the DNS records, then build and start the
-control plane. They run from a clone of the Agents repository on your Mac. Each script looks first for what it makes, so you can run it again safely.
+control plane. They run from a clone of the Agents repository on your Mac. With no Mac, do
+the [Steps](#steps) by hand instead: they need only a browser and the machine's own
+terminal. Each script looks first for what it makes, so you can run it again safely.
 Each takes `--dry-run`, which prints every command and runs none.
 
 ### What you make first
@@ -197,7 +199,7 @@ On another provider, or to do it by hand, follow these steps.
 2. Add the same records for the views name, such as `views.example.com`. The web page
    draws MCP Apps views from this name, because a view must have an origin of its own,
    apart from the page. A **CNAME** record to the first name is also correct.
-3. Check both from your Mac:
+3. Check both from your computer:
 
    ```sh
    dig +short agents.example.com
@@ -213,7 +215,7 @@ The control plane's key proves to every window, phone and host that it is your c
 plane. On the machine it is sealed in the store by a key in Cloud KMS, which never leaves
 Google Cloud. The machine gets only the right to use that key.
 
-On your Mac, with `gcloud` (put your Google Cloud project's id in place of `my-project`):
+On your computer, or in Google Cloud Shell, with `gcloud` (put your Google Cloud project's id in place of `my-project`):
 
 1. Make a key ring and a key:
 
@@ -323,7 +325,7 @@ On the machine, in the folder you copied to:
    a key from elsewhere, seal it before this step: see
    [Move the control plane from your Mac](#move-the-control-plane-from-your-mac).
 
-3. Within a minute Caddy has its certificate. Check from your Mac:
+3. Within a minute Caddy has its certificate. Check from your computer:
 
    ```sh
    curl https://agents.example.com/healthz
@@ -352,11 +354,23 @@ The first code comes from the machine. After that, every code comes from a paire
 Pair your iPhone and iPad from that window, as in
 [Connect a window or phone](connect-a-window-or-phone.md).
 
+**With no Mac, pair a browser first.** Add `--browser` to the command, so the code is
+for the web page:
+
+```sh
+docker compose -f deploy/compose.public.yaml exec control /agents-control code --client --browser
+```
+
+Open `https://agents.example.com/` in the browser, paste the code under **Connect this
+browser to your agents**, and click **Connect**. The code works once, for five minutes.
+See [Run Agents with no Mac](run-agents-with-no-mac.md) for the rest.
+
 ### Use Agents in a browser
 
 The control plane serves the Agents page at its own address, `https://agents.example.com/`,
-so a browser anywhere can use it. A browser pairs by a code from a window or phone that is
-already paired:
+so a browser anywhere can use it. The first browser can pair by a code from the machine
+(see [Pair your first window](#pair-your-first-window)). After that, a browser pairs by a
+code from a window, phone or browser that is already paired:
 
 1. In Agents on your Mac, open **Settings ▸ Control plane ▸ Clients** and click
    **Add a Browser…**. On an iPhone or iPad, tap **Add a Browser…** at the foot of the
@@ -798,5 +812,7 @@ one, and `apk add` them.
 
 ## Related
 
+- [Run Agents with no Mac](run-agents-with-no-mac.md): this control plane, the web page
+  and a codespace.
 - [Run the control plane as several copies](run-several-copies.md).
 - [The control plane](../explanation/control-plane.md).
