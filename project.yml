@@ -498,6 +498,10 @@ targets:
       - name: Build the email MCP server
         script: sh "$SRCROOT/scripts/go-github-mcp.sh" email-mcp
         basedOnDependencyAnalysis: false
+      # The jira MCP server (#3247), built and carried the same way.
+      - name: Build the jira MCP server
+        script: sh "$SRCROOT/scripts/go-github-mcp.sh" jira-mcp
+        basedOnDependencyAnalysis: false
       # The command machine provider (#691, in Go since #1364), which agents-control looks
       # for beside itself, built and carried the same way.
       - name: Build the command machine provider
@@ -523,6 +527,9 @@ targets:
         basedOnDependencyAnalysis: false
       - name: Carry the email MCP server
         script: sh "$SRCROOT/scripts/go-github-mcp.sh" --carry email-mcp
+        basedOnDependencyAnalysis: false
+      - name: Carry the jira MCP server
+        script: sh "$SRCROOT/scripts/go-github-mcp.sh" --carry jira-mcp
         basedOnDependencyAnalysis: false
       - name: Carry the command machine provider
         script: sh "$SRCROOT/scripts/go-github-mcp.sh" --carry workspace-commands

@@ -19,6 +19,10 @@ func TestNodeOfURL(t *testing.T) {
 		"https://gitlab.com/group/sub/project/-/issues/3":            "issue gitlab:group/sub/project#3",
 		"https://gitlab.example.com/group/project/-/merge_requests/4": "pr gitlab:group/project!4",
 		"https://linear.app/acme/issue/eng-4/fix-the-walk":           "issue linear:ENG-4",
+		"https://acme.atlassian.net/browse/proj-12":                  "issue jira:PROJ-12",
+		"https://jira.example.com/browse/OPS-3?focusedCommentId=1":   "issue jira:OPS-3",
+		"https://github.com/browse/ENG-1":                            "",
+		"https://acme.atlassian.net/browse/PROJ":                     "",
 		"https://github.com/alexec/Agents/-/issues/7":                "",
 		"https://example.com/a/b/issues/7":                           "",
 		"javascript:alert(1)":                                        "",
@@ -127,6 +131,32 @@ func TestOnlyOurServersViewsAskForLineage(t *testing.T) {
 	}
 	raw, _ = d.lineageViewResult(server("linear-mcp"), json.RawMessage(`{"url":"https://example.com"}`))
 	if json.Unmarshal(raw, &r) != nil || !r.IsError {
+		t.Fatalf("%s", raw)
+	}
+}
+
+// #3247: a session labelled PROJ-12 is in the record as linear:PROJ-12, so the Jira page's
+// section for PROJ-12 reads that one, under its own ref.
+func TestAJiraIssuesLineageReadsItsKeysSessions(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	folder := t.TempDir()
+	a := seeded(t, d, folder, func(a *wire.Agent) {
+		title := "Fix PROJ-12"
+		a.Title = &title
+		a.Labels = []wire.SessionLabel{{Value: "PROJ-12", Owner: wire.SessionLabelOwnerPerson}}
+	})
+	d.noteLineage(nil, a)
+	jira := viewServer{name: "jira", filled: sdk.McpServer{Stdio: &sdk.McpServerStdio{Name: "jira", Command: "jira-mcp"}}}
+	raw, err := d.lineageViewResult(jira, json.RawMessage(`{"url":"https://acme.atlassian.net/browse/PROJ-12"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var r struct {
+		StructuredContent lineageView `json:"structuredContent"`
+	}
+	if json.Unmarshal(raw, &r) != nil || r.StructuredContent.Ref != "jira:PROJ-12" || len(r.StructuredContent.Sessions) != 1 ||
+		r.StructuredContent.Sessions[0].Title != "Fix PROJ-12" {
 		t.Fatalf("%s", raw)
 	}
 }
