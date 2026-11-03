@@ -1892,3 +1892,19 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
 .work-plan-level { width: 3.2em; flex: none; }
 .work-plan-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .work-plan-cost { font-variant-numeric: tabular-nums; }
+/* Work ▸ Features (#3269): a row per feature: label; opened, its epics and its issues with no epic. */
+.work-feature-head { display: flex; gap: 8px; align-items: baseline; width: 100%; padding: 8px 4px; text-align: left; background: none; border: none;
+  border-radius: 0; color: inherit; font: inherit; cursor: pointer; }
+.work-feature-head:hover, .work-feature-row:hover { background: var(--paper-wash); }
+.work-feature-head .chevron { display: inline-block; width: 1em; opacity: 0.6; }
+.work-feature-head .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+.work-feature-head .counts, .work-feature-row .figures { margin-left: auto; opacity: 0.7; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.work-feature-open { padding: 0 0 6px 22px; }
+.work-feature-items { list-style: none; margin: 0; padding: 0; }
+.work-rows .work-feature-items li { border: none; }
+.work-feature-open h4 { margin: 6px 0 2px; font-weight: 600; opacity: 0.7; }
+.work-feature-row { display: flex; gap: 10px; align-items: baseline; width: 100%; padding: 3px 4px; text-align: left; background: none; border: none;
+  border-radius: 0; color: inherit; font: inherit; cursor: pointer; }
+.work-feature-row .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.work-feature-row .lead { min-width: 9em; opacity: 0.7; white-space: nowrap; }
+.work-feature-row .lead.attention { color: var(--tint-attention); opacity: 1; }
