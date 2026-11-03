@@ -158,8 +158,14 @@ func TestDriveScreenTakesTheScreenLeaseAndQueuesBehindAnotherAgent(t *testing.T)
 		}
 		return false
 	})
+	// The wake started a turn, and its end lets go of the screen (endScreenDrive): wait for
+	// it, or that end can take the lease back between the next call's lease and its drive
+	// (#3325). The grant came before the wake, so a lease no longer held is that end.
+	waitFor(t, "its turn over", func() bool {
+		return !d.holdsScreen(secondAgent.ID) && d.Store.Agent(secondAgent.ID).State == wire.AgentStateFinished
+	})
 
-	// Granted, a new call drives at once.
+	// The screen free, a new call takes it and drives at once.
 	second = appClient(t, d, secondAgent.ID)
 	second.post("initialize", map[string]any{}, 1)
 	if text, isErr := second.tool(2, "drive_screen", map[string]any{"app": "TextEdit", "action": "read"}); isErr || text != "fake tree" {
