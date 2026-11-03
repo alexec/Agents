@@ -428,6 +428,8 @@ public enum WorkList {
         case DaemonAPI.Method.forgeLabel: "Labels changed."
         case DaemonAPI.Method.forgeMerge: done.auto == true ? "Auto-merge is on: it merges when its checks pass." : "Merged."
         case DaemonAPI.Method.forgeApprove: "Approved."
+        case DaemonAPI.Method.forgeAddChild: "Child added."
+        case DaemonAPI.Method.forgeBlockedBy: "Blocked by changed."
         case DaemonAPI.Method.forgeClose: reopened ? "Reopened." : "Closed."
         case DaemonAPI.Method.forgeRerun:
             done.reran.map { $0 == 1 ? "1 run started again." : "\($0) runs started again." } ?? "Started again."

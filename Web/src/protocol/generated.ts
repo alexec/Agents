@@ -3485,12 +3485,35 @@ export interface FoldersListRequest {
 }
 
 /**
+ * forge/add-child (#3271): add a child to an epic's plan: a new issue (title, with level story,
+ * task, spike or bug) or one that is there (issue: #12, owner/repo#12, its URL, or a Linear key
+ * such as ENG-4). A new child gets the level's label and the epic's feature: label. GitHub and
+ * Linear.
+ */
+export interface ForgeAddChildRequest {
+  node: LineageNode;
+  title?: string;
+  level?: string;
+  issue?: string;
+}
+
+/**
  * forge/approve (#3130): approve a pull request at sha, the head commit its page shows (refused
  * when the head moved).
  */
 export interface ForgeApproveRequest {
   node: LineageNode;
   sha: string;
+}
+
+/**
+ * forge/blocked-by (#3271): the issues that block a child of a plan, to add and to take off, by
+ * node. GitHub and Linear.
+ */
+export interface ForgeBlockedByRequest {
+  node: LineageNode;
+  add?: LineageNode[];
+  remove?: LineageNode[];
 }
 
 /**
@@ -10088,7 +10111,9 @@ export interface Methods {
   "folders/setProject": { params: SetFolderProjectRequest; result: FolderSummary };
   "folders/unarchive": { params: FolderRequest; result: FolderSummary };
   "folders/undoGuardedChange": { params: GuardedChangeRequest; result: FolderSummary };
+  "forge/add-child": { params: ForgeAddChildRequest; result: ForgeDone };
   "forge/approve": { params: ForgeApproveRequest; result: ForgeDone };
+  "forge/blocked-by": { params: ForgeBlockedByRequest; result: ForgeDone };
   "forge/close": { params: ForgeCloseRequest; result: ForgeDone };
   "forge/comment": { params: ForgeCommentRequest; result: ForgeDone };
   "forge/diff": { params: ForgeNodeRequest; result: ForgeDiff };
@@ -10406,7 +10431,9 @@ export const MethodTarget = {
   "folders/setProject": "host",
   "folders/unarchive": "host",
   "folders/undoGuardedChange": "host",
+  "forge/add-child": "host",
   "forge/approve": "host",
+  "forge/blocked-by": "host",
   "forge/close": "host",
   "forge/comment": "host",
   "forge/diff": "host",
@@ -10957,7 +10984,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FolderWorktrees: { required: ["worktrees", "folder"], optional: [] },
   FoldersFindRequest: { required: [], optional: ["paths", "folders"] },
   FoldersListRequest: { required: ["includeArchived"], optional: [] },
+  ForgeAddChildRequest: { required: ["node"], optional: ["title", "level", "issue"] },
   ForgeApproveRequest: { required: ["node", "sha"], optional: [] },
+  ForgeBlockedByRequest: { required: ["node"], optional: ["add", "remove"] },
   ForgeCheck: { required: ["name", "state"], optional: ["url"] },
   ForgeCloseRequest: { required: ["node"], optional: ["reopen", "transition"] },
   ForgeComment: { required: ["author", "body", "at"], optional: ["url", "bot"] },

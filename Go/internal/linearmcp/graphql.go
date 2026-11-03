@@ -59,8 +59,14 @@ type gqlError struct {
 	} `json:"extensions"`
 }
 
-// query asks Linear query with variables and reads its data into out.
+// query asks Linear query with variables and reads its data into out. A read's answer is shared
+// for sharedFor; a mutation's never is, so the same write asked again is written again (#3271).
 func (l *RealLinear) query(ctx context.Context, query string, variables map[string]any, out any) error {
+	return l.ask(ctx, query, variables, out, !strings.HasPrefix(strings.TrimSpace(query), "mutation"))
+}
+
+// ask is query, with share false for a read that a write depends on.
+func (l *RealLinear) ask(ctx context.Context, query string, variables map[string]any, out any, share bool) error {
 	key := l.Key()
 	if key == "" {
 		return &LinearError{Kind: NotSignedIn, Message: "Linear is not signed in: connect Linear in Connectors, or set LINEAR_API_KEY to a personal API key"}
@@ -73,7 +79,7 @@ func (l *RealLinear) query(ctx context.Context, query string, variables map[stri
 	shared, have := l.recent[string(body)]
 	l.mu.Unlock()
 	var data json.RawMessage
-	if have && time.Since(shared.at) < l.sharing {
+	if have && share && time.Since(shared.at) < l.sharing {
 		data = shared.body
 	} else {
 		if data, err = l.post(ctx, key, body); err != nil {

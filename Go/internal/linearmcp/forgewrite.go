@@ -234,3 +234,131 @@ func (l *RealLinear) SetState(ctx context.Context, identifier string, closed boo
 	}
 	return nil
 }
+
+// The plan's writes (#3271): a child added to an epic, new or one that is there, and a child's
+// blockers. Linear says a block on the issue that blocks: "A blocks B" is B blocked by A.
+
+// AddChild opens an issue in the epic's team as its child, with the labels of the team's or the
+// workspace's that it names (a name Linear does not have is left off), and is its identifier
+// and URL.
+func (l *RealLinear) AddChild(ctx context.Context, epic, title string, labels []string) (string, string, error) {
+	r, err := l.issueRef(ctx, epic)
+	if err != nil {
+		return "", "", err
+	}
+	ids := []string{}
+	if len(labels) > 0 {
+		ls, err := l.teamLabels(ctx, r.Team)
+		if err != nil {
+			return "", "", err
+		}
+		for _, name := range labels {
+			for _, n := range ls {
+				if strings.EqualFold(n.Name, name) && !slices.Contains(ids, n.ID) {
+					ids = append(ids, n.ID)
+				}
+			}
+		}
+	}
+	var out struct {
+		IssueCreate struct {
+			Success bool `json:"success"`
+			Issue   *struct {
+				Identifier string `json:"identifier"`
+				URL        string `json:"url"`
+			} `json:"issue"`
+		} `json:"issueCreate"`
+	}
+	const create = `mutation($team: String!, $parent: String!, $title: String!, $labels: [String!]) {
+  issueCreate(input: {teamId: $team, parentId: $parent, title: $title, labelIds: $labels}) { success issue { identifier url } } }`
+	if err := l.query(ctx, create, map[string]any{"team": r.Team, "parent": r.ID, "title": title, "labels": ids}, &out); err != nil {
+		return "", "", err
+	}
+	if !out.IssueCreate.Success || out.IssueCreate.Issue == nil {
+		return "", "", refused("add a child to", epic)
+	}
+	return out.IssueCreate.Issue.Identifier, out.IssueCreate.Issue.URL, nil
+}
+
+// SetParent makes the issue identifier names a child of epic.
+func (l *RealLinear) SetParent(ctx context.Context, identifier, epic string) error {
+	parent, err := l.issueRef(ctx, epic)
+	if err != nil {
+		return err
+	}
+	var out struct {
+		IssueUpdate struct {
+			Success bool `json:"success"`
+		} `json:"issueUpdate"`
+	}
+	const update = `mutation($id: String!, $parent: String!) { issueUpdate(id: $id, input: {parentId: $parent}) { success } }`
+	if err := l.query(ctx, update, map[string]any{"id": identifier, "parent": parent.ID}, &out); err != nil {
+		return err
+	}
+	if !out.IssueUpdate.Success {
+		return refused("move", identifier)
+	}
+	return nil
+}
+
+const blockersQuery = `query($id: String!) { issue(id: $id) { id inverseRelations(first: 50) { nodes { id type issue { identifier } } } } }`
+
+// SetBlockedBy says that identifier is blocked by blocker, or with blocked false that it is not.
+// A block that is there already, or one to take off that is not, is not an error.
+func (l *RealLinear) SetBlockedBy(ctx context.Context, identifier, blocker string, blocked bool) error {
+	var out struct {
+		Issue *struct {
+			ID               string `json:"id"`
+			InverseRelations struct {
+				Nodes []struct {
+					ID    string `json:"id"`
+					Type  string `json:"type"`
+					Issue *struct {
+						Identifier string `json:"identifier"`
+					} `json:"issue"`
+				} `json:"nodes"`
+			} `json:"inverseRelations"`
+		} `json:"issue"`
+	}
+	if err := l.ask(ctx, blockersQuery, map[string]any{"id": identifier}, &out, false); err != nil {
+		return err
+	}
+	if out.Issue == nil {
+		return &LinearError{Kind: NotFound, Message: fmt.Sprintf("Linear issue %s was not found", identifier)}
+	}
+	relation := ""
+	for _, n := range out.Issue.InverseRelations.Nodes {
+		if n.Type == "blocks" && n.Issue != nil && strings.EqualFold(n.Issue.Identifier, blocker) {
+			relation = n.ID
+		}
+	}
+	var done map[string]struct {
+		Success bool `json:"success"`
+	}
+	if blocked == (relation != "") {
+		return nil
+	}
+	if blocked {
+		by, err := l.issueRef(ctx, blocker)
+		if err != nil {
+			return err
+		}
+		const create = `mutation($blocker: String!, $blocked: String!) {
+  issueRelationCreate(input: {issueId: $blocker, relatedIssueId: $blocked, type: blocks}) { success } }`
+		if err := l.query(ctx, create, map[string]any{"blocker": by.ID, "blocked": out.Issue.ID}, &done); err != nil {
+			return err
+		}
+		if !done["issueRelationCreate"].Success {
+			return refused("block", identifier)
+		}
+		return nil
+	}
+	const remove = `mutation($id: String!) { issueRelationDelete(id: $id) { success } }`
+	if err := l.query(ctx, remove, map[string]any{"id": relation}, &done); err != nil {
+		return err
+	}
+	if !done["issueRelationDelete"].Success {
+		return refused("unblock", identifier)
+	}
+	return nil
+}

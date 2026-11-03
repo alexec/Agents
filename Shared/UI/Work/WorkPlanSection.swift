@@ -7,27 +7,37 @@ import SwiftUI
 /// `lineage/cost`); a
 /// header with the lead, the children done and running, and the total cost; and **Start lead**
 /// (the `lead` skill's form, in the epic's folder) or **Open lead**. A row opens its issue's page.
+/// Where the machine writes to the forge, the plan changes here too (#3271): **Add child** (a new
+/// issue, or one that is there) under the steps, and each row's **Blocked by** menu of the other
+/// children; `wrote` reads the page again.
 struct WorkPlanSection: View {
     let model: any WorkModel
     let host: MachineRef
     let lineageHost: MachineRef?
     let detail: DaemonAPI.ForgeItemDetail
     let asked: Int
+    let writes: Bool
+    let wrote: () -> Void
 
     @State private var plan: DaemonAPI.ForgePlan?
     @State private var problem: String?
     @State private var rollups: [DaemonAPI.LineageNode: DaemonAPI.LineageCostRollup] = [:]
     @State private var links: [DaemonAPI.LineageNode: [DaemonAPI.LineageLink]] = [:]
-    @State private var said: String?
+    @State private var said: (words: String, failed: Bool)?
+    @State private var newChild = ""
+    @State private var level = "task"
+    @State private var busy = false
+    @State private var changed = 0
 
     private struct Ask: Equatable {
         var node: DaemonAPI.LineageNode
         var host: MachineRef
         var lineageHost: MachineRef?
         var asked: Int
+        var changed: Int
     }
 
-    private var ask: Ask { Ask(node: detail.item.node, host: host, lineageHost: lineageHost, asked: asked) }
+    private var ask: Ask { Ask(node: detail.item.node, host: host, lineageHost: lineageHost, asked: asked, changed: changed) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -40,6 +50,7 @@ struct WorkPlanSection: View {
                 } else {
                     steps(plan)
                 }
+                if writes, plan.item.state == "open" { addChild }
             } else if let problem {
                 Label(problem, systemImage: "exclamationmark.triangle").foregroundStyle(.secondary)
             } else {
@@ -76,18 +87,20 @@ struct WorkPlanSection: View {
             }
         }
         if let said {
-            Text(said).appText(.supporting).foregroundStyle(StateTint.failure.style(or: .secondary))
+            Text(said.words).appText(.supporting)
+                .foregroundStyle((said.failed ? StateTint.failure : .none).style(or: .secondary))
+                .textSelection(.enabled)
         }
     }
 
     private func startLead(_ start: DaemonAPI.ForgeStart) {
         guard let folder = detail.item.folder else {
-            said = "No folder on this machine is on this issue's repo."
+            said = ("No folder on this machine is on this issue's repo.", true)
             return
         }
         let lead = WorkPlan.leadStart(start, url: detail.item.url)
         let offer = AppViewStart(prompt: lead.prompt, labels: lead.labels, worktree: lead.worktree)
-        said = model.offerStart(offer, in: FolderKey(host: host, folder: URL(fileURLWithPath: folder)))
+        said = model.offerStart(offer, in: FolderKey(host: host, folder: URL(fileURLWithPath: folder))).map { ($0, true) }
     }
 
     // MARK: Steps
@@ -102,7 +115,10 @@ struct WorkPlanSection: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(.quaternary.opacity(0.5))
                 ForEach(plan.children.filter { $0.step == step.step }, id: \.item.node) { child in
-                    row(child)
+                    HStack(spacing: 0) {
+                        row(child)
+                        if writes, plan.children.count > 1 { blockedByMenu(child, in: plan) }
+                    }
                 }
             }
         }
@@ -145,6 +161,77 @@ struct WorkPlanSection: View {
         .help("Open \(WorkList.shortRef(child.item.node.ref))'s page")
     }
 
+    // MARK: Changing the plan (#3271)
+
+    /// A child's Blocked by: the plan's other children, a tick on each that blocks it now.
+    private func blockedByMenu(_ child: DaemonAPI.ForgePlanChild, in plan: DaemonAPI.ForgePlan) -> some View {
+        Menu {
+            Section("Blocked by") {
+                ForEach(WorkPlan.blockerChoices(child, in: plan), id: \.child.item.node) { choice in
+                    Toggle("\(WorkList.shortRef(choice.child.item.node.ref)) \(choice.child.item.title)",
+                           isOn: Binding(get: { choice.on }, set: { on in
+                               write(DaemonAPI.Method.forgeBlockedBy, WorkPlan.blockedBy(child, choice.child.item.node, on: on))
+                           }))
+                }
+            }
+        } label: {
+            Text("Blocked by").appText(.supporting)
+        }
+        .menuStyle(.button)
+        .buttonStyle(.borderless)
+        .fixedSize()
+        .padding(.trailing, 10)
+        .disabled(busy)
+        .help("Blocked by: which children \(WorkList.shortRef(child.item.node.ref)) waits for")
+    }
+
+    /// Add child: a new issue's title with its level, or #12 / ENG-4 for one that is there.
+    private var addChild: some View {
+        let names = WorkPlan.namesIssue(newChild)
+        return HStack(spacing: 8) {
+            TextField("New child's title, or #12 for an issue that is there", text: $newChild)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit(add)
+                .accessibilityLabel("Child")
+            Picker("Level", selection: $level) {
+                ForEach(WorkPlan.childLevels, id: \.self) { level in
+                    Text(level.isEmpty ? "No level" : level.capitalized).tag(level)
+                }
+            }
+            .labelsHidden()
+            .fixedSize()
+            .disabled(names)
+            .help(names ? "An issue that is there keeps its labels" : "The new child's level")
+            Button("Add child", action: add)
+                .disabled(busy || newChild.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .help(names ? "Make this issue a child of the epic" : "Open a new issue as a child of the epic, in its feature")
+            if busy { ProgressView().controlSize(.small) }
+        }
+    }
+
+    private func add() {
+        guard !newChild.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        write(DaemonAPI.Method.forgeAddChild, WorkPlan.addChild(detail.item.node, words: newChild, level: level)) {
+            newChild = ""
+        }
+    }
+
+    private func write(_ method: String, _ params: some Encodable & Sendable, then: @escaping () -> Void = {}) {
+        Task {
+            busy = true
+            defer { busy = false }
+            do {
+                let done = try await model.forge(method, params, returning: DaemonAPI.ForgeDone.self, on: host)
+                then()
+                changed += 1
+                said = (WorkList.doneWords(method, done), false)
+                wrote()
+            } catch {
+                said = (error.localizedDescription, true)
+            }
+        }
+    }
+
     private func tint(_ mark: WorkPlan.Mark) -> AnyShapeStyle {
         switch mark {
         case .done: return StateTint.vouched.style(or: .secondary)
@@ -159,7 +246,7 @@ struct WorkPlanSection: View {
     private func load() async {
         let mine = ask
         problem = nil
-        said = nil
+        if mine.changed == 0 { said = nil }
         let got: DaemonAPI.ForgePlan
         do {
             got = try await model.forge(DaemonAPI.Method.forgePlan, DaemonAPI.ForgePlanRequest(node: mine.node),

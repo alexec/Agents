@@ -3,8 +3,8 @@
 // lineage/walk and lineage/cost) and its cost; a header with the lead, the children done and running,
 // and the total cost; and the new-session form that Start lead fills in.
 import type {
-  AgentState, ForgeItem, ForgeLead, ForgePlan, ForgePlanChild, ForgePlanStep, ForgeStart, LineageCost, LineageCostNode,
-  LineageCostRollup, LineageLink, LineageNode,
+  AgentState, ForgeAddChildRequest, ForgeBlockedByRequest, ForgeItem, ForgeLead, ForgePlan, ForgePlanChild, ForgePlanStep, ForgeStart,
+  LineageCost, LineageCostNode, LineageCostRollup, LineageLink, LineageNode,
 } from "../protocol/generated";
 import { costWords, spent } from "./value";
 import { shortRef } from "./work";
@@ -130,3 +130,29 @@ export function leadStart(start: ForgeStart, url: string | undefined): ForgeStar
     labels: [...start.labels, ...start.labels.includes("lead") ? [] : ["lead"]],
   };
 }
+
+// Changing the plan (#3271).
+
+/** The levels a new child can have, as Add child's menu offers them; "" is none. */
+export const childLevels = ["story", "task", "spike", "bug", ""];
+
+/** Whether Add child's words name an issue that is there, not a new one's title: #12,
+ * owner/repo#12, an issue's URL, or a key such as ENG-4. */
+export const namesIssue = (words: string) =>
+  /^([\w.-]+\/[\w.-]+)?#[0-9]+$|^https?:\/\/\S+$|^[A-Za-z][A-Za-z0-9]{0,9}-[0-9]+$/.test(words.trim());
+
+/** Add child's request: the issue the words name, or a new child with them as its title. */
+export function addChildRequest(epic: LineageNode, words: string, level: string): ForgeAddChildRequest {
+  const text = words.trim();
+  if (namesIssue(text)) return { node: epic, issue: text };
+  return { node: epic, title: text, ...level ? { level } : {} };
+}
+
+/** The children a child can be blocked by: the plan's others, each with whether it is now. */
+export const blockerChoices = (child: ForgePlanChild, plan: ForgePlan) => plan.children
+  .filter((c) => c.item.node.ref !== child.item.node.ref)
+  .map((c) => ({ child: c, on: child.blockedBy.some((b) => b.ref === c.item.node.ref) }));
+
+/** Blocked by's request: the other child added as a blocker, or taken off. */
+export const blockedByRequest = (child: ForgePlanChild, blocker: LineageNode, on: boolean): ForgeBlockedByRequest =>
+  on ? { node: child.item.node, add: [blocker] } : { node: child.item.node, remove: [blocker] };

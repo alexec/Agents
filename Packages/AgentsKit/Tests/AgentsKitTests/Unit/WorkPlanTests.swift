@@ -117,4 +117,31 @@ struct WorkPlanTests {
         #expect(lead.labels == ["#3100", "lead"])
         #expect(lead.worktree == nil)
     }
+
+    // MARK: Changing the plan (#3271)
+
+    @Test func addChildNamesAnIssueThereOrOpensANewOne() {
+        for there in ["#12", " alexec/Agents#12 ", "https://github.com/alexec/Agents/issues/12", "ENG-4"] {
+            #expect(WorkPlan.namesIssue(there), "\(there)")
+            #expect(WorkPlan.addChild(issue(1), words: there, level: "task") ==
+                .init(node: issue(1), issue: there.trimmingCharacters(in: .whitespaces)))
+        }
+        for title in ["Retire the rows", "Fix #12 in the list", "ENG-4 follow-up"] {
+            #expect(!WorkPlan.namesIssue(title), "\(title)")
+        }
+        #expect(WorkPlan.addChild(issue(1), words: " Retire the rows ", level: "story") ==
+            .init(node: issue(1), title: "Retire the rows", level: "story"))
+        #expect(WorkPlan.addChild(issue(1), words: "Retire", level: "").level == nil)
+    }
+
+    @Test func blockedByOffersTheOtherChildrenWithATickOnTheBlockers() {
+        let fourth = child(4, step: 2, blockedBy: [2])
+        let plan = DaemonAPI.ForgePlan(item: .init(node: issue(1), title: "Epic", state: "open", updatedAt: day),
+                                       children: [child(2, step: 1), child(3, step: 1), fourth], steps: [])
+        let choices = WorkPlan.blockerChoices(fourth, in: plan)
+        #expect(choices.map(\.child.item.node) == [issue(2), issue(3)])
+        #expect(choices.map(\.on) == [true, false])
+        #expect(WorkPlan.blockedBy(fourth, issue(3), on: true) == .init(node: issue(4), add: [issue(3)]))
+        #expect(WorkPlan.blockedBy(fourth, issue(2), on: false) == .init(node: issue(4), remove: [issue(2)]))
+    }
 }
