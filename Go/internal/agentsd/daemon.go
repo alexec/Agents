@@ -58,6 +58,7 @@ type Daemon struct {
 	eventWaitState
 	messageState
 	helperQueueState
+	headlessSignInState
 	costBook
 	featureBook
 	workflowBook

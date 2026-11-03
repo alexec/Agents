@@ -154,6 +154,43 @@ export function accountState(account: AccountProfile): string {
 
 // The words of an added account (#840) on every client: AccountWords on the Mac and the Remote.
 
+// Signing a server's Claude or Codex in from the page (#3349): RuntimeSignInWords on the Mac.
+
+/** Whether a runtime's row offers Sign In… on its machine: Claude or Codex on a server, not signed in there. */
+export function offersMachineSignIn(status: RuntimeStatus): boolean {
+  return status.signIn !== undefined && !status.signIn.signedIn && !status.signIn.relayed;
+}
+
+/** The line under a server's Claude or Codex: whether it is signed in on the machine. */
+export function machineSignInLine(status: RuntimeStatus): string | undefined {
+  const signIn = status.signIn;
+  if (!signIn) return undefined;
+  if (signIn.signedIn) return "Signed in on this machine";
+  return signIn.relayed ? "Uses the Mac’s sign-in" : "Not signed in on this machine";
+}
+
+/** The words of the sheet that signs a runtime in on a machine with no browser. */
+export const machineSignInWords = {
+  title: (runtime: string, machine: string) => `Sign In to ${runtime} on ${machine}`,
+  asking: (runtime: string) => `Asking ${runtime} for a link…`,
+  openLink: "Open this link, and sign in to your account:",
+  open: "Open Link",
+  copyLink: "Copy Link",
+  pasteCode: "Then paste the code the page gives:",
+  typeCode: "Then type this code on the page:",
+  codexNote: "If OpenAI does not take the code, turn on device code sign-in in ChatGPT’s security settings.",
+  codeLabel: "Code",
+  useKey: "Use an API Key Instead",
+  useAccount: "Sign In to an Account Instead",
+  keyLabel: "API key",
+  keyNote: (runtimeID: string) => runtimeID === "claude"
+    ? "An Anthropic API key, or a token that claude setup-token made on another computer. It is kept on the machine."
+    : "An OpenAI API key. Codex keeps it on the machine.",
+  signIn: "Sign In",
+  done: "Done",
+  signingIn: "Signing in…",
+} as const;
+
 /** Where an added account is signed in: the Mac's Runtimes page (#2255). */
 export const signInOnTheMac = "Sign it in on the Mac, in Runtimes.";
 

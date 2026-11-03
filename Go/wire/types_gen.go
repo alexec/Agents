@@ -9187,6 +9187,45 @@ type RuntimeSession struct {
 	IsHeld *bool `json:"isHeld,omitzero"`
 }
 
+// Whether a runtime is signed in on the machine itself (#3349), for one a client signs in there with no browser on the machine: Claude and Codex on a server. Absent on a Mac, which signs its runtimes in in Runtimes.
+type RuntimeSignIn struct {
+	SignedIn bool `json:"signedIn"`
+
+	// A Mac lends it its own sign-in (056), so it runs without one of its own.
+	Relayed *bool `json:"relayed,omitzero"`
+}
+
+// The end of a sign-in runtimes/signInStart began (#3349): the code the sign-in page gave, when the step wants one, or cancel to stop it.
+type RuntimeSignInFinish struct {
+	SignInID string `json:"signInID"`
+
+	Code *string `json:"code,omitzero"`
+
+	Cancel *bool `json:"cancel,omitzero"`
+}
+
+// An API key to sign a runtime in with on the machine (#3349), when there is no account to sign in to.
+type RuntimeSignInKey struct {
+	RuntimeID string `json:"runtimeID"`
+
+	Key string `json:"key"`
+}
+
+// What the person does to sign a runtime in on a machine with no browser (#3349): open url in a browser of their own, then type userCode there (Codex), or paste back the code the page gives (wantsCode, Claude).
+type RuntimeSignInStep struct {
+	SignInID string `json:"signInID"`
+
+	RuntimeID string `json:"runtimeID"`
+
+	URL URL `json:"url"`
+
+	// The code to type on the page at url.
+	UserCode *string `json:"userCode,omitzero"`
+
+	// The page gives a code to paste back with runtimes/signInFinish.
+	WantsCode bool `json:"wantsCode"`
+}
+
 type RuntimeStatus struct {
 	Runtime Runtime `json:"runtime"`
 
@@ -9202,6 +9241,8 @@ type RuntimeStatus struct {
 
 	// Set when the organisation's policy does not allow this runtime here (#998, FR-010).
 	SetBy *PolicySetBy `json:"setBy,omitzero"`
+
+	SignIn *RuntimeSignIn `json:"signIn,omitzero"`
 }
 
 // A SCIM user's email (RFC 7643 §4.1.2), to show only: never a sign-in.

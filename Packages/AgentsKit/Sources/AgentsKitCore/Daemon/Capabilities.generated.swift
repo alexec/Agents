@@ -119,6 +119,7 @@ public enum Capability {
     public static let retention1 = "retention/1"
     public static let runtime1 = "runtime/1"
     public static let runtimesAccounts1 = "runtimes.accounts/1"
+    public static let runtimesSignIn1 = "runtimes.sign-in/1"
     public static let runtimes1 = "runtimes/1"
     public static let sandbox1 = "sandbox/1"
     public static let sessionsElsewhere1 = "sessions.elsewhere/1"
@@ -398,6 +399,9 @@ public enum Capability {
         "runtimes/removeAccount": "runtimes.accounts/1",
         "runtimes/setDefaultAccount": "host.org-routes/1",
         "runtimes/setProvider": "runtimes/1",
+        "runtimes/signInFinish": "runtimes.sign-in/1",
+        "runtimes/signInKey": "runtimes.sign-in/1",
+        "runtimes/signInStart": "runtimes.sign-in/1",
         "sandbox/set": "sandbox/1",
         "sandbox/state": "sandbox/1",
         "selfUpdate/set": "host.update/1",

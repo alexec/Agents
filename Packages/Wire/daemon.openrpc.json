@@ -6768,6 +6768,81 @@
       }
     },
     {
+      "name": "runtimes/signInFinish",
+      "x-capability": "runtimes.sign-in/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/RuntimeSignInFinish"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/RuntimeStatus"
+        }
+      }
+    },
+    {
+      "name": "runtimes/signInKey",
+      "x-capability": "runtimes.sign-in/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/RuntimeSignInKey"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/RuntimeStatus"
+        }
+      }
+    },
+    {
+      "name": "runtimes/signInStart",
+      "x-capability": "runtimes.sign-in/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/RuntimeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/RuntimeSignInStep"
+        }
+      }
+    },
+    {
       "name": "sandbox/changed",
       "x-capability": "sandbox/1",
       "x-notification": true,
