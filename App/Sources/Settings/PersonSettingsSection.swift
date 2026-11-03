@@ -10,8 +10,8 @@ import SwiftUI
 /// Saved on Return or on leaving the field, not per keystroke: each save goes to every
 /// server too.
 ///
-/// A second section (#2951) keeps the person's GitHub, GitLab and Linear logins: named on
-/// the Pull requests, Merge requests and Issues pages' Team section, and used to say an
+/// A second section (#2951) keeps the person's GitHub, GitLab, Linear and Jira (#3313)
+/// logins: named on the Pull requests, Merge requests and Issues pages' Team section, and used to say an
 /// agent is on one of the viewer's own rows. Filled in from this Mac's own connection
 /// (Activity ▸ Connectors) when it is signed in; given here only when it is not. Shown only
 /// with a control plane, which keeps them, and a save that fails says so (#3160).
@@ -22,13 +22,15 @@ struct PersonSettingsSection: View {
     @State private var github = ""
     @State private var gitlab = ""
     @State private var linear = ""
-    @State private var connectionLogins: [DaemonAPI.ConnectionProvider: String] = [:]
+    @State private var jira = ""
+    /// By provider: the Atlassian connection (#3304) is a provider this build may not know.
+    @State private var connectionLogins: [String: String] = [:]
     /// False until loadLogins answers, so a save before then cannot clear what is kept.
     @State private var loginsLoaded = false
     @State private var loginsNotSaved = false
     @FocusState private var focused: Field?
 
-    private enum Field { case name, pronouns, github, gitlab, linear }
+    private enum Field { case name, pronouns, github, gitlab, linear, jira }
 
     /// What a blank name gives: the first word of this Mac account's full name.
     private var accountName: String { PersonSettings().effectiveName() }
@@ -56,17 +58,20 @@ struct PersonSettingsSection: View {
 
             if model.controlRequests != nil {
                 Section {
-                    TextField("GitHub login", text: $github, prompt: Text(connectionLogins[.github] ?? "Not given"))
+                    TextField("GitHub login", text: $github, prompt: Text(connectionLogins["github"] ?? "Not given"))
                         .focused($focused, equals: .github)
                         .onSubmit(saveLogins)
-                    TextField("GitLab login", text: $gitlab, prompt: Text(connectionLogins[.gitlab] ?? "Not given"))
+                    TextField("GitLab login", text: $gitlab, prompt: Text(connectionLogins["gitlab"] ?? "Not given"))
                         .focused($focused, equals: .gitlab)
                         .onSubmit(saveLogins)
-                    TextField("Linear login", text: $linear, prompt: Text(connectionLogins[.linear] ?? "Not given"))
+                    TextField("Linear login", text: $linear, prompt: Text(connectionLogins["linear"] ?? "Not given"))
                         .focused($focused, equals: .linear)
                         .onSubmit(saveLogins)
+                    TextField("Jira login", text: $jira, prompt: Text(connectionLogins["atlassian"] ?? "Not given"))
+                        .focused($focused, equals: .jira)
+                        .onSubmit(saveLogins)
                 } header: {
-                    Text("GitHub, GitLab and Linear")
+                    Text("GitHub, GitLab, Linear and Jira")
                 } footer: {
                     VStack(alignment: .leading, spacing: 4) {
                         if loginsNotSaved {
@@ -74,7 +79,7 @@ struct PersonSettingsSection: View {
                                 .appText(.fine)
                                 .tinted(.failure)
                         }
-                        Text("Named on the Pull requests, Merge requests and Issues pages’ Team section, and used to say an agent is on one of your own. Filled in from this Mac’s own connection (Activity ▸ Connectors) when it is signed in; given here only when it is not.")
+                        Text("Named on the Pull requests, Merge requests and Issues pages’ Team section, and used to say an agent is on one of your own. Filled in from this Mac’s own connection (Activity ▸ Connectors) when it is signed in; given here only when it is not. A Jira login is your Atlassian account’s email, account id or display name.")
                             .appText(.fine)
                             .foregroundStyle(.secondary)
                     }
@@ -97,7 +102,7 @@ struct PersonSettingsSection: View {
         Task { await model.setPerson(next) }
     }
 
-    /// The control plane's own answer for "me" (#2951), to fill the three fields.
+    /// The control plane's own answer for "me" (#2951), to fill the four fields.
     private func loadLogins() async {
         guard let control = model.controlRequests,
               let list = try? await control.call(DaemonAPI.Method.peopleForViews, DaemonAPI.Empty(),
@@ -107,6 +112,7 @@ struct PersonSettingsSection: View {
         github = me.githubLogin ?? ""
         gitlab = me.gitlabLogin ?? ""
         linear = me.linearLogin ?? ""
+        jira = me.jiraLogin ?? ""
     }
 
     /// This Mac's own connections (#2951), for the fields' placeholders.
@@ -114,14 +120,15 @@ struct PersonSettingsSection: View {
         guard case .success(let list) = await model.connections(on: .mac) else { return }
         for c in list {
             if let login = c.login, !login.isEmpty {
-                connectionLogins[c.provider] = login
+                connectionLogins[c.provider.rawValue] = login
             }
         }
     }
 
     private func saveLogins() {
         guard loginsLoaded, let control = model.controlRequests else { return }
-        let logins = DaemonAPI.ForgeLogins(github: Self.kept(github) ?? "", gitlab: Self.kept(gitlab) ?? "", linear: Self.kept(linear) ?? "")
+        let logins = DaemonAPI.ForgeLogins(github: Self.kept(github) ?? "", gitlab: Self.kept(gitlab) ?? "", linear: Self.kept(linear) ?? "",
+                                             jira: Self.kept(jira) ?? "")
         Task {
             do {
                 _ = try await control.call(DaemonAPI.Method.peopleSetForgeLogins, logins)

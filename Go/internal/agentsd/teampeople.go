@@ -14,11 +14,11 @@ import (
 
 // The control plane's people, in a feeding tool's _meta (#2951, specs/2453-team-lists.md
 // part 4): callFromView and readViewCount give show_pull_requests, show_issues and
-// show_merge_requests the control plane's people and bots, with their GitHub, GitLab and
-// Linear logins and which is the viewer's own, so a row can be named as the control plane
-// knows the person, Team can be told from Others, and the viewer's own rows can say an
-// agent is on it. The github, gitlab and linear servers read it off the call; they make no
-// control-plane call of their own.
+// show_merge_requests the control plane's people and bots, with their GitHub, GitLab,
+// Linear and Jira logins and which is the viewer's own, so a row can be named as the control
+// plane knows the person, Team can be told from Others, and the viewer's own rows can say an
+// agent is on it. The github, gitlab, linear and jira servers read it off the call; they make
+// no control-plane call of their own.
 
 // teamFeedingTools are the github, gitlab, linear and jira servers' feeding tools that take the
 // control plane's people in their call's _meta (#2951).
@@ -104,6 +104,10 @@ func (d *Daemon) keepTeamPeople(ask *askControl, list []map[string]any) {
 	d.teamPeopleAsk, d.teamPeopleList, d.teamPeopleAt = ask, list, nowFunc()
 }
 
+// atlassianConnection is the Atlassian connection's provider (connections.Atlassian, #3304):
+// its login is the account's display name or email, a Jira login (#3313).
+const atlassianConnection = "atlassian"
+
 // teamPeople is people/forViews, with the viewer's own entry's blank forge logins filled
 // in from this machine's own connection, when it is signed in (#2951's open question).
 func (d *Daemon) teamPeople(ctx context.Context, ask *askControl) []map[string]any {
@@ -119,7 +123,7 @@ func (d *Daemon) teamPeople(ctx context.Context, ask *askControl) []map[string]a
 	out := make([]map[string]any, 0, len(list.People))
 	for _, p := range list.People {
 		you := p.You != nil && *p.You
-		github, gitlab, linear := optstr(p.GithubLogin), optstr(p.GitlabLogin), optstr(p.LinearLogin)
+		github, gitlab, linear, jira := optstr(p.GithubLogin), optstr(p.GitlabLogin), optstr(p.LinearLogin), optstr(p.JiraLogin)
 		if you && conns != nil {
 			if github == "" {
 				github = connectionLogin(conns, connections.GitHub)
@@ -129,6 +133,9 @@ func (d *Daemon) teamPeople(ctx context.Context, ask *askControl) []map[string]a
 			}
 			if linear == "" {
 				linear = connectionLogin(conns, connections.Linear)
+			}
+			if jira == "" {
+				jira = connectionLogin(conns, atlassianConnection)
 			}
 		}
 		row := map[string]any{"name": p.Name}
@@ -143,6 +150,9 @@ func (d *Daemon) teamPeople(ctx context.Context, ask *askControl) []map[string]a
 		}
 		if linear != "" {
 			row["linear"] = linear
+		}
+		if jira != "" {
+			row["jira"] = jira
 		}
 		if you {
 			row["you"] = true

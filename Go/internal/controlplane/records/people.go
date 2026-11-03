@@ -69,16 +69,18 @@ type Person struct {
 	Rev       int
 	Removed   *bool
 	RemovedAt *Stamp
-	// Their GitHub, GitLab and Linear logins (#2951), for the github, gitlab and linear
-	// servers' Team section and rows named as the control plane knows them. Set from a
-	// machine's own connection when it is signed in, or by hand in Settings ▸ You.
+	// Their GitHub, GitLab, Linear and Jira logins (#2951, #3313), for the github, gitlab,
+	// linear and jira servers' Team section and rows named as the control plane knows them.
+	// Set from a machine's own connection when it is signed in, or by hand in Settings ▸ You.
+	// A Jira login is the Atlassian account's email, account id or display name.
 	GitHubLogin string
 	GitLabLogin string
 	LinearLogin string
+	JiraLogin   string
 	Extra       Extra
 }
 
-// ForgeLogin is the person's login on that forge ("github", "gitlab" or "linear"), or "".
+// ForgeLogin is the person's login on that forge ("github", "gitlab", "linear" or "jira"), or "".
 func (p *Person) ForgeLogin(forge string) string {
 	switch forge {
 	case "github":
@@ -87,6 +89,8 @@ func (p *Person) ForgeLogin(forge string) string {
 		return p.GitLabLogin
 	case "linear":
 		return p.LinearLogin
+	case "jira":
+		return p.JiraLogin
 	}
 	return ""
 }
@@ -147,11 +151,13 @@ type personJSON struct {
 	GitHubLogin string      `json:"gitHubLogin,omitempty"`
 	GitLabLogin string      `json:"gitLabLogin,omitempty"`
 	LinearLogin string      `json:"linearLogin,omitempty"`
+	JiraLogin   string      `json:"jiraLogin,omitempty"`
 }
 
 func (p Person) MarshalJSON() ([]byte, error) {
 	return encodeKeeping(personJSON{p.ID, p.Name, p.Kind, p.Role, p.SignIns, p.Group, p.Caps, p.SCIM, p.Provisioned, p.Suspended,
-		p.RoleFrom, p.RoleByHand, p.LastNames, p.Rev, p.Removed, p.RemovedAt, p.GitHubLogin, p.GitLabLogin, p.LinearLogin}, p.Extra)
+		p.RoleFrom, p.RoleByHand, p.LastNames, p.Rev, p.Removed, p.RemovedAt, p.GitHubLogin, p.GitLabLogin, p.LinearLogin,
+		p.JiraLogin}, p.Extra)
 }
 
 func (p *Person) UnmarshalJSON(data []byte) error {
@@ -161,7 +167,8 @@ func (p *Person) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*p = Person{j.ID, j.Name, j.Kind, j.Role, j.SignIns, j.Group, j.Caps, j.SCIM, j.Provisioned, j.Suspended, j.RoleFrom,
-		j.RoleByHand, j.LastNames, j.Rev, j.Removed, j.RemovedAt, j.GitHubLogin, j.GitLabLogin, j.LinearLogin, extra}
+		j.RoleByHand, j.LastNames, j.Rev, j.Removed, j.RemovedAt, j.GitHubLogin, j.GitLabLogin, j.LinearLogin,
+		j.JiraLogin, extra}
 	return nil
 }
 

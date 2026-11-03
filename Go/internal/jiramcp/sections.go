@@ -20,8 +20,7 @@ const (
 // issueSection is an issue's section. Jira has no review, so Needs you is assigned to the
 // viewer only. With no control-plane people (#2951), Team is the site's users and its apps;
 // Others is customers and an issue with no creator. With control-plane people, Team is the
-// people and bots on this control plane instead, by their Jira email (the control plane
-// keeps no Jira login yet, so that is none until it does).
+// people and bots on this control plane instead, by their Jira login (#3313).
 func issueSection(i Issue, viewer *Person, people teamMeta) string {
 	switch {
 	case viewer != nil && viewer.ID != "" && i.AssigneeID == viewer.ID:
@@ -33,7 +32,7 @@ func issueSection(i Issue, viewer *Person, people teamMeta) string {
 		if i.Creator == nil {
 			return sectionOthers
 		}
-		if _, on := people[strings.ToLower(i.Creator.Email)]; on {
+		if _, on := people.of(i.Creator); on {
 			return sectionTeam
 		}
 		return sectionOthers
@@ -44,7 +43,7 @@ func issueSection(i Issue, viewer *Person, people teamMeta) string {
 	return sectionOthers
 }
 
-// teamMeta is the control plane's people and bots, by Jira email lowercased (#2951): read
+// teamMeta is the control plane's people and bots, by Jira login lowercased (#2951, #3313): read
 // from the call's _meta, which the host fills in, so this server makes no control-plane
 // call of its own. Empty with no control plane, or an older host.
 type teamMeta map[string]teamPerson
@@ -78,6 +77,24 @@ func teamMetaOf(meta mcp.Meta, forge string) teamMeta {
 		out[strings.ToLower(login)] = teamPerson{Name: name, Bot: bot, You: you}
 	}
 	return out
+}
+
+// of is the control-plane person who is p (#3313). A Jira login is the Atlassian account's
+// email, account id or display name, and Jira Cloud often hides the email, so any of the
+// three matches.
+func (t teamMeta) of(p *Person) (teamPerson, bool) {
+	if p == nil {
+		return teamPerson{}, false
+	}
+	for _, login := range []string{p.Email, p.ID, p.Name} {
+		if login == "" {
+			continue
+		}
+		if tp, on := t[strings.ToLower(login)]; on {
+			return tp, true
+		}
+	}
+	return teamPerson{}, false
 }
 
 // agentOnOf reads _meta's agentOnJira (#2951): who is on that key (PROJ-4), or "".

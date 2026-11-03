@@ -3,10 +3,12 @@ package agentsd
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/connections"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -127,5 +129,27 @@ func TestTeamPeopleIsKept(t *testing.T) {
 	d.SetControlAsk(nil)
 	if list := d.cachedTeamPeople(context.Background()); list != nil {
 		t.Fatalf("no control plane: %+v", list)
+	}
+}
+
+// The viewer's own blank Jira login comes from this machine's Atlassian connection (#3313), as
+// a blank Linear login comes from its Linear one; another person's login is theirs as kept.
+func TestTeamPeopleFillsTheViewersJiraLoginFromTheAtlassianConnection(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	file := &connections.File{Path: filepath.Join(t.TempDir(), connections.FileName)}
+	d.connStoreFor = func() (connections.Store, error) { return file, nil }
+	file.Put(connections.Connection{Provider: atlassianConnection, Login: "Alex Collins", Access: "atl",
+		AccessExpiresAt: time.Now().Add(time.Hour), ConnectedAt: time.Now()})
+	you, sam := true, "sam@example.com"
+	ask := askControl(func(context.Context, string, any) (json.RawMessage, error) {
+		return json.Marshal(wire.PeopleForViews{People: []wire.TeamPerson{
+			{ID: "a", Name: "Alex", Kind: "person", You: &you},
+			{ID: "s", Name: "Sam", Kind: "person", JiraLogin: &sam},
+		}})
+	})
+	people := d.teamPeople(context.Background(), &ask)
+	if len(people) != 2 || people[0]["jira"] != "Alex Collins" || people[1]["jira"] != sam {
+		t.Fatalf("people: %+v", people)
 	}
 }

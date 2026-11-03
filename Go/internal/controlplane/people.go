@@ -225,6 +225,9 @@ func (m *Methods) peopleMethod(ctx context.Context, method string, params json.R
 			if request.Linear != nil {
 				p.LinearLogin = *request.Linear
 			}
+			if request.Jira != nil {
+				p.JiraLogin = *request.Jira
+			}
 			return []records.Person{p}, nil
 		})
 		if err != nil {
@@ -350,7 +353,7 @@ func (m *Methods) peopleList(user string, admin bool) wire.PeopleList {
 }
 
 // peopleForViews is people/forViews (#2951): every person and bot on this control plane,
-// open to a member as much as an admin, for the github, gitlab and linear servers' Team
+// open to a member as much as an admin, for the github, gitlab, linear and jira servers' Team
 // section and "An agent is on it". Narrower than peopleList: no role, clients or machines.
 func (m *Methods) peopleForViews(user string) wire.PeopleForViews {
 	people := m.records.People()
@@ -360,7 +363,8 @@ func (m *Methods) peopleForViews(user string) wire.PeopleForViews {
 	out := wire.PeopleForViews{People: []wire.TeamPerson{}}
 	for _, p := range people {
 		row := wire.TeamPerson{ID: p.ID, Name: p.Name, Kind: kindOf(p),
-			GithubLogin: optional(p.GitHubLogin), GitlabLogin: optional(p.GitLabLogin), LinearLogin: optional(p.LinearLogin)}
+			GithubLogin: optional(p.GitHubLogin), GitlabLogin: optional(p.GitLabLogin), LinearLogin: optional(p.LinearLogin),
+			JiraLogin: optional(p.JiraLogin)}
 		if p.ID == m.s.localOwner() && (row.Name == "" || (m.records.Settings() != nil && row.Name == m.records.Settings().Name)) {
 			row.Name = localOwnerName
 		}

@@ -149,12 +149,10 @@ func AddViews(server *mcp.Server, jira Views) {
 				j := l.json()
 				section := issueSection(l.Issue, viewer, people)
 				j["section"] = section
-				if l.Creator != nil {
-					if tp, on := people[strings.ToLower(l.Creator.Email)]; on {
-						j["authorName"] = tp.Name
-						if tp.Bot {
-							j["authorBot"] = true
-						}
+				if tp, on := people.of(l.Creator); on {
+					j["authorName"] = tp.Name
+					if tp.Bot {
+						j["authorBot"] = true
 					}
 				}
 				if section == sectionNeedsYou {
