@@ -232,6 +232,13 @@ func (cl commandLine) controlNetwork() bool { return cl.code != "" || cl.network
 // detach starts this host again in a session of its own, under its supervisor, told
 // everything but --detach, and returns at once (037: the ssh that asked can finish).
 func detach(loc store.Locations) {
+	// A host that holds the root already is left as it is (#3348): a second start, over
+	// ssh or by hand, would leave a supervisor starting a host that can't take the lock,
+	// again and again. One stopping (install.sh kills the old one first) is waited for.
+	if running(loc.Lock(), 5*time.Second) {
+		fmt.Println("agentsd is running already")
+		return
+	}
 	var args []string
 	for _, a := range os.Args[1:] {
 		if a != "--detach" {
@@ -247,6 +254,26 @@ func detach(loc store.Locations) {
 		log.Fatal(err)
 	}
 	fmt.Printf("agentsd started under its supervisor, pid %d\n", cmd.Process.Pid)
+}
+
+// running is whether another agentsd holds the lock file, after waiting up to patience
+// for it to let go.
+func running(file string, patience time.Duration) bool {
+	f, err := os.OpenFile(file, os.O_RDONLY, 0)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	for until := time.Now().Add(patience); ; {
+		if syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB) == nil {
+			syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+			return false
+		}
+		if time.Now().After(until) {
+			return true
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 }
 
 // takeLock is DaemonLock: an exclusive flock on daemon.lock, holding this pid, so two

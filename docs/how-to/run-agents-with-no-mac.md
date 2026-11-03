@@ -84,10 +84,21 @@ For another runtime, use that runtime's own sign-in in the terminal. See
 On the web page, add a folder on the codespace and start a session in it, as you would on
 a Mac. The runtime menu shows the runtimes on the codespace.
 
+### When the codespace stops and starts again
+
+A codespace has no systemd, so its host does not start by itself after a stop (an idle
+timeout, or **Stop**). When the codespace's machine is linked to a Codespaces machine
+provider, the control plane starts the host over ssh:
+
+- **Start** on the machine starts the codespace, then the host.
+- A codespace started from GitHub, not from Agents, has its host started when the control
+  plane next lists the provider's codespaces, within 5 minutes.
+
+A machine with no link to a provider (added with the command from **Add a Machine…** only)
+is not started. Run that command again in the codespace's terminal, with a new code.
+
 ## What is missing for now
 
-- **After the codespace stops and starts again, its host does not start.** Run the command
-  from **Add a Machine…** again in the codespace's terminal, with a new code.
 - **Add as Machine… on a codespace does not work** from a control plane in the cloud: it
   needs ssh and `gh`, and the control plane's image has neither. Use the command from
   **Add a Machine…**, as above.
