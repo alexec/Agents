@@ -180,6 +180,17 @@ public enum ConnectorSetupWords {
         public static func servers(_ names: [String]) -> String? {
             names.isEmpty ? nil : "Connectors: " + names.joined(separator: ", ")
         }
+
+        /// One docs connector's line (#3307): the first doc its one search found, or why not.
+        public static func serverLine(_ server: DaemonAPI.DocsServer) -> String {
+            let words: String = switch server.state {
+            case .read: server.proof.map { "found \u{201C}\($0.title)\u{201D}" } ?? "searched, and found no doc."
+            case .notRead: "searching\u{2026}"
+            case .noMap: "no map of its search yet. Ask an agent to map it (the map-a-docs-server skill)."
+            case .failed: server.message ?? "the search didn't work."
+            }
+            return "\(server.name): \(words)"
+        }
     }
 
     /// The proof's lead word: "Newest" or "Last run".

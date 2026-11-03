@@ -20,3 +20,14 @@ test("the Docs slot says what it read, and its connectors", () => {
 test("a project sets only the forge's slots", () => {
   assert.deepEqual(["tasks", "codeReview", "ci", "docs", "workspace"].filter(c.isProjects), ["tasks", "codeReview", "ci"]);
 });
+
+test("each docs connector says what its one search found (#3307)", () => {
+  const proof = { title: "Design of the docs slot", url: "https://kb.example.com/P1" };
+  assert.equal(c.docs.serverLine({ name: "kb", state: "read", proof }), "kb: found “Design of the docs slot”");
+  assert.equal(c.docs.serverLine({ name: "kb", state: "read" }), "kb: searched, and found no doc.");
+  assert.equal(c.docs.serverLine({ name: "kb", state: "notRead" }), "kb: searching…");
+  assert.equal(c.docs.serverLine({ name: "notion", state: "noMap" }),
+    "notion: no map of its search yet. Ask an agent to map it (the map-a-docs-server skill).");
+  assert.equal(c.docs.serverLine({ name: "kb", state: "failed", message: "Its map names kb_search, a tool it doesn't have." }),
+    "kb: Its map names kb_search, a tool it doesn't have.");
+});

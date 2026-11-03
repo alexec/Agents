@@ -23,6 +23,8 @@ const (
 	lineageViewTool = "agents_lineage"
 	// lineageViewSessions bounds the sessions one answer names.
 	lineageViewSessions = 100
+	// lineageViewDocs bounds the docs one answer names (#3308).
+	lineageViewDocs = 50
 )
 
 // lineageViewServers is the servers whose views may ask, by their mcpcatalog id.
@@ -38,8 +40,11 @@ type lineageView struct {
 	Waste    string               `json:"waste,omitempty"`
 	Sessions []lineageViewSession `json:"sessions"`
 	// PRs is an issue's pull requests; Issues is a pull request's issues.
-	PRs     []lineageViewNode `json:"prs"`
-	Issues  []lineageViewNode `json:"issues"`
+	PRs    []lineageViewNode `json:"prs"`
+	Issues []lineageViewNode `json:"issues"`
+	// Docs is the docs those sessions read or linked to (#3308): the requirement or design
+	// behind the work.
+	Docs    []lineageViewNode `json:"docs"`
 	Limited bool              `json:"limited,omitempty"`
 }
 
@@ -56,7 +61,7 @@ type lineageViewNode struct {
 	Ref  string `json:"ref"`
 	Name string `json:"name"`
 	URL  string `json:"url,omitempty"`
-	// Outcome is open, merged, closed or reverted (a pull request), or "" (an issue).
+	// Outcome is open, merged, closed or reverted (a pull request), or "" (an issue or a doc).
 	Outcome string `json:"outcome,omitempty"`
 	Waste   bool   `json:"waste,omitempty"`
 	Words   string `json:"words,omitempty"`
@@ -142,7 +147,7 @@ func (d *Daemon) lineageViewOf(node wire.LineageNode, base string) lineageView {
 	cost := d.lineageCost(node)
 	g := d.lineage().Walk(node, lineage.MostDepth)
 	v := lineageView{Ref: node.Ref, Sessions: []lineageViewSession{}, PRs: []lineageViewNode{}, Issues: []lineageViewNode{},
-		Limited: g.Limited != nil && *g.Limited}
+		Docs: []lineageViewNode{}, Limited: g.Limited != nil && *g.Limited}
 
 	parts := map[wire.LineageNode]wire.LineageCostNode{}
 	for _, p := range cost.Parts {
@@ -196,7 +201,12 @@ func (d *Daemon) lineageViewOf(node wire.LineageNode, base string) lineageView {
 		}
 	}
 
-	v.Summary = lineageViewSummary(node, len(seen), v.PRs)
+	v.Docs = lineageViewDocsOf(g.Links, seen, base)
+	if len(v.Docs) > lineageViewDocs {
+		v.Docs, v.Limited = v.Docs[:lineageViewDocs], true
+	}
+
+	v.Summary = lineageViewSummary(node, len(seen), v.PRs, len(v.Docs))
 	if !lineageCostZero(cost.Total) {
 		v.Total = lineageCostLine(cost.Total)
 	}
@@ -204,6 +214,34 @@ func (d *Daemon) lineageViewOf(node wire.LineageNode, base string) lineageView {
 		v.Waste = "Waste: " + lineageCostLine(cost.Waste)
 	}
 	return v
+}
+
+// lineageViewDocsOf is the docs that the sessions read or linked to, newest first, each with
+// "read by 2 sessions" or "linked by 1 session".
+func lineageViewDocsOf(links []wire.LineageLink, sessions map[wire.LineageNode]bool, base string) []lineageViewNode {
+	var order []wire.LineageNode
+	readers, read := map[wire.LineageNode]map[wire.LineageNode]bool{}, map[wire.LineageNode]bool{}
+	for _, l := range links {
+		if !sessions[l.From] || l.To.Kind != lineage.KindDoc || l.Rel != lineage.RelReads && l.Rel != lineage.RelLinksTo {
+			continue
+		}
+		if readers[l.To] == nil {
+			readers[l.To] = map[wire.LineageNode]bool{}
+			order = append(order, l.To)
+		}
+		readers[l.To][l.From] = true
+		read[l.To] = read[l.To] || l.Rel == lineage.RelReads
+	}
+	out := []lineageViewNode{}
+	for _, n := range order {
+		how := "linked by "
+		if read[n] {
+			how = "read by "
+		}
+		out = append(out, lineageViewNode{Ref: n.Ref, Name: docName(n.Ref), URL: docURL(n.Ref, base),
+			Words: how + plural(len(readers[n]), "session", "sessions")})
+	}
+	return out
 }
 
 // lineageHow is how a session's link l to the page's node, or to one of its pull requests, reads.
@@ -275,8 +313,8 @@ func (d *Daemon) lineageViewSessionOf(s wire.LineageNode, how string) lineageVie
 	return out
 }
 
-// lineageViewSummary is "3 sessions · 2 pull requests (1 merged, 1 waste)".
-func lineageViewSummary(node wire.LineageNode, sessions int, prs []lineageViewNode) string {
+// lineageViewSummary is "3 sessions · 2 pull requests (1 merged, 1 waste) · 2 docs".
+func lineageViewSummary(node wire.LineageNode, sessions int, prs []lineageViewNode, docs int) string {
 	if sessions == 0 && len(prs) == 0 {
 		return "No session has worked on it yet."
 	}
@@ -307,6 +345,9 @@ func lineageViewSummary(node wire.LineageNode, sessions int, prs []lineageViewNo
 			pr += " (" + strings.Join(ends, ", ") + ")"
 		}
 		words = append(words, pr)
+	}
+	if docs > 0 {
+		words = append(words, plural(docs, "doc", "docs"))
 	}
 	return strings.Join(words, " · ")
 }

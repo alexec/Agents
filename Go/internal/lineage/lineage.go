@@ -37,6 +37,8 @@ const (
 	KindMilestone   = "milestone"
 	KindWorkflow    = "workflow"
 	KindRelease     = "release"
+	// KindDoc is a doc behind the work (#3308): a file under specs/ or docs/, or a docs page.
+	KindDoc = "doc"
 
 	RelWorksOn   = "works-on"
 	RelOpens     = "opens"
@@ -47,6 +49,9 @@ const (
 	RelPartOf    = "part-of"
 	// RelShippedIn is a milestone shipped in a release (#3023).
 	RelShippedIn = "shipped-in"
+	// RelReads and RelLinksTo are a session that read a doc, or named it in what it said (#3308).
+	RelReads   = "reads"
+	RelLinksTo = "links-to"
 
 	SourceStart  = "start"
 	SourceBranch = "branch"
@@ -439,7 +444,11 @@ func (f *Files) Walk(n wire.LineageNode, depth int) wire.LineageGraph {
 					}
 					seen[other] = true
 					g.Nodes = append(g.Nodes, other)
-					next = append(next, other)
+					// A doc is a leaf (#3308): many sessions read the same one, and the walk
+					// does not go through it to their work.
+					if other.Kind != KindDoc {
+						next = append(next, other)
+					}
 				}
 				went[i] = true
 				g.Links = append(g.Links, l)

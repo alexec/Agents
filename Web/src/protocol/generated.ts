@@ -2054,6 +2054,12 @@ export interface ConnectorSlot {
    * the folder's or the person's mcp.json. Absent with none.
    */
   servers?: string[];
+  /**
+   * Docs only (#3307): each docs connector's own read, in the order of servers: one real search
+   * through the map an agent wrote of its tools (.agents/docs-maps.json), and the first doc it
+   * found. Absent with none.
+   */
+  docsServers?: DocsServer[];
 }
 
 /**
@@ -2636,6 +2642,29 @@ export interface DiskWorktree {
   bytes: number;
   partial: boolean;
 }
+
+/**
+ * One docs connector in the Docs slot (#3307): its name in mcp.json, and what its one real search
+ * found.
+ */
+export interface DocsServer {
+  name: string;
+  state: DocsServerState;
+  /** The first doc the search found. Absent when it found none, or did not search. */
+  proof?: ConnectorProof;
+  /** failed: why, in a sentence. */
+  message?: string;
+}
+
+/**
+ * noMap: no agent has written a map of its search and read tools yet. notRead: mapped, not searched
+ * yet. read: its one search worked. failed: the search did not work; message says why.
+ */
+export type DocsServerState =
+  | "noMap"
+  | "notRead"
+  | "read"
+  | "failed";
 
 /**
  * A claimed email domain (#1002, D8, FR-010): proved by the TXT record `txtValue` at `txtName`, for
@@ -10638,7 +10667,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConnectorSetup: { required: ["folder", "slots", "events", "done"], optional: ["repository", "forge", "site", "repositoryURL", "connection", "installed", "installURL", "repositories", "project", "projectName"] },
   ConnectorSetupRequest: { required: ["folder"], optional: ["reading"] },
   ConnectorSkipRequest: { required: ["folder", "slot", "skipped"], optional: [] },
-  ConnectorSlot: { required: ["slot", "choice", "state"], optional: ["proof", "readAt", "message", "repository", "fromProject", "servers"] },
+  ConnectorSlot: { required: ["slot", "choice", "state"], optional: ["proof", "readAt", "message", "repository", "fromProject", "servers", "docsServers"] },
   ConnectorWorkflow: { required: ["id", "name"], optional: [] },
   ConsoleStopAgent: { required: ["host", "agent"], optional: [] },
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
@@ -10692,6 +10721,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DiskState: { required: ["alarms"], optional: [] },
   DiskThresholds: { required: [], optional: ["lowGB", "lowPercent", "criticalGB"] },
   DiskWorktree: { required: ["name", "bytes", "partial"], optional: [] },
+  DocsServer: { required: ["name", "state"], optional: ["proof", "message"] },
   DomainClaim: { required: ["domain", "provider", "state", "txtName", "txtValue", "sendHere", "require"], optional: ["lastGood", "failingSince", "claimed"] },
   DraftCheck: { required: ["passed"], optional: ["workspaces", "problem", "ssh", "noSSH"] },
   DraftOptionsNotification: { required: ["draftID", "options", "commands"], optional: ["failure"] },

@@ -105,6 +105,9 @@ lead, oldest first. This keeps the sidebar to a fixed depth however deep the cha
   the Delete key, archives its live children as well.
 - **Stop All** is in a parent's menu while it or a session under it can stop. It stops
   them all.
+- **A lead shows its epic's progress** after its title (#3270): a session labelled `lead`
+  that works on an epic (its `#<epic>` label) shows how many of the epic's children are
+  closed, such as `Work pages lead · 5/7`. It is asked again each time the lead wakes.
 
 ## Read and unread
 

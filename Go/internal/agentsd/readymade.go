@@ -29,6 +29,24 @@ func readyMadeIDs() []string {
 	return ids
 }
 
+// Ready-made skills with no workflow (#3307) are copied to the person's skills once, as a
+// ready-made workflow's skill is: map-a-docs-server, which any agent follows when asked.
+//
+//go:embed readymadeskills
+var readyMadeSkillsFS embed.FS
+
+// readyMadeSkillIDs is every ready-made skill with no workflow, by id.
+func readyMadeSkillIDs() []string {
+	entries, _ := readyMadeSkillsFS.ReadDir("readymadeskills")
+	var ids []string
+	for _, e := range entries {
+		if e.IsDir() {
+			ids = append(ids, e.Name())
+		}
+	}
+	return ids
+}
+
 func readyMadeText(id string) (workflow, skill string) {
 	w, _ := readyMadeFS.ReadFile("readymade/" + id + "/workflow.md")
 	s, _ := readyMadeFS.ReadFile("readymade/" + id + "/SKILL.md")
@@ -123,6 +141,16 @@ func (d *Daemon) ensureReadyMadeUserWorkflowsLocked() {
 	wasRemoved := map[string]bool{}
 	for _, id := range removed {
 		wasRemoved[id] = true
+	}
+	for _, id := range readyMadeSkillIDs() {
+		skillPath := filepath.Join(home, ".agents", "skills", id, "SKILL.md")
+		if !ownFolders(home, filepath.Join(".agents", "skills", id)) {
+			continue
+		}
+		if _, err := os.Lstat(skillPath); os.IsNotExist(err) && os.MkdirAll(filepath.Dir(skillPath), 0o755) == nil {
+			skill, _ := readyMadeSkillsFS.ReadFile("readymadeskills/" + id + "/SKILL.md")
+			_ = store.WriteAtomically(skillPath, skill, 0o644)
+		}
 	}
 	for _, id := range readyMadeIDs() {
 		if wasRemoved[id] {

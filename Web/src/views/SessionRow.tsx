@@ -21,6 +21,7 @@ import { labelClass } from "../model/labels";
 import { runningTool, runningToolLabel, sessionMark, type SessionMark } from "../model/sidebar";
 import { isMuted, muteMark, mutedHelp, mutedWords } from "../model/mute";
 import { callLine } from "../model/turns";
+import { leadProgressSpoken } from "../model/leadProgress";
 
 const glyphs: Record<StatusShape, string> = { working: "", needsYou: "!", waiting: "", done: "✓", stopped: "■" };
 
@@ -130,6 +131,8 @@ export interface RowExtras {
   said?: string | null;
   /** The first question this session is waiting for an answer to (#1324). */
   question?: string | null;
+  /** A lead's epic progress after its title (#3270), "5/7". */
+  progress?: string | null;
 }
 
 /** A row's extras, read from the store: only what this agent names is looked up. */
@@ -158,6 +161,7 @@ export function rowExtras(store: Store, host: string, agent: Agent): RowExtras {
     queued: agent.state === "queued" ? queuedLine(agent, store.folderAgents(host, folderPath(agent))) : null,
     said: store.saidLines.value[agent.id] ?? null,
     question: question ?? null,
+    progress: store.leadProgressOf(host, agent) ?? null,
   };
 }
 
@@ -191,11 +195,13 @@ export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = f
         : <StatusMark agent={agent} comingBack={extras?.comingBack ?? false} />}
       <span class="body">
         {/* Unread is a mark, as in Mail (#70): a dot (two rings in the sidebar) and a heavier title, gone once opened. */}
-        <span class={`title${drawsUnread(agent) ? " unread" : ""}${place ? " placed" : ""}`} aria-description={drawsUnread(agent) ? "unread" : undefined}>
+        <span class={`title${drawsUnread(agent) ? " unread" : ""}${place || extras?.progress ? " placed" : ""}`} aria-description={drawsUnread(agent) ? "unread" : undefined}>
           {drawsUnread(agent) && !inSidebar && <span class="unread-dot" aria-hidden="true" />}
           {/* The title gives way before its folder's name, which is whole (#587). */}
-          {place ? <span class="name">{agent.title ?? "Untitled"}</span> : agent.title ?? "Untitled"}
+          {place || extras?.progress ? <span class="name">{agent.title ?? "Untitled"}</span> : agent.title ?? "Untitled"}
           {place && <span class="place"> {place}</span>}
+          {/* A lead's epic, done of all its children (#3270). */}
+          {extras?.progress && <span class="lead-progress" aria-label={leadProgressSpoken(extras.progress)}> · {extras.progress}</span>}
           {/* Started by a workflow or another agent, not typed for by the person (028). */}
           {extras?.startedByWorkflow && (
             <span class="started-by" role="img" title={`Started by the workflow ${extras.startedByWorkflow}`}

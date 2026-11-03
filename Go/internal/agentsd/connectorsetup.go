@@ -158,6 +158,8 @@ type slotRecord struct {
 	// slot, #2669); empty is the record's.
 	Repo  string `json:"repo,omitempty"`
 	Forge string `json:"forge,omitempty"`
+	// Servers is the Docs slot's: each mapped docs connector's last search (#3307).
+	Servers []docsServerRecord `json:"servers,omitempty"`
 }
 
 // forgeName is the record's name for f's forge: gitlab, or empty for GitHub.
@@ -423,6 +425,8 @@ func (d *Daemon) connectorSetup(ctx context.Context, folder string, reading wire
 	for kind, src := range sources {
 		readable = readable || (src.usable && src.f.repo != "" && !skipped[kind])
 	}
+	docsMaps := d.docsMaps(folder)
+	docsNames, docsWords := d.docsServers(folder, docsMaps)
 
 	d.setupMu.Lock()
 	rec := d.setupRecordsLocked()[folder]
@@ -431,10 +435,12 @@ func (d *Daemon) connectorSetup(ctx context.Context, folder string, reading wire
 	}
 	due := reading == wire.ConnectorSetupReadingFresh ||
 		(reading == wire.ConnectorSetupReadingCached && time.Since(rec.ReadAt) > setupFresh)
-	// The Docs slot reads the folder itself, with or without a forge (#3248).
+	// The Docs slot reads the folder itself, with or without a forge (#3248), and searches
+	// each mapped docs connector once (#3307), again as soon as its map changes.
 	docs := rec.Slots[wire.ConnectorSlotKindDocs]
 	docsDue := !skipped[wire.ConnectorSlotKindDocs] && (reading == wire.ConnectorSetupReadingFresh ||
-		(reading == wire.ConnectorSetupReadingCached && (docs == nil || time.Since(docs.ReadAt) > setupFresh)))
+		(reading == wire.ConnectorSetupReadingCached && (docs == nil || time.Since(docs.ReadAt) > setupFresh ||
+			docsSearchesDue(docs, docsNames, docsMaps))))
 	rec = cloneRecord(rec)
 	d.setupMu.Unlock()
 
@@ -443,7 +449,9 @@ func (d *Daemon) connectorSetup(ctx context.Context, folder string, reading wire
 			d.readSetup(ctx, f, usable, conn.Access, rec, sources, skipped)
 		}
 		if docsDue {
-			rec.Slots[wire.ConnectorSlotKindDocs] = readDocs(folder, time.Now())
+			read := readDocs(folder, time.Now())
+			read.Servers = d.searchDocsServers(ctx, folder, docsNames, docsMaps, read.ReadAt)
+			rec.Slots[wire.ConnectorSlotKindDocs] = read
 		}
 		d.setupMu.Lock()
 		d.setupRecordsLocked()[folder] = rec
@@ -490,8 +498,7 @@ func (d *Daemon) connectorSetup(ctx context.Context, folder string, reading wire
 			out.ProjectName = &tools.Name
 		}
 	}
-	servers, words := d.docsServers(folder)
-	out.Slots = append(out.Slots, docsSlot(rec.Slots[wire.ConnectorSlotKindDocs], skipped[wire.ConnectorSlotKindDocs], servers, words))
+	out.Slots = append(out.Slots, docsSlot(rec.Slots[wire.ConnectorSlotKindDocs], skipped[wire.ConnectorSlotKindDocs], docsNames, docsWords, docsMaps))
 	out.Slots = append(out.Slots, wire.ConnectorSlot{Slot: wire.ConnectorSlotKindWorkspace,
 		Choice: slotChoice[wire.ConnectorSlotKindWorkspace], State: wire.ConnectorSlotStateRead})
 	for _, s := range out.Slots {

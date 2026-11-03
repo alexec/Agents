@@ -51,6 +51,7 @@ import { withRequest, withoutRequest } from "./channelLinks";
 import { withSignIn, withoutSignIn } from "./signIn";
 import type { ChartHint } from "./chart";
 import { Providers } from "./providers";
+import { isLead, leadEpic, leadProgressWords } from "./leadProgress";
 
 export { folderKey } from "./groups";
 
@@ -1866,6 +1867,35 @@ export class Store extends Work {
 
   /** While the sidebar searches: the line each session said that matches, by its id (#1585). */
   readonly saidLines = signal<Record<string, string>>({});
+
+  /** A lead's epic progress, "5/7", by host and session id (#3270), for its sidebar row. */
+  readonly leadProgress = signal<Record<string, string>>({});
+  /** The state and labels each lead was last asked at: asked again when they change, as a lead wakes for each child. */
+  private readonly leadAsked = new Map<string, string>();
+
+  /** A lead's epic progress, asked of its host when its state or labels changed since; undefined for another session. */
+  leadProgressOf(host: string, agent: Agent): string | undefined {
+    if (!isLead(agent) || agent.state === "archived") return undefined;
+    const key = `${host}/${agent.id}`;
+    const turn = `${agent.state}|${(agent.labels ?? []).map((l) => l.value).join(",")}`;
+    if (this.leadAsked.get(key) !== turn && this.has(host, Capability.lineage1) && this.has(host, Capability.forge1)) {
+      this.leadAsked.set(key, turn);
+      void this.askLeadProgress(host, agent.id, key);
+    }
+    return this.leadProgress.value[key];
+  }
+
+  private async askLeadProgress(host: string, id: string, key: string): Promise<void> {
+    // A call that fails keeps what the row said: the next wake asks again.
+    const walked = await this.link.call("lineage/walk", { node: { kind: "session", ref: `session:${id}` }, depth: 1 }, host).catch(() => null);
+    if (!walked) return;
+    const epic = leadEpic(id, walked.links);
+    const plan = epic ? await this.link.call("forge/plan", { node: epic }, host).catch(() => null) : undefined;
+    if (plan === null) return;
+    const words = plan ? leadProgressWords(plan) : undefined;
+    const { [key]: _, ...rest } = this.leadProgress.value;
+    this.leadProgress.value = words ? { ...rest, [key]: words } : rest;
+  }
 
   /** The next page from each host that has more, newest first as the host lists them. */
   async searchMore(): Promise<void> {

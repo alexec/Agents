@@ -53,6 +53,19 @@ struct ConnectorSetupWordsTests {
         #expect(ConnectorSetupWords.proof(docs, now: now) == "Newest: specs/3248-docs/spec.md 2 hours ago")
         #expect(ConnectorSetupWords.Docs.servers(docs.servers ?? []) == "Connectors: notion")
         #expect(ConnectorSetupWords.Docs.servers([]) == nil)
+        // Each docs connector's one real search, through its map (#3307).
+        let found = try JSONDecoder().decode([DaemonAPI.DocsServer].self, from: Data("""
+        [{"name":"kb","state":"read","proof":{"title":"Design of the docs slot","url":"https://kb.example.com/P1"}},
+         {"name":"notion","state":"noMap"},{"name":"wiki","state":"failed","message":"It wants a sign-in first."},
+         {"name":"drive","state":"read"},{"name":"new","state":"notRead"}]
+        """.utf8))
+        #expect(found.map(ConnectorSetupWords.Docs.serverLine) == [
+            "kb: found \u{201C}Design of the docs slot\u{201D}",
+            "notion: no map of its search yet. Ask an agent to map it (the map-a-docs-server skill).",
+            "wiki: It wants a sign-in first.",
+            "drive: searched, and found no doc.",
+            "new: searching\u{2026}",
+        ])
         let empty = DaemonAPI.ConnectorSlot(slot: .docs, choice: "This folder", state: .read)
         #expect(ConnectorSetupWords.line(empty, folder: "walk", repository: nil) == ConnectorSetupWords.Docs.none)
         let skipped = DaemonAPI.ConnectorSlot(slot: .docs, choice: "This folder", state: .skipped)
