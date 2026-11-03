@@ -178,10 +178,31 @@ jobs:
 
       # Agents Host carries agentsd, agents-control and the MCP servers, all Go (#1314): its
       # build fails without Go.
+      #
+      # The build cache is our own below, not setup-go's, as in `go` (#2512). setup-go keys
+      # it on go.mod alone, and `go-darwin` and `skew` share that key on macOS, so it held
+      # whatever the first run after a go.mod change compiled, and none of it was this
+      # job's darwin/arm64 and darwin/amd64 `-trimpath` builds: the seven helpers took
+      # 1.8–3.3 minutes of every run (November 2026), on the longest pole of a pull
+      # request's run.
       - uses: actions/setup-go@v6
         with:
           go-version-file: Go/go.mod
-          cache-dependency-path: Go/go.mod
+          cache: false
+      # Keyed on the Go sources, as in `go`: a pull request starts from its own newest, else
+      # main's. Go's build cache is content-addressed, so a restore from an older tree is
+      # only less warm, never wrong. go.mod names the toolchain.
+      - name: Restore Go build cache
+        id: go-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/Library/Caches/go-build
+            ~/go/pkg/mod
+          key: go-apps-${{ runner.os }}-${{ hashFiles('Go/go.mod', 'Go/go.sum') }}-${{ hashFiles('Go/**/*.go') }}
+          restore-keys: |
+            go-apps-${{ runner.os }}-${{ hashFiles('Go/go.mod', 'Go/go.sum') }}-
+            go-apps-${{ runner.os }}-
 
       - name: Generate the project
         run: xcodegen generate
@@ -209,6 +230,23 @@ jobs:
               -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO
           }
           clean_retry "$RESTORED" build/DD -- build
+
+      # The Go helpers are built in Agents Host's build above, so its outcome alone says
+      # whether the Go cache is complete; the Remote's build does not touch it. Each ref
+      # keeps only its newest, as the Xcode caches do.
+      - name: Save Go build cache
+        if: ${{ always() && !cancelled() && steps.go-cache.outputs.cache-hit != 'true' && steps.build-mac.outcome == 'success' }}
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            ~/Library/Caches/go-build
+            ~/go/pkg/mod
+          key: go-apps-${{ runner.os }}-${{ hashFiles('Go/go.mod', 'Go/go.sum') }}-${{ hashFiles('Go/**/*.go') }}
+      - name: Prune old Go build caches for this ref
+        if: ${{ always() && !cancelled() && steps.go-cache.outputs.cache-hit != 'true' && steps.build-mac.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/prune-ci-caches.sh "go-apps-${{ runner.os }}-" "go-apps-${{ runner.os }}-${{ hashFiles('Go/go.mod', 'Go/go.sum') }}-${{ hashFiles('Go/**/*.go') }}" "$GITHUB_REF"
 
       # arm64 only. A generic simulator destination builds every simulator arch, so the
       # Remote, its widget and AgentsKitCore were compiled a second time for x86_64, a
