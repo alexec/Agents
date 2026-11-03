@@ -12,10 +12,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/alexec/agents/Go/internal/codespacessh"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -164,49 +163,13 @@ func (g *githubCodespaces) PrepareSSH(ctx context.Context, login string) error {
 	return mergeCodespacesSSHConfig(filepath.Join(home, ".ssh", "config"), output)
 }
 
-const (
-	codespacesSSHBegin = "# BEGIN Agents Codespaces SSH"
-	codespacesSSHEnd   = "# END Agents Codespaces SSH"
+var (
+	codespacesSSHBegin = codespacessh.Begin("")
+	codespacesSSHEnd   = codespacessh.End("")
 )
 
-var codespacesSSHConfigMu sync.Mutex
-
 func mergeCodespacesSSHConfig(path string, generated []byte) error {
-	config := strings.TrimSpace(string(generated))
-	if config == "" {
-		return fmt.Errorf("GitHub CLI returned no Codespaces SSH configuration")
-	}
-	codespacesSSHConfigMu.Lock()
-	defer codespacesSSHConfigMu.Unlock()
-
-	current, err := os.ReadFile(path)
-	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("Could not read SSH configuration")
-	}
-	text := string(current)
-	begin, end := strings.Index(text, codespacesSSHBegin), strings.Index(text, codespacesSSHEnd)
-	block := codespacesSSHBegin + "\n" + config + "\n" + codespacesSSHEnd
-	if begin >= 0 && end >= begin {
-		end += len(codespacesSSHEnd)
-		text = text[:begin] + block + text[end:]
-	} else {
-		text = strings.TrimRight(text, "\n")
-		if text != "" {
-			text += "\n\n"
-		}
-		text += block + "\n"
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return fmt.Errorf("Could not prepare the SSH configuration folder")
-	}
-	mode := os.FileMode(0o600)
-	if info, err := os.Stat(path); err == nil {
-		mode = info.Mode().Perm()
-	}
-	if err := store.WriteAtomically(path, []byte(text), mode); err != nil {
-		return fmt.Errorf("Could not save the Codespaces SSH configuration")
-	}
-	return nil
+	return codespacessh.Merge(path, "", generated)
 }
 
 func (g *githubCodespaces) request(ctx context.Context, method, path string, body []byte, answer any) error {

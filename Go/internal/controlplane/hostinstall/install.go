@@ -74,6 +74,9 @@ type Installer struct {
 	ConfigFile string
 	// Env is the environment ssh runs with, less this process's own: nil is os.Environ.
 	Env []string
+	// Prepare readies ssh for a destination that needs more than the ssh config has, such
+	// as a codespace's gh (#3347), and says what ssh's environment needs for it. Nil: none.
+	Prepare func(ctx context.Context, destination string) ([]string, error)
 	// Progress says each step of an install: connect, checkSystem, setUp, started.
 	Progress func(name, step string)
 	// Tunnels may be nil: then a server that wants a tunnel is refused.
@@ -119,6 +122,18 @@ func (i *Installer) env(keepAgent bool) []string {
 		inherited = os.Environ()
 	}
 	return environment(keepAgent, inherited)
+}
+
+// prepared is env with what Prepare says destination needs.
+func (i *Installer) prepared(ctx context.Context, destination string, env []string) ([]string, error) {
+	if i.Prepare == nil {
+		return env, nil
+	}
+	more, err := i.Prepare(ctx, destination)
+	if err != nil {
+		return nil, err
+	}
+	return append(env, more...), nil
 }
 
 func (i *Installer) progress(name, step string) {
@@ -213,7 +228,11 @@ func (i *Installer) run(ctx context.Context, request Request, personsKnownHosts 
 	keyGiven := keyFile != ""
 	config := i.configFile()
 
-	ssh := sshCommand{executable: i.sshExecutable(), name: destination, env: i.env(!keyGiven)}
+	env, err := i.prepared(ctx, destination, i.env(!keyGiven))
+	if err != nil {
+		return nil, &Failure{Code: NotAllowed, Message: err.Error()}
+	}
+	ssh := sshCommand{executable: i.sshExecutable(), name: destination, env: env}
 	i.progress(name, "connect")
 	trusting := ""
 	if request.Trust != nil && !personsKnownHosts {
@@ -484,7 +503,11 @@ func knownHostsOverride(resolved string) []string {
 // at each start (#1701): the key it offers is taken and returned, in known_hosts form, to be
 // pinned again. A failure is said in the install's words, for the person.
 func (i *Installer) StartDaemon(ctx context.Context, destination, knownHosts, name string, renew bool) (string, error) {
-	ssh := sshCommand{executable: i.sshExecutable(), name: destination, env: i.env(true)}
+	env, err := i.prepared(ctx, destination, i.env(true))
+	if err != nil {
+		return "", err
+	}
+	ssh := sshCommand{executable: i.sshExecutable(), name: destination, env: env}
 	file := ""
 	if knownHosts != "" || renew {
 		folder, err := os.MkdirTemp("", "agents-start-")

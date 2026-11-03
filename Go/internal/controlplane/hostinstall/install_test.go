@@ -645,3 +645,43 @@ func TestTheTunnelIsHeldAfterTheInstallsLastStep(t *testing.T) {
 		t.Errorf("ssh calls after the tunnel was held: %q", strings.TrimPrefix(string(after), callsAtAdd))
 	}
 }
+
+// Prepare (#3347) is asked for the destination, and what it says goes into ssh's
+// environment, after the install's own: here, a log of its own for the fake ssh.
+func TestPrepareGivesSSHItsEnvironment(t *testing.T) {
+	f := newFake(t)
+	var steps, asked []string
+	i := f.installer(&fakeCodes{}, &steps)
+	prepared := filepath.Join(t.TempDir(), "log")
+	i.Prepare = func(_ context.Context, destination string) ([]string, error) {
+		asked = append(asked, destination)
+		return []string{"FAKE_SSH_LOG=" + prepared}, nil
+	}
+	reply(t)(i.Install(context.Background(), json.RawMessage(`{"destination":"agents@devbox.lan:2222"}`)))
+	if !reflect.DeepEqual(asked, []string{"agents@devbox.lan:2222"}) {
+		t.Errorf("asked %v", asked)
+	}
+	if data, _ := os.ReadFile(prepared); !strings.Contains(string(data), "devbox.lan") || f.logged() != "" {
+		t.Errorf("ssh did not run with Prepare's environment: %q, %q", data, f.logged())
+	}
+}
+
+func TestAFailedPrepareIsSaidAndNothingRuns(t *testing.T) {
+	f := newFake(t)
+	var steps []string
+	i := f.installer(&fakeCodes{}, &steps)
+	i.Prepare = func(context.Context, string) ([]string, error) {
+		return nil, errors.New("This control plane has no GitHub CLI (gh) to reach the codespace fuzzy over SSH")
+	}
+	_, err := i.Install(context.Background(), json.RawMessage(`{"destination":"cs.fuzzy.main"}`))
+	if got := failure(t, err); got.Code != NotAllowed || !strings.Contains(got.Message, "no GitHub CLI") {
+		t.Errorf("%v", got)
+	}
+	if f.logged() != "" || len(steps) != 0 {
+		t.Errorf("ran: %q %v", f.logged(), steps)
+	}
+	if _, err := i.StartDaemon(context.Background(), "cs.fuzzy.main", "", "fuzzy", false); err == nil ||
+		!strings.Contains(err.Error(), "no GitHub CLI") || f.logged() != "" {
+		t.Errorf("start: %v %q", err, f.logged())
+	}
+}

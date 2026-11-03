@@ -916,3 +916,36 @@ func TestAMemberCannotLinkAnotherPersonsWorkspace(t *testing.T) {
 		t.Fatalf("%+v", link)
 	}
 }
+
+// A codespace is reached through gh with its provider's token (#3347): only a
+// codespaces-api provider's, and only for the cs. host it lists.
+func TestACodespaceIsFoundWithItsProvidersToken(t *testing.T) {
+	h := newHarness(t, func(o *harnessOptions) {
+		o.workspaces = []MachineInfo{{ID: "fuzzy-space", Name: "fuzzy", State: "running", SSH: new("cs.fuzzy-space.main")}}
+	})
+	out := h.must(MethodProvidersAdd, map[string]any{"name": "Codespaces", "kind": "commands",
+		"commands": map[string]any{"preset": "codespaces-api"}, "secrets": map[string]string{"GITHUB_TOKEN": "ghp_test"}})
+	h.link(string(out.(ProviderSummary).ID), devbox, "fuzzy-space")
+	if !eventually(t, func() bool { name, _ := h.providers.Codespace("cs.fuzzy-space.main"); return name != "" }) {
+		t.Fatal("never found")
+	}
+	if name, token := h.providers.Codespace("cs.fuzzy-space.main"); name != "fuzzy-space" || token != "ghp_test" {
+		t.Errorf("%q %q", name, token)
+	}
+	for _, destination := range []string{"cs.fuzzy-space.other", "alex@127.0.0.1 -p 2222", ""} {
+		if name, token := h.providers.Codespace(destination); name != "" || token != "" {
+			t.Errorf("%q: %q %q", destination, name, token)
+		}
+	}
+}
+
+func TestADoctlProviderGivesNoCodespaceToken(t *testing.T) {
+	h := newHarness(t, func(o *harnessOptions) {
+		o.workspaces = []MachineInfo{{ID: "ws-1", Name: "ws-1", State: "running", SSH: new("cs.ws-1.main")}}
+	})
+	h.link(h.add(), devbox, "ws-1")
+	h.waitFor("offline", devbox, 5, func(r row) bool { return r.Workspace.WorkspaceState == "running" })
+	if name, token := h.providers.Codespace("cs.ws-1.main"); name != "" || token != "" {
+		t.Errorf("%q %q", name, token)
+	}
+}
