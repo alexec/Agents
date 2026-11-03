@@ -81,24 +81,7 @@
               "issue.assigned"
             ],
             "views": true
-          },
-          "secrets": [
-            {
-              "name": "JIRA_URL",
-              "description": "The Jira site, as https://example.atlassian.net",
-              "required": true
-            },
-            {
-              "name": "JIRA_EMAIL",
-              "description": "Your Atlassian account's email, as you sign in to Jira Cloud with",
-              "required": true
-            },
-            {
-              "name": "JIRA_API_TOKEN",
-              "description": "An API token from id.atlassian.com ▸ Security ▸ API tokens, or a Data Center personal access token",
-              "required": true
-            }
-          ]
+          }
         }
       }
     },

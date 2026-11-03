@@ -15,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/connections"
 )
 
 // RealJira reads Jira's REST API (version 2, which Jira Cloud and Jira Data Center both
@@ -40,6 +42,16 @@ type Auth struct {
 	Header string
 	// Cloud says it is Jira Cloud, whose search is /search/jql, paged by a token.
 	Cloud bool
+	// API is where requests go when it is not Site: api.atlassian.com/ex/jira/<cloud id>, for
+	// an Atlassian sign-in's token (#3304). Site stays the address of the site's own pages.
+	API string
+}
+
+func (a Auth) api() string {
+	if a.API != "" {
+		return a.API
+	}
+	return a.Site
 }
 
 // TokenAuth is the Auth for a site and a token: with an email, Jira Cloud's API token;
@@ -87,7 +99,7 @@ func (j *RealJira) call(ctx context.Context, method, path string, body any, out 
 			return &JiraError{Kind: Failed, Message: "Jira: " + err.Error()}
 		}
 	}
-	key := method + " " + auth.Site + path + " " + string(payload)
+	key := method + " " + auth.api() + path + " " + string(payload)
 	j.mu.Lock()
 	shared, have := j.recent[key]
 	j.mu.Unlock()
@@ -119,7 +131,7 @@ func (j *RealJira) send(ctx context.Context, auth Auth, method, path string, pay
 	if payload != nil {
 		body = bytes.NewReader(payload)
 	}
-	req, err := http.NewRequestWithContext(ctx, method, auth.Site+"/rest/api/2"+path, body)
+	req, err := http.NewRequestWithContext(ctx, method, auth.api()+"/rest/api/2"+path, body)
 	if err != nil {
 		return nil, &JiraError{Kind: Failed, Message: "Jira: " + err.Error()}
 	}
@@ -454,4 +466,31 @@ func added(from, to string) []string {
 		}
 	}
 	return out
+}
+
+// NewestIssue is the site's newest issue, or nil when it has none: the one real read that
+// proves an Atlassian connection (#3304).
+func (j *RealJira) NewestIssue(ctx context.Context) (*Issue, error) {
+	list, _, err := j.search(ctx, "created IS NOT EMPTY ORDER BY created DESC", fields, "", 1)
+	if err != nil || len(list) == 0 {
+		return nil, err
+	}
+	i := list[0].issue(j.Auth().Site)
+	return &i, nil
+}
+
+// ConnectionAuth is the Auth for the person's Atlassian connection (#3304): a 3LO token goes
+// to api.atlassian.com for the site's cloud id; a token on one site goes to the site, Basic
+// with the account's email (Jira Cloud) or Bearer (a Data Center personal access token).
+func ConnectionAuth(c connections.Connection) Auth {
+	site := strings.TrimRight(c.URL, "/")
+	header := connections.JiraHeader(c)
+	if site == "" || header == "" {
+		return Auth{Site: site}
+	}
+	a := Auth{Site: site, Header: header, Cloud: c.Resource != "" || c.User != ""}
+	if c.Resource != "" {
+		a.API = connections.JiraAPI(c)
+	}
+	return a
 }

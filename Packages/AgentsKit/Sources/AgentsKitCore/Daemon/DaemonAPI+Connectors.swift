@@ -8,7 +8,8 @@ import Foundation
 /// client opens the address in an authentication session, and gives back the code that the
 /// hand-back page sends to agents://oauth/callback. GitLab (#1630) is the device flow on
 /// gitlab.com, or a personal access token on any GitLab. Email (#1780) is one IMAP mailbox and
-/// its app password, which the host checks once and keeps. A folder's set-up is the folder's: its repository, four slots that each prove
+/// its app password, which the host checks once and keeps. Atlassian (#3304) is one sign-in for
+/// Jira and Confluence: Linear's code flow on Atlassian Cloud, or a token on one Jira site. A folder's set-up is the folder's: its repository, four slots that each prove
 /// themselves with one real read, and the github events it turned on.
 extension DaemonAPI.Method {
     public static let connectionsList = "connections/list"
@@ -31,7 +32,7 @@ extension DaemonAPI.Method {
 
 extension DaemonAPI {
     public enum ConnectionProvider: String, Codable, Sendable, Hashable, CaseIterable, Identifiable {
-        case github, linear, gitlab, email
+        case github, linear, gitlab, email, atlassian
         public var id: String { rawValue }
     }
 
@@ -55,12 +56,19 @@ extension DaemonAPI {
         public var workspace: String?
         /// When a token the host cannot renew ends: a GitLab access token's expiry.
         public var expiresAt: Date?
+        /// A token the person made, which the host does not renew and whose end it does not
+        /// know: a Jira API token (#3304). Nil for OAuth.
+        public var byToken: Bool?
+        /// Only in the answer that made the connection: the one real read that proves it, such
+        /// as Jira's newest issue (#3304).
+        public var newest: ConnectorProof?
 
         public init(provider: ConnectionProvider, login: String? = nil, state: ConnectionState = .connected,
-                    connectedAt: Date, installURL: String? = nil, workspace: String? = nil, expiresAt: Date? = nil) {
+                    connectedAt: Date, installURL: String? = nil, workspace: String? = nil, expiresAt: Date? = nil,
+                    byToken: Bool? = nil, newest: ConnectorProof? = nil) {
             self.provider = provider; self.login = login; self.state = state
             self.connectedAt = connectedAt; self.installURL = installURL; self.workspace = workspace
-            self.expiresAt = expiresAt
+            self.expiresAt = expiresAt; self.byToken = byToken; self.newest = newest
         }
     }
 
@@ -143,14 +151,18 @@ extension DaemonAPI {
     }
 
     /// A personal access token for a provider with no Agents application there (a
-    /// self-managed GitLab). The host checks it, keeps it, and never gives it back.
+    /// self-managed GitLab, a Jira site). The host checks it, keeps it, and never gives it back.
     public struct ConnectionTokenRequest: Codable, Sendable, Hashable {
         public var provider: ConnectionProvider
-        /// The provider's address, such as gitlab.example.com; gitlab.com when nil.
+        /// The provider's address, such as gitlab.example.com; gitlab.com when nil. A Jira site
+        /// must be given.
         public var url: String?
+        /// Atlassian only: the account's email, with a Jira Cloud API token; nil for a Jira Data
+        /// Center personal access token.
+        public var user: String?
         public var token: String
-        public init(provider: ConnectionProvider, url: String? = nil, token: String) {
-            self.provider = provider; self.url = url; self.token = token
+        public init(provider: ConnectionProvider, url: String? = nil, user: String? = nil, token: String) {
+            self.provider = provider; self.url = url; self.user = user; self.token = token
         }
     }
 

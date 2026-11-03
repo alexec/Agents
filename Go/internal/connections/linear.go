@@ -47,6 +47,30 @@ type CodeFlow struct {
 	Name string
 	HTTP *http.Client
 	Now  func() time.Time
+	// ClientSecret is sent with a code and a refresh by a provider that has no public
+	// clients (Atlassian, #3304); empty for Linear. It is the host's, never a client's.
+	ClientSecret string
+	// JSON sends the token requests as a JSON body, as Atlassian's documents ask.
+	JSON bool
+	// Extra goes in the authorize address too: Atlassian's audience.
+	Extra url.Values
+	// Who reads the account and the site the token reaches; nil is Linear's (Account).
+	Who func(ctx context.Context, access string) (Account, error)
+}
+
+// Account is who a code flow's token is for, and what it reaches: the workspace (a Linear
+// workspace, an Atlassian site's name), and for Atlassian the site's address and its cloud id.
+type Account struct {
+	Login, Workspace, URL, Resource string
+}
+
+// Whose is the account the token is for, by the provider's own reading.
+func (f *CodeFlow) Whose(ctx context.Context, access string) (Account, error) {
+	if f.Who != nil {
+		return f.Who(ctx, access)
+	}
+	login, workspace, err := f.Account(ctx, access)
+	return Account{Login: login, Workspace: workspace}, err
 }
 
 // NewLinearFlow is the flow for the Agents app on linear.app.
@@ -103,6 +127,9 @@ func (f *CodeFlow) AuthorizeURL(p PKCE) string {
 	q := url.Values{"client_id": {f.ClientID}, "redirect_uri": {f.RedirectURI}, "response_type": {"code"},
 		"scope": {f.Scopes}, "state": {p.State}, "code_challenge": {p.Challenge},
 		"code_challenge_method": {"S256"}, "prompt": {"consent"}}
+	for k, v := range f.Extra {
+		q[k] = v
+	}
 	return f.Authorize + "?" + q.Encode()
 }
 
@@ -116,11 +143,23 @@ func (f *CodeFlow) now() time.Time {
 // post sends form to the token endpoint and reads the answer. A failure says what failed,
 // never the form (which holds the code, the verifier or the refresh token).
 func (f *CodeFlow) post(ctx context.Context, form url.Values) (oauthAnswer, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, f.Token, strings.NewReader(form.Encode()))
+	if f.ClientSecret != "" {
+		form.Set("client_secret", f.ClientSecret)
+	}
+	body, kind := form.Encode(), "application/x-www-form-urlencoded"
+	if f.JSON {
+		flat := map[string]string{}
+		for k := range form {
+			flat[k] = form.Get(k)
+		}
+		b, _ := json.Marshal(flat)
+		body, kind = string(b), "application/json"
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, f.Token, strings.NewReader(body))
 	if err != nil {
 		return oauthAnswer{}, fmt.Errorf("the request to %s could not be made", f.Name)
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Content-Type", kind)
 	req.Header.Set("Accept", "application/json")
 	res, err := f.HTTP.Do(req)
 	if err != nil {
@@ -154,7 +193,7 @@ func (f *CodeFlow) Exchange(ctx context.Context, code, verifier string) (Token, 
 	return f.token(a)
 }
 
-// Refresh spends the refresh token for a new pair: Linear's refresh tokens rotate.
+// Refresh spends the refresh token for a new pair: Linear's and Atlassian's refresh tokens rotate.
 func (f *CodeFlow) Refresh(ctx context.Context, refresh string) (Token, error) {
 	a, err := f.post(ctx, url.Values{"grant_type": {"refresh_token"}, "refresh_token": {refresh},
 		"client_id": {f.ClientID}})

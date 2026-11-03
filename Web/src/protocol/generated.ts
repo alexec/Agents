@@ -1757,6 +1757,16 @@ export interface Connection {
    * makes a new one before then.
    */
   expiresAt?: WireDate;
+  /**
+   * The connection is a token the person made and the host does not renew, with no end it knows: a
+   * Jira API token or Data Center personal access token (#3304). Left out for OAuth.
+   */
+  byToken?: boolean;
+  /**
+   * Only in the answer that made the connection: the one real read that proves it, such as Jira's
+   * newest issue (#3304). Left out when the read found nothing or failed.
+   */
+  newest?: ConnectorProof;
 }
 
 export interface ConnectionDisconnectAnswer {
@@ -1782,14 +1792,16 @@ export interface ConnectionEmailRequest {
 
 /**
  * A tool the person connects to: GitHub (#1335) and Linear (#1343) with OAuth, GitLab (#1630) with
- * OAuth on gitlab.com or a personal access token on any GitLab, and email (#1780): one IMAP mailbox
- * with an app password.
+ * OAuth on gitlab.com or a personal access token on any GitLab, email (#1780): one IMAP mailbox
+ * with an app password, and Atlassian (#3304): one sign-in for Jira and Confluence, with OAuth on
+ * Atlassian Cloud or a token on one site.
  */
 export type ConnectionProvider =
   | "github"
   | "linear"
   | "gitlab"
-  | "email";
+  | "email"
+  | "atlassian";
 
 export interface ConnectionProviderRequest {
   provider: ConnectionProvider;
@@ -1878,17 +1890,22 @@ export interface ConnectionTokenAnswer {
 }
 
 /**
- * connections/sign-in/token (#1630): a personal access token the person made, for a provider with
- * no Agents application there (a self-managed GitLab). The host checks it with the provider, keeps
- * it in its own store, and never logs it or gives it back.
+ * connections/sign-in/token (#1630, #3304): a personal access token the person made, for a provider
+ * with no Agents application there (a self-managed GitLab, a Jira site). The host checks it with
+ * the provider, keeps it in its own store, and never logs it or gives it back.
  */
 export interface ConnectionTokenRequest {
   provider: ConnectionProvider;
   /**
-   * The provider's address, such as gitlab.example.com (https:// when it names no scheme).
-   * gitlab.com when left out.
+   * The provider's address, such as gitlab.example.com or example.atlassian.net (https:// when it
+   * names no scheme). gitlab.com when left out; a Jira site must be given.
    */
   url?: string;
+  /**
+   * Atlassian only: the account's email, sent with a Jira Cloud API token. Left out for a Jira Data
+   * Center personal access token.
+   */
+  user?: string;
   token: string;
 }
 
@@ -10649,7 +10666,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConfigChoice: { required: ["value", "name"], optional: ["description", "setBy"] },
   ConfigChoiceGroup: { required: ["options"], optional: ["name", "group"] },
   ConfigOption: { required: ["id", "name", "type"], optional: ["description", "category", "currentValue", "options"] },
-  Connection: { required: ["provider", "state", "connectedAt"], optional: ["login", "installURL", "workspace", "expiresAt"] },
+  Connection: { required: ["provider", "state", "connectedAt"], optional: ["login", "installURL", "workspace", "expiresAt", "byToken", "newest"] },
   ConnectionDisconnectAnswer: { required: [], optional: ["error"] },
   ConnectionEmailRequest: { required: ["server", "user", "password"], optional: [] },
   ConnectionProviderRequest: { required: ["provider"], optional: ["origin"] },
@@ -10657,7 +10674,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConnectionSignInCompleteRequest: { required: ["flowID", "state"], optional: ["code", "error"] },
   ConnectionSignInFlowRequest: { required: ["flowID"], optional: [] },
   ConnectionTokenAnswer: { required: [], optional: ["connection", "error"] },
-  ConnectionTokenRequest: { required: ["provider", "token"], optional: ["url"] },
+  ConnectionTokenRequest: { required: ["provider", "token"], optional: ["url", "user"] },
   ConnectionsList: { required: ["connections"], optional: [] },
   ConnectorCodespace: { required: ["id", "name", "repository", "state", "ssh"], optional: ["ref"] },
   ConnectorCodespaces: { required: ["codespaces"], optional: ["repository", "message"] },

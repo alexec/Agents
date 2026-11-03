@@ -27,6 +27,10 @@ struct ConnectorSetupView: View {
     @State private var connectingLinear = false
     /// Linear connected in that sheet: the catalogue opens next, for its connector.
     @State private var linearConnected = false
+    /// Connect Jira, from the Tasks slot (#3304), and whether it connected: the catalogue opens
+    /// next, at the Jira connector.
+    @State private var connectingJira = false
+    @State private var jiraConnected = false
     /// The control plane, for Where agents run (#2131): the machines and providers, and Add a
     /// Machine… in place. Nil with none.
     @State private var control: ControlSettingsModel?
@@ -117,6 +121,11 @@ struct ConnectorSetupView: View {
             if linearConnected { linearConnected = false; addConnector("") }
         }) {
             ConnectLinearSheet(host: folder.host, onConnected: { linearConnected = true })
+        }
+        .sheet(isPresented: $connectingJira, onDismiss: {
+            if jiraConnected { jiraConnected = false; addConnector(ConnectJiraSheet.search) }
+        }) {
+            ConnectJiraSheet(host: folder.host, onConnected: { jiraConnected = true })
         }
     }
 
@@ -243,6 +252,8 @@ struct ConnectorSetupView: View {
         case search(String)
         /// Linear for Tasks: Connect Linear first when it is not connected, then the catalogue.
         case linear
+        /// Jira for Tasks (#3304): Connect Jira first when it is not connected, then the catalogue.
+        case jira
     }
 
     private func act(_ action: Action) {
@@ -254,6 +265,7 @@ struct ConnectorSetupView: View {
         case .catalogue: addConnector("")
         case .search(let words): addConnector(words)
         case .linear: Task { await useLinear() }
+        case .jira: Task { await useJira() }
         case .open(let address): open(address)
         case .addMachine: addingMachine = .machine
         case .addProvider: addingMachine = .provider
@@ -269,6 +281,16 @@ struct ConnectorSetupView: View {
             addConnector("")
         } else {
             connectingLinear = true
+        }
+    }
+
+    /// The Jira connector reads the person's Atlassian connection (#3304), as Linear's does.
+    private func useJira() async {
+        if case .success(let list) = await model.connections(on: folder.host),
+           list.contains(where: { $0.provider == .atlassian && $0.state == .connected }) {
+            addConnector(ConnectJiraSheet.search)
+        } else {
+            connectingJira = true
         }
     }
 
@@ -395,6 +417,7 @@ private struct SlotCard: View {
             case .noRemote:
                 if slot.slot == .tasks {
                     Button("Linear\u{2026}") { act(.linear) }.buttonStyle(.paper)
+                    Button("Jira\u{2026}") { act(.jira) }.buttonStyle(.paper)
                     Button("From a catalogue\u{2026}") { act(.catalogue) }.buttonStyle(.link)
                 }
                 if !slot.isFromProject { skip }
@@ -558,6 +581,8 @@ private struct SlotChange: View {
                        chosen: !skipped, pick: { if skipped { act(.setUp(.tasks)) }; done() }),
                 Choice(title: "Linear\u{2026}", note: "Connect Linear, then add its connector.", chosen: false,
                        pick: { act(.linear) }),
+                Choice(title: "Jira\u{2026}", note: ConnectorSetupWords.Jira.tasksNote, chosen: false,
+                       pick: { act(.jira) }),
                 Choice(title: "From a catalogue\u{2026}", note: "Another tracker's connector.", chosen: false,
                        pick: { act(.catalogue) }),
                 Choice(title: "None", note: "Skip: agents won't use a tracker here.", chosen: skipped,

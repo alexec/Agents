@@ -38,6 +38,8 @@ export function ConnectorSetupSection({ store, host, folder, folderName, go }: {
   const [connecting, setConnecting] = useState<ConnectionProvider>();
   /** Whether the person's Linear connection is there, for the Tasks slot (#1682); unknown until read. */
   const [linearConnected, setLinearConnected] = useState<boolean>();
+  /** The same for the Atlassian connection, for the Tasks slot's Jira (#3304). */
+  const [jiraConnected, setJiraConnected] = useState<boolean>();
   const path = folderPath(folder);
   /** Add a Machine… or Add Provider…, in place (#2131). */
   const [adding, setAdding] = useState<"machine" | "provider">();
@@ -54,6 +56,7 @@ export function ConnectorSetupSection({ store, host, folder, folderName, go }: {
     try {
       const { connections } = await store.link.call("connections/list", {}, host);
       setLinearConnected(connections.some((c) => c.provider === "linear" && c.state === "connected"));
+      setJiraConnected(connections.some((c) => c.provider === "atlassian" && c.state === "connected"));
     } catch {
       // Unknown: the slot says what it said before.
     }
@@ -100,6 +103,7 @@ export function ConnectorSetupSection({ store, host, folder, folderName, go }: {
               <SlotCard key={slot.slot} slot={slot} setup={setup} folderName={folderName} reading={reading}
                 tryAgain={() => void load("fresh")} skip={(s) => void skip(slot.slot, s)}
                 linearConnected={linearConnected} connectLinear={() => setConnecting("linear")}
+                jiraConnected={jiraConnected} connectJira={() => setConnecting("atlassian")}
                 place={place} admin={store.person.value?.role !== "member"} add={setAdding} />
             ))}
           </div>
@@ -131,7 +135,7 @@ export function ConnectorSetupSection({ store, host, folder, folderName, go }: {
       {!setup && !problem && <p class="quiet small">Reading…</p>}
       {connecting && (
         <ConnectDialog store={store} host={host} provider={connecting} folder={path}
-          connected={() => void (connecting === "linear" ? readLinear() : load("fresh"))}
+          connected={() => void (connecting === "linear" || connecting === "atlassian" ? readLinear() : load("fresh"))}
           close={() => setConnecting(undefined)} />
       )}
       {adding && (
@@ -186,11 +190,13 @@ function SlotMark({ slot, reading }: { slot: ConnectorSlot; reading: boolean }) 
   return <span class={`slot-mark ${slot.state}`} role="img" aria-label={label}>{mark}</span>;
 }
 
-function SlotCard({ slot, setup, folderName, reading, tryAgain, skip, linearConnected, connectLinear, place, admin, add }: {
+function SlotCard({ slot, setup, folderName, reading, tryAgain, skip, linearConnected, connectLinear, jiraConnected, connectJira, place, admin, add }: {
   slot: ConnectorSlot; setup: ConnectorSetup; folderName: string; reading: boolean;
   tryAgain: () => void; skip: (skipped: boolean) => void;
   /** Tasks only: whether Linear is connected, unknown until read (#1682). */
   linearConnected: boolean | undefined; connectLinear: () => void;
+  /** Tasks only: whether the Atlassian connection is there, for Jira (#3304). */
+  jiraConnected: boolean | undefined; connectJira: () => void;
   /** Where agents run only (#2131): its machine and line, and Add a Machine… or Add Provider…. */
   place: { title: string; line: string }; admin: boolean; add: (what: "machine" | "provider") => void;
 }) {
@@ -229,6 +235,7 @@ function SlotCard({ slot, setup, folderName, reading, tryAgain, skip, linearConn
         {(slot.state === "notConnected" || slot.state === "noRemote") && slot.slot === "tasks" && (
           <>
             {linearConnected === false && <button class="link" onClick={connectLinear}>{words.connectLinear}</button>}
+            {jiraConnected === false && <button class="link" onClick={connectJira}>{words.connectJira}</button>}
             <span class="quiet">{words.otherTrackers(linearConnected !== false)}</span>
           </>
         )}
@@ -262,6 +269,9 @@ function SlotCard({ slot, setup, folderName, reading, tryAgain, skip, linearConn
           <button onClick={() => setChanging(false)}>{slot.choice}</button>
           {slot.slot === "tasks" && linearConnected === false && (
             <button onClick={() => { connectLinear(); setChanging(false); }}>{words.connectLinear}</button>
+          )}
+          {slot.slot === "tasks" && jiraConnected === false && (
+            <button title={words.jira.tasksNote} onClick={() => { connectJira(); setChanging(false); }}>{words.connectJira}</button>
           )}
           <button onClick={() => { skip(true); setChanging(false); }}>None (skip)</button>
           <button class="link" onClick={() => setChanging(false)}>Cancel</button>
@@ -343,7 +353,8 @@ const signInWindow = "agents-sign-in";
  * (frame H): the same sheet. The host gives an authorize address; the page opens it in a window,
  * and the hand-back page sends the code back here by postMessage. Connect GitLab (#1630): the
  * device flow on gitlab.com, or an access token on any GitLab, which goes to the host only.
- * Connect Email (#1780): an IMAP server, a user and an app password, which go to the host only.
+ * Connect Jira (#3304): Linear's code flow on Atlassian Cloud, or a token on one Jira site, and it
+ * ends on the site's newest issue, which proves it. Connect Email (#1780): an IMAP server, a user and an app password, which go to the host only.
  */
 export function ConnectDialog({ store, host, provider, folder, again, connected, close }: {
   store: Store; host: string; provider: ConnectionProvider; folder?: string;
@@ -353,17 +364,22 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
   const opening = provider === "gitlab" && again ? words.gitlabAgain(again) : undefined;
   type Step = { kind: "asking" } | { kind: "starting" } | { kind: "waiting"; flow: ConnectionSignIn }
     | { kind: "finishing" } | { kind: "install"; login: string; repository: string; url: string }
-    | { kind: "checking" } | { kind: "failed"; why: string };
+    | { kind: "checking" } | { kind: "jira"; connection: Connection } | { kind: "failed"; why: string };
   const [step, setStep] = useState<Step>({ kind: "asking" });
   /** GitLab only (#1630): an access token instead of the sign-in, for a self-managed GitLab. */
   const [withToken, setWithToken] = useState(opening?.withToken ?? false);
   const [address, setAddress] = useState(opening?.address ?? "");
   const [token, setToken] = useState("");
+  /** Jira only (#3304): the account's email, for a Jira Cloud API token. */
+  const [jiraEmail, setJiraEmail] = useState("");
   /** Email only (#1780). The app password stays in this state, and is cleared after the sign-in. */
   const [server, setServer] = useState("");
   const [user, setUser] = useState("");
   const [password, setPassword] = useState("");
   const isEmail = provider === "email";
+  const isJira = provider === "atlassian";
+  /** The authorization code with PKCE, handed back by postMessage: Linear and Atlassian. */
+  const codeFlow = provider === "linear" || isJira;
   const busy = step.kind === "starting" || step.kind === "waiting" || step.kind === "finishing" || step.kind === "checking";
   const [flowID, setFlowID] = useState<UUID>();
   /** Removes the message listener of the sign-in under way. */
@@ -380,12 +396,12 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
     stopListening.current?.();
     // Open the window now, in the click, so that the browser does not block it. Without
     // noopener: the hand-back page sends the code to its opener.
-    const popup = provider === "linear" ? window.open("about:blank", signInWindow) : null;
+    const popup = codeFlow ? window.open("about:blank", signInWindow) : null;
     setStep({ kind: "starting" });
     let flow: ConnectionSignIn;
     try {
       flow = await store.link.call("connections/sign-in",
-        provider === "linear" ? { provider, origin: location.origin } : { provider }, host);
+        codeFlow ? { provider, origin: location.origin } : { provider }, host);
     } catch (e) {
       popup?.close();
       setStep({ kind: "failed", why: why(e) });
@@ -403,6 +419,10 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
       setFlowID(undefined);
       if (done.status === "connected") {
         connected();
+        if (isJira && done.connection) {
+          setStep({ kind: "jira", connection: done.connection });
+          return;
+        }
         if (folder && provider === "github") {
           const setup = await store.link.call("connectors/setup", { folder, reading: "fresh" }, host).catch(() => null);
           if (setup?.installed === false && setup.repository && setup.installURL) {
@@ -462,17 +482,24 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
   const connectWithToken = async () => {
     const typed = token.trim();
     if (!typed || busy) return;
+    const jiraRequest = isJira ? words.jiraTokenRequest(address, jiraEmail, typed) : undefined;
+    if (isJira && !jiraRequest) return;
     setStep({ kind: "checking" });
     const url = address.trim();
     try {
-      const answer = await store.link.call("connections/sign-in/token", url ? { provider, url, token: typed } : { provider, token: typed }, host);
+      const answer = await store.link.call("connections/sign-in/token",
+        jiraRequest ?? (url ? { provider, url, token: typed } : { provider, token: typed }), host);
       if (answer.connection) {
         setToken("");
         connected();
+        if (isJira) {
+          setStep({ kind: "jira", connection: answer.connection });
+          return;
+        }
         close();
         return;
       }
-      setStep({ kind: "failed", why: answer.error ?? "GitLab did not take the token." });
+      setStep({ kind: "failed", why: answer.error ?? `${providerName} did not take the token.` });
     } catch (e) {
       setStep({ kind: "failed", why: why(e) });
     }
@@ -502,28 +529,56 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
   };
 
   return (
-    <Modal label={`Connect ${providerName}`} close={close}>
+    <Modal label={isJira ? words.jira.title : `Connect ${providerName}`} close={close}>
       <div class="sheet-body connect-sheet">
         <div class="connection">
           <span class="connector-mark" aria-hidden="true">{words.letters(provider)}</span>
           <div>
-            <p class="strong">Connect {providerName}</p>
+            <p class="strong">{isJira ? words.jira.title : `Connect ${providerName}`}</p>
             <p class="quiet small">{words.sheetSubtitleFor(provider)}</p>
           </div>
         </div>
-        {provider === "gitlab" && (
+        {step.kind === "jira" && (
+          <div class="sign-in-code">
+            <p class="strong">{words.jiraConnected(step.connection)}</p>
+            <p class="small">{words.jiraProof(step.connection)}</p>
+            {step.connection.newest?.url && <button class="link small" onClick={() => openOut(step.connection.newest!.url!)}>Open in Jira</button>}
+          </div>
+        )}
+        {step.kind !== "jira" && <>
+        {(provider === "gitlab" || isJira) && (
           <div class="button-group" role="radiogroup" aria-label="Connect with">
             {([false, true] as const).map((t) => (
               <button key={String(t)} type="button" role="radio" aria-checked={withToken === t} class={withToken === t ? "on" : ""}
                 disabled={busy} onClick={() => { setWithToken(t); if (step.kind === "failed") setStep({ kind: "asking" }); }}>
-                {t ? words.gitlab.tokenWay : words.gitlab.signInWay}
+                {isJira ? (t ? words.jira.tokenWay : words.jira.signInWay) : (t ? words.gitlab.tokenWay : words.gitlab.signInWay)}
               </button>
             ))}
           </div>
         )}
         <h2 class="setup-heading">Agents will be able to</h2>
         <ul class="abilities">{words.abilitiesFor(provider).map((a) => <li key={a}>{a}</li>)}</ul>
-        {withToken && (
+        {withToken && isJira && (
+          <form id="connect-token" class="token-form" onSubmit={(e) => { e.preventDefault(); void connectWithToken(); }}>
+            <p class="small">{words.jira.tokenIntro}</p>
+            <label>{words.jira.siteLabel}
+              <input type="text" value={address} placeholder={words.jira.sitePrompt} disabled={busy}
+                autocomplete="off" autocapitalize="off" spellcheck={false}
+                onInput={(e) => setAddress((e.target as HTMLInputElement).value)} />
+            </label>
+            <label>{words.jira.emailLabel}
+              <input type="email" value={jiraEmail} placeholder={words.jira.emailPrompt} disabled={busy}
+                autocomplete="off" autocapitalize="off" spellcheck={false}
+                onInput={(e) => setJiraEmail((e.target as HTMLInputElement).value)} />
+            </label>
+            <label>{words.jira.tokenLabel}
+              <input type="password" value={token} placeholder={words.jira.tokenPrompt} disabled={busy} autocomplete="off"
+                onInput={(e) => setToken((e.target as HTMLInputElement).value)} />
+            </label>
+            <button type="button" class="link small" onClick={() => openOut(words.jira.newTokenURL)}>{words.jira.newTokenButton}</button>
+          </form>
+        )}
+        {withToken && !isJira && (
           <form id="connect-token" class="token-form" onSubmit={(e) => { e.preventDefault(); void connectWithToken(); }}>
             <p class="small">{words.gitlab.tokenIntro}</p>
             <label>{words.gitlab.addressLabel}
@@ -558,8 +613,9 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
           </form>
         )}
         <p class="quiet small">{words.sheetChooseFor(provider)}</p>
+        </>}
         {step.kind === "starting" && (
-          <p class="quiet small">{provider === "linear" ? "Starting the sign-in…" : `Asking ${providerName} for a code…`}</p>
+          <p class="quiet small">{codeFlow ? "Starting the sign-in…" : `Asking ${providerName} for a code…`}</p>
         )}
         {step.kind === "waiting" && (
           <div class="sign-in-code">
@@ -574,7 +630,7 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
           </div>
         )}
         {step.kind === "finishing" && <p class="quiet small">{words.linear.finishing}</p>}
-        {step.kind === "checking" && <p class="quiet small">{isEmail ? words.email.checking : words.gitlab.checking}</p>}
+        {step.kind === "checking" && <p class="quiet small">{isEmail ? words.email.checking : isJira ? words.jira.checking : words.gitlab.checking}</p>}
         {step.kind === "install" && (
           <div class="sign-in-code">
             <p class="strong">Connected as {step.login}.</p>
@@ -584,7 +640,9 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
         {step.kind === "failed" && <p class="small failure">{step.why}</p>}
         <div class="sheet-actions">
           <span class="quiet small grow">{provider === "email" ? words.email.sheetFoot : words.sheetFoot}</span>
-          {step.kind === "install" ? (
+          {step.kind === "jira" ? (
+            <button class="prominent" onClick={close}>{words.jira.done}</button>
+          ) : step.kind === "install" ? (
             <>
               <button onClick={close}>Done</button>
               <button class="prominent" onClick={() => { if (step.kind === "install") openOut(step.url); close(); }}>Install on github.com</button>
@@ -598,7 +656,8 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
                     disabled={!words.emailRequest(server, user, password)}>{words.email.button}</button>
                 : withToken
                 ? (step.kind === "asking" || step.kind === "failed") &&
-                  <button type="submit" form="connect-token" class="prominent" disabled={!token.trim()}>{words.gitlab.tokenButton}</button>
+                  <button type="submit" form="connect-token" class="prominent"
+                    disabled={!token.trim() || (isJira && !address.trim())}>{words.gitlab.tokenButton}</button>
                 : <>
                   {step.kind === "asking" && <button class="prominent" onClick={() => void start()}>{words.continueButtonFor(provider)}</button>}
                   {step.kind === "failed" && <button class="prominent" onClick={() => void start()}>Try Again</button>}

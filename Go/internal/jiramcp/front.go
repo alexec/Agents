@@ -20,8 +20,9 @@ import (
 // initialize. Its tools and page are AddViews' (views.go); Atlassian's own MCP server changes issues.
 
 // Instructions are the server's words.
-const Instructions = "The Jira site's issues, read with JIRA_URL and an API token (JIRA_EMAIL and JIRA_API_TOKEN on " +
-	"Jira Cloud, a personal access token in JIRA_API_TOKEN on Jira Data Center): show_issues lists the open ones, with a " +
+const Instructions = "The Jira site's issues, read with the person's Atlassian connection (Connect Jira), or with " +
+	"JIRA_URL and an API token (JIRA_EMAIL and JIRA_API_TOKEN on Jira Cloud, a personal access token in JIRA_API_TOKEN " +
+	"on Jira Data Center): show_issues lists the open ones, with a " +
 	"page that has Start Agent, and the events issue.opened, issue.labelled, issue.commented and issue.assigned. " +
 	"Atlassian's own MCP server (mcp.atlassian.com) changes issues."
 

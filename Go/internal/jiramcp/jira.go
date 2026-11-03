@@ -49,6 +49,9 @@ type Issue struct {
 	Creator        *Person
 }
 
+// Created is when the issue was made, when Jira said it as a time.
+func (i Issue) Created() (time.Time, bool) { return parseTime(i.CreatedAt) }
+
 func (i Issue) json() map[string]any {
 	labels := i.Labels
 	if labels == nil {
@@ -136,8 +139,8 @@ type JiraError struct {
 func (e *JiraError) Error() string { return e.Message }
 
 // notSignedIn is what is said when there is no site or token.
-const notSignedIn = "Jira is not signed in: set JIRA_URL to the site, and JIRA_EMAIL and JIRA_API_TOKEN " +
-	"(Jira Cloud), or JIRA_API_TOKEN to a personal access token (Jira Data Center)"
+const notSignedIn = "Jira is not signed in: connect Jira in Connectors, or set JIRA_URL to the site, and JIRA_EMAIL " +
+	"and JIRA_API_TOKEN (Jira Cloud), or JIRA_API_TOKEN to a personal access token (Jira Data Center)"
 
 // commentChars is the most of a comment's body an event gives.
 const commentChars = 4000

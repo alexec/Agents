@@ -2,7 +2,9 @@
 // (Go/cmd/linear-mcp), with the events issue.opened, issue.labelled, issue.commented and
 // issue.assigned, polled (Jira's webhooks need a Jira admin); and the tools show_issues and
 // show_issue_details, with their page. Atlassian's own MCP server (mcp.atlassian.com), added
-// from the marketplace, changes issues. It reads the site in JIRA_URL with a token that
+// from the marketplace, changes issues. It reads the person's Atlassian connection (Connect
+// Jira, #3304), as the linear server reads Linear's. A token set by hand still goes first: it
+// reads the site in JIRA_URL with a token that
 // `.agents/mcp.json` names as ${JIRA_API_TOKEN}, so its value stays in
 // ~/.agents-secrets/secrets.env: on Jira Cloud an API token (id.atlassian.com ▸ Security ▸
 // API tokens) with the account's email in JIRA_EMAIL; on Jira Data Center a personal access
@@ -26,6 +28,7 @@ import (
 	"syscall"
 
 	"github.com/alexec/agents/Go/internal/buildinfo"
+	"github.com/alexec/agents/Go/internal/connections"
 	"github.com/alexec/agents/Go/internal/jiramcp"
 )
 
@@ -40,8 +43,13 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	connected := connections.Reader(connections.FromEnv(), connections.Atlassian)
 	auth := func() jiramcp.Auth {
-		return jiramcp.TokenAuth(os.Getenv("JIRA_URL"), os.Getenv("JIRA_EMAIL"), os.Getenv("JIRA_API_TOKEN"))
+		if os.Getenv("JIRA_API_TOKEN") != "" {
+			return jiramcp.TokenAuth(os.Getenv("JIRA_URL"), os.Getenv("JIRA_EMAIL"), os.Getenv("JIRA_API_TOKEN"))
+		}
+		c, _ := connected()
+		return jiramcp.ConnectionAuth(c)
 	}
 	jira := jiramcp.NewRealJira(auth)
 	upstream := jiramcp.NewServer(buildinfo.Version)

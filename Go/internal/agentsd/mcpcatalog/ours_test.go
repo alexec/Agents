@@ -102,26 +102,17 @@ func TestOursAreAddedHostedWithNoSecretToAsk(t *testing.T) {
 	}
 }
 
-// Jira has no connection yet (#3247): it asks for the site, the email and the API token, each
-// kept in secrets.env and named in the entry.
-func TestJiraAsksForItsSiteEmailAndToken(t *testing.T) {
+// Jira reads the person's Atlassian connection (#3304), as Linear does: it asks for no secret.
+func TestJiraAsksForNoSecret(t *testing.T) {
 	jira, ok := OursByID("agents/jira")
 	if !ok || jira.Command != "jira-mcp" {
 		t.Fatalf("jira: %+v %v", jira, ok)
 	}
-	built := BuildOurs(jira, func(name string) bool { return name == "JIRA_URL" })
-	want := `{"command":"jira-mcp","hosted":true,"env":{"JIRA_URL":"${JIRA_URL}","JIRA_EMAIL":"${JIRA_EMAIL}","JIRA_API_TOKEN":"${JIRA_API_TOKEN}"}}`
-	if got := strings.Join(strings.Fields(built.Entry.Stringified()), ""); got != want {
+	built := BuildOurs(jira, func(string) bool { return false })
+	if got := strings.Join(strings.Fields(built.Entry.Stringified()), ""); got != `{"command":"jira-mcp","hosted":true}` {
 		t.Fatalf("entry: %s", got)
 	}
-	var names []string
-	for _, v := range built.Variables {
-		if v.Kind != wire.MCPVariableKindSecret || !v.Required || v.Description == "" || v.AlreadySet != (v.Name == "JIRA_URL") {
-			t.Errorf("variable %+v", v)
-		}
-		names = append(names, v.Name)
-	}
-	if strings.Join(names, ",") != "JIRA_URL,JIRA_EMAIL,JIRA_API_TOKEN" || built.NameHere != "jira" {
+	if len(built.Variables) != 0 || built.NameHere != "jira" {
 		t.Fatalf("built: %+v", built)
 	}
 	r := OursResult(jira, jira.Declares)

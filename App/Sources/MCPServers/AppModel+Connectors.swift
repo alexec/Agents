@@ -63,18 +63,19 @@ extension AppModel {
         }
     }
 
-    /// A personal access token (GitLab, #1630): the connection it made, or why it made none.
-    func signInWithToken(_ provider: DaemonAPI.ConnectionProvider, url: String?, token: String, on host: MachineRef) async
-        -> Result<DaemonAPI.Connection, ConnectorProblem> {
+    /// A personal access token (GitLab, #1630; Jira, #3304, with the account's email on Jira
+    /// Cloud): the connection it made, or why it made none.
+    func signInWithToken(_ provider: DaemonAPI.ConnectionProvider, url: String?, user: String? = nil, token: String,
+                         on host: MachineRef) async -> Result<DaemonAPI.Connection, ConnectorProblem> {
         let answer = await connectorCall(host) {
             try await $0.call(DaemonAPI.Method.connectionsSignInToken,
-                              DaemonAPI.ConnectionTokenRequest(provider: provider, url: url, token: token),
+                              DaemonAPI.ConnectionTokenRequest(provider: provider, url: url, user: user, token: token),
                               returning: DaemonAPI.ConnectionTokenAnswer.self)
         }
         switch answer {
         case .success(let a):
             if let connection = a.connection { return .success(connection) }
-            return .failure(ConnectorProblem(words: a.error ?? "GitLab did not take the token."))
+            return .failure(ConnectorProblem(words: a.error ?? "\(ConnectorSetupWords.name(provider)) did not take the token."))
         case .failure(let problem): return .failure(problem)
         }
     }

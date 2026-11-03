@@ -30,11 +30,12 @@ import (
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 )
 
-// GitHub is the first provider (#1335). Linear is in linear.go, GitLab in gitlab.go, Email in email.go.
+// GitHub is the first provider (#1335). Linear is in linear.go, GitLab in gitlab.go, Email in
+// email.go, Atlassian in atlassian.go.
 const GitHub = "github"
 
 // Providers is every provider a store is asked about when it lists.
-var Providers = []string{GitHub, Linear, GitLab, Email}
+var Providers = []string{GitHub, Linear, GitLab, Email, Atlassian}
 
 // Connection is one provider's sign-in. Access and Refresh are secrets: they leave the
 // store only to the host's refresh and to a server's Authorization header.
@@ -45,7 +46,13 @@ type Connection struct {
 	// Workspace is the part of the provider the token reaches, such as a Linear workspace.
 	Workspace string `json:"workspace,omitempty"`
 	// URL is the provider's root when it is not the usual one: a self-managed GitLab's.
-	URL              string    `json:"url,omitempty"`
+	URL string `json:"url,omitempty"`
+	// Resource is the provider's id for what the token reaches: an Atlassian site's cloud id,
+	// for api.atlassian.com/ex/jira/<id> (#3304).
+	Resource string `json:"resource,omitempty"`
+	// User is the name a token is sent with when it is not a bearer token: the Atlassian
+	// account's email, with a Jira Cloud API token (Basic).
+	User             string    `json:"user,omitempty"`
 	Access           string    `json:"access,omitempty"`
 	Refresh          string    `json:"refresh,omitempty"`
 	AccessExpiresAt  time.Time `json:"accessExpiresAt,omitzero"`
