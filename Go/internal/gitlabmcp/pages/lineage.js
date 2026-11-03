@@ -1,5 +1,6 @@
 // The Lineage section (#2941): the sessions that worked on an issue or a pull request, and on
-// its pull requests, with what each cost, from the Agents host's own record. The host answers
+// its pull requests, with what each cost, and the docs they read (#3308), from the Agents
+// host's own record. The host answers
 // agents_lineage itself (docs/explanation/views.md); a host that doesn't, or an older one,
 // refuses it, and the section says so. lineageSection(ui, url) is the section, filled in once
 // the host answers. The gitlab, linear and jira servers' pages carry a copy, word for word.
@@ -20,6 +21,12 @@ const lineageSection = (ui, url) => {
     el("span", { className: "lineage-title", textContent: s.title }),
     el("span", { className: "muted", textContent: [s.how, s.words].filter(Boolean).join(" · ") }),
   ]);
+  // A doc a session read or linked to: the requirement or design behind the work (#3308).
+  const doc = (d) => el("div", { className: "lineage-row" }, [
+    el("span", { className: "pill", textContent: "Doc" }),
+    d.url ? link(d.name, d.url) : el("span", { className: "lineage-title", textContent: d.name }),
+    d.words ? el("span", { className: "muted", textContent: d.words }) : null,
+  ]);
   const draw = (l) => {
     const rows = [el("div", { className: "lineage-row" }, [el("strong", { textContent: "Lineage" }),
       el("span", { className: "muted", textContent: l.summary || "" })])];
@@ -27,6 +34,7 @@ const lineageSection = (ui, url) => {
     if (l.waste) rows.push(el("span", { className: "waste", textContent: l.waste }));
     for (const s of l.sessions || []) rows.push(session(s));
     for (const n of [...(l.prs || []), ...(l.issues || [])]) rows.push(node(n));
+    for (const d of l.docs || []) rows.push(doc(d));
     if (l.limited) rows.push(el("span", { className: "muted", textContent: "There is more than this shows." }));
     box.replaceChildren(...rows);
     ui.size();
