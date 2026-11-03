@@ -48,4 +48,40 @@ struct VoiceModeWordsTests {
         #expect(VoiceModeWords.heard(after: "", in: "and push") == "and push")
         #expect(VoiceModeWords.heard(after: "fix the bug", in: "fix") == "")
     }
+
+    /// #3340: words that do not end a sentence wait longer before they go.
+    @Test func onlyAWholeSentenceGoesAtTheShortPause() {
+        #expect(VoiceModeWords.endsSentence("Working very well right now."))
+        #expect(VoiceModeWords.endsSentence("Is there anything else? "))
+        #expect(VoiceModeWords.endsSentence("Stop!"))
+        #expect(VoiceModeWords.endsSentence("He said “go.”"))
+        #expect(!VoiceModeWords.endsSentence("Do we have"))
+        #expect(!VoiceModeWords.endsSentence("Rather than looking at milestones,"))
+        #expect(!VoiceModeWords.endsSentence("Or We can stop talking about ep"))
+        #expect(!VoiceModeWords.endsSentence(""))
+    }
+
+    /// #3340: the voice's own reply, heard back and misheard, does not stop it and is not
+    /// the next prompt; the person talking over it does.
+    @Test func theVoiceHeardBackIsNotTalkingOverIt() {
+        let said = ["I hear you: not by milestone.", "Go on."]
+        #expect(!VoiceModeWords.isBargeIn("I hear you not my master. Come on.", over: said, asking: false))
+        #expect(!VoiceModeWords.isBargeIn("I hear you", over: said, asking: false))
+        #expect(!VoiceModeWords.isBargeIn("mm-hmm yeah", over: said, asking: false))
+        #expect(!VoiceModeWords.isBargeIn("wait", over: said, asking: false))
+        #expect(VoiceModeWords.isBargeIn("wait", over: said, asking: true))
+        #expect(VoiceModeWords.isBargeIn("Stop, run the tests instead", over: said, asking: false))
+        #expect(VoiceModeWords.isBargeIn("not the milestone, the epic please", over: said, asking: false))
+        #expect(VoiceModeWords.isBargeIn("Fix the bug", over: [], asking: false))
+    }
+
+    /// #3340: a microphone's mishearing is one letter off, two in a long word.
+    @Test func nearWordsAreOneLetterOff() {
+        #expect(VoiceModeWords.isNear("my", "by"))
+        #expect(VoiceModeWords.isNear("milestones", "milestone"))
+        #expect(VoiceModeWords.isNear("branches", "branch"))
+        #expect(!VoiceModeWords.isNear("master", "milestone"))
+        #expect(!VoiceModeWords.isNear("come", "go"))
+        #expect(!VoiceModeWords.isNear("a", "i"))
+    }
 }
