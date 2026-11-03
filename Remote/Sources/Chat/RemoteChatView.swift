@@ -372,6 +372,14 @@ struct RemoteChatView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             })
         }
+        // It drives the Mac's screen (#3004, US4), as on the Mac: the live tile.
+        if agent.state == .running, let frame = page.liveFrame, frame.agentID == agent.id {
+            cards.append(WaitingCard(id: "live:" + agent.id.uuidString) {
+                DesktopControlTile(frame: frame, heardAt: page.liveFrameHeardAt)
+                    .chatColumn()
+                    .transition(.opacity)
+            })
+        }
         // Its drive_screen paused by the person's touch (#3004, US3), as on the Mac.
         if let pause = agent.desktopControlPause {
             cards.append(WaitingCard(id: "screen:" + agent.id.uuidString) {

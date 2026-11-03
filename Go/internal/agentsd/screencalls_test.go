@@ -43,7 +43,7 @@ func main() {
 			res = map[string]any{"ok": false, "touched": true, "typed": 3}
 		}
 		switch req["action"] {
-		case "screenshot":
+		case "screenshot", "frame":
 			res["image"] = "ZmFrZQ=="
 		case "read":
 			res["tree"] = "fake tree"

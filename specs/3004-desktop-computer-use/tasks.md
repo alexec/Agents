@@ -268,29 +268,47 @@ pauses or ends while backgrounded (spec US4 Acceptance Scenarios 1–4, SC-001, 
 
 ### Tests for User Story 4
 
-- [ ] T033 [P] [US4] Vitest: the tile and the pause card, including the locked-placeholder path, in
+- [x] T033 [P] [US4] Vitest: the tile and the pause card, including the locked-placeholder path, in
       `Web/test/desktopControl.test.mjs`.
 
 ### Implementation for User Story 4
 
-- [ ] T034 [US4] Go: push `desktopControl/liveFrame` (the `LiveFrame` type from T003) only to clients
+- [x] T034 [US4] Go: push `desktopControl/liveFrame` (the `LiveFrame` type from T003) only to clients
       currently showing the session (`d.showers`, the same gate `tellEntry` already uses), never to
       `d.record`; send `{agentID, locked: true, capturedAt}` with no `image` field while
       `d.personAway() == "locked"` (FR-012) — in `Go/internal/agentsd/turns.go` and
       `Go/internal/agentsd/lean.go`. Depends on T015. `[machines]`
-- [ ] T035 [P] [US4] `Shared/UI/Chat/DesktopControlTile.swift` (new): the live tile — latest screenshot
+- [x] T035 [P] [US4] `Shared/UI/Chat/DesktopControlTile.swift` (new): the live tile — latest screenshot
       or "Mac is locked" placeholder, plus the current narration line, refreshed within 2 s of each
       action and at least every 5 s idle — drawn by the Mac window and the Remote. `[chat]`
-- [ ] T036 [P] [US4] `Web/src/model/desktopControl.ts` (new) and `Web/src/views/chat/
+- [x] T036 [P] [US4] `Web/src/model/desktopControl.ts` (new) and `Web/src/views/chat/
       DesktopControlTile.tsx` (new): the web twin of the tile. `[chat]`
-- [ ] T037 [US4] `Web/src/views/chat/Rows.tsx`: draw the tile beside the existing `LiveLine`. Depends on
+- [x] T037 [US4] `Web/src/views/chat/Rows.tsx`: draw the tile beside the existing `LiveLine`. Depends on
       T036. `[chat]`
-- [ ] T038 [US4] parity: add the live-tile row, Tier **Core**, to `specs/071-web-remote/walks/
+- [x] T038 [US4] parity: add the live-tile row, Tier **Core**, to `specs/071-web-remote/walks/
       parity.md` and `specs/071-web-remote/walks/parity/chat-turns-and-turn-detail.md`. `[docs]`
-- [ ] T039 [US4] docs: `docs/how-to/let-an-agent-drive-desktop-apps.md` (new) — turning desktop control
+- [x] T039 [US4] docs: `docs/how-to/let-an-agent-drive-desktop-apps.md` (new) — turning desktop control
       on, granting Accessibility (naming the process T002 found), what the agent can and cannot do, and
       the Resume/Take Over/Stop controls; update `docs/reference/feature-matrix.md`'s browser-row
       neighbour with the desktop-control line. `[docs]`
+
+**Decided in the US4 PR** (Claude; Alex can overrule):
+
+- Each frame carries `narration`, `drive_screen`'s own reply to the last action ("Clicked Save in
+  TextEdit."), rather than each client reading it out of the transcript's tool-call title: the
+  three clients draw one field, and the idle frames keep the last action's words.
+- The idle frames use a new agents-drive action, `frame`, a screenshot that does not arm the touch
+  watch, so the person's own mouse between two of the agent's actions is not said again every 4 s.
+- A client counts a frame's age from when it heard it, on its own clock (a phone's may differ
+  from the Mac's), and takes the tile away once none came for 15 s; there is no
+  `desktopControl/stateChanged`, as in US3.
+- The web tile is in `Web/src/views/DesktopControlTile.tsx`, beside the pause card, and drawn in
+  `Chat.tsx`'s cards, not `Rows.tsx`; its test is `Web/test/desktopControl.test.mjs` (Node's test
+  runner, as every web test).
+- Still open from US4: Acceptance Scenario 2's notice when a run **pauses** while the client is
+  in the background. A turn's end already gets the ordinary turn notice, but a pause is not a
+  `Need` (`Go/internal/agentsd/attention.go`'s `needs()`), so it raises no banner or push. It needs
+  a new `NeedKind` on the wire and every client's Needs you and notice code: a change of its own.
 
 **Checkpoint**: all three clients show the live tile for a session holding `screen`, the locked
 placeholder never carries pixels, and no screenshot is ever written to disk or saved history (SC-005).

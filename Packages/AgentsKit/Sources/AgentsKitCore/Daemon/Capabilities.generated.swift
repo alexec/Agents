@@ -473,6 +473,7 @@ public enum Capability {
         "clone/changed": "clone/1",
         "cost/changed": "cost/1",
         "daemon/policyStateChanged": "host.policy/1",
+        "desktopControl/liveFrame": "host.desktop-control/1",
         "device/changed": "device/1",
         "disk/changed": "disk/1",
         "events/changed": "events/1",

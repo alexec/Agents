@@ -512,6 +512,8 @@ public extension DaemonAPI {
                 Row(Notification.runtimesAccountProfilesChanged, params: [AccountProfile].self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.agentEntry, params: EntryNotification.self, result: Empty.self, kind: .hostNotification),
+                Row(Notification.desktopControlLiveFrame, params: DesktopControlLiveFrame.self, result: Empty.self,
+                    kind: .hostNotification),
                 Row(Notification.agentRemoved, params: AgentRemovedNotification.self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.agentResuming, params: ResumingNotification.self, result: Empty.self,

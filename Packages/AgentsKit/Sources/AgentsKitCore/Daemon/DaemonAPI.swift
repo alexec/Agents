@@ -489,6 +489,8 @@ public enum DaemonAPI {
     public enum Notification {
         public static let agentChanged = "agent/changed"
         public static let agentEntry = "agent/entry"
+        /// The live tile's frame for an agent holding the screen (#3004, US4).
+        public static let desktopControlLiveFrame = "desktopControl/liveFrame"
         public static let agentPermission = "agent/permission"
         /// A server's runtime refused the credential it was started with, or found none
         /// (043, FR-016). `CredentialRefused`.

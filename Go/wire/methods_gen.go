@@ -331,6 +331,7 @@ var NotifyClientPermissionsChanged = Notification[ClientPermissionSettings]{"cli
 var NotifyCloneChanged = Notification[CloneNotification]{"clone/changed"}
 var NotifyCostChanged = Notification[CostState]{"cost/changed"}
 var NotifyDaemonPolicyStateChanged = Notification[PolicyState]{"daemon/policyStateChanged"}
+var NotifyDesktopControlLiveFrame = Notification[DesktopControlLiveFrame]{"desktopControl/liveFrame"}
 var NotifyDeviceChanged = Notification[DeviceNotification]{"device/changed"}
 var NotifyDiskChanged = Notification[DiskState]{"disk/changed"}
 var NotifyEventsChanged = Notification[EventsChange]{"events/changed"}
