@@ -110,8 +110,10 @@ func TestEveryAppToolIsOneMethodNamedAfterIt(t *testing.T) {
 	// cancel_wait cancels a wait for an event.
 	// hang_up hangs up a voice call (#2375), notify tells the person (#2805), and bring_back
 	// brings back a branch (#2947). drive_screen's noun, the screen, is singular: there is
-	// one of it (#3004). write_daily_summary writes summaries (#3192).
-	nouns := map[string]string{"bring_back": "branches", "notify": "people", "ask_question": "questions", "cancel_wait": "events", "wait_for_event": "events", "wait_for_agents": "agents", "check_again": "waits", "hang_up": "calls", "cancel_message": "sessions", "drive_screen": "screen", "write_daily_summary": "summaries"}
+	// one of it (#3004). write_daily_summary writes summaries (#3192). docs_search and docs_read name
+	// their noun first, as the docs/search and docs/read methods they are over (#3317).
+	nouns := map[string]string{"bring_back": "branches", "notify": "people", "ask_question": "questions", "cancel_wait": "events", "wait_for_event": "events", "wait_for_agents": "agents", "check_again": "waits", "hang_up": "calls", "cancel_message": "sessions", "drive_screen": "screen", "write_daily_summary": "summaries", "docs_search": "docs", "docs_read": "docs"}
+	verbs := map[string]string{"docs_search": "search", "docs_read": "read"}
 	seen := map[string]string{}
 	for _, tool := range appToolCalls() {
 		method, ok := appToolMethods[tool.name]
@@ -125,8 +127,12 @@ func TestEveryAppToolIsOneMethodNamedAfterIt(t *testing.T) {
 		seen[method] = tool.name
 		noun, verb, ok := strings.Cut(method, "/")
 		words := strings.Split(tool.name, "_")
-		if !ok || !strings.HasPrefix(strings.ToLower(verb), words[0]) {
-			t.Errorf("%s: %s does not start with the tool's verb, %s", tool.name, method, words[0])
+		toolVerb := words[0]
+		if v := verbs[tool.name]; v != "" {
+			toolVerb = v
+		}
+		if !ok || !strings.HasPrefix(strings.ToLower(verb), toolVerb) {
+			t.Errorf("%s: %s does not start with the tool's verb, %s", tool.name, method, toolVerb)
 		}
 		want := nouns[tool.name]
 		if want == "" {
