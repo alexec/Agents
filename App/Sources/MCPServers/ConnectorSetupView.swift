@@ -2,8 +2,8 @@ import AgentsKitCore
 import AppKit
 import SwiftUI
 
-/// A folder's Connectors set-up (#1336, frames A, C, D and G): one Connect GitHub…, then four
-/// slots (Tasks, Code review, CI, Where agents run), each proving itself with one real read,
+/// A folder's Connectors set-up (#1336, frames A, C, D and G): one Connect GitHub…, then five
+/// slots (Tasks, Code review, CI, Docs, Where agents run), each proving itself with one real read,
 /// then the events it turned on. The page is the set-up: Change… opens a slot in place, and
 /// the only sheet is Connect. The state is the host's, so the Remote and the web page show
 /// the same ticks.
@@ -11,8 +11,9 @@ struct ConnectorSetupView: View {
     @Environment(AppModel.self) private var model
     var folder: FolderKey
     var folderName: String
-    /// Opens the catalogue (Add Connector…), for Linear and the others.
-    var addConnector: () -> Void
+    /// Opens the catalogue (Add Connector…), for Linear and the others, with a search typed
+    /// (Notion for the Docs slot, #3248) or none.
+    var addConnector: (_ search: String) -> Void
 
     @State private var setup: DaemonAPI.ConnectorSetup?
     @State private var problem: String?
@@ -113,7 +114,7 @@ struct ConnectorSetupView: View {
             }
         }
         .sheet(isPresented: $connectingLinear, onDismiss: {
-            if linearConnected { linearConnected = false; addConnector() }
+            if linearConnected { linearConnected = false; addConnector("") }
         }) {
             ConnectLinearSheet(host: folder.host, onConnected: { linearConnected = true })
         }
@@ -238,6 +239,8 @@ struct ConnectorSetupView: View {
     enum Action {
         case connect, tryAgain, skip(DaemonAPI.ConnectorSlotKind), setUp(DaemonAPI.ConnectorSlotKind), catalogue, open(String),
              addMachine, addProvider, codespaces
+        /// The catalogue with a search typed, such as Notion for Docs (#3248).
+        case search(String)
         /// Linear for Tasks: Connect Linear first when it is not connected, then the catalogue.
         case linear
     }
@@ -248,7 +251,8 @@ struct ConnectorSetupView: View {
         case .tryAgain: Task { await load(.fresh) }
         case .skip(let slot): Task { await skip(slot, true) }
         case .setUp(let slot): Task { await skip(slot, false) }
-        case .catalogue: addConnector()
+        case .catalogue: addConnector("")
+        case .search(let words): addConnector(words)
         case .linear: Task { await useLinear() }
         case .open(let address): open(address)
         case .addMachine: addingMachine = .machine
@@ -262,7 +266,7 @@ struct ConnectorSetupView: View {
     private func useLinear() async {
         if case .success(let list) = await model.connections(on: folder.host),
            list.contains(where: { $0.provider == .linear && $0.state == .connected }) {
-            addConnector()
+            addConnector("")
         } else {
             connectingLinear = true
         }
@@ -329,6 +333,9 @@ private struct SlotCard: View {
             Text(slot.slot == .workspace ? place.title : ConnectorSetupWords.title(slot))
                 .appText(.supporting).fontWeight(.semibold)
             proofOrLine
+            if let servers = ConnectorSetupWords.Docs.servers(slot.servers ?? []) {
+                Text(servers).appText(.fine).foregroundStyle(.secondary).lineLimit(2)
+            }
             if slot.isFromProject {
                 // The project's (#2669): changed in the project's card, not here.
                 Text(ProjectWords.setByProject(setup.projectName ?? ProjectWords.title))
@@ -467,7 +474,10 @@ private struct SlotChange: View {
                     .foregroundStyle(.secondary).textCase(.uppercase)
             }
             Text(question).appText(.supporting).fontWeight(.semibold)
-            HStack(alignment: .top, spacing: 10) {
+            // Docs has six choices (#3248): three to a row, so each note can be read.
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10, alignment: .top),
+                                     count: choices.count > 4 ? 3 : choices.count),
+                      alignment: .leading, spacing: 10) {
                 ForEach(choices, id: \.title) { choice in
                     Button(action: choice.pick) {
                         HStack(alignment: .top, spacing: 8) {
@@ -513,6 +523,7 @@ private struct SlotChange: View {
         case .tasks: "Where do agents find their tasks?"
         case .codeReview: "Where do agents ask for review?"
         case .ci: "Where do agents see checks?"
+        case .docs: ConnectorSetupWords.Docs.question
         case .workspace: "Where should agents run?"
         }
     }
@@ -546,6 +557,21 @@ private struct SlotChange: View {
                        pick: { act(.catalogue) }),
                 Choice(title: "None", note: "Skip: agents won't use a tracker here.", chosen: skipped,
                        pick: { act(.skip(.tasks)) }),
+            ]
+        case .docs:
+            let words = ConnectorSetupWords.Docs.self
+            return [
+                Choice(title: "This folder", note: ConnectorSetupWords.proof(slot) ?? words.thisFolderNote,
+                       chosen: !skipped, pick: { if skipped { act(.setUp(.docs)) }; done() }),
+                Choice(title: "Confluence\u{2026}", note: words.confluenceNote, chosen: false,
+                       pick: { act(.search(words.confluenceSearch)) }),
+                Choice(title: "Notion\u{2026}", note: words.notionNote, chosen: false,
+                       pick: { act(.search(words.notionSearch)) }),
+                Choice(title: "Google Drive\u{2026}", note: words.googleDriveNote, chosen: false,
+                       pick: { act(.search(words.googleDriveSearch)) }),
+                Choice(title: "From a catalogue\u{2026}", note: words.catalogueNote, chosen: false,
+                       pick: { act(.catalogue) }),
+                Choice(title: "None", note: words.noneNote, chosen: skipped, pick: { act(.skip(.docs)) }),
             ]
         case .codeReview, .ci:
             return [

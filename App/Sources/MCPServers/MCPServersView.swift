@@ -14,7 +14,14 @@ struct MCPServersView: View {
     /// Nil for the person's own servers, on this Mac.
     var folder: FolderKey?
     @State private var checking = false
-    @State private var adding = false
+    /// The catalogue, open with what it searches for: Notion from the Docs slot (#3248), or
+    /// nothing. An item, so the sheet gets the search it was opened with.
+    @State private var adding: CatalogueSearch?
+
+    struct CatalogueSearch: Identifiable {
+        var words: String
+        var id: String { words }
+    }
     /// The connector Remove… asks about (#2154).
     @State private var removing: DaemonAPI.MCPServerHealth?
     /// Why the last Remove… did not take it out.
@@ -38,7 +45,7 @@ struct MCPServersView: View {
                 if let folder {
                     if model.host(host, has: Capability.connectorsSetup1) {
                         ConnectorSetupView(folder: folder, folderName: folderName ?? folder.folder.lastPathComponent,
-                                           addConnector: { adding = true })
+                                           addConnector: { adding = CatalogueSearch(words: $0) })
                     } else {
                         Text(UpdateWords.hostNeedsUpdate).foregroundStyle(.secondary)
                     }
@@ -56,7 +63,7 @@ struct MCPServersView: View {
                     // The catalogue writes this Mac's files (#1336 keeps that): a server's
                     // folder gets its connectors from Settings on the Mac it is on.
                     if host == .mac {
-                        Button("Add Connector\u{2026}") { adding = true }.buttonStyle(.paper)
+                        Button("Add Connector\u{2026}") { adding = CatalogueSearch(words: "") }.buttonStyle(.paper)
                     }
                     Button("Check Now") {
                         checking = true
@@ -130,8 +137,9 @@ struct MCPServersView: View {
                                         on: host == .mac ? nil : model.hosts.label(host))
                  + (folder != nil ? " " + MCPHealthWords.removesCommitted : ""))
         }
-        .sheet(isPresented: $adding) {
+        .sheet(item: $adding) { search in
             AddMCPSheet(destination: folder.map { .folder(folder: $0.folder.path) } ?? .personal,
+                        query: search.words,
                         onAdded: { Task { await model.refreshMCPHealth(host) } })
         }
     }

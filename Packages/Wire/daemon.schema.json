@@ -4866,7 +4866,7 @@
     },
     "ConnectorProof": {
       "type": "object",
-      "description": "The one real thing a slot read: the newest issue or pull request, or the last workflow run.",
+      "description": "The one real thing a slot read: the newest issue or pull request, the last workflow run, or the newest doc in the folder (its path as the title).",
       "properties": {
         "number": {
           "type": "integer",
@@ -5013,7 +5013,7 @@
         },
         "choice": {
           "type": "string",
-          "description": "What fills it, in words: GitHub Issues, GitHub pull requests, GitHub Actions, This Mac."
+          "description": "What fills it, in words: GitHub Issues, GitHub pull requests, GitHub Actions, This folder (docs), This Mac."
         },
         "state": {
           "$ref": "#/definitions/ConnectorSlotState"
@@ -5035,6 +5035,13 @@
         "fromProject": {
           "type": "boolean",
           "description": "The folder's project sets this slot (#2669), so it is the same in every folder of the project."
+        },
+        "servers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Docs only (#3248): the docs connectors that fill the slot beside this folder, by their names in the folder's or the person's mcp.json. Absent with none."
         }
       },
       "required": [
@@ -5046,11 +5053,12 @@
     },
     "ConnectorSlotKind": {
       "type": "string",
-      "description": "One slot of a folder's set-up (#1336), in the page's order: tasks (the tracker), codeReview, ci, and workspace (where agents run).",
+      "description": "One slot of a folder's set-up (#1336), in the page's order: tasks (the tracker), codeReview, ci, docs (where the docs live, #3248), and workspace (where agents run).",
       "enum": [
         "tasks",
         "codeReview",
         "ci",
+        "docs",
         "workspace"
       ]
     },

@@ -38,7 +38,7 @@ struct ProjectSlotsCard: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 if project?.mayChange == true {
-                    ForEach(setup.slots.filter { $0.slot != .workspace }) { slot in
+                    ForEach(setup.slots.filter { $0.slot.isProjects }) { slot in
                         row(slot)
                     }
                 }
@@ -68,7 +68,7 @@ struct ProjectSlotsCard: View {
                 .foregroundStyle(.secondary)
                 .task(id: setup.project) { await load() }
             if project?.mayChange == true {
-                ForEach(setup.slots.filter { $0.slot != .workspace }) { slot in
+                ForEach(setup.slots.filter { $0.slot.isProjects }) { slot in
                     VStack(alignment: .leading, spacing: 4) {
                         Text(ConnectorSetupWords.heading(slot.slot))
                         Text(ProjectWords.slotLine(slot, name: name))
