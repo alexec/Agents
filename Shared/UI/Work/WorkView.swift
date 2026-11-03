@@ -20,6 +20,8 @@ struct WorkView: View {
         Group {
             if place.ref != nil {
                 WorkItemPage(model: model, place: place).id(place)
+            } else if place.kind == .feature {
+                WorkFeaturesPane(model: model, state: model.workLists.features)
             } else {
                 WorkListPane(model: model, kind: place.kind, list: model.workLists[place.kind]).id(place.kind)
             }
@@ -40,13 +42,22 @@ struct WorkView: View {
             }
             ToolbarItem(placement: .principal) {
                 Picker("Show", selection: Binding(get: { place.kind }, set: { model.showWork(WorkPlace(kind: $0)) })) {
-                    ForEach(WorkList.Kind.allCases) { Text($0.title).tag($0) }
+                    ForEach(Self.kinds) { Text($0.title).tag($0) }
                 }
                 .labelsHidden()
                 .workKindPickerStyle(compact: compact)
                 .fixedSize()
             }
         }
+    }
+
+    /// Work's lists. Features is Mac + web (#3269): the Remote has not got it.
+    private static var kinds: [WorkList.Kind] {
+        #if os(iOS)
+        WorkList.Kind.allCases.filter { $0 != .feature }
+        #else
+        WorkList.Kind.allCases
+        #endif
     }
 
     /// Back and Forward: beside the window's title on the Mac, at the bar's end on the Remote,

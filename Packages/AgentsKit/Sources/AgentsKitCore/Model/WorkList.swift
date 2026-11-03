@@ -7,7 +7,8 @@ import Foundation
 public enum WorkList {
     /// Work's lists, in the order of its tabs, by the lineage kind each holds.
     public enum Kind: String, CaseIterable, Identifiable, Sendable, Hashable, Codable {
-        case issue, pr, milestone, release
+        /// Features (#3269) are the `feature:` labels on the epics, not a lineage kind: an epic opens as an issue.
+        case issue, pr, feature, milestone, release
 
         public var id: Self { self }
 
@@ -15,12 +16,14 @@ public enum WorkList {
             switch self {
             case .issue: "Issues"
             case .pr: "Pull requests"
+            case .feature: "Features"
             case .milestone: "Milestones"
             case .release: "Releases"
             }
         }
 
-        /// Issues and PRs are read from the forges; milestones and releases from lineage alone.
+        /// Issues and PRs are read from the forges; milestones and releases from lineage alone;
+        /// features from the forges' labels, as a list of their own.
         public var fromForge: Bool { self == .issue || self == .pr }
 
         /// The states a list can be narrowed to: a PR's merged is its own.
@@ -373,7 +376,9 @@ public enum WorkList {
     }
 
     /// The Work list a node's page is in: an issue, a PR, a milestone or a release; nil for any other.
-    public static func kind(of node: DaemonAPI.LineageNode) -> Kind? { Kind(rawValue: node.kind) }
+    public static func kind(of node: DaemonAPI.LineageNode) -> Kind? {
+        Kind(rawValue: node.kind).flatMap { $0 == .feature ? nil : $0 }
+    }
 
     /// A PR's checks: "Checks: 14 passing, 1 failing"; nil with none.
     public static func checksWords(_ checks: [DaemonAPI.ForgeCheck]?, summary: String? = nil) -> String? {

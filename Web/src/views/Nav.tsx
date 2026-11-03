@@ -20,6 +20,7 @@ import { orgPolicyNotSaved } from "./ConsoleOrgPolicy";
 import { ReportsPage } from "./Reports";
 import { LineagePage } from "./Lineage";
 import { WorkList, WorkPage } from "./Work";
+import { WorkFeatures } from "./WorkFeatures";
 import { SettingsPage } from "./Settings";
 import { WorkflowRow } from "./WorkflowRow";
 import { BackToList } from "./BackToList";
@@ -148,7 +149,8 @@ export function PageView({ store, page, down }: { store: Store; page: NavPage; d
         : page.draw.kind === "lineage" ? <LineagePage store={store} />
         : page.draw.kind === "work" ? (route.value.item
           ? <WorkPage key={route.value.item} store={store} kind={page.draw.work} ref={route.value.item} />
-          : <WorkList key={page.draw.work} store={store} kind={page.draw.work} />) : null}
+          : <WorkList key={page.draw.work} store={store} kind={page.draw.work} />)
+        : page.draw.kind === "features" ? <WorkFeatures store={store} /> : null}
     </Framed>
   );
 }

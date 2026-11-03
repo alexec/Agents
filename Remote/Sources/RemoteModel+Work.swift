@@ -78,6 +78,8 @@ extension RemoteModel {
 
     func openWorkSession(_ id: UUID) { sidebarItem = .session(id) }
 
+    func workLead(of epic: DaemonAPI.LineageNode) -> Agent? { WorkFeatures.lead(of: epic, in: work.agents) }
+
     /// The client for a Work call: the home host's, or another's while it answers.
     private func workClient(_ host: MachineRef) throws -> DaemonClient {
         guard let client = hostClient(host) else { throw HostAway(host: host) }

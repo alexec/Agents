@@ -24,6 +24,7 @@ export type PageDraw =
   | { kind: "console"; id: string }
   | { kind: "report"; section: Section }
   | { kind: "work"; work: WorkKind }
+  | { kind: "features" }
   | { kind: "usage" | "lineage" | "machines" | "workflows" | "settings" };
 
 export interface NavPage {
@@ -48,7 +49,11 @@ export const navPages: Record<NavSection, readonly NavPage[]> = {
   ],
   // Every issue and pull request from the forges, with lineage on top, and the milestones and releases
   // lineage knows (#3119). The page's id is the lineage kind, so #/work/pr/<ref> is a PR's page.
-  work: workKinds.map((k): NavPage => ({ id: k, title: workKindTitle[k], group: "Work", draw: { kind: "work", work: k } })),
+  // Features (#3269) after Pull requests: the feature:<name> labels on the epics, not a lineage kind.
+  work: workKinds.flatMap((k): NavPage[] => [
+    { id: k, title: workKindTitle[k], group: "Work", draw: { kind: "work", work: k } },
+    ...k === "pr" ? [{ id: "features", title: "Features", group: "Work", draw: { kind: "features" } } satisfies NavPage] : [],
+  ]),
   machines: [
     { id: "machines", title: "Machines", group: "Machines", draw: { kind: "machines" } },
     { id: "runtimes", title: "Runtimes", group: "On them", draw: { kind: "activity", page: "runtimes" } },
