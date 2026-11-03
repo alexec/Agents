@@ -45,6 +45,7 @@ import { GuardedChangeCards } from "./GuardedChange";
 import { KeptBubbles } from "./Kept";
 import { composerReason, line, markTitle } from "../model/orgPolicy";
 import { optionLabel } from "./OrgPolicyLine";
+import { fileURL } from "../model/completions";
 
 type Where = { kind: "folder" } | { kind: "new" } | { kind: "existing"; root: string } | { kind: "branch"; name: string }
   | { kind: "named"; name: string };
@@ -742,9 +743,11 @@ function SandboxPill({ runtimeID, name, override, runtimeDefault, codexMode, dis
 }
 
 /** A view's agents/start-agent (#834): this form, in the view's folder, filled in. Why it was
- *  not, or null. Nothing starts: the form waits for the person's Start. */
+ *  not, or null. Nothing starts: the form waits for the person's Start. `folder` is a `file:` URL
+ *  or a path, as a forge item's folder is (Start Agent and Start lead in Work, #3268). */
 export function offerStart(store: Store, host: string, folder: string, start: Start): string | null {
-  const summary = (store.folders.value[host] ?? []).find((p) => folderKey(p.folder.folder) === folderKey(folder));
+  const wanted = folderKey(folder.startsWith("/") ? fileURL(folder) : folder);
+  const summary = (store.folders.value[host] ?? []).find((p) => folderKey(p.folder.folder) === wanted);
   if (!summary) return `${decodeURIComponent(folderKey(folder).split("/").pop() ?? folder)} is not a folder here.`;
   store.offeredStart.value = { host, folder: summary.folder.folder, start };
   go({ host, folder: summary.folder.folder, compose: true });

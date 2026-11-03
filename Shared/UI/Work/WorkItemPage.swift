@@ -49,6 +49,12 @@ struct WorkItemPage: View {
                 } else if place.kind.fromForge, detail == nil {
                     ProgressView()
                 }
+                #if os(macOS)
+                // An epic's plan (#3268): Mac + web, so not on the Remote (#2796).
+                if let detail, WorkPlan.hasPlan(detail.got.item) {
+                    WorkPlanSection(model: model, host: detail.host, lineageHost: lineageHost, detail: detail.got, asked: asked)
+                }
+                #endif
                 if let detail { bodyAndComments(detail.got, on: detail.host) }
                 lineage
             }

@@ -1878,3 +1878,17 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
 .work-log header { display: flex; align-items: center; }
 .work-log header .spacer { flex: 1; }
 .work-log pre { max-height: 60vh; overflow: auto; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* An epic's plan on its Work page (#3268). */
+.work-plan-head { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin-bottom: 8px; }
+.work-plan-head .attention, .work-plan-mark.attention { color: var(--tint-attention); }
+.work-plan-steps { border: 1px solid var(--paper-rule); border-radius: 8px; overflow: hidden; }
+.work-plan-step h4 { margin: 0; padding: 5px 10px; background: var(--paper-wash); font-weight: 600; opacity: 0.8; }
+.work-plan-step ul { list-style: none; margin: 0; padding: 0; }
+.work-plan-row { display: flex; gap: 10px; align-items: baseline; width: 100%; padding: 5px 10px; text-align: left; background: none; border: none; color: inherit; font: inherit; cursor: pointer; }
+.work-plan-row:hover { background: var(--paper-wash); }
+.work-plan-mark { width: 1.2em; flex: none; text-align: center; }
+.work-plan-mark.done { color: var(--tint-vouched); }
+.work-plan-mark.waiting, .work-plan-mark.blocked { opacity: 0.6; }
+.work-plan-level { width: 3.2em; flex: none; }
+.work-plan-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.work-plan-cost { font-variant-numeric: tabular-nums; }

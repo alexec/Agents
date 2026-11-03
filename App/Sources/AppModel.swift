@@ -5808,6 +5808,8 @@ final class AppModel {
     /// A session's title for Work's links (#3256).
     func workSessionTitle(_ id: UUID) -> String? { work.agent(id)?.title }
 
+    func workSessionState(_ id: UUID) -> AgentState? { work.agent(id)?.state }
+
     func openWorkSession(_ id: UUID) { openAgent(id) }
 
     /// A page of the lineage nodes of a kind (#3118), from the control plane: Work's figures; nil

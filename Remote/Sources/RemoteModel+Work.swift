@@ -74,6 +74,8 @@ extension RemoteModel {
 
     func workSessionTitle(_ id: UUID) -> String? { work.agent(id)?.title }
 
+    func workSessionState(_ id: UUID) -> AgentState? { work.agent(id)?.state }
+
     func openWorkSession(_ id: UUID) { sidebarItem = .session(id) }
 
     /// The client for a Work call: the home host's, or another's while it answers.
