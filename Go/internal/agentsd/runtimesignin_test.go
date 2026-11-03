@@ -59,6 +59,14 @@ func fakeSignInTools(t *testing.T) string {
 	return home
 }
 
+// asAServer makes a daemon started on a Mac (CI's go-darwin) act as a server: a Mac signs
+// its runtimes in on the Mac.
+func asAServer(t *testing.T) {
+	old := macToolsHome
+	macToolsHome = ""
+	t.Cleanup(func() { macToolsHome = old })
+}
+
 func statusFor(t *testing.T, c *conn, id int, runtimeID string) wire.RuntimeStatus {
 	t.Helper()
 	var list []wire.RuntimeStatus
@@ -77,6 +85,7 @@ func TestSigningClaudeInOnAServer(t *testing.T) {
 	fakeSignInTools(t)
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
+	asAServer(t)
 
 	if s := statusFor(t, c, 1, "claude"); s.SignIn == nil || s.SignIn.SignedIn {
 		t.Fatalf("before: %+v", s.SignIn)
@@ -137,6 +146,7 @@ func TestSigningCodexInOnAServer(t *testing.T) {
 	t.Cleanup(func() { codexFinishWait = old })
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
+	asAServer(t)
 
 	var step wire.RuntimeSignInStep
 	json.Unmarshal(c.call(t, 1, "runtimes/signInStart", map[string]any{"runtimeID": "codex"}), &step)
@@ -177,6 +187,7 @@ func TestOnlyClaudeAndCodexSignInThisWay(t *testing.T) {
 	fakeSignInTools(t)
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
+	asAServer(t)
 	if e := c.callError(t, 1, "runtimes/signInStart", map[string]any{"runtimeID": "grok"}); e.Code != CodeNotSupported {
 		t.Fatalf("%+v", e)
 	}
