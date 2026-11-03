@@ -6,12 +6,12 @@ import type { ActivityPage } from "../route";
 import { reportSections, type Section } from "./console";
 import { workKinds, workKindTitle, type WorkKind } from "./work";
 
-export type NavSection = "overview" | "agents" | "work" | "machines" | "workflows" | "reports" | "requests" | "people" | "settings";
+export type NavSection = "overview" | "agents" | "work" | "docs" | "machines" | "workflows" | "reports" | "requests" | "people" | "settings";
 
-export const navSections: readonly NavSection[] = ["overview", "agents", "work", "machines", "workflows", "reports", "requests", "people", "settings"];
+export const navSections: readonly NavSection[] = ["overview", "agents", "work", "docs", "machines", "workflows", "reports", "requests", "people", "settings"];
 
 export const navTitle: Record<NavSection, string> = {
-  overview: "Overview", agents: "Agents", work: "Work", machines: "Machines", workflows: "Workflows", reports: "Reports",
+  overview: "Overview", agents: "Agents", work: "Work", docs: "Docs", machines: "Machines", workflows: "Workflows", reports: "Reports",
   requests: "Requests", people: "People", settings: "Settings",
 };
 
@@ -25,6 +25,7 @@ export type PageDraw =
   | { kind: "report"; section: Section }
   | { kind: "work"; work: WorkKind }
   | { kind: "features" }
+  | { kind: "docs" }
   | { kind: "usage" | "lineage" | "machines" | "workflows" | "settings" };
 
 export interface NavPage {
@@ -54,6 +55,8 @@ export const navPages: Record<NavSection, readonly NavPage[]> = {
     { id: k, title: workKindTitle[k], group: "Work", draw: { kind: "work", work: k } },
     ...k === "pr" ? [{ id: "features", title: "Features", group: "Work", draw: { kind: "features" } } satisfies NavPage] : [],
   ]),
+  // The folders' docs and the docs connectors' (#3321, spec 3319), one page; #/docs/<ref> is a doc's page.
+  docs: [{ id: "docs", title: "Docs", group: "Docs", draw: { kind: "docs" } }],
   machines: [
     { id: "machines", title: "Machines", group: "Machines", draw: { kind: "machines" } },
     { id: "runtimes", title: "Runtimes", group: "On them", draw: { kind: "activity", page: "runtimes" } },
@@ -144,5 +147,5 @@ export function movedPage(app: "console" | "a", page: string | undefined): { nav
 
 /** The g-then-letter key for each section. */
 export const sectionKeys: Record<string, NavSection> = {
-  o: "overview", a: "agents", i: "work", m: "machines", w: "workflows", r: "reports", q: "requests", p: "people", s: "settings",
+  o: "overview", a: "agents", i: "work", d: "docs", m: "machines", w: "workflows", r: "reports", q: "requests", p: "people", s: "settings",
 };

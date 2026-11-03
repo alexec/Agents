@@ -122,6 +122,8 @@ struct ContentView: View {
             MilestonesView().paperGround()
         } else if model.showsWork {
             WorkView(model: model).paperGround()
+        } else if model.showsDocs {
+            DocsView().paperGround()
         } else if let id = model.openWorkflow {
             // No files pane and no sidebar toggle: a workflow has no agent to have
             // asked about a file, so there would be nothing for either to show.
@@ -182,7 +184,7 @@ struct ContentView: View {
         guard terminal.isOpen, !model.showsEvents, !model.showsResources, !model.showsRuntimes,
               !model.showsMCPServers, !model.showsWorktrees,
               !model.showsSpending, !model.showsTokens, !model.showsTime, !model.showsMilestones,
-              !model.showsWork, let folder = model.selectedFolderSummary, folder.exists else { return nil }
+              !model.showsWork, !model.showsDocs, let folder = model.selectedFolderSummary, folder.exists else { return nil }
         return folder
     }
 
@@ -196,7 +198,7 @@ struct ContentView: View {
     private var showsChat: Bool {
         model.selection != nil && !model.showsEvents && !model.showsResources
             && !model.showsRuntimes && !model.showsMCPServers && !model.showsWorktrees
-            && !model.showsSpending && !model.showsTime && !model.showsMilestones && !model.showsWork
+            && !model.showsSpending && !model.showsTime && !model.showsMilestones && !model.showsWork && !model.showsDocs
             && model.openWorkflow == nil
             && model.folderPage == nil && model.openPin == nil
     }

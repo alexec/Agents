@@ -90,6 +90,8 @@
 
 /* A section's pages: a web side navigation, the open one marked by a bar of the accent. */
 .columns.sub-app { grid-template-columns: 15rem minmax(0, 1fr); }
+/* A section of one page (Docs, Requests) has no list: the page takes the width. */
+.columns.sub-app.one-page { grid-template-columns: minmax(0, 1fr); }
 .sub-app-list { padding: 8px 0 12px; background: var(--paper-sidebar); border-right: 1px solid var(--paper-rule); }
 .sub-app-group .section-head { opacity: 1; margin: 14px 20px 4px; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em;
   text-transform: uppercase; color: color-mix(in srgb, var(--paper-ink) 58%, transparent); }

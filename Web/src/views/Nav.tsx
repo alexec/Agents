@@ -21,6 +21,7 @@ import { ReportsPage } from "./Reports";
 import { LineagePage } from "./Lineage";
 import { WorkList, WorkPage } from "./Work";
 import { WorkFeatures } from "./WorkFeatures";
+import { DocPage, DocsList } from "./Docs";
 import { SettingsPage } from "./Settings";
 import { WorkflowRow } from "./WorkflowRow";
 import { BackToList } from "./BackToList";
@@ -110,7 +111,7 @@ export function SectionPage({ store, section, down }: { store: Store; section: E
   const open = openPage(section, r.section, admin);
   const list = pagesShown(section, admin, open?.id);
   return (
-    <div class="columns sub-app console" aria-busy={down}>
+    <div class={`columns sub-app console${list.length > 1 ? "" : " one-page"}`} aria-busy={down}>
       {list.length > 1 && (
         <nav class="folders sub-app-list" aria-label={navTitle[section]}>
           {groupedPages(list).map(([group, pages]) => (
@@ -150,7 +151,10 @@ export function PageView({ store, page, down }: { store: Store; page: NavPage; d
         : page.draw.kind === "work" ? (route.value.item
           ? <WorkPage key={route.value.item} store={store} kind={page.draw.work} ref={route.value.item} />
           : <WorkList key={page.draw.work} store={store} kind={page.draw.work} />)
-        : page.draw.kind === "features" ? <WorkFeatures store={store} /> : null}
+        : page.draw.kind === "features" ? <WorkFeatures store={store} />
+        : page.draw.kind === "docs" ? (route.value.item
+          ? <DocPage key={route.value.item} store={store} docRef={route.value.item} />
+          : <DocsList store={store} />) : null}
     </Framed>
   );
 }

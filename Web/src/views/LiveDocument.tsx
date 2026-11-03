@@ -45,6 +45,8 @@ export interface PageSource {
   write: (text: string) => Promise<boolean>;
   watch: () => () => void;
   changed: number | undefined;
+  /** A page nobody types on here: a doc (#3321), edited by an agent, in an editor or in its vendor's app. */
+  readOnly?: boolean | undefined;
 }
 
 export function LiveDocument({ store, host, agentID, path, line, source }: {
@@ -228,7 +230,7 @@ export function LiveDocument({ store, host, agentID, path, line, source }: {
   const state = loaded.value;
   const text = state.kind === "text" ? state.text : state.kind === "gone" ? state.last : "";
   const passages = split(text);
-  const canEdit = state.kind === "text" && store.link.state.kind === "open" && store.hostIsOnline(host);
+  const canEdit = !page.readOnly && state.kind === "text" && store.link.state.kind === "open" && store.hostIsOnline(host);
   return (
     <div class="live-page" ref={container}>
       {state.kind === "notYet" && <p class="quiet small">Not written yet. {name} will appear here as it is.</p>}

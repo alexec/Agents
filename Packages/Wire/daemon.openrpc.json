@@ -2689,6 +2689,11 @@
       "name": "docs/list",
       "description": "The docs of this machine's folders and their docs connectors (#3319).",
       "x-capability": "docs/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -2710,6 +2715,11 @@
       "name": "docs/read",
       "description": "A doc's Markdown by its ref, a bounded part at a time (#3319).",
       "x-capability": "docs/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -2731,6 +2741,11 @@
       "name": "docs/search",
       "description": "The docs whose text has the words, with where (#3319).",
       "x-capability": "docs/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
