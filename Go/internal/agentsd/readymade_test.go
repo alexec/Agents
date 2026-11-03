@@ -18,7 +18,7 @@ import (
 // events that mcpcatalog counts for the Workflows level.
 func TestReadyMadeWorkflowsRead(t *testing.T) {
 	ids := readyMadeIDs()
-	if !slices.Equal(ids, []string{"address-review-comments", "answer-a-sign-up-code", "daily-summary", "fix-failed-checks", "work-a-linear-issue", "work-an-issue"}) {
+	if !slices.Equal(ids, []string{"address-review-comments", "answer-a-sign-up-code", "daily-summary", "fix-failed-checks", "work-a-jira-issue", "work-a-linear-issue", "work-an-issue"}) {
 		t.Fatal(ids)
 	}
 	var events []string
@@ -46,9 +46,10 @@ func TestReadyMadeWorkflowsRead(t *testing.T) {
 }
 
 // One label is one agent (#1343): a GitHub or GitLab issue's starts Work an issue (#1633), a
-// Linear issue's Work a Linear issue, as all three servers raise issue.labelled.
+// Linear issue's Work a Linear issue, a Jira issue's Work a Jira issue (#3247), as all four
+// servers raise issue.labelled.
 func TestEachIssueWorkflowTakesItsServers(t *testing.T) {
-	for id, servers := range map[string][]string{"work-an-issue": {"github", "gitlab"}, "work-a-linear-issue": {"linear"}} {
+	for id, servers := range map[string][]string{"work-an-issue": {"github", "gitlab"}, "work-a-linear-issue": {"linear"}, "work-a-jira-issue": {"jira"}} {
 		text, _ := readyMadeText(id)
 		w := parseWorkflow(text, id, "/p")
 		raw, _ := json.Marshal(w.Triggers)
@@ -134,7 +135,7 @@ func TestReadyMadeWorkflowsLiveInUserFolderAndFoldersUseThem(t *testing.T) {
 	// A forge folder lists the built-ins as user workflows, off by default: all but the daily
 	// summary, which is the person's, not a folder's (#3192).
 	json.Unmarshal(c.call(t, 4, "workflows/list", map[string]any{"folder": folderURL}), &list)
-	if len(list) != 5 || list[0].IsEnabled || list[0].AwaitingApproval != nil || list[4].Workflow.Name != "Work an issue" || list[0].Scope == nil || *list[0].Scope != "user" {
+	if len(list) != 6 || list[0].IsEnabled || list[0].AwaitingApproval != nil || list[5].Workflow.Name != "Work an issue" || list[0].Scope == nil || *list[0].Scope != "user" {
 		t.Fatalf("%+v", list)
 	}
 	for _, id := range readyMadeIDs() {
@@ -144,7 +145,7 @@ func TestReadyMadeWorkflowsLiveInUserFolderAndFoldersUseThem(t *testing.T) {
 	}
 	var userList []wire.WorkflowSummary
 	json.Unmarshal(c.call(t, 5, "workflows/list", map[string]any{"scope": "user"}), &userList)
-	if len(userList) != 6 || userList[0].Content == nil || userList[0].Scope == nil || *userList[0].Scope != "user" {
+	if len(userList) != 7 || userList[0].Content == nil || userList[0].Scope == nil || *userList[0].Scope != "user" {
 		t.Fatalf("user workflows: %+v", userList)
 	}
 

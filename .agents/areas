@@ -317,6 +317,9 @@ Go/internal/githubmcp/                                 ci-server
 Go/cmd/linear-mcp/                                     ci-server
 Go/internal/linearmcp/                                 ci-server
 docs/how-to/use-linear-issues.md                       ci-server
+Go/cmd/jira-mcp/                                       ci-server
+Go/internal/jiramcp/                                   ci-server
+docs/how-to/use-jira-issues.md                         ci-server
 scripts/go-github-mcp.sh                               ci-server
 specs/038-*/                                           ci-server
 

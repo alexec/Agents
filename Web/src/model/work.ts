@@ -88,7 +88,7 @@ export function forgeRow(item: ForgeItem, host: string, lineage?: ReportNode): W
 export function lineageRow(n: ReportNode): WorkRow {
   return {
     node: n.node, title: n.resolved?.title ?? nodeName(n.node), state: n.resolved?.state ?? (n.outcome === "merged" ? "merged" : ""),
-    labels: (n.resolved?.labels ?? []).map((name) => ({ name })), repo: n.project ?? repoOf(n.node.ref), assignees: [],
+    labels: (n.resolved?.labels ?? []).map((name) => ({ name })), repo: n.repo ?? repoOf(n.node.ref), assignees: [],
     updated: unix(n.lastAt), url: lineageUrl(n.node), lineage: n,
   };
 }
@@ -151,6 +151,22 @@ export function sortRows(rows: readonly WorkRow[], sort: WorkSort): WorkRow[] {
     // With no lineage last; among those, the last updated first.
     case "cost": return out.sort((a, b) => costOf(b) - costOf(a) || Number(!!b.lineage) - Number(!!a.lineage) || tie(a, b));
   }
+}
+
+/** Where an item's page stands in the list it was opened from (#3257): the refs above and below it,
+ * and its place, counted from 1. As WorkList.Neighbours on the window. */
+export interface Neighbours { previous?: string | undefined; next?: string | undefined; position: number; count: number }
+
+/** The item's neighbours in `rows`, the list as it is filtered and sorted; undefined when the ref is not in it. */
+export function neighbours(ref: string, rows: readonly WorkRow[]): Neighbours | undefined {
+  const i = rows.findIndex((r) => r.node.ref === ref);
+  if (i < 0) return undefined;
+  return { previous: rows[i - 1]?.node.ref, next: rows[i + 1]?.node.ref, position: i + 1, count: rows.length };
+}
+
+/** "3 of 42"; "3 of 42+" while the list has more pages to read. */
+export function positionWords(n: Neighbours, more: boolean): string {
+  return `${n.position} of ${n.count}${more ? "+" : ""}`;
 }
 
 /** The choices of a filter's menu, from the rows read: their repos, labels and assignees, sorted. */

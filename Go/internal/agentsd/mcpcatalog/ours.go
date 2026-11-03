@@ -14,10 +14,12 @@ import (
 // They are added the same way as any other connector and run hosted, one copy per host
 // (#488). Their levels come from what they declare, as for any server.
 //
-// None asks for a secret. github-mcp, linear-mcp and gitlab-mcp read the person's GitHub,
-// Linear and GitLab connections (#1343, #1630); email-mcp reads the person's email connection
-// (Connect Email, #1780) and never sends mail. A token set by hand in mcp.json's env still goes
-// first. tested is when each was last tested on a real account (docs/reference/integrations.md).
+// github-mcp, linear-mcp and gitlab-mcp read the person's GitHub, Linear and GitLab
+// connections (#1343, #1630) and ask for no secret; email-mcp reads the person's email
+// connection (Connect Email, #1780) and never sends mail. A token set by hand in mcp.json's env
+// still goes first. jira-mcp (#3247) has no connection yet: it asks for Jira Cloud's site, email
+// and API token as secrets, which its entry names (Data Center takes JIRA_EMAIL out by hand). tested is when each was last tested on a
+// real account (docs/reference/integrations.md).
 
 //go:embed agents.json
 var agentsFile []byte
@@ -33,13 +35,21 @@ type Ours struct {
 	Description string
 	// Command is the binary beside agentsd: Agents Host and every Linux host carry it.
 	Command string
-	// Secret, when set, is the one secret it reads from its environment.
-	Secret, SecretDescription string
+	// Secrets are what it reads from its environment, each kept in the person's secrets.env
+	// and named in its mcp.json entry as ${NAME}.
+	Secrets []Secret
 	// Declares is what the server declares, for the catalogue before this host has checked
 	// it. A test holds its events and tools to the servers' own.
 	Declares Declared
 	// Tested is when it was last tested on a real account, empty when never.
 	Tested string
+}
+
+// Secret is one value a connector of ours reads from its environment.
+type Secret struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Required    bool   `json:"required"`
 }
 
 // Made is every connector Agents makes, in the file's order.
@@ -93,15 +103,19 @@ func OursResult(o Ours, declared Declared) wire.MCPCatalogResult {
 		Runs: []wire.MCPRunKind{wire.MCPRunKindCommand}, Levels: &levels, Marketplace: &market}
 }
 
-// BuildOurs is the mcp.json entry for one of ours: its command, hosted, and its secret by name.
+// BuildOurs is the mcp.json entry for one of ours: its command, hosted, and its secrets by name.
 func BuildOurs(o Ours, alreadySet func(string) bool) Built {
 	entry := skillcatalog.Object(skillcatalog.Pair{Key: "command", Value: skillcatalog.String(o.Command)},
 		skillcatalog.Pair{Key: "hosted", Value: skillcatalog.Value{Kind: 'b', Bool: true}})
 	vars := []wire.MCPVariable{}
-	if o.Secret != "" {
-		entry.Set("env", object([]pair{{o.Secret, "${" + o.Secret + "}"}}))
-		vars = append(vars, wire.MCPVariable{Name: o.Secret, Description: o.SecretDescription, Kind: wire.MCPVariableKindSecret,
-			Required: true, AlreadySet: alreadySet(o.Secret)})
+	if len(o.Secrets) > 0 {
+		env := make([]pair, 0, len(o.Secrets))
+		for _, s := range o.Secrets {
+			env = append(env, pair{s.Name, "${" + s.Name + "}"})
+			vars = append(vars, wire.MCPVariable{Name: s.Name, Description: s.Description, Kind: wire.MCPVariableKindSecret,
+				Required: s.Required, AlreadySet: alreadySet(s.Name)})
+		}
+		entry.Set("env", object(env))
 	}
 	return Built{NameHere: slug(o.Title), ChosenRun: wire.MCPRunKindCommand, CommandOrURL: o.Command + " (hosted)",
 		Entry: entry, Variables: vars}

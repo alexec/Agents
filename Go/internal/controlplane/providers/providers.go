@@ -116,6 +116,11 @@ type Hooks struct {
 	// Suspended says a person's org provider suspended them (#1002, D13): their machines
 	// are not started, by hand, for use or for a schedule. Nil: nobody is.
 	Suspended func(person string) bool
+	// ProjectFolders is the absolute paths of each machine's folders in a project, by
+	// machine id, as the machines joined them (#3277). Nil: no machine has any.
+	ProjectFolders func(project string) map[string][]string
+	// ProjectSessions is projects/sessions for an agent's person (#3277). Nil: refused.
+	ProjectSessions func(request wire.ProjectSessionsRequest, caller Caller) (wire.ProjectSessions, error)
 }
 
 // Config is what NewProviders is given.
@@ -470,11 +475,15 @@ func (p *Providers) AgentCall(host, agent, method string, params json.RawMessage
 	case MethodSessionOnMachine:
 		return p.startSessionOn(hostName, agent, rawOf(given), caller)
 	case MethodSessionCall:
-		return p.sessionCall(hostName, agent, rawOf(given), caller)
+		return p.sessionCall(host, hostName, agent, rawOf(given), caller)
 	case MethodSessionEnded:
 		return p.sessionEnded(hostName, rawOf(given), caller)
 	case MethodSendFolder:
 		return p.sendFolder(hostName, agent, rawOf(given), caller)
+	case MethodProjectFolders:
+		return p.projectFolders(rawOf(given), caller)
+	case MethodProjectSessions:
+		return p.projectSessions(host, rawOf(given), caller)
 	}
 	if named, ok := str(given["id"]); ok && (method == MethodProvidersCreate || method == MethodProvidersOptions) {
 		p.mu.Lock()

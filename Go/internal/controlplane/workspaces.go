@@ -73,6 +73,12 @@ func (s *Service) makeProviders(home string) *providers.Providers {
 			InGroup:   s.inGroup,
 			GroupName: s.groupName,
 			Suspended: s.suspended,
+			// The project's folders and sessions, for an agent's tools (#3277).
+			ProjectFolders: s.projectFolderPaths,
+			ProjectSessions: func(request wire.ProjectSessionsRequest, caller providers.Caller) (wire.ProjectSessions, error) {
+				return s.methods.projectSessions(context.Background(), request, caller.Person,
+					Caller{Session: caller.Session, Client: caller.Client, Kind: caller.Kind, Person: caller.Person})
+			},
 			HostCommand: func(person string) (string, error) {
 				shown, err := s.codes.Issue(withCodeOwner(context.Background(), person), true, false, 5*time.Minute)
 				if err != nil {

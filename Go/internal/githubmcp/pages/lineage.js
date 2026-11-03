@@ -2,7 +2,7 @@
 // its pull requests, with what each cost, from the Agents host's own record. The host answers
 // agents_lineage itself (docs/explanation/views.md); a host that doesn't, or an older one,
 // refuses it, and the section says so. lineageSection(ui, url) is the section, filled in once
-// the host answers. The gitlab and linear servers' pages carry a copy, word for word.
+// the host answers. The gitlab, linear and jira servers' pages carry a copy, word for word.
 const lineageSection = (ui, url) => {
   const { el, link } = ui;
   const box = el("div", { className: "lineage" }, [el("span", { className: "muted", textContent: "Lineage: loading…" })]);

@@ -11,6 +11,13 @@ struct AddMCPSheet: View {
     let destination: DaemonAPI.SkillDestination
     var onAdded: () -> Void = {}
 
+    /// query is a search to start with, such as Notion from the Docs slot (#3248).
+    init(destination: DaemonAPI.SkillDestination, query: String = "", onAdded: @escaping () -> Void = {}) {
+        self.destination = destination
+        self.onAdded = onAdded
+        _query = State(initialValue: query)
+    }
+
     @State private var query = ""
     @State private var results: [DaemonAPI.MCPCatalogResult] = []
     @State private var searched = false

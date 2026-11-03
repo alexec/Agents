@@ -2,20 +2,17 @@
 // every issue and pull request from forge/issues and forge/pulls on each machine, one row per ref, with
 // what lineage knows (reports/nodes: sessions, cost, lead time) under its title; the milestones and
 // releases lineage knows. A row opens its page.
-import { useSignal } from "@preact/signals";
+import { effect, useSignal } from "@preact/signals";
 import { useEffect, useMemo } from "preact/hooks";
-import type {
-  ForgeItem, ForgeItemDetail, ForgeLabel, ForgeListError, LineageCostRollup, LineageLink, LineageNode, ReportNode, ReportNodesSort,
-} from "../protocol/generated";
+import type { ForgeItemDetail, ForgeLabel, LineageCostRollup, LineageLink, LineageNode } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { Capability } from "../protocol/capabilities.generated";
-import { CallFailed } from "../wire/link";
 import { describe } from "../model/errors";
 import { hostAnswers } from "../model/capabilities";
 import {
-  anyFilter, checksWords, choices, errorWords, filterRows, fromForge, hasPage, labelColor, labelInk, linkGroups, lineageOnlyNote, lineageRow,
-  lineageWords, mergeForge, noAgentOnIt, noAgentYet, noForgeHere, noWork, notReadHere, openOnWords, pageCostWords, peopleWords, repoName,
-  reviewWords, shortRef, sortRows, titleSaysRef, workKindTitle, workSortTitle, type WorkFilter, type WorkKind, type WorkRow, type WorkSort, type WorkState,
+  checksWords, choices, errorWords, fromForge, hasPage, labelColor, labelInk, linkGroups, lineageOnlyNote, lineageWords, noAgentOnIt,
+  noAgentYet, noForgeHere, noWork, notReadHere, openOnWords, pageCostWords, peopleWords, positionWords, repoName, reviewWords, shortRef,
+  titleSaysRef, workKindTitle, workSortTitle, type WorkFilter, type WorkKind, type WorkRow, type WorkSort, type WorkState,
 } from "../model/work";
 import { kindWord, lineageUrl, readingTitles, sessionHost } from "../model/lineage";
 import { nodeName } from "../model/value";
@@ -26,101 +23,33 @@ import { Graph, useLayout, useWalk } from "./Lineage";
 import { WorkActions, WorkCommentBox } from "./WorkActions";
 import { WorkPlan } from "./WorkPlan";
 import { hasPlan } from "../model/epicPlan";
-import { go } from "../route";
+import { go, replace, route } from "../route";
+import {
+  allRows, askKey, forgeHosts, fromList, hasMore, loadList, loadMore, nextAfter, pageNeighbours, placeKey, shownRows, workList,
+} from "../model/workLists";
 
-/** How many pages of reports/nodes a list reads for its lineage: at most 500 nodes. */
-const lineagePages = 5;
-
-/** A machine's page of a forge list, and the cursor to its next. */
-interface HostList { host: string; items: ForgeItem[]; cursor?: string | undefined; errors: ForgeListError[] }
-
-/** The lineage of a kind, at most `lineagePages` pages of it; none when the control plane does not list nodes. */
-async function readLineage(store: Store, kind: WorkKind, sort: ReportNodesSort, cursor?: string): Promise<{ nodes: ReportNode[]; cursor?: string | undefined }> {
-  const nodes: ReportNode[] = [];
-  let next = cursor;
-  for (let i = 0; i < lineagePages; i++) {
-    const page = await store.link.call("reports/nodes", { kind, sort, limit: 100, ...next ? { cursor: next } : {} });
-    nodes.push(...page.nodes);
-    next = page.cursor;
-    if (!next || !fromForge(kind)) break;
-  }
-  return { nodes, cursor: next };
-}
-
-const forgeState = (s: WorkState) => s === "open" ? "open" : s === "all" ? "all" : "closed";
+// Back on a list, no page is opened from it yet: a pasted address of the last one opened has no Previous or Next.
+effect(() => { if (route.value.nav === "work" && !route.value.item) fromList.value = undefined; });
 
 export function WorkList({ store, kind }: { store: Store; kind: WorkKind }) {
-  const filter = useSignal<WorkFilter>(anyFilter);
-  const sort = useSignal<WorkSort>("updated");
-  const lists = useSignal<HostList[] | null>(null);
-  const lineage = useSignal<ReportNode[]>([]);
-  const lineageCursor = useSignal<string | undefined>(undefined);
-  const problem = useSignal<string | null>(null);
-  const more = useSignal(false);
-  const asked = useSignal(0);
-  const hosts = store.hosts.value.filter((h) => hostAnswers(h.state) && store.has(h.id, Capability.forge1));
-  const hostKey = hosts.map((h) => h.id).join(",");
+  // The list's state lives for the tab (#3257), so an item's page can go through it and Back finds it as it was.
+  const l = workList(kind);
+  const { filter, sort, lists, problem, more } = l;
+  const hosts = forgeHosts(store);
   const state = filter.value.state;
-  // An issue's or a PR's lineage is joined by ref, in any order; a milestone's or a release's list is lineage's own.
-  const nodesSort: ReportNodesSort = !fromForge(kind) && sort.value === "cost" ? "cost" : "newest";
+  const ask = askKey(store, l);
+  useEffect(() => { void loadList(store, l); }, [kind, ask]);
+  // Back from an item's page: the list at the row last opened.
+  const shownOnce = lists.value !== null;
   useEffect(() => {
-    let current = true;
-    lists.value = null;
-    lineage.value = [];
-    problem.value = null;
-    void (async () => {
-      // Lineage first, so the rows come with their figures; a control plane that does not list nodes gives none.
-      const known = await readLineage(store, kind, nodesSort).catch((e: unknown) => {
-        if (current && !(e instanceof CallFailed && e.code === -32601) && !fromForge(kind)) problem.value = describe(e);
-        return { nodes: [] as ReportNode[], cursor: undefined };
-      });
-      if (!current) return;
-      lineage.value = known.nodes;
-      lineageCursor.value = known.cursor;
-      if (!fromForge(kind)) { lists.value = []; return; }
-      const method = kind === "issue" ? "forge/issues" : "forge/pulls";
-      const read = await Promise.all(hosts.map(async (h): Promise<HostList> => {
-        try {
-          const got = await store.link.call(method, { state: forgeState(state), limit: 100 }, h.id);
-          return { host: h.id, items: got.items, cursor: got.cursor, errors: got.errors ?? [] };
-        } catch (e) {
-          return { host: h.id, items: [], errors: [{ forge: "", message: describe(e) }] };
-        }
-      }));
-      if (current) lists.value = read;
-    })();
-    return () => { current = false; };
-  }, [kind, hostKey, forgeState(state), nodesSort, asked.value]);
+    const opened = l.opened.peek();
+    if (shownOnce && opened) document.querySelector(`[data-ref="${CSS.escape(opened)}"]`)?.scrollIntoView({ block: "center" });
+  }, [shownOnce]);
 
-  const loadMore = async () => {
-    more.value = true;
-    try {
-      if (fromForge(kind)) {
-        const method = kind === "issue" ? "forge/issues" : "forge/pulls";
-        const read = await Promise.all((lists.value ?? []).map(async (l) => {
-          if (!l.cursor) return l;
-          const got = await store.link.call(method, { state: forgeState(state), limit: 100, cursor: l.cursor }, l.host);
-          return { ...l, items: [...l.items, ...got.items], cursor: got.cursor, errors: got.errors ?? [] };
-        }));
-        lists.value = read;
-      } else if (lineageCursor.value) {
-        const next = await readLineage(store, kind, nodesSort, lineageCursor.value);
-        lineage.value = [...lineage.value, ...next.nodes];
-        lineageCursor.value = next.cursor;
-      }
-    } catch (e) {
-      problem.value = describe(e);
-    } finally {
-      more.value = false;
-    }
-  };
-
-  const all: WorkRow[] = fromForge(kind) ? mergeForge(lists.value ?? [], lineage.value) : lineage.value.map(lineageRow);
+  const all = allRows(l);
   const offered = choices(all);
-  // Milestones and releases have no state in v1.
-  const rows = sortRows(filterRows(all, fromForge(kind) ? filter.value : { ...filter.value, state: "all" }), sort.value);
-  const errors = (lists.value ?? []).flatMap((l) => l.errors.map((e) => errorWords(e, hosts.length > 1 ? store.hosts.value.find((h) => h.id === l.host)?.name : undefined)));
-  const hasMore = fromForge(kind) ? (lists.value ?? []).some((l) => l.cursor) : !!lineageCursor.value;
+  const rows = shownRows(l);
+  const errors = (lists.value ?? []).flatMap((h) => h.errors.map((e) => errorWords(e, hosts.length > 1 ? store.hosts.value.find((x) => x.id === h.host)?.name : undefined)));
   const set = (patch: Partial<WorkFilter>) => { filter.value = { ...filter.value, ...patch }; };
   const states: WorkState[] = kind === "pr" ? ["open", "merged", "closed", "all"] : ["open", "closed", "all"];
 
@@ -141,7 +70,7 @@ export function WorkList({ store, kind }: { store: Store; kind: WorkKind }) {
         </select></label>
         <input type="search" placeholder="Filter" aria-label="Filter by words" value={filter.value.text}
           onInput={(e) => set({ text: (e.target as HTMLInputElement).value })} />
-        <button type="button" class="link" onClick={() => { asked.value++; }}>Refresh</button>
+        <button type="button" class="link" onClick={() => { l.asked.value++; }}>Refresh</button>
       </div>
       {problem.value && <p class="hint">{problem.value}</p>}
       {errors.map((e) => <p key={e} class="hint">{e}</p>)}
@@ -151,10 +80,10 @@ export function WorkList({ store, kind }: { store: Store; kind: WorkKind }) {
         : (
           <ul class="work-rows">
             {rows.map((r) => <WorkRowView key={r.node.ref} row={r} several={offered.repos.length > 1}
-              open={() => go({ nav: "work", section: kind, item: r.node.ref })} />)}
+              open={() => { l.opened.value = r.node.ref; fromList.value = placeKey(kind, r.node.ref); go({ nav: "work", section: kind, item: r.node.ref }); }} />)}
           </ul>
         )}
-      {hasMore && <button type="button" class="link" disabled={more.value} onClick={() => void loadMore()}>{more.value ? "Loading…" : "More"}</button>}
+      {hasMore(l) && <button type="button" class="link" disabled={more.value} onClick={() => void loadMore(store, l)}>{more.value ? "Loading…" : "More"}</button>}
       {!fromForge(kind) && <p class="quiet small">{lineageOnlyNote}</p>}
     </div>
   );
@@ -189,7 +118,7 @@ export function StatePill({ state, draft }: { state: string; draft?: boolean | u
 function WorkRowView({ row, several, open }: { row: WorkRow; several: boolean; open: () => void }) {
   const figures = lineageWords(row.lineage);
   return (
-    <li>
+    <li data-ref={row.node.ref}>
       <button type="button" class="work-row" onClick={open}>
         <span class="work-row-head">
           {!titleSaysRef(row) && <span class="work-ref">{shortRef(row.node.ref)}</span>}
@@ -311,6 +240,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
         <button type="button" title="Forward" aria-label="Forward" onClick={() => history.forward()}>›</button>
         <button type="button" class="link" onClick={() => go({ nav: "work", section: kind })}>All {workKindTitle[kind].toLowerCase()}</button>
         <button type="button" class="link" onClick={() => { asked.value++; }}>Refresh</button>
+        <Stepper store={store} kind={kind} at={ref} />
       </div>
       <header class="work-page-head">
         <h2><span class="work-title">{title}</span> {!titleSaysRef({ title, node }) && <span class="work-ref">{shortRef(ref)}</span>}</h2>
@@ -380,6 +310,41 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
           )}
       </section>
     </article>
+  );
+}
+
+/** Previous and Next through the list the page was opened from (#3257), j and k, and where the page
+ * stands in it. Each replaces the place, so Back goes to the list. None on a page opened from a link or an address. */
+function Stepper({ store, kind, at }: { store: Store; kind: WorkKind; at: string }) {
+  const n = pageNeighbours(kind, at);
+  const l = workList(kind);
+  const more = hasMore(l);
+  const to = (ref: string | undefined) => {
+    if (!ref) return;
+    l.opened.value = ref;
+    fromList.value = placeKey(kind, ref);
+    replace({ nav: "work", section: kind, item: ref });
+  };
+  const next = async () => { to(await nextAfter(store, kind, at)); };
+  useEffect(() => {
+    if (!n) return;
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (e.metaKey || e.ctrlKey || e.altKey || target?.closest("input, textarea, select, [contenteditable=true]")) return;
+      if (e.key === "j") { e.preventDefault(); void next(); }
+      if (e.key === "k") { e.preventDefault(); to(n.previous); }
+    };
+    addEventListener("keydown", onKey);
+    return () => removeEventListener("keydown", onKey);
+  }, [kind, at, n?.previous, n?.next]);
+  if (!n) return null;
+  return (
+    <span class="work-stepper">
+      <button type="button" title="Previous (k)" aria-label="Previous" disabled={!n.previous} onClick={() => to(n.previous)}>↑</button>
+      <span class="quiet small">{positionWords(n, more)}</span>
+      <button type="button" title="Next (j)" aria-label="Next" disabled={(!n.next && !more) || l.more.value} onClick={() => void next()}>
+        {l.more.value ? "…" : "↓"}</button>
+    </span>
   );
 }
 

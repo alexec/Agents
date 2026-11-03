@@ -46,15 +46,15 @@ func TestCostGoesOnTheActiveLinks(t *testing.T) {
 		t.Fatalf("issue %+v", got.Own)
 	}
 
-	// No link at all: on the session, said as unlinked in its project.
+	// No link at all: on the session, said as unlinked in its repo.
 	b := seeded(t, d, folder, nil)
 	d.bankSessionCost(b.ID, wire.Cost{Amount: 0.25, Currency: "USD"})
 	if got := d.lineageCost(sessionNode(b.ID)); usd(got.Own) != 0.25 {
 		t.Fatalf("session %+v", got.Own)
 	}
-	project := d.lineageCost(wire.LineageNode{Kind: lineage.KindProject, Ref: "github:alexec/agents"})
-	if usd(project.Total) != 3.25 || usd(project.Unlinked) != 0.25 {
-		t.Fatalf("project %+v", project)
+	repo := d.lineageCost(wire.LineageNode{Kind: lineage.KindRepo, Ref: "github:alexec/agents"})
+	if usd(repo.Total) != 3.25 || usd(repo.Unlinked) != 0.25 {
+		t.Fatalf("repo %+v", repo)
 	}
 }
 

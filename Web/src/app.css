@@ -1852,6 +1852,8 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .work-state.draft { background: #59636e; }
 .work-page-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
 .work-page-bar > button:not(.link) { min-width: 28px; }
+.work-stepper { display: inline-flex; gap: 6px; align-items: center; margin-left: auto; }
+.work-stepper > button { min-width: 28px; }
 .work-page-head h2 { margin: 0 0 4px; }
 .work-page-head .work-ref { font-weight: normal; }
 .work-page section { margin-top: 16px; }

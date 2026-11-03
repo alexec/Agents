@@ -353,7 +353,7 @@ func workspacesNote(listed wire.AgentMachines) string {
 	}
 	// Every machine of the person's, for start_session's machine (#2887).
 	if len(listed.Hosts) > 0 {
-		lines = append(lines, "The person's machines, where start_session with machine and folder starts a session once the person says yes:")
+		lines = append(lines, "The person's machines, where start_session with machine starts a session, in this project's folder there or in folder, once the person says yes:")
 		for _, h := range listed.Hosts {
 			lines = append(lines, "  - "+h.Name+": "+h.State)
 		}

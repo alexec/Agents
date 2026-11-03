@@ -2807,6 +2807,48 @@
       }
     },
     {
+      "name": "machines/projectFolders",
+      "x-capability": "sessions.project/1",
+      "description": "Through host/machines only (#3277): the project's folders on each of the person's machines, so an agent's start_session with machine alone starts in the project's folder there.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ProjectFoldersRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ProjectFolders"
+        }
+      }
+    },
+    {
+      "name": "machines/projectSessions",
+      "x-capability": "sessions.project/1",
+      "description": "Through host/machines only (#3277): projects/sessions for an agent, so its list_sessions, read_session, message_session and wait_for_agents reach the project's sessions on every one of the person's machines. Refused unless the asking machine has a folder of the project.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ProjectSessionsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ProjectSessions"
+        }
+      }
+    },
+    {
       "name": "machines/sendFolder",
       "x-capability": "folders.to-machine/1",
       "description": "Through host/machines only: one step of an agent's start_session with send (#2929), which sends this folder's branch to another of the person's machines, as Send to ‹machine›… does, or of its bring_back (#2947), which brings a branch back from there, as Bring Back from ‹machine›… does. The control plane sends that machine's folders/receiveState, folders/receiveUpload, folders/receive, folders/sendFacts, folders/sendPack or folders/sendRead; the machine has to be online.",

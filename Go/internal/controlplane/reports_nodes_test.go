@@ -76,7 +76,7 @@ func TestReportsNodesListsEachKind(t *testing.T) {
 	// Own 1 + 2 (two machines); total adds both PRs; the closed PR is waste; s1 once.
 	if one.Cost.Own.Cost["USD"] != 3 || one.Cost.Total.Cost["USD"] != 10 || one.Cost.Waste.Cost["USD"] != 3 ||
 		one.Sessions != 3 || one.Resolved == nil || one.Resolved.Title != "Fix it" ||
-		one.Project == nil || *one.Project != "github:o/r" || one.LeadTimeSeconds == nil {
+		one.Repo == nil || *one.Repo != "github:o/r" || one.LeadTimeSeconds == nil {
 		t.Fatalf("%+v", one)
 	}
 	prs := list(admin, wire.ReportNodesQuery{Kind: "pr", Scope: org, Sort: new(wire.ReportNodesSortCost)})

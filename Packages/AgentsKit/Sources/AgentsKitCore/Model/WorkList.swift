@@ -102,7 +102,7 @@ public enum WorkList {
             self.init(node: n.node, title: n.resolved?.title ?? ReportValueWords.name(n.node),
                       state: n.resolved?.state ?? (n.outcome == "merged" ? "merged" : ""),
                       labels: (n.resolved?.labels ?? []).map { DaemonAPI.ForgeLabel(name: $0) },
-                      repo: n.project ?? WorkList.repo(of: n.node.ref), updated: n.lastAt,
+                      repo: n.repo ?? WorkList.repo(of: n.node.ref), updated: n.lastAt,
                       url: WorkList.url(n.node), lineage: n)
         }
     }
@@ -225,6 +225,28 @@ public enum WorkList {
                 return tie(a, b)
             }
         }
+    }
+
+    /// Where an item's page stands in the list it was opened from (#3257): the refs above and
+    /// below it, and its place, counted from 1.
+    public struct Neighbours: Sendable, Hashable {
+        public var previous: String?
+        public var next: String?
+        public var position: Int
+        public var count: Int
+    }
+
+    /// The item's neighbours in `rows`, the list as it is filtered and sorted; nil when the ref is not in it.
+    public static func neighbours(of ref: String, in rows: [Row]) -> Neighbours? {
+        guard let i = rows.firstIndex(where: { $0.node.ref == ref }) else { return nil }
+        return Neighbours(previous: i > 0 ? rows[i - 1].node.ref : nil,
+                          next: i + 1 < rows.count ? rows[i + 1].node.ref : nil,
+                          position: i + 1, count: rows.count)
+    }
+
+    /// "3 of 42"; "3 of 42+" while the list has more pages to read.
+    public static func positionWords(_ n: Neighbours, more: Bool) -> String {
+        "\(n.position) of \(n.count)\(more ? "+" : "")"
     }
 
     /// The choices of a filter's menu, from the rows read: their repos, labels and assignees, sorted.
@@ -438,10 +460,14 @@ public enum WorkList {
 public struct WorkPlace: Hashable, Sendable {
     public var kind: WorkList.Kind
     public var ref: String?
+    /// The page was opened from its kind's list (#3257), so it has Previous and Next through it.
+    /// A page opened from a lineage link or an address has not.
+    public var fromList: Bool
 
-    public init(kind: WorkList.Kind, ref: String? = nil) {
+    public init(kind: WorkList.Kind, ref: String? = nil, fromList: Bool = false) {
         self.kind = kind
         self.ref = ref
+        self.fromList = fromList && ref != nil
     }
 
     public var node: DaemonAPI.LineageNode? { ref.map { DaemonAPI.LineageNode(kind: kind.rawValue, ref: $0) } }

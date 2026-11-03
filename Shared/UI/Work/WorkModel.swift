@@ -8,6 +8,8 @@ import SwiftUI
 protocol WorkModel: AnyObject, Sendable {
     /// Work's places: the list or the item's page open, and the ones before and after it.
     var workHistory: LineageHistory<WorkPlace> { get set }
+    /// Each Work list's filters, sort and rows (#3257), kept while the app runs.
+    var workLists: WorkLists { get }
     /// Open Work at a place: a list, or an item's page.
     func showWork(_ place: WorkPlace)
     /// The machines that read their forges, the home one first.
@@ -39,6 +41,32 @@ protocol WorkModel: AnyObject, Sendable {
 extension WorkModel {
     /// Where Work is: Issues until something else is opened.
     var workPlace: WorkPlace { workHistory.current ?? WorkPlace(kind: .issue) }
+
+    /// Where the item's page open stands in the list it was opened from (#3257); nil on a list,
+    /// or on a page opened from a link or an address.
+    var workNeighbours: WorkList.Neighbours? {
+        let place = workPlace
+        guard place.fromList, let ref = place.ref else { return nil }
+        return workLists[place.kind].neighbours(of: ref)
+    }
+
+    /// Whether Next can go on: a row below, or another page to read.
+    var workHasNext: Bool {
+        guard let n = workNeighbours else { return false }
+        return n.next != nil || workLists[workPlace.kind].hasMore
+    }
+
+    /// Previous or Next (#3257): the row above or below, in place of this one, so Back goes to
+    /// the list and not through each item. Next at the last row read reads the next page first.
+    func stepWork(forward: Bool) async {
+        let place = workPlace
+        guard let n = workNeighbours, let ref = place.ref else { return }
+        let list = workLists[place.kind]
+        let to = forward ? await list.next(after: ref, model: self) : n.previous
+        guard let to, workPlace == place else { return }
+        list.opened = to
+        workHistory.replace(WorkPlace(kind: place.kind, ref: to, fromList: true))
+    }
 }
 
 extension View {

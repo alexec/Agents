@@ -2315,7 +2315,7 @@ const ConnectorEventsStateOff ConnectorEventsState = "off"
 const ConnectorEventsStateTaken ConnectorEventsState = "taken"
 const ConnectorEventsStateFailed ConnectorEventsState = "failed"
 
-// The one real thing a slot read: the newest issue or pull request, or the last workflow run.
+// The one real thing a slot read: the newest issue or pull request, the last workflow run, or the newest doc in the folder (its path as the title).
 type ConnectorProof struct {
 	// The issue or pull request number.
 	Number *int64 `json:"number,omitzero"`
@@ -2397,7 +2397,7 @@ type ConnectorSkipRequest struct {
 type ConnectorSlot struct {
 	Slot ConnectorSlotKind `json:"slot"`
 
-	// What fills it, in words: GitHub Issues, GitHub pull requests, GitHub Actions, This Mac.
+	// What fills it, in words: GitHub Issues, GitHub pull requests, GitHub Actions, This folder (docs), This Mac.
 	Choice string `json:"choice"`
 
 	State ConnectorSlotState `json:"state"`
@@ -2414,14 +2414,18 @@ type ConnectorSlot struct {
 
 	// The folder's project sets this slot (#2669), so it is the same in every folder of the project.
 	FromProject *bool `json:"fromProject,omitzero"`
+
+	// Docs only (#3248): the docs connectors that fill the slot beside this folder, by their names in the folder's or the person's mcp.json. Absent with none.
+	Servers []string `json:"servers,omitzero"`
 }
 
-// One slot of a folder's set-up (#1336), in the page's order: tasks (the tracker), codeReview, ci, and workspace (where agents run).
+// One slot of a folder's set-up (#1336), in the page's order: tasks (the tracker), codeReview, ci, docs (where the docs live, #3248), and workspace (where agents run).
 type ConnectorSlotKind string
 
 const ConnectorSlotKindTasks ConnectorSlotKind = "tasks"
 const ConnectorSlotKindCodeReview ConnectorSlotKind = "codeReview"
 const ConnectorSlotKindCi ConnectorSlotKind = "ci"
+const ConnectorSlotKindDocs ConnectorSlotKind = "docs"
 const ConnectorSlotKindWorkspace ConnectorSlotKind = "workspace"
 
 // notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach the provider; message says why. refused: the provider refused the read, so the person grants it on the provider's site. noRemote: the folder has no GitHub or GitLab remote. skipped: the person skipped it; it counts as done.
@@ -4862,12 +4866,12 @@ type LineageCost struct {
 	WaitingSeconds float64 `json:"waitingSeconds"`
 }
 
-// One node's banked cost on a machine (#2350), whole, with what its rollups need: the project its ref is in, the issues a PR fixes (ended links too: a PR closed without a merge still counts against its issue, as waste), the milestones it is part of, and how a PR ended. A session's own cost is its turns that had no active link.
+// One node's banked cost on a machine (#2350), whole, with what its rollups need: the repo or tracker its ref is in, the issues a PR fixes (ended links too: a PR closed without a merge still counts against its issue, as waste), the milestones it is part of, and how a PR ended. A session's own cost is its turns that had no active link.
 type LineageCostNode struct {
 	Node LineageNode `json:"node"`
 
-	// The repo or tracker the node is in: github:alexec/agents, linear, or for a session its folder's repo (folder:<name> without one).
-	Project *string `json:"project,omitzero"`
+	// The repo or tracker the node is in: github:alexec/agents, linear, or for a session its folder's repo (folder:<name> without one). Not a project (#3275).
+	Repo *string `json:"repo,omitzero"`
 
 	Banked LineageCost `json:"banked"`
 
@@ -4898,7 +4902,7 @@ type LineageCostNode struct {
 	Sessions []string `json:"sessions,omitzero"`
 }
 
-// lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total adds its parts: an issue's PRs (the PRs that fix it); a milestone's issues, their PRs and the PRs part of it; a project's every node (kind project, ref github:alexec/agents). waste is the parts' PRs closed without a merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is the nodes added up, newest first, at most 500; limited says there are more.
+// lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total adds its parts: an issue's PRs (the PRs that fix it); a milestone's issues, their PRs and the PRs part of it; a repo's every node (kind repo, ref github:alexec/agents). waste is the parts' PRs closed without a merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is the nodes added up, newest first, at most 500; limited says there are more.
 type LineageCostRollup struct {
 	Node LineageNode `json:"node"`
 
@@ -7722,6 +7726,16 @@ type ProjectFolder struct {
 	Name string `json:"name"`
 }
 
+// machines/projectFolders (#3277): the project's folders on each of the person's machines, as they joined it, so start_session with machine alone picks the project's folder there.
+type ProjectFolders struct {
+	Machines []ProjectMachineFolders `json:"machines"`
+}
+
+// machines/projectFolders (#3277): the project.
+type ProjectFoldersRequest struct {
+	Project string `json:"project"`
+}
+
 // projects/list (#2317): the organisation's projects, by name.
 type ProjectList struct {
 	Projects []Project `json:"projects"`
@@ -7732,6 +7746,15 @@ type ProjectMachine struct {
 	Machine MachineRef `json:"machine"`
 
 	MachineName string `json:"machineName"`
+}
+
+// One machine of machines/projectFolders (#3277): its id and name, and the absolute paths of its folders in the project.
+type ProjectMachineFolders struct {
+	Machine MachineRef `json:"machine"`
+
+	MachineName string `json:"machineName"`
+
+	Folders []string `json:"folders"`
 }
 
 // projects/remove (#2317): the project. Refused while a folder names it.
@@ -8354,7 +8377,7 @@ type ReportNode struct {
 	Node LineageNode `json:"node"`
 
 	// The repo or tracker the node is in, as LineageCostNode's.
-	Project *string `json:"project,omitzero"`
+	Repo *string `json:"repo,omitzero"`
 
 	Resolved *LineageResolved `json:"resolved,omitzero"`
 
@@ -9355,6 +9378,12 @@ type SessionCall struct {
 
 	// With op message: replace the message of the starter's that waits, as message_session's replace.
 	Replace *bool `json:"replace,omitzero"`
+
+	// The asking agent's project (#3277). The host also answers status, read and message for a session that from did not start, when its folder is in this project now; stop and archive stay the starter's. The control plane checks that the asking machine has a folder of it.
+	Project *string `json:"project,omitzero"`
+
+	// With op status and project (#3277): the asker waits on it with wait_for_agents, so the host tells the asker's machine when it ends, as it tells a starter.
+	Watch *bool `json:"watch,omitzero"`
 }
 
 // What agents/fromStarter says (#2927): the words for the agent, the session's title, and how it ended, absent while it goes on.

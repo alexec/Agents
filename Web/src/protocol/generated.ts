@@ -1943,7 +1943,10 @@ export type ConnectorEventsState =
   | "taken"
   | "failed";
 
-/** The one real thing a slot read: the newest issue or pull request, or the last workflow run. */
+/**
+ * The one real thing a slot read: the newest issue or pull request, the last workflow run, or the
+ * newest doc in the folder (its path as the title).
+ */
 export interface ConnectorProof {
   /** The issue or pull request number. */
   number?: number;
@@ -2027,7 +2030,10 @@ export interface ConnectorSkipRequest {
  */
 export interface ConnectorSlot {
   slot: ConnectorSlotKind;
-  /** What fills it, in words: GitHub Issues, GitHub pull requests, GitHub Actions, This Mac. */
+  /**
+   * What fills it, in words: GitHub Issues, GitHub pull requests, GitHub Actions, This folder
+   * (docs), This Mac.
+   */
   choice: string;
   state: ConnectorSlotState;
   proof?: ConnectorProof;
@@ -2043,16 +2049,22 @@ export interface ConnectorSlot {
    * The folder's project sets this slot (#2669), so it is the same in every folder of the project.
    */
   fromProject?: boolean;
+  /**
+   * Docs only (#3248): the docs connectors that fill the slot beside this folder, by their names in
+   * the folder's or the person's mcp.json. Absent with none.
+   */
+  servers?: string[];
 }
 
 /**
  * One slot of a folder's set-up (#1336), in the page's order: tasks (the tracker), codeReview, ci,
- * and workspace (where agents run).
+ * docs (where the docs live, #3248), and workspace (where agents run).
  */
 export type ConnectorSlotKind =
   | "tasks"
   | "codeReview"
   | "ci"
+  | "docs"
   | "workspace";
 
 /**
@@ -4046,18 +4058,18 @@ export interface LineageCost {
 }
 
 /**
- * One node's banked cost on a machine (#2350), whole, with what its rollups need: the project its
- * ref is in, the issues a PR fixes (ended links too: a PR closed without a merge still counts
- * against its issue, as waste), the milestones it is part of, and how a PR ended. A session's own
- * cost is its turns that had no active link.
+ * One node's banked cost on a machine (#2350), whole, with what its rollups need: the repo or
+ * tracker its ref is in, the issues a PR fixes (ended links too: a PR closed without a merge still
+ * counts against its issue, as waste), the milestones it is part of, and how a PR ended. A
+ * session's own cost is its turns that had no active link.
  */
 export interface LineageCostNode {
   node: LineageNode;
   /**
    * The repo or tracker the node is in: github:alexec/agents, linear, or for a session its folder's
-   * repo (folder:<name> without one).
+   * repo (folder:<name> without one). Not a project (#3275).
    */
-  project?: string;
+  repo?: string;
   banked: LineageCost;
   /** A PR's issues, by ref. */
   fixes?: string[];
@@ -4091,9 +4103,9 @@ export interface LineageCostNode {
 /**
  * lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total
  * adds its parts: an issue's PRs (the PRs that fix it); a milestone's issues, their PRs and the PRs
- * part of it; a project's every node (kind project, ref github:alexec/agents). waste is the parts'
- * PRs closed without a merge or reverted. unlinked is the parts' sessions: turns with no active
- * link. parts is the nodes added up, newest first, at most 500; limited says there are more.
+ * part of it; a repo's every node (kind repo, ref github:alexec/agents). waste is the parts' PRs
+ * closed without a merge or reverted. unlinked is the parts' sessions: turns with no active link.
+ * parts is the nodes added up, newest first, at most 500; limited says there are more.
  */
 export interface LineageCostRollup {
   node: LineageNode;
@@ -6413,6 +6425,19 @@ export interface ProjectFolder {
   name: string;
 }
 
+/**
+ * machines/projectFolders (#3277): the project's folders on each of the person's machines, as they
+ * joined it, so start_session with machine alone picks the project's folder there.
+ */
+export interface ProjectFolders {
+  machines: ProjectMachineFolders[];
+}
+
+/** machines/projectFolders (#3277): the project. */
+export interface ProjectFoldersRequest {
+  project: string;
+}
+
 /** projects/list (#2317): the organisation's projects, by name. */
 export interface ProjectList {
   projects: Project[];
@@ -6422,6 +6447,16 @@ export interface ProjectList {
 export interface ProjectMachine {
   machine: MachineRef;
   machineName: string;
+}
+
+/**
+ * One machine of machines/projectFolders (#3277): its id and name, and the absolute paths of its
+ * folders in the project.
+ */
+export interface ProjectMachineFolders {
+  machine: MachineRef;
+  machineName: string;
+  folders: string[];
 }
 
 /** projects/remove (#2317): the project. Refused while a folder names it. */
@@ -6976,7 +7011,7 @@ export type ReportFormat =
 export interface ReportNode {
   node: LineageNode;
   /** The repo or tracker the node is in, as LineageCostNode's. */
-  project?: string;
+  repo?: string;
   resolved?: LineageResolved;
   cost: ReportNodeCost;
   sessions: number;
@@ -7760,6 +7795,17 @@ export interface SessionCall {
    * With op message: replace the message of the starter's that waits, as message_session's replace.
    */
   replace?: boolean;
+  /**
+   * The asking agent's project (#3277). The host also answers status, read and message for a
+   * session that from did not start, when its folder is in this project now; stop and archive stay
+   * the starter's. The control plane checks that the asking machine has a folder of it.
+   */
+  project?: string;
+  /**
+   * With op status and project (#3277): the asker waits on it with wait_for_agents, so the host
+   * tells the asker's machine when it ends, as it tells a starter.
+   */
+  watch?: boolean;
 }
 
 /**
@@ -10572,7 +10618,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConnectorSetup: { required: ["folder", "slots", "events", "done"], optional: ["repository", "forge", "site", "repositoryURL", "connection", "installed", "installURL", "repositories", "project", "projectName"] },
   ConnectorSetupRequest: { required: ["folder"], optional: ["reading"] },
   ConnectorSkipRequest: { required: ["folder", "slot", "skipped"], optional: [] },
-  ConnectorSlot: { required: ["slot", "choice", "state"], optional: ["proof", "readAt", "message", "repository", "fromProject"] },
+  ConnectorSlot: { required: ["slot", "choice", "state"], optional: ["proof", "readAt", "message", "repository", "fromProject", "servers"] },
   ConnectorWorkflow: { required: ["id", "name"], optional: [] },
   ConsoleStopAgent: { required: ["host", "agent"], optional: [] },
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
@@ -10774,7 +10820,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Levels: { required: [], optional: ["model", "permission", "permissionRequests"] },
   LineMember: { required: ["agentID", "askedAt", "isCallOpen"], optional: [] },
   LineageCost: { required: ["cost", "inputTokens", "outputTokens", "turns", "workingSeconds", "waitingSeconds"], optional: ["limitTokens"] },
-  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["project", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "endedAt", "resolved", "sessions"] },
+  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["repo", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "endedAt", "resolved", "sessions"] },
   LineageCostRollup: { required: ["node", "own", "total", "waste", "unlinked", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "parts"], optional: ["limited"] },
   LineageEndRequest: { required: ["from", "to", "rel"], optional: [] },
   LineageGraph: { required: ["nodes", "links"], optional: ["limited", "resolving", "resolved"] },
@@ -10995,8 +11041,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PrewarmRequest: { required: ["agentID", "why"], optional: [] },
   Project: { required: ["id", "name", "owner", "folders", "mayChange"], optional: ["slots"] },
   ProjectFolder: { required: ["machine", "folder", "name"], optional: [] },
+  ProjectFolders: { required: ["machines"], optional: [] },
+  ProjectFoldersRequest: { required: ["project"], optional: [] },
   ProjectList: { required: ["projects"], optional: [] },
   ProjectMachine: { required: ["machine", "machineName"], optional: [] },
+  ProjectMachineFolders: { required: ["machine", "machineName", "folders"], optional: [] },
   ProjectRequest: { required: ["id"], optional: [] },
   ProjectSession: { required: ["machine", "machineName", "session"], optional: [] },
   ProjectSessions: { required: ["sessions", "unreached"], optional: [] },
@@ -11057,7 +11106,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RenameRequest: { required: ["agentID", "title"], optional: [] },
   ReportCounts: { required: ["sessions", "failedSessions", "prsOpened", "prsMerged", "prsReverted", "mergeSeconds", "waits", "waitBuckets", "workflowRuns", "workflowFailures"], optional: [] },
   ReportExport: { required: ["text", "count", "format"], optional: [] },
-  ReportNode: { required: ["node", "cost", "sessions", "lastAt"], optional: ["project", "resolved", "leadTimeSeconds", "outcome"] },
+  ReportNode: { required: ["node", "cost", "sessions", "lastAt"], optional: ["repo", "resolved", "leadTimeSeconds", "outcome"] },
   ReportNodeCost: { required: ["own", "total", "waste"], optional: [] },
   ReportNodes: { required: ["nodes", "limited", "unresolved"], optional: ["cursor"] },
   ReportNodesQuery: { required: ["kind"], optional: ["state", "repo", "label", "since", "sort", "cursor", "limit", "scope"] },
@@ -11123,7 +11172,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SentNotice: { required: ["title", "outcome"], optional: ["body", "nextAt", "to"] },
   ServedRequest: { required: ["kind", "outcome"], optional: [] },
   ServerReachabilityChange: { required: ["server", "online"], optional: [] },
-  SessionCall: { required: ["from", "session", "op"], optional: ["message", "replace"] },
+  SessionCall: { required: ["from", "session", "op"], optional: ["message", "replace", "project", "watch"] },
   SessionCallReply: { required: ["said"], optional: ["title", "ended"] },
   SessionEnded: { required: ["machine", "session", "starter", "how"], optional: ["title"] },
   SessionLabel: { required: ["value", "owner", "addedAt"], optional: [] },

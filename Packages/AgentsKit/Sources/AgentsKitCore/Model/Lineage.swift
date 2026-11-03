@@ -77,7 +77,7 @@ public extension DaemonAPI {
     /// One node's banked cost on a machine, with what its rollups need.
     struct LineageCostNode: Codable, Sendable, Hashable {
         public var node: LineageNode
-        public var project: String?
+        public var repo: String?
         public var banked: LineageCost
         public var fixes: [String]?
         public var partOf: [String]?
@@ -90,11 +90,11 @@ public extension DaemonAPI {
         /// The sessions that worked on it, by ref, at most 20 (#3118).
         public var sessions: [String]?
 
-        public init(node: LineageNode, project: String? = nil, banked: LineageCost = .init(), fixes: [String]? = nil,
+        public init(node: LineageNode, repo: String? = nil, banked: LineageCost = .init(), fixes: [String]? = nil,
                     partOf: [String]? = nil, outcome: String? = nil, failedChecks: Int? = nil, lastAt: Date,
                     resolved: LineageResolved? = nil, sessions: [String]? = nil) {
             self.node = node
-            self.project = project
+            self.repo = repo
             self.banked = banked
             self.fixes = fixes
             self.partOf = partOf
@@ -369,6 +369,14 @@ public struct LineageHistory<Place: Hashable & Sendable>: Hashable, Sendable {
         places = Array(places.prefix(at + 1)) + [place]
         if places.count > Self.most { places.removeFirst(places.count - Self.most) }
         at = places.count - 1
+    }
+
+    /// Put a place where the current one is, as the browser's `replaceState` (#3257): Previous and
+    /// Next on a Work page, so Back goes to the list and not through each item.
+    public mutating func replace(_ place: Place) {
+        guard places.indices.contains(at) else { return go(place) }
+        places[at] = place
+        places = Array(places.prefix(at + 1))
     }
 
     public mutating func back() { if canGoBack { at -= 1 } }
