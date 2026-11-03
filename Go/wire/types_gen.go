@@ -4179,11 +4179,31 @@ type FoldersListRequest struct {
 	IncludeArchived bool `json:"includeArchived"`
 }
 
+// forge/add-child (#3271): add a child to an epic's plan: a new issue (title, with level story, task, spike or bug) or one that is there (issue: #12, owner/repo#12, its URL, or a Linear key such as ENG-4). A new child gets the level's label and the epic's feature: label. GitHub and Linear.
+type ForgeAddChildRequest struct {
+	Node LineageNode `json:"node"`
+
+	Title *string `json:"title,omitzero"`
+
+	Level *string `json:"level,omitzero"`
+
+	Issue *string `json:"issue,omitzero"`
+}
+
 // forge/approve (#3130): approve a pull request at sha, the head commit its page shows (refused when the head moved).
 type ForgeApproveRequest struct {
 	Node LineageNode `json:"node"`
 
 	Sha string `json:"sha"`
+}
+
+// forge/blocked-by (#3271): the issues that block a child of a plan, to add and to take off, by node. GitHub and Linear.
+type ForgeBlockedByRequest struct {
+	Node LineageNode `json:"node"`
+
+	Add []LineageNode `json:"add,omitzero"`
+
+	Remove []LineageNode `json:"remove,omitzero"`
 }
 
 // One of a pull request's checks (#3129): a check run or a commit status. state is passing, failing, running or skipped; url is its page on the forge.

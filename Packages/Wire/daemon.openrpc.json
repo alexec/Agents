@@ -3792,6 +3792,31 @@
       }
     },
     {
+      "name": "forge/add-child",
+      "x-capability": "forge-write/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ForgeAddChildRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ForgeDone"
+        }
+      }
+    },
+    {
       "name": "forge/approve",
       "x-capability": "forge-write/1",
       "tags": [
@@ -3806,6 +3831,31 @@
           "required": true,
           "schema": {
             "$ref": "daemon.schema.json#/definitions/ForgeApproveRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ForgeDone"
+        }
+      }
+    },
+    {
+      "name": "forge/blocked-by",
+      "x-capability": "forge-write/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ForgeBlockedByRequest"
           }
         }
       ],

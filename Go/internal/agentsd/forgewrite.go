@@ -42,6 +42,10 @@ type forgeGitHubWrites interface {
 	FailedLog(ctx context.Context, repo string, runID int, job string) (string, error)
 	PRDiff(ctx context.Context, repo string, number int, sha string) (map[string]any, error)
 	RepoLabels(ctx context.Context, repo string) ([]string, map[string]string, error)
+	// The plan's (#3271).
+	CreateIssue(ctx context.Context, repo, title string, labels []string) (int, string, error)
+	AddSubIssue(ctx context.Context, repo string, number int, childRepo string, childNumber int) error
+	SetBlockedBy(ctx context.Context, repo string, number int, blockerRepo string, blockerNumber int, blocked bool) error
 }
 
 // forgeGitLabWrites is what the writes ask of GitLab; a test gives a fake.
@@ -64,6 +68,10 @@ type forgeLinearWrites interface {
 	SetLabels(ctx context.Context, identifier string, add, remove []string) error
 	SetState(ctx context.Context, identifier string, closed bool) error
 	Labels(ctx context.Context, identifier string) ([]string, map[string]string, error)
+	// The plan's (#3271).
+	AddChild(ctx context.Context, epic, title string, labels []string) (string, string, error)
+	SetParent(ctx context.Context, identifier, epic string) error
+	SetBlockedBy(ctx context.Context, identifier, blocker string, blocked bool) error
 }
 
 func (d *Daemon) registerForgeWrites() {

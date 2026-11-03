@@ -126,3 +126,83 @@ func (g *RealGitHub) RepoLabels(ctx context.Context, repo string) ([]string, map
 	names, colors := labelsOf(ls)
 	return names, colors, nil
 }
+
+// The plan's writes (#3271): a child added to an epic, new or one that is there, and a child's
+// "blocked by" links. GitHub's sub-issue and dependency APIs take an issue's id, not its number.
+
+// issueID is the id of issue number of repo.
+func (g *RealGitHub) issueID(ctx context.Context, repo string, number int) (int64, error) {
+	if _, _, err := ownerName(repo); err != nil {
+		return 0, err
+	}
+	var i struct {
+		ID int64 `json:"id"`
+	}
+	if err := g.get(ctx, fmt.Sprintf("repos/%s/issues/%d", repo, number), false, &i); err != nil {
+		return 0, err
+	}
+	if i.ID == 0 {
+		return 0, &GitHubError{Kind: NotFound, Message: fmt.Sprintf("no issue #%d in %s", number, repo)}
+	}
+	return i.ID, nil
+}
+
+// CreateIssue opens an issue in repo with labels (GitHub makes a label that the repo does not
+// have), and is its number and URL.
+func (g *RealGitHub) CreateIssue(ctx context.Context, repo, title string, labels []string) (int, string, error) {
+	if _, _, err := ownerName(repo); err != nil {
+		return 0, "", err
+	}
+	body, _ := json.Marshal(map[string]any{"title": title, "labels": append([]string{}, labels...)})
+	data, err := g.do(ctx, http.MethodPost, fmt.Sprintf("repos/%s/issues", repo), body, false)
+	if err != nil {
+		return 0, "", err
+	}
+	var i struct {
+		Number  int    `json:"number"`
+		HTMLURL string `json:"html_url"`
+	}
+	if json.Unmarshal(data, &i) != nil || i.Number < 1 {
+		return 0, "", &GitHubError{Kind: Failed, Message: "GitHub's answer is not an issue"}
+	}
+	return i.Number, i.HTMLURL, nil
+}
+
+// AddSubIssue makes issue childNumber of childRepo a sub-issue of issue number of repo; it leaves
+// the parent it had, as a person who adds it to this epic means.
+func (g *RealGitHub) AddSubIssue(ctx context.Context, repo string, number int, childRepo string, childNumber int) error {
+	if _, _, err := ownerName(repo); err != nil {
+		return err
+	}
+	id, err := g.issueID(ctx, childRepo, childNumber)
+	if err != nil {
+		return err
+	}
+	body, _ := json.Marshal(map[string]any{"sub_issue_id": id, "replace_parent": true})
+	_, err = g.do(ctx, http.MethodPost, fmt.Sprintf("repos/%s/issues/%d/sub_issues", repo, number), body, false)
+	return err
+}
+
+// SetBlockedBy says that issue number of repo is blocked by issue blockerNumber of blockerRepo,
+// or with blocked false that it is not. A link to take off that is not there is not an error.
+func (g *RealGitHub) SetBlockedBy(ctx context.Context, repo string, number int, blockerRepo string, blockerNumber int, blocked bool) error {
+	if _, _, err := ownerName(repo); err != nil {
+		return err
+	}
+	id, err := g.issueID(ctx, blockerRepo, blockerNumber)
+	if err != nil {
+		return err
+	}
+	path := fmt.Sprintf("repos/%s/issues/%d/dependencies/blocked_by", repo, number)
+	if blocked {
+		body, _ := json.Marshal(map[string]int64{"issue_id": id})
+		_, err = g.do(ctx, http.MethodPost, path, body, false)
+		return err
+	}
+	_, err = g.do(ctx, http.MethodDelete, fmt.Sprintf("%s/%d", path, id), nil, false)
+	var ge *GitHubError
+	if err != nil && errors.As(err, &ge) && ge.Kind == NotFound {
+		return nil
+	}
+	return err
+}

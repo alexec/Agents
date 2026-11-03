@@ -39,6 +39,7 @@ func (d *Daemon) registerForgePlans() {
 	On(d, wire.CallForgeFeatures, func(ctx context.Context, _ *Client, r wire.ForgeFeaturesRequest) (wire.ForgeFeatures, error) {
 		return d.forgeFeatures(ctx, r)
 	})
+	d.registerForgePlanWrites()
 }
 
 // withHierarchy sets an issue's level and feature from its labels, and its parent and progress.

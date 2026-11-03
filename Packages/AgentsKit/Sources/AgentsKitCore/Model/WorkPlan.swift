@@ -146,6 +146,39 @@ public enum WorkPlan {
         return "Lead: “\(title ?? lead.title ?? "A session")” (\(state))"
     }
 
+    // MARK: Changing the plan (#3271)
+
+    /// The levels a new child can have, as Add child's menu offers them; "" is none.
+    public static let childLevels = ["story", "task", "spike", "bug", ""]
+
+    /// Whether Add child's words name an issue that is there, not a new one's title: #12,
+    /// owner/repo#12, an issue's URL, or a key such as ENG-4.
+    public static func namesIssue(_ words: String) -> Bool {
+        let text = words.trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.range(of: #"^([\w.-]+/[\w.-]+)?#[0-9]+$|^https?://\S+$|^[A-Za-z][A-Za-z0-9]{0,9}-[0-9]+$"#,
+                          options: .regularExpression) != nil
+    }
+
+    /// Add child's request: the issue the words name, or a new child with them as its title.
+    public static func addChild(_ epic: DaemonAPI.LineageNode, words: String, level: String) -> DaemonAPI.ForgeAddChildRequest {
+        let text = words.trimmingCharacters(in: .whitespacesAndNewlines)
+        if namesIssue(text) { return DaemonAPI.ForgeAddChildRequest(node: epic, issue: text) }
+        return DaemonAPI.ForgeAddChildRequest(node: epic, title: text, level: level.isEmpty ? nil : level)
+    }
+
+    /// The children a child can be blocked by: the plan's others, each with whether it is now.
+    public static func blockerChoices(_ child: DaemonAPI.ForgePlanChild, in plan: DaemonAPI.ForgePlan)
+        -> [(child: DaemonAPI.ForgePlanChild, on: Bool)] {
+        plan.children.filter { $0.item.node != child.item.node }.map { ($0, child.blockedBy.contains($0.item.node)) }
+    }
+
+    /// Blocked by's request: the other child added as a blocker, or taken off.
+    public static func blockedBy(_ child: DaemonAPI.ForgePlanChild, _ blocker: DaemonAPI.LineageNode, on: Bool)
+        -> DaemonAPI.ForgeBlockedByRequest {
+        on ? DaemonAPI.ForgeBlockedByRequest(node: child.item.node, add: [blocker])
+            : DaemonAPI.ForgeBlockedByRequest(node: child.item.node, remove: [blocker])
+    }
+
     /// Start lead's form (the `lead` skill's "Starting a lead"): the issue's own first line, the
     /// skill and the epic's address, its labels and `lead`, and no worktree.
     public static func leadStart(_ start: DaemonAPI.ForgeStart, url: String?) -> DaemonAPI.ForgeStart {

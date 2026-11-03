@@ -259,7 +259,8 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
       {forgeProblem.value && <p class="hint">{forgeProblem.value}</p>}
       {fromForge(kind) && !detail.value && !forgeProblem.value && <p class="hint">Loading…</p>}
       {detail.value && hasPlan(detail.value.got.item) && (
-        <WorkPlan store={store} host={detail.value.host} lineageHost={lineageHost} detail={detail.value.got} asked={asked.value} />
+        <WorkPlan store={store} host={detail.value.host} lineageHost={lineageHost} detail={detail.value.got} asked={asked.value}
+          writes={writes} wrote={() => void reread()} />
       )}
       {detail.value && (
         <section class="work-body" aria-label="Description">

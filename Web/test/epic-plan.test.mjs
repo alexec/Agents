@@ -87,3 +87,22 @@ test("Start lead fills the lead skill's form", () => {
   assert.deepEqual(lead.labels, ["#3100", "lead"]);
   assert.equal(lead.worktree, undefined);
 });
+
+test("Add child names an issue there or opens a new one (#3271)", () => {
+  for (const there of ["#12", " alexec/Agents#12 ", "https://github.com/alexec/Agents/issues/12", "ENG-4"]) {
+    assert.equal(p.namesIssue(there), true, there);
+    assert.deepEqual(p.addChildRequest(issue(1), there, "task"), { node: issue(1), issue: there.trim() });
+  }
+  for (const title of ["Retire the rows", "Fix #12 in the list", "ENG-4 follow-up"]) assert.equal(p.namesIssue(title), false, title);
+  assert.deepEqual(p.addChildRequest(issue(1), " Retire the rows ", "story"), { node: issue(1), title: "Retire the rows", level: "story" });
+  assert.deepEqual(p.addChildRequest(issue(1), "Retire", ""), { node: issue(1), title: "Retire" });
+});
+
+test("Blocked by offers the other children with a tick on the blockers (#3271)", () => {
+  const plan = { item: item(1), children: [child(2, 1), child(3, 1), child(4, 2, { blockedBy: [2] })], steps: [] };
+  const choices = p.blockerChoices(plan.children[2], plan);
+  assert.deepEqual(choices.map((c) => c.child.item.node), [issue(2), issue(3)]);
+  assert.deepEqual(choices.map((c) => c.on), [true, false]);
+  assert.deepEqual(p.blockedByRequest(plan.children[2], issue(3), true), { node: issue(4), add: [issue(3)] });
+  assert.deepEqual(p.blockedByRequest(plan.children[2], issue(2), false), { node: issue(4), remove: [issue(2)] });
+});

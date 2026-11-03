@@ -279,6 +279,35 @@ public extension DaemonAPI {
         }
     }
 
+    /// `forge/add-child` (#3271): a new child (`title`, with its `level`) or one that is there
+    /// (`issue`: #12, owner/repo#12, its URL, or a key such as ENG-4), added to the epic `node`.
+    struct ForgeAddChildRequest: Codable, Sendable, Hashable {
+        public var node: LineageNode
+        public var title: String?
+        public var level: String?
+        public var issue: String?
+
+        public init(node: LineageNode, title: String? = nil, level: String? = nil, issue: String? = nil) {
+            self.node = node
+            self.title = title
+            self.level = level
+            self.issue = issue
+        }
+    }
+
+    /// `forge/blocked-by` (#3271): issues that block the child `node`, to add and to take off.
+    struct ForgeBlockedByRequest: Codable, Sendable, Hashable {
+        public var node: LineageNode
+        public var add: [LineageNode]?
+        public var remove: [LineageNode]?
+
+        public init(node: LineageNode, add: [LineageNode]? = nil, remove: [LineageNode]? = nil) {
+            self.node = node
+            self.add = add
+            self.remove = remove
+        }
+    }
+
     /// `forge/close`: close it, or with `reopen` open it again; with `transition`, move a Jira
     /// issue by that transition of its workflow, by its id (#3260).
     struct ForgeCloseRequest: Codable, Sendable, Hashable {
@@ -545,4 +574,7 @@ public extension DaemonAPI.Method {
     /// `ForgePlanRequest` → `ForgePlan`, `ForgeFeaturesRequest` → `ForgeFeatures` (#3267).
     static let forgePlan = "forge/plan"
     static let forgeFeatures = "forge/features"
+    /// The plan's writes (#3271): `ForgeAddChildRequest` and `ForgeBlockedByRequest` → `ForgeDone`.
+    static let forgeAddChild = "forge/add-child"
+    static let forgeBlockedBy = "forge/blocked-by"
 }
