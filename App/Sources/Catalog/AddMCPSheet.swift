@@ -11,10 +11,19 @@ struct AddMCPSheet: View {
     let destination: DaemonAPI.SkillDestination
     var onAdded: () -> Void = {}
 
+    /// The marketplace to start on, when not the last one chosen: the Agents marketplace from the
+    /// Tasks slot, whose Linear and Jira connectors read the new connection (#3314).
+    let startOn: String?
+
+    /// The Agents marketplace (`skillcatalog.AgentsMarketplaceID`).
+    static let agentsMarketplace = "provided:agents"
+
     /// query is a search to start with, such as Notion from the Docs slot (#3248).
-    init(destination: DaemonAPI.SkillDestination, query: String = "", onAdded: @escaping () -> Void = {}) {
+    init(destination: DaemonAPI.SkillDestination, query: String = "", marketplace: String? = nil,
+         onAdded: @escaping () -> Void = {}) {
         self.destination = destination
         self.onAdded = onAdded
+        startOn = marketplace
         _query = State(initialValue: query)
     }
 
@@ -56,6 +65,7 @@ struct AddMCPSheet: View {
         }
         .frame(width: Self.size.width, height: Self.size.height)
         .background(Paper.ground)
+        .onAppear { if let startOn { chosen = startOn } }
         .task { await loadMarketplaces() }
         .task(id: SearchKey(query: query, marketplace: marketplace?.id)) {
             try? await Task.sleep(for: .milliseconds(300))

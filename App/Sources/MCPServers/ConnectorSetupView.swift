@@ -12,8 +12,9 @@ struct ConnectorSetupView: View {
     var folder: FolderKey
     var folderName: String
     /// Opens the catalogue (Add Connector…), for Linear and the others, with a search typed
-    /// (Notion for the Docs slot, #3248) or none.
-    var addConnector: (_ search: String) -> Void
+    /// (Notion for the Docs slot, #3248) or none, on a marketplace (the Agents one for Linear and
+    /// Jira, #3314) or the last one chosen.
+    var addConnector: (_ search: String, _ marketplace: String?) -> Void
 
     @State private var setup: DaemonAPI.ConnectorSetup?
     @State private var problem: String?
@@ -118,12 +119,12 @@ struct ConnectorSetupView: View {
             }
         }
         .sheet(isPresented: $connectingLinear, onDismiss: {
-            if linearConnected { linearConnected = false; addConnector("") }
+            if linearConnected { linearConnected = false; addOurs(Self.linearSearch) }
         }) {
             ConnectLinearSheet(host: folder.host, onConnected: { linearConnected = true })
         }
         .sheet(isPresented: $connectingJira, onDismiss: {
-            if jiraConnected { jiraConnected = false; addConnector(ConnectJiraSheet.search) }
+            if jiraConnected { jiraConnected = false; addOurs(ConnectJiraSheet.search) }
         }) {
             ConnectJiraSheet(host: folder.host, onConnected: { jiraConnected = true })
         }
@@ -262,8 +263,8 @@ struct ConnectorSetupView: View {
         case .tryAgain: Task { await load(.fresh) }
         case .skip(let slot): Task { await skip(slot, true) }
         case .setUp(let slot): Task { await skip(slot, false) }
-        case .catalogue: addConnector("")
-        case .search(let words): addConnector(words)
+        case .catalogue: addConnector("", nil)
+        case .search(let words): addConnector(words, nil)
         case .linear: Task { await useLinear() }
         case .jira: Task { await useJira() }
         case .open(let address): open(address)
@@ -278,7 +279,7 @@ struct ConnectorSetupView: View {
     private func useLinear() async {
         if case .success(let list) = await model.connections(on: folder.host),
            list.contains(where: { $0.provider == .linear && $0.state == .connected }) {
-            addConnector("")
+            addOurs(Self.linearSearch)
         } else {
             connectingLinear = true
         }
@@ -288,10 +289,19 @@ struct ConnectorSetupView: View {
     private func useJira() async {
         if case .success(let list) = await model.connections(on: folder.host),
            list.contains(where: { $0.provider == .atlassian && $0.state == .connected }) {
-            addConnector(ConnectJiraSheet.search)
+            addOurs(ConnectJiraSheet.search)
         } else {
             connectingJira = true
         }
+    }
+
+    /// The catalogue's search for the Linear connector.
+    static let linearSearch = "linear"
+
+    /// The catalogue on the Agents marketplace (#3314): its Linear and Jira connectors read the
+    /// connection, where another marketplace's search finds Atlassian's or Linear's own server.
+    private func addOurs(_ search: String) {
+        addConnector(search, AddMCPSheet.agentsMarketplace)
     }
 
     private func load(_ how: DaemonAPI.ConnectorSetupReading) async {

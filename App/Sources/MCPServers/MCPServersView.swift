@@ -15,12 +15,14 @@ struct MCPServersView: View {
     var folder: FolderKey?
     @State private var checking = false
     /// The catalogue, open with what it searches for: Notion from the Docs slot (#3248), or
-    /// nothing. An item, so the sheet gets the search it was opened with.
+    /// nothing, and on which marketplace (#3314). An item, so the sheet gets the search it was
+    /// opened with.
     @State private var adding: CatalogueSearch?
 
     struct CatalogueSearch: Identifiable {
         var words: String
-        var id: String { words }
+        var marketplace: String?
+        var id: String { "\(marketplace ?? "")|\(words)" }
     }
     /// The connector Remove… asks about (#2154).
     @State private var removing: DaemonAPI.MCPServerHealth?
@@ -45,7 +47,7 @@ struct MCPServersView: View {
                 if let folder {
                     if model.host(host, has: Capability.connectorsSetup1) {
                         ConnectorSetupView(folder: folder, folderName: folderName ?? folder.folder.lastPathComponent,
-                                           addConnector: { adding = CatalogueSearch(words: $0) })
+                                           addConnector: { adding = CatalogueSearch(words: $0, marketplace: $1) })
                     } else {
                         Text(UpdateWords.hostNeedsUpdate).foregroundStyle(.secondary)
                     }
@@ -139,7 +141,7 @@ struct MCPServersView: View {
         }
         .sheet(item: $adding) { search in
             AddMCPSheet(destination: folder.map { .folder(folder: $0.folder.path) } ?? .personal,
-                        query: search.words,
+                        query: search.words, marketplace: search.marketplace,
                         onAdded: { Task { await model.refreshMCPHealth(host) } })
         }
     }
