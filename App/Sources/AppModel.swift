@@ -5745,6 +5745,32 @@ final class AppModel {
                                          returning: DaemonAPI.LineageGraph.self)
     }
 
+    /// A lead's epic progress, "5/7", by session (#3270), for its sidebar row.
+    private(set) var leadProgress: [UUID: String] = [:]
+    /// The state and labels each lead was last asked at: asked again when they change, as a lead
+    /// wakes for each child.
+    @ObservationIgnored private var leadAsked: [UUID: String] = [:]
+
+    /// Ask a lead's host for its epic's progress when its state or labels changed since. A call
+    /// that fails keeps what the row said: the next wake asks again.
+    func loadLeadProgress(_ agent: Agent) async {
+        guard let turn = LeadProgress.turn(agent), agent.state != .archived, leadAsked[agent.id] != turn,
+              self.agent(agent.id, has: Capability.lineage1), self.agent(agent.id, has: Capability.forge1) else { return }
+        leadAsked[agent.id] = turn
+        let host = host(ofAgent: agent.id)
+        guard let walked = try? await client(for: host).call(
+            DaemonAPI.Method.lineageWalk,
+            DaemonAPI.LineageNodeRequest(node: LineageList.node(ofSession: agent.id), depth: 1),
+            returning: DaemonAPI.LineageGraph.self) else { return }
+        guard let epic = LeadProgress.epic(of: agent.id, in: walked.links) else {
+            leadProgress[agent.id] = nil
+            return
+        }
+        guard let plan = try? await client(for: host).call(DaemonAPI.Method.forgePlan, DaemonAPI.ForgePlanRequest(node: epic),
+                                                           returning: DaemonAPI.ForgePlan.self) else { return }
+        leadProgress[agent.id] = LeadProgress.words(plan)
+    }
+
     /// An issue's or a PR's cost rolled up, from the session's host; nil when it will not say.
     func lineageCost(_ node: DaemonAPI.LineageNode, of agentID: UUID) async -> DaemonAPI.LineageCostRollup? {
         await lineageCost(node, on: host(ofAgent: agentID))
