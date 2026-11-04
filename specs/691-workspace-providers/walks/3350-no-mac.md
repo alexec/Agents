@@ -1,4 +1,4 @@
-# Walk: Agents with no Mac, a cloud control plane, the web page and a real codespace (#3350, #3369, 2026-11-03)
+# Walk: Agents with no Mac, a cloud control plane, the web page and a real codespace (#3350, #3369, #3384, 2026-11-03)
 
 The no-Mac path of epic #3345, on main at `aa146c6f9` (with #3346, #3347, #3348 and #3349), and
 the steps of [Run Agents with no Mac](../../../docs/how-to/run-agents-with-no-mac.md).
@@ -8,15 +8,15 @@ the steps of [Run Agents with no Mac](../../../docs/how-to/run-agents-with-no-ma
 | 1. Pair the first browser with `agents-control code --client --browser` | **works** |
 | 2a. Add the `codespaces-api` provider on the web page | **works** |
 | 2b. Make a codespace from the web page (New Machine…) | **works**: `basicLinux32gb`, made in 3 s |
-| 2c. **Add as Machine…** on the codespace | #3350: **not on the web page**. #3369: **joins**, in about 2 minutes, but the page says "That took too long. Try again." after 30 s, so the machine is **not linked** |
+| 2c. **Add as Machine…** on the codespace | #3350: **not on the web page**. #3369: **joins**, in about 2 minutes, but the page says "That took too long. Try again." after 30 s, so the machine is **not linked**. #3384: **works**: "Installed on w3384-walk" after 1 min 50 s, and linked when it joined |
 | 2d. The docs' way in: the command from Add a Machine ▸ A server, run in the codespace | #3350: **broken on a codespace** (found by reading). #3369: **works**: "Started in the background (no systemd user session here)." |
-| 2e. Link to Machine… on a machine that joined with no link | **works** |
-| 3a. Sign Claude in on the codespace from the web page | **Sign In… fails**: "Claude's own command line is not on this machine". With `npm install -g @anthropic-ai/claude-code`, as the docs say, the sheet gives Claude's link. The sign-in itself needs Alex's account: #1781 |
+| 2e. Link to Machine… on a machine that joined with no link | **works**. #3384: it shows the codespace's host key and asks **Trust and Link** |
+| 3a. Sign Claude in on the codespace from the web page | #3369: **Sign In… fails**: "Claude's own command line is not on this machine", until `npm install -g @anthropic-ai/claude-code`. #3384: **works** with nothing installed by hand: the sheet gives Claude's link. The sign-in itself needs Alex's account: #1781 |
 | 3b. One turn | not walked: no runtime signed in (#1781) |
 | 4a. Stop from Agents | **works** |
-| 4b. Start from GitHub; the machine comes back | **works** for a machine from Add as Machine…: online 32 s after the codespace started. **Does not** for a machine joined with the command and then linked: no trusted host key |
+| 4b. Start from GitHub; the machine comes back | **works** for a machine from Add as Machine…: online 32 s after the codespace started. #3369: **does not** for a machine joined with the command and then linked: no trusted host key. #3384: **works** for that machine too: online 15 s after the codespace was up |
 | 4c. Start from Agents | not walked: in this set-up the control plane stops with the codespace (#1781) |
-| 5. Clean up | **done**, both times |
+| 5. Clean up | **done**, each time |
 
 Steps 3 and 4 need the codespace to reach the control plane. In #3350 the control plane was on
 this Mac's loopback, and a reverse ssh tunnel from this Mac into the codespace (to stand in
@@ -204,12 +204,83 @@ a Claude account, so it and a turn are on Alex's checklist, #1781.
   server" until the provider wrote gh's ssh config again, 7 s later: the control user's home is
   not on the volume.
 
+## The third walk (#3384)
+
+On main at `c084734bc`, with #3377 (Add as Machine… waits), #3378 (Claude's toolset on a server),
+#3379 (Link to Machine… trusts the host key), #3380 (tini), #3381 (Remove…), #3382 and #3383, and
+`Web/test/walk/nomac3369.mjs` (its `link` stage now presses **Trust and Link**).
+
+### Set-up
+
+As #3369's: the codespace `w3384-walk` on `alexec/agents-walk`, `basicLinux32gb`, made with
+`gh codespace create` at 20:54 and deleted at 21:11; the control plane's image built in the
+codespace from a clone of this commit, **with no `chmod`** this time, run in its Docker at
+`https://localhost:18791` with `--self-signed` and `AGENTS_CONTROL_KEY_FILE` on the volume; headless
+Chrome on this Mac through `gh codespace ports forward`. The provider's token was gh's own, sent
+over the page's socket. No token was made, so none is to revoke.
+
+The image's PID 1 is `tini`, and `agents-control` is PID 7 (#3380). After an install, a link and
+an ssh start, the container had **no zombie processes**.
+
+### Add as Machine… (#3377)
+
+**Install** showed the host key, **Trust and Install** started the install, and the dialog waited:
+**"Installed on w3384-walk. It is linked to this machine when it joins."** 1 min 50 s after the
+click. **Done**, and the row said **"Running · linked to w3384-walk"** at once ("host w3384-walk
+enrolled", then "workspace: w3384-walk linked to …" 3 s later).
+
+### Sign In… (#3378)
+
+Nothing was installed by hand, and `claude` is not on the codespace's PATH. Runtimes listed Claude
+as **"Not usable: not signed in"** with **Sign In…**, and the sheet gave Claude's link
+(`https://claude.com/cai/oauth/authorize?…`): the host now installs Claude's toolset, and the
+control plane could read it with no `chmod` on the clone (#3383). The sign-in itself and a turn
+stay Alex's, on #1781.
+
+### A machine joined with the command, linked, back after a stop (#3379)
+
+The machine from Add as Machine… was removed over the page's socket (by its id; the page's own
+**Remove…** is #3381's), and the command from **Add a Machine… ▸ A server** run in the codespace:
+"Started in the background (no systemd user session here). codespaces-fddd96 joined the control
+plane."
+
+**Link to Machine…** on the row, then **Link**: the dialog showed **"This machine's host key is new
+to the control plane: SHA256:YVurI…. Link only if this is the key the machine shows (ssh-keygen -lf
+on its host key): its provider starts it over ssh with this key."** and **Trust and Link**. That
+linked it.
+
+**Stop** on the row stopped the codespace (Shutdown within 4 minutes), with the control plane in it.
+Started from GitHub (`POST /user/codespaces/…/start`), the codespace was up in 32 s, and the
+control plane said **"ssh start codespaces-fddd96, running with its host offline: ok"** 14 s later
+and "host ibrjcqwg connected" a second after that: online 15 s after the codespace was up. The row
+said "Running · linked to codespaces-fddd96" with Stop and Unlink.
+
+**Start from Agents** could not be walked, as before: the control plane stops with the codespace.
+
+### Also seen (#3384)
+
+- **The same codespace's key is new again at Link to Machine…**, after the machine that Add as
+  Machine… joined was removed: the key the install trusted went with that machine. One more click,
+  and it is the same key; it is not wrong.
+- **`hosts/remove` by the machine's name says "No machine is called w3384-walk."**; it takes the
+  id. The page's Remove… gives the id, so a person does not meet this.
+- **Machine providers still says** "Docker, Cloud Workstations, your own commands and MCP servers
+  are added in the Mac app." (#3382's PR lists it for the lead.)
+- The control plane needs `AGENTS_CONTROL_KEY_FILE` (or a key) when it runs with no `--home`: the
+  container restarted with "say where the control plane's key is" until it had one. As it should;
+  the walk's set-up had left it out.
+
 ## Cost
 
 #3350: one `basicLinux32gb` codespace for about 5 minutes, about $0.02 at $0.18 an hour.
 #3369: one for about 50 minutes, about $0.15.
+#3384: one for about 17 minutes, about $0.05.
 
 ## Clean-up
+
+#3384: the codespace `w3384-walk` was deleted at 21:11, with the control plane, its image
+and its volume in it; the port forward and the Chrome profile on this Mac were removed. No token
+was made.
 
 #3369: the codespace `w3369-walk` was deleted at 19:19, with the control plane, its image and
 its volume in it; the port forward, the Chrome profile and the walk's files on this Mac were
