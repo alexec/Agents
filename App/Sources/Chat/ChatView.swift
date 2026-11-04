@@ -276,7 +276,7 @@ struct ChatView: View {
     }
 
     /// A Stopped by a policy card's button (#2957, FR-025): the pane of the layer that
-    /// decides. A folder's opens its Folder Settings at Policy, on that folder.
+    /// decides. A folder's opens its Project Settings at Policy, on that folder.
     private static func openPolicy(_ action: PolicyLayersWords.StopAction, model: AppModel,
                                    requests: WindowRequests, openSettings: OpenSettingsAction) {
         switch action {
@@ -286,7 +286,7 @@ struct ChatView: View {
         case .changeFolder(let path):
             let folder = URL(filePath: path)
             if model.selectedFolder?.standardizedFileURL != folder.standardizedFileURL { model.selectedFolder = folder }
-            requests.folderSettings = .policy
+            requests.projectSettings = .policy
         case .openSpending:
             model.settingsPaneAsked = .spending
             openSettings()

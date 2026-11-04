@@ -59,7 +59,7 @@ A workflow's run or a session started by a session can wait by itself, with nobo
 - **A workflow:** on its page, turn on **Continue when the allowance is back**, or add
   `continue-when-back: true` to its file's front matter. Each run whose turn is refused for a
   spent allowance waits at once, and its row says **Continues at 07:00**.
-- **Helpers:** on the Mac, open the folder's **Folder Settings ▸ General** and turn on
+- **Helpers:** on the Mac, open the folder's **Project Settings ▸ Work at Once** and turn on
   **Helpers continue when the allowance is back**. It is kept in `.agents/folder.json`.
 
 Both are off unless you set them. A chat you started waits only when you choose **Continue**.

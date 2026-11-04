@@ -317,7 +317,7 @@ export type StopAction =
 export function stopAction(refusal: PolicyRefusal): StopAction {
   const layer = refusal.layer;
   if (layer?.kind === "you") return { kind: "yours", label: `Change in ${groupTitle} ▸ ${title}` };
-  // The web page has no Folder Settings (research R13): the folder's layer opens in Agents ▸ Policy.
+  // The folder's layer opens in Agents ▸ Policy, as Project Settings ▸ Policy does (#3280).
   if (layer?.kind === "folder" && layer.folder !== undefined) {
     return { kind: "folder", label: `Change in ${layer.name}’s ${title}`, folder: layer.folder };
   }

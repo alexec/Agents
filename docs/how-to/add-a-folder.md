@@ -61,8 +61,8 @@ keep **Its Own Project**.
 
 To move a folder that you added before:
 
-1. On the Mac, select the folder and choose **File ▸ Folder Settings…**. On the iPhone,
-   iPad or web page, open the folder's menu and choose **Project…**.
+1. On the Mac or the web page, open the folder's menu and choose **Folder Settings…**. The
+   iPhone and iPad do not change a folder's project (#2798).
 2. Under **Project**, pick another project, or choose **New Project…** and type a name.
 
    To rename the project, choose **Rename Project…**. Only the person who made it, or an

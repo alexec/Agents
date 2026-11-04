@@ -29,17 +29,17 @@ try {
   })()`);
   await sleep(300);
   const items = await page.eval(`[...document.querySelectorAll(".context-menu [role=menuitem]")].map((b) => b.textContent)`);
-  check(items.includes("Cost on Pull Requests…"), `folder menu: ${js(items)}`);
+  check(items.includes("Project Settings…"), `folder menu: ${js(items)}`);
   await page.shot(`${out}/web-menu.png`);
-  await page.eval(`[...document.querySelectorAll(".context-menu [role=menuitem]")].find((b) => b.textContent === "Cost on Pull Requests…").click()`);
-  await page.waitFor(`document.querySelector("dialog.sheet[open] select")`);
+  await page.eval(`[...document.querySelectorAll(".context-menu [role=menuitem]")].find((b) => b.textContent === "Project Settings…").click()`);
+  await page.waitFor(`document.querySelector("dialog.sheet[open] select[aria-label^=\"Cost\"]")`);
   await sleep(500);
-  const selected = () => page.eval(`(() => { const s = document.querySelector("dialog.sheet select"); return s.options[s.selectedIndex].text; })()`);
+  const selected = () => page.eval(`(() => { const s = document.querySelector("dialog.sheet select[aria-label^=Cost]"); return s.options[s.selectedIndex].text; })()`);
   check((await selected()) === "Cost, tokens and time", `shown: ${await selected()}`);
   await page.shot(`${out}/web-cost.png`);
 
-  await page.eval(`(() => { const s = document.querySelector("dialog.sheet select"); s.value = "tokens"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
-  await page.waitFor(`(() => { const s = document.querySelector("dialog.sheet select"); return s.options[s.selectedIndex].text === "Tokens and time" && !s.disabled; })()`, 10_000).catch(() => {});
+  await page.eval(`(() => { const s = document.querySelector("dialog.sheet select[aria-label^=Cost]"); s.value = "tokens"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+  await page.waitFor(`(() => { const s = document.querySelector("dialog.sheet select[aria-label^=Cost]"); return s.options[s.selectedIndex].text === "Tokens and time" && !s.disabled; })()`, 10_000).catch(() => {});
   check((await selected()) === "Tokens and time", `picked: ${await selected()}`);
   await page.shot(`${out}/web-tokens.png`);
 } finally {

@@ -101,7 +101,7 @@ struct PolicyLayersWordsTests {
         #expect(stop(org) == .seeOrganisation)
         #expect(PolicyLayersWords.stopAction(.init(reason: "update", words: "w")) == .seeOrganisation)
         #expect(PolicyLayersWords.stopActionTitle(.changeYours) == "Change in Agents ▸ Policy")
-        #expect(PolicyLayersWords.stopActionTitle(.changeFolder("/x")) == "Change in Folder Settings ▸ Policy")
+        #expect(PolicyLayersWords.stopActionTitle(.changeFolder("/x")) == "Change in Project Settings ▸ Policy")
     }
 
     @Test func onlyTheOrganisationsBudgetOffersAskForMore() {

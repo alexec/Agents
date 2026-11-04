@@ -854,20 +854,18 @@ private struct FolderMenu: View {
             requests.focusPrompt()
         }
         .disabled(model.hostUnreachable(summary.host))
-        Button("Folder Settings…") {
+        Button(ProjectSettingsWords.menuItem) {
             model.showFolder(summary.key)
-            requests.folderSettings = .general
+            requests.projectSettings = .general
         }
+        Button(ProjectSettingsWords.folderMenuItem) { requests.folderSettings = FolderSettingsAsk(folder: summary.key) }
         // The project's folders on every machine (#3278), each with its machine and state.
         if !others.isEmpty {
             Menu(SidebarProjects.foldersMenu) {
                 ForEach([summary] + others, id: \.key) { folder in
                     Menu(SidebarProjects.folderLine(folder, machine: model.hosts.label(folder.host), state: state(of: folder.host))) {
                         Button(SidebarProjects.openFolder) { model.showFolder(folder.key) }
-                        Button(SidebarProjects.folderSettings) {
-                            model.showFolder(folder.key)
-                            requests.folderSettings = .general
-                        }
+                        Button(SidebarProjects.folderSettings) { requests.folderSettings = FolderSettingsAsk(folder: folder.key) }
                     }
                     .disabled(model.hostUnreachable(folder.host))
                 }

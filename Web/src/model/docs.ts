@@ -304,6 +304,6 @@ export function relatedDocs(searches: readonly (readonly DocsSearchResult[])[], 
     .slice(0, most).map((s) => s.doc);
 }
 
-export const noDocsHere = "No machine here reads docs yet. Docs come from a folder's Docs slot, in Folder Settings.";
+export const noDocsHere = "No machine here reads docs yet. Docs come from a project's Docs slot, in Project Settings ▸ Tools.";
 export const noDocs = "No docs. A folder's Markdown files at its top and under specs/ and docs/ show here.";
 export const noResults = "No doc has those words.";

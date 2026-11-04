@@ -1,5 +1,5 @@
-// The #2317 walk, on a scratch root with folders added: the folder menu's Project… opens the
-// project modal, which names the folder's project; New Project… makes one and puts the folder
+// The #2317 walk, on a scratch root with folders added: the folder menu's Folder Settings… and its Choose Project… open the
+// project modal (#3280), which names the folder's project; New Project… makes one and puts the folder
 // in it; Rename Project… renames it. Screenshots go to <out dir>.
 //
 //   node Web/test/walk/projects2317.mjs <WEB_URL> <browser code> <folder name> <out dir>
@@ -32,8 +32,9 @@ try {
   };
   await openMenu();
   const items = await page.eval(`[...document.querySelectorAll(".context-menu [role=menuitem]")].map((b) => b.textContent)`);
-  check(items.includes("Project…"), `folder menu: ${js(items)}`);
-  await page.eval(`[...document.querySelectorAll(".context-menu [role=menuitem]")].find((b) => b.textContent === "Project…").click()`);
+  check(items.includes("Folder Settings…"), `folder menu: ${js(items)}`);
+  await page.eval(`[...document.querySelectorAll(".context-menu [role=menuitem]")].find((b) => b.textContent === "Folder Settings…").click()`);
+  await page.press("Choose Project…");
   await page.waitFor(`document.querySelector("dialog.sheet[open] select")`);
   await sleep(500);
   const selected = () => page.eval(`(() => { const s = document.querySelector("dialog.sheet select"); return s.options[s.selectedIndex].text; })()`);

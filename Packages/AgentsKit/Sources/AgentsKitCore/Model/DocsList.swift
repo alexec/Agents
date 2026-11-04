@@ -212,7 +212,7 @@ public enum DocsList {
     /// The Mac window's address of a doc (spec 3319).
     public static func windowAddress(_ ref: String) -> String { "agents://docs/\(ref)" }
 
-    public static let noDocsHere = "No machine here reads docs yet. Docs come from a folder’s Docs slot, in Folder Settings."
+    public static let noDocsHere = "No machine here reads docs yet. Docs come from a project’s Docs slot, in Project Settings ▸ Tools."
     public static let noDocs = "No docs. A folder’s Markdown files at its top and under specs/ and docs/ show here."
     public static let noResults = "No doc has those words."
 }

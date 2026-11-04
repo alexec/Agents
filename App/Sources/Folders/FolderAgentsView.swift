@@ -382,11 +382,11 @@ struct WaitingForOKBanner: View {
         }
     }
 
-    /// Plugins first: they are approved on Folder Settings, and a workflow is approved
+    /// Plugins first: they are approved in Project Settings, and a workflow is approved
     /// on its own page, which is one click from the middle column anyway.
     private func review() {
         if !plugins.isEmpty {
-            requests.folderSettings = .plugins
+            requests.projectSettings = .plugins
         } else if let first = workflows.first {
             model.openWorkflow = first.id
         }

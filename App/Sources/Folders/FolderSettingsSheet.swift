@@ -1,100 +1,53 @@
 import AgentsKitCore
-import AppKit
 import SwiftUI
 
-/// The panes of Folder Settings: General, then the Agent Configuration pages that Settings
-/// has too (#754), which the rail shows as one row with the pages listed in its pane (#1076). Worktrees moved to Activity
-/// (#790): they change on their own, and settings are what a person sets.
+/// The panes of Folder Settings (#3280, specs/3273-project-unit): only what belongs to one
+/// directory on one machine. What every folder of the project shares is Project Settings'
+/// (`ProjectSettingsSheet`).
 enum FolderSettingsPane: String, Hashable, CaseIterable, Identifiable {
-    case general
-    /// The folder's own layer of the policy (#2957, FR-022): `.agents/policy.json`.
-    case policy
-    case overview, instructions, skills, personas, workflows, mcp, plugins, other
+    case general, diskSpace, worktrees
 
     var id: String { rawValue }
-
-    init(_ page: AgentConfigurationPage) {
-        switch page {
-        case .overview: self = .overview
-        case .instructions: self = .instructions
-        case .skills: self = .skills
-        case .personas: self = .personas
-        case .workflows: self = .workflows
-        case .mcp: self = .mcp
-        case .plugins: self = .plugins
-        case .other: self = .other
-        }
-    }
-
-    /// The Agent Configuration page it is, if it is one.
-    var page: AgentConfigurationPage? {
-        switch self {
-        case .general, .policy: nil
-        case .overview: .overview
-        case .instructions: .instructions
-        case .skills: .skills
-        case .personas: .personas
-        case .workflows: .workflows
-        case .mcp: .mcp
-        case .plugins: .plugins
-        case .other: .other
-        }
-    }
 
     var title: String {
         switch self {
         case .general: "General"
-        case .policy: PolicyLayersWords.title
-        default: page?.title ?? ""
+        case .diskSpace: "Disk Space"
+        case .worktrees: "Worktrees"
         }
     }
 
-    var symbol: String { self == .policy ? PolicyLayersWords.symbol : "gearshape" }
+    var symbol: String {
+        switch self {
+        case .general: "folder"
+        case .diskSpace: "internaldrive"
+        case .worktrees: "arrow.triangle.branch"
+        }
+    }
 }
 
-/// One folder's settings, as a sheet over the window (066, look/ frame C): a rail down
-/// the left, the chosen pane beside it, and Done. The app's Settings window at a smaller
-/// size, so a person who has found one has found the other.
-///
-/// A sheet rather than a page, because settings are somewhere you go to change a thing
-/// and come back from — the folder's sessions are still behind it when it closes. What
-/// the folder page used to say about the folder itself (where it is, what it has cost)
-/// is General's, since nobody acts on it from the page.
-///
-/// On a server only General is offered: the other panes read and write files in the
-/// folder, which is not on this Mac.
+/// Which folder's Folder Settings are up, and at which pane.
+struct FolderSettingsAsk: Hashable {
+    var folder: FolderKey
+    var pane: FolderSettingsPane = .general
+}
+
+/// One folder's settings, as a sheet over the window (#3280): the path, the machine and the
+/// project it is in, its disk space lines and its worktrees. Smaller than Project Settings,
+/// with the same rail and Done, and a way to the project's.
 struct FolderSettingsSheet: View {
     @Environment(AppModel.self) private var model
-    @Binding var pane: FolderSettingsPane?
+    @Environment(WindowRequests.self) private var requests
+    @Binding var ask: FolderSettingsAsk?
 
-    /// The smallest it can be dragged to, and where it opens the first time (#439).
-    /// Wide enough for the rail, Agent Configuration's page list and a page (#1076).
-    static let size = CGSize(width: 900, height: 560)
+    static let size = CGSize(width: 720, height: 460)
 
-    /// The size it was last left at, so it opens as the person left it.
-    @AppStorage("folderSettingsWidth", store: WindowDefaults.store) private var width = Double(Self.size.width)
-    @AppStorage("folderSettingsHeight", store: WindowDefaults.store) private var height = Double(Self.size.height)
+    private var summary: DaemonAPI.FolderSummary? { ask.flatMap { model.work.folder($0.folder) } }
+    private var chosen: FolderSettingsPane { ask?.pane ?? .general }
 
-    private var summary: DaemonAPI.FolderSummary? { model.selectedFolderSummary }
-    private var folder: URL? { model.selectedFolder }
-    private var isOnMac: Bool { model.selectedFolderKey?.host == .mac }
-
-    /// What the folder's `.agents` holds, for the Agent Configuration lines' counts and
-    /// pages (#754). Read when the sheet opens, when a page is chosen, and when the app
-    /// comes back to the front.
-    @State private var snapshot: DaemonAPI.SharedSnapshot?
-    /// A Skills, Personas or Workflows file has edits not saved: the rail and Done ask first (#2745).
-    @State private var unsaved = false
-    @State private var leaving: UnsavedLeave?
-
-    /// Policy goes through the folder's own machine, so a server's folder has it too.
+    /// Worktrees are listed for this Mac's folders (#790).
     private var panes: [FolderSettingsPane] {
-        isOnMac ? FolderSettingsPane.allCases : [.general, .policy]
-    }
-
-    private var chosen: FolderSettingsPane {
-        guard let pane, panes.contains(pane) else { return .general }
-        return pane
+        summary?.host == .mac ? FolderSettingsPane.allCases : [.general, .diskSpace]
     }
 
     var body: some View {
@@ -102,336 +55,178 @@ struct FolderSettingsSheet: View {
             rail
             Divider()
             VStack(spacing: 0) {
-                content
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        if let summary {
+                            switch chosen {
+                            case .general: FolderGeneralPane(summary: summary)
+                            case .diskSpace: FolderDiskSpacePane(summary: summary)
+                            case .worktrees: FolderWorktreesPane(summary: summary)
+                            }
+                        } else {
+                            Text("This folder is not here any more.").foregroundStyle(.secondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .padding(24)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 HStack {
+                    Button(ProjectSettingsWords.menuItem) { openProjectSettings() }
+                        .buttonStyle(.paper)
+                        .disabled(summary == nil)
                     Spacer()
-                    Button("Done") { $leaving.leave(unsaved: unsaved) { pane = nil } }
+                    Button("Done") { ask = nil }
                         .buttonStyle(.paperProminent)
                         .keyboardShortcut(.defaultAction)
                 }
                 .padding(16)
             }
         }
-        // Resizable: a range rather than a fixed size, so the sheet can be dragged big
-        // enough to show a whole pane, and the panes fill what it is given (#439).
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .discardUnsavedQuestion($leaving)
-        // Escape closes a sheet: with edits not saved, it asks as Done does.
-        .interactiveDismissDisabled(unsaved)
-        .onExitCommand { if unsaved { $leaving.leave(unsaved: unsaved) { pane = nil } } }
-        .frame(minWidth: Self.size.width, idealWidth: max(width, Self.size.width),
-               maxWidth: .infinity,
-               minHeight: Self.size.height, idealHeight: max(height, Self.size.height),
-               maxHeight: .infinity)
+        .frame(minWidth: Self.size.width, idealWidth: Self.size.width, maxWidth: .infinity,
+               minHeight: Self.size.height, idealHeight: Self.size.height, maxHeight: .infinity)
         .presentationSizing(.fitted)
-        .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
-            width = size.width
-            height = size.height
-        }
-        // What the panes read: the worktrees are the prompt's list, asked for here in
-        // case the sheet opened from a chat, where the prompt is somebody else's.
-        .task(id: folder) {
-            guard let folder else { return }
-            await model.refreshPlugins(in: folder)
-            await refreshSnapshot()
-            if isOnMac, model.draftCwd != folder {
-                model.draftCwd = folder
-                await model.loadDraftOptions()
-            }
-        }
-        .onChange(of: chosen) { _, now in
-            if now.page != nil { Task { await refreshSnapshot() } }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            Task { await refreshSnapshot() }
+        .task(id: summary?.key) {
+            if summary?.host == .mac { await model.loadWorktrees() }
         }
     }
 
-    private func refreshSnapshot() async {
-        guard isOnMac, let folder else { snapshot = nil; return }
-        if let fresh = await model.sharedSnapshot(folder: folder) { snapshot = fresh }
+    /// The project's settings, kept in this folder: the window shows this folder, so Project
+    /// Settings reads and writes its `.agents`.
+    private func openProjectSettings() {
+        guard let summary else { return }
+        if model.selectedFolderKey != summary.key { model.showFolder(summary.key) }
+        requests.projectSettings = .general
+        ask = nil
     }
 
     private var rail: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(summary?.name ?? "Folder")
+            Text(summary?.name ?? ProjectSettingsWords.folderTitle)
                 .appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
                 .lineLimit(1)
                 .padding(.horizontal, 10)
                 .padding(.bottom, 6)
-            paneItem(.general, title: FolderSettingsPane.general.title, symbol: FolderSettingsPane.general.symbol,
-                     lit: chosen == .general, waiting: !(summary?.guardedChanges ?? []).isEmpty)
-            paneItem(.policy, title: FolderSettingsPane.policy.title, symbol: FolderSettingsPane.policy.symbol,
-                     lit: chosen == .policy, waiting: (summary?.guardedChanges ?? []).contains { $0.policy != nil })
-            if isOnMac {
-                paneItem(chosen.page == nil ? .overview : chosen, title: SettingsPane.agentConfiguration.title,
-                         symbol: SettingsPane.agentConfiguration.symbol,
-                         lit: chosen.page != nil, waiting: waitingPlugins > 0)
+            ForEach(panes) { each in
+                RailButton(lit: chosen == each, label: each.title, selected: chosen == each,
+                           action: { ask?.pane = each }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: each.symbol)
+                            .frame(width: 20)
+                            .foregroundStyle(chosen == each ? AnyShapeStyle(Paper.ground) : AnyShapeStyle(.secondary))
+                            .accessibilityHidden(true)
+                        Text(each.title).lineLimit(1)
+                        Spacer()
+                    }
+                }
             }
             Spacer()
         }
         .padding(12)
-        .frame(width: 236)
+        .frame(width: 200)
         .frame(maxHeight: .infinity)
         .background(Paper.sidebar)
     }
+}
 
-    private func paneItem(_ each: FolderSettingsPane, title: String, symbol: String,
-                          lit: Bool, waiting: Bool) -> some View {
-        RailButton(lit: lit, label: title + (waiting ? ", waiting for your OK" : ""),
-                   selected: lit, action: { if !lit { $leaving.leave(unsaved: unsaved) { pane = each } } }) {
-            HStack(spacing: 8) {
-                Image(systemName: symbol)
-                    .frame(width: 20)
-                    .foregroundStyle(lit ? AnyShapeStyle(Paper.ground) : AnyShapeStyle(.secondary))
-                    .accessibilityHidden(true)
-                Text(title)
-                    .lineLimit(1)
-                Spacer()
-                if waiting {
-                    Circle().fill(StateTint.attention.style(or: .secondary)).frame(width: 7, height: 7)
-                        .accessibilityHidden(true)
+/// The folder itself: where it is, on which machine, the project it is in, and what it has
+/// cost.
+private struct FolderGeneralPane: View {
+    @Environment(AppModel.self) private var model
+    let summary: DaemonAPI.FolderSummary
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SettingsPaneTitle(title: FolderSettingsPane.general.title)
+            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 14, verticalSpacing: 12) {
+                settingsRow("Folder") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(FolderPlace.path(summary.folder.folder, on: summary.host))
+                            .textSelection(.enabled)
+                            .help(summary.folder.folder.path)
+                        if !summary.exists {
+                            Label("Folder is missing", systemImage: "exclamationmark.triangle")
+                                .appText(.fine)
+                                .tinted(.failure)
+                        } else if summary.host == .mac {
+                            Button("Show in Finder") {
+                                model.reveal(summary.folder.folder, on: summary.host)
+                            }
+                            .buttonStyle(.paper)
+                            .appText(.fine)
+                        }
+                    }
                 }
+                settingsRow("Machine") { Text(model.hosts.label(summary.host)) }
+                // What people work on, across machines (#2317).
+                settingsRow(ProjectWords.title) {
+                    ProjectPicker(control: model.controlRequests, summary: summary) { id in
+                        await model.setProject(id, for: summary.key)
+                    }
+                }
+                settingsRow("Spent") { spent }
             }
+            .appText(.supporting)
+            Divider().padding(.vertical, 20)
+            Button("Archive Folder") {
+                Task { await model.archiveFolder(summary.key) }
+            }
+            .buttonStyle(.paper)
+            .disabled(model.hosts.isOffline(summary.host))
+            .help("Put this folder away. Its sessions are kept; unarchive it from Archived in the sidebar.")
         }
     }
 
-    private var waitingPlugins: Int {
-        model.plugins(in: folder).filter { $0.awaitingApproval != nil }.count
-    }
-
-    @ViewBuilder
-    private var content: some View {
-        if let page = chosen.page, let folder {
-            AgentConfigurationView(place: .folder(folder), snapshot: snapshot,
-                                   page: Binding(get: { page }, set: { pane = FolderSettingsPane($0) }),
-                                   waiting: waitingPlugins > 0 ? [.plugins] : [],
-                                   refresh: { await refreshSnapshot() }, unsaved: $unsaved)
-        } else if chosen == .policy, let summary {
-            FolderPolicyPane(summary: summary)
-        } else {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    FolderGeneralPane()
-                }
-                .frame(maxWidth: .infinity, alignment: .topLeading)
-                .padding(24)
+    /// What this folder has cost, in words that say how sure the figure is.
+    ///
+    /// `Cost.total(of:)` returns nil when nothing has been spent, and a zero would be a
+    /// claim the app has not made, so nothing priced says so instead.
+    private var spent: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if let total = Cost.total(of: summary.costToDate) {
+                Text("\(total) since it was added")
+            } else {
+                Text("Nothing priced yet").foregroundStyle(.secondary)
+            }
+            if summary.unmeasuredAgents > 0 {
+                let sessions = summary.unmeasuredAgents == 1 ? "1 session" : "\(summary.unmeasuredAgents) sessions"
+                settingsNote("\(sessions) ran on a runtime that reports no price, so this is a minimum.")
             }
         }
     }
 }
 
-/// The folder itself: its name, where it is, what it has cost, and how many agents its
-/// agents may start (#64).
-private struct FolderGeneralPane: View {
+/// When the disk under this folder is low (#195): a line for low and one for critical.
+private struct FolderDiskSpacePane: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.dismiss) private var dismiss
-
-    private var summary: DaemonAPI.FolderSummary? { model.selectedFolderSummary }
+    let summary: DaemonAPI.FolderSummary
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(FolderSettingsPane.general.title)
-                .appText(.title).fontWeight(.semibold)
-                .padding(.bottom, 18)
-            if let summary {
-                // Changes made outside the app to its own files wait here (#502).
-                ForEach(summary.guardedChanges ?? []) { change in
-                    GuardedChangeQuestion(change: change, key: summary.key, leaving: { dismiss() })
-                        .padding(.bottom, 18)
+            SettingsPaneTitle(title: FolderSettingsPane.diskSpace.title)
+            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 14, verticalSpacing: 12) {
+                settingsRow("Low disk space") {
+                    diskLine(\.lowGB, default: DiskThresholds.defaultLowGB, choices: DiskThresholds.lowChoices)
                 }
-                Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 14, verticalSpacing: 12) {
-                    row("Name") { Text(summary.name).textSelection(.enabled) }
-                    row("Folder") {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(FolderPlace.path(summary.folder.folder, on: summary.host))
-                                .textSelection(.enabled)
-                                .help(summary.folder.folder.path)
-                            if !summary.exists {
-                                Label("Folder is missing", systemImage: "exclamationmark.triangle")
-                                    .appText(.fine)
-                                    .tinted(.failure)
-                            } else if summary.host == .mac {
-                                Button("Show in Finder") {
-                                    model.reveal(summary.folder.folder, on: summary.host)
-                                }
-                                .buttonStyle(.paper)
-                                .appText(.fine)
-                            }
-                        }
-                    }
-                    row("Machine") { Text(model.hosts.label(summary.host)) }
-                    // What people work on, across machines (#2317).
-                    row(ProjectWords.title) {
-                        ProjectPicker(control: model.controlRequests, summary: summary) { id in
-                            await model.setProject(id, for: summary.key)
-                        }
-                    }
-                    row("Spent") { spent(summary) }
-                    // What a merged pull request says it cost (#2352); an older host has no such setting.
-                    if model.host(summary.host, has: Capability.lineageComment1) {
-                        row("Cost on pull requests") {
-                            VStack(alignment: .leading, spacing: 6) {
-                                prCostComment(in: summary)
-                                Text(PRCostComment.help + " Saved in .agents/folder.json.")
-                                    .appText(.fine)
-                                    .foregroundStyle(.secondary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                        }
-                    }
-                    // Rules of the policy now (#2957, FR-015, FR-023): what applies here, and where
-                    // to change it. Folder Settings ▸ Policy sets this folder's own (slice 5).
-                    row("Helpers") {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("\(summary.helperLimits.running) running, \(summary.helperLimits.notArchived) not archived")
-                                .monospacedDigit()
-                            if let mark = summary.helperLimitsSetBy { OrgPolicyLine(mark: mark) }
-                            Text("Set in Settings ▸ Agents ▸ Policy.")
-                                .appText(.fine)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    row("Helpers queued") {
-                        VStack(alignment: .leading, spacing: 6) {
-                            helperLimit(\.queued, in: summary, default: HelperLimit.defaultQueued,
-                                        upTo: HelperLimit.maximumQueued)
-                            Text("How many more sessions that other sessions started may wait to start, "
-                                 + "oldest first, when a place frees. Agents can't change this.")
-                                .appText(.fine)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                            // They go with the folder (#126), so say where.
-                            Text("This and Helpers archived are saved in .agents/folder.json, a file in "
-                                 + "this folder you may commit.")
-                                .appText(.fine)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                    row("Helpers archived") {
-                        VStack(alignment: .leading, spacing: 6) {
-                            mayArchive(in: summary)
-                            Text("A session may archive only sessions it started, once their turn has ended, "
-                                 + "and never your own sessions. Off, it asks you instead. You can bring any of them back.")
-                                .appText(.fine)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                    row("Pull request merged") {
-                        VStack(alignment: .leading, spacing: 6) {
-                            archiveWhenMerged(in: summary)
-                            Text("A session in a worktree is archived when the pull request from its branch merges, "
-                                 + "once its turn has ended and its worktree has nothing uncommitted. Any other session "
-                                 + "gets a line in its chat. This needs the github or gitlab connector in this folder. "
-                                 + "You can bring any of them back.")
-                                .appText(.fine)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                    row("Allowance spent") {
-                        VStack(alignment: .leading, spacing: 6) {
-                            helpersContinue(in: summary)
-                            Text("A session started by a session waits for the allowance and carries on "
-                                 + "when it is back, as if you had chosen Continue. Off, it stops until you do.")
-                                .appText(.fine)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                    row("Other machines") {
-                        VStack(alignment: .leading, spacing: 6) {
-                            startOnMachines(in: summary)
-                            Text("On, a session here may start a session on another of your machines without "
-                                 + "asking you first. The new session's chat still says which session started it, "
-                                 + "and from which machine. Off, it asks you each time.")
-                                .appText(.fine)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                    row("Low disk space") {
-                        diskLine(\.lowGB, in: summary, default: DiskThresholds.defaultLowGB,
-                                 choices: DiskThresholds.lowChoices)
-                    }
-                    row("Critical disk space") {
-                        VStack(alignment: .leading, spacing: 6) {
-                            diskLine(\.criticalGB, in: summary, default: DiskThresholds.defaultCriticalGB,
-                                     choices: DiskThresholds.criticalChoices)
-                            Text("When free space on the disk holding this folder or its worktrees falls below "
-                                 + "these, the window says so and machine.disk_low is raised for agents and workflows. "
-                                 + "Low is also below \((summary.folder.diskSpace ?? DiskThresholds()).effectiveLowPercent)% "
-                                 + "of the disk. Saved in .agents/folder.json.")
-                                .appText(.fine)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
+                settingsRow("Critical disk space") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        diskLine(\.criticalGB, default: DiskThresholds.defaultCriticalGB,
+                                 choices: DiskThresholds.criticalChoices)
+                        settingsNote("When free space on the disk holding this folder or its worktrees falls below "
+                                     + "these, the window says so and machine.disk_low is raised for agents and workflows. "
+                                     + "Low is also below \((summary.folder.diskSpace ?? DiskThresholds()).effectiveLowPercent)% "
+                                     + "of the disk. Saved in .agents/folder.json.")
                     }
                 }
-                .appText(.supporting)
-                Divider().padding(.vertical, 20)
-                Button("Archive Folder") {
-                    Task { await model.archiveFolder(summary.key) }
-                }
-                .buttonStyle(.paper)
-                .disabled(model.hosts.isOffline(summary.host))
-                .help("Put this folder away. Its sessions are kept; unarchive it from Archived in the sidebar.")
             }
+            .appText(.supporting)
         }
-    }
-
-    private func row(_ label: String, @ViewBuilder value: () -> some View) -> some View {
-        GridRow {
-            Text(label)
-                .foregroundStyle(.secondary)
-                .gridColumnAlignment(.trailing)
-            value()
-        }
-    }
-
-    /// One helper limit (#64) as a menu of the numbers it may be, its default marked and
-    /// choosing it putting the folder back to the default.
-    private func helperLimit(_ key: WritableKeyPath<HelperLimits, Int?>, in summary: DaemonAPI.FolderSummary,
-                             default standard: Int, upTo maximum: Int, from minimum: Int = 1) -> some View {
-        let kept = summary.folder.helperLimits ?? HelperLimits()
-        let current = kept[keyPath: key] ?? standard
-        return Picker("", selection: Binding(get: { current }, set: { chosen in
-            var limits = kept
-            limits[keyPath: key] = chosen == standard ? nil : chosen
-            Task { await model.setHelperLimits(limits, for: summary.key) }
-        })) {
-            ForEach(Array(Swift.min(minimum, current)...Swift.max(maximum, current)), id: \.self) { number in
-                Text(number == standard ? "\(number) (default)" : "\(number)").tag(number)
-            }
-        }
-        .labelsHidden()
-        .fixedSize()
-        .disabled(model.hosts.isOffline(summary.host))
-    }
-
-    /// What the host says on the folder's merged pull requests (#2352): off, the default, or
-    /// the tokens and time, or the cost too.
-    private func prCostComment(in summary: DaemonAPI.FolderSummary) -> some View {
-        let current = summary.folder.prCostComment ?? .off
-        return Picker("", selection: Binding(get: { current }, set: { chosen in
-            Task { await model.setPRCostComment(chosen, for: summary.key) }
-        })) {
-            ForEach(PRCostComment.allCases, id: \.self) { choice in
-                Text(choice == .off ? "\(choice.words) (default)" : choice.words).tag(choice)
-            }
-        }
-        .labelsHidden()
-        .fixedSize()
-        .disabled(model.hosts.isOffline(summary.host))
     }
 
     /// One disk space line (#195) as a menu of sizes, its default marked and choosing it
     /// putting the folder back to the default. A size set by hand is offered too.
-    private func diskLine(_ key: WritableKeyPath<DiskThresholds, Int?>, in summary: DaemonAPI.FolderSummary,
-                          default standard: Int, choices: [Int]) -> some View {
+    private func diskLine(_ key: WritableKeyPath<DiskThresholds, Int?>, default standard: Int,
+                          choices: [Int]) -> some View {
         let kept = summary.folder.diskSpace ?? DiskThresholds()
         let current = kept[keyPath: key] ?? standard
         let offered = Set(choices + [current]).sorted()
@@ -448,82 +243,26 @@ private struct FolderGeneralPane: View {
         .fixedSize()
         .disabled(model.hosts.isOffline(summary.host))
     }
+}
 
-    /// Whether sessions may archive the sessions they started (#120, #638), beside the limits
-    /// those places count against. Back to nil when it is the default again.
-    private func mayArchive(in summary: DaemonAPI.FolderSummary) -> some View {
-        let kept = summary.folder.helperLimits ?? HelperLimits()
-        return Toggle("Sessions may archive the sessions they started", isOn: Binding(get: { kept.mayArchive }, set: { on in
-            var limits = kept
-            limits.agentsMayArchive = on == HelperLimit.defaultAgentsMayArchive ? nil : on
-            Task { await model.setHelperLimits(limits, for: summary.key) }
-        }))
-        .toggleStyle(.switch)
-        .controlSize(.small)
-        .disabled(model.hosts.isOffline(summary.host))
+/// This folder's worktrees, as Activity ▸ Worktrees lists them (#790), with Remove… and
+/// Clean up worktrees.
+private struct FolderWorktreesPane: View {
+    @Environment(AppModel.self) private var model
+    let summary: DaemonAPI.FolderSummary
+
+    private var group: DaemonAPI.FolderWorktrees? {
+        model.work.worktreesForCleanup().first { $0.folder.standardizedFileURL == summary.folder.folder.standardizedFileURL }
     }
 
-    /// Whether a session is archived when its pull request merges (#2886). On is the default,
-    /// and back to nil.
-    private func archiveWhenMerged(in summary: DaemonAPI.FolderSummary) -> some View {
-        let kept = summary.folder.helperLimits ?? HelperLimits()
-        return Toggle("Archive a session when its pull request merges", isOn: Binding(get: { kept.archivesWhenMerged }, set: { on in
-            var limits = kept
-            limits.archiveWhenMerged = on == HelperLimit.defaultArchiveWhenMerged ? nil : on
-            Task { await model.setHelperLimits(limits, for: summary.key) }
-        }))
-        .toggleStyle(.switch)
-        .controlSize(.small)
-        .disabled(model.hosts.isOffline(summary.host))
-    }
-
-    /// Whether helpers carry on by themselves when a spent allowance is back (#1918). Off
-    /// is the default, and back to nil.
-    private func helpersContinue(in summary: DaemonAPI.FolderSummary) -> some View {
-        let kept = summary.folder.helperLimits ?? HelperLimits()
-        return Toggle("Helpers continue when the allowance is back", isOn: Binding(get: { kept.continueWhenBack == true }, set: { on in
-            var limits = kept
-            limits.continueWhenBack = on ? true : nil
-            Task { await model.setHelperLimits(limits, for: summary.key) }
-        }))
-        .toggleStyle(.switch)
-        .controlSize(.small)
-        .disabled(model.hosts.isOffline(summary.host))
-    }
-
-    /// Whether start_session with a machine skips the question to the person (#2928). Off is
-    /// the default, and back to nil. Only the person sets it, here.
-    private func startOnMachines(in summary: DaemonAPI.FolderSummary) -> some View {
-        let kept = summary.folder.helperLimits ?? HelperLimits()
-        return Toggle("Agents may start sessions on my other machines without asking",
-                      isOn: Binding(get: { kept.agentsMayStartOnMachines == true }, set: { on in
-            var limits = kept
-            limits.agentsMayStartOnMachines = on ? true : nil
-            Task { await model.setHelperLimits(limits, for: summary.key) }
-        }))
-        .toggleStyle(.switch)
-        .controlSize(.small)
-        .disabled(model.hosts.isOffline(summary.host))
-    }
-
-    /// What this folder has cost, in words that say how sure the figure is.
-    ///
-    /// `Cost.total(of:)` returns nil when nothing has been spent, and a zero would be a
-    /// claim the app has not made, so nothing priced says so instead.
-    @ViewBuilder
-    private func spent(_ summary: DaemonAPI.FolderSummary) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            if let total = Cost.total(of: summary.costToDate) {
-                Text("\(total) since it was added")
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SettingsPaneTitle(title: FolderSettingsPane.worktrees.title,
+                              note: "This folder's worktrees and how much each holds on disk. Idle ones come first, largest first.")
+            if let group, !group.worktrees.isEmpty {
+                WorktreesGroup(group: group)
             } else {
-                Text("Nothing priced yet").foregroundStyle(.secondary)
-            }
-            if summary.unmeasuredAgents > 0 {
-                let sessions = summary.unmeasuredAgents == 1 ? "1 session" : "\(summary.unmeasuredAgents) sessions"
-                Text("\(sessions) ran on a runtime that reports no price, so this is a minimum.")
-                    .appText(.fine)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text("This folder has no worktrees.").foregroundStyle(.secondary)
             }
         }
     }
@@ -539,5 +278,26 @@ enum FolderPlace {
         if path == home { return "~" }
         if path.hasPrefix(home + "/") { return "~" + path.dropFirst(home.count) }
         return path
+    }
+}
+
+extension View {
+    /// Project Settings or Folder Settings, as one sheet over the window (#3280): Folder
+    /// Settings… in Project Settings' Folders swaps one for the other without a second sheet.
+    func settingsSheets(_ requests: WindowRequests) -> some View {
+        sheet(isPresented: Binding(get: { requests.projectSettings != nil || requests.folderSettings != nil },
+                                   set: { if !$0 { requests.projectSettings = nil; requests.folderSettings = nil } })) {
+            Group {
+                if requests.folderSettings != nil {
+                    FolderSettingsSheet(ask: Binding(get: { requests.folderSettings },
+                                                     set: { requests.folderSettings = $0 }))
+                } else {
+                    ProjectSettingsSheet(pane: Binding(get: { requests.projectSettings },
+                                                       set: { requests.projectSettings = $0 }))
+                }
+            }
+            .environment(requests)
+            .paperSheet()
+        }
     }
 }
