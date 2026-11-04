@@ -255,6 +255,8 @@ public extension DaemonAPI.Method {
     static let policyFolder = "policy/folder"
     /// `SetFolderPolicyRequest` → `PolicyRules` (#2957).
     static let policySetFolder = "policy/setFolder"
+    /// `SettleUntrustedYourPolicyRequest` → `YourPolicyState` (#3230).
+    static let policySettleUntrustedYours = "policy/settleUntrustedYours"
     /// `SignedYourPolicy` → `PolicyApplyYoursResult` (#2957, the Mac window's direct link only).
     static let policyApplyYours = "policy/applyYours"
 }

@@ -6616,6 +6616,13 @@ export interface PolicyRuleBudgets {
   dailyTokens?: number;
 }
 
+/** One rule a layer sets, in the Policy pane's words (#3230): for example Per day: $40.00 a day. */
+export interface PolicyRuleLine {
+  rule: PolicyRuleName;
+  title: string;
+  words: string;
+}
+
 /** One rule a policy layer can set (#2957, data-model.md "EffectiveRule"). */
 export type PolicyRuleName =
   | "permissionMode"
@@ -8414,6 +8421,20 @@ export interface SetYourPolicyRequest {
   revision: number;
 }
 
+/**
+ * policy/settleUntrustedYours (#3230): what the person chose for the untrusted copy in file, read
+ * at revision of your layer. sign true signs its rules with this machine's person key as the next
+ * revision of your layer; false sets the copy aside and changes nothing. Either way it is not shown
+ * again. Refused conflict when file or revision is not the current one, notKeeper on a machine that
+ * is not the keeper, forbidden from the agent socket role, an MCP tool or a workflow (FR-010), and
+ * invalid when the rules fail policylayers.Validate.
+ */
+export interface SettleUntrustedYourPolicyRequest {
+  file: string;
+  revision: number;
+  sign: boolean;
+}
+
 export interface SharedInstructions {
   path: string;
   exists: boolean;
@@ -9460,6 +9481,28 @@ export interface UnqueueRequest {
   promptID: UUID;
 }
 
+/**
+ * A copy of your layer on disk that fails the signature check (#3230): signed with a person key
+ * this machine does not have, such as on another Mac before the root moved here. Shown, never
+ * applied, until the person signs it again here (policy/settleUntrustedYours).
+ */
+export interface UntrustedYourPolicy {
+  /**
+   * The kept file's name in the settings folder: policy-yours.json, or
+   * policy-yours.json.untrusted-<time> once a change here kept it aside (#3122).
+   */
+  file: string;
+  rules: PolicyRules;
+  revision: number;
+  changed: WireDate;
+  /** The host id of the machine that signed it. */
+  keeper: string;
+  /** The id of the person key it was signed with. */
+  keyID: string;
+  /** Each rule the copy sets, in the Policy pane's words and order. */
+  lines: PolicyRuleLine[];
+}
+
 export type UpdateState =
   | { unknown: Record<string, never> }
   | { current: Record<string, never> }
@@ -10244,6 +10287,11 @@ export interface YourPolicyState {
    * its direct link with policy/applyYours (research R3, path 2).
    */
   signed?: SignedYourPolicy;
+  /**
+   * Your rules from a copy of your layer this machine cannot trust (#3230): the newest such copy.
+   * Its rules do not apply until the person signs them again here.
+   */
+  untrusted?: UntrustedYourPolicy;
 }
 
 /** Every method the web remote may call: its params and its result. */
@@ -10476,6 +10524,7 @@ export interface Methods {
   "policy/set": { params: PolicySet; result: PolicyKept };
   "policy/setFolder": { params: SetFolderPolicyRequest; result: PolicyRules };
   "policy/setYours": { params: SetYourPolicyRequest; result: YourPolicy };
+  "policy/settleUntrustedYours": { params: SettleUntrustedYourPolicyRequest; result: YourPolicyState };
   "policy/stopAll": { params: PolicyStopAllRequest; result: PolicyKept };
   "policy/yours": { params: Empty; result: YourPolicyState };
   "preferences/get": { params: Empty; result: Record<string, JSONValue> };
@@ -10812,6 +10861,7 @@ export const MethodTarget = {
   "policy/set": "control",
   "policy/setFolder": "host",
   "policy/setYours": "host",
+  "policy/settleUntrustedYours": "host",
   "policy/stopAll": "control",
   "policy/yours": "host",
   "preferences/get": "host",
@@ -11574,6 +11624,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PolicyRefusal: { required: ["reason", "words"], optional: ["rule", "until", "layer", "value"] },
   PolicyRefuseMore: { required: ["request"], optional: [] },
   PolicyRuleBudgets: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },
+  PolicyRuleLine: { required: ["rule", "title", "words"], optional: [] },
   PolicyRules: { required: [], optional: ["permissionMode", "permissionRequests", "sandbox", "budgets", "helpers", "workflows", "noticeLimits", "archiveMyChats", "runtimes", "marketplaces", "environment"] },
   PolicyRuntimeRule: { required: [], optional: ["models", "reach"] },
   PolicySet: { required: ["policy"], optional: ["rev"] },
@@ -11749,6 +11800,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SetSandboxRequest: { required: ["agentID"], optional: ["choice"] },
   SetUnreadRequest: { required: ["agentID", "unread"], optional: [] },
   SetYourPolicyRequest: { required: ["rules", "revision"], optional: [] },
+  SettleUntrustedYourPolicyRequest: { required: ["file", "revision", "sign"], optional: [] },
   SharedInstructions: { required: ["path", "exists", "reach"], optional: [] },
   SharedLook: { required: ["kind", "page", "item", "text"], optional: [] },
   SharedMCP: { required: ["file", "servers", "app", "runtimeOnly"], optional: ["problem"] },
@@ -11856,6 +11908,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   TurnsRequest: { required: ["agentID", "limit"], optional: ["before"] },
   UnpushedWork: { required: ["worktree", "folder"], optional: ["branch", "ahead", "unmerged", "uncommitted"] },
   UnqueueRequest: { required: ["agentID", "promptID"], optional: [] },
+  UntrustedYourPolicy: { required: ["file", "rules", "revision", "changed", "keeper", "keyID", "lines"], optional: [] },
   Usage: { required: ["used", "size", "at"], optional: ["cost"] },
   UsageBucket: { required: ["cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns"], optional: [] },
   UsageHistory: { required: ["hours", "days", "now"], optional: ["timeZone"] },
@@ -11923,5 +11976,5 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorktreesSized: { required: ["sizes"], optional: [] },
   WriteFailure: { required: ["cause", "what", "message"], optional: ["path"] },
   YourPolicy: { required: ["rules", "revision", "changed", "person", "keeper"], optional: ["changedFrom"] },
-  YourPolicyState: { required: ["policy", "keeper"], optional: ["pinnedKeyID", "signed"] },
+  YourPolicyState: { required: ["policy", "keeper"], optional: ["pinnedKeyID", "signed", "untrusted"] },
 };

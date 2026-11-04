@@ -5955,6 +5955,32 @@
       }
     },
     {
+      "name": "policy/settleUntrustedYours",
+      "x-capability": "host.policy-layers/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Signs the rules of an untrusted copy of your layer with this machine's person key, or sets the copy aside, as the person chose (#3230): never without the person, since that would make the signature check worthless. Refused conflict, notKeeper, forbidden or invalid (SettleUntrustedYourPolicyRequest).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SettleUntrustedYourPolicyRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/YourPolicyState"
+        }
+      }
+    },
+    {
       "name": "policy/yours",
       "x-capability": "host.policy-layers/1",
       "tags": [

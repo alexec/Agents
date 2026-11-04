@@ -147,6 +147,23 @@ public enum PolicyLayersWords {
         return "\(layer.kind == "you" ? "Your policy" : layer.name): \(value)"
     }
 
+    // MARK: Rules signed on another Mac (#3230)
+
+    public static let untrustedTitle = "Your rules from another Mac don’t apply"
+    public static let signAgain = "Sign with This Mac’s Key"
+    public static let setAside = "Don’t Use Them"
+
+    /// Why the rules stopped applying, and what signing does.
+    public static func untrustedLine(_ copy: DaemonAPI.UntrustedYourPolicy) -> String {
+        "These rules were signed on another Mac on \(copy.changed.formatted(date: .abbreviated, time: .omitted)), with a key this Mac doesn’t have, so they stopped applying here. Check them. Then sign them with this Mac’s key to use them again."
+    }
+
+    /// One of its rules: "Per day: $40.00 a day".
+    public static func untrustedRule(_ line: DaemonAPI.PolicyRuleLine) -> String { "\(line.title): \(line.words)" }
+
+    /// A copy that sets no rule.
+    public static let untrustedNone = "It sets no rules."
+
     // MARK: A folder's layer (FR-022, frame D)
 
     /// Folder Settings ▸ Policy's line under its title.
