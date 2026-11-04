@@ -69,6 +69,36 @@ func TestDailySummaryCollectsAndKeepsThree(t *testing.T) {
 	}
 }
 
+// Only the newest daily summary is in For Review (#3352): a new page takes its title, and
+// the older runs' pages that nobody opened are marked read; another session's file stays.
+func TestOnlyTheNewestSummaryIsForReview(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	home := t.TempDir()
+	d.PersonalHome = home
+	wid := dailySummaryID
+	unseen := func(a *wire.Agent) { a.FileToSee = &wire.ShownFile{Path: filepath.Join(home, "old.md")} }
+	older := seeded(t, d, home, func(a *wire.Agent) { a.StartedByWorkflow = &wid; unseen(a) })
+	work := seeded(t, d, t.TempDir(), unseen)
+	me := seeded(t, d, home, func(a *wire.Agent) { a.State, a.StartedByWorkflow = wire.AgentStateRunning, &wid })
+
+	if _, err := d.saveSummary(me.ID, "Intro\n\n# Daily summary, Tue 3 Nov\n\n## Landed\n", "", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if a := d.Store.Agent(me.ID); a.Title == nil || *a.Title != "Daily summary, Tue 3 Nov" {
+		t.Fatalf("title %v", a.Title)
+	}
+	if d.Store.Agent(older.ID).FileToSee != nil {
+		t.Fatal("an older summary stayed in For Review")
+	}
+	if d.Store.Agent(work.ID).FileToSee == nil {
+		t.Fatal("another session's file to see was cleared")
+	}
+	if got := summaryTitle("no heading\n## Part\n"); got != "" {
+		t.Fatalf("title %q from a page with no first heading", got)
+	}
+}
+
 // Only a session in the home folder is offered write_daily_summary, and the workflow is never
 // copied into a project.
 func TestDailySummaryIsTheHomeFolders(t *testing.T) {
