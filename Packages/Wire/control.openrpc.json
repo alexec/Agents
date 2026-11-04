@@ -2186,6 +2186,11 @@
     {
       "name": "hosts/install",
       "x-capability": "hosts/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {

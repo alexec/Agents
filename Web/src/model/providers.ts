@@ -2,7 +2,7 @@
 // ControlSettingsModel: listed when Settings opens, kept by control/providersChanged, and each
 // change sent to the control plane. Secrets pass through in a request and are not kept here.
 import { signal } from "@preact/signals";
-import type { Group, MachineRef, ProviderAdd, ProviderID, ProviderSummary } from "../protocol/generated";
+import type { ControlMachine, Group, MachineRef, ProviderAdd, ProviderID, ProviderSummary } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import type { Caller } from "../protocol/methods";
 import { CallFailed } from "../wire/link";
@@ -14,6 +14,9 @@ export interface StopAsk {
   host: string;
   question: string;
 }
+
+/** What Add as Machine… came to: installed under a name, a host key to look at first, or why not. */
+export type InstallOutcome = { added: string } | { needsTrust: string } | { failed: string };
 
 export class Providers {
   /** As last listed; null before the first list. */
@@ -98,6 +101,39 @@ export class Providers {
       return null;
     } catch (error) {
       return describe(error);
+    }
+  }
+
+  /** The machines Add as Machine… installed, by name, linked to their workspace once they join. */
+  private readonly linkOnJoin = new Map<string, { provider: string; workspace: string }>();
+
+  /**
+   * Add as Machine… (#3365), as the window's: the control plane installs Agents on `workspace` over
+   * its own ssh (gh's, for a codespace), and the machine is linked to it once it joins, so its
+   * provider starts it again (#3348). `trust` is the host key's fingerprint, when the person said
+   * it is the one the machine shows.
+   */
+  async install(destination: string, name: string, provider: string, workspace: string, trust?: string): Promise<InstallOutcome> {
+    try {
+      const answer = await this.caller.call("hosts/install", { destination, name, ...(trust ? { trust } : {}) }) as
+        { needsTrust?: string; name?: string } | null;
+      if (answer?.needsTrust) return { needsTrust: answer.needsTrust };
+      const joined = answer?.name || name || destination;
+      this.linkOnJoin.set(joined, { provider, workspace });
+      return { added: joined };
+    } catch (error) {
+      return { failed: describe(error) };
+    }
+  }
+
+  /** On each list of hosts: links the ones Add as Machine… installed that have joined since. */
+  linkJoined(hosts: readonly ControlMachine[]): void {
+    for (const [name, wanted] of this.linkOnJoin) {
+      const host = hosts.find((h) => h.name === name && !h.workspace);
+      if (!host) continue;
+      this.linkOnJoin.delete(name);
+      void this.caller.call("hosts/link", { host: host.id as MachineRef, provider: wanted.provider as ProviderID, workspace: wanted.workspace })
+        .catch(() => undefined);
     }
   }
 

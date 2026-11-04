@@ -59,6 +59,13 @@ tablet, use **Add a Browser…** in this one; see
    A codespace has no systemd, so the command says **Started in the background (no
    systemd user session here).** The machine then shows under **Machines** on the web page.
 
+Or, with a GitHub Codespaces machine provider (see
+[Set up a cloud machine provider](set-up-a-cloud-machine-provider.md)): on the web page, open
+**Settings ▸ Machine providers**, find the codespace and click **Add as Machine…**. The
+codespace must be running. The control plane installs Agents on it over `gh`'s ssh and links
+the machine to the codespace. The first time, the dialog shows the codespace's host key:
+click **Trust and Install**. You do not need a terminal in the codespace.
+
 Do the same on any other Linux server. See [Add a machine](add-a-machine.md) for folders
 on the machine.
 
@@ -99,9 +106,6 @@ is not started. Run that command again in the codespace's terminal, with a new c
 
 ## What is missing for now
 
-- **Add as Machine… on a codespace does not work** from a control plane in the cloud: it
-  needs ssh and `gh`, and the control plane's image has neither. Use the command from
-  **Add a Machine…**, as above.
 - **The web page cannot sign a runtime in on a machine.** Sign it in in the machine's
   terminal, as above.
 
