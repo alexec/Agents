@@ -22,8 +22,11 @@ func (f *fakeResolves) lookup(_ context.Context, _ string, repo forgeRepo, kind 
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	ref := repo.issue(n).Ref
-	if kind == "pr" {
+	switch kind {
+	case "pr":
 		ref = repo.pr(n).Ref
+	case "milestone":
+		ref = repo.milestone(n).Ref
 	}
 	f.asked[ref]++
 	r, ok := f.of[ref]
@@ -179,12 +182,46 @@ func TestLineageWalkResolvesOffTheRequestPath(t *testing.T) {
 	}
 }
 
+// A milestone found for an issue is resolved, so Work's Milestones says its title, not its
+// ref, with no walk to ask for it.
+func TestIssueMilestoneResolvesItsTitle(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	folder := t.TempDir()
+	repo := forgeRepo{"github", "alexec/agents"}
+	d.repos = map[string]forgeRepo{folder: repo}
+	d.issueLookup = (&fakeMilestones{of: map[string]int{"github:alexec/agents#12": 15}, asked: map[string]int{}}).lookup
+	fake := &fakeResolves{asked: map[string]int{}, of: map[string]wire.LineageResolved{
+		"github:alexec/agents/milestone/15": {Title: "0.16 Work"},
+	}}
+	d.resolveLookup = fake.lookup
+	seeded(t, d, folder, func(*wire.Agent) {}) // a folder signed in to the repo
+
+	d.noteIssueMilestone(folder, repo, 12)
+	settleMilestones(t, d)
+	d.resolveSettle(5 * time.Second)
+	d.resolveMu.Lock()
+	e := d.resolveCache[repo.milestone(15)]
+	d.resolveMu.Unlock()
+	if !e.ok || e.resolved.Title != "0.16 Work" {
+		t.Fatalf("milestone resolved: %+v", e)
+	}
+	// Found again within resolveRecheck: not asked again.
+	d.resolveSoon(repo.milestone(15))
+	d.resolveSettle(5 * time.Second)
+	if n := fake.times("github:alexec/agents/milestone/15"); n != 1 {
+		t.Fatalf("milestone asked %d times, want 1", n)
+	}
+}
+
 func TestNodeOfRepo(t *testing.T) {
 	for ref, kind := range map[string]string{
-		"github:alexec/agents#12": "issue",
-		"github:alexec/agents#13": "pr",
-		"gitlab:group/project#4":  "issue",
-		"gitlab:group/project!5":  "pr",
+		"github:alexec/agents#12":          "issue",
+		"github:alexec/agents#13":          "pr",
+		"gitlab:group/project#4":           "issue",
+		"gitlab:group/project!5":           "pr",
+		"github:alexec/agents/milestone/3": "milestone",
+		"gitlab:group/project/milestone/2": "milestone",
 	} {
 		repo, n, ok := nodeOfRepo(wire.LineageNode{Kind: kind, Ref: ref})
 		if !ok || n <= 0 || repo.forge == "" {
@@ -193,9 +230,10 @@ func TestNodeOfRepo(t *testing.T) {
 	}
 	for ref, kind := range map[string]string{
 		"session:00000000-0000-0000-0000-000000000001": "session",
-		"linear:ENG-4":           "issue",
-		"github:alexec/agents#0": "issue",
-		"github:no-number":      "issue",
+		"linear:ENG-4":                     "issue",
+		"github:alexec/agents#0":           "issue",
+		"github:no-number":                 "issue",
+		"github:alexec/agents/milestone/x": "milestone",
 	} {
 		if _, _, ok := nodeOfRepo(wire.LineageNode{Kind: kind, Ref: ref}); ok {
 			t.Errorf("%s: want not resolvable", ref)
@@ -214,6 +252,8 @@ func TestResolvedOf(t *testing.T) {
 		{"pr", `{"title":"Fix it","state":"closed"}`, "Fix it", "closed", nil},
 		{"issue", `{"title":"Fix it","state":"opened","labels":["bug","area:lineage"]}`,
 			"Fix it", "open", []string{"bug", "area:lineage"}},
+		{"milestone", `{"number":3,"title":"0.16 Work","state":"open"}`, "0.16 Work", "open", nil},
+		{"milestone", `[{"iid":2,"title":"0.16 Work","state":"active"}]`, "0.16 Work", "open", nil},
 	}
 	for _, c := range cases {
 		got, err := resolvedOf(c.kind, []byte(c.body))
@@ -231,6 +271,9 @@ func TestResolvedOf(t *testing.T) {
 	}
 	if _, err := resolvedOf("issue", []byte(`{"state":"open"}`)); err == nil {
 		t.Error("no title: want an error")
+	}
+	if _, err := resolvedOf("milestone", []byte("[]")); err == nil {
+		t.Error("no milestone: want an error")
 	}
 	if _, err := resolvedOf("issue", []byte("not json")); err == nil {
 		t.Error("not json: want an error")

@@ -241,7 +241,7 @@ func (d *Daemon) refreshCostLinksLocked() {
 	}
 }
 
-// refreshCostResolvedLocked puts on each issue and PR node the title, state and labels the
+// refreshCostResolvedLocked puts on each issue, PR and milestone node the title, state and labels the
 // resolve cache has for it (#3118), for reports/nodes, marking the nodes whose answer
 // changed unsent. It asks no forge: a node is resolved when a lineage walk asks for it.
 func (d *Daemon) refreshCostResolvedLocked() {
