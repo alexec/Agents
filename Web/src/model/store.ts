@@ -16,7 +16,7 @@ import type {
   GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, DailySummarySettings, DesktopControlSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
-  PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, RemoveRequest, ClientPermissionSettings, PRCostComment } from "../protocol/generated";
+  PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, BudgetRequest, RemoveRequest, ClientPermissionSettings, PRCostComment } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import type { FolderGoneAsk } from "./missingFolder";
@@ -24,6 +24,7 @@ import { describe, methodNotFound } from "./errors";
 import { fromWireDate } from "../protocol/dates";
 import { addCap, dropCap, openCaps } from "./teamGroups";
 import { withGovernanceRequest } from "./governance";
+import { withBudgetRequest } from "./console";
 import type { SaveOutcome } from "./sourceEdit";
 import { artifactsIn, withArtifactsOf, type Artifact } from "./artifacts";
 import { log } from "../log";
@@ -443,6 +444,8 @@ export class Work {
   readonly linkRequests = signal<ChannelLinkRequest[]>([]);
   /** Requests for an MCP server or skill waiting for an admin (#2019, M5); empty for a member. */
   readonly governanceRequests = signal<CatalogRequest[]>([]);
+  /** Ask for More requests of today waiting for an admin (#3262); empty for a member. */
+  readonly budgetRequests = signal<BudgetRequest[]>([]);
   /** People their provider's SCIM deleted, suspended until an admin removes them (#1002); empty for a member. Here,
    * not in the Requests page, so the Console's count has them (#2436). */
   readonly removeRequests = signal<RemoveRequest[]>([]);
@@ -1293,6 +1296,11 @@ export class Store extends Work {
         if (request && !request.for && this.linkPeople.value.length === 0) void this.loadLinkRequests();
         return;
       }
+      if (method === "control/budgetRequested") {
+        const request = params as BudgetRequest | null;
+        if (request?.id && this.people.value?.admin) this.budgetRequests.value = withBudgetRequest(this.budgetRequests.value, request);
+        return;
+      }
       if (method === "control/governanceRequested") {
         const request = params as CatalogRequest | null;
         if (request?.id && this.people.value?.admin) this.governanceRequests.value = withGovernanceRequest(this.governanceRequests.value, request);
@@ -1409,7 +1417,8 @@ export class Store extends Work {
   load(): Promise<void> {
     return this.once("*", async () => {
       const [hosts] = await Promise.all([this.link.call("hosts/list", {}), this.loadPlane(), this.loadKept(), this.loadJoinRequests(),
-        this.loadPeople().then(() => Promise.all([this.loadLinkRequests(), this.loadGovernanceRequests(), this.loadRemoveRequests()])),
+        this.loadPeople().then(() => Promise.all([this.loadLinkRequests(), this.loadGovernanceRequests(), this.loadBudgetRequests(),
+          this.loadRemoveRequests()])),
         this.loadSignInRequests()]);
       this.takeHosts(hosts);
       await Promise.all(this.hosts.value.filter((host) => hostAnswers(host.state)).map((host) => this.onHost(host.id, async () => {
@@ -1512,6 +1521,13 @@ export class Store extends Work {
     const listed = admin ? await this.link.call("governance/requests", {}).then((l) => l.requests, () => []) : [];
     // An admin's own decided ones come too, for Settings ▸ Policy: the Console has the waiting ones.
     this.governanceRequests.value = listed.filter((r) => r.state === "waiting");
+  }
+
+  /** An admin's Ask for More requests of today waiting (#3262); a member, or a control plane before them, has none. */
+  async loadBudgetRequests(): Promise<void> {
+    const admin = this.people.value?.admin ?? false;
+    const listed = admin ? await this.link.call("policy/requests", {}).then((l) => l.requests, () => []) : [];
+    this.budgetRequests.value = listed.filter((r) => r.state === "waiting");
   }
 
   /** An admin's SCIM removals waiting (#1002, #2436); a member, or a control plane before SCIM, has none. */

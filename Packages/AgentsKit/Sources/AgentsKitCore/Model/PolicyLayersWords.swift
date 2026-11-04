@@ -72,8 +72,8 @@ public enum PolicyLayersWords {
         case changeYours
         /// A folder's layer: its Folder Settings ▸ Policy, by the folder's path.
         case changeFolder(String)
-        /// An organisation budget: the Spending report. Ask for More waits for its request
-        /// (#3262).
+        /// An organisation budget: the Spending report. The card also offers Ask for More
+        /// (#3262, `canAskForMore`).
         case openSpending
         /// Any other organisation rule, or a refusal that names no layer.
         case seeOrganisation
@@ -93,6 +93,43 @@ public enum PolicyLayersWords {
         case .changeFolder: "Change in Folder Settings ▸ \(title)"
         case .openSpending: "Open Spending"
         case .seeOrganisation: "See \(organisationTitle)"
+        }
+    }
+
+    // MARK: Ask for More (#3262, spec 998 FR-019)
+
+    public static let askForMore = "Ask for More"
+    public static let askForMoreHelp = "Ask your organisation's admins to raise today's budget. They answer on Console ▸ Requests."
+
+    /// Whether the card offers Ask for More: the organisation's budget stopped the agent.
+    public static func canAskForMore(_ refusal: DaemonAPI.PolicyRefusal) -> Bool {
+        refusal.reason == "budget" && stopAction(refusal) == .openSpending
+    }
+
+    /// Sends Ask for More on the control plane; with none, it cannot be reached.
+    public static func askForMore(on control: DaemonClient?) async throws -> DaemonAPI.BudgetRequest {
+        guard let control else { throw URLError(.notConnectedToInternet) }
+        return try await control.call(DaemonAPI.Method.policyAskForMore, DaemonAPI.PolicyAskForMore(),
+                                      returning: DaemonAPI.BudgetRequest.self)
+    }
+
+    /// Why Ask for More did not go: the control plane's words, or that it is older than the ask.
+    public static func askRefusal(_ error: any Error) -> String {
+        if let error = error as? JSONRPCError, error.code == JSONRPCError.methodNotFound {
+            return "This control plane cannot take the request yet. Update it, or ask an admin another way."
+        }
+        return PeopleWords.refusal(error)
+    }
+
+    /// The card's line once asked, by where the request stands.
+    public static func asked(_ request: DaemonAPI.BudgetRequest) -> String {
+        let by = request.decidedBy.map { " by \($0)" } ?? ""
+        switch request.state {
+        case .waiting: return "Asked. An admin can raise today's budget."
+        case .raised:
+            let to = request.daily.map { " to \(OrgPolicyWords.dollars($0))" } ?? ""
+            return "Raised\(to) for today\(by). Send again to go on."
+        case .refused: return "Refused for today\(by)."
         }
     }
 

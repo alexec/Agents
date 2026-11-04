@@ -3,9 +3,10 @@
 // the layers and sends each rule's words and cap line; these are the page's own: the sections, the titles, what a
 // menu offers, and which of its values a cap dims.
 import type {
-  EffectivePolicy, EffectiveRule, GuardedChangePolicy, JSONValue, PolicyBehindMachine, PolicyLayerRef, PolicyRefusal, PolicyRules,
+  BudgetRequest, EffectivePolicy, EffectiveRule, GuardedChangePolicy, JSONValue, PolicyBehindMachine, PolicyLayerRef, PolicyRefusal, PolicyRules,
 } from "../protocol/generated";
 import { absolutePath } from "./fileWatch";
+import { dollars } from "./orgPolicy";
 
 export const groupTitle = "Agents";
 export const title = "Policy";
@@ -284,8 +285,8 @@ export function stopLayerLine(refusal: PolicyRefusal): string | undefined {
   return `${layerName(refusal.layer)}: ${refusal.value}`;
 }
 
-/** What the card offers: Change for a layer the person can edit, Open Spending for an organisation budget (no
- * client asks for more yet: only an admin's policy/raise), See Organisation Policy for another organisation rule. */
+/** What the card offers: Change for a layer the person can edit, Open Spending for an organisation budget (with Ask
+ * for More beside it, canAskForMore), See Organisation Policy for another organisation rule. */
 export type StopAction =
   | { kind: "yours"; label: string }
   | { kind: "folder"; label: string; folder: string }
@@ -301,6 +302,32 @@ export function stopAction(refusal: PolicyRefusal): StopAction {
   }
   if (refusal.reason === "budget") return { kind: "spending", label: "Open Spending" };
   return { kind: "organisation", label: `See ${organisationTitle}` };
+}
+
+// Ask for More (#3262, spec 998 FR-019): at the organisation's budget, the card asks an admin to raise it for today.
+
+export const askForMoreTitle = "Ask for More";
+export const askForMoreHelp = "Ask your organisation's admins to raise today's budget. They answer on Console ▸ Requests.";
+
+/** Whether the card offers Ask for More: the organisation's budget stopped the agent. */
+export function canAskForMore(refusal: PolicyRefusal): boolean {
+  return refusal.reason === "budget" && stopAction(refusal).kind === "spending";
+}
+
+/** The card's line once asked, by where the request stands. */
+export function askedWords(r: BudgetRequest): string {
+  const by = r.decidedBy ? ` by ${r.decidedBy}` : "";
+  switch (r.state) {
+    case "raised": return `Raised${r.daily !== undefined ? ` to ${dollars(r.daily)}` : ""} for today${by}. Send again to go on.`;
+    case "refused": return `Refused for today${by}.`;
+    default: return "Asked. An admin can raise today's budget.";
+  }
+}
+
+/** Why Ask for More did not go: a control plane older than the ask says so. */
+export function askRefusal(error: unknown): string | undefined {
+  const code = (error as { code?: number } | null)?.code;
+  return code === -32601 ? "This control plane cannot take the request yet. Update it, or ask an admin another way." : undefined;
 }
 
 // A waiting change to a folder's .agents/policy.json (#2957, T058, frame D): the guarded-change card's words.

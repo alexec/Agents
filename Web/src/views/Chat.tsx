@@ -209,6 +209,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       },
       noteChart: (file) => store.noteChartHint(host, file.path, file.chart),
       readFile: (path) => store.readFile(host, session, path),
+      // Ask for More at the organisation's budget (#3262): on the control plane, not the host.
+      askForMore: () => store.link.call("policy/askForMore", {}),
       // With no Mac, no window shows terminal output (#3425).
       hasMac: store.hasMac.value,
     };

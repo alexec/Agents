@@ -532,7 +532,9 @@ struct RemoteChatView: View {
             },
             leaseStatus: { [model] agentID in model.work.leaseStatus(of: agentID) },
             openLease: openLease,
-            fromLine: { [model] sender in model.work.fromLine(sender) })
+            fromLine: { [model] sender in model.work.fromLine(sender) },
+            // Ask for More on a Stopped by a policy card (#3262); the Remote has no Spending.
+            askForMore: { [model] in try await PolicyLayersWords.askForMore(on: model.controlPlane) })
     }
 
     /// What a view in the chat may ask of the phone (#187): the Mac it is on, the person's

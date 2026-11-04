@@ -130,3 +130,17 @@ test("a waiting change to a folder's policy asks Allow, Keep the old value, or S
     { allow: "Allow", undo: "Keep Ask", review: "Show Change" });
   assert.equal(p.policyChangeButtons({ looser: ["permissionMode", "sandbox"], words: "w" }).undo, "Keep Old Rules");
 });
+
+// #3262: Ask for More on the card, only at the organisation's budget, and where it stands once asked.
+test("the stop card offers Ask for More at the organisation's budget", () => {
+  const acme = { kind: "organisation", name: "Acme" };
+  assert.equal(p.canAskForMore({ reason: "budget", rule: "budgets", words: "w", layer: acme }), true);
+  assert.equal(p.canAskForMore({ reason: "budget", rule: "budgets.daily", words: "w", layer: { kind: "you", name: "You" } }), false);
+  assert.equal(p.canAskForMore({ reason: "policy", rule: "sandbox", words: "w", layer: acme }), false);
+  const r = { id: "r", user: "u", userName: "Sam", day: "2026-11-03", at: 1, state: "waiting" };
+  assert.equal(p.askedWords(r), "Asked. An admin can raise today's budget.");
+  assert.equal(p.askedWords({ ...r, state: "raised", daily: 80, decidedBy: "Alex" }), "Raised to $80 for today by Alex. Send again to go on.");
+  assert.equal(p.askedWords({ ...r, state: "refused", decidedBy: "Alex" }), "Refused for today by Alex.");
+  assert.match(p.askRefusal({ code: -32601 }), /cannot take the request yet/);
+  assert.equal(p.askRefusal({ code: -32602 }), undefined);
+});

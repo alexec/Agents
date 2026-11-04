@@ -174,6 +174,9 @@ var controlActions = map[string]string{
 	"governance/approved": "Approved an MCP server or skill",
 	"governance/refused":  "Refused an MCP server or skill",
 	"governance/revoked":  "Took back an approval of an MCP server or skill",
+	// Ask for More (#3262): the ask and a refusal write their own entries; a raise is policy/raise's.
+	"policy/askedForMore": "Asked for more of today's budget",
+	"policy/refusedMore":  "Refused more of today's budget",
 	// The read API (#2019): each writes its own entry, naming the token, never its value.
 	"readApi/made":    "Made a read API token",
 	"readApi/revoked": "Revoked a read API token",
