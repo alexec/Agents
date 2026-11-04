@@ -100,6 +100,7 @@ const CapPersonas1 = "personas/1"
 const CapPersonas2 = "personas/2"
 const CapPins1 = "pins/1"
 const CapPlugins1 = "plugins/1"
+const CapPolicyAsk1 = "policy.ask/1"
 const CapPolicy1 = "policy/1"
 const CapPool1 = "pool/1"
 const CapPreferences1 = "preferences/1"
@@ -686,9 +687,12 @@ var ControlCapabilities = pairs([][2]string{
 	{"people/removeRequests", "org-identity/1"},
 	{"people/setForgeLogins", "people/1"},
 	{"people/setRole", "people/1"},
+	{"policy/askForMore", "policy.ask/1"},
 	{"policy/get", "policy/1"},
 	{"policy/mine", "policy/1"},
 	{"policy/raise", "policy/1"},
+	{"policy/refuseMore", "policy.ask/1"},
+	{"policy/requests", "policy.ask/1"},
 	{"policy/set", "policy/1"},
 	{"policy/stopAll", "policy/1"},
 	{"projects/joined", "projects/1"},
@@ -761,6 +765,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"workflows/claimRun", "bots/1"},
 	{"workflows/fire", "events.team/1"},
 	{"workflows/trigger", "events.team/1"},
+	{"control/budgetRequested", "policy.ask/1"},
 	{"control/capReached", "bots/1"},
 	{"control/clientChanged", "control/1"},
 	{"control/cutOff", "org-identity/1"},
@@ -810,6 +815,7 @@ var ControlCapabilities = pairs([][2]string{
 
 // ControlNotifications is each notification in control.openrpc.json: what its server sends, not serves.
 var ControlNotifications = set([]string{
+	"control/budgetRequested",
 	"control/capReached",
 	"control/clientChanged",
 	"control/cutOff",

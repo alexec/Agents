@@ -367,6 +367,68 @@ func TestARaiseIsForOnePersonAndToday(t *testing.T) {
 	}
 }
 
+// #3262, FR-019: a person at the budget asks for more; an admin sees it waiting, and a raise
+// or a refusal answers it. One request a person a day.
+func TestAskForMoreIsAnsweredByARaiseOrARefusal(t *testing.T) {
+	t.Parallel()
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	_, window := p.client("Alex's Mac")
+	sam := p.invite(window, "Sam", wire.UserRoleMember)
+	bea := p.invite(window, "Bea", wire.UserRoleMember)
+
+	if e := callError(t, sam.window, "", "policy/askForMore", wire.PolicyAskForMore{}); !strings.Contains(e, "no budget") {
+		t.Fatal(e)
+	}
+	setPolicy(t, window, wire.OrgPolicy{Budgets: &wire.PolicyBudgets{Daily: optional(40.0)}}, nil)
+	var asked, again wire.BudgetRequest
+	json.Unmarshal(call(t, sam.window, "", "policy/askForMore", wire.PolicyAskForMore{Why: optional("  the release  ")}), &asked)
+	if asked.State != wire.BudgetRequestStateWaiting || asked.User != sam.id || asked.UserName != "Sam" || deref(asked.Why) != "the release" {
+		t.Fatalf("%+v", asked)
+	}
+	json.Unmarshal(call(t, sam.window, "", "policy/askForMore", wire.PolicyAskForMore{}), &again)
+	if again.ID != asked.ID {
+		t.Fatalf("asked twice: %+v", again)
+	}
+	var beas wire.BudgetRequest
+	json.Unmarshal(call(t, bea.window, "", "policy/askForMore", wire.PolicyAskForMore{}), &beas)
+
+	requests := func(s *controllink.Session) []wire.BudgetRequest {
+		var list wire.BudgetRequestList
+		json.Unmarshal(call(t, s, "", "policy/requests", wire.Empty{}), &list)
+		return list.Requests
+	}
+	if got := requests(window); len(got) != 2 {
+		t.Fatalf("the admin sees %+v", got)
+	}
+	if got := requests(bea.window); len(got) != 1 || got[0].User != bea.id {
+		t.Fatalf("Bea sees %+v", got)
+	}
+	if e := callError(t, sam.window, "", "policy/refuseMore", wire.PolicyRefuseMore{Request: beas.ID}); !strings.Contains(e, "Only an admin") {
+		t.Fatal(e)
+	}
+
+	call(t, window, "", "policy/raise", wire.PolicyRaiseRequest{User: sam.id, Daily: optional(80.0), Request: optional(asked.ID)})
+	var refused wire.BudgetRequest
+	json.Unmarshal(call(t, window, "", "policy/refuseMore", wire.PolicyRefuseMore{Request: beas.ID}), &refused)
+	if refused.State != wire.BudgetRequestStateRefused || refused.DecidedBy == nil {
+		t.Fatalf("%+v", refused)
+	}
+	if e := callError(t, window, "", "policy/refuseMore", wire.PolicyRefuseMore{Request: asked.ID}); !strings.Contains(e, "Another admin") {
+		t.Fatal(e)
+	}
+	if got := requests(window); len(got) != 0 {
+		t.Fatalf("still waiting: %+v", got)
+	}
+	if got := requests(sam.window); len(got) != 1 || got[0].State != wire.BudgetRequestStateRaised || deref(got[0].Daily) != 80 {
+		t.Fatalf("Sam sees %+v", got)
+	}
+	// Refused, asking again the same day answers the refusal.
+	json.Unmarshal(call(t, bea.window, "", "policy/askForMore", wire.PolicyAskForMore{}), &again)
+	if again.State != wire.BudgetRequestStateRefused {
+		t.Fatalf("%+v", again)
+	}
+}
+
 // Edge case "a machine of an older version": with requireFollowing, a machine that has not
 // applied the current version starts no work, and does once it says it has.
 func TestRequireFollowingRefusesAMachineBehind(t *testing.T) {

@@ -104,6 +104,29 @@ struct PolicyLayersWordsTests {
         #expect(PolicyLayersWords.stopActionTitle(.changeFolder("/x")) == "Change in Folder Settings ▸ Policy")
     }
 
+    @Test func onlyTheOrganisationsBudgetOffersAskForMore() {
+        func refusal(_ kind: String, _ reason: String) -> DaemonAPI.PolicyRefusal {
+            .init(reason: reason, rule: "budgets.daily", words: "w", layer: .init(kind: kind, name: "Acme"))
+        }
+        #expect(PolicyLayersWords.canAskForMore(refusal("organisation", "budget")))
+        #expect(!PolicyLayersWords.canAskForMore(refusal("you", "budget")))
+        #expect(!PolicyLayersWords.canAskForMore(refusal("organisation", "policy")))
+        #expect(PolicyLayersWords.canAskForMore(.init(reason: "budget", words: "w")))
+    }
+
+    @Test func theStopCardSaysWhereAnAskStands() {
+        var r = DaemonAPI.BudgetRequest(id: "r", user: "u", userName: "Sam", day: "2026-11-03", at: Date())
+        #expect(PolicyLayersWords.asked(r) == "Asked. An admin can raise today's budget.")
+        r.state = .raised
+        r.daily = 80
+        r.decidedBy = "Alex"
+        #expect(PolicyLayersWords.asked(r) == "Raised to $80 for today by Alex. Send again to go on.")
+        r.state = .refused
+        #expect(PolicyLayersWords.asked(r) == "Refused for today by Alex.")
+        let old = JSONRPCError(code: JSONRPCError.methodNotFound, message: "no")
+        #expect(PolicyLayersWords.askRefusal(old).hasPrefix("This control plane cannot take the request yet."))
+    }
+
     @Test func theStopCardNamesTheRuleAndTheLayersValue() {
         #expect(PolicyLayersWords.ruleTitle("budgets.daily") == "Per day")
         #expect(PolicyLayersWords.ruleTitle("budgets") == "Budget")

@@ -271,7 +271,8 @@ struct ChatView: View {
             fromLine: { [model] sender in model.work.fromLine(sender) },
             openPolicy: { [model, requests, openSettings] action in
                 Self.openPolicy(action, model: model, requests: requests, openSettings: openSettings)
-            })
+            },
+            askForMore: { [model] in try await PolicyLayersWords.askForMore(on: model.controlRequests) })
     }
 
     /// A Stopped by a policy card's button (#2957, FR-025): the pane of the layer that

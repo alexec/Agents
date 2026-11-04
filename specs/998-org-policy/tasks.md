@@ -29,7 +29,7 @@
 - [x] T008 [US2] Push `host/policy` on `host/hello` and on each change, with the hash dedup of `userscope.go`; tell the other copies through the mesh, as `userChanged` does. Handle `host/policyApplied` and keep each machine's applied version for the Console. With `requireFollowing`, the router refuses agent starts on a machine whose applied version is not the current one (edge case "a machine of an older version").
 - [x] T009 [US2] Add the `policy/*` actions to `audit.controlActions` in `Go/internal/controlplane/audit/audit.go`, with before and after.
 - [ ] T010 [US4] Add `Go/internal/controlplane/policybudget.go`: `checkBudgets(user)` from the roll-ups (as `spentToday`, plus tokens), raises, and the sweep of old raises. Call it where `checkCaps` is called. In `bots.go`, `sendHostUser` sends `capReachedUntil` for a person at a budget too.
-- [ ] T011 [US4] Add the Requests kind `budget` in `Go/internal/controlplane/console.go`; answering it calls `policy/raise`.
+- [x] T011 [US4] Add the Requests kind `budget` in `Go/internal/controlplane/console.go`; answering it calls `policy/raise`. (#3262: `policy/askForMore`, `policy/requests` and `policy/refuseMore` in `policy_ask.go`; a raise answers the person's request of the day.)
 - [x] T012 [US2] Rotation (T4): sign the policy again with the new key at rotation, in `rotate.go`.
 - [x] T013 [P] Docs: `docs/explanation/control-plane.md` gains "Policy" and the store keys; `docs/reference/policy.md` (fields).
 
@@ -86,7 +86,7 @@
 - [x] T029 [US3] (moved here from slice 2b, because the pane needs the words first) Add the words and the decoding of `setBy` and `PolicyRefusal` in `Packages/AgentsKit/Sources/AgentsKitCore/Model/OrgPolicy.swift`, with tests (`OrgPolicyWordsTests`); the same in `Web/src/model/orgPolicy.ts` with `Web/test/orgPolicy.test.mjs`. Map the new `OrgPolicy*` files to `settings` in `.agents/areas`, and `OrgPolicyLine*` to `runtimes`.
 - [x] T036 [US2] Web: `Web/src/views/ConsoleOrgPolicy.tsx` and a `policy` section in `Web/src/model/console.ts` (group "Rules", before Report Policy): a control per rule, the preview from `policy/preview` ("3 people use Gemini; their agents will be refused"), a warning when no runtime is left, Save with `rev`. Tests in `Web/test/console.test.mjs`.
 - [x] T037 [US2] The Console's Machines page shows "Follows policy vN" or **Does not follow policy** (FR-024).
-- [ ] T038 [US4] Requests shows `budget` requests with **Raise for Today**.
+- [x] T038 [US4] Requests shows `budget` requests with **Raise for Today**. (#3262: Console ▸ Requests ▸ Budgets, and **Ask for More** on the Stopped by a policy card on all three clients.)
 - [x] T039 [P] [US3] Mac: Settings ▸ Control plane ▸ Policy (`App/Sources/Settings/SettingsWindow.swift`, a new `SettingsPane.policy`), drawing `Shared/UI/OrgPolicyPane.swift`: the rules in words, the last change and its actor, **Edit in Console** for an admin.
 - [x] T040 [P] [US3] Remote: the same pane in `Remote/Sources/Settings/` from `Shared/UI/OrgPolicyPane.swift`.
 - [x] T041 [P] [US3] Web: `Web/src/views/settings/Policy.tsx` in `sections.ts` (Control plane group).

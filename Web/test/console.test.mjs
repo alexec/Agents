@@ -89,8 +89,8 @@ test("Live Now (#2019, M9) says each agent's state and cost, and adds up the boa
 });
 
 test("the Requests count has the people SCIM removed (#2436)", () => {
-  assert.equal(c.waitingCount({ joins: 0, links: 0, capped: 0, governance: 0, removals: 2 }), 2);
-  assert.equal(c.waitingCount({ joins: 1, links: 1, capped: 1, governance: 1, removals: 1 }), 5);
+  assert.equal(c.waitingCount({ joins: 0, links: 0, capped: 0, governance: 0, budgets: 0, removals: 2 }), 2);
+  assert.equal(c.waitingCount({ joins: 1, links: 1, capped: 1, governance: 1, budgets: 1, removals: 1 }), 6);
 });
 
 test("Live Now tells two agents apart by a short id, and Stop… names the one it stops (#2435)", () => {
@@ -99,4 +99,17 @@ test("Live Now tells two agents apart by a short id, and Stop… names the one i
   assert.equal(c.liveShortID(a), "0f3c9a21");
   assert.equal(c.liveStopLabel(a, "Claude"), "Stop Claude 0f3c9a21 on Bea's Mac");
   assert.match(c.liveStopQuestion(a, "Claude"), /^Stop Claude 0f3c9a21 on Bea's Mac \(Bea\)\? .*Bea reads that an admin stopped it\.$/);
+});
+
+// #3262: an Ask for More on Console ▸ Requests, its line, the raise it starts from, and the list after an answer.
+test("an Ask for More waits on Requests until it is answered", () => {
+  const sam = { id: "a", user: "u", userName: "Sam", day: "2026-11-03", at: 2, state: "waiting" };
+  assert.equal(c.budgetRequestWords(sam), "Sam asks for more than today’s budget");
+  assert.equal(c.budgetRequestWords({ ...sam, why: "the release" }), "Sam asks for more than today’s budget: the release");
+  assert.equal(c.raiseDefault(40), "80");
+  assert.equal(c.raiseDefault(undefined), "");
+  const bea = { ...sam, id: "b", userName: "Bea", at: 1 };
+  assert.deepEqual(c.withBudgetRequest([], sam).map((r) => r.id), ["a"]);
+  assert.deepEqual(c.withBudgetRequest([sam], bea).map((r) => r.id), ["b", "a"]);
+  assert.deepEqual(c.withBudgetRequest([sam, bea], { ...sam, state: "raised" }).map((r) => r.id), ["b"]);
 });

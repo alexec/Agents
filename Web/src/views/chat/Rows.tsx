@@ -6,7 +6,7 @@ import { hostNeedsUpdate } from "../../model/capabilities";
 import { createContext } from "preact";
 import { useContext, useEffect, useRef } from "preact/hooks";
 import type {
-  AgentState, BackgroundItem, ContentBlock, EndedReason, FileReading, JSONValue, MessageSender, Plan, ToolCall, ToolCallContent, ToolCallLocation,
+  AgentState, BackgroundItem, BudgetRequest, ContentBlock, EndedReason, FileReading, JSONValue, MessageSender, Plan, ToolCall, ToolCallContent, ToolCallLocation,
   PolicySetBy, SandboxFailureRecord, TranscriptEntry, WorkReport,
 } from "../../protocol/generated";
 import { lineDiff } from "../../model/diff";
@@ -155,6 +155,8 @@ export interface CallActions {
   branchNeedsUpdate?: boolean | undefined;
   /** "From" another agent's message (ChatActions.fromLine, #3240): its sender by its title as it is now. */
   fromLine?: ((sender: MessageSender | undefined) => string) | undefined;
+  /** Ask for More on a Stopped by a policy card at the organisation's budget (ChatActions.askForMore, #3262). */
+  askForMore?: (() => Promise<BudgetRequest>) | undefined;
 }
 export const CallActionsContext = createContext<CallActions | null>(null);
 

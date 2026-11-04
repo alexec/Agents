@@ -94,6 +94,9 @@ struct ChatActions {
     /// A Stopped by a policy card's button (#2957, FR-025): the pane of the layer that
     /// decides. Nil draws the card without it.
     var openPolicy: (@MainActor (PolicyLayersWords.StopAction) -> Void)? = nil
+    /// Ask for More on that card at the organisation's budget (#3262): sends
+    /// `policy/askForMore` on the control plane. Nil draws the card without it.
+    var askForMore: (@MainActor () async throws -> DaemonAPI.BudgetRequest)? = nil
 }
 
 extension EnvironmentValues {

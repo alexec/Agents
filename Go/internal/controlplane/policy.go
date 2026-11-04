@@ -198,7 +198,8 @@ func (m *Methods) policyMethod(ctx context.Context, method string, params json.R
 		if err := checkBudget(request.Daily, request.DailyTokens); err != nil {
 			return nil, err
 		}
-		return m.s.changePolicy(ctx, actor, nil, func(now time.Time, current *wire.OrgPolicy) (wire.OrgPolicy, error) {
+		var raised wire.BudgetRaise
+		kept, err := m.s.changePolicy(ctx, actor, nil, func(now time.Time, current *wire.OrgPolicy) (wire.OrgPolicy, error) {
 			if current == nil || current.Budgets == nil {
 				return wire.OrgPolicy{}, fail(invalidParams, "The policy sets no budget to raise.")
 			}
@@ -212,8 +213,15 @@ func (m *Methods) policyMethod(ctx context.Context, method string, params json.R
 				return r.User == request.User && r.Day == day
 			}), raise)
 			next.Budgets = &budgets
+			raised = raise
 			return next, nil
 		})
+		if err != nil {
+			return nil, err
+		}
+		// The person's Ask for More of today, if they asked (#3262), is answered by it.
+		m.s.raisedFor(ctx, actor, raised, time.Now())
+		return kept, nil
 	}
 	return nil, notFound(method)
 }

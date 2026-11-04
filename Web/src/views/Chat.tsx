@@ -209,6 +209,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       },
       noteChart: (file) => store.noteChartHint(host, file.path, file.chart),
       readFile: (path) => store.readFile(host, session, path),
+      // Ask for More at the organisation's budget (#3262): on the control plane, not the host.
+      askForMore: () => store.link.call("policy/askForMore", {}),
     };
   }, [host, session, agent?.pendingSandboxFailure, down, !agent || agent.state === "archived", store.has(host, Capability.chatBranch1)]);
 

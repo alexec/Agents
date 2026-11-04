@@ -1406,6 +1406,45 @@ type BudgetRaise struct {
 	Request *string `json:"request,omitzero"`
 }
 
+// A person's Ask for More (#3262, spec 998 FR-019): at their organisation's budget, they ask an admin to raise it for today (UTC). One a person a day; it goes the day after.
+type BudgetRequest struct {
+	ID string `json:"id"`
+
+	User string `json:"user"`
+
+	UserName string `json:"userName"`
+
+	// The UTC day it asks for, YYYY-MM-DD.
+	Day string `json:"day"`
+
+	At Date `json:"at"`
+
+	Why *string `json:"why,omitzero"`
+
+	State BudgetRequestState `json:"state"`
+
+	// The budget a day in dollars the admin raised it to.
+	Daily *float64 `json:"daily,omitzero"`
+
+	// The tokens a day the admin raised it to.
+	DailyTokens *int64 `json:"dailyTokens,omitzero"`
+
+	DecidedBy *string `json:"decidedBy,omitzero"`
+
+	DecidedAt *Date `json:"decidedAt,omitzero"`
+}
+
+// policy/requests (#3262): to an admin, today's Ask for More requests waiting; to anyone, their own of today.
+type BudgetRequestList struct {
+	Requests []BudgetRequest `json:"requests"`
+}
+
+type BudgetRequestState string
+
+const BudgetRequestStateWaiting BudgetRequestState = "waiting"
+const BudgetRequestStateRaised BudgetRequestState = "raised"
+const BudgetRequestStateRefused BudgetRequestState = "refused"
+
 type BuildOutputRemoved struct {
 	Removed []string `json:"removed"`
 
@@ -7601,6 +7640,11 @@ type PolicyApplyYoursResult struct {
 	Revision int64 `json:"revision"`
 }
 
+// policy/askForMore (#3262, spec 998 FR-019): a person at their organisation's budget asks an admin to raise it for today.
+type PolicyAskForMore struct {
+	Why *string `json:"why,omitzero"`
+}
+
 // A machine of the person's that does not say host.policy-layers/1 (#2957, EffectivePolicy.behind, Edge Cases "A machine of an older version").
 type PolicyBehindMachine struct {
 	Host string `json:"host"`
@@ -7746,6 +7790,11 @@ type PolicyRefusal struct {
 	Layer *PolicyLayerRef `json:"layer,omitzero"`
 
 	Value *string `json:"value,omitzero"`
+}
+
+// policy/refuseMore (#3262), an admin's: refuse an Ask for More. policy/raise with the request's id raises it.
+type PolicyRefuseMore struct {
+	Request string `json:"request"`
 }
 
 // Money and tokens a layer caps per agent and per UTC day (#2957, data-model.md "PolicyRules"). Unset means no limit. Unlike OrgPolicy's PolicyBudgets, no allowUnmetered or raises: only the organisation layer has those (FR-003).

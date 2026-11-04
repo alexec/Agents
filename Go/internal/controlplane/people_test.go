@@ -315,6 +315,7 @@ func TestEveryClientMethodChecksTheOwner(t *testing.T) {
 		"signIn/domains/list": true, "signIn/domains/claim": true, "signIn/domains/check": true, "signIn/domains/set": true,
 		"signIn/domains/preview": true, "signIn/domains/remove": true,
 		"policy/get": true, "policy/mine": true, "policy/set": true, "policy/stopAll": true, "policy/raise": true,
+		"policy/askForMore": true, "policy/requests": true, "policy/refuseMore": true,
 		"orgRoutes/mine": true, "orgRoutes/list": true, "orgRoutes/set": true, "orgRoutes/replaceKey": true,
 		"orgRoutes/check": true, "orgRoutes/remove": true,
 		"scim/set": true, "scim/tokens/list": true, "scim/tokens/make": true, "scim/tokens/revoke": true,
