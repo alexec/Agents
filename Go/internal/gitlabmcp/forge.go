@@ -27,11 +27,19 @@ import (
 // SearchFilter is what a list lists: merge requests or issues, in state open, closed or all
 // (open when ""), narrowed by a label, an assignee's username and words in the title or
 // description, and a feature: the name of a feature:<name> label (#3267). A closed merge request
-// includes a merged one.
+// includes a merged one. Board is a group board's scope (#3282): its labels and milestone.
 type SearchFilter struct {
 	MRs                             bool
 	State                           string
 	Label, Assignee, Query, Feature string
+	Board                           BoardScope
+}
+
+// BoardScope is what a group board shows (#3282): the issues with all of Labels, and in
+// Milestone when it is not "". An empty scope is every issue of the group.
+type BoardScope struct {
+	Labels    []string
+	Milestone string
 }
 
 // Item is an issue or a merge request as the forge reads list it.
@@ -260,6 +268,10 @@ func listPath(project string, f SearchFilter, state, before string, first int) s
 	}
 	if f.Feature != "" {
 		labels = append(labels, "feature:"+f.Feature)
+	}
+	labels = append(labels, f.Board.Labels...)
+	if f.Board.Milestone != "" {
+		q.Set("milestone", f.Board.Milestone)
 	}
 	if len(labels) > 0 {
 		q.Set("labels", strings.Join(labels, ","))
@@ -589,4 +601,32 @@ func (g *RealGitLab) Plan(ctx context.Context, project string, number int) (Plan
 		p.Children = append(p.Children, c)
 	}
 	return p, nil
+}
+
+// GroupBoard is a group board's scope (#3282): GET /groups/:group/boards/:id. GitLab's own
+// milestones "Any", "None", "Upcoming" and "Started" are not one milestone, so they scope
+// nothing here.
+func (g *RealGitLab) GroupBoard(ctx context.Context, group string, id int) (BoardScope, error) {
+	var board struct {
+		Labels []struct {
+			Name string `json:"name"`
+		} `json:"labels"`
+		Milestone *struct {
+			ID    int    `json:"id"`
+			Title string `json:"title"`
+		} `json:"milestone"`
+	}
+	if err := g.get(ctx, fmt.Sprintf("groups/%s/boards/%d", pid(group), id), true, &board); err != nil {
+		return BoardScope{}, err
+	}
+	scope := BoardScope{}
+	for _, l := range board.Labels {
+		if l.Name != "" {
+			scope.Labels = append(scope.Labels, l.Name)
+		}
+	}
+	if m := board.Milestone; m != nil && m.ID > 0 {
+		scope.Milestone = m.Title
+	}
+	return scope, nil
 }

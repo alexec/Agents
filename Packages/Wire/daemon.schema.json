@@ -9418,6 +9418,32 @@
       ],
       "additionalProperties": false
     },
+    "ForgeBoards": {
+      "type": "object",
+      "description": "forge/boards (#3282): the boards of the projects of this machine's folders, each once, by url, in its project's order.",
+      "properties": {
+        "boards": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProjectBoard"
+          }
+        }
+      },
+      "required": [
+        "boards"
+      ],
+      "additionalProperties": false
+    },
+    "ForgeBoardsRequest": {
+      "type": "object",
+      "description": "forge/boards (#3282): the boards of every folder's project on this machine, or of one folder's.",
+      "properties": {
+        "folder": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
     "ForgeCheck": {
       "type": "object",
       "description": "One of a pull request's checks (#3129): a check run or a commit status. state is passing, failing, running or skipped; url is its page on the forge.",
@@ -9655,6 +9681,10 @@
       "properties": {
         "folder": {
           "type": "string"
+        },
+        "board": {
+          "type": "string",
+          "description": "A board's url, from forge/boards (#3282): only the epics on that board."
         }
       },
       "additionalProperties": false
@@ -9938,7 +9968,7 @@
     },
     "ForgeListRequest": {
       "type": "object",
-      "description": "forge/issues and forge/pulls (#3129): the issues or pull requests of every folder on this machine, or of one folder's repo. state is open (when not said), closed or all; a closed pull request includes a merged one. label, assignee (a login) and query (words in the title or body) narrow the list. limit is 1 to 100, 50 when not said; cursor is the last page's. feature (a name: work for the label feature:work) narrows it to one feature's items (#3267).",
+      "description": "forge/issues and forge/pulls (#3129): the issues or pull requests of every folder on this machine, or of one folder's repo. state is open (when not said), closed or all; a closed pull request includes a merged one. label, assignee (a login) and query (words in the title or body) narrow the list. limit is 1 to 100, 50 when not said; cursor is the last page's. feature (a name: work for the label feature:work) narrows it to one feature's items (#3267). board (a board's url, from forge/boards) narrows it to one board's items (#3282).",
       "properties": {
         "folder": {
           "type": "string"
@@ -9962,6 +9992,9 @@
           "type": "integer"
         },
         "feature": {
+          "type": "string"
+        },
+        "board": {
           "type": "string"
         }
       },
@@ -18109,13 +18142,20 @@
           },
           "mayChange": {
             "type": "boolean",
-            "description": "The caller is the owner or an admin, so may rename and remove it, and set its slots."
+            "description": "The caller is the owner or an admin, so may rename and remove it, and set its slots and boards."
           },
           "slots": {
             "type": "array",
             "description": "The project's Tasks, Code review and CI (#2669), one per slot: every folder in the project uses them. A slot that is not here is each folder's own.",
             "items": {
               "$ref": "#/definitions/ProjectSlot"
+            }
+          },
+          "boards": {
+            "type": "array",
+            "description": "The boards in the project's Tasks slot (#3282), in their order. Absent with none.",
+            "items": {
+              "$ref": "#/definitions/ProjectBoard"
             }
           }
         },
@@ -18125,6 +18165,56 @@
           "owner",
           "folders",
           "mayChange"
+        ],
+        "additionalProperties": false
+      },
+      "ProjectBoard": {
+        "type": "object",
+        "description": "One board in a project's Tasks slot (#3282): a GitHub Projects board, a Jira board, a Linear team or a GitLab group board, by its address and a name (the team's). Work's Issues and Features lists narrow to one. A client sends name and url; the control plane reads forge, key and site from the url.",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "description": "The board's address on the web: github.com/orgs/<org>/projects/<n> (or users/<login>), <site>/jira/software/…/boards/<id>, linear.app/<workspace>/team/<KEY>, or <gitlab>/groups/<group>/-/boards/<id>. It names the board in forge/issues' board."
+          },
+          "forge": {
+            "$ref": "#/definitions/ConnectionProvider",
+            "description": "github, atlassian (Jira), linear or gitlab."
+          },
+          "key": {
+            "type": "string",
+            "description": "The board on its forge: <owner>/<number> on GitHub, the board id on Jira, the team key on Linear, <group>#<id> on GitLab."
+          },
+          "site": {
+            "type": "string",
+            "description": "The board's host: github.com, the Jira site, linear.app, gitlab.com or a self-managed GitLab."
+          }
+        },
+        "required": [
+          "name",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "ProjectBoardsSet": {
+        "type": "object",
+        "description": "projects/setBoards (#3282): the project's boards, all of them each time, in their order; none leaves Tasks with no boards. Only the owner or an admin. At most 20.",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "boards": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/ProjectBoard"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "boards"
         ],
         "additionalProperties": false
       },
@@ -18385,6 +18475,13 @@
             "type": "array",
             "items": {
               "$ref": "#/definitions/ProjectSlot"
+            }
+          },
+          "boards": {
+            "type": "array",
+            "description": "The boards in the project's Tasks slot (#3282), in their order. Absent with none.",
+            "items": {
+              "$ref": "#/definitions/ProjectBoard"
             }
           }
         },

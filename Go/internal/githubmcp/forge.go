@@ -14,11 +14,12 @@ import (
 
 // SearchFilter is what a search lists: pull requests or issues, in state open, closed or all
 // (open when ""), narrowed by a label, an assignee's login and words, and by a feature: the
-// name of a feature:<name> label (#3267).
+// name of a feature:<name> label (#3267), and by a GitHub Projects board: Project is its
+// <owner>/<number> (#3282).
 type SearchFilter struct {
-	PRs                             bool
-	State                           string
-	Label, Assignee, Query, Feature string
+	PRs                                      bool
+	State                                    string
+	Label, Assignee, Query, Feature, Project string
 }
 
 // Item is an issue or a pull request as the forge reads list it.
@@ -217,6 +218,9 @@ func SearchQuery(repos []string, f SearchFilter) string {
 	}
 	if f.Assignee != "" {
 		words = append(words, "assignee:"+f.Assignee)
+	}
+	if f.Project != "" {
+		words = append(words, "project:"+f.Project)
 	}
 	if q := strings.TrimSpace(f.Query); q != "" {
 		words = append(words, q)

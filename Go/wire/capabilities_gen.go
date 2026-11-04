@@ -56,6 +56,7 @@ const CapFolder1 = "folder/1"
 const CapFoldersToMachine1 = "folders.to-machine/1"
 const CapFolders1 = "folders/1"
 const CapForgeWrite1 = "forge-write/1"
+const CapForgeBoards1 = "forge.boards/1"
 const CapForge1 = "forge/1"
 const CapGit1 = "git/1"
 const CapGovernance1 = "governance/1"
@@ -105,6 +106,7 @@ const CapPolicy1 = "policy/1"
 const CapPool1 = "pool/1"
 const CapPreferences1 = "preferences/1"
 const CapPresence1 = "presence/1"
+const CapProjectsBoards1 = "projects.boards/1"
 const CapProjectsSessions1 = "projects.sessions/1"
 const CapProjects1 = "projects/1"
 const CapProviders1 = "providers/1"
@@ -296,6 +298,7 @@ var HostCapabilities = pairs([][2]string{
 	{"forge/add-child", "forge-write/1"},
 	{"forge/approve", "forge-write/1"},
 	{"forge/blocked-by", "forge-write/1"},
+	{"forge/boards", "forge.boards/1"},
 	{"forge/close", "forge-write/1"},
 	{"forge/comment", "forge-write/1"},
 	{"forge/diff", "forge-write/1"},
@@ -704,6 +707,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"projects/remove", "projects/1"},
 	{"projects/sessions", "projects.sessions/1"},
 	{"projects/set", "projects/1"},
+	{"projects/setBoards", "projects.boards/1"},
 	{"projects/setSlot", "projects/1"},
 	{"providers/add", "providers/1"},
 	{"providers/create", "providers/1"},

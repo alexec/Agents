@@ -1648,6 +1648,16 @@ button.plain:hover { opacity: 1; }
 .slot-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 6px; }
 .slot-actions:empty { display: none; }
 .slot-change { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+/* The project's boards (#3282): a row per board (its name, its address, Remove), then Add a board. */
+.project-boards { margin-top: 12px; }
+.project-boards ul { list-style: none; padding: 0; margin: 6px 0; display: flex; flex-direction: column; gap: 4px; }
+.project-boards li { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.project-boards li a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.board-name { font-weight: 600; flex: none; }
+.board-add { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+.board-add input { font: inherit; color: inherit; padding: 5px 8px; border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-control); background: var(--paper-ground); }
+.board-add input:nth-of-type(2) { flex: 1; min-width: 260px; }
 .connector-setup .attention, .connections .attention { color: var(--tint-attention); }
 .connect-sheet { max-width: 480px; }
 .connect-sheet ul.abilities { list-style: none; padding: 0; margin: 0 0 8px; background: var(--paper-raised);

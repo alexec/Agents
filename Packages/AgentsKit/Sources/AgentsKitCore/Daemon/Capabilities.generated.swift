@@ -57,6 +57,7 @@ public enum Capability {
     public static let foldersToMachine1 = "folders.to-machine/1"
     public static let folders1 = "folders/1"
     public static let forgeWrite1 = "forge-write/1"
+    public static let forgeBoards1 = "forge.boards/1"
     public static let forge1 = "forge/1"
     public static let git1 = "git/1"
     public static let governance1 = "governance/1"
@@ -106,6 +107,7 @@ public enum Capability {
     public static let pool1 = "pool/1"
     public static let preferences1 = "preferences/1"
     public static let presence1 = "presence/1"
+    public static let projectsBoards1 = "projects.boards/1"
     public static let projectsSessions1 = "projects.sessions/1"
     public static let projects1 = "projects/1"
     public static let providers1 = "providers/1"
@@ -297,6 +299,7 @@ public enum Capability {
         "forge/add-child": "forge-write/1",
         "forge/approve": "forge-write/1",
         "forge/blocked-by": "forge-write/1",
+        "forge/boards": "forge.boards/1",
         "forge/close": "forge-write/1",
         "forge/comment": "forge-write/1",
         "forge/diff": "forge-write/1",
@@ -651,6 +654,7 @@ public enum Capability {
         "projects/remove": "projects/1",
         "projects/sessions": "projects.sessions/1",
         "projects/set": "projects/1",
+        "projects/setBoards": "projects.boards/1",
         "projects/setSlot": "projects/1",
         "providers/add": "providers/1",
         "providers/create": "providers/1",

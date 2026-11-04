@@ -1,7 +1,7 @@
 // A folder's Project (#2317): the words of ProjectWords in Packages/AgentsKit
 // (Model/Project.swift), the same on the Mac, the Remote and the web page.
 import { CallFailed, describe, methodNotFound } from "./errors";
-import type { ConnectorSetup, ConnectorSlot, PersonRow, Project, ProjectFolder, ProjectSlot } from "../protocol/generated";
+import type { ConnectorSetup, ConnectorSlot, PersonRow, Project, ProjectBoard, ProjectFolder, ProjectSlot } from "../protocol/generated";
 
 export const projectWords = {
   title: "Project",
@@ -20,6 +20,45 @@ export const projectWords = {
   remove: "Remove Project",
   tryAgain: "Try Again",
 } as const;
+
+/** A project's boards (#3282), on the Connectors page and in Work's Board menu, as ProjectBoardWords on the window. */
+export const boardWords = {
+  heading: "Boards",
+  note: "A board is a GitHub Projects board, a Jira board, a Linear team or a GitLab group board. "
+    + "Work ▸ Issues and Features can show one board.",
+  none: "No boards. Work shows every issue of the project.",
+  onlyOwner: "Only the project's owner or an admin can change its boards.",
+  namePrompt: "Name",
+  addressPrompt: "https://github.com/orgs/acme/projects/7",
+  add: "Add Board",
+  remove: "Remove",
+} as const;
+
+/** A board's forge, in words, after its name; empty for one the control plane has not read. */
+export function boardForge(board: ProjectBoard): string {
+  switch (board.forge) {
+    case "github": return "GitHub Projects";
+    case "atlassian": return "Jira";
+    case "linear": return "Linear team";
+    case "gitlab": return "GitLab";
+    default: return "";
+  }
+}
+
+/** What projects/setBoards takes of each board: its name and its address. The control plane reads the rest. */
+const sent = (boards: readonly ProjectBoard[]): ProjectBoard[] => boards.map(({ name, url }) => ({ name, url }));
+
+/** The boards with one more at the end, its name and address trimmed; undefined when either is empty. */
+export function boardsWith(boards: readonly ProjectBoard[], name: string, url: string): ProjectBoard[] | undefined {
+  const n = name.trim(), u = url.trim();
+  if (!n || !u) return undefined;
+  return [...sent(boards), { name: n, url: u }];
+}
+
+/** The boards without the one at `url`. */
+export function boardsWithout(boards: readonly ProjectBoard[], url: string): ProjectBoard[] {
+  return sent(boards.filter((b) => b.url !== url));
+}
 
 /** On a Connectors page whose folder is in a project (#2669): whose the slots are, and who may change them. */
 export function slotsOwner(name: string): string {

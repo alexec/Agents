@@ -28,7 +28,9 @@ type Project struct {
 	// Slots is the project's Tasks, Code review and CI (#2669), one per slot; a slot not
 	// here is each folder's own.
 	Slots []wire.ProjectSlot
-	Extra Extra
+	// Boards is the boards in the project's Tasks slot (#3282), in their order.
+	Boards []wire.ProjectBoard
+	Extra  Extra
 }
 
 type projectJSON struct {
@@ -39,11 +41,12 @@ type projectJSON struct {
 	Rev       int                `json:"rev,omitempty"`
 	Removed   *bool              `json:"removed,omitempty"`
 	RemovedAt *Stamp             `json:"removedAt,omitempty"`
-	Slots     []wire.ProjectSlot `json:"slots,omitempty"`
+	Slots     []wire.ProjectSlot  `json:"slots,omitempty"`
+	Boards    []wire.ProjectBoard `json:"boards,omitempty"`
 }
 
 func (p Project) MarshalJSON() ([]byte, error) {
-	return encodeKeeping(projectJSON{p.ID, p.Name, p.Owner, p.MadeAt, p.Rev, p.Removed, p.RemovedAt, p.Slots}, p.Extra)
+	return encodeKeeping(projectJSON{p.ID, p.Name, p.Owner, p.MadeAt, p.Rev, p.Removed, p.RemovedAt, p.Slots, p.Boards}, p.Extra)
 }
 
 func (p *Project) UnmarshalJSON(data []byte) error {
@@ -52,7 +55,7 @@ func (p *Project) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	*p = Project{j.ID, j.Name, j.Owner, j.MadeAt, j.Rev, j.Removed, j.RemovedAt, j.Slots, extra}
+	*p = Project{j.ID, j.Name, j.Owner, j.MadeAt, j.Rev, j.Removed, j.RemovedAt, j.Slots, j.Boards, extra}
 	return nil
 }
 

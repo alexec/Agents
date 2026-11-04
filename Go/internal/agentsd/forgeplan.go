@@ -323,7 +323,7 @@ func (d *Daemon) forgeFeatures(ctx context.Context, r wire.ForgeFeaturesRequest)
 	var cursor *string
 	for range featureEpicPages {
 		page, err := d.forgeList(ctx, false, wire.ForgeListRequest{Folder: r.Folder, State: new("all"), Label: new("epic"),
-			Limit: new(int64(forgeListMost)), Cursor: cursor})
+			Limit: new(int64(forgeListMost)), Cursor: cursor, Board: r.Board})
 		if err != nil {
 			return wire.ForgeFeatures{}, Invalid("forge/features: %v", strings.TrimPrefix(err.Error(), "forge/issues: "))
 		}

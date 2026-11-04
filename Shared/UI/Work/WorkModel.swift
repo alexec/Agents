@@ -14,6 +14,9 @@ protocol WorkModel: AnyObject, Sendable {
     func showWork(_ place: WorkPlace)
     /// The machines that read their forges, the home one first.
     var forgeMachines: [(id: MachineRef, name: String)] { get }
+    /// The machines that narrow their forges to a board (#3282), the home one first. None on the
+    /// Remote: boards are the Mac's and the web page's (tier Mac + web).
+    var boardMachines: [(id: MachineRef, name: String)] { get }
     /// The machines that keep links, the home one first.
     var lineageMachines: [(id: MachineRef, name: String)] { get }
     /// Whether a machine takes the Work pages' writes (#3130).
@@ -41,6 +44,32 @@ protocol WorkModel: AnyObject, Sendable {
 }
 
 extension WorkModel {
+    /// The boards of every machine's folders' projects (#3282), each once, by url, the first
+    /// name kept; none from a machine that cannot be read.
+    func workBoards() async -> [DaemonAPI.ProjectBoard] {
+        let machines = boardMachines
+        var got: [(host: MachineRef, boards: [DaemonAPI.ProjectBoard])] = []
+        await withTaskGroup(of: (MachineRef, [DaemonAPI.ProjectBoard]).self) { group in
+            for machine in machines {
+                group.addTask {
+                    let list = try? await self.forge(DaemonAPI.Method.forgeBoards, DaemonAPI.ForgeBoardsRequest(),
+                                                     returning: DaemonAPI.ForgeBoards.self, on: machine.id)
+                    return (machine.id, list?.boards ?? [])
+                }
+            }
+            for await (host, boards) in group { got.append((host, boards)) }
+        }
+        // The machines' own order, the home one first, so the same board keeps the same name.
+        let order = machines.map(\.id)
+        got.sort { (order.firstIndex(of: $0.host) ?? .max) < (order.firstIndex(of: $1.host) ?? .max) }
+        return WorkList.mergeBoards(got.map(\.boards))
+    }
+
+    /// The machines a list asks: those that narrow to the board when one is chosen.
+    func workMachines(board: String) -> [(id: MachineRef, name: String)] {
+        board.isEmpty ? forgeMachines : boardMachines
+    }
+
     /// Where Work is: Issues until something else is opened.
     var workPlace: WorkPlace { workHistory.current ?? WorkPlace(kind: .issue) }
 

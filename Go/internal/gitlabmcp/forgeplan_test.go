@@ -84,3 +84,11 @@ func TestListPathFeature(t *testing.T) {
 		t.Fatalf("path: %s", p)
 	}
 }
+
+// #3282: a group board's scope is labels and a milestone, beside the list's own label.
+func TestListPathBoard(t *testing.T) {
+	p := listPath("group/app", SearchFilter{Label: "bug", Board: BoardScope{Labels: []string{"team-a"}, Milestone: "0.17"}}, "opened", "", 20)
+	if !strings.Contains(p, "labels=bug%2Cteam-a") || !strings.Contains(p, "milestone=0.17") {
+		t.Fatalf("path: %s", p)
+	}
+}

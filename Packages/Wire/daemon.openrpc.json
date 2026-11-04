@@ -4007,6 +4007,31 @@
       }
     },
     {
+      "name": "forge/boards",
+      "x-capability": "forge.boards/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ForgeBoardsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ForgeBoards"
+        }
+      }
+    },
+    {
       "name": "forge/close",
       "x-capability": "forge-write/1",
       "tags": [

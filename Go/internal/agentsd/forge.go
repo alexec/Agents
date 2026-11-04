@@ -66,6 +66,7 @@ type forgeGitLab interface {
 	Search(ctx context.Context, projects []string, f gitlabmcp.SearchFilter, after string, first int) (gitlabmcp.SearchPage, error)
 	ItemPage(ctx context.Context, project string, number int, mr bool, before string) (gitlabmcp.ItemDetail, error)
 	Plan(ctx context.Context, project string, number int) (gitlabmcp.Plan, error)
+	GroupBoard(ctx context.Context, group string, id int) (gitlabmcp.BoardScope, error)
 	forgeGitLabWrites
 }
 
@@ -79,6 +80,7 @@ type forgeJira interface {
 	SetState(ctx context.Context, key string, closed bool) error
 	Transition(ctx context.Context, key, id string) error
 	Plan(ctx context.Context, key string) (jiramcp.Plan, error)
+	BoardFilter(ctx context.Context, board string) (string, error)
 }
 
 // forgeLinear is what the forge reads ask of Linear; a test gives a fake.
@@ -135,6 +137,7 @@ func (d *Daemon) registerForge() {
 	On(d, wire.CallForgePull, item(lineage.KindPR))
 	d.registerForgePlans()
 	d.registerForgeWrites()
+	d.registerForgeBoards()
 }
 
 // forgeCursor is a list's cursor, one per forge, so a page goes on where each forge stopped.
@@ -194,8 +197,21 @@ func (d *Daemon) forgeList(ctx context.Context, prs bool, r wire.ForgeListReques
 		}
 		folders = []string{f}
 	}
+	var board *forgeBoard
+	var boardWire wire.ProjectBoard
+	if url := deref(r.Board); url != "" {
+		var in []string
+		var ok bool
+		if boardWire, in, ok = d.boardIn(folders, url); !ok {
+			return wire.ForgeList{Items: []wire.ForgeItem{}}, nil
+		}
+		folders = in
+	}
 	sources := d.forgeSources(ctx, prs, folders)
-	key, _ := json.Marshal([]any{method, sources.key(), r.State, r.Label, r.Assignee, r.Query, r.Feature, cursor, limit})
+	if deref(r.Board) != "" {
+		board = narrowToBoard(&sources, boardWire, folders, prs)
+	}
+	key, _ := json.Marshal([]any{method, sources.key(), board.key(), r.State, r.Label, r.Assignee, r.Query, r.Feature, cursor, limit})
 	if a, ok := d.forgeCached(string(key)); ok && a.list != nil {
 		return *a.list, nil
 	}
@@ -206,8 +222,12 @@ func (d *Daemon) forgeList(ctx context.Context, prs bool, r wire.ForgeListReques
 		gh, err := d.forgeGitHub()
 		if err == nil {
 			var page githubmcp.SearchPage
-			page, err = gh.Search(ctx, sources.repos, githubmcp.SearchFilter{PRs: prs, State: state, Label: deref(r.Label),
-				Assignee: deref(r.Assignee), Query: deref(r.Query), Feature: deref(r.Feature)}, cursor.GitHub, limit)
+			f := githubmcp.SearchFilter{PRs: prs, State: state, Label: deref(r.Label),
+				Assignee: deref(r.Assignee), Query: deref(r.Query), Feature: deref(r.Feature)}
+			if board != nil {
+				f.Project = board.project
+			}
+			page, err = gh.Search(ctx, sources.repos, f, cursor.GitHub, limit)
 			for _, i := range page.Items {
 				p.items = append(p.items, forgeItemOf(i, sources.folderOf[forgeRepo{"github", strings.ToLower(i.Repo)}]))
 			}
@@ -218,10 +238,14 @@ func (d *Daemon) forgeList(ctx context.Context, prs bool, r wire.ForgeListReques
 	}
 	if (len(sources.gitlab) > 0 || sources.gitlabErr != nil) && !slices.Contains(cursor.Done, "gitlab") {
 		p := forgePage{forge: "gitlab", err: sources.gitlabErr}
+		f := gitlabmcp.SearchFilter{MRs: prs, State: state,
+			Label: deref(r.Label), Assignee: deref(r.Assignee), Query: deref(r.Query), Feature: deref(r.Feature)}
+		if p.err == nil && board != nil {
+			f.Board, p.err = d.forgeGitLab(sources.root).GroupBoard(ctx, board.group, board.id)
+		}
 		if p.err == nil {
 			var page gitlabmcp.SearchPage
-			page, p.err = d.forgeGitLab(sources.root).Search(ctx, sources.gitlab, gitlabmcp.SearchFilter{MRs: prs, State: state,
-				Label: deref(r.Label), Assignee: deref(r.Assignee), Query: deref(r.Query), Feature: deref(r.Feature)}, cursor.GitLab, limit)
+			page, p.err = d.forgeGitLab(sources.root).Search(ctx, sources.gitlab, f, cursor.GitLab, limit)
 			for _, i := range page.Items {
 				p.items = append(p.items, gitlabItemOf(i, sources.folderOf[forgeRepo{"gitlab", strings.ToLower(i.Project)}]))
 			}
@@ -248,15 +272,23 @@ func (d *Daemon) forgeList(ctx context.Context, prs bool, r wire.ForgeListReques
 		p.err = err
 		pages = append(pages, p)
 	}
-	if len(sources.projects) > 0 && !slices.Contains(cursor.Done, "jira") {
+	if (len(sources.projects) > 0 || board != nil && board.jira != "") && !slices.Contains(cursor.Done, "jira") {
 		p := forgePage{forge: "jira"}
 		j, err := d.forgeJira()
+		f := jiramcp.SearchFilter{State: state, Label: deref(r.Label),
+			Assignee: deref(r.Assignee), Query: deref(r.Query), Feature: deref(r.Feature)}
+		if err == nil && board != nil {
+			f.Filter, err = j.BoardFilter(ctx, board.jira)
+		}
 		if err == nil {
 			var page jiramcp.SearchPage
-			page, err = j.Search(ctx, sources.projects, jiramcp.SearchFilter{State: state, Label: deref(r.Label),
-				Assignee: deref(r.Assignee), Query: deref(r.Query), Feature: deref(r.Feature)}, cursor.Jira, limit)
+			page, err = j.Search(ctx, sources.projects, f, cursor.Jira, limit)
 			for _, i := range page.Items {
-				p.items = append(p.items, jiraItemOf(i, sources.projectFolder[i.Project]))
+				folder, named := sources.projectFolder[i.Project]
+				if !named && board != nil {
+					folder = board.home
+				}
+				p.items = append(p.items, jiraItemOf(i, folder))
 			}
 			p.cursors, p.next = page.Cursors, page.Next
 		}

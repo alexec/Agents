@@ -10,9 +10,9 @@ import { Capability } from "../protocol/capabilities.generated";
 import { describe } from "../model/errors";
 import { hostAnswers } from "../model/capabilities";
 import {
-  checksWords, choices, errorWords, fromForge, hasPage, labelColor, labelInk, linkGroups, lineageOnlyNote, lineageWords, noAgentOnIt,
-  noAgentYet, noForgeHere, noWork, notReadHere, openOnWords, pageCostWords, peopleWords, positionWords, repoName, reviewWords, shortRef,
-  titleSaysRef, workKindTitle, workSortTitle, type WorkFilter, type WorkKind, type WorkRow, type WorkSort, type WorkState,
+  boardChoices, boardName, checksWords, choices, errorWords, fromForge, hasPage, labelColor, labelInk, linkGroups, lineageOnlyNote,
+  lineageWords, noAgentOnIt, noAgentYet, noForgeHere, noWork, notReadHere, openOnWords, pageCostWords, peopleWords, positionWords, repoName,
+  reviewWords, shortRef, titleSaysRef, workKindTitle, workSortTitle, type WorkFilter, type WorkKind, type WorkRow, type WorkSort, type WorkState,
 } from "../model/work";
 import { kindWord, lineageUrl, readingTitles, sessionHost } from "../model/lineage";
 import { nodeName } from "../model/value";
@@ -26,7 +26,8 @@ import { WorkDocs } from "./Docs";
 import { hasPlan } from "../model/epicPlan";
 import { go, replace, route } from "../route";
 import {
-  allRows, askKey, forgeHosts, fromList, hasMore, loadList, loadMore, nextAfter, pageNeighbours, placeKey, shownRows, workList,
+  allRows, askKey, boardHosts, boards, forgeHosts, fromList, hasMore, loadBoards, loadList, loadMore, nextAfter, pageNeighbours, placeKey,
+  shownRows, workList,
 } from "../model/workLists";
 
 // Back on a list, no page is opened from it yet: a pasted address of the last one opened has no Previous or Next.
@@ -40,6 +41,9 @@ export function WorkList({ store, kind }: { store: Store; kind: WorkKind }) {
   const state = filter.value.state;
   const ask = askKey(store, l);
   useEffect(() => { void loadList(store, l); }, [kind, ask]);
+  // The Board menu's choices (#3282), from the machines that know boards: Issues only.
+  const boardKey = boardHosts(store).map((h) => h.id).join(",");
+  useEffect(() => { if (kind === "issue") void loadBoards(store); }, [kind, boardKey]);
   // Back from an item's page: the list at the row last opened.
   const shownOnce = lists.value !== null;
   useEffect(() => {
@@ -62,6 +66,10 @@ export function WorkList({ store, kind }: { store: Store; kind: WorkKind }) {
             {states.map((s) => <option key={s} value={s}>{s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
           </select></label>
         )}
+        {kind === "issue" && (
+          <Choice label="Board" any="All" value={filter.value.board} options={boardChoices(boards.value, filter.value.board)}
+            words={(url) => boardName(boards.value, url)} onChange={(board) => set({ board })} />
+        )}
         <Choice label="Repo" value={filter.value.repo} options={offered.repos} words={repoName} onChange={(repo) => set({ repo })} />
         <Choice label="Label" value={filter.value.label} options={offered.labels} onChange={(label) => set({ label })} />
         {fromForge(kind) && <Choice label="Assignee" value={filter.value.assignee} options={offered.assignees} onChange={(assignee) => set({ assignee })} />}
@@ -71,7 +79,7 @@ export function WorkList({ store, kind }: { store: Store; kind: WorkKind }) {
         </select></label>
         <input type="search" placeholder="Filter" aria-label="Filter by words" value={filter.value.text}
           onInput={(e) => set({ text: (e.target as HTMLInputElement).value })} />
-        <button type="button" class="link" onClick={() => { l.asked.value++; }}>Refresh</button>
+        <button type="button" class="link" onClick={() => { l.asked.value++; if (kind === "issue") void loadBoards(store, true); }}>Refresh</button>
       </div>
       {problem.value && <p class="hint">{problem.value}</p>}
       {errors.map((e) => <p key={e} class="hint">{e}</p>)}
@@ -90,14 +98,14 @@ export function WorkList({ store, kind }: { store: Store; kind: WorkKind }) {
   );
 }
 
-/** A filter's menu: Any, then the choices. */
-function Choice({ label, value, options, words = (s) => s, onChange }: {
-  label: string; value: string; options: string[]; words?: (s: string) => string; onChange: (v: string) => void;
+/** A filter's menu: Any (or `any`), then the choices. */
+export function Choice({ label, value, options, words = (s) => s, any = label === "Repo" ? "All" : "Any", onChange }: {
+  label: string; value: string; options: string[]; words?: (s: string) => string; any?: string; onChange: (v: string) => void;
 }) {
   if (options.length === 0 && !value) return null;
   return (
     <label>{label} <select value={value} onChange={(e) => onChange((e.target as HTMLSelectElement).value)}>
-      <option value="">{label === "Repo" ? "All" : "Any"}</option>
+      <option value="">{any}</option>
       {options.map((o) => <option key={o} value={o}>{words(o)}</option>)}
     </select></label>
   );

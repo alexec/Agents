@@ -78,6 +78,14 @@ func (f *fakeForgeJira) Plan(_ context.Context, key string) (jiramcp.Plan, error
 		}}, nil
 }
 
+// BoardFilter is board 12's filter (#3282).
+func (f *fakeForgeJira) BoardFilter(_ context.Context, board string) (string, error) {
+	if board != "12" {
+		return "", &jiramcp.JiraError{Kind: jiramcp.NotFound, Message: "Jira: no board " + board}
+	}
+	return "10040", nil
+}
+
 func (f *fakeForgeJira) asked() ([]string, []string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
