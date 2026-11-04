@@ -347,6 +347,11 @@ public extension DaemonAPI {
                 // Cost on Pull Requests… on a folder's menu (#2352), as the window's Folder Settings has it.
                 Row(Method.foldersSetPRCostComment, params: SetPRCostCommentRequest.self, result: FolderSummary.self,
                     kind: .hostRequest),
+                // Helper limits and disk space in the web page's Folder Settings (#3280), as the window's has them.
+                Row(Method.foldersSetHelperLimits, params: SetHelperLimitsRequest.self, result: FolderSummary.self,
+                    kind: .hostRequest),
+                Row(Method.foldersSetDiskSpace, params: SetDiskSpaceRequest.self, result: FolderSummary.self,
+                    kind: .hostRequest),
                 // A change to the folder's own files made outside the app (#531): read, Keep, Undo.
                 Row(Method.foldersReadGuardedChange, params: GuardedChangeRequest.self, result: GuardedChangeReading.self,
                     kind: .hostRequest),
