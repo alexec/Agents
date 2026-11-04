@@ -177,31 +177,24 @@ private struct ApprovalListRow: View {
 }
 
 /// A pull request waiting for the person's approval, under For Review (#3330). A click opens
-/// its page, with its screenshots, in the browser; Dismiss, on hover and in its menu, takes
-/// it out for good.
+/// its page, with its screenshots, in the browser; Dismiss, a trailing swipe as Archive is on a
+/// session's row, and in its menu, takes it out for good.
 private struct ReviewPullListRow: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openURL) private var openURL
     let pull: ReviewPull
     let folder: FolderKey
     let place: String?
-    @State private var hovering = false
 
     var body: some View {
         ReviewPullRowLabel(pull: pull, place: place)
-            .opacity(hovering ? 0.35 : 1)
-            .overlay(alignment: .trailing) {
-                if hovering {
-                    Button("Dismiss", action: dismiss)
-                        .buttonStyle(.borderless)
-                        .appText(.fine)
-                        .help("Take this pull request out of For Review")
-                }
-            }
             .help("\(pull.title) · Pull request #\(pull.number) · \(pull.repo)")
-            .onHover { hovering = $0 }
             .pointerStyle(.link)
             .onTapGesture { openURL(pull.url) }
+            .swipeActions(edge: .trailing) {
+                SwipeAction("Dismiss", systemImage: "xmark") { await dismissNow() }
+                    .tint(.gray)
+            }
             .contextMenu {
                 Button("Open Pull Request") { openURL(pull.url) }
                 Button("Dismiss", action: dismiss)
@@ -211,39 +204,40 @@ private struct ReviewPullListRow: View {
     }
 
     private func dismiss() {
-        Task { await model.dismissReview(pull, in: folder) }
+        Task { await dismissNow() }
+    }
+
+    private func dismissNow() async {
+        await model.dismissReview(pull, in: folder)
     }
 }
 
-/// A suggestion of the read-only daily checks, under For Review (#3331). A click, or Start on
-/// hover, starts a session in its folder with its prompt and opens it; Dismiss, on hover and in
-/// its menu, takes it out for good.
+/// A suggestion of the read-only daily checks, under For Review (#3331). A click, or Start as a
+/// leading swipe, starts a session in its folder with its prompt and opens it; Dismiss, a
+/// trailing swipe, and in its menu, takes it out for good, as the Remote's row has them.
 private struct CheckSuggestionListRow: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openURL) private var openURL
     let suggestion: CheckSuggestion
     let folder: FolderKey
     let place: String?
-    @State private var hovering = false
 
     var body: some View {
         CheckSuggestionRowLabel(suggestion: suggestion, place: place)
-            .opacity(hovering ? 0.35 : 1)
-            .overlay(alignment: .trailing) {
-                if hovering {
-                    HStack(spacing: 2) {
-                        Button("Start", action: start)
-                            .help("Start a session on this with its prompt")
-                        Button("Dismiss", action: dismiss)
-                            .help("Take this suggestion out of For Review for good")
-                    }
-                    .buttonStyle(.borderless)
-                    .appText(.fine)
-                }
-            }
             .help("\(suggestion.title) · \(CheckSuggestionRowLabel.line(suggestion))")
-            .onHover { hovering = $0 }
             .onTapGesture(perform: start)
+            .swipeActions(edge: .leading) {
+                SwipeAction("Start", systemImage: "play") {
+                    await model.startSuggestion(suggestion, in: folder)
+                }
+                .tint(Paper.accent)
+            }
+            .swipeActions(edge: .trailing) {
+                SwipeAction("Dismiss", systemImage: "xmark") {
+                    await model.dismissSuggestion(suggestion, in: folder)
+                }
+                .tint(.gray)
+            }
             .contextMenu {
                 Button("Start Session", action: start)
                 if let link = suggestion.link {
