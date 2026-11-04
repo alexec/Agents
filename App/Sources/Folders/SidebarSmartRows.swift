@@ -14,6 +14,8 @@ struct SmartFold: View {
     let folds: SidebarFolds
     /// The search's words, already trimmed; empty when there is no search.
     let query: String
+    /// Each folder's group name (#3278): its project's, when it shares one with other folders.
+    var places: [FolderKey: String] = [:]
     /// The smart groups turned off in Settings ▸ Sidebar (#846): their sessions are listed
     /// by the next group they fit.
     @AppStorage(SidebarSmartRow.offDefaultsKey, store: WindowDefaults.store) private var smartOff = SidebarSmartRow.offAtFirst
@@ -129,6 +131,7 @@ struct SmartFold: View {
     }
 
     private func place(of key: FolderKey) -> String? {
+        if let place = places[key] { return place }
         guard let summary = model.work.folder(key) else { return nil }
         return SidebarOrder.label(summary) { model.hosts.label($0) }
     }

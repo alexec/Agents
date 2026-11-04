@@ -1100,6 +1100,8 @@ final class AppModel {
     @ObservationIgnored private var controlHosts: [MachineRef: DaemonClient] = [:]
     /// The control plane's own connection, as the watch made it: for Start on a strip (#691).
     @ObservationIgnored private(set) var controlRequests: DaemonClient?
+    /// The names of the projects the sidebar groups (#3278).
+    let projectNames = ProjectNames()
     /// People (#994): the machines waiting for this person's approval, fed from the watch.
     let people = PeopleState()
     /// The GitHub sign-ins waiting for this person's Approve (#995).

@@ -26,8 +26,9 @@ import { macHostNoticeDetail, macHostNoticeTitle } from "../model/macHostNotice"
 import { hostAnswers } from "../model/capabilities";
 import { Capability } from "../protocol/capabilities.generated";
 import { parseQuery, queryMatches, type LabelQuery } from "../model/labels";
-import { keeper, keepsInUnread, newSessionFolder, pinnedSessions, pinnedWorkflows, folderSessions, rememberedFolder, rememberFolder,
-  smartAgents, smartApprovals, smartPulls, smartSuggestions, smartRows, smartTitles, withKept, type FolderKey, type SmartRow } from "../model/sidebar";
+import { folderLine, groupLabel, keeper, keepsInUnread, machineMark, machineState, newSessionFolder, pinnedSessions, pinnedWorkflows,
+  folderSessions, projectGroups, rememberedFolder, rememberFolder, sharedProjects, smartAgents, smartApprovals, smartPulls,
+  smartSuggestions, smartRows, smartTitles, withKept, type FolderKey, type ProjectGroup, type SmartRow } from "../model/sidebar";
 import { updatedLine } from "../model/updated";
 import { namedRelative, workflowSummary } from "../model/workflows";
 import { fromWireDate, toWireDate } from "../protocol/dates";
@@ -109,6 +110,30 @@ export function archivedFolders(hosts: ControlMachine[], folders: Record<string,
     .sort((a, b) => (b.folder.folder.archivedAt ?? b.folder.lastActivityAt) - (a.folder.folder.archivedAt ?? a.folder.lastActivityAt));
 }
 
+/** The names of the projects the sidebar groups (#3278), read from the control plane, by id. */
+const projectNames = signal<Record<string, string>>({});
+
+function placeKey(host: string, folder: string): string {
+  return `${host}|${folderKey(folder)}`;
+}
+
+/** Each folder's group name (#3278): its own label alone, or its project's name. */
+function groupLabels(groups: readonly ProjectGroup<Placed>[], macID: string): Map<string, string> {
+  const labels = new Map<string, string>();
+  for (const group of groups) {
+    const { host, folder } = group.main;
+    const name = groupLabel(group, folderLabel(host, folder, macID),
+      folder.project === undefined ? undefined : projectNames.value[folder.project], folder.name);
+    for (const placed of [group.main, ...group.others]) labels.set(placeKey(placed.host.id, placed.folder.folder.folder), name);
+  }
+  return labels;
+}
+
+/** The name a smart group's row says after its title: its folder's group name. */
+function placeOf(places: ReadonlyMap<string, string>, host: ControlMachine, folder: FolderSummary, macID: string): string {
+  return places.get(placeKey(host.id, folder.folder.folder)) ?? folderLabel(host, folder, macID);
+}
+
 export function Sidebar({ session, store, linkDown }: { session: Session; store: Store; linkDown: boolean }) {
   const search = useSignal("");
   // What the folds filter by: the field's words once typing pauses, so a keystroke costs the
@@ -139,7 +164,11 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
     const agent = r.session ? store.agent(r.host, r.session) : undefined;
     if (agent && inOpenSmartRow(store, r.host, agent)) return;
     if (r.workflow && smartGroupsOn.peek().has("pinned") && folds.isSmartOpen("pinned") && store.workflowPinsIn(r.host, r.folder).includes(r.workflow)) return;
-    folds.set(r.host, r.folder, true);
+    // A folder of a project is drawn in its project's group (#3278): that group unfolds.
+    const at = placeKey(r.host, r.folder);
+    const owner = projectGroups(orderedFolders(store.hosts.peek(), store.folders.peek(), store.macHostID.peek()), store.macHostID.peek())
+      .find((g) => [g.main, ...g.others].some((p) => placeKey(p.host.id, p.folder.folder.folder) === at))?.main;
+    folds.set(owner?.host.id ?? r.host, owner?.folder.folder.folder ?? r.folder, true);
   }, [r.host, r.folder, r.session, r.workflow, r.page, r.archive, r.mcp]);
   // The next New Session at the top starts here too (#495).
   useEffect(() => {
@@ -156,6 +185,16 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
     : every.filter(({ host, folder }) => (machine === null || host.id === machine)
       && (state === "any" || liveSessions(store, host.id, folder.folder.folder).length > 0));
   const archived = held ? [] : archivedFolders(store.hosts.value, store.folders.value);
+  // One group per project (#3278): a project's folders on every machine together.
+  const groups = projectGroups(folders, store.macHostID.value);
+  const places = groupLabels(groups, store.macHostID.value);
+  const shared = sharedProjects(groups).join("\n");
+  useEffect(() => {
+    if (!shared) return;
+    void store.link.call("projects/list", {}).then((list) => {
+      projectNames.value = Object.fromEntries(list.projects.map((p) => [p.id, p.name]));
+    }, () => { /* A failed read keeps the names it had; the main folder's name stands in. */ });
+  }, [shared]);
   const showsArchived = folds.showsArchivedFolders.value;
   const offline = store.hosts.value.filter((h) => !hostAnswers(h.state));
   const macHost = store.hosts.value.find((h) => h.id === store.macHostID.value);
@@ -186,14 +225,16 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
         {/* Pinned, Needs You, Working, Unread: a group each across every folder and host (#495, #773),
             each that is on in this browser's Settings (#846). */}
         {folders.length > 0 && smartRows.filter((row) => smartGroupsOn.value.has(row) && (!held || aloneRows.has(row))).map((row) => (
-          <SmartFold key={row} row={row} store={store} folders={folders} query={query} linkDown={linkDown}
+          <SmartFold key={row} row={row} store={store} folders={folders} places={places} query={query} linkDown={linkDown}
             downSince={session.state.value.kind === "down" ? session.state.value.since : undefined} />
         ))}
-        {/* One group per folder (#495), its name the group's heading, its sessions the rows. */}
+        {/* One group per project (#495, #3278), its name the group's heading, its sessions the rows. A
+            project with one folder is that folder's group, as before. */}
         <section class="folder-list" aria-label="Folders">
-          {folders.map(({ host, folder }) => (
+          {groups.map(({ main: { host, folder }, others }) => (
             <FolderFold key={`${host.id}|${folder.folder.folder}`} store={store} host={host} folder={folder}
-              query={query} linkDown={linkDown} alone={!!held} />
+              query={query} linkDown={linkDown} alone={!!held} others={others}
+              groupName={others.length > 0 ? places.get(placeKey(host.id, folder.folder.folder)) : undefined} />
           ))}
           {held && <Elsewhere store={store} folders={every.filter((p) => !folders.includes(p))} />}
           {/* A host had more matches than its page: the next page, on asking (#176). */}
@@ -311,6 +352,17 @@ function startedByOf(store: Store, id: string): string | undefined {
   return undefined;
 }
 
+/** A folder's live sessions as its group lists them (#3278): those no smart group lists, newest started first. */
+function listedSessions(store: Store, host: string, folder: string, parsed: LabelQuery | undefined,
+  on: ReadonlySet<SmartRow>): Agent[] {
+  const live = liveSessions(store, host, folder);
+  const pins = store.sessionPinsIn(host, folder);
+  const keptID = !parsed && keptInUnread.value?.host === host ? keptInUnread.value.id : undefined;
+  const keptAgent = keptID ? live.find((a) => a.id === keptID) : undefined;
+  const kept = keptAgent && keepsInUnread(keptAgent, pins, on, keeper(keptInUnread.value?.hadFile ?? false, on)) ? keptAgent.id : undefined;
+  return folderSessions(live, pins, parsed, kept, on);
+}
+
 function liveSessions(store: Store, host: string, folder: string): Agent[] {
   const state = alone.value ? "any" : stateFilter.value;
   return store.folderView(host, folder).headings.flatMap((h) => h.agents).filter((a) => keptByState(a, state));
@@ -386,8 +438,10 @@ type SmartLine = Placed & ({ kind: "session"; agent: Agent } | { kind: "workflow
  * searching only with a match (#507); Unread still is while it keeps the open session. Folded, it
  * lists nothing but counts.
  */
-function SmartFold({ row, store, folders, query, linkDown, downSince }: {
+function SmartFold({ row, store, folders, places, query, linkDown, downSince }: {
   row: SmartRow; store: Store; folders: Placed[]; query: string; linkDown: boolean;
+  /** Each folder's group name (#3278), which a row says after its title. */
+  places: ReadonlyMap<string, string>;
   /** When the link was lost: Needs You says its count was last true then (#1163). */
   downSince?: number | undefined;
 }) {
@@ -481,7 +535,7 @@ function SmartFold({ row, store, folders, query, linkDown, downSince }: {
         const host = line.host.id;
         const folder = line.folder.folder.folder;
         const down = linkDown || !store.hostIsOnline(host);
-        const place = folderLabel(line.host, line.folder, store.macHostID.value);
+        const place = placeOf(places, line.host, line.folder, store.macHostID.value);
         return line.kind === "session" ? (
           <SidebarSession key={`${host}|${line.agent.id}`} store={store} host={host} folder={folder} agent={line.agent}
             chosen={r.host === host && r.session === line.agent.id} down={down} pinnedAt={line.pins} place={place} tree={line.tree} />
@@ -497,7 +551,7 @@ function SmartFold({ row, store, folders, query, linkDown, downSince }: {
         const host = placed.host.id;
         const folder = placed.folder.folder.folder;
         const key = `${host}|${folder}|${approvalID(approval)}`;
-        const place = folderLabel(placed.host, placed.folder, store.macHostID.value);
+        const place = placeOf(places, placed.host, placed.folder, store.macHostID.value);
         const down = linkDown || !store.hostIsOnline(host);
         if (opensItsSubject(approval)) {
           const agentID = approval.agentID as string | undefined;
@@ -512,12 +566,12 @@ function SmartFold({ row, store, folders, query, linkDown, downSince }: {
       {open && pulls.map(({ folder: placed, pull }) => {
         const host = placed.host.id;
         return <ReviewPullRow key={`${host}|${pull.url}`} store={store} host={host} folder={placed.folder.folder.folder} pull={pull}
-          place={folderLabel(placed.host, placed.folder, store.macHostID.value)} down={linkDown || !store.hostIsOnline(host)} />;
+          place={placeOf(places, placed.host, placed.folder, store.macHostID.value)} down={linkDown || !store.hostIsOnline(host)} />;
       })}
       {open && suggestions.map(({ folder: placed, suggestion }) => {
         const host = placed.host.id;
         return <CheckSuggestionRow key={`${host}|${suggestion.id}`} store={store} host={host} folder={placed.folder.folder.folder}
-          suggestion={suggestion} place={folderLabel(placed.host, placed.folder, store.macHostID.value)}
+          suggestion={suggestion} place={placeOf(places, placed.host, placed.folder, store.macHostID.value)}
           down={linkDown || !store.hostIsOnline(host)} />;
       })}
     </details>
@@ -532,14 +586,22 @@ function SmartFold({ row, store, folders, query, linkDown, downSince }: {
  * folder's agents alone, so a change to an agent draws one fold again, and a folded one reads
  * nothing of its sessions (#170). `query` is the search's words, already trimmed.
  */
-const FolderFold = memo(function FolderFold({ store, host, folder: summary, query, linkDown, alone: isAlone = false }: {
+const FolderFold = memo(function FolderFold({ store, host, folder: summary, query, linkDown, alone: isAlone = false,
+  others = [], groupName }: {
   store: Store; host: ControlMachine; folder: FolderSummary; query: string; linkDown: boolean;
   /** In a tab holding this folder alone (#1089): its rows under a Sessions heading, always open. */
   alone?: boolean;
+  /** The project's other folders (#3278), whose live sessions are listed in this group too. */
+  others?: Placed[];
+  /** The group's name when it is a project's: the project's name. */
+  groupName?: string | undefined;
 }) {
   const r = route.value;
   const folder = summary.folder.folder;
-  const label = folderLabel(host, summary, store.macHostID.value);
+  const label = groupName ?? folderLabel(host, summary, store.macHostID.value);
+  const group: ProjectGroup<Placed> = { main: { host, folder: summary }, others };
+  const macID = store.macHostID.value;
+  const hostName = (id: string) => store.hosts.value.find((h) => h.id === id)?.name ?? id;
   const searching = query !== "";
   const unfolded = searching || isAlone || folds.isOpen(host.id, folder);
   const down = linkDown || !store.hostIsOnline(host.id);
@@ -586,7 +648,14 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
   const keptID = !parsed && keptInUnread.value?.host === host.id ? keptInUnread.value.id : undefined;
   const keptAgent = keptID ? live.find((a) => a.id === keptID) : undefined;
   const kept = keptAgent && keepsInUnread(keptAgent, pins, on, keeper(keptInUnread.value?.hadFile ?? false, on)) ? keptAgent.id : undefined;
-  const sessions = !unfolded ? [] : folderSessions(live, pins, parsed, kept, on);
+  // The project's other folders' live sessions too (#3278), each still its own folder's.
+  const elsewhere = new Map<string, Placed>();
+  const theirs = !unfolded ? [] : others.flatMap((placed) => {
+    const listed = listedSessions(store, placed.host.id, placed.folder.folder.folder, parsed, on);
+    for (const agent of listed) elsewhere.set(agent.id, placed);
+    return listed;
+  });
+  const sessions = !unfolded ? [] : [...folderSessions(live, pins, parsed, kept, on), ...theirs].sort(byStart);
   const recentArchived = !parsed ? recentlyArchived(view.archived, recentArchivedShown, toWireDate(new Date())) : [];
   const archived = !unfolded || !parsed ? [] : view.archived.filter((a) => queryMatches(parsed, a));
   const allWorkflows = (unfolded ? store.folderWorkflows(host.id, folder) : [])
@@ -617,6 +686,15 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
   const folderMenu: MenuItem[] = [
     { label: "New Session", disabled: down, help: "Start a new session in this folder",
       run: () => go({ host: host.id, folder: folder, compose: true }) },
+    // The project's folders on every machine (#3278), each with its machine and state: one opens it.
+    ...(others.length === 0 ? [] : [
+      { label: "Folders", disabled: true, run: () => {} },
+      ...[group.main, ...others].map((placed) => ({
+        label: folderLine(placed.folder.name, store.isMac(placed.host.id) ? "This Mac" : placed.host.name,
+          machineState(store.hostIsOnline(placed.host.id), placed.host.workspace?.workspaceState)),
+        disabled: linkDown || !store.hostIsOnline(placed.host.id), help: "Open this folder of the project",
+        run: () => go({ host: placed.host.id, folder: placed.folder.folder.folder, compose: true }) })),
+    ]),
     // The folder alone, in a tab of its own (#1089), as the window opens it in a window of its own.
     { label: "Open in New Tab", help: "Open this folder alone in a new browser tab",
       run: () => void window.open(aloneURL(host.id, folder), "_blank", "noopener") },
@@ -649,12 +727,19 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
         run: () => importFromMenu(store, host.id, { folder, name: summary.name }) },
     ] : []),
   ];
-  const row = (agent: Agent, tree?: TreeRow) => (
-    <SidebarSession key={agent.id} store={store} host={host.id} folder={folder} agent={agent}
-      chosen={r.host === host.id && r.session === agent.id} down={down} tree={tree} />
-  );
+  const row = (agent: Agent, tree?: TreeRow) => {
+    // A session of the project's other folder is that folder's, and says its machine when elsewhere (#3278).
+    const at = elsewhere.get(agent.id);
+    const its = at?.host.id ?? host.id;
+    return (
+      <SidebarSession key={`${its}|${agent.id}`} store={store} host={its} folder={at?.folder.folder.folder ?? folder} agent={agent}
+        chosen={r.host === its && r.session === agent.id} down={at ? linkDown || !store.hostIsOnline(its) : down} tree={tree}
+        place={machineMark(group, its, macID, hostName)} />
+    );
+  };
   // Each under the session that started it, folded (#835).
-  const sessionRows = treeRows(sessions, (id) => store.agent(host.id, id)?.startedByAgent, (id) => folds.isSessionOpen(id));
+  const sessionRows = treeRows(sessions, (id) => others.length > 0 ? startedByOf(store, id) : store.agent(host.id, id)?.startedByAgent,
+    (id) => folds.isSessionOpen(id));
   const workflowRow = (summary: WorkflowSummary) => (
     <div class="nav-item" key={summary.workflow.workflowID}>
       <WorkflowRow store={store} host={host.id} summary={summary} disabled={down}

@@ -304,6 +304,8 @@ final class RemoteModel {
     /// The watch's own client of the control plane while it is connected, for the control
     /// plane's own requests (`hosts/start`, #691). Nil against a bridge with no control plane.
     @ObservationIgnored private(set) var controlPlane: DaemonClient?
+    /// The names of the projects the sidebar groups (#3278).
+    let projectNames = ProjectNames()
     /// People (#994): the machines waiting for this person's approval, fed from the watch.
     let people = PeopleState()
     /// The GitHub sign-ins waiting for this person's Approve (#995).
