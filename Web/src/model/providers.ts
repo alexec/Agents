@@ -5,7 +5,7 @@ import { signal } from "@preact/signals";
 import type { ControlMachine, Group, MachineRef, ProviderAdd, ProviderID, ProviderSummary } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import type { Caller } from "../protocol/methods";
-import { CallFailed } from "../wire/link";
+import { CallFailed, LinkDown } from "../wire/link";
 import { describe } from "./errors";
 import { providerWords } from "./machineProviders";
 
@@ -114,14 +114,20 @@ export class Providers {
    * it is the one the machine shows.
    */
   async install(destination: string, name: string, provider: string, workspace: string, trust?: string): Promise<InstallOutcome> {
+    // Linked on join from the start (#3377): when the page stops waiting, the install goes on and
+    // the machine still joins.
+    const asked = name || destination;
+    this.linkOnJoin.set(asked, { provider, workspace });
     try {
       const answer = await this.caller.call("hosts/install", { destination, name, ...(trust ? { trust } : {}) }) as
         { needsTrust?: string; name?: string } | null;
+      this.linkOnJoin.delete(asked);
       if (answer?.needsTrust) return { needsTrust: answer.needsTrust };
-      const joined = answer?.name || name || destination;
+      const joined = answer?.name || asked;
       this.linkOnJoin.set(joined, { provider, workspace });
       return { added: joined };
     } catch (error) {
+      if (!(error instanceof LinkDown)) this.linkOnJoin.delete(asked);
       return { failed: describe(error) };
     }
   }
