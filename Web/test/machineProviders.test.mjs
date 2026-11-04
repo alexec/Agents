@@ -114,6 +114,31 @@ test("Add as Machine… says why the control plane refused", async () => {
   assert.deepEqual(await p.install("cs.x", "x", "gh", "x"), { failed: "Only the control plane's owner can use its ssh." });
 });
 
+test("Add as Machine… waits for the install, and links the machine also when the page stopped waiting (#3377)", async () => {
+  assert.ok(w.callTimeoutFor("hosts/install") >= 10 * 60_000);
+  const linked = [];
+  const p = new w.Providers({
+    call: async (method, params) => {
+      if (method === "hosts/install") throw new w.CallTimedOut("hosts/install");
+      if (method === "hosts/link") return linked.push(params);
+      throw new Error(method);
+    },
+  });
+  assert.ok("failed" in await p.install("cs.cs-box", "cs-box", "gh", "cs-box-id"));
+  p.linkJoined([{ id: "7", name: "cs-box" }]);
+  assert.deepEqual(linked, [{ host: "7", provider: "gh", workspace: "cs-box-id" }]);
+  // A refusal installed nothing: nothing to link.
+  const refused = new w.Providers({
+    call: async (method, params) => {
+      if (method === "hosts/install") throw new w.CallFailed(-32001, "No.");
+      return linked.push(params);
+    },
+  });
+  await refused.install("cs.x", "x", "gh", "x");
+  refused.linkJoined([{ id: "8", name: "x" }]);
+  assert.equal(linked.length, 1);
+});
+
 function plane({ oneCopy = true, working = false } = {}) {
   const asked = [];
   return {
