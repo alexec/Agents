@@ -108,12 +108,56 @@ test("Add as Machine… installs, shows a new host key first, and links the mach
   assert.equal(asked.filter((a) => a.method === "hosts/link").length, 0);
   p.linkJoined([{ id: "1", name: "other" }, { id: "7", name: "cs-box" }]);
   p.linkJoined([{ id: "7", name: "cs-box" }]);
-  assert.deepEqual(asked.filter((a) => a.method === "hosts/link").map((a) => a.params), [{ host: "7", provider: "gh", workspace: "cs-box-id" }]);
+  // The key trusted for the install is the one the link keeps (#3379).
+  assert.deepEqual(asked.filter((a) => a.method === "hosts/link").map((a) => a.params),
+    [{ host: "7", provider: "gh", workspace: "cs-box-id", trust: "SHA256:abc" }]);
+});
+
+test("Link to Machine… shows a new host key first, then links with it trusted (#3379)", async () => {
+  assert.ok(w.callTimeoutFor("hosts/link") >= 60_000);
+  const asked = [];
+  const p = new w.Providers({
+    call: async (method, params) => {
+      asked.push(params);
+      if (params.trust === "SHA256:abc") return {};
+      throw new w.CallFailed(w.Failure.hostKeyToTrust, "This machine’s host key is new.", { fingerprint: "SHA256:abc" });
+    },
+  });
+  assert.deepEqual(await p.link("7", "gh", "cs", true, 30), { needsTrust: "SHA256:abc" });
+  assert.deepEqual(await p.link("7", "gh", "cs", true, 30, "SHA256:abc"), { linked: true });
+  assert.deepEqual(asked.at(-1), { host: "7", provider: "gh", workspace: "cs", startWhenUsed: true, stopWhenIdleMinutes: 30, trust: "SHA256:abc" });
+  const refused = new w.Providers({ call: async () => { throw new w.CallFailed(-32602, "There is no such workspace."); } });
+  assert.deepEqual(await refused.link("7", "gh", "cs", true, 30), { failed: "There is no such workspace." });
 });
 
 test("Add as Machine… says why the control plane refused", async () => {
   const p = new w.Providers({ call: async () => { throw new w.CallFailed(-32001, "Only the control plane's owner can use its ssh."); } });
   assert.deepEqual(await p.install("cs.x", "x", "gh", "x"), { failed: "Only the control plane's owner can use its ssh." });
+});
+
+test("Add as Machine… waits for the install, and links the machine also when the page stopped waiting (#3377)", async () => {
+  assert.ok(w.callTimeoutFor("hosts/install") >= 10 * 60_000);
+  const linked = [];
+  const p = new w.Providers({
+    call: async (method, params) => {
+      if (method === "hosts/install") throw new w.CallTimedOut("hosts/install");
+      if (method === "hosts/link") return linked.push(params);
+      throw new Error(method);
+    },
+  });
+  assert.ok("failed" in await p.install("cs.cs-box", "cs-box", "gh", "cs-box-id"));
+  p.linkJoined([{ id: "7", name: "cs-box" }]);
+  assert.deepEqual(linked, [{ host: "7", provider: "gh", workspace: "cs-box-id" }]);
+  // A refusal installed nothing: nothing to link.
+  const refused = new w.Providers({
+    call: async (method, params) => {
+      if (method === "hosts/install") throw new w.CallFailed(-32001, "No.");
+      return linked.push(params);
+    },
+  });
+  await refused.install("cs.x", "x", "gh", "x");
+  refused.linkJoined([{ id: "8", name: "x" }]);
+  assert.equal(linked.length, 1);
 });
 
 function plane({ oneCopy = true, working = false } = {}) {
@@ -168,4 +212,9 @@ test("Stop asks first while agents work there, then stops with confirmRunning", 
   assert.deepEqual(await p.stop("h1"), { host: "h1", question: "Stop box? A is working there." });
   assert.equal(await p.stop("h1", true), null);
   assert.deepEqual(link.asked.at(-1).params, { host: "h1", confirmRunning: true });
+});
+
+test("Link to Machine with no machine says Add a Machine…, not the Mac app (#3382)", () => {
+  assert.doesNotMatch(w.providerWords.noHosts, /\bMac\b/);
+  assert.match(w.providerWords.noHosts, /Add a Machine…/);
 });

@@ -12,14 +12,16 @@ notice.
 
 1. **Get the facts.** Call `write_daily_summary` with `action: collect`. It lists, for every
    folder on this machine since the last summary: what landed, what failed or stopped,
-   what waits on the person (oldest first), and the suggestions nobody took. Each line
-   has its link.
+   what waits on the person (oldest first), the suggestions nobody took, and what the
+   daily checks found in the folders nobody worked in. Each line has its link.
 2. **Write the page.** Markdown, under 60 lines, in plain words:
    - A title with the date, such as `# Daily summary, Mon 2 Nov`.
    - One opening line that says the most important thing, such as "2 things wait on you;
      5 PRs landed."
    - Four parts, in this order: **Waits on you**, **Failed or stopped**, **Landed**,
-     **Suggested next**. A part with nothing in it says so in one line.
+     **Suggested next**. A part with nothing in it says so in one line. **Suggested next**
+     also has what the checks found, urgent ones first, each with the prompt that starts
+     a session on it.
    - One line per item, with its link from the facts as a Markdown link, such as
      `[Fix the login test](agents://agent/…)`. Put the same kind of item together
      (for example, "3 sessions done in Agents"). Never make up an item or a link.

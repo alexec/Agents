@@ -13929,7 +13929,7 @@
     },
     "MachineLink": {
       "type": "object",
-      "description": "hosts/link.",
+      "description": "hosts/link. A machine whose ssh host key the control plane has not trusted yet (one that joined with the command, #3379) is refused -32069 hostKeyToTrust, data {fingerprint}, until trust is that fingerprint: the key is then kept for the machine's ssh start.",
       "properties": {
         "host": {
           "$ref": "#/definitions/MachineRef"
@@ -13945,6 +13945,9 @@
         },
         "stopWhenIdleMinutes": {
           "type": "integer"
+        },
+        "trust": {
+          "type": "string"
         }
       },
       "required": [

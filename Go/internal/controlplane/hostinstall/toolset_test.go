@@ -19,7 +19,7 @@ import (
 const appToolsets = "../../../../App/Resources/toolsets"
 
 func TestTheAppsNodeToolsetsAreReadAndItsArchivesAreNot(t *testing.T) {
-	all := loadToolsets(appToolsets, []string{"claude", "codex", "opencode", "antigravity"})
+	all, missing := loadToolsets(appToolsets, []string{"claude", "codex", "opencode", "antigravity"})
 	var got []string
 	for _, ts := range all {
 		got = append(got, ts.manifest.RuntimeID+":"+ts.shimName())
@@ -30,6 +30,10 @@ func TestTheAppsNodeToolsetsAreReadAndItsArchivesAreNot(t *testing.T) {
 	if strings.Join(got, " ") != "claude:npx codex:codex-acp" {
 		t.Fatalf("%v", got)
 	}
+	// The archives are named but are not Node toolsets, and that is said.
+	if len(missing) != 2 || !strings.HasPrefix(missing[0], "opencode: ") || !strings.HasPrefix(missing[1], "antigravity: ") {
+		t.Fatalf("missing %q", missing)
+	}
 	// The id is the window's: the manifest's and the lock's bytes, one after the other.
 	cmd := exec.Command("sh", "-c", "cat manifest.json package-lock.json | sha256sum | cut -c1-16")
 	cmd.Dir = filepath.Join(appToolsets, "claude")
@@ -39,6 +43,29 @@ func TestTheAppsNodeToolsetsAreReadAndItsArchivesAreNot(t *testing.T) {
 	if last := all[0].shimLines()[3]; strings.HasSuffix(last, `"$@"`) ||
 		!strings.Contains(last, "lib/node_modules/@agentclientprotocol/claude-agent-acp/dist/index.js") {
 		t.Fatalf("claude's shim %q", last)
+	}
+}
+
+// A toolset the control plane cannot read is said, not skipped without a word (#3383).
+func TestAToolsetThatCannotBeReadIsSaid(t *testing.T) {
+	folder := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(folder, "claude"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(folder, "claude", "manifest.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	all, missing := loadToolsets(folder, []string{"claude", "codex"})
+	if len(all) != 0 || len(missing) != 2 || !strings.HasPrefix(missing[0], "claude: ") ||
+		!strings.Contains(missing[0], toolsetLockFile) || missing[1] != "codex: no toolset in "+folder {
+		t.Fatalf("all %v, missing %q", all, missing)
+	}
+	if _, missing := loadToolsets(filepath.Join(folder, "gone"), []string{"claude"}); len(missing) != 1 ||
+		!strings.HasPrefix(missing[0], "claude: ") {
+		t.Fatalf("an unreadable folder: %q", missing)
+	}
+	if _, missing := loadToolsets("", []string{"claude"}); len(missing) != 1 || missing[0] != "claude: no toolsets folder" {
+		t.Fatalf("no folder: %q", missing)
 	}
 }
 
@@ -235,7 +262,9 @@ func TestNoToolsetFolderInstallsNone(t *testing.T) {
 	i.ToolsetFolder = ""
 	reply(t)(i.Install(context.Background(),
 		json.RawMessage(`{"destination":"devbox","trust":"`+hostKeyFingerprint+`"}`)))
-	if _, err := os.Stat(f.server("tools")); err == nil || len(f.logs) != 0 {
+	// None is installed, and that is said (#3383).
+	if _, err := os.Stat(f.server("tools")); err == nil || len(f.logs) != 1 ||
+		f.logs[0] != "hosts/install: no toolset for claude: no toolsets folder on devbox" {
 		t.Fatalf("tools made, logs %v", f.logs)
 	}
 }

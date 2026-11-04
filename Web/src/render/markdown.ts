@@ -7,8 +7,10 @@
 // A picture beside a page is drawn from bytes `files/read` returns. A link opens in a new tab,
 // and only http, https and mailto links are links at all. A file: link, or a bare absolute path, is a link only
 // where the page says how a file opens (a chat opens it in Files, #548), and then it never navigates.
+// An agents://agent/<id> link selects that session (#3353), as on the Mac and the Remote.
 import MarkdownIt, { type Token } from "markdown-it";
 import { pageImagePath } from "../model/pageImage";
+import { agentLinkID, openAgentLink } from "../model/agentLink";
 import { LocalPicture } from "./LocalPicture";
 import { memo } from "./memo";
 import { highlightCode } from "./codeHighlight";
@@ -83,8 +85,12 @@ function build(tokens: readonly Token[], images?: PageImages, openFile?: OpenFil
       if (name === "link") {
         const href = String(token.attrGet("href") ?? "");
         const path = openFile ? fileLinkPath(href) : null;
+        const agent = agentLinkID(href);
         if (isSafeLink(href)) {
           Object.assign(props, { href, target: "_blank", rel: "noopener noreferrer" });
+        } else if (agent) {
+          tag = "button";
+          Object.assign(props, { type: "button", class: "link reading", title: "Show the session", onClick: () => openAgentLink(agent) });
         } else if (path && openFile) {
           tag = "button";
           Object.assign(props, { type: "button", class: "link reading", title: path, onClick: () => openFile({ path }) });

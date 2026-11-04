@@ -8579,6 +8579,10 @@
         "code": -32090,
         "message": "hostOffline"
       },
+      "hostKeyToTrust": {
+        "code": -32069,
+        "message": "hostKeyToTrust"
+      },
       "importedAgent": {
         "code": -32096,
         "message": "importedAgent"

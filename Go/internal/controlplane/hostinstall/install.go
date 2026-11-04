@@ -394,7 +394,13 @@ func (i *Installer) installToolsets(ctx context.Context, server installer, found
 	if dist == "" {
 		dist = nodeDist
 	}
-	for _, t := range loadToolsets(i.ToolsetFolder, runtimes) {
+	toolsets, missing := loadToolsets(i.ToolsetFolder, runtimes)
+	for _, why := range missing {
+		if i.Log != nil {
+			i.Log("hosts/install: no toolset for %s on %s", why, name)
+		}
+	}
+	for _, t := range toolsets {
 		if err := server.installToolset(ctx, t, found, dist, folder); err != nil {
 			text := err.Error()
 			if p, ok := err.(*Problem); ok {
@@ -550,4 +556,44 @@ func (i *Installer) StartDaemon(ctx context.Context, destination, knownHosts, na
 		return "", err
 	}
 	return hosttunnels.Pinned(string(taken)), nil
+}
+
+// HostKey is the key to pin for a host that joined with no install, such as one that ran
+// the join command itself, when it is linked to a workspace (#3379): its ssh start then
+// checks it as an install's does. The key the person's own known_hosts trusts is taken
+// at once; another is taken only when trust is its fingerprint, as hosts/install shows it,
+// and is otherwise answered as needsTrust. knownHosts is in known_hosts form.
+func (i *Installer) HostKey(ctx context.Context, destination, trust string) (knownHosts, needsTrust string, err error) {
+	env, err := i.prepared(ctx, destination, i.env(true))
+	if err != nil {
+		return "", "", err
+	}
+	folder, err := os.MkdirTemp("", "agents-hostkey-")
+	if err != nil {
+		return "", "", err
+	}
+	defer os.RemoveAll(folder)
+	config := i.configFile()
+	ssh := sshCommand{executable: i.sshExecutable(), name: destination, env: env, options: join(config, options("", ""))}
+	ssh.options = append(ssh.options, personsKnownHostsOptions(ctx, ssh)...)
+	if known := personsKey(ctx, ssh, config, folder); known != "" {
+		return known, "", nil
+	}
+	fetching := ssh
+	fetching.options = config
+	file, fingerprint, err := fetchHostKey(ctx, fetching, folder)
+	if err != nil {
+		if p, ok := err.(*Problem); ok {
+			return "", "", errors.New(Say(p, false))
+		}
+		return "", "", err
+	}
+	if trust != fingerprint {
+		return "", fingerprint, nil
+	}
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return "", "", err
+	}
+	return string(data), "", nil
 }

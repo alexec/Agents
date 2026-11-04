@@ -17,6 +17,8 @@ struct ControlProvidersPage: View {
     @State private var editing: DaemonAPI.ProviderSummary?
     /// Start a Machine from a Repository… (#1809).
     @State private var startingMachine = false
+    /// Link to <machine>: its host key, to trust first (#3379).
+    @State private var trusting: LinkTrust?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -65,6 +67,34 @@ struct ControlProvidersPage: View {
             Button("Cancel", role: .cancel) {}
         } message: { _ in
             Text("Its machines stay as they are, unlinked: nothing here can start or stop them any more.")
+        }
+        .alert("Trust \(trusting?.name ?? "")’s host key?",
+               isPresented: Binding(get: { trusting != nil }, set: { if !$0 { trusting = nil } }),
+               presenting: trusting) { trust in
+            Button("Trust and Link") {
+                Task { await control.link(trust.host, to: trust.provider, workspace: trust.workspace, trust: trust.fingerprint) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { trust in
+            Text(LinkWorkspaceSheet.trustNote(trust.fingerprint))
+        }
+    }
+
+    /// A link that waits on a host key to trust (#3379).
+    struct LinkTrust: Identifiable {
+        var host: MachineRef
+        var name: String
+        var provider: ProviderID
+        var workspace: String
+        var fingerprint: String
+        var id: String { fingerprint }
+    }
+
+    private func link(_ host: DaemonAPI.ControlMachine, to provider: ProviderID, workspace: String) {
+        Task {
+            if let fingerprint = await control.link(host.id, to: provider, workspace: workspace) {
+                trusting = LinkTrust(host: host.id, name: host.name, provider: provider, workspace: workspace, fingerprint: fingerprint)
+            }
         }
     }
 
@@ -147,17 +177,13 @@ struct ControlProvidersPage: View {
     private func linkToExistingHost(_ workspace: DaemonAPI.MachineInfo, of provider: DaemonAPI.ProviderSummary) -> some View {
         let hosts = control.hostsThatMayBe(workspace)
         if hosts.count == 1, let host = hosts.first {
-            Button("Link to \(host.name)") {
-                Task { await control.link(host.id, to: provider.id, workspace: workspace.id) }
-            }
+            Button("Link to \(host.name)") { link(host, to: provider.id, workspace: workspace.id) }
             .buttonStyle(.paper)
             .help("\(host.name) may already be this machine: links it, without installing again.")
         } else if !hosts.isEmpty {
             Menu("Link to Existing Machine") {
                 ForEach(hosts) { host in
-                    Button(host.name) {
-                        Task { await control.link(host.id, to: provider.id, workspace: workspace.id) }
-                    }
+                    Button(host.name) { link(host, to: provider.id, workspace: workspace.id) }
                 }
             }
             .menuStyle(.borderlessButton)
@@ -1131,6 +1157,14 @@ struct LinkWorkspaceSheet: View {
     @State private var chosen: String?
     @State private var startWhenUsed = true
     @State private var stopWhenIdle = WorkspaceLink.defaultIdleMinutes
+    /// The host key to trust first, for a machine that joined with the command (#3379).
+    @State private var fingerprint: String?
+    @State private var working = false
+
+    /// What a new host key is said with, here and on the providers page.
+    static func trustNote(_ fingerprint: String) -> String {
+        "This machine’s host key is new to the control plane: \(fingerprint). Link only if this is the key the machine shows (ssh-keygen -lf on its host key): its provider starts it over ssh with this key."
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -1156,12 +1190,18 @@ struct LinkWorkspaceSheet: View {
                 Text("After 2 hours").tag(120)
             }
             .fixedSize()
+            if let fingerprint {
+                Text(Self.trustNote(fingerprint))
+                    .appText(.supporting)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             HStack {
+                if working { ProgressView().controlSize(.small) }
                 Spacer()
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Link") { link() }
+                Button(fingerprint == nil ? "Link" : "Trust and Link") { link() }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(chosen == nil)
+                    .disabled(chosen == nil || working)
             }
         }
         .padding(28)
@@ -1176,6 +1216,7 @@ struct LinkWorkspaceSheet: View {
         let other = workspace.host.flatMap { id in control.hosts.first { $0.id == id }?.name }
         let selected = chosen == key(provider, workspace)
         return Button {
+            if chosen != key(provider, workspace) { fingerprint = nil }
             chosen = key(provider, workspace)
         } label: {
             HStack(spacing: 8) {
@@ -1197,9 +1238,16 @@ struct LinkWorkspaceSheet: View {
         guard let chosen, let slash = chosen.firstIndex(of: "/") else { return }
         let provider = ProviderID(rawValue: String(chosen[..<slash]))
         let workspace = String(chosen[chosen.index(after: slash)...])
+        working = true
         Task {
-            await control.link(host.id, to: provider, workspace: workspace,
-                               startWhenUsed: startWhenUsed, stopWhenIdleMinutes: stopWhenIdle)
+            let shown = await control.link(host.id, to: provider, workspace: workspace,
+                                           startWhenUsed: startWhenUsed, stopWhenIdleMinutes: stopWhenIdle,
+                                           trust: fingerprint)
+            working = false
+            if let shown {
+                fingerprint = shown
+                return
+            }
             dismiss()
         }
     }

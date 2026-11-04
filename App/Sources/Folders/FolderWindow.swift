@@ -159,6 +159,7 @@ struct FolderWindow: View {
 /// The two columns of a folder's window: its sidebar and what is picked in it.
 private struct FolderWindowColumns: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
     let window: FolderWindowState
     let summary: DaemonAPI.FolderSummary
     let chat: PoppedChat?
@@ -192,8 +193,13 @@ private struct FolderWindowColumns: View {
         .environment(\.windowFolder, window.key)
         .environment(\.windowOpen, WindowOpener(window: window))
         .environment(\.windowPick, window.pick)
-        // A file a chat links to is on the folder's host, as in the main window.
+        // A file a chat links to is on the folder's host, as in the main window. A session's
+        // link picks it here when it is this folder's, else where a notification would (#3353).
         .environment(\.openURL, OpenURLAction { url in
+            if case .agent(let id) = AttentionLink.parse(url) {
+                if !model.showInFolderWindow(id) { model.showInMainWindow(id, opening: openWindow) }
+                return .handled
+            }
             guard let fileURL = ChatLinkURL.fileURL(from: url) else { return .systemAction }
             model.open(fileURL, on: summary.host)
             return .handled

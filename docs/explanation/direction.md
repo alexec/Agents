@@ -1,6 +1,6 @@
 ---
 diataxis: explanation
-description: What Agents is for, the three ways to run it, how one organisation's data is kept apart from another's, and where each kind of data lives and is backed up.
+description: What Agents is for, the principles for hosting, trust and data, the three ways to run it, how one organisation's data is kept apart from another's, and where each kind of data lives and is backed up.
 devices: [mac, iphone, ipad, server]
 ---
 
@@ -14,6 +14,38 @@ show in the same place.
 This page says where the product is going. It is the reference that milestones, specs and
 issues agree with. When one of them disagrees with this page, change one of the two in the
 same branch.
+
+## Principles
+
+Alex set these on 2026-11-03 (#3392, #3401, #3403). Every spec, plan and issue agrees with
+them. A change that cannot agree says why, and which principle it leaves out.
+
+1. **Nothing relies on the Mac.** The web page is a full client and has every feature. A
+   Mac is a client, and a machine for its own local folders. It owns nothing else: no
+   control plane that others need, and no relay.
+2. **Three shapes, one product.** Hosted at agentloops.dev is the default way in.
+   Self-hosted is for a customer who runs the control plane in their own cloud account or
+   data centre. A person on their own is a hosted account with one person, or runs a
+   control plane on their Mac as an option. Single-user use stays. Say "self-hosted", not
+   "on-prem"; use "on-premises" only as a search word beside it.
+3. **Everyone signs in. Nobody is anonymous.** A person signs in with Apple, Google or
+   GitHub. A team organisation is expected to use single sign-on (OIDC, and SAML later)
+   and SCIM. Single sign-on is free in every shape.
+4. **Anyone can sign up, and gets an organisation of their own.** Each organisation is
+   fully isolated from the others. The hosted service is free for now.
+5. **Customers bring their own compute, repositories, AI and policies.** They set them up
+   themselves. The operator of the hosted service cannot do it for them, or act for them.
+6. **The control plane holds nothing it could misuse.** It routes messages and keeps a
+   directory of people, clients and machines. It holds no customer AI key and no compute
+   credential, and it cannot act as a client on a customer's machine. The customer's
+   clients seal secrets to the customer's machines (#3401).
+7. **Keep nothing that can stay on the customer's systems.** Keep the minimum, use
+   pseudonymous ids instead of names where possible, and keep it for a short time. This
+   keeps us in line with laws such as GDPR, and keeps a data leak small.
+8. **Encrypt in transit and at rest, to the usual standard.** TLS 1.2 or later on every
+   connection. The provider's encryption at rest, and envelope encryption with a KMS for
+   what the service must keep. A customer's own key (BYOK) is the first enterprise option.
+   End-to-end encryption is a product choice, for later.
 
 ## From nothing to working
 
@@ -37,14 +69,15 @@ organisations it serves, changes.
 
 | Shape | Who runs the control plane | Organisations on it | For |
 |---|---|---|---|
-| **Single user** | Agents Host on your Mac | One, with one person | One developer at home |
-| **Self-hosted** | You, as a container on your own hosting | One | A team or a company that keeps everything in its own account |
-| **Hosted** | Us | Many, one per account | Anyone who wants to start in a browser |
+| **Hosted** (the default) | Us, at agentloops.dev | Many, one per account | Anyone who wants to start in a browser, alone or as a team |
+| **Self-hosted** (on-premises, or in your own cloud account) | You, as a container on your own hosting | One | A team or a company that keeps everything in its own account |
+| **Single user on a Mac** (an option) | Agents Host on your Mac | One, with one person | One developer who wants the control plane at home |
 
+- In every shape, the agents run on the customer's own machines. "Hosted" means that we run
+  the control plane, not the agents.
 - The control plane is free in every shape. Its source is visible like the rest, all rights reserved.
-- Hosted starts small (0.8): **one control plane per account**, each a separate copy with
-  its own store and key. That uses the single-organisation design as it is today. Many
-  organisations on one shared copy (T10, #1003) comes later, in 0.12.
+- Hosted gives **one control plane per account**, each with its own store and key, on one
+  service (`agents-hosted`, #1003).
 - A feature is built for all three shapes, or it says which shape it leaves out and why.
 
 ## Tenancy: what belongs to what
@@ -53,7 +86,8 @@ Every record and every folder belongs to one organisation and one person:
 
 ```text
 organisation           one control plane store prefix (hosted: one per account)
-└── person             signed in with Google, Apple or GitHub; keyed by (issuer, subject)
+└── person             signed in with Google, Apple, GitHub or the organisation's single
+    │                  sign-on; keyed by (issuer, subject)
     ├── client         a window, phone, iPad or browser; belongs to one person
     ├── machine        started by a machine provider, or registered; belongs to one person
     │                  (#1117)
@@ -99,6 +133,9 @@ The control plane adopts an id that it does not know, so a clone joins with noth
 - **Credentials:** a secret lives in the person's account on their machines, or, for an
   organisation credential (such as a Slack app or an org model key), on the control plane,
   sealed to each machine's key. A secret is never written to the store in clear text.
+  Today the control plane opens an organisation credential to seal it again for each
+  machine. Principle 6 removes that: the customer's client seals it, and the control plane
+  stores only what it cannot open (#3397).
 
 ## Where data lives
 

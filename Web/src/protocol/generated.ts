@@ -40,6 +40,7 @@ export const Failure = {
   folderGone: -32004,
   folderHasLiveAgents: -32013,
   folderInTheWay: -32025,
+  hostKeyToTrust: -32069,
   hostOffline: -32090,
   importedAgent: -32096,
   kept: -32067,
@@ -5098,13 +5099,18 @@ export interface MachineLastHeard {
   heardAt?: WireDate;
 }
 
-/** hosts/link. */
+/**
+ * hosts/link. A machine whose ssh host key the control plane has not trusted yet (one that joined
+ * with the command, #3379) is refused -32069 hostKeyToTrust, data {fingerprint}, until trust is
+ * that fingerprint: the key is then kept for the machine's ssh start.
+ */
 export interface MachineLink {
   host: MachineRef;
   provider: ProviderID;
   workspace: string;
   startWhenUsed?: boolean;
   stopWhenIdleMinutes?: number;
+  trust?: string;
 }
 
 /** hosts/setMachineOptions. stopWhenIdleMinutes 0 turns it off. */
@@ -10281,6 +10287,7 @@ export interface Methods {
   "hosts/link": { params: MachineLink; result: ControlMachine };
   "hosts/list": { params: Empty; result: ControlMachine[] };
   "hosts/listKept": { params: Empty; result: KeptList };
+  "hosts/remove": { params: MachineRequest; result: Empty };
   "hosts/retryKept": { params: KeptRequestID; result: Empty };
   "hosts/setMachineOptions": { params: MachineOptions; result: ControlMachine };
   "hosts/start": { params: MachineRequest; result: ControlMachine };
@@ -10611,6 +10618,7 @@ export const MethodTarget = {
   "hosts/link": "control",
   "hosts/list": "control",
   "hosts/listKept": "control",
+  "hosts/remove": "control",
   "hosts/retryKept": "control",
   "hosts/setMachineOptions": "control",
   "hosts/start": "control",
@@ -11287,7 +11295,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineJoinStatus: { required: ["member", "connected", "at"], optional: ["problem"] },
   MachineJoinTicket: { required: ["request", "code", "expires"], optional: [] },
   MachineLastHeard: { required: ["host"], optional: ["folders", "agents", "heardAt"] },
-  MachineLink: { required: ["host", "provider", "workspace"], optional: ["startWhenUsed", "stopWhenIdleMinutes"] },
+  MachineLink: { required: ["host", "provider", "workspace"], optional: ["startWhenUsed", "stopWhenIdleMinutes", "trust"] },
   MachineOptions: { required: ["host"], optional: ["startWhenUsed", "stopWhenIdleMinutes", "startForSchedules"] },
   MachinePolicy: { required: [], optional: ["policy", "signature", "none"] },
   MachineProjects: { required: ["projects"], optional: [] },

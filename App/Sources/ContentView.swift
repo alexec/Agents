@@ -317,8 +317,13 @@ struct ContentView: View {
         // the system's link blue rather than the app's accent (#156).
         .tint(Paper.accent)
         // A file a chat links to is on its host: that host opens it (058, US1). Links to
-        // the web are the window's own.
+        // the web are the window's own. A session's link, as the daily summary writes one
+        // per line, selects that session (#3353).
         .environment(\.openURL, OpenURLAction { url in
+            if case .agent(let id) = AttentionLink.parse(url) {
+                model.openAgent(id)
+                return .handled
+            }
             guard let fileURL = ChatLinkURL.fileURL(from: url) else { return .systemAction }
             model.open(fileURL, on: model.selectedFolderHost)
             return .handled

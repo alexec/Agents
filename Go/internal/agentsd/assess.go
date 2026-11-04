@@ -93,6 +93,7 @@ var appToolMethods = map[string]string{
 	"bring_back":          "branches/bringBack",
 	"drive_screen":        "screen/drive",
 	"write_daily_summary": "summaries/write",
+	"check_folders":       "folders/check",
 	"docs_search":         "docs/search",
 	"docs_read":           "docs/read",
 }

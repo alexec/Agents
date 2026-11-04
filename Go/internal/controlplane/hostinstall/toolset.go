@@ -146,13 +146,24 @@ func loadToolset(folder string) (toolset, error) {
 
 // loadToolsets is Toolset.loadAll, for the runtimes named: every Node toolset under
 // folder whose manifest names one of them, in the order named. A folder that cannot be
-// read is skipped.
-func loadToolsets(folder string, runtimes []string) []toolset {
+// read is skipped, but not without a word (#3383): missing says, for each runtime named
+// that has no toolset, why, with the error of the folder named after it when there is one.
+func loadToolsets(folder string, runtimes []string) (all []toolset, missing []string) {
 	if folder == "" {
-		return nil
+		for _, r := range runtimes {
+			missing = append(missing, r+": no toolsets folder")
+		}
+		return nil, missing
 	}
-	entries, _ := os.ReadDir(folder)
+	entries, err := os.ReadDir(folder)
+	if err != nil {
+		for _, r := range runtimes {
+			missing = append(missing, r+": "+err.Error())
+		}
+		return nil, missing
+	}
 	byRuntime := map[string]toolset{}
+	failed := map[string]error{}
 	names := make([]string, 0, len(entries))
 	for _, e := range entries {
 		names = append(names, e.Name())
@@ -161,15 +172,21 @@ func loadToolsets(folder string, runtimes []string) []toolset {
 	for _, name := range names {
 		if t, err := loadToolset(filepath.Join(folder, name)); err == nil {
 			byRuntime[t.manifest.RuntimeID] = t
+		} else {
+			failed[name] = err
 		}
 	}
-	var all []toolset
 	for _, r := range runtimes {
-		if t, ok := byRuntime[r]; ok {
+		switch t, ok := byRuntime[r]; {
+		case ok:
 			all = append(all, t)
+		case failed[r] != nil:
+			missing = append(missing, r+": "+failed[r].Error())
+		default:
+			missing = append(missing, r+": no toolset in "+folder)
 		}
 	}
-	return all
+	return all, missing
 }
 
 // canInstallToolsets is ServerFacts.canInstallToolsets: Node's official Linux builds need

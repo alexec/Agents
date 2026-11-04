@@ -37,7 +37,7 @@ services:
         VERSION: ${AGENTS_VERSION:-dev}
     image: ghcr.io/alexec/agents-control:${AGENTS_VERSION:-latest}
     restart: unless-stopped
-    entrypoint: ["/agents-hosted"]
+    entrypoint: ["/sbin/tini", "--", "/agents-hosted"]
     command: ["serve"]
     environment:
       # Every account's records, each under accounts/<id>/: a folder in the data volume, or a

@@ -2293,6 +2293,17 @@ export class Store extends Work {
     }
   }
 
+  /** Remove… on a machine (#3381): it stops connecting, and its agents are left running where they are. */
+  async removeHost(host: string): Promise<void> {
+    try {
+      await this.link.call("hosts/remove", { host: host as MachineRef });
+      this.takeHosts(this.hosts.value.filter((h) => h.id !== host));
+      this.forgetHost(host);
+    } catch (error) {
+      this.say(describe(error));
+    }
+  }
+
   /** × on a kept prompt: it isn't sent, and the workspace keeps starting (US3 AS3). */
   async dropKept(kept: KeptRequest): Promise<void> {
     this.kept.value = this.kept.value.filter((k) => k.id !== kept.id);
