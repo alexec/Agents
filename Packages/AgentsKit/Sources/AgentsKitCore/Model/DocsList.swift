@@ -65,6 +65,13 @@ public enum DocsList {
         public var heading: String
         /// The project its folder is in: a connector's is the project of the folder whose mcp.json adds it.
         public var project: Project?
+        /// Every folder in it, by machine: a project's folders on each machine, the first one's first.
+        public var members: [Member] = []
+
+        public struct Member: Hashable, Sendable {
+            public var host: MachineRef
+            public var id: String
+        }
 
         public var id: String { key }
     }
@@ -100,21 +107,24 @@ public enum DocsList {
     }
 
     /// Every machine's sources, the folders first and then the connectors, each once. A project's
-    /// folder is said by the project's name, with no machine: its clones are one source, the first
-    /// machine's.
+    /// folders are one source, said by the project's name with no machine, on every machine (#3408).
     public static func sources(_ lists: [HostDocs], projectOf: ProjectOf = { _, _ in nil }) -> [SourceRow] {
         let several = lists.count > 1
-        var seen = Set<String>()
         var out: [SourceRow] = []
         for kind in [DaemonAPI.DocsSource.Kind.folder, .connector] {
             for list in lists {
                 for source in list.sources where source.kind == kind {
                     let project = projectOf(list.host, source.folder ?? (kind == .folder ? source.id : nil))
                     let key = sourceKey(host: list.host, source, project: project)
-                    guard seen.insert(key).inserted else { continue }
+                    let member = SourceRow.Member(host: list.host, id: source.id)
+                    if let kept = out.firstIndex(where: { $0.key == key }) {
+                        if kind == .folder { out[kept].members.append(member) }
+                        continue
+                    }
                     let heading = kind == .connector ? source.name
                         : project?.name ?? (several ? "\(source.name) (\(list.name))" : source.name)
-                    out.append(SourceRow(key: key, host: list.host, source: source, heading: heading, project: project))
+                    out.append(SourceRow(key: key, host: list.host, source: source, heading: heading, project: project,
+                                         members: [member]))
                 }
             }
         }
@@ -129,14 +139,17 @@ public enum DocsList {
     }
 
     /// The sources and their docs, sorted, with the one source asked for or all of them, in the one
-    /// project asked for or in every one. A project's docs are its first clone's.
+    /// project asked for or in every one. A project's docs are those of all its folders, each ref
+    /// once: a doc in two clones is the first clone's.
     public static func groups(_ lists: [HostDocs], sort: Sort, only: String = "", projectOf: ProjectOf = { _, _ in nil },
                               project: String = "") -> [Group] {
         sources(lists, projectOf: projectOf)
             .filter { (only.isEmpty || $0.key == only) && (project.isEmpty || $0.project?.id == project) }.map { row in
             var seen = Set<String>()
-            let docs = lists.filter { row.source.kind == .connector || $0.host == row.host }
-                .flatMap { $0.docs.filter { $0.source == row.source.id } }
+            let docs = row.members.flatMap { member in
+                lists.filter { row.source.kind == .connector || $0.host == member.host }
+                    .flatMap { $0.docs.filter { $0.source == member.id } }
+            }
                 .filter { seen.insert($0.ref).inserted }
             return Group(row: row, shelves: shelves(docs, sort: sort, byFolder: row.source.kind == .folder))
         }
@@ -244,12 +257,18 @@ public enum DocsList {
         }.map(\.element)
     }
 
-    /// The results whose doc is in a source the list shows (#3408): a project's other clones, and a
-    /// project not asked for, are left out, as the list leaves them out.
+    /// The results whose doc is in a source the list shows (#3408): a project not asked for is left out.
     public static func results(_ results: [Result], in rows: [SourceRow]) -> [Result] {
         results.filter { r in
-            rows.contains { $0.source.id == r.result.doc.source && ($0.source.kind == .connector || $0.host == r.host) }
+            rows.contains { row in
+                row.members.contains { $0.id == r.result.doc.source && (row.source.kind == .connector || $0.host == r.host) }
+            }
         }
+    }
+
+    /// The source ids to search on a machine, for one source: its folders there, or the connector.
+    public static func searchSources(_ row: SourceRow, on host: MachineRef) -> [String] {
+        row.source.kind == .connector ? [row.source.id] : row.members.filter { $0.host == host }.map(\.id)
     }
 
     /// The Mac window's address of a doc (spec 3319).

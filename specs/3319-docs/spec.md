@@ -23,8 +23,8 @@ A doc comes from one source. The list groups the docs by source.
   which starts the `map-a-docs-server` skill.
 - Each machine reads its own folders and connectors. The clients merge the machines, as
   Work does. One connector on two machines is one source: the client keeps the first.
-- A project's folders are one source, said by the project's name, also when the project is
-  cloned on several machines: the client keeps the first clone (#3408). A **Project** filter
+- A project's folders are one source, said by the project's name, on every machine, with
+  each doc once: a doc in two clones is the first clone's (#3408). A **Project** filter
   is beside Source, with **All projects** first. A docs connector goes under the project of the
   folder whose mcp.json adds it.
 

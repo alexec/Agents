@@ -77,13 +77,14 @@ final class DocsListState {
         // The typing rests first; a newer search cancels this one.
         try? await Task.sleep(for: .milliseconds(250))
         guard !Task.isCancelled else { return }
-        // One source is asked of the machine the list keeps it on; a connector of every machine.
+        // One source is asked of each machine that has a folder of it; a connector of every machine.
         let rows = rows(model: model)
         let row = rows.first { $0.key == only }
-        let sources = row.map { [$0.source.id] }
         let shown = rows.filter { (only.isEmpty || $0.key == only) && (inProject.isEmpty || $0.project?.id == inProject) }
         var got: [(host: MachineRef, results: [DaemonAPI.DocsSearchResult])] = []
-        for machine in model.docsMachines where row?.source.kind != .folder || row?.host == machine.id {
+        for machine in model.docsMachines {
+            let sources = row.map { DocsList.searchSources($0, on: machine.id) }
+            if sources?.isEmpty == true { continue }
             let found = try? await model.docs(DaemonAPI.Method.docsSearch,
                                               DaemonAPI.DocsSearchRequest(query: words, sources: sources, limit: 50),
                                               returning: DaemonAPI.DocsSearch.self, on: machine.id)

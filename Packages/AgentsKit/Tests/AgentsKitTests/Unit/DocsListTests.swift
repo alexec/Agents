@@ -70,6 +70,7 @@ struct DocsListTests {
             (host == .mac && folder == Self.agents.id) || (host == studio && folder == clone.id) ? app : nil
         }
         let rows = DocsList.sources([Self.mac, other], projectOf: projectOf)
+        try #require(rows.count == 4)
         #expect(rows.map(\.key) == ["project:p1", "studio|/home/a/notes", "mcp:confluence", "mcp:notion"])
         #expect(rows.map(\.heading) == ["Agents app", "notes (Studio)", "confluence", "notion"])
         #expect(rows.first?.host == .mac)
@@ -78,7 +79,11 @@ struct DocsListTests {
         #expect(DocsList.projects(rows) == [app])
         let one = DocsList.groups([Self.mac, other], sort: .updated, projectOf: projectOf, project: "p1")
         #expect(one.map(\.row.key) == ["project:p1", "mcp:confluence", "mcp:notion"])
+        // The clone's README is the same ref as the Mac's, so it is there once, the Mac's.
         #expect(try #require(one.first).shelves.flatMap(\.docs).count == 4)
+        #expect(rows[0].members.map(\.host) == [.mac, studio])
+        #expect(DocsList.searchSources(rows[0], on: studio) == [clone.id])
+        #expect(DocsList.searchSources(rows[2], on: studio) == ["mcp:confluence"])
     }
 
     @Test func aProjectWithOneFolderLooksAsTheFolderDoes() {
@@ -96,8 +101,8 @@ struct DocsListTests {
             .init(host: host, result: .init(doc: Doc(ref: ref, title: ref, source: source), matches: []))
         }
         let kept = DocsList.results([found(.mac, Self.agents.id, "a"), found(studio, clone.id, "b"),
-                                     found(studio, "mcp:confluence", "c")], in: rows)
-        #expect(kept.map(\.result.doc.ref) == ["a", "c"])
+                                     found(studio, "/home/a/notes", "n"), found(studio, "mcp:confluence", "c")], in: rows)
+        #expect(kept.map(\.result.doc.ref) == ["a", "b", "c"])
     }
 
     @Test func aRowSaysThePathOfAFolderDocAndTheTitleOfAConnectorDoc() {

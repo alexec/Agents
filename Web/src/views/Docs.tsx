@@ -13,7 +13,7 @@ import { fileURL } from "../model/completions";
 import { folderKey } from "../model/groups";
 import {
   docStartHelp, docStartLabels, docStartPrompt, docStarts, docStartTitle, docsGroups, docsProjects, docsSortTitle, isFolderDoc,
-  linkedRefs, mapItPrompt, mergeResults, mergeSources, noDocs, noDocsHere, noResults, relatedDocs, resultsIn, searchWords,
+  linkedRefs, mapItPrompt, mergeResults, mergeSources, noDocs, noDocsHere, noResults, relatedDocs, resultsIn, searchSources, searchWords,
   shortForm, sourceProblem, titleBeside, underShelf, updatedWords, vendorName, windowAddress, type DocStart, type DocsSort,
   type HostDocs, type ProjectOf,
 } from "../model/docs";
@@ -95,12 +95,12 @@ export function DocsList({ store }: { store: Store }) {
     let current = true;
     searching.value = true;
     const timer = setTimeout(() => {
-      // One source is asked of the machine the list keeps it on; a connector of every machine.
+      // One source is asked of each machine that has a folder of it; a connector of every machine.
       const row = rows.find((r) => r.key === only.value);
-      const sources = row ? [row.source.id] : undefined;
-      const asking = row && row.source.kind === "folder" ? hosts.filter((h) => h.id === row.host) : hosts;
+      const asking = row ? hosts.filter((h) => searchSources(row, h.id).length > 0) : hosts;
       void Promise.all(asking.map(async (h) => {
         try {
+          const sources = row ? searchSources(row, h.id) : undefined;
           const got = await store.link.call("docs/search", { query: words, limit: 50, ...sources ? { sources } : {} }, h.id);
           return { host: h.id, results: got.results };
         } catch {
