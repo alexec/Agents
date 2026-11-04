@@ -216,10 +216,11 @@ open for item 2 and for the notes' known issues (`git merge-base --is-ancestor <
 
 1. **CI is green on it:** `gh run list --branch main --commit <sha> --json name,conclusion`
    shows every run `success` (or `skipped`). If one is still running, wait for it: a push
-   to `main` is never a pull request, so `checks.failed` (a PR's own runs) never fires for
-   it, and nothing wakes on a pass either. Wait instead with `wait_for_event` (`pr.merged`,
-   `until_minutes: 10`), since a PR landing is what would cancel this run by moving main
-   past `<sha>`, then look again however it woke (run `--after` as above if it did move).
+   to `main` is never a pull request, so `checks.failed` and `checks.passed` (a PR's own
+   runs) never fire for it. Wait instead with `wait_for_event` on the `github` server's
+   `run.completed` (`where: {"branch": "main"}`, #3444) and `pr.merged`, `until_minutes: 10`,
+   since a PR landing is what would cancel this run by moving main past `<sha>`, then look
+   again however it woke (run `--after` as above if it did move).
    A newer push never cancels a running run on `main` (#2218), but it replaces a pending
    one: when the pin's CI was replaced and never ran, start over on the newest main. If a
    run on `<sha>` failed, end with `partly_done`; main broken is fixed by its own PR,
@@ -233,10 +234,13 @@ open for item 2 and for the notes' known issues (`git merge-base --is-ancestor <
 5. **The archives build on a cold cache** (#2780): `gh workflow run release-dry-run.yml -f
    ref=<sha>`, then find its run (`gh run list --workflow release-dry-run.yml --json
    databaseId,displayTitle,status --jq '.[] | select(.displayTitle == "release dry run <sha>")'`)
-   and look again until it is `completed` (it takes up to an hour). It runs by
-   `workflow_dispatch`, not a pull request, so no event here wakes on it ending, in success
-   or failure: `check_again` (`in_minutes: 10`) and look again (run `--after` as above if main
-   moved meanwhile; with `keep the pin`, the same run goes on). It runs release.yml's `mac` and `testflight` archives as dry runs on a
+   and wait until it is `completed` (it takes up to an hour). It runs by
+   `workflow_dispatch`, not a pull request, so `checks.*` never fire for it: wait with
+   `wait_for_event` on the `github` server's `run.completed`, `where: {"run": <id>}`
+   (#3444), with `pr.merged` beside it and `until_minutes: 20` as a back-stop. The event's
+   `run.conclusion` is the result. However it woke, look again (run `--after` as above if
+   main moved meanwhile; with `keep the pin`, the same run goes on). Never wait on a
+   background shell or a timer alone: a background shell ends with the session's process. It runs release.yml's `mac` and `testflight` archives as dry runs on a
    runner with an empty build cache, which no lane or merge wave does (#2773 spent
    v0.12.0's tag). A run of it on a pull request does not count: run it on `<sha>`. If it
    failed, end with `partly_done`, naming the job and its first error; the fix goes through
@@ -284,9 +288,12 @@ A tag that already exists for this version means another release ran: end with
 
 ## 8. Check
 
-1. Wait for the release run: `gh run list --workflow release.yml --branch v<version>`;
-   `gh run watch <id> --exit-status` (run it in the background, then wait with
-   `wait_for_event` and `until_minutes: 30`, and look again).
+1. Wait for the release run: find it with `gh run list --workflow release.yml --branch
+   v<version>`, then wait with `wait_for_event` on the `github` server's `run.completed`,
+   `where: {"workflow": "release.yml", "branch": "v<version>"}` (#3444), `until_minutes: 30`
+   as a back-stop. The event's `run.conclusion` is the result; however it woke, look again
+   with `gh run view <id> --json status,conclusion,jobs`. Never wait on a background
+   `gh run watch`: it ends with the session's process, and nothing wakes the release.
 2. **GitHub:** `gh release view v<version> --json assets` has the `.dmg`, the `.zip`,
    both `agentsd-linux-*.tar.gz` and `SHA256SUMS`. Macs update Agents Host from the `.zip`
    and `SHA256SUMS` by these names (#2178): a release without them updates no Mac.

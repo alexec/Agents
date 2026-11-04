@@ -741,9 +741,39 @@ final class AppModel {
     static let newSessionFolderDefault = "newSessionFolder"
 
     private func rememberNewSessionFolder(_ key: FolderKey) {
+        rememberProjectFolder(key)
         guard rememberedNewSessionFolder != key else { return }
         rememberedNewSessionFolder = key
         WindowDefaults.store.set(key.stored, forKey: Self.newSessionFolderDefault)
+    }
+
+    /// New Session's projects (#3279): the live folders in the sidebar's order, as
+    /// projects. A project with one folder is that folder, as before.
+    var newSessionProjects: [NewSessionProject.Choice] {
+        NewSessionProject.choices(SidebarOrder.folders(liveFolders, servers: hosts.servers))
+    }
+
+    /// A new session in the project: in its folder on this Mac when it has one, else in
+    /// the one last used in it (#3279).
+    func showProject(_ choice: NewSessionProject.Choice) {
+        let remembered = rememberedProjectFolders[choice.id].flatMap(FolderKey.init(stored:))
+        guard let key = NewSessionProject.folder(in: choice, isHere: { $0 == .mac || self.isOnThisMac($0) },
+                                                 remembered: remembered) else { return }
+        showFolder(key)
+    }
+
+    /// The folder last used in each project, by the project's id (#3279).
+    private var rememberedProjectFolders: [String: String] =
+        WindowDefaults.store.dictionary(forKey: AppModel.newSessionProjectFoldersDefault) as? [String: String] ?? [:]
+
+    static let newSessionProjectFoldersDefault = "newSessionProjectFolders"
+
+    private func rememberProjectFolder(_ key: FolderKey) {
+        guard let summary = liveFolders.first(where: { $0.key == key }) else { return }
+        let id = NewSessionProject.id(of: summary)
+        guard rememberedProjectFolders[id] != key.stored else { return }
+        rememberedProjectFolders[id] = key.stored
+        WindowDefaults.store.set(rememberedProjectFolders, forKey: Self.newSessionProjectFoldersDefault)
     }
 
     /// A new session in the selected folder: the empty chat with its prompt, where a

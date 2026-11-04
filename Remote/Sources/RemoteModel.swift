@@ -656,9 +656,39 @@ final class RemoteModel {
 
     /// Every way into a folder's New session calls this, and a start in it (#2160).
     func rememberNewSessionFolder(_ key: FolderKey) {
+        rememberProjectFolder(key)
         guard rememberedNewSessionFolder != key else { return }
         rememberedNewSessionFolder = key
         UserDefaults.standard.set(key.stored, forKey: Self.newSessionFolderDefault)
+    }
+
+    /// New Session's projects (#3279): the live folders in the sidebar's order, as
+    /// projects. A project with one folder is that folder, as before.
+    var newSessionProjects: [NewSessionProject.Choice] {
+        let servers = hostSections.map(\.id).filter { $0 != .mac }
+        return NewSessionProject.choices(SidebarOrder.folders(folders, servers: servers))
+    }
+
+    /// A new session in the project, in the folder last used in it (#3279): the Remote is
+    /// no machine of the project's, so "this machine" is the one last used.
+    func showProject(_ choice: NewSessionProject.Choice) {
+        let remembered = rememberedProjectFolders[choice.id].flatMap(FolderKey.init(stored:))
+        guard let key = NewSessionProject.folder(in: choice, isHere: { _ in false }, remembered: remembered) else { return }
+        sidebarItem = .folder(key)
+    }
+
+    /// The folder last used in each project, by the project's id (#3279).
+    private var rememberedProjectFolders: [String: String] =
+        UserDefaults.standard.dictionary(forKey: RemoteModel.newSessionProjectFoldersDefault) as? [String: String] ?? [:]
+
+    static let newSessionProjectFoldersDefault = "newSessionProjectFolders"
+
+    private func rememberProjectFolder(_ key: FolderKey) {
+        guard let summary = work.folder(key) else { return }
+        let id = NewSessionProject.id(of: summary)
+        guard rememberedProjectFolders[id] != key.stored else { return }
+        rememberedProjectFolders[id] = key.stored
+        UserDefaults.standard.set(rememberedProjectFolders, forKey: Self.newSessionProjectFoldersDefault)
     }
     var selectedAgent: Agent? { work.agent(selection) }
     var entries: [TranscriptEntry] { work.entries }

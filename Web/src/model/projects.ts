@@ -100,3 +100,57 @@ export function removeRefusal(project: Project): string | null {
 export function removeQuestion(project: Project): string {
   return `Remove the project ${project.name}? A folder that names it later brings it back.`;
 }
+
+/**
+ * New Session's projects (#3279), the rule of NewSessionProject in Packages/AgentsKit, the same
+ * on the Mac and the Remote: the folders in the sidebar's order, as projects. A folder that names
+ * no project is a project of its own, and a project is named by its first folder, so a project
+ * with one folder looks as that folder does today.
+ */
+export interface NewSessionProject<T> { id: string; name: string; folders: T[] }
+
+export function newSessionProjectID(host: string, folder: { folder: { folder: string }; project?: string }): string {
+  return folder.project ? folder.project : `folder:${host}|${folder.folder.folder}`;
+}
+
+export function newSessionProjects<T extends { host: { id: string }; folder: { name: string; project?: string; folder: { folder: string } } }>(
+  ordered: readonly T[]): NewSessionProject<T>[] {
+  const projects = new Map<string, NewSessionProject<T>>();
+  for (const row of ordered) {
+    const id = newSessionProjectID(row.host.id, row.folder);
+    const project = projects.get(id);
+    if (project) project.folders.push(row);
+    else projects.set(id, { id, name: row.folder.name, folders: [row] });
+  }
+  return [...projects.values()];
+}
+
+/**
+ * The folder a picked project starts in: the one last used in it, else the first. The web page is
+ * no machine of the project's, so "this machine" is the machine last used (#3273).
+ */
+export function projectFolder<T>(project: NewSessionProject<T>, remembered: ((row: T) => boolean) | undefined): T | undefined {
+  return (remembered && project.folders.find(remembered)) ?? project.folders[0];
+}
+
+const projectFoldersKey = "agents.newSession.projectFolders";
+
+/** The folder last used in each project (`host|folder`), kept in localStorage as the window keeps it in defaults. */
+export function rememberedProjectFolders(storage: Storage | undefined): Record<string, string> {
+  try {
+    const stored = JSON.parse(storage?.getItem(projectFoldersKey) ?? "null");
+    return stored && typeof stored === "object" ? stored as Record<string, string> : {};
+  } catch {
+    return {};
+  }
+}
+
+export function rememberProjectFolder(storage: Storage | undefined, project: string, folder: string): void {
+  try {
+    const kept = rememberedProjectFolders(storage);
+    if (kept[project] === folder) return;
+    storage?.setItem(projectFoldersKey, JSON.stringify({ ...kept, [project]: folder }));
+  } catch {
+    // A private window may refuse to store; the first folder stands in.
+  }
+}

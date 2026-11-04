@@ -50,3 +50,19 @@ test("projects: Remove is off with folders in it, or for one not yours", () => {
   assert.match(p.removeRefusal({ ...projects[0], folders: [{ machine: "m", folder: "file:///a", name: "a" }] }), /Move its folders/);
   assert.match(p.removeRefusal({ ...projects[0], mayChange: false }), /owner or an admin/);
 });
+
+// New Session picks the project, then the machine (#3279), as NewSessionProject in AgentsKit.
+test("projects: New Session's projects are the folders by project, in the sidebar's order", () => {
+  const row = (host, path, project) => ({ host: { id: host }, folder: { name: path.split("/").pop(), project, folder: { folder: `file://${path}` } } });
+  const mac = row("mac", "/src/Agents", "p1");
+  const www = row("mac", "/src/www", undefined);
+  const clone = row("devbox", "/home/alex/Agents", "p1");
+  const other = row("devbox", "/src/www", undefined);
+  const choices = p.newSessionProjects([mac, www, clone, other]);
+  assert.deepEqual(choices.map((c) => c.name), ["Agents", "www", "www"]);
+  assert.deepEqual(choices[0].folders, [mac, clone]);
+  assert.equal(choices[1].folders.length, 1);
+  // The one last used in the project, else the first.
+  assert.equal(p.projectFolder(choices[0], (r) => r === clone), clone);
+  assert.equal(p.projectFolder(choices[0], undefined), mac);
+});

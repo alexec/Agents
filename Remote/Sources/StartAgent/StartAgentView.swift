@@ -99,6 +99,8 @@ struct StartAgentView: View {
                     .frame(maxWidth: .infinity)
                     .listRowBackground(Color.clear)
             }
+            // Project, then On (#3279): not in a folder's own scene, which is the folder.
+            if sceneFolder == nil { ProjectRows(folder: folder) }
             personaHeading
             // Starts kept for this folder's stopped workspace (#691 US3, layouts.md L6a): the
             // agent each makes opens once the host is up.
