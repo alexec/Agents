@@ -24,7 +24,7 @@ struct DailySummarySettingsSection: View {
                 if let problem {
                     Text(problem).tinted(.failure)
                 }
-                Text(DailySummaryControls.footer)
+                Text(DailySummaryControls.footer(for: model.dailySummarySettings?.mode ?? .off))
             }
             .appText(.fine)
             .foregroundStyle(.secondary)

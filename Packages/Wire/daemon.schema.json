@@ -6134,10 +6134,11 @@
     },
     "DailySummaryMode": {
       "type": "string",
-      "description": "How much the daily summary does (#3351): off, or the summary only. Summary and checks comes with the checks (#3192).",
+      "description": "How much the daily summary does (#3351, #3395): off, the summary only, or the summary and the read-only checks between summaries (the home folder's Daily checks workflow).",
       "enum": [
         "off",
-        "summary"
+        "summary",
+        "summaryAndChecks"
       ]
     },
     "DailySummarySettings": {
@@ -6150,6 +6151,10 @@
         "at": {
           "type": "string",
           "description": "The time it runs, HH:MM in this machine's time zone, on the hour or the half hour. 08:00 by default."
+        },
+        "checksEvery": {
+          "type": "integer",
+          "description": "With summaryAndChecks, how many hours apart the checks run, counted from the summary's time and never at it (#3395): 2, 3, 4, 6, 8 or 12. 4 by default."
         }
       },
       "required": [

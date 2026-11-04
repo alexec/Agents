@@ -461,8 +461,10 @@ or while you are away. Archive is for one you are putting away.
 It is off until you turn it on. **Settings ▸ Agent Configuration ▸ Workflows** has one control
 for it, for all folders, on the Mac, the iPhone and iPad, and the web page (#3351):
 
-- **Daily summary:** **Off** or **Summary only**.
+- **Daily summary:** **Off**, **Summary only** or **Summary and checks** (#3395).
 - **Time:** when it runs, on the hour or the half hour. It is 08:00 by default.
+- **Checks:** with **Summary and checks**, how often the [daily checks](#the-daily-checks)
+  run: every 2, 3, 4, 6, 8 or 12 hours. It is every 4 hours by default.
 
 The control changes the workflow file itself: `enabled:`, and the schedule's `at:` and
 `between:`. A change to the file by hand shows in the control. It runs on weekdays. To change
@@ -492,8 +494,9 @@ the days, edit the schedule's `days:`.
 ### The daily checks
 
 **Daily checks** is the daily summary's other ready-made workflow (#3355), in
-`~/.agents/workflows/daily-checks.md`. It is off until you turn it on. Between summaries, at
-00:00, 04:00, 12:00, 16:00 and 20:00, its agent looks at the folders on that machine that had
+`~/.agents/workflows/daily-checks.md`. It is off until you turn it on. Between summaries, by
+default every 4 hours from the summary's time (00:00, 04:00, 12:00, 16:00 and 20:00 for an
+08:00 summary), its agent looks at the folders on that machine that had
 no work since the last check. It only reads: it never pushes, comments, sends a message or
 starts a session.
 
@@ -507,8 +510,10 @@ starts a session.
   it, in `~/.agents/checks/suggestions.json` (the newest 50, for a week). The next daily
   summary lists them under **Suggested next**. An urgent one, such as a broken default
   branch, sends a notice at once.
-- **Off** in the daily summary's control turns the checks off too. Until the control has
-  **Summary and checks**, turn them on in the workflow's page or with `enabled: true`.
+- **Summary and checks** in the daily summary's control turns them on (#3395). The control
+  writes the workflow's `on:` list again: one schedule every few hours from the summary's
+  time, never at it. A new time or a new interval moves them. **Off** and **Summary only**
+  turn the checks off.
 
 ## See also
 

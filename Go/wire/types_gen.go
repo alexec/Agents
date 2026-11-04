@@ -2914,11 +2914,12 @@ type DaemonStatus struct {
 	AgentsLive int64 `json:"agentsLive"`
 }
 
-// How much the daily summary does (#3351): off, or the summary only. Summary and checks comes with the checks (#3192).
+// How much the daily summary does (#3351, #3395): off, the summary only, or the summary and the read-only checks between summaries (the home folder's Daily checks workflow).
 type DailySummaryMode string
 
 const DailySummaryModeOff DailySummaryMode = "off"
 const DailySummaryModeSummary DailySummaryMode = "summary"
+const DailySummaryModeSummaryAndChecks DailySummaryMode = "summaryAndChecks"
 
 // The daily summary's one control, for all folders (#3351). It is the home folder's ready-made Daily summary workflow: the mode turns it on or off, and the time is its schedule's. The days stay as the workflow says (weekdays by default).
 type DailySummarySettings struct {
@@ -2926,6 +2927,9 @@ type DailySummarySettings struct {
 
 	// The time it runs, HH:MM in this machine's time zone, on the hour or the half hour. 08:00 by default.
 	At string `json:"at"`
+
+	// With summaryAndChecks, how many hours apart the checks run, counted from the summary's time and never at it (#3395): 2, 3, 4, 6, 8 or 12. 4 by default.
+	ChecksEvery *int64 `json:"checksEvery,omitzero"`
 }
 
 type DayRecap struct {

@@ -5,7 +5,16 @@ import type { DailySummaryMode } from "../protocol/generated";
 export const dailySummaryModes: { mode: DailySummaryMode; label: string }[] = [
   { mode: "off", label: "Off" },
   { mode: "summary", label: "Summary only" },
+  { mode: "summaryAndChecks", label: "Summary and checks" },
 ];
+
+/** How often the checks can run, in hours: each divides the day evenly (#3395). */
+export const checksEveryChoices = [2, 3, 4, 6, 8, 12];
+
+/** How often, as a person reads it, such as "Every 4 hours". */
+export function checksEveryLabel(hours: number): string {
+  return `Every ${hours} hours`;
+}
 
 /** Every half hour of the day, as HH:MM: the times the daily summary can run at. */
 export const dailySummaryTimes = Array.from({ length: 48 }, (_, i) =>
@@ -26,3 +35,7 @@ export function dailySummaryTimeLabel(at: string): string {
 export const dailySummaryHint = "Once a day, an agent writes one short page from every folder: what landed, "
   + "what failed or stopped, what waits on you and what the agents suggest next. "
   + "It runs on weekdays, on the Auto runtime, and only reads.";
+
+export const checksHint = "Between summaries, an agent checks the folders that had no work: "
+  + "failing CI, pull requests that went stale or are in conflict, and issues no session has. "
+  + "The next summary lists what it finds. It only reads.";

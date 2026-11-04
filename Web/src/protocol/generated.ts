@@ -2503,12 +2503,13 @@ export interface DaemonStatus {
 }
 
 /**
- * How much the daily summary does (#3351): off, or the summary only. Summary and checks comes with
- * the checks (#3192).
+ * How much the daily summary does (#3351, #3395): off, the summary only, or the summary and the
+ * read-only checks between summaries (the home folder's Daily checks workflow).
  */
 export type DailySummaryMode =
   | "off"
-  | "summary";
+  | "summary"
+  | "summaryAndChecks";
 
 /**
  * The daily summary's one control, for all folders (#3351). It is the home folder's ready-made
@@ -2522,6 +2523,11 @@ export interface DailySummarySettings {
    * default.
    */
   at: string;
+  /**
+   * With summaryAndChecks, how many hours apart the checks run, counted from the summary's time and
+   * never at it (#3395): 2, 3, 4, 6, 8 or 12. 4 by default.
+   */
+  checksEvery?: number;
 }
 
 export interface DayRecap {
@@ -11174,7 +11180,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   CostState: { required: ["limits", "today", "day", "tokensToday"], optional: ["note", "organisation", "setBy"] },
   CredentialsOffer: { required: ["runtimes", "ownSignInOnly"], optional: ["notRelayed", "signIns"] },
   DaemonStatus: { required: ["turnsInFlight", "agentsLive"], optional: [] },
-  DailySummarySettings: { required: ["mode", "at"], optional: [] },
+  DailySummarySettings: { required: ["mode", "at"], optional: ["checksEvery"] },
   DayRecap: { required: ["agents", "peakAgents", "longestClear"], optional: ["prsMerged"] },
   DeclareResourceRequest: { required: ["resource"], optional: ["replacing"] },
   DeclaredResource: { required: ["name", "displayName", "description", "holders"], optional: ["defaultMinutes", "maximumMinutes"] },

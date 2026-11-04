@@ -2,6 +2,7 @@ package agentsd
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -139,6 +140,58 @@ func TestDailySummaryOffTurnsChecksOff(t *testing.T) {
 	}
 	if _, err := d.setDailySummarySettings(wire.DailySummarySettings{Mode: wire.DailySummaryModeOff, At: "08:00"}); err != nil {
 		t.Fatal(err)
+	}
+	if w, err := d.oneWorkflow(home, dailyChecksID); err != nil || w.IsEnabled {
+		t.Fatalf("%+v, %v", w, err)
+	}
+}
+
+// #3395: Summary and checks turns the Daily checks on every few hours from the summary's time,
+// never at it; a new time or interval moves them, and Summary only turns them off.
+func TestSummaryAndChecksSchedulesTheChecks(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	home := t.TempDir()
+	d.PersonalHome = home
+	hours := func() []string {
+		t.Helper()
+		w, err := d.oneWorkflow(home, dailyChecksID)
+		if err != nil || !w.IsEnabled || w.AwaitingApproval != nil {
+			t.Fatalf("%+v, %v", w, err)
+		}
+		var got []string
+		for _, tr := range w.Workflow.Triggers {
+			sc := tr.Schedule.Value
+			got = append(got, fmt.Sprintf("%02d:%02d", sc.Hours[0], sc.StartMinute))
+		}
+		return got
+	}
+	s, err := d.setDailySummarySettings(wire.DailySummarySettings{Mode: wire.DailySummaryModeSummaryAndChecks, At: "08:00"})
+	if err != nil || s.Mode != wire.DailySummaryModeSummaryAndChecks || s.ChecksEvery == nil || *s.ChecksEvery != 4 {
+		t.Fatalf("%+v, %v", s, err)
+	}
+	if got := hours(); !slices.Equal(got, []string{"00:00", "04:00", "12:00", "16:00", "20:00"}) {
+		t.Fatal(got)
+	}
+	six := int64(6)
+	s, err = d.setDailySummarySettings(wire.DailySummarySettings{Mode: wire.DailySummaryModeSummaryAndChecks, At: "09:30", ChecksEvery: &six})
+	if err != nil || *s.ChecksEvery != 6 || s.At != "09:30" {
+		t.Fatalf("%+v, %v", s, err)
+	}
+	if got := hours(); !slices.Equal(got, []string{"03:30", "15:30", "21:30"}) {
+		t.Fatal(got)
+	}
+	text, _ := os.ReadFile(filepath.Join(home, ".agents", "workflows", dailyChecksID+".md"))
+	if !strings.Contains(string(text), "when-done: archive") || !strings.Contains(string(text), "permission-mode: plan") {
+		t.Fatalf("the rest of the metadata went:\n%s", text)
+	}
+	five := int64(5)
+	if _, err := d.setDailySummarySettings(wire.DailySummarySettings{Mode: wire.DailySummaryModeSummaryAndChecks, At: "09:30", ChecksEvery: &five}); err == nil {
+		t.Fatal("every 5 hours was taken")
+	}
+	s, err = d.setDailySummarySettings(wire.DailySummarySettings{Mode: wire.DailySummaryModeSummary, At: "09:30"})
+	if err != nil || s.Mode != wire.DailySummaryModeSummary || *s.ChecksEvery != 6 {
+		t.Fatalf("%+v, %v", s, err)
 	}
 	if w, err := d.oneWorkflow(home, dailyChecksID); err != nil || w.IsEnabled {
 		t.Fatalf("%+v, %v", w, err)

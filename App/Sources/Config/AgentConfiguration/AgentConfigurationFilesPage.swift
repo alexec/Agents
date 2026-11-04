@@ -48,7 +48,7 @@ struct AgentConfigurationFilesPage: View {
                         .fixedSize()
                         Spacer()
                     }
-                    Text(DailySummaryControls.footer)
+                    Text(DailySummaryControls.footer(for: settings.mode))
                         .appText(.fine)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

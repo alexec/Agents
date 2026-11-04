@@ -2253,7 +2253,7 @@ export class Store extends Work {
     );
   }
 
-  /** The person chose Off or Summary, or a time, for the daily summary (#3351). */
+  /** The person chose a mode, a time or how often the checks run, for the daily summary (#3351, #3395). */
   async setDailySummary(settings: DailySummarySettings): Promise<void> {
     const before = this.dailySummary.value;
     this.dailySummary.value = settings;
