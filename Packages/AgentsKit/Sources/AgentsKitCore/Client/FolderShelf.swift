@@ -220,4 +220,11 @@ final class PinShelf {
     func setReviews(_ reviews: [ReviewPull]) {
         if self.reviews != reviews { self.reviews = reviews }
     }
+
+    /// What the read-only daily checks found (#3331), newest first.
+    private(set) var suggestions: [CheckSuggestion] = []
+
+    func setSuggestions(_ suggestions: [CheckSuggestion]) {
+        if self.suggestions != suggestions { self.suggestions = suggestions }
+    }
 }

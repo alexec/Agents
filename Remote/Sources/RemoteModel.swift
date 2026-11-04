@@ -3734,6 +3734,34 @@ final class RemoteModel {
         }
     }
 
+    /// Start on a suggestion of the daily checks in For Review (#3331): the host starts a
+    /// session in its folder with its prompt, and it opens here.
+    func startSuggestion(_ suggestion: CheckSuggestion, in folder: URL) async {
+        do {
+            let id = try await client.call(DaemonAPI.Method.suggestionsStart,
+                                           DaemonAPI.SuggestionRequest(folder: folder, id: suggestion.id), returning: UUID.self)
+            work.dropSuggestion(suggestion.id, in: folder)
+            _ = await loadWholeAgent(id)
+            selectedFolder = folder
+            openWorkflow = nil
+            selection = id
+        } catch {
+            problem = sentence(for: error)
+        }
+    }
+
+    /// Dismiss on a suggestion of the daily checks in For Review (#3331): gone at once, then
+    /// the host told, which keeps it out for good.
+    func dismissSuggestion(_ suggestion: CheckSuggestion, in folder: URL) async {
+        work.dropSuggestion(suggestion.id, in: folder)
+        do {
+            try await client.call(DaemonAPI.Method.suggestionsDismiss,
+                                  DaemonAPI.SuggestionRequest(folder: folder, id: suggestion.id))
+        } catch {
+            problem = sentence(for: error)
+        }
+    }
+
     /// Hide or Show on a server's list view (#2032): shown at once, then the host told.
     func setViewHidden(_ uri: String, _ hidden: Bool, in folder: URL) async {
         work.setViewHidden(uri, hidden, in: folder)

@@ -549,6 +549,28 @@ struct SidebarModelTests {
         #expect(SidebarSmartRow.forReview.count(in: model, folders: folders) == 1)
     }
 
+    /// For Review lists, after its pull requests, the read-only daily checks' suggestions
+    /// (#3331), the urgent first, then newest first, and counts them; a search matches the
+    /// title and the prompt; Start or Dismiss takes one out at once.
+    @Test func forReviewListsTheChecksSuggestions() {
+        let model = AgentsModel()
+        let older = CheckSuggestion(id: "a", title: "CI fails on main", prompt: "Fix CI on a branch.", at: t0)
+        let newer = CheckSuggestion(id: "b", title: "PR #12 is in conflict", prompt: "Rebase it.", at: t0.addingTimeInterval(60))
+        let urgent = CheckSuggestion(id: "c", title: "Nightly missed", prompt: "Run it.", urgent: true, at: t0.addingTimeInterval(-60))
+        model.replacePins([FolderPins(folder: api, pins: [], suggestions: [older, newer, urgent])])
+        let folders = [key]
+
+        #expect(SidebarSmartRow.forReview.suggestions(in: model, folders: folders).map(\.suggestion.id) == ["c", "b", "a"])
+        #expect(SidebarSmartRow.forReview.count(in: model, folders: folders) == 3)
+        #expect(SidebarSmartRow.forReview.isShown(in: model, folders: folders))
+        #expect(SidebarSmartRow.needsYou.suggestions(in: model, folders: folders).isEmpty)
+        #expect(SidebarSmartRow.forReview.suggestions(in: model, folders: folders, query: "rebase").map(\.suggestion.id) == ["b"])
+
+        model.dropSuggestion("b", in: api)
+        #expect(SidebarSmartRow.forReview.suggestions(in: model, folders: folders).map(\.suggestion.id) == ["c", "a"])
+        #expect(SidebarSmartRow.forReview.count(in: model, folders: folders) == 2)
+    }
+
     /// A smart group turned off (#846) is not drawn, and its sessions go to the next group
     /// they fit, or under their folder: still listed once, none left out.
     @Test func aGroupTurnedOffPassesItsSessionsOn() {

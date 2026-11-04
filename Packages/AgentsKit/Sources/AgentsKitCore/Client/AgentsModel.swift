@@ -65,6 +65,9 @@ public final class AgentsModel {
     /// Each folder's pull requests waiting for the person's approval (#3330), kept current by
     /// `pins/changed`. A folder with none is absent.
     @ObservationIgnored public private(set) var reviewPulls: [URL: [ReviewPull]] = [:]
+    /// Each folder's suggestions of the daily checks (#3331), kept current by `pins/changed`.
+    /// A folder with none is absent.
+    @ObservationIgnored public private(set) var checkSuggestions: [URL: [CheckSuggestion]] = [:]
     /// Bumped by `pages/changed`: a page a screen may be showing changed on disk. Whoever
     /// shows one reads it again, with its stamp, so an unchanged file costs nothing.
     public private(set) var pageRevisions: [URL: [String: Int]] = [:]
@@ -690,6 +693,9 @@ public final class AgentsModel {
             let reviews = notification.reviews ?? []
             reviewPulls[folder] = reviews.isEmpty ? nil : reviews
             pinShelves[folder]?.setReviews(reviews)
+            let suggestions = notification.suggestions ?? []
+            checkSuggestions[folder] = suggestions.isEmpty ? nil : suggestions
+            pinShelves[folder]?.setSuggestions(suggestions)
             pinShelves[folder]?.setPins(notification.pins)
             pinShelves[folder]?.setSessions(sessions)
             pinShelves[folder]?.setWorkflows(flows)
@@ -892,6 +898,21 @@ public final class AgentsModel {
         pinShelves[key]?.setReviews(reviews)
     }
 
+    /// One folder's suggestions of the daily checks (#3331), newest first.
+    public func checkSuggestions(in folder: URL?) -> [CheckSuggestion] {
+        guard let folder else { return [] }
+        return pinShelf(folder).suggestions
+    }
+
+    /// A suggestion started from or dismissed as a screen left it, before the host says so.
+    public func dropSuggestion(_ id: String, in folder: URL) {
+        let key = Folder.standardize(folder)
+        guard var suggestions = checkSuggestions[key] else { return }
+        suggestions.removeAll { $0.id == id }
+        checkSuggestions[key] = suggestions.isEmpty ? nil : suggestions
+        pinShelves[key]?.setSuggestions(suggestions)
+    }
+
     /// A server view hidden or shown as a screen left it, before the host says so.
     public func setViewHidden(_ uri: String, _ hidden: Bool, in folder: URL) {
         let key = Folder.standardize(folder)
@@ -920,9 +941,14 @@ public final class AgentsModel {
             listed.reviews.flatMap { $0.isEmpty ? nil : (Folder.standardize(listed.folder), $0) }
         }, uniquingKeysWith: { $1 })
         if reviewPulls != reviews { reviewPulls = reviews }
+        let suggestions = Dictionary(listed.compactMap { listed in
+            listed.suggestions.flatMap { $0.isEmpty ? nil : (Folder.standardize(listed.folder), $0) }
+        }, uniquingKeysWith: { $1 })
+        if checkSuggestions != suggestions { checkSuggestions = suggestions }
         for (folder, shelf) in pinShelves {
             shelf.setViews(serverViews[folder] ?? [])
             shelf.setReviews(reviewPulls[folder] ?? [])
+            shelf.setSuggestions(checkSuggestions[folder] ?? [])
             shelf.setPins(pins[folder] ?? [])
             shelf.setSessions(sessionPins[folder] ?? [])
             shelf.setWorkflows(workflowPins[folder] ?? [])
@@ -972,6 +998,7 @@ public final class AgentsModel {
         let shelf = PinShelf()
         shelf.setViews(serverViews[key] ?? [])
         shelf.setReviews(reviewPulls[key] ?? [])
+        shelf.setSuggestions(checkSuggestions[key] ?? [])
         shelf.setPins(pins[key] ?? [])
         shelf.setSessions(sessionPins[key] ?? [])
         shelf.setWorkflows(workflowPins[key] ?? [])

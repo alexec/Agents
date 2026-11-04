@@ -333,7 +333,7 @@ func (d *Daemon) pinsChanged(folder string) {
 		}
 		pp := d.folderPins(folder)
 		Broadcast(d, wire.NotifyPinsChanged, wire.PinsChangedNotification{Folder: pp.Folder, Pins: pp.Pins,
-			Sessions: pp.Sessions, Workflows: pp.Workflows, Views: pp.Views, Reviews: pp.Reviews})
+			Sessions: pp.Sessions, Workflows: pp.Workflows, Views: pp.Views, Reviews: pp.Reviews, Suggestions: pp.Suggestions})
 	})
 }
 
@@ -400,7 +400,7 @@ func (d *Daemon) pinViews(folder string, f pinsFile) []wire.PinView {
 func (d *Daemon) folderPins(folder string) wire.FolderPins {
 	f := d.readPins(folder)
 	pp := wire.FolderPins{Folder: fileURL(folder, true), Pins: d.pinViews(folder, f), Views: d.serverViews(folder, f),
-		Reviews: d.reviewsFor(folder)}
+		Reviews: d.reviewsFor(folder), Suggestions: d.suggestionsFor(folder, time.Now())}
 	for _, s := range f.sessions {
 		pp.Sessions = append(pp.Sessions, s.Session)
 	}
@@ -470,7 +470,7 @@ func (d *Daemon) registerPins() {
 		for _, s := range ps {
 			pp := d.folderPins(store.FolderPath(s.Folder.Folder))
 			if len(pp.Pins) > 0 || len(pp.Sessions) > 0 || len(pp.Workflows) > 0 || len(pp.Views) > 0 ||
-				len(pp.Reviews) > 0 {
+				len(pp.Reviews) > 0 || len(pp.Suggestions) > 0 {
 				out = append(out, pp)
 			}
 		}

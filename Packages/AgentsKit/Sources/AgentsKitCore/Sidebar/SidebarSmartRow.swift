@@ -14,7 +14,8 @@ import Foundation
 /// that ended done with a file it showed that nobody has opened (`fileToSee`), the daily
 /// summary's too. Opening it, or Mark as Read, its Dismiss, takes it out. After its sessions,
 /// each folder's open pull requests labelled needs-approval (#3330), until they are answered,
-/// closed or dismissed.
+/// closed or dismissed, then the read-only daily checks' suggestions (#3331), until one is
+/// started or dismissed.
 ///
 /// Read off each folder's shelf (#165), so a folded smart row costs a sum of counts per
 /// folder and not a pass over every agent held; only an open one lists its sessions.
@@ -69,7 +70,7 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
             // over the live sessions, not the shelf's sums, which are for all four.
             return agents(in: work, folders: folders, on: on).count
                 + (self == .needsYou ? folders.reduce(0) { $0 + Self.ownApprovals(in: work, $1).count } : 0)
-                + pulls(in: work, folders: folders).count
+                + pulls(in: work, folders: folders).count + suggestions(in: work, folders: folders).count
         }
         return folders.reduce(0) { total, key in
             let shelf = work.shelf(key)
@@ -90,7 +91,8 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
                 return total + (shelf.counts[.needsAttention] ?? 0) + (shelf.counts[.blocked] ?? 0)
                     + Self.askingAtRest(in: shelf) + Self.ownApprovals(in: work, key).count - pinnedHere - failedHere
             case .forReview:
-                return total + Self.forReview(in: shelf).count + work.reviewPulls(in: key.folder).count - pinnedHere
+                return total + Self.forReview(in: shelf).count + work.reviewPulls(in: key.folder).count
+                    + work.checkSuggestions(in: key.folder).count - pinnedHere
             case .working:
                 return total + (shelf.counts[.running] ?? 0) - pinnedHere
             case .unread:
@@ -190,6 +192,7 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
             || !workflows(in: work, folders: folders, query: query).isEmpty
             || !approvals(in: work, folders: folders, query: query).isEmpty
             || !pulls(in: work, folders: folders, query: query).isEmpty
+            || !suggestions(in: work, folders: folders, query: query).isEmpty
     }
 
     /// The sessions it gathers, newest started first, as a search leaves them.
@@ -288,6 +291,25 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
                 .map { (folder: key, pull: $0) }
         }
         .sorted { $0.pull.updatedAt > $1.pull.updatedAt }
+    }
+
+    /// The read-only daily checks' suggestions in the folders named, each with its folder
+    /// (#3331): only For Review lists them, after its pull requests, the urgent first, then
+    /// newest first. A search matches the title and the prompt.
+    @MainActor
+    public func suggestions(in work: AgentsModel, folders: [FolderKey], query: String = "")
+        -> [(folder: FolderKey, suggestion: CheckSuggestion)] {
+        guard self == .forReview else { return [] }
+        let words = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return folders.flatMap { key in
+            work.checkSuggestions(in: key.folder)
+                .filter { words.isEmpty || "\($0.title) \($0.prompt)".lowercased().contains(words) }
+                .map { (folder: key, suggestion: $0) }
+        }
+        .sorted { a, b in
+            let (ua, ub) = (a.suggestion.urgent ?? false, b.suggestion.urgent ?? false)
+            return ua != ub ? ua : a.suggestion.at > b.suggestion.at
+        }
     }
 
     /// One folder's approvals drawn as rows of their own: every kind but a session's

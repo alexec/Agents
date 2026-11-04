@@ -52,6 +52,11 @@ struct SmartFold: View {
                     ForEach(row.pulls(in: model.work, folders: folders, query: query), id: \.pull.id) { item in
                         ReviewPullListRow(pull: item.pull, folder: item.folder, place: place(of: item.folder))
                     }
+                    ForEach(row.suggestions(in: model.work, folders: folders, query: query),
+                            id: \.suggestion.id) { item in
+                        CheckSuggestionListRow(suggestion: item.suggestion, folder: item.folder,
+                                               place: place(of: item.folder))
+                    }
                 }
             }
         } header: {
@@ -206,6 +211,56 @@ private struct ReviewPullListRow: View {
 
     private func dismiss() {
         Task { await model.dismissReview(pull, in: folder) }
+    }
+}
+
+/// A suggestion of the read-only daily checks, under For Review (#3331). A click, or Start on
+/// hover, starts a session in its folder with its prompt and opens it; Dismiss, on hover and in
+/// its menu, takes it out for good.
+private struct CheckSuggestionListRow: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.openURL) private var openURL
+    let suggestion: CheckSuggestion
+    let folder: FolderKey
+    let place: String?
+    @State private var hovering = false
+
+    var body: some View {
+        CheckSuggestionRowLabel(suggestion: suggestion, place: place)
+            .opacity(hovering ? 0.35 : 1)
+            .overlay(alignment: .trailing) {
+                if hovering {
+                    HStack(spacing: 2) {
+                        Button("Start", action: start)
+                            .help("Start a session on this with its prompt")
+                        Button("Dismiss", action: dismiss)
+                            .help("Take this suggestion out of For Review for good")
+                    }
+                    .buttonStyle(.borderless)
+                    .appText(.fine)
+                }
+            }
+            .help("\(suggestion.title) · \(CheckSuggestionRowLabel.line(suggestion))")
+            .onHover { hovering = $0 }
+            .onTapGesture(perform: start)
+            .contextMenu {
+                Button("Start Session", action: start)
+                if let link = suggestion.link {
+                    Button("Open Link") { openURL(link) }
+                }
+                Button("Dismiss", action: dismiss)
+            }
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction(named: "Start", start)
+            .accessibilityAction(named: "Dismiss", dismiss)
+    }
+
+    private func start() {
+        Task { await model.startSuggestion(suggestion, in: folder) }
+    }
+
+    private func dismiss() {
+        Task { await model.dismissSuggestion(suggestion, in: folder) }
     }
 }
 

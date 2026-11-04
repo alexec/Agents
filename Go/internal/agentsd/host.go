@@ -128,8 +128,9 @@ func (d *Daemon) catchUp(r wire.CatchUpRequest) wire.CatchUpSnapshot {
 		if part == "pins" {
 			s.Pins = []wire.FolderPins{}
 			for _, p := range d.folders(false) {
-				// As pins/list: a folder with only server views or pull requests for review (#3330) too.
-				if pp := d.folderPins(store.FolderPath(p.Folder.Folder)); len(pp.Pins)+len(pp.Sessions)+len(pp.Workflows)+len(pp.Views)+len(pp.Reviews) > 0 {
+				// As pins/list: a folder with only server views, pull requests or the checks'
+				// suggestions for review (#3330, #3331) too.
+				if pp := d.folderPins(store.FolderPath(p.Folder.Folder)); len(pp.Pins)+len(pp.Sessions)+len(pp.Workflows)+len(pp.Views)+len(pp.Reviews)+len(pp.Suggestions) > 0 {
 					s.Pins = append(s.Pins, pp)
 				}
 			}

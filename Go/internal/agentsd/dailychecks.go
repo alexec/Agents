@@ -3,12 +3,16 @@ package agentsd
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
+	"log"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -24,6 +28,9 @@ import (
 // issues assigned to the person that no session has, and a missed scheduled workflow. It keeps
 // each finding that needs the person as a suggestion, with a prompt that starts a session on
 // it; the next summary lists them, and an urgent one sends a notice. It reads and never acts.
+// Every client lists them in For Review (#3331), with the folder's pins, until the person starts
+// a session from one (suggestions/start) or dismisses it (suggestions/dismiss); a dismissed one
+// never comes back, in For Review, the next summary or a later check.
 
 const (
 	dailyChecksID = "daily-checks"
@@ -37,6 +44,8 @@ const (
 	checkFolders = 30
 	// checkLines is the most findings of one kind a folder lists: the rest is a count.
 	checkLines = 10
+	// dismissalsKept is the most dismissals the checks keep: the oldest go first.
+	dismissalsKept = 200
 )
 
 // checksMu keeps one read-change-write of the checks' file at a time.
@@ -52,11 +61,35 @@ type checkSuggestion struct {
 	At     time.Time `json:"at"`
 }
 
-// checksRecord is ~/.agents/checks/suggestions.json: when the last check started, and what it
-// and the ones before it found.
+// id is the suggestion's name on the wire (#3331): the same for as long as it is kept.
+func (s checkSuggestion) id() string {
+	sum := sha256.Sum256([]byte(s.Folder + "\x00" + s.Title + "\x00" + s.At.UTC().Format(time.RFC3339Nano)))
+	return hex.EncodeToString(sum[:8])
+}
+
+// dismissedSuggestion is one the person dismissed (#3331): a check that finds it again, by
+// its folder and title, does not keep it.
+type dismissedSuggestion struct {
+	Folder string    `json:"folder"`
+	Title  string    `json:"title"`
+	At     time.Time `json:"at"`
+}
+
+// checksRecord is ~/.agents/checks/suggestions.json: when the last check started, what it
+// and the ones before it found, and what the person dismissed.
 type checksRecord struct {
-	CheckedAt   time.Time         `json:"checkedAt,omitzero"`
-	Suggestions []checkSuggestion `json:"suggestions"`
+	CheckedAt   time.Time             `json:"checkedAt,omitzero"`
+	Suggestions []checkSuggestion     `json:"suggestions"`
+	Dismissed   []dismissedSuggestion `json:"dismissed,omitempty"`
+}
+
+func (r checksRecord) dismissed(folder, title string) bool {
+	for _, x := range r.Dismissed {
+		if x.Folder == folder && x.Title == title {
+			return true
+		}
+	}
+	return false
 }
 
 func checksPath(home string) string {
@@ -338,6 +371,10 @@ func (d *Daemon) keepSuggestion(id wire.UUID, args map[string]json.RawMessage, a
 	home := d.personalHome()
 	checksMu.Lock()
 	r := readChecks(home)
+	if r.dismissed(s.Folder, s.Title) {
+		checksMu.Unlock()
+		return "Not kept: the person dismissed this one before. Do not suggest it again.", nil
+	}
 	kept := []checkSuggestion{}
 	for _, old := range r.Suggestions {
 		if (old.Folder != s.Folder || old.Title != s.Title) && at.Sub(old.At) < summaryReach {
@@ -354,7 +391,8 @@ func (d *Daemon) keepSuggestion(id wire.UUID, args map[string]json.RawMessage, a
 	if err != nil {
 		return "", &Error{Message: "The suggestion was not kept: " + err.Error()}
 	}
-	said := "Kept: the next daily summary lists it."
+	d.pinsChanged(s.Folder)
+	said := "Kept: For Review lists it, and the next daily summary."
 	if s.Urgent {
 		if reply, err := d.notify(id, map[string]json.RawMessage{"title": jsonString("Daily checks"),
 			"body": jsonString(s.Title + " (" + filepath.Base(s.Folder) + ")")}); err != nil {
@@ -387,4 +425,120 @@ func checkSuggestions(home string, since time.Time) []string {
 		out = append(out, line)
 	}
 	return out
+}
+
+// suggestionsFor is a folder's suggestions for For Review (#3331), newest first: those of the
+// last week, as the summary reads them.
+func (d *Daemon) suggestionsFor(folder string, at time.Time) []wire.CheckSuggestion {
+	home := d.personalHome()
+	if home == "" {
+		return nil // a scratch root with no home: no checks ran
+	}
+	checksMu.Lock()
+	r := readChecks(home)
+	checksMu.Unlock()
+	var out []wire.CheckSuggestion
+	for _, s := range slices.Backward(r.Suggestions) {
+		if filepath.Clean(s.Folder) != filepath.Clean(folder) || at.Sub(s.At) >= summaryReach {
+			continue
+		}
+		c := wire.CheckSuggestion{ID: s.id(), Title: s.Title, Prompt: s.Prompt, At: wire.DateOf(s.At)}
+		if s.Link != "" {
+			c.Link = new(wire.URL(s.Link))
+		}
+		if s.Urgent {
+			c.Urgent = new(true)
+		}
+		out = append(out, c)
+	}
+	return out
+}
+
+// takeSuggestion takes one of a folder's suggestions out (#3331): started from, or dismissed,
+// which is kept so that it never comes back. False when there is no such suggestion.
+func (d *Daemon) takeSuggestion(folder, id string, dismiss bool, at time.Time) (checkSuggestion, bool, error) {
+	home := d.personalHome()
+	if home == "" {
+		return checkSuggestion{}, false, nil
+	}
+	checksMu.Lock()
+	defer checksMu.Unlock()
+	r := readChecks(home)
+	i := slices.IndexFunc(r.Suggestions, func(s checkSuggestion) bool {
+		return filepath.Clean(s.Folder) == filepath.Clean(folder) && s.id() == id
+	})
+	if i < 0 {
+		return checkSuggestion{}, false, nil
+	}
+	s := r.Suggestions[i]
+	r.Suggestions = slices.Delete(r.Suggestions, i, i+1)
+	if dismiss && !r.dismissed(s.Folder, s.Title) {
+		r.Dismissed = append(r.Dismissed, dismissedSuggestion{Folder: s.Folder, Title: s.Title, At: at})
+		if len(r.Dismissed) > dismissalsKept {
+			r.Dismissed = r.Dismissed[len(r.Dismissed)-dismissalsKept:]
+		}
+	}
+	return s, true, writeChecks(home, r)
+}
+
+// findSuggestion is one of a folder's suggestions, by its id.
+func (d *Daemon) findSuggestion(folder, id string) (checkSuggestion, bool) {
+	home := d.personalHome()
+	if home == "" {
+		return checkSuggestion{}, false
+	}
+	checksMu.Lock()
+	r := readChecks(home)
+	checksMu.Unlock()
+	for _, s := range r.Suggestions {
+		if filepath.Clean(s.Folder) == filepath.Clean(folder) && s.id() == id {
+			return s, true
+		}
+	}
+	return checkSuggestion{}, false
+}
+
+func (d *Daemon) registerSuggestions() {
+	gone := func() error {
+		return Invalid("That suggestion is not there any more: it was started or dismissed, or is over a week old.")
+	}
+	On(d, wire.CallSuggestionsDismiss, func(ctx context.Context, c *Client, r wire.SuggestionRequest) (wire.Empty, error) {
+		folder, err := d.knownPinFolder(r.Folder)
+		if err != nil {
+			return wire.Empty{}, err
+		}
+		_, ok, err := d.takeSuggestion(folder, r.ID, true, time.Now())
+		if err != nil {
+			return wire.Empty{}, &Error{Message: "The dismissal was not kept: " + err.Error()}
+		}
+		d.pinsChanged(folder)
+		if !ok {
+			return wire.Empty{}, gone()
+		}
+		return wire.Empty{}, nil
+	})
+	// Start: a session in the suggestion's folder with its prompt, on the Auto runtime, which
+	// picks the runtime as a new session's page does; only then is the suggestion taken out.
+	On(d, wire.CallSuggestionsStart, func(ctx context.Context, c *Client, r wire.SuggestionRequest) (wire.UUID, error) {
+		folder, err := d.knownPinFolder(r.Folder)
+		if err != nil {
+			return "", err
+		}
+		s, ok := d.findSuggestion(folder, r.ID)
+		if !ok {
+			d.pinsChanged(folder)
+			return "", gone()
+		}
+		id, err := d.startAs(wire.StartRequest{RuntimeID: autoRuntimeID, Cwd: store.FolderURL(folder), Prompt: s.Prompt,
+			Attachments: []wire.Attachment{}, StartOptions: wire.StartOptions{Values: map[string]wire.JSONValue{}, ExtraArguments: []string{}},
+			AdditionalDirectories: []wire.URL{}, McpServers: []wire.MCPServer{}, Labels: []string{}}, c.actor)
+		if err != nil {
+			return "", err
+		}
+		if _, _, err := d.takeSuggestion(folder, r.ID, false, time.Now()); err != nil {
+			log.Printf("daily checks: a started suggestion was not taken out: %v", err)
+		}
+		d.pinsChanged(folder)
+		return id, nil
+	})
 }
