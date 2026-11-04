@@ -6958,6 +6958,11 @@ export interface ProviderSummary {
    * control plane, which lets everyone.
    */
   mayUse?: boolean;
+  /**
+   * The CLI its machines are reached through over ssh (gh, coder) when the machine that runs the
+   * provider has none (#3367). Absent when it needs none or has it.
+   */
+  sshToolMissing?: string;
 }
 
 /**
@@ -11434,7 +11439,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProviderRequest: { required: [], optional: ["id"] },
   ProviderRuntime: { required: ["id", "name", "isDefault"], optional: [] },
   ProviderRuntimes: { required: ["runtimes"], optional: ["host", "why"] },
-  ProviderSummary: { required: ["id", "name", "kind", "secrets", "capabilities", "contract", "mapped", "workspaces", "current"], optional: ["preset", "listedAt", "problem", "group", "mayUse"] },
+  ProviderSummary: { required: ["id", "name", "kind", "secrets", "capabilities", "contract", "mapped", "workspaces", "current"], optional: ["preset", "listedAt", "problem", "group", "mayUse", "sshToolMissing"] },
   PushToken: { required: ["environment"], optional: ["token"] },
   QueuedPrompt: { required: ["id", "text", "attachments", "queuedAt", "from"], optional: ["preface", "sender"] },
   QueuedStart: { required: ["labels"], optional: ["runtimeID", "permissionMode", "model", "worktree"] },

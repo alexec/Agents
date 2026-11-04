@@ -166,8 +166,8 @@ admin (read and write), or a classic one with the `codespace` scope.
    image needs nothing: the image has `ssh` and `gh`, and the control plane writes each
    codespace's ssh host itself, with the provider's token (#3347).
 
-A codespace has no ssh port of its own, so ssh still goes through `gh`. The provider's card
-says "needs gh for ssh". It can make a codespace from a repository, but it can't install
+A codespace has no ssh port of its own, so ssh still goes through `gh`. When the machine that
+runs the control plane has no `gh`, the provider's card says "needs gh for ssh". It can make a codespace from a repository, but it can't install
 Agents on its first boot: add it with **Add as Host…** on the Mac.
 
 Through its CLI, install `gh` and sign it in.
@@ -181,7 +181,8 @@ Through its API, you need your deployment's address and a session token.
 3. Give the token in **Session token**.
 4. On the Mac that runs the control plane, run `coder config-ssh`.
 
-ssh still goes through `coder`, so the card says "needs coder for ssh".
+ssh still goes through `coder`, so the card says "needs coder for ssh" when the machine that
+runs the control plane has no `coder`.
 
 Through its CLI, install `coder`, sign it in, and run `coder config-ssh`.
 

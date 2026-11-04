@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os/exec"
 	"regexp"
 	"sort"
 	"strconv"
@@ -122,6 +123,8 @@ type Hooks struct {
 	ProjectFolders func(project string) map[string][]string
 	// ProjectSessions is projects/sessions for an agent's person (#3277). Nil: refused.
 	ProjectSessions func(request wire.ProjectSessionsRequest, caller Caller) (wire.ProjectSessions, error)
+	// HasTool says this machine has a CLI on its PATH (#3367). Nil: exec.LookPath.
+	HasTool func(name string) bool
 }
 
 // Config is what NewProviders is given.
@@ -825,6 +828,9 @@ func (p *Providers) Summaries() []ProviderSummary {
 		s := ProviderSummary{ID: wire.ProviderID(r.ID), Name: r.Name, Kind: r.Kind, Secrets: secrets, Capabilities: caps,
 			Contract: int64(r.Contract), Mapped: r.Map != nil, Preset: optional(r.preset()), Workspaces: workspaces,
 			Current: l.current, Problem: optional(l.problem), Group: r.Group}
+		if tool := sshTool(r.preset()); tool != "" && !p.hasTool(tool) {
+			s.SshToolMissing = &tool
+		}
 		if l.listedAt != nil {
 			s.ListedAt = dateOf(*l.listedAt)
 		}
@@ -1117,6 +1123,27 @@ func (p *Providers) Refresh(only string) {
 	}
 	p.changed()
 	p.bringBack()
+}
+
+// sshTool is the CLI an API preset's machines are reached through over ssh, as the ssh
+// ProxyCommand: gh for a codespace, coder for a Coder workspace; "" for none.
+func sshTool(preset string) string {
+	switch preset {
+	case "codespaces-api":
+		return "gh"
+	case "coder-api":
+		return "coder"
+	}
+	return ""
+}
+
+// hasTool is Hooks.HasTool, else whether exec finds the CLI.
+func (p *Providers) hasTool(name string) bool {
+	if p.hooks.HasTool != nil {
+		return p.hooks.HasTool(name)
+	}
+	_, err := exec.LookPath(name)
+	return err == nil
 }
 
 // startsNoHost is whether a preset's workspaces never start their host by themselves: a

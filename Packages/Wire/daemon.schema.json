@@ -18675,6 +18675,10 @@
         "mayUse": {
           "type": "boolean",
           "description": "The caller may start machines from it (#1761): they are in its group. Absent from an older control plane, which lets everyone."
+        },
+        "sshToolMissing": {
+          "type": "string",
+          "description": "The CLI its machines are reached through over ssh (gh, coder) when the machine that runs the provider has none (#3367). Absent when it needs none or has it."
         }
       },
       "required": [

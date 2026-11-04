@@ -50,7 +50,9 @@ const summary = (over = {}) => ({ id: "do", name: "DO", kind: "commands", secret
 test("the card's chip and lines are the window's", () => {
   assert.equal(w.kindChip(summary({ preset: "digitalocean-api" })), "command provider · digitalocean-api · API");
   assert.equal(w.kindChip(summary({ preset: "doctl" })), "command provider · doctl · CLI");
-  assert.equal(w.providerLine(summary({ preset: "codespaces-api", listedAt: 0 }), () => "9:00"), "Listed 9:00 · No machines · needs gh for ssh");
+  assert.equal(w.providerLine(summary({ preset: "codespaces-api", listedAt: 0, sshToolMissing: "gh" }), () => "9:00"), "Listed 9:00 · No machines · needs gh for ssh");
+  // The control plane has gh (#3367): nothing to say.
+  assert.equal(w.providerLine(summary({ preset: "codespaces-api", listedAt: 0 }), () => "9:00"), "Listed 9:00 · No machines");
   assert.equal(w.providerLine(summary({ problem: "401", current: false }), () => ""), "Couldn’t list: 401");
   const hosts = [{ id: "h1", name: "box" }];
   assert.equal(w.workspaceLine({ id: "a", name: "a", state: "running", host: "h1", cost: "$4/mo" }, hosts), "Running · linked to box · $4/mo");

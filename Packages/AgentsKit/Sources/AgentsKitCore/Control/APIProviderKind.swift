@@ -187,11 +187,8 @@ public enum MachineProviderWords {
         if let problem = provider.problem, !provider.current || provider.listedAt == nil { parts.append("Couldn’t list: \(problem)") }
         if let at = provider.listedAt { parts.append("\(provider.current ? "Listed" : "Showing what it listed at") \(time(at))") }
         if provider.workspaces.isEmpty, provider.listedAt != nil { parts.append("No machines") }
-        switch provider.preset {
-        case "codespaces-api": parts.append("needs gh for ssh")
-        case "coder-api": parts.append("needs coder for ssh")
-        default: break
-        }
+        // Only when the machine that runs it has no such CLI (#3367).
+        if let tool = provider.sshToolMissing { parts.append("needs \(tool) for ssh") }
         return parts.joined(separator: " · ")
     }
 

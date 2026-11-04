@@ -291,11 +291,15 @@ public extension DaemonAPI {
         /// The caller may start machines from it (#1761). Nil from an older control plane,
         /// which lets everyone.
         public var mayUse: Bool?
+        /// The CLI its machines are reached through over ssh (gh, coder) when the machine
+        /// that runs the provider has none (#3367). Nil when it needs none or has it.
+        public var sshToolMissing: String?
 
         public init(id: ProviderID, name: String, kind: String, secrets: [String: Bool] = [:],
                     capabilities: [String] = [], contract: Int = 1, mapped: Bool = false, preset: String? = nil,
                     workspaces: [MachineInfo] = [], listedAt: Date? = nil, current: Bool = true,
-                    problem: String? = nil, group: String? = nil, mayUse: Bool? = nil) {
+                    problem: String? = nil, group: String? = nil, mayUse: Bool? = nil,
+                    sshToolMissing: String? = nil) {
             self.id = id
             self.name = name
             self.kind = kind
@@ -310,6 +314,7 @@ public extension DaemonAPI {
             self.problem = problem
             self.group = group
             self.mayUse = mayUse
+            self.sshToolMissing = sshToolMissing
         }
 
         /// Whether the caller may start machines from it.
