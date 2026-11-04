@@ -1,7 +1,7 @@
 // A pull request waiting for the person's approval in For Review (#3330), as the window's and the
 // Remote's ReviewPullRowLabel (Shared/UI/ReviewPullRow.swift): the mark, the title with its folder,
-// the time and one grey line, its number and repo. A press opens its page, with its screenshots, in a
-// new tab; Dismiss, on hover and in its menu, takes it out for good.
+// the time and one grey line, its number and repo. It is a link, with the title drawn as one: a press
+// opens its page, with its screenshots, in a new tab; Dismiss, on hover and in its menu, takes it out for good.
 import type { ReviewPull } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { shortAgo } from "../model/activity";
@@ -38,9 +38,10 @@ export function ReviewPullRow({ store, host, folder, pull, place, down }: {
   ];
   return (
     <div class="nav-item review-pull">
-      <button class="row session pull" aria-description="pull request waiting for your approval"
+      <a class="row session pull" href={pull.url} target="_blank" rel="noopener"
+        aria-description="pull request waiting for your approval, opens in a new tab"
         title={`${pull.title} · ${pullLine(pull)}`}
-        onClick={open} onContextMenu={(e) => openContextMenu(e, menu())}
+        onContextMenu={(e) => openContextMenu(e, menu())}
         onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu()); }} {...holdForMenu(menu)}>
         <PullMark />
         <span class="body">
@@ -51,7 +52,7 @@ export function ReviewPullRow({ store, host, folder, pull, place, down }: {
           <span class="subtitle">{pullLine(pull)}</span>
         </span>
         <time class="when" dateTime={at.toISOString()} title={at.toLocaleString()}>{shortAgo(at)}</time>
-      </button>
+      </a>
       <button class="dismiss" disabled={down} onClick={dismiss} aria-label={`Dismiss ${pull.title}`}
         title="Take this pull request out of For Review">Dismiss</button>
     </div>
