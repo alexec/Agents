@@ -27,7 +27,7 @@ final class ControlSettingsModel {
     private(set) var drafts: [UUID: DaemonAPI.ProviderDraftUpdate] = [:]
     /// Servers added from a provider's workspace (Add as Host…), by name: linked to it once
     /// they join.
-    private var linkOnJoin: [String: (provider: ProviderID, workspace: String)] = [:]
+    private var linkOnJoin: [String: (provider: ProviderID, workspace: String, trust: String?)] = [:]
     private(set) var clients: [ClientRecord] = []
     /// How each connected client reaches the control plane now (frame N). Empty from a
     /// control plane that does not say.
@@ -238,11 +238,28 @@ final class ControlSettingsModel {
         await perform(DaemonAPI.Method.providersRemove, DaemonAPI.ProviderRequest(id: id))
     }
 
+    /// Links a host to a workspace. A host that joined with the command has no ssh host key
+    /// trusted yet (#3379): the fingerprint to show is answered, and `trust` is that one once
+    /// the person trusts it. Nil once linked or refused.
+    @discardableResult
     func link(_ host: MachineRef, to provider: ProviderID, workspace: String, startWhenUsed: Bool? = nil,
-              stopWhenIdleMinutes: Int? = nil) async {
-        await perform(DaemonAPI.Method.hostsLink,
-                      DaemonAPI.MachineLink(host: host, provider: provider, workspace: workspace,
-                                         startWhenUsed: startWhenUsed, stopWhenIdleMinutes: stopWhenIdleMinutes))
+              stopWhenIdleMinutes: Int? = nil, trust: String? = nil) async -> String? {
+        do {
+            _ = try await client.call(DaemonAPI.Method.hostsLink,
+                                      DaemonAPI.MachineLink(host: host, provider: provider, workspace: workspace,
+                                                            startWhenUsed: startWhenUsed, stopWhenIdleMinutes: stopWhenIdleMinutes,
+                                                            trust: trust))
+            problem = nil
+        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.hostKeyToTrust {
+            if let fingerprint = error.data?["fingerprint"]?.stringValue { return fingerprint }
+            problem = HostProblem.controlRefusal(error)
+        } catch let error as JSONRPCError {
+            problem = HostProblem.controlRefusal(error)
+        } catch {
+            problem = "The control plane can’t be reached."
+        }
+        await refresh()
+        return nil
     }
 
     /// A host stops using a Mac's git access for one git server (#1122).
@@ -347,8 +364,9 @@ final class ControlSettingsModel {
     }
 
     /// Links a server added from a workspace once it joins under `name` (Add as Host…).
-    func linkWhenJoined(name: String, provider: ProviderID, workspace: String) async {
-        linkOnJoin[name] = (provider, workspace)
+    /// `trust` is the host key's fingerprint the install trusted, which the link keeps (#3379).
+    func linkWhenJoined(name: String, provider: ProviderID, workspace: String, trust: String? = nil) async {
+        linkOnJoin[name] = (provider, workspace, trust)
         await linkJoined()
     }
 
@@ -357,7 +375,8 @@ final class ControlSettingsModel {
             guard let host = hosts.first(where: { $0.name == name && $0.workspace == nil }) else { continue }
             linkOnJoin[name] = nil
             _ = try? await client.call(DaemonAPI.Method.hostsLink,
-                                       DaemonAPI.MachineLink(host: host.id, provider: wanted.provider, workspace: wanted.workspace))
+                                       DaemonAPI.MachineLink(host: host.id, provider: wanted.provider, workspace: wanted.workspace,
+                                                             trust: wanted.trust))
         }
     }
 

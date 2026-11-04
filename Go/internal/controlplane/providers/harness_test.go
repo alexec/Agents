@@ -322,6 +322,7 @@ type harnessOptions struct {
 	installedOver string
 	backUp        func(host string, caller Caller) (bool, error)
 	hasTool       func(name string) bool
+	hostKey       func(host, destination, trust string) (string, string, error)
 }
 
 func quickTiming() Timing {
@@ -367,6 +368,7 @@ func newHarness(t *testing.T, opts ...func(*harnessOptions)) *harness {
 			Connect: func(ProviderRecord, map[string]string) (Provider, error) { return provider, nil },
 			BackUp:  o.backUp,
 			HasTool: o.hasTool,
+			HostKey: o.hostKey,
 		}})
 	t.Cleanup(h.providers.Stop)
 	for _, host := range [][2]string{{devbox, "devbox"}, {other, "other"}} {

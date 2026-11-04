@@ -32,6 +32,7 @@ const (
 	CodeProviderFailed       = -32066
 	CodeKept                 = -32067
 	CodeAgentsWorking        = -32068
+	CodeHostKeyToTrust       = -32069
 	CodeHostOffline          = -32090
 	CodeNoSuchHost           = -32091
 	CodeStoreUnavailable     = -32094

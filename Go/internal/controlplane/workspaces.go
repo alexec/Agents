@@ -60,6 +60,7 @@ func (s *Service) makeProviders(home string) *providers.Providers {
 				}
 			},
 			Stopped: s.router.CloseStopped,
+			HostKey: s.hostKey,
 			InstalledOver: func(host string) string {
 				if s.tunnels == nil {
 					return ""
@@ -200,10 +201,23 @@ func providersCaller(c Caller) providers.Caller {
 	return providers.Caller{Session: c.Session, Client: c.Client, Kind: c.Kind, Person: c.Person}
 }
 
+// hostKey is the providers' HostKey hook (#3379): none for a host whose tunnel keeps the
+// key trusted at its install; else the key to keep on its link.
+func (s *Service) hostKey(host, destination, trust string) (string, string, error) {
+	if s.tunnels != nil {
+		if _, keys, ok := s.tunnels.Installed(host); ok && keys != "" {
+			return "", "", nil
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	return s.installer.HostKey(ctx, destination, trust)
+}
+
 // sshStart is the providers' SSHStart hook: a host's agentsd started over ssh. The key
-// trusted at the install, whatever address the host has now (#1691); else the person's own
-// known_hosts (#965). With renewKey, the key it is offered is taken and pinned again for
-// its tunnel (#1701).
+// trusted at the install, whatever address the host has now (#1691); else the one trusted
+// when it was linked (#3379); else the person's own known_hosts (#965). With renewKey, the
+// key it is offered is taken and pinned again for its tunnel (#1701).
 func (s *Service) sshStart(host records.MachineRecord, destination string, renewKey bool) error {
 	known := ""
 	if s.tunnels != nil {
@@ -215,6 +229,9 @@ func (s *Service) sshStart(host records.MachineRecord, destination string, renew
 		}
 	} else {
 		renewKey = false
+	}
+	if link := providers.LinkOf(&host); known == "" && link != nil {
+		known = link.KnownHosts
 	}
 	// A provider may give alex@127.0.0.1 -p 2222: ssh takes it as one word (#857).
 	taken, err := s.installer.StartDaemon(context.Background(), providers.SSHDestination(destination), known, host.Name, renewKey)

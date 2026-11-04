@@ -15,6 +15,9 @@ export interface StopAsk {
   question: string;
 }
 
+/** What Link to Machine… came to: linked, a host key to look at first, or why not. */
+export type LinkOutcome = { linked: true } | { needsTrust: string } | { failed: string };
+
 /** What Add as Machine… came to: installed under a name, a host key to look at first, or why not. */
 export type InstallOutcome = { added: string } | { needsTrust: string } | { failed: string };
 
@@ -94,18 +97,29 @@ export class Providers {
     }
   }
 
-  /** Link to Machine: `host` runs on `workspace` of `provider`. */
-  async link(host: string, provider: string, workspace: string, startWhenUsed: boolean, stopWhenIdleMinutes: number): Promise<string | null> {
+  /**
+   * Link to Machine: `host` runs on `workspace` of `provider`. A machine that joined with the
+   * command has no host key trusted yet (#3379): its fingerprint comes back to show, and `trust`
+   * is that fingerprint once the person said it is the one the machine shows.
+   */
+  async link(host: string, provider: string, workspace: string, startWhenUsed: boolean, stopWhenIdleMinutes: number,
+    trust?: string): Promise<LinkOutcome> {
     try {
-      await this.caller.call("hosts/link", { host: host as MachineRef, provider: provider as ProviderID, workspace, startWhenUsed, stopWhenIdleMinutes });
-      return null;
+      await this.caller.call("hosts/link", {
+        host: host as MachineRef, provider: provider as ProviderID, workspace, startWhenUsed, stopWhenIdleMinutes,
+        ...(trust ? { trust } : {}),
+      });
+      return { linked: true };
     } catch (error) {
-      return describe(error);
+      const fingerprint = error instanceof CallFailed && error.code === Failure.hostKeyToTrust
+        ? (error.data as { fingerprint?: string } | undefined)?.fingerprint : undefined;
+      if (fingerprint) return { needsTrust: fingerprint };
+      return { failed: describe(error) };
     }
   }
 
   /** The machines Add as Machine… installed, by name, linked to their workspace once they join. */
-  private readonly linkOnJoin = new Map<string, { provider: string; workspace: string }>();
+  private readonly linkOnJoin = new Map<string, { provider: string; workspace: string; trust?: string | undefined }>();
 
   /**
    * Add as Machine… (#3365), as the window's: the control plane installs Agents on `workspace` over
@@ -116,15 +130,16 @@ export class Providers {
   async install(destination: string, name: string, provider: string, workspace: string, trust?: string): Promise<InstallOutcome> {
     // Linked on join from the start (#3377): when the page stops waiting, the install goes on and
     // the machine still joins.
+    // The key trusted for the install is the one the link keeps (#3379).
     const asked = name || destination;
-    this.linkOnJoin.set(asked, { provider, workspace });
+    this.linkOnJoin.set(asked, { provider, workspace, trust });
     try {
       const answer = await this.caller.call("hosts/install", { destination, name, ...(trust ? { trust } : {}) }) as
         { needsTrust?: string; name?: string } | null;
       this.linkOnJoin.delete(asked);
       if (answer?.needsTrust) return { needsTrust: answer.needsTrust };
       const joined = answer?.name || asked;
-      this.linkOnJoin.set(joined, { provider, workspace });
+      this.linkOnJoin.set(joined, { provider, workspace, trust });
       return { added: joined };
     } catch (error) {
       if (!(error instanceof LinkDown)) this.linkOnJoin.delete(asked);
@@ -138,7 +153,10 @@ export class Providers {
       const host = hosts.find((h) => h.name === name && !h.workspace);
       if (!host) continue;
       this.linkOnJoin.delete(name);
-      void this.caller.call("hosts/link", { host: host.id as MachineRef, provider: wanted.provider as ProviderID, workspace: wanted.workspace })
+      void this.caller.call("hosts/link", {
+        host: host.id as MachineRef, provider: wanted.provider as ProviderID, workspace: wanted.workspace,
+        ...(wanted.trust ? { trust: wanted.trust } : {}),
+      })
         .catch(() => undefined);
     }
   }

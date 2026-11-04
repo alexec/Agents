@@ -206,7 +206,10 @@ type WorkspaceLink struct {
 	MeasuredStartSeconds *int
 	// The due time it was last started for, so each starts it once.
 	WokeFor *time.Time
-	Extra   records.Extra
+	// The ssh host key trusted at the link, in known_hosts form, for a host with no
+	// install to have trusted one (#3379); "" for none.
+	KnownHosts string
+	Extra      records.Extra
 }
 
 // Schedule is DaemonAPI.MachineSchedule as a link keeps it.
@@ -243,6 +246,7 @@ type linkJSON struct {
 	Schedule             *scheduleJSON  `json:"schedule,omitempty"`
 	MeasuredStartSeconds *int           `json:"measuredStartSeconds,omitempty"`
 	WokeFor              *records.Stamp `json:"wokeFor,omitempty"`
+	KnownHosts           string         `json:"knownHosts,omitempty"`
 }
 
 func stamp(t *time.Time) *records.Stamp {
@@ -263,7 +267,7 @@ func unstamp(s *records.Stamp) *time.Time {
 
 func (l WorkspaceLink) MarshalJSON() ([]byte, error) {
 	j := linkJSON{l.Provider, l.Workspace, l.StartWhenUsed, l.StopWhenIdleMinutes, l.StartForSchedules, nil,
-		l.MeasuredStartSeconds, stamp(l.WokeFor)}
+		l.MeasuredStartSeconds, stamp(l.WokeFor), l.KnownHosts}
 	if l.Schedule != nil {
 		j.Schedule = &scheduleJSON{stamp(l.Schedule.At), l.Schedule.Workflow}
 	}
@@ -277,7 +281,7 @@ func (l *WorkspaceLink) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*l = WorkspaceLink{j.Provider, j.Workspace, j.StartWhenUsed, j.StopWhenIdleMinutes, j.StartForSchedules, nil,
-		j.MeasuredStartSeconds, unstamp(j.WokeFor), extra}
+		j.MeasuredStartSeconds, unstamp(j.WokeFor), j.KnownHosts, extra}
 	if j.Schedule != nil {
 		l.Schedule = &Schedule{unstamp(j.Schedule.At), j.Schedule.Workflow}
 	}

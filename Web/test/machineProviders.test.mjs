@@ -108,7 +108,26 @@ test("Add as Machine… installs, shows a new host key first, and links the mach
   assert.equal(asked.filter((a) => a.method === "hosts/link").length, 0);
   p.linkJoined([{ id: "1", name: "other" }, { id: "7", name: "cs-box" }]);
   p.linkJoined([{ id: "7", name: "cs-box" }]);
-  assert.deepEqual(asked.filter((a) => a.method === "hosts/link").map((a) => a.params), [{ host: "7", provider: "gh", workspace: "cs-box-id" }]);
+  // The key trusted for the install is the one the link keeps (#3379).
+  assert.deepEqual(asked.filter((a) => a.method === "hosts/link").map((a) => a.params),
+    [{ host: "7", provider: "gh", workspace: "cs-box-id", trust: "SHA256:abc" }]);
+});
+
+test("Link to Machine… shows a new host key first, then links with it trusted (#3379)", async () => {
+  assert.ok(w.callTimeoutFor("hosts/link") >= 60_000);
+  const asked = [];
+  const p = new w.Providers({
+    call: async (method, params) => {
+      asked.push(params);
+      if (params.trust === "SHA256:abc") return {};
+      throw new w.CallFailed(w.Failure.hostKeyToTrust, "This machine’s host key is new.", { fingerprint: "SHA256:abc" });
+    },
+  });
+  assert.deepEqual(await p.link("7", "gh", "cs", true, 30), { needsTrust: "SHA256:abc" });
+  assert.deepEqual(await p.link("7", "gh", "cs", true, 30, "SHA256:abc"), { linked: true });
+  assert.deepEqual(asked.at(-1), { host: "7", provider: "gh", workspace: "cs", startWhenUsed: true, stopWhenIdleMinutes: 30, trust: "SHA256:abc" });
+  const refused = new w.Providers({ call: async () => { throw new w.CallFailed(-32602, "There is no such workspace."); } });
+  assert.deepEqual(await refused.link("7", "gh", "cs", true, 30), { failed: "There is no such workspace." });
 });
 
 test("Add as Machine… says why the control plane refused", async () => {

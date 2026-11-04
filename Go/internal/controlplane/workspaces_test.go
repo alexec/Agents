@@ -2,6 +2,8 @@ package controlplane
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"os"
 	"path/filepath"
 	"strings"
@@ -154,4 +156,42 @@ func TestAStoppedHostsUplinkIsClosedAndOffline(t *testing.T) {
 		t.Fatalf("%+v", state)
 	}
 	r.CloseStopped("nobody")
+}
+
+// A host that joined with the command has no install to have trusted its key, so the key
+// trusted when it was linked is the one its ssh start checks (#3379).
+func TestAStartOverSSHChecksTheKeyTrustedAtTheLink(t *testing.T) {
+	t.Parallel()
+	ssh, said := keyedSSH(t, "LINKKEY")
+	s := &Service{installer: &hostinstall.Installer{SSH: ssh}, cfg: Config{Log: func(string) {}}}
+	host := records.MachineRecord{ID: "cs", Name: "w3379-cs",
+		Workspace: []byte(`{"provider":"p","workspace":"w","knownHosts":"cs.w ssh-ed25519 LINKKEY\n"}`)}
+	if err := s.sshStart(host, "cs.w", false); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(said)
+	words := string(data)
+	for _, want := range []string{"HostKeyAlias=agents-pinned-host", "StrictHostKeyChecking=yes"} {
+		if !strings.Contains(words, want+"\n") {
+			t.Errorf("ssh was not given %q: %q", want, words)
+		}
+	}
+}
+
+// Linking such a host fetches the key its workspace offers: shown by its fingerprint until
+// that one is trusted, then given in known_hosts form (#3379).
+func TestAHostKeyIsFetchedToTrustAtALink(t *testing.T) {
+	t.Parallel()
+	ssh, _ := keyedSSH(t, "QUJD")
+	installer := &hostinstall.Installer{SSH: ssh}
+	sum := sha256.Sum256([]byte("ABC"))
+	fingerprint := "SHA256:" + base64.RawStdEncoding.EncodeToString(sum[:])
+	known, needsTrust, err := installer.HostKey(context.Background(), "cs.w", "")
+	if err != nil || known != "" || needsTrust != fingerprint {
+		t.Fatalf("%q %q %v", known, needsTrust, err)
+	}
+	known, needsTrust, err = installer.HostKey(context.Background(), "cs.w", fingerprint)
+	if err != nil || needsTrust != "" || known != "agents-pinned-host ssh-ed25519 QUJD\n" {
+		t.Fatalf("%q %q %v", known, needsTrust, err)
+	}
 }

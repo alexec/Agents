@@ -393,6 +393,7 @@ const FailureFileNotReadable = -32033
 const FailureFolderGone = -32004
 const FailureFolderHasLiveAgents = -32013
 const FailureFolderInTheWay = -32025
+const FailureHostKeyToTrust = -32069
 const FailureHostOffline = -32090
 const FailureImportedAgent = -32096
 const FailureKept = -32067
