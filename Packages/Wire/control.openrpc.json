@@ -2938,6 +2938,27 @@
       }
     },
     {
+      "name": "machines/summaryFacts",
+      "x-capability": "summary.machines/1",
+      "description": "Through host/machines only (#3354): the Daily summary workflow's facts from each of the person's other machines. The control plane asks each one online for its agents/summaryFacts at once; one that is off, or does not answer in time, is named with why.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SummaryFactsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MachinesSummaryFacts"
+        }
+      }
+    },
+    {
       "name": "notices/delivered",
       "x-capability": "notices/1",
       "description": "To the host whose notice it is, on its channel 0 (#2860): the control plane sent it to one of the person's devices, so the host records where on the notice's line.",

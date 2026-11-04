@@ -475,7 +475,12 @@ the days, edit the schedule's `days:`.
 - Its agent calls [`write_daily_summary`](agent-tools.md) for the facts. These are every folder on
   that machine since the last summary (at most a week back): sessions done and pull requests
   merged, sessions and workflows that failed or stopped, what waits on you (oldest first),
-  and suggestions nobody took. The agent writes one short page from them, with a link on each
+  and suggestions nobody took.
+- The facts also come from each of your other machines (#3354). The control plane asks each
+  one that is online for its facts, at the same time, and each one has 30 seconds to answer.
+  Their lines start with the machine's name, and a pull request merged in a checkout on two
+  machines is listed one time. A machine that is off, or that did not answer, is named on
+  the page. Another person's machines are not in your summary. The agent writes one short page from them, with a link on each
   line. `agents://agent/…` links open their session on the iPhone and iPad.
 - The page is saved in `~/.agents/summaries/`, where the last 3 stay. It opens in the files
   pane, and one notice goes to the Mac and the phone. Its session stays until you archive it.
