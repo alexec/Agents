@@ -26,6 +26,7 @@ func (d *Daemon) register() {
 	d.registerMac()
 	d.registerAgents()
 	d.registerPins()
+	d.registerReviews()
 	d.registerSettings()
 	d.registerHost()
 	d.registerBackups()

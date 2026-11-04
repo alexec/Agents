@@ -285,6 +285,8 @@ public extension DaemonAPI {
                 Row(Method.pinsArrange, params: PinArrangeRequest.self, result: Empty.self, kind: .hostRequest),
                 // Hide and Show on a server's list view (#2032).
                 Row(Method.pinsHideView, params: PinHideViewRequest.self, result: Empty.self, kind: .hostRequest),
+                // Dismiss on a pull request in For Review (#3330).
+                Row(Method.reviewsDismiss, params: ReviewDismissRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.pinsWrite, params: PinWriteRequest.self, result: Empty.self, kind: .hostRequest),
                 // Pin, Unpin and a drop among pinned sessions (#180), from every client alike.
                 Row(Method.pinsPinSession, params: PinSessionRequest.self, result: Empty.self, kind: .hostRequest),

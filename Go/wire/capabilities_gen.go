@@ -116,6 +116,7 @@ const CapReports1 = "reports/1"
 const CapResourcesLeases1 = "resources.leases/1"
 const CapResources1 = "resources/1"
 const CapRetention1 = "retention/1"
+const CapReviews1 = "reviews/1"
 const CapRuntime1 = "runtime/1"
 const CapRuntimesAccounts1 = "runtimes.accounts/1"
 const CapRuntimesSignIn1 = "runtimes.sign-in/1"
@@ -383,6 +384,7 @@ var HostCapabilities = pairs([][2]string{
 	{"resources/snapshot", "resources.leases/1"},
 	{"retention/set", "retention/1"},
 	{"retention/state", "retention/1"},
+	{"reviews/dismiss", "reviews/1"},
 	{"runtimes/accountProfiles", "runtimes.accounts/1"},
 	{"runtimes/accounts", "runtimes/1"},
 	{"runtimes/addAccount", "runtimes.accounts/1"},

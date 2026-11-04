@@ -30,6 +30,8 @@ type fakeForgeGitHub struct {
 	epics []githubmcp.Item
 	plan  githubmcp.Plan
 	plans int
+	// reviews are what a list of the label needs-approval gives (#3330).
+	reviews []githubmcp.Item
 }
 
 func (f *fakeForgeGitHub) Search(_ context.Context, repos []string, sf githubmcp.SearchFilter, after string, first int) (githubmcp.SearchPage, error) {
@@ -38,6 +40,9 @@ func (f *fakeForgeGitHub) Search(_ context.Context, repos []string, sf githubmcp
 	f.searches = append(f.searches, strings.Join(repos, ",")+" "+githubmcp.SearchQuery(repos, sf)+" after="+after)
 	if sf.Label == "epic" {
 		return githubmcp.SearchPage{Items: f.epics}, nil
+	}
+	if sf.Label == "needs-approval" {
+		return githubmcp.SearchPage{Items: f.reviews}, nil
 	}
 	if after != "" {
 		return githubmcp.SearchPage{Items: []githubmcp.Item{{Repo: "alexec/web", Number: 2, PR: sf.PRs, State: "open", Title: "Older"}}}, nil

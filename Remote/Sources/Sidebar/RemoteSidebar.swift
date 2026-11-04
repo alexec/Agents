@@ -297,6 +297,10 @@ struct RemoteSmartFold: View {
                             RemoteApprovalRow(approval: item.approval, folder: item.folder, place: place(of: item.folder))
                         }
                     }
+                    // For Review's pull requests waiting for an approval (#3330), after its sessions.
+                    ForEach(row.pulls(in: model.work, folders: keys, query: query), id: \.pull.id) { item in
+                        RemoteReviewPullRow(pull: item.pull, folder: item.folder, place: place(of: item.folder))
+                    }
                 }
             }
         } header: {
@@ -396,6 +400,37 @@ private struct RemoteApprovalRow: View {
 
     private func answerNow(_ action: Approval.Action) {
         Task { await model.settleApproval(approval, action, for: folder) }
+    }
+}
+
+/// A pull request waiting for the person's approval, under For Review (#3330), the window's
+/// `ReviewPullListRow`: a tap opens its page, with its screenshots; Dismiss is a swipe and in
+/// the long press, and takes it out for good.
+private struct RemoteReviewPullRow: View {
+    @Environment(RemoteModel.self) private var model
+    @Environment(\.openURL) private var openURL
+    let pull: ReviewPull
+    let folder: FolderKey
+    let place: String?
+
+    var body: some View {
+        Button { openURL(pull.url) } label: {
+            ReviewPullRowLabel(pull: pull, place: place)
+        }
+        .buttonStyle(.plain)
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button("Dismiss", systemImage: "xmark") { dismissNow() }
+                .tint(.gray)
+        }
+        .contextMenu {
+            Button("Open Pull Request", systemImage: "arrow.up.right.square") { openURL(pull.url) }
+            Button("Dismiss", systemImage: "xmark") { dismissNow() }
+        }
+        .accessibilityAction(named: "Dismiss", dismissNow)
+    }
+
+    private func dismissNow() {
+        Task { await model.dismissReview(pull, in: folder.folder) }
     }
 }
 

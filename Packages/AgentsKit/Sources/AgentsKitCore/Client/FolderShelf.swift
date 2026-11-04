@@ -213,4 +213,11 @@ final class PinShelf {
     func setSessions(_ sessions: [UUID]) {
         if self.sessions != sessions { self.sessions = sessions }
     }
+
+    /// The pull requests waiting for the person's approval (#3330), newest first.
+    private(set) var reviews: [ReviewPull] = []
+
+    func setReviews(_ reviews: [ReviewPull]) {
+        if self.reviews != reviews { self.reviews = reviews }
+    }
 }

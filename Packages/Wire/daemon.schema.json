@@ -9037,6 +9037,13 @@
           "items": {
             "$ref": "#/definitions/PinView"
           }
+        },
+        "reviews": {
+          "type": "array",
+          "description": "Its open pull requests waiting for the person's approval (#3330), newest first. Nil from a host with none.",
+          "items": {
+            "$ref": "#/definitions/ReviewPull"
+          }
         }
       },
       "required": [
@@ -16956,6 +16963,13 @@
           "items": {
             "$ref": "#/definitions/PinView"
           }
+        },
+        "reviews": {
+          "type": "array",
+          "description": "Its open pull requests waiting for the person's approval (#3330), newest first. Nil from a host with none.",
+          "items": {
+            "$ref": "#/definitions/ReviewPull"
+          }
         }
       },
       "required": [
@@ -20274,6 +20288,57 @@
         "settings",
         "archivedCount",
         "archivedBytes"
+      ],
+      "additionalProperties": false
+    },
+    "ReviewDismissRequest": {
+      "type": "object",
+      "description": "reviews/dismiss (#3330): a person's Dismiss on a pull request in the sidebar's For Review. The host keeps it, so that pull request is not listed again.",
+      "properties": {
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "url": {
+          "$ref": "#/definitions/URLString",
+          "description": "The pull request's page, as its ReviewPull says it."
+        }
+      },
+      "required": [
+        "folder",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "ReviewPull": {
+      "type": "object",
+      "description": "An open pull request labelled needs-approval, a UI change waiting for the person (#2811), in the sidebar's For Review (#3330) until it is labelled approved or changes-wanted, is closed, or is dismissed.",
+      "properties": {
+        "url": {
+          "$ref": "#/definitions/URLString"
+        },
+        "number": {
+          "type": "integer"
+        },
+        "title": {
+          "type": "string"
+        },
+        "repo": {
+          "type": "string",
+          "description": "owner/name."
+        },
+        "author": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "url",
+        "number",
+        "title",
+        "repo",
+        "updatedAt"
       ],
       "additionalProperties": false
     },

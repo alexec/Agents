@@ -1781,6 +1781,16 @@ final class AppModel {
         }
     }
 
+    /// Dismiss on a pull request in For Review (#3330): gone at once, then the host told,
+    /// which keeps it out for good.
+    func dismissReview(_ pull: ReviewPull, in key: FolderKey) async {
+        work.dismissReview(pull.url, in: key.folder)
+        await attempt(on: key.host) {
+            try await self.client(for: key.host).call(DaemonAPI.Method.reviewsDismiss,
+                                                      DaemonAPI.ReviewDismissRequest(folder: key.folder, url: pull.url))
+        }
+    }
+
     /// Hide or Show on a server's list view (#2032): shown at once, then the host told.
     func setViewHidden(_ uri: String, _ hidden: Bool, in key: FolderKey) async {
         work.setViewHidden(uri, hidden, in: key.folder)

@@ -102,6 +102,13 @@
 .sidebar-mark.asksToArchive { color: var(--tint-attention); font-size: 0.75rem; }
 /* Waiting for an OK (#773): a shield, in the attention tint as the hand is, whatever its kind. */
 .sidebar-mark.approval { color: var(--tint-attention); }
+/* For Review's pull requests (#3330): the accent, as a page's row; Dismiss over the time on hover. */
+.sidebar-mark.pull { color: var(--accent); }
+.nav-item.review-pull { position: relative; }
+.review-pull > .dismiss { display: none; position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  border: 0; border-radius: 5px; padding: 2px 8px; background: color-mix(in srgb, var(--paper-ink) 12%, transparent); color: inherit; font-size: 0.75rem; cursor: pointer; }
+.review-pull:is(:hover, :focus-within) > .dismiss { display: inline-block; }
+.review-pull:is(:hover, :focus-within) :is(.when, .place) { visibility: hidden; }
 
 /* A folder's Archived row (#495), opening its page: in the rows' type, its count on the right. */
 .row.page-row { grid-template-columns: minmax(0, 1fr); padding: 0; }

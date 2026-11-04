@@ -4109,6 +4109,9 @@ type FolderPins struct {
 	Workflows []string `json:"workflows,omitzero"`
 
 	Views []PinView `json:"views,omitzero"`
+
+	// Its open pull requests waiting for the person's approval (#3330), newest first. Nil from a host with none.
+	Reviews []ReviewPull `json:"reviews,omitzero"`
 }
 
 type FolderPlugin struct {
@@ -7500,6 +7503,9 @@ type PinsChangedNotification struct {
 	Workflows []string `json:"workflows,omitzero"`
 
 	Views []PinView `json:"views,omitzero"`
+
+	// Its open pull requests waiting for the person's approval (#3330), newest first. Nil from a host with none.
+	Reviews []ReviewPull `json:"reviews,omitzero"`
 }
 
 type Plan struct {
@@ -8994,6 +9000,30 @@ type RetentionState struct {
 	ArchivedCount int64 `json:"archivedCount"`
 
 	ArchivedBytes int64 `json:"archivedBytes"`
+}
+
+// reviews/dismiss (#3330): a person's Dismiss on a pull request in the sidebar's For Review. The host keeps it, so that pull request is not listed again.
+type ReviewDismissRequest struct {
+	Folder URL `json:"folder"`
+
+	// The pull request's page, as its ReviewPull says it.
+	URL URL `json:"url"`
+}
+
+// An open pull request labelled needs-approval, a UI change waiting for the person (#2811), in the sidebar's For Review (#3330) until it is labelled approved or changes-wanted, is closed, or is dismissed.
+type ReviewPull struct {
+	URL URL `json:"url"`
+
+	Number int64 `json:"number"`
+
+	Title string `json:"title"`
+
+	// owner/name.
+	Repo string `json:"repo"`
+
+	Author *string `json:"author,omitzero"`
+
+	UpdatedAt Date `json:"updatedAt"`
 }
 
 type Runtime struct {
