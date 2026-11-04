@@ -456,6 +456,10 @@ public enum DaemonAPI {
         public static let desktopControlSet = "desktopControl/set"
         public static let desktopControlResume = "desktopControl/resume"
         public static let desktopControlTakeOver = "desktopControl/takeOver"
+        /// The daily summary's one control (#3351): Off or Summary, and its time, for all
+        /// folders. The home folder's Daily summary workflow keeps it.
+        public static let dailySummarySettings = "dailySummary/settings"
+        public static let dailySummarySetSettings = "dailySummary/setSettings"
         /// One agent's override (nil clears it), and the card's recovery (064).
         public static let agentsSetSandbox = "agents/setSandbox"
         public static let agentsAnswerSandbox = "agents/answerSandbox"
@@ -529,6 +533,9 @@ public enum DaemonAPI {
         public static let modesChanged = "modes/changed"
         /// The display choices changed: the whole map, as `preferences/get` answers (#1033).
         public static let preferencesChanged = "preferences/changed"
+        /// The daily summary's control changed (#3351): the whole of it, as
+        /// `dailySummary/settings` answers.
+        public static let dailySummaryChanged = "dailySummary/changed"
         /// The whole resolved fact for one need: where it should be showing and whether
         /// the person may be buzzed. Broadcast to every connection, not only to `to`,
         /// which is what lets the losers withdraw (021).

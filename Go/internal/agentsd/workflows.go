@@ -757,6 +757,8 @@ func (d *Daemon) tellEveryWorkflow() {
 	for f := range folders {
 		d.sendFolder(f)
 	}
+	// The daily summary's control is the home folder's Daily summary workflow (#3351).
+	Broadcast(d, wire.NotifyDailySummaryChanged, d.dailySummarySettings())
 }
 
 func (d *Daemon) oneWorkflow(folder, id string) (wire.WorkflowSummary, error) {

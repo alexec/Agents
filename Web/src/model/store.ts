@@ -15,7 +15,7 @@ import type {
   PagesChangedNotification, PinsChangedNotification, PinView, ReviewPull, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, PolicySetBy, RuntimeAllowances,
   GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
-  BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, DesktopControlSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
+  BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, DailySummarySettings, DesktopControlSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
   PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, RemoveRequest, ClientPermissionSettings, PRCostComment } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
@@ -383,6 +383,9 @@ export class Work {
   /** Desktop control's own off-by-default switch (#3004, US2), for Settings: null until it has
    * said, or from a host too old to know the method, which leaves the section out. */
   readonly desktopControl = signal<DesktopControlSettings | null>(null);
+  /** The daily summary's Off / Summary control and its time (#3351), for Settings ▸ Workflows: null
+   * until the Mac's host has said, or from a host too old to know the method, which leaves it out. */
+  readonly dailySummary = signal<DailySummarySettings | null>(null);
   /** Each host's folders' worktrees (#790), as `worktrees/all` last answered: asked when Activity ▸
    * Worktrees is shown, not kept up by the host. */
   readonly worktreeLists = signal<Record<string, FolderWorktrees[]>>({});
@@ -686,6 +689,9 @@ export class Work {
         return true;
       case "preferences/changed":
         if (this.isMac(host)) preferencesSaid(params as Record<string, JSONValue>);
+        return true;
+      case "dailySummary/changed":
+        if (this.isMac(host)) this.dailySummary.value = params as DailySummarySettings;
         return true;
       case "modes/changed":
         this.rememberedModes.value = { ...this.rememberedModes.value, [host]: params as Record<string, JSONValue> };
@@ -2202,6 +2208,26 @@ export class Store extends Work {
       this.desktopControl.value = await this.link.call("desktopControl/set", { enabled }, this.macHostID.value);
     } catch (error) {
       this.desktopControl.value = before;
+      this.say(describe(error));
+    }
+  }
+
+  /** Settings ▸ Workflows' daily summary (#3351), asked when the section is shown. */
+  loadDailySummary(): void {
+    void this.link.call("dailySummary/settings", {}, this.macHostID.value).then(
+      (settings) => { this.dailySummary.value = settings; },
+      () => { /* too old to know the method: the control stays out. */ },
+    );
+  }
+
+  /** The person chose Off or Summary, or a time, for the daily summary (#3351). */
+  async setDailySummary(settings: DailySummarySettings): Promise<void> {
+    const before = this.dailySummary.value;
+    this.dailySummary.value = settings;
+    try {
+      this.dailySummary.value = await this.link.call("dailySummary/setSettings", settings, this.macHostID.value);
+    } catch (error) {
+      this.dailySummary.value = before;
       this.say(describe(error));
     }
   }

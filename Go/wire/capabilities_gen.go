@@ -38,6 +38,7 @@ const CapControl1 = "control/1"
 const CapCost1 = "cost/1"
 const CapCredentials1 = "credentials/1"
 const CapDaemon1 = "daemon/1"
+const CapDailySummary1 = "daily-summary/1"
 const CapDevice1 = "device/1"
 const CapDevices1 = "devices/1"
 const CapDisk1 = "disk/1"
@@ -232,6 +233,8 @@ var HostCapabilities = pairs([][2]string{
 	{"daemon/policyState", "host.policy/1"},
 	{"daemon/quit", "daemon/1"},
 	{"daemon/status", "daemon/1"},
+	{"dailySummary/setSettings", "daily-summary/1"},
+	{"dailySummary/settings", "daily-summary/1"},
 	{"desktopControl/resume", "host.desktop-control/1"},
 	{"desktopControl/set", "host.desktop-control/1"},
 	{"desktopControl/state", "host.desktop-control/1"},
@@ -478,6 +481,7 @@ var HostCapabilities = pairs([][2]string{
 	{"clone/changed", "clone/1"},
 	{"cost/changed", "cost/1"},
 	{"daemon/policyStateChanged", "host.policy/1"},
+	{"dailySummary/changed", "daily-summary/1"},
 	{"desktopControl/liveFrame", "host.desktop-control/1"},
 	{"device/changed", "device/1"},
 	{"disk/changed", "disk/1"},
@@ -531,6 +535,7 @@ var HostNotifications = set([]string{
 	"clone/changed",
 	"cost/changed",
 	"daemon/policyStateChanged",
+	"dailySummary/changed",
 	"desktopControl/liveFrame",
 	"device/changed",
 	"disk/changed",
