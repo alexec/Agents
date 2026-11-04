@@ -247,6 +247,7 @@ var CallResourcesSnapshot = Method[Empty, LeaseSnapshot]{"resources/snapshot"}
 var CallRetentionSet = Method[RetentionSetRequest, RetentionSetResult]{"retention/set"}
 var CallRetentionState = Method[Empty, RetentionState]{"retention/state"}
 var CallReviewsDismiss = Method[ReviewDismissRequest, Empty]{"reviews/dismiss"}
+var CallReviewsOpen = Method[ReviewOpenRequest, Empty]{"reviews/open"}
 var CallRuntimesAccountProfiles = Method[Empty, []AccountProfile]{"runtimes/accountProfiles"}
 var CallRuntimesAccounts = Method[Empty, []RuntimeAccount]{"runtimes/accounts"}
 var CallRuntimesAddAccount = Method[AddAccountRequest, AccountProfile]{"runtimes/addAccount"}

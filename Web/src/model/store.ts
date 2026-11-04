@@ -3075,6 +3075,15 @@ export class Store extends Work {
     await this.act("reviews/dismiss", { folder: folder as never, url: url as never }, host);
   }
 
+  /** A press on a pull request in For Review (#3464): drawn read at once, then the host told, which keeps it for every client. */
+  async openReview(host: string, folder: string, url: string): Promise<void> {
+    const pulls = this.reviewPullsIn(host, folder);
+    if (!pulls.some((p) => p.url === url && !p.opened)) return;
+    const key = `${host}|${folderKey(folder)}`;
+    this.reviewPulls.value = { ...this.reviewPulls.value, [key]: pulls.map((p) => (p.url === url ? { ...p, opened: true } : p)) };
+    await this.act("reviews/open", { folder: folder as never, url: url as never }, host);
+  }
+
   /** A folder's suggestions of the daily checks (#3331), newest first. */
   checkSuggestionsIn(host: string, folder: string): CheckSuggestion[] {
     return this.checkSuggestions.value[`${host}|${folderKey(folder)}`] ?? [];

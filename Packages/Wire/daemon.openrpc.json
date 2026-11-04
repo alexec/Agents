@@ -6522,6 +6522,32 @@
       }
     },
     {
+      "name": "reviews/open",
+      "x-capability": "reviews/2",
+      "description": "Say that the person opened a pull request in the sidebar's For Review (#3464): the host keeps it, and its row is drawn read.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ReviewOpenRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "runtime/account",
       "x-capability": "runtime/1",
       "x-notification": true,

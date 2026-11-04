@@ -193,13 +193,13 @@ private struct ReviewPullListRow: View {
         ReviewPullRowLabel(pull: pull, place: place)
             .help("\(pull.title) · Pull request #\(pull.number) · \(pull.repo)")
             .pointerStyle(.link)
-            .onTapGesture { openURL(pull.url) }
+            .onTapGesture(perform: open)
             .swipeActions(edge: .trailing) {
                 SwipeAction("Dismiss", systemImage: "xmark") { await dismissNow() }
                     .tint(.gray)
             }
             .contextMenu {
-                Button("Open Pull Request") { openURL(pull.url) }
+                Button("Open Pull Request", action: open)
                 Button("Dismiss", action: dismiss)
             }
             .accessibilityAddTraits(.isButton)
@@ -212,6 +212,12 @@ private struct ReviewPullListRow: View {
 
     private func dismissNow() async {
         await model.dismissReview(pull, in: folder)
+    }
+
+    /// Opens its page, and draws it read from then on (#3464).
+    private func open() {
+        openURL(pull.url)
+        Task { await model.openReview(pull, in: folder) }
     }
 }
 

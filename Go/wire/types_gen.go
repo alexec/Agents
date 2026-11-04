@@ -9178,6 +9178,14 @@ type ReviewDismissRequest struct {
 	URL URL `json:"url"`
 }
 
+// reviews/open (#3464): a person opened a pull request's page from the sidebar's For Review. The host keeps it, so its row is drawn read on every client.
+type ReviewOpenRequest struct {
+	Folder URL `json:"folder"`
+
+	// The pull request's page, as its ReviewPull says it.
+	URL URL `json:"url"`
+}
+
 // An open pull request labelled needs-approval, a UI change waiting for the person (#2811), in the sidebar's For Review (#3330) until it is labelled approved or changes-wanted, is closed, or is dismissed.
 type ReviewPull struct {
 	URL URL `json:"url"`
@@ -9192,6 +9200,9 @@ type ReviewPull struct {
 	Author *string `json:"author,omitzero"`
 
 	UpdatedAt Date `json:"updatedAt"`
+
+	// The person has opened its page (reviews/open, #3464): its row is drawn read, not bold.
+	Opened *bool `json:"opened,omitzero"`
 }
 
 type Runtime struct {

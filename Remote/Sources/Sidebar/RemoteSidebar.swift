@@ -436,7 +436,7 @@ private struct RemoteReviewPullRow: View {
     let place: String?
 
     var body: some View {
-        Button { openURL(pull.url) } label: {
+        Button(action: open) {
             ReviewPullRowLabel(pull: pull, place: place)
         }
         .buttonStyle(.plain)
@@ -445,7 +445,7 @@ private struct RemoteReviewPullRow: View {
                 .tint(.gray)
         }
         .contextMenu {
-            Button("Open Pull Request", systemImage: "arrow.up.right.square") { openURL(pull.url) }
+            Button("Open Pull Request", systemImage: "arrow.up.right.square", action: open)
             Button("Dismiss", systemImage: "xmark") { dismissNow() }
         }
         .accessibilityAction(named: "Dismiss", dismissNow)
@@ -453,6 +453,12 @@ private struct RemoteReviewPullRow: View {
 
     private func dismissNow() {
         Task { await model.dismissReview(pull, in: folder.folder) }
+    }
+
+    /// Opens its page, and draws it read from then on (#3464).
+    private func open() {
+        openURL(pull.url)
+        Task { await model.openReview(pull, in: folder.folder) }
     }
 }
 

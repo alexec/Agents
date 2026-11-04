@@ -20603,6 +20603,24 @@
       ],
       "additionalProperties": false
     },
+    "ReviewOpenRequest": {
+      "type": "object",
+      "description": "reviews/open (#3464): a person opened a pull request's page from the sidebar's For Review. The host keeps it, so its row is drawn read on every client.",
+      "properties": {
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "url": {
+          "$ref": "#/definitions/URLString",
+          "description": "The pull request's page, as its ReviewPull says it."
+        }
+      },
+      "required": [
+        "folder",
+        "url"
+      ],
+      "additionalProperties": false
+    },
     "ReviewPull": {
       "type": "object",
       "description": "An open pull request labelled needs-approval, a UI change waiting for the person (#2811), in the sidebar's For Review (#3330) until it is labelled approved or changes-wanted, is closed, or is dismissed.",
@@ -20625,6 +20643,10 @@
         },
         "updatedAt": {
           "$ref": "#/definitions/WireDate"
+        },
+        "opened": {
+          "type": "boolean",
+          "description": "The person has opened its page (reviews/open, #3464): its row is drawn read, not bold."
         }
       },
       "required": [

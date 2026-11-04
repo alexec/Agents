@@ -20,12 +20,15 @@ import (
 // (#3129), one search for every folder, on its own poll; said with each folder's pins
 // (FolderPins.reviews, pins/changed). A dismissal is kept in <root>/review-dismissals.json,
 // so a dismissed pull request never comes back; not in the folder's .agents/pins.json, which
-// a repo may check in.
+// a repo may check in. A pull request the person opened is kept in <root>/review-opened.json
+// (#3464), so every client draws its row read.
 
 const (
 	reviewLabel = "needs-approval"
 	// reviewDismissalsPerFolder bounds the dismissals kept for one folder: the oldest go first.
 	reviewDismissalsPerFolder = 200
+	// reviewOpenedPerFolder bounds the opened pull requests kept for one folder: the oldest go first.
+	reviewOpenedPerFolder = 200
 )
 
 // The labels that say the person has answered: the pull request leaves For Review.
@@ -44,6 +47,9 @@ type reviewBook struct {
 	// dismissed is each folder's dismissed pull requests' URLs, oldest first.
 	dismissed       map[string][]string
 	dismissedLoaded bool
+	// opened is each folder's opened pull requests' URLs, oldest first.
+	opened       map[string][]string
+	openedLoaded bool
 }
 
 func (d *Daemon) reviewDismissalsPath() string {
@@ -62,11 +68,35 @@ func (d *Daemon) dismissedLocked() map[string][]string {
 	return d.dismissed
 }
 
-// reviewsFor is a folder's pull requests for review, newest first; nil when it has none.
+func (d *Daemon) reviewOpenedPath() string {
+	return filepath.Join(d.Store.Loc.Root, "review-opened.json")
+}
+
+func (d *Daemon) openedLocked() map[string][]string {
+	if !d.openedLoaded {
+		d.openedLoaded = true
+		d.opened = map[string][]string{}
+		readStore(d.reviewOpenedPath(), &d.opened, "every opened pull request may be drawn unread again")
+		if d.opened == nil {
+			d.opened = map[string][]string{}
+		}
+	}
+	return d.opened
+}
+
+// reviewsFor is a folder's pull requests for review, newest first, each one the person opened
+// said so; nil when it has none.
 func (d *Daemon) reviewsFor(folder string) []wire.ReviewPull {
 	d.reviewMu.Lock()
 	defer d.reviewMu.Unlock()
-	return slices.Clone(d.reviews[folder])
+	prs := slices.Clone(d.reviews[folder])
+	opened := d.openedLocked()[folder]
+	for i := range prs {
+		if slices.Contains(opened, string(prs[i].URL)) {
+			prs[i].Opened = new(true)
+		}
+	}
+	return prs
 }
 
 // reviewPullOf is a forge item as For Review lists it, and whether it belongs there.
@@ -182,6 +212,26 @@ func (d *Daemon) dismissReview(folder string, url wire.URL) {
 	d.pinsChanged(folder)
 }
 
+// openReview keeps that the person opened a pull request, so its row is drawn read.
+func (d *Daemon) openReview(folder string, url wire.URL) {
+	d.reviewMu.Lock()
+	opened := d.openedLocked()
+	if slices.Contains(opened[folder], string(url)) {
+		d.reviewMu.Unlock()
+		return
+	}
+	kept := append(opened[folder], string(url))
+	if len(kept) > reviewOpenedPerFolder {
+		kept = kept[len(kept)-reviewOpenedPerFolder:]
+	}
+	opened[folder] = kept
+	if err := writeStore(d.reviewOpenedPath(), opened); err != nil {
+		log.Printf("for review: the opened pull requests were not written: %v", err)
+	}
+	d.reviewMu.Unlock()
+	d.pinsChanged(folder)
+}
+
 func (d *Daemon) registerReviews() {
 	On(d, wire.CallReviewsDismiss, func(ctx context.Context, c *Client, r wire.ReviewDismissRequest) (wire.Empty, error) {
 		folder, err := d.knownPinFolder(r.Folder)
@@ -192,6 +242,17 @@ func (d *Daemon) registerReviews() {
 			return wire.Empty{}, Invalid("reviews/dismiss names the pull request's url.")
 		}
 		d.dismissReview(folder, r.URL)
+		return wire.Empty{}, nil
+	})
+	On(d, wire.CallReviewsOpen, func(ctx context.Context, c *Client, r wire.ReviewOpenRequest) (wire.Empty, error) {
+		folder, err := d.knownPinFolder(r.Folder)
+		if err != nil {
+			return wire.Empty{}, err
+		}
+		if strings.TrimSpace(string(r.URL)) == "" {
+			return wire.Empty{}, Invalid("reviews/open names the pull request's url.")
+		}
+		d.openReview(folder, r.URL)
 		return wire.Empty{}, nil
 	})
 }

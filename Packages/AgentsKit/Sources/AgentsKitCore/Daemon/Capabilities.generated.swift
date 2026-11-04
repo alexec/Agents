@@ -122,6 +122,7 @@ public enum Capability {
     public static let resources1 = "resources/1"
     public static let retention1 = "retention/1"
     public static let reviews1 = "reviews/1"
+    public static let reviews2 = "reviews/2"
     public static let runtime1 = "runtime/1"
     public static let runtimesAccounts1 = "runtimes.accounts/1"
     public static let runtimesSignIn1 = "runtimes.sign-in/1"
@@ -397,6 +398,7 @@ public enum Capability {
         "retention/set": "retention/1",
         "retention/state": "retention/1",
         "reviews/dismiss": "reviews/1",
+        "reviews/open": "reviews/2",
         "runtimes/accountProfiles": "runtimes.accounts/1",
         "runtimes/accounts": "runtimes/1",
         "runtimes/addAccount": "runtimes.accounts/1",

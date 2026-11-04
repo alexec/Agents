@@ -898,6 +898,16 @@ public final class AgentsModel {
         pinShelves[key]?.setReviews(reviews)
     }
 
+    /// A pull request opened from For Review as a screen pressed it, before the host says so (#3464).
+    public func openReview(_ url: URL, in folder: URL) {
+        let key = Folder.standardize(folder)
+        guard var reviews = reviewPulls[key], let at = reviews.firstIndex(where: { $0.url == url }),
+              reviews[at].isUnread else { return }
+        reviews[at].opened = true
+        reviewPulls[key] = reviews
+        pinShelves[key]?.setReviews(reviews)
+    }
+
     /// One folder's suggestions of the daily checks (#3331), newest first.
     public func checkSuggestions(in folder: URL?) -> [CheckSuggestion] {
         guard let folder else { return [] }
