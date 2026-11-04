@@ -10276,6 +10276,7 @@ export interface Methods {
   "hosts/link": { params: MachineLink; result: ControlMachine };
   "hosts/list": { params: Empty; result: ControlMachine[] };
   "hosts/listKept": { params: Empty; result: KeptList };
+  "hosts/remove": { params: MachineRequest; result: Empty };
   "hosts/retryKept": { params: KeptRequestID; result: Empty };
   "hosts/setMachineOptions": { params: MachineOptions; result: ControlMachine };
   "hosts/start": { params: MachineRequest; result: ControlMachine };
@@ -10606,6 +10607,7 @@ export const MethodTarget = {
   "hosts/link": "control",
   "hosts/list": "control",
   "hosts/listKept": "control",
+  "hosts/remove": "control",
   "hosts/retryKept": "control",
   "hosts/setMachineOptions": "control",
   "hosts/start": "control",

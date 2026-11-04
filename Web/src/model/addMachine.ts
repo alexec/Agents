@@ -35,6 +35,9 @@ export const addMachineWords = {
   makingCode: "Making a code…",
   joined: (name: string) => `${name} joined. The code can’t be used again.`,
   machinesFoot: "Removing a machine stops it connecting. Its agents are left running where they are.",
+  /** Remove… on a machine, asked as the window's Machines pane asks it (#3381). */
+  removeTitle: (name: string) => `Remove ${name}?`,
+  removeNote: "It stops connecting, and every window and device stops seeing it. Its agents are left running where they are.",
   started: (name: string) => `${name} is starting. It installs Agents and joins on its first boot.`,
 };
 

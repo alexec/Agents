@@ -5,13 +5,16 @@ import { addMachineWords } from "../../model/addMachine";
 import { AddMachineDialog } from "../AddMachineDialog";
 import { appMissingWords, missingWords, stateWords, versionWords } from "../../model/capabilities";
 
-/** Machines (#1759): every machine, with its version (#1748) and what one too old for the control plane is
- * missing, as the window's Machines pane lists them. The control plane's own version is under the list. */
+/** Machines (#1759): every machine, with its version (#1748), what one too old for the control plane is
+ * missing and Remove… (#3381), as the window's Machines pane lists them. The control plane's own version is under the list. */
 export function VersionsSection({ store }: { store: Store }) {
   const plane = store.plane.value;
   const hosts = store.hosts.value.filter((h) => h.relay == null);
   const appMissing = plane?.version ? appMissingWords(plane.required, plane.version) : null;
   const [adding, setAdding] = useState(false);
+  const remove = (host: { id: string; name: string }) => {
+    if (window.confirm(`${addMachineWords.removeTitle(host.name)} ${addMachineWords.removeNote}`)) void store.removeHost(host.id);
+  };
   return (
     <section aria-labelledby="settings-machines">
       <h3 class="section-head" id="settings-machines">Machines</h3>
@@ -22,6 +25,8 @@ export function VersionsSection({ store }: { store: Store }) {
           <div class="setting" key={host.id}>
             <span>{host.name}{missing && <span class="small failure"> {missing}</span>}</span>
             <span class="faint">{host.state === "online" ? "" : `${stateWords(host)} · `}{versionWords(host)}</span>
+            {/* The window's Remove… (#3381): the control plane says no to one who may not. */}
+            <button type="button" class="destructive" onClick={() => remove(host)}>Remove…</button>
           </div>
         );
       })}
