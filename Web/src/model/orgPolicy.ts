@@ -3,7 +3,7 @@
 // are OrgPolicyWords (Packages/AgentsKit/.../Model/OrgPolicy.swift) on the Mac and the Remote; the
 // same here, for Settings ▸ Policy and Console ▸ Policy. Below them, the Console's form: the policy
 // as fields an admin types in, back to a policy, and what a change does before it is saved.
-import type { AuditActor, CostLimits, FleetMachine, OrgPolicy, PolicyBudgets, PolicyLayerRef, PolicyReach, PolicyRefusal, PolicyRuntimeRule, PolicySetBy, PolicyState, PolicyStopAll,
+import type { AuditActor, ClientPermissionMode, CostLimits, FleetMachine, OrgPolicy, PolicyBudgets, PolicyLayerRef, PolicyReach, PolicyRefusal, PolicyRuntimeRule, PolicySetBy, PolicyState, PolicyStopAll,
   PolicyView, WireDate }
   from "../protocol/generated";
 import type { CallFailed } from "../wire/link";
@@ -172,10 +172,30 @@ export function helperWords(h: { mostRunning?: number; mostNotArchived?: number 
   return parts.length === 0 ? null : `At most ${parts.join(" and ")} in a folder`;
 }
 
+/** "At most 3 in a burst, then a wait of 10 min"; null when neither is set (#2957, FR-003). */
+export function noticeWords(n: { burst?: number; waitMinutes?: number }): string | null {
+  const wait = n.waitMinutes === undefined ? null : `a wait of ${minutes(n.waitMinutes)}`;
+  if (n.burst !== undefined) return `At most ${n.burst} in a burst${wait ? `, then ${wait}` : ""}`;
+  return wait && `${wait.charAt(0).toUpperCase()}${wait.slice(1)} after a burst`;
+}
+
+/** "10 min", "1 hour", "4 hours", as Agents ▸ Policy says a wait. */
+function minutes(n: number): string {
+  if (n < 60 || n % 60 !== 0) return `${n} min`;
+  return n === 60 ? "1 hour" : `${n / 60} hours`;
+}
+
+/** The answers to a permission request, loosest first, as Agents ▸ Policy names them (#2957). */
+export const requestNames: Record<ClientPermissionMode, string> = { alwaysApprove: "Approve for me", default: "Ask me" };
+
 /** Each rule the policy sets, in words, in the pane's order. Empty for a policy that sets none. */
 export function rules(p: OrgPolicy): Rule[] {
   const out: Rule[] = [];
   if (p.permissionMode) out.push({ name: "permissionMode", title: "Modes", words: `Up to ${modeNames[p.permissionMode] ?? p.permissionMode}` });
+  if (p.permissionRequests) {
+    out.push({ name: "permissionRequests", title: "Permission requests",
+      words: p.permissionRequests === "default" ? "Ask me" : `Up to ${requestNames[p.permissionRequests] ?? p.permissionRequests}` });
+  }
   if (p.sandbox === "required") out.push({ name: "sandbox", title: "Command sandbox", words: "Required" });
   if (p.runtimes) {
     out.push({ name: "runtimes", title: "Runtimes", words: runtimeWords(p.runtimes) });
@@ -200,6 +220,12 @@ export function rules(p: OrgPolicy): Rule[] {
   }
   const helpers = p.helpers && helperWords(p.helpers);
   if (helpers) out.push({ name: "helpers", title: "Helper sessions", words: helpers });
+  if (p.workflows?.mostOn !== undefined) {
+    out.push({ name: "workflows.mostOn", title: "Workflows", words: `At most ${p.workflows.mostOn} turned on in a folder` });
+  }
+  const notices = p.noticeLimits && noticeWords(p.noticeLimits);
+  if (notices) out.push({ name: "noticeLimits", title: "Notices", words: notices });
+  if (p.archiveMyChats === false) out.push({ name: "archiveMyChats", title: "Archiving chats", words: "Agents may not archive a person’s chats" });
   if (p.environment) out.push({ name: "environment.passThrough", title: "Variables passed to runtimes", words: list(p.environment.passThrough) });
   const terms = p.notices?.antigravityTerms;
   if (terms && terms !== "show") {
@@ -278,6 +304,8 @@ export interface RuntimeField {
 
 export interface PolicyForm {
   mode: ModeName | "";
+  /** The loosest answer to a permission request (#2957): any when empty. */
+  requests: ClientPermissionMode | "";
   sandboxRequired: boolean;
   limitRuntimes: boolean;
   runtimes: Record<string, RuntimeField>;
@@ -291,6 +319,12 @@ export interface PolicyForm {
   allowUnmetered: string[];
   mostRunning: string;
   mostNotArchived: string;
+  /** #2957, FR-003: the most workflows on in a folder, and the notices' burst and wait. */
+  mostWorkflows: string;
+  burst: string;
+  waitMinutes: string;
+  /** Whether agents may archive a person's finished chats: false is the rule, true sets none. */
+  archiveChats: boolean;
   limitPassThrough: boolean;
   passThrough: string;
   requireFollowing: boolean;
@@ -317,6 +351,7 @@ export function formOf(p: OrgPolicy | undefined): PolicyForm {
   }
   return {
     mode: p?.permissionMode ?? "",
+    requests: p?.permissionRequests ?? "",
     sandboxRequired: p?.sandbox === "required",
     limitRuntimes: p?.runtimes !== undefined,
     runtimes,
@@ -330,6 +365,10 @@ export function formOf(p: OrgPolicy | undefined): PolicyForm {
     allowUnmetered: [...(p?.budgets?.allowUnmetered ?? [])],
     mostRunning: numberText(p?.helpers?.mostRunning),
     mostNotArchived: numberText(p?.helpers?.mostNotArchived),
+    mostWorkflows: numberText(p?.workflows?.mostOn),
+    burst: numberText(p?.noticeLimits?.burst),
+    waitMinutes: numberText(p?.noticeLimits?.waitMinutes),
+    archiveChats: p?.archiveMyChats !== false,
     limitPassThrough: p?.environment !== undefined,
     passThrough: p?.environment?.passThrough.join(", ") ?? "",
     requireFollowing: p?.requireFollowing === true,
@@ -365,6 +404,7 @@ export function policyOf(form: PolicyForm, base: OrgPolicy | undefined, me: Audi
     else p[key] = value;
   };
   set("permissionMode", form.mode === "" ? undefined : form.mode);
+  set("permissionRequests", form.requests === "" ? undefined : form.requests);
   set("sandbox", form.sandboxRequired ? "required" : undefined);
   // A runtime's ways to the model sit on its rule (#999), so a reach rule with no runtime list names every runtime.
   const reached = Object.entries(form.reach).some(([, c]) => c !== "any");
@@ -418,6 +458,14 @@ export function policyOf(form: PolicyForm, base: OrgPolicy | undefined, me: Audi
   } else {
     set("helpers", undefined);
   }
+  const mostOn = count(form.mostWorkflows), burst = count(form.burst), waitMinutes = count(form.waitMinutes);
+  if (mostOn === null) return { problem: `“${form.mostWorkflows}” is not a number of workflows.` };
+  if (burst === null) return { problem: `“${form.burst}” is not a number of notices.` };
+  if (waitMinutes === null) return { problem: `“${form.waitMinutes}” is not a number of minutes.` };
+  set("workflows", mostOn !== undefined ? { mostOn } : undefined);
+  set("noticeLimits", burst !== undefined || waitMinutes !== undefined
+    ? { ...(burst !== undefined && { burst }), ...(waitMinutes !== undefined && { waitMinutes }) } : undefined);
+  set("archiveMyChats", form.archiveChats ? undefined : false);
   const passThrough = names(form.passThrough);
   const wrong = passThrough.find((n) => !/^[A-Za-z_][A-Za-z0-9_]*\*?$/.test(n));
   if (form.limitPassThrough && wrong) return { problem: `“${wrong}” is not a variable name: letters, digits and _, with * at the end allowed.` };
