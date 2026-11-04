@@ -2870,6 +2870,38 @@
       ],
       "additionalProperties": false
     },
+    "BudgetRequest": {
+      "type": "object",
+      "description": "A person's Ask for More (#3262, spec 998 FR-019): at their organisation's budget, they ask an admin to raise it for today (UTC). One a person a day; it goes the day after.",
+      "properties": {
+        "id": { "type": "string" },
+        "user": { "type": "string" },
+        "userName": { "type": "string" },
+        "day": { "type": "string", "description": "The UTC day it asks for, YYYY-MM-DD." },
+        "at": { "$ref": "#/definitions/WireDate" },
+        "why": { "type": "string" },
+        "state": { "$ref": "#/definitions/BudgetRequestState" },
+        "daily": { "type": "number", "description": "The budget a day in dollars the admin raised it to." },
+        "dailyTokens": { "type": "integer", "description": "The tokens a day the admin raised it to." },
+        "decidedBy": { "type": "string" },
+        "decidedAt": { "$ref": "#/definitions/WireDate" }
+      },
+      "required": ["id", "user", "userName", "day", "at", "state"],
+      "additionalProperties": false
+    },
+    "BudgetRequestList": {
+      "type": "object",
+      "description": "policy/requests (#3262): to an admin, today's Ask for More requests waiting; to anyone, their own of today.",
+      "properties": {
+        "requests": { "type": "array", "items": { "$ref": "#/definitions/BudgetRequest" } }
+      },
+      "required": ["requests"],
+      "additionalProperties": false
+    },
+    "BudgetRequestState": {
+      "type": "string",
+      "enum": ["waiting", "raised", "refused"]
+    },
     "BuildOutputRemoved": {
       "type": "object",
       "properties": {
@@ -17188,6 +17220,14 @@
       ],
       "additionalProperties": false
     },
+    "PolicyAskForMore": {
+      "type": "object",
+      "description": "policy/askForMore (#3262, spec 998 FR-019): a person at their organisation's budget asks an admin to raise it for today.",
+      "properties": {
+        "why": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
     "PolicyBehindMachine": {
       "type": "object",
       "description": "A machine of the person's that does not say host.policy-layers/1 (#2957, EffectivePolicy.behind, Edge Cases \"A machine of an older version\").",
@@ -17526,6 +17566,15 @@
         "reason",
         "words"
       ],
+      "additionalProperties": false
+    },
+    "PolicyRefuseMore": {
+      "type": "object",
+      "description": "policy/refuseMore (#3262), an admin's: refuse an Ask for More. policy/raise with the request's id raises it.",
+      "properties": {
+        "request": { "type": "string" }
+      },
+      "required": ["request"],
       "additionalProperties": false
     },
     "PolicyRuleBudgets": {

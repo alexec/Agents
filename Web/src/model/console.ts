@@ -2,7 +2,7 @@
 // audit, team workflows) and of Reports (everyone, scoped by role), each a page in its section of the
 // bar since #2141 (model/nav.ts). The Mac window and the Remote draw the Me scope of Reports already
 // (Cost, Time, Pool), and leave the admins' pages to the web.
-import type { ChannelLinkRequest, FleetMachine, Group, LiveAgent, LiveBoard, PersonRow, TeamBot, TeamBotRun } from "../protocol/generated";
+import type { BudgetRequest, ChannelLinkRequest, FleetMachine, Group, LiveAgent, LiveBoard, PersonRow, TeamBot, TeamBotRun } from "../protocol/generated";
 import { dollars } from "./teamGroups";
 import { money } from "./limits";
 import { CallFailed } from "../wire/link";
@@ -177,8 +177,30 @@ export function runsWords(runs: number): string {
 // first, each with Stop (console/stopAgent). Ids and numbers only; no agent's title or words.
 
 /** How many requests wait on the Console's Requests page, each kind counted (#2436: SCIM removals too). */
-export function waitingCount(n: { joins: number; links: number; capped: number; governance: number; removals: number }): number {
-  return n.joins + n.links + n.capped + n.governance + n.removals;
+export function waitingCount(n: { joins: number; links: number; capped: number; governance: number; budgets: number; removals: number }): number {
+  return n.joins + n.links + n.capped + n.governance + n.budgets + n.removals;
+}
+
+// Ask for More (#3262, spec 998 FR-019): a person at the organisation's budget asks to raise it for today.
+
+export const budgetsTitle = "Budgets";
+export const raiseTitle = "Raise for Today";
+export const budgetsFoot = "A raise is for one person and today only, kept in the Policy as an exception, and ends at 00:00 UTC.";
+
+/** An admin's line for a waiting ask: "Sam asks for more than today's budget: the release". */
+export function budgetRequestWords(r: BudgetRequest): string {
+  return `${r.userName} asks for more than today’s budget${r.why ? `: ${r.why}` : ""}`;
+}
+
+/** What Raise for Today offers first: twice the budget a day, or nothing when the policy sets none. */
+export function raiseDefault(daily: number | undefined): string {
+  return daily === undefined ? "" : budgetInput(daily * 2);
+}
+
+/** The waiting list after a request was made or answered, oldest first. */
+export function withBudgetRequest(list: BudgetRequest[], r: BudgetRequest): BudgetRequest[] {
+  const rest = list.filter((x) => x.id !== r.id);
+  return (r.state === "waiting" ? [...rest, r] : rest).sort((a, b) => a.at - b.at);
 }
 
 export const noLive = "No agent is running now on any machine.";

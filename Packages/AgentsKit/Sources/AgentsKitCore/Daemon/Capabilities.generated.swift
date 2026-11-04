@@ -101,6 +101,7 @@ public enum Capability {
     public static let personas2 = "personas/2"
     public static let pins1 = "pins/1"
     public static let plugins1 = "plugins/1"
+    public static let policyAsk1 = "policy.ask/1"
     public static let policy1 = "policy/1"
     public static let pool1 = "pool/1"
     public static let preferences1 = "preferences/1"
@@ -634,9 +635,12 @@ public enum Capability {
         "people/removeRequests": "org-identity/1",
         "people/setForgeLogins": "people/1",
         "people/setRole": "people/1",
+        "policy/askForMore": "policy.ask/1",
         "policy/get": "policy/1",
         "policy/mine": "policy/1",
         "policy/raise": "policy/1",
+        "policy/refuseMore": "policy.ask/1",
+        "policy/requests": "policy.ask/1",
         "policy/set": "policy/1",
         "policy/stopAll": "policy/1",
         "projects/joined": "projects/1",
@@ -709,6 +713,7 @@ public enum Capability {
         "workflows/claimRun": "bots/1",
         "workflows/fire": "events.team/1",
         "workflows/trigger": "events.team/1",
+        "control/budgetRequested": "policy.ask/1",
         "control/capReached": "bots/1",
         "control/clientChanged": "control/1",
         "control/cutOff": "org-identity/1",

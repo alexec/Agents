@@ -697,6 +697,27 @@
       }
     },
     {
+      "name": "control/budgetRequested",
+      "x-capability": "policy.ask/1",
+      "description": "To admins, and to the person who asked (#3262): an Ask for More waits, or was raised or refused.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BudgetRequest"
+          }
+        }
+      ]
+    },
+    {
       "name": "control/capReached",
       "x-capability": "bots/1",
       "tags": [
@@ -3360,6 +3381,32 @@
       }
     },
     {
+      "name": "policy/askForMore",
+      "x-capability": "policy.ask/1",
+      "description": "Any person's (#3262, spec 998 FR-019): at the organisation's budget, ask an admin to raise it for today. Asking again the same day answers the same request.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PolicyAskForMore"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BudgetRequest"
+        }
+      }
+    },
+    {
       "name": "policy/get",
       "x-capability": "policy/1",
       "description": "An admin's: the whole policy, its rev, and each machine's applied version (#998).",
@@ -3434,6 +3481,58 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/PolicyKept"
+        }
+      }
+    },
+    {
+      "name": "policy/refuseMore",
+      "x-capability": "policy.ask/1",
+      "description": "An admin's (#3262): refuse an Ask for More.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PolicyRefuseMore"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BudgetRequest"
+        }
+      }
+    },
+    {
+      "name": "policy/requests",
+      "x-capability": "policy.ask/1",
+      "description": "To an admin, today's Ask for More requests waiting; to anyone, their own of today (#3262).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BudgetRequestList"
         }
       }
     },

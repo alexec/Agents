@@ -134,6 +134,59 @@ test("edits in the form change the policy, and a field that is not a number is s
   assert.match(o.policyOf(form, p, priya).problem, /^“NOT-A-NAME” is not a variable name/);
 });
 
+test("the organisation's new rules of #2957 are said, and go to the form and back", () => {
+  const p = policy({ permissionRequests: "default", workflows: { mostOn: 5 }, noticeLimits: { burst: 2, waitMinutes: 60 }, archiveMyChats: false });
+  assert.deepEqual(o.rules(p).map((r) => [r.title, r.words]), [
+    ["Permission requests", "Ask me"],
+    ["Workflows", "At most 5 turned on in a folder"],
+    ["Notices", "At most 2 in a burst, then a wait of 1 hour"],
+    ["Archiving chats", "Agents may not archive a person’s chats"],
+  ]);
+  assert.deepEqual(o.policyOf(o.formOf(p), p, priya).policy, p);
+  assert.equal(o.rules(policy({ permissionRequests: "alwaysApprove" }))[0].words, "Up to Approve for me");
+  assert.equal(o.noticeWords({ waitMinutes: 15 }), "A wait of 15 min after a burst");
+  assert.equal(o.noticeWords({}), null);
+  // Agents may archive chats when no rule says otherwise: true is no rule.
+  assert.deepEqual(o.rules(policy({ archiveMyChats: true })), []);
+  const none = o.formOf(undefined);
+  assert.deepEqual([none.requests, none.mostWorkflows, none.burst, none.waitMinutes, none.archiveChats], ["", "", "", "", true]);
+});
+
+test("edits to the new rules change the policy, and a field that is not a number is said", () => {
+  const p = policy({ noticeLimits: { burst: 3 } });
+  const form = o.formOf(p);
+  form.requests = "default";
+  form.mostWorkflows = "10";
+  form.burst = "";
+  form.waitMinutes = "30";
+  form.archiveChats = false;
+  const made = o.policyOf(form, p, priya).policy;
+  assert.equal(made.permissionRequests, "default");
+  assert.deepEqual(made.workflows, { mostOn: 10 });
+  assert.deepEqual(made.noticeLimits, { waitMinutes: 30 });
+  assert.equal(made.archiveMyChats, false);
+  assert.deepEqual(o.changes(p, made), [
+    "Permission requests: Ask me",
+    "Workflows: At most 10 turned on in a folder",
+    "Notices: At most 3 in a burst → A wait of 30 min after a burst",
+    "Archiving chats: Agents may not archive a person’s chats",
+  ]);
+  form.archiveChats = true;
+  form.waitMinutes = "";
+  form.mostWorkflows = "";
+  form.requests = "";
+  const cleared = o.policyOf(form, made, priya).policy;
+  assert.deepEqual(["permissionRequests", "workflows", "noticeLimits", "archiveMyChats"].filter((k) => k in cleared), []);
+  form.mostWorkflows = "many";
+  assert.equal(o.policyOf(form, p, priya).problem, "“many” is not a number of workflows.");
+  form.mostWorkflows = "";
+  form.burst = "-1";
+  assert.equal(o.policyOf(form, p, priya).problem, "“-1” is not a number of notices.");
+  form.burst = "";
+  form.waitMinutes = "1.5";
+  assert.equal(o.policyOf(form, p, priya).problem, "“1.5” is not a number of minutes.");
+});
+
 test("a rule taken out says so in the preview", () => {
   assert.deepEqual(o.changes(policy({ sandbox: "required" }), policy()), ["Command sandbox: no longer set"]);
   assert.deepEqual(o.changes(undefined, policy({ requireFollowing: true })), ["Machines: A machine that does not follow this policy starts no agent"]);

@@ -461,6 +461,10 @@ public extension DaemonAPI {
                 Row(Method.policySet, params: PolicySet.self, result: PolicyKept.self, kind: .controlRequest),
                 Row(Method.policyStopAll, params: PolicyStopAllRequest.self, result: PolicyKept.self, kind: .controlRequest),
                 Row(Method.policyRaise, params: PolicyRaiseRequest.self, result: PolicyKept.self, kind: .controlRequest),
+                // Ask for More (#3262): the person's ask on the Stopped by a policy card, Console ▸ Requests.
+                Row(Method.policyAskForMore, params: PolicyAskForMore.self, result: BudgetRequest.self, kind: .controlRequest),
+                Row(Method.policyRequests, params: Empty.self, result: BudgetRequestList.self, kind: .controlRequest),
+                Row(Method.policyRefuseMore, params: PolicyRefuseMore.self, result: BudgetRequest.self, kind: .controlRequest),
                 // The organisation's ways to the model (#999): Console ▸ Model Access, and Settings ▸ Policy.
                 Row(Method.orgRoutesMine, params: Empty.self, result: OrgRoutesMine.self, kind: .controlRequest),
                 Row(Method.orgRoutesList, params: Empty.self, result: OrgRouteList.self, kind: .controlRequest),
@@ -618,6 +622,8 @@ public extension DaemonAPI {
                 Row(Notification.controlOrgRoutesChanged, params: Empty.self, result: Empty.self,
                     kind: .controlNotification),
                 Row(Notification.controlGovernanceRequested, params: CatalogRequest.self, result: Empty.self,
+                    kind: .controlNotification),
+                Row(Notification.controlBudgetRequested, params: BudgetRequest.self, result: Empty.self,
                     kind: .controlNotification),
             ]
         }

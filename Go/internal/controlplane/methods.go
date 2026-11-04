@@ -130,9 +130,12 @@ var own = methodSet(
 	"people/removeRequests",
 	"people/setForgeLogins",
 	"people/setRole",
+	"policy/askForMore",
 	"policy/get",
 	"policy/mine",
 	"policy/raise",
+	"policy/refuseMore",
+	"policy/requests",
 	"policy/set",
 	"policy/stopAll",
 	"projects/list",
@@ -246,7 +249,9 @@ var writes = methodSet(
 	"people/remove",
 	"people/setForgeLogins",
 	"people/setRole",
+	"policy/askForMore",
 	"policy/raise",
+	"policy/refuseMore",
 	"policy/set",
 	"policy/stopAll",
 	"projects/remove",
@@ -337,6 +342,8 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return m.botsMethod(ctx, method, params, from)
 	case "policy/get", "policy/mine", "policy/set", "policy/stopAll", "policy/raise":
 		return m.policyMethod(ctx, method, params, from)
+	case "policy/askForMore", "policy/requests", "policy/refuseMore":
+		return m.policyAskMethod(ctx, method, params, from)
 	case "orgRoutes/mine", "orgRoutes/list", "orgRoutes/set", "orgRoutes/replaceKey", "orgRoutes/check", "orgRoutes/remove":
 		return m.orgRoutesMethod(ctx, method, params, from)
 	case "links/list", "links/requests", "links/approve", "links/deny", "links/remove":

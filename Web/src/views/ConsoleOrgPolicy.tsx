@@ -7,11 +7,11 @@
 import { useEffect } from "preact/hooks";
 import { signal, useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
-import type { FleetMachine, OrgRouteKept, PolicyKept } from "../protocol/generated";
+import type { ClientPermissionMode, FleetMachine, OrgRouteKept, PolicyKept } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import { failedWords, notSaved } from "../model/console";
-import { changed, changes, formOf, modeNames, modes, policyOf, reachChoiceNames, reachChoices, runtimeName, termsChoices, termsNames, unmetered, viewOf,
-  warnings } from "../model/orgPolicy";
+import { changed, changes, formOf, modeNames, modes, policyOf, reachChoiceNames, reachChoices, requestNames, runtimeName, termsChoices, termsNames, unmetered,
+  viewOf, warnings } from "../model/orgPolicy";
 import type { ReachChoice } from "../model/orgPolicy";
 import { routeRuntimes } from "../model/orgAccounts";
 import type { ModeName, PolicyForm } from "../model/orgPolicy";
@@ -105,12 +105,20 @@ export function OrgPolicyPage({ store, down }: { store: Store; down: boolean }) 
         : <p class="quiet small">No policy yet. Nothing is capped until you save one.</p>}
 
       <section aria-labelledby="org-policy-modes">
-        <h3 class="section-head" id="org-policy-modes">Modes and Sandbox</h3>
+        <h3 class="section-head" id="org-policy-modes">Permissions and Sandbox</h3>
         <label class="setting">
           <span>Loosest mode</span>
           <select value={form.mode} onChange={(e) => edit({ mode: (e.currentTarget as HTMLSelectElement).value as ModeName | "" })}>
             <option value="">Any</option>
             {modes.map((m) => <option key={m} value={m}>Up to {modeNames[m]}</option>)}
+          </select>
+        </label>
+        <label class="setting">
+          <span>Permission requests</span>
+          <select value={form.requests} onChange={(e) => edit({ requests: (e.currentTarget as HTMLSelectElement).value as ClientPermissionMode | "" })}>
+            <option value="">Any</option>
+            {form.requests === "alwaysApprove" && <option value="alwaysApprove">Up to {requestNames.alwaysApprove}</option>}
+            <option value="default">{requestNames.default}</option>
           </select>
         </label>
         <label class="setting">
@@ -206,7 +214,7 @@ export function OrgPolicyPage({ store, down }: { store: Store; down: boolean }) 
       </section>
 
       <section aria-labelledby="org-policy-helpers">
-        <h3 class="section-head" id="org-policy-helpers">Helper Sessions in a Folder</h3>
+        <h3 class="section-head" id="org-policy-helpers">Helpers and Workflows in a Folder</h3>
         <label class="setting">
           <span>Most running</span>
           <span class="budget-field"><input type="text" inputMode="numeric" placeholder="None" aria-label="Most running" value={form.mostRunning} onInput={text("mostRunning")} /></span>
@@ -215,6 +223,27 @@ export function OrgPolicyPage({ store, down }: { store: Store; down: boolean }) 
           <span>Most not archived</span>
           <span class="budget-field"><input type="text" inputMode="numeric" placeholder="None" aria-label="Most not archived" value={form.mostNotArchived} onInput={text("mostNotArchived")} /></span>
         </label>
+        <label class="setting">
+          <span>Workflows turned on</span>
+          <span class="budget-field"><input type="text" inputMode="numeric" placeholder="None" aria-label="Workflows turned on" value={form.mostWorkflows} onInput={text("mostWorkflows")} /></span>
+        </label>
+      </section>
+
+      <section aria-labelledby="org-policy-notices">
+        <h3 class="section-head" id="org-policy-notices">Notices and Chats</h3>
+        <label class="setting">
+          <span>Notices in a burst</span>
+          <span class="budget-field"><input type="text" inputMode="numeric" placeholder="None" aria-label="Notices in a burst" value={form.burst} onInput={text("burst")} /></span>
+        </label>
+        <label class="setting">
+          <span>Wait after a burst</span>
+          <span class="budget-field"><input type="text" inputMode="numeric" placeholder="None" aria-label="Wait after a burst" value={form.waitMinutes} onInput={text("waitMinutes")} /> min</span>
+        </label>
+        <label class="setting">
+          <span>Agents may archive a person’s chats</span>
+          <input type="checkbox" role="switch" checked={form.archiveChats} onChange={check("archiveChats")} />
+        </label>
+        <p class="hint">An agent sends no more notices after a burst until the wait ends. With no rule, each person’s own limits apply: 3 notices, then 10 min.</p>
       </section>
 
       <section aria-labelledby="org-policy-environment">

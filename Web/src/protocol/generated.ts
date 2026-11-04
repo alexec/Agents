@@ -1219,6 +1219,40 @@ export interface BudgetRaise {
   request?: string;
 }
 
+/**
+ * A person's Ask for More (#3262, spec 998 FR-019): at their organisation's budget, they ask an
+ * admin to raise it for today (UTC). One a person a day; it goes the day after.
+ */
+export interface BudgetRequest {
+  id: string;
+  user: string;
+  userName: string;
+  /** The UTC day it asks for, YYYY-MM-DD. */
+  day: string;
+  at: WireDate;
+  why?: string;
+  state: BudgetRequestState;
+  /** The budget a day in dollars the admin raised it to. */
+  daily?: number;
+  /** The tokens a day the admin raised it to. */
+  dailyTokens?: number;
+  decidedBy?: string;
+  decidedAt?: WireDate;
+}
+
+/**
+ * policy/requests (#3262): to an admin, today's Ask for More requests waiting; to anyone, their own
+ * of today.
+ */
+export interface BudgetRequestList {
+  requests: BudgetRequest[];
+}
+
+export type BudgetRequestState =
+  | "waiting"
+  | "raised"
+  | "refused";
+
 export interface BuildOutputRemoved {
   removed: string[];
   freed: WorktreeSize;
@@ -6361,6 +6395,14 @@ export interface PolicyApplyYoursResult {
 }
 
 /**
+ * policy/askForMore (#3262, spec 998 FR-019): a person at their organisation's budget asks an admin
+ * to raise it for today.
+ */
+export interface PolicyAskForMore {
+  why?: string;
+}
+
+/**
  * A machine of the person's that does not say host.policy-layers/1 (#2957, EffectivePolicy.behind,
  * Edge Cases "A machine of an older version").
  */
@@ -6524,6 +6566,14 @@ export interface PolicyRefusal {
   until?: WireDate;
   layer?: PolicyLayerRef;
   value?: string;
+}
+
+/**
+ * policy/refuseMore (#3262), an admin's: refuse an Ask for More. policy/raise with the request's id
+ * raises it.
+ */
+export interface PolicyRefuseMore {
+  request: string;
 }
 
 /**
@@ -10425,11 +10475,14 @@ export interface Methods {
   "pins/unpinSession": { params: PinSessionRequest; result: Empty };
   "pins/unpinWorkflow": { params: WorkflowRequest; result: Empty };
   "pins/write": { params: PinWriteRequest; result: Empty };
+  "policy/askForMore": { params: PolicyAskForMore; result: BudgetRequest };
   "policy/effective": { params: PolicyEffectiveRequest; result: EffectivePolicy };
   "policy/folder": { params: PolicyFolderRequest; result: PolicyFolderState };
   "policy/get": { params: Empty; result: PolicyKept };
   "policy/mine": { params: Empty; result: PolicyView };
   "policy/raise": { params: PolicyRaiseRequest; result: PolicyKept };
+  "policy/refuseMore": { params: PolicyRefuseMore; result: BudgetRequest };
+  "policy/requests": { params: Empty; result: BudgetRequestList };
   "policy/set": { params: PolicySet; result: PolicyKept };
   "policy/setFolder": { params: SetFolderPolicyRequest; result: PolicyRules };
   "policy/setYours": { params: SetYourPolicyRequest; result: YourPolicy };
@@ -10757,11 +10810,14 @@ export const MethodTarget = {
   "pins/unpinSession": "host",
   "pins/unpinWorkflow": "host",
   "pins/write": "host",
+  "policy/askForMore": "control",
   "policy/effective": "host",
   "policy/folder": "host",
   "policy/get": "control",
   "policy/mine": "control",
   "policy/raise": "control",
+  "policy/refuseMore": "control",
+  "policy/requests": "control",
   "policy/set": "control",
   "policy/setFolder": "host",
   "policy/setYours": "host",
@@ -10885,6 +10941,7 @@ export interface Notifications {
   "backups/changed": BackupState;
   "clientPermissions/changed": ClientPermissionSettings;
   "clone/changed": CloneNotification;
+  "control/budgetRequested": BudgetRequest;
   "control/capReached": CapReached;
   "control/governanceRequested": CatalogRequest;
   "control/groupsChanged": GroupsChanged;
@@ -11027,6 +11084,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BringBack: { required: ["moved", "applied"], optional: [] },
   BringBackRequest: { required: ["folder", "branches"], optional: ["bundle", "patch", "patchOn"] },
   BudgetRaise: { required: ["user", "day", "by"], optional: ["daily", "dailyTokens", "request"] },
+  BudgetRequest: { required: ["id", "user", "userName", "day", "at", "state"], optional: ["why", "daily", "dailyTokens", "decidedBy", "decidedAt"] },
+  BudgetRequestList: { required: ["requests"], optional: [] },
   BuildOutputRemoved: { required: ["removed", "freed"], optional: [] },
   CancelWaitRequest: { required: ["agentID"], optional: [] },
   CapReached: { required: ["user", "name", "spentUSD", "capUSD", "until"], optional: ["group"] },
@@ -11503,6 +11562,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PluginsListRequest: { required: ["folder"], optional: [] },
   PolicyApplied: { required: ["version"], optional: [] },
   PolicyApplyYoursResult: { required: ["revision"], optional: [] },
+  PolicyAskForMore: { required: [], optional: ["why"] },
   PolicyBehindMachine: { required: ["host", "name"], optional: [] },
   PolicyBudgets: { required: ["allowUnmetered", "raises"], optional: ["daily", "dailyTokens", "perAgent", "perAgentTokens"] },
   PolicyEffectiveRequest: { required: [], optional: ["folder"] },
@@ -11519,6 +11579,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PolicyNotices: { required: [], optional: ["antigravityTerms"] },
   PolicyRaiseRequest: { required: ["user"], optional: ["daily", "dailyTokens", "request"] },
   PolicyRefusal: { required: ["reason", "words"], optional: ["rule", "until", "layer", "value"] },
+  PolicyRefuseMore: { required: ["request"], optional: [] },
   PolicyRuleBudgets: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },
   PolicyRuleLine: { required: ["rule", "title", "words"], optional: [] },
   PolicyRules: { required: [], optional: ["permissionMode", "permissionRequests", "sandbox", "budgets", "helpers", "workflows", "noticeLimits", "archiveMyChats", "runtimes", "marketplaces", "environment"] },

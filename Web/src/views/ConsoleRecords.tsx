@@ -1,11 +1,12 @@
 // The Console's records (#1804): Audit (M8), who did what, for one person or everyone, with CSV;
 // and Requests (M7), what waits for an admin: machines asking to join, channel identities asking
-// to be linked, and bots stopped at a cap.
+// to be linked, bots stopped at a cap, and people at the organisation's budget asking for more (#3262).
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
-import type { ChannelLinkRequest, PersonRow, RemoveRequest } from "../protocol/generated";
-import { failedWords, linkWords, noRequests, requestsFoot, waitingCount } from "../model/console";
+import type { BudgetRequest, ChannelLinkRequest, PersonRow, RemoveRequest } from "../protocol/generated";
+import { budgetRequestWords, budgetsFoot, budgetsTitle, failedWords, linkWords, noRequests, raiseDefault, raiseTitle, requestsFoot, waitingCount,
+  withBudgetRequest } from "../model/console";
 import { capReachedWords } from "../model/teamGroups";
 import { liveJoins } from "../model/people";
 import { liveRequests, withoutRequest } from "../model/channelLinks";
@@ -110,6 +111,8 @@ export function RequestsPage({ store, down }: { store: Store; down: boolean }) {
       )}
       {/* People asking for an MCP server or skill (#2019, M5). */}
       <GovernanceRequests store={store} down={down} />
+      {/* People at the organisation's budget asking for more today (#3262). */}
+      <BudgetRequests store={store} down={down} />
       {removals.value.length > 0 && (
         <section aria-labelledby="requests-removals">
           <h3 class="section-head" id="requests-removals">Removals</h3>
@@ -139,11 +142,73 @@ export function RequestsPage({ store, down }: { store: Store; down: boolean }) {
   );
 }
 
+/** Console ▸ Requests ▸ Budgets (#3262, spec 998 FR-019): each Ask for More, to raise for today (policy/raise with the
+ * request's id) or refuse (policy/refuseMore). The raise starts at twice the budget a day, in dollars, or in tokens
+ * when the policy sets only tokens. */
+function BudgetRequests({ store, down }: { store: Store; down: boolean }) {
+  const problem = useSignal<string | null>(null);
+  const amounts = useSignal<Record<string, string>>({});
+  const list = store.budgetRequests.value;
+  // The budget a day, for the raise to start from: policy/mine, if Settings ▸ Policy has not read it yet.
+  useEffect(() => {
+    if (list.length > 0 && !down && store.orgPolicy.value === null) {
+      void store.link.call("policy/mine", {}).then((view) => { if (store.orgPolicy.value === null) store.orgPolicy.value = view; }, () => {});
+    }
+  }, [list.length > 0, down]);
+  if (list.length === 0) return null;
+  const budgets = store.orgPolicy.value?.policy?.budgets;
+  const inTokens = budgets?.daily === undefined && budgets?.dailyTokens !== undefined;
+  const amount = (r: BudgetRequest) => amounts.value[r.id] ?? raiseDefault(inTokens ? budgets?.dailyTokens : budgets?.daily);
+  const answer = async (r: BudgetRequest, raise: boolean) => {
+    try {
+      if (raise) {
+        const to = Number(amount(r));
+        await store.link.call("policy/raise", { user: r.user, ...(inTokens ? { dailyTokens: Math.round(to) } : { daily: to }), request: r.id });
+        store.budgetRequests.value = withBudgetRequest(store.budgetRequests.value, { ...r, state: "raised" });
+      } else {
+        store.budgetRequests.value = withBudgetRequest(store.budgetRequests.value, await store.link.call("policy/refuseMore", { request: r.id }));
+      }
+      problem.value = null;
+    } catch (error) {
+      problem.value = failedWords(error);
+      void store.loadBudgetRequests();
+    }
+  };
+  return (
+    <section aria-labelledby="requests-budgets">
+      <h3 class="section-head" id="requests-budgets">{budgetsTitle}</h3>
+      {problem.value && <p class="hint" role="alert">{problem.value}</p>}
+      <ul class="request-list">
+        {list.map((r) => {
+          const usd = Number(amount(r));
+          return (
+            <li key={r.id} class="request">
+              <span>{budgetRequestWords(r)}</span>
+              <span class="request-actions">
+                <label class="amount">
+                  <span>{inTokens ? "To tokens" : "To $"}</span>
+                  <input type="number" min="0" step={inTokens ? "1" : "any"} disabled={down}
+                    aria-label={`Today's budget for ${r.userName}, in ${inTokens ? "tokens" : "dollars"}`}
+                    value={amount(r)} onInput={(e) => { amounts.value = { ...amounts.value, [r.id]: (e.currentTarget as HTMLInputElement).value }; }} />
+                </label>
+                <button type="button" disabled={down} onClick={() => void answer(r, false)}>Refuse</button>
+                <button type="button" class="prominent" disabled={down || !(usd > 0)} onClick={() => void answer(r, true)}>{raiseTitle}</button>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      <p class="hint">{budgetsFoot}</p>
+    </section>
+  );
+}
+
 /** How many requests wait, for the Console's list and its Overview: machines, channel identities, capped bots (#2070),
  * asks for an MCP server or skill (#2019, M5), and people SCIM removed (#2436). */
 export function requestCount(store: Store): number {
   return waitingCount({ joins: liveJoins(store.joinRequests.value).length, links: liveRequests(store.linkRequests.value).length,
-    capped: store.capped.value.length, governance: store.governanceRequests.value.length, removals: store.removeRequests.value.length });
+    capped: store.capped.value.length, governance: store.governanceRequests.value.length, budgets: store.budgetRequests.value.length,
+    removals: store.removeRequests.value.length });
 }
 
 /** "Acme Okta deleted Bea on 12 Oct at 09:30. Bea is suspended until you remove them." */

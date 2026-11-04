@@ -224,6 +224,74 @@ public extension DaemonAPI {
         }
     }
 
+    /// `policy/askForMore`: a person at the organisation's budget asks an admin to raise it
+    /// for today (#3262, FR-019).
+    struct PolicyAskForMore: Codable, Sendable, Hashable {
+        public var why: String?
+
+        public init(why: String? = nil) {
+            self.why = why
+        }
+    }
+
+    /// `policy/refuseMore`: an admin refuses an Ask for More (#3262).
+    struct PolicyRefuseMore: Codable, Sendable, Hashable {
+        public var request: String
+
+        public init(request: String) {
+            self.request = request
+        }
+    }
+
+    /// Where an Ask for More stands.
+    enum BudgetRequestState: String, Codable, Sendable, Hashable {
+        case waiting
+        case raised
+        case refused
+    }
+
+    /// A person's Ask for More (#3262): one a person a UTC day, gone the day after.
+    struct BudgetRequest: Codable, Sendable, Hashable, Identifiable {
+        public var id: String
+        public var user: String
+        public var userName: String
+        /// The UTC day it asks for, YYYY-MM-DD.
+        public var day: String
+        public var at: Date
+        public var why: String?
+        public var state: BudgetRequestState
+        /// What the admin raised it to.
+        public var daily: Double?
+        public var dailyTokens: Int?
+        public var decidedBy: String?
+        public var decidedAt: Date?
+
+        public init(id: String, user: String, userName: String, day: String, at: Date, why: String? = nil,
+                    state: BudgetRequestState = .waiting, daily: Double? = nil, dailyTokens: Int? = nil,
+                    decidedBy: String? = nil, decidedAt: Date? = nil) {
+            self.id = id
+            self.user = user
+            self.userName = userName
+            self.day = day
+            self.at = at
+            self.why = why
+            self.state = state
+            self.daily = daily
+            self.dailyTokens = dailyTokens
+            self.decidedBy = decidedBy
+            self.decidedAt = decidedAt
+        }
+    }
+
+    /// `policy/requests`: to an admin, today's waiting; to anyone, their own of today (#3262).
+    struct BudgetRequestList: Codable, Sendable, Hashable {
+        public var requests: [BudgetRequest]
+
+        public init(requests: [BudgetRequest]) {
+            self.requests = requests
+        }
+    }
+
     /// The mark on a choice the policy refuses or caps (FR-010), on the lists a machine sends.
     struct PolicySetBy: Codable, Sendable, Hashable {
         /// `organisation`, `you` or `folder`: the layer that decided (#2957, R8).
@@ -385,6 +453,12 @@ public extension DaemonAPI.Method {
     static let policyStopAll = "policy/stopAll"
     /// `PolicyRaiseRequest` → `PolicyKept`: an admin's (#998).
     static let policyRaise = "policy/raise"
+    /// `PolicyAskForMore` → `BudgetRequest`: any person's (#3262).
+    static let policyAskForMore = "policy/askForMore"
+    /// `Empty` → `BudgetRequestList`: an admin's waiting ones, and anyone's own (#3262).
+    static let policyRequests = "policy/requests"
+    /// `PolicyRefuseMore` → `BudgetRequest`: an admin's (#3262).
+    static let policyRefuseMore = "policy/refuseMore"
     /// `Empty` → `PolicyState`: the policy as this machine follows it (#998, T027).
     static let daemonPolicyState = "daemon/policyState"
     /// `Empty` → `PassThroughState`: the person's pass-through names, marked (#998).
@@ -396,6 +470,8 @@ public extension DaemonAPI.Notification {
     static let controlPolicyChanged = "control/policyChanged"
     /// `PolicyView`: the kill switch went on or off (#998).
     static let controlStopAll = "control/stopAll"
+    /// `BudgetRequest`: an Ask for More waits, or was answered (#3262).
+    static let controlBudgetRequested = "control/budgetRequested"
     /// `PolicyState`: the policy this machine follows changed, or the kill switch turned (#998).
     static let daemonPolicyStateChanged = "daemon/policyStateChanged"
 }

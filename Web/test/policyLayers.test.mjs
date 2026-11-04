@@ -140,3 +140,17 @@ test("rules signed on another Mac say so, with each rule, and offer to sign them
   assert.equal(p.signAgain, "Sign with This Mac’s Key");
   assert.equal(p.setAside, "Don’t Use Them");
 });
+
+// #3262: Ask for More on the card, only at the organisation's budget, and where it stands once asked.
+test("the stop card offers Ask for More at the organisation's budget", () => {
+  const acme = { kind: "organisation", name: "Acme" };
+  assert.equal(p.canAskForMore({ reason: "budget", rule: "budgets", words: "w", layer: acme }), true);
+  assert.equal(p.canAskForMore({ reason: "budget", rule: "budgets.daily", words: "w", layer: { kind: "you", name: "You" } }), false);
+  assert.equal(p.canAskForMore({ reason: "policy", rule: "sandbox", words: "w", layer: acme }), false);
+  const r = { id: "r", user: "u", userName: "Sam", day: "2026-11-03", at: 1, state: "waiting" };
+  assert.equal(p.askedWords(r), "Asked. An admin can raise today's budget.");
+  assert.equal(p.askedWords({ ...r, state: "raised", daily: 80, decidedBy: "Alex" }), "Raised to $80 for today by Alex. Send again to go on.");
+  assert.equal(p.askedWords({ ...r, state: "refused", decidedBy: "Alex" }), "Refused for today by Alex.");
+  assert.match(p.askRefusal({ code: -32601 }), /cannot take the request yet/);
+  assert.equal(p.askRefusal({ code: -32602 }), undefined);
+});
