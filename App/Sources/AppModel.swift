@@ -5953,6 +5953,12 @@ final class AppModel {
             .sorted { ($0.id == mine ? 0 : 1, $0.name) < ($1.id == mine ? 0 : 1, $1.name) }
     }
 
+    /// The machines that narrow their forges to a board (#3282), This Mac first.
+    var boardMachines: [(id: MachineRef, name: String)] {
+        let narrows = Set((controlPlaneHosts ?? []).filter { $0.has(Capability.forgeBoards1) }.map(\.id))
+        return forgeMachines.filter { narrows.contains($0.id) }
+    }
+
     /// The machines that read docs (#3321), this Mac first.
     var docsMachines: [(id: MachineRef, name: String)] {
         let mine = thisMacHostID

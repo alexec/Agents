@@ -12,6 +12,8 @@ final class WorkListState {
     var sort = WorkList.Sort.updated
     var lists: [(host: MachineRef, list: DaemonAPI.ForgeList)]?
     var lineage: [DaemonAPI.ReportNode] = []
+    /// The boards the Board menu offers (#3282), read with the list.
+    var boards: [DaemonAPI.ProjectBoard] = []
     var lineageCursor: String?
     var problem: String?
     var loadingMore = false
@@ -30,9 +32,10 @@ final class WorkListState {
         var state: String
         var sort: DaemonAPI.ReportNodesSort
         var asked: Int
+        var board: String
     }
 
-    var ask: Ask { Ask(state: filter.state.forge, sort: nodesSort, asked: asked) }
+    var ask: Ask { Ask(state: filter.state.forge, sort: nodesSort, asked: asked, board: filter.board) }
 
     /// An issue's or a PR's lineage is joined by ref, in any order; a milestone's or a release's list is lineage's own.
     private var nodesSort: DaemonAPI.ReportNodesSort { !kind.fromForge && sort == .cost ? .cost : .newest }
@@ -104,12 +107,20 @@ final class WorkListState {
         guard kind.fromForge else { lists = []; return }
         let state = filter.state.forge
         let kind = kind
+        let board = filter.board
+        if kind == .issue {
+            let boards = await model.workBoards()
+            guard ask == mine else { return }
+            self.boards = boards
+        }
         var got: [(host: MachineRef, list: DaemonAPI.ForgeList)] = []
         await withTaskGroup(of: (MachineRef, DaemonAPI.ForgeList).self) { group in
-            for machine in model.forgeMachines {
+            for machine in model.workMachines(board: board) {
                 group.addTask {
                     do {
-                        return (machine.id, try await model.forgeList(kind, .init(state: state, limit: 100), on: machine.id))
+                        return (machine.id, try await model.forgeList(kind, .init(state: state, limit: 100,
+                                                                                  board: board.isEmpty ? nil : board),
+                                                                      on: machine.id))
                     } catch {
                         return (machine.id, .init(errors: [.init(forge: "", message: error.localizedDescription)]))
                     }
@@ -129,7 +140,8 @@ final class WorkListState {
                 var next: [(host: MachineRef, list: DaemonAPI.ForgeList)] = []
                 for entry in lists ?? [] {
                     guard let cursor = entry.list.cursor else { next.append(entry); continue }
-                    let page = try await model.forgeList(kind, .init(state: filter.state.forge, cursor: cursor, limit: 100),
+                    let page = try await model.forgeList(kind, .init(state: filter.state.forge, cursor: cursor, limit: 100,
+                                                                     board: filter.board.isEmpty ? nil : filter.board),
                                                          on: entry.host)
                     next.append((entry.host, .init(items: entry.list.items + page.items, cursor: page.cursor, errors: page.errors)))
                 }

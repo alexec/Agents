@@ -8073,7 +8073,7 @@ type Project struct {
 type ProjectBoard struct {
 	Name string `json:"name"`
 
-	// The board's address: https://github.com/orgs/<org>/projects/<n> (or users/<login>), https://<site>/jira/software/…/boards/<id>, https://linear.app/<workspace>/team/<KEY>, or https://<gitlab>/groups/<group>/-/boards/<id>. It names the board in forge/issues' board.
+	// The board's address on the web: github.com/orgs/<org>/projects/<n> (or users/<login>), <site>/jira/software/…/boards/<id>, linear.app/<workspace>/team/<KEY>, or <gitlab>/groups/<group>/-/boards/<id>. It names the board in forge/issues' board.
 	URL string `json:"url"`
 
 	// github, atlassian (Jira), linear or gitlab.

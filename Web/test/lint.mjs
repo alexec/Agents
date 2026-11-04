@@ -60,6 +60,8 @@ const allowedURLs = new Set([
   // Connect Jira (#3304): Make an API Token's page on Atlassian, a link the person opens in a
   // new tab, never fetched.
   "https://id.atlassian.com/manage-profile/security/api-tokens",
+  // Project Settings ▸ Tools ▸ Boards (#3282): the Address field's example text, never fetched.
+  "https://github.com/orgs/acme/projects/7",
   // Connect Linear (#1343): the hand-back page, the one origin whose postMessage the page takes.
   "https://oauth.agentloops.dev",
   // Console ▸ Sign-In (#1002): each preset's issuer, as a field's example text; the control plane reads the

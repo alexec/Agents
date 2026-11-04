@@ -180,3 +180,33 @@ test("previous and next are the rows above and below in the list shown (#3257)",
   // A row the filters leave out has no place in the list.
   assert.equal(w.neighbours(refs[1], w.filterRows(rows, { ...w.anyFilter, text: "Issue 3" })), undefined);
 });
+
+// #3282: a project's boards narrow Issues and Features, on the machines that know boards.
+test("the boards of several machines are one list, each once by url, the first name kept", () => {
+  const a = { name: "Platform", url: "https://github.com/orgs/acme/projects/7", forge: "github", key: "acme/7" };
+  const b = { name: "Mobile", url: "https://linear.app/acme/team/MOB" };
+  const merged = w.mergeBoards([[a], [{ ...a, name: "Other name" }, b], []]);
+  assert.deepEqual(merged.map((x) => [x.name, x.url]), [["Platform", a.url], ["Mobile", b.url]]);
+  assert.deepEqual(w.mergeBoards([]), []);
+});
+
+test("the Board menu offers each board by its name, and keeps one chosen that no machine lists now", () => {
+  const boards = [{ name: "Platform", url: "https://github.com/orgs/acme/projects/7" }];
+  assert.deepEqual(w.boardChoices(boards, ""), [boards[0].url]);
+  assert.deepEqual(w.boardChoices(boards, boards[0].url), [boards[0].url]);
+  assert.deepEqual(w.boardChoices(boards, "https://linear.app/acme/team/OLD"), [boards[0].url, "https://linear.app/acme/team/OLD"]);
+  assert.equal(w.boardName(boards, boards[0].url), "Platform");
+  assert.equal(w.boardName(boards, "https://linear.app/acme/team/OLD"), "https://linear.app/acme/team/OLD");
+});
+
+test("a list's request carries the board only when one is chosen", () => {
+  assert.equal(w.anyFilter.board, "");
+  assert.deepEqual(w.forgeListRequest("open", ""), { state: "open", limit: 100 });
+  assert.deepEqual(w.forgeListRequest("all", "https://github.com/orgs/acme/projects/7", "c2"),
+    { state: "all", limit: 100, cursor: "c2", board: "https://github.com/orgs/acme/projects/7" });
+  assert.deepEqual(w.withBoard({}, ""), {});
+  assert.deepEqual(w.withBoard({ state: "open", feature: "work" }, "u"), { state: "open", feature: "work", board: "u" });
+  // The board is the machines' to narrow: the rows are not filtered by it again here.
+  const rows = w.mergeForge([{ host: "mac", items: [item(1)] }], []);
+  assert.equal(w.filterRows(rows, { ...w.anyFilter, board: "https://github.com/orgs/acme/projects/7" }).length, 1);
+});

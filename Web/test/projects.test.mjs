@@ -66,3 +66,27 @@ test("projects: New Session's projects are the folders by project, in the sideba
   assert.equal(p.projectFolder(choices[0], (r) => r === clone), clone);
   assert.equal(p.projectFolder(choices[0], undefined), mac);
 });
+
+// Project Settings ▸ Tools ▸ Boards (#3282): each change sends the whole list, each board's name and address.
+test("projects: a board is added at the end, trimmed, and only with a name and an address", () => {
+  const boards = [{ name: "Platform", url: "https://github.com/orgs/acme/projects/7", forge: "github", key: "acme/7", site: "github.com" }];
+  assert.deepEqual(p.boardsWith(boards, " Mobile ", " https://linear.app/acme/team/MOB "), [
+    { name: "Platform", url: "https://github.com/orgs/acme/projects/7" },
+    { name: "Mobile", url: "https://linear.app/acme/team/MOB" },
+  ]);
+  assert.equal(p.boardsWith(boards, "", "https://linear.app/acme/team/MOB"), undefined);
+  assert.equal(p.boardsWith(boards, "Mobile", "  "), undefined);
+});
+
+test("projects: a board is removed by its address, and none is an empty list", () => {
+  const boards = [{ name: "A", url: "https://a", forge: "github" }, { name: "B", url: "https://b" }];
+  assert.deepEqual(p.boardsWithout(boards, "https://a"), [{ name: "B", url: "https://b" }]);
+  assert.deepEqual(p.boardsWithout([{ name: "B", url: "https://b" }], "https://b"), []);
+});
+
+test("projects: a board's forge in words, after its name", () => {
+  assert.equal(p.boardForge({ name: "A", url: "u", forge: "github" }), "GitHub Projects");
+  assert.equal(p.boardForge({ name: "A", url: "u", forge: "atlassian" }), "Jira");
+  assert.equal(p.boardForge({ name: "A", url: "u", forge: "linear" }), "Linear team");
+  assert.equal(p.boardForge({ name: "A", url: "u" }), "");
+});

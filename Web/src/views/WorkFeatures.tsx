@@ -1,14 +1,16 @@
 // Work ▸ Features (#3269, spec 3265), as the window's WorkFeaturesPane: a row per feature:<name> label
 // (forge/features on each machine) with its epic counts; opened, its open epics (forge/issues with the
 // feature), each with its progress and its lead, and its issues with no epic. A row opens the issue's page.
+// The Board menu (#3282) narrows both reads to one board, on the machines that know boards.
 import { signal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import { useEffect } from "preact/hooks";
 import type { ForgeFeature, ForgeItem } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { describe } from "../model/errors";
-import { errorWords, labelColor, noForgeHere, shortRef } from "../model/work";
-import { forgeHosts } from "../model/workLists";
+import { boardChoices, boardName, errorWords, labelColor, noForgeHere, shortRef, withBoard } from "../model/work";
+import { boardHosts, boards, forgeHosts, listHosts, loadBoards } from "../model/workLists";
+import { Choice } from "./Work";
 import {
   epicLead, epicProgressWords, featureCountWords, featureTitle, leadRowWords, mergeFeatures, noFeatures, nothingOpen, openedFeature,
 } from "../model/workFeatures";
@@ -20,12 +22,15 @@ const errors = signal<string[]>([]);
 const opened = signal<ReadonlySet<string>>(new Set());
 const items = signal<Readonly<Record<string, { items: ForgeItem[]; errors: string[] }>>>({});
 const asked = signal(0);
+/** The board chosen, by its url; empty for all. */
+const board = signal("");
 let read: string | undefined;
 
 async function loadFeatures(store: Store) {
   const mine = asked.value;
-  const hosts = forgeHosts(store);
-  const key = `${mine} ${hosts.map((h) => h.id).join(",")}`;
+  const on = board.value;
+  const hosts = listHosts(store, on);
+  const key = `${mine} ${on} ${hosts.map((h) => h.id).join(",")}`;
   if (read === key && features.value !== null) return;
   read = key;
   features.value = null;
@@ -33,12 +38,12 @@ async function loadFeatures(store: Store) {
   items.value = {};
   const got = await Promise.all(hosts.map(async (h) => {
     try {
-      return { host: h, list: await store.link.call("forge/features", {}, h.id) };
+      return { host: h, list: await store.link.call("forge/features", withBoard({}, on), h.id) };
     } catch (e) {
       return { host: h, list: { features: [], errors: [{ forge: "", message: describe(e) }] } };
     }
   }));
-  if (asked.value !== mine) return;
+  if (asked.value !== mine || board.value !== on) return;
   errors.value = got.flatMap(({ host, list }) => (list.errors ?? []).map((e) => errorWords(e, hosts.length > 1 ? host.name : undefined)));
   features.value = mergeFeatures(got.map(({ list }) => list.features));
   for (const name of opened.value) void readItems(store, name);
@@ -47,17 +52,18 @@ async function loadFeatures(store: Store) {
 /** An opened feature's open issues from every machine. */
 async function readItems(store: Store, name: string) {
   const mine = asked.value;
-  const hosts = forgeHosts(store);
+  const on = board.value;
+  const hosts = listHosts(store, on);
   const got = await Promise.all(hosts.map(async (h) => {
     const machine = hosts.length > 1 ? h.name : undefined;
     try {
-      const list = await store.link.call("forge/issues", { state: "open", limit: 100, feature: name }, h.id);
+      const list = await store.link.call("forge/issues", withBoard({ state: "open", limit: 100, feature: name }, on), h.id);
       return { items: list.items, errors: (list.errors ?? []).map((e) => errorWords(e, machine)) };
     } catch (e) {
       return { items: [], errors: [machine ? `${machine}: ${describe(e)}` : describe(e)] };
     }
   }));
-  if (asked.value !== mine) return;
+  if (asked.value !== mine || board.value !== on) return;
   items.value = { ...items.value, [name.toLowerCase()]: { items: got.flatMap((g) => g.items), errors: got.flatMap((g) => g.errors) } };
 }
 
@@ -72,13 +78,17 @@ function toggle(store: Store, name: string) {
 
 export function WorkFeatures({ store }: { store: Store }) {
   const hosts = forgeHosts(store);
-  useEffect(() => { void loadFeatures(store); }, [asked.value, hosts.map((h) => h.id).join(",")]);
+  useEffect(() => { void loadFeatures(store); }, [asked.value, board.value, listHosts(store, board.value).map((h) => h.id).join(",")]);
+  const boardKey = boardHosts(store).map((h) => h.id).join(",");
+  useEffect(() => { void loadBoards(store); }, [boardKey]);
   const list = features.value;
   return (
     <div class="work-list">
       <div class="work-filters">
+        <Choice label="Board" any="All" value={board.value} options={boardChoices(boards.value, board.value)}
+          words={(url) => boardName(boards.value, url)} onChange={(url) => { board.value = url; }} />
         <span class="quiet small">The feature:&lt;name&gt; labels on the epics.</span>
-        <button type="button" class="link" onClick={() => { asked.value++; }}>Refresh</button>
+        <button type="button" class="link" onClick={() => { asked.value++; void loadBoards(store, true); }}>Refresh</button>
       </div>
       {errors.value.map((e) => <p key={e} class="hint">{e}</p>)}
       {hosts.length === 0 ? <p class="hint">{noForgeHere}</p>

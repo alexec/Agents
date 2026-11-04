@@ -2,14 +2,14 @@
 // the cursors to the next pages, kept per kind for the tab's life. An item's page goes through the list
 // it was opened from (Previous and Next, j and k), and Back finds the list as it was left.
 import { signal, type Signal } from "@preact/signals";
-import type { ForgeItem, ForgeListError, ReportNode, ReportNodesSort } from "../protocol/generated";
+import type { ForgeItem, ForgeListError, ProjectBoard, ReportNode, ReportNodesSort } from "../protocol/generated";
 import type { Store } from "./store";
 import { Capability } from "../protocol/capabilities.generated";
 import { CallFailed } from "../wire/link";
 import { describe } from "./errors";
 import { hostAnswers } from "./capabilities";
 import {
-  anyFilter, filterRows, fromForge, lineageRow, mergeForge, neighbours, sortRows,
+  anyFilter, filterRows, forgeListRequest, fromForge, lineageRow, mergeBoards, mergeForge, neighbours, sortRows,
   type Neighbours, type WorkFilter, type WorkKind, type WorkRow, type WorkSort, type WorkState,
 } from "./work";
 
@@ -61,6 +61,26 @@ export const nodesSort = (l: WorkListState): ReportNodesSort => !fromForge(l.kin
 
 export const forgeHosts = (store: Store) => store.hosts.value.filter((h) => hostAnswers(h.state) && store.has(h.id, Capability.forge1));
 
+/** The machines that know boards (#3282): only they are asked for a board's list, as one that does not would list it all. */
+export const boardHosts = (store: Store) => forgeHosts(store).filter((h) => store.has(h.id, Capability.forgeBoards1));
+
+/** The machines a list is read from: with a board chosen, those that know boards. */
+export const listHosts = (store: Store, board: string) => board ? boardHosts(store) : forgeHosts(store);
+
+/** The boards of the machines' projects (forge/boards, #3282), for Issues' and Features' Board menu. */
+export const boards = signal<ProjectBoard[]>([]);
+let boardsRead: string | undefined;
+
+/** Read the boards from each machine that knows them, unless they were read from those already; `again` reads them anyway. */
+export async function loadBoards(store: Store, again = false): Promise<void> {
+  const hosts = boardHosts(store);
+  const mine = hosts.map((h) => h.id).join(",");
+  if (boardsRead === mine && !again) return;
+  boardsRead = mine;
+  const got = await Promise.all(hosts.map((h) => store.link.call("forge/boards", {}, h.id).then((b) => b.boards, () => [])));
+  if (boardsRead === mine) boards.value = mergeBoards(got);
+}
+
 /** Every row read, one per ref. */
 export function allRows(l: WorkListState): WorkRow[] {
   return fromForge(l.kind) ? mergeForge(l.lists.value ?? [], l.lineage.value) : l.lineage.value.map(lineageRow);
@@ -86,9 +106,10 @@ async function readLineage(store: Store, kind: WorkKind, sort: ReportNodesSort, 
   return { nodes, cursor: next };
 }
 
-/** What the list is read for: its state, sort, machines and Refresh. */
+/** What the list is read for: its state, board, sort, machines and Refresh. */
 export function askKey(store: Store, l: WorkListState): string {
-  return [forgeState(l.filter.value.state), nodesSort(l), forgeHosts(store).map((h) => h.id).join(","), l.asked.value].join("|");
+  const { state, board } = l.filter.value;
+  return [forgeState(state), board, nodesSort(l), listHosts(store, board).map((h) => h.id).join(","), l.asked.value].join("|");
 }
 
 /** Read the list for what it is asked, unless it was read for that already. */
@@ -99,8 +120,8 @@ export async function loadList(store: Store, l: WorkListState): Promise<void> {
   const current = () => l.read === mine;
   const { kind } = l;
   const sort = nodesSort(l);
-  const state = l.filter.peek().state;
-  const hosts = forgeHosts(store);
+  const { state, board } = l.filter.peek();
+  const hosts = listHosts(store, board);
   l.lists.value = null;
   l.lineage.value = [];
   l.problem.value = null;
@@ -116,7 +137,7 @@ export async function loadList(store: Store, l: WorkListState): Promise<void> {
   const method = kind === "issue" ? "forge/issues" : "forge/pulls";
   const read = await Promise.all(hosts.map(async (h): Promise<HostList> => {
     try {
-      const got = await store.link.call(method, { state: forgeState(state), limit: 100 }, h.id);
+      const got = await store.link.call(method, forgeListRequest(forgeState(state), board), h.id);
       return { host: h.id, items: got.items, cursor: got.cursor, errors: got.errors ?? [] };
     } catch (e) {
       return { host: h.id, items: [], errors: [{ forge: "", message: describe(e) }] };
@@ -131,10 +152,10 @@ export async function loadMore(store: Store, l: WorkListState): Promise<void> {
   try {
     if (fromForge(l.kind)) {
       const method = l.kind === "issue" ? "forge/issues" : "forge/pulls";
-      const state = forgeState(l.filter.peek().state);
+      const { state, board } = l.filter.peek();
       l.lists.value = await Promise.all((l.lists.peek() ?? []).map(async (h) => {
         if (!h.cursor) return h;
-        const got = await store.link.call(method, { state, limit: 100, cursor: h.cursor }, h.host);
+        const got = await store.link.call(method, forgeListRequest(forgeState(state), board, h.cursor), h.host);
         return { ...h, items: [...h.items, ...got.items], cursor: got.cursor, errors: got.errors ?? [] };
       }));
     } else if (l.lineageCursor.peek()) {

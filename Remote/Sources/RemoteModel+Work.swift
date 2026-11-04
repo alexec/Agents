@@ -20,6 +20,9 @@ extension RemoteModel {
         workMachines { $0.has(Capability.lineage1) }
     }
 
+    /// None: boards are the Mac's and the web page's (#3282, tier Mac + web).
+    var boardMachines: [(id: MachineRef, name: String)] { [] }
+
     /// The control plane's machines that run agents, can do `can` and answer this phone: the
     /// home host first, as `.mac`, then the rest by name. Empty without a control plane, as on
     /// the Mac.

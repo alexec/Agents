@@ -88,7 +88,8 @@ public extension DaemonAPI {
 
     /// `forge/issues` and `forge/pulls`' question: every folder's on the machine, or one
     /// folder's. `state` is open (when nil), closed or all; `limit` is 1 to 100, 50 when nil;
-    /// `feature` (a name: work for the label feature:work) narrows it to one feature (#3267).
+    /// `feature` (a name: work for the label feature:work) narrows it to one feature (#3267);
+    /// `board` (a board's url, from `forge/boards`) to one board (#3282).
     struct ForgeListRequest: Codable, Sendable, Hashable {
         public var folder: String?
         public var state: String?
@@ -98,9 +99,11 @@ public extension DaemonAPI {
         public var cursor: String?
         public var limit: Int?
         public var feature: String?
+        public var board: String?
 
         public init(folder: String? = nil, state: String? = nil, label: String? = nil, assignee: String? = nil,
-                    query: String? = nil, cursor: String? = nil, limit: Int? = nil, feature: String? = nil) {
+                    query: String? = nil, cursor: String? = nil, limit: Int? = nil, feature: String? = nil,
+                    board: String? = nil) {
             self.folder = folder
             self.state = state
             self.label = label
@@ -109,6 +112,7 @@ public extension DaemonAPI {
             self.cursor = cursor
             self.limit = limit
             self.feature = feature
+            self.board = board
         }
     }
 
@@ -516,13 +520,31 @@ public extension DaemonAPI {
         }
     }
 
-    /// `forge/features`' question: every folder's on the machine, or one folder's.
+    /// `forge/features`' question: every folder's on the machine, or one folder's; `board` (a
+    /// board's url) only the epics on that board (#3282).
     struct ForgeFeaturesRequest: Codable, Sendable, Hashable {
         public var folder: String?
+        public var board: String?
 
-        public init(folder: String? = nil) {
+        public init(folder: String? = nil, board: String? = nil) {
             self.folder = folder
+            self.board = board
         }
+    }
+
+    /// `forge/boards`' question (#3282): the boards of every folder's project on the machine,
+    /// or of one folder's.
+    struct ForgeBoardsRequest: Codable, Sendable, Hashable {
+        public var folder: String?
+
+        public init(folder: String? = nil) { self.folder = folder }
+    }
+
+    /// `forge/boards`' answer: each board once, by url.
+    struct ForgeBoards: Codable, Sendable, Hashable {
+        public var boards: [ProjectBoard]
+
+        public init(boards: [ProjectBoard] = []) { self.boards = boards }
     }
 
     /// A feature: its label's name after `feature:`, with its colour; its epics, and the open ones.
@@ -574,6 +596,8 @@ public extension DaemonAPI.Method {
     /// `ForgePlanRequest` → `ForgePlan`, `ForgeFeaturesRequest` → `ForgeFeatures` (#3267).
     static let forgePlan = "forge/plan"
     static let forgeFeatures = "forge/features"
+    /// `ForgeBoardsRequest` → `ForgeBoards` (#3282).
+    static let forgeBoards = "forge/boards"
     /// The plan's writes (#3271): `ForgeAddChildRequest` and `ForgeBlockedByRequest` → `ForgeDone`.
     static let forgeAddChild = "forge/add-child"
     static let forgeBlockedBy = "forge/blocked-by"

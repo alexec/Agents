@@ -183,21 +183,37 @@ public enum WorkList {
         return Array(rows.values)
     }
 
-    /// What a list is narrowed to. Empty repo, label, assignee or text is any.
+    /// What a list is narrowed to. Empty repo, label, assignee or text is any. A board (#3282) is
+    /// a board's url, which the machines narrow to as they read: it is not a filter of the rows.
     public struct Filter: Sendable, Hashable {
         public var state: State
         public var repo: String
         public var label: String
         public var assignee: String
         public var text: String
+        public var board: String
 
-        public init(state: State = .open, repo: String = "", label: String = "", assignee: String = "", text: String = "") {
+        public init(state: State = .open, repo: String = "", label: String = "", assignee: String = "", text: String = "",
+                    board: String = "") {
             self.state = state
             self.repo = repo
             self.label = label
             self.assignee = assignee
             self.text = text
+            self.board = board
         }
+    }
+
+    /// The boards of each machine (#3282), each once by url, in the order first given; the name
+    /// a board first has is kept.
+    public static func mergeBoards(_ lists: [[DaemonAPI.ProjectBoard]]) -> [DaemonAPI.ProjectBoard] {
+        var seen = Set<String>()
+        return lists.flatMap { $0 }.filter { seen.insert($0.url).inserted }
+    }
+
+    /// A board's name in the Board menu, from the boards read; the url when it is not one of them.
+    public static func boardName(_ url: String, in boards: [DaemonAPI.ProjectBoard]) -> String {
+        boards.first { $0.url == url }?.name ?? url
     }
 
     /// Whether a row is in the state asked: a merged PR is merged, not closed.
