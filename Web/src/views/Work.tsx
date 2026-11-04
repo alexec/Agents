@@ -22,6 +22,7 @@ import { Markdown } from "../render/markdown";
 import { Graph, useLayout, useWalk } from "./Lineage";
 import { WorkActions, WorkCommentBox } from "./WorkActions";
 import { WorkPlan } from "./WorkPlan";
+import { WorkDocs } from "./Docs";
 import { hasPlan } from "../model/epicPlan";
 import { go, replace, route } from "../route";
 import {
@@ -281,6 +282,9 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
         </section>
       )}
       {writes && detail.value && <WorkCommentBox store={store} host={detail.value.host} node={node} wrote={() => void reread()} />}
+      {detail.value && (kind === "issue" || kind === "pr") && (
+        <WorkDocs store={store} itemRef={ref} title={detail.value.got.item.title} body={detail.value.got.body} asked={asked.value} />
+      )}
       <section class="work-lineage" aria-label="Lineage">
         <h3>Lineage</h3>
         {!lineageHost ? <p class="hint">No machine keeps links yet. Update Agents on a machine to see them.</p>

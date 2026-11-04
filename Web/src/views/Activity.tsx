@@ -20,7 +20,8 @@ import { forCleanup, pageLine, tally as worktreeTally, worktreesIntro } from "..
 import { BackToList } from "./BackToList";
 import { Modal } from "./Modal";
 import { folderKey, folderPath } from "../model/groups";
-import { accountChoices, accountRows, accountState, agentsHolding, allowanceLine, defaultAccountName, isOrgRow, orgAllowanceLine, ownRow, ownSignInID, reachesFoot, reachesTheModelBy, removeMessage, rowTitle, runtimeTime, signInOnTheMac } from "../model/runtimes";
+import { accountChoices, accountRows, accountState, agentsHolding, allowanceLine, defaultAccountName, isOrgRow, orgAllowanceLine, ownRow, ownSignInID, reachesFoot, reachesTheModelBy, machineSignInLine, offersMachineSignIn, removeMessage, rowTitle, runtimeTime, signInOnTheMac } from "../model/runtimes";
+import { RuntimeSignInDialog } from "./RuntimeSignInDialog";
 import { fromOrganisation } from "../model/orgAccounts";
 import { setBy as setByWords } from "../model/orgPolicy";
 import { personalEmpty, personalIntro, personalServers } from "../model/hostedMCP";
@@ -227,6 +228,8 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
   const pane = useSignal<"events" | "audit">("events");
   // Cost, or Reports: every person's machines, from the control plane (#1811).
   const costPane = useSignal<"cost" | "reports">("cost");
+  // The runtime whose sign-in sheet is open (#3349).
+  const signingIn = useSignal<{ host: string; status: RuntimeStatus } | null>(null);
   return (
     <section class={`chat activity-page ${page}-page`} aria-label={pageTitles[page]}>
       <header class="column-head page-head"><BackToList />
@@ -279,6 +282,12 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
                       {status.poolNote && <p class="quiet small">{status.poolNote}</p>}
                       {allowance?.setupNote && <p class="quiet small">{allowance.setupNote.split("`").map((part, i) => i % 2 ? <code key={i}>{part}</code> : part)}</p>}
                       {isAllowanceOut && allowance && <button onClick={() => void store.markRuntimeAvailable(host.id, allowance.credentialKey)}>Mark available</button>}
+                      {/* A server's Claude or Codex, signed in there from here (#3349). */}
+                      {/* Said once: the allowance says "not signed in" already. */}
+                      {machineSignInLine(status) && !allowance?.unusable && <p class="quiet small">{machineSignInLine(status)}</p>}
+                      {offersMachineSignIn(status) && store.has(host.id, Capability.runtimesSignIn1) && (
+                        <button onClick={() => { signingIn.value = { host: host.id, status }; }}>Sign In…</button>
+                      )}
                       {/* Only this Mac's, and only one that is on it: no client can sign in a server's account (#2257). */}
                       {status.runtime.accountFolderVariable !== undefined && !("missing" in status.availability) && store.isMac(host.id) && <AddAccount store={store} host={host.id} runtime={status.runtime.id} />}
                       <ReachesTheModelBy store={store} host={host.id} runtime={status.runtime.id} />
@@ -361,6 +370,11 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
           {page === "milestones" && <MilestonesPage store={store} />}
         </div>
       </div>
+      {signingIn.value && (
+        <RuntimeSignInDialog store={store} host={signingIn.value.host} runtimeID={signingIn.value.status.runtime.id}
+          runtimeName={signingIn.value.status.runtime.name} machine={hostName(signingIn.value.host)}
+          close={() => { signingIn.value = null; }} />
+      )}
     </section>
   );
 }

@@ -463,6 +463,39 @@ struct AgentsModelTests {
                 "while a method nobody knows is still passed on")
     }
 
+    /// The live tile (#3004, US4): one frame, the watched chat's, replaced by the next and
+    /// dropped when the chat changes; another agent's is not read past its agentID.
+    @Test func theLiveTileKeepsOnlyTheWatchedChatsLatestFrame() throws {
+        let model = AgentsModel()
+        let id = UUID(), other = UUID()
+        model.watching = id
+        let first = DesktopControlLiveFrame(agentID: id, image: "ZmFrZQ==", narration: "Clicked Save in TextEdit.",
+                                            capturedAt: Date())
+        #expect(model.apply(DaemonAPI.Notification.desktopControlLiveFrame, try notification(first)))
+        #expect(model.liveFrame == first)
+        #expect(model.liveFrame?.imageData == Data("fake".utf8))
+        #expect(DesktopControlLiveFrame.isFresh(heardAt: model.liveFrameHeardAt, now: Date()))
+        #expect(!DesktopControlLiveFrame.isFresh(heardAt: model.liveFrameHeardAt,
+                                                 now: Date().addingTimeInterval(DesktopControlLiveFrame.staleAfter)))
+
+        let locked = DesktopControlLiveFrame(agentID: id, locked: true, narration: "Typed into TextEdit.", capturedAt: Date())
+        model.apply(DaemonAPI.Notification.desktopControlLiveFrame, try notification(locked))
+        #expect(model.liveFrame == locked)
+        #expect(model.liveFrame?.imageData == nil, "no picture while the screen is locked")
+
+        let theirs = DesktopControlLiveFrame(agentID: other, image: "ZmFrZQ==", capturedAt: Date())
+        let read = AgentsModel.read(DaemonAPI.Notification.desktopControlLiveFrame, try notification(theirs), showing: id)
+        guard case .skipped = read else {
+            Issue.record("another agent's frame was read: \(String(describing: read))")
+            return
+        }
+        model.apply(DaemonAPI.Notification.desktopControlLiveFrame, try notification(theirs))
+        #expect(model.liveFrame == locked, "another agent's frame is not this chat's")
+
+        model.watching = other
+        #expect(model.liveFrame == nil)
+    }
+
     @Test func archivedFoldersAreKeptApartFromLiveOnes() {
         let model = AgentsModel()
         let live = DaemonAPI.FolderSummary(

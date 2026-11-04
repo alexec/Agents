@@ -8,3 +8,9 @@ export const pauseBody = "The agent stopped so it does not fight you for the scr
 export const resumeLabel = "Resume";
 export const takeOverLabel = "Take Over";
 export const takeOverHelp = "Let go of the screen lease now. The agent does not drive the screen again in this turn.";
+
+// The live tile's words (#3004, US4), DesktopControlTileWords (Shared/UI/Chat/DesktopControlTile.swift).
+export const tileTitle = "Driving the Mac's screen";
+export const tileLocked = "Mac is locked";
+export const tileLockedBody = "The agent keeps working. No picture is shown while the screen is locked.";
+export const tileWaiting = "Waiting for the first look at the screen…";

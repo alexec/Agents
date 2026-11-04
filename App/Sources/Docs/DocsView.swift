@@ -277,6 +277,7 @@ private struct DocPage: View {
     @State private var reading: (host: MachineRef, reading: DaemonAPI.DocsReading)?
     @State private var problem: String?
     @State private var copied: String?
+    @State private var startProblem: String?
 
     /// How often a folder doc is read again while its page is shown.
     private static let followEvery: Duration = .seconds(5)
@@ -310,6 +311,7 @@ private struct DocPage: View {
                 .joined(separator: " · "))
                 .appText(.fine).foregroundStyle(.secondary).textSelection(.enabled).lineLimit(1).truncationMode(.middle)
             HStack(spacing: 8) {
+                if let doc, let host = reading?.host { startMenu(doc, on: host) }
                 if let doc, !DocsList.isFolderDoc(doc), let url = doc.url.flatMap(URL.init(string:)) {
                     Button("Open in \(DocsList.vendorName(ref))") { openURL(url) }
                 } else if let doc, let place = filesPlace(doc) {
@@ -324,7 +326,42 @@ private struct DocPage: View {
                 Button("All docs") { model.showDocs(DocsPlace()) }
                     .linkStyle()
             }
+            if let startProblem {
+                Text(startProblem).appText(.supporting).tinted(.failure)
+            }
         }
+    }
+
+    /// Start Agent ▾ (#3322): a new session from this doc, in its folder; a connector doc's asks
+    /// for the folder, as each start's own menu of this machine's folders.
+    @ViewBuilder
+    private func startMenu(_ doc: DaemonAPI.Doc, on host: MachineRef) -> some View {
+        Menu("Start Agent") {
+            ForEach(DocsList.Start.allCases, id: \.self) { start in
+                if DocsList.isFolderDoc(doc) {
+                    Button(start.title) { self.start(start, doc, in: doc.folder ?? "", on: host) }
+                        .help(start.help)
+                } else {
+                    Menu(start.title) {
+                        let folders = model.folders.filter { $0.host == host }
+                        if folders.isEmpty { Text("No folder on this machine") }
+                        ForEach(folders) { folder in
+                            Button(folder.name) { self.start(start, doc, in: folder.folder.folder.path, on: host) }
+                        }
+                    }
+                    .help(start.help)
+                }
+            }
+        }
+        .fixedSize()
+        .help(DocsList.isFolderDoc(doc) ? "A new session in this doc’s folder, working from it"
+            : "A new session working from this doc, in a folder you choose")
+    }
+
+    private func start(_ start: DocsList.Start, _ doc: DaemonAPI.Doc, in folder: String, on host: MachineRef) {
+        startProblem = folder.isEmpty ? "This doc has no folder here." : model.offerStart(
+            AppViewStart(prompt: start.prompt(doc.ref), labels: start.labels(doc)),
+            in: FolderKey(host: host, folder: URL(fileURLWithPath: folder)))
     }
 
     private func copy(_ what: String, _ text: String) {

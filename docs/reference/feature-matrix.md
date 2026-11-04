@@ -59,8 +59,10 @@ Agents' ◐ cells, and why:
 - **A browser the agent drives:** through the Playwright server from the MCP marketplace,
   with nothing shown in the app, or with **Use Chrome** (#1837), which drives the person's
   own Chrome for Claude alone, once its extension is installed. Desktop control's
-  `drive_screen` (#3004) lets an agent of any runtime drive a browser by its screen,
-  mouse and keyboard, but the app does not show it yet: the live tile is still to come.
+  `drive_screen` (#3004) lets an agent of any runtime drive a browser, or any other app on
+  the Mac, by its screen, mouse and keyboard, and every client shows it working on a live
+  tile; but there is no browser pane of its own. See
+  [Let an agent drive desktop apps](../how-to/let-an-agent-drive-desktop-apps.md).
 - **Several accounts per runtime:** for Claude and Codex alone (#840). The person picks
   the account when a session starts. See
   [More than one account](runtimes.md#more-than-one-account).

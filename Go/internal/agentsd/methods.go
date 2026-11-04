@@ -60,6 +60,7 @@ func (d *Daemon) register() {
 	d.registerMoves()
 	d.registerRuntimeSessions()
 	d.registerRuntimeAuth()
+	d.registerHeadlessSignIn()
 	d.registerWorkflows()
 	d.registerDailySummary()
 	d.registerShells()

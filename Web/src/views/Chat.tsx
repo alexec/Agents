@@ -50,6 +50,7 @@ import { BackToList } from "./BackToList";
 import { comingBackDescription, footStatusWords } from "../model/status";
 import { ArchiveCard } from "./ArchiveCard";
 import { DesktopControlPauseCard } from "./DesktopControlPauseCard";
+import { DesktopControlTile } from "./DesktopControlTile";
 import { showsThoughts, shownItems } from "../model/thoughts";
 import { hasTurnInFlight, promptPlaceholder, willQueue } from "../model/promptWords";
 import { eventCarryOnPrompt, eventWaitLine, eventWaitMinutes, eventWaitSummaryLines, leaseMark, lineCarryOnPrompt, lineResource, triggerURL } from "../model/rowLines";
@@ -464,6 +465,11 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       node: <div class="cards"><GuardedChangeCard store={store} host={host} folder={folder} change={change} down={down} /></div>,
     })),
     ...asked,
+    // It drives the Mac's screen (#3004, US4): the live tile, above any pause card.
+    ...(agent && agent.state === "running" ? [{
+      key: `live:${agent.id}`,
+      node: <DesktopControlTile store={store} host={host} agentID={agent.id} />,
+    }] : []),
     // Its drive_screen paused by the person's touch (#3004, US3): Resume or Take Over.
     ...(agent?.desktopControlPause ? [{
       key: `screen:${agent.id}`,

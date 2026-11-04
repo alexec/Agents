@@ -380,6 +380,13 @@ struct ChatView: View {
                     .help(selectedHostOffline ? offlineHelp : "")
             })
         }
+        // It drives the Mac's screen (#3004, US4): the live tile, above any pause card.
+        if agent.state == .running, let frame = model.work.liveFrame, frame.agentID == agent.id {
+            cards.append(WaitingCard(id: "live:" + agent.id.uuidString) {
+                DesktopControlTile(frame: frame, heardAt: model.work.liveFrameHeardAt)
+                    .chatColumn()
+            })
+        }
         // Its drive_screen paused by the person's touch (#3004, US3): Resume or Take Over.
         if let pause = agent.desktopControlPause {
             cards.append(WaitingCard(id: "screen:" + agent.id.uuidString) {

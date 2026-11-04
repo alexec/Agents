@@ -149,6 +149,24 @@ server's agents use Claude as you, through this Mac, whenever this Mac is awake.
 sign-in itself stays on this Mac. Click **Don't Allow** to sign Claude in on the server
 instead.
 
+### Sign Claude or Codex in on the server from the web page
+
+With no Mac to lend a sign-in, sign Claude or Codex in on the server itself (#3349). The
+server needs no browser: the web page opens the sign-in page in yours.
+
+1. On the web page, open **Machines ▸ Runtimes**. Under the server's heading, Claude or
+   Codex says **Not usable: not signed in**. Click **Sign In…**.
+2. Click **Open Link**, and sign in to your account on the page it opens.
+   - **Claude:** the page gives a code. Paste it into the sheet and click **Sign In**.
+     Claude makes a sign-in that lasts a year, kept on the server for Agents only.
+   - **Codex:** type the code the sheet shows on the page, then click **Done**. If OpenAI
+     does not take the code, turn on device code sign-in in ChatGPT's security settings.
+3. Or click **Use an API Key Instead**, and paste an Anthropic or OpenAI API key. For
+   Claude, a token that `claude setup-token` made on another computer works too.
+
+The row then says **Signed in on this machine**. A server that uses this Mac's sign-in
+does not offer **Sign In…**.
+
 ### Let the server use this Mac's git access
 
 A private repository needs git access. If the server has no git credential helper of its

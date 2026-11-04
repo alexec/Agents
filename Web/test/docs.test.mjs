@@ -86,3 +86,48 @@ test("Docs is in the bar after Work, and #/docs/<ref> is a doc's page", () => {
   assert.deepEqual(route.parseRoute(hash), { nav: "docs", section: "docs", item: ref });
   assert.deepEqual(route.parseRoute("#/docs"), { nav: "docs" });
 });
+
+// Start Agent on a doc and the Docs section on Work's pages (#3322), as DocsStartTests has them.
+const specDoc = doc("specs/3319-docs/spec.md", "Docs", agents.id);
+
+test("Build this names the doc in its prompt and labels the session doc:<short form>", () => {
+  assert.ok(d.docStartPrompt("build", specDoc.ref).includes(specDoc.ref));
+  assert.ok(d.docStartPrompt("build", specDoc.ref).includes("docs_read"));
+  assert.deepEqual(d.docStartLabels("build", specDoc), ["doc:3319-docs/spec.md"]);
+  assert.deepEqual(d.docStartLabels("review", specDoc), []);
+  assert.deepEqual(d.docStartLabels("ask", specDoc), []);
+  assert.deepEqual(d.docStarts.map((s) => d.docStartTitle[s]), ["Build this", "Review this", "Ask about this"]);
+});
+
+test("The doc: label fits a session label: whole path parts, a file name's end, a title's start", () => {
+  assert.equal(d.docLabel({ path: "README.md", title: "x" }), "doc:README.md");
+  assert.equal(d.docLabel({ path: "docs/explanation/leases.md", title: "x" }), "doc:leases.md");
+  assert.equal(d.docLabel({ path: "specs/a-very-long-file-name-here.md", title: "x" }), "doc:ng-file-name-here.md");
+  assert.equal(d.docLabel({ title: "Payments: requirements and more" }), "doc:Payments: requiremen");
+});
+
+test("An item's body names docs by ref, by address and by a specs/ or docs/ path of its repo", () => {
+  const body = `Spec: \`specs/3319-docs/spec.md\`, "A doc's page". See also docs/explanation/leases.md.
+The page: #/docs/github%3Aalexec%2Fagents%2Fdoc%2FREADME.md and agents://docs/confluence:acme.atlassian.net/123.
+Raw: github:alexec/agents/doc/specs/3265-work-plans/spec.md, notion:1f2e.
+Not these: https://github.com/alexec/Agents/blob/main/specs/0001/spec.md, src/docs/x.md, specs/3319-docs/spec.md again.`;
+  assert.deepEqual(d.linkedRefs(body, "github:alexec/agents#3322"), [
+    "github:alexec/agents/doc/specs/3319-docs/spec.md",
+    "github:alexec/agents/doc/docs/explanation/leases.md",
+    "github:alexec/agents/doc/README.md",
+    "confluence:acme.atlassian.net/123",
+    "github:alexec/agents/doc/specs/3265-work-plans/spec.md",
+    "notion:1f2e",
+  ]);
+  assert.deepEqual(d.linkedRefs("specs/a.md and notion:9", "linear:ENG-4"), ["notion:9"]);
+  assert.equal(d.repoPrefix("gitlab:acme/web!12"), "gitlab:acme/web/doc/");
+});
+
+test("A title is searched by its longest uncommon words, and the docs most of them find come first", () => {
+  assert.deepEqual(d.searchWords("Docs 3: Start Agent on a doc, and a Docs section on Work's issue and PR pages"),
+    ["section", "start", "agent", "issue"]);
+  const [a, b, c, linked] = ["a.md", "b.md", "c.md", "l.md"].map((p) => doc(p, "A doc", agents.id));
+  const r = (x, n) => ({ doc: x, matches: Array.from({ length: n }, () => ({ line: 1, snippet: "x" })) });
+  const got = d.relatedDocs([[r(a, 1), r(linked, 9)], [r(b, 5), r(a, 1)], [r(c, 1), r(b, 1)]], new Set([linked.ref]));
+  assert.deepEqual(got.map((x) => x.ref), [b.ref, a.ref, c.ref]);
+});
