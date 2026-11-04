@@ -398,6 +398,8 @@ func (d *Daemon) yourPolicyState() wire.YourPolicyState {
 		state.Signed = &wire.SignedYourPolicy{Policy: base64.StdEncoding.EncodeToString(d.yoursNow.Policy),
 			Signature: d.yoursNow.Signature, Key: d.yoursPublicKeyLocked()}
 	}
+	// A copy this machine cannot trust, for the person to sign again or set aside (#3230).
+	state.Untrusted = d.untrustedYoursLocked()
 	return state
 }
 
@@ -505,6 +507,9 @@ func (d *Daemon) registerPolicyYours() {
 	})
 	On(d, wire.CallPolicySetYours, func(_ context.Context, c *Client, r wire.SetYourPolicyRequest) (wire.YourPolicy, error) {
 		return d.setYourPolicy(c, r)
+	})
+	On(d, wire.CallPolicySettleUntrustedYours, func(_ context.Context, c *Client, r wire.SettleUntrustedYourPolicyRequest) (wire.YourPolicyState, error) {
+		return d.settleUntrustedYours(c, r)
 	})
 	On(d, wire.CallPolicyApplyYours, func(_ context.Context, c *Client, r wire.SignedYourPolicy) (wire.PolicyApplyYoursResult, error) {
 		if err := forbiddenCallerRefusal(c); err != nil {

@@ -34,6 +34,12 @@ struct PolicyPane: View {
         Form {
             if let effective {
                 banner(effective)
+                #if os(macOS)
+                // Rules signed on another Mac (#3230): tier mac+web, so not on the Remote.
+                if let untrusted = yours?.untrusted {
+                    untrustedSection(untrusted)
+                }
+                #endif
                 ForEach(PolicyLayersWords.Section.allCases, id: \.self) { section in
                     Section {
                         ForEach(PolicyLayersWords.rows(in: section)) { row in
@@ -98,6 +104,34 @@ struct PolicyPane: View {
         .paperListRow()
     }
 
+    /// The rules of a copy of your layer this Mac can't trust (#3230), and the person's choice:
+    /// sign them with this Mac's person key, or set the copy aside. Nothing signs them without it.
+    private func untrustedSection(_ copy: DaemonAPI.UntrustedYourPolicy) -> some View {
+        Section {
+            VStack(alignment: .leading, spacing: 6) {
+                Label(PolicyLayersWords.untrustedTitle, systemImage: "exclamationmark.shield")
+                    .appText(.reading).fontWeight(.semibold).tinted(.attention)
+                Text(PolicyLayersWords.untrustedLine(copy)).appText(.fine)
+                    .fixedSize(horizontal: false, vertical: true)
+                if copy.lines.isEmpty {
+                    Text(PolicyLayersWords.untrustedNone).appText(.fine).foregroundStyle(.secondary)
+                } else {
+                    ForEach(copy.lines, id: \.rule) { line in
+                        Text("• " + PolicyLayersWords.untrustedRule(line)).appText(.fine)
+                    }
+                }
+                HStack {
+                    Button(PolicyLayersWords.signAgain) { Task { await settle(copy, sign: true) } }
+                        .buttonStyle(.borderedProminent)
+                    Button(PolicyLayersWords.setAside) { Task { await settle(copy, sign: false) } }
+                }
+                .disabled(isSaving)
+            }
+            .accessibilityElement(children: .contain)
+        }
+        .paperListRow()
+    }
+
     private func load() async {
         guard let host else {
             problem = "This Mac’s host can’t be reached."
@@ -123,6 +157,22 @@ struct PolicyPane: View {
             _ = try await host.call(DaemonAPI.Method.policySetYours,
                                     DaemonAPI.SetYourPolicyRequest(rules: rules, revision: yours.policy.revision),
                                     returning: DaemonAPI.YourPolicy.self)
+            problem = nil
+        } catch {
+            problem = PeopleWords.refusal(error)
+        }
+        await load()
+    }
+
+    private func settle(_ copy: DaemonAPI.UntrustedYourPolicy, sign: Bool) async {
+        guard let host, let yours else { return }
+        isSaving = true
+        defer { isSaving = false }
+        do {
+            _ = try await host.call(DaemonAPI.Method.policySettleUntrustedYours,
+                                    DaemonAPI.SettleUntrustedYourPolicyRequest(file: copy.file, revision: yours.policy.revision,
+                                                                               sign: sign),
+                                    returning: DaemonAPI.YourPolicyState.self)
             problem = nil
         } catch {
             problem = PeopleWords.refusal(error)

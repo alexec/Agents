@@ -123,6 +123,10 @@ func (d *Daemon) askIssueMilestone(j milestoneJob) {
 				d.link(issue, to, lineage.RelPartOf, lineage.SourceForge)
 			}
 		})
+		if m > 0 {
+			// Its title, for Work's Milestones (reports/nodes), which no walk asks for.
+			d.resolveSoon(j.repo.milestone(m))
+		}
 	}
 	// After the links are given: no longer waiting means they are in the linker's work.
 	d.issueMu.Lock()
