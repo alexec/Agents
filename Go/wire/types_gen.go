@@ -2935,6 +2935,22 @@ type DeliveredRoute struct {
 	Expires *Date `json:"expires,omitzero"`
 }
 
+// The live tile's latest look at the Mac's screen while an agent holds the screen lease (#3004, US4, FR-011): a downscaled JPEG of the whole screen, base64, or, while the screen is locked, locked and no image (FR-012). Sent only to the clients showing that agent, never recorded, never replayed (FR-016).
+type DesktopControlLiveFrame struct {
+	AgentID UUID `json:"agentID"`
+
+	// Base64 JPEG. Absent while the screen is locked.
+	Image *string `json:"image,omitzero"`
+
+	// The Mac's screen is locked: the tile says so and shows no picture.
+	Locked *bool `json:"locked,omitzero"`
+
+	// What the agent last did on the screen, in words: drive_screen's own reply, such as Clicked Save in TextEdit. Absent before its first action.
+	Narration *string `json:"narration,omitzero"`
+
+	CapturedAt Date `json:"capturedAt"`
+}
+
 // An agent's drive_screen paused by the person's own touch (#3004, US3): the app it was driving, and when.
 type DesktopControlPause struct {
 	App string `json:"app"`
@@ -4093,6 +4109,9 @@ type FolderPins struct {
 	Workflows []string `json:"workflows,omitzero"`
 
 	Views []PinView `json:"views,omitzero"`
+
+	// Its open pull requests waiting for the person's approval (#3330), newest first. Nil from a host with none.
+	Reviews []ReviewPull `json:"reviews,omitzero"`
 }
 
 type FolderPlugin struct {
@@ -7484,6 +7503,9 @@ type PinsChangedNotification struct {
 	Workflows []string `json:"workflows,omitzero"`
 
 	Views []PinView `json:"views,omitzero"`
+
+	// Its open pull requests waiting for the person's approval (#3330), newest first. Nil from a host with none.
+	Reviews []ReviewPull `json:"reviews,omitzero"`
 }
 
 type Plan struct {
@@ -8980,6 +9002,30 @@ type RetentionState struct {
 	ArchivedBytes int64 `json:"archivedBytes"`
 }
 
+// reviews/dismiss (#3330): a person's Dismiss on a pull request in the sidebar's For Review. The host keeps it, so that pull request is not listed again.
+type ReviewDismissRequest struct {
+	Folder URL `json:"folder"`
+
+	// The pull request's page, as its ReviewPull says it.
+	URL URL `json:"url"`
+}
+
+// An open pull request labelled needs-approval, a UI change waiting for the person (#2811), in the sidebar's For Review (#3330) until it is labelled approved or changes-wanted, is closed, or is dismissed.
+type ReviewPull struct {
+	URL URL `json:"url"`
+
+	Number int64 `json:"number"`
+
+	Title string `json:"title"`
+
+	// owner/name.
+	Repo string `json:"repo"`
+
+	Author *string `json:"author,omitzero"`
+
+	UpdatedAt Date `json:"updatedAt"`
+}
+
 type Runtime struct {
 	ID string `json:"id"`
 
@@ -9171,6 +9217,45 @@ type RuntimeSession struct {
 	IsHeld *bool `json:"isHeld,omitzero"`
 }
 
+// Whether a runtime is signed in on the machine itself (#3349), for one a client signs in there with no browser on the machine: Claude and Codex on a server. Absent on a Mac, which signs its runtimes in in Runtimes.
+type RuntimeSignIn struct {
+	SignedIn bool `json:"signedIn"`
+
+	// A Mac lends it its own sign-in (056), so it runs without one of its own.
+	Relayed *bool `json:"relayed,omitzero"`
+}
+
+// The end of a sign-in runtimes/signInStart began (#3349): the code the sign-in page gave, when the step wants one, or cancel to stop it.
+type RuntimeSignInFinish struct {
+	SignInID string `json:"signInID"`
+
+	Code *string `json:"code,omitzero"`
+
+	Cancel *bool `json:"cancel,omitzero"`
+}
+
+// An API key to sign a runtime in with on the machine (#3349), when there is no account to sign in to.
+type RuntimeSignInKey struct {
+	RuntimeID string `json:"runtimeID"`
+
+	Key string `json:"key"`
+}
+
+// What the person does to sign a runtime in on a machine with no browser (#3349): open url in a browser of their own, then type userCode there (Codex), or paste back the code the page gives (wantsCode, Claude).
+type RuntimeSignInStep struct {
+	SignInID string `json:"signInID"`
+
+	RuntimeID string `json:"runtimeID"`
+
+	URL URL `json:"url"`
+
+	// The code to type on the page at url.
+	UserCode *string `json:"userCode,omitzero"`
+
+	// The page gives a code to paste back with runtimes/signInFinish.
+	WantsCode bool `json:"wantsCode"`
+}
+
 type RuntimeStatus struct {
 	Runtime Runtime `json:"runtime"`
 
@@ -9186,6 +9271,8 @@ type RuntimeStatus struct {
 
 	// Set when the organisation's policy does not allow this runtime here (#998, FR-010).
 	SetBy *PolicySetBy `json:"setBy,omitzero"`
+
+	SignIn *RuntimeSignIn `json:"signIn,omitzero"`
 }
 
 // A SCIM user's email (RFC 7643 §4.1.2), to show only: never a sign-in.

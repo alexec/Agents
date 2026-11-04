@@ -12,7 +12,9 @@ import Foundation
 ///
 /// For Review (#3194) holds what is ready to look at but blocks no agent: today, a session
 /// that ended done with a file it showed that nobody has opened (`fileToSee`), the daily
-/// summary's too. Opening it, or Mark as Read, its Dismiss, takes it out.
+/// summary's too. Opening it, or Mark as Read, its Dismiss, takes it out. After its sessions,
+/// each folder's open pull requests labelled needs-approval (#3330), until they are answered,
+/// closed or dismissed.
 ///
 /// Read off each folder's shelf (#165), so a folded smart row costs a sum of counts per
 /// folder and not a pass over every agent held; only an open one lists its sessions.
@@ -67,6 +69,7 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
             // over the live sessions, not the shelf's sums, which are for all four.
             return agents(in: work, folders: folders, on: on).count
                 + (self == .needsYou ? folders.reduce(0) { $0 + Self.ownApprovals(in: work, $1).count } : 0)
+                + pulls(in: work, folders: folders).count
         }
         return folders.reduce(0) { total, key in
             let shelf = work.shelf(key)
@@ -87,7 +90,7 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
                 return total + (shelf.counts[.needsAttention] ?? 0) + (shelf.counts[.blocked] ?? 0)
                     + Self.askingAtRest(in: shelf) + Self.ownApprovals(in: work, key).count - pinnedHere - failedHere
             case .forReview:
-                return total + Self.forReview(in: shelf).count - pinnedHere
+                return total + Self.forReview(in: shelf).count + work.reviewPulls(in: key.folder).count - pinnedHere
             case .working:
                 return total + (shelf.counts[.running] ?? 0) - pinnedHere
             case .unread:
@@ -186,6 +189,7 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
         return !agents(in: work, folders: folders, query: query, on: on).isEmpty
             || !workflows(in: work, folders: folders, query: query).isEmpty
             || !approvals(in: work, folders: folders, query: query).isEmpty
+            || !pulls(in: work, folders: folders, query: query).isEmpty
     }
 
     /// The sessions it gathers, newest started first, as a search leaves them.
@@ -268,6 +272,22 @@ public enum SidebarSmartRow: String, CaseIterable, Hashable, Sendable {
                 .map { (folder: key, approval: $0) }
         }
         .sorted { ($0.approval.since ?? .distantPast) < ($1.approval.since ?? .distantPast) }
+    }
+
+    /// The pull requests waiting for the person's approval in the folders named, each with
+    /// its folder (#3330): only For Review lists them, newest first, after its sessions. A
+    /// search matches the title, the repo and the number.
+    @MainActor
+    public func pulls(in work: AgentsModel, folders: [FolderKey], query: String = "")
+        -> [(folder: FolderKey, pull: ReviewPull)] {
+        guard self == .forReview else { return [] }
+        let words = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return folders.flatMap { key in
+            work.reviewPulls(in: key.folder)
+                .filter { words.isEmpty || "\($0.title) \($0.repo) #\($0.number)".lowercased().contains(words) }
+                .map { (folder: key, pull: $0) }
+        }
+        .sorted { $0.pull.updatedAt > $1.pull.updatedAt }
     }
 
     /// One folder's approvals drawn as rows of their own: every kind but a session's

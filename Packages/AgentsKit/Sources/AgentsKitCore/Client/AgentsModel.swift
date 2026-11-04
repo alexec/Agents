@@ -62,6 +62,9 @@ public final class AgentsModel {
     /// Each folder's servers' list views (#2032), the hidden ones marked, kept current by
     /// `pins/changed`. A folder with none is absent.
     @ObservationIgnored public private(set) var serverViews: [URL: [PinView]] = [:]
+    /// Each folder's pull requests waiting for the person's approval (#3330), kept current by
+    /// `pins/changed`. A folder with none is absent.
+    @ObservationIgnored public private(set) var reviewPulls: [URL: [ReviewPull]] = [:]
     /// Bumped by `pages/changed`: a page a screen may be showing changed on disk. Whoever
     /// shows one reads it again, with its stamp, so an unchanged file costs nothing.
     public private(set) var pageRevisions: [URL: [String: Int]] = [:]
@@ -237,6 +240,7 @@ public final class AgentsModel {
             terminalAgents = [:]
             terminalsByWrite = []
             terminalOutputBytes = 0
+            liveFrame = nil
         }
     }
 
@@ -283,6 +287,13 @@ public final class AgentsModel {
     /// that made it, and a client that was not listening asks `agents/resuming` on
     /// connect rather than inferring it.
     public private(set) var resuming: Set<UUID> = []
+
+    /// The live tile's latest frame (#3004, US4): one, for the chat being watched, since the
+    /// host sends frames only to the client showing that agent. Replaced by each frame, never
+    /// kept past it or written anywhere (FR-016).
+    public private(set) var liveFrame: DesktopControlLiveFrame?
+    /// When `liveFrame` was heard, on this client's clock.
+    public private(set) var liveFrameHeardAt = Date.distantPast
 
     /// What the reader will allow, what today has cost, and which local day that is.
     ///
@@ -462,6 +473,7 @@ public final class AgentsModel {
         case showFile(DaemonAPI.ShowFileNotification)
         case resuming(DaemonAPI.ResumingNotification)
         case terminalOutput(DaemonAPI.TerminalOutputNotification)
+        case liveFrame(DesktopControlLiveFrame)
         /// Ours, and unreadable. Claimed, so nobody else guesses at it, and skipped.
         case unreadable
         /// Ours, and about an agent this client is not showing: not read past its agentID.
@@ -481,7 +493,8 @@ public final class AgentsModel {
         func decode<T: Decodable>(_ type: T.Type, _ wrap: (T) -> Update) -> Update {
             (try? params?.decode(type)).map(wrap) ?? .unreadable
         }
-        if let showing, method == DaemonAPI.Notification.agentEntry || method == DaemonAPI.Notification.agentTerminalOutput {
+        if let showing, method == DaemonAPI.Notification.agentEntry || method == DaemonAPI.Notification.agentTerminalOutput
+            || method == DaemonAPI.Notification.desktopControlLiveFrame {
             let agentID = params?["agentID"]?.stringValue.flatMap(UUID.init(uuidString:))
             guard let agentID, agentID == showing || alsoShowing.contains(agentID) else { return .skipped }
         }
@@ -522,6 +535,7 @@ public final class AgentsModel {
         case DaemonAPI.Notification.agentShowFile: return decode(DaemonAPI.ShowFileNotification.self, Update.showFile)
         case DaemonAPI.Notification.agentResuming: return decode(DaemonAPI.ResumingNotification.self, Update.resuming)
         case DaemonAPI.Notification.agentTerminalOutput: return decode(DaemonAPI.TerminalOutputNotification.self, Update.terminalOutput)
+        case DaemonAPI.Notification.desktopControlLiveFrame: return decode(DesktopControlLiveFrame.self, Update.liveFrame)
         default: return nil
         }
     }
@@ -673,6 +687,9 @@ public final class AgentsModel {
             let views = notification.views ?? []
             serverViews[folder] = views.isEmpty ? nil : views
             pinShelves[folder]?.setViews(views)
+            let reviews = notification.reviews ?? []
+            reviewPulls[folder] = reviews.isEmpty ? nil : reviews
+            pinShelves[folder]?.setReviews(reviews)
             pinShelves[folder]?.setPins(notification.pins)
             pinShelves[folder]?.setSessions(sessions)
             pinShelves[folder]?.setWorkflows(flows)
@@ -739,6 +756,11 @@ public final class AgentsModel {
         case .showFile(let notification):
             filesToShow[notification.agentID] = notification.file
             rememberChart(notification.file)
+
+        case .liveFrame(let frame):
+            guard frame.agentID == watching else { return }
+            liveFrame = frame
+            liveFrameHeardAt = Date()
 
         case .resuming(let notification):
             if notification.isResuming {
@@ -855,6 +877,21 @@ public final class AgentsModel {
         pins(in: folder).first { $0.path == path } ?? serverViews(in: folder).first { $0.path == path }
     }
 
+    /// One folder's pull requests waiting for the person's approval (#3330), newest first.
+    public func reviewPulls(in folder: URL?) -> [ReviewPull] {
+        guard let folder else { return [] }
+        return pinShelf(folder).reviews
+    }
+
+    /// A pull request dismissed from For Review as a screen left it, before the host says so.
+    public func dismissReview(_ url: URL, in folder: URL) {
+        let key = Folder.standardize(folder)
+        guard var reviews = reviewPulls[key] else { return }
+        reviews.removeAll { $0.url == url }
+        reviewPulls[key] = reviews.isEmpty ? nil : reviews
+        pinShelves[key]?.setReviews(reviews)
+    }
+
     /// A server view hidden or shown as a screen left it, before the host says so.
     public func setViewHidden(_ uri: String, _ hidden: Bool, in folder: URL) {
         let key = Folder.standardize(folder)
@@ -879,8 +916,13 @@ public final class AgentsModel {
             listed.views.flatMap { $0.isEmpty ? nil : (Folder.standardize(listed.folder), $0) }
         }, uniquingKeysWith: { $1 })
         if serverViews != views { serverViews = views }
+        let reviews = Dictionary(listed.compactMap { listed in
+            listed.reviews.flatMap { $0.isEmpty ? nil : (Folder.standardize(listed.folder), $0) }
+        }, uniquingKeysWith: { $1 })
+        if reviewPulls != reviews { reviewPulls = reviews }
         for (folder, shelf) in pinShelves {
             shelf.setViews(serverViews[folder] ?? [])
+            shelf.setReviews(reviewPulls[folder] ?? [])
             shelf.setPins(pins[folder] ?? [])
             shelf.setSessions(sessionPins[folder] ?? [])
             shelf.setWorkflows(workflowPins[folder] ?? [])
@@ -929,6 +971,7 @@ public final class AgentsModel {
         if let shelf = pinShelves[key] { return shelf }
         let shelf = PinShelf()
         shelf.setViews(serverViews[key] ?? [])
+        shelf.setReviews(reviewPulls[key] ?? [])
         shelf.setPins(pins[key] ?? [])
         shelf.setSessions(sessionPins[key] ?? [])
         shelf.setWorkflows(workflowPins[key] ?? [])

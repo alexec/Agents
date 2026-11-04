@@ -419,13 +419,41 @@ public struct FolderPins: Codable, Sendable, Hashable {
     public var workflows: [String]?
     /// Its servers' list views (#2032), the hidden ones marked. Nil from a host with none.
     public var views: [PinView]?
+    /// Its pull requests waiting for the person's approval (#3330). Nil from a host with none.
+    public var reviews: [ReviewPull]?
 
     public init(folder: URL, pins: [PinView], sessions: [UUID] = [], workflows: [String] = [],
-                views: [PinView] = []) {
+                views: [PinView] = [], reviews: [ReviewPull] = []) {
         self.folder = folder
         self.pins = pins
         self.sessions = sessions.isEmpty ? nil : sessions
         self.workflows = workflows.isEmpty ? nil : workflows
         self.views = views.isEmpty ? nil : views
+        self.reviews = reviews.isEmpty ? nil : reviews
+    }
+}
+
+/// An open pull request labelled needs-approval, a UI change waiting for the person (#2811),
+/// listed in the sidebar's For Review (#3330) until it is labelled approved or
+/// changes-wanted, is closed, or is dismissed. A row opens `url`, its page with the
+/// screenshots.
+public struct ReviewPull: Codable, Sendable, Hashable, Identifiable {
+    public var url: URL
+    public var number: Int
+    public var title: String
+    /// owner/name.
+    public var repo: String
+    public var author: String?
+    public var updatedAt: Date
+
+    public var id: URL { url }
+
+    public init(url: URL, number: Int, title: String, repo: String, author: String? = nil, updatedAt: Date) {
+        self.url = url
+        self.number = number
+        self.title = title
+        self.repo = repo
+        self.author = author
+        self.updatedAt = updatedAt
     }
 }

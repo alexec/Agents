@@ -151,6 +151,21 @@ test("Needs You lists every folder's approvals, oldest first, but a session's ar
   assert.equal(smartApprovals([{ folder: "c" }]).length, 0);
 });
 
+test("For Review lists every folder's pull requests waiting for approval, newest first, and a search matches them (#3330)", async () => {
+  const { smartPulls } = await load("src/model/sidebar.ts");
+  const pull = (number, title, updatedAt) => ({ url: `https://github.com/alexec/agents/pull/${number}`, number, title,
+    repo: "alexec/agents", updatedAt });
+  const folders = [
+    { folder: "a", pulls: [pull(1, "Sidebar: For Review", 10)] },
+    { folder: "b", pulls: [pull(2, "Chat: a new prompt bar", 30), pull(3, "Web: Dismiss", 20)] },
+    { folder: "c", pulls: [] },
+  ];
+  assert.deepEqual(smartPulls(folders).map(({ folder, pull }) => `${folder}:${pull.number}`), ["b:2", "b:3", "a:1"]);
+  assert.deepEqual(smartPulls(folders, "prompt").map(({ pull }) => pull.number), [2]);
+  assert.deepEqual(smartPulls(folders, "#3").map(({ pull }) => pull.number), [3]);
+  assert.equal(smartPulls([{ folder: "c", pulls: [] }]).length, 0);
+});
+
 test("a search matches an approval's title, kind and grey line (#773)", async () => {
   const { smartApprovals } = await load("src/model/sidebar.ts");
   const folders = [{ folder: "a", approvals: [

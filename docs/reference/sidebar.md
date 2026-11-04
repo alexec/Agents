@@ -40,7 +40,7 @@ you without opening each folder.
 | --- | --- | --- |
 | **Pinned** | The sessions and workflows you pinned, in the order you pinned them. | On, open |
 | **Needs You** | Sessions that asked you something, are blocked, or ask to be archived. Also each approval that waits for you: a connector, a workflow, a plugin, a guarded file, and a workflow that failed. | On, open |
-| **For Review** | Finished sessions that showed you a file you have not opened yet, such as a report or the daily summary. These do not block an agent. | On, open |
+| **For Review** | Finished sessions that showed you a file you have not opened yet, such as a report or the daily summary. After them, each folder's open pull requests with the `needs-approval` label, until one gets `approved` or `changes-wanted`, or is closed. These do not block an agent. | On, open |
 | **Working** | Sessions with a turn in progress. | Off |
 | **Unread** | Finished sessions you have not opened since they finished. | Off |
 
@@ -56,6 +56,10 @@ you without opening each folder.
   another one. This keeps the row from moving away under the pointer.
 - **To dismiss a row in For Review,** use **Mark as Read**: right-click on the Mac and the
   web page, swipe left on iPhone and iPad. Opening the session dismisses it too.
+- **A pull request in For Review opens its page** on GitHub, with its screenshots. To take
+  it out, use **Dismiss**: point at the row on the Mac and the web page, or swipe left on
+  iPhone and iPad. A dismissed pull request does not come back. The host reads the list
+  each two minutes from the GitHub connection, so a new label can take that long to show.
 
 ### Turn a smart group on or off
 

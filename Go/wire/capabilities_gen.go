@@ -116,8 +116,10 @@ const CapReports1 = "reports/1"
 const CapResourcesLeases1 = "resources.leases/1"
 const CapResources1 = "resources/1"
 const CapRetention1 = "retention/1"
+const CapReviews1 = "reviews/1"
 const CapRuntime1 = "runtime/1"
 const CapRuntimesAccounts1 = "runtimes.accounts/1"
+const CapRuntimesSignIn1 = "runtimes.sign-in/1"
 const CapRuntimes1 = "runtimes/1"
 const CapSandbox1 = "sandbox/1"
 const CapSessionsElsewhere1 = "sessions.elsewhere/1"
@@ -382,6 +384,7 @@ var HostCapabilities = pairs([][2]string{
 	{"resources/snapshot", "resources.leases/1"},
 	{"retention/set", "retention/1"},
 	{"retention/state", "retention/1"},
+	{"reviews/dismiss", "reviews/1"},
 	{"runtimes/accountProfiles", "runtimes.accounts/1"},
 	{"runtimes/accounts", "runtimes/1"},
 	{"runtimes/addAccount", "runtimes.accounts/1"},
@@ -397,6 +400,9 @@ var HostCapabilities = pairs([][2]string{
 	{"runtimes/removeAccount", "runtimes.accounts/1"},
 	{"runtimes/setDefaultAccount", "host.org-routes/1"},
 	{"runtimes/setProvider", "runtimes/1"},
+	{"runtimes/signInFinish", "runtimes.sign-in/1"},
+	{"runtimes/signInKey", "runtimes.sign-in/1"},
+	{"runtimes/signInStart", "runtimes.sign-in/1"},
 	{"sandbox/set", "sandbox/1"},
 	{"sandbox/state", "sandbox/1"},
 	{"selfUpdate/set", "host.update/1"},
@@ -472,6 +478,7 @@ var HostCapabilities = pairs([][2]string{
 	{"clone/changed", "clone/1"},
 	{"cost/changed", "cost/1"},
 	{"daemon/policyStateChanged", "host.policy/1"},
+	{"desktopControl/liveFrame", "host.desktop-control/1"},
 	{"device/changed", "device/1"},
 	{"disk/changed", "disk/1"},
 	{"events/changed", "events/1"},
@@ -524,6 +531,7 @@ var HostNotifications = set([]string{
 	"clone/changed",
 	"cost/changed",
 	"daemon/policyStateChanged",
+	"desktopControl/liveFrame",
 	"device/changed",
 	"disk/changed",
 	"events/changed",

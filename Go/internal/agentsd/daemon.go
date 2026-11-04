@@ -41,6 +41,7 @@ type Daemon struct {
 	agentMu sync.Mutex
 	pinState
 	viewCountBook
+	reviewBook
 	attachmentBook
 	settingsState
 	userScopeState
@@ -58,6 +59,7 @@ type Daemon struct {
 	eventWaitState
 	messageState
 	helperQueueState
+	headlessSignInState
 	costBook
 	featureBook
 	workflowBook
@@ -161,6 +163,8 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	d.watchDisk()
 	// The counts on the servers' list view rows (#2033).
 	d.startViewCounts()
+	// The pull requests waiting for the person, in For Review (#3330).
+	d.startReviews()
 	d.installDefaultToolsets()
 	return d, nil
 }

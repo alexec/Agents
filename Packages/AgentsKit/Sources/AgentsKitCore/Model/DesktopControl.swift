@@ -22,6 +22,42 @@ public struct DesktopControlPause: Codable, Sendable, Hashable {
     }
 }
 
+/// The live tile's latest look at the Mac's screen while an agent holds the `screen` lease
+/// (#3004, US4, FR-011): `desktopControl/liveFrame`, sent only to the clients showing that
+/// agent and never recorded. `image` is a base64 JPEG of the whole screen, absent while the
+/// screen is locked (`locked`, FR-012). `narration` is the agent's last action, in words.
+public struct DesktopControlLiveFrame: Codable, Sendable, Hashable {
+    public var agentID: UUID
+    public var image: String?
+    public var locked: Bool?
+    public var narration: String?
+    public var capturedAt: Date
+
+    public init(agentID: UUID, image: String? = nil, locked: Bool? = nil, narration: String? = nil,
+                capturedAt: Date) {
+        self.agentID = agentID
+        self.image = image
+        self.locked = locked
+        self.narration = narration
+        self.capturedAt = capturedAt
+    }
+
+    /// The picture's bytes, or nil while the screen is locked.
+    public var imageData: Data? {
+        guard locked != true, let image else { return nil }
+        return Data(base64Encoded: image)
+    }
+
+    /// How long a frame stands for the screen after it is heard: the host sends one at least
+    /// every 5 seconds while it holds the lease, so none for this long means it was let go.
+    /// Counted on this client's clock from when it heard the frame, never from `capturedAt`,
+    /// the Mac's clock, which a phone's may differ from.
+    public static let staleAfter: TimeInterval = 15
+
+    /// Whether the tile still shows a frame heard at `heardAt`, at `now`.
+    public static func isFresh(heardAt: Date, now: Date) -> Bool { now.timeIntervalSince(heardAt) < staleAfter }
+}
+
 public struct DesktopControlSettings: Codable, Sendable, Hashable {
     public var enabled: Bool
 

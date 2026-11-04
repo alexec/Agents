@@ -10,6 +10,7 @@
 //
 //   {"action":"access"}
 //   {"action":"screenshot"}
+//   {"action":"frame"}
 //   {"action":"click","app":"TextEdit","label":"Save"}
 //   {"action":"click","app":"TextEdit","x":120,"y":80}
 //   {"action":"type","app":"TextEdit","text":"hello"}
@@ -66,14 +67,16 @@ readFrames { frame in
         return
     }
     let app = json["app"] as? String ?? ""
-    touchWatch.arm()
+    // The live tile's frame (US4) is not the agent's command: the person's touch between
+    // two of those is said by the last command's arming, not again every few seconds.
+    if action != "frame" { touchWatch.arm() }
     switch action {
     case "access":
         // Desktop control's Accessibility gate (#3004, US2, FR-005): triggers macOS's own
         // grant prompt on first use if not already granted.
         reply(["ok": true, "trusted": axIsTrusted()])
 
-    case "screenshot":
+    case "screenshot", "frame":
         guard let image = captureScreenshotBase64() else {
             reply(["ok": false, "error": "could not capture the screen."])
             return

@@ -5,8 +5,9 @@
 // listed once, in its first group (#587). Needs You holds everything waiting for the person (#773):
 // sessions asking or blocked, sessions asking to be archived (#584, #649, once a group of their own),
 // and each folder's approvals as rows of their own. For Review (#3194) holds what is ready to look at
-// but blocks no agent: a session done with a file it showed that nobody has opened.
-import type { Agent, Approval, WorkflowSummary } from "../protocol/generated";
+// but blocks no agent: a session done with a file it showed that nobody has opened, then each folder's
+// open pull requests labelled needs-approval (#3330).
+import type { Agent, Approval, ReviewPull, WorkflowSummary } from "../protocol/generated";
 import { asksToArchive, byStart, folderKey, groupOf, showsUnread } from "./groups";
 import { queryMatches, type LabelQuery } from "./labels";
 import { isSessionApproval, kindWords } from "./approvals";
@@ -160,6 +161,20 @@ export function smartApprovals<P>(folders: readonly { folder: P; approvals?: rea
       && (!words || `${a.title} ${kindWords[a.kind]} ${a.line}`.toLowerCase().includes(words)))
     .map((approval) => ({ folder, approval })))
     .sort((a, b) => sinceOf(a.approval) - sinceOf(b.approval));
+}
+
+/**
+ * For Review's pull requests waiting for the person's approval (#3330), each with its folder, as
+ * `SidebarSmartRow.pulls`: newest first, after the group's sessions. A search matches the title, the
+ * repo and the number.
+ */
+export function smartPulls<P>(folders: readonly { folder: P; pulls: readonly ReviewPull[] }[],
+  query = ""): { folder: P; pull: ReviewPull }[] {
+  const words = query.trim().toLowerCase();
+  return folders.flatMap(({ folder, pulls }) => pulls
+    .filter((p) => !words || `${p.title} ${p.repo} #${p.number}`.toLowerCase().includes(words))
+    .map((pull) => ({ folder, pull })))
+    .sort((a, b) => b.pull.updatedAt - a.pull.updatedAt);
 }
 
 /** When it began waiting, the unknown first: a stable sort keeps those in their folders' order. */

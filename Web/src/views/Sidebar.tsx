@@ -28,7 +28,7 @@ import { hostAnswers } from "../model/capabilities";
 import { Capability } from "../protocol/capabilities.generated";
 import { parseQuery, queryMatches, type LabelQuery } from "../model/labels";
 import { keeper, keepsInUnread, newSessionFolder, pinnedSessions, pinnedWorkflows, folderSessions, rememberedFolder, rememberFolder,
-  smartAgents, smartApprovals, smartRows, smartTitles, withKept, type FolderKey, type SmartRow } from "../model/sidebar";
+  smartAgents, smartApprovals, smartPulls, smartRows, smartTitles, withKept, type FolderKey, type SmartRow } from "../model/sidebar";
 import { updatedLine } from "../model/updated";
 import { namedRelative, workflowSummary } from "../model/workflows";
 import { fromWireDate, toWireDate } from "../protocol/dates";
@@ -50,6 +50,7 @@ import { WorkflowRow } from "./WorkflowRow";
 import { footLine, offersStart } from "./OfflineStrip";
 import { PinnedPageRows, ServerViewRows, showHiddenViewsItem } from "./Pins";
 import { ApprovalRow, FailedWorkflowRow } from "./Approval";
+import { ReviewPullRow } from "./ReviewPull";
 import { JoinRequests } from "./JoinRequest";
 import { LinkRequests } from "./ChannelLinks";
 import { SignInRequests } from "./SignInRequests";
@@ -447,7 +448,12 @@ function SmartFold({ row, store, folders, query, linkDown, downSince }: {
   const waiting = row !== "needsYou" ? [] : folders.map((placed) => ({ folder: placed, approvals: placed.folder.approvals }));
   const approvals = smartApprovals(waiting, query);
   if (row === "needsYou") count += query ? smartApprovals(waiting).length : approvals.length;
-  if (parsed ? lines.length === 0 && approvals.length === 0 : count === 0 && !keptPlace) return null;
+  // The pull requests waiting for an approval, each folder's, after For Review's sessions (#3330).
+  const reviewing = row !== "forReview" ? [] : folders.map((placed) => ({ folder: placed,
+    pulls: store.reviewPullsIn(placed.host.id, placed.folder.folder.folder) }));
+  const pulls = smartPulls(reviewing, query);
+  if (row === "forReview") count += query ? smartPulls(reviewing).length : pulls.length;
+  if (parsed ? lines.length === 0 && approvals.length === 0 && pulls.length === 0 : count === 0 && !keptPlace) return null;
   const title = smartTitles[row];
   const updated = row === "needsYou" && downSince !== undefined ? updatedLine(downSince) : null;
   return (
@@ -493,6 +499,11 @@ function SmartFold({ row, store, folders, query, linkDown, downSince }: {
         }
         return <ApprovalRow key={key} store={store} host={host} folder={folder} approval={approval} place={place} down={down}
           chosen={r.host === host && r.review === approvalID(approval) && r.folder !== undefined && folderKey(r.folder) === folderKey(folder)} />;
+      })}
+      {open && pulls.map(({ folder: placed, pull }) => {
+        const host = placed.host.id;
+        return <ReviewPullRow key={`${host}|${pull.url}`} store={store} host={host} folder={placed.folder.folder.folder} pull={pull}
+          place={folderLabel(placed.host, placed.folder, store.macHostID.value)} down={linkDown || !store.hostIsOnline(host)} />;
       })}
     </details>
   );

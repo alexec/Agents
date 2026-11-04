@@ -51,9 +51,14 @@ separate narration field is sent back.
 
 One of:
 
-- `{agentID, image: string (data), capturedAt: WireDate}` — a downscaled screenshot.
-- `{agentID, locked: true, capturedAt: WireDate}` — the screen is locked (FR-012); no
+- `{agentID, image: string (data), narration?, capturedAt: WireDate}` — a downscaled screenshot.
+- `{agentID, locked: true, narration?, capturedAt: WireDate}` — the screen is locked (FR-012); no
   `image` field is ever present in this case.
+- `{agentID, narration?, capturedAt: WireDate}` — no picture could be taken (Screen Recording not
+  granted); the tile says it waits for one.
+
+`narration` is `drive_screen`'s reply to the last action ("Clicked Save in TextEdit."), kept in
+memory for the idle frames. The wire type is `DesktopControlLiveFrame`.
 
 Held only for as long as it takes to reach a showing client; never written to `d.record`,
 the project folder, or `<root>`.

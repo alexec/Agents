@@ -4,14 +4,15 @@
 import { preferencesSaid, sendPreferencesWith } from "./preferences";
 import { folderPath as hostedFolderPath } from "./hostedMCP";
 import type { ExportImportBusy } from "./exports";
+import type { HeardLiveFrame } from "./desktopControl";
 import { batch, computed, signal, type ReadonlySignal, type Signal } from "@preact/signals";
 import type {
-  Agent, AgentRemovedNotification, ResumingNotification, ControlMachine, MachineRef, MachineWorkspace, ElicitationNotification, ElicitationRequest, EntryNotification,
+  Agent, AgentRemovedNotification, ResumingNotification, DesktopControlLiveFrame, ControlMachine, MachineRef, MachineWorkspace, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, FolderSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
-  WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, FolderRemovedNotification, DraftOptionsNotification, JSONValue, Methods, AccountProfile, RuntimeAccount, RuntimeStatus,
+  WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, FolderRemovedNotification, DraftOptionsNotification, JSONValue, Methods, AccountProfile, RuntimeAccount, RuntimeSignInStep, RuntimeStatus,
   StartRequest, UUID, AutoMappings, AutoPreview, AutoPreviewRequest, AutoSettings, ClientPermissionMode, Levels, ModelLevel, PermissionLevel, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
   CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
-  PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, PolicySetBy, RuntimeAllowances,
+  PagesChangedNotification, PinsChangedNotification, PinView, ReviewPull, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, PolicySetBy, RuntimeAllowances,
   GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, DesktopControlSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
@@ -242,6 +243,11 @@ export class Work {
   /** The latest load of the open chat: an older answer landing after a newer one is dropped (#400). */
   protected transcriptLoads = 0;
 
+  /**
+   * The live tile's latest frame (#3004, US4, `desktopControl/liveFrame`): one, since a host sends
+   * frames only to the page showing that agent. Replaced by the next, never kept (FR-016).
+   */
+  readonly liveFrame = signal<HeardLiveFrame | null>(null);
   /** The last file an agent asked to be put in front of the person (`agent/showFile`). */
   readonly shownFile = signal<{ host: string; agentID: string; path: string; line?: number | undefined; at: number } | null>(null);
   /** A new agent a view filled in (#834, agents/start-agent), for the new-agent form on that
@@ -277,6 +283,8 @@ export class Work {
   readonly workflowPins = signal<Record<string, string[]>>({});
   /** Each folder's servers' list views by `host|folder` (#2032), the hidden ones marked, kept by pins/changed. */
   readonly serverViews = signal<Record<string, PinView[]>>({});
+  /** Each folder's pull requests waiting for the person's approval by `host|folder` (#3330), newest first, kept by pins/changed. */
+  readonly reviewPulls = signal<Record<string, ReviewPull[]>>({});
   /** Bumped by pages/changed: a page shown may have changed on disk; read it again. */
   readonly pageRevisions = signal<Record<string, number>>({});
 
@@ -593,6 +601,7 @@ export class Work {
         this.sessionPins.value = { ...this.sessionPins.value, [`${host}|${folderKey(note.folder)}`]: note.sessions ?? [] };
         this.workflowPins.value = { ...this.workflowPins.value, [`${host}|${folderKey(note.folder)}`]: note.workflows ?? [] };
         this.serverViews.value = { ...this.serverViews.value, [`${host}|${folderKey(note.folder)}`]: note.views ?? [] };
+        this.reviewPulls.value = { ...this.reviewPulls.value, [`${host}|${folderKey(note.folder)}`]: note.reviews ?? [] };
         return true;
       }
       case "pages/changed": {
@@ -613,6 +622,9 @@ export class Work {
         if (held) this.writeWorkflows(key, held.filter((w) => w.workflow.workflowID !== note.workflowID));
         return true;
       }
+      case "desktopControl/liveFrame":
+        this.liveFrame.value = { host, frame: params as DesktopControlLiveFrame, heardAt: Date.now() };
+        return true;
       case "agent/showFile": {
         const note = params as ShowFileNotification;
         this.noteChartHint(host, note.file.path, note.file.chart);
@@ -1626,6 +1638,7 @@ export class Store extends Work {
       this.sessionPins.value = notOf(this.sessionPins.value);
       this.workflowPins.value = notOf(this.workflowPins.value);
       this.serverViews.value = notOf(this.serverViews.value);
+      this.reviewPulls.value = notOf(this.reviewPulls.value);
       this.leases.value = without(this.leases.value);
       this.hostedMCP.value = without(this.hostedMCP.value);
       this.mcpHealth.value = without(this.mcpHealth.value);
@@ -1699,8 +1712,10 @@ export class Store extends Work {
       const sessions = Object.fromEntries(Object.entries(this.sessionPins.value).filter(([key]) => !key.startsWith(`${host}|`)));
       const flows = Object.fromEntries(Object.entries(this.workflowPins.value).filter(([key]) => !key.startsWith(`${host}|`)));
       const views = Object.fromEntries(Object.entries(this.serverViews.value).filter(([key]) => !key.startsWith(`${host}|`)));
+      const reviews = Object.fromEntries(Object.entries(this.reviewPulls.value).filter(([key]) => !key.startsWith(`${host}|`)));
       for (const folder of listed) {
         views[`${host}|${folderKey(folder.folder)}`] = folder.views ?? [];
+        reviews[`${host}|${folderKey(folder.folder)}`] = folder.reviews ?? [];
         held[`${host}|${folderKey(folder.folder)}`] = folder.pins;
         sessions[`${host}|${folderKey(folder.folder)}`] = folder.sessions ?? [];
         flows[`${host}|${folderKey(folder.folder)}`] = folder.workflows ?? [];
@@ -1709,6 +1724,7 @@ export class Store extends Work {
       this.sessionPins.value = sessions;
       this.workflowPins.value = flows;
       this.serverViews.value = views;
+      this.reviewPulls.value = reviews;
     }).catch(failed("pins/list"));
     // A host from before #251 doesn't answer, and nothing is said to be coming back.
     void this.link.call("agents/resuming", {}, host).then((response) => {
@@ -2595,6 +2611,29 @@ export class Store extends Work {
     return added;
   }
 
+  /** Sign a server's Claude or Codex in (#3349): the link, and the code to type there or the want of one back. Throws the host's refusal. */
+  signInStart(host: string, runtimeID: string): Promise<RuntimeSignInStep> {
+    return this.link.call("runtimes/signInStart", { runtimeID }, host);
+  }
+
+  /** The end of a sign-in: the code the page gave, or cancel. Throws the host's refusal, such as a code it did not take. */
+  async signInFinish(host: string, signInID: string, finish: { code?: string; cancel?: boolean }): Promise<void> {
+    this.noteRuntime(host, await this.link.call("runtimes/signInFinish", { signInID, ...finish }, host));
+  }
+
+  /** Sign a server's Claude or Codex in with an API key (#3349). Throws the host's refusal. */
+  async signInKey(host: string, runtimeID: string, key: string): Promise<void> {
+    this.noteRuntime(host, await this.link.call("runtimes/signInKey", { runtimeID, key }, host));
+  }
+
+  /** One runtime's status, in place of the one the page had. */
+  private noteRuntime(host: string, status: RuntimeStatus): void {
+    const list = this.runtimes.value[host] ?? [];
+    this.runtimes.value = { ...this.runtimes.value, [host]: list.map((r) => (r.runtime.id === status.runtime.id ? status : r)) };
+    // Its allowance row said it could not be used without a sign-in.
+    void this.reloadAllowances(host);
+  }
+
   /** Remove an added account: its sessions stop, and its folder goes (#840). */
   async removeAccount(host: string, account: AccountProfile): Promise<void> {
     await this.link.call("runtimes/removeAccount", { runtimeID: account.runtimeID, accountID: account.id }, host);
@@ -2893,6 +2932,18 @@ export class Store extends Work {
         return hidden ? { ...rest, hidden: true } : rest;
       }) };
     await this.act("pins/hideView", { folder: folder as never, uri, hidden }, host);
+  }
+
+  /** A folder's pull requests waiting for the person's approval (#3330), newest first. */
+  reviewPullsIn(host: string, folder: string): ReviewPull[] {
+    return this.reviewPulls.value[`${host}|${folderKey(folder)}`] ?? [];
+  }
+
+  /** Dismiss on a pull request in For Review (#3330): gone at once, then the host told, which keeps it out for good. */
+  async dismissReview(host: string, folder: string, url: string): Promise<void> {
+    const key = `${host}|${folderKey(folder)}`;
+    this.reviewPulls.value = { ...this.reviewPulls.value, [key]: this.reviewPullsIn(host, folder).filter((p) => p.url !== url) };
+    await this.act("reviews/dismiss", { folder: folder as never, url: url as never }, host);
   }
 
   /** A file of the folder's: a pinned page, or what an HTML page draws from. */

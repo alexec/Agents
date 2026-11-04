@@ -2516,6 +2516,26 @@ export interface DeliveredRoute {
 }
 
 /**
+ * The live tile's latest look at the Mac's screen while an agent holds the screen lease (#3004,
+ * US4, FR-011): a downscaled JPEG of the whole screen, base64, or, while the screen is locked,
+ * locked and no image (FR-012). Sent only to the clients showing that agent, never recorded, never
+ * replayed (FR-016).
+ */
+export interface DesktopControlLiveFrame {
+  agentID: UUID;
+  /** Base64 JPEG. Absent while the screen is locked. */
+  image?: string;
+  /** The Mac's screen is locked: the tile says so and shows no picture. */
+  locked?: boolean;
+  /**
+   * What the agent last did on the screen, in words: drive_screen's own reply, such as Clicked Save
+   * in TextEdit. Absent before its first action.
+   */
+  narration?: string;
+  capturedAt: WireDate;
+}
+
+/**
  * An agent's drive_screen paused by the person's own touch (#3004, US3): the app it was driving,
  * and when.
  */
@@ -3420,6 +3440,11 @@ export interface FolderPins {
   sessions?: UUID[];
   workflows?: string[];
   views?: PinView[];
+  /**
+   * Its open pull requests waiting for the person's approval (#3330), newest first. Nil from a host
+   * with none.
+   */
+  reviews?: ReviewPull[];
 }
 
 export interface FolderPlugin {
@@ -6230,6 +6255,11 @@ export interface PinsChangedNotification {
   sessions?: UUID[];
   workflows?: string[];
   views?: PinView[];
+  /**
+   * Its open pull requests waiting for the person's approval (#3330), newest first. Nil from a host
+   * with none.
+   */
+  reviews?: ReviewPull[];
 }
 
 export interface Plan {
@@ -7571,6 +7601,31 @@ export interface RetentionState {
   archivedBytes: number;
 }
 
+/**
+ * reviews/dismiss (#3330): a person's Dismiss on a pull request in the sidebar's For Review. The
+ * host keeps it, so that pull request is not listed again.
+ */
+export interface ReviewDismissRequest {
+  folder: URLString;
+  /** The pull request's page, as its ReviewPull says it. */
+  url: URLString;
+}
+
+/**
+ * An open pull request labelled needs-approval, a UI change waiting for the person (#2811), in the
+ * sidebar's For Review (#3330) until it is labelled approved or changes-wanted, is closed, or is
+ * dismissed.
+ */
+export interface ReviewPull {
+  url: URLString;
+  number: number;
+  title: string;
+  /** owner/name. */
+  repo: string;
+  author?: string;
+  updatedAt: WireDate;
+}
+
 export interface Runtime {
   id: string;
   name: string;
@@ -7682,6 +7737,51 @@ export interface RuntimeSession {
   isHeld?: boolean;
 }
 
+/**
+ * Whether a runtime is signed in on the machine itself (#3349), for one a client signs in there
+ * with no browser on the machine: Claude and Codex on a server. Absent on a Mac, which signs its
+ * runtimes in in Runtimes.
+ */
+export interface RuntimeSignIn {
+  signedIn: boolean;
+  /** A Mac lends it its own sign-in (056), so it runs without one of its own. */
+  relayed?: boolean;
+}
+
+/**
+ * The end of a sign-in runtimes/signInStart began (#3349): the code the sign-in page gave, when the
+ * step wants one, or cancel to stop it.
+ */
+export interface RuntimeSignInFinish {
+  signInID: string;
+  code?: string;
+  cancel?: boolean;
+}
+
+/**
+ * An API key to sign a runtime in with on the machine (#3349), when there is no account to sign in
+ * to.
+ */
+export interface RuntimeSignInKey {
+  runtimeID: string;
+  key: string;
+}
+
+/**
+ * What the person does to sign a runtime in on a machine with no browser (#3349): open url in a
+ * browser of their own, then type userCode there (Codex), or paste back the code the page gives
+ * (wantsCode, Claude).
+ */
+export interface RuntimeSignInStep {
+  signInID: string;
+  runtimeID: string;
+  url: URLString;
+  /** The code to type on the page at url. */
+  userCode?: string;
+  /** The page gives a code to paste back with runtimes/signInFinish. */
+  wantsCode: boolean;
+}
+
 export interface RuntimeStatus {
   runtime: Runtime;
   availability: RuntimeAvailability;
@@ -7691,6 +7791,7 @@ export interface RuntimeStatus {
   isOut?: boolean;
   /** Set when the organisation's policy does not allow this runtime here (#998, FR-010). */
   setBy?: PolicySetBy;
+  signIn?: RuntimeSignIn;
 }
 
 /** A SCIM user's email (RFC 7643 §4.1.2), to show only: never a sign-in. */
@@ -10243,6 +10344,7 @@ export interface Methods {
   "reports/value": { params: ReportQuery; result: ReportValue };
   "reports/views": { params: Empty; result: ReportViews };
   "resources/snapshot": { params: Empty; result: LeaseSnapshot };
+  "reviews/dismiss": { params: ReviewDismissRequest; result: Empty };
   "runtimes/accountProfiles": { params: Empty; result: AccountProfile[] };
   "runtimes/accounts": { params: Empty; result: RuntimeAccount[] };
   "runtimes/addAccount": { params: AddAccountRequest; result: AccountProfile };
@@ -10251,6 +10353,9 @@ export interface Methods {
   "runtimes/markAvailable": { params: MarkRuntimeAvailable; result: RuntimeAllowances };
   "runtimes/removeAccount": { params: AccountRequest; result: UUID[] };
   "runtimes/setDefaultAccount": { params: DefaultAccountRequest; result: Empty };
+  "runtimes/signInFinish": { params: RuntimeSignInFinish; result: RuntimeStatus };
+  "runtimes/signInKey": { params: RuntimeSignInKey; result: RuntimeStatus };
+  "runtimes/signInStart": { params: RuntimeRequest; result: RuntimeSignInStep };
   "sandbox/state": { params: Empty; result: SandboxSettings };
   "scim/set": { params: SCIMSet; result: OrgProviderKept };
   "scim/tokens/list": { params: SCIMTokensRequest; result: SCIMTokenList };
@@ -10567,6 +10672,7 @@ export const MethodTarget = {
   "reports/value": "control",
   "reports/views": "control",
   "resources/snapshot": "host",
+  "reviews/dismiss": "host",
   "runtimes/accountProfiles": "host",
   "runtimes/accounts": "host",
   "runtimes/addAccount": "host",
@@ -10575,6 +10681,9 @@ export const MethodTarget = {
   "runtimes/markAvailable": "host",
   "runtimes/removeAccount": "host",
   "runtimes/setDefaultAccount": "host",
+  "runtimes/signInFinish": "host",
+  "runtimes/signInKey": "host",
+  "runtimes/signInStart": "host",
   "sandbox/state": "host",
   "scim/set": "control",
   "scim/tokens/list": "control",
@@ -10672,6 +10781,7 @@ export interface Notifications {
   "control/stopAll": PolicyView;
   "control/userSettingsChanged": UserSettingsChanged;
   "daemon/policyStateChanged": PolicyState;
+  "desktopControl/liveFrame": DesktopControlLiveFrame;
   "disk/changed": DiskState;
   "files/changed": FilesChangedNotification;
   "folder/changed": FolderSummary;
@@ -10892,6 +11002,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DeletePreview: { required: ["count", "bytes"], optional: [] },
   DeleteSessionRequest: { required: ["runtimeID", "sessionID"], optional: ["confirmed"] },
   DeliveredRoute: { required: ["id", "name", "kind", "runtimes", "defaultFor", "secretFields", "version", "sealed"], optional: ["vendor", "settings", "models", "expires"] },
+  DesktopControlLiveFrame: { required: ["agentID", "capturedAt"], optional: ["image", "locked", "narration"] },
   DesktopControlPause: { required: ["app", "pausedAt"], optional: [] },
   DesktopControlSettings: { required: ["enabled"], optional: [] },
   DestinationStateAnswer: { required: ["destinationState"], optional: [] },
@@ -10984,7 +11095,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FolderDetection: { required: ["enabled", "paths"], optional: [] },
   FolderHunk: { required: ["oldStart", "newStart", "noNewlineAtEnd", "lines"], optional: [] },
   FolderMCPServer: { required: ["name", "summary", "approval", "missingSecrets", "secretNames", "entryDigest"], optional: ["managed", "signIn", "views"] },
-  FolderPins: { required: ["folder", "pins"], optional: ["sessions", "workflows", "views"] },
+  FolderPins: { required: ["folder", "pins"], optional: ["sessions", "workflows", "views", "reviews"] },
   FolderPlugin: { required: ["folder", "name", "carries", "folderPath"], optional: ["awaitingApproval"] },
   FolderRemovedNotification: { required: ["folder"], optional: [] },
   FolderRequest: { required: ["folder"], optional: [] },
@@ -11254,7 +11365,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PingResponse: { required: ["ok"], optional: [] },
   PinnedPersonKey: { required: ["key", "keyID", "from", "at"], optional: [] },
   PinnerView: { required: ["kind", "id", "name"], optional: [] },
-  PinsChangedNotification: { required: ["folder", "pins"], optional: ["sessions", "workflows", "views"] },
+  PinsChangedNotification: { required: ["folder", "pins"], optional: ["sessions", "workflows", "views", "reviews"] },
   Plan: { required: ["entries", "state", "at"], optional: ["planID"] },
   PlanEntry: { required: ["content", "priority", "status"], optional: [] },
   PluginApproveRequest: { required: ["plugin", "digest"], optional: [] },
@@ -11383,6 +11494,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RetentionSetResult: { required: ["applied"], optional: ["wouldDelete", "state"] },
   RetentionSettings: { required: ["keepFor"], optional: [] },
   RetentionState: { required: ["settings", "archivedCount", "archivedBytes"], optional: [] },
+  ReviewDismissRequest: { required: ["folder", "url"], optional: [] },
+  ReviewPull: { required: ["url", "number", "title", "repo", "updatedAt"], optional: ["author"] },
   Runtime: { required: ["id", "name", "executable", "arguments", "installPage", "usesAppCopyOnly"], optional: ["install", "accountFolderVariable"] },
   RuntimeAccount: { required: ["runtimeID", "state", "authMethods", "canLogOut", "providers", "promptCapabilities", "canSteer", "checkedAt"], optional: ["currentProviderID", "signedInAs"] },
   RuntimeAllowances: { required: ["rows", "at"], optional: ["shared"] },
@@ -11391,7 +11504,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RuntimeAssessmentScore: { required: ["agentID", "runtimeID", "scoredAt", "checks"], optional: ["model", "runtimeVersion", "host", "reportPath"] },
   RuntimeRequest: { required: ["runtimeID"], optional: [] },
   RuntimeSession: { required: ["sessionID", "cwd"], optional: ["additionalDirectories", "title", "updatedAt", "isHeld"] },
-  RuntimeStatus: { required: ["runtime", "availability", "checkedAt", "outdated"], optional: ["poolNote", "isOut", "setBy"] },
+  RuntimeSignIn: { required: ["signedIn"], optional: ["relayed"] },
+  RuntimeSignInFinish: { required: ["signInID"], optional: ["code", "cancel"] },
+  RuntimeSignInKey: { required: ["runtimeID", "key"], optional: [] },
+  RuntimeSignInStep: { required: ["signInID", "runtimeID", "url", "wantsCode"], optional: ["userCode"] },
+  RuntimeStatus: { required: ["runtime", "availability", "checkedAt", "outdated"], optional: ["poolNote", "isOut", "setBy", "signIn"] },
   SCIMEmail: { required: ["value"], optional: ["type", "primary"] },
   SCIMName: { required: [], optional: ["givenName", "familyName", "formatted"] },
   SCIMSet: { required: ["provider", "on"], optional: ["match"] },

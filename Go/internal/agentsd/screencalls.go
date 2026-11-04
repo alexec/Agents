@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -44,6 +45,8 @@ type driveProcess struct {
 	stdin   io.WriteCloser
 	replies chan driveReply
 	mu      sync.Mutex
+	// done is closed when it stops: the live tile's idle frames end with it (screenlive.go).
+	done chan struct{}
 }
 
 type driveReply struct {
@@ -59,6 +62,9 @@ type screenDriveState struct {
 	screenApps map[wire.UUID]string
 	pauses     map[wire.UUID]*screenPause
 	takenOver  map[wire.UUID]bool
+	// screenSaid is each agent's last drive_screen narration, for the live tile's idle
+	// frames (screenlive.go).
+	screenSaid map[wire.UUID]string
 }
 
 // read takes agents-drive's frames until it ends.
@@ -126,6 +132,7 @@ func (p *driveProcess) call(req map[string]any) (map[string]any, error) {
 }
 
 func (p *driveProcess) stop() {
+	close(p.done)
 	p.stdin.Close()
 	done := make(chan struct{})
 	go func() { p.cmd.Wait(); close(done) }()
@@ -163,8 +170,9 @@ func (d *Daemon) screenDriveFor(agent wire.UUID) (*driveProcess, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
-	p := &driveProcess{cmd: cmd, stdin: stdin, replies: make(chan driveReply, 1)}
+	p := &driveProcess{cmd: cmd, stdin: stdin, replies: make(chan driveReply, 1), done: make(chan struct{})}
 	go p.read(bufio.NewReader(stdout), func() { d.pauseScreen(agent) })
+	safe.Go("live tile", func() { d.watchLive(agent, p) })
 	d.drives[agent] = p
 	return p, nil
 }
@@ -203,6 +211,7 @@ func (d *Daemon) endScreenDrive(agent wire.UUID) {
 	d.driveMu.Lock()
 	delete(d.takenOver, agent)
 	delete(d.screenApps, agent)
+	delete(d.screenSaid, agent)
 	d.driveMu.Unlock()
 }
 
@@ -352,6 +361,7 @@ func (d *Daemon) driveScreen(agent wire.UUID, args map[string]json.RawMessage) (
 		}
 		return "", &Error{Message: msg}
 	}
+	var said string
 	switch action {
 	case "screenshot":
 		data, _ := res["image"].(string)
@@ -361,18 +371,26 @@ func (d *Daemon) driveScreen(agent wire.UUID, args map[string]json.RawMessage) (
 		}
 		d.images[agent] = pendingImage{Data: data, Mime: "image/jpeg"}
 		d.appMu.Unlock()
-		return "Screenshot of " + app + ".", nil
+		said = "Screenshot of " + app + "."
+		// The live tile shows this still itself (US4).
+		d.liveFrameAfter(agent, data, said)
+		return said, nil
 	case "read":
 		tree, _ := res["tree"].(string)
+		d.liveFrameAfter(agent, "", "Read "+app+".")
 		return tree, nil
 	case "click":
 		if label := argString(args, "label"); label != "" {
-			return "Clicked " + label + " in " + app + ".", nil
+			said = "Clicked " + label + " in " + app + "."
+		} else {
+			said = fmt.Sprintf("Clicked %s at %s,%s.", app, string(args["x"]), string(args["y"]))
 		}
-		return fmt.Sprintf("Clicked %s at %s,%s.", app, string(args["x"]), string(args["y"])), nil
 	case "type":
-		return "Typed into " + app + ".", nil
+		said = "Typed into " + app + "."
 	default: // "key"
-		return "Pressed " + argString(args, "keyName") + " in " + app + ".", nil
+		said = "Pressed " + argString(args, "keyName") + " in " + app + "."
 	}
+	// The live tile shows what the action did (US4, FR-011's 2 seconds).
+	d.liveFrameAfter(agent, "", said)
+	return said, nil
 }

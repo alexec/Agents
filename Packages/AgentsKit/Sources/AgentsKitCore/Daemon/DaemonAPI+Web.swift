@@ -192,6 +192,11 @@ public extension DaemonAPI {
                     kind: .hostRequest),
                 Row(Method.runtimesAddAccount, params: AddAccountRequest.self, result: AccountProfile.self, kind: .hostRequest),
                 Row(Method.runtimesRemoveAccount, params: AccountRequest.self, result: [UUID].self, kind: .hostRequest),
+                // A runtime signed in on a machine with no browser (#3349).
+                Row(Method.runtimesSignInStart, params: RuntimeRequest.self, result: RuntimeSignInStep.self, kind: .hostRequest),
+                Row(Method.runtimesSignInFinish, params: RuntimeSignInFinish.self, result: RuntimeStatus.self,
+                    kind: .hostRequest),
+                Row(Method.runtimesSignInKey, params: RuntimeSignInKey.self, result: RuntimeStatus.self, kind: .hostRequest),
                 // Reaches the Model By (#999), on the runtime's row.
                 Row(Method.runtimesSetDefaultAccount, params: DefaultAccountRequest.self, result: Empty.self,
                     kind: .hostRequest),
@@ -280,6 +285,8 @@ public extension DaemonAPI {
                 Row(Method.pinsArrange, params: PinArrangeRequest.self, result: Empty.self, kind: .hostRequest),
                 // Hide and Show on a server's list view (#2032).
                 Row(Method.pinsHideView, params: PinHideViewRequest.self, result: Empty.self, kind: .hostRequest),
+                // Dismiss on a pull request in For Review (#3330).
+                Row(Method.reviewsDismiss, params: ReviewDismissRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.pinsWrite, params: PinWriteRequest.self, result: Empty.self, kind: .hostRequest),
                 // Pin, Unpin and a drop among pinned sessions (#180), from every client alike.
                 Row(Method.pinsPinSession, params: PinSessionRequest.self, result: Empty.self, kind: .hostRequest),
@@ -512,6 +519,8 @@ public extension DaemonAPI {
                 Row(Notification.runtimesAccountProfilesChanged, params: [AccountProfile].self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.agentEntry, params: EntryNotification.self, result: Empty.self, kind: .hostNotification),
+                Row(Notification.desktopControlLiveFrame, params: DesktopControlLiveFrame.self, result: Empty.self,
+                    kind: .hostNotification),
                 Row(Notification.agentRemoved, params: AgentRemovedNotification.self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.agentResuming, params: ResumingNotification.self, result: Empty.self,

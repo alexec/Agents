@@ -2419,6 +2419,27 @@
       }
     },
     {
+      "name": "desktopControl/liveFrame",
+      "x-capability": "host.desktop-control/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "The live tile's frame (#3004, US4, FR-011): sent to the clients showing an agent that holds the screen lease, after each drive_screen action and at least every 5 seconds while it is idle. Locked and no image while the Mac's screen is locked (FR-012). Never recorded.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/DesktopControlLiveFrame"
+          }
+        }
+      ]
+    },
+    {
       "name": "desktopControl/resume",
       "x-capability": "host.desktop-control/1",
       "tags": [
@@ -6320,6 +6341,32 @@
       }
     },
     {
+      "name": "reviews/dismiss",
+      "x-capability": "reviews/1",
+      "description": "Take a pull request out of the sidebar's For Review (#3330) for good: the host keeps the dismissal.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ReviewDismissRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "runtime/account",
       "x-capability": "runtime/1",
       "x-notification": true,
@@ -6743,6 +6790,81 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/RuntimeAccount"
+        }
+      }
+    },
+    {
+      "name": "runtimes/signInFinish",
+      "x-capability": "runtimes.sign-in/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/RuntimeSignInFinish"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/RuntimeStatus"
+        }
+      }
+    },
+    {
+      "name": "runtimes/signInKey",
+      "x-capability": "runtimes.sign-in/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/RuntimeSignInKey"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/RuntimeStatus"
+        }
+      }
+    },
+    {
+      "name": "runtimes/signInStart",
+      "x-capability": "runtimes.sign-in/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/RuntimeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/RuntimeSignInStep"
         }
       }
     },
