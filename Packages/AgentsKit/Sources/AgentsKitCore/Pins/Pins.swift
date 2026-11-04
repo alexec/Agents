@@ -421,15 +421,18 @@ public struct FolderPins: Codable, Sendable, Hashable {
     public var views: [PinView]?
     /// Its pull requests waiting for the person's approval (#3330). Nil from a host with none.
     public var reviews: [ReviewPull]?
+    /// What the read-only daily checks found in it (#3331), newest first. Nil from a host with none.
+    public var suggestions: [CheckSuggestion]?
 
     public init(folder: URL, pins: [PinView], sessions: [UUID] = [], workflows: [String] = [],
-                views: [PinView] = [], reviews: [ReviewPull] = []) {
+                views: [PinView] = [], reviews: [ReviewPull] = [], suggestions: [CheckSuggestion] = []) {
         self.folder = folder
         self.pins = pins
         self.sessions = sessions.isEmpty ? nil : sessions
         self.workflows = workflows.isEmpty ? nil : workflows
         self.views = views.isEmpty ? nil : views
         self.reviews = reviews.isEmpty ? nil : reviews
+        self.suggestions = suggestions.isEmpty ? nil : suggestions
     }
 }
 
@@ -455,5 +458,31 @@ public struct ReviewPull: Codable, Sendable, Hashable, Identifiable {
         self.repo = repo
         self.author = author
         self.updatedAt = updatedAt
+    }
+}
+
+/// A finding of the read-only daily checks in a folder (#3355): failing CI, a pull request in
+/// conflict, an issue no session has. Listed in the sidebar's For Review (#3331) until a session
+/// is started from it (Start, `suggestions/start`) or it is dismissed (`suggestions/dismiss`).
+public struct CheckSuggestion: Codable, Sendable, Hashable, Identifiable {
+    /// What Start and Dismiss name.
+    public var id: String
+    /// What is wrong, in a line.
+    public var title: String
+    /// What Start sends to the new session.
+    public var prompt: String
+    /// The page it is about, such as the failing run or the pull request.
+    public var link: URL?
+    public var urgent: Bool?
+    /// When the check found it.
+    public var at: Date
+
+    public init(id: String, title: String, prompt: String, link: URL? = nil, urgent: Bool? = nil, at: Date) {
+        self.id = id
+        self.title = title
+        self.prompt = prompt
+        self.link = link
+        self.urgent = urgent
+        self.at = at
     }
 }

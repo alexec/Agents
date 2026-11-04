@@ -162,3 +162,99 @@ func TestDailyChecksIsTheHomeFolders(t *testing.T) {
 		t.Fatal(skill)
 	}
 }
+
+// suggestionsIn is pins/list's For Review suggestions of a folder (#3331).
+func suggestionsIn(t *testing.T, c *conn, id int, folder string) []wire.CheckSuggestion {
+	t.Helper()
+	var listed []wire.FolderPins
+	json.Unmarshal(c.call(t, id, "pins/list", wire.Empty{}), &listed)
+	for _, pp := range listed {
+		if filepath.Clean(store.FolderPath(pp.Folder)) == filepath.Clean(folder) {
+			return pp.Suggestions
+		}
+	}
+	return nil
+}
+
+// #3331: every client lists the checks' suggestions in For Review, with the folder's pins,
+// newest first; Start opens a session with its prompt and takes it out; a dismissed one never
+// comes back, not in For Review, the next summary or a later check.
+func TestForReviewListsTheChecksSuggestionsWithStartAndDismiss(t *testing.T) {
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	d.SettingsDir = t.TempDir()
+	home := t.TempDir()
+	d.PersonalHome = home
+	checks, summary := dailyChecksID, dailySummaryID
+	me := seeded(t, d, home, func(a *wire.Agent) { a.State, a.StartedByWorkflow = wire.AgentStateRunning, &checks })
+	writer := seeded(t, d, home, func(a *wire.Agent) { a.State, a.StartedByWorkflow = wire.AgentStateRunning, &summary })
+	quiet := t.TempDir()
+	seeded(t, d, quiet, func(a *wire.Agent) { a.LastActivityAt = now() - 3*24*3600 })
+	suggest := func(title, prompt string) string {
+		said, err := d.dailyChecks(me.ID, map[string]json.RawMessage{"action": jsonString("suggest"), "folder": jsonString(quiet),
+			"title": jsonString(title), "prompt": jsonString(prompt), "link": jsonString("https://github.com/alexec/agents/actions/runs/1")})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return said
+	}
+	suggest("CI fails on main", "Find why CI fails on main and fix it on a branch.")
+	suggest("PR #12 is in conflict", "Rebase PR #12 onto main.")
+
+	got := suggestionsIn(t, c, 1, quiet)
+	if len(got) != 2 || got[0].Title != "PR #12 is in conflict" || got[1].Title != "CI fails on main" ||
+		got[0].ID == "" || got[0].ID == got[1].ID || got[1].Link == nil {
+		t.Fatalf("For Review's suggestions: %+v", got)
+	}
+	if again := suggestionsIn(t, c, 2, quiet); again[0].ID != got[0].ID {
+		t.Fatalf("an id changed between two reads: %s %s", again[0].ID, got[0].ID)
+	}
+	var snapshot wire.CatchUpSnapshot
+	json.Unmarshal(c.call(t, 3, "client/catchUp", wire.CatchUpRequest{Parts: []string{"pins"}}), &snapshot)
+	caught := 0
+	for _, pp := range snapshot.Pins {
+		caught += len(pp.Suggestions)
+	}
+	if caught != 2 {
+		t.Fatalf("the catch-up's suggestions: %d", caught)
+	}
+
+	// Dismiss: gone, kept out of the summary, and not kept again by a later check.
+	folder := store.FolderURL(quiet)
+	c.call(t, 4, "suggestions/dismiss", wire.SuggestionRequest{Folder: folder, ID: got[1].ID})
+	if left := suggestionsIn(t, c, 5, quiet); len(left) != 1 || left[0].ID != got[0].ID {
+		t.Fatalf("after Dismiss: %+v", left)
+	}
+	if said := suggest("CI fails on main", "Fix CI."); !strings.Contains(said, "dismissed") {
+		t.Fatalf("a dismissed suggestion was kept again: %q", said)
+	}
+	if left := suggestionsIn(t, c, 6, quiet); len(left) != 1 {
+		t.Fatalf("a dismissed suggestion came back: %+v", left)
+	}
+	page, err := d.dailySummary(writer.ID, map[string]json.RawMessage{"action": jsonString("collect")})
+	if err != nil || strings.Contains(page, "CI fails on main") || !strings.Contains(page, "PR #12 is in conflict") {
+		t.Fatalf("the summary's facts: %v\n%s", err, page)
+	}
+	if e := c.callError(t, 7, "suggestions/dismiss", wire.SuggestionRequest{Folder: folder, ID: got[1].ID}); e == nil {
+		t.Fatal("a suggestion dismissed twice")
+	}
+
+	// Start: a session in its folder with its prompt, and the suggestion goes.
+	var id wire.UUID
+	json.Unmarshal(c.call(t, 8, "suggestions/start", wire.SuggestionRequest{Folder: folder, ID: got[0].ID}), &id)
+	a := d.Store.Agent(id)
+	if a == nil || filepath.Clean(folderPath(a)) != filepath.Clean(quiet) {
+		t.Fatalf("the started session: %+v", a)
+	}
+	waitFor(t, "its prompt", func() bool {
+		prompts := userMessages(d, id)
+		return len(prompts) > 0 && strings.Contains(prompts[0], "Rebase PR #12 onto main.")
+	})
+	if left := suggestionsIn(t, c, 9, quiet); len(left) != 0 {
+		t.Fatalf("a started suggestion is still listed: %+v", left)
+	}
+	if e := c.callError(t, 10, "suggestions/start", wire.SuggestionRequest{Folder: folder, ID: got[0].ID}); e == nil {
+		t.Fatal("a suggestion started twice")
+	}
+}
