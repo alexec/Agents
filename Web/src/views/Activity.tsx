@@ -20,7 +20,7 @@ import { forCleanup, pageLine, tally as worktreeTally, worktreesIntro } from "..
 import { BackToList } from "./BackToList";
 import { Modal } from "./Modal";
 import { folderKey, folderPath } from "../model/groups";
-import { accountChoices, accountRows, accountState, agentsHolding, allowanceLine, defaultAccountName, isOrgRow, orgAllowanceLine, ownRow, ownSignInID, reachesFoot, reachesTheModelBy, machineSignInLine, offersMachineSignIn, removeMessage, rowTitle, runtimeTime, signInOnTheMac } from "../model/runtimes";
+import { accountChoices, accountRows, accountState, agentsHolding, allowanceLine, defaultAccountName, isOrgRow, orgAllowanceLine, ownRow, ownSignInID, reachesFoot, reachesTheModelBy, machineSignInLine, offersMachineSignIn, removeMessage, rowTitle, runtimeTime, runtimesHint, signInOnTheMac } from "../model/runtimes";
 import { RuntimeSignInDialog } from "./RuntimeSignInDialog";
 import { fromOrganisation } from "../model/orgAccounts";
 import { setBy as setByWords } from "../model/orgPolicy";
@@ -354,7 +354,7 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
               <button onClick={() => { for (const host of hosts) void store.loadWorktrees(host.id); }}>Refresh</button>
             </>
           )}
-          {page === "runtimes" && <p class="hint">Install a runtime on the Mac, in Settings ▸ Agent Runtimes. Sign it in on the Mac, in Runtimes.</p>}
+          {page === "runtimes" && <p class="hint">{runtimesHint(store.hosts.value.some((h) => store.isMac(h.id)))}</p>}
           {page === "spending" && (
             <div class="tabs events-panes" role="tablist" aria-label="Show">
               {(["cost", "reports"] as const).map((p) => (
