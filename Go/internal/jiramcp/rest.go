@@ -86,7 +86,11 @@ func NewRealJira(auth func() Auth) *RealJira {
 
 // MARK: REST
 
-// call asks Jira method path (under /rest/api/2) with body, and reads the answer into out.
+// agilePath is where Jira Software's API is: its boards (#3282).
+const agilePath = "/rest/agile/1.0"
+
+// call asks Jira method path (under /rest/api/2, or under agilePath) with body, and reads the
+// answer into out.
 func (j *RealJira) call(ctx context.Context, method, path string, body any, out any) error {
 	auth := j.Auth()
 	if !auth.signedIn() {
@@ -131,7 +135,11 @@ func (j *RealJira) send(ctx context.Context, auth Auth, method, path string, pay
 	if payload != nil {
 		body = bytes.NewReader(payload)
 	}
-	req, err := http.NewRequestWithContext(ctx, method, auth.api()+"/rest/api/2"+path, body)
+	// A path under agilePath is Jira Software's; any other is under /rest/api/2.
+	if !strings.HasPrefix(path, agilePath+"/") {
+		path = "/rest/api/2" + path
+	}
+	req, err := http.NewRequestWithContext(ctx, method, auth.api()+path, body)
 	if err != nil {
 		return nil, &JiraError{Kind: Failed, Message: "Jira: " + err.Error()}
 	}

@@ -237,7 +237,8 @@ func (s *Service) keepJoined(ctx context.Context, host string, joined wire.Proje
 	return answer, nil
 }
 
-// projectsMethod answers projects/list, projects/set, projects/setSlot and projects/remove.
+// projectsMethod answers projects/list, projects/set, projects/setSlot, projects/setBoards and
+// projects/remove.
 func (m *Methods) projectsMethod(ctx context.Context, method string, params json.RawMessage, from Caller) (any, error) {
 	user := m.callerPerson(from)
 	admin := m.s.isAdmin(user)
@@ -260,6 +261,12 @@ func (m *Methods) projectsMethod(ctx context.Context, method string, params json
 			return nil, err
 		}
 		return m.setProjectSlot(ctx, request, user, admin)
+	case "projects/setBoards":
+		request, err := require[wire.ProjectBoardsSet](params, "ProjectBoardsSet")
+		if err != nil {
+			return nil, err
+		}
+		return m.setProjectBoards(ctx, request, user, admin)
 	case "projects/remove":
 		request, err := require[wire.ProjectRequest](params, "ProjectRequest")
 		if err != nil {
@@ -303,6 +310,9 @@ func projectOnWire(p records.Project, folders []wire.ProjectFolder, mayChange bo
 	out := wire.Project{ID: p.ID, Name: p.Name, Owner: p.Owner, Folders: folders, MayChange: mayChange}
 	if len(p.Slots) > 0 {
 		out.Slots = p.Slots
+	}
+	if len(p.Boards) > 0 {
+		out.Boards = p.Boards
 	}
 	return out
 }
@@ -510,7 +520,11 @@ func (s *Service) machineProjects(folders []wire.JoinedFolder) wire.MachineProje
 			if slots == nil {
 				slots = []wire.ProjectSlot{}
 			}
-			out.Projects = append(out.Projects, wire.ProjectTools{ID: p.ID, Name: p.Name, Slots: slots})
+			tools := wire.ProjectTools{ID: p.ID, Name: p.Name, Slots: slots}
+			if len(p.Boards) > 0 {
+				tools.Boards = p.Boards
+			}
+			out.Projects = append(out.Projects, tools)
 		}
 	}
 	return out

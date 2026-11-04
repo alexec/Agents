@@ -4305,6 +4305,16 @@ type ForgeBlockedByRequest struct {
 	Remove []LineageNode `json:"remove,omitzero"`
 }
 
+// forge/boards (#3282): the boards of the projects of this machine's folders, each once, by url, in its project's order.
+type ForgeBoards struct {
+	Boards []ProjectBoard `json:"boards"`
+}
+
+// forge/boards (#3282): the boards of every folder's project on this machine, or of one folder's.
+type ForgeBoardsRequest struct {
+	Folder *string `json:"folder,omitzero"`
+}
+
 // One of a pull request's checks (#3129): a check run or a commit status. state is passing, failing, running or skipped; url is its page on the forge.
 type ForgeCheck struct {
 	Name string `json:"name"`
@@ -4408,6 +4418,9 @@ type ForgeFeatures struct {
 // forge/features (#3267): the features of every folder on this machine, or of one folder's repo.
 type ForgeFeaturesRequest struct {
 	Folder *string `json:"folder,omitzero"`
+
+	// A board's url, from forge/boards (#3282): only the epics on that board.
+	Board *string `json:"board,omitzero"`
 }
 
 // An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for GitHub, GitLab, Linear and Jira (#3260), so one page draws each. node is its lineage node (kind issue or pr, ref github:alexec/Agents#12). state is open, closed or merged; status is the tracker's own name for its step, where its workflow has steps (a Jira status, as In Progress; one in Jira's Done category is closed). folder is a folder on this machine on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own fields: draft; checks is passing, failing, running or none; review is approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown; autoMerge says auto-merge is on. The hierarchy (#3267): parent is the issue it is a sub-issue (a Linear or GitLab child) of; level is epic, story, task or spike, from its labels; feature is the name of its feature:<name> label; progress is a parent's closed children of all of them, where the forge says it: in a GitHub list, and on an issue's own read.
@@ -4533,7 +4546,7 @@ type ForgeListError struct {
 	Message string `json:"message"`
 }
 
-// forge/issues and forge/pulls (#3129): the issues or pull requests of every folder on this machine, or of one folder's repo. state is open (when not said), closed or all; a closed pull request includes a merged one. label, assignee (a login) and query (words in the title or body) narrow the list. limit is 1 to 100, 50 when not said; cursor is the last page's. feature (a name: work for the label feature:work) narrows it to one feature's items (#3267).
+// forge/issues and forge/pulls (#3129): the issues or pull requests of every folder on this machine, or of one folder's repo. state is open (when not said), closed or all; a closed pull request includes a merged one. label, assignee (a login) and query (words in the title or body) narrow the list. limit is 1 to 100, 50 when not said; cursor is the last page's. feature (a name: work for the label feature:work) narrows it to one feature's items (#3267). board (a board's url, from forge/boards) narrows it to one board's items (#3282).
 type ForgeListRequest struct {
 	Folder *string `json:"folder,omitzero"`
 
@@ -4550,6 +4563,8 @@ type ForgeListRequest struct {
 	Limit *int64 `json:"limit,omitzero"`
 
 	Feature *string `json:"feature,omitzero"`
+
+	Board *string `json:"board,omitzero"`
 }
 
 // forge/log (#3130): the last lines of each failed check's log, as plain text.
@@ -8044,11 +8059,38 @@ type Project struct {
 
 	Folders []ProjectFolder `json:"folders"`
 
-	// The caller is the owner or an admin, so may rename and remove it, and set its slots.
+	// The caller is the owner or an admin, so may rename and remove it, and set its slots and boards.
 	MayChange bool `json:"mayChange"`
 
 	// The project's Tasks, Code review and CI (#2669), one per slot: every folder in the project uses them. A slot that is not here is each folder's own.
 	Slots []ProjectSlot `json:"slots,omitzero"`
+
+	// The boards in the project's Tasks slot (#3282), in their order. Absent with none.
+	Boards []ProjectBoard `json:"boards,omitzero"`
+}
+
+// One board in a project's Tasks slot (#3282): a GitHub Projects board, a Jira board, a Linear team or a GitLab group board, by its address and a name (the team's). Work's Issues and Features lists narrow to one. A client sends name and url; the control plane reads forge, key and site from the url.
+type ProjectBoard struct {
+	Name string `json:"name"`
+
+	// The board's address: https://github.com/orgs/<org>/projects/<n> (or users/<login>), https://<site>/jira/software/…/boards/<id>, https://linear.app/<workspace>/team/<KEY>, or https://<gitlab>/groups/<group>/-/boards/<id>. It names the board in forge/issues' board.
+	URL string `json:"url"`
+
+	// github, atlassian (Jira), linear or gitlab.
+	Forge *ConnectionProvider `json:"forge,omitzero"`
+
+	// The board on its forge: <owner>/<number> on GitHub, the board id on Jira, the team key on Linear, <group>#<id> on GitLab.
+	Key *string `json:"key,omitzero"`
+
+	// The board's host: github.com, the Jira site, linear.app, gitlab.com or a self-managed GitLab.
+	Site *string `json:"site,omitzero"`
+}
+
+// projects/setBoards (#3282): the project's boards, all of them each time, in their order; none leaves Tasks with no boards. Only the owner or an admin. At most 20.
+type ProjectBoardsSet struct {
+	ID string `json:"id"`
+
+	Boards []ProjectBoard `json:"boards"`
 }
 
 // A folder in a project (#2317), as its machine last reported it.
@@ -8157,6 +8199,9 @@ type ProjectTools struct {
 	Name string `json:"name"`
 
 	Slots []ProjectSlot `json:"slots"`
+
+	// The boards in the project's Tasks slot (#3282), in their order. Absent with none.
+	Boards []ProjectBoard `json:"boards,omitzero"`
 }
 
 // control/projectsChanged (#2317): a project was made, renamed, adopted or removed, or a folder joined one.

@@ -3628,6 +3628,21 @@ export interface ForgeBlockedByRequest {
 }
 
 /**
+ * forge/boards (#3282): the boards of the projects of this machine's folders, each once, by url, in
+ * its project's order.
+ */
+export interface ForgeBoards {
+  boards: ProjectBoard[];
+}
+
+/**
+ * forge/boards (#3282): the boards of every folder's project on this machine, or of one folder's.
+ */
+export interface ForgeBoardsRequest {
+  folder?: string;
+}
+
+/**
  * One of a pull request's checks (#3129): a check run or a commit status. state is passing,
  * failing, running or skipped; url is its page on the forge.
  */
@@ -3734,6 +3749,8 @@ export interface ForgeFeatures {
  */
 export interface ForgeFeaturesRequest {
   folder?: string;
+  /** A board's url, from forge/boards (#3282): only the epics on that board. */
+  board?: string;
 }
 
 /**
@@ -3861,7 +3878,8 @@ export interface ForgeListError {
  * machine, or of one folder's repo. state is open (when not said), closed or all; a closed pull
  * request includes a merged one. label, assignee (a login) and query (words in the title or body)
  * narrow the list. limit is 1 to 100, 50 when not said; cursor is the last page's. feature (a name:
- * work for the label feature:work) narrows it to one feature's items (#3267).
+ * work for the label feature:work) narrows it to one feature's items (#3267). board (a board's url,
+ * from forge/boards) narrows it to one board's items (#3282).
  */
 export interface ForgeListRequest {
   folder?: string;
@@ -3872,6 +3890,7 @@ export interface ForgeListRequest {
   cursor?: string;
   limit?: number;
   feature?: string;
+  board?: string;
 }
 
 /** forge/log (#3130): the last lines of each failed check's log, as plain text. */
@@ -6802,13 +6821,53 @@ export interface Project {
   name: string;
   owner: string;
   folders: ProjectFolder[];
-  /** The caller is the owner or an admin, so may rename and remove it, and set its slots. */
+  /**
+   * The caller is the owner or an admin, so may rename and remove it, and set its slots and boards.
+   */
   mayChange: boolean;
   /**
    * The project's Tasks, Code review and CI (#2669), one per slot: every folder in the project uses
    * them. A slot that is not here is each folder's own.
    */
   slots?: ProjectSlot[];
+  /** The boards in the project's Tasks slot (#3282), in their order. Absent with none. */
+  boards?: ProjectBoard[];
+}
+
+/**
+ * One board in a project's Tasks slot (#3282): a GitHub Projects board, a Jira board, a Linear team
+ * or a GitLab group board, by its address and a name (the team's). Work's Issues and Features lists
+ * narrow to one. A client sends name and url; the control plane reads forge, key and site from the
+ * url.
+ */
+export interface ProjectBoard {
+  name: string;
+  /**
+   * The board's address: https://github.com/orgs/<org>/projects/<n> (or users/<login>),
+   * https://<site>/jira/software/…/boards/<id>, https://linear.app/<workspace>/team/<KEY>, or
+   * https://<gitlab>/groups/<group>/-/boards/<id>. It names the board in forge/issues' board.
+   */
+  url: string;
+  /** github, atlassian (Jira), linear or gitlab. */
+  forge?: ConnectionProvider;
+  /**
+   * The board on its forge: <owner>/<number> on GitHub, the board id on Jira, the team key on
+   * Linear, <group>#<id> on GitLab.
+   */
+  key?: string;
+  /**
+   * The board's host: github.com, the Jira site, linear.app, gitlab.com or a self-managed GitLab.
+   */
+  site?: string;
+}
+
+/**
+ * projects/setBoards (#3282): the project's boards, all of them each time, in their order; none
+ * leaves Tasks with no boards. Only the owner or an admin. At most 20.
+ */
+export interface ProjectBoardsSet {
+  id: string;
+  boards: ProjectBoard[];
 }
 
 /** A folder in a project (#2317), as its machine last reported it. */
@@ -6918,6 +6977,8 @@ export interface ProjectTools {
   id: string;
   name: string;
   slots: ProjectSlot[];
+  /** The boards in the project's Tasks slot (#3282), in their order. Absent with none. */
+  boards?: ProjectBoard[];
 }
 
 /**
@@ -10434,6 +10495,7 @@ export interface Methods {
   "forge/add-child": { params: ForgeAddChildRequest; result: ForgeDone };
   "forge/approve": { params: ForgeApproveRequest; result: ForgeDone };
   "forge/blocked-by": { params: ForgeBlockedByRequest; result: ForgeDone };
+  "forge/boards": { params: ForgeBoardsRequest; result: ForgeBoards };
   "forge/close": { params: ForgeCloseRequest; result: ForgeDone };
   "forge/comment": { params: ForgeCommentRequest; result: ForgeDone };
   "forge/diff": { params: ForgeNodeRequest; result: ForgeDiff };
@@ -10541,6 +10603,7 @@ export interface Methods {
   "projects/list": { params: Empty; result: ProjectList };
   "projects/remove": { params: ProjectRequest; result: Empty };
   "projects/set": { params: ProjectSet; result: Project };
+  "projects/setBoards": { params: ProjectBoardsSet; result: Project };
   "projects/setSlot": { params: ProjectSlotSet; result: Project };
   "providers/add": { params: ProviderAdd; result: ProviderSummary };
   "providers/create": { params: ProviderCreate; result: ProviderCreated };
@@ -10773,6 +10836,7 @@ export const MethodTarget = {
   "forge/add-child": "host",
   "forge/approve": "host",
   "forge/blocked-by": "host",
+  "forge/boards": "host",
   "forge/close": "host",
   "forge/comment": "host",
   "forge/diff": "host",
@@ -10880,6 +10944,7 @@ export const MethodTarget = {
   "projects/list": "control",
   "projects/remove": "control",
   "projects/set": "control",
+  "projects/setBoards": "control",
   "projects/setSlot": "control",
   "providers/add": "control",
   "providers/create": "control",
@@ -11346,6 +11411,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeAddChildRequest: { required: ["node"], optional: ["title", "level", "issue"] },
   ForgeApproveRequest: { required: ["node", "sha"], optional: [] },
   ForgeBlockedByRequest: { required: ["node"], optional: ["add", "remove"] },
+  ForgeBoards: { required: ["boards"], optional: [] },
+  ForgeBoardsRequest: { required: [], optional: ["folder"] },
   ForgeCheck: { required: ["name", "state"], optional: ["url"] },
   ForgeCloseRequest: { required: ["node"], optional: ["reopen", "transition"] },
   ForgeComment: { required: ["author", "body", "at"], optional: ["url", "bot"] },
@@ -11356,7 +11423,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeDone: { required: [], optional: ["url", "auto", "reran"] },
   ForgeFeature: { required: ["name", "epics", "open"], optional: ["color"] },
   ForgeFeatures: { required: ["features"], optional: ["errors"] },
-  ForgeFeaturesRequest: { required: [], optional: ["folder"] },
+  ForgeFeaturesRequest: { required: [], optional: ["folder", "board"] },
   ForgeItem: { required: ["node", "title", "state", "labels", "assignees", "updatedAt", "comments"], optional: ["status", "url", "folder", "author", "milestone", "draft", "checks", "review", "mergeable", "autoMerge", "parent", "level", "feature", "progress"] },
   ForgeItemDetail: { required: ["item", "body", "comments"], optional: ["cursor", "checks", "reviewThreads", "filesChanged", "head", "mergeMethods", "start", "transitions"] },
   ForgeItemRequest: { required: ["node"], optional: ["cursor"] },
@@ -11366,7 +11433,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeLead: { required: ["session", "state"], optional: ["title"] },
   ForgeList: { required: ["items"], optional: ["cursor", "errors"] },
   ForgeListError: { required: ["forge", "message"], optional: [] },
-  ForgeListRequest: { required: [], optional: ["folder", "state", "label", "assignee", "query", "cursor", "limit", "feature"] },
+  ForgeListRequest: { required: [], optional: ["folder", "state", "label", "assignee", "query", "cursor", "limit", "feature", "board"] },
   ForgeLog: { required: ["text"], optional: [] },
   ForgeLogRequest: { required: ["node"], optional: ["check"] },
   ForgeLogins: { required: [], optional: ["github", "gitlab", "linear", "jira"] },
@@ -11648,7 +11715,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PresenceReport: { required: ["active"], optional: ["watching", "mayNotify", "showing", "alsoShowing"] },
   PreviewFile: { required: ["path", "bytes", "runnable", "via"], optional: [] },
   PrewarmRequest: { required: ["agentID", "why"], optional: [] },
-  Project: { required: ["id", "name", "owner", "folders", "mayChange"], optional: ["slots"] },
+  Project: { required: ["id", "name", "owner", "folders", "mayChange"], optional: ["slots", "boards"] },
+  ProjectBoard: { required: ["name", "url"], optional: ["forge", "key", "site"] },
+  ProjectBoardsSet: { required: ["id", "boards"], optional: [] },
   ProjectFolder: { required: ["machine", "folder", "name"], optional: [] },
   ProjectFolders: { required: ["machines"], optional: [] },
   ProjectFoldersRequest: { required: ["project"], optional: [] },
@@ -11662,7 +11731,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProjectSet: { required: ["name"], optional: ["id"] },
   ProjectSlot: { required: ["slot"], optional: ["forge", "repository", "site", "skipped"] },
   ProjectSlotSet: { required: ["id", "slot"], optional: ["value"] },
-  ProjectTools: { required: ["id", "name", "slots"], optional: [] },
+  ProjectTools: { required: ["id", "name", "slots"], optional: ["boards"] },
   ProjectsChanged: { required: [], optional: ["id", "removed"] },
   ProjectsJoined: { required: ["folders"], optional: [] },
   PromptRequest: { required: ["agentID", "text", "attachments", "from"], optional: ["sendID", "voice"] },
