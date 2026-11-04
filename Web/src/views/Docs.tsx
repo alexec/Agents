@@ -1,10 +1,10 @@
 // Docs (#3321, spec 3319), as the window's DocsView: every machine's docs from docs/list, grouped by
-// source (each folder, then each docs connector), a folder's by its subfolders; search with docs/search,
-// each match's line and snippet under its doc; and a doc's page from docs/read, read only, live for a
-// folder's own file.
+// source (each project, each folder in no project, then each docs connector), a folder's by its
+// subfolders, with a Project filter (#3408); search with docs/search, each match's line and snippet
+// under its doc; and a doc's page from docs/read, read only, live for a folder's own file.
 import { signal, useSignal } from "@preact/signals";
 import { useEffect, useMemo, useRef } from "preact/hooks";
-import type { Doc, DocsReading, DocsSearchResult, FileReading, WireDate } from "../protocol/generated";
+import type { Doc, DocsReading, DocsSearchResult, FileReading, Project, WireDate } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { Capability } from "../protocol/capabilities.generated";
 import { describe } from "../model/errors";
@@ -12,10 +12,12 @@ import { hostAnswers } from "../model/capabilities";
 import { fileURL } from "../model/completions";
 import { folderKey } from "../model/groups";
 import {
-  docStartHelp, docStartLabels, docStartPrompt, docStarts, docStartTitle, docsGroups, docsSortTitle, isFolderDoc, linkedRefs,
-  mapItPrompt, mergeResults, noDocs, noDocsHere, noResults, relatedDocs, searchWords, shortForm, sourceProblem, titleBeside,
-  underShelf, updatedWords, vendorName, windowAddress, type DocStart, type DocsSort, type HostDocs,
+  docStartHelp, docStartLabels, docStartPrompt, docStarts, docStartTitle, docsGroups, docsProjects, docsSortTitle, isFolderDoc,
+  linkedRefs, mapItPrompt, mergeResults, mergeSources, noDocs, noDocsHere, noResults, relatedDocs, resultsIn, searchWords,
+  shortForm, sourceProblem, titleBeside, underShelf, updatedWords, vendorName, windowAddress, type DocStart, type DocsSort,
+  type HostDocs, type ProjectOf,
 } from "../model/docs";
+import { projectName } from "../model/projects";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { LiveDocument, type PageSource } from "./LiveDocument";
 import { offerStart } from "./NewAgent";
@@ -25,12 +27,36 @@ import { go, routeHash } from "../route";
 const lists = signal<HostDocs[] | null>(null);
 const sort = signal<DocsSort>("updated");
 const only = signal("");
+/** A project's id, or "" for All projects (#3408). */
+const inProject = signal("");
+/** The organisation's projects, for their names; none without a control plane. */
+const projects = signal<Project[]>([]);
 const query = signal("");
 const asked = signal(0);
 /** The line a search match opens a doc's page at, spent once the page has gone there. */
 const openAt = signal<{ ref: string; line: number } | undefined>(undefined);
 /** The machine a doc was listed on, so its page reads it there first. */
 const listedOn = new Map<string, string>();
+
+/** The projects' names, read once a page opens; a folder whose project is not on the list is said by its own name. */
+function useProjects(store: Store) {
+  useEffect(() => {
+    void store.link.call("projects/list", {}).then((l) => { projects.value = l.projects; }, () => undefined);
+  }, [store.projectsChanges.value]);
+}
+
+/** The project of a machine's folder, by the folder's path, as its summary names it. */
+function projectOfIn(store: Store): ProjectOf {
+  const all = store.folders.value;
+  const list = projects.value;
+  return (host, folder) => {
+    if (!folder) return undefined;
+    const wanted = folderKey(folder.startsWith("/") ? fileURL(folder) : folder);
+    const summary = (all[host] ?? []).find((f) => folderKey(f.folder.folder) === wanted);
+    if (!summary?.project) return undefined;
+    return { id: summary.project, name: projectName(summary.project, list) ?? summary.name };
+  };
+}
 
 const docsHosts = (store: Store) => store.hosts.value.filter((h) => hostAnswers(h.state) && store.has(h.id, Capability.docs1));
 
@@ -51,6 +77,11 @@ export function DocsList({ store }: { store: Store }) {
   const hostKey = hosts.map((h) => h.id).join(",");
   const results = useSignal<(DocsSearchResult & { host: string })[] | null>(null);
   const searching = useSignal(false);
+  useProjects(store);
+  const projectOf = projectOfIn(store);
+  const l = lists.value;
+  const rows = useMemo(() => (l ? mergeSources(l, projectOf) : []), [l, store.folders.value, projects.value]);
+  const shown = rows.filter((r) => (!only.value || r.key === only.value) && (!inProject.value || r.project?.id === inProject.value));
   useEffect(() => {
     let current = true;
     lists.value = null;
@@ -64,8 +95,11 @@ export function DocsList({ store }: { store: Store }) {
     let current = true;
     searching.value = true;
     const timer = setTimeout(() => {
-      const sources = only.value ? [sourceIDOf(only.value)] : undefined;
-      void Promise.all(hosts.map(async (h) => {
+      // One source is asked of the machine the list keeps it on; a connector of every machine.
+      const row = rows.find((r) => r.key === only.value);
+      const sources = row ? [row.source.id] : undefined;
+      const asking = row && row.source.kind === "folder" ? hosts.filter((h) => h.id === row.host) : hosts;
+      void Promise.all(asking.map(async (h) => {
         try {
           const got = await store.link.call("docs/search", { query: words, limit: 50, ...sources ? { sources } : {} }, h.id);
           return { host: h.id, results: got.results };
@@ -75,16 +109,17 @@ export function DocsList({ store }: { store: Store }) {
       })).then((got) => {
         if (!current) return;
         for (const g of got) for (const r of g.results) if (!listedOn.has(r.doc.ref)) listedOn.set(r.doc.ref, g.host);
-        results.value = mergeResults(got);
+        results.value = resultsIn(mergeResults(got), shown);
         searching.value = false;
       });
     }, 250);
     return () => { current = false; clearTimeout(timer); };
-  }, [words, only.value, hostKey]);
+  }, [words, only.value, inProject.value, hostKey, rows]);
 
-  const l = lists.value;
-  const groups = useMemo(() => (l ? docsGroups(l, sort.value, only.value) : []), [l, sort.value, only.value]);
-  const allSources = useMemo(() => (l ? docsGroups(l, sort.value) : []), [l]);
+  const groups = useMemo(() => (l ? docsGroups(l, sort.value, only.value, projectOf, inProject.value) : []),
+    [l, sort.value, only.value, inProject.value, rows]);
+  const projectChoices = docsProjects(rows);
+  const sourceChoices = rows.filter((r) => !inProject.value || r.project?.id === inProject.value);
   const problems = (l ?? []).filter((h) => h.problem).map((h) => `${h.name}: ${h.problem}`);
   const open = (doc: Doc, line?: number) => {
     openAt.value = line ? { ref: doc.ref, line } : undefined;
@@ -96,9 +131,19 @@ export function DocsList({ store }: { store: Store }) {
       <div class="work-filters" role="group" aria-label="Filters">
         <input type="search" placeholder="Search docs" aria-label="Search docs" value={query.value}
           onInput={(e) => { query.value = (e.target as HTMLInputElement).value; }} />
+        {projectChoices.length > 0 && (
+          <label>Project <select value={inProject.value} onChange={(e) => {
+            inProject.value = (e.target as HTMLSelectElement).value;
+            // A source of another project is not in the list any more.
+            if (only.value && !rows.some((r) => r.key === only.value && (!inProject.value || r.project?.id === inProject.value))) only.value = "";
+          }}>
+            <option value="">All projects</option>
+            {projectChoices.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select></label>
+        )}
         <label>Source <select value={only.value} onChange={(e) => { only.value = (e.target as HTMLSelectElement).value; }}>
           <option value="">All</option>
-          {allSources.map((s) => <option key={s.key} value={s.key}>{s.heading}</option>)}
+          {sourceChoices.map((s) => <option key={s.key} value={s.key}>{s.heading}</option>)}
         </select></label>
         {!words && (
           <label>Sort <select value={sort.value} onChange={(e) => { sort.value = (e.target as HTMLSelectElement).value as DocsSort; }}>
@@ -140,11 +185,6 @@ export function DocsList({ store }: { store: Store }) {
         })}
     </div>
   );
-}
-
-/** The DocsSource id inside a list's source key (host|id for a folder). */
-function sourceIDOf(key: string): string {
-  return key.startsWith("mcp:") ? key : key.slice(key.indexOf("|") + 1);
 }
 
 function DocRow({ doc, name, open }: { doc: Doc; name: string; open: () => void }) {
@@ -207,6 +247,7 @@ export function DocPage({ store, docRef }: { store: Store; docRef: string }) {
   const copied = useSignal<string | null>(null);
   const startProblem = useSignal<string | null>(null);
   const line = openAt.value?.ref === docRef ? openAt.value.line : undefined;
+  useProjects(store);
 
   // The machine that listed it first, then this Mac, then the others.
   const order = useMemo(() => {
@@ -257,6 +298,8 @@ export function DocPage({ store, docRef }: { store: Store; docRef: string }) {
   };
   const link = location.origin + location.pathname + location.search + routeHash({ nav: "docs", section: "docs", item: docRef });
   const filesPlace = doc && got.value ? folderPlace(store, got.value.host, doc) : undefined;
+  // The project it is in (#3408), as an issue's or a PR's page says it.
+  const project = doc && got.value ? projectOfIn(store)(got.value.host, doc.folder) : undefined;
 
   return (
     <article class="work-page docs-page">
@@ -268,7 +311,7 @@ export function DocPage({ store, docRef }: { store: Store; docRef: string }) {
       <header class="work-page-head">
         <h2><span class="work-title">{doc ? shortForm(doc) : docRef}</span></h2>
         <p class="quiet small">
-          {[docRef, doc?.updated !== undefined ? `updated ${updatedWords(doc)}` : ""].filter(Boolean).join(" · ")}
+          {[project?.name ?? "", docRef, doc?.updated !== undefined ? `updated ${updatedWords(doc)}` : ""].filter(Boolean).join(" · ")}
         </p>
         <div class="work-actions-bar">
           {doc && got.value && <StartMenu store={store} host={got.value.host} doc={doc} said={(why) => { startProblem.value = why; }} />}

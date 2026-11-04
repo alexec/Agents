@@ -58,6 +58,48 @@ struct DocsListTests {
         #expect(rows.filter { $0.key == "mcp:confluence" }.map(\.host) == [.mac])
     }
 
+    @Test func aProjectsClonesOnTwoMachinesAreOneSourceSaidByItsName() throws {
+        let studio = MachineRef(rawValue: "studio")
+        let clone = Source(id: "/home/a/agents", kind: .folder, name: "agents", folder: "/home/a/agents")
+        let notes = Source(id: "/home/a/notes", kind: .folder, name: "notes", folder: "/home/a/notes")
+        let other = DocsList.HostDocs(host: studio, name: "Studio", docs: [
+            Doc(ref: "github:alexec/agents/doc/README.md", title: "Agents", source: clone.id, folder: clone.id, path: "README.md"),
+        ], sources: [clone, notes])
+        let app = DocsList.Project(id: "p1", name: "Agents app")
+        let projectOf: DocsList.ProjectOf = { host, folder in
+            (host == .mac && folder == Self.agents.id) || (host == studio && folder == clone.id) ? app : nil
+        }
+        let rows = DocsList.sources([Self.mac, other], projectOf: projectOf)
+        #expect(rows.map(\.key) == ["project:p1", "studio|/home/a/notes", "mcp:confluence", "mcp:notion"])
+        #expect(rows.map(\.heading) == ["Agents app", "notes (Studio)", "confluence", "notion"])
+        #expect(rows.first?.host == .mac)
+        // A connector is under the project of the folder whose mcp.json adds it.
+        #expect(rows[2].project == app)
+        #expect(DocsList.projects(rows) == [app])
+        let one = DocsList.groups([Self.mac, other], sort: .updated, projectOf: projectOf, project: "p1")
+        #expect(one.map(\.row.key) == ["project:p1", "mcp:confluence", "mcp:notion"])
+        #expect(try #require(one.first).shelves.flatMap(\.docs).count == 4)
+    }
+
+    @Test func aProjectWithOneFolderLooksAsTheFolderDoes() {
+        let rows = DocsList.sources([Self.mac]) { _, folder in folder == Self.agents.id ? .init(id: "p1", name: "Agents") : nil }
+        #expect(rows.map(\.heading) == ["Agents", "confluence", "notion"])
+    }
+
+    @Test func searchShowsOnlyResultsInASourceTheListShows() {
+        let studio = MachineRef(rawValue: "studio")
+        let clone = Source(id: "/home/a/agents", kind: .folder, name: "agents", folder: "/home/a/agents")
+        let rows = DocsList.sources([Self.mac, .init(host: studio, name: "Studio", sources: [clone])]) { _, folder in
+            folder == nil ? nil : .init(id: "p1", name: "Agents")
+        }
+        func found(_ host: MachineRef, _ source: String, _ ref: String) -> DocsList.Result {
+            .init(host: host, result: .init(doc: Doc(ref: ref, title: ref, source: source), matches: []))
+        }
+        let kept = DocsList.results([found(.mac, Self.agents.id, "a"), found(studio, clone.id, "b"),
+                                     found(studio, "mcp:confluence", "c")], in: rows)
+        #expect(kept.map(\.result.doc.ref) == ["a", "c"])
+    }
+
     @Test func aRowSaysThePathOfAFolderDocAndTheTitleOfAConnectorDoc() {
         #expect(DocsList.shortForm(Self.spec) == "specs/3319-docs/spec.md")
         #expect(DocsList.shortForm(Self.payments) == "Payments: requirements")

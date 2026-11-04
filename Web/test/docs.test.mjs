@@ -52,6 +52,40 @@ test("one connector on two machines is one source; each machine's folder is its 
   assert.deepEqual(rows.filter((r) => r.key === "mcp:confluence").map((r) => r.host), ["mac"]);
 });
 
+test("a project's clones on two machines are one source, said by the project's name, the first machine's docs (#3408)", () => {
+  const studio = {
+    host: "studio", name: "Studio", sources: [folder("/home/a/agents", "agents"), folder("/home/a/notes", "notes")],
+    docs: [doc("README.md", "Agents", "/home/a/agents"), doc("plan.md", "Plan", "/home/a/notes")],
+  };
+  const projects = { "mac|/Users/a/Agents": { id: "p1", name: "Agents app" }, "studio|/home/a/agents": { id: "p1", name: "Agents app" } };
+  const projectOf = (host, f) => projects[`${host}|${f}`];
+  const rows = d.mergeSources([mac, studio], projectOf);
+  assert.deepEqual(rows.map((r) => [r.key, r.heading, r.host]), [
+    ["project:p1", "Agents app", "mac"], ["studio|/home/a/notes", "notes (Studio)", "studio"],
+    ["mcp:confluence", "confluence", "mac"], ["mcp:notion", "notion", "mac"],
+  ]);
+  // A connector is under the project of the folder whose mcp.json adds it.
+  assert.equal(rows[2].project.id, "p1");
+  assert.deepEqual(d.docsProjects(rows), [{ id: "p1", name: "Agents app" }]);
+  const one = d.docsGroups([mac, studio], "updated", "", projectOf, "p1");
+  assert.deepEqual(one.map((g) => g.key), ["project:p1", "mcp:confluence", "mcp:notion"]);
+  assert.equal(one[0].shelves.flatMap((s) => s.docs).length, 4);
+  assert.deepEqual(d.docsGroups([mac, studio], "updated", "", projectOf).map((g) => g.key).length, 4);
+});
+
+test("a project with one folder looks as the folder does, with the project's name (#3408)", () => {
+  const rows = d.mergeSources([mac], (_h, f) => (f === agents.id ? { id: "p1", name: "Agents" } : undefined));
+  assert.deepEqual(rows.map((r) => r.heading), ["Agents", "confluence", "notion"]);
+});
+
+test("search shows only the results in a source the list shows (#3408)", () => {
+  const rows = d.mergeSources([mac, { host: "studio", name: "Studio", sources: [folder("/home/a/agents", "agents")], docs: [] }],
+    (_h, f) => (f ? { id: "p1", name: "Agents" } : undefined));
+  const r = (host, source, ref) => ({ host, doc: { ref, source }, matches: [] });
+  const kept = d.resultsIn([r("mac", agents.id, "a"), r("studio", "/home/a/agents", "b"), r("studio", "mcp:confluence", "c")], rows);
+  assert.deepEqual(kept.map((x) => x.doc.ref), ["a", "c"]);
+});
+
 test("a row says the path of a folder doc and the title of a connector doc", () => {
   assert.equal(d.shortForm(mac.docs[0]), "specs/3319-docs/spec.md");
   assert.equal(d.shortForm(mac.docs[4]), "Payments: requirements");
