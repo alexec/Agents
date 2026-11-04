@@ -213,7 +213,7 @@ test("a list's request carries the board only when one is chosen", () => {
 
 test("a project has the repos its folders read on every machine, and the Project filter shows them (#3283)", () => {
   const read = (n, repo, folder) => item(n, { node: { kind: "issue", ref: `github:${repo}#${n}` }, folder });
-  const agents = { id: "p1", name: "Agents", folders: new Set([w.workFolderKey("mac", "/Users/a/Agents/"), w.workFolderKey("box", "/home/a/Agents")]) };
+  const agents = { id: "p1", name: "Agents", folders: new Set([w.workFolderKey("mac", "file:///Users/a/Agents/"), w.workFolderKey("box", "/home/a/Agents")]) };
   const www = { id: "p2", name: "www", folders: new Set([w.workFolderKey("mac", "/Users/a/www")]) };
   const quiet = { id: "p3", name: "quiet", folders: new Set([w.workFolderKey("mac", "/Users/a/quiet")]) };
   const lists = [

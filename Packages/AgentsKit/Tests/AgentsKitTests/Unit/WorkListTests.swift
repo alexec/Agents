@@ -69,7 +69,7 @@ struct WorkListTests {
         #expect(WorkList.Filter().board.isEmpty)
     }
 
-    @Test func aProjectHasTheReposItsFoldersReadOnEveryMachine() {
+    @Test func aProjectHasTheReposItsFoldersReadOnEveryMachine() throws {
         let box = MachineRef(rawValue: "box")
         func read(_ n: Int, _ repo: String, _ folder: String) -> DaemonAPI.ForgeItem {
             var i = item(n, repo: repo)
@@ -88,7 +88,7 @@ struct WorkListTests {
         let projects = WorkList.projectRepos([agents, www, quiet], lists: lists)
         // A project whose folders read nothing is not offered.
         #expect(projects.map(\.project.name) == ["Agents", "www"])
-        #expect(projects[0].repos == ["github:alexec/Agents", "github:alexec/docs"])
+        #expect(try #require(projects.first).repos == ["github:alexec/Agents", "github:alexec/docs"])
 
         let rows = WorkList.merge(lists, lineage: [])
         #expect(Set(WorkList.filter(rows, .init(project: "p1"), projects: projects).map(\.node.ref))

@@ -10,6 +10,7 @@ import { fromWireDate } from "../protocol/dates";
 import { costWords, nodeName, spent } from "./value";
 import { lineageUrl } from "./lineage";
 import { timeWords } from "./time";
+import { folderPathOf } from "./projectSettings";
 
 /** Work's lists, in the order of its tabs, by the lineage kind each holds. */
 export type WorkKind = "issue" | "pr" | "milestone" | "release";
@@ -134,9 +135,10 @@ export const allProjects = "All projects";
 /** An item's project on its page (#3283). */
 export const projectWords = (name: string) => `Project ${name}`;
 
-/** A folder as Work matches it to a forge item's (#3283): host|path, with no slash at the end. */
-export function workFolderKey(host: string, path: string): string {
-  return `${host}|${path.replace(/(.)\/+$/, "$1")}`;
+/** A folder as Work matches it to a forge item's (#3283): host|path, with no slash at the end. A folder's own
+ * record names it by its file URL, a forge item by its path. */
+export function workFolderKey(host: string, folder: string): string {
+  return `${host}|${(folder.startsWith("file:") ? folderPathOf(folder) : folder).replace(/(.)\/+$/, "$1")}`;
 }
 
 /** Each project's repos and trackers (#3283): those of the items its folders read, on every machine, before the
