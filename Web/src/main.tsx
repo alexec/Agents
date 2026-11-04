@@ -7,12 +7,14 @@ import { Store } from "./model/store";
 import { Session } from "./session";
 import { startPresence } from "./presence";
 import { startPageNotices } from "./pageNotices";
+import { startAgentLinks } from "./model/agentLink";
 import { startSpinnerClock } from "./spinnerClock";
 
 const session = new Session();
 const store = new Store(session.link);
 startPresence(store);
 startPageNotices(store);
+startAgentLinks(store);
 startSpinnerClock();
 const root = document.getElementById("app");
 if (root) render(<App session={session} store={store} />, root);
