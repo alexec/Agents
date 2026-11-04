@@ -55,19 +55,30 @@ final class RemoteModel {
     /// A send refused because the agent's folder has gone (#119), with the ways on.
     var folderGone: FolderGoneAsk?
 
-    /// Which folder is being looked at. Not the daemon's business: it owns what is
-    /// true about the work, and which of it somebody happens to be reading is not that.
-    var selectedFolder: URL? {
+    /// Which folder is being looked at, with its host: two machines can each have a folder
+    /// at one path (#3446), as the window's `selectedFolderHost` and the web's route keep.
+    /// Not the daemon's business: it owns what is true about the work, and which of it
+    /// somebody happens to be reading is not that.
+    var selectedKey: FolderKey? {
         didSet {
-            guard selectedFolder != oldValue else { return }
+            guard selectedKey != oldValue else { return }
             composing = false
             selection = nil
             openWorkflow = nil
             openPin = nil
             openArchive = false
-            if selectedFolder != nil { openActivity = nil }
+            if selectedKey != nil { openActivity = nil }
             letGoOfFolders(keeping: selectedFolder)
         }
+    }
+
+    /// The selected folder's path, whichever host it is on.
+    var selectedFolder: URL? { selectedKey?.folder }
+
+    /// A folder known by its path alone, on whichever host the list has it: what a launch
+    /// argument names. The Mac's when the list has none.
+    private func folderKey(_ folder: URL) -> FolderKey {
+        work.folder(folder)?.key ?? FolderKey(host: .mac, folder: folder)
     }
 
     /// A new session is being written in the selected folder (#2090), the Mac's
@@ -543,7 +554,7 @@ final class RemoteModel {
     /// Resources, Runtimes or Spending. Nil, or one of those.
     var openActivity: SidebarItem? {
         didSet {
-            if openActivity != nil, selectedFolder != nil { selectedFolder = nil }
+            if openActivity != nil, selectedKey != nil { selectedKey = nil }
         }
     }
 
@@ -557,8 +568,7 @@ final class RemoteModel {
     var sidebarItem: SidebarItem? {
         get {
             if let openActivity { return openActivity }
-            guard let folder = selectedFolder else { return nil }
-            let key = FolderKey(host: selectedSummary?.host ?? .mac, folder: folder)
+            guard let key = selectedKey else { return nil }
             if openArchive { return .archive(key) }
             if let openPin { return .pin(openPin, in: key) }
             if let openWorkflow { return .workflow(openWorkflow, in: key) }
@@ -573,14 +583,14 @@ final class RemoteModel {
             switch newValue {
             case nil:
                 openActivity = nil
-                selectedFolder = nil
+                selectedKey = nil
                 selection = nil
                 openWorkflow = nil
                 openPin = nil
                 openArchive = false
                 openReview = nil
             case .folder(let key):
-                selectedFolder = key.folder
+                selectedKey = key
                 selection = nil
                 openPin = nil
                 openWorkflow = nil
@@ -589,21 +599,21 @@ final class RemoteModel {
                 // The next New Session at the sidebar's top starts here too (#495).
                 rememberNewSessionFolder(key)
             case .session(let id):
-                if let folder = work.agent(id)?.folderPath { selectedFolder = folder }
+                if let agent = work.agent(id) { selectedKey = FolderKey(host: agent.host, folder: agent.folderPath) }
                 openPin = nil
                 openWorkflow = nil
                 openArchive = false
                 openReview = nil
                 selection = id
             case .workflow(let id, let key):
-                selectedFolder = key.folder
+                selectedKey = key
                 openPin = nil
                 selection = nil
                 openArchive = false
                 openReview = nil
                 openWorkflow = id
             case .pin(let path, let key):
-                selectedFolder = key.folder
+                selectedKey = key
                 openWorkflow = nil
                 selection = nil
                 openArchive = false
@@ -611,7 +621,7 @@ final class RemoteModel {
                 openPin = path
             case .review(let id, let key):
                 // A change waiting for an OK (#1472), from its row under Needs You.
-                selectedFolder = key.folder
+                selectedKey = key
                 selection = nil
                 openPin = nil
                 openWorkflow = nil
@@ -622,7 +632,7 @@ final class RemoteModel {
             case .archive(let key):
                 // The folder's archive page (#495, #498), with what is opened from it
                 // pushed over it.
-                selectedFolder = key.folder
+                selectedKey = key
                 selection = nil
                 openPin = nil
                 openWorkflow = nil
@@ -634,7 +644,7 @@ final class RemoteModel {
             }
         }
     }
-    var selectedSummary: DaemonAPI.FolderSummary? { work.folder(selectedFolder) }
+    var selectedSummary: DaemonAPI.FolderSummary? { work.folder(selectedKey) }
 
     /// The folder New Session at the top of the sidebar starts in (#495, #498, #2160): the
     /// window's rule, `NewSessionFolder`. A change of choice is said in remote.log.
@@ -738,8 +748,9 @@ final class RemoteModel {
 
     /// The folder whose New session page (#366) is on screen, if one is: set by the page
     /// while it shows, so the runtime behind its choices is held only then, and cleared
-    /// when the agent it started is ready to be looked at.
-    var startingIn: URL? {
+    /// when the agent it started is ready to be looked at. With its host: a folder at the
+    /// same path on another machine is another page (#3446).
+    var startingIn: FolderKey? {
         didSet {
             guard startingIn != oldValue else { return }
             if let startingIn { queueOpenStart(startingIn) } else { closeStart() }
@@ -751,7 +762,7 @@ final class RemoteModel {
     /// that has had nothing behind it since its agent started.
     private func startPageMoved(afresh: Bool) {
         let next = startPage.key
-        note("start: page now held for \(next?.lastPathComponent ?? "nothing")")
+        note("start: page now held for \(next?.folder.lastPathComponent ?? "nothing")")
         if afresh, let next, next == startingIn {
             closeStart()
             queueOpenStart(next)
@@ -763,11 +774,11 @@ final class RemoteModel {
 
     /// The folders whose New session is asked for now (#2090): the sidebar's pick, and each
     /// folder scene's. What SwiftUI says came and went is not trusted beyond these (#2089).
-    private var startPagesWanted: [URL] {
-        var wanted: [URL] = []
-        if case .folder(let key) = sidebarItem { wanted.append(key.folder) }
+    private var startPagesWanted: [FolderKey] {
+        var wanted: [FolderKey] = []
+        if case .folder(let key) = sidebarItem { wanted.append(key) }
         for state in folderScenes.values {
-            if case .folder(let key) = state.pick { wanted.append(key.folder) }
+            if case .folder(let key) = state.pick { wanted.append(key) }
         }
         return wanted
     }
@@ -787,13 +798,13 @@ final class RemoteModel {
     /// The showing of the page that holds `startingIn` (#1044). The detail is rebuilt with
     /// each pick, and the page it replaced can say it went after the new one said it came:
     /// only the showing that holds the page lets it go.
-    @ObservationIgnored private var startPage = PageHold<URL>()
+    @ObservationIgnored private var startPage = PageHold<FolderKey>()
 
     /// The page came on screen. Opened afresh each time, even in the same folder: a
     /// showing that went without saying so left nothing this one can trust.
-    func startPageAppeared(in folder: URL, page: UUID) {
+    func startPageAppeared(in folder: FolderKey, page: UUID) {
         startPage.appeared(folder, showing: page)
-        note("start: page appeared for \(folder.lastPathComponent)")
+        note("start: page appeared for \(folder.folder.lastPathComponent)")
         guard startingIn == folder else { startingIn = folder; return }
         closeStart()
         queueOpenStart(folder)
@@ -802,10 +813,10 @@ final class RemoteModel {
     /// A showing that said it went is still on screen (#2089), and nothing holds the page:
     /// it holds it again. Not one whose agent has started, which is on its way out, nor
     /// while one starts.
-    func startPageStillShown(in folder: URL, page: UUID) {
+    func startPageStillShown(in folder: FolderKey, page: UUID) {
         guard startingIn == nil, !isStarting, !startedPages.contains(page),
               startPagesWanted.contains(folder) else { return }
-        note("start: page still shown for \(folder.lastPathComponent), held again")
+        note("start: page still shown for \(folder.folder.lastPathComponent), held again")
         startPageAppeared(in: folder, page: page)
     }
 
@@ -822,26 +833,26 @@ final class RemoteModel {
     /// What a ui:// view filled the page with (#834), for the page in its folder to take
     /// once it is on screen. The person still presses Start.
     struct OfferedStart: Equatable {
-        let folder: URL
+        let folder: FolderKey
         let start: AppViewStart
     }
 
     private(set) var offeredStart: OfferedStart?
     /// The offered worktree's name, chosen once the page's repository has answered: before
     /// then the page has no Worktree row, and opening it puts the place back.
-    @ObservationIgnored private var offeredWorktree: (folder: URL, choice: WorktreeChoice)?
+    @ObservationIgnored private var offeredWorktree: (folder: FolderKey, choice: WorktreeChoice)?
 
     /// Open the New session page in a view's folder, filled in (#834), as New Session
     /// opens it. Why it did not open, or nil.
     func offerStart(_ start: AppViewStart, in key: FolderKey) -> String? {
         guard let summary = work.folder(key) else { return "This folder isn’t one the phone knows." }
         guard !isStarting else { return "An agent is starting. Try again once it has." }
-        offeredStart = OfferedStart(folder: summary.folder.folder, start: start)
-        offeredWorktree = start.worktreeChoice.map { (folder: summary.folder.folder, choice: $0) }
+        offeredStart = OfferedStart(folder: summary.key, start: start)
+        offeredWorktree = start.worktreeChoice.map { (folder: summary.key, choice: $0) }
         sidebarItem = .folder(summary.key)
         // Already open in this folder: its repository is asked again for the worktree.
-        if start.worktreeChoice != nil, startingIn == summary.folder.folder {
-            Task { await loadStartWorktrees(in: summary.folder.folder) }
+        if start.worktreeChoice != nil, startingIn == summary.key {
+            Task { await loadStartWorktrees(in: summary.key) }
         }
         return nil
     }
@@ -853,7 +864,7 @@ final class RemoteModel {
     }
 
     /// The offer for the page in `folder`, taken once.
-    func takeOfferedStart(in folder: URL) -> AppViewStart? {
+    func takeOfferedStart(in folder: FolderKey) -> AppViewStart? {
         guard let offered = offeredStart, offered.folder == folder else { return nil }
         offeredStart = nil
         return offered.start
@@ -932,6 +943,8 @@ final class RemoteModel {
     /// retry, so the Mac answers with the agent the first one made rather than
     /// starting the work twice.
     private(set) var unsettledStart: DaemonAPI.StartRequest?
+    /// The host `unsettledStart` was sent to: its `cwd` alone could be a folder on another (#3446).
+    @ObservationIgnored private var unsettledStartOn: MachineRef = .mac
     private(set) var isStarting = false
     /// Where in the folder the new agent works, when not the folder (030).
     /// Decided per agent, so it goes back to the folder each time the page
@@ -972,13 +985,13 @@ final class RemoteModel {
     private static let startParts: Set<CatchUpPart> = [.runtimes, .allowances, .modes, .sandbox]
 
     /// Opens the page, numbered as it is queued: an open queued before a later one is let go.
-    private func queueOpenStart(_ folder: URL) {
+    private func queueOpenStart(_ folder: FolderKey) {
         startOpens += 1
         let open = startOpens
         Task { await openStart(in: folder, open: open) }
     }
 
-    private func openStart(in folder: URL, open: Int) async {
+    private func openStart(in folder: FolderKey, open: Int) async {
         guard open == startOpens else { return }
         startOpenedAt = .now
         startOpenedOn = startHost
@@ -1011,7 +1024,7 @@ final class RemoteModel {
         }
         // Said, so a page left with no choices can be read from the log (#2089).
         guard startingIn == folder else {
-            note("start: open of \(folder.lastPathComponent) gave way to \(startingIn?.lastPathComponent ?? "nothing")")
+            note("start: open of \(folder.folder.lastPathComponent) gave way to \(startingIn?.folder.lastPathComponent ?? "nothing")")
             return
         }
         // A later open of the page asks for the choices; one draft, not two.
@@ -1033,7 +1046,7 @@ final class RemoteModel {
     /// runtimes for a server's folder opens again on its own host's.
     private func startHostMoved() {
         guard let folder = startingIn, let opened = startOpenedOn, opened != startHost, !isStarting else { return }
-        note("start: \(folder.lastPathComponent) is on \(hostName(startHost)), not \(hostName(opened)); opened again")
+        note("start: \(folder.folder.lastPathComponent) is on \(hostName(startHost)), not \(hostName(opened)); opened again")
         closeStart()
         queueOpenStart(folder)
     }
@@ -1096,7 +1109,7 @@ final class RemoteModel {
         note("start: \(method) sent")
         do {
             // Decoded here: the type's conformance may be this actor's own.
-            let answer = try await client(for: params).callWithin(StartPageAsks.patience(for: method), method, params,
+            let answer = try await client(for: params, on: startHost).callWithin(StartPageAsks.patience(for: method), method, params,
                                                                   returning: JSONValue.self).decode(T.self)
             note("start: \(method) answered in \(ContinuousClock.now - began)")
             return answer
@@ -1135,8 +1148,8 @@ final class RemoteModel {
     }
 
     /// The repository's worktrees for the page. Asked once when it opens, never polled.
-    private func loadStartWorktrees(in folder: URL) async {
-        let request = DaemonAPI.WorktreesListRequest(folder: folder)
+    private func loadStartWorktrees(in folder: FolderKey) async {
+        let request = DaemonAPI.WorktreesListRequest(folder: folder.folder)
         startAsks.asking(.worktrees)
         let answer: DaemonAPI.WorktreesListResponse
         do {
@@ -1159,8 +1172,8 @@ final class RemoteModel {
 
     /// The folder's personas (#760). A host too old to know the method offers none; one
     /// that did not answer is asked again once it does (#1096).
-    private func loadStartPersonas(in folder: URL) async {
-        let request = DaemonAPI.PersonasListRequest(folder: folder)
+    private func loadStartPersonas(in folder: FolderKey) async {
+        let request = DaemonAPI.PersonasListRequest(folder: folder.folder)
         startAsks.asking(.personas)
         let listed: [Persona]
         do {
@@ -1188,7 +1201,7 @@ final class RemoteModel {
     /// start can use it; otherwise the folder (030, research R2).
     private var startOptionsFolder: URL? {
         if case .existing(let root) = startWorktree { return root }
-        return startingIn
+        return startingIn?.folder
     }
 
     /// Choose where the new agent works, and make the draft there if that moved it.
@@ -1442,7 +1455,7 @@ final class RemoteModel {
     /// `voice`: said in voice mode, so its replies are spoken, as on the Mac; `started` is
     /// told the new session's id (Alex, 2026-10-29).
     func startAgent(prompt: String, attachments: [Attachment] = [], labels: [String] = [],
-                    in folder: URL, page: UUID, voice: Bool = false,
+                    in folder: FolderKey, page: UUID, voice: Bool = false,
                     started: (UUID) -> Void = { _ in }) async -> Bool {
         let words = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !words.isEmpty, !isStarting else { return false }
@@ -1477,9 +1490,10 @@ final class RemoteModel {
         // The unsettled start's id only for the same folder: sent again there, the Mac
         // answers with the agent it made if it made one. Anywhere else it is a new
         // start, and reusing the id would be answered with the other folder's agent.
-        let retrying = unsettledStart?.cwd == folder ? unsettledStart?.requestID : nil
+        let retrying = unsettledStart?.cwd == folder.folder && unsettledStartOn == folder.host
+            ? unsettledStart?.requestID : nil
         let request = DaemonAPI.StartRequest(
-            runtimeID: runtimeID, cwd: folder, prompt: words, attachments: attachments,
+            runtimeID: runtimeID, cwd: folder.folder, prompt: words, attachments: attachments,
             startOptions: StartOptions(values: startChosen), draftID: startDraftID,
             additionalDirectories: startFolders, worktree: startWorktree, requestID: retrying ?? UUID(), sandbox: startSandbox,
             labels: labels, persona: startPersona,
@@ -1489,7 +1503,7 @@ final class RemoteModel {
                            permissionRequests: isAutoStart ? nil : startClientPermission))
         startingPage = page
         defer { startingPage = nil }
-        return await send(start: request, told: started)
+        return await send(start: request, on: folder.host, told: started)
     }
 
     func setLabels(on id: UUID, add: [String] = [], remove: [String] = []) async -> Bool {
@@ -1518,7 +1532,8 @@ final class RemoteModel {
         labelVocabularies[folder] = values
     }
 
-    private func send(start request: DaemonAPI.StartRequest, told: (UUID) -> Void = { _ in }) async -> Bool {
+    private func send(start request: DaemonAPI.StartRequest, on host: MachineRef,
+                      told: (UUID) -> Void = { _ in }) async -> Bool {
         isStarting = true
         defer { isStarting = false }
         startRefusal = nil
@@ -1526,7 +1541,7 @@ final class RemoteModel {
         if let requestID = request.requestID { liveActivities.askedToStart(requestID) }
         // A stopped workspace that starts when used: kept, and shown on this page until the
         // agent it makes opens (#691 US3, layouts.md L6a).
-        if let host = work.folder(request.cwd)?.host, host != .mac, isStale(on: host), startsWhenUsed(host) {
+        if host != .mac, isStale(on: host), startsWhenUsed(host) {
             var kept = request
             kept.draftID = nil
             guard let said = await keepThroughControl(host, DaemonAPI.Method.agentsStart, kept) else { return false }
@@ -1535,13 +1550,14 @@ final class RemoteModel {
             return true
         }
         unsettledStart = request
+        unsettledStartOn = host
         do {
-            let id = try await sendOnce(DaemonAPI.Method.agentsStart, request).decode(UUID.self)
+            let id = try await sendOnce(DaemonAPI.Method.agentsStart, request, on: host).decode(UUID.self)
             // Taken by the start. One that answered after the Send (#1171) is let go as the
             // page closes.
             if startDraftID == request.draftID { startDraftID = nil }
             told(id)
-            await started(id, in: request.cwd)
+            await started(id, in: FolderKey(host: host, folder: request.cwd))
             return true
         } catch let refused as JSONRPCError {
             // The Mac said no, so nothing was started under this id and a later
@@ -1567,11 +1583,10 @@ final class RemoteModel {
     /// - Parameter open: go to it. True when the person is waiting on the page; false
     ///   when a lost answer is settled later, perhaps while they read something else,
     ///   and taking the screen from them would be the surprise.
-    private func started(_ id: UUID, in folder: URL, open: Bool = true) async {
+    private func started(_ id: UUID, in key: FolderKey, open: Bool = true) async {
+        let folder = key.folder
         // The last folder used is the one a session was started in, from any window (#2160).
-        if let key = work.folder(folder)?.key ?? work.agent(id).map({ FolderKey(host: $0.host, folder: folder) }) {
-            rememberNewSessionFolder(key)
-        }
+        rememberNewSessionFolder(key)
         unsettledStart = nil
         startWorktree = nil
         // Only now: a draft is kept until the agent it was typed for exists (FR-017).
@@ -1583,11 +1598,11 @@ final class RemoteModel {
         startPage.release()
         startPageMoved(afresh: true)
         // Started in a folder's own scene: it opens there (#1089).
-        if let scene = composingScene.flatMap({ folderScenes[$0] }), scene.key.folder == folder {
+        if let scene = composingScene.flatMap({ folderScenes[$0] }), scene.key == key {
             scene.pick = .session(id)
             return
         }
-        selectedFolder = folder
+        selectedKey = key
         openWorkflow = nil
         // In the start page's place, which is the detail's own: no sheet to wait out (#366).
         selection = id
@@ -1597,16 +1612,17 @@ final class RemoteModel {
     /// same id, which the Mac answers with that agent if it did make one.
     private func settleUnsettledStart() async {
         guard let request = unsettledStart, let requestID = request.requestID else { return }
+        let key = FolderKey(host: unsettledStartOn, folder: request.cwd)
         if let made = work.agents.first(where: { $0.startRequestID == requestID }) {
-            await started(made.id, in: request.cwd, open: startingIn == request.cwd)
+            await started(made.id, in: key, open: startingIn == key)
             return
         }
-        guard startingIn == request.cwd else { return }
-        _ = await send(start: request)
+        guard startingIn == key else { return }
+        _ = await send(start: request, on: key.host)
     }
 
-    private func startRefusalBeforeSending(in folder: URL) -> String? {
-        let host = work.folder(folder)?.host ?? .mac
+    private func startRefusalBeforeSending(in folder: FolderKey) -> String? {
+        let host = folder.host
         if isStale(on: host), !(host != .mac && startsWhenUsed(host)) { return notAnswering(host, "nothing was started.") }
         guard let summary = work.folder(folder) else { return nil }
         if summary.folder.isArchived { return "This folder was archived on the Mac, so nothing was started." }
@@ -2124,8 +2140,12 @@ final class RemoteModel {
     /// Another host this phone cannot reach now is `HostAway` at once: the call used to
     /// go to the home host, which could mean a whole catch-up there before failing
     /// anyway (#208).
-    private func client(for params: some Encodable) throws -> DaemonClient {
-        guard let host = otherHost(named: params) else { return client }
+    ///
+    /// `host` names it outright, for a call whose folder could be at the same path on
+    /// another machine (#3446).
+    private func client(for params: some Encodable, on host: MachineRef? = nil) throws -> DaemonClient {
+        let host = host ?? otherHost(named: params) ?? .mac
+        guard host != .mac else { return client }
         guard let other = otherHosts[host], reachableHosts.contains(host) else { throw HostAway(host: host) }
         return other
     }
@@ -2186,7 +2206,7 @@ final class RemoteModel {
 
     /// The host of the folder the start page is open on: where the new agent starts.
     var startHost: MachineRef {
-        startingIn.flatMap { work.folder($0)?.host } ?? .mac
+        startingIn?.host ?? .mac
     }
 
     /// Whether a host can do what `capability` names (#1748): its row's list, with `.mac`
@@ -2773,8 +2793,9 @@ final class RemoteModel {
     /// link went is `HostAway` at once: that host's watch brings it back, not this
     /// phone's own reconnect.
     @discardableResult
-    private func sendOnce(_ method: String, _ params: some Encodable & Sendable) async throws -> JSONValue {
-        let client = try client(for: params)
+    private func sendOnce(_ method: String, _ params: some Encodable & Sendable,
+                          on named: MachineRef? = nil) async throws -> JSONValue {
+        let client = try client(for: params, on: named)
         let patience = Self.sendPatience
         do {
             return try await client.callWhileAnswering(method, params, checkingEvery: patience)
@@ -2782,7 +2803,7 @@ final class RemoteModel {
         } catch DaemonClient.ConnectError.couldNotConnect {
         }
         guard client === self.client else {
-            if let host = otherHost(named: params) {
+            if let host = named ?? otherHost(named: params) {
                 reachableHosts.remove(host)
                 throw HostAway(host: host)
             }
@@ -3297,7 +3318,7 @@ final class RemoteModel {
     private func showTheFirstFolderNeedingYou() {
         openWorkflow = nil
         selection = nil
-        selectedFolder = work.liveFolders.first(where: needsYou)?.folder.folder
+        selectedKey = work.liveFolders.first(where: needsYou)?.key
     }
 
     /// Whether anything in a folder is waiting on a person: the same sum the widget
@@ -3774,7 +3795,7 @@ final class RemoteModel {
                                            DaemonAPI.SuggestionRequest(folder: folder, id: suggestion.id), returning: UUID.self)
             work.dropSuggestion(suggestion.id, in: folder)
             _ = await loadWholeAgent(id)
-            selectedFolder = folder
+            selectedKey = FolderKey(host: .mac, folder: folder)
             openWorkflow = nil
             selection = id
         } catch {
@@ -4169,9 +4190,9 @@ final class RemoteModel {
     /// A folder archived on the Mac while it is being read here moves the selection
     /// rather than leaving an empty screen.
     private func settleSelection() {
-        guard let selectedFolder else { return }
-        if !folders.contains(where: { $0.folder.folder == selectedFolder }) {
-            self.selectedFolder = nil
+        guard let selectedKey else { return }
+        if !folders.contains(where: { $0.key == selectedKey }) {
+            self.selectedKey = nil
         }
     }
 
@@ -4750,14 +4771,14 @@ final class RemoteModel {
             problem = "Your Mac is not answering, so that could not be sent."
             return false
         }
-        let folder = work.agent(agentID)?.folderPath
+        let folder = work.agent(agentID).map { FolderKey(host: $0.host, folder: $0.folderPath) }
         do {
             let id = try await sendOnce(DaemonAPI.Method.agentsContinueInFolder,
                                         DaemonAPI.ContinueInFolderRequest(agentID: agentID, text: text,
                                                                            attachments: attachments,
                                                                            requestID: UUID())).decode(UUID.self)
             await loadWholeAgent(id)
-            if let folder { selectedFolder = folder }
+            if let folder { selectedKey = folder }
             selection = id
             return true
         } catch let error as JSONRPCError {
@@ -4814,12 +4835,12 @@ final class RemoteModel {
             problem = "Your Mac is not answering, so that could not be sent."
             return
         }
-        let folder = work.agent(agentID)?.folderPath
+        let folder = work.agent(agentID).map { FolderKey(host: $0.host, folder: $0.folderPath) }
         do {
             let id = try await sendOnce(DaemonAPI.Method.agentsFork,
                                         DaemonAPI.AgentRequest(agentID: agentID)).decode(UUID.self)
             await loadWholeAgent(id)
-            if let folder { selectedFolder = folder }
+            if let folder { selectedKey = folder }
             selection = id
         } catch let error as JSONRPCError {
             problem = error.message
@@ -4835,14 +4856,14 @@ final class RemoteModel {
             problem = "Your Mac is not answering, so that could not be sent."
             return
         }
-        let folder = work.agent(agentID)?.folderPath
+        let folder = work.agent(agentID).map { FolderKey(host: $0.host, folder: $0.folderPath) }
         do {
             let id = try await sendOnce(DaemonAPI.Method.agentsBranchFrom,
                                         DaemonAPI.BranchFromRequest(agentID: agentID, entryID: entryID))
                 .decode(UUID.self)
             StartDraftKeeper.shared.note(text, [], for: .agent(id))
             await loadWholeAgent(id)
-            if let folder { selectedFolder = folder }
+            if let folder { selectedKey = folder }
             selection = id
         } catch let error as JSONRPCError {
             problem = error.message
@@ -5035,12 +5056,12 @@ final class RemoteModel {
         if let name = value("-folder"),
            let summary = work.folders.first(where: { $0.name == name }) {
             // Its page is New session (#366).
-            selectedFolder = summary.folder.folder
+            selectedKey = summary.key
             composing = true
         }
         if let title = value("-agent"),
            let agent = work.agents.first(where: { $0.title == title }) {
-            selectedFolder = agent.folderPath
+            selectedKey = FolderKey(host: agent.host, folder: agent.folderPath)
             // A beat, so the folder has been pushed before the conversation is. Two
             // pushes in one turn of the loop is not something to ask of a split view.
             try? await Task.sleep(for: .milliseconds(600))
@@ -5055,7 +5076,7 @@ final class RemoteModel {
         // `-workflow` opens a workflow's page on the chosen folder, by its name.
         if let name = value("-workflow"),
            let workflow = work.workflows.first(where: { $0.workflow.name == name }) {
-            selectedFolder = workflow.folder
+            selectedKey = folderKey(workflow.folder)
             try? await Task.sleep(for: .milliseconds(600))
             openWorkflow = workflow.id
         }

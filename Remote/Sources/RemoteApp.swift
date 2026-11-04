@@ -348,10 +348,10 @@ struct RemoteView: View {
                 ArchivePage(folder: summary.key).paperGround()
             }
         case .start:
-            if let folder = model.selectedFolder {
+            if let key = model.selectedKey {
                 // Held open while it is on screen: the runtime behind its choices is let
                 // go when it is not (029).
-                StartAgentView(folder: folder)
+                StartAgentView(key: key)
                     .paperGround()
             }
         case .page(let path):

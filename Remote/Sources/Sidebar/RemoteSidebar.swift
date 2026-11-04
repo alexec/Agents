@@ -884,7 +884,7 @@ private struct FolderMenuItems: View {
     var others: [DaemonAPI.FolderSummary] = []
 
     var body: some View {
-        NewSessionButton(folder: summary.folder.folder)
+        NewSessionButton(folder: summary.key)
         // The folder alone (#1089): a scene of its own on an iPad, a screen on an iPhone.
         OpenFolderButton(key: summary.key)
         if !others.isEmpty {
@@ -913,11 +913,11 @@ private struct FolderMenuItems: View {
 /// New session in a folder: its page, the start form (029, #366).
 struct NewSessionButton: View {
     @Environment(RemoteModel.self) private var model
-    let folder: URL
+    let folder: FolderKey
 
     var body: some View {
         Button {
-            model.sidebarItem = .folder(FolderKey(host: model.work.folder(folder)?.host ?? .mac, folder: folder))
+            model.sidebarItem = .folder(folder)
         } label: {
             Label("New Session", systemImage: "plus")
         }

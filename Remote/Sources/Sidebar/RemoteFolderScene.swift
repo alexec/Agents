@@ -166,7 +166,7 @@ private struct RemoteFolderColumns: View {
                     .environment(\.poppedChat, chat)
             }
         case .folder:
-            StartAgentView(folder: summary.folder.folder)
+            StartAgentView(key: summary.key)
                 .paperGround()
         case nil:
             // Only New Session opens the start page (#2090), as in the sidebar of every folder.

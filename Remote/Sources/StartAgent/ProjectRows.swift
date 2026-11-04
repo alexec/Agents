@@ -6,7 +6,7 @@ import SwiftUI
 /// looks as a folder does today. Adding a folder on another machine is Mac + web (#2798).
 struct ProjectRows: View {
     @Environment(RemoteModel.self) private var model
-    let folder: URL
+    let folder: FolderKey
 
     var body: some View {
         let projects = model.newSessionProjects
