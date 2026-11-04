@@ -235,3 +235,68 @@ export function rememberFolder(storage: Storage | undefined, folder: FolderKey):
     // A private window may refuse to store; the first folder stands in.
   }
 }
+
+// The sidebar's groups (#3278, spec 3273), as `SidebarProjects` in AgentsKitCore: one per project,
+// not per folder. A project with one folder looks as that folder did before.
+
+/** A folder as the sidebar places it: its machine's id, and the project its folder.json names. */
+export interface Grouped { host: { id: string }; folder: { project?: string | undefined } }
+
+/** One group: the main folder (this machine's, or the first in order), then the project's others. */
+export interface ProjectGroup<P extends Grouped> { main: P; others: P[] }
+
+/**
+ * `ordered` in the sidebar's order (`orderedFolders`), gathered by project. Each group stands where
+ * its first folder stands, so the pinned stay first and, in each of the two, the projects with a
+ * folder on this machine come first. `here` is this machine: the group's main folder is its folder there.
+ */
+export function projectGroups<P extends Grouped>(ordered: readonly P[], here: string): ProjectGroup<P>[] {
+  const slots: P[][] = [];
+  const slotOf = new Map<string, number>();
+  for (const placed of ordered) {
+    const project = placed.folder.project;
+    const at = project === undefined ? undefined : slotOf.get(project);
+    if (at !== undefined) { slots[at]!.push(placed); continue; }
+    if (project !== undefined) slotOf.set(project, slots.length);
+    slots.push([placed]);
+  }
+  return slots.map((folders) => {
+    const main = folders.find((p) => p.host.id === here) ?? folders[0]!;
+    return { main, others: folders.filter((p) => p !== main) };
+  });
+}
+
+/** Whether the group's folders are on more than one machine: only then does a session's row say its machine. */
+export function spansMachines<P extends Grouped>(group: ProjectGroup<P>): boolean {
+  return group.others.some((p) => p.host.id !== group.main.host.id);
+}
+
+/** The group's name: the folder's own label alone, or the project's name (the main folder's until it is known). */
+export function groupLabel<P extends Grouped>(group: ProjectGroup<P>, own: string, projectName: string | undefined,
+  mainName: string): string {
+  return group.others.length === 0 ? own : projectName ?? mainName;
+}
+
+/** What a session's row in the group says after its title: its machine, when the group spans machines and it is elsewhere. */
+export function machineMark<P extends Grouped>(group: ProjectGroup<P>, host: string, here: string,
+  hostName: (id: string) => string): string | undefined {
+  return spansMachines(group) && host !== here ? hostName(host) : undefined;
+}
+
+/** The project ids that more than one folder shares: the names the sidebar needs. */
+export function sharedProjects<P extends Grouped>(groups: readonly ProjectGroup<P>[]): string[] {
+  return groups.filter((g) => g.others.length > 0).flatMap((g) => g.main.folder.project ?? []).sort();
+}
+
+export type MachineState = "online" | "offline" | "stopped";
+
+/** SidebarProjects.state: stopped when its workspace is (#691), offline when it does not answer. */
+export function machineState(online: boolean, workspaceState: string | undefined): MachineState {
+  if (workspaceState === "stopped") return "stopped";
+  return online ? "online" : "offline";
+}
+
+/** One folder in the group's Folders list: "Agents — devbox, online". */
+export function folderLine(name: string, machine: string, state: MachineState): string {
+  return `${name} — ${machine}, ${state}`;
+}

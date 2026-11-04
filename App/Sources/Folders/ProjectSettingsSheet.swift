@@ -535,7 +535,9 @@ private struct ProjectWorkAtOncePane: View {
                         Text("\(summary.helperLimits.running) running, \(summary.helperLimits.notArchived) not archived")
                             .monospacedDigit()
                         if let mark = summary.helperLimitsSetBy { OrgPolicyLine(mark: mark) }
-                        settingsNote("Set in Settings ▸ Agents ▸ Policy, or for this project in Policy.")
+                        settingsNote("Set in Settings ▸ Agents ▸ Policy, or for this project in Policy. "
+                                     + "They count across all the project's folders, on every machine. A lead doesn't count; "
+                                     + "the sessions it starts do.")
                     }
                 }
                 settingsRow("Helpers queued") {

@@ -18,13 +18,30 @@ export interface HostDocs {
   problem?: string | undefined;
 }
 
-/** A source as the list shows it: one per folder of each machine, one per connector of them all. */
+/** The project a folder is in (#3408), as the list names it: its id, and its name. */
+export interface DocsProject {
+  id: string;
+  name: string;
+}
+
+/** The project of a machine's folder, by the folder's path; undefined for a folder in no project. */
+export type ProjectOf = (host: string, folder: string | undefined) => DocsProject | undefined;
+
+const noProjects: ProjectOf = () => undefined;
+
+/** A source as the list shows it: one per project, one per folder in no project on each machine, and
+ * one per connector of them all. */
 export interface DocsSourceRow {
-  /** host|id for a folder; the id alone for a connector, which is one source on every machine. */
+  /** project:<id> for a project's folders; host|id for a folder in no project; the id alone for a
+   * connector, which is one source on every machine. */
   key: string;
   host: string;
   source: DocsSource;
   heading: string;
+  /** The project its folder is in: a connector's is the project of the folder whose mcp.json adds it. */
+  project?: DocsProject | undefined;
+  /** Every folder in it, by machine: a project's folders on each machine, the first one's first. */
+  members: { host: string; id: string }[];
 }
 
 /** The docs of one subfolder of a source: "specs/", "docs/", or "" for its top. */
@@ -37,36 +54,52 @@ export interface DocsGroup extends DocsSourceRow {
   shelves: DocsShelf[];
 }
 
-/** The key the list keeps a source by: one connector on two machines is one source, the first kept. */
-export function sourceKey(host: string, source: Pick<DocsSource, "id" | "kind">): string {
-  return source.kind === "connector" ? source.id : `${host}|${source.id}`;
+/** The key the list keeps a source by: one connector on two machines is one source, and so are a
+ * project's clones on two machines (#3408). The first is kept. */
+export function sourceKey(host: string, source: Pick<DocsSource, "id" | "kind">, project?: DocsProject): string {
+  if (source.kind === "connector") return source.id;
+  return project ? `project:${project.id}` : `${host}|${source.id}`;
 }
 
-/** Every machine's sources, the folders first and then the connectors, each once. */
-export function mergeSources(lists: readonly HostDocs[]): DocsSourceRow[] {
+/** Every machine's sources, the folders first and then the connectors, each once. A project's folders
+ * are one source, said by the project's name with no machine, on every machine (#3408). */
+export function mergeSources(lists: readonly HostDocs[], projectOf: ProjectOf = noProjects): DocsSourceRow[] {
   const several = lists.length > 1;
-  const seen = new Set<string>();
   const out: DocsSourceRow[] = [];
   for (const kind of ["folder", "connector"] as const) {
     for (const l of lists) {
       for (const s of l.sources) {
         if (s.kind !== kind) continue;
-        const key = sourceKey(l.host, s);
-        if (seen.has(key)) continue;
-        seen.add(key);
-        out.push({ key, host: l.host, source: s, heading: kind === "folder" && several ? `${s.name} (${l.name})` : s.name });
+        const project = projectOf(l.host, s.folder ?? (kind === "folder" ? s.id : undefined));
+        const key = sourceKey(l.host, s, project);
+        const kept = out.find((r) => r.key === key);
+        if (kept) {
+          if (kind === "folder") kept.members.push({ host: l.host, id: s.id });
+          continue;
+        }
+        const heading = kind === "connector" ? s.name : project ? project.name : several ? `${s.name} (${l.name})` : s.name;
+        out.push({ key, host: l.host, source: s, heading, project, members: [{ host: l.host, id: s.id }] });
       }
     }
   }
   return out;
 }
 
-/** The sources and their docs, sorted, with the one source asked for or all of them. */
-export function docsGroups(lists: readonly HostDocs[], sort: DocsSort, only = ""): DocsGroup[] {
-  const sources = mergeSources(lists).filter((s) => !only || s.key === only);
+/** The projects the sources are in, by name, for the Project filter. */
+export function docsProjects(rows: readonly DocsSourceRow[]): DocsProject[] {
+  const by = new Map<string, DocsProject>();
+  for (const r of rows) if (r.project && !by.has(r.project.id)) by.set(r.project.id, r.project);
+  return [...by.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+}
+
+/** The sources and their docs, sorted, with the one source asked for or all of them, in the one
+ * project asked for or in every one. A project's docs are those of all its folders, each ref once:
+ * a doc in two clones is the first clone's. */
+export function docsGroups(lists: readonly HostDocs[], sort: DocsSort, only = "", projectOf: ProjectOf = noProjects, project = ""): DocsGroup[] {
+  const sources = mergeSources(lists, projectOf).filter((s) => (!only || s.key === only) && (!project || s.project?.id === project));
   return sources.map((s) => {
-    const docs = lists.filter((l) => s.source.kind === "connector" || l.host === s.host)
-      .flatMap((l) => l.docs.filter((d) => d.source === s.source.id));
+    const docs = s.members.flatMap((m) => lists.filter((l) => s.source.kind === "connector" || l.host === m.host)
+      .flatMap((l) => l.docs.filter((d) => d.source === m.id)));
     return { ...s, shelves: shelves(unique(docs), sort, s.source.kind === "folder") };
   });
 }
@@ -173,6 +206,16 @@ export function mergeResults(lists: readonly { host: string; results: DocsSearch
     }
   }
   return out.sort((a, b) => b.matches.length - a.matches.length);
+}
+
+/** The results whose doc is in a source the list shows (#3408): a project not asked for is left out. */
+export function resultsIn<R extends { host: string; doc: Pick<Doc, "source"> }>(results: readonly R[], rows: readonly DocsSourceRow[]): R[] {
+  return results.filter((r) => rows.some((s) => s.members.some((m) => m.id === r.doc.source && (s.source.kind === "connector" || m.host === r.host))));
+}
+
+/** The source ids to search on a machine, for one source: its folders there, or the connector. */
+export function searchSources(row: DocsSourceRow, host: string): string[] {
+  return row.source.kind === "connector" ? [row.source.id] : row.members.filter((m) => m.host === host).map((m) => m.id);
 }
 
 /** The Mac window's address of a doc (spec 3319). */

@@ -120,8 +120,8 @@ func (d *Daemon) startOnMachine(me *wire.Agent, args map[string]json.RawMessage,
 	}
 	d.noteStartedThere(startedThere{Machine: machine, Session: id, Starter: me.ID, Folder: here, There: folder, Title: title, At: now()})
 	return sent + fmt.Sprintf("Started %s on %s, in %s (id %s). list_sessions, read_session, message_session, wait_for_agents, stop_session and archive_session "+
-		"reach it by its id, and it counts in this folder's limits until it is archived; the person sees it under %s. This folder now has %s.",
-		quotedTitle(&title), machine, folder, id, machine, d.helperPlaces(here)), nil
+		"reach it by its id, and it counts in %s's limits until it is archived; the person sees it under %s. %s now has %s.",
+		quotedTitle(&title), machine, folder, id, scopeWords(here), machine, scopeTitle(here), d.helperPlaces(here)), nil
 }
 
 // agentsMayStartOnMachines is HelperLimits.agentsMayStartOnMachines (#2928): off unless the

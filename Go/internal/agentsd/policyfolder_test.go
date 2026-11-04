@@ -96,7 +96,7 @@ func TestAFolderPolicyThatLoosensWaits(t *testing.T) {
 	}
 	// The card says which rule it loosens, from what to what (frame D, GuardedChange.policy).
 	if p := state.Pending.Policy; p == nil || len(p.Looser) != 1 || p.Looser[0] != wire.PolicyRuleNameHelpersMostRunning ||
-		!strings.HasPrefix(p.Words, "Helpers running in each folder: ") || !strings.Contains(p.Words, " → ") || p.Was == nil {
+		!strings.HasPrefix(p.Words, "Helpers running in each project: ") || !strings.Contains(p.Words, " → ") || p.Was == nil {
 		t.Fatalf("pending policy = %+v", state.Pending.Policy)
 	}
 	// The guarded-file actions behave as any other guarded file's do.

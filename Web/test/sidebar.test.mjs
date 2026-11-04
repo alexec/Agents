@@ -632,3 +632,26 @@ test("Remove…'s words name a server and say a refusal as a removal (#2266)", a
   assert.equal(notRemovedOffline("github", "devbox"), "github was not removed: devbox is offline.");
   assert.equal(notRemoved("github", "That machine is offline."), "github was not removed. That machine is offline.");
 });
+
+test("the sidebar groups by project: one folder as before, a project's folders on every machine as one (#3278)", async () => {
+  const { projectGroups, groupLabel, machineMark, sharedProjects, machineState, folderLine } = await load("src/model/sidebar.ts");
+  const at = (host, name, project) => ({ host: { id: host }, folder: { name, project } });
+  // A server's folder first (pinned), this Mac's later: one group in the first one's place, this Mac's the main one.
+  const ordered = [at("devbox", "Agents", "p"), at("mac", "www", undefined), at("mac", "Agents", "p"), at("devbox", "api", "q")];
+  const groups = projectGroups(ordered, "mac");
+  assert.equal(groups.length, 3);
+  assert.equal(groups[0].main, ordered[2]);
+  assert.deepEqual(groups[0].others, [ordered[0]]);
+  assert.equal(groups[1].main, ordered[1]);
+  assert.deepEqual(groups[2].others, [], "a project with one folder is that folder's group");
+  assert.equal(groupLabel(groups[2], "devbox:api", "API", "api"), "devbox:api", "one folder keeps its own name");
+  assert.equal(groupLabel(groups[0], "Agents", "The Agents", "Agents"), "The Agents");
+  assert.equal(groupLabel(groups[0], "Agents", undefined, "Agents"), "Agents", "the main folder's name until the project's is read");
+  assert.deepEqual(sharedProjects(groups), ["p"]);
+  assert.equal(machineMark(groups[0], "devbox", "mac", () => "devbox"), "devbox");
+  assert.equal(machineMark(groups[0], "mac", "mac", () => "mac"), undefined);
+  assert.equal(machineMark(projectGroups([at("mac", "a", "r"), at("mac", "b", "r")], "mac")[0], "devbox", "mac", () => "devbox"),
+    undefined, "folders on one machine say no machine");
+  assert.equal(machineState(false, "stopped"), "stopped");
+  assert.equal(folderLine("Agents", "devbox", machineState(true, undefined)), "Agents — devbox, online");
+});

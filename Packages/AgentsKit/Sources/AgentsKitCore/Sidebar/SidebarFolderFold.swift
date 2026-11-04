@@ -126,10 +126,12 @@ public struct SidebarFolderFold {
     /// folder's shelf (#165). A search unfolds every folder, and `label` is the name the
     /// row shows, which the search also matches. `keptInUnread` is the session Unread keeps
     /// while it is open, listed there and not here (#689), or For Review (`keptBy`, #3194). `on` is the smart groups turned
-    /// on (#846): with Pinned off, the pinned are listed here as any other.
+    /// on (#846): with Pinned off, the pinned are listed here as any other. `alsoIn` is the
+    /// project's other folders (#3278): their live sessions are listed with this folder's,
+    /// and only this folder's pages, workflows and archive are the fold's.
     public init(_ key: FolderKey, label: String, in work: AgentsModel, query: String = "", isOpen: Bool,
                 keptInUnread: UUID? = nil, keptBy: SidebarSmartRow = .unread,
-                on: Set<SidebarSmartRow> = SidebarSmartRow.all) {
+                on: Set<SidebarSmartRow> = SidebarSmartRow.all, alsoIn: [FolderKey] = []) {
         self.key = key
         let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
         self.query = words
@@ -152,12 +154,15 @@ public struct SidebarFolderFold {
         archivedWorkflows = workflows.filter(\.isArchived)
 
         let shelf = work.shelf(key)
-        let pinned = !pinsOn ? [] : work.pinnedSessions(in: key.folder).compactMap { work.agent($0) }
-            .filter { $0.host == key.host && $0.state != .archived }
+        let pinned = !pinsOn ? [] : ([key] + alsoIn).flatMap { folder in
+            work.pinnedSessions(in: folder.folder).compactMap { work.agent($0) }
+                .filter { $0.host == folder.host && $0.state != .archived }
+        }
         let pinnedIDs = Set(pinned.map(\.id))
         self.pinned = matcher.map { pinned.filter($0.matches) } ?? pinned
+        let shelves = [shelf] + alsoIn.map { work.shelf($0) }
         for group in AgentGroup.live {
-            let held = shelf.groups[group] ?? []
+            let held = shelves.flatMap { $0.groups[group] ?? [] }
             if !held.isEmpty { hasLive = true }
             let unpinned = pinnedIDs.isEmpty ? held : held.filter { !pinnedIDs.contains($0.id) }
             let shown = matcher.map { unpinned.filter($0.matches) } ?? unpinned
