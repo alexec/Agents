@@ -10,7 +10,7 @@ Product Owner do.
 
 Follow AGENTS.md, above all "Landing a change" (one lane per area, `.agents/areas`, when
 an issue is taken, conflicting PRs one at a time) and "Questions that already have an
-answer". The order of work is in AGENTS.md, "Work by milestone" only: follow it there.
+answer". The order of work is in AGENTS.md, "Work by epic, release by milestone" only: follow it there.
 
 **Starting a lane:**
 
@@ -100,20 +100,21 @@ Rules from Alex (2026-10-12/13) that are not in AGENTS.md:
 - **While a release runs, its helpers go first** (#1730). Start no standing or backlog
   lane while a release helper is queued, and when places are full, stop one (its work
   pushed) to free a place. Archive finished helpers at once.
-- **Only the open milestone is worked** (#2309). Start no lane for the next milestone
-  before the open one ships; spare places go to the bug lane and the standing lane, then
-  the backlog.
-- **Order of places** (#3212): `priority:high` first; then UI changes (below); then the open
-  milestone's work and the bug lane together; then `polish` and `competitor`; then the
+- **Work goes by epic** (#3465; replaces #2309). Give places to epics' leads, several
+  epics at once; a later milestone's epic can run and merge before an earlier milestone
+  ships. With more epics than places: the earliest milestone first, then core usability
+  (#2800), then RICE.
+- **Order of places** (#3212, #3465): `priority:high` first; then UI changes (below); then
+  the milestones' epics and the bug lane together; then `polish` and `competitor`; then the
   backlog by RICE.
 - **UI changes go early** (#2337): `priority:high` first, then UI changes (`App/Sources`,
   `Remote/Sources`, `Shared/UI`, `Web/src`), bugs first, from the milestone, the bug lane and the
   backlog alike, then the rest. When places run short, pause a non-UI lane, never a UI one: a person
   must review each UI change, so it must get to `main` and TestFlight early. A UI
   enhancement gets its place early too, and merges after Alex approves it (#2811).
-- **The release unparks the next milestone** (#1729, #2309): when it ships, the next
-  milestone becomes the open one and the release takes `parked` off its issues. Check its
-  report; land anything it could not release.
+- **A milestone ships when its items are closed** (#3465): the release tags only when
+  every issue in the open milestone is closed. Check its report; land anything it could not
+  release.
 - **Open questions get an agent.** An issue with open questions is not held back: start
   an agent that settles them: it decides the easy-to-undo ones and tells Alex
   (AGENTS.md, "Decide and tell"), and asks Alex the rest.
