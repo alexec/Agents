@@ -15099,6 +15099,33 @@
         "notice"
       ]
     },
+    "NotCommittedResponse": {
+      "type": "object",
+      "description": "folders/notCommitted (#3448): what in the folder's .agents Git ignores, so it stays on this machine and the project's other folders do not get it.",
+      "properties": {
+        "isRepository": {
+          "type": "boolean",
+          "description": "False when the folder is not in a Git repository: then nothing in .agents is committed, and paths is empty."
+        },
+        "paths": {
+          "type": "array",
+          "description": "Paths from the folder, such as .agents/worktrees/. A folder that Git ignores whole is one path, with a slash at its end. At most 500.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "more": {
+          "type": "integer",
+          "description": "How many more paths there are after the first 500."
+        }
+      },
+      "required": [
+        "isRepository",
+        "paths",
+        "more"
+      ],
+      "additionalProperties": false
+    },
     "NoticeDelivered": {
       "type": "object",
       "description": "notices/delivered (#2860): the control plane sent a host's notice to one of the person's devices.",

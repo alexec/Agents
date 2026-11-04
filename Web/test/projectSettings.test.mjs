@@ -22,3 +22,14 @@ test("project settings: the folder that keeps them is named", () => {
   assert.equal(p.folderPathOf("file:///Users/a/My%20Repo/"), "/Users/a/My Repo");
   assert.match(p.writtenIn("/Users/a/Agents", "This Mac"), /^Written in \/Users\/a\/Agents on This Mac\. Commit \.agents/);
 });
+
+test("project settings: Folder Settings has Not Committed, and Remove from Project… says what happens", () => {
+  assert.deepEqual(p.folderPanes.map((x) => x.id), ["general", "diskSpace", "notCommitted"]);
+  assert.match(p.removeQuestion("/Users/a/Agents"), /^Remove \/Users\/a\/Agents from this project\?\n\nIt gets a project of its own, named after it\./);
+});
+
+test("project settings: the folder's own project takes a free name", () => {
+  assert.equal(p.freeProjectName("shop", [{ name: "Agents" }]), "shop");
+  assert.equal(p.freeProjectName("shop", [{ name: "Shop" }, { name: "shop 2" }]), "shop 3");
+  assert.equal(p.freeProjectName("  ", []), "Project");
+});

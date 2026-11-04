@@ -5,7 +5,7 @@ import SwiftUI
 /// directory on one machine. What every folder of the project shares is Project Settings'
 /// (`ProjectSettingsSheet`).
 enum FolderSettingsPane: String, Hashable, CaseIterable, Identifiable {
-    case general, diskSpace, worktrees
+    case general, diskSpace, worktrees, notCommitted
 
     var id: String { rawValue }
 
@@ -14,6 +14,7 @@ enum FolderSettingsPane: String, Hashable, CaseIterable, Identifiable {
         case .general: "General"
         case .diskSpace: "Disk Space"
         case .worktrees: "Worktrees"
+        case .notCommitted: "Not Committed"
         }
     }
 
@@ -22,6 +23,7 @@ enum FolderSettingsPane: String, Hashable, CaseIterable, Identifiable {
         case .general: "folder"
         case .diskSpace: "internaldrive"
         case .worktrees: "arrow.triangle.branch"
+        case .notCommitted: "eye.slash"
         }
     }
 }
@@ -33,7 +35,7 @@ struct FolderSettingsAsk: Hashable {
 }
 
 /// One folder's settings, as a sheet over the window (#3280): the path, the machine and the
-/// project it is in, its disk space lines and its worktrees. Smaller than Project Settings,
+/// project it is in, its disk space lines, its worktrees and what in its `.agents` is not committed. Smaller than Project Settings,
 /// with the same rail and Done, and a way to the project's.
 struct FolderSettingsSheet: View {
     @Environment(AppModel.self) private var model
@@ -47,7 +49,7 @@ struct FolderSettingsSheet: View {
 
     /// Worktrees are listed for this Mac's folders (#790).
     private var panes: [FolderSettingsPane] {
-        summary?.host == .mac ? FolderSettingsPane.allCases : [.general, .diskSpace]
+        summary?.host == .mac ? FolderSettingsPane.allCases : [.general, .diskSpace, .notCommitted]
     }
 
     var body: some View {
@@ -62,6 +64,7 @@ struct FolderSettingsSheet: View {
                             case .general: FolderGeneralPane(summary: summary)
                             case .diskSpace: FolderDiskSpacePane(summary: summary)
                             case .worktrees: FolderWorktreesPane(summary: summary)
+                            case .notCommitted: FolderNotCommittedPane(summary: summary)
                             }
                         } else {
                             Text("This folder is not here any more.").foregroundStyle(.secondary)
@@ -263,6 +266,66 @@ private struct FolderWorktreesPane: View {
                 WorktreesGroup(group: group)
             } else {
                 Text("This folder has no worktrees.").foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+/// What in this folder's `.agents` Git ignores (#3448): it stays on this machine, so the
+/// project's other folders do not get it.
+private struct FolderNotCommittedPane: View {
+    @Environment(AppModel.self) private var model
+    let summary: DaemonAPI.FolderSummary
+    @State private var reading: DaemonAPI.NotCommittedResponse?
+    @State private var problem: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SettingsPaneTitle(title: FolderSettingsPane.notCommitted.title,
+                              note: "What in this folder's .agents Git ignores. It stays on this machine: "
+                                  + "the project's other folders do not get it.")
+            if let problem {
+                Text(problem).foregroundStyle(.secondary)
+            } else if let reading {
+                if !reading.isRepository {
+                    Text("This folder is not in a Git repository, so nothing in its .agents is committed.")
+                        .foregroundStyle(.secondary)
+                } else if reading.paths.isEmpty {
+                    Text("Git ignores nothing in this folder's .agents.").foregroundStyle(.secondary)
+                } else {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(reading.paths, id: \.self) { path in
+                            Text(path)
+                                .appText(.code)
+                                .textSelection(.enabled)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .help(path)
+                        }
+                        if reading.more > 0 {
+                            Text("and \(reading.more) more").foregroundStyle(.secondary)
+                        }
+                    }
+                    .appText(.supporting)
+                    if summary.host == .mac {
+                        Button("Show .agents in Finder") {
+                            model.reveal(summary.folder.folder.appending(path: ".agents"), on: summary.host)
+                        }
+                        .buttonStyle(.paper)
+                        .appText(.fine)
+                        .padding(.top, 14)
+                    }
+                }
+            } else {
+                ProgressView().controlSize(.small)
+            }
+        }
+        .task(id: summary.key) {
+            do {
+                reading = try await model.notCommitted(in: summary.key)
+                problem = nil
+            } catch {
+                problem = model.describe(error)
             }
         }
     }

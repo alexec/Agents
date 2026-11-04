@@ -3612,6 +3612,31 @@
       }
     },
     {
+      "name": "folders/notCommitted",
+      "x-capability": "folders.not-committed/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/FolderRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/NotCommittedResponse"
+        }
+      }
+    },
+    {
       "name": "folders/readGuardedChange",
       "x-capability": "folders/1",
       "tags": [

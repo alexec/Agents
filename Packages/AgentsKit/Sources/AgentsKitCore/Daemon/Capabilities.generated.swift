@@ -54,6 +54,7 @@ public enum Capability {
     public static let filesDiagnostics1 = "files.diagnostics/1"
     public static let files1 = "files/1"
     public static let folder1 = "folder/1"
+    public static let foldersNotCommitted1 = "folders.not-committed/1"
     public static let foldersToMachine1 = "folders.to-machine/1"
     public static let folders1 = "folders/1"
     public static let forgeWrite1 = "forge-write/1"
@@ -283,6 +284,7 @@ public enum Capability {
         "folders/find": "folders/1",
         "folders/keepGuardedChange": "folders/1",
         "folders/list": "folders/1",
+        "folders/notCommitted": "folders.not-committed/1",
         "folders/readGuardedChange": "folders/1",
         "folders/receive": "folders/1",
         "folders/receiveState": "folders/1",

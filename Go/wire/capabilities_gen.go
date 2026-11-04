@@ -53,6 +53,7 @@ const CapFilesComplete1 = "files.complete/1"
 const CapFilesDiagnostics1 = "files.diagnostics/1"
 const CapFiles1 = "files/1"
 const CapFolder1 = "folder/1"
+const CapFoldersNotCommitted1 = "folders.not-committed/1"
 const CapFoldersToMachine1 = "folders.to-machine/1"
 const CapFolders1 = "folders/1"
 const CapForgeWrite1 = "forge-write/1"
@@ -282,6 +283,7 @@ var HostCapabilities = pairs([][2]string{
 	{"folders/find", "folders/1"},
 	{"folders/keepGuardedChange", "folders/1"},
 	{"folders/list", "folders/1"},
+	{"folders/notCommitted", "folders.not-committed/1"},
 	{"folders/readGuardedChange", "folders/1"},
 	{"folders/receive", "folders/1"},
 	{"folders/receiveState", "folders/1"},

@@ -1434,8 +1434,10 @@ dialog.sheet:has(.settings-sheet) { width: min(760px, calc(100vw - 32px)); max-h
 .settings-grid dt { color: var(--ink-secondary, inherit); opacity: 0.75; text-align: right; }
 .settings-grid dd { margin: 0; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
 .project-folders { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; width: 100%; }
-.project-folders li { display: grid; grid-template-columns: 90px 1fr auto auto; gap: 10px; align-items: baseline; }
+.project-folders li { display: grid; grid-template-columns: 90px 1fr auto auto auto; gap: 10px; align-items: baseline; }
 .project-folders .path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.not-committed-paths { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.not-committed-paths code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
 .switch-row { display: flex; gap: 8px; align-items: center; }
 .settings-sheet .sheet-actions { display: flex; gap: 8px; justify-content: flex-end; }
 .settings-sheet .sheet-actions.start { justify-content: flex-start; }
