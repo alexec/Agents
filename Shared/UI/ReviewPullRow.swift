@@ -3,7 +3,9 @@ import SwiftUI
 
 /// A pull request waiting for the person's approval in For Review (#3330), drawn as an
 /// approval's row is (#773): the mark, the title and its folder, the time, and one grey line,
-/// its number and repo. The window and the Remote both draw it; each adds its own Dismiss.
+/// its number and repo. A press opens its page in the browser, so its title is drawn as a link
+/// is, in the accent and underlined. The window and the Remote both draw it; each adds its own
+/// Dismiss.
 struct ReviewPullRowLabel: View {
     let pull: ReviewPull
     /// Which folder it is in, after the title, as a smart group's rows name theirs.
@@ -17,10 +19,11 @@ struct ReviewPullRowLabel: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
-                    // White, as every row's title is (#587).
+                    // A link, not white as other rows' titles are (#587): a press leaves the app.
                     Text(pull.title)
                         .appText(.supporting)
-                        .foregroundStyle(.primary)
+                        .underline()
+                        .foregroundStyle(Paper.accent)
                         .lineLimit(1)
                     if let place {
                         Text(place)

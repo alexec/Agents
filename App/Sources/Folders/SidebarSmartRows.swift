@@ -200,6 +200,7 @@ private struct ReviewPullListRow: View {
             }
             .help("\(pull.title) · Pull request #\(pull.number) · \(pull.repo)")
             .onHover { hovering = $0 }
+            .pointerStyle(.link)
             .onTapGesture { openURL(pull.url) }
             .contextMenu {
                 Button("Open Pull Request") { openURL(pull.url) }
