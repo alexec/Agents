@@ -6,8 +6,8 @@ description: Channel identities linked to people, so a chat or email message act
 
 # Channels
 
-A channel is a chat app or a mailbox that an MCP server brings in (#1223), such as Slack or
-email. A message on it can start a workflow. A channel identity (a Slack user, an email
+A channel is a chat app or a mailbox that an MCP server brings in (#1223), such as Slack,
+Google Chat (`googlechat`, #1016) or email. A message on it can start a workflow. A channel identity (a Slack user, an email
 address) can be faked or given to someone else, so it acts as a person only once that person
 has linked it (#1762, spec 736 FR-037).
 

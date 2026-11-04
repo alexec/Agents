@@ -54,7 +54,7 @@ RUN for cmd in agents-control workspace-commands agents-hosted; do \
 FROM gosrc AS servers
 ARG VERSION=dev
 RUN mkdir -p /out/servers && for arch in x86_64:amd64 aarch64:arm64; do \
-      for cmd in agentsd github-mcp linear-mcp gitlab-mcp email-mcp jira-mcp; do \
+      for cmd in agentsd github-mcp linear-mcp gitlab-mcp email-mcp jira-mcp googlechat-mcp; do \
         out=/out/servers/$cmd-linux-${arch%%:*}; \
         CGO_ENABLED=0 GOOS=linux GOARCH=${arch##*:} go build -trimpath \
           -ldflags "-s -w -X github.com/alexec/agents/Go/internal/buildinfo.Version=$VERSION" \

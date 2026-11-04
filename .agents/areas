@@ -331,6 +331,11 @@ Go/internal/gitlabmcp/                                 gitlab
 Go/cmd/email-mcp/                                      email
 Go/internal/emailmcp/                                  email
 
+# googlechat: the Google Chat MCP server (#1016): a Chat app's messages and answers, and posts.
+Go/cmd/googlechat-mcp/                                 googlechat
+Go/internal/googlechatmcp/                             googlechat
+docs/how-to/use-google-chat.md                         googlechat
+
 # control-plane: the control plane's core: joining, membership, grants, copies and
 # handover, routing, its store, keys, its server and its deploy. Team, reports, channels
 # and sign-in are areas of their own below (#2017), so that more lanes can work on the

@@ -235,8 +235,8 @@ var serverFileNames = func() map[string]bool {
 	names := map[string]bool{"VERSION": true}
 	for _, arch := range []string{"x86_64", "aarch64"} {
 		// The host (Go, #1136; one name since #1381); github-mcp (#1232), linear-mcp (#839), gitlab-mcp (#1629),
-		// email-mcp (#1780), jira-mcp (#3247).
-		for _, program := range []string{"agentsd", "github-mcp", "linear-mcp", "gitlab-mcp", "email-mcp", "jira-mcp"} {
+		// email-mcp (#1780), jira-mcp (#3247), googlechat-mcp (#1016).
+		for _, program := range []string{"agentsd", "github-mcp", "linear-mcp", "gitlab-mcp", "email-mcp", "jira-mcp", "googlechat-mcp"} {
 			names[program+"-linux-"+arch] = true
 			names[program+"-linux-"+arch+".sha256"] = true
 		}
