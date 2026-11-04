@@ -35,7 +35,7 @@ func (d *Daemon) installDefaultToolsets() {
 		if r == nil || d.recipe(id) == nil {
 			continue
 		}
-		if path, _, _ := locateFor(r); path != "" {
+		if path, _, _ := locateFor(r); installedAt(r, path) {
 			continue
 		}
 		log.Printf("%s is missing: installing it from the toolset the control plane gave", r.Name)
