@@ -10,7 +10,7 @@ import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../../model/store";
 import type {
-  EffectivePolicy, EffectiveRule, JSONValue, PolicyFolderState, PolicyFolderWithRules, URLString, YourPolicyState,
+  EffectivePolicy, EffectiveRule, JSONValue, PolicyFolderState, PolicyFolderWithRules, UntrustedYourPolicy, URLString, YourPolicyState,
 } from "../../protocol/generated";
 import { describe } from "../../model/errors";
 import { absolutePath } from "../../model/fileWatch";
