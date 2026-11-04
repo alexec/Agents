@@ -11,6 +11,7 @@ import SwiftUI
 struct PoppedChatWindow: View {
     @Environment(AppModel.self) private var model
     @Environment(\.appearsActive) private var appearsActive
+    @Environment(\.openWindow) private var openWindow
     /// The session, as the window was opened with it and is restored with it.
     let id: UUID?
     @State private var chat: PoppedChat?
@@ -51,8 +52,13 @@ struct PoppedChatWindow: View {
         .environment(states)
         .environment(requests)
         .tint(Paper.accent)
-        // A file a chat links to is on its host, as in the main window.
+        // A file a chat links to is on its host, as in the main window. A session's link
+        // opens it where a notification would (#3353).
         .environment(\.openURL, OpenURLAction { url in
+            if case .agent(let id) = AttentionLink.parse(url) {
+                if !model.showInFolderWindow(id) { model.showInMainWindow(id, opening: openWindow) }
+                return .handled
+            }
             guard let fileURL = ChatLinkURL.fileURL(from: url) else { return .systemAction }
             model.open(fileURL, on: agent?.host ?? .mac)
             return .handled
