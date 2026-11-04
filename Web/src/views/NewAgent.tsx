@@ -41,6 +41,9 @@ import { DiskStrip } from "./DiskStrip";
 import { LevelSelect, PromptMenus, type LevelProps } from "./PromptMenus";
 import { BackToList } from "./BackToList";
 import { orderedFolders, folderLabel } from "./Sidebar";
+import { addFolderOn, hostLabel } from "./NewFolder";
+import { newSessionProjects, projectFolder, rememberProjectFolder, rememberedProjectFolders } from "../model/projects";
+import { hostAnswers } from "../model/capabilities";
 import { GuardedChangeCards } from "./GuardedChange";
 import { KeptBubbles } from "./Kept";
 import { composerReason, line, markTitle } from "../model/orgPolicy";
@@ -473,7 +476,7 @@ export function NewAgent({ store, host, folder, folderName, down }: {
       {!down && <DiskStrip store={store} host={host} />}
       <div class="scroll new-heading">
         <Huddle focused={promptFocused.value} typed={typed.value} />
-        <FolderSwitch store={store} host={host} folder={folder} folderName={folderName} down={down} />
+        <ProjectSwitch store={store} host={host} folder={folder} folderName={folderName} down={down} />
         {personas.value.length > 0 && (
           <div class="persona-choice">
             {usablePersonas.length > 0 && (
@@ -806,22 +809,79 @@ function PersonaSwitch({ personas, picked, down, choose }: {
   );
 }
 
-function FolderSwitch({ store, host, folder, folderName, down }: {
+/**
+ * New Session's Project, then On (#3279), as the window's and the Remote's: a menu of the
+ * projects, and under it the machines with a folder of the one picked. A project with one folder
+ * hides On and is named as its folder is today, so it looks as the folder's menu did.
+ */
+function ProjectSwitch({ store, host, folder, folderName, down }: {
   store: Store; host: string; folder: string; folderName: string; down: boolean;
 }) {
-  const folders = orderedFolders(store.hosts.value, store.folders.value, store.macHostID.value);
-  const at = folders.findIndex((p) => p.host.id === host && folderKey(p.folder.folder.folder) === folderKey(folder));
-  if (folders.length < 2 || at < 0) return <h1>{folderName}</h1>;
+  const macID = store.macHostID.value;
+  const projects = newSessionProjects(orderedFolders(store.hosts.value, store.folders.value, macID));
+  type Row = (typeof projects)[number]["folders"][number];
+  const keyOf = (r: Row) => `${r.host.id}|${folderKey(r.folder.folder.folder)}`;
+  const thisKey = `${host}|${folderKey(folder)}`;
+  const at = projects.findIndex((p) => p.folders.some((r) => keyOf(r) === thisKey));
+  const current = projects[at];
+  const here = current?.folders.findIndex((r) => keyOf(r) === thisKey) ?? -1;
+  // The folder last used in its project: where the project starts when it is picked again.
+  useEffect(() => {
+    if (current) rememberProjectFolder(storage, current.id, thisKey);
+  }, [current?.id, thisKey]);
+  if (!current || here < 0) return <h1>{folderName}</h1>;
+  const label = (p: typeof current) => p.folders.length === 1 ? folderLabel(p.folders[0]!.host, p.folders[0]!.folder, macID) : p.name;
+  const open = (r: Row) => go({ host: r.host.id, folder: r.folder.folder.folder, compose: true });
+  const machine = (r: Row) => {
+    const id = r.host.id;
+    const twice = current.folders.filter((o) => o.host.id === id).length > 1;
+    const name = twice ? `${hostLabel(store, id)} · ${decodeURI(folderKey(r.folder.folder.folder).replace(/^file:\/\//, ""))}` : hostLabel(store, id);
+    if (store.startsWhenUsed(id)) return `${name} (stopped, starts when used)`;
+    return store.hostIsOnline(id) ? name : `${name} (offline)`;
+  };
+  // Add Folder… on a machine that has none of the project's yet, as the last of On.
+  const others = store.hosts.value.filter((h) => hostAnswers(h.state) && !current.folders.some((r) => r.host.id === h.id));
   return (
-    <h1 class="folder-switch" title="Start it in another folder">
-      <span aria-hidden="true">{folderLabel(folders[at]!.host, folders[at]!.folder, store.macHostID.value)} <span class="caret">▾</span></span>
-      <select aria-label="Folder" disabled={down} value={String(at)}
-        onChange={(e) => {
-          const picked = folders[Number((e.currentTarget as HTMLSelectElement).value)];
-          if (picked) go({ host: picked.host.id, folder: picked.folder.folder.folder, compose: true });
-        }}>
-        {folders.map(({ host: h, folder: p }, i) => <option key={`${h.id}|${p.folder.folder}`} value={String(i)}>{folderLabel(h, p, store.macHostID.value)}</option>)}
-      </select>
-    </h1>
+    <>
+      {projects.length < 2 ? <h1>{label(current)}</h1> : (
+        <h1 class="folder-switch" title="Start it in another project">
+          <span aria-hidden="true">{label(current)} <span class="caret">▾</span></span>
+          <select aria-label="Project" disabled={down} value={String(at)}
+            onChange={(e) => {
+              const picked = projects[Number((e.currentTarget as HTMLSelectElement).value)];
+              if (!picked) return;
+              const kept = rememberedProjectFolders(storage)[picked.id];
+              const row = projectFolder(picked, kept ? (r) => keyOf(r) === kept : undefined);
+              if (row) open(row);
+            }}>
+            {projects.map((p, i) => <option key={p.id} value={String(i)}>{label(p)}</option>)}
+          </select>
+        </h1>
+      )}
+      {current.folders.length > 1 && (
+        <label class="persona-menu machine-switch" title="Start it on another machine">
+          <span aria-hidden="true">On {hostLabel(store, host)} <span class="caret">▾</span></span>
+          <select aria-label="On" disabled={down} value={String(here)}
+            onChange={(e) => {
+              const select = e.currentTarget as HTMLSelectElement;
+              if (select.value.startsWith("add:")) {
+                const machineID = select.value.slice(4);
+                select.value = String(here);
+                addFolderOn(machineID);
+                return;
+              }
+              const row = current.folders[Number(select.value)];
+              if (row) open(row);
+            }}>
+            {current.folders.map((r, i) => <option key={keyOf(r)} value={String(i)}>{machine(r)}</option>)}
+            {others.length > 0 && (
+              <optgroup label="Add a folder on another machine">
+                {others.map((h) => <option key={h.id} value={`add:${h.id}`}>Add Folder on {hostLabel(store, h.id)}…</option>)}
+              </optgroup>
+            )}
+          </select>
+        </label>
+      )}
+    </>
   );
 }

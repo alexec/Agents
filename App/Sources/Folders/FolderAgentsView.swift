@@ -17,6 +17,7 @@ import SwiftUI
 struct FolderAgentsView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.appearsActive) private var appearsActive
+    @Environment(WindowRequests.self) private var requests
     /// The folder of the window this is in, when that is a folder's own (#1089): its
     /// folder, whatever the main window has selected.
     @Environment(\.windowFolder) private var windowFolder
@@ -120,7 +121,8 @@ struct FolderAgentsView: View {
         VStack(spacing: 6) {
             // No menu of folders in a folder's own window: the window is the folder.
             if windowFolder == nil {
-                folderMenu
+                projectMenu
+                machineMenu
             } else {
                 Text(summary?.name ?? "Folder")
                     .appText(.title).fontWeight(.semibold)
@@ -146,24 +148,27 @@ struct FolderAgentsView: View {
         .chatColumn()
     }
 
-    /// The folder's name, as a menu of every folder (#495): New Session at the top of
-    /// the sidebar starts in the last one used, and this is where another is chosen.
-    private var folderMenu: some View {
-        Menu {
-            ForEach(SidebarOrder.folders(model.liveFolders, servers: model.hosts.servers), id: \.key) { folder in
+    /// The project's name, as a menu of every project (#495, #3279): New Session at the top
+    /// of the sidebar starts in the last one used, and this is where another is chosen. A
+    /// project with one folder is that folder, with its name, as before.
+    private var projectMenu: some View {
+        let projects = model.newSessionProjects
+        let current = NewSessionProject.choice(of: summary?.key, in: projects)
+        return Menu {
+            ForEach(projects) { project in
                 Button {
-                    model.showFolder(folder.key)
+                    model.showProject(project)
                 } label: {
-                    if folder.key == model.selectedFolderKey {
-                        Label(label(folder), systemImage: "checkmark")
+                    if project.id == current?.id {
+                        Label(projectLabel(project), systemImage: "checkmark")
                     } else {
-                        Text(label(folder))
+                        Text(projectLabel(project))
                     }
                 }
             }
         } label: {
             HStack(spacing: 6) {
-                Text(summary?.name ?? "Folder")
+                Text(current?.name ?? summary?.name ?? "Project")
                     .appText(.title).fontWeight(.semibold)
                     .lineLimit(1)
                 Image(systemName: "chevron.up.chevron.down")
@@ -177,8 +182,80 @@ struct FolderAgentsView: View {
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help("Start the session in another folder")
-        .accessibilityLabel("Folder: \(summary?.name ?? "none")")
+        .help("Start the session in another project")
+        .accessibilityLabel("Project: \(current?.name ?? summary?.name ?? "none")")
+    }
+
+    /// A project with one folder is named as its folder is today: `server:Name` when the
+    /// folder is on a server. One with folders on several machines is named alone.
+    private func projectLabel(_ project: NewSessionProject.Choice) -> String {
+        guard project.hidesMachine, let key = project.folders.first,
+              let folder = model.liveFolders.first(where: { $0.key == key }) else { return project.name }
+        return label(folder)
+    }
+
+    /// On: the machines that have a folder of the project (#3279), this one first. A
+    /// stopped machine starts when it is used. Not drawn for a project with one folder.
+    @ViewBuilder private var machineMenu: some View {
+        if let summary, let project = NewSessionProject.choice(of: summary.key, in: model.newSessionProjects),
+           !project.hidesMachine {
+            Menu {
+                ForEach(project.folders, id: \.self) { key in
+                    Button {
+                        model.showFolder(key)
+                    } label: {
+                        if key == summary.key {
+                            Label(machineLabel(key, in: project), systemImage: "checkmark")
+                        } else {
+                            Text(machineLabel(key, in: project))
+                        }
+                    }
+                }
+                // The existing Send to ‹machine›… sheet (#1123), not a new flow.
+                if model.canSend(from: summary.host), !model.sendTargets.isEmpty {
+                    Divider()
+                    Menu("Add a Folder on Another Machine") {
+                        ForEach(model.sendTargets, id: \.self) { host in
+                            Button("Send to \(model.hosts.label(host))…") {
+                                requests.sendToHost = SendToHostRequest(folder: summary.folder.folder, from: summary.host,
+                                                                        host: host)
+                            }
+                        }
+                    }
+                    .disabled(!summary.exists)
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Text("On \(model.hosts.label(summary.host))")
+                        .appText(.reading)
+                        .lineLimit(1)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .imageScale(.small)
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                }
+                .contentShape(Rectangle())
+            }
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Start the session on another machine")
+            .accessibilityLabel("On: \(model.hosts.label(summary.host))")
+        }
+    }
+
+    /// `This Mac`, `devbox (offline)`, `cloud-1 (stopped, starts when used)`; with the path
+    /// when the project has two folders on the machine.
+    private func machineLabel(_ key: FolderKey, in project: NewSessionProject.Choice) -> String {
+        let host = key.host
+        var name = model.hosts.label(host)
+        if project.folders.filter({ $0.host == host }).count > 1 {
+            name += " · \(FolderPlace.path(key.folder, on: host))"
+        }
+        if model.startsWhenUsed(host) { return "\(name) (stopped, starts when used)" }
+        if model.hostUnreachable(host) { return "\(name) (offline)" }
+        return name
     }
 
     /// The kind of session to start (#760), the same control as the folder's name, a
