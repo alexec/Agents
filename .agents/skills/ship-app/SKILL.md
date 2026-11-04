@@ -50,7 +50,11 @@ Since 058 the Mac runs:
 - **Agents Host**, at `~/Applications/Agents Host.app`. Its two launch agents
   (`com.alexecollins.agentshost.control` and `.daemon`) are the control plane and this
   Mac's host, registered under Login Items. The script swaps the new bundle in and
-  `launchctl kickstart -k`s both jobs.
+  `launchctl kickstart -k`s both jobs. The jobs name their app by bundle id only, so
+  launchd can start them from any copy that LaunchServices knows (#3451). Before the
+  restart, the script unregisters every other copy that is on disk, then checks that
+  both jobs run from `~/Applications`. `ship.sh --check-host` shows the copies and where
+  the jobs run from, and changes nothing.
 - **The window**: the `AgentsStore` build, a client of the control plane. It runs from
   `~/Applications/AgentsLive/<sha>-<time>/Agents.app`, never from `build/DD-store`. Any
   build in the main checkout writes over `build/DD-*`.
@@ -70,8 +74,11 @@ wave recompiles little. Logs are in `/tmp/ship-app-<sha>/`. It refuses when:
 The Mac half runs detached (`--restart`), because restarting the host ends this
 session's turn. Its log is `/tmp/main-restart-all-<sha>.log`. When the session comes
 back, the log must show:
-- both `com.alexecollins.agentshost.*` jobs with pids and `CLAUDE vars: 0`;
-- a `window:` line.
+- both `com.alexecollins.agentshost.*` jobs with pids, programs in
+  `~/Applications/Agents Host.app`, and `CLAUDE vars: 0`;
+- a `window:` line;
+- no `FAILED:` line. That line, and a notification, mean the jobs still run from
+  another copy: run `ship.sh --check-host`.
 
 ## Since the switch
 

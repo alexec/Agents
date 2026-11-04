@@ -33,6 +33,13 @@
 #                           nothing is built or installed
 #   ship.sh --build-only    build in this checkout (a worktree's copy builds the worktree),
 #                           check the products are optimised, and stop: nothing is installed
+#   ship.sh --check-host    say which copies of Agents Host macOS knows and whether the jobs
+#                           run from the installed one; nothing is changed (#3451)
+#
+# The jobs name their app by bundle id only, so launchd can start them from any copy that
+# LaunchServices knows, such as an old Debug build in some checkout (#3451). The restart
+# leaves LaunchServices only the installed copy before it restarts the jobs, and then
+# checks that they run from it.
 set -u
 setopt pipefail
 
@@ -46,6 +53,8 @@ HOST_JOBS=(com.alexecollins.agentshost.control com.alexecollins.agentshost.daemo
 # from the old copy, and CloudKit refuses a client whose binary is gone (#1103).
 RELAY_JOB=com.alexecollins.agentshost.relay
 STORE_ID=com.alexecollins.agents.store
+HOST_ID=com.alexecollins.agents.host
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 
 loaded() { launchctl print $GUI/$1 >/dev/null 2>&1 }
 job_pid() { launchctl print $GUI/$1 2>/dev/null | awk '/^\tpid = /{print $3; exit}' }
@@ -58,6 +67,44 @@ live_apps() {
       bundle=${cmd%/Contents/MacOS/Agents}
       [[ $(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$bundle/Contents/Info.plist" 2>/dev/null) == $1 ]] && echo "$pid $bundle"
     done
+}
+
+# Every copy of Agents Host that LaunchServices has, also ones that are gone.
+host_copies() {
+  $LSREGISTER -dump Bundle 2>/dev/null | awk -v id=$HOST_ID '
+    /^-----/ { path = "" }
+    /^path:/ { sub(/^path: */, ""); sub(/ \(0x[0-9a-f]+\)$/, ""); path = $0 }
+    /^identifier:/ && $2 == id && path != "" { print path }' | sort -u
+}
+# LaunchServices keeps only the installed copy, so launchd can start no other. A copy that
+# is gone cannot be started, and lsregister cannot remove it.
+only_installed_host() {
+  local copy
+  for copy in ${(f)"$(host_copies)"}; do
+    [[ $copy == $HOSTAPP_AT || ! -d $copy ]] && continue
+    if $LSREGISTER -u "$copy" 2>/dev/null; then echo "unregistered $copy"
+    else echo "could not unregister $copy"; fi
+  done
+  $LSREGISTER -f "$HOSTAPP_AT"
+}
+# Says where each loaded job runs from; fails if one is not running from the installed copy.
+host_jobs_installed() {
+  local j pid prog ok=0
+  for j in $HOST_JOBS; do
+    loaded $j || continue
+    pid=$(job_pid $j)
+    prog=${pid:+$(ps -o comm= -p $pid)}
+    if [[ -z $prog ]]; then echo "$j: not running"; ok=1
+    elif [[ $prog != $HOSTAPP_AT/* ]]; then echo "$j: runs $prog, not the installed $HOSTAPP_AT"; ok=1
+    else echo "$j: $pid $prog"; fi
+  done
+  return $ok
+}
+# Waits up to 30s for the jobs to run from the installed copy.
+wait_host_jobs_installed() {
+  local i
+  for i in {1..15}; do host_jobs_installed >/dev/null && break; sleep 2; done
+  host_jobs_installed
 }
 
 restart() { # live-folder sha delay
@@ -84,6 +131,7 @@ restart() { # live-folder sha delay
   fi
   mv "$LIVE/Agents Host.app" "$HOSTAPP_AT"
   echo "$(date) Agents Host $SHA at $HOSTAPP_AT"
+  only_installed_host
   for j in $HOST_JOBS $RELAY_JOB; do
     if loaded $j; then launchctl kickstart -k $GUI/$j && echo "restarted $j"; fi
   done
@@ -102,14 +150,17 @@ restart() { # live-folder sha delay
   $CLEAN open "$LIVE/Agents.app"
 
   sleep 8
+  local wrong=0
+  if ! wait_host_jobs_installed; then
+    # Something registered another copy again while this ran: once more, then give up.
+    echo "$(date) the jobs do not run from $HOSTAPP_AT; unregistering the other copies again"
+    only_installed_host
+    for j in $HOST_JOBS; do loaded $j && launchctl kickstart -k $GUI/$j; done
+    wait_host_jobs_installed || wrong=1
+  fi
   for j in $HOST_JOBS; do
     pid=$(job_pid $j)
-    if [[ -n $pid ]]; then
-      echo "$j: $pid $(ps -o command= -p $pid)"
-      echo "  CLAUDE vars: $(ps eww -p $pid | tr ' ' '\n' | grep -c ^CLAUDE)"
-    else
-      echo "$j: not running"
-    fi
+    [[ -n $pid ]] && echo "$j CLAUDE vars: $(ps eww -p $pid | tr ' ' '\n' | grep -c ^CLAUDE)"
   done
   echo "window: $(ps -axww -o pid=,command= | grep -E "^ *[0-9]+ $LIVE/Agents.app/Contents/MacOS/Agents$")"
 
@@ -121,6 +172,11 @@ restart() { # live-folder sha delay
     if ps -axww -o command= | grep -F -q "$old/"; then echo "keeping $old: still running"; continue; fi
     echo "removing $old"; rm -rf "$old"
   done
+  if (( wrong )); then
+    echo "$(date) FAILED: Agents Host's jobs do not run from $HOSTAPP_AT (#3451); see ship.sh --check-host"
+    osascript -e 'display notification "Its jobs run from another copy. See /tmp/main-restart-all-'$SHA'.log" with title "Agents Host did not restart from the installed app"' 2>/dev/null
+    exit 1
+  fi
   echo "$(date) done"
 }
 
@@ -158,6 +214,15 @@ install_device() { # udid bid app sha
 if [[ ${1:-} == --restart ]]; then
   shift
   restart "$@"
+  exit
+fi
+if [[ ${1:-} == --check-host ]]; then
+  echo "copies of $HOST_ID that macOS knows:"
+  host_copies | while read -r copy; do
+    [[ $copy == $HOSTAPP_AT ]] && echo "  $copy (installed)" && continue
+    [[ -d $copy ]] && echo "  $copy" || echo "  $copy (gone)"
+  done
+  host_jobs_installed
   exit
 fi
 if [[ ${1:-} == --install-device ]]; then

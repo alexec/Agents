@@ -9,12 +9,14 @@ import (
 	"errors"
 	"log"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/buildinfo"
 	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -180,14 +182,26 @@ func (s *sender) drop() {
 }
 
 // problem is why a dial failed, in words: a refused proof says what it means, as it is
-// tried again for ever and nothing else would say it (#1996).
+// tried again for ever and nothing else would say it (#1996). It names the program and
+// version that made the attempt: an old copy of the app started in place of the
+// installed one fails the same way while the Keychain holds the right key (#3451).
 func (u *Uplink) problem(err error) string {
 	var r *Refusal
 	if errors.As(err, &r) && r.Reason == BadProof {
-		return "it does not take this host's key as " + u.Member.Host +
-			" (another host may have enrolled under that id); make a new host code and join again"
+		return "it does not take this host's key as " + u.Member.Host + " from " + running() +
+			"; if that is not the installed app, start the installed one; if it is, another" +
+			" host may have enrolled under that id: make a new host code and join again"
 	}
 	return err.Error()
+}
+
+// running is this program's path and version, for a message.
+func running() string {
+	path, err := os.Executable()
+	if err != nil {
+		path = os.Args[0]
+	}
+	return path + " " + buildinfo.String()
 }
 
 func (u *Uplink) Run(ctx context.Context) {
