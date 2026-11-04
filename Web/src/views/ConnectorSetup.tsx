@@ -747,7 +747,9 @@ export function YourConnections({ store, host }: { store: Store; host: string })
   const [again, setAgain] = useState<Connection>();
   const load = async () => {
     try {
-      setConnections((await store.link.call("connections/list", {}, host)).connections);
+      const list = (await store.link.call("connections/list", {}, host)).connections;
+      setConnections(list);
+      store.knowConnections(host, list);
       setProblem(undefined);
     } catch (e) {
       setConnections([]);

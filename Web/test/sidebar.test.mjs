@@ -655,3 +655,26 @@ test("the sidebar groups by project: one folder as before, a project's folders o
   assert.equal(machineState(false, "stopped"), "stopped");
   assert.equal(folderLine("Agents", "devbox", machineState(true, undefined)), "Agents — devbox, online");
 });
+
+test("a project's Connectors row: this machine's folder, else the first online, red when a connection ended (#3407)", async () => {
+  const { projectGroups, connectorsPlace } = await load("src/model/sidebar.ts");
+  const { hasEnded, endedConnections, endedLine } = await load("src/model/connectorSetup.ts");
+  const { toWireDate } = await load("src/protocol/dates.ts");
+  const at = (host, name, project) => ({ host: { id: host }, folder: { name, project } });
+  const [both] = projectGroups([at("devbox", "Agents", "p"), at("mac", "Agents", "p")], "mac");
+  assert.equal(connectorsPlace(both, "mac", () => true).host.id, "mac");
+  const [servers] = projectGroups([at("devbox", "Agents", "p"), at("cloud", "Agents", "p")], "mac");
+  assert.equal(connectorsPlace(servers, "mac", (h) => h !== "devbox").host.id, "cloud", "the first whose machine answers");
+  assert.equal(connectorsPlace(servers, "mac", () => false).host.id, "devbox", "none answers: the main one");
+
+  const now = new Date();
+  const fine = { provider: "github", state: "connected", connectedAt: toWireDate(now) };
+  const refused = { ...fine, state: "signInAgain" };
+  const expired = { provider: "gitlab", state: "connected", connectedAt: toWireDate(now), expiresAt: toWireDate(new Date(now.getTime() - 60000)) };
+  const later = { ...expired, expiresAt: toWireDate(new Date(now.getTime() + 60000)) };
+  assert.ok(!hasEnded(fine, now) && !hasEnded(later, now));
+  assert.deepEqual(endedConnections([fine, refused, later, expired], now).map((c) => c.provider), ["github", "gitlab"]);
+  assert.equal(endedLine([]), undefined);
+  assert.equal(endedLine([expired]), "Your GitLab connection ended");
+  assert.equal(endedLine([refused, expired]), "Your GitHub and GitLab connections ended");
+});

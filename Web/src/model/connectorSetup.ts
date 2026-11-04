@@ -268,6 +268,24 @@ export function tokenEnds(at: Date, now: Date = new Date()): string {
   return `ends ${new Date(at.getTime() - 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}`;
 }
 
+/** Whether a connection ended (#3407): the provider refused its renewal, or its token's end has passed. As the Mac's `hasEnded`. */
+export function hasEnded(c: Connection, now: Date = new Date()): boolean {
+  return c.state === "signInAgain" || (c.expiresAt !== undefined && fromWireDate(c.expiresAt) <= now);
+}
+
+/** The connections that ended, in the list's order. */
+export function endedConnections(list: readonly Connection[], now: Date = new Date()): Connection[] {
+  return list.filter((c) => hasEnded(c, now));
+}
+
+/** What a Connectors row's tooltip says of them: "Your GitLab connection ended". Undefined with none. */
+export function endedLine(ended: readonly Connection[]): string | undefined {
+  const names = ended.map((c) => name(c.provider));
+  if (names.length === 0) return undefined;
+  if (names.length === 1) return `Your ${names[0]} connection ended`;
+  return `Your ${names.slice(0, -1).join(", ")} and ${names[names.length - 1]} connections ended`;
+}
+
 /** A provider with no connection yet, on Connectors. */
 export function notConnectedNote(p: ConnectionProvider): string {
   return {

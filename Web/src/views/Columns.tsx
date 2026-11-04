@@ -25,7 +25,7 @@ import { PinnedPage } from "./Pins";
 import { ArchivePage } from "./ArchivePage";
 import { MCPServersPage } from "./MCPServers";
 import { ReviewPage } from "./Review";
-import { Sidebar } from "./Sidebar";
+import { projectNameOf, Sidebar } from "./Sidebar";
 import { ContextMenu } from "./ContextMenu";
 import { MilestoneCard } from "./MilestoneCard";
 import { NavBar, PageView, SectionPage } from "./Nav";
@@ -97,7 +97,8 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
           ) : r.host && r.folder && folder && r.archive ? (
             <ArchivePage store={store} host={r.host} folder={folder.folder.folder} folderName={folder.name} down={down} />
           ) : r.host && r.folder && folder && r.mcp ? (
-            <MCPServersPage store={store} host={r.host} folder={folder.folder.folder} folderName={folder.name} />
+            <MCPServersPage store={store} host={r.host} folder={folder.folder.folder}
+              folderName={projectNameOf(folder.project) ?? folder.name} />
           ) : r.host && r.folder && folder && r.compose ? (
             // Only when asked for: leaving a session shows nothing chosen, not New Session (#2090).
             <NewAgent store={store} host={r.host} folder={folder.folder.folder} folderName={folder.name} down={down} />

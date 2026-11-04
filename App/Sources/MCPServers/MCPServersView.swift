@@ -1,10 +1,10 @@
 import AgentsKitCore
 import SwiftUI
 
-/// A folder's Connectors page, with its set-up first (#1336), or the person's own Connectors page, with
+/// A project's Connectors page, with its set-up first (#1336), or the person's own Connectors page, with
 /// their connections first. Then every MCP server in one `mcp.json` and how each is doing
-/// (#753): under Activity, the person's own `~/.agents/mcp.json` (#589); under a folder, its
-/// `.agents/mcp.json`.
+/// (#753): under Status, the person's own `~/.agents/mcp.json` (#589); under a project, its
+/// repository's `.agents/mcp.json`, read in one of its folders (#3407).
 ///
 /// A hosted server (#488) says what its one copy is doing; any other, what the host found
 /// when it last checked it, and Check Now checks them again. Add Connector… opens the
@@ -57,7 +57,7 @@ struct MCPServersView: View {
                     Text(UpdateWords.hostNeedsUpdate).foregroundStyle(.secondary)
                 }
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(folder == nil ? "User connectors" : "Folder connectors")
+                    Text(folder == nil ? "User connectors" : "Project connectors")
                         .appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
                         .textCase(.uppercase)
                         .accessibilityAddTraits(.isHeader)
@@ -146,7 +146,11 @@ struct MCPServersView: View {
         }
     }
 
-    private var folderName: String? { folder.flatMap { model.work.folder($0)?.name } }
+    /// The project's name when the sidebar groups several folders under it (#3278, #3407),
+    /// else the folder's, as before.
+    private var folderName: String? {
+        folder.flatMap { model.work.folder($0) }.map { model.projectNames.name(of: $0.project) ?? $0.name }
+    }
 
     /// Its secrets stay: Settings' Remove… is where one is forgotten too.
     private func remove(_ server: DaemonAPI.MCPServerHealth) async {
@@ -162,15 +166,16 @@ struct MCPServersRow: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        // The title alone (#587): the count is the tooltip's, and one not answering turns
-        // the row's icon red (`activityIcon(_:warns:)`).
-        let words = MCPHealthWords.tally(model.work.mcpHealthSnapshot()?.personal ?? [])?.words
+        // The title alone (#587): the count is the tooltip's, and one not answering, or a
+        // connection that ended (#3407), turns the row's icon red (`activityIcon(_:warns:)`).
+        let words = [MCPHealthWords.tally(model.work.mcpHealthSnapshot()?.personal ?? [])?.words,
+                     ConnectorSetupWords.endedLine(model.endedConnections.on(.mac))].compactMap { $0 }
         HStack(alignment: .firstTextBaseline) {
             Text("Connectors").foregroundStyle(.primary)
             Spacer()
         }
-        .help(words.map { "\($0). Every connector in your own mcp.json, and how each is doing" }
-              ?? "Every connector in your own mcp.json, and how each is doing")
-        .accessibilityValue(words ?? "")
+        .help((words + ["Your connections and the connectors in your own mcp.json, and how each is doing"])
+              .joined(separator: ". "))
+        .accessibilityValue(words.joined(separator: ". "))
     }
 }

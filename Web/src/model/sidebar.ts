@@ -266,6 +266,13 @@ export function projectGroups<P extends Grouped>(ordered: readonly P[], here: st
   });
 }
 
+/** The folder whose connectors the group's Connectors row shows (#3407), as the Mac's `connectorsFolder`: the one on this
+ * machine, else the first whose machine answers, else the main one. The repository's .agents/mcp.json is the same in every clone. */
+export function connectorsPlace<P extends Grouped>(group: ProjectGroup<P>, here: string, online: (host: string) => boolean): P {
+  const all = [group.main, ...group.others];
+  return all.find((p) => p.host.id === here) ?? all.find((p) => online(p.host.id)) ?? group.main;
+}
+
 /** Whether the group's folders are on more than one machine: only then does a session's row say its machine. */
 export function spansMachines<P extends Grouped>(group: ProjectGroup<P>): boolean {
   return group.others.some((p) => p.host.id !== group.main.host.id);

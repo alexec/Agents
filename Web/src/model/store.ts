@@ -2,7 +2,7 @@
 // ported by hand for the notifications the web remote hears and held to Fixtures/web/reducer
 // (research R7). Nothing here decides anything; the hosts do.
 import { preferencesSaid, sendPreferencesWith } from "./preferences";
-import { folderPath as hostedFolderPath } from "./hostedMCP";
+import { folderPath as hostedFolderPath, healthTally, personalServers } from "./hostedMCP";
 import type { ExportImportBusy } from "./exports";
 import type { HeardLiveFrame } from "./desktopControl";
 import { batch, computed, signal, type ReadonlySignal, type Signal } from "@preact/signals";
@@ -16,7 +16,9 @@ import type {
   GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, DailySummarySettings, DesktopControlSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
-  PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, BudgetRequest, RemoveRequest, ClientPermissionSettings, PRCostComment } from "../protocol/generated";
+  PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, BudgetRequest, RemoveRequest, ClientPermissionSettings, PRCostComment,
+  Connection } from "../protocol/generated";
+import { endedConnections, endedLine, hasEnded } from "./connectorSetup";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import type { FolderGoneAsk } from "./missingFolder";
@@ -376,6 +378,11 @@ export class Work {
   /** Every MCP server each host's mcp.json files name, and how each is doing (#753), replaced whole
    * by `mcp/healthChanged`. */
   readonly mcpHealth = signal<Record<string, MCPHealthSnapshot>>({});
+  /** Each host's connections that ended (#3407), which turn the Connectors rows red. The host tells no client, so they are
+   * read when it connects, every few minutes, and whenever Connectors reads them. */
+  readonly endedConnections = signal<Record<string, Connection[]>>({});
+  /** A project's Connectors folder (`host|folder`), and the ended connection its slots use (#3407). */
+  readonly endedInFolders = signal<Record<string, Connection>>({});
   /** Each host's chats it is bringing back by itself after a restart: Coming back (#251). */
   readonly resuming = signal<Record<string, readonly string[]>>({});
   /** Each host's volumes low on space (#196), replaced whole by each disk/changed, never merged. */
@@ -1676,6 +1683,8 @@ export class Store extends Work {
       this.leases.value = without(this.leases.value);
       this.hostedMCP.value = without(this.hostedMCP.value);
       this.mcpHealth.value = without(this.mcpHealth.value);
+      this.endedConnections.value = without(this.endedConnections.value);
+      this.endedInFolders.value = notOf(this.endedInFolders.value);
       this.runtimes.value = without(this.runtimes.value);
       this.accounts.value = without(this.accounts.value);
       this.sandboxDefaults.value = without(this.sandboxDefaults.value);
@@ -1778,6 +1787,7 @@ export class Store extends Work {
     void this.link.call("mcp/health", {}, host).then((snapshot) => {
       this.mcpHealth.value = { ...this.mcpHealth.value, [host]: snapshot };
     }).catch(failed("mcp/health"));
+    void this.loadConnections(host);
     // A host too old to know disk/state says nothing, and no strip is drawn.
     void this.link.call("disk/state", {}, host).then((state) => {
       this.disk.value = { ...this.disk.value, [host]: state };
@@ -2634,6 +2644,45 @@ export class Store extends Work {
     } catch {
       this.problem.value = "That did not reach your Mac.";
     }
+  }
+
+  /** Keeps what a host's connections/list said: the ones that ended (#3407). */
+  knowConnections(host: string, list: readonly Connection[]): void {
+    const ended = endedConnections(list);
+    const had = this.endedConnections.value[host] ?? [];
+    if (JSON.stringify(had) !== JSON.stringify(ended)) this.endedConnections.value = { ...this.endedConnections.value, [host]: ended };
+  }
+
+  /** Why the person's Connectors page warns (#587, #3407): one of their own connectors does not answer, or a connection
+   * ended, on any host. Undefined when neither. */
+  connectorsWarning(): string | undefined {
+    const failing = this.hosts.value.map((h) => healthTally(personalServers(this.mcpHealthOf(h.id))))
+      .filter((t) => t?.failing).map((t) => t!.words);
+    const ended = endedLine(this.hosts.value.flatMap((h) => this.endedConnections.value[h.id] ?? []));
+    const words = [...failing, ...(ended ? [ended] : [])];
+    return words.length > 0 ? words.join(". ") : undefined;
+  }
+
+  /** Reads a host's connections, on a host that has them; a failed read keeps what it had. */
+  async loadConnections(host: string): Promise<void> {
+    if (!this.has(host, Capability.connections1)) return;
+    try {
+      this.knowConnections(host, (await this.link.call("connections/list", {}, host)).connections);
+    } catch { /* kept */ }
+  }
+
+  /** Each host's connections, and, on a host where one ended, the stored set-up of each project's Connectors folder there
+   * (#3407): a slot stops working when its connection ends. A stored set-up is the host's last reading, so no provider is asked. */
+  async refreshEndedConnections(places: readonly { host: string; folder: string }[]): Promise<void> {
+    const hosts = [...new Set(places.map((p) => p.host))].filter((h) => this.hostIsOnline(h));
+    await Promise.all(hosts.map((h) => this.loadConnections(h)));
+    const next: Record<string, Connection> = {};
+    for (const { host, folder } of places) {
+      if ((this.endedConnections.value[host] ?? []).length === 0 || !this.has(host, Capability.connectorsSetup1)) continue;
+      const setup = await this.link.call("connectors/setup", { folder: hostedFolderPath(folder), reading: "stored" }, host).catch(() => null);
+      if (setup?.connection && hasEnded(setup.connection)) next[`${host}|${folderKey(folder)}`] = setup.connection;
+    }
+    if (JSON.stringify(next) !== JSON.stringify(this.endedInFolders.value)) this.endedInFolders.value = next;
   }
 
   /** A host's MCP servers (#753); from a host too old to say, its hosted servers alone, as the page

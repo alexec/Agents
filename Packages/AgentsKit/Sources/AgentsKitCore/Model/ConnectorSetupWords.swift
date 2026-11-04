@@ -315,6 +315,29 @@ public enum ConnectorSetupWords {
         return at <= now ? "ended" : "ends \(at.addingTimeInterval(-1).formatted(style))"
     }
 
+    // MARK: A connection that ended (#3407): the Connectors rows turn red
+
+    /// Whether a connection ended: the provider refused its renewal (a grant taken back), or
+    /// its access token's end has passed (a GitLab token).
+    public static func hasEnded(_ c: DaemonAPI.Connection, now: Date = Date()) -> Bool {
+        c.state == .signInAgain || c.expiresAt.map { $0 <= now } == true
+    }
+
+    /// The connections that ended, in the list's order.
+    public static func ended(_ connections: [DaemonAPI.Connection], now: Date = Date()) -> [DaemonAPI.Connection] {
+        connections.filter { hasEnded($0, now: now) }
+    }
+
+    /// What a Connectors row's tooltip says of them: "Your GitLab connection ended". Nil with none.
+    public static func endedLine(_ ended: [DaemonAPI.Connection]) -> String? {
+        let names = ended.map { name($0.provider) }
+        switch names.count {
+        case 0: return nil
+        case 1: return "Your \(names[0]) connection ended"
+        default: return "Your \(names.dropLast().joined(separator: ", ")) and \(names.last!) connections ended"
+        }
+    }
+
     /// A provider with no connection yet, on Connectors.
     public static func notConnectedNote(_ p: DaemonAPI.ConnectionProvider) -> String {
         switch p {

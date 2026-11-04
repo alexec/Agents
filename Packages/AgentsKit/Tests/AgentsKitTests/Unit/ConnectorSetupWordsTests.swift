@@ -143,6 +143,21 @@ struct ConnectorSetupWordsTests {
         #expect(!signIn.withToken && signIn.address.isEmpty)
     }
 
+    /// A connection that ended turns the Connectors rows red (#3407): a refused renewal, or a
+    /// token whose end has passed. The same as the web page's `endedConnections`.
+    @Test func aConnectionEndsWhenRefusedOrPastItsEnd() {
+        let now = Date()
+        let fine = DaemonAPI.Connection(provider: .github, connectedAt: now)
+        let refused = DaemonAPI.Connection(provider: .github, state: .signInAgain, connectedAt: now)
+        let expired = DaemonAPI.Connection(provider: .gitlab, connectedAt: now, expiresAt: now.addingTimeInterval(-60))
+        let later = DaemonAPI.Connection(provider: .gitlab, connectedAt: now, expiresAt: now.addingTimeInterval(60))
+        #expect(!ConnectorSetupWords.hasEnded(fine, now: now) && !ConnectorSetupWords.hasEnded(later, now: now))
+        #expect(ConnectorSetupWords.ended([fine, refused, later, expired], now: now).map(\.provider) == [.github, .gitlab])
+        #expect(ConnectorSetupWords.endedLine([]) == nil)
+        #expect(ConnectorSetupWords.endedLine([expired]) == "Your GitLab connection ended")
+        #expect(ConnectorSetupWords.endedLine([refused, expired]) == "Your GitHub and GitLab connections ended")
+    }
+
     /// Connect Email (#1780): the row says the IMAP server and the app password, and no end.
     @Test func emailWords() {
         let c = DaemonAPI.Connection(provider: .email, login: "agents@example.com", connectedAt: Date(),
