@@ -1201,6 +1201,12 @@ export class Store extends Work {
   /** The control plane's workspace providers (#1808), for Settings ▸ Control plane. */
   readonly providers: Providers;
 
+  /** A machine Add as Machine… installed is linked to its workspace once it joins (#3365). */
+  override takeHosts(hosts: ControlMachine[], now = Date.now()): void {
+    super.takeHosts(hosts, now);
+    this.providers.linkJoined(hosts);
+  }
+
   async loadUserWorkflows(host: string): Promise<void> {
     const listed = await this.link.call("workflows/list", { scope: "user" }, host).catch(() => null);
     if (!listed) return;

@@ -380,6 +380,8 @@ public extension DaemonAPI {
                 Row(Method.providersRefresh, params: ProviderRequest.self, result: Empty.self, kind: .controlRequest),
                 Row(Method.hostsLink, params: MachineLink.self, result: ControlMachine.self, kind: .controlRequest),
                 Row(Method.hostsUnlink, params: MachineRequest.self, result: ControlMachine.self, kind: .controlRequest),
+                // Add as Machine… on a workspace (#3365): installed over the control plane's ssh.
+                Row(Method.hostsInstall, params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
                 Row(Method.hostsSetMachineOptions, params: MachineOptions.self, result: ControlMachine.self,
                     kind: .controlRequest),
                 // Start a Machine from a Repository (#1809): the provider's form, then the machine.

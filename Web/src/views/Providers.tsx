@@ -1,12 +1,12 @@
 // Settings ▸ Machine providers (#1808), the window's Settings ▸ Machine Providers: each
 // provider as a card of its workspaces, Add Provider… (kind first, then its short form), Edit…,
-// List Again and Remove…, and on a workspace Link to Host…, Start, Stop and Unlink.
+// List Again and Remove…, and on a workspace Add as Machine…, Link to Host…, Start, Stop and Unlink.
 import { useEffect, useState } from "preact/hooks";
 import type { ControlMachine, ProviderSummary, MachineInfo } from "../protocol/generated";
 import type { Store } from "../model/store";
 import {
-  defaultIdleMinutes, idleChoices, kindChip, kindFields, kindNeeds, kindOfPreset, kindTitle, linkableHosts, mayBe, noHostLine,
-  providerKinds, providerLine, providerRequest, providerWords as words, workspaceLine, type ProviderKind,
+  addAsMachine, defaultIdleMinutes, idleChoices, kindChip, kindFields, kindNeeds, kindOfPreset, kindTitle, linkableHosts, mayBe, noHostLine,
+  providerKinds, providerLine, providerRequest, providerWords as words, sshDestination, workspaceLine, type ProviderKind,
 } from "../model/machineProviders";
 import { Modal } from "./Modal";
 import { MachineDialog } from "./MachineDialog";
@@ -21,6 +21,7 @@ export function ProvidersSection({ store }: { store: Store }) {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<ProviderSummary>();
   const [linking, setLinking] = useState<{ provider: ProviderSummary; workspace: MachineInfo }>();
+  const [installing, setInstalling] = useState<{ provider: ProviderSummary; workspace: MachineInfo }>();
   const [said, setSaid] = useState<string | null>(null);
   // Lists every provider again when the page opens (FR-004).
   useEffect(() => { void store.providers.load(); }, []);
@@ -33,7 +34,7 @@ export function ProvidersSection({ store }: { store: Store }) {
       {said && <p class="hint failure">{said}</p>}
       {!off && providers?.map((p) => (
         <ProviderCard key={p.id} store={store} provider={p} say={setSaid} edit={() => setEditing(p)}
-          link={(workspace) => setLinking({ provider: p, workspace })} />
+          link={(workspace) => setLinking({ provider: p, workspace })} install={(workspace) => setInstalling({ provider: p, workspace })} />
       ))}
       {!off && (
         <>
@@ -50,12 +51,16 @@ export function ProvidersSection({ store }: { store: Store }) {
       {linking && (
         <LinkDialog store={store} provider={linking.provider} workspace={linking.workspace} close={() => setLinking(undefined)} />
       )}
+      {installing && (
+        <InstallDialog store={store} provider={installing.provider} workspace={installing.workspace} close={() => setInstalling(undefined)} />
+      )}
     </section>
   );
 }
 
-function ProviderCard({ store, provider, say, edit, link }: {
+function ProviderCard({ store, provider, say, edit, link, install }: {
   store: Store; provider: ProviderSummary; say: (why: string | null) => void; edit: () => void; link: (w: MachineInfo) => void;
+  install: (w: MachineInfo) => void;
 }) {
   const hosts = store.hosts.value;
   const groups = store.providers.groups.value;
@@ -91,16 +96,16 @@ function ProviderCard({ store, provider, say, edit, link }: {
         {admin && <button type="button" class="destructive" onClick={() => void remove()}>Remove…</button>}
       </li>
       {provider.workspaces.map((w) => (
-        <WorkspaceRow key={w.id} store={store} provider={provider} workspace={w} hosts={hosts} say={say} link={() => link(w)} />
+        <WorkspaceRow key={w.id} store={store} provider={provider} workspace={w} hosts={hosts} say={say} link={() => link(w)} install={() => install(w)} />
       ))}
       {making && <MachineDialog store={store} machine picked={provider.id} close={() => setMaking(false)} />}
     </ul>
   );
 }
 
-function WorkspaceRow({ store, provider, workspace, hosts, say, link }: {
+function WorkspaceRow({ store, provider, workspace, hosts, say, link, install }: {
   store: Store; provider: ProviderSummary; workspace: MachineInfo; hosts: readonly ControlMachine[];
-  say: (why: string | null) => void; link: () => void;
+  say: (why: string | null) => void; link: () => void; install: () => void;
 }) {
   const host = workspace.host ? hosts.find((h) => h.id === workspace.host) : undefined;
   const linked = host?.workspace;
@@ -120,6 +125,7 @@ function WorkspaceRow({ store, provider, workspace, hosts, say, link }: {
   };
   const free = linkableHosts(workspace, hosts);
   const noHost = noHostLine(workspace, hosts);
+  const adding = addAsMachine(workspace);
   return (
     <li class="connection workspace-row">
       <span class={`dot ${workspace.state === "running" ? "online" : workspace.state === "unknown" ? "attention" : "offline"}`} aria-hidden="true" />
@@ -137,6 +143,9 @@ function WorkspaceRow({ store, provider, workspace, hosts, say, link }: {
         <button type="button" onClick={link}>
           {free.length === 1 && mayBe(workspace, free[0]!.name) ? `Link to ${free[0]!.name}…` : "Link to Machine…"}
         </button>
+      )}
+      {adding && (
+        <button type="button" disabled={!adding.ready} title={adding.help} onClick={install}>{words.addAsMachine}</button>
       )}
     </li>
   );
@@ -260,6 +269,68 @@ function LinkDialog({ store, provider, workspace, close }: {
         <div class="sheet-actions">
           <button type="button" onClick={close}>Cancel</button>
           <button type="button" class="prominent" disabled={!host} onClick={() => void link()}>Link</button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/**
+ * Add as Machine… (#3365), the window's ControlAddServerSheet as a workspace fills it in: the
+ * control plane installs Agents over its ssh (gh's, for a codespace), a new host key is shown
+ * to trust first, and the machine is linked to the workspace once it joins.
+ */
+function InstallDialog({ store, provider, workspace, close }: {
+  store: Store; provider: ProviderSummary; workspace: MachineInfo; close: () => void;
+}) {
+  const [name, setName] = useState(workspace.name);
+  const [destination, setDestination] = useState(sshDestination(workspace.ssh ?? ""));
+  const [fingerprint, setFingerprint] = useState<string>();
+  const [working, setWorking] = useState(false);
+  const [problem, setProblem] = useState<string>();
+  const [installed, setInstalled] = useState<string>();
+  const install = async () => {
+    if (!destination.trim()) return setProblem("Give the ssh destination.");
+    setWorking(true);
+    setProblem(undefined);
+    const outcome = await store.providers.install(destination.trim(), name.trim(), provider.id, workspace.id, fingerprint);
+    setWorking(false);
+    if ("needsTrust" in outcome) return setFingerprint(outcome.needsTrust);
+    setFingerprint(undefined);
+    if ("failed" in outcome) return setProblem(outcome.failed);
+    setInstalled(outcome.added);
+    // It may have joined while the install ran.
+    store.providers.linkJoined(store.hosts.peek());
+  };
+  return (
+    <Modal label={`Add ${workspace.name} as a Machine`} close={close}>
+      <div class="sheet-body connect-sheet provider-sheet">
+        <p class="strong">Add {workspace.name} as a Machine</p>
+        <p class="small quiet">{words.installNote(provider.name)}</p>
+        {installed ? <p class="small">{words.installed(installed)}</p> : (
+          <form class="token-form" onSubmit={(e) => { e.preventDefault(); void install(); }}>
+            <label>Name
+              <input type="text" value={name} disabled={working} autocomplete="off" spellcheck={false}
+                onInput={(e) => setName((e.target as HTMLInputElement).value)} />
+            </label>
+            <label>ssh destination
+              <input type="text" value={destination} disabled={working || !!fingerprint} autocomplete="off" autocapitalize="off" spellcheck={false}
+                onInput={(e) => setDestination((e.target as HTMLInputElement).value)} />
+            </label>
+          </form>
+        )}
+        {fingerprint && <p class="small">{words.trustNote(fingerprint)}</p>}
+        {working && <p class="quiet small">{words.installing}</p>}
+        {problem && <p class="small failure">{problem}</p>}
+        <div class="sheet-actions">
+          {installed ? <button type="button" class="prominent" onClick={close}>Done</button> : (
+            <>
+              <button type="button" onClick={close}>Cancel</button>
+              <button type="button" class="prominent" disabled={working} onClick={() => void install()}>
+                {fingerprint ? "Trust and Install" : "Install"}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </Modal>

@@ -10269,6 +10269,7 @@ export interface Methods {
   "hosts/approveJoin": { params: JoinRequestDecide; result: JoinApproved };
   "hosts/denyJoin": { params: JoinRequestDecide; result: Empty };
   "hosts/dropKept": { params: KeptRequestID; result: Empty };
+  "hosts/install": { params: MachineInstall; result: JSONValue };
   "hosts/joinRequests": { params: Empty; result: JoinRequest[] };
   "hosts/lastHeard": { params: MachineRequest; result: MachineLastHeard };
   "hosts/lendGit": { params: LendGit; result: Empty };
@@ -10598,6 +10599,7 @@ export const MethodTarget = {
   "hosts/approveJoin": "control",
   "hosts/denyJoin": "control",
   "hosts/dropKept": "control",
+  "hosts/install": "control",
   "hosts/joinRequests": "control",
   "hosts/lastHeard": "control",
   "hosts/lendGit": "control",
