@@ -52,14 +52,24 @@ jobs:
 
   # Swift coverage took longer than the PR job's test budget. Run it at night so it
   # cannot hold a pull request or a main push; this workflow is not a required check.
+  # Each package has its own budget: AgentsKit's whole job takes about 6 minutes, and
+  # CodeText's ran to the 60-minute limit on every night from 2026-10-28 to 11-03, on
+  # an xcode-27 runner that the day's pull requests wait for (#594). 20 minutes is
+  # more than three times AgentsKit's job; a CodeText run that needs more is hung.
   coverage-swift:
     if: github.event_name == 'schedule'
     strategy:
       fail-fast: false
       matrix:
-        package: [AgentsKit, CodeText]
+        include:
+          - package: AgentsKit
+            minutes: 60
+            test-minutes: 55
+          - package: CodeText
+            minutes: 20
+            test-minutes: 15
     runs-on: xcode-27
-    timeout-minutes: 60
+    timeout-minutes: ${{ matrix.minutes }}
     env:
       DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
     steps:
@@ -73,7 +83,8 @@ jobs:
           fi
 
       - name: Test with coverage
-        timeout-minutes: 55
+        # Leaves 5 minutes of the job for the coverage report and its upload.
+        timeout-minutes: ${{ matrix.test-minutes }}
         run: |
           if [[ "${{ matrix.package }}" == AgentsKit ]]; then
             swift test --enable-code-coverage --package-path Packages/AgentsKit \
