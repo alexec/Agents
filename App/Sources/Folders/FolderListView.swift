@@ -56,6 +56,9 @@ struct FolderListView: View {
         SidebarOrder.folders(model.liveFolders, servers: model.hosts.servers)
     }
 
+    /// One group per project (#3278): a project's folders on every machine together.
+    private var groups: [SidebarProjects.Group] { SidebarProjects.groups(orderedFolders) }
+
     /// No runtime can be started on: Runtimes' icon says so in red (#587).
     private var runtimesFailing: Bool {
         RuntimeTally(model.runtimes, allowances: model.runtimeAllowances)?.noneWorking == true
@@ -206,16 +209,20 @@ struct FolderListView: View {
             // folder's is, so every group in the list lines up alike (#495). Empty, or
             // with no match for a search, a group is not drawn (#507).
             // A group turned off in Settings ▸ Sidebar is not drawn (#846).
+            let groups = groups
+            let labels = groupLabels(groups)
             ForEach(SidebarSmartRow.allCases.filter(smartOn.contains), id: \.self) { row in
-                SmartFold(row: row, folders: orderedFolders.map(\.key), folds: folds, query: searched)
+                SmartFold(row: row, folders: orderedFolders.map(\.key), folds: folds, query: searched, places: labels)
             }
 
-            // One group per folder (#495), its name the group's heading, its sessions the
-            // rows: Mail's accounts rather than a Folders heading with folds under it.
-            ForEach(orderedFolders, id: \.key) { summary in
-                FolderFold(summary: summary, folds: folds, query: searched,
-                            showsAllMatches: showingAllMatches.contains(summary.key),
-                            showAllMatches: { showingAllMatches.insert(summary.key) })
+            // One group per project (#495, #3278), its name the group's heading, its sessions
+            // the rows: Mail's accounts rather than a Folders heading with folds under it. A
+            // project with one folder is that folder's group, as before.
+            ForEach(groups) { group in
+                FolderFold(summary: group.main, folds: folds, query: searched,
+                            showsAllMatches: showingAllMatches.contains(group.id),
+                            showAllMatches: { showingAllMatches.insert(group.id) },
+                            others: group.others, groupLabel: labels[group.id])
             }
 
             Section {
@@ -257,6 +264,10 @@ struct FolderListView: View {
         // until the list is made again (#237): once per drift, keeping folds, selection
         // and search, which live outside it. The scroll goes back to the top.
         .id(outlineRebuilds)
+        // The names of the projects that group several folders (#3278).
+        .task(id: SidebarProjects.sharedProjects(groups)) {
+            await model.projectNames.load(SidebarProjects.sharedProjects(groups), from: model.controlRequests)
+        }
         .onReceive(NotificationCenter.default.publisher(for: .outlineListDrifted)) { _ in
             outlineRebuilds &+= 1
         }
@@ -408,7 +419,9 @@ struct FolderListView: View {
             return
         }
         if case .session(let id) = item, let agent = model.work.agent(id) {
-            folds.set(FolderKey(host: agent.host, folder: agent.folderPath), open: true)
+            // A folder of a project is drawn in its project's group (#3278): that group unfolds.
+            let key = FolderKey(host: agent.host, folder: agent.folderPath)
+            folds.set(groups.first { $0.holds(key) }?.id ?? key, open: true)
         } else if case .workflow(_, let key) = item {
             folds.set(key, open: true)
         } else if case .pin(_, let key) = item {
@@ -467,6 +480,11 @@ struct FolderListView: View {
     private func label(_ summary: DaemonAPI.FolderSummary) -> String {
         SidebarOrder.label(summary) { model.hosts.label($0) }
     }
+
+    /// Each folder's group name (#3278): `server:Folder` alone, or its project's name.
+    private func groupLabels(_ groups: [SidebarProjects.Group]) -> [FolderKey: String] {
+        SidebarProjects.labels(groups, projectName: { model.projectNames.name(of: $0) }) { model.hosts.label($0) }
+    }
 }
 
 /// One folder in the sidebar: its row, and folded under it its sessions — Needs you
@@ -493,8 +511,13 @@ struct FolderFold: View {
     var smartGroups: Set<SidebarSmartRow>? = nil
     /// Drawn in a folder's own window (#1089).
     var inWindow = false
+    /// The project's other folders (#3278), whose sessions are listed in this group too.
+    var others: [DaemonAPI.FolderSummary] = []
+    /// The group's name when it is a project's: the project's name.
+    var groupLabel: String? = nil
 
     private var key: FolderKey { summary.key }
+    private var group: SidebarProjects.Group { SidebarProjects.Group(main: summary, others: others) }
 
     var body: some View {
         // Folded, nothing under the row is drawn, so nothing is filed for it: the row
@@ -503,7 +526,8 @@ struct FolderFold: View {
         let on = smartGroups ?? SidebarSmartRow.on(off: smartOff)
         let fold = SidebarFolderFold(key, label: label, in: model.work, query: query,
                                       isOpen: folds.isOpen(key), keptInUnread: model.keptInUnread,
-                                      keptBy: SidebarSmartRow.keeper(fileToSee: model.keptHadFile, on: on), on: on)
+                                      keptBy: SidebarSmartRow.keeper(fileToSee: model.keptHadFile, on: on), on: on,
+                                      alsoIn: group.otherKeys)
         let isOpen = fold.isUnfolded
         if fold.isShown {
             Section(isExpanded: Binding(
@@ -534,7 +558,9 @@ struct FolderFold: View {
                 // A closed fold has no rows at all (#237).
                 ForEach(FoldedRow.rows(sessionsOpen ? SidebarTree.rows(fold.sessions, in: model.work, folds: folds) : [],
                                        in: .sessions)) { row in
-                    SessionSidebarRow(agent: row.item.agent, tree: row.item, folds: folds, isNested: grouped)
+                    // A session on another machine of the project says which (#3278).
+                    SessionSidebarRow(agent: row.item.agent, place: machineMark(row.item.agent),
+                                      tree: row.item, folds: folds, isNested: grouped)
                 }
                 if !fold.recentArchived.isEmpty {
                     let recentOpen = folds.isOpen(key, .recentArchivedSessions)
@@ -597,7 +623,7 @@ struct FolderFold: View {
             .listRowInsets(.vertical, 3)
             // Last known, not current: the server is not answering (037).
             .foregroundStyle(model.hostUnreachable(summary.host) ? .secondary : .primary)
-            .contextMenu { FolderMenu(summary: summary) }
+            .contextMenu { FolderMenu(summary: summary, others: others) }
             // A file dropped here goes into the folder's drop box (#231).
             .dropsIntoDropbox(of: key)
             // No tag: the row is not something to open (#375). The folder's
@@ -609,7 +635,11 @@ struct FolderFold: View {
     /// A server's folder says which server (Alex, #145): no heading for each host, so
     /// the host goes in the name. This Mac's go by name alone.
     private var label: String {
-        SidebarOrder.label(summary) { model.hosts.label($0) }
+        groupLabel ?? SidebarOrder.label(summary) { model.hosts.label($0) }
+    }
+
+    private func machineMark(_ agent: Agent) -> String? {
+        SidebarProjects.machineMark(of: agent, in: group) { model.hosts.label($0) }
     }
 
     /// While searching: the workflows and archived sessions that matched, after the live
@@ -811,6 +841,8 @@ private struct FolderMenu: View {
     @Environment(WindowRequests.self) private var requests
     @Environment(\.openWindow) private var openWindow
     let summary: DaemonAPI.FolderSummary
+    /// The project's other folders (#3278): with any, the menu lists them under Folders.
+    var others: [DaemonAPI.FolderSummary] = []
 
     var body: some View {
         // The folder alone, in a window of its own (#1089); its key is the Window menu's.
@@ -825,6 +857,21 @@ private struct FolderMenu: View {
         Button("Folder Settings…") {
             model.showFolder(summary.key)
             requests.folderSettings = .general
+        }
+        // The project's folders on every machine (#3278), each with its machine and state.
+        if !others.isEmpty {
+            Menu(SidebarProjects.foldersMenu) {
+                ForEach([summary] + others, id: \.key) { folder in
+                    Menu(SidebarProjects.folderLine(folder, machine: model.hosts.label(folder.host), state: state(of: folder.host))) {
+                        Button(SidebarProjects.openFolder) { model.showFolder(folder.key) }
+                        Button(SidebarProjects.folderSettings) {
+                            model.showFolder(folder.key)
+                            requests.folderSettings = .general
+                        }
+                    }
+                    .disabled(model.hostUnreachable(folder.host))
+                }
+            }
         }
         // A drag onto the row goes to the drop box's top; this names a folder in it.
         Button("Put Files in Drop Box…") { requests.dropboxFolder = summary.key }
@@ -870,6 +917,13 @@ private struct FolderMenu: View {
             }
             .disabled(!summary.exists)
         }
+    }
+}
+
+private extension FolderMenu {
+    func state(of host: MachineRef) -> SidebarProjects.MachineState {
+        SidebarProjects.state(offline: model.hostUnreachable(host),
+                              workspaceState: model.hosts.controlRows[host]?.workspace?.workspaceState)
     }
 }
 

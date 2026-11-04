@@ -57,6 +57,9 @@ struct RemoteSidebar: View {
 
     var body: some View {
         let folders = SidebarOrder.folders(model.folders, servers: servers)
+        // One group per project (#3278): a project's folders on every machine together.
+        let groups = SidebarProjects.groups(folders)
+        let labels = groupLabels(groups)
         List(selection: selection) {
             // A machine asking to join as this person (#994): at the top, as it waits on
             // an answer and its code lasts ten minutes.
@@ -135,17 +138,19 @@ struct RemoteSidebar: View {
                 // A group turned off in Settings ▸ Sidebar is not drawn (#846).
                 let on = SidebarSmartRow.on(off: smartOff)
                 ForEach(SidebarSmartRow.allCases.filter(on.contains), id: \.self) { row in
-                    RemoteSmartFold(row: row, folders: folders, folds: folds, query: searched)
+                    RemoteSmartFold(row: row, folders: folders, folds: folds, query: searched, places: labels)
                 }
             }
 
-            // One group per folder (#495), its name the group's heading, its sessions
-            // the rows: Mail's accounts rather than a Folders heading with folds under it.
-            ForEach(folders, id: \.key) { summary in
-                RemoteFolderFold(summary: summary, folds: folds, query: searched,
-                                  label: SidebarOrder.label(summary) { model.hostLabel($0) },
-                                  showsAllMatches: showingAllMatches.contains(summary.key),
-                                  showAllMatches: { showingAllMatches.insert(summary.key) })
+            // One group per project (#495, #3278), its name the group's heading, its
+            // sessions the rows: Mail's accounts rather than a Folders heading with folds
+            // under it. A project with one folder is that folder's group, as before.
+            ForEach(groups) { group in
+                RemoteFolderFold(summary: group.main, folds: folds, query: searched,
+                                  label: labels[group.id] ?? group.main.name,
+                                  showsAllMatches: showingAllMatches.contains(group.id),
+                                  showAllMatches: { showingAllMatches.insert(group.id) },
+                                  others: group.others)
             }
             // A host had more matches than its page: the next page, on asking (#176, #533).
             if !searched.isEmpty, model.searchHasMore {
@@ -236,6 +241,15 @@ struct RemoteSidebar: View {
             }
         }
         .refreshable { await model.catchUp() }
+        // The names of the projects that group several folders (#3278).
+        .task(id: SidebarProjects.sharedProjects(groups)) {
+            await model.projectNames.load(SidebarProjects.sharedProjects(groups), from: model.controlPlane)
+        }
+    }
+
+    /// Each folder's group name (#3278): `server:Folder` alone, or its project's name.
+    private func groupLabels(_ groups: [SidebarProjects.Group]) -> [FolderKey: String] {
+        SidebarProjects.labels(groups, projectName: { model.projectNames.name(of: $0) }) { model.hostLabel($0) }
     }
 
     /// Said once on the screen. Beside the detail on a wide iPad, the detail carries the
@@ -266,6 +280,8 @@ struct RemoteSmartFold: View {
     /// The groups drawn, when not those Settings ▸ Sidebar turns on: a folder's own
     /// scene has Pinned and Needs You only (#1089).
     var groups: Set<SidebarSmartRow>? = nil
+    /// Each folder's group name (#3278): its project's, when it shares one with other folders.
+    var places: [FolderKey: String] = [:]
     private var on: Set<SidebarSmartRow> { groups ?? SidebarSmartRow.on(off: smartOff) }
 
     var body: some View {
@@ -371,6 +387,7 @@ struct RemoteSmartFold: View {
     }
 
     private func place(of key: FolderKey) -> String? {
+        if let place = places[key] { return place }
         guard let summary = folders.first(where: { $0.host == key.host && $0.folder.folder == key.folder }) else { return nil }
         return SidebarOrder.label(summary) { model.hostLabel($0) }
     }
@@ -588,14 +605,18 @@ struct RemoteFolderFold: View {
     var smartGroups: Set<SidebarSmartRow>? = nil
     /// Drawn in a folder's own scene (#1089).
     var inScene = false
+    /// The project's other folders (#3278), whose sessions are listed in this group too.
+    var others: [DaemonAPI.FolderSummary] = []
 
     private var key: FolderKey { summary.key }
+    private var group: SidebarProjects.Group { SidebarProjects.Group(main: summary, others: others) }
 
     var body: some View {
         let on = smartGroups ?? SidebarSmartRow.on(off: smartOff)
         let fold = SidebarFolderFold(key, label: label, in: model.work, query: query, isOpen: folds.isOpen(key),
                                       keptInUnread: model.keptInUnread,
-                                      keptBy: SidebarSmartRow.keeper(fileToSee: model.keptHadFile, on: on), on: on)
+                                      keptBy: SidebarSmartRow.keeper(fileToSee: model.keptHadFile, on: on), on: on,
+                                      alsoIn: group.otherKeys)
         let isOpen = fold.isUnfolded
         if fold.isShown {
             // A search holds every match open.
@@ -653,12 +674,14 @@ struct RemoteFolderFold: View {
     private func heading(_ isOpen: Bool) -> some View {
         FolderRow(summary: summary, label: label, isFolded: !isOpen, asHeading: true)
             .foregroundStyle(model.hostIsOffline(summary.host) ? .secondary : .primary)
-            .contextMenu { FolderMenuItems(summary: summary) }
+            .contextMenu { FolderMenuItems(summary: summary, others: others) }
             .accessibilityHint(isOpen ? "Folds the folder" : "Unfolds the folder")
             // The rest of its live sessions when the first page did not hold them
-            // all. On the heading, which is always there, not on every row.
+            // all, the project's other folders' too (#3278). On the heading, which is
+            // always there, not on every row.
             .task(id: isOpen) {
-                if isOpen { await model.fillFolder(summary.folder.folder) }
+                guard isOpen else { return }
+                for folder in group.folders { await model.fillFolder(folder.folder.folder) }
             }
     }
 
@@ -676,7 +699,9 @@ struct RemoteFolderFold: View {
         }
         // A closed fold has no rows at all (#237).
         ForEach(isOpen ? SidebarTree.rows(fold.sessions, in: model.work, folds: folds) : []) { row in
-            SidebarSessionRow(agent: row.agent, tree: row, folds: folds, isNested: grouped)
+            // A session on another machine of the project says which (#3278).
+            SidebarSessionRow(agent: row.agent, place: SidebarProjects.machineMark(of: row.agent, in: group) { model.hostLabel($0) },
+                              tree: row, folds: folds, isNested: grouped)
         }
         if !fold.recentArchived.isEmpty {
             let recentOpen = folds.isOpen(key, .recentArchivedSessions)
@@ -854,11 +879,25 @@ private struct ForgetThisDeviceRow: View {
 private struct FolderMenuItems: View {
     @Environment(RemoteModel.self) private var model
     let summary: DaemonAPI.FolderSummary
+    /// The project's other folders (#3278): with any, Folders lists them, to open one.
+    /// Managing them is the Mac's and the web page's (#2798).
+    var others: [DaemonAPI.FolderSummary] = []
 
     var body: some View {
         NewSessionButton(folder: summary.folder.folder)
         // The folder alone (#1089): a scene of its own on an iPad, a screen on an iPhone.
         OpenFolderButton(key: summary.key)
+        if !others.isEmpty {
+            Menu(SidebarProjects.foldersMenu) {
+                ForEach([summary] + others, id: \.key) { folder in
+                    let state = SidebarProjects.state(offline: model.hostIsOffline(folder.host),
+                                                      workspaceState: model.controlHost(folder.host)?.workspace?.workspaceState)
+                    Menu(SidebarProjects.folderLine(folder, machine: model.hostLabel(folder.host), state: state)) {
+                        Button(SidebarProjects.openFolder) { model.sidebarItem = .folder(folder.key) }
+                    }
+                }
+            }
+        }
         ShowHiddenViewsButton(summary: summary)
         // To the top of the sidebar, as the window's Pin.
         Button {

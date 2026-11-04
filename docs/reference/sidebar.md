@@ -18,7 +18,7 @@ iPhone, and on a narrow web page, it is the first screen, and what you open goes
 | **Status** | Pages about the work going on now: **Events**, **Resources**, **Runtimes**, **Connectors** and **Worktrees**. |
 | **Usage** | Pages about past work: **Cost**, **Tokens**, **Time**, and **Milestones** until you have done every first step. |
 | Smart groups | **Pinned**, **Needs You**, **For Review**, **Working** and **Unread**, each across every folder and host. See [Smart groups](#smart-groups). |
-| One group per folder | Each folder's own sessions and workflows. See [A folder's group](#a-folders-group). |
+| One group per project | Each project's sessions on every machine, and its folder's workflows. A project with one folder is that folder's group. See [A folder's group](#a-folders-group) and [A project with folders on several machines](#a-project-with-folders-on-several-machines). |
 | **Archived folders** | Folders you put away. The heading stays folded until you open it. Each has **Unarchive**. |
 | The foot | Lines about this Mac's host and the servers, when there is something to say. On iPhone and iPad, **Settings…**. On the web page, **Settings** and **Help**. |
 
@@ -26,6 +26,9 @@ There is no heading for each host. Pinned folders come first, then the rest. In 
 the two, this Mac's folders come first, then each server's, in the order you added them.
 A server's folder shows the server's name before its own, such as `devbox:api`. A row
 stays in its place however busy its folder is.
+
+The folders of one project are one group, in the place of the first of them. See
+[A project with folders on several machines](#a-project-with-folders-on-several-machines).
 
 **Status** and **Usage** each fold, as a folder does. Both start open. A row in **Status**
 shows its icon in red when something is wrong: **Runtimes** when no runtime can start,
@@ -100,6 +103,28 @@ heading to open it. In order, an open folder holds:
 
 While you search, the archived sessions and workflows that match show in the folder's
 group instead, the first 10 with **Show all** for the rest.
+
+## A project with folders on several machines
+
+Each folder is in a project. A folder is in a project of its own name until you put two
+folders in one project (Folder Settings ▸ General ▸ **Project**). A project with one
+folder looks as that folder does: the same group, the same name and the same menu.
+
+The folders of one project, on every machine, are **one group**:
+
+- **The heading** is the project's name. The group's pages, workflows and archive are
+  those of its folder on this machine, or of its first folder when this machine has
+  none.
+- **Its sessions** are the sessions of all its folders, newest started first. When the
+  folders are on more than one machine, a session on another machine shows that
+  machine's name after its title, such as `devbox`. On the iPhone, the iPad and the web
+  page, "this machine" is the Mac whose folders show by name alone.
+- **Folders,** in the group's menu, lists each folder with its machine and state:
+  *Agents — devbox, online*. The state is online, offline or stopped. On the Mac, each
+  folder has **Open Folder** and **Folder Settings…**. On the iPhone, the iPad and the
+  web page, a folder only opens.
+- **The smart groups** show the project's name after a session's title, where they show
+  a folder's name for a folder alone.
 
 ## Sessions under the session that started them
 

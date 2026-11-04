@@ -637,4 +637,63 @@ struct SidebarModelTests {
         // Nothing kept (#979): Pinned, Needs You and For Review (#3194) on.
         #expect(SidebarSmartRow.on(off: SidebarSmartRow.offAtFirst) == [.pinned, .needsYou, .forReview])
     }
+
+    // MARK: One group per project (#3278)
+
+    private func inProject(_ summary: DaemonAPI.FolderSummary, _ project: String?) -> DaemonAPI.FolderSummary {
+        var summary = summary
+        summary.project = project
+        return summary
+    }
+
+    @Test func aProjectWithOneFolderIsThatFoldersGroupAsBefore() throws {
+        let ordered = [inProject(summary(api), "p-api"), summary(web), inProject(summary(api, host: devbox), "p-other")]
+        let groups = SidebarProjects.groups(ordered)
+        try #require(groups.map(\.id) == ordered.map(\.key))
+        #expect(groups.allSatisfy { $0.others.isEmpty })
+        let label = SidebarProjects.label(groups[2], projectName: "Other") { _ in "devbox" }
+        #expect(label == "devbox:api", "one folder keeps its own name, not the project's")
+        #expect(SidebarProjects.sharedProjects(groups).isEmpty)
+    }
+
+    @Test func aProjectsFoldersOnEveryMachineAreOneGroupWhereItsFirstFolderStood() throws {
+        // A server's folder first in the order (pinned), this Mac's later: one group, in the
+        // first one's place, with this Mac's folder as its main one.
+        let ordered = [inProject(summary(api, host: devbox), "p"), summary(web), inProject(summary(api), "p")]
+        let groups = SidebarProjects.groups(ordered)
+        try #require(groups.count == 2)
+        #expect(groups[0].main.key == FolderKey(host: .mac, folder: api))
+        #expect(groups[0].others.map(\.key) == [FolderKey(host: devbox, folder: api)])
+        #expect(groups[0].spansMachines)
+        #expect(groups[0].holds(FolderKey(host: devbox, folder: api)))
+        #expect(groups[1].main.key == FolderKey(host: .mac, folder: web))
+        #expect(SidebarProjects.label(groups[0], projectName: "Agents") { _ in "devbox" } == "Agents")
+        #expect(SidebarProjects.label(groups[0], projectName: nil) { _ in "devbox" } == "api",
+                "the main folder's name until the project's is read")
+        #expect(SidebarProjects.sharedProjects(groups) == ["p"])
+    }
+
+    @Test func aSessionOnAnotherMachineOfTheProjectSaysWhich() {
+        let model = AgentsModel()
+        let here = agent(api, .finished, "here", at: 1)
+        let there = agent(api, .finished, "there", at: 2, host: devbox)
+        model.replaceAgents([here])
+        model.replaceAgents([there], from: devbox)
+        let group = SidebarProjects.Group(main: summary(api), others: [summary(api, host: devbox)])
+        let fold = SidebarFolderFold(key, label: "Agents", in: model, isOpen: true, on: [],
+                                      alsoIn: group.otherKeys)
+        #expect(Set(fold.sessions.map(\.title)) == ["here", "there"], "both folders' sessions in the one group")
+        let mark: (Agent) -> String? = { SidebarProjects.machineMark(of: $0, in: group) { _ in "devbox" } }
+        #expect(fold.sessions.map(mark).compactMap { $0 } == ["devbox"])
+        // Two folders on this one machine: no machine to say.
+        let local = SidebarProjects.Group(main: summary(api), others: [summary(web)])
+        #expect(SidebarProjects.machineMark(of: there, in: local) { _ in "devbox" } == nil)
+    }
+
+    @Test func theFoldersListSaysEachFoldersMachineAndState() {
+        #expect(SidebarProjects.state(offline: false, workspaceState: nil) == .online)
+        #expect(SidebarProjects.state(offline: true, workspaceState: nil) == .offline)
+        #expect(SidebarProjects.state(offline: true, workspaceState: "stopped") == .stopped)
+        #expect(SidebarProjects.folderLine(summary(api), machine: "devbox", state: .online) == "api — devbox, online")
+    }
 }
