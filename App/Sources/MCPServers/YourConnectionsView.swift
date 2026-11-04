@@ -2,9 +2,9 @@ import AgentsKitCore
 import AppKit
 import SwiftUI
 
-/// Activity ▸ Connectors (#1336, frame E): the person's connections, one row each with
-/// Disconnect, and each folder's set-up with Open ›. A connection is the person's, so it
-/// lives here; a folder's page shows it as one line.
+/// Status ▸ Connectors (#1336, frame E): the person's connections, one row each with
+/// Disconnect. A connection is the person's, so it lives here; a project's page shows it as
+/// one line. Each project's set-up is on its own Connectors row in the sidebar (#3407).
 struct YourConnectionsView: View {
     @Environment(AppModel.self) private var model
 
@@ -55,15 +55,6 @@ struct YourConnectionsView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
                     ProgressView().controlSize(.small).padding(12)
-                }
-            }
-            if !folders.isEmpty {
-                heading("Folders").padding(.top, 6)
-                card {
-                    ForEach(Array(folders.enumerated()), id: \.element.id) { index, p in
-                        if index > 0 { Divider().padding(.leading, 14) }
-                        folderRow(p)
-                    }
                 }
             }
         }
@@ -122,23 +113,6 @@ struct YourConnectionsView: View {
         .padding(.horizontal, 14).padding(.vertical, 10)
     }
 
-    private func folderRow(_ p: DaemonAPI.FolderSummary) -> some View {
-        let setup = setups[p.key]
-        return HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(p.name).appText(.supporting).fontWeight(.semibold)
-                Text(setup.map(ConnectorSetupWords.folderLine) ?? " ").appText(.fine).foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 8)
-            if let setup {
-                Text("\(setup.done) of \(setup.slots.count)").appText(.fine).foregroundStyle(.secondary).monospacedDigit()
-            }
-            Button("Open \u{203A}") { model.sidebarItem = .folderMCPServers(p.key) }
-                .buttonStyle(.link).appText(.fine)
-        }
-        .padding(.horizontal, 14).padding(.vertical, 10)
-    }
-
     @ViewBuilder private var connectItems: some View {
         ForEach(unconnected, id: \.self) { p in
             Button(ConnectorSetupWords.menuName(p)) { again = nil; connecting = p }
@@ -168,7 +142,7 @@ struct YourConnectionsView: View {
 
     private func load() async {
         switch await model.connections(on: .mac) {
-        case .success(let list): connections = list; problem = nil
+        case .success(let list): connections = list; problem = nil; model.endedConnections.set(list, on: .mac)
         case .failure(let failure): connections = []; problem = failure.words
         }
         for p in folders {

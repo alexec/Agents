@@ -64,9 +64,17 @@ struct FolderListView: View {
         RuntimeTally(model.runtimes, allowances: model.runtimeAllowances)?.noneWorking == true
     }
 
-    /// A hosted server stopped while in use: MCP Servers' icon says so in red (#587, #589).
-    private var mcpServersStopped: Bool {
+    /// A hosted server stopped while in use, or a connection ended: Connectors' icon says so
+    /// in red (#587, #589, #3407).
+    private var connectorsWarn: Bool {
         MCPHealthWords.tally(model.work.mcpHealthSnapshot()?.personal ?? [])?.failing == true
+            || !model.endedConnections.on(.mac).isEmpty
+    }
+
+    /// Each project's Connectors folder (#3407), whose stored set-up says whether a slot's
+    /// connection ended.
+    private func connectorsFolders(_ groups: [SidebarProjects.Group]) -> [DaemonAPI.FolderSummary] {
+        groups.map { SidebarProjects.connectorsFolder($0) { !model.hostUnreachable($0) } }
     }
 
     var body: some View {
@@ -173,7 +181,7 @@ struct FolderListView: View {
                     .appText(.supporting).sidebarInk(.resources).tag(SidebarItem.resources)
                 RuntimesRow().activityIcon("cpu", warns: runtimesFailing)
                     .appText(.supporting).sidebarInk(.runtimes).tag(SidebarItem.runtimes)
-                MCPServersRow().activityIcon("server.rack", warns: mcpServersStopped)
+                MCPServersRow().activityIcon("server.rack", warns: connectorsWarn)
                     .appText(.supporting).sidebarInk(.mcpServers).tag(SidebarItem.mcpServers)
                 WorktreesRow().activityIcon("arrow.triangle.branch")
                     .appText(.supporting).sidebarInk(.worktrees).tag(SidebarItem.worktrees)
@@ -267,6 +275,14 @@ struct FolderListView: View {
         // The names of the projects that group several folders (#3278).
         .task(id: SidebarProjects.sharedProjects(groups)) {
             await model.projectNames.load(SidebarProjects.sharedProjects(groups), from: model.controlRequests)
+        }
+        // The connections that ended (#3407): the host tells no client, so read them on
+        // connecting, when the projects' Connectors folders change, and every five minutes.
+        .task(id: ConnectorsRead(connected: model.isConnected, folders: connectorsFolders(groups).map(\.key))) {
+            while !Task.isCancelled {
+                await model.refreshEndedConnections(folders: connectorsFolders(groups))
+                try? await Task.sleep(for: .seconds(300))
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .outlineListDrifted)) { _ in
             outlineRebuilds &+= 1
@@ -429,7 +445,8 @@ struct FolderListView: View {
         } else if case .archive(let key) = item {
             folds.set(key, open: true)
         } else if case .folderMCPServers(let key) = item {
-            folds.set(key, open: true)
+            // The project's Connectors row may be another folder's of the group (#3407).
+            folds.set(groups.first { $0.holds(key) }?.id ?? key, open: true)
         } else if case .folder(let key) = item {
             // A new session, from ⌘N or a menu: its row is in the fold.
             folds.set(key, open: true)
@@ -579,14 +596,17 @@ struct FolderFold: View {
                     // match is one click away as it was.
                     searchMatches(fold)
                 } else {
-                    // Its connectors (#753), under every folder even with none yet (#1422):
-                    // a page, red when one does not answer, with how many (#1569).
-                    let servers = model.work.mcpServers(in: key)
+                    // Its connectors (#753), under every group even with none yet (#1422):
+                    // a page, red when one does not answer or a slot's connection ended,
+                    // with how many (#1569). The project's, one row for all its folders (#3407).
+                    let place = SidebarProjects.connectorsFolder(group) { !model.hostUnreachable($0) }.key
+                    let servers = model.work.mcpServers(in: place)
                     let tally = MCPHealthWords.tally(servers)
+                    let ended = model.endedConnections.inFolders[place].flatMap { ConnectorSetupWords.endedLine([$0]) }
                     FolderPageRow(title: "Connectors", systemImage: "server.rack",
-                                   item: .folderMCPServers(key), warns: tally?.failing ?? false,
+                                   item: .folderMCPServers(place), warns: tally?.failing == true || ended != nil,
                                    count: servers.count)
-                        .help(tally?.words ?? "No connectors yet")
+                        .help([tally?.words ?? "No connectors yet", ended].compactMap { $0 }.joined(separator: ". "))
                     // The archive, one row opening a page (#495): never a fold inside
                     // the group.
                     let archived = fold.archivedCount(summary) + fold.archivedWorkflows.count
@@ -660,6 +680,12 @@ struct FolderFold: View {
                 .foregroundStyle(.secondary)
         }
     }
+}
+
+/// What the sidebar's read of the ended connections starts again on (#3407).
+private struct ConnectorsRead: Equatable {
+    var connected: Bool
+    var folders: [FolderKey]
 }
 
 /// The first row of the sidebar (#495): a new session, in the folder the last one was

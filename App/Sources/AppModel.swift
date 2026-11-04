@@ -1102,6 +1102,8 @@ final class AppModel {
     @ObservationIgnored private(set) var controlRequests: DaemonClient?
     /// The names of the projects the sidebar groups (#3278).
     let projectNames = ProjectNames()
+    /// The connections that ended, which turn the Connectors rows red (#3407).
+    let endedConnections = EndedConnections()
     /// People (#994): the machines waiting for this person's approval, fed from the watch.
     let people = PeopleState()
     /// The GitHub sign-ins waiting for this person's Approve (#995).

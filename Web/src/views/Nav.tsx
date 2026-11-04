@@ -101,6 +101,11 @@ function PageMark({ store, page }: { store: Store; page: NavPage }) {
   if (page.id === "requests" && requestCount(store) > 0) return <span class="sub-app-count">{requestCount(store)}</span>;
   if (page.id === "reportPolicy" && policyNotSaved(store)) return <span class="quiet small attention">Not saved</span>;
   if (page.id === "policy" && orgPolicyNotSaved(store)) return <span class="quiet small attention">Not saved</span>;
+  // Connectors: a connector of the person's that does not answer, or a connection that ended (#3407), as the window's red icon.
+  if (page.id === "mcp") {
+    const words = store.connectorsWarning();
+    if (words) return <span class="small failure" title={words} aria-label={words}>●</span>;
+  }
   return null;
 }
 

@@ -1,6 +1,6 @@
 // Every MCP server in one mcp.json and how each is doing (#753), as the window's MCPServersView and
-// the Remote's MCPServersListView: the person's own under Activity, a folder's on its own page from
-// its row in the sidebar. A folder's page opens with its set-up (#1336), and Connectors with
+// the Remote's MCPServersListView: the person's own under Machines, a project's on its own page from
+// its row in the sidebar, read in one of its folders (#3407). A folder's page opens with its set-up (#1336), and Connectors with
 // the person's connections. Read-only but for Check Now and Remove… (#2154): servers are edited in Settings.
 import { useState } from "preact/hooks";
 import type { Store } from "../model/store";
@@ -83,7 +83,7 @@ export function ConnectorLevels({ levels }: { levels: MCPLevels | undefined }) {
   );
 }
 
-/** A folder's MCP servers, in the chat's place. */
+/** A project's MCP servers, in the chat's place: its repository's .agents/mcp.json (#3407). */
 export function MCPServersPage({ store, host, folder, folderName }: {
   store: Store; host: string; folder: string; folderName: string;
 }) {
@@ -98,7 +98,7 @@ export function MCPServersPage({ store, host, folder, folderName }: {
             ? <ConnectorSetupSection store={store} host={host} folder={folder} folderName={folderName}
               go={(workflow) => go({ host, folder: folder, workflow })} />
             : <p class="hint">{hostNeedsUpdate}</p>}
-          <h2 class="setup-heading">Folder connectors</h2>
+          <h2 class="setup-heading">Project connectors</h2>
           <MCPServersList store={store} host={host} folder={folder} />
           {empty && <p class="hint">{folderEmpty}</p>}
           <p class="hint">{folderIntro}</p>

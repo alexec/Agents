@@ -696,4 +696,16 @@ struct SidebarModelTests {
         #expect(SidebarProjects.state(offline: true, workspaceState: "stopped") == .stopped)
         #expect(SidebarProjects.folderLine(summary(api), machine: "devbox", state: .online) == "api — devbox, online")
     }
+
+    // MARK: The project's Connectors row (#3407)
+
+    @Test func theProjectsConnectorsAreThisMachinesFolderElseTheFirstOnline() {
+        let elsewhere = MachineRef(rawValue: "cloud001")
+        let mac = SidebarProjects.Group(main: summary(api), others: [summary(api, host: devbox)])
+        #expect(SidebarProjects.connectorsFolder(mac) { _ in true }.host == .mac)
+        let servers = SidebarProjects.Group(main: summary(api, host: devbox), others: [summary(api, host: elsewhere)])
+        #expect(SidebarProjects.connectorsFolder(servers) { $0 != devbox }.host == elsewhere,
+                "the first folder whose machine answers")
+        #expect(SidebarProjects.connectorsFolder(servers) { _ in false }.host == devbox, "none answers: the main one")
+    }
 }

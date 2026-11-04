@@ -27,8 +27,9 @@ import { hostAnswers } from "../model/capabilities";
 import { Capability } from "../protocol/capabilities.generated";
 import { parseQuery, queryMatches, type LabelQuery } from "../model/labels";
 import { folderLine, groupLabel, keeper, keepsInUnread, machineMark, machineState, newSessionFolder, pinnedSessions, pinnedWorkflows,
-  folderSessions, projectGroups, rememberedFolder, rememberFolder, sharedProjects, smartAgents, smartApprovals, smartPulls,
+  connectorsPlace, folderSessions, projectGroups, rememberedFolder, rememberFolder, sharedProjects, smartAgents, smartApprovals, smartPulls,
   smartSuggestions, smartRows, smartTitles, withKept, type FolderKey, type ProjectGroup, type SmartRow } from "../model/sidebar";
+import { endedLine } from "../model/connectorSetup";
 import { updatedLine } from "../model/updated";
 import { namedRelative, workflowSummary } from "../model/workflows";
 import { fromWireDate, toWireDate } from "../protocol/dates";
@@ -113,6 +114,11 @@ export function archivedFolders(hosts: ControlMachine[], folders: Record<string,
 /** The names of the projects the sidebar groups (#3278), read from the control plane, by id. */
 const projectNames = signal<Record<string, string>>({});
 
+/** A project's name when the sidebar groups several folders under it (#3278), else undefined. */
+export function projectNameOf(project: string | undefined): string | undefined {
+  return project === undefined ? undefined : projectNames.value[project];
+}
+
 function placeKey(host: string, folder: string): string {
   return `${host}|${folderKey(folder)}`;
 }
@@ -195,6 +201,17 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
       projectNames.value = Object.fromEntries(list.projects.map((p) => [p.id, p.name]));
     }, () => { /* A failed read keeps the names it had; the main folder's name stands in. */ });
   }, [shared]);
+  // The connections that ended (#3407): the host tells no client, so they are read on opening and every five minutes,
+  // with the stored set-up of each project's Connectors folder on a host where one ended.
+  const connectorPlaces = groups.map((g) => connectorsPlace(g, store.macHostID.value, (h) => store.hostIsOnline(h)))
+    .map((p) => ({ host: p.host.id, folder: p.folder.folder.folder }));
+  const connectorPlacesKey = connectorPlaces.map((p) => placeKey(p.host, p.folder)).join("\n");
+  useEffect(() => {
+    const read = () => void store.refreshEndedConnections(connectorPlaces);
+    read();
+    const every = window.setInterval(read, 5 * 60 * 1000);
+    return () => window.clearInterval(every);
+  }, [connectorPlacesKey]);
   const showsArchived = folds.showsArchivedFolders.value;
   const offline = store.hosts.value.filter((h) => !hostAnswers(h.state));
   const macHost = store.hosts.value.find((h) => h.id === store.macHostID.value);
@@ -679,8 +696,16 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
 
   const here = r.host === host.id && r.folder !== undefined && folderKey(r.folder) === folderKey(folder);
   const archiveCount = (summary.counts.archived ?? 0) + archivedWorkflows.length;
-  const mcpServers = folderServers(store.mcpHealthOf(host.id), folder);
+  // The project's connectors, one row for all its folders (#3407): this machine's folder, else the first online one.
+  const connectors = connectorsPlace(group, store.macHostID.value, (h) => store.hostIsOnline(h));
+  const connectorsHost = connectors.host.id;
+  const connectorsFolder = connectors.folder.folder.folder;
+  const mcpServers = folderServers(store.mcpHealthOf(connectorsHost), connectorsFolder);
   const mcpTally = healthTally(mcpServers);
+  const endedConnection = store.endedInFolders.value[placeKey(connectorsHost, connectorsFolder)];
+  const connectorsWords = [mcpTally?.words ?? "No connectors yet", endedConnection && endedLine([endedConnection])]
+    .filter((w): w is string => !!w).join(". ");
+  const connectorsHere = r.host === connectorsHost && r.folder !== undefined && folderKey(r.folder) === folderKey(connectorsFolder);
   const fold = (open: boolean) => folds.set(host.id, folder, open);
   const folderPinned = summary.folder.pinned === true;
   const folderMenu: MenuItem[] = [
@@ -845,13 +870,13 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
               <button class="link show-all" onClick={() => (showsAllMatches.value = true)}>Show all {archived.length}</button>
             )}
           </> : <>
-          {/* Its connectors (#753), under every folder even with none yet (#1422): a page, red when one does not answer,
-              with how many after the title, small and grey, none at zero (#1569). */}
+          {/* Its connectors (#753), under every group even with none yet (#1422): a page, red when one does not answer or a
+              slot's connection ended (#3407), with how many after the title, small and grey, none at zero (#1569). */}
           <div class="nav-item">
-            <div class={`row page-row${here && r.mcp ? " chosen" : ""}`}>
-              <button class="pick" aria-current={here && !!r.mcp} aria-label={`Connectors, ${mcpTally?.words ?? "none yet"}`}
-                title={mcpTally?.words ?? "No connectors yet"} onClick={() => go({ host: host.id, folder: folder, mcp: true })}>
-                <span class={`pin-mark${mcpTally?.failing ? " warns" : ""}`} aria-hidden="true">▤</span>
+            <div class={`row page-row${connectorsHere && r.mcp ? " chosen" : ""}`}>
+              <button class="pick" aria-current={connectorsHere && !!r.mcp} aria-label={`Connectors, ${mcpTally || endedConnection ? connectorsWords : "none yet"}`}
+                title={connectorsWords} onClick={() => go({ host: connectorsHost, folder: connectorsFolder, mcp: true })}>
+                <span class={`pin-mark${mcpTally?.failing || endedConnection ? " warns" : ""}`} aria-hidden="true">▤</span>
                 <span class="title">Connectors{mcpServers.length > 0 && <span class="count">{mcpServers.length}</span>}</span>
               </button>
             </div>

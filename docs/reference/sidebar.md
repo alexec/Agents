@@ -32,7 +32,8 @@ The folders of one project are one group, in the place of the first of them. See
 
 **Status** and **Usage** each fold, as a folder does. Both start open. A row in **Status**
 shows its icon in red when something is wrong: **Runtimes** when no runtime can start,
-and **Connectors** when a connector does not answer.
+and **Connectors** when one of your connectors does not answer or one of your connections
+ended (for example, a GitLab token that expired). Its tooltip says which.
 
 ## Smart groups
 
@@ -96,8 +97,11 @@ heading to open it. In order, an open folder holds:
   first, and each folder keeps its own fold. A search opens it to show what matched. It
   shows only when the folder has a workflow that is not archived and not pinned. Pinned
   workflows are in **Pinned**.
-- **Connectors,** a row that opens the folder's connectors, with how many it has. It is
-  red when one does not answer.
+- **Connectors,** a row that opens the project's connectors, with how many it has: its
+  set-up, its slots and its repository's `.agents/mcp.json`. A project with folders on
+  several machines has one row, for the folder on this machine, else the first one that is
+  online. It is red when a connector does not answer, or when the connection that its
+  slots use ended.
 - **Archived,** a row that opens a page of the folder's archived sessions and
   workflows. It shows only when there is something archived.
 

@@ -83,6 +83,15 @@ public enum SidebarProjects {
         return labels
     }
 
+    /// The folder whose connectors the group's Connectors row shows (#3407): the one on this
+    /// machine, else the first whose machine answers, else the main one. The repository's
+    /// `.agents/mcp.json` is the same in every clone, so any one folder is correct; health is
+    /// read on each host, so one that answers says more.
+    public static func connectorsFolder(_ group: Group, here: MachineRef = .mac,
+                                        isOnline: (MachineRef) -> Bool) -> DaemonAPI.FolderSummary {
+        group.folders.first { $0.host == here } ?? group.folders.first { isOnline($0.host) } ?? group.main
+    }
+
     /// What a session's row in the group says after its title: its machine's name, when the
     /// group's folders are on more than one machine and the session is not on this one.
     public static func machineMark(of agent: Agent, in group: Group, here: MachineRef = .mac,
