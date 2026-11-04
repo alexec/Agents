@@ -394,7 +394,13 @@ func (i *Installer) installToolsets(ctx context.Context, server installer, found
 	if dist == "" {
 		dist = nodeDist
 	}
-	for _, t := range loadToolsets(i.ToolsetFolder, runtimes) {
+	toolsets, missing := loadToolsets(i.ToolsetFolder, runtimes)
+	for _, why := range missing {
+		if i.Log != nil {
+			i.Log("hosts/install: no toolset for %s on %s", why, name)
+		}
+	}
+	for _, t := range toolsets {
 		if err := server.installToolset(ctx, t, found, dist, folder); err != nil {
 			text := err.Error()
 			if p, ok := err.(*Problem); ok {

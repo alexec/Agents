@@ -84,7 +84,9 @@ RUN apk add --no-cache ca-certificates openssh-client github-cli tini && adduser
 COPY --from=go /out/agents-control /out/workspace-commands /out/agents-hosted /
 COPY --from=web /src/Web/dist/ /web/
 COPY --from=servers /out/servers/ /servers/
-COPY App/Resources/toolsets/ /toolsets/
+# Readable by the control user whatever the build machine's umask left them (#3383): a
+# /toolsets it could not read put no runtime on a server that joined.
+COPY --chmod=0755 App/Resources/toolsets/ /toolsets/
 COPY deploy/compose.public.yaml deploy/compose.hosted.yaml deploy/Caddyfile.public \
      deploy/Caddyfile.hosted deploy/make-secrets.sh /deploy/
 USER control
