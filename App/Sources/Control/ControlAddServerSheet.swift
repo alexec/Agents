@@ -411,7 +411,7 @@ struct ControlAddServerSheet: View {
                 outcome = result
                 if case .added(let joined, _) = result, let prefill, let provider = prefill.provider,
                    let workspace = prefill.workspace {
-                    await control.linkWhenJoined(name: joined, provider: provider, workspace: workspace)
+                    await control.linkWhenJoined(name: joined, provider: provider, workspace: workspace, trust: trusting)
                 }
             }
         }

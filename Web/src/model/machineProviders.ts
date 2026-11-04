@@ -102,6 +102,8 @@ export const providerWords = {
   startFirst: "Start it first: it has to be running to be installed.",
   installNote: (provider: string) => `The control plane installs Agents on it over its own ssh, and links the machine to it, so ${provider} starts it again.`,
   installing: "Installing Agents… This takes a minute or two.",
+  linking: "Linking… This reads the machine’s ssh host key.",
+  linkTrustNote: (fingerprint: string) => `This machine’s host key is new to the control plane: ${fingerprint}. Link only if this is the key the machine shows (ssh-keygen -lf on its host key): its provider starts it over ssh with this key.`,
   trustNote: (fingerprint: string) => `This machine’s host key is new to the control plane: ${fingerprint}. Install only if this is the key the machine shows (ssh-keygen -lf on its host key).`,
   installed: (name: string) => `Installed on ${name}. It is linked to this machine when it joins.`,
 };

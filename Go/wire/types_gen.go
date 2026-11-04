@@ -6122,7 +6122,7 @@ type MachineLastHeard struct {
 	HeardAt *Date `json:"heardAt,omitzero"`
 }
 
-// hosts/link.
+// hosts/link. A machine whose ssh host key the control plane has not trusted yet (one that joined with the command, #3379) is refused -32069 hostKeyToTrust, data {fingerprint}, until trust is that fingerprint: the key is then kept for the machine's ssh start.
 type MachineLink struct {
 	Host MachineRef `json:"host"`
 
@@ -6133,6 +6133,8 @@ type MachineLink struct {
 	StartWhenUsed *bool `json:"startWhenUsed,omitzero"`
 
 	StopWhenIdleMinutes *int64 `json:"stopWhenIdleMinutes,omitzero"`
+
+	Trust *string `json:"trust,omitzero"`
 }
 
 // hosts/setMachineOptions. stopWhenIdleMinutes 0 turns it off.
