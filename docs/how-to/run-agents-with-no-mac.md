@@ -58,13 +58,8 @@ tablet, use **Add a Browser…** in this one; see
 
    The machine then shows under **Machines** on the web page.
 
-   A codespace has no systemd, but its `systemctl` command does not say so, so the command
-   says **Started as the systemd user service agents-host.** and starts nothing (#3350).
-   Until that is fixed, start the host yourself, in the same terminal:
-
-   ```sh
-   ~/.agents-server/bin/current --root ~/.agents-server/root --serve --detach --control-network --host-name "$(hostname)"
-   ```
+   A codespace has no systemd, so the command starts the host in the background and says
+   **Started in the background (no systemd user session here).** (#3366).
 
 Do the same on any other Linux server. See [Add a machine](add-a-machine.md) for folders
 on the machine.
