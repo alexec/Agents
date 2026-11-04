@@ -682,7 +682,7 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
     ...(others.length === 0 ? [] : [
       { label: "Folders", disabled: true, run: () => {} },
       ...[group.main, ...others].map((placed) => ({
-        label: folderLine(placed.folder.name, placed.host.name,
+        label: folderLine(placed.folder.name, store.isMac(placed.host.id) ? "This Mac" : placed.host.name,
           machineState(store.hostIsOnline(placed.host.id), placed.host.workspace?.workspaceState)),
         disabled: linkDown || !store.hostIsOnline(placed.host.id), help: "Open this folder of the project",
         run: () => go({ host: placed.host.id, folder: placed.folder.folder.folder, compose: true }) })),
