@@ -333,10 +333,12 @@ func TestMembershipAdoptsOnlyANewerAcceptableList(t *testing.T) {
 	}
 }
 
-// #1996: a refused proof says what it means, where a person looks; anything else as it was.
+// #1996: a refused proof says what it means, where a person looks, and which program
+// made the attempt (#3451); anything else as it was.
 func TestABadProofIsSaidInWords(t *testing.T) {
 	u := &Uplink{Member: &Membership{Host: "mac"}}
-	if said := u.problem(Refuse(BadProof)); !strings.Contains(said, "key as mac") || !strings.Contains(said, "new host code") {
+	if said := u.problem(Refuse(BadProof)); !strings.Contains(said, "key as mac") || !strings.Contains(said, "new host code") ||
+		!strings.Contains(said, running()) || !strings.Contains(said, "installed") {
 		t.Fatal(said)
 	}
 	if said := u.problem(errors.New("dial: refused")); said != "dial: refused" {
