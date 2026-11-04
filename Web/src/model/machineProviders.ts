@@ -86,22 +86,26 @@ const kinds: Record<ProviderKind, KindInfo> = {
 
 export const providerWords = {
   heading: "Machine providers",
-  footer: "A provider starts and stops your machines: DigitalOcean Droplets, GitHub Codespaces, Coder workspaces, "
+  /** Under the list: what a provider is, and the kinds only the Mac app adds (#3425). */
+  footer: (hasMac: boolean) => "A provider starts and stops your machines: DigitalOcean Droplets, GitHub Codespaces, Coder workspaces, "
     + "Google Compute Engine VMs or AWS EC2 instances, through their API. It runs on the control plane, so it can start a machine that is down. "
-    + "Docker, Cloud Workstations, your own commands and MCP servers are added in the Mac app.",
+    + (hasMac ? "Docker, Cloud Workstations, your own commands and MCP servers are added in the Mac app."
+      : "The web page cannot add Docker, Cloud Workstations, your own commands or MCP servers yet."),
   off: "Machine providers are off on this control plane.",
   add: "Add Provider…",
   secretsFoot: "Tokens and keys go to the control plane and are never shown again. This page does not keep them.",
   editSecret: "Leave empty to keep the one it has.",
   removeTitle: (name: string) => `Remove ${name}?`,
   removeNote: "Its machines stay as they are, unlinked: nothing here can start or stop them any more.",
-  noHosts: "No machine to link: add one in the Mac app, or start one from a repository.",
+  noHosts: "No machine to link: add one in Settings ▸ Machines, with Add a Machine…, or start one from a repository.",
   notAHostYet: "Not joined yet, and it gives no ssh destination: add it with the command from Add a Machine…, then Link to Machine….",
   addAsMachine: "Add as Machine…",
   addAsMachineHelp: "Installs Agents on it over ssh, and links the machine to it.",
   startFirst: "Start it first: it has to be running to be installed.",
   installNote: (provider: string) => `The control plane installs Agents on it over its own ssh, and links the machine to it, so ${provider} starts it again.`,
   installing: "Installing Agents… This takes a minute or two.",
+  linking: "Linking… This reads the machine’s ssh host key.",
+  linkTrustNote: (fingerprint: string) => `This machine’s host key is new to the control plane: ${fingerprint}. Link only if this is the key the machine shows (ssh-keygen -lf on its host key): its provider starts it over ssh with this key.`,
   trustNote: (fingerprint: string) => `This machine’s host key is new to the control plane: ${fingerprint}. Install only if this is the key the machine shows (ssh-keygen -lf on its host key).`,
   installed: (name: string) => `Installed on ${name}. It is linked to this machine when it joins.`,
 };

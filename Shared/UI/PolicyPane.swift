@@ -6,7 +6,8 @@ import SwiftUI
 /// above, and where it comes from. The machine resolves the layers (`policy/effective`) and
 /// keeps your layer (`policy/yours`, `policy/setYours`); this pane draws and asks.
 ///
-/// One view for the Mac's Settings pane and, read only at first, the Remote's (slice 6). The
+/// One view for the Mac's Settings pane and the Remote's (slice 6), where only the rules it
+/// changed before are changed and the rest are read only (FR-027). The
 /// web page's is `Web/src/views/settings/AgentsPolicy.tsx`.
 struct PolicyPane: View {
     /// The machine that keeps your layer (the Mac's own host), or nil while it can't be reached.
@@ -15,6 +16,9 @@ struct PolicyPane: View {
     let revision: Int
     /// Opens Organisation Policy, where there is one to open.
     var openOrganisationPolicy: (() -> Void)?
+    /// The rules this client changes; nil is every rule. The Remote's are
+    /// `PolicyLayersWords.remoteEditable` (FR-027): it shows the others read only.
+    var editableRules: Set<String>?
 
     @State private var effective: DaemonAPI.EffectivePolicy?
     @State private var yours: DaemonAPI.YourPolicyState?
@@ -35,7 +39,8 @@ struct PolicyPane: View {
                         ForEach(PolicyLayersWords.rows(in: section)) { row in
                             PolicyRuleRow(row: row, rule: effective.rules.first { $0.rule == row.rule },
                                           yours: yours.flatMap { PolicyLayersWords.value($0.policy.rules, row.rule) },
-                                          editable: yours != nil && !isSaving) { value in
+                                          editable: yours != nil && !isSaving
+                                              && editableRules?.contains(row.rule) != false) { value in
                                 Task { await save(row.rule, value) }
                             }
                         }
@@ -75,6 +80,9 @@ struct PolicyPane: View {
                 } else {
                     Text(PolicyLayersWords.foldersLine(effective.foldersWithRules.count))
                         .appText(.fine).foregroundStyle(.secondary)
+                }
+                if editableRules != nil {
+                    Text(PolicyLayersWords.readOnlyLine).appText(.fine).foregroundStyle(.secondary)
                 }
                 if let behind = PolicyLayersWords.behindLine(effective.behind) {
                     Text(behind).appText(.fine).tinted(.attention)

@@ -177,3 +177,11 @@ test("runtimes: a server's Claude or Codex offers Sign In… only when it is not
   assert.equal(r.machineSignInLine(on({ signedIn: false, relayed: true })), "Uses the Mac’s sign-in");
   assert.equal(r.machineSignInWords.title("Claude", "codespace"), "Sign In to Claude on codespace");
 });
+
+test("runtimes hint: the Mac's panes with a Mac, the machines' own rows with none (#3382)", () => {
+  assert.match(r.runtimesHint(true), /on the Mac, in Settings ▸ Agent Runtimes/);
+  const none = r.runtimesHint(false);
+  assert.doesNotMatch(none, /\bMac\b/);
+  assert.match(none, /Add a Machine…/);
+  assert.match(none, /Sign In…/);
+});

@@ -78,16 +78,21 @@ RUN npm run build
 
 # Named base: deploy/demo builds its codes job from it.
 FROM alpine:3.24 AS base
-RUN apk add --no-cache ca-certificates openssh-client github-cli && adduser -D -u 10001 control \
+RUN apk add --no-cache ca-certificates openssh-client github-cli tini && adduser -D -u 10001 control \
  && mkdir /data && chown control /data
 # workspace-commands sits beside agents-control, where it looks first.
 COPY --from=go /out/agents-control /out/workspace-commands /out/agents-hosted /
 COPY --from=web /src/Web/dist/ /web/
 COPY --from=servers /out/servers/ /servers/
-COPY App/Resources/toolsets/ /toolsets/
+# Readable by the control user whatever the build machine's umask left them (#3383): a
+# /toolsets it could not read put no runtime on a server that joined.
+COPY --chmod=0755 App/Resources/toolsets/ /toolsets/
 COPY deploy/compose.public.yaml deploy/compose.hosted.yaml deploy/Caddyfile.public \
      deploy/Caddyfile.hosted deploy/make-secrets.sh /deploy/
 USER control
 EXPOSE 8791
-ENTRYPOINT ["/agents-control"]
+# tini is PID 1 (#3380): agents-control starts gh and ssh, and their children are orphaned to
+# PID 1, which must reap them or they stay as zombies. In the image, so every runner gets it
+# (compose, docker run, the GCP VM) with no --init.
+ENTRYPOINT ["/sbin/tini", "--", "/agents-control"]
 CMD ["serve", "--bind", "0.0.0.0", "--port", "8791"]

@@ -150,9 +150,12 @@ export function levelsSentence(levels: MCPLevels | undefined): string {
   return `Reaches ${reached.join(", ")}. Not yet ${not.join(", ")}.`;
 }
 
-export const personalIntro = "Every connector in your own ~/.agents/mcp.json, which every agent has. "
-  + "A hosted one runs once on this machine; any other is checked every four hours, and when its entry changes. "
-  + "Edit them in the Mac's Settings ▸ Agent Configuration ▸ Connectors.";
+/** Above the personal connectors: where they are edited, on the Mac or, with none, in each machine's file (#3425). */
+export function personalIntro(hasMac: boolean): string {
+  return "Every connector in your own ~/.agents/mcp.json, which every agent has. "
+    + "A hosted one runs once on this machine; any other is checked every four hours, and when its entry changes. "
+    + (hasMac ? "Edit them in the Mac's Settings ▸ Agent Configuration ▸ Connectors." : "Edit them in ~/.agents/mcp.json on each machine.");
+}
 export const folderIntro = "Every connector in this folder's .agents/mcp.json. "
   + "A hosted one runs once on its machine; any other is checked every four hours, and when its entry changes. "
   + "Edit them in the folder's settings.";

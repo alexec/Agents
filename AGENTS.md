@@ -4,6 +4,7 @@
 
 - **For the project's purpose and setup:** READ `README.md`.
 - **For architecture, terminology and decisions:** CONSULT `docs/`.
+- **For hosting, sign-in, trust and customer data:** FOLLOW the principles in `docs/explanation/direction.md` (#3403). A spec, plan or issue agrees with them, or says which one it leaves out and why.
 - **For a task a skill covers:** USE the skill in `.agents/skills/`.
 - **When a task calls for a specialist perspective:** ADOPT a persona from `.agents/personas/`.
 

@@ -6,7 +6,7 @@
 //            the page's socket, so it is in no screenshot), Add as Machine… on the codespace,
 //            trust its host key, and wait for the machine to join and be linked.
 //   command: remove $WALK_HOST over the page's socket, then Add a Machine ▸ A server's command.
-//   link:    Link to Machine… on a codespace whose machine joined with no link.
+//   link:    Link to Machine… on a codespace whose machine joined with no link (Trust and Link, #3379).
 //   stop:    Stop on the linked codespace's row.
 //   signin:  Runtimes: the codespace's Claude says Sign In…; the sheet gives Claude's link.
 //   machine: Settings ▸ Machines and the provider's card: what they say about the codespace now.
@@ -121,7 +121,16 @@ try {
     await page.waitFor(dialog);
     await page.shot(`${out}/web-9-link.png`);
     await page.press("Link");
-    await page.waitFor(`${section}.textContent.includes("linked to")`, 60_000);
+    // A machine that joined with the command has no host key trusted yet (#3379): the dialog
+    // shows the codespace's and asks to trust it.
+    const trustButton = `[...(${dialog})?.querySelectorAll("button") ?? []].find((b) => b.textContent === "Trust and Link")`;
+    await page.waitFor(`!!(${trustButton}) || ${section}.textContent.includes("linked to")`, 150_000);
+    if (await page.eval(`!!(${trustButton})`)) {
+      console.log("dialog: " + (await page.text("dialog[open]")).replace(/\s+/g, " ").slice(0, 600));
+      await page.shot(`${out}/web-9b-trust.png`);
+      await page.eval(`(${trustButton}).click()`);
+    }
+    await page.waitFor(`${section}.textContent.includes("linked to")`, 150_000);
     check(true, "linked to its machine");
     await page.shot(`${out}/web-10-linked.png`);
   } else if (stage === "stop") {

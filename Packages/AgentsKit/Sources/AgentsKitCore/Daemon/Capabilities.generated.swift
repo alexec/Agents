@@ -136,6 +136,7 @@ public enum Capability {
     public static let storage1 = "storage/1"
     public static let store1 = "store/1"
     public static let suggestions1 = "suggestions/1"
+    public static let summaryMachines1 = "summary.machines/1"
     public static let surface1 = "surface/1"
     public static let time1 = "time/1"
     public static let tunnel1 = "tunnel/1"
@@ -191,6 +192,7 @@ public enum Capability {
         "agents/start": "agents/1",
         "agents/stop": "agents/1",
         "agents/stopBackground": "agents/1",
+        "agents/summaryFacts": "summary.machines/1",
         "agents/touchedPaths": "agents/1",
         "agents/transcript": "agents/1",
         "agents/turns": "agents/1",
@@ -618,6 +620,7 @@ public enum Capability {
         "machines/sessionCall": "sessions.elsewhere/1",
         "machines/sessionEnded": "sessions.elsewhere/1",
         "machines/startSession": "sessions.on-machine/1",
+        "machines/summaryFacts": "summary.machines/1",
         "notices/take": "notices/1",
         "orgRoutes/check": "org-routes/1",
         "orgRoutes/list": "org-routes/1",

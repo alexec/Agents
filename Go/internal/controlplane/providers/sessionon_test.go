@@ -1,8 +1,10 @@
 package providers
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/wire"
@@ -302,5 +304,53 @@ func TestAnAgentReachesItsProjectOnOtherMachines(t *testing.T) {
 	out, _ = h.agentCall(MethodProjectFolders, map[string]any{"project": "p-app"})
 	if m := out.(wire.ProjectFolders).Machines; len(m) != 1 || m[0].MachineName != "other" {
 		t.Fatalf("%+v", m)
+	}
+}
+
+// The daily summary's facts from the person's other machines (#3354): each one online is
+// asked for its agents/summaryFacts; one that is off, or does not answer, is named with why;
+// the asking machine, another person's and a relay are not in it.
+func TestTheSummaryAsksThePersonsOtherMachines(t *testing.T) {
+	h := newHarness(t)
+	const laptop, kims, relay, old = "laptop01", "kims0001", "relay001", "old00001"
+	for _, m := range [][2]string{{laptop, "laptop"}, {kims, "kims-mac"}, {old, "old-box"}} {
+		h.enroll(m[0], m[1])
+	}
+	if err := h.records.SaveHost(context.Background(), records.MachineRecord{ID: relay, Name: "relay", Platform: "macOS", Version: "1", Relay: new(true)}); err != nil {
+		t.Fatal(err)
+	}
+	h.providers.hooks.OwnerOf = func(host string) string {
+		if host == kims {
+			return "kim"
+		}
+		return "lee"
+	}
+	for _, host := range []string{devbox, kims, relay, old} {
+		h.router.setOnline(host, true)
+	}
+	h.router.mu.Lock()
+	h.router.answer = func(host, method string, params json.RawMessage) *Reply {
+		if host == old {
+			return &Reply{Error: &Failure{Code: -32601, Message: "no such method"}}
+		}
+		return &Reply{Result: rawOf(wire.SummaryFacts{Folders: 2, Landed: []string{"Session \"Fix it\" in app done."},
+			Failed: []string{}, Waiting: []string{}, Suggested: []string{}, Checked: []string{}})}
+	}
+	h.router.mu.Unlock()
+
+	out, err := h.agentCall(MethodSummaryFacts, wire.SummaryFactsRequest{Since: wire.DateOf(time.Now().Add(-time.Hour))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := out.(wire.MachinesSummaryFacts).Machines
+	if len(got) != 3 || got[0].MachineName != "devbox" || got[0].Facts == nil || got[0].Facts.Folders != 2 ||
+		got[1].MachineName != "laptop" || got[1].Unreached == nil || *got[1].Unreached != "off" ||
+		got[2].MachineName != "old-box" || got[2].Facts != nil || got[2].Unreached == nil {
+		t.Fatalf("%+v", got)
+	}
+	for _, d := range h.router.deliveries() {
+		if d.method != wire.CallAgentsSummaryFacts.Name || d.host == other || d.host == kims || d.host == relay {
+			t.Fatalf("asked %+v", d)
+		}
 	}
 }

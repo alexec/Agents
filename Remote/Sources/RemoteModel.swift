@@ -885,6 +885,11 @@ final class RemoteModel {
     /// The organisation's policy as the Mac's host follows it (#998): the red strip on every
     /// page and the composer's reason while the kill switch is on. Nil from an older Mac.
     private(set) var policyState: DaemonAPI.PolicyState?
+    /// Moves when the Mac's host says a policy layer changed (#2957, `policy/effectiveChanged`):
+    /// Settings ▸ Agents ▸ Policy reads the layers again.
+    private(set) var policyRevision = 0
+    /// The machine that keeps your layer of the policy: the Mac's own host.
+    var policyHost: DaemonClient { client }
     /// The person's own pass-through names on the Mac, each marked when the policy refuses it (#998).
     private(set) var passThrough = DaemonAPI.PassThroughState()
     private(set) var startChoicesState: StartChoicesState = .loading
@@ -2643,6 +2648,9 @@ final class RemoteModel {
                 await self.refreshSandboxSettings()
                 await self.refreshCostState()
             }
+        }
+        if notification.method == DaemonAPI.Notification.policyEffectiveChanged {
+            self.policyRevision += 1
         }
         if notification.method == DaemonAPI.Notification.runtimeChanged, self.parts.changed(.runtimes) {
             self.reloadRuntimes()

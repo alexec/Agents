@@ -1217,6 +1217,27 @@
       }
     },
     {
+      "name": "agents/summaryFacts",
+      "x-capability": "summary.machines/1",
+      "description": "From the control plane only (#3354): this machine's facts for the daily summary that another of the person's machines writes: sessions done and stopped, what waits on the person, suggestions not taken, and what the checks found here.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SummaryFactsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SummaryFacts"
+        }
+      }
+    },
+    {
       "name": "agents/touchedPaths",
       "x-capability": "agents/1",
       "tags": [
@@ -8630,6 +8651,10 @@
       "hostOffline": {
         "code": -32090,
         "message": "hostOffline"
+      },
+      "hostKeyToTrust": {
+        "code": -32069,
+        "message": "hostKeyToTrust"
       },
       "importedAgent": {
         "code": -32096,

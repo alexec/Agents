@@ -176,7 +176,7 @@ export function Changes({ store, host, session }: { store: Store; host: string; 
   if (!list.value) return <p class="hint">Reading what changed…</p>;
   const changes = list.value;
   // Why git's half is missing, as the Remote says it: a chat (#229) is in no repository.
-  const unavailable = unavailableNote(changes.git);
+  const unavailable = unavailableNote(changes.git, store.isMac(host) ? undefined : store.hosts.value.find((h) => h.id === host)?.name ?? host);
   if (!changes.files.length) {
     return (
       <>

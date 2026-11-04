@@ -311,3 +311,40 @@ func TestUntarXZStaysInside(t *testing.T) {
 		}
 	}
 }
+
+// On a server, Claude's npx is not Claude installed (#3378): every machine with Node has one,
+// and Claude's sign-in needs its toolset's command line or the person's own claude.
+func TestAServerTakesNPXAsNoClaude(t *testing.T) {
+	home, own := t.TempDir(), t.TempDir()
+	t.Setenv("HOME", home)
+	oldShell, oldMac := loginShellPath, macToolsHome
+	loginShellPath, macToolsHome = func(string) []string { return []string{own} }, ""
+	resetShellPath := func() { shellPath.Lock(); shellPath.key = ""; shellPath.Unlock() }
+	resetShellPath()
+	t.Cleanup(func() { loginShellPath, macToolsHome = oldShell, oldMac; resetShellPath() })
+	claude, codex := runtimeByID("claude"), runtimeByID("codex")
+
+	if installedAt(claude, "") || !installedAt(codex, "/usr/bin/codex-acp") {
+		t.Fatal("a runtime that is not npx is installed where it was found")
+	}
+	// A CI runner or a dev machine can have its own claude in one of the usual places.
+	if onPath([]string{"PATH=" + strings.Join(searchPaths(), ":")}, "claude") == "" && installedAt(claude, "/usr/bin/npx") {
+		t.Fatal("npx alone is taken as Claude installed")
+	}
+	shim := filepath.Join(toolsetFolder("claude"), "current", "bin", "npx")
+	os.MkdirAll(filepath.Dir(shim), 0o755)
+	os.WriteFile(shim, []byte("#!/bin/sh\n"), 0o755)
+	os.WriteFile(filepath.Join(filepath.Dir(filepath.Dir(shim)), "ok"), nil, 0o644)
+	if !installedAt(claude, shim) {
+		t.Fatal("Claude's toolset is not taken as Claude installed")
+	}
+	os.WriteFile(filepath.Join(own, "claude"), []byte("#!/bin/sh\n"), 0o755)
+	if !installedAt(claude, "/usr/bin/npx") {
+		t.Fatal("the person's own claude is not taken as Claude installed")
+	}
+	macToolsHome = t.TempDir()
+	os.Remove(filepath.Join(own, "claude"))
+	if !installedAt(claude, "/usr/bin/npx") {
+		t.Fatal("a Mac's npx is Claude, as before")
+	}
+}

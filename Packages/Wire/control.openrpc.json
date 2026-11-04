@@ -2407,6 +2407,11 @@
     {
       "name": "hosts/remove",
       "x-capability": "hosts/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -2934,6 +2939,27 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/UUID"
+        }
+      }
+    },
+    {
+      "name": "machines/summaryFacts",
+      "x-capability": "summary.machines/1",
+      "description": "Through host/machines only (#3354): the Daily summary workflow's facts from each of the person's other machines. The control plane asks each one online for its agents/summaryFacts at once; one that is off, or does not answer in time, is named with why.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SummaryFactsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MachinesSummaryFacts"
         }
       }
     },
