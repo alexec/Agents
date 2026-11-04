@@ -63,7 +63,7 @@ func (s schema) lookup(name string) (property, bool) {
 type args struct {
 	repo, branch, label, workflow string
 	pr, issue, run                int
-	anyone, mine        bool
+	anyone, mine                  bool
 }
 
 // check reads raw (null or missing as {}) and checks it: no unknown keys, types, shapes.
