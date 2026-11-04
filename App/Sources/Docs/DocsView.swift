@@ -10,6 +10,10 @@ final class DocsListState {
     var sort = DocsList.Sort.updated
     /// A source's key, or "" for All.
     var only = ""
+    /// A project's id, or "" for All projects (#3408).
+    var inProject = ""
+    /// The organisation's projects' names, by id; none without a control plane.
+    var projectNames: [String: String] = [:]
     var query = ""
     var results: [DocsList.Result]?
     var searching = false
@@ -34,8 +38,36 @@ final class DocsListState {
                 read.append(.init(host: machine.id, name: machine.name, problem: error.localizedDescription))
             }
         }
+        await readProjectNames(model: model)
         // A newer Refresh wins.
         if asked == self.asked { lists = read }
+    }
+
+    /// The projects' names, from the control plane; a failed read keeps the last.
+    func readProjectNames(model: AppModel) async {
+        guard let control = model.controlRequests,
+              let got = try? await control.call(DaemonAPI.Method.projectsList, DaemonAPI.Empty(),
+                                                returning: DaemonAPI.ProjectList.self) else { return }
+        projectNames = Dictionary(got.projects.map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a })
+    }
+
+    /// The project of a machine's folder, by the folder's path, as its summary names it; a project
+    /// not on the list is said by the folder's own name.
+    func projectOf(model: AppModel) -> DocsList.ProjectOf {
+        let folders = model.folders
+        let names = projectNames
+        return { host, folder in
+            guard let folder else { return nil }
+            let wanted = Folder.standardize(URL(fileURLWithPath: folder))
+            guard let summary = folders.first(where: { $0.host == host && Folder.standardize($0.folder.folder) == wanted }),
+                  let id = summary.project else { return nil }
+            return DocsList.Project(id: id, name: names[id] ?? summary.name)
+        }
+    }
+
+    /// The sources the list shows, each project's once.
+    func rows(model: AppModel) -> [DocsList.SourceRow] {
+        DocsList.sources(lists ?? [], projectOf: projectOf(model: model))
     }
 
     func search(model: AppModel) async {
@@ -45,9 +77,14 @@ final class DocsListState {
         // The typing rests first; a newer search cancels this one.
         try? await Task.sleep(for: .milliseconds(250))
         guard !Task.isCancelled else { return }
-        let sources = only.isEmpty ? nil : [only.hasPrefix("mcp:") ? only : String(only.split(separator: "|", maxSplits: 1).last ?? "")]
+        // One source is asked of each machine that has a folder of it; a connector of every machine.
+        let rows = rows(model: model)
+        let row = rows.first { $0.key == only }
+        let shown = rows.filter { (only.isEmpty || $0.key == only) && (inProject.isEmpty || $0.project?.id == inProject) }
         var got: [(host: MachineRef, results: [DaemonAPI.DocsSearchResult])] = []
         for machine in model.docsMachines {
+            let sources = row.map { DocsList.searchSources($0, on: machine.id) }
+            if sources?.isEmpty == true { continue }
             let found = try? await model.docs(DaemonAPI.Method.docsSearch,
                                               DaemonAPI.DocsSearchRequest(query: words, sources: sources, limit: 50),
                                               returning: DaemonAPI.DocsSearch.self, on: machine.id)
@@ -55,13 +92,13 @@ final class DocsListState {
         }
         guard !Task.isCancelled else { return }
         for list in got { for r in list.results where listedOn[r.doc.ref] == nil { listedOn[r.doc.ref] = list.host } }
-        results = DocsList.merged(got)
+        results = DocsList.results(DocsList.merged(got), in: shown)
         searching = false
     }
 }
 
 /// Docs (#3321, spec 3319), as the web page's Docs section: every machine's docs (`docs/list`),
-/// grouped by source, a folder's by its subfolders; search (`docs/search`) with each match's line
+/// grouped by source (each project once, #3408), a folder's by its subfolders, with a Project filter; search (`docs/search`) with each match's line
 /// and snippet; and a doc's page (`docs/read`), read only. Back and Forward go along the places.
 struct DocsView: View {
     @Environment(AppModel.self) private var model
@@ -102,7 +139,7 @@ private struct DocsListPane: View {
             content
         }
         .task(id: list.ask) { await list.load(model: model) }
-        .task(id: [list.query, list.only]) { await list.search(model: model) }
+        .task(id: [list.query, list.only, list.inProject]) { await list.search(model: model) }
     }
 
     private var filters: some View {
@@ -110,9 +147,22 @@ private struct DocsListPane: View {
             TextField("Search docs", text: $list.query)
                 .textFieldStyle(.roundedBorder)
                 .accessibilityLabel("Search docs")
+            let rows = list.rows(model: model)
+            let projects = DocsList.projects(rows)
+            if !projects.isEmpty {
+                Picker("Project", selection: $list.inProject) {
+                    Text("All projects").tag("")
+                    ForEach(projects) { Text($0.name).tag($0.id) }
+                }
+                .fixedSize()
+                .onChange(of: list.inProject) { _, project in
+                    // A source of another project is not in the list any more.
+                    if !project.isEmpty, rows.first(where: { $0.key == list.only })?.project?.id != project { list.only = "" }
+                }
+            }
             Picker("Source", selection: $list.only) {
                 Text("All").tag("")
-                ForEach(DocsList.sources(list.lists ?? [])) { Text($0.heading).tag($0.key) }
+                ForEach(rows.filter { list.inProject.isEmpty || $0.project?.id == list.inProject }) { Text($0.heading).tag($0.key) }
             }
             .fixedSize()
             if words.isEmpty {
@@ -133,7 +183,8 @@ private struct DocsListPane: View {
         } else if !words.isEmpty {
             results
         } else if let lists = list.lists {
-            let groups = DocsList.groups(lists, sort: list.sort, only: list.only)
+            let groups = DocsList.groups(lists, sort: list.sort, only: list.only, projectOf: list.projectOf(model: model),
+                                         project: list.inProject)
             List {
                 ForEach(lists.compactMap { l in l.problem.map { "\(l.name): \($0)" } }, id: \.self) { line in
                     Label(line, systemImage: "exclamationmark.triangle").foregroundStyle(.secondary)
@@ -299,15 +350,26 @@ private struct DocPage: View {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .task(id: ref) { await read() }
+        .task(id: ref) {
+            // The names, for the project the page says, while the doc is read.
+            if model.docsList.projectNames.isEmpty { Task { await model.docsList.readProjectNames(model: model) } }
+            await read()
+        }
     }
 
     private var doc: DaemonAPI.Doc? { reading?.reading.doc }
 
+    private var project: DocsList.Project? {
+        guard let reading else { return nil }
+        return model.docsList.projectOf(model: model)(reading.host, reading.reading.doc.folder)
+    }
+
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(doc.map(DocsList.shortForm) ?? ref).appText(.title).lineLimit(2)
-            Text([ref, doc.map { "updated " + DocsList.updatedWords($0) } ?? ""].filter { !$0.isEmpty && $0 != "updated " }
+            // The project it is in (#3408), as an issue's or a PR's page says it.
+            Text([project?.name ?? "", ref, doc.map { "updated " + DocsList.updatedWords($0) } ?? ""]
+                .filter { !$0.isEmpty && $0 != "updated " }
                 .joined(separator: " · "))
                 .appText(.fine).foregroundStyle(.secondary).textSelection(.enabled).lineLimit(1).truncationMode(.middle)
             HStack(spacing: 8) {
