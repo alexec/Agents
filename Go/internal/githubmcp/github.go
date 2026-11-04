@@ -101,6 +101,24 @@ func (d RunData) json() map[string]any {
 // passedJSON is checks.passed's payload: the run, with no failedJobs.
 func (d RunData) passedJSON() map[string]any { return d.run() }
 
+// CompletedRun is a finished workflow run of any trigger, as run.completed sees it (#3444): a
+// tag's release.yml or a workflow_dispatch run, which no pull request owns.
+type CompletedRun struct {
+	Run RunRef
+	// Workflow is the workflow's file name, as release.yml; Event is what started it, as push.
+	Workflow, Event, Conclusion, Actor string
+	// Trusted says whether the run is the repo's own: not from a fork, and started by a person,
+	// not a bot (#728).
+	Trusted bool
+}
+
+func (c CompletedRun) data() map[string]any {
+	return map[string]any{"run": map[string]any{
+		"id": c.Run.ID, "attempt": c.Run.Attempt, "name": c.Run.Name, "workflow": c.Workflow, "event": c.Event,
+		"branch": c.Run.Branch, "headSha": c.Run.HeadSHA, "url": c.Run.URL, "conclusion": c.Conclusion, "actor": c.Actor,
+	}, "completedAt": c.Run.UpdatedAt}
+}
+
 // OpenPR is an open pull request, drafts too, as pr.opened sees it (#833). Here and in the
 // PRs below, Trusted says whether the PR is the repo's own: its branch not in a fork, and its
 // author the repo's owner, a member or a collaborator, not a bot (#728).
@@ -257,6 +275,10 @@ type GitHub interface {
 	// RunDetails is the run's PR, and its failed jobs when jobs is true, or nil when it belongs to
 	// no PR. checks.passed asks for no jobs: its payload has none (#3107).
 	RunDetails(ctx context.Context, repo string, run RunRef, jobs bool) (*RunData, error)
+	// CompletedRuns are workflow runs of any trigger and conclusion that finished at or after since,
+	// in any order (#3444): only workflow's (a file name) when it is set, only branch's (a branch or a
+	// tag) when it is set, and only run id when it is not 0.
+	CompletedRuns(ctx context.Context, repo, workflow, branch string, run int, since string) (runs []CompletedRun, truncated bool, err error)
 	// PRBranch is the head branch of PR number pr. checks.failed and checks.passed with a pr and
 	// no branch list only that branch's runs, not the whole repo's (#3107).
 	PRBranch(ctx context.Context, repo string, pr int) (string, error)

@@ -25,6 +25,7 @@ type fakeGitHub struct {
 	reviewed   []ReviewedPR
 	rabbit     []CodeRabbitComment
 	prComments []PRComment
+	completed  []CompletedRun
 	err        error
 	noRepo     bool
 	// reviews and assigned are what ask the connection's owner, alexec (#2034).
@@ -147,6 +148,30 @@ func (f *fakeGitHub) runsWith(branch, since, conclusion string) ([]RunRef, bool,
 		}
 	}
 	return out, false, nil
+}
+
+func (f *fakeGitHub) CompletedRuns(_ context.Context, _, workflow, branch string, run int, since string) ([]CompletedRun, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.err != nil {
+		return nil, false, f.err
+	}
+	var out []CompletedRun
+	for _, r := range f.completed {
+		if (workflow == "" || r.Workflow == workflow) && (branch == "" || r.Run.Branch == branch) &&
+			(run == 0 || r.Run.ID == run) && !before(r.Run.UpdatedAt, since) {
+			out = append(out, r)
+		}
+	}
+	return out, false, nil
+}
+
+func (f *fakeGitHub) addCompleted(id, attempt int, workflow, branch, at, conclusion string, trusted bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.completed = append(f.completed, CompletedRun{Run: RunRef{ID: id, Attempt: attempt, Name: "Release",
+		URL: fmt.Sprintf("https://github.com/%s/actions/runs/%d", repo, id), HeadSHA: fmt.Sprintf("sha%d", id), Branch: branch, UpdatedAt: at},
+		Workflow: workflow, Event: "push", Conclusion: conclusion, Actor: "alexec", Trusted: trusted})
 }
 
 func (f *fakeGitHub) PRBranch(_ context.Context, _ string, pr int) (string, error) {
@@ -368,6 +393,8 @@ func TestEventsListGivesEveryEventPollOnlyWithTheirSchemas(t *testing.T) {
 		if strings.HasPrefix(name, "issue.") {
 			_, hasIssue := props["issue"]
 			equal(t, hasIssue, name != "issue.opened", name+" issue")
+		} else if name == "run.completed" {
+			equal(t, props["run"].(map[string]any)["type"], "integer", name+" run")
 		} else {
 			equal(t, props["pr"].(map[string]any)["type"], "integer", name+" pr")
 		}
@@ -375,7 +402,7 @@ func TestEventsListGivesEveryEventPollOnlyWithTheirSchemas(t *testing.T) {
 	sort.Strings(names)
 	equal(t, names, []string{"checks.failed", "checks.passed", "issue.assigned", "issue.closed", "issue.commented", "issue.labelled", "issue.opened",
 		"pr.closed", "pr.commented", "pr.conflicted", "pr.labelled", "pr.merged", "pr.opened", "pr.unlabelled", "review.comment", "review.posted",
-		"review.requested"}, "names")
+		"review.requested", "run.completed"}, "names")
 }
 
 func TestCursorNullGivesNoEventsAndACursor(t *testing.T) {
@@ -435,6 +462,53 @@ func TestAPassedRunGivesOneChecksPassedWithNoFailedJobsAndAFailedRunDoesNotLeakI
 	// checks.failed still ignores the passed run.
 	firstFailed := h.poll("checks.failed", args, nil)
 	equal(t, ids(h.poll("checks.failed", args, firstFailed["cursor"])), []string{"checks.failed:" + repo + ":9105:1"}, "checks.failed ids")
+}
+
+// run.completed wakes a release on its tag's release.yml or its dry run (#3444), whatever the
+// conclusion, once per run and attempt, filtered by workflow, branch and run.
+func TestRunCompletedRaisesAnyConclusionOncePerAttempt(t *testing.T) {
+	h := newHarness(t)
+	args := map[string]any{"repo": repo, "workflow": "release.yml", "branch": "v0.16.0"}
+	first := h.poll("run.completed", args, nil)
+	h.fake.addCompleted(9200, 1, "release.yml", "v0.16.0", h.at(5), "failure", true)
+	h.fake.addCompleted(9201, 1, "release.yml", "v0.15.0", h.at(5), "success", true)
+	h.fake.addCompleted(9202, 1, "ci.yml", "v0.16.0", h.at(5), "success", true)
+	raised := h.poll("run.completed", args, first["cursor"])
+	equal(t, ids(raised), []string{"run.completed:" + repo + ":9200:1"}, "only the tag's release.yml")
+	equal(t, eventsOf(raised)[0]["data"], map[string]any{
+		"run": map[string]any{"id": float64(9200), "attempt": float64(1), "name": "Release", "workflow": "release.yml", "event": "push",
+			"branch": "v0.16.0", "headSha": "sha9200", "url": "https://github.com/" + repo + "/actions/runs/9200",
+			"conclusion": "failure", "actor": "alexec"},
+		"completedAt": h.at(5),
+	}, "data")
+	h.fake.addCompleted(9200, 2, "release.yml", "v0.16.0", h.at(9), "success", true)
+	again := h.poll("run.completed", args, raised["cursor"])
+	equal(t, ids(again), []string{"run.completed:" + repo + ":9200:2"}, "a rerun is a new event")
+	equal(t, ids(h.poll("run.completed", args, again["cursor"])), []string{}, "raised once")
+
+	byID := map[string]any{"repo": repo, "run": float64(9203)}
+	firstByID := h.poll("run.completed", byID, nil)
+	h.fake.addCompleted(9203, 1, "release-dry-run.yml", "main", h.at(12), "cancelled", true)
+	h.fake.addCompleted(9204, 1, "release-dry-run.yml", "main", h.at(12), "success", true)
+	equal(t, ids(h.poll("run.completed", byID, firstByID["cursor"])), []string{"run.completed:" + repo + ":9203:1"}, "by run id")
+}
+
+func TestRunCompletedLeavesOutForksAndBotsUnlessAnyone(t *testing.T) {
+	h := newHarness(t)
+	own := map[string]any{"repo": repo}
+	anyone := map[string]any{"repo": repo, "anyone": true}
+	firstOwn, firstAnyone := h.poll("run.completed", own, nil), h.poll("run.completed", anyone, nil)
+	h.fake.addCompleted(9300, 1, "ci.yml", "fork/main", h.at(5), "success", false)
+	equal(t, ids(h.poll("run.completed", own, firstOwn["cursor"])), []string{}, "not the repo's own")
+	equal(t, ids(h.poll("run.completed", anyone, firstAnyone["cursor"])), []string{"run.completed:" + repo + ":9300:1"}, "anyone")
+}
+
+func TestRunCompletedRefusesAWorkflowThatIsNotAFileName(t *testing.T) {
+	h := newHarness(t)
+	_, err := h.rpc(map[string]any{"name": "run.completed", "arguments": map[string]any{"workflow": "../ci"}})
+	if err == nil || err.Code != -32602 {
+		t.Fatalf("got %v, want -32602", err)
+	}
 }
 
 func TestChecksWithAPRListOnlyItsBranchAndPassesFetchNoJobs(t *testing.T) {

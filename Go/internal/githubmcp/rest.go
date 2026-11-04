@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path"
 	"strconv"
 	"strings"
 	"sync"
@@ -428,66 +429,125 @@ func (g *RealGitHub) PassedRuns(ctx context.Context, repo, branch, since string)
 	return g.runs(ctx, repo, branch, since, "success", isSucceeded)
 }
 
+// runJSON is a workflow run as GitHub's API lists it.
+type runJSON struct {
+	ID           int    `json:"id"`
+	Attempt      int    `json:"run_attempt"`
+	Name         string `json:"name"`
+	DisplayTitle string `json:"display_title"`
+	Path         string `json:"path"`
+	Event        string `json:"event"`
+	HTMLURL      string `json:"html_url"`
+	HeadSHA      string `json:"head_sha"`
+	HeadBranch   string `json:"head_branch"`
+	Status       string `json:"status"`
+	Conclusion   string `json:"conclusion"`
+	UpdatedAt    string `json:"updated_at"`
+	CreatedAt    string `json:"created_at"`
+	PullRequests []struct {
+		Number int `json:"number"`
+	} `json:"pull_requests"`
+	Actor           user `json:"actor"`
+	TriggeringActor user `json:"triggering_actor"`
+	HeadRepository  *struct {
+		FullName string `json:"full_name"`
+	} `json:"head_repository"`
+}
+
+func (r runJSON) ref() RunRef {
+	name := r.Name
+	if name == "" {
+		name = r.DisplayTitle
+	}
+	attempt := r.Attempt
+	if attempt == 0 {
+		attempt = 1
+	}
+	number := 0
+	if len(r.PullRequests) > 0 {
+		number = r.PullRequests[0].Number
+	}
+	return RunRef{ID: r.ID, Attempt: attempt, Name: name, URL: r.HTMLURL, HeadSHA: r.HeadSHA,
+		Branch: r.HeadBranch, PRNumber: number, UpdatedAt: r.UpdatedAt}
+}
+
+func (r runJSON) completed(repo string) CompletedRun {
+	actor := r.TriggeringActor
+	if actor.Login == "" {
+		actor = r.Actor
+	}
+	own := r.HeadRepository == nil || strings.EqualFold(r.HeadRepository.FullName, repo)
+	bot := actor.Type == "Bot" || strings.HasSuffix(actor.Login, "[bot]")
+	return CompletedRun{Run: r.ref(), Workflow: path.Base(r.Path), Event: r.Event, Conclusion: r.Conclusion,
+		Actor: actor.Login, Trusted: own && actor.Login != "" && !bot}
+}
+
 // runs are pull_request runs updated at or after since whose status matches status, in any
 // order; matches filters the conclusion too, as a defensive double-check of status.
 func (g *RealGitHub) runs(ctx context.Context, repo, branch, since, status string, matches func(string) bool) ([]RunRef, bool, error) {
-	type run struct {
-		ID           int    `json:"id"`
-		Attempt      int    `json:"run_attempt"`
-		Name         string `json:"name"`
-		DisplayTitle string `json:"display_title"`
-		HTMLURL      string `json:"html_url"`
-		HeadSHA      string `json:"head_sha"`
-		HeadBranch   string `json:"head_branch"`
-		Status       string `json:"status"`
-		Conclusion   string `json:"conclusion"`
-		UpdatedAt    string `json:"updated_at"`
-		CreatedAt    string `json:"created_at"`
-		PullRequests []struct {
-			Number int `json:"number"`
-		} `json:"pull_requests"`
+	list := fmt.Sprintf("repos/%s/actions/runs?event=pull_request&status=%s", repo, status)
+	var runs []RunRef
+	truncated, err := g.listRuns(ctx, list, branch, since, func(r runJSON) {
+		if r.Status == "completed" && matches(r.Conclusion) {
+			runs = append(runs, r.ref())
+		}
+	})
+	return runs, truncated, err
+}
+
+func (g *RealGitHub) CompletedRuns(ctx context.Context, repo, workflow, branch string, run int, since string) ([]CompletedRun, bool, error) {
+	var runs []CompletedRun
+	keep := func(r runJSON) {
+		if r.Status == "completed" && !before(r.UpdatedAt, since) && (workflow == "" || path.Base(r.Path) == workflow) &&
+			(branch == "" || r.HeadBranch == branch) && (run == 0 || r.ID == run) {
+			runs = append(runs, r.completed(repo))
+		}
 	}
+	if run != 0 {
+		// One run is asked for by its id: no listing to page through.
+		var r runJSON
+		if err := g.get(ctx, fmt.Sprintf("repos/%s/actions/runs/%d", repo, run), true, &r); err != nil {
+			return nil, false, err
+		}
+		keep(r)
+		return runs, false, nil
+	}
+	list := fmt.Sprintf("repos/%s/actions/runs?status=completed", repo)
+	if workflow != "" {
+		list = fmt.Sprintf("repos/%s/actions/workflows/%s/runs?status=completed", repo, url.PathEscape(workflow))
+	}
+	truncated, err := g.listRuns(ctx, list, branch, since, keep)
+	return runs, truncated, err
+}
+
+// listRuns hands each run of list (a branch's only, when branch is set) updated at or after
+// since to keep, newest created first, until the runs were created before since's rerun window.
+func (g *RealGitHub) listRuns(ctx context.Context, list, branch, since string, keep func(runJSON)) (bool, error) {
 	floor := ""
 	if t, ok := parseTime(since); ok {
 		floor = timeString(t.Add(-rerunWindow))
 	}
-	path := fmt.Sprintf("repos/%s/actions/runs?event=pull_request&status=%s", repo, status)
 	if branch != "" {
-		path += "&branch=" + url.QueryEscape(branch)
+		list += "&branch=" + url.QueryEscape(branch)
 	}
-	var runs []RunRef
 	for page := 1; page <= maxPages; page++ {
-		var list struct {
-			Runs []run `json:"workflow_runs"`
+		var got struct {
+			Runs []runJSON `json:"workflow_runs"`
 		}
-		if err := g.get(ctx, query(path, page), true, &list); err != nil {
-			return nil, false, err
+		if err := g.get(ctx, query(list, page), true, &got); err != nil {
+			return false, err
 		}
-		for _, r := range list.Runs {
-			if r.Status != "completed" || !matches(r.Conclusion) || before(r.UpdatedAt, since) {
-				continue
+		for _, r := range got.Runs {
+			if !before(r.UpdatedAt, since) {
+				keep(r)
 			}
-			name := r.Name
-			if name == "" {
-				name = r.DisplayTitle
-			}
-			attempt := r.Attempt
-			if attempt == 0 {
-				attempt = 1
-			}
-			number := 0
-			if len(r.PullRequests) > 0 {
-				number = r.PullRequests[0].Number
-			}
-			runs = append(runs, RunRef{ID: r.ID, Attempt: attempt, Name: name, URL: r.HTMLURL, HeadSHA: r.HeadSHA,
-				Branch: r.HeadBranch, PRNumber: number, UpdatedAt: r.UpdatedAt})
 		}
 		// Runs are listed newest created first; a rerun keeps its created_at.
-		if len(list.Runs) < perPage || before(list.Runs[len(list.Runs)-1].CreatedAt, floor) {
-			return runs, false, nil
+		if len(got.Runs) < perPage || before(got.Runs[len(got.Runs)-1].CreatedAt, floor) {
+			return false, nil
 		}
 	}
-	return runs, true, nil
+	return true, nil
 }
 
 func (g *RealGitHub) RunDetails(ctx context.Context, repo string, run RunRef, wantJobs bool) (*RunData, error) {
