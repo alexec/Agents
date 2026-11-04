@@ -108,8 +108,15 @@ is not started. Run that command again in the codespace's terminal, with a new c
 
 ## What is missing for now
 
-- **The command does not start the host on a codespace** (#3350): start it yourself, as
-  above.
+- **Add as Machine… says "That took too long"** after 30 seconds, while the install goes on
+  (#3369's walk). Wait for the machine to show under **Machines**, then click **Link to
+  Machine…** on the codespace, so the provider starts it again.
+- **Sign In… on a codespace's Claude says Claude's command line is not on the machine**
+  (#3369's walk). Install it first in the codespace's terminal:
+  `npm install -g @anthropic-ai/claude-code`.
+- **A machine added with the command does not come back after a stop,** even when linked:
+  the control plane has no host key it trusts for the codespace (#3369's walk). Use **Add as
+  Machine…**, or run the command again.
 
 ## Related
 
