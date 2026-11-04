@@ -23,6 +23,7 @@ import {
 import { go, route } from "../../route";
 import { PolicySource } from "./PolicySource";
 import { GuardedChangeCard } from "../GuardedChange";
+import { useSettingsMachine } from "./SettingsMachine";
 
 export function AgentsPolicySection({ store, down }: { store: Store; down: boolean }) {
   const item = route.value.nav === "settings" ? route.value.item : undefined;
@@ -32,22 +33,23 @@ export function AgentsPolicySection({ store, down }: { store: Store; down: boole
     const id = item === organisationItem ? "settings-policy" : item?.startsWith("policy") ? "settings-agents-policy" : undefined;
     if (id) document.getElementById(id)?.scrollIntoView();
   }, [item]);
+  const { host, picker } = useSettingsMachine(store);
   return (
     <section aria-labelledby="settings-agents-policy">
       <h3 class="section-head" id="settings-agents-policy">{title}</h3>
-      <Layer key={folder ?? ""} store={store} down={down} folder={folder} />
+      {picker}
+      {host && <Layer key={`${host}|${folder ?? ""}`} store={store} host={host} down={down} folder={folder} />}
     </section>
   );
 }
 
 /** Your layer, or a folder's when folder is set. */
-function Layer({ store, down, folder }: { store: Store; down: boolean; folder: string | undefined }) {
+function Layer({ store, host, down, folder }: { store: Store; host: string; down: boolean; folder: string | undefined }) {
   const effective = useSignal<EffectivePolicy | null>(null);
   const yours = useSignal<YourPolicyState | null>(null);
   const folderState = useSignal<PolicyFolderState | null>(null);
   const problem = useSignal<string | null>(null);
   const saving = useSignal(false);
-  const host = store.macHostID.value;
   const load = async () => {
     try {
       if (folder === undefined) {

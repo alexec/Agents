@@ -1221,8 +1221,10 @@ export class Store extends Work {
     }
   }
 
+  /** The files, or why they could not be read (#3368). */
   async agentConfigEditorFiles(host: string, folder: string | undefined, kind: "skills" | "personas" | "workflows") {
-    return this.link.call("agentConfig/editorFiles", { folder: folder as never, kind }, host).catch(() => null);
+    return this.link.call("agentConfig/editorFiles", { folder: folder as never, kind }, host)
+      .catch((error: unknown) => ({ problem: describe(error) }));
   }
 
   async saveAgentConfigEditorFile(host: string, folder: string | undefined,

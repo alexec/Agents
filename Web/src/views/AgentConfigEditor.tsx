@@ -3,6 +3,8 @@ import type { AgentConfigEditorFile } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { Modal } from "./Modal";
 import { agentConfigurationFollows, thisMacOnly } from "../model/userScope";
+import { machineKeepsItsOwn, machineOnly } from "../model/settingsMachine";
+import { useSettingsMachine } from "./settings/SettingsMachine";
 
 export type AgentConfigKind = "skills" | "personas" | "workflows";
 const kinds: AgentConfigKind[] = ["skills", "personas", "workflows"];
@@ -68,7 +70,7 @@ export function AgentConfigEditor({ store, host, folder, kind, down, open, onUns
 
   async function reload(wanted = selected) {
     const listed = await store.agentConfigEditorFiles(host, folder, kind);
-    if (!listed) { setProblem("Files could not be loaded."); return; }
+    if ("problem" in listed) { setProblem(`Files could not be loaded. ${listed.problem}`); return; }
     setFiles(listed);
     pick(listed.some((file) => file.path === wanted) ? wanted : listed[0]?.path ?? "", listed);
   }
@@ -130,21 +132,25 @@ export function AgentConfigEditor({ store, host, folder, kind, down, open, onUns
 }
 
 /** `~/.agents` is the Mac's (#2766, #2704): said at the top, with what goes to the other machines, as the Mac and
- * the Remote. */
-function UserScopeLines() {
+ * the Remote. With no Mac (#3368), the chosen machine's, which keeps its own. */
+function UserScopeLines({ name }: { name?: string | undefined }) {
   return <div class="agent-config-sync">
-    <p><strong>{thisMacOnly}</strong></p>
-    <p class="hint">{agentConfigurationFollows}</p>
+    <p><strong>{name ? machineOnly(name) : thisMacOnly}</strong></p>
+    <p class="hint">{name ? machineKeepsItsOwn(name) : agentConfigurationFollows}</p>
   </div>;
 }
 
 export function AgentConfigSettingsSection({ store, down, kind }: {
   store: Store; down: boolean; kind: AgentConfigKind;
 }) {
+  const { host, name, isMac, picker } = useSettingsMachine(store);
   return <section aria-label={title(kind)}>
     <h3 class="section-head">{title(kind)}</h3>
-    <UserScopeLines />
-    <AgentConfigEditor store={store} host={store.macHostID.value} kind={kind} down={down} />
+    {picker}
+    {host && <>
+      <UserScopeLines name={isMac ? undefined : name} />
+      <AgentConfigEditor store={store} host={host} kind={kind} down={down} />
+    </>}
   </section>;
 }
 
