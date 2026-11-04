@@ -22,8 +22,9 @@ import (
 // lookup already does (lineagemilestone.go, #2935). Resolved on demand, not polled: a
 // lineage walk is read far less often than a sidebar list, so each node is asked again only
 // when it is walked again after resolveRecheck, and never when no folder is signed in to ask
-// with. Linear, milestones and releases are not resolved yet; a GitHub or GitLab issue or
-// pull request is.
+// with. Linear and releases are not resolved yet; a GitHub or GitLab issue, pull request or
+// milestone is. A milestone is sent to be resolved when an issue's milestone is found
+// (lineagemilestone.go), as no walk asks for it before Work lists it.
 //
 // Never on the walk's own path (#3102): a walk answers at once with what the cache holds
 // (a node past resolveRecheck keeps its old answer while it is asked again), and the nodes it
@@ -90,20 +91,10 @@ func (d *Daemon) resolvedGraph(g wire.LineageGraph) wire.LineageGraph {
 		if d.resolveAsking[n] || len(ask) >= resolvePerWalk {
 			continue
 		}
-		if d.resolveAsking == nil {
-			d.resolveAsking = map[wire.LineageNode]bool{}
-		}
-		d.resolveAsking[n] = true
 		ask = append(ask, n)
 	}
-	if d.resolveSlots == nil {
-		d.resolveSlots = make(chan struct{}, resolveWorkers)
-	}
-	d.resolveWait.Add(len(ask))
+	d.askResolveLocked(ask)
 	d.resolveMu.Unlock()
-	for _, n := range ask {
-		go d.resolveInBackground(n)
-	}
 	if len(resolved) > 0 {
 		g.Resolved = resolved
 	}
@@ -111,6 +102,35 @@ func (d *Daemon) resolvedGraph(g wire.LineageGraph) wire.LineageGraph {
 		g.Resolving = &pending
 	}
 	return g
+}
+
+// resolveSoon sends n to be asked in the background, unless it is being asked, or its answer
+// is younger than resolveRecheck.
+func (d *Daemon) resolveSoon(n wire.LineageNode) {
+	if _, _, ok := nodeOfRepo(n); !ok {
+		return
+	}
+	d.resolveMu.Lock()
+	defer d.resolveMu.Unlock()
+	if e, cached := d.resolveCache[n]; cached && nowFunc().Sub(e.at) < resolveRecheck || d.resolveAsking[n] {
+		return
+	}
+	d.askResolveLocked([]wire.LineageNode{n})
+}
+
+// askResolveLocked marks the nodes as being asked and asks each in the background.
+func (d *Daemon) askResolveLocked(ask []wire.LineageNode) {
+	if d.resolveAsking == nil {
+		d.resolveAsking = map[wire.LineageNode]bool{}
+	}
+	if d.resolveSlots == nil {
+		d.resolveSlots = make(chan struct{}, resolveWorkers)
+	}
+	d.resolveWait.Add(len(ask))
+	for _, n := range ask {
+		d.resolveAsking[n] = true
+		go d.resolveInBackground(n)
+	}
 }
 
 // resolveInBackground asks for n once a place is free, and caches the answer.
@@ -139,7 +159,8 @@ func (d *Daemon) resolveSettle(wait time.Duration) {
 }
 
 // resolveNode asks for n's title, state and labels and caches them; the answer is not ok when
-// n is not a GitHub or GitLab issue or pull request, or no folder is signed in to ask with.
+// n is not a GitHub or GitLab issue, pull request or milestone, or no folder is signed in to
+// ask with.
 func (d *Daemon) resolveNode(ctx context.Context, n wire.LineageNode) {
 	repo, num, ok := nodeOfRepo(n)
 	if !ok {
@@ -185,10 +206,10 @@ func (d *Daemon) dropOldestResolvedLocked() {
 	delete(d.resolveCache, oldest)
 }
 
-// nodeOfRepo is the repo and number of a GitHub or GitLab issue or pull request node:
-// github:o/r#12, gitlab:g/p!4.
+// nodeOfRepo is the repo and number of a GitHub or GitLab issue, pull request or milestone
+// node: github:o/r#12, gitlab:g/p!4, github:o/r/milestone/3 (GitLab: the milestone's iid).
 func nodeOfRepo(n wire.LineageNode) (forgeRepo, int, bool) {
-	if n.Kind != lineage.KindIssue && n.Kind != lineage.KindPR {
+	if n.Kind != lineage.KindIssue && n.Kind != lineage.KindPR && n.Kind != lineage.KindMilestone {
 		return forgeRepo{}, 0, false
 	}
 	forge, rest, ok := strings.Cut(n.Ref, ":")
@@ -196,7 +217,10 @@ func nodeOfRepo(n wire.LineageNode) (forgeRepo, int, bool) {
 		return forgeRepo{}, 0, false
 	}
 	sep := "#"
-	if n.Kind == lineage.KindPR && forge == "gitlab" {
+	switch {
+	case n.Kind == lineage.KindMilestone:
+		sep = "/milestone/"
+	case n.Kind == lineage.KindPR && forge == "gitlab":
 		sep = "!"
 	}
 	path, num, ok := strings.Cut(rest, sep)
@@ -207,8 +231,8 @@ func nodeOfRepo(n wire.LineageNode) (forgeRepo, int, bool) {
 	return forgeRepo{forge, path}, i, true
 }
 
-// forgeResolveNode asks gh or glab, in folder, for an issue's or pull request's title, state
-// and labels.
+// forgeResolveNode asks gh or glab, in folder, for an issue's, pull request's or milestone's
+// title, state and labels.
 func forgeResolveNode(ctx context.Context, folder string, repo forgeRepo, kind string, n int) (wire.LineageResolved, error) {
 	var exe, path string
 	switch {
@@ -220,8 +244,13 @@ func forgeResolveNode(ctx context.Context, folder string, repo forgeRepo, kind s
 		exe, path = forgeCLI("glab"), fmt.Sprintf("projects/%s/issues/%d", url.PathEscape(repo.path), n)
 	case repo.forge == "gitlab" && kind == lineage.KindPR:
 		exe, path = forgeCLI("glab"), fmt.Sprintf("projects/%s/merge_requests/%d", url.PathEscape(repo.path), n)
+	case repo.forge == "github" && kind == lineage.KindMilestone:
+		exe, path = forgeCLI("gh"), fmt.Sprintf("repos/%s/milestones/%d", repo.path, n)
+	case repo.forge == "gitlab" && kind == lineage.KindMilestone:
+		// GitLab's milestones/:id takes the global id; a node has the iid, which the list filters by.
+		exe, path = forgeCLI("glab"), fmt.Sprintf("projects/%s/milestones?iids[]=%d", url.PathEscape(repo.path), n)
 	default:
-		return wire.LineageResolved{}, fmt.Errorf("no issues or pull requests on %s", repo.forge)
+		return wire.LineageResolved{}, fmt.Errorf("no %s on %s", kind, repo.forge)
 	}
 	if exe == "" {
 		return wire.LineageResolved{}, errors.New("gh or glab is not installed")
@@ -244,17 +273,23 @@ type forgeIssueOrPR struct {
 	Labels   []json.RawMessage `json:"labels"`
 }
 
-// resolvedOf is a node's title, state and labels from the forge's own JSON for it. state is
-// normalized to open, closed or merged: GitLab's issues say "opened" for open, and a GitHub
-// pull request's own state says only open or closed, merged_at telling merged apart from
-// closed.
+// resolvedOf is a node's title, state and labels from the forge's own JSON for it: an object,
+// or for a GitLab milestone a list of the one. state is normalized to open, closed or merged:
+// GitLab's issues say "opened" for open and its milestones "active", and a GitHub pull
+// request's own state says only open or closed, merged_at telling merged apart from closed.
 func resolvedOf(kind string, out []byte) (wire.LineageResolved, error) {
 	var j forgeIssueOrPR
-	if err := json.Unmarshal(out, &j); err != nil || j.Title == "" {
+	var list []forgeIssueOrPR
+	if json.Unmarshal(out, &list) == nil && len(list) > 0 {
+		j = list[0]
+	} else if err := json.Unmarshal(out, &j); err != nil {
+		j = forgeIssueOrPR{}
+	}
+	if j.Title == "" {
 		return wire.LineageResolved{}, errors.New("the forge did not say its title")
 	}
 	state := j.State
-	if state == "opened" {
+	if state == "opened" || state == "active" {
 		state = "open"
 	}
 	if kind == lineage.KindPR && j.MergedAt != nil && *j.MergedAt != "" {
