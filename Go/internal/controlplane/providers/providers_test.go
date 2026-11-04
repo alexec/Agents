@@ -939,6 +939,30 @@ func TestACodespaceIsFoundWithItsProvidersToken(t *testing.T) {
 	}
 }
 
+// A codespaces-api provider says it needs gh for ssh only when this machine has no gh
+// (#3367); a provider that reaches its machines without a CLI never says it.
+func TestAProviderSaysItNeedsGhOnlyWhenThisMachineHasNone(t *testing.T) {
+	for _, has := range []bool{true, false} {
+		h := newHarness(t, func(o *harnessOptions) { o.hasTool = func(name string) bool { return has && name == "gh" } })
+		out := h.must(MethodProvidersAdd, map[string]any{"name": "Codespaces", "kind": "commands",
+			"commands": map[string]any{"preset": "codespaces-api"}, "secrets": map[string]string{"GITHUB_TOKEN": "ghp_test"}})
+		h.add()
+		want := map[string]string{string(out.(ProviderSummary).ID): "gh"}
+		if has {
+			want = map[string]string{}
+		}
+		got := map[string]string{}
+		for _, s := range h.providers.Summaries() {
+			if s.SshToolMissing != nil {
+				got[string(s.ID)] = *s.SshToolMissing
+			}
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("has gh %v: %v", has, got)
+		}
+	}
+}
+
 func TestADoctlProviderGivesNoCodespaceToken(t *testing.T) {
 	h := newHarness(t, func(o *harnessOptions) {
 		o.workspaces = []MachineInfo{{ID: "ws-1", Name: "ws-1", State: "running", SSH: new("cs.ws-1.main")}}

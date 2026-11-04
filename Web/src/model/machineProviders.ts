@@ -177,19 +177,14 @@ export function kindChip(provider: ProviderSummary): string {
   return provider.kind === "commands" ? "command provider" : provider.mapped ? "MCP server · mapped" : "MCP server";
 }
 
-/** The CLI an API preset still needs for ssh. */
-function sshTool(preset: string | undefined): string | undefined {
-  return preset === "codespaces-api" ? "gh" : preset === "coder-api" ? "coder" : undefined;
-}
-
 /** The grey line under a provider's name, as the window's providerLine. */
 export function providerLine(provider: ProviderSummary, time: (at: Date) => string): string {
   const parts: string[] = [];
   if (provider.problem && (!provider.current || provider.listedAt == null)) parts.push(`Couldn’t list: ${provider.problem}`);
   if (provider.listedAt != null) parts.push(`${provider.current ? "Listed" : "Showing what it listed at"} ${time(fromWireDate(provider.listedAt))}`);
   if (provider.workspaces.length === 0 && provider.listedAt != null) parts.push("No machines");
-  const tool = sshTool(provider.preset);
-  if (tool) parts.push(`needs ${tool} for ssh`);
+  // Only when the machine that runs it has no such CLI (#3367).
+  if (provider.sshToolMissing) parts.push(`needs ${provider.sshToolMissing} for ssh`);
   return parts.join(" · ");
 }
 
