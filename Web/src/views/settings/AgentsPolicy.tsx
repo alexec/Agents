@@ -10,15 +10,15 @@ import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../../model/store";
 import type {
-  EffectivePolicy, EffectiveRule, JSONValue, PolicyFolderState, PolicyFolderWithRules, URLString, YourPolicyState,
+  EffectivePolicy, EffectiveRule, JSONValue, PolicyFolderState, PolicyFolderWithRules, UntrustedYourPolicy, URLString, YourPolicyState,
 } from "../../protocol/generated";
 import { describe } from "../../model/errors";
 import { absolutePath } from "../../model/fileWatch";
 import {
   backToYours, banner, behindLine, cappedByYours, choice, count, folderFile, folderIsKept, folderName, foldersLine, folderWaits, foot,
   isLooser, keptNotUsed, layerLine, moneyValue, notSet, openFolder, organisationItem, organisationTitle, policyFolderOf, policyItem,
-  rowsIn, rulesCount, sameAsYoursLine, sections, sectionTitles, setting, title, tokensValue, toolsFoot, ruleValue, whereFrom,
-  yoursIsKept, type Row,
+  rowsIn, rulesCount, sameAsYoursLine, sections, sectionTitles, setAside, setting, signAgain, title, tokensValue, toolsFoot, ruleValue,
+  untrustedLine, untrustedNone, untrustedRule, untrustedTitle, whereFrom, yoursIsKept, type Row,
 } from "../../model/policyLayers";
 import { go, route } from "../../route";
 import { PolicySource } from "./PolicySource";
@@ -86,6 +86,22 @@ function Layer({ store, host, down, folder }: { store: Store; host: string; down
     }
     await load();
   };
+  // A copy of your layer signed on another Mac (#3230): its rules apply only once the person signs them here.
+  const settle = async (sign: boolean) => {
+    const kept = yours.value;
+    const copy = kept?.untrusted;
+    if (!kept || !copy) return;
+    saving.value = true;
+    try {
+      await store.link.call("policy/settleUntrustedYours", { file: copy.file, revision: kept.policy.revision, sign }, host);
+      problem.value = null;
+    } catch (error) {
+      problem.value = describe(error);
+    } finally {
+      saving.value = false;
+    }
+    await load();
+  };
   const eff = effective.value;
   const pending = folderState.value?.pending;
   const invalid = folderState.value?.invalid;
@@ -113,6 +129,9 @@ function Layer({ store, host, down, folder }: { store: Store; host: string; down
               {pending && <p class="hint" role="status">{invalid ?? folderWaits}</p>}
             </div>
           )}
+          {folder === undefined && yours.value?.untrusted && (
+            <Untrusted copy={yours.value.untrusted} busy={down || saving.value} settle={(sign) => void settle(sign)} />
+          )}
           {folder !== undefined && pending && (
             // The waiting change itself (frame D): Allow, Keep <old value>, Show Change.
             <div class="cards">
@@ -135,6 +154,26 @@ function Layer({ store, host, down, folder }: { store: Store; host: string; down
         </>
       )}
     </>
+  );
+}
+
+/** The rules of a copy of your layer this Mac can't trust (#3230), and the person's choice: sign them with this Mac's
+ * person key, or set the copy aside. Nothing signs them without it. */
+function Untrusted({ copy, busy, settle }: { copy: UntrustedYourPolicy; busy: boolean; settle: (sign: boolean) => void }) {
+  return (
+    <div class="policy-banner policy-untrusted" role="status">
+      <p class="strong attention">{untrustedTitle}</p>
+      <p class="hint">{untrustedLine(copy)}</p>
+      {copy.lines.length === 0 ? <p class="hint">{untrustedNone}</p> : (
+        <ul class="policy-untrusted-rules">
+          {copy.lines.map((line) => <li key={line.rule}>{untrustedRule(line)}</li>)}
+        </ul>
+      )}
+      <div class="policy-untrusted-actions">
+        <button type="button" class="prominent" disabled={busy} onClick={() => settle(true)}>{signAgain}</button>
+        <button type="button" disabled={busy} onClick={() => settle(false)}>{setAside}</button>
+      </div>
+    </div>
   );
 }
 

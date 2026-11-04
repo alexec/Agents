@@ -191,3 +191,83 @@ func TestAnUntrustedLayerIsKeptAsideNotWrittenOver(t *testing.T) {
 		t.Fatalf("%+v", state.Policy.Rules)
 	}
 }
+
+// untrustedLayer saves your layer with daily 40 under key A, then makes the daemon read it
+// as another Mac would (#3122, #3230): key store B is empty, so the file fails the check.
+func untrustedLayer(t *testing.T) (*Daemon, *conn) {
+	root := t.TempDir()
+	d, c := start(t, root)
+	d.SettingsDir = t.TempDir()
+	c.call(t, 1, "policy/setYours", wire.SetYourPolicyRequest{Rules: wire.PolicyRules{
+		Budgets: &wire.PolicyRuleBudgets{Daily: &wire.Cost{Amount: 40, Currency: "USD"}},
+	}, Revision: 1})
+	if err := os.Remove(filepath.Join(root, "person-key")); err != nil {
+		t.Fatal(err)
+	}
+	d.yoursRead = false
+	d.yoursRulesCache.Store(nil)
+	return d, c
+}
+
+// TestAnUntrustedLayerIsShownAndSignedAgain (#3230): policy/yours says an untrusted copy is
+// on disk, with its rules in words; nothing applies until the person signs it again, and
+// then its rules are this Mac's own layer and the copy is not shown again.
+func TestAnUntrustedLayerIsShownAndSignedAgain(t *testing.T) {
+	d, c := untrustedLayer(t)
+
+	var state wire.YourPolicyState
+	json.Unmarshal(c.call(t, 2, "policy/yours", nil), &state)
+	u := state.Untrusted
+	if u == nil || u.File != yourPolicyFile || u.Revision != 2 || len(u.Lines) != 1 || u.Lines[0].Title != "Per day" {
+		t.Fatalf("untrusted: %+v", u)
+	}
+	if state.Policy.Rules.Budgets != nil {
+		t.Fatalf("the untrusted rules apply: %+v", state.Policy.Rules)
+	}
+
+	if e := c.callError(t, 3, "policy/settleUntrustedYours", wire.SettleUntrustedYourPolicyRequest{File: "policy-yours.json.untrusted-1", Revision: 0, Sign: true}); e == nil || e.Code != wire.FailureChangedElsewhere {
+		t.Fatalf("another file: %+v", e)
+	}
+
+	state = wire.YourPolicyState{}
+	json.Unmarshal(c.call(t, 4, "policy/settleUntrustedYours", wire.SettleUntrustedYourPolicyRequest{File: u.File, Revision: 0, Sign: true}), &state)
+	if b := state.Policy.Rules.Budgets; b == nil || b.Daily == nil || b.Daily.Amount != 40 || state.Policy.Revision != 3 {
+		t.Fatalf("signed: %+v", state.Policy)
+	}
+	if state.Untrusted != nil {
+		t.Fatalf("still shown: %+v", state.Untrusted)
+	}
+	settled, _ := filepath.Glob(filepath.Join(d.SettingsDir, yourPolicyFile+".untrusted-*"+settledSuffix))
+	if len(settled) != 1 {
+		t.Fatalf("the copy was not kept: %v", settled)
+	}
+	// Trusted after a restart too.
+	d.yoursRead = false
+	state = wire.YourPolicyState{}
+	json.Unmarshal(c.call(t, 5, "policy/yours", nil), &state)
+	if b := state.Policy.Rules.Budgets; b == nil || b.Daily == nil || b.Daily.Amount != 40 || state.Untrusted != nil {
+		t.Fatalf("after a restart: %+v %+v", state.Policy, state.Untrusted)
+	}
+}
+
+// TestAnUntrustedLayerSetAsideChangesNothing (#3230): the person says no; the rules stay
+// unsigned and the copy is not shown again.
+func TestAnUntrustedLayerSetAsideChangesNothing(t *testing.T) {
+	d, c := untrustedLayer(t)
+
+	var state wire.YourPolicyState
+	json.Unmarshal(c.call(t, 2, "policy/yours", nil), &state)
+	file := state.Untrusted.File
+	state = wire.YourPolicyState{}
+	json.Unmarshal(c.call(t, 3, "policy/settleUntrustedYours", wire.SettleUntrustedYourPolicyRequest{File: file, Revision: 0, Sign: false}), &state)
+	if state.Untrusted != nil || state.Policy.Rules.Budgets != nil {
+		t.Fatalf("%+v %+v", state.Policy, state.Untrusted)
+	}
+	if _, err := os.Stat(filepath.Join(d.SettingsDir, yourPolicyFile)); !os.IsNotExist(err) {
+		t.Fatalf("policy-yours.json is still there: %v", err)
+	}
+	settled, _ := filepath.Glob(filepath.Join(d.SettingsDir, yourPolicyFile+".untrusted-*"+settledSuffix))
+	if len(settled) != 1 {
+		t.Fatalf("the copy was not kept: %v", settled)
+	}
+}

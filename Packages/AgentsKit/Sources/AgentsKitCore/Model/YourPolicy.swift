@@ -78,12 +78,73 @@ public extension DaemonAPI {
         /// The signed copy, when this machine keeps one: the Mac window passes it to a server
         /// over its direct link with `policy/applyYours` (research R3, path 2).
         public var signed: SignedYourPolicy?
+        /// Your rules from a copy of your layer this machine cannot trust (#3230): the newest such
+        /// copy. Its rules do not apply until the person signs them again here.
+        public var untrusted: UntrustedYourPolicy?
 
-        public init(policy: YourPolicy, keeper: PolicyKeeper, pinnedKeyID: String? = nil, signed: SignedYourPolicy? = nil) {
+        public init(policy: YourPolicy, keeper: PolicyKeeper, pinnedKeyID: String? = nil, signed: SignedYourPolicy? = nil,
+                    untrusted: UntrustedYourPolicy? = nil) {
             self.policy = policy
             self.keeper = keeper
             self.pinnedKeyID = pinnedKeyID
             self.signed = signed
+            self.untrusted = untrusted
+        }
+    }
+
+    /// One rule a layer sets, in the Policy pane's words (#3230).
+    struct PolicyRuleLine: Codable, Sendable, Hashable {
+        /// `permissionMode`, `budgets.daily`, and so on.
+        public var rule: String
+        public var title: String
+        public var words: String
+
+        public init(rule: String, title: String, words: String) {
+            self.rule = rule
+            self.title = title
+            self.words = words
+        }
+    }
+
+    /// A copy of your layer on disk that fails the signature check (#3230): signed with a person
+    /// key this machine does not have, such as on another Mac before the root moved here. Shown,
+    /// never applied, until the person signs it again here (`policy/settleUntrustedYours`).
+    struct UntrustedYourPolicy: Codable, Sendable, Hashable {
+        /// The kept file's name: `policy-yours.json`, or `policy-yours.json.untrusted-<time>`.
+        public var file: String
+        public var rules: PolicyRules
+        public var revision: Int
+        public var changed: Date
+        /// The host id of the machine that signed it.
+        public var keeper: String
+        public var keyID: String
+        /// Each rule the copy sets, in the Policy pane's words and order.
+        public var lines: [PolicyRuleLine]
+
+        public init(file: String, rules: PolicyRules, revision: Int, changed: Date, keeper: String, keyID: String,
+                    lines: [PolicyRuleLine]) {
+            self.file = file
+            self.rules = rules
+            self.revision = revision
+            self.changed = changed
+            self.keeper = keeper
+            self.keyID = keyID
+            self.lines = lines
+        }
+    }
+
+    /// `policy/settleUntrustedYours` (#3230): what the person chose for the untrusted copy in
+    /// `file`, read at `revision` of your layer. `sign` signs its rules with this machine's person
+    /// key as the next revision; false sets the copy aside and changes nothing.
+    struct SettleUntrustedYourPolicyRequest: Codable, Sendable, Hashable {
+        public var file: String
+        public var revision: Int
+        public var sign: Bool
+
+        public init(file: String, revision: Int, sign: Bool) {
+            self.file = file
+            self.revision = revision
+            self.sign = sign
         }
     }
 
