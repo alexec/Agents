@@ -38,7 +38,7 @@ written, and it takes the skill at a fixed commit.
 
 ## Add a skill to a folder
 
-1. Open the folder, then choose **Folder Settings** in its toolbar, and **Instructions &
+1. Open the folder, then choose **Project Settings** in its toolbar, and **Instructions &
    skills** in the sheet. The **Skills** section lists the skills in the folder's `.agents/skills`.
 2. Choose **Add skill…** there, and search and choose as above. **Add to** starts on the
    folder; the button reads **Add to** and the folder's name.
@@ -55,7 +55,7 @@ fetched again.
 ## Keep a skill up to date
 
 When a skill's source has changed since it was added, it is marked **update** in
-**Settings ▸ Agent Configuration ▸ Skills** or in Folder Settings. The app asks GitHub at most once an hour
+**Settings ▸ Agent Configuration ▸ Skills** or in Project Settings. The app asks GitHub at most once an hour
 for each repository.
 
 1. Choose **Update…**. The sheet lists what changes, file by file, and shows the new
@@ -67,7 +67,7 @@ your edits go.
 
 ## Take a skill out
 
-Choose **Remove…** in the skill's detail, or **Remove** in Folder Settings, and confirm. The
+Choose **Remove…** in the skill's detail, or **Remove** in Project Settings, and confirm. The
 folder goes to the Trash and its record is dropped. No agent started after that has it.
 
 ## What the app will not touch

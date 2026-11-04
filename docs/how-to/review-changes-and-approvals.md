@@ -40,7 +40,7 @@ You can also open the page from the short card in a chat. When an agent changes 
 the card shows above its prompt with who changed it, the lines added and removed
 (**+N −M**), **Review…**, **Undo** and **Keep**. Click **Review…** to read the whole change.
 When no agent made the change, the card is on the folder's page. On the Mac it is also in
-Folder Settings.
+Project Settings.
 
 ## Read the change
 

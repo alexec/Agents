@@ -65,7 +65,7 @@ public enum PolicyLayersWords {
     public enum StopAction: Hashable, Sendable {
         /// Your layer: Settings ▸ Agents ▸ Policy.
         case changeYours
-        /// A folder's layer: its Folder Settings ▸ Policy, by the folder's path.
+        /// A folder's layer: its Project Settings ▸ Policy, by the folder's path.
         case changeFolder(String)
         /// An organisation budget: the Spending report. The card also offers Ask for More
         /// (#3262, `canAskForMore`).
@@ -85,7 +85,7 @@ public enum PolicyLayersWords {
     public static func stopActionTitle(_ action: StopAction) -> String {
         switch action {
         case .changeYours: "Change in \(groupTitle) ▸ \(title)"
-        case .changeFolder: "Change in Folder Settings ▸ \(title)"
+        case .changeFolder: "Change in Project Settings ▸ \(title)"
         case .openSpending: "Open Spending"
         case .seeOrganisation: "See \(organisationTitle)"
         }

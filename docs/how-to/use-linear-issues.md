@@ -55,7 +55,7 @@ Add Linear's own server from the registry, or by hand with the URL
    (`LINEAR_API_KEY=lin_api_…`), not in the folder, and name it in the entry:
    `"env": { "LINEAR_API_KEY": "${LINEAR_API_KEY}" }`.
 
-2. In **Folder Settings ▸ Agent Configuration ▸ Connectors**, choose **Approve** on
+2. In **Project Settings ▸ Agent Configuration ▸ Connectors**, choose **Approve** on
    `linear`. See [Add a connector by hand](add-a-connector-by-hand.md).
 
 3. To keep the page in the sidebar, pin it in the folder's `.agents/pins.json`:

@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac, web]
-description: Make the policy tighter for the agents in one folder with Folder Settings ▸ Policy, commit the rules with the folder's code, and answer a change that makes them looser.
+description: Make the policy tighter for the agents in one folder with Project Settings ▸ Policy, commit the rules with the folder's code, and answer a change that makes them looser.
 ---
 
 # Set rules for a folder
@@ -16,7 +16,7 @@ the layers work together.
 
 On the Mac:
 
-1. Open the folder, then choose **Folder Settings…** (⌘,) and **Policy** in the rail.
+1. Open the folder, then choose **Project Settings…** (⌥⌘,) and **Policy** in the rail.
 2. Each row says **Same as yours** and your value, until the folder sets it.
 3. Choose a value. The menu dims each value that is looser than yours, with the reason.
 4. Commit `.agents/policy.json` with the folder's code.
@@ -49,4 +49,4 @@ A file that is not a valid policy also waits, with the reason.
 
 When a rule holds what you sent, or stops a turn at a budget, the chat shows a
 **Stopped by a policy** card. It names the rule, the layer that decides and its value. For a
-folder's rule, **Change in Folder Settings ▸ Policy** opens the folder's layer.
+folder's rule, **Change in Project Settings ▸ Policy** opens the folder's layer.

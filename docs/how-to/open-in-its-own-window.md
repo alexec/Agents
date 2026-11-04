@@ -71,7 +71,7 @@ Do one of these:
 - Right-click the Agents icon in the Dock and choose the folder.
 
 The window has a sidebar of only that folder: **New Session**, its **Pinned** and
-**Needs You**, its sessions, its workflows, **Archived**, and **Folder Settings…** at the
+**Needs You**, its sessions, its workflows, **Archived**, and **Project Settings…** at the
 foot. A session you start or select there opens in that window. The window has its own
 inspector, and it keeps the pane and the width for that folder. Its toolbar also has the
 folder's shell (Control-`).

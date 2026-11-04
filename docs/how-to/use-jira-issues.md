@@ -78,7 +78,7 @@ Add Atlassian's own server from the registry, or by hand with the URL
    `JIRA_API_TOKEN` the API token. **On Jira Data Center**, put the personal access token in
    `JIRA_API_TOKEN` and remove the `JIRA_EMAIL` line.
 
-2. In **Folder Settings ▸ Agent Configuration ▸ Connectors**, choose **Approve** on `jira`.
+2. In **Project Settings ▸ Agent Configuration ▸ Connectors**, choose **Approve** on `jira`.
    See [Add a connector by hand](add-a-connector-by-hand.md).
 
 3. To keep the page in the sidebar, pin it in the folder's `.agents/pins.json`:

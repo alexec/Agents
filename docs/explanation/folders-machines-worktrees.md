@@ -158,7 +158,7 @@ it does not know yet, with the folder's name.
 You see no new step. A folder that names no project gets one of its own name when you add it,
 or when its machine next starts. The Add Folder sheet has a **Project** menu that starts on
 **Its Own Project**; pick another there, and the machine writes that id as it adds the folder
-(#2671). Later, you pick another project in Folder Settings ▸ General ▸ Project on the Mac,
+(#2671). Later, you pick another project in Folder Settings ▸ General ▸ Project on the Mac or the web page,
 or with **Project…** in the folder's menu on the web page (the Remote has none, #2798). Every
 project, its owner and its folders are on the web page's **Projects** page (Console ▸ Projects).
 
@@ -226,17 +226,17 @@ once you delete them; connectors go with each conversation as it starts, so noth
 written into a runtime's own config. **Settings ▸ Agent Configuration** shows what each runtime ends up
 with. See [Share skills, instructions and connectors with every agent](../how-to/share-skills-across-agents.md).
 
-A folder's instructions, skills, connectors and plugins are set up in **Folder Settings ▸
+A folder's instructions, skills, connectors and plugins are set up in **Project Settings ▸
 Agent Configuration**, a sheet opened from the folder page's toolbar, the folder's context
-menu in the sidebar, or **File ▸ Folder Settings…** (Option-Command-comma). Its pages are the
+menu in the sidebar, or **File ▸ Project Settings…** (Option-Command-comma). Its pages are the
 same as **Settings ▸ Agent Configuration**: Overview, Instructions, Skills, Connectors,
-Plugins and Other files, between the folder's own **General** and **Worktrees**. The folder
+Plugins and Other files, after the project's own **General**, **Tools**, **Work at Once**, **Sessions** and **Policy**. The folder
 is the difference: yours is `~/.agents`, the folder's is its `.agents`, and its instructions
 are `AGENTS.md` at the top of the folder. A folder's Overview counts what is there, where
 yours also shows what each runtime gets. Because that folder is committed,
 a skill added there reaches everyone who clones the folder; one added in **Settings ▸ Agent Configuration**
 is yours alone. A worktree has its own `.agents`, so a change there stays on that branch until
-it is merged. **General** also holds the folder's two limits on agents that other agents start: how many may be running (3 unless you change it) and how many may be kept until you archive them (5). They are saved in the folder's own `.agents/folder.json`, so they go wherever the folder goes. A change to that file, or to `.agents/pins.json`, made outside the app is not used until you keep it there; see [Settings](../reference/settings.md). See [Agent tools](../reference/agent-tools.md). On a server, Folder Settings shows only **General**. See
+it is merged. **Work at Once** also holds the project's limits on agents that other agents start: how many may be running (3 unless you change it) and how many may be kept until you archive them (5). They are saved in the folder's own `.agents/folder.json`, so they go wherever the folder goes. A change to that file, or to `.agents/pins.json`, made outside the app is not used until you keep it there; see [Settings](../reference/settings.md). See [Agent tools](../reference/agent-tools.md). On a server, Project Settings has no Agent Configuration pages. **Folder Settings** keeps only what is one folder's: its path, machine and project, its disk space lines and its worktrees (#3280). See
 [Add a skill from a catalogue](../how-to/add-a-skill-from-a-catalogue.md).
 
 A folder's connectors (MCP servers) live in `.agents/mcp.json`, on that same page. The file is committed, so it names each secret as `${NAME}` and never

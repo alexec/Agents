@@ -3759,6 +3759,11 @@
     {
       "name": "folders/setDiskSpace",
       "x-capability": "folders/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -3779,6 +3784,11 @@
     {
       "name": "folders/setHelperLimits",
       "x-capability": "folders/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {

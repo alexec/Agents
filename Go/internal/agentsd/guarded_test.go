@@ -31,7 +31,7 @@ func TestAChangeWhileAnAgentWorksWaitsForKeepOrUndo(t *testing.T) {
 	if f := d.readPins(dir); len(f.pins) != 1 {
 		t.Fatalf("the change was used: %+v", f.pins)
 	}
-	if e := c.callError(t, 3, "pins/unpin", map[string]any{"folder": folder, "path": "a.md"}); !strings.HasSuffix(e.Message, "is waiting for the person to keep or undo the change in Folder Settings.") {
+	if e := c.callError(t, 3, "pins/unpin", map[string]any{"folder": folder, "path": "a.md"}); !strings.HasSuffix(e.Message, "is waiting for the person to keep or undo the change in Project Settings.") {
 		t.Fatal(e.Message)
 	}
 	s, _ := d.summaryFor(dir)

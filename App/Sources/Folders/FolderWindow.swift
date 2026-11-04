@@ -204,14 +204,8 @@ private struct FolderWindowColumns: View {
             model.open(fileURL, on: summary.host)
             return .handled
         })
-        // The folder's settings, over this window (066).
-        .sheet(isPresented: Binding(get: { window.requests.folderSettings != nil },
-                                    set: { if !$0 { window.requests.folderSettings = nil } })) {
-            FolderSettingsSheet(pane: Binding(get: { window.requests.folderSettings },
-                                               set: { window.requests.folderSettings = $0 }))
-                .environment(window.requests)
-                .paperSheet()
-        }
+        // The project's settings or the folder's, over this window (066, #3280).
+        .settingsSheets(window.requests)
     }
 
     @ViewBuilder
@@ -305,9 +299,9 @@ private struct FolderWindowSidebar: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             HStack {
                 Button {
-                    window.requests.folderSettings = .general
+                    window.requests.projectSettings = .general
                 } label: {
-                    Label("Folder Settings…", systemImage: "gearshape")
+                    Label(ProjectSettingsWords.menuItem, systemImage: "gearshape")
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)

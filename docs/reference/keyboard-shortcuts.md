@@ -27,7 +27,7 @@ ones every Mac app has.
 | Shift-Command-O | **File ▸ Clone Folder from Git URL…** | Clones a Git URL as a folder. |
 | Control-Command-O | **File ▸ Add a Machine…** | Adds a machine, as Settings ▸ Machines does. Off with no control plane. |
 | Shift-Command-R | **File ▸ Show in Finder** | Shows the agent's or folder in Finder. |
-| Option-Command-, | **File ▸ Folder Settings…** | Opens the selected folder's settings: its instructions, skills, plugins, connectors and worktrees. |
+| Option-Command-, | **File ▸ Project Settings…** | Opens the selected folder's project's settings: its tools, helper limits, policy, instructions, skills, plugins and connectors. Folder Settings… is on the folder's menu. |
 | Command-. | **Session ▸ Stop** | Stops the agent and stays on the conversation. |
 | Shift-Command-Return | **Session ▸ Carry On** | Tells an agent blocked under **Needs you** that its block has gone, or a **Waiting** one that its wait is over early. |
 | Option-Command-Delete | **Session ▸ Archive** or **Unarchive** | Archives the session, or unarchives an archived one. |

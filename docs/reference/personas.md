@@ -52,7 +52,7 @@ The body is the persona's prompt. It can name the skills the persona relies on.
 
 ## Manage them in Agents
 
-Manage your own persona files in **Settings ▸ Agent Configuration ▸ Personas**, on the Mac, the iPhone, the iPad and the web. On the Mac, manage a folder's persona files in **Folder Settings ▸ Agent Configuration ▸ Personas**. You choose a persona on the new-session form on every client.
+Manage your own persona files in **Settings ▸ Agent Configuration ▸ Personas**, on the Mac, the iPhone, the iPad and the web. On the Mac, manage a folder's persona files in **Project Settings ▸ Agent Configuration ▸ Personas**. You choose a persona on the new-session form on every client.
 Choose the folder or personal scope, then open a file, create one, edit its Markdown or
 delete it. The editor keeps the whole Markdown file, including front matter fields the app
 does not know, so a saved persona is available to future session starts in that scope.

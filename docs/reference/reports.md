@@ -135,7 +135,7 @@ machines' copies of one node add up, as each banked its own turns.
   machine that hears `pr.merged` comments on the PR with the cost of the PR and the issues
   it fixes: cost, tokens, sessions, agent time, wait time and failed CI rounds. It edits
   that one comment when more is banked on them, for 30 days. The person's own `gh` or
-  `glab` posts it. Folder Settings ▸ Cost on pull requests on the Mac, and the folder's
+  `glab` posts it. Project Settings ▸ General ▸ Cost on pull requests on the Mac, and the folder's
   **Cost on Pull Requests…** on the web page, set it.
 - **The machine makes most links itself** (#2349): a session's `#n`, `P#n` or Linear-key
   label, a helper's parent, a workflow's run, the sessions on a pull request's branch and

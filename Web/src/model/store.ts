@@ -8,7 +8,7 @@ import type { HeardLiveFrame } from "./desktopControl";
 import { batch, computed, signal, type ReadonlySignal, type Signal } from "@preact/signals";
 import type {
   Agent, AgentRemovedNotification, ResumingNotification, DesktopControlLiveFrame, ControlMachine, MachineRef, MachineWorkspace, ElicitationNotification, ElicitationRequest, EntryNotification,
-  PermissionNotification, PermissionRequest, FolderSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
+  PermissionNotification, PermissionRequest, FolderSummary, HelperLimits, DiskThresholds, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, FolderRemovedNotification, DraftOptionsNotification, JSONValue, Methods, AccountProfile, RuntimeAccount, RuntimeSignInStep, RuntimeStatus,
   StartRequest, UUID, AutoMappings, AutoPreview, AutoPreviewRequest, AutoSettings, ClientPermissionMode, Levels, ModelLevel, PermissionLevel, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
   CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
@@ -2489,6 +2489,18 @@ export class Store extends Work {
   /** What a folder's merged pull requests say of their cost (#2352). Throws a refusal. */
   async setFolderPRCostComment(host: string, folder: string, prCostComment: PRCostComment): Promise<void> {
     const summary = await this.link.call("folders/setPRCostComment", { folder: folder as never, prCostComment }, host);
+    this.upsertFolder(summary, host);
+  }
+
+  /** A folder's helper limits and switches in `.agents/folder.json` (#64), from Project Settings (#3280). Throws a refusal. */
+  async setFolderHelperLimits(host: string, folder: string, limits: HelperLimits): Promise<void> {
+    const summary = await this.link.call("folders/setHelperLimits", { folder: folder as never, limits }, host);
+    this.upsertFolder(summary, host);
+  }
+
+  /** A folder's disk space lines (#195), from Folder Settings (#3280). Throws a refusal. */
+  async setFolderDiskSpace(host: string, folder: string, diskSpace: DiskThresholds): Promise<void> {
+    const summary = await this.link.call("folders/setDiskSpace", { folder: folder as never, diskSpace }, host);
     this.upsertFolder(summary, host);
   }
 
