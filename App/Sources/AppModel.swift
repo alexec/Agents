@@ -5946,6 +5946,17 @@ final class AppModel {
             .sorted { ($0.id == mine ? 0 : 1, $0.name) < ($1.id == mine ? 0 : 1, $1.name) }
     }
 
+    /// Work's projects (#3283): New Session's, each folder named by the machine Work's lists
+    /// read it on, this Mac by its control plane id.
+    var workProjects: [WorkList.Project] {
+        let mine = thisMacHostID ?? .mac
+        return newSessionProjects.map { choice in
+            WorkList.Project(id: choice.id, name: choice.name, folders: Set(choice.folders.map {
+                WorkList.folderKey(host: $0.host == .mac ? mine : $0.host, path: $0.folder.path(percentEncoded: false))
+            }))
+        }
+    }
+
     /// The machines that read their forges (#3119), This Mac first: Work's issues and PRs come from each.
     var forgeMachines: [(id: MachineRef, name: String)] {
         let mine = thisMacHostID

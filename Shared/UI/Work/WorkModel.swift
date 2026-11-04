@@ -17,6 +17,8 @@ protocol WorkModel: AnyObject, Sendable {
     /// The machines that narrow their forges to a board (#3282), the home one first. None on the
     /// Remote: boards are the Mac's and the web page's (tier Mac + web).
     var boardMachines: [(id: MachineRef, name: String)] { get }
+    /// The person's projects (#3283), for Work's Project filter: Mac + web, so the Remote has none.
+    var workProjects: [WorkList.Project] { get }
     /// The machines that keep links, the home one first.
     var lineageMachines: [(id: MachineRef, name: String)] { get }
     /// Whether a machine takes the Work pages' writes (#3130).
@@ -44,6 +46,8 @@ protocol WorkModel: AnyObject, Sendable {
 }
 
 extension WorkModel {
+    var workProjects: [WorkList.Project] { [] }
+
     /// The boards of every machine's folders' projects (#3282), each once, by url, the first
     /// name kept; none from a machine that cannot be read.
     func workBoards() async -> [DaemonAPI.ProjectBoard] {

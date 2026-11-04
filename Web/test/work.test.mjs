@@ -210,3 +210,30 @@ test("a list's request carries the board only when one is chosen", () => {
   const rows = w.mergeForge([{ host: "mac", items: [item(1)] }], []);
   assert.equal(w.filterRows(rows, { ...w.anyFilter, board: "https://github.com/orgs/acme/projects/7" }).length, 1);
 });
+
+test("a project has the repos its folders read on every machine, and the Project filter shows them (#3283)", () => {
+  const read = (n, repo, folder) => item(n, { node: { kind: "issue", ref: `github:${repo}#${n}` }, folder });
+  const agents = { id: "p1", name: "Agents", folders: new Set([w.workFolderKey("mac", "/Users/a/Agents/"), w.workFolderKey("box", "/home/a/Agents")]) };
+  const www = { id: "p2", name: "www", folders: new Set([w.workFolderKey("mac", "/Users/a/www")]) };
+  const quiet = { id: "p3", name: "quiet", folders: new Set([w.workFolderKey("mac", "/Users/a/quiet")]) };
+  const lists = [
+    { host: "mac", items: [read(1, "alexec/Agents", "/Users/a/Agents"), read(2, "alexec/www", "/Users/a/www")] },
+    { host: "box", items: [read(3, "alexec/docs", "/home/a/Agents")] },
+  ];
+  const projects = w.projectRepos([agents, www, quiet], lists);
+  // A project whose folders read nothing is not offered.
+  assert.deepEqual(projects.map((p) => p.project.name), ["Agents", "www"]);
+  assert.deepEqual([...projects[0].repos].sort(), ["github:alexec/Agents", "github:alexec/docs"]);
+
+  const rows = w.mergeForge(lists, []);
+  const refs = (project) => w.filterRows(rows, { ...w.anyFilter, project }, projects).map((r) => r.node.ref).sort();
+  assert.deepEqual(refs("p1"), ["github:alexec/Agents#1", "github:alexec/docs#3"]);
+  assert.deepEqual(refs("p2"), ["github:alexec/www#2"]);
+  assert.deepEqual(refs("p3"), []);
+  assert.equal(w.filterRows(rows, w.anyFilter, projects).length, 3);
+
+  assert.equal(w.projectOfFolder("/home/a/Agents", "box", [agents, www])?.name, "Agents");
+  assert.equal(w.projectOfFolder("/home/a/Agents", "mac", [agents, www]), undefined);
+  assert.equal(w.projectOfFolder(undefined, "mac", [agents]), undefined);
+  assert.equal(w.projectWords("Agents"), "Project Agents");
+});

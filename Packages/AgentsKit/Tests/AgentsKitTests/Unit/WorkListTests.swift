@@ -69,6 +69,39 @@ struct WorkListTests {
         #expect(WorkList.Filter().board.isEmpty)
     }
 
+    @Test func aProjectHasTheReposItsFoldersReadOnEveryMachine() {
+        let box = MachineRef(rawValue: "box")
+        func read(_ n: Int, _ repo: String, _ folder: String) -> DaemonAPI.ForgeItem {
+            var i = item(n, repo: repo)
+            i.folder = folder
+            return i
+        }
+        let agents = WorkList.Project(id: "p1", name: "Agents", folders: [
+            WorkList.folderKey(host: .mac, path: "/Users/a/Agents/"), WorkList.folderKey(host: box, path: "/home/a/Agents"),
+        ])
+        let www = WorkList.Project(id: "p2", name: "www", folders: [WorkList.folderKey(host: .mac, path: "/Users/a/www")])
+        let quiet = WorkList.Project(id: "p3", name: "quiet", folders: [WorkList.folderKey(host: .mac, path: "/Users/a/quiet")])
+        let lists: [(host: MachineRef, items: [DaemonAPI.ForgeItem])] = [
+            (host: .mac, items: [read(1, "alexec/Agents", "/Users/a/Agents"), read(2, "alexec/www", "/Users/a/www")]),
+            (host: box, items: [read(3, "alexec/docs", "/home/a/Agents")]),
+        ]
+        let projects = WorkList.projectRepos([agents, www, quiet], lists: lists)
+        // A project whose folders read nothing is not offered.
+        #expect(projects.map(\.project.name) == ["Agents", "www"])
+        #expect(projects[0].repos == ["github:alexec/Agents", "github:alexec/docs"])
+
+        let rows = WorkList.merge(lists, lineage: [])
+        #expect(Set(WorkList.filter(rows, .init(project: "p1"), projects: projects).map(\.node.ref))
+            == ["github:alexec/Agents#1", "github:alexec/docs#3"])
+        #expect(WorkList.filter(rows, .init(project: "p2"), projects: projects).map(\.node.ref) == ["github:alexec/www#2"])
+        #expect(WorkList.filter(rows, .init(project: "p3"), projects: projects).isEmpty)
+        #expect(WorkList.filter(rows, .init(), projects: projects).count == 3)
+
+        #expect(WorkList.project(ofFolder: "/home/a/Agents", on: box, in: [agents, www])?.name == "Agents")
+        #expect(WorkList.project(ofFolder: "/home/a/Agents", on: .mac, in: [agents, www]) == nil)
+        #expect(WorkList.project(ofFolder: nil, on: .mac, in: [agents]) == nil)
+    }
+
     @Test func filtersStateRepoLabelAssigneeAndWords() {
         let rows = WorkList.merge([(host: .mac, items: [
             item(1, labels: [.init(name: "bug", color: "d73a4a")], assignees: ["alexec"]),

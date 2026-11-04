@@ -9,8 +9,8 @@ import { CallFailed } from "../wire/link";
 import { describe } from "./errors";
 import { hostAnswers } from "./capabilities";
 import {
-  anyFilter, filterRows, forgeListRequest, fromForge, lineageRow, mergeBoards, mergeForge, neighbours, sortRows,
-  type Neighbours, type WorkFilter, type WorkKind, type WorkRow, type WorkSort, type WorkState,
+  anyFilter, filterRows, forgeListRequest, fromForge, lineageRow, mergeBoards, mergeForge, neighbours, projectRepos, sortRows,
+  type Neighbours, type WorkFilter, type WorkKind, type WorkProject, type WorkProjectRepos, type WorkRow, type WorkSort, type WorkState,
 } from "./work";
 
 /** How many pages of reports/nodes a list reads for its lineage: at most 500 nodes. */
@@ -22,6 +22,8 @@ export interface HostList { host: string; items: ForgeItem[]; cursor?: string | 
 export interface WorkListState {
   kind: WorkKind;
   filter: Signal<WorkFilter>;
+  /** The person's projects (#3283), as the view last said them, for the Project filter. */
+  projects: Signal<readonly WorkProject[]>;
   sort: Signal<WorkSort>;
   lists: Signal<HostList[] | null>;
   lineage: Signal<ReportNode[]>;
@@ -45,7 +47,7 @@ export function workList(kind: WorkKind): WorkListState {
   let l = lists.get(kind);
   if (!l) {
     l = {
-      kind, filter: signal(anyFilter), sort: signal<WorkSort>("updated"), lists: signal(null), lineage: signal([]),
+      kind, filter: signal(anyFilter), projects: signal([]), sort: signal<WorkSort>("updated"), lists: signal(null), lineage: signal([]),
       lineageCursor: signal(undefined), problem: signal(null), more: signal(false), asked: signal(0), opened: signal(undefined),
       read: undefined,
     };
@@ -86,9 +88,16 @@ export function allRows(l: WorkListState): WorkRow[] {
   return fromForge(l.kind) ? mergeForge(l.lists.value ?? [], l.lineage.value) : l.lineage.value.map(lineageRow);
 }
 
+/** Each project with the repos its folders read (#3283); none for milestones and releases, which lineage alone
+ * lists, with no folder. */
+export function listProjects(l: WorkListState): WorkProjectRepos[] {
+  return fromForge(l.kind) ? projectRepos(l.projects.value, l.lists.value ?? []) : [];
+}
+
 /** The rows as the list shows them: filtered and sorted. Milestones and releases have no state in v1. */
 export function shownRows(l: WorkListState): WorkRow[] {
-  return sortRows(filterRows(allRows(l), fromForge(l.kind) ? l.filter.value : { ...l.filter.value, state: "all" }), l.sort.value);
+  return sortRows(filterRows(allRows(l), fromForge(l.kind) ? l.filter.value : { ...l.filter.value, state: "all" }, listProjects(l)),
+    l.sort.value);
 }
 
 export const hasMore = (l: WorkListState) => fromForge(l.kind) ? (l.lists.value ?? []).some((h) => h.cursor) : !!l.lineageCursor.value;

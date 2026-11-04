@@ -82,6 +82,14 @@ struct WorkItemPage: View {
 
     // MARK: Header
 
+    /// The project the item was read for (#3283), when the person has more than one: with one, the
+    /// page says nothing new.
+    private var projectWords: String? {
+        let projects = model.workProjects
+        guard projects.count > 1, let detail else { return nil }
+        return WorkList.project(ofFolder: detail.got.item.folder, on: detail.host, in: projects).map { WorkList.projectWords($0.name) }
+    }
+
     private var header: some View {
         let item = detail?.got.item
         let resolved = graph?.resolved?[node.ref]
@@ -106,7 +114,7 @@ struct WorkItemPage: View {
             }
             // On a phone the ref takes the line, and "Open on …" goes under it.
             (compact ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4)) : AnyLayout(HStackLayout(spacing: 6))) {
-                Text(([node.ref] + [item.map(WorkList.peopleWords)].compactMap { $0 }.filter { !$0.isEmpty })
+                Text(([node.ref] + [item.map(WorkList.peopleWords), projectWords].compactMap { $0 }.filter { !$0.isEmpty })
                     .joined(separator: " · "))
                     .appText(.supporting).foregroundStyle(.secondary)
                     .textSelection(.enabled)

@@ -12,8 +12,11 @@ import { hostAnswers } from "../model/capabilities";
 import {
   boardChoices, boardName, checksWords, choices, errorWords, fromForge, hasPage, labelColor, labelInk, linkGroups, lineageOnlyNote,
   lineageWords, noAgentOnIt, noAgentYet, noForgeHere, noWork, notReadHere, openOnWords, pageCostWords, peopleWords, positionWords, repoName,
-  reviewWords, shortRef, titleSaysRef, workKindTitle, workSortTitle, type WorkFilter, type WorkKind, type WorkRow, type WorkSort, type WorkState,
+  reviewWords, shortRef, titleSaysRef, workKindTitle, workSortTitle, allProjects, projectOfFolder, projectWords, workFolderKey,
+  type WorkFilter, type WorkKind, type WorkProject, type WorkRow, type WorkSort, type WorkState,
 } from "../model/work";
+import { newSessionProjects } from "../model/projects";
+import { orderedFolders } from "./Sidebar";
 import { kindWord, lineageUrl, readingTitles, sessionHost } from "../model/lineage";
 import { nodeName } from "../model/value";
 import { ago } from "../model/connectorSetup";
@@ -26,9 +29,20 @@ import { WorkDocs } from "./Docs";
 import { hasPlan } from "../model/epicPlan";
 import { go, replace, route } from "../route";
 import {
-  allRows, askKey, boardHosts, boards, forgeHosts, fromList, hasMore, loadBoards, loadList, loadMore, nextAfter, pageNeighbours, placeKey,
-  shownRows, workList,
+  allRows, askKey, boardHosts, boards, forgeHosts, fromList, hasMore, listProjects, loadBoards, loadList, loadMore, nextAfter, pageNeighbours,
+  placeKey, shownRows, workList,
 } from "../model/workLists";
+
+/** The person's projects (#3283), New Session's, for the Project filter and an item's page: each folder by the
+ * machine Work's lists read it on. */
+export function workProjects(store: Store): WorkProject[] {
+  return newSessionProjects(orderedFolders(store.hosts.value, store.folders.value, store.macHostID.value)).map((p) => ({
+    id: p.id, name: p.name, folders: new Set(p.folders.map((r) => workFolderKey(r.host.id, r.folder.folder.folder))),
+  }));
+}
+
+/** What the projects are, as one string, so a list hears of a change and not of each render. */
+const projectsKey = (projects: readonly WorkProject[]) => projects.map((p) => `${p.id} ${p.name} ${[...p.folders].join(",")}`).join(";");
 
 // Back on a list, no page is opened from it yet: a pasted address of the last one opened has no Previous or Next.
 effect(() => { if (route.value.nav === "work" && !route.value.item) fromList.value = undefined; });
@@ -44,6 +58,9 @@ export function WorkList({ store, kind }: { store: Store; kind: WorkKind }) {
   // The Board menu's choices (#3282), from the machines that know boards: Issues only.
   const boardKey = boardHosts(store).map((h) => h.id).join(",");
   useEffect(() => { if (kind === "issue") void loadBoards(store); }, [kind, boardKey]);
+  const projects = workProjects(store);
+  useEffect(() => { l.projects.value = projects; }, [projectsKey(projects)]);
+  const offeredProjects = listProjects(l).map((p) => p.project);
   // Back from an item's page: the list at the row last opened.
   const shownOnce = lists.value !== null;
   useEffect(() => {
@@ -65,6 +82,10 @@ export function WorkList({ store, kind }: { store: Store; kind: WorkKind }) {
           <label>State <select value={state} onChange={(e) => set({ state: (e.target as HTMLSelectElement).value as WorkState })}>
             {states.map((s) => <option key={s} value={s}>{s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
           </select></label>
+        )}
+        {(offeredProjects.length > 1 || filter.value.project) && (
+          <Choice label="Project" any={allProjects} value={filter.value.project} options={offeredProjects.map((p) => p.id)}
+            words={(id) => offeredProjects.find((p) => p.id === id)?.name ?? allProjects} onChange={(project) => set({ project })} />
         )}
         {kind === "issue" && (
           <Choice label="Board" any="All" value={filter.value.board} options={boardChoices(boards.value, filter.value.board)}
@@ -240,6 +261,9 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
     }
     return hasPage(n) ? () => go({ nav: "work", section: n.kind, item: n.ref }) : undefined;
   };
+  // The project the item was read for (#3283), when the person has more than one: with one, the page says nothing new.
+  const projects = workProjects(store);
+  const project = projects.length > 1 && detail.value ? projectOfFolder(item?.folder, detail.value.host, projects) : undefined;
   const checks = item?.node.kind === "pr" ? checksWords(detail.value?.got.checks, item.checks) : undefined;
   const review = item?.node.kind === "pr" ? reviewWords(item.review) : undefined;
 
@@ -259,7 +283,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
           {labels.map((l) => <LabelChip key={l.name} label={l} />)}
         </div>
         <p class="quiet small">
-          {[ref, ...item ? [peopleWords(item)] : []].filter(Boolean).join(" · ")}
+          {[ref, ...item ? [peopleWords(item)] : [], ...project ? [projectWords(project.name)] : []].filter(Boolean).join(" · ")}
           {url && <> · <a href={url} target="_blank" rel="noopener noreferrer">{openOnWords(ref)}</a></>}
         </p>
         {(checks || review) && <p class="small">{[checks, review].filter(Boolean).join(" · ")}</p>}
