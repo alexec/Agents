@@ -710,16 +710,19 @@ func (d *Daemon) messageSession(caller wire.UUID, args map[string]json.RawMessag
 	wakes := !busy && !stopped && !waitsOnPerson && looser == ""
 	if wakes && target.StartedByAgent != nil {
 		// The limit in force (#3149): the effective policy's helpers.mostRunning.
-		limit, _, _ := d.helperLimitsIn(folderPath(target))
+		// Across the project (#3281).
+		folder := folderPath(target)
+		d.countProject(folder)
+		limit, _, _ := d.helperLimitsIn(folder)
 		running := 0
-		for _, a := range append(d.thereAgents(folderPath(target)), d.folderSessions(folderPath(target))...) {
-			if a.StartedByAgent != nil && inFlight(a.State) {
+		for _, a := range d.helpersIn(folder) {
+			if inFlight(a.State) {
 				running++
 			}
 		}
 		if int64(running) >= limit {
-			return "", refusedMessage(fmt.Sprintf("waking %s would take a running place, and this folder already has %d of %d sessions "+
-				"started by sessions running. Send it once one finishes; wait with wait_for_agents.", name, running, limit))
+			return "", refusedMessage(fmt.Sprintf("waking %s would take a running place, and %s already has %d of %d sessions "+
+				"started by sessions running. Send it once one finishes; wait with wait_for_agents.", name, scopeWords(folder), running, limit))
 		}
 	}
 	d.messageMu.Lock()

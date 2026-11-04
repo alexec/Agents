@@ -71,26 +71,9 @@ func (d *Daemon) projectElsewhere(caller *wire.Agent, includeArchived bool) (ses
 	if project == "" || d.askControl.Load() == nil {
 		return nil, nil, false, nil
 	}
-	out, err := d.askWorkspacesPatient(caller.ID, projectSessionsMethod,
-		wire.ProjectSessionsRequest{Project: project, IncludeArchived: &includeArchived}, projectSessionsAsk)
+	sessions, unreached, err = d.projectSessionsElsewhere(caller.ID, project, includeArchived)
 	if err != nil {
 		return nil, nil, true, err
-	}
-	var listed wire.ProjectSessions
-	if json.Unmarshal(out, &listed) != nil {
-		return nil, nil, true, &Error{Code: wire.FailureNotSupported, Message: "the control plane's answer could not be read"}
-	}
-	// This machine's are listed from its own store.
-	here := d.controlMachine()
-	for _, s := range listed.Sessions {
-		if !strings.EqualFold(string(s.Machine), here) {
-			sessions = append(sessions, s)
-		}
-	}
-	for _, m := range listed.Unreached {
-		if !strings.EqualFold(string(m.Machine), here) {
-			unreached = append(unreached, m)
-		}
 	}
 	return sessions, unreached, true, nil
 }

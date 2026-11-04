@@ -149,6 +149,8 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	d.resumeBlocks()
 	d.resumeContinues()
 	d.checkEveryQueue()
+	// A place another machine of the project frees (#3281).
+	d.checkProjectQueues()
 	d.restoreRuns()
 	d.startWorkflowClock()
 	// Each folder's one watch (#173), which the first workflow scan starts too.
