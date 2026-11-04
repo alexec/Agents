@@ -86,9 +86,11 @@ const kinds: Record<ProviderKind, KindInfo> = {
 
 export const providerWords = {
   heading: "Machine providers",
-  footer: "A provider starts and stops your machines: DigitalOcean Droplets, GitHub Codespaces, Coder workspaces, "
+  /** Under the list: what a provider is, and the kinds only the Mac app adds (#3425). */
+  footer: (hasMac: boolean) => "A provider starts and stops your machines: DigitalOcean Droplets, GitHub Codespaces, Coder workspaces, "
     + "Google Compute Engine VMs or AWS EC2 instances, through their API. It runs on the control plane, so it can start a machine that is down. "
-    + "Docker, Cloud Workstations, your own commands and MCP servers are added in the Mac app.",
+    + (hasMac ? "Docker, Cloud Workstations, your own commands and MCP servers are added in the Mac app."
+      : "The web page cannot add Docker, Cloud Workstations, your own commands or MCP servers yet."),
   off: "Machine providers are off on this control plane.",
   add: "Add Provider…",
   secretsFoot: "Tokens and keys go to the control plane and are never shown again. This page does not keep them.",

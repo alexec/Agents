@@ -40,12 +40,13 @@ export function footerWords(state: BackupState): string {
 }
 
 /** What a folder on the disk it backs up means, and what to do (#2139); null elsewhere. The
- * folder is chosen on the Mac. */
-export function sameDiskWords(state: BackupState): string | null {
+ * Mac's folder is chosen on the Mac; a server's is not chosen on this page, so it says only the
+ * control plane (#3425). */
+export function sameDiskWords(state: BackupState, onMac: boolean): string | null {
   if (backupTarget(state) !== "folder" || !state.sameDisk) return null;
-  let words = "This folder is on the same disk as what it backs up. A backup here can undo a mistake, "
-    + "but is lost with the disk. Choose a folder on a second disk, or one that syncs to another place, on the Mac.";
-  if (state.canUseControl) words += " Or back up to the control plane.";
+  let words = "This folder is on the same disk as what it backs up. A backup here can undo a mistake, but is lost with the disk.";
+  if (onMac) words += " Choose a folder on a second disk, or one that syncs to another place, on the Mac.";
+  if (state.canUseControl) words += onMac ? " Or back up to the control plane." : " Back up to the control plane instead.";
   return words;
 }
 

@@ -423,6 +423,8 @@ export class Work {
   isMac(host: string | undefined): boolean {
     return host !== undefined && host === this.macHostID.value;
   }
+  /** Whether the person has a Mac among their machines (#3382, #3425): with none, a line says what to do here. */
+  readonly hasMac: ReadonlySignal<boolean> = computed(() => this.hosts.value.some((h) => this.isMac(h.id)));
   /** Why this Mac's host is quiet, as the window says it (#666), or nil while it is online. */
   readonly macHostNotice: ReadonlySignal<MacHostNotice | null> = computed(() => {
     const plane = this.plane.value;

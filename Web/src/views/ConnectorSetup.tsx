@@ -104,7 +104,7 @@ export function ConnectorSetupSection({ store, host, folder, folderName, go }: {
                 tryAgain={() => void load("fresh")} skip={(s) => void skip(slot.slot, s)}
                 linearConnected={linearConnected} connectLinear={() => setConnecting("linear")}
                 jiraConnected={jiraConnected} connectJira={() => setConnecting("atlassian")}
-                place={place} admin={store.person.value?.role !== "member"} add={setAdding} />
+                place={place} admin={store.person.value?.role !== "member"} add={setAdding} hasMac={store.hasMac.value} />
             ))}
           </div>
           {setup.project && <ProjectSlots store={store} setup={setup} changed={() => void load("cached")} />}
@@ -190,7 +190,7 @@ function SlotMark({ slot, reading }: { slot: ConnectorSlot; reading: boolean }) 
   return <span class={`slot-mark ${slot.state}`} role="img" aria-label={label}>{mark}</span>;
 }
 
-function SlotCard({ slot, setup, folderName, reading, tryAgain, skip, linearConnected, connectLinear, jiraConnected, connectJira, place, admin, add }: {
+function SlotCard({ slot, setup, folderName, reading, tryAgain, skip, linearConnected, connectLinear, jiraConnected, connectJira, place, admin, add, hasMac }: {
   slot: ConnectorSlot; setup: ConnectorSetup; folderName: string; reading: boolean;
   tryAgain: () => void; skip: (skipped: boolean) => void;
   /** Tasks only: whether Linear is connected, unknown until read (#1682). */
@@ -199,6 +199,8 @@ function SlotCard({ slot, setup, folderName, reading, tryAgain, skip, linearConn
   jiraConnected: boolean | undefined; connectJira: () => void;
   /** Where agents run only (#2131): its machine and line, and Add a Machine… or Add Provider…. */
   place: { title: string; line: string }; admin: boolean; add: (what: "machine" | "provider") => void;
+  /** Whether the person has a Mac (#3425): what only the Mac app adds is sent there, or said to be missing here. */
+  hasMac: boolean;
 }) {
   const [changing, setChanging] = useState(false);
   const workspace = slot.slot === "workspace";
@@ -236,7 +238,7 @@ function SlotCard({ slot, setup, folderName, reading, tryAgain, skip, linearConn
           <>
             {linearConnected === false && <button class="link" onClick={connectLinear}>{words.connectLinear}</button>}
             {jiraConnected === false && <button class="link" onClick={connectJira}>{words.connectJira}</button>}
-            <span class="quiet">{words.otherTrackers(linearConnected !== false)}</span>
+            <span class="quiet">{words.otherTrackers(linearConnected !== false, hasMac)}</span>
           </>
         )}
         {!fromProject && (slot.state === "notConnected" || slot.state === "noRemote") && <button class="link" onClick={() => skip(true)}>Skip</button>}
@@ -257,7 +259,7 @@ function SlotCard({ slot, setup, folderName, reading, tryAgain, skip, linearConn
             <button title={whereAgentsRun.addProviderNote} onClick={() => { add("provider"); setChanging(false); }}>{addMachineWords.addProvider}</button>
           )}
           {words.forgeOf(setup) === "github" && setup.repository && setup.connection?.state === "connected" && (
-            <p class="quiet small">GitHub Codespaces: Set up on the Mac.</p>
+            <p class="quiet small">{words.codespacesElsewhere(hasMac)}</p>
           )}
           <button class="link" onClick={() => setChanging(false)}>Cancel</button>
           <p class="quiet small">{addMachineWords.providersYours}</p>
@@ -271,11 +273,11 @@ function SlotCard({ slot, setup, folderName, reading, tryAgain, skip, linearConn
             <button onClick={() => { connectLinear(); setChanging(false); }}>{words.connectLinear}</button>
           )}
           {slot.slot === "tasks" && jiraConnected === false && (
-            <button title={words.jira.tasksNote} onClick={() => { connectJira(); setChanging(false); }}>{words.connectJira}</button>
+            <button title={words.jira.tasksNote(hasMac)} onClick={() => { connectJira(); setChanging(false); }}>{words.connectJira}</button>
           )}
           <button onClick={() => { skip(true); setChanging(false); }}>None (skip)</button>
           <button class="link" onClick={() => setChanging(false)}>Cancel</button>
-          {slot.slot === "docs" && <p class="quiet small">{words.docs.addOnTheMac}</p>}
+          {slot.slot === "docs" && <p class="quiet small">{words.docs.addElsewhere(hasMac)}</p>}
         </div>
       )}
     </div>
