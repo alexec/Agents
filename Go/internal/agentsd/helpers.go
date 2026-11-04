@@ -47,22 +47,47 @@ func (d *Daemon) helperLimitsIn(folder string) (running, notArchived, queued int
 }
 
 // helpersIn is HelperLimit.helpers: started by an agent, not archived, not queued, oldest first.
-// The ones its agents started on other machines count here too (#2927).
+// The ones its agents started on other machines count here too (#2927), and, for a folder in
+// a project, those in every folder of the project here and on the other machines (#3281),
+// as last counted (countProject). A lead does not count.
 func (d *Daemon) helpersIn(folder string) []wire.Agent {
 	out := d.thereAgents(folder)
+	project := projectOfFolder(folder)
+	projects := projectsOfFolders{folder: project}
 	for _, a := range d.Store.Agents() {
-		if a.StartedByAgent != nil && a.State != wire.AgentStateArchived && a.State != wire.AgentStateQueued && folderPath(&a) == folder {
+		if a.StartedByAgent != nil && a.State != wire.AgentStateArchived && a.State != wire.AgentStateQueued && !isLead(&a) &&
+			inLimitScope(folder, project, projects, &a) {
 			out = append(out, a)
 		}
 	}
-	return sortedByAge(out)
+	if c, ok := d.projectCountOf(folder); ok {
+		out = append(out, c.helpers...)
+	}
+	return sortedByAge(uniqueAgents(out))
 }
 
-// helperQueue is HelperLimit.queue: the queued, first in first.
+// uniqueAgents is as, each id once: a session this machine's agent started on another
+// machine is in thereAgents and in the project's count both.
+func uniqueAgents(as []wire.Agent) []wire.Agent {
+	seen := map[wire.UUID]bool{}
+	var out []wire.Agent
+	for _, a := range as {
+		if !seen[a.ID] {
+			seen[a.ID] = true
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+// helperQueue is HelperLimit.queue: the queued in folder, or in every folder here of its
+// project, first in first. This machine starts only its own.
 func (d *Daemon) helperQueue(folder string) []wire.Agent {
 	var out []wire.Agent
+	project := projectOfFolder(folder)
+	projects := projectsOfFolders{folder: project}
 	for _, a := range d.Store.Agents() {
-		if a.State == wire.AgentStateQueued && folderPath(&a) == folder {
+		if a.State == wire.AgentStateQueued && inLimitScope(folder, project, projects, &a) {
 			out = append(out, a)
 		}
 	}
@@ -73,6 +98,16 @@ func (d *Daemon) helperQueue(folder string) []wire.Agent {
 		return out[i].ID < out[j].ID
 	})
 	return out
+}
+
+// queuedCount is how many wait in folder's queue: this machine's, and, for a project, those
+// queued on its other machines, as last counted.
+func (d *Daemon) queuedCount(folder string) int {
+	n := len(d.helperQueue(folder))
+	if c, ok := d.projectCountOf(folder); ok {
+		n += len(c.queued)
+	}
+	return n
 }
 
 // helperRunning is HelperLimit.isRunning: holding a running place.
@@ -96,14 +131,15 @@ func (d *Daemon) runningHelpers(folder string) []wire.Agent {
 	return out
 }
 
-// helperPlaces is "1 of 3 running, 2 of 5 not archived", and the queue once there is one.
+// helperPlaces is "1 of 3 running, 2 of 5 not archived", and the queue once there is one;
+// for a project, and what its count could not reach.
 func (d *Daemon) helperPlaces(folder string) string {
 	running, notArchived, queued := d.helperLimitsIn(folder)
 	s := fmt.Sprintf("%d of %d running, %d of %d not archived", len(d.runningHelpers(folder)), running, len(d.helpersIn(folder)), notArchived)
-	if q := len(d.helperQueue(folder)); q > 0 {
+	if q := d.queuedCount(folder); q > 0 {
 		s += fmt.Sprintf(", %d of %d queued", q, queued)
 	}
-	return s
+	return s + d.countedHereWords(folder)
 }
 
 // starters is the chain of agents above one: who started it, who started that, and on. A
@@ -189,13 +225,13 @@ func (d *Daemon) stopSession(caller wire.UUID, args map[string]json.RawMessage) 
 		})
 		d.record(t.ID, stateChanged(wire.AgentStateStopped, reason(wire.EndedReasonCancelled)))
 		d.agentEnded(t.ID)
-		return "Took " + name + " off the queue; it will not start. This folder now has " + d.helperPlaces(folder) + ".", nil
+		return "Took " + name + " off the queue; it will not start. " + scopeTitle(folder) + " now has " + d.helperPlaces(folder) + ".", nil
 	}
 	if !d.stopHelper(t) {
 		return name + " had already stopped; nothing changed.", nil
 	}
 	d.checkQueueSoon(folder)
-	return "Stopped " + name + ", freeing its running place; it keeps its other place until it is archived. This folder now has " +
+	return "Stopped " + name + ", freeing its running place; it keeps its other place until it is archived. " + scopeTitle(folder) + " now has " +
 		d.helperPlaces(folder) + ".", nil
 }
 
@@ -237,7 +273,7 @@ func (d *Daemon) requestArchiveHelper(caller, target wire.UUID) (string, error) 
 	may := d.agentsMayArchive(folder)
 	if may && !helperRunning(t) {
 		d.archiveBy(t.ID, wire.AgentArchivedReasonByAgent)
-		return "Archived " + name + ", freeing its place; the person can unarchive it. This folder now has " + d.helperPlaces(folder) + ".", nil
+		return "Archived " + name + ", freeing its place; the person can unarchive it. " + scopeTitle(folder) + " now has " + d.helperPlaces(folder) + ".", nil
 	}
 	if r := t.ArchiveRequest; r != nil && r.Requested != nil {
 		return name + " already waits for the person to approve archiving it; nothing changed.", nil
@@ -254,5 +290,5 @@ func (d *Daemon) requestArchiveHelper(caller, target wire.UUID) (string, error) 
 		return name + " will wait for the person to approve archiving it when its turn ends, freeing its running place then.", nil
 	}
 	return name + " now waits for the person to approve archiving it, which frees its running place; it keeps its other place until it is archived. " +
-		"This folder now has " + d.helperPlaces(folder) + ".", nil
+		scopeTitle(folder) + " now has " + d.helperPlaces(folder) + ".", nil
 }

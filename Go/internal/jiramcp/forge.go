@@ -25,10 +25,11 @@ import (
 
 // SearchFilter is what a list lists: issues in state open, closed or all (open when ""),
 // narrowed by a label, an assignee's display name, words in the summary, description or
-// comments, and a feature: the name of a feature:<name> label (#3267).
+// comments, and a feature: the name of a feature:<name> label (#3267). Filter is a board's
+// filter, by its id (#3282): the board's issues, in place of the projects'.
 type SearchFilter struct {
-	State                           string
-	Label, Assignee, Query, Feature string
+	State                                   string
+	Label, Assignee, Query, Feature, Filter string
 }
 
 // Item is an issue as the forge reads list it, by its key (PROJ-12).
@@ -142,6 +143,9 @@ func SearchJQL(projects []string, f SearchFilter) string {
 		keys[n] = quoted(p)
 	}
 	clauses := []string{"project in (" + strings.Join(keys, ", ") + ")"}
+	if f.Filter != "" {
+		clauses[0] = "filter = " + f.Filter
+	}
 	switch f.State {
 	case "", "open":
 		clauses = append(clauses, "statusCategory != "+categoryIDs["done"])
@@ -237,7 +241,7 @@ func (j *RealJira) searchPage(ctx context.Context, jql string, read []string, ma
 // after ("" for the first page), in one search.
 func (j *RealJira) Search(ctx context.Context, projects []string, f SearchFilter, after string, first int) (SearchPage, error) {
 	page := SearchPage{Items: []Item{}, Cursors: []string{}}
-	if len(projects) == 0 {
+	if len(projects) == 0 && f.Filter == "" {
 		return page, nil
 	}
 	from, skip, err := cursorParts(after)
@@ -565,4 +569,24 @@ func (j *RealJira) Plan(ctx context.Context, key string) (Plan, error) {
 		p.Children = append(p.Children, c)
 	}
 	return p, nil
+}
+
+// BoardFilter is the id of the filter a board shows (#3282), from Jira Software's
+// /rest/agile/1.0/board/<id>/configuration.
+func (j *RealJira) BoardFilter(ctx context.Context, board string) (string, error) {
+	if board == "" || strings.Trim(board, "0123456789") != "" {
+		return "", &JiraError{Kind: Failed, Message: "Jira: a board's id is a number"}
+	}
+	var config struct {
+		Filter struct {
+			ID string `json:"id"`
+		} `json:"filter"`
+	}
+	if err := j.call(ctx, http.MethodGet, agilePath+"/board/"+board+"/configuration", nil, &config); err != nil {
+		return "", err
+	}
+	if config.Filter.ID == "" || strings.Trim(config.Filter.ID, "0123456789") != "" {
+		return "", &JiraError{Kind: Failed, Message: "Jira: board " + board + " has no filter"}
+	}
+	return config.Filter.ID, nil
 }

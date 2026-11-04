@@ -2,6 +2,11 @@ name: slow-tests
 
 on:
   workflow_dispatch:
+    inputs:
+      coverage:
+        description: Run only the Swift coverage jobs, as the nightly run does (#3442).
+        type: boolean
+        default: false
   schedule:
     - cron: '17 9 * * *'
 
@@ -10,7 +15,7 @@ permissions:
 
 jobs:
   slow-tests:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && !inputs.coverage
     runs-on: xcode-27
     timeout-minutes: 20
     env:
@@ -39,7 +44,7 @@ jobs:
   # The wall-clock budgets (#225): held only here and by scripts/perf-tests.sh on a quiet
   # Mac. Everywhere else these tests check what they compute and print the time.
   perf-tests:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && !inputs.coverage
     runs-on: xcode-27
     timeout-minutes: 20
     env:
@@ -56,8 +61,14 @@ jobs:
   # CodeText's ran to the 60-minute limit on every night from 2026-10-28 to 11-03, on
   # an xcode-27 runner that the day's pull requests wait for (#594). 20 minutes is
   # more than three times AgentsKit's job; a CodeText run that needs more is hung.
+  #
+  # CodeText's tests pass in a second; what hung was the JSON export that `swift test`
+  # makes after them (#3442). It read the coverage map of the 20 vendored tree-sitter
+  # grammars, megabytes of generated C each, and on the runner's 7 GB filled 36 GB of
+  # swap. That C is not ours to cover, so CodeText builds its C with no coverage map:
+  # its Swift is still measured, and the whole test step takes seconds.
   coverage-swift:
-    if: github.event_name == 'schedule'
+    if: github.event_name == 'schedule' || inputs.coverage
     strategy:
       fail-fast: false
       matrix:
@@ -65,9 +76,11 @@ jobs:
           - package: AgentsKit
             minutes: 60
             test-minutes: 55
+            build-flags: ""
           - package: CodeText
             minutes: 20
             test-minutes: 15
+            build-flags: -Xcc -fno-coverage-mapping
     runs-on: xcode-27
     timeout-minutes: ${{ matrix.minutes }}
     env:
@@ -82,15 +95,22 @@ jobs:
             xcodebuild -downloadComponent MetalToolchain
           fi
 
+      # The build and the test run are two steps, so a log says which one stops (#3442).
+      - name: Build with coverage
+        timeout-minutes: ${{ matrix.test-minutes }}
+        run: |
+          swift build --build-tests --enable-code-coverage ${{ matrix.build-flags }} \
+            --package-path Packages/${{ matrix.package }}
+
       - name: Test with coverage
         # Leaves 5 minutes of the job for the coverage report and its upload.
         timeout-minutes: ${{ matrix.test-minutes }}
         run: |
           if [[ "${{ matrix.package }}" == AgentsKit ]]; then
-            swift test --enable-code-coverage --package-path Packages/AgentsKit \
+            swift test --skip-build --enable-code-coverage --package-path Packages/AgentsKit \
               --experimental-maximum-parallelization-width 3
           else
-            swift test --enable-code-coverage --package-path Packages/CodeText
+            swift test --skip-build --enable-code-coverage --package-path Packages/CodeText
           fi
 
       - name: Report Swift coverage
@@ -103,7 +123,8 @@ jobs:
           binary=""
           if [[ -d "$package_path/.build" ]]; then
             profile=$(find "$package_path/.build" -path '*/codecov/default.profdata' -type f -print -quit)
-            binary=$(find "$package_path/.build" -path "*/debug/${{ matrix.package }}*Tests.xctest/Contents/MacOS/*Tests" -type f -print -quit)
+            # -ipath: this toolchain builds into .build/out/Products/Debug, not .build/<triple>/debug.
+            binary=$(find "$package_path/.build" -ipath "*/debug/${{ matrix.package }}*Tests.xctest/Contents/MacOS/*Tests" -type f -print -quit)
           fi
           if [[ -f "$profile" && -n "$binary" ]]; then
             echo '### ${{ matrix.package }} coverage' >> "$GITHUB_STEP_SUMMARY"
@@ -120,4 +141,6 @@ jobs:
           name: swift-coverage-${{ matrix.package }}
           path: Packages/${{ matrix.package }}/.build/**/codecov/*
           if-no-files-found: ignore
+          # The profiles are under .build, which upload-artifact skips as hidden otherwise.
+          include-hidden-files: true
           retention-days: 14

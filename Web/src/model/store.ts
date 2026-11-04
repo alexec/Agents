@@ -415,7 +415,11 @@ export class Work {
    * (#666), from `control/status`.
    */
   readonly plane = signal<{ machineID: string; homeHost?: string | undefined; thisMacHost?: MachineJoinStatus | undefined;
-    name?: string; version?: string; required?: RequiredCapabilities | undefined } | null>(null);
+    name?: string; version?: string; required?: RequiredCapabilities | undefined; capabilities?: string[] | undefined } | null>(null);
+  /** Whether the control plane said `capability` (#1748), from `control/status`: false until it has said its list. */
+  planeHas(capability: string): boolean {
+    return this.plane.value?.capabilities?.includes(capability) ?? false;
+  }
   /**
    * The person's Mac (#1501): the host that keeps their display choices (#1033) and that the page
    * calls "This Mac". It is `mac`, or, with a control plane elsewhere, where this Mac's host joins
@@ -1455,7 +1459,7 @@ export class Store extends Work {
     const status = await this.link.call("control/status", {}).catch(() => null);
     if (!status) return;
     this.plane.value = { machineID: status.machineID, homeHost: status.homeHost, thisMacHost: status.thisMacHost,
-      name: status.name, version: status.version, required: status.required };
+      name: status.name, version: status.version, required: status.required, capabilities: status.capabilities };
     this.person.value = status.person ?? null;
     this.joinCommand.value = status.joinCommand || null;
     knowPublicViews(status.publicViews);

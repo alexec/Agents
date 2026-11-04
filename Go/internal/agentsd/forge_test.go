@@ -251,6 +251,9 @@ func (f *fakeForgeGitLab) Search(_ context.Context, projects []string, sf gitlab
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.searches = append(f.searches, strings.Join(projects, ",")+" after="+after)
+	if len(sf.Board.Labels) > 0 || sf.Board.Milestone != "" {
+		f.searches[len(f.searches)-1] += " board=" + strings.Join(sf.Board.Labels, ",") + "@" + sf.Board.Milestone
+	}
 	if after != "" {
 		return gitlabmcp.SearchPage{Items: []gitlabmcp.Item{}, Cursors: []string{}}, nil
 	}
@@ -272,6 +275,14 @@ func (f *fakeForgeGitLab) ItemPage(_ context.Context, project string, number int
 		UpdatedAt: "2026-11-01T10:00:00Z"}, Body: "The body.", Before: "2",
 		Thread:    []gitlabmcp.Comment{{Author: "kim", Body: "Fine.", At: "2026-11-01T10:05:00Z", URL: "u1"}},
 		CheckRuns: []gitlabmcp.Check{{Name: "check: test", State: "passing"}}, ReviewThreads: 1, FilesChanged: 3, Head: "head4", Pipeline: 99}, nil
+}
+
+// GroupBoard is a group board's scope (#3282): board 5 of Group shows Team A's issues in 0.17.
+func (f *fakeForgeGitLab) GroupBoard(_ context.Context, group string, id int) (gitlabmcp.BoardScope, error) {
+	if group != "Group" || id != 5 {
+		return gitlabmcp.BoardScope{}, &gitlabmcp.GitLabError{Kind: gitlabmcp.NotFound, Message: "no such board"}
+	}
+	return gitlabmcp.BoardScope{Labels: []string{"team-a"}, Milestone: "0.17"}, nil
 }
 
 // fakeForgeLinear is Linear's lists and item reads, and what each was asked.

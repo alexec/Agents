@@ -429,10 +429,11 @@ func (d *Daemon) waitThere(name string, caller wire.UUID) (*wire.Agent, error) {
 // messageThere is message_session to a session caller started on another machine.
 func (d *Daemon) messageThere(me *wire.Agent, s *startedThere, text string, replace bool) (string, error) {
 	if s.Ended != nil && s.Ended.Finished != nil {
+		d.countProject(s.Folder)
 		running, _, _ := d.helperLimitsIn(s.Folder)
 		if r := len(d.runningHelpers(s.Folder)); int64(r) >= running {
-			return "", refusedMessage(fmt.Sprintf("waking %s would take a running place, and this folder already has %d of %d sessions "+
-				"started by sessions running. Send it once one finishes; wait with wait_for_agents.", quotedTitle(&s.Title), r, running))
+			return "", refusedMessage(fmt.Sprintf("waking %s would take a running place, and %s already has %d of %d sessions "+
+				"started by sessions running. Send it once one finishes; wait with wait_for_agents.", quotedTitle(&s.Title), scopeWords(s.Folder), r, running))
 		}
 	}
 	if !replace && !d.spendMessage(me.ID) {

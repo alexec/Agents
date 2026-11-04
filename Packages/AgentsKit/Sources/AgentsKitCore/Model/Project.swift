@@ -11,21 +11,55 @@ public extension DaemonAPI {
         /// Its folders as their machines last said them: every machine's for an admin, the
         /// caller's own machines' for a member.
         public var folders: [ProjectFolder]
-        /// The caller is its owner or an admin, so may rename and remove it, and set its slots.
+        /// The caller is its owner or an admin, so may rename and remove it, and set its slots
+        /// and boards.
         public var mayChange: Bool
         /// Its Tasks, Code review and CI (#2669), one per slot; a slot not here is each
         /// folder's own.
         public var slots: [ProjectSlot]?
+        /// The boards in its Tasks slot (#3282), in their order.
+        public var boards: [ProjectBoard]?
 
         public init(id: String, name: String, owner: String = "", folders: [ProjectFolder] = [], mayChange: Bool = true,
-                    slots: [ProjectSlot]? = nil) {
+                    slots: [ProjectSlot]? = nil, boards: [ProjectBoard]? = nil) {
             self.id = id
             self.name = name
             self.owner = owner
             self.folders = folders
             self.mayChange = mayChange
             self.slots = slots
+            self.boards = boards
         }
+    }
+
+    /// One board in a project's Tasks slot (#3282): a GitHub Projects board, a Jira board, a
+    /// Linear team or a GitLab group board, by its address and a name (the team's). A client
+    /// sends the name and the address; the control plane reads the rest from the address.
+    struct ProjectBoard: Codable, Sendable, Hashable, Identifiable {
+        public var name: String
+        /// The address, in the one form the control plane keeps; it names the board in
+        /// `forge/issues`' `board`.
+        public var url: String
+        public var forge: ConnectionProvider?
+        /// The board on its forge: `<owner>/<number>`, a Jira board id, a Linear team key,
+        /// `<group>#<id>`.
+        public var key: String?
+        public var site: String?
+
+        public var id: String { url }
+
+        public init(name: String, url: String, forge: ConnectionProvider? = nil, key: String? = nil, site: String? = nil) {
+            self.name = name; self.url = url; self.forge = forge; self.key = key; self.site = site
+        }
+    }
+
+    /// `projects/setBoards` (#3282): the project's boards, all of them each time, in their
+    /// order. Only the owner or an admin.
+    struct ProjectBoardsSet: Codable, Sendable, Hashable {
+        public var id: String
+        public var boards: [ProjectBoard]
+
+        public init(id: String, boards: [ProjectBoard]) { self.id = id; self.boards = boards }
     }
 
     /// One of a project's Tasks, Code review and CI slots (#2669): the forge and repository
@@ -67,8 +101,12 @@ public extension DaemonAPI {
         public var id: String
         public var name: String
         public var slots: [ProjectSlot]
+        /// The boards in its Tasks slot (#3282).
+        public var boards: [ProjectBoard]?
 
-        public init(id: String, name: String, slots: [ProjectSlot] = []) { self.id = id; self.name = name; self.slots = slots }
+        public init(id: String, name: String, slots: [ProjectSlot] = [], boards: [ProjectBoard]? = nil) {
+            self.id = id; self.name = name; self.slots = slots; self.boards = boards
+        }
     }
 
     /// `projects/joined`'s answer and `host/projects` (#2669).
@@ -160,6 +198,8 @@ public extension DaemonAPI.Method {
     static let projectsRemove = "projects/remove"
     /// `ProjectSlotSet` → `Project`, the owner's or an admin's (#2669).
     static let projectsSetSlot = "projects/setSlot"
+    /// `ProjectBoardsSet` → `Project`, the owner's or an admin's (#3282).
+    static let projectsSetBoards = "projects/setBoards"
     /// `SetFolderProjectRequest` → `FolderSummary`, on the folder's machine (#2317).
     static let foldersSetProject = "folders/setProject"
 }
@@ -229,5 +269,29 @@ public enum ProjectWords {
     public static func taken(_ name: String, in projects: [DaemonAPI.Project], except: String? = nil) -> Bool {
         let wanted = name.trimmingCharacters(in: .whitespaces)
         return projects.contains { $0.id != except && $0.name.caseInsensitiveCompare(wanted) == .orderedSame }
+    }
+}
+
+/// The words of a project's boards (#3282), in Project Settings ▸ Tools and Work's Board menu (the
+/// web page's are in `Web/src/model/projects.ts`).
+public enum ProjectBoardWords {
+    public static let heading = "Boards"
+    public static let note = "A board is a GitHub Projects board, a Jira board, a Linear team or a GitLab group board. "
+        + "Work ▸ Issues and Features can show one board."
+    public static let none = "No boards. Work shows every issue of the project."
+    public static let onlyOwner = "Only the project's owner or an admin can change its boards."
+    public static let namePrompt = "Name"
+    public static let addressPrompt = "https://github.com/orgs/acme/projects/7"
+    public static let add = "Add Board"
+    public static let remove = "Remove"
+    /// A board's forge, in words, after its name.
+    public static func forge(_ board: DaemonAPI.ProjectBoard) -> String {
+        switch board.forge {
+        case .github: "GitHub Projects"
+        case .atlassian: "Jira"
+        case .linear: "Linear team"
+        case .gitlab: "GitLab"
+        default: ""
+        }
     }
 }

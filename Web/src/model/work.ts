@@ -3,7 +3,8 @@
 // (reports/nodes: cost, sessions, lead time) on top. Milestones and releases come from reports/nodes
 // alone in v1. As WorkList has it on the window.
 import type {
-  ForgeCheck, ForgeDone, ForgeItem, ForgeItemDetail, ForgeLabel, ForgeListError, ForgeMergeMethod, LineageCostRollup, LineageLink, LineageNode, ReportNode,
+  ForgeCheck, ForgeDone, ForgeItem, ForgeItemDetail, ForgeLabel, ForgeListError, ForgeListRequest, ForgeMergeMethod, LineageCostRollup, LineageLink,
+  LineageNode, ProjectBoard, ReportNode,
 } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import { costWords, nodeName, spent } from "./value";
@@ -118,16 +119,47 @@ export function mergeForge(lists: readonly { host: string; items: readonly Forge
   return [...rows.values()];
 }
 
-/** What a list is narrowed to. Empty text, repo, label or assignee is any. */
+/** What a list is narrowed to. Empty text, repo, label, assignee or board is any. The board (a board's url,
+ * #3282) is the machines' to narrow, as the state is: the rows read are the board's already. */
 export interface WorkFilter {
   state: WorkState;
   repo: string;
   label: string;
   assignee: string;
   text: string;
+  board: string;
 }
 
-export const anyFilter: WorkFilter = { state: "open", repo: "", label: "", assignee: "", text: "" };
+export const anyFilter: WorkFilter = { state: "open", repo: "", label: "", assignee: "", text: "", board: "" };
+
+/** A board's url on a request, when one is chosen (#3282); the request as it was with none. */
+export function withBoard<T extends object>(request: T, board: string): T & { board?: string } {
+  return board ? { ...request, board } : request;
+}
+
+/** forge/issues' and forge/pulls' request: the state, a page of 100, the board when one is chosen, the next page's cursor. */
+export function forgeListRequest(state: string, board: string, cursor?: string): ForgeListRequest {
+  return withBoard({ state, limit: 100, ...cursor ? { cursor } : {} }, board);
+}
+
+/** The boards of several machines (forge/boards, #3282) as one list: each once, by url, in the order first read,
+ * with the name the first machine gave it. */
+export function mergeBoards(lists: readonly (readonly ProjectBoard[])[]): ProjectBoard[] {
+  const by = new Map<string, ProjectBoard>();
+  for (const b of lists.flat()) if (!by.has(b.url)) by.set(b.url, b);
+  return [...by.values()];
+}
+
+/** The Board menu's choices, by url: the boards read, and the chosen one when no machine lists it now. */
+export function boardChoices(boards: readonly ProjectBoard[], chosen: string): string[] {
+  const urls = boards.map((b) => b.url);
+  return chosen && !urls.includes(chosen) ? [...urls, chosen] : urls;
+}
+
+/** A board's name in the menu, by its url; the url for one no machine lists now. */
+export function boardName(boards: readonly ProjectBoard[], url: string): string {
+  return boards.find((b) => b.url === url)?.name ?? url;
+}
 
 /** Whether a row is in the state asked: closed is closed without a merge when merged is its own choice. */
 export function stateMatches(row: WorkRow, state: WorkState): boolean {

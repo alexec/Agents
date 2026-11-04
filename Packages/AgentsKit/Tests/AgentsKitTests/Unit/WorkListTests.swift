@@ -57,6 +57,18 @@ struct WorkListTests {
         #expect(WorkList.lineageWords(quiet) == nil)
     }
 
+    /// #3282: each machine's boards once by url, the first name kept; a board's name in the menu.
+    @Test func boardsAreMergedByURL() {
+        let web = DaemonAPI.ProjectBoard(name: "Web", url: "https://github.com/orgs/acme/projects/7")
+        let renamed = DaemonAPI.ProjectBoard(name: "Web team", url: web.url)
+        let plat = DaemonAPI.ProjectBoard(name: "Platform", url: "https://linear.app/acme/team/PLAT")
+        let merged = WorkList.mergeBoards([[web], [renamed, plat]])
+        #expect(merged.map(\.name) == ["Web", "Platform"])
+        #expect(WorkList.boardName(plat.url, in: merged) == "Platform")
+        #expect(WorkList.boardName("https://elsewhere", in: merged) == "https://elsewhere")
+        #expect(WorkList.Filter().board.isEmpty)
+    }
+
     @Test func filtersStateRepoLabelAssigneeAndWords() {
         let rows = WorkList.merge([(host: .mac, items: [
             item(1, labels: [.init(name: "bug", color: "d73a4a")], assignees: ["alexec"]),

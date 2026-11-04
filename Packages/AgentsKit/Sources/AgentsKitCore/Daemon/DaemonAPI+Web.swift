@@ -232,6 +232,7 @@ public extension DaemonAPI {
                 Row(Method.forgeDiff, params: ForgeNodeRequest.self, result: ForgeDiff.self, kind: .hostRequest),
                 Row(Method.forgePlan, params: ForgePlanRequest.self, result: ForgePlan.self, kind: .hostRequest),
                 Row(Method.forgeFeatures, params: ForgeFeaturesRequest.self, result: ForgeFeatures.self, kind: .hostRequest),
+                Row(Method.forgeBoards, params: ForgeBoardsRequest.self, result: ForgeBoards.self, kind: .hostRequest),
                 Row(Method.forgeAddChild, params: ForgeAddChildRequest.self, result: ForgeDone.self, kind: .hostRequest),
                 Row(Method.forgeBlockedBy, params: ForgeBlockedByRequest.self, result: ForgeDone.self, kind: .hostRequest),
                 Row(Method.docsList, params: DocsListRequest.self, result: DocsList.self, kind: .hostRequest),
@@ -506,6 +507,7 @@ public extension DaemonAPI {
                 Row(Method.projectsList, params: Empty.self, result: ProjectList.self, kind: .controlRequest),
                 Row(Method.projectsSet, params: ProjectSet.self, result: Project.self, kind: .controlRequest),
                 Row(Method.projectsSetSlot, params: ProjectSlotSet.self, result: Project.self, kind: .controlRequest),
+                Row(Method.projectsSetBoards, params: ProjectBoardsSet.self, result: Project.self, kind: .controlRequest),
                 Row(Method.projectsRemove, params: ProjectRequest.self, result: Empty.self, kind: .controlRequest),
                 // Bots run the team's workflows (#1761): in Settings ▸ People.
                 Row(Method.botsMake, params: BotMake.self, result: BotMade.self, kind: .controlRequest),

@@ -11,8 +11,10 @@ import type {
 import { folderPath } from "../model/hostedMCP";
 import { Capability } from "../protocol/capabilities.generated";
 import * as words from "../model/connectorSetup";
-import { projectSlotFrom, projectsNotRead, projectWords, setByProject, slotLine, slotsOwner } from "../model/projects";
-import type { Project } from "../protocol/generated";
+import {
+  boardForge, boardsWith, boardsWithout, boardWords, projectSlotFrom, projectsNotRead, projectWords, setByProject, slotLine, slotsOwner,
+} from "../model/projects";
+import type { Project, ProjectBoard } from "../protocol/generated";
 import { addMachineWords, whereAgentsRun } from "../model/addMachine";
 import { Modal } from "./Modal";
 import { AddMachineDialog } from "./AddMachineDialog";
@@ -287,7 +289,7 @@ function SlotCard({ slot, setup, folderName, reading, tryAgain, skip, linearConn
 /**
  * The folder's project's tools (#2669), as the window's ProjectSlotsCard: Tasks, Code review and
  * CI are the project's, and its owner or an admin makes a folder's own slot the project's, or
- * gives one back to each folder.
+ * gives one back to each folder. The project's boards (#3282) follow, with a control plane that keeps them.
  */
 function ProjectSlots({ store, setup, changed }: { store: Store; setup: ConnectorSetup; changed: () => void }) {
   const [project, setProject] = useState<Project>();
@@ -322,26 +324,90 @@ function ProjectSlots({ store, setup, changed }: { store: Store; setup: Connecto
     }
   };
   return (
-    <div class="setup-card project-slots">
-      <p class="quiet small">{slotsOwner(name)}</p>
-      {project?.mayChange && setup.slots.filter((s) => words.isProjects(s.slot)).map((slot) => {
-        const value = projectSlotFrom(setup, slot);
-        return (
-          <p key={slot.slot} class="small project-slot">
-            <span class="slot-kind">{words.heading(slot.slot)}</span>{" "}
-            <span>{slotLine(slot, name)}</span>{" "}
-            {slot.fromProject
-              ? <button class="link" disabled={asking} onClick={() => void set(slot.slot, undefined)}>{projectWords.useFolderOwn}</button>
-              : value && <button class="link" disabled={asking} onClick={() => void set(slot.slot, value)}>{projectWords.useForProject}</button>}
+    <>
+      <div class="setup-card project-slots">
+        <p class="quiet small">{slotsOwner(name)}</p>
+        {project?.mayChange && setup.slots.filter((s) => words.isProjects(s.slot)).map((slot) => {
+          const value = projectSlotFrom(setup, slot);
+          return (
+            <p key={slot.slot} class="small project-slot">
+              <span class="slot-kind">{words.heading(slot.slot)}</span>{" "}
+              <span>{slotLine(slot, name)}</span>{" "}
+              {slot.fromProject
+                ? <button class="link" disabled={asking} onClick={() => void set(slot.slot, undefined)}>{projectWords.useFolderOwn}</button>
+                : value && <button class="link" disabled={asking} onClick={() => void set(slot.slot, value)}>{projectWords.useForProject}</button>}
+            </p>
+          );
+        })}
+        {notRead && (
+          <p class="small failure">
+            {notRead}{" "}
+            <button class="link" onClick={load}>{projectWords.tryAgain}</button>
           </p>
-        );
-      })}
-      {notRead && (
-        <p class="small failure">
-          {notRead}{" "}
-          <button class="link" onClick={load}>{projectWords.tryAgain}</button>
-        </p>
+        )}
+        {problem && <p class="small failure">{problem}</p>}
+      </div>
+      {project && store.planeHas(Capability.projectsBoards1) && <ProjectBoards store={store} project={project} changed={setProject} />}
+    </>
+  );
+}
+
+/**
+ * The boards in the project's Tasks slot (#3282), as the window's ProjectBoardsCard: each with
+ * Remove, and Add a board, for the owner or an admin. Each change sends the whole list.
+ */
+function ProjectBoards({ store, project, changed }: { store: Store; project: Project; changed: (project: Project) => void }) {
+  const [name, setName] = useState("");
+  const [url, setURL] = useState("");
+  const [problem, setProblem] = useState<string>();
+  const [asking, setAsking] = useState(false);
+  const boards = project.boards ?? [];
+  const set = async (next: ProjectBoard[]) => {
+    setAsking(true);
+    try {
+      changed(await store.link.call("projects/setBoards", { id: project.id, boards: next }));
+      setProblem(undefined);
+      return true;
+    } catch (e) {
+      setProblem(why(e));
+      return false;
+    } finally {
+      setAsking(false);
+    }
+  };
+  const adding = boardsWith(boards, name, url);
+  const add = async (e: Event) => {
+    e.preventDefault();
+    if (!adding || asking) return;
+    if (await set(adding)) { setName(""); setURL(""); }
+  };
+  return (
+    <div class="setup-card project-boards">
+      <p class="small strong">{boardWords.heading}</p>
+      <p class="quiet small">{boardWords.note}</p>
+      {boards.length === 0 ? <p class="quiet small">{boardWords.none}</p> : (
+        <ul>
+          {boards.map((b) => (
+            <li key={b.url}>
+              <span class="board-name">{b.name}</span>{" "}
+              {boardForge(b) && <span class="quiet small">{boardForge(b)}</span>}{" "}
+              <a class="quiet small" href={b.url} target="_blank" rel="noopener noreferrer">{b.url}</a>{" "}
+              {project.mayChange && (
+                <button class="link" disabled={asking} onClick={() => void set(boardsWithout(boards, b.url))}>{boardWords.remove}</button>
+              )}
+            </li>
+          ))}
+        </ul>
       )}
+      {project.mayChange ? (
+        <form class="board-add" aria-label={boardWords.add} onSubmit={(e) => void add(e)}>
+          <input type="text" aria-label={boardWords.namePrompt} placeholder={boardWords.namePrompt} value={name} disabled={asking}
+            onInput={(e) => setName((e.currentTarget as HTMLInputElement).value)} />
+          <input type="text" aria-label="Address" placeholder={boardWords.addressPrompt} value={url} disabled={asking}
+            onInput={(e) => setURL((e.currentTarget as HTMLInputElement).value)} />
+          <button type="submit" disabled={asking || !adding}>{boardWords.add}</button>
+        </form>
+      ) : <p class="quiet small">{boardWords.onlyOwner}</p>}
       {problem && <p class="small failure">{problem}</p>}
     </div>
   );

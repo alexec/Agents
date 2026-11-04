@@ -154,6 +154,12 @@ private struct WorkListPane: View {
         if kind.fromForge {
             choice("Assignee", any: "Any", selection: $list.filter.assignee, options: offered.assignees)
         }
+        #if os(macOS)
+        // Boards are the Mac's and the web page's (#3282, tier Mac + web): the machines narrow to one as they read.
+        if kind == .issue, !list.boards.isEmpty || !list.filter.board.isEmpty {
+            WorkBoardPicker(selection: $list.filter.board, boards: list.boards)
+        }
+        #endif
         named("Sort", list.sort.title) {
             Picker("Sort", selection: $list.sort) {
                 ForEach(kind.sorts, id: \.self) { Text($0.title).tag($0) }
@@ -354,3 +360,22 @@ struct WorkStatePill: View {
         }
     }
 }
+
+#if os(macOS)
+/// Work's Board menu (#3282): every board, or one of the boards of the folders' projects.
+struct WorkBoardPicker: View {
+    @Binding var selection: String
+    let boards: [DaemonAPI.ProjectBoard]
+
+    var body: some View {
+        Picker("Board", selection: $selection) {
+            Text("All").tag("")
+            ForEach(boards) { Text($0.name).tag($0.url) }
+            if !selection.isEmpty, !boards.contains(where: { $0.url == selection }) {
+                Text(WorkList.boardName(selection, in: boards)).tag(selection)
+            }
+        }
+        .fixedSize()
+    }
+}
+#endif

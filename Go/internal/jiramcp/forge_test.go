@@ -187,3 +187,29 @@ func TestPlanIsTheChildrenWithTheirBlockers(t *testing.T) {
 		}
 	}
 }
+
+// #3282: a board's issues are its filter's, in place of the projects', read from Jira
+// Software's API.
+func TestABoardIsItsFilter(t *testing.T) {
+	if jql := SearchJQL(nil, SearchFilter{Filter: "10040", Label: "bug"}); jql != `filter = 10040 AND statusCategory != 3 AND labels = "bug" ORDER BY updated DESC` {
+		t.Fatalf("jql: %s", jql)
+	}
+	f, j := newSite(t, true, func(path string, _ map[string]any) any {
+		if path == "/rest/agile/1.0/board/12/configuration" {
+			return map[string]any{"id": 12, "filter": map[string]any{"id": "10040"}}
+		}
+		return map[string]any{"filter": map[string]any{}}
+	})
+	if id, err := j.BoardFilter(context.Background(), "12"); err != nil || id != "10040" {
+		t.Fatalf("%q %v", id, err)
+	}
+	if _, err := j.BoardFilter(context.Background(), "13"); err == nil {
+		t.Fatal("a board with no filter")
+	}
+	if _, err := j.BoardFilter(context.Background(), "../x"); err == nil {
+		t.Fatal("a board id that is not a number")
+	}
+	if len(f.asked) != 2 || f.asked[0] != "GET /rest/agile/1.0/board/12/configuration" {
+		t.Fatalf("asked %q", f.asked)
+	}
+}

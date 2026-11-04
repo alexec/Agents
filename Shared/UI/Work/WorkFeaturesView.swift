@@ -16,24 +16,40 @@ final class WorkFeaturesState {
     var items: [String: [DaemonAPI.ForgeItem]] = [:]
     var itemErrors: [String: [String]] = [:]
     var asked = 0
-    private var read: Int?
+    /// The board the epics are narrowed to (#3282), by its url; "" for every board.
+    var board = ""
+    /// The boards the Board menu offers, read with the features.
+    var boards: [DaemonAPI.ProjectBoard] = []
+    private var read: Ask?
 
-    /// Read the features, unless they were read for this Refresh already.
+    private struct Ask: Equatable {
+        var asked: Int
+        var board: String
+    }
+
+    private var ask: Ask { Ask(asked: asked, board: board) }
+
+    /// Read the features, unless they were read for this Refresh and board already.
     func load(model: any WorkModel) async {
-        let mine = asked
+        let mine = ask
         guard read != mine || features == nil else { return }
         read = mine
         features = nil
         errors = []
         items = [:]
         itemErrors = [:]
-        let machines = model.forgeMachines
+        let board = board
+        let found = await model.workBoards()
+        guard ask == mine else { return }
+        boards = found
+        let machines = model.workMachines(board: board)
         var got: [(host: MachineRef, list: DaemonAPI.ForgeFeatures)] = []
         await withTaskGroup(of: (MachineRef, DaemonAPI.ForgeFeatures).self) { group in
             for machine in machines {
                 group.addTask {
                     do {
-                        return (machine.id, try await model.forge(DaemonAPI.Method.forgeFeatures, DaemonAPI.ForgeFeaturesRequest(),
+                        return (machine.id, try await model.forge(DaemonAPI.Method.forgeFeatures,
+                                                                  DaemonAPI.ForgeFeaturesRequest(board: board.isEmpty ? nil : board),
                                                                   returning: DaemonAPI.ForgeFeatures.self, on: machine.id))
                     } catch {
                         return (machine.id, .init(errors: [.init(forge: "", message: error.localizedDescription)]))
@@ -42,7 +58,7 @@ final class WorkFeaturesState {
             }
             for await (host, list) in group { got.append((host, list)) }
         }
-        guard asked == mine else { return }
+        guard ask == mine else { return }
         errors = got.flatMap { entry in
             (entry.list.errors ?? []).map { e in
                 WorkList.errorWords(e, machine: machines.count > 1 ? machines.first { $0.id == entry.host }?.name : nil)
@@ -62,15 +78,17 @@ final class WorkFeaturesState {
     /// An opened feature's open issues from every machine, each ref once.
     private func readItems(_ name: String, model: any WorkModel) async {
         let key = name.lowercased()
-        let mine = asked
-        let machines = model.forgeMachines
+        let mine = ask
+        let board = board
+        let machines = model.workMachines(board: board)
         var got: [DaemonAPI.ForgeItem] = []
         var problems: [String] = []
         await withTaskGroup(of: (MachineRef, Result<DaemonAPI.ForgeList, Error>).self) { group in
             for machine in machines {
                 group.addTask {
                     do {
-                        return (machine.id, .success(try await model.forgeList(.issue, .init(state: "open", limit: 100, feature: name),
+                        return (machine.id, .success(try await model.forgeList(.issue, .init(state: "open", limit: 100, feature: name,
+                                                                                             board: board.isEmpty ? nil : board),
                                                                                on: machine.id)))
                     } catch {
                         return (machine.id, .failure(error))
@@ -88,7 +106,7 @@ final class WorkFeaturesState {
                 }
             }
         }
-        guard asked == mine else { return }
+        guard ask == mine else { return }
         items[key] = got
         itemErrors[key] = problems
     }
@@ -106,13 +124,19 @@ struct WorkFeaturesPane: View {
             HStack {
                 Text("The feature:<name> labels on the epics.").appText(.supporting).foregroundStyle(.secondary)
                 Spacer()
+                #if os(macOS)
+                // Boards are the Mac's and the web page's (#3282, tier Mac + web).
+                if !state.boards.isEmpty || !state.board.isEmpty {
+                    WorkBoardPicker(selection: $state.board, boards: state.boards)
+                }
+                #endif
                 Button("Refresh") { state.asked += 1 }.linkStyle()
             }
             .padding(.horizontal, 16).padding(.vertical, 8)
             Divider()
             content
         }
-        .workTask(id: state.asked) { await state.load(model: model) }
+        .workTask(id: [String(state.asked), state.board]) { await state.load(model: model) }
     }
 
     @ViewBuilder

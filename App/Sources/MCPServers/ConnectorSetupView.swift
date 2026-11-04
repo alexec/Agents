@@ -73,6 +73,9 @@ struct ConnectorSetupView: View {
                 heading(ConnectorSetupWords.setUpHeading(setup))
                 slots(setup)
                 ProjectSlotsCard(control: model.controlRequests, setup: setup) { await load(.cached) }
+                if let project = setup.project {
+                    ProjectBoardsCard(control: model.controlRequests, project: project)
+                }
                 if setup.connection != nil || setup.events.state != .off {
                     heading("Events")
                     events(setup.events, forge: setup.forgeOrGitHub)
