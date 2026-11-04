@@ -13929,7 +13929,7 @@
     },
     "MachineLink": {
       "type": "object",
-      "description": "hosts/link.",
+      "description": "hosts/link. A machine whose ssh host key the control plane has not trusted yet (one that joined with the command, #3379) is refused -32069 hostKeyToTrust, data {fingerprint}, until trust is that fingerprint: the key is then kept for the machine's ssh start.",
       "properties": {
         "host": {
           "$ref": "#/definitions/MachineRef"
@@ -13945,6 +13945,9 @@
         },
         "stopWhenIdleMinutes": {
           "type": "integer"
+        },
+        "trust": {
+          "type": "string"
         }
       },
       "required": [
@@ -14163,6 +14166,29 @@
       },
       "required": [
         "host"
+      ],
+      "additionalProperties": false
+    },
+    "MachineSummaryFacts": {
+      "type": "object",
+      "description": "One of the person's other machines in machines/summaryFacts (#3354): its facts, or, when it is off or did not answer, unreached, the words that say why.",
+      "properties": {
+        "machine": {
+          "$ref": "#/definitions/MachineRef"
+        },
+        "machineName": {
+          "type": "string"
+        },
+        "facts": {
+          "$ref": "#/definitions/SummaryFacts"
+        },
+        "unreached": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "machine",
+        "machineName"
       ],
       "additionalProperties": false
     },
@@ -14387,6 +14413,22 @@
         "agent",
         "method",
         "params"
+      ],
+      "additionalProperties": false
+    },
+    "MachinesSummaryFacts": {
+      "type": "object",
+      "description": "machines/summaryFacts (#3354): the daily summary's facts from each of the person's other machines, by name.",
+      "properties": {
+        "machines": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MachineSummaryFacts"
+          }
+        }
+      },
+      "required": [
+        "machines"
       ],
       "additionalProperties": false
     },
@@ -24338,6 +24380,67 @@
         "id",
         "label",
         "prompt"
+      ],
+      "additionalProperties": false
+    },
+    "SummaryFacts": {
+      "type": "object",
+      "description": "agents/summaryFacts (#3354): one machine's lines for the daily summary since a time, each list at most 40 lines, newest last; folders is how many folders it has.",
+      "properties": {
+        "folders": {
+          "type": "integer"
+        },
+        "landed": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+        "failed": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+        "waiting": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+        "suggested": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+        "checked": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+      },
+      "required": [
+        "folders",
+        "landed",
+        "failed",
+        "waiting",
+        "suggested",
+        "checked"
+      ],
+      "additionalProperties": false
+    },
+    "SummaryFactsRequest": {
+      "type": "object",
+      "description": "agents/summaryFacts and machines/summaryFacts (#3354): the facts since this time.",
+      "properties": {
+        "since": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "since"
       ],
       "additionalProperties": false
     },

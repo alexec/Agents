@@ -10,8 +10,10 @@ import type { BackupEvery, BackupRestoreResult, BackupSettings, BackupState, Bac
 
 /** Backups (#1810): how often, how many kept, where, Back Up Now, and Restore for each backup there. The
  * Mac's folder is its disk, so it is chosen on the Mac. A server's page draws the same (#1815). */
-function BackupsView({ state, title, id, configure, make, restore }: {
+function BackupsView({ state, onMac, title, id, configure, make, restore }: {
   state: BackupState;
+  /** The Mac's backups, not a server's (#3425): only the Mac's folder is chosen on the Mac. */
+  onMac: boolean;
   title: string;
   id: string;
   configure: (settings: BackupSettings) => void;
@@ -69,7 +71,7 @@ function BackupsView({ state, title, id, configure, make, restore }: {
         </div>
       ))}
       {error && <p class="hint">{error}</p>}
-      {sameDiskWords(state) && <p class="hint attention">{sameDiskWords(state)}</p>}
+      {sameDiskWords(state, onMac) && <p class="hint attention">{sameDiskWords(state, onMac)}</p>}
       <p class="hint">{footerWords(state)}</p>
     </section>
   );
@@ -81,7 +83,7 @@ export function BackupsSection({ store }: { store: Store }) {
   const state = store.backups.value;
   if (!state) return null;
   return (
-    <BackupsView state={state} title="Backups" id="settings-backups"
+    <BackupsView state={state} onMac title="Backups" id="settings-backups"
       configure={(settings) => void store.configureBackups(settings)} make={() => void store.makeBackup()}
       restore={(id) => store.restoreBackup(id)} />
   );
@@ -102,7 +104,7 @@ function ServerBackups({ store, host, name }: { store: Store; host: string; name
   const keep = (next: BackupState | null) => { if (next) setState(next); };
   if (!state) return asked ? <p class="hint">{name} can’t be asked about its backups now.</p> : null;
   return (
-    <BackupsView state={state} title={`Backups of ${name}`} id={`settings-backups-${host}`}
+    <BackupsView state={state} onMac={false} title={`Backups of ${name}`} id={`settings-backups-${host}`}
       configure={(settings) => void store.configureBackups(settings, host).then(keep)}
       make={() => void store.makeBackup(host).then(keep)}
       restore={(id) => store.restoreBackup(id, host)} />

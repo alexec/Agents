@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/wire"
@@ -114,5 +115,13 @@ func (d *Daemon) registerDailySummary() {
 	})
 	On(d, wire.CallDailySummarySetSettings, func(ctx context.Context, c *Client, r wire.DailySummarySettings) (wire.DailySummarySettings, error) {
 		return d.setDailySummarySettings(r)
+	})
+	// The daily summary another of the person's machines writes (#3354), from the control plane.
+	On(d, wire.CallAgentsSummaryFacts, func(ctx context.Context, c *Client, r wire.SummaryFactsRequest) (wire.SummaryFacts, error) {
+		since := r.Since.Time()
+		if reach := time.Now().Add(-summaryReach); since.Before(reach) {
+			since = reach
+		}
+		return sentSummaryFacts(d.machineSummaryFacts("", since)), nil
 	})
 }

@@ -319,6 +319,16 @@ func (d *Daemon) statusOf(r *runtimeDef) wire.RuntimeStatus {
 	return wire.RuntimeStatus{Runtime: r.Runtime, CheckedAt: now()}
 }
 
+// installedAt says whether path, where r was located, is r installed. On a server, Claude's
+// npx is not (#3378): every machine with Node has one, but Claude's sign-in needs Claude's
+// own command line, which only its toolset or the person's own claude carries.
+func installedAt(r *runtimeDef, path string) bool {
+	if path == "" || macToolsHome != "" || r.Executable != "npx" || path == toolsetShim(toolsetFolder(r.ID), r.Executable) {
+		return path != ""
+	}
+	return onPath([]string{"PATH=" + strings.Join(searchPaths(), ":")}, r.ID) != ""
+}
+
 // installRuntime is runtimes/install: started and left running.
 func (d *Daemon) installRuntime(c *Client, id string) (wire.RuntimeStatus, error) {
 	r := runtimeByID(id)
@@ -339,7 +349,7 @@ func (d *Daemon) installRuntime(c *Client, id string) (wire.RuntimeStatus, error
 		return d.statusOf(r), nil
 	}
 	path, _, _ := locateFor(r)
-	if path != "" && !d.outdated(id, path) {
+	if installedAt(r, path) && !d.outdated(id, path) {
 		delete(d.states, id)
 		d.instMu.Unlock()
 		return d.statusOf(r), nil

@@ -134,6 +134,7 @@ const CapSimulators1 = "simulators/1"
 const CapSkills1 = "skills/1"
 const CapStorage1 = "storage/1"
 const CapStore1 = "store/1"
+const CapSummaryMachines1 = "summary.machines/1"
 const CapSurface1 = "surface/1"
 const CapTime1 = "time/1"
 const CapTunnel1 = "tunnel/1"
@@ -189,6 +190,7 @@ var HostCapabilities = pairs([][2]string{
 	{"agents/start", "agents/1"},
 	{"agents/stop", "agents/1"},
 	{"agents/stopBackground", "agents/1"},
+	{"agents/summaryFacts", "summary.machines/1"},
 	{"agents/touchedPaths", "agents/1"},
 	{"agents/transcript", "agents/1"},
 	{"agents/turns", "agents/1"},
@@ -669,6 +671,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"machines/sessionCall", "sessions.elsewhere/1"},
 	{"machines/sessionEnded", "sessions.elsewhere/1"},
 	{"machines/startSession", "sessions.on-machine/1"},
+	{"machines/summaryFacts", "summary.machines/1"},
 	{"notices/take", "notices/1"},
 	{"orgRoutes/check", "org-routes/1"},
 	{"orgRoutes/list", "org-routes/1"},

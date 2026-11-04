@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controlplane/records"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // Machine providers on the control plane (#691): adding one, linking a host to its
@@ -1011,6 +1012,58 @@ func TestARunningCodespaceWithItsHostOfflineIsStartedOverSSH(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	if got := h.ssh.all(); len(got) != 2 {
 		t.Fatalf("ssh %v", got)
+	}
+}
+
+// A host that joined with the command was never reached over ssh, so its link asks to
+// trust the workspace's host key, and keeps it for the ssh start (#3379).
+func TestLinkingAHostNoInstallTrustedKeepsTheHostKeyTrustedThen(t *testing.T) {
+	var asked []string
+	h := newHarness(t, func(o *harnessOptions) {
+		o.workspaces = []MachineInfo{{ID: "fuzzy-space", Name: "fuzzy", State: "stopped", SSH: new("cs.fuzzy-space.main")}}
+		o.hostKey = func(host, destination, trust string) (string, string, error) {
+			asked = append(asked, host+" "+destination+" "+trust)
+			if trust != "SHA256:abc" {
+				return "", "SHA256:abc", nil
+			}
+			return "cs.fuzzy-space.main ssh-ed25519 KEY\n", "", nil
+		}
+	})
+	id := h.add()
+	request := MachineLink{Host: wire.MachineRef(devbox), Provider: wire.ProviderID(id), Workspace: "fuzzy-space"}
+	_, err := h.call(MethodHostsLink, request)
+	var f *Failure
+	if !errors.As(err, &f) || f.Code != CodeHostKeyToTrust || string(f.Data) != `{"fingerprint":"SHA256:abc"}` {
+		t.Fatalf("%v", err)
+	}
+	if LinkOf(h.records.Host(devbox)) != nil {
+		t.Fatal("linked before its key was trusted")
+	}
+	request.Trust = new("SHA256:abc")
+	h.must(MethodHostsLink, request)
+	link := LinkOf(h.records.Host(devbox))
+	if link == nil || link.KnownHosts != "cs.fuzzy-space.main ssh-ed25519 KEY\n" {
+		t.Fatalf("%+v", link)
+	}
+	// Linked again, to the same workspace: the key it keeps is not asked for again.
+	h.link(id, devbox, "fuzzy-space")
+	if link := LinkOf(h.records.Host(devbox)); link == nil || link.KnownHosts == "" {
+		t.Fatalf("%+v", link)
+	}
+	if want := []string{devbox + " cs.fuzzy-space.main ", devbox + " cs.fuzzy-space.main SHA256:abc"}; !reflect.DeepEqual(asked, want) {
+		t.Fatalf("%q", asked)
+	}
+}
+
+// A key that can't be fetched (the workspace is stopped, say) does not stop the link.
+func TestALinkWhoseHostKeyCannotBeFetchedKeepsNone(t *testing.T) {
+	h := newHarness(t, func(o *harnessOptions) {
+		o.hostKey = func(string, string, string) (string, string, error) { return "", "", errors.New("no route") }
+	})
+	id := h.add()
+	h.link(id, devbox, "agents-devbox")
+	if link := LinkOf(h.records.Host(devbox)); link == nil || link.KnownHosts != "" {
+		t.Fatalf("%+v", link)
 	}
 }
 

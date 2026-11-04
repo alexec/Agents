@@ -63,6 +63,8 @@ const slowCallTimeout: Readonly<Record<string, number>> = {
   "agents/import": 10 * 60_000,
   // Add as Machine… (#3377): the control plane installs Agents over ssh, about 2 min on a codespace.
   "hosts/install": 15 * 60_000,
+  // Link to Machine… (#3379) fetches the machine's ssh host key first, up to a minute.
+  "hosts/link": 2 * 60_000,
 };
 
 /** How long `method` waits. `override` is a test's one timeout for every method. */

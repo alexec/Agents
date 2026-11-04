@@ -40,6 +40,7 @@ export const Failure = {
   folderGone: -32004,
   folderHasLiveAgents: -32013,
   folderInTheWay: -32025,
+  hostKeyToTrust: -32069,
   hostOffline: -32090,
   importedAgent: -32096,
   kept: -32067,
@@ -5098,13 +5099,18 @@ export interface MachineLastHeard {
   heardAt?: WireDate;
 }
 
-/** hosts/link. */
+/**
+ * hosts/link. A machine whose ssh host key the control plane has not trusted yet (one that joined
+ * with the command, #3379) is refused -32069 hostKeyToTrust, data {fingerprint}, until trust is
+ * that fingerprint: the key is then kept for the machine's ssh start.
+ */
 export interface MachineLink {
   host: MachineRef;
   provider: ProviderID;
   workspace: string;
   startWhenUsed?: boolean;
   stopWhenIdleMinutes?: number;
+  trust?: string;
 }
 
 /** hosts/setMachineOptions. stopWhenIdleMinutes 0 turns it off. */
@@ -5198,6 +5204,17 @@ export interface MachineStop {
   confirmRunning?: boolean;
 }
 
+/**
+ * One of the person's other machines in machines/summaryFacts (#3354): its facts, or, when it is
+ * off or did not answer, unreached, the words that say why.
+ */
+export interface MachineSummaryFacts {
+  machine: MachineRef;
+  machineName: string;
+  facts?: SummaryFacts;
+  unreached?: string;
+}
+
 export interface MachineTunnel {
   up: boolean;
   problem?: string;
@@ -5280,6 +5297,14 @@ export interface MachineWorkspaceCall {
   agent: string;
   method: string;
   params: JSONValue;
+}
+
+/**
+ * machines/summaryFacts (#3354): the daily summary's facts from each of the person's other
+ * machines, by name.
+ */
+export interface MachinesSummaryFacts {
+  machines: MachineSummaryFacts[];
 }
 
 export interface ManagedMCPServer {
@@ -9056,6 +9081,24 @@ export interface SuggestedPrompt {
   prompt: string;
 }
 
+/**
+ * agents/summaryFacts (#3354): one machine's lines for the daily summary since a time, each list at
+ * most 40 lines, newest last; folders is how many folders it has.
+ */
+export interface SummaryFacts {
+  folders: number;
+  landed: string[];
+  failed: string[];
+  waiting: string[];
+  suggested: string[];
+  checked: string[];
+}
+
+/** agents/summaryFacts and machines/summaryFacts (#3354): the facts since this time. */
+export interface SummaryFactsRequest {
+  since: WireDate;
+}
+
 /** Surface (Attention/Surface.swift): a tagged object, `{ mac: {} }` or `{ device: "<uuid>" }`. */
 export type Surface =
   | { mac: Record<string, never> }
@@ -11339,7 +11382,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineJoinStatus: { required: ["member", "connected", "at"], optional: ["problem"] },
   MachineJoinTicket: { required: ["request", "code", "expires"], optional: [] },
   MachineLastHeard: { required: ["host"], optional: ["folders", "agents", "heardAt"] },
-  MachineLink: { required: ["host", "provider", "workspace"], optional: ["startWhenUsed", "stopWhenIdleMinutes"] },
+  MachineLink: { required: ["host", "provider", "workspace"], optional: ["startWhenUsed", "stopWhenIdleMinutes", "trust"] },
   MachineOptions: { required: ["host"], optional: ["startWhenUsed", "stopWhenIdleMinutes", "startForSchedules"] },
   MachinePolicy: { required: [], optional: ["policy", "signature", "none"] },
   MachineProjects: { required: ["projects"], optional: [] },
@@ -11352,6 +11395,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineSessionStart: { required: ["host", "start"], optional: [] },
   MachineStatus: { required: ["idle", "running"], optional: ["schedule"] },
   MachineStop: { required: ["host"], optional: ["confirmRunning"] },
+  MachineSummaryFacts: { required: ["machine", "machineName"], optional: ["facts", "unreached"] },
   MachineTunnel: { required: ["up"], optional: ["problem"] },
   MachineTunnelChanged: { required: ["name", "tunnel"], optional: ["host"] },
   MachineUpdate: { required: ["host", "destination"], optional: ["key", "trust"] },
@@ -11359,6 +11403,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineUserSettings: { required: ["user", "settings", "secrets"], optional: [] },
   MachineWorkspace: { required: ["provider", "providerName", "workspace", "workspaceName", "workspaceState", "canStart", "canStop", "startWhenUsed", "current"], optional: ["hostState", "phase", "since", "problem", "stoppedBy", "stopWhenIdleMinutes", "cost", "startForSchedules", "tellsSchedule", "nextWorkflow", "nextWorkflowAt", "wakeAt"] },
   MachineWorkspaceCall: { required: ["agent", "method", "params"], optional: [] },
+  MachinesSummaryFacts: { required: ["machines"], optional: [] },
   ManagedMCPServer: { required: ["name", "registryName", "version", "run", "addedAt", "destination"], optional: ["byHand"] },
   ManagedSkill: { required: ["destination", "name", "source", "edited", "update"], optional: ["skillPath", "recordedHash", "commit", "committedAt", "catalogue"] },
   MarkRuntimeAvailable: { required: ["credentialKey"], optional: [] },
@@ -11731,6 +11776,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   StopBackgroundRequest: { required: ["agentID", "itemID"], optional: [] },
   StoreNotes: { required: ["notes"], optional: [] },
   SuggestedPrompt: { required: ["id", "label", "prompt"], optional: [] },
+  SummaryFacts: { required: ["folders", "landed", "failed", "waiting", "suggested", "checked"], optional: [] },
+  SummaryFactsRequest: { required: ["since"], optional: [] },
   SurfaceIdentification: { required: ["id", "name", "kind"], optional: [] },
   TeamBot: { required: ["user", "name", "spentTodayUSD", "capped", "machines", "online", "workflows", "live"], optional: ["group", "groupName", "caps"] },
   TeamBotRun: { required: ["host", "hostName", "agent"], optional: ["workflow", "since"] },

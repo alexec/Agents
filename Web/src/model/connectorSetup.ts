@@ -92,7 +92,10 @@ export function isProjects(kind: ConnectorSlotKind): boolean {
 export const docs = {
   question: "Where do your docs live?",
   none: "No docs yet in specs/, docs/ or a *.md file at the top.",
-  addOnTheMac: "Confluence, Notion, Google Drive and other docs connectors: add them on the Mac, in Add Connector….",
+  /** The docs connectors the page has no catalogue for (#3425): on the Mac, or not here yet. */
+  addElsewhere: (hasMac: boolean): string => hasMac
+    ? "Confluence, Notion, Google Drive and other docs connectors: add them on the Mac, in Add Connector…."
+    : "Confluence, Notion, Google Drive and other docs connectors: the web page cannot add them yet.",
   servers: (names: string[]): string | undefined => names.length ? `Connectors: ${names.join(", ")}` : undefined,
   /** One docs connector's line (#3307): the first doc its one search found, or why not. */
   serverLine: (s: DocsServer): string => `${s.name}: ${{
@@ -206,10 +209,17 @@ export const connectLinear = "Connect Linear…";
 /** The Tasks slot's way to Jira (#3304): the Atlassian connection first, then its connector. */
 export const connectJira = "Connect Jira…";
 
-/** The Tasks slot's other trackers: the page has no catalogue. */
-export function otherTrackers(linearConnected: boolean): string {
+/** The Tasks slot's other trackers: the page has no catalogue. With no Mac, it says so (#3425). */
+export function otherTrackers(linearConnected: boolean, hasMac: boolean): string {
+  if (!hasMac) return "The web page cannot add a tracker's connector yet.";
   return linearConnected ? "Linear and other trackers: Add Connector on the Mac."
     : "Then add its connector, or another tracker's, with Add Connector on the Mac.";
+}
+
+/** Where agents run, with GitHub connected: Codespaces is a provider, on the Mac or here (#3425). */
+export function codespacesElsewhere(hasMac: boolean): string {
+  return hasMac ? "GitHub Codespaces: Set up on the Mac."
+    : "GitHub Codespaces: add it in Settings ▸ Machine providers, with Add Provider….";
 }
 
 /** The providers a person connects, in the order Connectors shows them. */
@@ -403,7 +413,8 @@ export const jira = {
   newTokenButton: "Make an API Token on Atlassian",
   checking: "Checking the token with Jira…",
   disconnectNote: "Disconnect deletes the machine's tokens. Jira's events stop until you connect again or set JIRA_API_TOKEN. To revoke Agents too, go to id.atlassian.com ▸ Connected apps.",
-  tasksNote: "Connect Jira, then add its connector on the Mac.",
+  tasksNote: (hasMac: boolean): string => hasMac ? "Connect Jira, then add its connector on the Mac."
+    : "Connect Jira. The web page cannot add its connector yet.",
   done: "Done",
 };
 

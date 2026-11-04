@@ -7,7 +7,7 @@ const a = await load("src/model/attachments.ts");
 const utf8 = (s) => new TextEncoder().encode(s);
 
 test("text goes by value, named, with its size", () => {
-  const made = a.textAttachment(utf8("héllo"), "notes.md", "text/markdown");
+  const made = a.textAttachment(utf8("héllo"), "notes.md", "text/markdown", true);
   assert.deepEqual(made.ok.block, { type: "resource", resource: { uri: "browser:notes.md", text: "héllo", mimeType: "text/markdown" } });
   assert.equal(made.ok.displayName, "notes.md");
   assert.equal(made.ok.byteCount, 6);
@@ -15,14 +15,14 @@ test("text goes by value, named, with its size", () => {
 });
 
 test("anything that isn't text or a picture is refused in a sentence", () => {
-  assert.equal(a.textAttachment(new Uint8Array([0xff, 0xfe, 0x00]), "a.bin", "").refused,
+  assert.equal(a.textAttachment(new Uint8Array([0xff, 0xfe, 0x00]), "a.bin", "", true).refused,
     "a.bin is not a picture or text, so it would have to be on the Mac to attach.");
-  assert.ok(a.textAttachment(utf8("a\u0000b"), "z.txt", "text/plain").refused);
+  assert.ok(a.textAttachment(utf8("a\u0000b"), "z.txt", "text/plain", true).refused);
 });
 
 test("a runtime that won't take it says so before it is sent", () => {
   const picture = a.pictureAttachment(new Uint8Array([1, 2, 3]), "shot.png");
-  const text = a.textAttachment(utf8("x"), "x.txt", "text/plain").ok;
+  const text = a.textAttachment(utf8("x"), "x.txt", "text/plain", true).ok;
   assert.equal(a.refusal(picture, { image: false }), "This runtime does not take pictures");
   assert.equal(a.refusal(picture, { image: true }), null);
   assert.equal(a.refusal(text, {}), "This runtime does not take file contents, so this can only be attached on the Mac");
@@ -33,14 +33,14 @@ test("a runtime that won't take it says so before it is sent", () => {
 
 test("what attachments need Auto's pick to take (#3162)", () => {
   const picture = a.pictureAttachment(new Uint8Array([1, 2, 3]), "shot.png");
-  const text = a.textAttachment(utf8("x"), "x.txt", "text/plain").ok;
+  const text = a.textAttachment(utf8("x"), "x.txt", "text/plain", true).ok;
   assert.equal(a.attachmentNeeds([]), undefined);
   assert.deepEqual(a.attachmentNeeds([picture]), { image: true });
   assert.deepEqual(a.attachmentNeeds([picture, text]), { image: true, embeddedContext: true });
 });
 
 test("900 KB in all", () => {
-  const big = a.textAttachment(utf8("x".repeat(600_000)), "a.txt", "text/plain").ok;
+  const big = a.textAttachment(utf8("x".repeat(600_000)), "a.txt", "text/plain", true).ok;
   assert.equal(a.totalRefusal([big]), null);
   assert.equal(a.totalRefusal([big, big]),
     "From a browser, attachments can be 900 KB in all, and these are 1.2 MB. Remove one to send.");
