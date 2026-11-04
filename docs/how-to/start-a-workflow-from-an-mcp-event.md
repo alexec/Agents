@@ -38,7 +38,7 @@ this folder's `.agents/mcp.json` as `github`, a local server the app hosts:
 { "mcpServers": { "github": { "command": "github-mcp", "hosted": true } } }
 ```
 
-1. In **Folder Settings ▸ Agent Configuration ▸ Connectors**, `github` arrived with the folder, so it is
+1. In **Project Settings ▸ Agent Configuration ▸ Connectors**, `github` arrived with the folder, so it is
    **waiting for your OK**: choose **Approve**. Until you do, it is asked for nothing, and
    the workflow's page says it is waiting for approval. See
    [Add a connector from the registry](add-a-connector-from-the-registry.md).

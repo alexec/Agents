@@ -378,7 +378,7 @@ func (d *Daemon) queueHelper(caller *wire.Agent, prompt, runtimeID, model string
 		}
 		return "", &Error{Code: wire.FailureNotYours, Message: fmt.Sprintf("Nothing was started: %s queue is full too: %d of %d sessions queued%s. "+
 			"Stop one of yours that is queued with stop_session if it is no longer wanted, or wait for the queue to move. "+
-			"The person sets these limits in Folder Settings.", behind, len(queue), limit, names)}
+			"The person sets these limits in Project Settings.", behind, len(queue), limit, names)}
 	}
 	given, err := changeLabelsAs(wire.SessionLabelOwnerAgent, nil, labels, nil, vocabulary(folder, d.Store.Agents()))
 	if err != nil {

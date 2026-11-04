@@ -16,9 +16,8 @@ import { undoLabel, undoMillis } from "../model/archiveWords";
 import { healthTally, folderServers } from "../model/hostedMCP";
 import { signal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import { ProjectAgentConfigModal } from "./AgentConfigEditor";
-import { ProjectModal } from "./ProjectPicker";
-import { PRCostCommentModal } from "./PRCostComment";
+import { FolderSettingsModal, ProjectSettingsModal } from "./ProjectSettings";
+import { projectSettingsWords } from "../model/projectSettings";
 import { actDoing, recentArchivedShown, type Store } from "../model/store";
 import { byStart, folderKey, recentlyArchived, folderPath as agentFolderPath, showsUnread } from "../model/groups";
 import { folds } from "../model/folds";
@@ -58,6 +57,9 @@ import { SignInRequests } from "./SignInRequests";
 import { approvalID, failedRuns, opensItsSubject } from "../model/approvals";
 import { memo } from "../render/memo";
 
+
+/** Folder Settings asked for another folder of the project, from Project Settings' Folders (#3280). */
+const otherFolderSettings = signal<{ host: string; folder: string } | null>(null);
 /** The docs site: the guides and the statuses reference (#1327), as the window's Help ▸ Agents Help. */
 const helpSite = "https://docs.agentloops.dev/";
 
@@ -543,9 +545,15 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
   const down = linkDown || !store.hostIsOnline(host.id);
   // Every match on show, past the first few; a new search shows the few again.
   const showsAllMatches = useSignal(false);
-  const configOpen = useSignal(false);
-  const projectOpen = useSignal(false);
-  const prCostOpen = useSignal(false);
+  const settingsOpen = useSignal<"project" | "folder" | null>(null);
+  // Folder Settings of another folder of the project, chosen in Project Settings' Folders: that folder's fold opens it.
+  const other = otherFolderSettings.value;
+  useEffect(() => {
+    if (other && other.host === host.id && folderKey(other.folder) === folderKey(folder)) {
+      otherFolderSettings.value = null;
+      settingsOpen.value = "folder";
+    }
+  }, [other]);
   useEffect(() => { showsAllMatches.value = false; }, [query]);
   const online = store.hostIsOnline(host.id);
   // A file dragged onto the row goes into the folder's drop box (#231). Before any early return:
@@ -614,16 +622,12 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
       run: () => void window.open(aloneURL(host.id, folder), "_blank", "noopener") },
     { label: "Put Files in Drop Box…", disabled: down, help: "Put files into this folder's .agents/dropbox/ (#231)",
       run: () => putFilesInDropbox(host.id, folder, label) },
-    { label: "Agent Configuration…", disabled: down,
-      run: () => { configOpen.value = true; } },
-    // What people work on, across machines (#2317), as the window's Folder Settings ▸ Project.
-    { label: "Project…", disabled: down, help: "Choose the project this folder is in",
-      run: () => { projectOpen.value = true; } },
-    // What its merged pull requests say they cost (#2352), as the window's Folder Settings ▸ Cost on pull requests.
-    ...(store.has(host.id, Capability.lineageComment1) ? [
-      { label: "Cost on Pull Requests…", disabled: down, help: "Choose what a merged pull request says it cost",
-        run: () => { prCostOpen.value = true; } },
-    ] : []),
+    // What the project's folders share, and what is this folder's alone (#3280), as the window's
+    // Project Settings… and Folder Settings…. Agent Configuration, the Project and Cost on pull requests are in them.
+    { label: projectSettingsWords.menuItem, disabled: down, help: "What every folder of this project shares",
+      run: () => { settingsOpen.value = "project"; } },
+    { label: projectSettingsWords.folderMenuItem, disabled: down, help: "This folder's place, project and disk space",
+      run: () => { settingsOpen.value = "folder"; } },
     ...showHiddenViewsItem(store, host.id, folder, down),
     // To the top of the sidebar, as the window's Pin.
     { label: folderPinned ? "Unpin" : "Pin", disabled: down,
@@ -661,12 +665,15 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
   return (
     <div class={`folder-fold${down && !linkDown ? " greyed" : ""}`} role="group" aria-label={label}
       data-host={host.id} data-folder={folder}>
-      {projectOpen.value && <ProjectModal store={store} host={host.id} folder={folder} summary={summary}
-        close={() => { projectOpen.value = false; }} />}
-      {prCostOpen.value && <PRCostCommentModal store={store} host={host.id} folder={folder} summary={summary}
-        close={() => { prCostOpen.value = false; }} />}
-      {configOpen.value && <ProjectAgentConfigModal store={store} host={host.id} folder={folder} down={down}
-        close={() => { configOpen.value = false; }} />}
+      {settingsOpen.value === "project" && <ProjectSettingsModal store={store} host={host.id} folder={folder} summary={summary}
+        down={down} close={() => { settingsOpen.value = null; }}
+        openFolder={(h, f) => {
+          settingsOpen.value = null;
+          if (h === host.id && folderKey(f) === folderKey(folder)) settingsOpen.value = "folder";
+          else otherFolderSettings.value = { host: h, folder: f };
+        }} />}
+      {settingsOpen.value === "folder" && <FolderSettingsModal store={store} host={host.id} folder={folder} summary={summary}
+        down={down} close={() => { settingsOpen.value = null; }} openProject={() => { settingsOpen.value = "project"; }} />}
       {isAlone ? (
         // The tab is the folder, so its name is the tab's title and not a heading (#1089).
         <p class={`sidebar-head-label alone-sessions${drop.targeted ? " drop-target" : ""}`} {...drop.props}>Sessions</p>

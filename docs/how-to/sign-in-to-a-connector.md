@@ -13,7 +13,7 @@ describes, in your own browser. The next agent you start has the connector, with
 
 ## See which connectors want it
 
-Open **Settings ▸ Agent Configuration ▸ Connectors**, or **Folder Settings ▸ Agent Configuration ▸ Connectors**. A remote
+Open **Settings ▸ Agent Configuration ▸ Connectors**, or **Project Settings ▸ Agent Configuration ▸ Connectors**. A remote
 server that asked for a sign-in says **needs sign-in** on its row, the way a missing secret
 says **NAME not set**. Agents start without it until you sign in.
 

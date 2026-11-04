@@ -68,14 +68,13 @@ These are not in `~/.agents`, because they belong to one machine, or because an 
 not be able to change them:
 
 - **A folder's own rules:** `.agents/policy.json` in the folder, the folder's layer of the
-  policy (#2957). Commit it with the folder's code. Set it in **Folder Settings ▸ Policy**
+  policy (#2957). Commit it with the folder's code. Set it in **Project Settings ▸ Policy**
   on the Mac, or **Settings ▸ Agents ▸ Policy** on the web page
   ([Set rules for a folder](../how-to/set-rules-for-a-folder.md)).
 - **A folder's project:** `"project": "<id>"` in the folder's `.agents/folder.json`, the
   project the folder is in (#2317). Commit it, and a clone on another machine joins the same
   project. A folder that names none gets a new id when it is added or when its machine next
-  starts. Set it in **Folder Settings ▸ General ▸ Project** on the Mac, or with **Project…** in
-  the folder's menu on the web page. The last copy of each project's slots that the control
+  starts. Set it in **Folder Settings ▸ General ▸ Project** on the Mac and the web page (the folder's menu, **Folder Settings…**). The last copy of each project's slots that the control
   plane sent is in `<root>/project-tools.json` on each machine (#2669).
 - **Secrets:** `~/.agents-secrets`, a separate folder that only you can read.
 - **This Mac's data:** agents, transcripts, and the sleep, resource, approval and

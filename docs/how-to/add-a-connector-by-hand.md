@@ -19,7 +19,7 @@ the sheet shows the tools it listed.
 
 ## Add it
 
-1. Open **Settings ▸ Agent Configuration ▸ Connectors**, or **Folder Settings ▸ Agent Configuration ▸ Connectors**, and
+1. Open **Settings ▸ Agent Configuration ▸ Connectors**, or **Project Settings ▸ Agent Configuration ▸ Connectors**, and
    choose **Add Connector…**.
 2. Choose **Add by hand…**.
 3. Give it a **Name**: letters, digits, dots, dashes and underscores. Agents see its tools

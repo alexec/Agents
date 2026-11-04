@@ -180,7 +180,7 @@ it (#2887). `list_machines` gives the agent the names of all your machines.
 
 1. The agent asks first. Its question card says the machine, the folder and the task.
    To let the agents in a folder start these sessions without asking, turn on **Agents may
-   start sessions on my other machines without asking** in **Folder Settings ▸ General ▸
+   start sessions on my other machines without asking** in **Project Settings ▸ Work at Once ▸
    Other machines** (#2928). It is off until you turn it on, it is saved in
    `.agents/folder.json`, and only you can change it.
 2. Choose **Start it**. The session starts on that machine and shows in your list under it.

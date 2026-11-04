@@ -1427,6 +1427,18 @@ dialog.sheet {
   box-shadow: 0 12px 40px var(--paper-shadow);
 }
 dialog.sheet::backdrop { background: rgb(0 0 0 / 0.25); }
+/* Project Settings and Folder Settings (#3280): tabs over a grid of a label and its value. */
+dialog.sheet:has(.settings-sheet) { width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 64px); }
+.settings-sheet [role="tabpanel"] { min-height: 260px; }
+.settings-grid { display: grid; grid-template-columns: max-content 1fr; gap: 12px 14px; margin: 0; }
+.settings-grid dt { color: var(--ink-secondary, inherit); opacity: 0.75; text-align: right; }
+.settings-grid dd { margin: 0; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.project-folders { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.project-folders li { display: grid; grid-template-columns: 90px 1fr auto auto; gap: 10px; align-items: baseline; }
+.project-folders .path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.switch-row { display: flex; gap: 8px; align-items: center; }
+.settings-sheet .sheet-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.settings-sheet .sheet-actions.start { justify-content: flex-start; }
 .sheet-body { display: flex; flex-direction: column; gap: 10px; }
 .sheet h2 { margin: 0; font-size: 0.9375rem; font-weight: 600; }
 .sheet input[type="text"],

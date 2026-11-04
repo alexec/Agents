@@ -39,10 +39,14 @@ final class WindowRequests {
     /// Open File… is up over the window (#415), searching the open session's folders.
     var showsFileSearch = false
 
-    /// The Folder Settings pane showing, or nil while the sheet is shut (066). Set by
-    /// the toolbar, the folder's context menu, the menu bar and the folder's banner,
-    /// and taken down by the sheet's Done.
-    var folderSettings: FolderSettingsPane?
+    /// The Project Settings pane showing, or nil while the sheet is shut (066, #3280). Set
+    /// by the folder's context menu, the menu bar and the folder's banner, and taken down by
+    /// the sheet's Done. The project is the selected folder's.
+    var projectSettings: ProjectSettingsPane?
+
+    /// The folder whose Folder Settings are up (#3280), or nil. Set by the folder's context
+    /// menu and Project Settings' Folders, taken down by the sheet's Done.
+    var folderSettings: FolderSettingsAsk?
 
     /// The folder whose Drop Box sheet is up (#231), or nil. Set by the folder's
     /// context menu, taken down by the sheet's Done.
@@ -143,7 +147,7 @@ struct AgentsCommands: Commands {
             Button("Show in Finder") { showInFinder() }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
                 .disabled(folderForFinder == nil)
-            Button("Folder Settings…") { keyRequests.folderSettings = .general }
+            Button(ProjectSettingsWords.menuItem) { keyRequests.projectSettings = .general }
                 .keyboardShortcut(",", modifiers: [.command, .option])
                 .disabled(keyFolder == nil)
         }

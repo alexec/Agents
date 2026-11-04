@@ -27,7 +27,7 @@ runs on any host, with nothing else installed there.
 
 Only a local server can be hosted: `"hosted"` on an entry with a `url` is a problem with
 the file, and the Agent Configuration page says so. A folder's entry with `"hosted"` added or changed is
-approved again, in **Folder Settings ▸ Agent Configuration ▸ Connectors**, as any changed entry is.
+approved again, in **Project Settings ▸ Agent Configuration ▸ Connectors**, as any changed entry is.
 
 ## What the app does with it
 

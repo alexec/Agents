@@ -233,7 +233,7 @@ struct WorkflowPage: View {
                 }
                 .help(summary.scope == "user"
                       ? "Open this workflow's file in Settings ▸ Agent Configuration ▸ Workflows"
-                      : "Open this workflow's file in Folder Settings ▸ Agent Configuration ▸ Workflows")
+                      : "Open this workflow's file in Project Settings ▸ Agent Configuration ▸ Workflows")
             }
             Button(role: .destructive) { confirmsDelete = true } label: {
                 Label("Delete…", systemImage: "trash")
@@ -336,7 +336,7 @@ struct WorkflowPage: View {
             model.settingsPaneAsked = .agentConfiguration
             openSettings()
         } else {
-            requests.folderSettings = .workflows
+            requests.projectSettings = .workflows
         }
     }
 

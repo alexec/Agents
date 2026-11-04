@@ -379,14 +379,8 @@ struct ContentView: View {
         } message: { alert in
             Text(alert.message)
         }
-        // One folder's settings, over whatever the window is showing (066).
-        .sheet(isPresented: Binding(get: { requests.folderSettings != nil },
-                                    set: { if !$0 { requests.folderSettings = nil } })) {
-            FolderSettingsSheet(pane: Binding(get: { requests.folderSettings },
-                                               set: { requests.folderSettings = $0 }))
-                .environment(requests)
-                .paperSheet()
-        }
+        // The project's settings or one folder's, over whatever the window is showing (066, #3280).
+        .settingsSheets(requests)
         // An agent that needs its runtime signed in gets the sign-in, not an error.
         .sheet(isPresented: Binding(get: { model.signInRuntimeID != nil },
                                     set: { if !$0 { model.putAwaySignIn() } })) {

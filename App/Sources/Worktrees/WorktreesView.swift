@@ -53,8 +53,8 @@ struct WorktreesView: View {
     }
 }
 
-/// One folder's worktrees under its name, with Clean up worktrees.
-private struct WorktreesGroup: View {
+/// One folder's worktrees under its name, with Clean up worktrees; also Folder Settings ▸ Worktrees.
+struct WorktreesGroup: View {
     @Environment(AppModel.self) private var model
     let group: DaemonAPI.FolderWorktrees
 

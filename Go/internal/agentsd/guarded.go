@@ -237,7 +237,7 @@ func (d *Daemon) settled(folder, path string) bool {
 }
 
 func guardedRefusal(path, lead string) error {
-	return Invalid("%s%s was changed outside the app and is waiting for the person to keep or undo the change in Folder Settings.", lead, path)
+	return Invalid("%s%s was changed outside the app and is waiting for the person to keep or undo the change in Project Settings.", lead, path)
 }
 
 // approveWrite records the app's own write as approved.

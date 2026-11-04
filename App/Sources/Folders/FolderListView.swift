@@ -822,10 +822,11 @@ private struct FolderMenu: View {
             requests.focusPrompt()
         }
         .disabled(model.hostUnreachable(summary.host))
-        Button("Folder Settings…") {
+        Button(ProjectSettingsWords.menuItem) {
             model.showFolder(summary.key)
-            requests.folderSettings = .general
+            requests.projectSettings = .general
         }
+        Button(ProjectSettingsWords.folderMenuItem) { requests.folderSettings = FolderSettingsAsk(folder: summary.key) }
         // A drag onto the row goes to the drop box's top; this names a folder in it.
         Button("Put Files in Drop Box…") { requests.dropboxFolder = summary.key }
             .disabled(model.hostUnreachable(summary.host) || !summary.exists)

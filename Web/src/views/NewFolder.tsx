@@ -22,7 +22,7 @@ type Adding = { kind: "folder" | "clone"; host: string } | { kind: "machine" };
 /** The dialog open now, if any: one at a time, from the + menu, the empty list or the folders menu. */
 const adding = signal<Adding | null>(null);
 
-/** Add Folder… on `host`, from New Session's On (#3279): the dialog the + menu opens. */
+/** Add Folder… on `host`: from New Session's On (#3279) and Project Settings' Add on Another Machine… (#3280). */
 export function addFolderOn(host: string): void {
   adding.value = { kind: "folder", host };
 }

@@ -10424,6 +10424,8 @@ export interface Methods {
   "folders/keepGuardedChange": { params: GuardedChangeRequest; result: FolderSummary };
   "folders/list": { params: FoldersListRequest; result: FolderSummary[] };
   "folders/readGuardedChange": { params: GuardedChangeRequest; result: GuardedChangeReading };
+  "folders/setDiskSpace": { params: SetDiskSpaceRequest; result: FolderSummary };
+  "folders/setHelperLimits": { params: SetHelperLimitsRequest; result: FolderSummary };
   "folders/setPRCostComment": { params: SetPRCostCommentRequest; result: FolderSummary };
   "folders/setPinned": { params: SetPinnedRequest; result: FolderSummary };
   "folders/setProject": { params: SetFolderProjectRequest; result: FolderSummary };
@@ -10761,6 +10763,8 @@ export const MethodTarget = {
   "folders/keepGuardedChange": "host",
   "folders/list": "host",
   "folders/readGuardedChange": "host",
+  "folders/setDiskSpace": "host",
+  "folders/setHelperLimits": "host",
   "folders/setPRCostComment": "host",
   "folders/setPinned": "host",
   "folders/setProject": "host",

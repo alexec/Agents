@@ -57,7 +57,7 @@ or the folder's ([Set rules for a folder](../how-to/set-rules-for-a-folder.md)).
 ## What moved
 
 The limits that were in Settings ▸ Cost, Settings ▸ Notifications, the archive switch of
-Settings ▸ Sidebar and the helper limits of Folder Settings ▸ General are rules of your
+Settings ▸ Sidebar and the helper limits of Project Settings ▸ Work at Once are rules of your
 layer now. On first start, the machine reads your old values into your layer once.
 Control plane ▸ Policy is now **Organisation Policy**. Resources stays a setting: it says
 what a machine can take, not what an agent may do.
