@@ -430,8 +430,12 @@ func checkSuggestions(home string, since time.Time) []string {
 // suggestionsFor is a folder's suggestions for For Review (#3331), newest first: those of the
 // last week, as the summary reads them.
 func (d *Daemon) suggestionsFor(folder string, at time.Time) []wire.CheckSuggestion {
+	home := d.personalHome()
+	if home == "" {
+		return nil // a scratch root with no home: no checks ran
+	}
 	checksMu.Lock()
-	r := readChecks(d.personalHome())
+	r := readChecks(home)
 	checksMu.Unlock()
 	var out []wire.CheckSuggestion
 	for _, s := range slices.Backward(r.Suggestions) {
@@ -454,6 +458,9 @@ func (d *Daemon) suggestionsFor(folder string, at time.Time) []wire.CheckSuggest
 // which is kept so that it never comes back. False when there is no such suggestion.
 func (d *Daemon) takeSuggestion(folder, id string, dismiss bool, at time.Time) (checkSuggestion, bool, error) {
 	home := d.personalHome()
+	if home == "" {
+		return checkSuggestion{}, false, nil
+	}
 	checksMu.Lock()
 	defer checksMu.Unlock()
 	r := readChecks(home)
@@ -476,8 +483,12 @@ func (d *Daemon) takeSuggestion(folder, id string, dismiss bool, at time.Time) (
 
 // findSuggestion is one of a folder's suggestions, by its id.
 func (d *Daemon) findSuggestion(folder, id string) (checkSuggestion, bool) {
+	home := d.personalHome()
+	if home == "" {
+		return checkSuggestion{}, false
+	}
 	checksMu.Lock()
-	r := readChecks(d.personalHome())
+	r := readChecks(home)
 	checksMu.Unlock()
 	for _, s := range r.Suggestions {
 		if filepath.Clean(s.Folder) == filepath.Clean(folder) && s.id() == id {
