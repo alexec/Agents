@@ -208,13 +208,14 @@ export function otherAgentsNote(git: GitView | undefined): string | null {
 
 /**
  * Why git's half of the list is missing, in the Remote's words (RemoteChangesPane.unavailable):
- * a folder that is not a repository says so rather than nothing.
+ * a folder that is not a repository says so rather than nothing. `machine` names a folder's machine that is
+ * not the Mac (#3425).
  */
-export function unavailableNote(git: GitView | undefined): string | null {
+export function unavailableNote(git: GitView | undefined, machine?: string): string | null {
   if (!git || !("unavailable" in git)) return null;
   const why = git.unavailable;
   if ("notARepository" in why) return "This folder is not a Git repository.";
-  if ("gitNotInstalled" in why) return "Git is not installed on the Mac.";
+  if ("gitNotInstalled" in why) return `Git is not installed on ${machine ?? "the Mac"}.`;
   if ("folderGone" in why) return "The agent's folder is gone.";
   return why.failed.message;
 }

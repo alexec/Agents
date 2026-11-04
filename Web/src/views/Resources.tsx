@@ -4,6 +4,7 @@
 import type { Store } from "../model/store";
 import type { Lease, ResourceState } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
+import { resourcesHint } from "../model/onTheMac";
 
 /** "14:05", twenty-four hours, as LeaseWords.clock says it to agents and the Mac. */
 function clock(at: number): string {
@@ -49,7 +50,7 @@ export function Resources({ store, host, open }: { store: Store; host: string; o
     <details class="resources" open={open}>
       <summary class="subhead">Resources <span class="count">{declared.length + busy.length}</span></summary>
       <ul>{declared.map(row)}{busy.map(row)}</ul>
-      <p class="hint">Declared on the Mac, in Settings ▸ Resources. Agents lease one whenever its description applies.</p>
+      <p class="hint">{resourcesHint(store.hasMac.value)}</p>
     </details>
   );
 }

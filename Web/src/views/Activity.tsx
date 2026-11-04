@@ -22,6 +22,7 @@ import { Modal } from "./Modal";
 import { folderKey, folderPath } from "../model/groups";
 import { accountChoices, accountRows, accountState, agentsHolding, allowanceLine, defaultAccountName, isOrgRow, orgAllowanceLine, ownRow, ownSignInID, reachesFoot, reachesTheModelBy, machineSignInLine, offersMachineSignIn, removeMessage, rowTitle, runtimeTime, runtimesHint, signInOnTheMac } from "../model/runtimes";
 import { RuntimeSignInDialog } from "./RuntimeSignInDialog";
+import { limitsHint, noResourcesHint } from "../model/onTheMac";
 import { fromOrganisation } from "../model/orgAccounts";
 import { setBy as setByWords } from "../model/orgPolicy";
 import { personalEmpty, personalIntro, personalServers } from "../model/hostedMCP";
@@ -256,7 +257,7 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
                 </section>
               ))}
               {Object.values(store.leases.value).every((s) => s.resources.length === 0) && (
-                <p class="hint">Nothing is declared or held. Resources are declared on the Mac, in Settings ▸ Resources.</p>
+                <p class="hint">{noResourcesHint(store.hasMac.value)}</p>
               )}
             </>
           )}
@@ -324,7 +325,7 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
           ))}
           {page === "mcp" && (
             <>
-              <p class="hint">{personalIntro}</p>
+              <p class="hint">{personalIntro(store.hasMac.value)}</p>
               {store.hosts.value.map((host) => (
                 <section key={host.id}>
                   {several && <h2 class="section-head">{hostName(host.id)}</h2>}
@@ -354,7 +355,7 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
               <button onClick={() => { for (const host of hosts) void store.loadWorktrees(host.id); }}>Refresh</button>
             </>
           )}
-          {page === "runtimes" && <p class="hint">{runtimesHint(store.hosts.value.some((h) => store.isMac(h.id)))}</p>}
+          {page === "runtimes" && <p class="hint">{runtimesHint(store.hasMac.value)}</p>}
           {page === "spending" && (
             <div class="tabs events-panes" role="tablist" aria-label="Show">
               {(["cost", "reports"] as const).map((p) => (
@@ -600,7 +601,7 @@ function TokensPage({ store, hostName }: { store: Store; hostName: (host: string
             Each agent up to {state.limits.perAgentTokens.toLocaleString()} tokens</p>}
         </section>
       ))}
-      <p class="hint">Limits are set on the Mac.</p>
+      <p class="hint">{limitsHint(store.hasMac.value)}</p>
     </>
   );
 }
@@ -651,7 +652,7 @@ function SpendingPage({ store, hostName }: { store: Store; hostName: (host: stri
           {state.note && <p class="quiet small">⚠︎ {state.note}</p>}
         </section>
       ))}
-      <p class="hint">Limits are set on the Mac.</p>
+      <p class="hint">{limitsHint(store.hasMac.value)}</p>
     </>
   );
 }
