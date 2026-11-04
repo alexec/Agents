@@ -141,4 +141,6 @@ jobs:
           name: swift-coverage-${{ matrix.package }}
           path: Packages/${{ matrix.package }}/.build/**/codecov/*
           if-no-files-found: ignore
+          # The profiles are under .build, which upload-artifact skips as hidden otherwise.
+          include-hidden-files: true
           retention-days: 14
