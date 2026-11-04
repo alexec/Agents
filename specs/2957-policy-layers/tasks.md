@@ -140,7 +140,7 @@
 - [ ] T066 [US5] Add the Stopped-by-a-policy card to `Remote/Sources/Chat/` (FR-027).
 - [ ] T067 [US3] Add the guarded-change card's policy words to `Remote/Sources/Chat/`, read only (the Remote has no Folder Settings).
 - [ ] T068 [US2] Change `Web/src/views/ConsoleOrgPolicy.tsx` and `Web/src/model/orgPolicy.ts`: the organisation's new rules of FR-003, and the permission mode shown in the four words of FR-002 (Clarifications: "Auto's levels, on every layer and every client"). Tests in `Web/test/console.test.mjs` and `Web/test/orgPolicy.test.mjs`.
-- [ ] T069 File the parity issue for editing every other rule on the Remote (FR-027, "the rest is read only on the Remote at first, with a parity issue for the rest").
+- [x] T069 File the parity issue for editing every other rule on the Remote (FR-027, "the rest is read only on the Remote at first, with a parity issue for the rest").
 - [ ] T070 Add the Remote's rows to `specs/071-web-remote/walks/parity/settings-and-project-settings.md`, `notifications-and-badges.md` and `chat-turns-and-turn-detail.md`; run `scripts/parity-counts.py`.
 - [ ] T071 Lease `build`, walk the Remote's "Remote edits" row of quickstart.md's table with the walk simulator, and the Console with headless Chrome, take the screenshots for Alex's approval (`pr-shots.sh`), release `build`.
 
