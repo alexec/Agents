@@ -143,6 +143,11 @@ private struct PolicyAmountField: View {
                 .multilineTextAlignment(.trailing)
                 .monospacedDigit()
                 .frame(width: empty == nil ? 110 : 180)
+                #if os(iOS)
+                // Digits with a Return key, which sets the limit (#3344).
+                .keyboardType(.numbersAndPunctuation)
+                .submitLabel(.done)
+                #endif
                 .onSubmit { save(text) }
                 .disabled(!editable)
         }

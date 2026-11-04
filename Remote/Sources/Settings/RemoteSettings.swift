@@ -22,12 +22,11 @@ struct RemoteSettings: View {
                     SettingsPageLink("Sidebar", systemImage: "sidebar.left") { SidebarSettingsSection() }
                 }
                 .paperListRow()
-                // Agents ▸ Policy is Core (#2957, FR-027): every rule and where it comes from, read
-                // only but for the notice limits and the archive switch.
+                // Agents ▸ Policy is Core (#2957, FR-027): every rule and where it comes from,
+                // changed here as on the Mac (#3344).
                 Section(PolicyLayersWords.groupTitle) {
                     NavigationLink {
-                        PolicyPane(host: model.policyHost, revision: model.policyRevision,
-                                   editableRules: PolicyLayersWords.remoteEditable)
+                        PolicyPane(host: model.policyHost, revision: model.policyRevision)
                             .navigationTitle(PolicyLayersWords.title)
                             .navigationBarTitleDisplayMode(.inline)
                     } label: {
