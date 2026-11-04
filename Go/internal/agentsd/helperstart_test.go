@@ -28,7 +28,7 @@ func TestALeadStartsSessionsAndTheyQueue(t *testing.T) {
 		t.Fatal(text)
 	}
 	text, _ := m.tool(4, "start_session", map[string]any{"prompt": "wait for me", "labels": []string{"helper"}})
-	if !strings.HasPrefix(text, "Started “wait for me” (id ") || !strings.HasSuffix(text, "This folder now has 1 of 1 running, 1 of 5 not archived.") {
+	if !strings.HasPrefix(text, "Started “wait for me” (id ") || !strings.HasSuffix(text, "This project now has 1 of 1 running, 1 of 5 not archived.") {
 		t.Fatal(text)
 	}
 	first := wire.UUID(strings.Fields(text)[5][:36])
@@ -37,7 +37,7 @@ func TestALeadStartsSessionsAndTheyQueue(t *testing.T) {
 	}
 	waitFor(t, "the first working", func() bool { return d.Store.Agent(first).State == wire.AgentStateRunning })
 	text, _ = m.tool(5, "start_session", map[string]any{"prompt": "Write it"})
-	if !strings.HasPrefix(text, "Queued “Write it” (id ") || !strings.Contains(text, ", 1st in this folder's queue: This folder already has 1 of 1 sessions started by sessions running") {
+	if !strings.HasPrefix(text, "Queued “Write it” (id ") || !strings.Contains(text, ", 1st in this project's queue: This project already has 1 of 1 sessions started by sessions running") {
 		t.Fatal(text)
 	}
 	second := wire.UUID(strings.Fields(text)[4][:36])

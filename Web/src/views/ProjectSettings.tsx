@@ -133,7 +133,8 @@ export function ProjectSettingsModal({ store, host, folder, summary, down, close
   const workAtOnce = <dl class="settings-grid">
     <dt>Helpers</dt>
     <dd>
-      <p class="sheet-note">How many run and stay unarchived is set in Agents ▸ Policy, or for this project in Policy.</p>
+      <p class="sheet-note">How many run and stay unarchived is set in Agents ▸ Policy, or for this project in Policy. They
+        count across all the project's folders, on every machine. A lead doesn't count; the sessions it starts do.</p>
     </dd>
     <dt>Helpers queued</dt>
     <dd>
