@@ -40,7 +40,7 @@ you without opening each folder.
 | --- | --- | --- |
 | **Pinned** | The sessions and workflows you pinned, in the order you pinned them. | On, open |
 | **Needs You** | Sessions that asked you something, are blocked, or ask to be archived. Also each approval that waits for you: a connector, a workflow, a plugin, a guarded file, and a workflow that failed. | On, open |
-| **For Review** | Finished sessions that showed you a file you have not opened yet, such as a report or the newest daily summary. After them, each folder's open pull requests with the `needs-approval` label, until one gets `approved` or `changes-wanted`, or is closed. These do not block an agent. | On, open |
+| **For Review** | Finished sessions that showed you a file you have not opened yet, such as a report or the newest daily summary. After them, each folder's open pull requests with the `needs-approval` label, until one gets `approved` or `changes-wanted`, or is closed. Then what the daily checks found, such as failing CI or a pull request in conflict, until you start a session on it or dismiss it. These do not block an agent. | On, open |
 | **Working** | Sessions with a turn in progress. | Off |
 | **Unread** | Finished sessions you have not opened since they finished. | Off |
 
@@ -60,6 +60,13 @@ you without opening each folder.
   it out, use **Dismiss**: point at the row on the Mac and the web page, or swipe left on
   iPhone and iPad. A dismissed pull request does not come back. The host reads the list
   each two minutes from the GitHub connection, so a new label can take that long to show.
+- **A suggestion of the daily checks in For Review starts a session** in its folder with
+  its prompt, on the Auto runtime, and opens it: click the row, or use **Start** when you
+  point at it on the Mac and the web page. On iPhone and iPad, tap it or swipe right. Then
+  it leaves For Review. To take it out with no session, use **Dismiss**: point at the row
+  on the Mac and the web page, or swipe left on iPhone and iPad. A dismissed suggestion does
+  not come back, in For Review, in the next daily summary or from a later check. An urgent
+  one has an orange mark.
 
 ### Turn a smart group on or off
 

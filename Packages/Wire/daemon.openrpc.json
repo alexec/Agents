@@ -7697,6 +7697,58 @@
       ]
     },
     {
+      "name": "suggestions/dismiss",
+      "x-capability": "suggestions/1",
+      "description": "Take a suggestion of the daily checks out of the sidebar's For Review (#3331) for good: the host keeps the dismissal, so neither For Review nor the next daily summary lists it, and the checks do not keep it again.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SuggestionRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "suggestions/start",
+      "x-capability": "suggestions/1",
+      "description": "Start on a suggestion of the daily checks in For Review (#3331): the host starts a session in its folder with its prompt, on the Auto runtime, and takes the suggestion out. The result is the new session's id.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SuggestionRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/UUID"
+        }
+      }
+    },
+    {
       "name": "surface/identify",
       "x-capability": "surface/1",
       "tags": [

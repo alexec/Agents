@@ -1618,6 +1618,24 @@ export type ChartMark =
   | "point"
   | "area";
 
+/**
+ * A finding of the read-only daily checks (#3355) in a folder, in the sidebar's For Review (#3331)
+ * until a session is started from it (suggestions/start) or it is dismissed (suggestions/dismiss).
+ */
+export interface CheckSuggestion {
+  /** Stable for the suggestion: what suggestions/start and suggestions/dismiss name. */
+  id: string;
+  /** What is wrong, in a line. */
+  title: string;
+  /** What Start sends to the new session. */
+  prompt: string;
+  /** The page it is about, such as the failing run or the pull request. */
+  link?: URLString;
+  urgent?: boolean;
+  /** When the check found it. */
+  at: WireDate;
+}
+
 /** clients/announce, on a pairing connection. */
 export interface ClientAnnounce {
   id: UUID;
@@ -3467,6 +3485,11 @@ export interface FolderPins {
    * with none.
    */
   reviews?: ReviewPull[];
+  /**
+   * What the read-only daily checks found in it for the person (#3331), newest first, until a
+   * session is started from one or it is dismissed. Nil from a host with none.
+   */
+  suggestions?: CheckSuggestion[];
 }
 
 export interface FolderPlugin {
@@ -6282,6 +6305,11 @@ export interface PinsChangedNotification {
    * with none.
    */
   reviews?: ReviewPull[];
+  /**
+   * What the read-only daily checks found in it for the person (#3331), newest first, until a
+   * session is started from one or it is dismissed. Nil from a host with none.
+   */
+  suggestions?: CheckSuggestion[];
 }
 
 export interface Plan {
@@ -9035,6 +9063,16 @@ export interface SuggestedPrompt {
   prompt: string;
 }
 
+/**
+ * suggestions/start or suggestions/dismiss (#3331): the person's Start or Dismiss on a suggestion
+ * of the daily checks in For Review.
+ */
+export interface SuggestionRequest {
+  folder: URLString;
+  /** The suggestion's id, as its CheckSuggestion says it. */
+  id: string;
+}
+
 /** Surface (Attention/Surface.swift): a tagged object, `{ mac: {} }` or `{ device: "<uuid>" }`. */
 export type Surface =
   | { mac: Record<string, never> }
@@ -10414,6 +10452,8 @@ export interface Methods {
   "simulators/shutdown": { params: SimulatorRequest; result: Empty };
   "simulators/tap": { params: SimulatorTapRequest; result: Empty };
   "store/notes": { params: Empty; result: StoreNotes };
+  "suggestions/dismiss": { params: SuggestionRequest; result: Empty };
+  "suggestions/start": { params: SuggestionRequest; result: UUID };
   "surface/identify": { params: SurfaceIdentification; result: Empty };
   "time/history": { params: Empty; result: TimeHistory };
   "usage/history": { params: Empty; result: UsageHistory };
@@ -10744,6 +10784,8 @@ export const MethodTarget = {
   "simulators/shutdown": "host",
   "simulators/tap": "host",
   "store/notes": "host",
+  "suggestions/dismiss": "host",
+  "suggestions/start": "host",
   "surface/identify": "host",
   "time/history": "host",
   "usage/history": "host",
@@ -10969,6 +11011,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ChannelOpen: { required: ["client"], optional: ["device", "relayed", "tunnel", "tunnelRef", "fanOut", "actor"] },
   ChannelSender: { required: ["channel", "identity"], optional: ["name", "email", "dkim"] },
   ChartHint: { required: ["mark", "x", "y"], optional: ["color", "title"] },
+  CheckSuggestion: { required: ["id", "title", "prompt", "at"], optional: ["link", "urgent"] },
   ClientAnnounce: { required: ["id", "publicKey", "name", "kind"], optional: [] },
   ClientConnection: { required: ["client", "relayed"], optional: ["through"] },
   ClientPairingRequest: { required: [], optional: ["kind", "grant"] },
@@ -11128,7 +11171,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FolderDetection: { required: ["enabled", "paths"], optional: [] },
   FolderHunk: { required: ["oldStart", "newStart", "noNewlineAtEnd", "lines"], optional: [] },
   FolderMCPServer: { required: ["name", "summary", "approval", "missingSecrets", "secretNames", "entryDigest"], optional: ["managed", "signIn", "views"] },
-  FolderPins: { required: ["folder", "pins"], optional: ["sessions", "workflows", "views", "reviews"] },
+  FolderPins: { required: ["folder", "pins"], optional: ["sessions", "workflows", "views", "reviews", "suggestions"] },
   FolderPlugin: { required: ["folder", "name", "carries", "folderPath"], optional: ["awaitingApproval"] },
   FolderRemovedNotification: { required: ["folder"], optional: [] },
   FolderRequest: { required: ["folder"], optional: [] },
@@ -11398,7 +11441,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PingResponse: { required: ["ok"], optional: [] },
   PinnedPersonKey: { required: ["key", "keyID", "from", "at"], optional: [] },
   PinnerView: { required: ["kind", "id", "name"], optional: [] },
-  PinsChangedNotification: { required: ["folder", "pins"], optional: ["sessions", "workflows", "views", "reviews"] },
+  PinsChangedNotification: { required: ["folder", "pins"], optional: ["sessions", "workflows", "views", "reviews", "suggestions"] },
   Plan: { required: ["entries", "state", "at"], optional: ["planID"] },
   PlanEntry: { required: ["content", "priority", "status"], optional: [] },
   PluginApproveRequest: { required: ["plugin", "digest"], optional: [] },
@@ -11677,6 +11720,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   StopBackgroundRequest: { required: ["agentID", "itemID"], optional: [] },
   StoreNotes: { required: ["notes"], optional: [] },
   SuggestedPrompt: { required: ["id", "label", "prompt"], optional: [] },
+  SuggestionRequest: { required: ["folder", "id"], optional: [] },
   SurfaceIdentification: { required: ["id", "name", "kind"], optional: [] },
   TeamBot: { required: ["user", "name", "spentTodayUSD", "capped", "machines", "online", "workflows", "live"], optional: ["group", "groupName", "caps"] },
   TeamBotRun: { required: ["host", "hostName", "agent"], optional: ["workflow", "since"] },

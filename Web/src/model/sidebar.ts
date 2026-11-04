@@ -6,8 +6,8 @@
 // sessions asking or blocked, sessions asking to be archived (#584, #649, once a group of their own),
 // and each folder's approvals as rows of their own. For Review (#3194) holds what is ready to look at
 // but blocks no agent: a session done with a file it showed that nobody has opened, then each folder's
-// open pull requests labelled needs-approval (#3330).
-import type { Agent, Approval, ReviewPull, WorkflowSummary } from "../protocol/generated";
+// open pull requests labelled needs-approval (#3330), then the read-only daily checks' suggestions (#3331).
+import type { Agent, Approval, CheckSuggestion, ReviewPull, WorkflowSummary } from "../protocol/generated";
 import { asksToArchive, byStart, folderKey, groupOf, showsUnread } from "./groups";
 import { queryMatches, type LabelQuery } from "./labels";
 import { isSessionApproval, kindWords } from "./approvals";
@@ -175,6 +175,20 @@ export function smartPulls<P>(folders: readonly { folder: P; pulls: readonly Rev
     .filter((p) => !words || `${p.title} ${p.repo} #${p.number}`.toLowerCase().includes(words))
     .map((pull) => ({ folder, pull })))
     .sort((a, b) => b.pull.updatedAt - a.pull.updatedAt);
+}
+
+/**
+ * For Review's suggestions of the read-only daily checks (#3331), each with its folder, as
+ * `SidebarSmartRow.suggestions`: after its pull requests, the urgent first, then newest first. A
+ * search matches the title and the prompt.
+ */
+export function smartSuggestions<P>(folders: readonly { folder: P; suggestions: readonly CheckSuggestion[] }[],
+  query = ""): { folder: P; suggestion: CheckSuggestion }[] {
+  const words = query.trim().toLowerCase();
+  return folders.flatMap(({ folder, suggestions }) => suggestions
+    .filter((s) => !words || `${s.title} ${s.prompt}`.toLowerCase().includes(words))
+    .map((suggestion) => ({ folder, suggestion })))
+    .sort((a, b) => Number(b.suggestion.urgent ?? false) - Number(a.suggestion.urgent ?? false) || b.suggestion.at - a.suggestion.at);
 }
 
 /** When it began waiting, the unknown first: a stable sort keeps those in their folders' order. */

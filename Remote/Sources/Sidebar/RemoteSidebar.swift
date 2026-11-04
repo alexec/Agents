@@ -301,6 +301,11 @@ struct RemoteSmartFold: View {
                     ForEach(row.pulls(in: model.work, folders: keys, query: query), id: \.pull.id) { item in
                         RemoteReviewPullRow(pull: item.pull, folder: item.folder, place: place(of: item.folder))
                     }
+                    // The daily checks' suggestions (#3331), after them.
+                    ForEach(row.suggestions(in: model.work, folders: keys, query: query), id: \.suggestion.id) { item in
+                        RemoteCheckSuggestionRow(suggestion: item.suggestion, folder: item.folder,
+                                                 place: place(of: item.folder))
+                    }
                 }
             }
         } header: {
@@ -431,6 +436,50 @@ private struct RemoteReviewPullRow: View {
 
     private func dismissNow() {
         Task { await model.dismissReview(pull, in: folder.folder) }
+    }
+}
+
+/// A suggestion of the read-only daily checks, under For Review (#3331), the window's
+/// `CheckSuggestionListRow`: a tap starts a session with its prompt and opens it; Start is a
+/// leading swipe too, Dismiss a trailing one, both in the long press. Dismissed, it never
+/// comes back.
+private struct RemoteCheckSuggestionRow: View {
+    @Environment(RemoteModel.self) private var model
+    @Environment(\.openURL) private var openURL
+    let suggestion: CheckSuggestion
+    let folder: FolderKey
+    let place: String?
+
+    var body: some View {
+        Button(action: startNow) {
+            CheckSuggestionRowLabel(suggestion: suggestion, place: place)
+        }
+        .buttonStyle(.plain)
+        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+            Button("Start", systemImage: "play") { startNow() }
+                .tint(.accentColor)
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button("Dismiss", systemImage: "xmark") { dismissNow() }
+                .tint(.gray)
+        }
+        .contextMenu {
+            Button("Start Session", systemImage: "play") { startNow() }
+            if let link = suggestion.link {
+                Button("Open Link", systemImage: "arrow.up.right.square") { openURL(link) }
+            }
+            Button("Dismiss", systemImage: "xmark") { dismissNow() }
+        }
+        .accessibilityAction(named: "Start", startNow)
+        .accessibilityAction(named: "Dismiss", dismissNow)
+    }
+
+    private func startNow() {
+        Task { await model.startSuggestion(suggestion, in: folder.folder) }
+    }
+
+    private func dismissNow() {
+        Task { await model.dismissSuggestion(suggestion, in: folder.folder) }
     }
 }
 

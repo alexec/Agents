@@ -166,6 +166,19 @@ test("For Review lists every folder's pull requests waiting for approval, newest
   assert.equal(smartPulls([{ folder: "c", pulls: [] }]).length, 0);
 });
 
+test("For Review lists every folder's suggestions of the daily checks, the urgent first, then newest, and a search matches them (#3331)", async () => {
+  const { smartSuggestions } = await load("src/model/sidebar.ts");
+  const s = (id, title, prompt, at, urgent) => ({ id, title, prompt, at, ...(urgent ? { urgent } : {}) });
+  const folders = [
+    { folder: "a", suggestions: [s("1", "CI fails on main", "Fix CI on a branch.", 10)] },
+    { folder: "b", suggestions: [s("2", "PR #12 is in conflict", "Rebase it.", 30), s("3", "Nightly missed", "Run it.", 5, true)] },
+    { folder: "c", suggestions: [] },
+  ];
+  assert.deepEqual(smartSuggestions(folders).map(({ folder, suggestion }) => `${folder}:${suggestion.id}`), ["b:3", "b:2", "a:1"]);
+  assert.deepEqual(smartSuggestions(folders, "rebase").map(({ suggestion }) => suggestion.id), ["2"]);
+  assert.equal(smartSuggestions([{ folder: "c", suggestions: [] }]).length, 0);
+});
+
 test("a search matches an approval's title, kind and grey line (#773)", async () => {
   const { smartApprovals } = await load("src/model/sidebar.ts");
   const folders = [{ folder: "a", approvals: [

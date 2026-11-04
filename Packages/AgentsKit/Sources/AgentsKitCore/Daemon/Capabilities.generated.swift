@@ -135,6 +135,7 @@ public enum Capability {
     public static let skills1 = "skills/1"
     public static let storage1 = "storage/1"
     public static let store1 = "store/1"
+    public static let suggestions1 = "suggestions/1"
     public static let surface1 = "surface/1"
     public static let time1 = "time/1"
     public static let tunnel1 = "tunnel/1"
@@ -437,6 +438,8 @@ public enum Capability {
         "skills/remove": "skills/1",
         "skills/update-preview": "skills/1",
         "store/notes": "store/1",
+        "suggestions/dismiss": "suggestions/1",
+        "suggestions/start": "suggestions/1",
         "surface/identify": "surface/1",
         "time/history": "time/1",
         "usage/history": "usage/1",

@@ -1944,6 +1944,26 @@ const ChartMarkLine ChartMark = "line"
 const ChartMarkPoint ChartMark = "point"
 const ChartMarkArea ChartMark = "area"
 
+// A finding of the read-only daily checks (#3355) in a folder, in the sidebar's For Review (#3331) until a session is started from it (suggestions/start) or it is dismissed (suggestions/dismiss).
+type CheckSuggestion struct {
+	// Stable for the suggestion: what suggestions/start and suggestions/dismiss name.
+	ID string `json:"id"`
+
+	// What is wrong, in a line.
+	Title string `json:"title"`
+
+	// What Start sends to the new session.
+	Prompt string `json:"prompt"`
+
+	// The page it is about, such as the failing run or the pull request.
+	Link *URL `json:"link,omitzero"`
+
+	Urgent *bool `json:"urgent,omitzero"`
+
+	// When the check found it.
+	At Date `json:"at"`
+}
+
 // clients/announce, on a pairing connection.
 type ClientAnnounce struct {
 	ID UUID `json:"id"`
@@ -4126,6 +4146,9 @@ type FolderPins struct {
 
 	// Its open pull requests waiting for the person's approval (#3330), newest first. Nil from a host with none.
 	Reviews []ReviewPull `json:"reviews,omitzero"`
+
+	// What the read-only daily checks found in it for the person (#3331), newest first, until a session is started from one or it is dismissed. Nil from a host with none.
+	Suggestions []CheckSuggestion `json:"suggestions,omitzero"`
 }
 
 type FolderPlugin struct {
@@ -7520,6 +7543,9 @@ type PinsChangedNotification struct {
 
 	// Its open pull requests waiting for the person's approval (#3330), newest first. Nil from a host with none.
 	Reviews []ReviewPull `json:"reviews,omitzero"`
+
+	// What the read-only daily checks found in it for the person (#3331), newest first, until a session is started from one or it is dismissed. Nil from a host with none.
+	Suggestions []CheckSuggestion `json:"suggestions,omitzero"`
 }
 
 type Plan struct {
@@ -10661,6 +10687,14 @@ type SuggestedPrompt struct {
 	Label string `json:"label"`
 
 	Prompt string `json:"prompt"`
+}
+
+// suggestions/start or suggestions/dismiss (#3331): the person's Start or Dismiss on a suggestion of the daily checks in For Review.
+type SuggestionRequest struct {
+	Folder URL `json:"folder"`
+
+	// The suggestion's id, as its CheckSuggestion says it.
+	ID string `json:"id"`
 }
 
 // Surface (Attention/Surface.swift): a tagged object, `{ mac: {} }` or `{ device: "<uuid>" }`.

@@ -1795,6 +1795,30 @@ final class AppModel {
         }
     }
 
+    /// Start on a suggestion of the daily checks in For Review (#3331): the host starts a
+    /// session in its folder with its prompt, and the window opens it.
+    func startSuggestion(_ suggestion: CheckSuggestion, in key: FolderKey) async {
+        var started: UUID?
+        let ok = await attempt(on: key.host) {
+            started = try await self.client(for: key.host).call(DaemonAPI.Method.suggestionsStart,
+                                                                DaemonAPI.SuggestionRequest(folder: key.folder, id: suggestion.id),
+                                                                returning: UUID.self)
+        }
+        guard ok, let started else { return }
+        work.dropSuggestion(suggestion.id, in: key.folder)
+        openAgent(started)
+    }
+
+    /// Dismiss on a suggestion of the daily checks in For Review (#3331): gone at once, then
+    /// the host told, which keeps it out for good.
+    func dismissSuggestion(_ suggestion: CheckSuggestion, in key: FolderKey) async {
+        work.dropSuggestion(suggestion.id, in: key.folder)
+        await attempt(on: key.host) {
+            try await self.client(for: key.host).call(DaemonAPI.Method.suggestionsDismiss,
+                                                      DaemonAPI.SuggestionRequest(folder: key.folder, id: suggestion.id))
+        }
+    }
+
     /// Hide or Show on a server's list view (#2032): shown at once, then the host told.
     func setViewHidden(_ uri: String, _ hidden: Bool, in key: FolderKey) async {
         work.setViewHidden(uri, hidden, in: key.folder)

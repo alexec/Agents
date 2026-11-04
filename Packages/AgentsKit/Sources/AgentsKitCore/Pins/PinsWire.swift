@@ -30,6 +30,11 @@ public extension DaemonAPI.Method {
     static let pinsArrangeWorkflows = "pins/arrangeWorkflows"
     /// A person's Dismiss on a pull request in For Review (#3330): it is not listed again.
     static let reviewsDismiss = "reviews/dismiss"
+    /// Start on a suggestion of the daily checks in For Review (#3331): a new session with its
+    /// prompt, whose id it answers; the suggestion goes.
+    static let suggestionsStart = "suggestions/start"
+    /// Dismiss on a suggestion of the daily checks in For Review (#3331): it never comes back.
+    static let suggestionsDismiss = "suggestions/dismiss"
 }
 
 public extension DaemonAPI.Notification {
@@ -172,15 +177,18 @@ public extension DaemonAPI {
         public var views: [PinView]?
         /// Its pull requests waiting for the person's approval (#3330). Nil from a host with none.
         public var reviews: [ReviewPull]?
+        /// What the read-only daily checks found in it (#3331), newest first. Nil from a host with none.
+        public var suggestions: [CheckSuggestion]?
 
         public init(folder: URL, pins: [PinView], sessions: [UUID] = [], workflows: [String] = [],
-                    views: [PinView] = [], reviews: [ReviewPull] = []) {
+                    views: [PinView] = [], reviews: [ReviewPull] = [], suggestions: [CheckSuggestion] = []) {
             self.folder = folder
             self.pins = pins
             self.sessions = sessions.isEmpty ? nil : sessions
             self.workflows = workflows.isEmpty ? nil : workflows
             self.views = views.isEmpty ? nil : views
             self.reviews = reviews.isEmpty ? nil : reviews
+            self.suggestions = suggestions.isEmpty ? nil : suggestions
         }
     }
 
@@ -192,6 +200,17 @@ public extension DaemonAPI {
         public init(folder: URL, url: URL) {
             self.folder = folder
             self.url = url
+        }
+    }
+
+    /// A person's Start or Dismiss on a suggestion of the daily checks in For Review (#3331).
+    struct SuggestionRequest: Codable, Sendable, Hashable {
+        public var folder: URL
+        public var id: String
+
+        public init(folder: URL, id: String) {
+            self.folder = folder
+            self.id = id
         }
     }
 

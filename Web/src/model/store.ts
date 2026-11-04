@@ -12,7 +12,7 @@ import type {
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, FolderRemovedNotification, DraftOptionsNotification, JSONValue, Methods, AccountProfile, RuntimeAccount, RuntimeSignInStep, RuntimeStatus,
   StartRequest, UUID, AutoMappings, AutoPreview, AutoPreviewRequest, AutoSettings, ClientPermissionMode, Levels, ModelLevel, PermissionLevel, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
   CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
-  PagesChangedNotification, PinsChangedNotification, PinView, ReviewPull, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, PolicySetBy, RuntimeAllowances,
+  PagesChangedNotification, PinsChangedNotification, PinView, ReviewPull, CheckSuggestion, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, PolicySetBy, RuntimeAllowances,
   GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, DailySummarySettings, DesktopControlSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
@@ -285,6 +285,8 @@ export class Work {
   readonly serverViews = signal<Record<string, PinView[]>>({});
   /** Each folder's pull requests waiting for the person's approval by `host|folder` (#3330), newest first, kept by pins/changed. */
   readonly reviewPulls = signal<Record<string, ReviewPull[]>>({});
+  /** Each folder's suggestions of the daily checks by `host|folder` (#3331), newest first, kept by pins/changed. */
+  readonly checkSuggestions = signal<Record<string, CheckSuggestion[]>>({});
   /** Bumped by pages/changed: a page shown may have changed on disk; read it again. */
   readonly pageRevisions = signal<Record<string, number>>({});
 
@@ -605,6 +607,7 @@ export class Work {
         this.workflowPins.value = { ...this.workflowPins.value, [`${host}|${folderKey(note.folder)}`]: note.workflows ?? [] };
         this.serverViews.value = { ...this.serverViews.value, [`${host}|${folderKey(note.folder)}`]: note.views ?? [] };
         this.reviewPulls.value = { ...this.reviewPulls.value, [`${host}|${folderKey(note.folder)}`]: note.reviews ?? [] };
+        this.checkSuggestions.value = { ...this.checkSuggestions.value, [`${host}|${folderKey(note.folder)}`]: note.suggestions ?? [] };
         return true;
       }
       case "pages/changed": {
@@ -1647,6 +1650,7 @@ export class Store extends Work {
       this.workflowPins.value = notOf(this.workflowPins.value);
       this.serverViews.value = notOf(this.serverViews.value);
       this.reviewPulls.value = notOf(this.reviewPulls.value);
+      this.checkSuggestions.value = notOf(this.checkSuggestions.value);
       this.leases.value = without(this.leases.value);
       this.hostedMCP.value = without(this.hostedMCP.value);
       this.mcpHealth.value = without(this.mcpHealth.value);
@@ -1721,9 +1725,11 @@ export class Store extends Work {
       const flows = Object.fromEntries(Object.entries(this.workflowPins.value).filter(([key]) => !key.startsWith(`${host}|`)));
       const views = Object.fromEntries(Object.entries(this.serverViews.value).filter(([key]) => !key.startsWith(`${host}|`)));
       const reviews = Object.fromEntries(Object.entries(this.reviewPulls.value).filter(([key]) => !key.startsWith(`${host}|`)));
+      const suggestions = Object.fromEntries(Object.entries(this.checkSuggestions.value).filter(([key]) => !key.startsWith(`${host}|`)));
       for (const folder of listed) {
         views[`${host}|${folderKey(folder.folder)}`] = folder.views ?? [];
         reviews[`${host}|${folderKey(folder.folder)}`] = folder.reviews ?? [];
+        suggestions[`${host}|${folderKey(folder.folder)}`] = folder.suggestions ?? [];
         held[`${host}|${folderKey(folder.folder)}`] = folder.pins;
         sessions[`${host}|${folderKey(folder.folder)}`] = folder.sessions ?? [];
         flows[`${host}|${folderKey(folder.folder)}`] = folder.workflows ?? [];
@@ -1733,6 +1739,7 @@ export class Store extends Work {
       this.workflowPins.value = flows;
       this.serverViews.value = views;
       this.reviewPulls.value = reviews;
+      this.checkSuggestions.value = suggestions;
     }).catch(failed("pins/list"));
     // A host from before #251 doesn't answer, and nothing is said to be coming back.
     void this.link.call("agents/resuming", {}, host).then((response) => {
@@ -2972,6 +2979,29 @@ export class Store extends Work {
     const key = `${host}|${folderKey(folder)}`;
     this.reviewPulls.value = { ...this.reviewPulls.value, [key]: this.reviewPullsIn(host, folder).filter((p) => p.url !== url) };
     await this.act("reviews/dismiss", { folder: folder as never, url: url as never }, host);
+  }
+
+  /** A folder's suggestions of the daily checks (#3331), newest first. */
+  checkSuggestionsIn(host: string, folder: string): CheckSuggestion[] {
+    return this.checkSuggestions.value[`${host}|${folderKey(folder)}`] ?? [];
+  }
+
+  private dropSuggestion(host: string, folder: string, id: string): void {
+    const key = `${host}|${folderKey(folder)}`;
+    this.checkSuggestions.value = { ...this.checkSuggestions.value, [key]: this.checkSuggestionsIn(host, folder).filter((s) => s.id !== id) };
+  }
+
+  /** Start on a suggestion of the daily checks (#3331): the host starts a session with its prompt; answers its id, or null. */
+  async startSuggestion(host: string, folder: string, id: string): Promise<string | null> {
+    const started = await this.act("suggestions/start", { folder: folder as never, id }, host);
+    if (started) this.dropSuggestion(host, folder, id);
+    return started;
+  }
+
+  /** Dismiss on a suggestion of the daily checks (#3331): gone at once, then the host told, which keeps it out for good. */
+  async dismissSuggestion(host: string, folder: string, id: string): Promise<void> {
+    this.dropSuggestion(host, folder, id);
+    await this.act("suggestions/dismiss", { folder: folder as never, id }, host);
   }
 
   /** A file of the folder's: a pinned page, or what an HTML page draws from. */

@@ -109,6 +109,16 @@
   border: 0; border-radius: 5px; padding: 2px 8px; background: color-mix(in srgb, var(--paper-ink) 12%, transparent); color: inherit; font-size: 0.75rem; cursor: pointer; }
 .review-pull:is(:hover, :focus-within) > .dismiss { display: inline-block; }
 .review-pull:is(:hover, :focus-within) :is(.when, .place) { visibility: hidden; }
+/* For Review's suggestions of the daily checks (#3331): the accent, an urgent one the attention tint;
+   Start and Dismiss over the time on hover, as a pull request's Dismiss. */
+.sidebar-mark.suggestion { color: var(--accent); }
+.sidebar-mark.suggestion.urgent { color: var(--tint-attention); }
+.nav-item.check-suggestion { position: relative; }
+.check-suggestion > .actions { display: none; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); gap: 4px; }
+.check-suggestion > .actions > button { border: 0; border-radius: 5px; padding: 2px 8px;
+  background: color-mix(in srgb, var(--paper-ink) 12%, transparent); color: inherit; font-size: 0.75rem; cursor: pointer; }
+.check-suggestion:is(:hover, :focus-within) > .actions { display: inline-flex; }
+.check-suggestion:is(:hover, :focus-within) :is(.when, .place) { visibility: hidden; }
 
 /* A folder's Archived row (#495), opening its page: in the rows' type, its count on the right. */
 .row.page-row { grid-template-columns: minmax(0, 1fr); padding: 0; }
