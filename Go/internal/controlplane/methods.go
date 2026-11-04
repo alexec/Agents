@@ -580,7 +580,10 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		if err != nil {
 			return nil, err
 		}
-		host := string(request.Host)
+		host, err := m.ownHostNamed(from, string(request.Host))
+		if err != nil {
+			return nil, err
+		}
 		gone, err := m.removeHost(ctx, host, from)
 		if err != nil {
 			return nil, err
@@ -681,6 +684,29 @@ func (m *Methods) hostList(from Caller) []wire.ControlMachine {
 		}
 	}
 	return out
+}
+
+// ownHostNamed is a machine as a caller names it: by its id, or by the name of one of the
+// caller's own, as a script or an agent saw it listed (#3426). A name that is no machine
+// of the caller's comes back as it was, for the call to refuse.
+func (m *Methods) ownHostNamed(from Caller, named string) (string, error) {
+	if m.records.Host(named) != nil || strings.TrimSpace(named) == "" {
+		return named, nil
+	}
+	found := ""
+	for _, h := range m.records.Hosts() {
+		if !strings.EqualFold(h.Name, strings.TrimSpace(named)) || !m.owns(from, h.ID) {
+			continue
+		}
+		if found != "" {
+			return "", fail(invalidParams, "More than one machine is called %s. Name it by its id.", named)
+		}
+		found = h.ID
+	}
+	if found == "" {
+		return named, nil
+	}
+	return found, nil
 }
 
 // removeHost takes a machine off the control plane: hosts/remove, or with its person.
