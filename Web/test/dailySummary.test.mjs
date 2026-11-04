@@ -11,10 +11,14 @@ const w = await load("src/model/dailySummaryWords.ts");
 test("the control's words are the window's and the Remote's", () => {
   const swift = read("Shared/UI/DailySummaryControls.swift").replace(/"\s*\+\s*"/g, "");
   assert.ok(swift.includes(w.dailySummaryHint), w.dailySummaryHint);
+  assert.ok(swift.includes(w.checksHint), w.checksHint);
   const model = read("Packages/AgentsKit/Sources/AgentsKitCore/Model/DailySummarySettings.swift");
   for (const { mode, label } of w.dailySummaryModes) {
     assert.ok(model.includes(`case .${mode}: "${label}"`), label);
   }
+  assert.ok(model.includes(`checksEveryChoices = [${w.checksEveryChoices.join(", ")}]`));
+  assert.ok(model.includes('"Every \\(hours) hours"'));
+  assert.equal(w.checksEveryLabel(4), "Every 4 hours");
 });
 
 test("every half hour is offered, and a hand-set time too", () => {

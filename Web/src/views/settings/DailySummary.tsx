@@ -1,11 +1,12 @@
-// Settings ▸ Agent Configuration ▸ Workflows' daily summary (#3351): Off or Summary only, and the
-// time, for all folders, as the Mac's and the Remote's. The home folder's Daily summary workflow
-// keeps it on the Mac's host.
+// Settings ▸ Agent Configuration ▸ Workflows' daily summary (#3351): Off, Summary only or Summary
+// and checks (#3395), the time, and how often the checks run, for all folders, as the Mac's and
+// the Remote's. The home folder's Daily summary and Daily checks workflows keep it on the Mac's host.
 import { useEffect } from "preact/hooks";
 import type { Store } from "../../model/store";
 import type { DailySummaryMode } from "../../protocol/generated";
 import {
-  dailySummaryChoices, dailySummaryHint, dailySummaryModes, dailySummaryTimeLabel,
+  checksEveryChoices, checksEveryLabel, checksHint, dailySummaryChoices, dailySummaryHint, dailySummaryModes,
+  dailySummaryTimeLabel,
 } from "../../model/dailySummaryWords";
 
 export function DailySummaryControl({ store }: { store: Store }) {
@@ -30,7 +31,16 @@ export function DailySummaryControl({ store }: { store: Store }) {
           </select>
         </label>
       )}
-      <p class="hint">{dailySummaryHint}</p>
+      {settings.mode === "summaryAndChecks" && (
+        <label class="setting">
+          <span>Checks</span>
+          <select value={String(settings.checksEvery ?? 4)}
+            onChange={(e) => void store.setDailySummary({ ...settings, checksEvery: Number(e.currentTarget.value) })}>
+            {checksEveryChoices.map((h) => <option key={h} value={String(h)}>{checksEveryLabel(h)}</option>)}
+          </select>
+        </label>
+      )}
+      <p class="hint">{settings.mode === "summaryAndChecks" ? `${dailySummaryHint} ${checksHint}` : dailySummaryHint}</p>
     </div>
   );
 }
