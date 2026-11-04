@@ -457,7 +457,7 @@ private struct RemoteCheckSuggestionRow: View {
         .buttonStyle(.plain)
         .swipeActions(edge: .leading, allowsFullSwipe: true) {
             Button("Start", systemImage: "play") { startNow() }
-                .tint(.accentColor)
+                .tint(Paper.accent)
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button("Dismiss", systemImage: "xmark") { dismissNow() }
