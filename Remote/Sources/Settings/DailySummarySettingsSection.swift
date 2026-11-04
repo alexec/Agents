@@ -22,7 +22,7 @@ struct DailySummarySettingsSection: View {
         } footer: {
             VStack(alignment: .leading, spacing: 4) {
                 if let problem {
-                    Text(problem).foregroundStyle(.red)
+                    Text(problem).tinted(.failure)
                 }
                 Text(DailySummaryControls.footer)
             }
