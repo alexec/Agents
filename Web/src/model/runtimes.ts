@@ -191,6 +191,16 @@ export const machineSignInWords = {
   signingIn: "Signing in…",
 } as const;
 
+/**
+ * Under the Runtimes page (#3382): where a runtime is installed and signed in. With a Mac, its
+ * Settings ▸ Agent Runtimes and Runtimes; with none, the machines' own rows on this page.
+ */
+export function runtimesHint(hasMac: boolean): string {
+  return hasMac ? "Install a runtime on the Mac, in Settings ▸ Agent Runtimes. Sign it in on the Mac, in Runtimes."
+    : "Runtimes run on your machines: add one in Settings ▸ Machines, with Add a Machine…. "
+      + "Sign Claude or Codex in on a machine with Sign In… in its row.";
+}
+
 /** Where an added account is signed in: the Mac's Runtimes page (#2255). */
 export const signInOnTheMac = "Sign it in on the Mac, in Runtimes.";
 

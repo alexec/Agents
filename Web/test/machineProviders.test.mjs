@@ -194,3 +194,8 @@ test("Stop asks first while agents work there, then stops with confirmRunning", 
   assert.equal(await p.stop("h1", true), null);
   assert.deepEqual(link.asked.at(-1).params, { host: "h1", confirmRunning: true });
 });
+
+test("Link to Machine with no machine says Add a Machine…, not the Mac app (#3382)", () => {
+  assert.doesNotMatch(w.providerWords.noHosts, /\bMac\b/);
+  assert.match(w.providerWords.noHosts, /Add a Machine…/);
+});
