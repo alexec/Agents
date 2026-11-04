@@ -1,13 +1,9 @@
 package agentsd
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"errors"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -120,22 +116,9 @@ func (d *Daemon) countMergedPRsWith(gh string) {
 // mergedPullRequests is the pull requests of the repository folder is in that merged on
 // or after day (yyyy-MM-dd), at most 1,000 of them.
 func mergedPullRequests(ctx context.Context, gh, folder, day string) ([]mergedPull, error) {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, gh, "pr", "list", "--state", "merged", "--search", "merged:>="+day,
-		"--json", "url,mergedAt,headRefName", "--limit", "1000")
-	cmd.Dir = folder
-	cmd.Env = append(os.Environ(), "GH_PROMPT_DISABLED=1", "GH_NO_UPDATE_NOTIFIER=1", "NO_COLOR=1")
-	var out, errs bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &out, &errs
-	if err := cmd.Run(); err != nil {
-		if line, _, _ := strings.Cut(strings.TrimSpace(errs.String()), "\n"); line != "" {
-			return nil, errors.New(line)
-		}
-		return nil, err
-	}
 	var pulls []mergedPull
-	if err := json.Unmarshal(out.Bytes(), &pulls); err != nil {
+	if err := ghJSON(ctx, gh, folder, &pulls, "pr", "list", "--state", "merged", "--search", "merged:>="+day,
+		"--json", "url,mergedAt,headRefName", "--limit", "1000"); err != nil {
 		return nil, err
 	}
 	return pulls, nil

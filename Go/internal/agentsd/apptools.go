@@ -99,6 +99,7 @@ func appToolCalls() []appTool {
 		{"move_worktree", (*Daemon).moveWorktree},
 		{"drive_screen", (*Daemon).driveScreen},
 		{"write_daily_summary", (*Daemon).dailySummary},
+		{"check_folders", (*Daemon).dailyChecks},
 		{"docs_search", (*Daemon).docsSearchTool},
 		{"docs_read", (*Daemon).docsReadTool},
 	}
@@ -385,9 +386,10 @@ func offeredTools(movesItself, bot, desktopControl, summarizes bool) []json.RawM
 		// A bot's machine has no ask tools: nobody answers there (#1761, FR-032). A host
 		// with no agents-drive beside it, or with desktop control Off, has no drive_screen
 		// (#3004, host.desktop-control/1, FR-004). Only a session in the person's home
-		// folder, as the Daily summary's is, has write_daily_summary (#3192).
+		// folder, as the Daily summary's and the Daily checks' are, has write_daily_summary
+		// and check_folders (#3192, #3355).
 		if !done[name] || name == "move_worktree" && !movesItself || askTools[name] && bot ||
-			name == "drive_screen" && !desktopControl || name == "write_daily_summary" && !summarizes {
+			name == "drive_screen" && !desktopControl || (name == "write_daily_summary" || name == "check_folders") && !summarizes {
 			continue
 		}
 		b, _ := json.Marshal(t)
