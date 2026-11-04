@@ -82,6 +82,19 @@ var events = append([]event{
 			"pr": prSchema(nil), "headSha": str,
 			"run": object(map[string]any{"id": integer, "attempt": integer, "name": str, "url": str}),
 		})},
+	// A run no pull request owns, as a tag's release or a workflow_dispatch run (#3444).
+	{name: "run.completed", title: "Workflow run finished",
+		description: "A GitHub Actions workflow run finished, whatever started it (a push, a tag, workflow_dispatch, a schedule) and whatever its conclusion (success, failure, cancelled…): one event per run and attempt, so a rerun is a new one. For a run no pull request owns, such as a tag's release.yml or a dry run started by hand; a PR's own runs are checks.failed and checks.passed. Only runs from the repo itself, not a fork, started by a person, never a bot, unless anyone is true.",
+		input: schema{repoProperty,
+			property{name: "workflow", kind: "string", description: "Only runs of this workflow, by its file name, as release.yml.",
+				pattern: regexp.MustCompile(`^[A-Za-z0-9_.-]+\.ya?ml$`), looksLike: "release.yml"},
+			branchProperty("Only runs on this branch or tag, as main or v0.16.0."),
+			property{name: "run", kind: "integer", description: "Only this run, by its id."}, anyoneProperty},
+		payload: object(map[string]any{
+			"run": object(map[string]any{"id": integer, "attempt": integer, "name": str, "workflow": str, "event": str,
+				"branch": str, "headSha": str, "url": str, "conclusion": str, "actor": str}),
+			"completedAt": str,
+		})},
 	{name: "pr.opened", title: "Pull request opened",
 		description: "A pull request was opened, or a draft was marked ready for review: a PR open and not a draft now that was not at the last poll. Drafts never count. Reopened, it is raised again." + ownPRs,
 		input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty},
@@ -665,6 +678,27 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 						return nil, nil
 					}
 					return c.data(), nil
+				}})
+		}
+		return list, truncated, nil
+	}
+	if name == "run.completed" {
+		runs, truncated, err := gh.CompletedRuns(ctx, repo, a.workflow, a.branch, a.run, since)
+		if err != nil {
+			return nil, false, err
+		}
+		var list []candidate
+		for _, r := range runs {
+			at := normalized(r.Run.UpdatedAt)
+			if at == "" {
+				continue
+			}
+			list = append(list, candidate{eventID: fmt.Sprintf("run.completed:%s:%d:%d", repo, r.Run.ID, r.Run.Attempt), time: at,
+				data: func() (map[string]any, error) {
+					if !a.anyone && !r.Trusted {
+						return nil, nil
+					}
+					return r.data(), nil
 				}})
 		}
 		return list, truncated, nil

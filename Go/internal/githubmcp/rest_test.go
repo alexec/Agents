@@ -135,6 +135,41 @@ func TestPassedRunsOnlyMatchesSuccess(t *testing.T) {
 		UpdatedAt: "2026-10-16T10:05:00Z"}}, "only the successful run")
 }
 
+func TestCompletedRunsOfAWorkflowAndByID(t *testing.T) {
+	since := "2026-10-16T10:00:00.000Z"
+	api := newFakeAPI(t, map[string]string{
+		"repos/" + repo + "/actions/workflows/release.yml/runs": `{"workflow_runs": [
+			{"id": 5, "run_attempt": 1, "name": "Release", "path": ".github/workflows/release.yml", "event": "push", "html_url": "u5",
+			 "head_sha": "s5", "head_branch": "v0.16.0", "status": "completed", "conclusion": "success",
+			 "updated_at": "2026-10-16T10:30:00Z", "created_at": "2026-10-16T09:00:00Z", "pull_requests": [],
+			 "actor": {"login": "alexec", "type": "User"}, "head_repository": {"full_name": "` + repo + `"}},
+			{"id": 6, "run_attempt": 1, "name": "Release", "path": ".github/workflows/release.yml", "event": "push",
+			 "head_branch": "v0.16.0", "status": "in_progress", "updated_at": "2026-10-16T10:31:00Z", "created_at": "2026-10-16T09:30:00Z"},
+			{"id": 7, "run_attempt": 1, "name": "Release", "path": ".github/workflows/release.yml", "event": "push",
+			 "head_branch": "v0.15.0", "status": "completed", "conclusion": "success", "updated_at": "2026-10-15T10:00:00Z",
+			 "created_at": "2026-10-15T09:00:00Z"}]}`,
+		"repos/" + repo + "/actions/runs/8": `{"id": 8, "run_attempt": 2, "name": "Dependabot", "path": ".github/workflows/ci.yml",
+			"event": "pull_request", "head_branch": "dependabot/x", "status": "completed", "conclusion": "failure",
+			"updated_at": "2026-10-16T10:10:00Z", "triggering_actor": {"login": "dependabot[bot]", "type": "Bot"},
+			"actor": {"login": "alexec", "type": "User"}}`,
+	})
+	g := api.github()
+	runs, truncated, err := g.CompletedRuns(context.Background(), repo, "release.yml", "", 0, since)
+	if err != nil || truncated {
+		t.Fatal(err, truncated)
+	}
+	equal(t, runs, []CompletedRun{{Run: RunRef{ID: 5, Attempt: 1, Name: "Release", URL: "u5", HeadSHA: "s5", Branch: "v0.16.0",
+		UpdatedAt: "2026-10-16T10:30:00Z"}, Workflow: "release.yml", Event: "push", Conclusion: "success", Actor: "alexec", Trusted: true}},
+		"only the finished run since")
+	byID, _, err := g.CompletedRuns(context.Background(), repo, "", "", 8, since)
+	if err != nil {
+		t.Fatal(err)
+	}
+	equal(t, len(byID), 1, "the run by its id")
+	equal(t, byID[0].Actor, "dependabot[bot]", "the actor that started this attempt")
+	equal(t, byID[0].Trusted, false, "a bot's run is not the repo's own")
+}
+
 // A PR is the repo's own only from a branch of the repo, by one of its own: a collaborator's
 // fork, or a fork since deleted, is not.
 func TestAPRFromAForkIsNotTheReposOwn(t *testing.T) {

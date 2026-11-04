@@ -61,8 +61,8 @@ func (s schema) lookup(name string) (property, bool) {
 
 // args are an event's checked arguments.
 type args struct {
-	repo, branch, label string
-	pr, issue           int
+	repo, branch, label, workflow string
+	pr, issue, run                int
 	anyone, mine        bool
 }
 
@@ -104,9 +104,12 @@ func (s schema) check(raw json.RawMessage) (args, *rpcError) {
 			if err != nil || i <= 0 || strings.HasPrefix(string(value), `"`) {
 				return a, invalidParams("%s must be a positive integer", key)
 			}
-			if key == "pr" {
+			switch key {
+			case "pr":
 				a.pr = int(i)
-			} else {
+			case "run":
+				a.run = int(i)
+			default:
 				a.issue = int(i)
 			}
 		case "boolean":
@@ -134,6 +137,8 @@ func (s schema) check(raw json.RawMessage) (args, *rpcError) {
 				a.branch = text
 			case "label":
 				a.label = text
+			case "workflow":
+				a.workflow = text
 			}
 		}
 	}
