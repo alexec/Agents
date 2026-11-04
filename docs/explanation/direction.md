@@ -20,32 +20,32 @@ same branch.
 Alex set these on 2026-11-03 (#3392, #3401, #3403). Every spec, plan and issue agrees with
 them. A change that cannot agree says why, and which principle it leaves out.
 
-1. **Nothing relies on the Mac.** The web page is a full client and has every feature. A
-   Mac is a client, and a machine for its own local folders. It owns nothing else: no
-   control plane that others need, and no relay.
-2. **Three shapes, one product.** Hosted at agentloops.dev is the default way in.
-   Self-hosted is for a customer who runs the control plane in their own cloud account or
-   data centre. A person on their own is a hosted account with one person, or runs a
-   control plane on their Mac as an option. Single-user use stays. Say "self-hosted", not
-   "on-prem"; use "on-premises" only as a search word beside it.
-3. **Everyone signs in. Nobody is anonymous.** A person signs in with Apple, Google or
-   GitHub. A team organisation is expected to use single sign-on (OIDC, and SAML later)
-   and SCIM. Single sign-on is free in every shape.
-4. **Anyone can sign up, and gets an organisation of their own.** Each organisation is
-   fully isolated from the others. The hosted service is free for now.
-5. **Customers bring their own compute, repositories, AI and policies.** They set them up
-   themselves. The operator of the hosted service cannot do it for them, or act for them.
-6. **The control plane holds nothing it could misuse.** It routes messages and keeps a
-   directory of people, clients and machines. It holds no customer AI key and no compute
-   credential, and it cannot act as a client on a customer's machine. The customer's
-   clients seal secrets to the customer's machines (#3401).
-7. **Keep nothing that can stay on the customer's systems.** Keep the minimum, use
-   pseudonymous ids instead of names where possible, and keep it for a short time. This
-   keeps us in line with laws such as GDPR, and keeps a data leak small.
-8. **Encrypt in transit and at rest, to the usual standard.** TLS 1.2 or later on every
-   connection. The provider's encryption at rest, and envelope encryption with a KMS for
-   what the service must keep. A customer's own key (BYOK) is the first enterprise option.
-   End-to-end encryption is a product choice, for later.
+- **Principle 1: Nothing relies on the Mac.** The web page is a full client and has every feature. A
+  Mac is a client, and a machine for its own local folders. It owns nothing else: no
+  control plane that others need, and no relay.
+- **Principle 2: Three shapes, one product.** Hosted at agentloops.dev is the default way in.
+  Self-hosted is for a customer who runs the control plane in their own cloud account or
+  data centre. A person on their own is a hosted account with one person, or runs a
+  control plane on their Mac as an option. Single-user use stays. Say "self-hosted", not
+  "on-prem"; use "on-premises" only as a search word beside it.
+- **Principle 3: Everyone signs in. Nobody is anonymous.** A person signs in with Apple, Google or
+  GitHub. A team organisation is expected to use single sign-on (OIDC, and SAML later)
+  and SCIM. Single sign-on is free in every shape.
+- **Principle 4: Anyone can sign up, and gets an organisation of their own.** Each organisation is
+  fully isolated from the others. The hosted service is free for now.
+- **Principle 5: Customers bring their own compute, repositories, AI and policies.** They set them up
+  themselves. The operator of the hosted service cannot do it for them, or act for them.
+- **Principle 6: The control plane holds nothing it could misuse.** It routes messages and keeps a
+  directory of people, clients and machines. It holds no customer AI key and no compute
+  credential, and it cannot act as a client on a customer's machine. The customer's
+  clients seal secrets to the customer's machines (#3401).
+- **Principle 7: Keep nothing that can stay on the customer's systems.** Keep the minimum, use
+  pseudonymous ids instead of names where possible, and keep it for a short time. This
+  keeps us in line with laws such as GDPR, and keeps a data leak small.
+- **Principle 8: Encrypt in transit and at rest, to the usual standard.** TLS 1.2 or later on every
+  connection. The provider's encryption at rest, and envelope encryption with a KMS for
+  what the service must keep. A customer's own key (BYOK) is the first enterprise option.
+  End-to-end encryption is a product choice, for later.
 
 ## From nothing to working
 
