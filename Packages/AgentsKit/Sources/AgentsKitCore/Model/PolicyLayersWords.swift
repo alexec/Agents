@@ -21,6 +21,11 @@ public enum PolicyLayersWords {
     public static let decides = "Decides"
     public static let folderFile = "committed with the folder’s code"
     public static let toolsFoot = "Agent Runtimes and Connectors set these up. Here you see what the layers allow."
+    /// The rules the Remote changes (FR-027): the two it changed in Notifications and the one
+    /// it changed in Sidebar before slice 4. It shows every other rule read only, at first.
+    public static let remoteEditable: Set<String> = ["noticeLimits.burst", "noticeLimits.waitMinutes", "archiveMyChats"]
+    /// The banner's line where only some rules can be changed (the Remote).
+    public static let readOnlyLine = "Change the other rules on your Mac or on the web page."
     public static let foot = "Agents, helpers and workflows can’t change these. Each rule only gets tighter from layer to layer: the tightest value applies."
 
     /// The banner's first line (FR-021): who sets limits above yours, or no one.
@@ -206,7 +211,7 @@ public enum PolicyLayersWords {
         rule == "noticeLimits.waitMinutes" ? minutes(n) : "\(n)"
     }
 
-    /// "10 min", "1 hour", "4 hours": the notice menu's words (`NotificationLimitsSection`).
+    /// "10 min", "1 hour", "4 hours": the notice menu's words.
     public static func minutes(_ minutes: Int) -> String {
         guard minutes >= 60, minutes % 60 == 0 else { return "\(minutes) min" }
         let hours = minutes / 60
