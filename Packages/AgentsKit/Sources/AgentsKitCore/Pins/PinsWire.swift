@@ -30,6 +30,8 @@ public extension DaemonAPI.Method {
     static let pinsArrangeWorkflows = "pins/arrangeWorkflows"
     /// A person's Dismiss on a pull request in For Review (#3330): it is not listed again.
     static let reviewsDismiss = "reviews/dismiss"
+    /// Say the person opened a pull request in For Review (#3464): its row is drawn read.
+    static let reviewsOpen = "reviews/open"
     /// Start on a suggestion of the daily checks in For Review (#3331): a new session with its
     /// prompt, whose id it answers; the suggestion goes.
     static let suggestionsStart = "suggestions/start"
@@ -189,6 +191,17 @@ public extension DaemonAPI {
             self.views = views.isEmpty ? nil : views
             self.reviews = reviews.isEmpty ? nil : reviews
             self.suggestions = suggestions.isEmpty ? nil : suggestions
+        }
+    }
+
+    /// A person's press on a pull request in For Review (#3464), by its page's address.
+    struct ReviewOpenRequest: Codable, Sendable, Hashable {
+        public var folder: URL
+        public var url: URL
+
+        public init(folder: URL, url: URL) {
+            self.folder = folder
+            self.url = url
         }
     }
 

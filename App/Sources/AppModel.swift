@@ -1829,6 +1829,17 @@ final class AppModel {
         }
     }
 
+    /// A press on a pull request in For Review (#3464): drawn read at once, then the host told,
+    /// which keeps it, so every client draws it read.
+    func openReview(_ pull: ReviewPull, in key: FolderKey) async {
+        guard pull.isUnread else { return }
+        work.openReview(pull.url, in: key.folder)
+        await attempt(on: key.host) {
+            try await self.client(for: key.host).call(DaemonAPI.Method.reviewsOpen,
+                                                      DaemonAPI.ReviewOpenRequest(folder: key.folder, url: pull.url))
+        }
+    }
+
     /// Start on a suggestion of the daily checks in For Review (#3331): the host starts a
     /// session in its folder with its prompt, and the window opens it.
     func startSuggestion(_ suggestion: CheckSuggestion, in key: FolderKey) async {

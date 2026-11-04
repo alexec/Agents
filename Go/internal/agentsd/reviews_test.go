@@ -78,6 +78,19 @@ func TestForReviewListsPullRequestsWaitingForApproval(t *testing.T) {
 	if got := reviewsIn(t, d, c, 6, "alexec/agents"); len(got) != 1 || got[0].Number != 1 {
 		t.Fatalf("a dismissed pull request came back: %+v", got)
 	}
+
+	// #3464: one the person opened is said opened, after the next read too, and kept on disk.
+	if got := reviewsIn(t, d, c, 30, "alexec/agents"); got[0].Opened != nil {
+		t.Fatalf("not opened yet: %+v", got)
+	}
+	c.call(t, 31, "reviews/open", wire.ReviewOpenRequest{Folder: folder, URL: wire.URL(older.URL)})
+	d.readReviews(d.ctx)
+	if got := reviewsIn(t, d, c, 32, "alexec/agents"); len(got) != 1 || got[0].Opened == nil || !*got[0].Opened {
+		t.Fatalf("after open: %+v", got)
+	}
+	if b, err := os.ReadFile(d.reviewOpenedPath()); err != nil || !strings.Contains(string(b), older.URL) {
+		t.Fatalf("the opened pull request is kept on disk: %s %v", b, err)
+	}
 	b, err := os.ReadFile(d.reviewDismissalsPath())
 	if err != nil || !strings.Contains(string(b), newer.URL) {
 		t.Fatalf("the dismissal is kept on disk: %s %v", b, err)

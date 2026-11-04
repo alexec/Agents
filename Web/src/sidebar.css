@@ -108,6 +108,7 @@
 /* A press opens its page in a new tab, so its title is drawn as a link is, with the hand. */
 .review-pull > a.row { cursor: pointer; -webkit-touch-callout: none; }
 .review-pull > a.row .name { color: var(--accent); text-decoration: underline; }
+.review-pull.unread > a.row .name { font-weight: 600; }
 .review-pull > .dismiss { display: none; position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
   border: 0; border-radius: 5px; padding: 2px 8px; background: color-mix(in srgb, var(--paper-ink) 12%, transparent); color: inherit; font-size: 0.75rem; cursor: pointer; }
 .review-pull:is(:hover, :focus-within) > .dismiss { display: inline-block; }

@@ -3766,6 +3766,19 @@ final class RemoteModel {
         }
     }
 
+    /// A press on a pull request in For Review (#3464): drawn read at once, then the host told,
+    /// which keeps it, so every client draws it read.
+    func openReview(_ pull: ReviewPull, in folder: URL) async {
+        guard pull.isUnread else { return }
+        work.openReview(pull.url, in: folder)
+        do {
+            try await client.call(DaemonAPI.Method.reviewsOpen,
+                                  DaemonAPI.ReviewOpenRequest(folder: folder, url: pull.url))
+        } catch {
+            problem = sentence(for: error)
+        }
+    }
+
     /// Start on a suggestion of the daily checks in For Review (#3331): the host starts a
     /// session in its folder with its prompt, and it opens here.
     func startSuggestion(_ suggestion: CheckSuggestion, in folder: URL) async {

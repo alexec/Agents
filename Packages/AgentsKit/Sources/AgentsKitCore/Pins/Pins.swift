@@ -448,16 +448,22 @@ public struct ReviewPull: Codable, Sendable, Hashable, Identifiable {
     public var repo: String
     public var author: String?
     public var updatedAt: Date
+    /// The person has opened its page (`reviews/open`, #3464): its row is drawn read, not bold.
+    public var opened: Bool?
 
     public var id: URL { url }
+    /// Not opened yet: its title is bold.
+    public var isUnread: Bool { opened != true }
 
-    public init(url: URL, number: Int, title: String, repo: String, author: String? = nil, updatedAt: Date) {
+    public init(url: URL, number: Int, title: String, repo: String, author: String? = nil, updatedAt: Date,
+                opened: Bool? = nil) {
         self.url = url
         self.number = number
         self.title = title
         self.repo = repo
         self.author = author
         self.updatedAt = updatedAt
+        self.opened = opened
     }
 }
 

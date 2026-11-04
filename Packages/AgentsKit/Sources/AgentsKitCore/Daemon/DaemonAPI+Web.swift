@@ -294,6 +294,8 @@ public extension DaemonAPI {
                 Row(Method.pinsHideView, params: PinHideViewRequest.self, result: Empty.self, kind: .hostRequest),
                 // Dismiss on a pull request in For Review (#3330).
                 Row(Method.reviewsDismiss, params: ReviewDismissRequest.self, result: Empty.self, kind: .hostRequest),
+                // A press on a pull request in For Review, so its row is drawn read (#3464).
+                Row(Method.reviewsOpen, params: ReviewOpenRequest.self, result: Empty.self, kind: .hostRequest),
                 // Start and Dismiss on a suggestion of the daily checks in For Review (#3331).
                 Row(Method.suggestionsStart, params: SuggestionRequest.self, result: UUID.self, kind: .hostRequest),
                 Row(Method.suggestionsDismiss, params: SuggestionRequest.self, result: Empty.self, kind: .hostRequest),

@@ -547,6 +547,12 @@ struct SidebarModelTests {
         model.dismissReview(newer.url, in: api)
         #expect(SidebarSmartRow.forReview.pulls(in: model, folders: folders).map(\.pull.number) == [1])
         #expect(SidebarSmartRow.forReview.count(in: model, folders: folders) == 1)
+
+        // #3464: unread until opened; opened, it is drawn read at once.
+        #expect(model.reviewPulls(in: api).first?.isUnread == true)
+        model.openReview(older.url, in: api)
+        #expect(model.reviewPulls(in: api).first?.isUnread == false)
+        #expect(SidebarSmartRow.forReview.count(in: model, folders: folders) == 1)
     }
 
     /// For Review lists, after its pull requests, the read-only daily checks' suggestions

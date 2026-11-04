@@ -7816,6 +7816,16 @@ export interface ReviewDismissRequest {
 }
 
 /**
+ * reviews/open (#3464): a person opened a pull request's page from the sidebar's For Review. The
+ * host keeps it, so its row is drawn read on every client.
+ */
+export interface ReviewOpenRequest {
+  folder: URLString;
+  /** The pull request's page, as its ReviewPull says it. */
+  url: URLString;
+}
+
+/**
  * An open pull request labelled needs-approval, a UI change waiting for the person (#2811), in the
  * sidebar's For Review (#3330) until it is labelled approved or changes-wanted, is closed, or is
  * dismissed.
@@ -7828,6 +7838,8 @@ export interface ReviewPull {
   repo: string;
   author?: string;
   updatedAt: WireDate;
+  /** The person has opened its page (reviews/open, #3464): its row is drawn read, not bold. */
+  opened?: boolean;
 }
 
 export interface Runtime {
@@ -10629,6 +10641,7 @@ export interface Methods {
   "reports/views": { params: Empty; result: ReportViews };
   "resources/snapshot": { params: Empty; result: LeaseSnapshot };
   "reviews/dismiss": { params: ReviewDismissRequest; result: Empty };
+  "reviews/open": { params: ReviewOpenRequest; result: Empty };
   "runtimes/accountProfiles": { params: Empty; result: AccountProfile[] };
   "runtimes/accounts": { params: Empty; result: RuntimeAccount[] };
   "runtimes/addAccount": { params: AddAccountRequest; result: AccountProfile };
@@ -10970,6 +10983,7 @@ export const MethodTarget = {
   "reports/views": "control",
   "resources/snapshot": "host",
   "reviews/dismiss": "host",
+  "reviews/open": "host",
   "runtimes/accountProfiles": "host",
   "runtimes/accounts": "host",
   "runtimes/addAccount": "host",
@@ -11809,7 +11823,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RetentionSettings: { required: ["keepFor"], optional: [] },
   RetentionState: { required: ["settings", "archivedCount", "archivedBytes"], optional: [] },
   ReviewDismissRequest: { required: ["folder", "url"], optional: [] },
-  ReviewPull: { required: ["url", "number", "title", "repo", "updatedAt"], optional: ["author"] },
+  ReviewOpenRequest: { required: ["folder", "url"], optional: [] },
+  ReviewPull: { required: ["url", "number", "title", "repo", "updatedAt"], optional: ["author", "opened"] },
   Runtime: { required: ["id", "name", "executable", "arguments", "installPage", "usesAppCopyOnly"], optional: ["install", "accountFolderVariable"] },
   RuntimeAccount: { required: ["runtimeID", "state", "authMethods", "canLogOut", "providers", "promptCapabilities", "canSteer", "checkedAt"], optional: ["currentProviderID", "signedInAs"] },
   RuntimeAllowances: { required: ["rows", "at"], optional: ["shared"] },
