@@ -15,7 +15,9 @@ struct StartAgentView: View {
     @Environment(RemoteModel.self) private var model
     /// The folder of the scene this is in, when that is a folder's own (#1089).
     @Environment(\.sceneFolder) private var sceneFolder
-    let folder: URL
+    /// The folder, with its host: another machine can have one at the same path (#3446).
+    let key: FolderKey
+    private var folder: URL { key.folder }
 
     @State private var text = ""
     @State private var attachments: [Attachment] = []
@@ -39,7 +41,7 @@ struct StartAgentView: View {
         .onAppear {
             // What it starts opens in this scene (#1089).
             model.composingScene = sceneFolder
-            model.startPageAppeared(in: folder, page: page)
+            model.startPageAppeared(in: key, page: page)
             let kept = StartDraftKeeper.shared.draft(in: folder)
             text = kept?.text ?? ""
             attachments = kept?.attachments ?? []
@@ -63,7 +65,7 @@ struct StartAgentView: View {
         // because it is going: the model knows which started their agent. A count, not
         // `startingIn`: that went to the folder and back to nil before a frame was drawn.
         .onChange(of: model.startPageLetGo) {
-            model.startPageStillShown(in: folder, page: page)
+            model.startPageStillShown(in: key, page: page)
         }
         // Said once, when it arrives: a refusal is the one thing on this page a person
         // using VoiceOver would otherwise have to go looking for.
@@ -100,7 +102,7 @@ struct StartAgentView: View {
                     .listRowBackground(Color.clear)
             }
             // Project, then On (#3279): not in a folder's own scene, which is the folder.
-            if sceneFolder == nil { ProjectRows(folder: folder) }
+            if sceneFolder == nil { ProjectRows(folder: key) }
             personaHeading
             // Starts kept for this folder's stopped workspace (#691 US3, layouts.md L6a): the
             // agent each makes opens once the host is up.
@@ -115,7 +117,7 @@ struct StartAgentView: View {
                     hostName: { [model] in model.hostName($0) }))
             }
             // A change to the folder's own files that no session can be asked about (#531).
-            if let key = model.work.folder(folder)?.key {
+            if model.work.folder(key) != nil {
                 ForEach(model.work.guardedChanges(ofFolder: key)) { change in
                     Section {
                         GuardedChangeQuestion(change: change, key: key)
@@ -158,7 +160,7 @@ struct StartAgentView: View {
         .onContinuousHover(coordinateSpace: .global) { phase in
             if case let .active(location) = phase { pointer = location } else { pointer = nil }
         }
-        .navigationTitle(model.work.folder(folder)?.name ?? "New session")
+        .navigationTitle(model.work.folder(key)?.name ?? "New session")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 0) {
@@ -245,7 +247,7 @@ struct StartAgentView: View {
     /// What a view filled the page with (#834): its prompt in the field, unsent, and its
     /// labels beside any already there. Its worktree is the model's to choose.
     private func takeOffer() {
-        guard let start = model.takeOfferedStart(in: folder) else { return }
+        guard let start = model.takeOfferedStart(in: key) else { return }
         text = start.prompt
         // Held to what a session takes, as a label typed here is.
         draftLabels += SessionLabelPolicy.accepted(start.labels, existing: draftLabels)
@@ -372,7 +374,7 @@ struct StartAgentView: View {
         focused = false
         let words = text
         let attached = attachments
-        Task { _ = await model.startAgent(prompt: words, attachments: attached, labels: draftLabels, in: folder, page: page) }
+        Task { _ = await model.startAgent(prompt: words, attachments: attached, labels: draftLabels, in: key, page: page) }
     }
 
     /// Voice mode is on in this new session, not started yet.
@@ -386,7 +388,7 @@ struct StartAgentView: View {
     /// say which it is, so voice mode goes on in its chat (#2375).
     private func sendSpoken(_ words: String, _ stopping: UUID?) async -> UUID? {
         var started: UUID?
-        guard await model.startAgent(prompt: words, labels: draftLabels, in: folder, page: page, voice: true,
+        guard await model.startAgent(prompt: words, labels: draftLabels, in: key, page: page, voice: true,
                                      started: { started = $0 }) else { return nil }
         return started
     }

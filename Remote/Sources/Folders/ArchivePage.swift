@@ -51,7 +51,7 @@ struct ArchivePage: View {
             answered = await model.loadArchived(in: folder)
         }
         .onDisappear {
-            if !model.openArchive || model.selectedFolder != folder.folder {
+            if !model.openArchive || model.selectedKey != folder {
                 model.letGoOfArchived(in: folder.folder)
             }
         }
