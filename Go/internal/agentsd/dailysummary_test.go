@@ -1,10 +1,13 @@
 package agentsd
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -174,5 +177,60 @@ func TestSetScheduleLineRefusesTwo(t *testing.T) {
 	got, err := setScheduleLine("at", ":30", one)
 	if err != nil || !strings.Contains(got, "      at: \":30\"\n") || !strings.Contains(got, "at: body") {
 		t.Fatalf("%q, %v", got, err)
+	}
+}
+
+// Facts from the person's other machines (#3354): the summary asks the control plane, which
+// asks each of them; their lines say the machine, a pull request merged in a checkout on two
+// machines is one, and a machine that is off is named, not left out.
+func TestDailySummaryHasTheOtherMachines(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	home := t.TempDir()
+	d.PersonalHome = home
+	wid := dailySummaryID
+	me := seeded(t, d, home, func(a *wire.Agent) { a.State, a.StartedByWorkflow = wire.AgentStateRunning, &wid })
+	pull := pullLine + "Mon 09:00: https://github.com/o/r/pull/1"
+	var mu sync.Mutex
+	var asked []string
+	d.SetControlAsk(func(_ context.Context, method string, params any) (json.RawMessage, error) {
+		call, _ := params.(wire.MachineWorkspaceCall)
+		mu.Lock()
+		asked = append(asked, call.Method)
+		mu.Unlock()
+		return json.Marshal(wire.MachinesSummaryFacts{Machines: []wire.MachineSummaryFacts{
+			{Machine: "pc", MachineName: "pc", Facts: &wire.SummaryFacts{Folders: 3, Landed: []string{`Session "Port it" in app done at Mon 10:00.`, pull, pull},
+				Failed: []string{}, Waiting: []string{"Question in app: which port?"}, Suggested: []string{}, Checked: []string{}}},
+			{Machine: "box", MachineName: "box", Unreached: new("off")},
+		}})
+	})
+	facts := d.summaryFacts(me.ID, time.Now())
+	mu.Lock()
+	if !slices.Contains(asked, wire.CallMachinesSummaryFacts.Name) {
+		t.Fatalf("asked %v", asked)
+	}
+	mu.Unlock()
+	for _, want := range []string{
+		`On pc: Session "Port it" in app done at Mon 10:00.`,
+		"On pc: Question in app: which port?",
+		"Not in these facts: box, off.",
+		", pc (",
+	} {
+		if !strings.Contains(facts, want) {
+			t.Fatalf("no %q in:\n%s", want, facts)
+		}
+	}
+	if strings.Count(facts, "pull/1") != 1 {
+		t.Fatalf("a pull request from two checkouts is listed twice:\n%s", facts)
+	}
+
+	// What this machine answers another's summary: each list cut, with a count of the rest.
+	work := t.TempDir()
+	for range summaryLines + 5 {
+		seeded(t, d, work, func(a *wire.Agent) { a.State = wire.AgentStateFinished })
+	}
+	sent := sentSummaryFacts(d.machineSummaryFacts("", time.Now().Add(-time.Hour)))
+	if len(sent.Landed) != summaryLines+1 || sent.Landed[summaryLines] != "and 5 more" || sent.Waiting == nil || sent.Checked == nil {
+		t.Fatalf("%d %v", len(sent.Landed), sent.Landed[len(sent.Landed)-1])
 	}
 }

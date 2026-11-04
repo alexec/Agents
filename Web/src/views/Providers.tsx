@@ -42,7 +42,7 @@ export function ProvidersSection({ store }: { store: Store }) {
           {store.person.value?.role !== "member" && (
             <div class="provider-add"><button type="button" onClick={() => setAdding(true)}>{words.add}</button></div>
           )}
-          <p class="hint">{words.footer}</p>
+          <p class="hint">{words.footer(store.hasMac.value)}</p>
         </>
       )}
       {(adding || editing) && (
@@ -237,9 +237,17 @@ function LinkDialog({ store, provider, workspace, close }: {
   const [startWhenUsed, setStartWhenUsed] = useState(true);
   const [idle, setIdle] = useState(defaultIdleMinutes);
   const [problem, setProblem] = useState<string | null>(null);
+  const [fingerprint, setFingerprint] = useState<string>();
+  const [working, setWorking] = useState(false);
   const link = async () => {
-    const refused = await store.providers.link(host, provider.id, workspace.id, startWhenUsed, idle);
-    if (refused) setProblem(refused);
+    setWorking(true);
+    setProblem(null);
+    const outcome = await store.providers.link(host, provider.id, workspace.id, startWhenUsed, idle, fingerprint);
+    setWorking(false);
+    // A machine that joined with the command: its host key, to trust first (#3379).
+    if ("needsTrust" in outcome) return setFingerprint(outcome.needsTrust);
+    setFingerprint(undefined);
+    if ("failed" in outcome) setProblem(outcome.failed);
     else close();
   };
   return (
@@ -250,7 +258,7 @@ function LinkDialog({ store, provider, workspace, close }: {
         {hosts.length === 0 ? <p class="small">{words.noHosts}</p> : (
           <form class="token-form" onSubmit={(e) => { e.preventDefault(); void link(); }}>
             <label>Machine
-              <select value={host} onChange={(e) => setHost((e.target as HTMLSelectElement).value)}>
+              <select value={host} disabled={working || !!fingerprint} onChange={(e) => setHost((e.target as HTMLSelectElement).value)}>
                 {hosts.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
               </select>
             </label>
@@ -265,10 +273,14 @@ function LinkDialog({ store, provider, workspace, close }: {
             </label>
           </form>
         )}
+        {fingerprint && <p class="small">{words.linkTrustNote(fingerprint)}</p>}
+        {working && <p class="quiet small">{words.linking}</p>}
         {problem && <p class="small failure">{problem}</p>}
         <div class="sheet-actions">
           <button type="button" onClick={close}>Cancel</button>
-          <button type="button" class="prominent" disabled={!host} onClick={() => void link()}>Link</button>
+          <button type="button" class="prominent" disabled={!host || working} onClick={() => void link()}>
+            {fingerprint ? "Trust and Link" : "Link"}
+          </button>
         </div>
       </div>
     </Modal>

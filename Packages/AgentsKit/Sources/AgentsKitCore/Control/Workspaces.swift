@@ -225,6 +225,9 @@ public extension DaemonAPI.Failure {
     static let providerFailed = -32066
     /// Stop while agents are working there, not confirmed (US4 AS4). `data` is `{running: [names]}`.
     static let agentsWorking = -32068
+    /// hosts/link for a machine whose ssh host key nobody has trusted yet: one that joined
+    /// with the command (#3379). `data` is `{fingerprint}`, given back as `trust`.
+    static let hostKeyToTrust = -32069
 }
 
 public extension DaemonAPI {
@@ -441,14 +444,18 @@ public extension DaemonAPI {
         public var workspace: String
         public var startWhenUsed: Bool?
         public var stopWhenIdleMinutes: Int?
+        /// The fingerprint of the host key shown with `hostKeyToTrust`, once the person
+        /// trusts it (#3379).
+        public var trust: String?
 
         public init(host: MachineRef, provider: ProviderID, workspace: String, startWhenUsed: Bool? = nil,
-                    stopWhenIdleMinutes: Int? = nil) {
+                    stopWhenIdleMinutes: Int? = nil, trust: String? = nil) {
             self.host = host
             self.provider = provider
             self.workspace = workspace
             self.startWhenUsed = startWhenUsed
             self.stopWhenIdleMinutes = stopWhenIdleMinutes
+            self.trust = trust
         }
     }
 

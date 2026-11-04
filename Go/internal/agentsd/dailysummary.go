@@ -3,6 +3,7 @@ package agentsd
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -156,18 +157,81 @@ func refusalName(r wire.WorkflowRefusal) string {
 	return "refused"
 }
 
-// summaryFacts is what happened since the last summary in every folder here, as Markdown
-// the agent writes the page from.
+// summaryFacts is what happened since the last summary in every folder here and on the
+// person's other machines (#3354), as Markdown the agent writes the page from.
 func (d *Daemon) summaryFacts(me wire.UUID, at time.Time) string {
-	home := d.personalHome()
-	since := summarySince(home, at)
-	from := wire.DateOf(since)
+	since := summarySince(d.personalHome(), at)
 	host, _ := os.Hostname()
-	landed := summaryList{title: "Landed", none: "Nothing landed."}
-	failed := summaryList{title: "Failed or stopped", none: "Nothing failed or stopped."}
-	waiting := summaryList{title: "Waits on you (oldest first)", none: "Nothing waits on you."}
-	suggested := summaryList{title: "Suggested next (not taken)", none: "No suggestions wait."}
-	checked := summaryList{title: "Found by the checks", none: "The checks found nothing.", lines: checkSuggestions(home, since)}
+	here := d.machineSummaryFacts(me, since)
+	landed := summaryList{title: "Landed", none: "Nothing landed.", lines: here.Landed}
+	failed := summaryList{title: "Failed or stopped", none: "Nothing failed or stopped.", lines: here.Failed}
+	waiting := summaryList{title: "Waits on you (oldest first)", none: "Nothing waits on you.", lines: here.Waiting}
+	suggested := summaryList{title: "Suggested next (not taken)", none: "No suggestions wait.", lines: here.Suggested}
+	checked := summaryList{title: "Found by the checks", none: "The checks found nothing.", lines: here.Checked}
+	elsewhere, unreached := d.otherMachinesFacts(me, since)
+	folders := here.Folders
+	pulls := map[string]bool{}
+	for _, line := range here.Landed {
+		pulls[line] = true
+	}
+	for _, m := range elsewhere {
+		folders += m.Facts.Folders
+		on := func(lines []string) []string {
+			out := make([]string, 0, len(lines))
+			for _, line := range lines {
+				// The same pull request from a checkout on each machine is one.
+				if strings.HasPrefix(line, pullLine) {
+					if !pulls[line] {
+						pulls[line] = true
+						out = append(out, line)
+					}
+					continue
+				}
+				out = append(out, "On "+m.MachineName+": "+line)
+			}
+			return out
+		}
+		landed.lines = append(landed.lines, on(m.Facts.Landed)...)
+		failed.lines = append(failed.lines, on(m.Facts.Failed)...)
+		waiting.lines = append(waiting.lines, on(m.Facts.Waiting)...)
+		suggested.lines = append(suggested.lines, on(m.Facts.Suggested)...)
+		checked.lines = append(checked.lines, on(m.Facts.Checked)...)
+	}
+	var b strings.Builder
+	machines := host
+	if len(elsewhere) > 0 {
+		names := []string{host}
+		for _, m := range elsewhere {
+			names = append(names, m.MachineName)
+		}
+		machines = strings.Join(names, ", ")
+	}
+	fmt.Fprintf(&b, "# Facts for the daily summary\n\nSince %s, on %s (%d folders). Each session link opens it in the app.\n",
+		since.Local().Format("Mon 2 Jan 15:04"), machines, folders)
+	if len(unreached) > 0 {
+		b.WriteString("\nNot in these facts: " + strings.Join(unreached, "; ") + ". Say so on the page.\n")
+	}
+	for _, l := range []summaryList{landed, failed, waiting, suggested, checked} {
+		l.write(&b)
+	}
+	b.WriteString("\nWrite the page from these facts, then call write_daily_summary with action save.\n")
+	return b.String()
+}
+
+// pullLine starts a landed line for a merged pull request.
+const pullLine = "Pull request merged at "
+
+// machineSummaryFacts is this machine's lines for a summary since a time: for its own
+// summary, and for one another of the person's machines writes (agents/summaryFacts). me,
+// the summary's own session, is left out; so are the summary's and the checks' sessions.
+func (d *Daemon) machineSummaryFacts(me wire.UUID, since time.Time) wire.SummaryFacts {
+	home := d.personalHome()
+	from := wire.DateOf(since)
+	out := wire.SummaryFacts{Folders: int64(len(d.folderPaths())), Landed: []string{}, Failed: []string{},
+		Waiting: []string{}, Suggested: []string{}, Checked: checkSuggestions(home, since)}
+	if out.Checked == nil {
+		out.Checked = []string{}
+	}
 	active := map[string]bool{}
 	agents := d.Store.Agents()
 	sort.Slice(agents, func(i, j int) bool { return agents[i].LastActivityAt < agents[j].LastActivityAt })
@@ -184,20 +248,20 @@ func (d *Daemon) summaryFacts(me wire.UUID, at time.Time) string {
 		switch {
 		case a.LastActivityAt < from:
 		case a.EndedReason != nil && failedEnds[*a.EndedReason] != "":
-			failed.lines = append(failed.lines, fmt.Sprintf("Session %s stopped at %s: %s. %s", where,
+			out.Failed = append(out.Failed, fmt.Sprintf("Session %s stopped at %s: %s. %s", where,
 				summaryClock(a.LastActivityAt.Time()), failedEnds[*a.EndedReason], sessionLink(a.ID)))
 		case a.State == wire.AgentStateFinished || a.ArchivedAt != nil && *a.ArchivedAt >= from:
-			landed.lines = append(landed.lines, fmt.Sprintf("Session %s done at %s. %s", where,
+			out.Landed = append(out.Landed, fmt.Sprintf("Session %s done at %s. %s", where,
 				summaryClock(a.LastActivityAt.Time()), sessionLink(a.ID)))
 		}
 		if a.State != wire.AgentStateArchived && len(a.SuggestedPrompts) > 0 {
 			s := a.SuggestedPrompts[0]
-			suggested.lines = append(suggested.lines, fmt.Sprintf("%q, suggested by %s: %s. %s", s.Label, where,
+			out.Suggested = append(out.Suggested, fmt.Sprintf("%q, suggested by %s: %s. %s", s.Label, where,
 				prefix(strings.Join(strings.Fields(s.Prompt), " "), 200), sessionLink(a.ID)))
 		}
 	}
 	for _, p := range d.summaryPulls(active, since) {
-		landed.lines = append(landed.lines, fmt.Sprintf("Pull request merged at %s: %s", summaryClock(p.MergedAt), p.URL))
+		out.Landed = append(out.Landed, fmt.Sprintf("%s%s: %s", pullLine, summaryClock(p.MergedAt), p.URL))
 	}
 	for _, w := range d.workflowSummaries("") {
 		o := w.LastOutcome
@@ -205,7 +269,7 @@ func (d *Daemon) summaryFacts(me wire.UUID, at time.Time) string {
 			continue
 		}
 		if why := refusalName(o.Refused.Value); !quietRefusals[why] {
-			failed.lines = append(failed.lines, fmt.Sprintf("Workflow %q in %s did not run at %s: %s.", w.Workflow.Name,
+			out.Failed = append(out.Failed, fmt.Sprintf("Workflow %q in %s did not run at %s: %s.", w.Workflow.Name,
 				filepath.Base(store.FolderPath(w.Workflow.Folder)), summaryClock(o.Refused.At.Time()), why))
 		}
 	}
@@ -216,16 +280,53 @@ func (d *Daemon) summaryFacts(me wire.UUID, at time.Time) string {
 		if n.AgentID != nil {
 			line += " " + sessionLink(*n.AgentID)
 		}
-		waiting.lines = append(waiting.lines, line)
+		out.Waiting = append(out.Waiting, line)
 	}
-	var b strings.Builder
-	fmt.Fprintf(&b, "# Facts for the daily summary\n\nSince %s, on %s (%d folders). Each session link opens it in the app.\n",
-		since.Local().Format("Mon 2 Jan 15:04"), host, len(d.folderPaths()))
-	for _, l := range []summaryList{landed, failed, waiting, suggested, checked} {
-		l.write(&b)
+	return out
+}
+
+// sentSummaryFacts is agents/summaryFacts' answer: each list cut to summaryLines, with a
+// count of the rest, so one busy machine's answer stays small.
+func sentSummaryFacts(f wire.SummaryFacts) wire.SummaryFacts {
+	cut := func(lines []string) []string {
+		if len(lines) <= summaryLines {
+			return lines
+		}
+		return append(lines[:summaryLines:summaryLines], fmt.Sprintf("and %d more", len(lines)-summaryLines))
 	}
-	b.WriteString("\nWrite the page from these facts, then call write_daily_summary with action save.\n")
-	return b.String()
+	f.Landed, f.Failed, f.Waiting, f.Suggested, f.Checked = cut(f.Landed), cut(f.Failed), cut(f.Waiting), cut(f.Suggested), cut(f.Checked)
+	return f
+}
+
+// otherMachinesFacts is the facts of each of the person's other machines, through the
+// control plane (machines/summaryFacts, #3354), and the words for each one that is off or
+// did not answer. None off a control plane, or from one too old to ask.
+func (d *Daemon) otherMachinesFacts(me wire.UUID, since time.Time) ([]wire.MachineSummaryFacts, []string) {
+	if d.askControl.Load() == nil {
+		return nil, nil
+	}
+	out, err := d.askWorkspaces(me, wire.CallMachinesSummaryFacts.Name, wire.SummaryFactsRequest{Since: wire.DateOf(since)})
+	if err != nil {
+		log.Printf("daily summary: the other machines' facts were not asked: %v", err)
+		return nil, []string{"the other machines, as the control plane did not answer"}
+	}
+	var got wire.MachinesSummaryFacts
+	if json.Unmarshal(out, &got) != nil {
+		return nil, []string{"the other machines, as the control plane's answer could not be read"}
+	}
+	var facts []wire.MachineSummaryFacts
+	var unreached []string
+	for _, m := range got.Machines {
+		switch {
+		case m.Facts != nil:
+			facts = append(facts, m)
+		case m.Unreached != nil:
+			unreached = append(unreached, m.MachineName+", "+*m.Unreached)
+		default:
+			unreached = append(unreached, m.MachineName)
+		}
+	}
+	return facts, unreached
 }
 
 // summaryPulls is the pull requests merged since, in the folders that had work: gh names

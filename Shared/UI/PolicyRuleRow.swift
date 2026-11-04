@@ -41,7 +41,8 @@ struct PolicyRuleRow: View {
                 .appText(.fine)
                 .disabled(rule == nil)
                 .popover(isPresented: $showsSource) {
-                    if let rule { PolicySourcePopover(row: row, rule: rule) }
+                    // A popover on the iPhone too, not a sheet: it is a short list.
+                    if let rule { PolicySourcePopover(row: row, rule: rule).presentationCompactAdaptation(.popover) }
                 }
         }
         .accessibilityElement(children: .contain)

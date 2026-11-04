@@ -19,6 +19,12 @@ struct PolicyLayersWordsTests {
         #expect(PolicyLayersWords.Section.allCases.map(\.title) == ["Permissions", "Money", "Work at once", "Your attention", "Tools"])
     }
 
+    /// The Remote edits only the rules it edited before slice 4 (FR-027, #3195).
+    @Test func theRemoteEditsTheNoticeLimitsAndTheArchiveSwitchOnly() {
+        #expect(PolicyLayersWords.remoteEditable == ["noticeLimits.burst", "noticeLimits.waitMinutes", "archiveMyChats"])
+        #expect(PolicyLayersWords.remoteEditable.allSatisfy { rule in PolicyLayersWords.rows.contains { $0.rule == rule } })
+    }
+
     @Test func theBannerNamesTheOrganisationOrSaysYouSetEveryLimit() {
         #expect(PolicyLayersWords.banner(.init(organisation: "Acme")) == "Acme sets limits above yours")
         #expect(PolicyLayersWords.banner(.init()) == "You set every limit")

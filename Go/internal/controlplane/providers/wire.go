@@ -32,6 +32,7 @@ const (
 	CodeProviderFailed       = -32066
 	CodeKept                 = -32067
 	CodeAgentsWorking        = -32068
+	CodeHostKeyToTrust       = -32069
 	CodeHostOffline          = -32090
 	CodeNoSuchHost           = -32091
 	CodeStoreUnavailable     = -32094
@@ -135,6 +136,7 @@ const (
 	MethodSessionEnded      = "machines/sessionEnded"
 	MethodProjectFolders    = "machines/projectFolders"
 	MethodProjectSessions   = "machines/projectSessions"
+	MethodSummaryFacts      = "machines/summaryFacts"
 	MethodSendFolder        = "machines/sendFolder"
 	MethodHostMachines      = "host/machines"
 	MethodHostProviderDraft = "host/providerDraft"
@@ -177,6 +179,7 @@ var AgentWorkspaceMethods = map[string]bool{
 	MethodWorkspacesAgent: true, MethodHostsStart: true, MethodHostsStop: true, MethodProvidersOptions: true,
 	MethodProvidersCreate: true, MethodHostsDelete: true, MethodSessionOnMachine: true, MethodSessionCall: true,
 	MethodSessionEnded: true, MethodSendFolder: true, MethodProjectFolders: true, MethodProjectSessions: true,
+	MethodSummaryFacts: true,
 }
 
 // KeptMethods is DaemonAPI.Method.keptMethods: the only requests that are kept.

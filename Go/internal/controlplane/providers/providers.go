@@ -98,6 +98,11 @@ type Hooks struct {
 	// InstalledOver is the ssh destination the host was installed over, when its tunnel
 	// keeps it (#965); "" for none.
 	InstalledOver func(host string) string
+	// HostKey is the ssh host key to keep on a host's link, in known_hosts form, for its
+	// ssh start (#3379): "" with no needsTrust when its tunnel keeps one already. needsTrust
+	// is the fingerprint of a key nobody trusts yet, kept only once trust is that one. Nil
+	// keeps none.
+	HostKey func(host, destination, trust string) (knownHosts, needsTrust string, err error)
 	// Connect is a connection to a provider, as its record says.
 	Connect func(record ProviderRecord, secrets map[string]string) (Provider, error)
 	// HostCommand is the one line that installs a host with a new host code, for a new
@@ -491,6 +496,8 @@ func (p *Providers) AgentCall(host, agent, method string, params json.RawMessage
 		return p.projectFolders(rawOf(given), caller)
 	case MethodProjectSessions:
 		return p.projectSessions(host, rawOf(given), caller)
+	case MethodSummaryFacts:
+		return p.summaryFacts(host, rawOf(given), caller)
 	}
 	if named, ok := str(given["id"]); ok && (method == MethodProvidersCreate || method == MethodProvidersOptions) {
 		p.mu.Lock()
@@ -1278,6 +1285,10 @@ func (p *Providers) link(request MachineLink) (any, error) {
 	if !ok {
 		return nil, invalid("There is no such provider.")
 	}
+	knownHosts, err := p.linkHostKey(host, WorkspaceLink{Provider: provider, Workspace: request.Workspace}, deref(request.Trust))
+	if err != nil {
+		return nil, err
+	}
 	// One host per workspace: linking moves the link.
 	for _, other := range p.records.Hosts() {
 		link := LinkOf(&other)
@@ -1316,12 +1327,46 @@ func (p *Providers) link(request MachineLink) (any, error) {
 			link.StartForSchedules = had.StartForSchedules
 			link.Schedule = had.Schedule
 		}
+		link.KnownHosts = knownHosts
+		if knownHosts == "" && had != nil && had.Provider == provider && had.Workspace == request.Workspace {
+			link.KnownHosts = had.KnownHosts
+		}
 		setLink(h, link)
 	}, func() {
 		// Listed again, in the background: the last list can be from before an install
 		// woke the workspace (#965).
 		go p.Refresh(provider)
 	})
+}
+
+// linkHostKey is the ssh host key a link keeps for its host's ssh start (#3379): a host
+// that joined with the command was never reached over ssh, so no key is trusted for it, and
+// its ssh start would fail. A new key is refused hostKeyToTrust, with its fingerprint, until
+// trust is that one. A workspace that gives no ssh destination, or that can't be reached
+// now, keeps none: its ssh start checks as before.
+func (p *Providers) linkHostKey(host string, link WorkspaceLink, trust string) (string, error) {
+	if p.hooks.HostKey == nil {
+		return "", nil
+	}
+	if had := LinkOf(p.records.Host(host)); had != nil && had.KnownHosts != "" &&
+		had.Provider == link.Provider && had.Workspace == link.Workspace {
+		return "", nil
+	}
+	destination := p.sshDestination(link, host)
+	if destination == "" {
+		return "", nil
+	}
+	knownHosts, needsTrust, err := p.hooks.HostKey(host, SSHDestination(destination), trust)
+	if err != nil {
+		p.log(fmt.Sprintf("workspace: link %s: no host key kept: %s", host, errorWords(err)))
+		return "", nil
+	}
+	if needsTrust != "" {
+		f := fail(CodeHostKeyToTrust, "This machine’s host key is new to the control plane: %s. Trust it only if it is the one the machine shows.", needsTrust)
+		f.Data = rawOf(map[string]any{"fingerprint": needsTrust})
+		return "", f
+	}
+	return knownHosts, nil
 }
 
 func (p *Providers) changeLink(host string, change func(*records.MachineRecord), after func()) (any, error) {
