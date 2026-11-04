@@ -9,6 +9,8 @@ import Observation
 final class WorkListState {
     let kind: WorkList.Kind
     var filter = WorkList.Filter()
+    /// The person's projects (#3283), as the model last said them, for the Project filter.
+    var projects: [WorkList.Project] = []
     var sort = WorkList.Sort.updated
     var lists: [(host: MachineRef, list: DaemonAPI.ForgeList)]?
     var lineage: [DaemonAPI.ReportNode] = []
@@ -50,7 +52,13 @@ final class WorkListState {
         var f = filter
         // Milestones and releases have no state in v1.
         if !kind.fromForge { f.state = .all }
-        return WorkList.sort(WorkList.filter(all, f), by: sort)
+        return WorkList.sort(WorkList.filter(all, f, projects: projectRepos), by: sort)
+    }
+
+    /// Each project with the repos its folders read (#3283); none for milestones and releases,
+    /// which lineage alone lists, with no folder.
+    var projectRepos: [(project: WorkList.Project, repos: Set<String>)] {
+        kind.fromForge ? WorkList.projectRepos(projects, lists: (lists ?? []).map { (host: $0.host, items: $0.list.items) }) : []
     }
 
     var hasMore: Bool { kind.fromForge ? (lists ?? []).contains { $0.list.cursor != nil } : lineageCursor != nil }

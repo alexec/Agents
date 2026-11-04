@@ -10,6 +10,7 @@ import { fromWireDate } from "../protocol/dates";
 import { costWords, nodeName, spent } from "./value";
 import { lineageUrl } from "./lineage";
 import { timeWords } from "./time";
+import { folderPathOf } from "./projectSettings";
 
 /** Work's lists, in the order of its tabs, by the lineage kind each holds. */
 export type WorkKind = "issue" | "pr" | "milestone" | "release";
@@ -44,6 +45,8 @@ export interface WorkRow {
   url?: string | undefined;
   /** The machine the forge read came from, to read the item again on. */
   host?: string | undefined;
+  /** The folder on host the forge read was for (#3283): its project is the row's. */
+  folder?: string | undefined;
   draft?: boolean | undefined;
   lineage?: ReportNode | undefined;
 }
@@ -89,7 +92,7 @@ export function forgeRow(item: ForgeItem, host: string, lineage?: ReportNode): W
   return {
     node: item.node, title: item.title, state: item.state, status: item.status, labels: item.labels, repo: repoOf(item.node.ref),
     author: item.author, assignees: item.assignees, milestone: item.milestone, updated: unix(item.updatedAt),
-    url: item.url, host, draft: item.draft, lineage,
+    url: item.url, host, folder: item.folder, draft: item.draft, lineage,
   };
 }
 
@@ -119,10 +122,59 @@ export function mergeForge(lists: readonly { host: string; items: readonly Forge
   return [...rows.values()];
 }
 
-/** What a list is narrowed to. Empty text, repo, label, assignee or board is any. The board (a board's url,
+/** A project in Work's Project filter (#3283): New Session's (newSessionProjects), a folder that names none a
+ * project of its own, and its folders on each machine as workFolderKeys. As WorkList.Project on the window. */
+export interface WorkProject { id: string; name: string; folders: ReadonlySet<string> }
+
+/** A project and the repos and trackers its folders read. */
+export interface WorkProjectRepos { project: WorkProject; repos: ReadonlySet<string> }
+
+/** The Project filter's first choice (#3283), as Work lists everything. */
+export const allProjects = "All projects";
+
+/** An item's project on its page (#3283). */
+export const projectWords = (name: string) => `Project ${name}`;
+
+/** A folder as Work matches it to a forge item's (#3283): host|path, with no slash at the end. A folder's own
+ * record names it by its file URL, a forge item by its path. */
+export function workFolderKey(host: string, folder: string): string {
+  return `${host}|${(folder.startsWith("file:") ? folderPathOf(folder) : folder).replace(/(.)\/+$/, "$1")}`;
+}
+
+/** Each project's repos and trackers (#3283): those of the items its folders read, on every machine, before the
+ * copies of one ref are merged, so a repo two projects read is in both. The projects in their order, without
+ * the ones whose folders read nothing. */
+export function projectRepos(projects: readonly WorkProject[], lists: readonly { host: string; items: readonly ForgeItem[] }[]): WorkProjectRepos[] {
+  const read = new Map<string, Set<string>>();
+  for (const { host, items } of lists) {
+    for (const item of items) {
+      if (!item.folder) continue;
+      const key = workFolderKey(host, item.folder);
+      const repos = read.get(key) ?? new Set<string>();
+      repos.add(repoOf(item.node.ref));
+      read.set(key, repos);
+    }
+  }
+  return projects.flatMap((project) => {
+    const repos = new Set([...project.folders].flatMap((f) => [...read.get(f) ?? []]));
+    return repos.size === 0 ? [] : [{ project, repos }];
+  });
+}
+
+/** The project of the folder a forge item was read for on host (#3283), for its page; undefined when the folder is in
+ * none of them. */
+export function projectOfFolder(folder: string | undefined, host: string, projects: readonly WorkProject[]): WorkProject | undefined {
+  if (!folder) return undefined;
+  const key = workFolderKey(host, folder);
+  return projects.find((p) => p.folders.has(key));
+}
+
+/** What a list is narrowed to. Empty text, project, repo, label, assignee or board is any. The board (a board's url,
  * #3282) is the machines' to narrow, as the state is: the rows read are the board's already. */
 export interface WorkFilter {
   state: WorkState;
+  /** A WorkProject's id (#3283): the rows of the repos its folders read. */
+  project: string;
   repo: string;
   label: string;
   assignee: string;
@@ -130,7 +182,7 @@ export interface WorkFilter {
   board: string;
 }
 
-export const anyFilter: WorkFilter = { state: "open", repo: "", label: "", assignee: "", text: "", board: "" };
+export const anyFilter: WorkFilter = { state: "open", project: "", repo: "", label: "", assignee: "", text: "", board: "" };
 
 /** A board's url on a request, when one is chosen (#3282); the request as it was with none. */
 export function withBoard<T extends object>(request: T, board: string): T & { board?: string } {
@@ -168,10 +220,13 @@ export function stateMatches(row: WorkRow, state: WorkState): boolean {
   return row.state === state;
 }
 
-export function filterRows(rows: readonly WorkRow[], f: WorkFilter): WorkRow[] {
+/** The rows f asks for. projects is projectRepos: a project picked that read nothing has no rows. */
+export function filterRows(rows: readonly WorkRow[], f: WorkFilter, projects: readonly WorkProjectRepos[] = []): WorkRow[] {
   const words = f.text.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const repos = f.project ? projects.find((p) => p.project.id === f.project)?.repos ?? new Set<string>() : undefined;
   return rows.filter((r) => {
     if (!stateMatches(r, f.state)) return false;
+    if (repos && !repos.has(r.repo)) return false;
     if (f.repo && r.repo !== f.repo) return false;
     if (f.label && !r.labels.some((l) => l.name === f.label)) return false;
     if (f.assignee && !r.assignees.includes(f.assignee)) return false;

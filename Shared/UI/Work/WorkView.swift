@@ -109,6 +109,7 @@ private struct WorkListPane: View {
             content
         }
         .workTask(id: list.ask) { await list.load(model: model) }
+        .onChange(of: model.workProjects, initial: true) { _, projects in list.projects = projects }
     }
 
     /// One row of them on the Mac and an iPad; on a phone the choices scroll sideways over
@@ -149,6 +150,7 @@ private struct WorkListPane: View {
                 }
             }
         }
+        project
         choice("Repo", any: "All", selection: $list.filter.repo, options: offered.repos, words: WorkList.repoName)
         choice("Label", any: "Any", selection: $list.filter.label, options: offered.labels)
         if kind.fromForge {
@@ -163,6 +165,23 @@ private struct WorkListPane: View {
         named("Sort", list.sort.title) {
             Picker("Sort", selection: $list.sort) {
                 ForEach(kind.sorts, id: \.self) { Text($0.title).tag($0) }
+            }
+        }
+    }
+
+    /// The Project filter (#3283): All projects, then each project whose folders read something.
+    /// With one project it is not there, so a person with one sees Work as before.
+    @ViewBuilder
+    private var project: some View {
+        let projects = list.projectRepos.map(\.project)
+        let picked = list.filter.project
+        if projects.count > 1 || !picked.isEmpty {
+            let name = picked.isEmpty ? WorkList.allProjects : projects.first { $0.id == picked }?.name ?? WorkList.allProjects
+            named("Project", name) {
+                Picker("Project", selection: $list.filter.project) {
+                    Text(WorkList.allProjects).tag("")
+                    ForEach(projects) { Text($0.name).tag($0.id) }
+                }
             }
         }
     }

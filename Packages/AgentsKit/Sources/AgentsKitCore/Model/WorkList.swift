@@ -71,6 +71,8 @@ public enum WorkList {
         public var url: URL?
         /// The machine the forge read came from, to read the item again on.
         public var host: MachineRef?
+        /// The folder on `host` the forge read was for (#3283): its project is the row's.
+        public var folder: String?
         public var draft: Bool
         public var lineage: DaemonAPI.ReportNode?
 
@@ -78,7 +80,7 @@ public enum WorkList {
 
         public init(node: DaemonAPI.LineageNode, title: String, state: String, labels: [DaemonAPI.ForgeLabel] = [],
                     repo: String, author: String? = nil, assignees: [String] = [], milestone: String? = nil,
-                    updated: Date, url: URL? = nil, host: MachineRef? = nil, draft: Bool = false,
+                    updated: Date, url: URL? = nil, host: MachineRef? = nil, folder: String? = nil, draft: Bool = false,
                     lineage: DaemonAPI.ReportNode? = nil, status: String? = nil) {
             self.node = node
             self.title = title
@@ -92,6 +94,7 @@ public enum WorkList {
             self.updated = updated
             self.url = url
             self.host = host
+            self.folder = folder
             self.draft = draft
             self.lineage = lineage
         }
@@ -100,7 +103,8 @@ public enum WorkList {
         public init(_ item: DaemonAPI.ForgeItem, on host: MachineRef, lineage: DaemonAPI.ReportNode? = nil) {
             self.init(node: item.node, title: item.title, state: item.state, labels: item.labels, repo: WorkList.repo(of: item.node.ref),
                       author: item.author, assignees: item.assignees, milestone: item.milestone, updated: item.updatedAt,
-                      url: item.url.flatMap(URL.init(string:)), host: host, draft: item.draft ?? false, lineage: lineage,
+                      url: item.url.flatMap(URL.init(string:)), host: host, folder: item.folder, draft: item.draft ?? false,
+                      lineage: lineage,
                       status: item.status)
         }
 
@@ -183,19 +187,75 @@ public enum WorkList {
         return Array(rows.values)
     }
 
-    /// What a list is narrowed to. Empty repo, label, assignee or text is any. A board (#3282) is
+    /// A project in Work's Project filter (#3283): New Session's (`NewSessionProject`), a folder that
+    /// names none a project of its own, and its folders on each machine as `folderKey`s.
+    public struct Project: Sendable, Hashable, Identifiable {
+        public var id: String
+        public var name: String
+        public var folders: Set<String>
+
+        public init(id: String, name: String, folders: Set<String>) {
+            self.id = id
+            self.name = name
+            self.folders = folders
+        }
+    }
+
+    /// The Project filter's first choice (#3283), as Work lists everything.
+    public static let allProjects = "All projects"
+
+    /// An item's project on its page (#3283).
+    public static func projectWords(_ name: String) -> String { "Project \(name)" }
+
+    /// A folder as Work matches it to a forge item's (#3283): `host|path`, with no slash at the end.
+    public static func folderKey(host: MachineRef, path: String) -> String {
+        var path = path
+        while path.count > 1, path.hasSuffix("/") { path.removeLast() }
+        return "\(host.rawValue)|\(path)"
+    }
+
+    /// Each project's repos and trackers (#3283): those of the items its folders read, on every
+    /// machine, before the copies of one ref are merged, so a repo two projects read is in both.
+    /// The projects in their order, without the ones whose folders read nothing.
+    public static func projectRepos(_ projects: [Project], lists: [(host: MachineRef, items: [DaemonAPI.ForgeItem])])
+        -> [(project: Project, repos: Set<String>)] {
+        var read: [String: Set<String>] = [:]
+        for (host, items) in lists {
+            for item in items {
+                guard let folder = item.folder else { continue }
+                read[folderKey(host: host, path: folder), default: []].insert(repo(of: item.node.ref))
+            }
+        }
+        return projects.compactMap { project in
+            let repos = project.folders.reduce(into: Set<String>()) { $0.formUnion(read[$1] ?? []) }
+            return repos.isEmpty ? nil : (project, repos)
+        }
+    }
+
+    /// The project of the folder a forge item was read for on `host` (#3283), for its page; nil
+    /// when the folder is in none of `projects`.
+    public static func project(ofFolder folder: String?, on host: MachineRef, in projects: [Project]) -> Project? {
+        guard let folder else { return nil }
+        let key = folderKey(host: host, path: folder)
+        return projects.first { $0.folders.contains(key) }
+    }
+
+    /// What a list is narrowed to. Empty project, repo, label, assignee or text is any. A board (#3282) is
     /// a board's url, which the machines narrow to as they read: it is not a filter of the rows.
     public struct Filter: Sendable, Hashable {
         public var state: State
+        /// A `Project`'s id (#3283): the rows of the repos its folders read.
+        public var project: String
         public var repo: String
         public var label: String
         public var assignee: String
         public var text: String
         public var board: String
 
-        public init(state: State = .open, repo: String = "", label: String = "", assignee: String = "", text: String = "",
-                    board: String = "") {
+        public init(state: State = .open, project: String = "", repo: String = "", label: String = "", assignee: String = "",
+                    text: String = "", board: String = "") {
             self.state = state
+            self.project = project
             self.repo = repo
             self.label = label
             self.assignee = assignee
@@ -225,10 +285,13 @@ public enum WorkList {
         }
     }
 
-    public static func filter(_ rows: [Row], _ f: Filter) -> [Row] {
+    /// The rows `f` asks for. `projects` is `projectRepos`: a project picked that read nothing has no rows.
+    public static func filter(_ rows: [Row], _ f: Filter, projects: [(project: Project, repos: Set<String>)] = []) -> [Row] {
         let words = f.text.lowercased().split(whereSeparator: \.isWhitespace).map(String.init)
+        let repos = f.project.isEmpty ? nil : projects.first { $0.project.id == f.project }?.repos ?? []
         return rows.filter { r in
             guard matches(r, state: f.state) else { return false }
+            if let repos, !repos.contains(r.repo) { return false }
             if !f.repo.isEmpty, r.repo != f.repo { return false }
             if !f.label.isEmpty, !r.labels.contains(where: { $0.name == f.label }) { return false }
             if !f.assignee.isEmpty, !r.assignees.contains(f.assignee) { return false }
