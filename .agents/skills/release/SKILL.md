@@ -246,6 +246,22 @@ open for item 2 and for the notes' known issues (`git merge-base --is-ancestor <
    failed, end with `partly_done`, naming the job and its first error; the fix goes through
    the Scrum Master as for main broken.
 
+   **A job that no runner took is not a failure** (#3445). GitHub can cancel a job before
+   it starts ("The job was not acquired by Runner of type hosted even after multiple
+   attempts"), and the run then ends `failure`; v0.16.0's `host` job did this. Look at
+   each job that is not `success`:
+
+   ```sh
+   gh run view <id> --json jobs --jq '.jobs[] | select(.conclusion != "success" and .conclusion != "skipped") | [.databaseId, .name, .conclusion, (.steps | length)] | @tsv'
+   gh api repos/alexec/Agents/check-runs/<job id>/annotations --jq '.[].message'
+   ```
+
+   A job that is `cancelled` with no steps run, or whose annotation says that no runner
+   took it, did not run: run `gh run rerun <id> --failed` once, wait again as above, and
+   look again. Only a job that ran and failed (or is in this state a second time) ends the
+   release with `partly_done`. A job cancelled because the pin moved is not a failure
+   either (see the pin, above).
+
 ## 6. Version and notes
 
 1. Run `release-plan.py --ref <sha>` again, so the plan lists what the pin holds and nothing
@@ -294,6 +310,8 @@ A tag that already exists for this version means another release ran: end with
    as a back-stop. The event's `run.conclusion` is the result; however it woke, look again
    with `gh run view <id> --json status,conclusion,jobs`. Never wait on a background
    `gh run watch`: it ends with the session's process, and nothing wakes the release.
+   A job that no runner took is not a failure: look and run it again once, as in step 5,
+   item 5 (#3445). Only a job that ran and failed goes to items 2–4.
 2. **GitHub:** `gh release view v<version> --json assets` has the `.dmg`, the `.zip`,
    both `agentsd-linux-*.tar.gz` and `SHA256SUMS`. Macs update Agents Host from the `.zip`
    and `SHA256SUMS` by these names (#2178): a release without them updates no Mac.
