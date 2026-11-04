@@ -188,7 +188,7 @@ struct ControlProvidersPage: View {
         }
         if provider.workspaces.isEmpty, provider.listedAt != nil { parts.append("No machines") }
         if let group = GroupWords.providerLine(provider, groups: control.groups) { parts.append(group) }
-        if let tool = provider.preset.flatMap(AddProviderSheet.Kind.sshTool) { parts.append("needs \(tool) for ssh") }
+        if let tool = provider.sshToolMissing { parts.append("needs \(tool) for ssh") }
         // A map or commands written for it that give no ssh (#975); a preset's own way in is its own.
         let written = provider.kind == "commands" ? provider.preset == nil : provider.mapped
         if written, !provider.workspaces.isEmpty, provider.workspaces.allSatisfy({ $0.ssh == nil }) {
@@ -299,16 +299,6 @@ struct AddProviderSheet: View {
 
         /// Whether a preset is an API one.
         static func byAPI(_ preset: String) -> Bool { preset.hasSuffix("-api") }
-
-        /// The CLI an API preset still needs, only for ssh: a codespace or a Coder workspace
-        /// is reached through its CLI as the ssh ProxyCommand.
-        static func sshTool(_ preset: String) -> String? {
-            switch preset {
-            case "codespaces-api": "gh"
-            case "coder-api": "coder"
-            default: nil
-            }
-        }
 
         /// The API preset's name and the secret its token goes in.
         var api: (preset: String, secret: String)? {

@@ -8267,6 +8267,9 @@ type ProviderSummary struct {
 
 	// The caller may start machines from it (#1761): they are in its group. Absent from an older control plane, which lets everyone.
 	MayUse *bool `json:"mayUse,omitzero"`
+
+	// The CLI its machines are reached through over ssh (gh, coder) when the machine that runs the provider has none (#3367). Absent when it needs none or has it.
+	SshToolMissing *string `json:"sshToolMissing,omitzero"`
 }
 
 // Which APNs a device token belongs to (#1460): a Debug build's (sandbox) or a TestFlight and App Store build's.
