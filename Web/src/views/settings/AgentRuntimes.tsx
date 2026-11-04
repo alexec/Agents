@@ -4,6 +4,7 @@
 import type { AutoField, AutoMapping, AutoSettings, NativeSetting, RuntimeStatus } from "../../protocol/generated";
 import type { Store } from "../../model/store";
 import { autoFields, cellOf, fieldWords, levelWords, levelsOf, mappedRuntimes, markWords, unavailableState } from "../../model/levels";
+import { useSettingsMachine } from "./SettingsMachine";
 
 /** A runtime's state, as the Auto page says it. */
 function stateWords(store: Store, host: string, status: RuntimeStatus | undefined): string {
@@ -19,7 +20,8 @@ function stateWords(store: Store, host: string, status: RuntimeStatus | undefine
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 export function AgentRuntimesSection({ store, down }: { store: Store; down: boolean }) {
-  const host = store.macHostID.value;
+  const { host: machine, picker } = useSettingsMachine(store);
+  const host = machine ?? "";
   const settings: AutoSettings = store.autoSettings.value[host] ?? { order: [], excluded: [], overrides: [] };
   const mappings = store.autoMappings.value[host];
   const listed = store.runtimes.value[host] ?? [];
@@ -39,7 +41,8 @@ export function AgentRuntimesSection({ store, down }: { store: Store; down: bool
     const overrides = settings.overrides.filter((o) => !(o.runtimeID === runtimeID && o.field === field && o.level === level));
     save({ ...settings, overrides: native ? [...overrides, { runtimeID, field, level, native }] : overrides });
   };
-  const heading = <h3 class="section-head" id="settings-auto">Agent Runtimes ▸ Auto</h3>;
+  const heading = <><h3 class="section-head" id="settings-auto">Agent Runtimes ▸ Auto</h3>{picker}</>;
+  if (!machine) return <section aria-labelledby="settings-auto">{heading}</section>;
   if (!mappings) {
     // Shown while the cells load, and with why and Try again when they did not come (#2894).
     const problem = store.autoProblems.value[host];
