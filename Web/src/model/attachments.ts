@@ -17,15 +17,17 @@ function newID(): UUID {
 }
 
 /** A file read as text, or refused when it isn't text. `type` is the browser's MIME type. */
-export function textAttachment(bytes: Uint8Array, name: string, type: string): Made {
+export function textAttachment(bytes: Uint8Array, name: string, type: string, hasMac: boolean): Made {
+  const notText = hasMac ? `${name} is not a picture or text, so it would have to be on the Mac to attach.`
+    : `${name} is not a picture or text, so the web page cannot attach it.`;
   let text: string;
   try {
     text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   } catch {
-    return { refused: `${name} is not a picture or text, so it would have to be on the Mac to attach.` };
+    return { refused: notText };
   }
   if (text.includes("\u0000")) {
-    return { refused: `${name} is not a picture or text, so it would have to be on the Mac to attach.` };
+    return { refused: notText };
   }
   const block: ContentBlock = { type: "resource", resource: { uri: `browser:${name}`, text, mimeType: type || "text/plain" } };
   return { ok: { id: newID(), block, displayName: name, byteCount: new TextEncoder().encode(text).length } };
@@ -69,7 +71,7 @@ export function sizeRefusal(name: string, size: number, type: string): string | 
 }
 
 /** A dropped, pasted or picked file, made fit to send. */
-export async function attach(file: File): Promise<Made> {
+export async function attach(file: File, hasMac: boolean): Promise<Made> {
   const name = file.name || "Pasted picture";
   const tooBig = sizeRefusal(name, file.size, file.type);
   if (tooBig) return { refused: tooBig };
@@ -77,7 +79,7 @@ export async function attach(file: File): Promise<Made> {
     const jpeg = await shrink(file);
     return jpeg ? { ok: pictureAttachment(jpeg, name) } : { refused: `${name} could not be read as a picture.` };
   }
-  return textAttachment(new Uint8Array(await file.arrayBuffer()), name, file.type);
+  return textAttachment(new Uint8Array(await file.arrayBuffer()), name, file.type, hasMac);
 }
 
 function requirement(block: ContentBlock): "image" | "audio" | "embeddedContext" | null {
@@ -91,7 +93,7 @@ function requirement(block: ContentBlock): "image" | "audio" | "embeddedContext"
 
 /** Why this runtime won't take it (Attachment.refusal and PhoneAttachment.refusal), in its name
  * when that is known (#3162), or null. */
-export function refusal(attachment: Attachment, capabilities: ACPPromptCapabilities | undefined, runtime?: string): string | null {
+export function refusal(attachment: Attachment, capabilities: ACPPromptCapabilities | undefined, runtime?: string, hasMac = true): string | null {
   if (!capabilities) return null;
   const needs = requirement(attachment.block);
   if (needs === null || capabilities[needs] === true) return null;
@@ -99,7 +101,8 @@ export function refusal(attachment: Attachment, capabilities: ACPPromptCapabilit
   switch (needs) {
     case "image": return `${name} does not take pictures`;
     case "audio": return `${name} does not take audio`;
-    case "embeddedContext": return `${name} does not take file contents, so this can only be attached on the Mac`;
+    case "embeddedContext": return hasMac ? `${name} does not take file contents, so this can only be attached on the Mac`
+      : `${name} does not take file contents`;
   }
 }
 

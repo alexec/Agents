@@ -36,8 +36,13 @@ test("where backups go has words, and the store's sentence only when they go the
 
 test("a folder on the disk it backs up says so, with what to do (#2139)", () => {
   const state = (extra) => ({ settings: { every: "daily", keep: 3 }, folder: "/root/backups", backups: [], making: false, ...extra });
-  assert.equal(backups.sameDiskWords(state({})), null);
-  assert.match(backups.sameDiskWords(state({ sameDisk: true })), /same disk as what it backs up.*lost with the disk.*on the Mac\.$/);
-  assert.match(backups.sameDiskWords(state({ sameDisk: true, canUseControl: true })), /Or back up to the control plane\.$/);
-  assert.equal(backups.sameDiskWords(state({ sameDisk: true, settings: { every: "daily", keep: 3, target: "control" } })), null);
+  assert.equal(backups.sameDiskWords(state({}), true), null);
+  assert.match(backups.sameDiskWords(state({ sameDisk: true }), true), /same disk as what it backs up.*lost with the disk.*on the Mac\.$/);
+  assert.match(backups.sameDiskWords(state({ sameDisk: true, canUseControl: true }), true), /Or back up to the control plane\.$/);
+  assert.equal(backups.sameDiskWords(state({ sameDisk: true, settings: { every: "daily", keep: 3, target: "control" } }), true), null);
+  // A server's folder is not chosen on the Mac (#3425).
+  assert.equal(backups.sameDiskWords(state({ sameDisk: true }), false),
+    "This folder is on the same disk as what it backs up. A backup here can undo a mistake, but is lost with the disk.");
+  assert.match(backups.sameDiskWords(state({ sameDisk: true, canUseControl: true }), false),
+    /lost with the disk\. Back up to the control plane instead\.$/);
 });

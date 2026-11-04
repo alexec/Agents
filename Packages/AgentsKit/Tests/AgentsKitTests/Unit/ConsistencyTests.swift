@@ -398,17 +398,6 @@ struct ConsistencyTests {
             """)
     }
 
-    /// "Agents may archive the chats I start" says, where it is still a switch of its own (the
-    /// Remote's Sidebar settings), that another machine does not read it (#1872), in the docs'
-    /// words. On the Mac and the web page it is a rule of Agents ▸ Policy (#2957).
-    @Test func theArchiveSwitchSaysOtherMachinesDoNotReadIt() async throws {
-        let sentence = "Another machine does not read this switch, so a chat in a folder on another machine may still archive itself."
-        for path in ["Shared/UI/SidebarSettingsSection.swift"] {
-            let text = try String(contentsOf: Self.root.appending(path: path), encoding: .utf8)
-            #expect(text.contains(sentence), "\(path) does not say that another machine ignores the switch")
-        }
-    }
-
     /// The statement that sends `events/cancelWait` (#2068): the line naming the method
     /// and the line before it, where the call and its `try` begin.
     static func cancelWaitMisrouted(_ statement: String) -> Bool {

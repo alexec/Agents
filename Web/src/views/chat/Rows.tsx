@@ -28,6 +28,7 @@ import { continueWithout, keepStopped, sandboxCard } from "../../model/sandboxWo
 import { OrgPolicyLine } from "../OrgPolicyLine";
 import { PolicyStopCard } from "./PolicyStopCard";
 import { memo } from "../../render/memo";
+import { terminalOutput } from "../../model/onTheMac";
 
 /** The text of a message's blocks: text blocks as Markdown, anything else named. */
 export function Blocks({ blocks, text }: { blocks: ContentBlock[] | undefined; text: string }) {
@@ -136,6 +137,8 @@ export interface CallActions {
   showEdit: (diff: Extract<ToolCallContent, { type: "diff" }>, toolCallID: string | undefined) => void;
   /** The sandbox failure the open agent waits on an answer to (Agent.pendingSandboxFailure, #253). */
   waitingSandbox?: SandboxFailureRecord | undefined;
+  /** Whether the person has a Mac (#3425): terminal output is shown only in its window. */
+  hasMac?: boolean | undefined;
   /** The organisation's mark while its policy requires the sandbox (#998): no Continue without sandbox. */
   sandboxSetBy?: PolicySetBy | undefined;
   answerSandbox?: ((carryOn: boolean) => Promise<void>) | undefined;
@@ -214,7 +217,7 @@ export function ToolCallLine({ call, text, focused = false, background, onClick 
             if (piece.type === "content" && piece.content.type === "text") return <Markdown key={index} text={piece.content.text} openFile={actions?.open} />;
             // Any other block as a message draws it: a picture, an attachment (#252).
             if (piece.type === "content") return <div key={index} class="quiet"><Blocks blocks={[piece.content]} text="" /></div>;
-            if (piece.type === "terminal") return <p key={index} class="quiet">Terminal output is shown in the Mac window.</p>;
+            if (piece.type === "terminal") return <p key={index} class="quiet">{terminalOutput(actions?.hasMac ?? true)}</p>;
             // Kept rather than dropped: what the runtime sent, as the window shows it.
             return <pre key={index} class="raw faint">{pretty(piece as unknown as JSONValue).split("\n").slice(0, 6).join("\n")}</pre>;
           })}

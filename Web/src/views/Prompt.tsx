@@ -162,7 +162,7 @@ export function Prompt({ store, draftKey, placeholder, capabilities, runtimeName
 
   const take = async (files: Iterable<File>) => {
     for (const file of files) {
-      const made = await attach(file);
+      const made = await attach(file, store.hasMac.value);
       if ("ok" in made) {
         attachments.value = [...attachments.value, made.ok];
         said.value = null;
@@ -197,7 +197,7 @@ export function Prompt({ store, draftKey, placeholder, capabilities, runtimeName
   const chosenIndex = Math.min(selected.value, Math.max(0, listLength - 1));
 
   const tooMuch = totalRefusal(attachments.value);
-  const refused = attachments.value.map((a) => refusal(a, capabilities, runtimeName)).find((r) => r !== null) ?? null;
+  const refused = attachments.value.map((a) => refusal(a, capabilities, runtimeName, store.hasMac.value)).find((r) => r !== null) ?? null;
   useEffect(() => { onAttachments?.(attachments.value); }, [attachments.value]);
   const canSend = !disabled && !sending.value && text.value.trim() !== "" && !tooMuch && !refused;
 
@@ -259,7 +259,7 @@ export function Prompt({ store, draftKey, placeholder, capabilities, runtimeName
         {attachments.value.length > 0 && (
           <ul class="attachments" aria-label="Attached">
             {attachments.value.map((attachment) => {
-              const why = refusal(attachment, capabilities, runtimeName);
+              const why = refusal(attachment, capabilities, runtimeName, store.hasMac.value);
               return (
                 <li key={attachment.id}>
                   <span>{attachment.block.type === "image" ? "🖼" : "📄"} {attachment.displayName}</span>

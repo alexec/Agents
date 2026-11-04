@@ -42,7 +42,7 @@ export function ProvidersSection({ store }: { store: Store }) {
           {store.person.value?.role !== "member" && (
             <div class="provider-add"><button type="button" onClick={() => setAdding(true)}>{words.add}</button></div>
           )}
-          <p class="hint">{words.footer}</p>
+          <p class="hint">{words.footer(store.hasMac.value)}</p>
         </>
       )}
       {(adding || editing) && (

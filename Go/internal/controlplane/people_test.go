@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -647,5 +648,34 @@ func TestRemoveFirstSaysWhatWorkIsNotPushed(t *testing.T) {
 	}
 	if e := callError(t, alexWindow, "", "people/removePreview", wire.PersonRequest{User: sam.id}); !strings.Contains(e, "no such person") {
 		t.Fatalf("a removed person: %s", e)
+	}
+}
+
+// hosts/remove takes a machine's name as well as its id (#3426), but only a name of the
+// caller's own machines; two of its own with one name are refused, to be named by id.
+func TestRemoveAMachineByItsName(t *testing.T) {
+	t.Parallel()
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	_, admin := p.client("Alex's Mac")
+	sam := p.invite(admin, "Sam", wire.UserRoleMember)
+	bea := p.invite(admin, "Bea", wire.UserRoleMember)
+	samBox := p.machine(sam, "Sam").member.Host
+	p.machine(bea, "Bea")
+	p.machine(bea, "bea")
+
+	// Another person's machine, by its name: there is no such machine.
+	if e := callError(t, bea.window, "", "hosts/remove", map[string]string{"host": "box Sam"}); !strings.Contains(e, "No machine is called box Sam.") {
+		t.Fatal(e)
+	}
+	if e := callError(t, sam.window, "", "hosts/remove", map[string]string{"host": "nobody"}); !strings.Contains(e, "No machine is called nobody.") {
+		t.Fatal(e)
+	}
+	if e := callError(t, bea.window, "", "hosts/remove", map[string]string{"host": "box bea"}); !strings.Contains(e, "Name it by its id") {
+		t.Fatal(e)
+	}
+	// Its own, by its name in any case.
+	call(t, sam.window, "", "hosts/remove", map[string]string{"host": " BOX sam "})
+	if got := listedHosts(t, sam.window); slices.Contains(got, samBox) {
+		t.Fatalf("%v", got)
 	}
 }

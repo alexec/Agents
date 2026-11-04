@@ -180,7 +180,7 @@ struct SettingsWindow: View {
         switch pane.wrappedValue {
         case .appearance: FormColumn { Form { AppearanceSettingsView() }.paperForm() }
         // The archive switch is a rule of Agents ▸ Policy now (#2957, FR-023).
-        case .sidebar: FormColumn { Form { SidebarSettingsSection(showsArchiveSwitch: false) }.paperForm() }
+        case .sidebar: FormColumn { Form { SidebarSettingsSection() }.paperForm() }
         case .agentsPolicy:
             FormColumn {
                 PolicyPane(host: model.policyHost, revision: model.policyRevision,

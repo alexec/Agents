@@ -211,8 +211,11 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       readFile: (path) => store.readFile(host, session, path),
       // Ask for More at the organisation's budget (#3262): on the control plane, not the host.
       askForMore: () => store.link.call("policy/askForMore", {}),
+      // With no Mac, no window shows terminal output (#3425).
+      hasMac: store.hasMac.value,
     };
-  }, [host, session, agent?.pendingSandboxFailure, down, !agent || agent.state === "archived", store.has(host, Capability.chatBranch1)]);
+  }, [host, session, agent?.pendingSandboxFailure, down, !agent || agent.state === "archived", store.has(host, Capability.chatBranch1),
+    store.hasMac.value]);
 
   const scroller = useRef<HTMLDivElement>(null);
   const chatColumn = useRef<HTMLElement>(null);
