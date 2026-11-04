@@ -875,6 +875,9 @@ final class RemoteModel {
     /// Every runtime's cells for the shared words (#2658), as the Mac's host has them. Auto's
     /// own settings are Mac + web (#2923).
     private(set) var autoMappings = AutoMappings()
+    /// The daily summary's Off / Summary control and its time (#3351), from the Mac's host. Nil
+    /// until it has said, or from a host too old to know the method.
+    private(set) var dailySummarySettings: DailySummarySettings?
     /// Each runtime's sandbox default, read from the Mac, for "Use runtime default (Off)".
     private(set) var sandboxSettings = SandboxSettings()
     /// The Mac-wide permission choice for Cursor, Grok and OpenCode (061).
@@ -1236,6 +1239,26 @@ final class RemoteModel {
         guard isAutoStart, let folder = startOptionsFolder else { startAutoPreview = nil; return }
         let request = AutoPreviewRequest(cwd: folder, levels: startLevels, sandbox: startSandbox, needs: startAttachmentNeeds)
         startAutoPreview = try? await askForStart(DaemonAPI.Method.autoPreview, request, returning: AutoPreview.self)
+    }
+
+    func refreshDailySummarySettings() async {
+        dailySummarySettings = try? await client.call(DaemonAPI.Method.dailySummarySettings, DaemonAPI.Empty(),
+                                                      returning: DailySummarySettings.self)
+    }
+
+    /// The person chose Off or Summary, or a time, for the daily summary (#3351). Nil when it
+    /// was set; else why not, and the control goes back to what it was.
+    func setDailySummarySettings(_ settings: DailySummarySettings) async -> String? {
+        let before = dailySummarySettings
+        dailySummarySettings = settings
+        do {
+            dailySummarySettings = try await client.call(DaemonAPI.Method.dailySummarySetSettings, settings,
+                                                         returning: DailySummarySettings.self)
+            return nil
+        } catch {
+            dailySummarySettings = before
+            return sentence(for: error)
+        }
     }
 
     func refreshAuto() async {
@@ -2553,6 +2576,10 @@ final class RemoteModel {
         }
         if let removedFolder, self.labelVocabularies[removedFolder] != nil {
             self.reloadLabelVocabulary(in: removedFolder)
+        }
+        if notification.method == DaemonAPI.Notification.dailySummaryChanged,
+           let settings = try? notification.params?.decode(DailySummarySettings.self) {
+            self.dailySummarySettings = settings
         }
         if notification.method == DaemonAPI.Notification.preferencesChanged,
            let preferences = try? notification.params?.decode(DaemonAPI.DisplayPreferences.self) {

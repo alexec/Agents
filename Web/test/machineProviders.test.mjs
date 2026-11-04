@@ -50,7 +50,9 @@ const summary = (over = {}) => ({ id: "do", name: "DO", kind: "commands", secret
 test("the card's chip and lines are the window's", () => {
   assert.equal(w.kindChip(summary({ preset: "digitalocean-api" })), "command provider · digitalocean-api · API");
   assert.equal(w.kindChip(summary({ preset: "doctl" })), "command provider · doctl · CLI");
-  assert.equal(w.providerLine(summary({ preset: "codespaces-api", listedAt: 0 }), () => "9:00"), "Listed 9:00 · No machines · needs gh for ssh");
+  assert.equal(w.providerLine(summary({ preset: "codespaces-api", listedAt: 0, sshToolMissing: "gh" }), () => "9:00"), "Listed 9:00 · No machines · needs gh for ssh");
+  // The control plane has gh (#3367): nothing to say.
+  assert.equal(w.providerLine(summary({ preset: "codespaces-api", listedAt: 0 }), () => "9:00"), "Listed 9:00 · No machines");
   assert.equal(w.providerLine(summary({ problem: "401", current: false }), () => ""), "Couldn’t list: 401");
   const hosts = [{ id: "h1", name: "box" }];
   assert.equal(w.workspaceLine({ id: "a", name: "a", state: "running", host: "h1", cost: "$4/mo" }, hosts), "Running · linked to box · $4/mo");
@@ -71,6 +73,47 @@ test("a workspace no host can be linked to says where to make it one (#1931)", (
   assert.equal(w.noHostLine({ id: "x", name: "other", state: "stopped" }, taken), w.providerWords.notAHostYet);
   assert.equal(w.noHostLine({ id: "x", name: "other", state: "running" }, [...taken, { id: "1", name: "free" }]), undefined);
   assert.equal(w.noHostLine({ id: "x", name: "devbox", state: "running", host: "4" }, taken), undefined);
+  // One with an ssh destination has Add as Machine… in place of the line (#3365).
+  assert.equal(w.noHostLine({ id: "x", name: "other", state: "stopped", ssh: "cs.other" }, taken), undefined);
+});
+
+test("Add as Machine… is offered with an ssh destination, and pressable only while it runs (#3365)", () => {
+  assert.deepEqual(w.addAsMachine({ id: "x", name: "cs", state: "running", ssh: "cs.cs" }), { ready: true, help: w.providerWords.addAsMachineHelp });
+  assert.deepEqual(w.addAsMachine({ id: "x", name: "cs", state: "stopped", ssh: "cs.cs" }), { ready: false, help: w.providerWords.startFirst });
+  assert.equal(w.addAsMachine({ id: "x", name: "cs", state: "running" }), undefined);
+  assert.equal(w.addAsMachine({ id: "x", name: "cs", state: "running", ssh: "cs.cs", host: "4" }), undefined);
+});
+
+test("a provider's ssh with a port is one word, as ssh takes it", () => {
+  assert.equal(w.sshDestination("alex@127.0.0.1 -p 2222"), "ssh://alex@127.0.0.1:2222");
+  assert.equal(w.sshDestination(" cs.devbox "), "cs.devbox");
+  assert.equal(w.sshDestination("a@b -p x"), "a@b -p x");
+});
+
+test("Add as Machine… installs, shows a new host key first, and links the machine once it joins (#3365)", async () => {
+  const asked = [];
+  const p = new w.Providers({
+    call: async (method, params) => {
+      asked.push({ method, params });
+      if (method === "hosts/install") return params.trust ? { name: "cs-box", tunnel: false } : { needsTrust: "SHA256:abc", name: "cs-box" };
+      if (method === "hosts/link") return {};
+      throw new Error(method);
+    },
+  });
+  assert.deepEqual(await p.install("cs.cs-box", "cs-box", "gh", "cs-box-id"), { needsTrust: "SHA256:abc" });
+  assert.deepEqual(await p.install("cs.cs-box", "cs-box", "gh", "cs-box-id", "SHA256:abc"), { added: "cs-box" });
+  assert.deepEqual(asked.at(-1).params, { destination: "cs.cs-box", name: "cs-box", trust: "SHA256:abc" });
+  // Not joined yet: nothing to link.
+  p.linkJoined([{ id: "1", name: "other" }]);
+  assert.equal(asked.filter((a) => a.method === "hosts/link").length, 0);
+  p.linkJoined([{ id: "1", name: "other" }, { id: "7", name: "cs-box" }]);
+  p.linkJoined([{ id: "7", name: "cs-box" }]);
+  assert.deepEqual(asked.filter((a) => a.method === "hosts/link").map((a) => a.params), [{ host: "7", provider: "gh", workspace: "cs-box-id" }]);
+});
+
+test("Add as Machine… says why the control plane refused", async () => {
+  const p = new w.Providers({ call: async () => { throw new w.CallFailed(-32001, "Only the control plane's owner can use its ssh."); } });
+  assert.deepEqual(await p.install("cs.x", "x", "gh", "x"), { failed: "Only the control plane's owner can use its ssh." });
 });
 
 function plane({ oneCopy = true, working = false } = {}) {

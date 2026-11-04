@@ -31,7 +31,8 @@ in, as before.
 The token goes in only as the provider's secret. It is sent in a request's header, never in
 an address, a log or an error. A codespace and a Coder machine have no ssh port of their
 own, so ssh to them still goes through `gh` or `coder`, as the ssh ProxyCommand; the
-Providers page says "needs gh for ssh" or "needs coder for ssh". A droplet is reached with
+Providers page says "needs gh for ssh" or "needs coder for ssh" when the machine that runs
+the control plane does not have that CLI (#3367). A droplet is reached with
 plain ssh to its public address, and so is an EC2 instance.
 
 AWS EC2 Instances is through its API only, with an IAM user's access key ID and secret

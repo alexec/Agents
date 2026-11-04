@@ -144,6 +144,10 @@ final class AppModel {
     /// This Mac). Nil until the daemon has said, including a daemon too old to know the
     /// method, which Settings draws as Off.
     private(set) var desktopControlSettings: DesktopControlSettings?
+    /// The daily summary's Off / Summary control and its time (#3351, Settings ▸ Agent
+    /// Configuration ▸ Workflows). Nil until the daemon has said, including a daemon too old
+    /// to know the method, which Settings leaves out.
+    private(set) var dailySummarySettings: DailySummarySettings?
     /// How this Mac's host updates Agents Host by itself (#2178). Nil from a host that
     /// cannot (a test's, or one older than the method), and Settings draws nothing for it.
     private(set) var selfUpdate: DaemonAPI.SelfUpdate?
@@ -2050,6 +2054,25 @@ final class AppModel {
         }
     }
 
+    /// The daily summary's control (#3351). A daemon too old to know the method leaves this nil.
+    func refreshDailySummarySettings() async {
+        dailySummarySettings = try? await macClient.call(DaemonAPI.Method.dailySummarySettings,
+                                                      DaemonAPI.Empty(),
+                                                      returning: DailySummarySettings.self)
+    }
+
+    /// The person chose Off or Summary, or a time, for the daily summary (#3351).
+    func setDailySummarySettings(_ settings: DailySummarySettings) async {
+        let before = dailySummarySettings
+        dailySummarySettings = settings
+        let saved = await attempt {
+            self.dailySummarySettings = try await self.macClient.call(DaemonAPI.Method.dailySummarySetSettings,
+                                                                   settings,
+                                                                   returning: DailySummarySettings.self)
+        }
+        if !saved { dailySummarySettings = before }
+    }
+
     /// Every resource and who holds it (036). A daemon too old to know the method
     /// leaves `leases` nil, and nothing about leases is drawn.
     func refreshLeases() async {
@@ -3255,6 +3278,10 @@ final class AppModel {
             guard let settings = try? params?.decode(SandboxSettings.self) else { return }
             sandboxSettings = settings
 
+        case DaemonAPI.Notification.dailySummaryChanged:
+            guard let settings = try? params?.decode(DailySummarySettings.self) else { return }
+            dailySummarySettings = settings
+
         case DaemonAPI.Notification.autoChanged:
             guard let settings = try? params?.decode(AutoSettings.self) else { return }
             let changed = autoSettings != settings
@@ -3738,7 +3765,7 @@ final class AppModel {
         case DaemonAPI.Notification.wakeChanged, DaemonAPI.Notification.modesChanged,
              DaemonAPI.Notification.attentionChanged, DaemonAPI.Notification.storeNotesChanged,
              DaemonAPI.Notification.milestonesChanged, DaemonAPI.Notification.preferencesChanged,
-             DaemonAPI.Notification.backupsChanged:
+             DaemonAPI.Notification.backupsChanged, DaemonAPI.Notification.dailySummaryChanged:
             // The milestones and display choices are the person's, kept on the Mac's own
             // host (#984, #1033). Settings ▸ Machines ▸ This Mac ▸ Backups is this Mac's (#1810).
             return
@@ -3855,7 +3882,7 @@ final class AppModel {
         DaemonAPI.Notification.signInNeeded, DaemonAPI.Notification.clientPermissionsChanged,
         DaemonAPI.Notification.personChanged, DaemonAPI.Notification.sandboxChanged, DaemonAPI.Notification.autoChanged,
         DaemonAPI.Notification.backupsChanged, DaemonAPI.Notification.runtimesAccountProfilesChanged,
-        DaemonAPI.Notification.daemonPolicyStateChanged,
+        DaemonAPI.Notification.daemonPolicyStateChanged, DaemonAPI.Notification.dailySummaryChanged,
     ]
 
     /// What is this Mac's own, from this Mac's host by an id of its own (#1496). Its

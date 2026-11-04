@@ -96,7 +96,14 @@ export const providerWords = {
   removeTitle: (name: string) => `Remove ${name}?`,
   removeNote: "Its machines stay as they are, unlinked: nothing here can start or stop them any more.",
   noHosts: "No machine to link: add one in the Mac app, or start one from a repository.",
-  notAHostYet: "Not joined yet: add it as a machine in the Mac app, in Settings ▸ Machine Providers.",
+  notAHostYet: "Not joined yet, and it gives no ssh destination: add it with the command from Add a Machine…, then Link to Machine….",
+  addAsMachine: "Add as Machine…",
+  addAsMachineHelp: "Installs Agents on it over ssh, and links the machine to it.",
+  startFirst: "Start it first: it has to be running to be installed.",
+  installNote: (provider: string) => `The control plane installs Agents on it over its own ssh, and links the machine to it, so ${provider} starts it again.`,
+  installing: "Installing Agents… This takes a minute or two.",
+  trustNote: (fingerprint: string) => `This machine’s host key is new to the control plane: ${fingerprint}. Install only if this is the key the machine shows (ssh-keygen -lf on its host key).`,
+  installed: (name: string) => `Installed on ${name}. It is linked to this machine when it joins.`,
 };
 
 export function kindTitle(kind: ProviderKind): string { return kinds[kind].title; }
@@ -170,19 +177,14 @@ export function kindChip(provider: ProviderSummary): string {
   return provider.kind === "commands" ? "command provider" : provider.mapped ? "MCP server · mapped" : "MCP server";
 }
 
-/** The CLI an API preset still needs for ssh. */
-function sshTool(preset: string | undefined): string | undefined {
-  return preset === "codespaces-api" ? "gh" : preset === "coder-api" ? "coder" : undefined;
-}
-
 /** The grey line under a provider's name, as the window's providerLine. */
 export function providerLine(provider: ProviderSummary, time: (at: Date) => string): string {
   const parts: string[] = [];
   if (provider.problem && (!provider.current || provider.listedAt == null)) parts.push(`Couldn’t list: ${provider.problem}`);
   if (provider.listedAt != null) parts.push(`${provider.current ? "Listed" : "Showing what it listed at"} ${time(fromWireDate(provider.listedAt))}`);
   if (provider.workspaces.length === 0 && provider.listedAt != null) parts.push("No machines");
-  const tool = sshTool(provider.preset);
-  if (tool) parts.push(`needs ${tool} for ssh`);
+  // Only when the machine that runs it has no such CLI (#3367).
+  if (provider.sshToolMissing) parts.push(`needs ${provider.sshToolMissing} for ssh`);
   return parts.join(" · ");
 }
 
@@ -197,11 +199,29 @@ export function workspaceLine(workspace: MachineInfo, hosts: readonly ControlMac
 }
 
 /**
- * What a workspace with no host says when no host is free to link to it (#1931): this page can
- * not install Agents on it, so the person is told where to (the Mac's Add as Host…).
+ * What a workspace with no host says when no host is free to link to it and it gives no ssh
+ * destination (#1931): Add as Machine… cannot reach it, so the person is told the other way in.
  */
 export function noHostLine(workspace: MachineInfo, hosts: readonly ControlMachine[]): string | undefined {
-  return !workspace.host && linkableHosts(workspace, hosts).length === 0 ? providerWords.notAHostYet : undefined;
+  return !workspace.host && !workspace.ssh && linkableHosts(workspace, hosts).length === 0 ? providerWords.notAHostYet : undefined;
+}
+
+/**
+ * Add as Machine… on a workspace no host has (#3365), as the window's: offered when the provider
+ * gives an ssh destination, and pressable only while it runs. Answers undefined when it is not
+ * offered, else whether it can be pressed and its help line.
+ */
+export function addAsMachine(workspace: MachineInfo): { ready: boolean; help: string } | undefined {
+  if (workspace.host || !workspace.ssh) return undefined;
+  const ready = workspace.state === "running";
+  return { ready, help: ready ? providerWords.addAsMachineHelp : providerWords.startFirst };
+}
+
+/** `alex@127.0.0.1 -p 2222`, as a provider may give it, as ssh takes it in one word (the window's sshDestination). */
+export function sshDestination(destination: string): string {
+  const words = destination.trim().split(/\s+/);
+  if (words.length !== 3 || words[1] !== "-p" || !/^\d+$/.test(words[2]!)) return destination.trim();
+  return `ssh://${words[0]}:${Number(words[2])}`;
 }
 
 /** Whether a host named `hostName` may be this workspace (MachineInfo.mayBe, #976). */

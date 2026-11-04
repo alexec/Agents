@@ -69,6 +69,36 @@ func TestDailySummaryCollectsAndKeepsThree(t *testing.T) {
 	}
 }
 
+// Only the newest daily summary is in For Review (#3352): a new page takes its title, and
+// the older runs' pages that nobody opened are marked read; another session's file stays.
+func TestOnlyTheNewestSummaryIsForReview(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	home := t.TempDir()
+	d.PersonalHome = home
+	wid := dailySummaryID
+	unseen := func(a *wire.Agent) { a.FileToSee = &wire.ShownFile{Path: filepath.Join(home, "old.md")} }
+	older := seeded(t, d, home, func(a *wire.Agent) { a.StartedByWorkflow = &wid; unseen(a) })
+	work := seeded(t, d, t.TempDir(), unseen)
+	me := seeded(t, d, home, func(a *wire.Agent) { a.State, a.StartedByWorkflow = wire.AgentStateRunning, &wid })
+
+	if _, err := d.saveSummary(me.ID, "Intro\n\n# Daily summary, Tue 3 Nov\n\n## Landed\n", "", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if a := d.Store.Agent(me.ID); a.Title == nil || *a.Title != "Daily summary, Tue 3 Nov" {
+		t.Fatalf("title %v", a.Title)
+	}
+	if d.Store.Agent(older.ID).FileToSee != nil {
+		t.Fatal("an older summary stayed in For Review")
+	}
+	if d.Store.Agent(work.ID).FileToSee == nil {
+		t.Fatal("another session's file to see was cleared")
+	}
+	if got := summaryTitle("no heading\n## Part\n"); got != "" {
+		t.Fatalf("title %q from a page with no first heading", got)
+	}
+}
+
 // Only a session in the home folder is offered write_daily_summary, and the workflow is never
 // copied into a project.
 func TestDailySummaryIsTheHomeFolders(t *testing.T) {
@@ -92,5 +122,57 @@ func TestDailySummaryIsTheHomeFolders(t *testing.T) {
 	}
 	if !strings.Contains(skill, "`write_daily_summary`") || !oneMachineWorkflows[dailySummaryID] {
 		t.Fatal(skill)
+	}
+}
+
+// The daily summary's control (#3351) is the home folder's Daily summary workflow: Summary turns
+// it on at the time asked, Off turns it off and keeps the time.
+func TestDailySummaryControlIsTheWorkflow(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	home := t.TempDir()
+	d.PersonalHome = home
+	path := filepath.Join(home, ".agents", "workflows", dailySummaryID+".md")
+
+	var s wire.DailySummarySettings
+	json.Unmarshal(c.call(t, 1, "dailySummary/settings", map[string]any{}), &s)
+	if s.Mode != wire.DailySummaryModeOff || s.At != "08:00" {
+		t.Fatalf("%+v", s)
+	}
+	json.Unmarshal(c.call(t, 2, "dailySummary/setSettings", map[string]any{"mode": "summary", "at": "7:30"}), &s)
+	if s.Mode != wire.DailySummaryModeSummary || s.At != "07:30" {
+		t.Fatalf("%+v", s)
+	}
+	text, _ := os.ReadFile(path)
+	for _, want := range []string{`at: ":30"`, `between: "07:30-07:30"`, "days: [mon, tue, wed, thu, fri]"} {
+		if !strings.Contains(string(text), want) {
+			t.Fatalf("no %q in:\n%s", want, text)
+		}
+	}
+	if strings.Contains(string(text), "enabled: false") {
+		t.Fatalf("still off:\n%s", text)
+	}
+	if sum, err := d.oneWorkflow(home, dailySummaryID); err != nil || !sum.IsEnabled || sum.AwaitingApproval != nil {
+		t.Fatalf("%+v, %v", sum, err)
+	}
+
+	json.Unmarshal(c.call(t, 3, "dailySummary/setSettings", map[string]any{"mode": "off", "at": "07:30"}), &s)
+	if s.Mode != wire.DailySummaryModeOff || s.At != "07:30" {
+		t.Fatalf("%+v", s)
+	}
+	if _, err := d.setDailySummarySettings(wire.DailySummarySettings{Mode: wire.DailySummaryModeSummary, At: "07:15"}); err == nil {
+		t.Fatal("a time off the half hour was taken")
+	}
+}
+
+func TestSetScheduleLineRefusesTwo(t *testing.T) {
+	two := "---\non:\n  - schedule:\n      at: \":00\"\n  - schedule:\n      at: \":30\"\n---\nbody\n"
+	if _, err := setScheduleLine("at", ":30", two); err == nil {
+		t.Fatal("changed one of two schedules")
+	}
+	one := "---\non:\n  - schedule:\n      at: \":00\" # the hour\n---\nat: body\n"
+	got, err := setScheduleLine("at", ":30", one)
+	if err != nil || !strings.Contains(got, "      at: \":30\"\n") || !strings.Contains(got, "at: body") {
+		t.Fatalf("%q, %v", got, err)
 	}
 }

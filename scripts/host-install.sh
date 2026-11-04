@@ -124,7 +124,10 @@ else
 fi
 
 unit="$HOME/.config/systemd/user/agents-host.service"
-if command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then
+# /run/systemd/system is there only when systemd runs (sd_booted). A codespace's
+# systemctl is a shim that exits 0 with no systemd, so its exit code alone says
+# nothing (#3366).
+if [ -d /run/systemd/system ] && command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then
     mkdir -p "$(dirname "$unit")"
     cat > "$unit" <<UNIT
 [Unit]

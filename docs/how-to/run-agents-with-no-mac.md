@@ -58,16 +58,18 @@ tablet, use **Add a Browser…** in this one; see
 
    The machine then shows under **Machines** on the web page.
 
-   A codespace has no systemd, but its `systemctl` command does not say so, so the command
-   says **Started as the systemd user service agents-host.** and starts nothing (#3350).
-   Until that is fixed, start the host yourself, in the same terminal:
-
-   ```sh
-   ~/.agents-server/bin/current --root ~/.agents-server/root --serve --detach --control-network --host-name "$(hostname)"
-   ```
+   A codespace has no systemd, so the command starts the host in the background and says
+   **Started in the background (no systemd user session here).** (#3366).
 
 Do the same on any other Linux server. See [Add a machine](add-a-machine.md) for folders
 on the machine.
+
+Or, with a GitHub Codespaces machine provider (see
+[Set up a cloud machine provider](set-up-a-cloud-machine-provider.md)): on the web page, open
+**Settings ▸ Machine providers**, find the codespace and click **Add as Machine…**. The
+codespace must be running. The control plane installs Agents on it over `gh`'s ssh and links
+the machine to the codespace. The first time, the dialog shows the codespace's host key:
+click **Trust and Install**. You do not need a terminal in the codespace.
 
 ### Sign a runtime in on the codespace
 
@@ -106,9 +108,6 @@ is not started. Run that command again in the codespace's terminal, with a new c
 
 ## What is missing for now
 
-- **The web page has no Add as Machine…** for a codespace that a provider lists. The
-  control plane can install over ssh through `gh` (#3347), but only the Mac window asks it
-  to. Use the command from **Add a Machine…**, as above.
 - **The command does not start the host on a codespace** (#3350): start it yourself, as
   above.
 

@@ -6064,6 +6064,32 @@
       ],
       "additionalProperties": false
     },
+    "DailySummaryMode": {
+      "type": "string",
+      "description": "How much the daily summary does (#3351): off, or the summary only. Summary and checks comes with the checks (#3192).",
+      "enum": [
+        "off",
+        "summary"
+      ]
+    },
+    "DailySummarySettings": {
+      "type": "object",
+      "description": "The daily summary's one control, for all folders (#3351). It is the home folder's ready-made Daily summary workflow: the mode turns it on or off, and the time is its schedule's. The days stay as the workflow says (weekdays by default).",
+      "properties": {
+        "mode": {
+          "$ref": "#/definitions/DailySummaryMode"
+        },
+        "at": {
+          "type": "string",
+          "description": "The time it runs, HH:MM in this machine's time zone, on the hour or the half hour. 08:00 by default."
+        }
+      },
+      "required": [
+        "mode",
+        "at"
+      ],
+      "additionalProperties": false
+    },
     "DayRecap": {
       "type": "object",
       "properties": {
@@ -18675,6 +18701,10 @@
         "mayUse": {
           "type": "boolean",
           "description": "The caller may start machines from it (#1761): they are in its group. Absent from an older control plane, which lets everyone."
+        },
+        "sshToolMissing": {
+          "type": "string",
+          "description": "The CLI its machines are reached through over ssh (gh, coder) when the machine that runs the provider has none (#3367). Absent when it needs none or has it."
         }
       },
       "required": [

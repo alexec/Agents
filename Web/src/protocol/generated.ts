@@ -2449,6 +2449,28 @@ export interface DaemonStatus {
   agentsLive: number;
 }
 
+/**
+ * How much the daily summary does (#3351): off, or the summary only. Summary and checks comes with
+ * the checks (#3192).
+ */
+export type DailySummaryMode =
+  | "off"
+  | "summary";
+
+/**
+ * The daily summary's one control, for all folders (#3351). It is the home folder's ready-made
+ * Daily summary workflow: the mode turns it on or off, and the time is its schedule's. The days
+ * stay as the workflow says (weekdays by default).
+ */
+export interface DailySummarySettings {
+  mode: DailySummaryMode;
+  /**
+   * The time it runs, HH:MM in this machine's time zone, on the hour or the half hour. 08:00 by
+   * default.
+   */
+  at: string;
+}
+
 export interface DayRecap {
   prsMerged?: number;
   agents: number;
@@ -6958,6 +6980,11 @@ export interface ProviderSummary {
    * control plane, which lets everyone.
    */
   mayUse?: boolean;
+  /**
+   * The CLI its machines are reached through over ssh (gh, coder) when the machine that runs the
+   * provider has none (#3367). Absent when it needs none or has it.
+   */
+  sshToolMissing?: string;
 }
 
 /**
@@ -10181,6 +10208,8 @@ export interface Methods {
   "cost/state": { params: Empty; result: CostState };
   "credentials/offer": { params: CredentialsOffer; result: Empty };
   "daemon/policyState": { params: Empty; result: PolicyState };
+  "dailySummary/setSettings": { params: DailySummarySettings; result: DailySummarySettings };
+  "dailySummary/settings": { params: Empty; result: DailySummarySettings };
   "desktopControl/resume": { params: AgentRequest; result: Empty };
   "desktopControl/set": { params: DesktopControlSettings; result: DesktopControlSettings };
   "desktopControl/state": { params: Empty; result: DesktopControlSettings };
@@ -10245,6 +10274,7 @@ export interface Methods {
   "hosts/approveJoin": { params: JoinRequestDecide; result: JoinApproved };
   "hosts/denyJoin": { params: JoinRequestDecide; result: Empty };
   "hosts/dropKept": { params: KeptRequestID; result: Empty };
+  "hosts/install": { params: MachineInstall; result: JSONValue };
   "hosts/joinRequests": { params: Empty; result: JoinRequest[] };
   "hosts/lastHeard": { params: MachineRequest; result: MachineLastHeard };
   "hosts/lendGit": { params: LendGit; result: Empty };
@@ -10508,6 +10538,8 @@ export const MethodTarget = {
   "cost/state": "host",
   "credentials/offer": "host",
   "daemon/policyState": "host",
+  "dailySummary/setSettings": "host",
+  "dailySummary/settings": "host",
   "desktopControl/resume": "host",
   "desktopControl/set": "host",
   "desktopControl/state": "host",
@@ -10572,6 +10604,7 @@ export const MethodTarget = {
   "hosts/approveJoin": "control",
   "hosts/denyJoin": "control",
   "hosts/dropKept": "control",
+  "hosts/install": "control",
   "hosts/joinRequests": "control",
   "hosts/lastHeard": "control",
   "hosts/lendGit": "control",
@@ -10779,6 +10812,7 @@ export interface Notifications {
   "control/stopAll": PolicyView;
   "control/userSettingsChanged": UserSettingsChanged;
   "daemon/policyStateChanged": PolicyState;
+  "dailySummary/changed": DailySummarySettings;
   "desktopControl/liveFrame": DesktopControlLiveFrame;
   "disk/changed": DiskState;
   "files/changed": FilesChangedNotification;
@@ -10993,6 +11027,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   CostState: { required: ["limits", "today", "day", "tokensToday"], optional: ["note", "organisation", "setBy"] },
   CredentialsOffer: { required: ["runtimes", "ownSignInOnly"], optional: ["notRelayed", "signIns"] },
   DaemonStatus: { required: ["turnsInFlight", "agentsLive"], optional: [] },
+  DailySummarySettings: { required: ["mode", "at"], optional: [] },
   DayRecap: { required: ["agents", "peakAgents", "longestClear"], optional: ["prsMerged"] },
   DeclareResourceRequest: { required: ["resource"], optional: ["replacing"] },
   DeclaredResource: { required: ["name", "displayName", "description", "holders"], optional: ["defaultMinutes", "maximumMinutes"] },
@@ -11434,7 +11469,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProviderRequest: { required: [], optional: ["id"] },
   ProviderRuntime: { required: ["id", "name", "isDefault"], optional: [] },
   ProviderRuntimes: { required: ["runtimes"], optional: ["host", "why"] },
-  ProviderSummary: { required: ["id", "name", "kind", "secrets", "capabilities", "contract", "mapped", "workspaces", "current"], optional: ["preset", "listedAt", "problem", "group", "mayUse"] },
+  ProviderSummary: { required: ["id", "name", "kind", "secrets", "capabilities", "contract", "mapped", "workspaces", "current"], optional: ["preset", "listedAt", "problem", "group", "mayUse", "sshToolMissing"] },
   PushToken: { required: ["environment"], optional: ["token"] },
   QueuedPrompt: { required: ["id", "text", "attachments", "queuedAt", "from"], optional: ["preface", "sender"] },
   QueuedStart: { required: ["labels"], optional: ["runtimeID", "permissionMode", "model", "worktree"] },

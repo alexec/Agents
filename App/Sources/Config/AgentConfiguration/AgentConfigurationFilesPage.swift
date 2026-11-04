@@ -38,6 +38,24 @@ struct AgentConfigurationFilesPage: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 12)
             }
+            // Your workflows: the daily summary's one control, for all folders (#3351).
+            if kind == .workflows, folder == nil, let settings = model.dailySummarySettings {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 16) {
+                        DailySummaryControls(settings: settings) { changed in
+                            Task { await model.setDailySummarySettings(changed) }
+                        }
+                        .fixedSize()
+                        Spacer()
+                    }
+                    Text(DailySummaryControls.footer)
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+            }
             AgentConfigFileEditor(kind: kind, location: "\(place.folderName)/\(kind.rawValue)",
                                   load: { await model.agentConfigEditorFiles(on: host, folder: folder, kind: kind) },
                                   saveFile: { path, content, delete in
@@ -45,6 +63,9 @@ struct AgentConfigurationFilesPage: View {
                                                                            path: path, content: content, delete: delete)
                                   },
                                   unsaved: unsaved, open: $opening)
+        }
+        .task {
+            if kind == .workflows, folder == nil { await model.refreshDailySummarySettings() }
         }
         // A file asked for from elsewhere, such as a workflow page's Edit File… (#2803).
         .onChange(of: model.agentConfigFileAsked, initial: true) { _, asked in

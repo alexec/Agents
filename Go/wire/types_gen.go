@@ -2855,6 +2855,20 @@ type DaemonStatus struct {
 	AgentsLive int64 `json:"agentsLive"`
 }
 
+// How much the daily summary does (#3351): off, or the summary only. Summary and checks comes with the checks (#3192).
+type DailySummaryMode string
+
+const DailySummaryModeOff DailySummaryMode = "off"
+const DailySummaryModeSummary DailySummaryMode = "summary"
+
+// The daily summary's one control, for all folders (#3351). It is the home folder's ready-made Daily summary workflow: the mode turns it on or off, and the time is its schedule's. The days stay as the workflow says (weekdays by default).
+type DailySummarySettings struct {
+	Mode DailySummaryMode `json:"mode"`
+
+	// The time it runs, HH:MM in this machine's time zone, on the hour or the half hour. 08:00 by default.
+	At string `json:"at"`
+}
+
 type DayRecap struct {
 	PrsMerged *int64 `json:"prsMerged,omitzero"`
 
@@ -8253,6 +8267,9 @@ type ProviderSummary struct {
 
 	// The caller may start machines from it (#1761): they are in its group. Absent from an older control plane, which lets everyone.
 	MayUse *bool `json:"mayUse,omitzero"`
+
+	// The CLI its machines are reached through over ssh (gh, coder) when the machine that runs the provider has none (#3367). Absent when it needs none or has it.
+	SshToolMissing *string `json:"sshToolMissing,omitzero"`
 }
 
 // Which APNs a device token belongs to (#1460): a Debug build's (sandbox) or a TestFlight and App Store build's.
