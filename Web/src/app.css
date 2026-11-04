@@ -1577,6 +1577,8 @@ button.plain:hover { opacity: 1; }
 .new-heading .folder-switch { position: relative; cursor: pointer; }
 .new-heading .folder-switch .caret { font-size: 0.8125rem; opacity: 0.5; }
 .new-heading .folder-switch select { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; font: inherit; }
+/* On (#3279): the machine of the project's folder, a size smaller, under the project. */
+.new-heading .machine-switch { display: inline-block; margin-bottom: 0.25rem; }
 /* The persona (#913): the folder's control, a size smaller, under it. */
 .new-heading .persona-switch { display: flex; justify-content: center; position: relative; width: 100%; }
 .new-heading .persona-switch.none { opacity: 0.65; }

@@ -22,6 +22,11 @@ type Adding = { kind: "folder" | "clone"; host: string } | { kind: "machine" };
 /** The dialog open now, if any: one at a time, from the + menu, the empty list or the folders menu. */
 const adding = signal<Adding | null>(null);
 
+/** Add Folder… on `host`, from New Session's On (#3279): the dialog the + menu opens. */
+export function addFolderOn(host: string): void {
+  adding.value = { kind: "folder", host };
+}
+
 /** "This Mac" for the host on this Mac; otherwise its name, as the window labels them. */
 export function hostLabel(store: Store, host: string): string {
   return store.isMac(host) ? "This Mac" : store.hosts.value.find((h) => h.id === host)?.name ?? host;
