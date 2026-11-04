@@ -484,6 +484,27 @@ the days, edit the schedule's `days:`.
   the page; the row then leaves For Review. When a new summary is saved, the older ones leave
   For Review, also if you did not open them (#3352).
 
+### The daily checks
+
+**Daily checks** is the daily summary's other ready-made workflow (#3355), in
+`~/.agents/workflows/daily-checks.md`. It is off until you turn it on. Between summaries, at
+00:00, 04:00, 12:00, 16:00 and 20:00, its agent looks at the folders on that machine that had
+no work since the last check. It only reads: it never pushes, comments, sends a message or
+starts a session.
+
+- It runs in your home folder, in plan mode, on the Auto runtime, on one of your machines, as
+  the summary does. Its session is archived when it is done.
+- Its agent calls [`check_folders`](agent-tools.md) for what looks wrong, using that machine's
+  `gh`: a workflow whose newest run on the default branch failed, a pull request in conflict
+  or unchanged for a week, an issue assigned to you that no session has, and a scheduled
+  workflow that missed its run. It can read more to decide (git, `gh`, connectors).
+- Each finding that needs you is kept as a suggestion, with a prompt that starts a session on
+  it, in `~/.agents/checks/suggestions.json` (the newest 50, for a week). The next daily
+  summary lists them under **Suggested next**. An urgent one, such as a broken default
+  branch, sends a notice at once.
+- **Off** in the daily summary's control turns the checks off too. Until the control has
+  **Summary and checks**, turn them on in the workflow's page or with `enabled: true`.
+
 ## See also
 
 - [Set up a workflow](../how-to/set-up-a-workflow.md)

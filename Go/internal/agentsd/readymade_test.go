@@ -18,7 +18,7 @@ import (
 // events that mcpcatalog counts for the Workflows level.
 func TestReadyMadeWorkflowsRead(t *testing.T) {
 	ids := readyMadeIDs()
-	if !slices.Equal(ids, []string{"address-review-comments", "answer-a-sign-up-code", "daily-summary", "fix-failed-checks", "work-a-jira-issue", "work-a-linear-issue", "work-an-issue"}) {
+	if !slices.Equal(ids, []string{"address-review-comments", "answer-a-sign-up-code", "daily-checks", "daily-summary", "fix-failed-checks", "work-a-jira-issue", "work-a-linear-issue", "work-an-issue"}) {
 		t.Fatal(ids)
 	}
 	var events []string
@@ -145,7 +145,7 @@ func TestReadyMadeWorkflowsLiveInUserFolderAndFoldersUseThem(t *testing.T) {
 	}
 	var userList []wire.WorkflowSummary
 	json.Unmarshal(c.call(t, 5, "workflows/list", map[string]any{"scope": "user"}), &userList)
-	if len(userList) != 7 || userList[0].Content == nil || userList[0].Scope == nil || *userList[0].Scope != "user" {
+	if len(userList) != 8 || userList[0].Content == nil || userList[0].Scope == nil || *userList[0].Scope != "user" {
 		t.Fatalf("user workflows: %+v", userList)
 	}
 

@@ -36,7 +36,7 @@ const (
 
 // oneMachineWorkflows are the person's own workflows that run on one of their machines,
 // claimed per schedule, and only in their home folder: never copied into a project (#3192).
-var oneMachineWorkflows = map[string]bool{dailySummaryID: true}
+var oneMachineWorkflows = map[string]bool{dailySummaryID: true, dailyChecksID: true}
 
 func summariesDir(home string) string { return filepath.Join(home, ".agents", "summaries") }
 
@@ -167,12 +167,13 @@ func (d *Daemon) summaryFacts(me wire.UUID, at time.Time) string {
 	failed := summaryList{title: "Failed or stopped", none: "Nothing failed or stopped."}
 	waiting := summaryList{title: "Waits on you (oldest first)", none: "Nothing waits on you."}
 	suggested := summaryList{title: "Suggested next (not taken)", none: "No suggestions wait."}
+	checked := summaryList{title: "Found by the checks", none: "The checks found nothing.", lines: checkSuggestions(home, since)}
 	active := map[string]bool{}
 	agents := d.Store.Agents()
 	sort.Slice(agents, func(i, j int) bool { return agents[i].LastActivityAt < agents[j].LastActivityAt })
 	for i := range agents {
 		a := &agents[i]
-		if a.ID == me || a.StartedByWorkflow != nil && *a.StartedByWorkflow == dailySummaryID {
+		if a.ID == me || bySummaryWorkflow(a) {
 			continue
 		}
 		folder := folderPath(a)
@@ -200,7 +201,7 @@ func (d *Daemon) summaryFacts(me wire.UUID, at time.Time) string {
 	}
 	for _, w := range d.workflowSummaries("") {
 		o := w.LastOutcome
-		if w.Workflow.WorkflowID == dailySummaryID || o == nil || o.Refused == nil || o.Refused.At < from {
+		if w.Workflow.WorkflowID == dailySummaryID || w.Workflow.WorkflowID == dailyChecksID || o == nil || o.Refused == nil || o.Refused.At < from {
 			continue
 		}
 		if why := refusalName(o.Refused.Value); !quietRefusals[why] {
@@ -220,7 +221,7 @@ func (d *Daemon) summaryFacts(me wire.UUID, at time.Time) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Facts for the daily summary\n\nSince %s, on %s (%d folders). Each session link opens it in the app.\n",
 		since.Local().Format("Mon 2 Jan 15:04"), host, len(d.folderPaths()))
-	for _, l := range []summaryList{landed, failed, waiting, suggested} {
+	for _, l := range []summaryList{landed, failed, waiting, suggested, checked} {
 		l.write(&b)
 	}
 	b.WriteString("\nWrite the page from these facts, then call write_daily_summary with action save.\n")
@@ -322,4 +323,3 @@ func (d *Daemon) saveSummary(id wire.UUID, markdown, headline string, at time.Ti
 	}
 	return strings.Join(said, " "), nil
 }
-

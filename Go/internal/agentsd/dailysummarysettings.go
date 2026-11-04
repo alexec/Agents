@@ -70,6 +70,15 @@ func (d *Daemon) setDailySummarySettings(r wire.DailySummarySettings) (wire.Dail
 	if _, err := d.enableWorkflow(wire.WorkflowEnableRequest{Folder: store.FolderURL(home), WorkflowID: dailySummaryID, Enabled: r.Mode == wire.DailySummaryModeSummary}, "person"); err != nil {
 		return wire.DailySummarySettings{}, err
 	}
+	// The checks report through the summary (#3355): Off turns them off too. Summary leaves
+	// them as the Daily checks workflow says, until the control has Summary and checks.
+	if r.Mode == wire.DailySummaryModeOff {
+		if checks, err := d.oneWorkflow(home, dailyChecksID); err == nil && checks.IsEnabled {
+			if _, err := d.enableWorkflow(wire.WorkflowEnableRequest{Folder: store.FolderURL(home), WorkflowID: dailyChecksID, Enabled: false}, "person"); err != nil {
+				return wire.DailySummarySettings{}, err
+			}
+		}
+	}
 	return d.dailySummarySettings(), nil
 }
 
