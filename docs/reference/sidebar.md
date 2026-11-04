@@ -40,7 +40,7 @@ you without opening each folder.
 | --- | --- | --- |
 | **Pinned** | The sessions and workflows you pinned, in the order you pinned them. | On, open |
 | **Needs You** | Sessions that asked you something, are blocked, or ask to be archived. Also each approval that waits for you: a connector, a workflow, a plugin, a guarded file, and a workflow that failed. | On, open |
-| **For Review** | Finished sessions that showed you a file you have not opened yet, such as a report or the daily summary. After them, each folder's open pull requests with the `needs-approval` label, until one gets `approved` or `changes-wanted`, or is closed. These do not block an agent. | On, open |
+| **For Review** | Finished sessions that showed you a file you have not opened yet, such as a report or the newest daily summary. After them, each folder's open pull requests with the `needs-approval` label, until one gets `approved` or `changes-wanted`, or is closed. These do not block an agent. | On, open |
 | **Working** | Sessions with a turn in progress. | Off |
 | **Unread** | Finished sessions you have not opened since they finished. | Off |
 

@@ -259,6 +259,32 @@ func (d *Daemon) summaryPulls(folders map[string]bool, since time.Time) []merged
 	return out
 }
 
+// summaryTitle is a page's first heading, such as "Daily summary, Mon 2 Nov"; "" when it has none.
+func summaryTitle(markdown string) string {
+	for line := range strings.Lines(markdown) {
+		if h, ok := strings.CutPrefix(strings.TrimSpace(line), "# "); ok {
+			return prefix(strings.TrimSpace(h), 120)
+		}
+	}
+	return ""
+}
+
+// newestSummary makes this run's session the one daily summary in For Review (#3352): it
+// takes the page's title, so its row says which day, and the earlier runs' sessions in the
+// home folder are marked read, so an older page that nobody opened leaves the group.
+func (d *Daemon) newestSummary(id wire.UUID, markdown string) {
+	if title := summaryTitle(markdown); title != "" {
+		d.change(id, func(a *wire.Agent) { a.Title = &title })
+	}
+	home := filepath.Clean(d.personalHome())
+	for _, a := range d.Store.Agents() {
+		if a.ID != id && a.StartedByWorkflow != nil && *a.StartedByWorkflow == dailySummaryID &&
+			filepath.Clean(store.FolderPath(a.Cwd)) == home && a.FileToSee != nil {
+			d.markRead(a.ID)
+		}
+	}
+}
+
 // saveSummary writes the page, keeps the newest few, shows it and sends one notice.
 func (d *Daemon) saveSummary(id wire.UUID, markdown, headline string, at time.Time) (string, error) {
 	if strings.TrimSpace(markdown) == "" {
@@ -282,6 +308,7 @@ func (d *Daemon) saveSummary(id wire.UUID, markdown, headline string, at time.Ti
 		}
 	}
 	said := []string{"Saved at " + path + "."}
+	d.newestSummary(id, markdown)
 	if _, err := d.showFile(id, map[string]json.RawMessage{"path": jsonString(path)}); err != nil {
 		said = append(said, "Not shown: "+err.Error())
 	}

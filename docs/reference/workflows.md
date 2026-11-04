@@ -479,6 +479,10 @@ the days, edit the schedule's `days:`.
   line. `agents://agent/…` links open their session on the iPhone and iPad.
 - The page is saved in `~/.agents/summaries/`, where the last 3 stay. It opens in the files
   pane, and one notice goes to the Mac and the phone. Its session stays until you archive it.
+- Until you open it, the newest summary is a row in the sidebar's **For Review**, on every
+  client, named by the page's title (such as "Daily summary, Mon 2 Nov"). Open the row to read
+  the page; the row then leaves For Review. When a new summary is saved, the older ones leave
+  For Review, also if you did not open them (#3352).
 
 ## See also
 
