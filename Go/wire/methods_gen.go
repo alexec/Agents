@@ -224,6 +224,7 @@ var CallPolicyEffective = Method[PolicyEffectiveRequest, EffectivePolicy]{"polic
 var CallPolicyFolder = Method[PolicyFolderRequest, PolicyFolderState]{"policy/folder"}
 var CallPolicySetFolder = Method[SetFolderPolicyRequest, PolicyRules]{"policy/setFolder"}
 var CallPolicySetYours = Method[SetYourPolicyRequest, YourPolicy]{"policy/setYours"}
+var CallPolicySettleUntrustedYours = Method[SettleUntrustedYourPolicyRequest, YourPolicyState]{"policy/settleUntrustedYours"}
 var CallPolicyYours = Method[Empty, YourPolicyState]{"policy/yours"}
 var CallPoolApplyAllowances = Method[ApplyAllowancesRequest, Changed]{"pool/applyAllowances"}
 var CallPreferencesGet = Method[Empty, map[string]JSONValue]{"preferences/get"}

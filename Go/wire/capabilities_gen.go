@@ -368,6 +368,7 @@ var HostCapabilities = pairs([][2]string{
 	{"policy/folder", "host.policy-layers/1"},
 	{"policy/setFolder", "host.policy-layers/1"},
 	{"policy/setYours", "host.policy-layers/1"},
+	{"policy/settleUntrustedYours", "host.policy-layers/1"},
 	{"policy/yours", "host.policy-layers/1"},
 	{"pool/applyAllowances", "pool/1"},
 	{"preferences/get", "preferences/1"},

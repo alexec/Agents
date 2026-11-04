@@ -130,3 +130,13 @@ test("a waiting change to a folder's policy asks Allow, Keep the old value, or S
     { allow: "Allow", undo: "Keep Ask", review: "Show Change" });
   assert.equal(p.policyChangeButtons({ looser: ["permissionMode", "sandbox"], words: "w" }).undo, "Keep Old Rules");
 });
+
+test("rules signed on another Mac say so, with each rule, and offer to sign them again (#3230)", () => {
+  // 2026-11-01T12:00:00Z, in seconds since 2001.
+  const copy = { file: "policy-yours.json", rules: {}, revision: 2, changed: 815_227_200, keeper: "h", keyID: "k",
+    lines: [{ rule: "budgets.daily", title: "Per day", words: "$40.00 a day" }] };
+  assert.match(p.untrustedLine(copy), /^These rules were signed on another Mac on .*2026, with a key this Mac doesn’t have/);
+  assert.equal(p.untrustedRule(copy.lines[0]), "Per day: $40.00 a day");
+  assert.equal(p.signAgain, "Sign with This Mac’s Key");
+  assert.equal(p.setAside, "Don’t Use Them");
+});

@@ -142,4 +142,16 @@ struct PolicyLayersWordsTests {
         let again = try JSONDecoder().decode(TranscriptEntry.Kind.self, from: JSONEncoder().encode(kind))
         #expect(again == kind)
     }
+
+    /// Rules signed on another Mac (#3230): the same words as the web page's, read as the wire has them.
+    @Test func rulesSignedOnAnotherMacSaySoAndOfferToSignAgain() throws {
+        let raw = #"{"policy":{"rules":{},"revision":0,"changed":0,"person":"local","keeper":"h"},"keeper":{"host":"h","name":"h"},"untrusted":{"file":"policy-yours.json","rules":{"budgets":{"daily":{"amount":40,"currency":"USD"}}},"revision":2,"changed":815227200,"keeper":"h","keyID":"k","lines":[{"rule":"budgets.daily","title":"Per day","words":"$40.00 a day"}]}}"#
+        let state = try JSONDecoder().decode(DaemonAPI.YourPolicyState.self, from: Data(raw.utf8))
+        let copy = try #require(state.untrusted)
+        #expect(PolicyLayersWords.untrustedLine(copy).hasPrefix("These rules were signed on another Mac on "))
+        let line = try #require(copy.lines.first)
+        #expect(PolicyLayersWords.untrustedRule(line) == "Per day: $40.00 a day")
+        #expect(PolicyLayersWords.signAgain == "Sign with This Mac’s Key")
+        #expect(PolicyLayersWords.setAside == "Don’t Use Them")
+    }
 }

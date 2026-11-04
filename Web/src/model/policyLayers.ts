@@ -3,8 +3,10 @@
 // the layers and sends each rule's words and cap line; these are the page's own: the sections, the titles, what a
 // menu offers, and which of its values a cap dims.
 import type {
-  EffectivePolicy, EffectiveRule, GuardedChangePolicy, JSONValue, PolicyBehindMachine, PolicyLayerRef, PolicyRefusal, PolicyRules,
+  EffectivePolicy, EffectiveRule, GuardedChangePolicy, JSONValue, PolicyBehindMachine, PolicyLayerRef, PolicyRefusal, PolicyRuleLine,
+  PolicyRules, UntrustedYourPolicy,
 } from "../protocol/generated";
+import { fromWireDate } from "../protocol/dates";
 import { absolutePath } from "./fileWatch";
 
 export const groupTitle = "Agents";
@@ -215,6 +217,25 @@ export function tokensValue(text: string): JSONValue | undefined | null {
   if (digits === "") return undefined;
   const v = Number(digits);
   return Number.isInteger(v) && v >= 1 ? v : null;
+}
+
+// Rules signed on another Mac (#3230): policy/yours's untrusted copy, which policy/settleUntrustedYours signs or sets
+// aside, as the person chooses.
+
+export const untrustedTitle = "Your rules from another Mac don’t apply";
+export const signAgain = "Sign with This Mac’s Key";
+export const setAside = "Don’t Use Them";
+export const untrustedNone = "It sets no rules.";
+
+/** Why the rules stopped applying, and what signing does. */
+export function untrustedLine(copy: UntrustedYourPolicy): string {
+  const day = fromWireDate(copy.changed).toLocaleDateString(undefined, { dateStyle: "medium" });
+  return `These rules were signed on another Mac on ${day}, with a key this Mac doesn’t have, so they stopped applying here. Check them. Then sign them with this Mac’s key to use them again.`;
+}
+
+/** One of its rules: "Per day: $40.00 a day". */
+export function untrustedRule(line: PolicyRuleLine): string {
+  return `${line.title}: ${line.words}`;
 }
 
 // A folder's layer, opened from the banner's list in the same pane (#2957, T057, research R13): the web page has no

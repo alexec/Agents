@@ -17505,6 +17505,27 @@
       },
       "additionalProperties": false
     },
+    "PolicyRuleLine": {
+      "type": "object",
+      "description": "One rule a layer sets, in the Policy pane's words (#3230): for example Per day: $40.00 a day.",
+      "properties": {
+        "rule": {
+          "$ref": "#/definitions/PolicyRuleName"
+        },
+        "title": {
+          "type": "string"
+        },
+        "words": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "rule",
+        "title",
+        "words"
+      ],
+      "additionalProperties": false
+    },
     "PolicyRuleName": {
       "type": "string",
       "enum": [
@@ -22274,6 +22295,27 @@
       ],
       "additionalProperties": false
     },
+    "SettleUntrustedYourPolicyRequest": {
+      "type": "object",
+      "description": "policy/settleUntrustedYours (#3230): what the person chose for the untrusted copy in file, read at revision of your layer. sign true signs its rules with this machine's person key as the next revision of your layer; false sets the copy aside and changes nothing. Either way it is not shown again. Refused conflict when file or revision is not the current one, notKeeper on a machine that is not the keeper, forbidden from the agent socket role, an MCP tool or a workflow (FR-010), and invalid when the rules fail policylayers.Validate.",
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer"
+        },
+        "sign": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "file",
+        "revision",
+        "sign"
+      ],
+      "additionalProperties": false
+    },
     "SharedInstructions": {
       "type": "object",
       "properties": {
@@ -25670,6 +25712,50 @@
       ],
       "additionalProperties": false
     },
+    "UntrustedYourPolicy": {
+      "type": "object",
+      "description": "A copy of your layer on disk that fails the signature check (#3230): signed with a person key this machine does not have, such as on another Mac before the root moved here. Shown, never applied, until the person signs it again here (policy/settleUntrustedYours).",
+      "properties": {
+        "file": {
+          "type": "string",
+          "description": "The kept file's name in the settings folder: policy-yours.json, or policy-yours.json.untrusted-<time> once a change here kept it aside (#3122)."
+        },
+        "rules": {
+          "$ref": "#/definitions/PolicyRules"
+        },
+        "revision": {
+          "type": "integer"
+        },
+        "changed": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "keeper": {
+          "type": "string",
+          "description": "The host id of the machine that signed it."
+        },
+        "keyID": {
+          "type": "string",
+          "description": "The id of the person key it was signed with."
+        },
+        "lines": {
+          "type": "array",
+          "description": "Each rule the copy sets, in the Policy pane's words and order.",
+          "items": {
+            "$ref": "#/definitions/PolicyRuleLine"
+          }
+        }
+      },
+      "required": [
+        "file",
+        "rules",
+        "revision",
+        "changed",
+        "keeper",
+        "keyID",
+        "lines"
+      ],
+      "additionalProperties": false
+    },
     "UpdateState": {
       "anyOf": [
         {
@@ -28315,6 +28401,10 @@
         "signed": {
           "$ref": "#/definitions/SignedYourPolicy",
           "description": "The signed copy, when this machine keeps one (#2957): the Mac window passes it to a server over its direct link with policy/applyYours (research R3, path 2)."
+        },
+        "untrusted": {
+          "$ref": "#/definitions/UntrustedYourPolicy",
+          "description": "Your rules from a copy of your layer this machine cannot trust (#3230): the newest such copy. Its rules do not apply until the person signs them again here."
         }
       },
       "required": [

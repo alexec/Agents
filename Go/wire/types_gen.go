@@ -7741,6 +7741,15 @@ type PolicyRuleBudgets struct {
 	DailyTokens *int64 `json:"dailyTokens,omitzero"`
 }
 
+// One rule a layer sets, in the Policy pane's words (#3230): for example Per day: $40.00 a day.
+type PolicyRuleLine struct {
+	Rule PolicyRuleName `json:"rule"`
+
+	Title string `json:"title"`
+
+	Words string `json:"words"`
+}
+
 // One rule a policy layer can set (#2957, data-model.md "EffectiveRule").
 type PolicyRuleName string
 
@@ -9848,6 +9857,15 @@ type SetYourPolicyRequest struct {
 	Revision int64 `json:"revision"`
 }
 
+// policy/settleUntrustedYours (#3230): what the person chose for the untrusted copy in file, read at revision of your layer. sign true signs its rules with this machine's person key as the next revision of your layer; false sets the copy aside and changes nothing. Either way it is not shown again. Refused conflict when file or revision is not the current one, notKeeper on a machine that is not the keeper, forbidden from the agent socket role, an MCP tool or a workflow (FR-010), and invalid when the rules fail policylayers.Validate.
+type SettleUntrustedYourPolicyRequest struct {
+	File string `json:"file"`
+
+	Revision int64 `json:"revision"`
+
+	Sign bool `json:"sign"`
+}
+
 type SharedInstructions struct {
 	Path string `json:"path"`
 
@@ -11190,6 +11208,27 @@ type UnqueueRequest struct {
 	PromptID UUID `json:"promptID"`
 }
 
+// A copy of your layer on disk that fails the signature check (#3230): signed with a person key this machine does not have, such as on another Mac before the root moved here. Shown, never applied, until the person signs it again here (policy/settleUntrustedYours).
+type UntrustedYourPolicy struct {
+	// The kept file's name in the settings folder: policy-yours.json, or policy-yours.json.untrusted-<time> once a change here kept it aside (#3122).
+	File string `json:"file"`
+
+	Rules PolicyRules `json:"rules"`
+
+	Revision int64 `json:"revision"`
+
+	Changed Date `json:"changed"`
+
+	// The host id of the machine that signed it.
+	Keeper string `json:"keeper"`
+
+	// The id of the person key it was signed with.
+	KeyID string `json:"keyID"`
+
+	// Each rule the copy sets, in the Policy pane's words and order.
+	Lines []PolicyRuleLine `json:"lines"`
+}
+
 type UpdateState struct {
 	Unknown *struct{} `json:"unknown,omitzero"`
 
@@ -12269,4 +12308,7 @@ type YourPolicyState struct {
 
 	// The signed copy, when this machine keeps one (#2957): the Mac window passes it to a server over its direct link with policy/applyYours (research R3, path 2).
 	Signed *SignedYourPolicy `json:"signed,omitzero"`
+
+	// Your rules from a copy of your layer this machine cannot trust (#3230): the newest such copy. Its rules do not apply until the person signs them again here.
+	Untrusted *UntrustedYourPolicy `json:"untrusted,omitzero"`
 }

@@ -91,6 +91,8 @@ public extension DaemonAPI {
                 Row(Notification.policyEffectiveChanged, params: PolicyEffectiveRequest.self, result: Empty.self, kind: .hostNotification),
                 Row(Method.policyYours, params: Empty.self, result: YourPolicyState.self, kind: .hostRequest),
                 Row(Method.policySetYours, params: SetYourPolicyRequest.self, result: YourPolicy.self, kind: .hostRequest),
+                Row(Method.policySettleUntrustedYours, params: SettleUntrustedYourPolicyRequest.self, result: YourPolicyState.self,
+                    kind: .hostRequest),
                 Row(Method.policyFolder, params: PolicyFolderRequest.self, result: PolicyFolderState.self, kind: .hostRequest),
                 Row(Method.policySetFolder, params: SetFolderPolicyRequest.self, result: PolicyRules.self, kind: .hostRequest),
                 Row(Method.optionsRemembered, params: RememberedOptionsRequest.self, result: [ConfigOption].self,
