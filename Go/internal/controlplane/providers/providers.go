@@ -496,6 +496,8 @@ func (p *Providers) AgentCall(host, agent, method string, params json.RawMessage
 		return p.projectFolders(rawOf(given), caller)
 	case MethodProjectSessions:
 		return p.projectSessions(host, rawOf(given), caller)
+	case MethodSummaryFacts:
+		return p.summaryFacts(host, rawOf(given), caller)
 	}
 	if named, ok := str(given["id"]); ok && (method == MethodProvidersCreate || method == MethodProvidersOptions) {
 		p.mu.Lock()

@@ -6229,6 +6229,17 @@ type MachineStop struct {
 	ConfirmRunning *bool `json:"confirmRunning,omitzero"`
 }
 
+// One of the person's other machines in machines/summaryFacts (#3354): its facts, or, when it is off or did not answer, unreached, the words that say why.
+type MachineSummaryFacts struct {
+	Machine MachineRef `json:"machine"`
+
+	MachineName string `json:"machineName"`
+
+	Facts *SummaryFacts `json:"facts,omitzero"`
+
+	Unreached *string `json:"unreached,omitzero"`
+}
+
 type MachineTunnel struct {
 	Up bool `json:"up"`
 
@@ -6330,6 +6341,11 @@ type MachineWorkspaceCall struct {
 	Method string `json:"method"`
 
 	Params JSONValue `json:"params"`
+}
+
+// machines/summaryFacts (#3354): the daily summary's facts from each of the person's other machines, by name.
+type MachinesSummaryFacts struct {
+	Machines []MachineSummaryFacts `json:"machines"`
 }
 
 type ManagedMCPServer struct {
@@ -10663,6 +10679,26 @@ type SuggestedPrompt struct {
 	Label string `json:"label"`
 
 	Prompt string `json:"prompt"`
+}
+
+// agents/summaryFacts (#3354): one machine's lines for the daily summary since a time, each list at most 40 lines, newest last; folders is how many folders it has.
+type SummaryFacts struct {
+	Folders int64 `json:"folders"`
+
+	Landed []string `json:"landed"`
+
+	Failed []string `json:"failed"`
+
+	Waiting []string `json:"waiting"`
+
+	Suggested []string `json:"suggested"`
+
+	Checked []string `json:"checked"`
+}
+
+// agents/summaryFacts and machines/summaryFacts (#3354): the facts since this time.
+type SummaryFactsRequest struct {
+	Since Date `json:"since"`
 }
 
 // Surface (Attention/Surface.swift): a tagged object, `{ mac: {} }` or `{ device: "<uuid>" }`.
