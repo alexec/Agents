@@ -371,6 +371,8 @@ public extension DaemonAPI {
                 // A linked host's workspace (#691): Start on the offline strip.
                 Row(Method.hostsStart, params: MachineRequest.self, result: ControlMachine.self, kind: .controlRequest),
                 Row(Method.hostsStop, params: MachineStop.self, result: ControlMachine.self, kind: .controlRequest),
+                // Settings ▸ Machines (#3381): Remove… on a machine.
+                Row(Method.hostsRemove, params: MachineRequest.self, result: Empty.self, kind: .controlRequest),
                 // Settings ▸ Machine providers (#1808): the API providers, and a workspace's host
                 // linked and unlinked.
                 Row(Method.providersList, params: Empty.self, result: JSONValue.self, kind: .controlRequest),
