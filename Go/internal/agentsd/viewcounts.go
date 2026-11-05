@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -80,8 +79,8 @@ func (d *Daemon) kickViewCounts() {
 	}
 }
 
-// countViewsEvery polls every shown view's count until the daemon ends.
-func (d *Daemon) countViewsEvery() {
+// countViewsEvery polls every shown view's count until ctx ends, at Shutdown (#3522).
+func (d *Daemon) countViewsEvery(ctx context.Context) {
 	kick := make(chan struct{}, 1)
 	d.viewCountMu.Lock()
 	d.viewCountKick = kick
@@ -90,7 +89,7 @@ func (d *Daemon) countViewsEvery() {
 	defer t.Stop()
 	for {
 		select {
-		case <-d.ctx.Done():
+		case <-ctx.Done():
 			return
 		case <-kick:
 			// A view with no count yet: soon, but never sooner than the first poll.
@@ -98,7 +97,7 @@ func (d *Daemon) countViewsEvery() {
 			continue
 		case <-t.C:
 		}
-		d.countViewsOnce(d.ctx)
+		d.countViewsOnce(ctx)
 		t.Reset(viewCountEvery)
 	}
 }
@@ -220,4 +219,4 @@ func viewCountOf(result json.RawMessage) (count, attention *int64, failed bool) 
 }
 
 // startViewCounts starts the poll.
-func (d *Daemon) startViewCounts() { safe.Go("view counts", d.countViewsEvery) }
+func (d *Daemon) startViewCounts() { d.goLoop("view counts", d.countViewsEvery) }
