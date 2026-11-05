@@ -8,7 +8,7 @@ import type { HeardLiveFrame } from "./desktopControl";
 import { batch, computed, signal, type ReadonlySignal, type Signal } from "@preact/signals";
 import type {
   Agent, AgentRemovedNotification, ResumingNotification, DesktopControlLiveFrame, ControlMachine, MachineRef, MachineWorkspace, ElicitationNotification, ElicitationRequest, EntryNotification,
-  PermissionNotification, PermissionRequest, FolderSummary, HelperLimits, DiskThresholds, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
+  PermissionNotification, PermissionRequest, FolderSummary, HelperLimits, DiskThresholds, NotCommittedResponse, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, FolderRemovedNotification, DraftOptionsNotification, JSONValue, Methods, AccountProfile, RuntimeAccount, RuntimeSignInStep, RuntimeStatus,
   StartRequest, UUID, AutoMappings, AutoPreview, AutoPreviewRequest, AutoSettings, ClientPermissionMode, Levels, ModelLevel, PermissionLevel, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
   CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
@@ -23,6 +23,7 @@ import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import type { FolderGoneAsk } from "./missingFolder";
 import { describe, methodNotFound } from "./errors";
+import { freeProjectName } from "./projectSettings";
 import { fromWireDate } from "../protocol/dates";
 import { addCap, dropCap, openCaps } from "./teamGroups";
 import { withGovernanceRequest } from "./governance";
@@ -2498,6 +2499,18 @@ export class Store extends Work {
   async setFolderProject(host: string, folder: string, project: string): Promise<void> {
     const summary = await this.link.call("folders/setProject", { folder: folder as never, project }, host);
     this.upsertFolder(summary, host);
+  }
+
+  /** Remove from Project… (#3448): the folder leaves its project for a new one of its own, named after it. Throws a refusal. */
+  async removeFolderFromProject(host: string, folder: string, name: string): Promise<void> {
+    const { projects } = await this.link.call("projects/list", {});
+    const made = await this.link.call("projects/set", { name: freeProjectName(name, projects) });
+    await this.setFolderProject(host, folder, made.id);
+  }
+
+  /** What in a folder's .agents Git ignores (#3448), read by its own machine. Throws a refusal. */
+  notCommitted(host: string, folder: string): Promise<NotCommittedResponse> {
+    return this.link.call("folders/notCommitted", { folder: folder as never }, host);
   }
 
   /** What a folder's merged pull requests say of their cost (#2352). Throws a refusal. */

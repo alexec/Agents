@@ -230,6 +230,21 @@ public enum ProjectWords {
     }
     public static let tryAgain = "Try Again"
     public static let noControlPlane = "Connect to a control plane to choose a project."
+    /// The name Remove from Project… gives a folder's own project (#3448): its own name, or
+    /// with " 2", " 3", … when a project here has it, as the control plane names one it
+    /// adopts (`freeProjectName`).
+    public static func freeName(_ name: String, among projects: [DaemonAPI.Project]) -> String {
+        let taken = Set(projects.map { $0.name.lowercased() })
+        var name = name.trimmingCharacters(in: .whitespaces)
+        if name.isEmpty { name = title }
+        var free = name
+        var n = 2
+        while taken.contains(free.lowercased()) {
+            free = "\(name) \(n)"
+            n += 1
+        }
+        return free
+    }
     /// The Add Folder sheet's first choice (#2671), what a solo person keeps.
     public static let ownProject = "Its Own Project"
     /// Under the Add Folder sheet's picker.

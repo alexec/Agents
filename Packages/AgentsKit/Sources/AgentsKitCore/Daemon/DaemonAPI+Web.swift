@@ -355,6 +355,9 @@ public extension DaemonAPI {
                     kind: .hostRequest),
                 Row(Method.foldersSetDiskSpace, params: SetDiskSpaceRequest.self, result: FolderSummary.self,
                     kind: .hostRequest),
+                // Not Committed in the web page's Folder Settings (#3448), as the window's has it.
+                Row(Method.foldersNotCommitted, params: FolderRequest.self, result: NotCommittedResponse.self,
+                    kind: .hostRequest),
                 // A change to the folder's own files made outside the app (#531): read, Keep, Undo.
                 Row(Method.foldersReadGuardedChange, params: GuardedChangeRequest.self, result: GuardedChangeReading.self,
                     kind: .hostRequest),

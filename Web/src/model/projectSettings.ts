@@ -12,7 +12,27 @@ export const projectSettingsWords = {
   addOnAnotherMachine: "Add on Another Machine…",
   notConnected: "not connected",
   noControlPlane: "Connect to a control plane to see the project's folders on your other machines.",
+  removeFromProject: "Remove…",
+  removeHelp: "Remove from Project: give this folder a project of its own",
+  notCommittedNote: "What in this folder's .agents Git ignores. It stays on this machine: the project's other folders do not get it.",
+  notARepository: "This folder is not in a Git repository, so nothing in its .agents is committed.",
+  nothingIgnored: "Git ignores nothing in this folder's .agents.",
 } as const;
+
+/** Remove from Project…'s question (#3448): the folder gets a project of its own. */
+export function removeQuestion(path: string): string {
+  return `Remove ${path} from this project?\n\nIt gets a project of its own, named after it. Its sessions stay with it. `
+    + "To put it back, choose this project in its Folder Settings.";
+}
+
+/** The name of that project: the folder's, or with " 2", " 3", … when a project has it, as the control plane names one it adopts. */
+export function freeProjectName(name: string, projects: readonly { name: string }[]): string {
+  const taken = new Set(projects.map((p) => p.name.toLowerCase()));
+  const base = name.trim() || "Project";
+  let free = base;
+  for (let n = 2; taken.has(free.toLowerCase()); n++) free = `${base} ${n}`;
+  return free;
+}
 
 /** The panes of Project Settings, in the window's order. Agent Configuration's files open in their own dialog. */
 export const projectPanes = [
@@ -29,6 +49,7 @@ export type ProjectPane = (typeof projectPanes)[number]["id"];
 export const folderPanes = [
   { id: "general", title: "General" },
   { id: "diskSpace", title: "Disk Space" },
+  { id: "notCommitted", title: "Not Committed" },
 ] as const;
 export type FolderPane = (typeof folderPanes)[number]["id"];
 

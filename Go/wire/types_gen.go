@@ -6679,6 +6679,18 @@ const NeedKindReport NeedKind = "report"
 const NeedKindGuardedChange NeedKind = "guardedChange"
 const NeedKindNotice NeedKind = "notice"
 
+// folders/notCommitted (#3448): what in the folder's .agents Git ignores, so it stays on this machine and the project's other folders do not get it.
+type NotCommittedResponse struct {
+	// False when the folder is not in a Git repository: then nothing in .agents is committed, and paths is empty.
+	IsRepository bool `json:"isRepository"`
+
+	// Paths from the folder, such as .agents/worktrees/. A folder that Git ignores whole is one path, with a slash at its end. At most 500.
+	Paths []string `json:"paths"`
+
+	// How many more paths there are after the first 500.
+	More int64 `json:"more"`
+}
+
 // notices/delivered (#2860): the control plane sent a host's notice to one of the person's devices.
 type NoticeDelivered struct {
 	Need NeedID `json:"need"`

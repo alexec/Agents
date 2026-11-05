@@ -132,6 +132,7 @@ var CallFoldersDelete = Method[FolderRequest, Empty]{"folders/delete"}
 var CallFoldersFind = Method[FoldersFindRequest, []FoundFolder]{"folders/find"}
 var CallFoldersKeepGuardedChange = Method[GuardedChangeRequest, FolderSummary]{"folders/keepGuardedChange"}
 var CallFoldersList = Method[FoldersListRequest, []FolderSummary]{"folders/list"}
+var CallFoldersNotCommitted = Method[FolderRequest, NotCommittedResponse]{"folders/notCommitted"}
 var CallFoldersReadGuardedChange = Method[GuardedChangeRequest, GuardedChangeReading]{"folders/readGuardedChange"}
 var CallFoldersReceive = Method[ReceiveRequest, FolderSummary]{"folders/receive"}
 var CallFoldersReceiveState = Method[ReceiveStateRequest, ReceiveState]{"folders/receiveState"}

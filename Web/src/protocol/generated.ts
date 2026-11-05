@@ -5555,6 +5555,25 @@ export type NeedKind =
   | "notice";
 
 /**
+ * folders/notCommitted (#3448): what in the folder's .agents Git ignores, so it stays on this
+ * machine and the project's other folders do not get it.
+ */
+export interface NotCommittedResponse {
+  /**
+   * False when the folder is not in a Git repository: then nothing in .agents is committed, and
+   * paths is empty.
+   */
+  isRepository: boolean;
+  /**
+   * Paths from the folder, such as .agents/worktrees/. A folder that Git ignores whole is one path,
+   * with a slash at its end. At most 500.
+   */
+  paths: string[];
+  /** How many more paths there are after the first 500. */
+  more: number;
+}
+
+/**
  * notices/delivered (#2860): the control plane sent a host's notice to one of the person's devices.
  */
 export interface NoticeDelivered {
@@ -10496,6 +10515,7 @@ export interface Methods {
   "folders/delete": { params: FolderRequest; result: Empty };
   "folders/keepGuardedChange": { params: GuardedChangeRequest; result: FolderSummary };
   "folders/list": { params: FoldersListRequest; result: FolderSummary[] };
+  "folders/notCommitted": { params: FolderRequest; result: NotCommittedResponse };
   "folders/readGuardedChange": { params: GuardedChangeRequest; result: GuardedChangeReading };
   "folders/setDiskSpace": { params: SetDiskSpaceRequest; result: FolderSummary };
   "folders/setHelperLimits": { params: SetHelperLimitsRequest; result: FolderSummary };
@@ -10838,6 +10858,7 @@ export const MethodTarget = {
   "folders/delete": "host",
   "folders/keepGuardedChange": "host",
   "folders/list": "host",
+  "folders/notCommitted": "host",
   "folders/readGuardedChange": "host",
   "folders/setDiskSpace": "host",
   "folders/setHelperLimits": "host",
@@ -11613,6 +11634,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MoveRequest: { required: ["agentID", "removeLeft", "discardChanges"], optional: ["target"] },
   NativeSetting: { required: [], optional: ["options", "sandbox", "clientPermission"] },
   Need: { required: ["id", "folder", "kind", "raisedAt", "headline"], optional: ["agentID"] },
+  NotCommittedResponse: { required: ["isRepository", "paths", "more"], optional: [] },
   NoticeDelivered: { required: ["need", "to"], optional: [] },
   NoticeDelivery: { required: ["notice", "to"], optional: [] },
   NoticeLimits: { required: ["burst", "cooldownMinutes"], optional: [] },

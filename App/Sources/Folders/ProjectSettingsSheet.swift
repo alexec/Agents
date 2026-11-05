@@ -265,7 +265,8 @@ struct ProjectSettingsSheet: View {
                     switch chosen {
                     case .workAtOnce: ProjectWorkAtOncePane(summary: summary)
                     case .sessions: ProjectSessionsPane(summary: summary)
-                    default: ProjectGeneralPane(summary: summary, project: project, owner: owner)
+                    default: ProjectGeneralPane(summary: summary, project: project, owner: owner,
+                                                reload: { await loadProject() })
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -331,6 +332,15 @@ enum ProjectSettingsWords {
     static let noOtherMachine = "Every machine you have has a folder of this project. Add a machine in Settings ▸ Machines first."
     static let notConnected = "not connected to this Mac"
     static let noControlPlane = "Connect to a control plane to see the project's folders on your other machines."
+
+    /// Remove from Project… on a folder of the project (#3448): it gets a project of its own.
+    static let removeFromProject = "Remove…"
+    static let removeButton = "Remove from Project"
+    static let removeHelp = "Remove from Project: give this folder a project of its own"
+    static func removeQuestion(_ path: String) -> String { "Remove \(path) from this project?" }
+    static let removeMessage =
+        "It gets a project of its own, named after it. Its sessions stay with it. "
+            + "To put it back, choose this project in its Folder Settings."
 }
 
 /// Where a Project Settings pane says its folder is: the path and the machine.
@@ -349,6 +359,11 @@ private struct ProjectGeneralPane: View {
     let summary: DaemonAPI.FolderSummary
     let project: DaemonAPI.Project?
     let owner: String?
+    /// Reads the project again, once a folder has left it.
+    let reload: () async -> Void
+    /// The folder Remove from Project… asks about, and why the last one could not leave.
+    @State private var removing: DaemonAPI.FolderSummary?
+    @State private var removeProblem: String?
 
     /// One folder of the project, as the Folders list shows it.
     private struct FolderLine: Identifiable {
@@ -435,8 +450,21 @@ private struct ProjectGeneralPane: View {
                         }
                         .buttonStyle(.paper)
                         .appText(.fine)
+                        .fixedSize()
+                        // A project of one folder has nothing to remove it from.
+                        if lines.count > 1 {
+                            Button(ProjectSettingsWords.removeFromProject) { removing = local }
+                                .buttonStyle(.paper)
+                                .appText(.fine)
+                                .fixedSize()
+                                .disabled(model.hostUnreachable(local.host))
+                                .help(ProjectSettingsWords.removeHelp)
+                        }
                     }
                 }
+            }
+            if let removeProblem {
+                Text(removeProblem).appText(.fine).tinted(.failure)
             }
             Menu(ProjectSettingsWords.addOnAnotherMachine) {
                 ForEach(otherMachines, id: \.self) { machine in
@@ -450,6 +478,19 @@ private struct ProjectGeneralPane: View {
             if model.controlRequests == nil {
                 settingsNote(ProjectSettingsWords.noControlPlane)
             }
+        }
+        .confirmationDialog(removing.map { ProjectSettingsWords.removeQuestion(FolderPlace.path($0.folder.folder, on: $0.host)) } ?? "",
+                            isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
+                            presenting: removing) { folder in
+            Button(ProjectSettingsWords.removeButton) {
+                Task {
+                    removeProblem = await model.removeFromProject(folder)
+                    await reload()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text(ProjectSettingsWords.removeMessage)
         }
     }
 
