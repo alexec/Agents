@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/internal/machinelock"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -305,5 +306,29 @@ func TestLockResetOnDaemonSockAsksForTheLockAgain(t *testing.T) {
 	}
 	if RoleAgent.Allows(wire.CallDaemonLockReset.Name) {
 		t.Fatal("an agent's helper may reset the lock")
+	}
+}
+
+// #3542: the control plane may stop, unsigned, the writer of a provider draft it holds,
+// whose start a client of the lock signed; no other agent.
+func TestTheControlPlaneStopsOnlyADraftsWriter(t *testing.T) {
+	d, _, _, _ := lockedMachine(t)
+	cwd := t.TempDir()
+	writer := seeded(t, d, cwd, func(a *wire.Agent) {
+		a.Purpose = &wire.AgentPurpose{ProviderDraft: &wire.AgentPurposeProviderDraft{ID: wire.UUID(store.NewUUID())}}
+	})
+	work := seeded(t, d, cwd, nil)
+	cp := channelTo(d)
+	cp.send(requestLine(1, wire.CallAgentsStop.Name, wire.AgentStopRequest{AgentID: work.ID}))
+	if line := cp.answer(t, 1); !notInLockAnswer(line) {
+		t.Fatalf("the control plane stopped a person's agent: %s", line)
+	}
+	cp.send(requestLine(2, wire.CallAgentsStop.Name, wire.AgentStopRequest{AgentID: writer.ID, ByAdmin: new(true)}))
+	if line := cp.answer(t, 2); !notInLockAnswer(line) {
+		t.Fatalf("the control plane stopped a writer as an admin: %s", line)
+	}
+	cp.send(requestLine(3, wire.CallAgentsStop.Name, wire.AgentStopRequest{AgentID: writer.ID}))
+	if line := cp.answer(t, 3); notInLockAnswer(line) {
+		t.Fatalf("the control plane could not stop its draft's writer: %s", line)
 	}
 }

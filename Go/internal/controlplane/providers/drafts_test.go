@@ -41,6 +41,9 @@ type world struct {
 	ownerHere    bool
 	ownerAsked   int
 	agent        string
+	// The host holds its person's lock: it takes only a signed start (#3542).
+	locked bool
+	signed []wire.LockDelivery
 }
 
 func newWorld(tools []string, descriptions map[string]string) *world {
@@ -196,6 +199,15 @@ func newDraftHarness(w *world, timing DraftTiming, localHost bool, busy string, 
 			w.mu.Lock()
 			defer w.mu.Unlock()
 			w.started = append(w.started, request)
+			if w.locked {
+				return "", fail(wire.FailureNotInLock, "This machine takes requests only from your devices.")
+			}
+			return w.agent, nil
+		},
+		SignedStart: func(_ string, start wire.LockDelivery, _ Caller) (string, error) {
+			w.mu.Lock()
+			defer w.mu.Unlock()
+			w.signed = append(w.signed, start)
 			return w.agent, nil
 		},
 		StopAgent: func(_, agent string, _ Caller) {
@@ -810,4 +822,71 @@ func TestAnUpdateWhoseSecretIsAWordIsStillSentRedacted(t *testing.T) {
 	if out, ok := redactUpdate(update, NewRedaction(map[string]string{"S": "Claude"})); !ok || out.RuntimeName != "${S}" {
 		t.Errorf("%+v", out)
 	}
+}
+
+// #3542: a host that holds its person's lock refuses the control plane's own start, so the
+// sheet's client signs the writer's start, and it goes as it came.
+func TestALockedHostStartsTheWriterAsTheSheetsClientSignedIt(t *testing.T) {
+	w := newWorld(dropletTools, nil)
+	w.locked = true
+	h := newDraftHarness(w, quickDraftTiming(), true, "", nil)
+	started, err := h.start(mapForm, map[string]string{"DIGITALOCEAN_API_TOKEN": secretValue}, "claude")
+	if err != nil || started.Sign == nil {
+		t.Fatalf("%v %+v", err, started)
+	}
+	sign := *started.Sign
+	if string(sign.Machine) != h.host || sign.Method != MethodAgentsStart {
+		t.Fatalf("to sign: %+v", sign)
+	}
+	var start StartRequest
+	if json.Unmarshal([]byte(sign.Params), &start) != nil || PurposeDraft(start) != string(started.Draft) {
+		t.Fatalf("not the writer's start: %s", sign.Params)
+	}
+	if strings.Contains(sign.Params, secretValue) {
+		t.Fatal("the start to sign holds a secret's value")
+	}
+	lock := wire.LockSignature{To: new(h.host), At: time.Now().Unix(), Key: []byte{4}, Sig: []byte{1}}
+	stranger := h.owner
+	stranger.Client = records.NewUUID()
+	if err := h.drafts.Signed(ProviderDraftSigned{Draft: started.Draft, Lock: lock}, stranger); err == nil {
+		t.Fatal("another client's signature was taken")
+	}
+	if err := h.drafts.Signed(ProviderDraftSigned{Draft: started.Draft, Lock: lock}, h.owner); err != nil {
+		t.Fatal(err)
+	}
+	w.read(func() {
+		if len(w.signed) != 1 || w.signed[0].Params != sign.Params || w.signed[0].Method != sign.Method ||
+			!reflect.DeepEqual(w.signed[0].Lock, lock) {
+			t.Fatalf("not delivered as signed: %+v", w.signed)
+		}
+	})
+	if u := w.last(); u == nil || u.State != "writing" {
+		t.Fatalf("the draft: %+v", u)
+	}
+	if note := h.mustTool(t, string(started.Draft), ToolReadTools, map[string]any{}); note == NotYoursWords {
+		t.Fatal("the writer is not the draft's")
+	}
+	if err := h.drafts.Signed(ProviderDraftSigned{Draft: started.Draft, Lock: lock}, h.owner); err == nil {
+		t.Fatal("a second signature started a second writer")
+	}
+}
+
+// A start that is not signed in time ends the draft.
+func TestAWritersStartNotSignedInTimeFails(t *testing.T) {
+	w := newWorld(dropletTools, nil)
+	w.locked = true
+	timing := quickDraftTiming()
+	timing.Answer = 50 * time.Millisecond
+	h := newDraftHarness(w, timing, true, "", nil)
+	started, err := h.start(mapForm, map[string]string{"DIGITALOCEAN_API_TOKEN": secretValue}, "claude")
+	if err != nil || started.Sign == nil {
+		t.Fatalf("%v %+v", err, started)
+	}
+	for range 300 {
+		if u := w.last(); u != nil && u.State == "failed" {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("the draft: %+v", w.last())
 }

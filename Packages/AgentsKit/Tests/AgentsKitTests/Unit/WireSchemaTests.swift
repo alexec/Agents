@@ -194,6 +194,8 @@ struct WireSchemaTests {
             "KeepRequest": Self.through(DaemonAPI.KeepRequest.self),
             "ProviderDraftStart": Self.through(DaemonAPI.ProviderDraftStart.self),
             "ProviderDraftStarted": Self.through(DaemonAPI.ProviderDraftStarted.self),
+            "ProviderDraftSign": Self.through(DaemonAPI.ProviderDraftSign.self),
+            "ProviderDraftSigned": Self.through(DaemonAPI.ProviderDraftSigned.self),
             "ProviderDraftRequest": Self.through(DaemonAPI.ProviderDraftRequest.self),
             "ProviderDraftAnswer": Self.through(DaemonAPI.ProviderDraftAnswer.self),
             "ProviderRuntimes": Self.through(DaemonAPI.ProviderRuntimes.self),
