@@ -1020,6 +1020,7 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 	if a := d.Store.Agent(l.id); a != nil && a.State == wire.AgentStateArchived {
 		l.forgetTools()
 		d.endScreenDrive(l.id)
+		d.endBrowserDrive(l.id)
 		d.workflowRunFinished(l.id)
 		d.guardedTurnEnded(l.id)
 		d.checkQueueSoon(folderPath(a))
@@ -1041,6 +1042,7 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 	var requested, archiveNow, keptBlock bool
 	l.forgetTools()
 	d.endScreenDrive(l.id)
+	d.endBrowserDrive(l.id)
 	d.change(l.id, func(a *wire.Agent) {
 		a.State, a.EndedReason, a.RunningTool = s, reason(why), nil
 		if why != wire.EndedReasonDaemonGone {

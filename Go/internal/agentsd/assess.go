@@ -103,6 +103,16 @@ func appToolMethod(tool string) string {
 	if m, ok := appToolMethods[tool]; ok {
 		return m
 	}
+	// A browser tool (#3534) is browser/<the rest, in camelCase>: browser/takeScreenshot.
+	if rest, ok := strings.CutPrefix(tool, "browser_"); ok && rest != "" {
+		words := strings.Split(rest, "_")
+		for i := 1; i < len(words); i++ {
+			if words[i] != "" {
+				words[i] = strings.ToUpper(words[i][:1]) + words[i][1:]
+			}
+		}
+		return "browser/" + strings.Join(words, "")
+	}
 	return tool
 }
 
