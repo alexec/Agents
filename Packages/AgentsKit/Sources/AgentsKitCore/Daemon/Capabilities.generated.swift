@@ -87,6 +87,7 @@ public enum Capability {
     public static let hostsJoin1 = "hosts.join/1"
     public static let hosts1 = "hosts/1"
     public static let lineageComment1 = "lineage.comment/1"
+    public static let lineageEstimate1 = "lineage.estimate/1"
     public static let lineage1 = "lineage/1"
     public static let links1 = "links/1"
     public static let liveactivity1 = "liveactivity/1"
@@ -345,6 +346,7 @@ public enum Capability {
         "git/fill": "git/1",
         "lineage/cost": "lineage/1",
         "lineage/end": "lineage/1",
+        "lineage/estimate": "lineage.estimate/1",
         "lineage/link": "lineage/1",
         "lineage/links": "lineage/1",
         "lineage/walk": "lineage/1",

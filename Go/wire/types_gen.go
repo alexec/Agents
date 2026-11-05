@@ -5414,6 +5414,84 @@ type LineageEndRequest struct {
 	Rel string `json:"rel"`
 }
 
+// lineage/estimate (#3559): what an issue or an epic will probably cost and take, from the closed issues like it on this machine (specs/3557-estimates/spec.md). An issue matches the closed issues with its type (bug or enhancement) and level (story, task, spike or bug); when fewer than 5 match, those with its type; then all of them (matchedBy says level, type or all). Only issues that closed with a merged PR that fixes them count, and no epic. Each figure is the median and the P10 to P90 range of the matches (8 in 10 like it land there), absent when fewer than 5 of them have it; with fewer than 5 closed issues in all there are no figures (closedIssues says how many there are). An epic adds up its open children by a simulation with a fixed seed: one match per child, 1,000 times. Its times follow its steps: the children of one step run at the same time, so a draw's time is the sum over the steps of its longest child. spent is what its closed children cost. landsAt is startAt (now when the request has none) plus the cycle time.
+type LineageEstimate struct {
+	Node LineageNode `json:"node"`
+
+	// bug or enhancement, from its labels; absent with neither.
+	Type *string `json:"type,omitzero"`
+
+	// epic, story, task, spike or bug, from its labels; absent with none.
+	Level *string `json:"level,omitzero"`
+
+	// An epic's child's step in its plan (forge/plan).
+	Step *int64 `json:"step,omitzero"`
+
+	// The closed issues there are to match, on this machine.
+	ClosedIssues int64 `json:"closedIssues"`
+
+	// An issue's rule: level (the same type and level), type or all. Absent for an epic, and with too few closed issues.
+	MatchedBy *string `json:"matchedBy,omitzero"`
+
+	// The closed issues the estimate used; for an epic, those its open children used, each once.
+	Matches int64 `json:"matches"`
+
+	// Dollars, by currency, as LineageCost.cost.
+	Cost map[string]LineageEstimateRange `json:"cost,omitzero"`
+
+	InputTokens *LineageEstimateRange `json:"inputTokens,omitzero"`
+
+	OutputTokens *LineageEstimateRange `json:"outputTokens,omitzero"`
+
+	// The agents' time at work.
+	WorkingSeconds *LineageEstimateRange `json:"workingSeconds,omitzero"`
+
+	// From the first work to the last PR merged. It varies with the queue (lanes, CI, approvals), not with the work: the backtest's error was x2.4.
+	LeadTimeSeconds *LineageEstimateRange `json:"leadTimeSeconds,omitzero"`
+
+	// From the start of work (#3562) to the last PR merged.
+	CycleTimeSeconds *LineageEstimateRange `json:"cycleTimeSeconds,omitzero"`
+
+	LandsAt *LineageEstimateDates `json:"landsAt,omitzero"`
+
+	// An epic's children that are open.
+	OpenChildren *int64 `json:"openChildren,omitzero"`
+
+	// An epic's children that are closed.
+	ClosedChildren *int64 `json:"closedChildren,omitzero"`
+
+	// What an epic's closed children cost, each with the PRs that fix it.
+	Spent *LineageCost `json:"spent,omitzero"`
+
+	// An epic's open children, each estimated as an issue, in step order.
+	Children []LineageEstimate `json:"children,omitzero"`
+}
+
+// When work lands (#3559): the median and the P10 to P90 range.
+type LineageEstimateDates struct {
+	Median Date `json:"median"`
+
+	P10 Date `json:"p10"`
+
+	P90 Date `json:"p90"`
+}
+
+// A figure's estimate (#3559): the median and the P10 to P90 range.
+type LineageEstimateRange struct {
+	Median float64 `json:"median"`
+
+	P10 float64 `json:"p10"`
+
+	P90 float64 `json:"p90"`
+}
+
+// lineage/estimate (#3559): an issue or an epic, and when work on it starts, for landsAt (now when absent).
+type LineageEstimateRequest struct {
+	Node LineageNode `json:"node"`
+
+	StartAt *Date `json:"startAt,omitzero"`
+}
+
 // lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the walk stopped at its limit on nodes, so there is more. resolved is each node's title, state and labels from its connector, by ref, for the nodes a connector could resolve (#3089). resolving says some nodes are still being resolved in the background, so walk again shortly for them (#3102).
 type LineageGraph struct {
 	Nodes []LineageNode `json:"nodes"`

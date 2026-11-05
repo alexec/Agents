@@ -4773,6 +4773,26 @@
       }
     },
     {
+      "name": "lineage/estimate",
+      "x-capability": "lineage.estimate/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LineageEstimateRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LineageEstimate"
+        }
+      }
+    },
+    {
       "name": "lineage/link",
       "x-capability": "lineage/1",
       "paramStructure": "by-name",
