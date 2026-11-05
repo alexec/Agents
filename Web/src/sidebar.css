@@ -4,7 +4,8 @@
    three-column rules in app.css. */
 
 .columns.with-sidebar { grid-template-columns: 300px minmax(0, 1fr); }
-.files-open .columns.with-sidebar { grid-template-columns: 300px minmax(0, 1fr) 420px; }
+/* The files pane and the chat share the room half and half, as the Mac's inspector opens (Alex). */
+.files-open .columns.with-sidebar { grid-template-columns: 300px minmax(0, 1fr) minmax(420px, 1fr); }
 .with-sidebar .chat, .with-sidebar .files { grid-column: 2; grid-row: 1; }
 .files-open .with-sidebar .files { grid-column: 3; }
 
