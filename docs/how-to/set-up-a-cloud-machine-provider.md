@@ -6,13 +6,14 @@ description: Add AWS EC2, Google Compute Engine, Google Cloud Workstations, Digi
 
 # Set up a cloud machine provider
 
-A machine provider starts and stops the machines that your hosts run on. It runs on the
-control plane, not on a host, so it can start a host that is down. This page tells you how
+A machine provider starts and stops the machines that your hosts run on. One of your own
+machines carries it, such as your Mac, and the control plane sends it each list, start and
+stop, so it can start a host that is down (#3398). This page tells you how
 to add one for a cloud, and which credentials each cloud needs.
 
 Most clouds have an **API preset**: you give a token or a key, and there is nothing to
 install. A **CLI preset** uses the cloud's own CLI, which must be installed and signed in
-on the Mac that runs the control plane.
+on the machine that carries the provider.
 
 | Cloud | Through its API | Through its CLI | Its machines |
 | --- | --- | --- | --- |
@@ -53,11 +54,10 @@ from a provider that can make machines.
 
 ## Where the credentials go
 
-You type a token or a key once. It goes to the control plane and is never shown again. The
-device that you typed it on does not keep it. The control plane keeps it in its store,
-sealed with the key that seals your secrets (a KMS on a cloud machine), so no value is in
-the store in clear, and a store copy or a backup keeps it. It is never sent to a host or a
-client, and never logged. An API preset sends it only in
+You type a token or a key once, and it is never shown again. It goes to the machine that
+carries the provider, which keeps it in `~/.agents-secrets/provider-secrets.json`, readable
+only by you (#3398). The control plane passes it on once and keeps none. The device that
+you typed it on does not keep it either. It is never logged. An API preset sends it only in
 a request's header, never in an address.
 
 To change it later, choose **Edit…** on the provider's card. An empty field keeps the one
@@ -179,7 +179,9 @@ Through its API, you need your deployment's address and a session token.
 1. Make the token with `coder tokens create`.
 2. Give the address in **Deployment**, such as `https://coder.example.com`.
 3. Give the token in **Session token**.
-4. On the Mac that runs the control plane, run `coder config-ssh`.
+4. On the Mac that runs the control plane, sign `coder` in with `coder login <address>`,
+   then run `coder config-ssh`. The control plane installs Agents on a Coder machine
+   over the `coder.<name>` host that it writes.
 
 ssh still goes through `coder`, so the card says "needs coder for ssh" when the machine that
 runs the control plane has no `coder`.
