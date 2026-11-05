@@ -37,9 +37,11 @@
 #                           run from the installed one; nothing is changed (#3451)
 #
 # The jobs name their app by bundle id only, so launchd can start them from any copy that
-# LaunchServices knows, such as an old Debug build in some checkout (#3451). The restart
-# leaves LaunchServices only the installed copy before it restarts the jobs, and then
-# checks that they run from it.
+# LaunchServices knows, such as an old Debug build in some checkout (#3451). launchd keeps
+# the copy it found while that copy is on disk, also when LaunchServices forgets it (#3521).
+# So the restart leaves LaunchServices only the installed copy, moves aside the copy the
+# jobs run from, restarts them, puts that copy back, and then checks that they run from
+# the installed one.
 set -u
 setopt pipefail
 
@@ -100,6 +102,38 @@ host_jobs_installed() {
   done
   return $ok
 }
+# The bundles the host jobs run from, other than the installed one.
+running_copies() {
+  local j pid prog
+  for j in $HOST_JOBS; do
+    pid=$(job_pid $j)
+    prog=${pid:+$(ps -o comm= -p $pid)}
+    [[ $prog == /*/Contents/* && $prog != $HOSTAPP_AT/* ]] && echo ${prog%%/Contents/*}
+  done | sort -u
+}
+# launchd starts a job again from the copy it found, while that copy is on disk, even when
+# LaunchServices no longer has it (#3521). A copy that is not there makes launchd look
+# again, and it finds the installed one. The running processes keep their files.
+typeset -a ASIDE
+move_aside_running_copies() {
+  local copy
+  for copy in ${(f)"$(running_copies)"}; do
+    if mv "$copy" "$copy.aside-$$"; then ASIDE+=($copy); echo "moved aside $copy"
+    else echo "could not move aside $copy"; fi
+  done
+}
+# The copies moved aside go back, unregistered, once launchd has started the jobs again.
+put_back_copies() {
+  local copy
+  for copy in $ASIDE; do
+    if [[ -e $copy ]]; then echo "left $copy.aside-$$: a new $copy is there"; continue; fi
+    if mv "$copy.aside-$$" "$copy"; then
+      $LSREGISTER -u "$copy" 2>/dev/null
+      echo "put back $copy"
+    else echo "could not put back $copy (it is at $copy.aside-$$)"; fi
+  done
+  ASIDE=()
+}
 # Waits up to 30s for the jobs to run from the installed copy.
 wait_host_jobs_installed() {
   local i
@@ -132,9 +166,12 @@ restart() { # live-folder sha delay
   mv "$LIVE/Agents Host.app" "$HOSTAPP_AT"
   echo "$(date) Agents Host $SHA at $HOSTAPP_AT"
   only_installed_host
+  move_aside_running_copies
   for j in $HOST_JOBS $RELAY_JOB; do
     if loaded $j; then launchctl kickstart -k $GUI/$j && echo "restarted $j"; fi
   done
+  wait_host_jobs_installed >/dev/null
+  put_back_copies
   if (( HOSTUI )) || ! any_loaded $HOST_JOBS; then
     $CLEAN open "$HOSTAPP_AT"
     echo "opened Agents Host"
@@ -153,10 +190,12 @@ restart() { # live-folder sha delay
   local wrong=0
   if ! wait_host_jobs_installed; then
     # Something registered another copy again while this ran: once more, then give up.
-    echo "$(date) the jobs do not run from $HOSTAPP_AT; unregistering the other copies again"
+    echo "$(date) the jobs do not run from $HOSTAPP_AT; unregistering and moving aside the other copies again"
     only_installed_host
+    move_aside_running_copies
     for j in $HOST_JOBS; do loaded $j && launchctl kickstart -k $GUI/$j; done
     wait_host_jobs_installed || wrong=1
+    put_back_copies
   fi
   for j in $HOST_JOBS; do
     pid=$(job_pid $j)

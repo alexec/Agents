@@ -122,6 +122,13 @@ public struct TranscriptEntry: Codable, Hashable, Sendable, Identifiable {
         /// drawn: it is said on that notice's line.
         case noticeDelivered(NoticeDelivery)
 
+        /// The files a turn changed (#3437), recorded as it ended: drawn as the Changed
+        /// files card, with Undo These Changes.
+        case turnChanged(TurnChanges)
+
+        /// A turn's changes put back (#3437). Not drawn: said on that turn's card.
+        case turnUndone(TurnUndo)
+
         /// Something a newer version of this app wrote down, read by an older one.
         /// Kept whole and skipped when drawing, so a transcript is never lost to a
         /// kind that did not exist when this build was made.

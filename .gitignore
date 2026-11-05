@@ -30,4 +30,6 @@ Web/dist/
 
 # Go builds for walks and the Go host (#1136).
 Go/out/
+# The observability walk's certificates and answers (#3417).
+Go/internal/controlplane/walk/observability/run/
 __pycache__/

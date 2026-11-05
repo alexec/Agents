@@ -68,6 +68,7 @@ var CallCatalogPreview = Method[CatalogPreviewRequest, CatalogPreviewAnswer]{"ca
 var CallCatalogSearch = Method[CatalogSearchRequest, JSONValue]{"catalog/search"}
 var CallChangesFile = Method[ChangesFileRequest, ChangedFileDetail]{"changes/file"}
 var CallChangesList = Method[ChangesListRequest, ChangesList]{"changes/list"}
+var CallChangesUndoTurn = Method[UndoTurnRequest, UndoTurnResult]{"changes/undoTurn"}
 var CallClientCatchUp = Method[CatchUpRequest, CatchUpSnapshot]{"client/catchUp"}
 var CallClientPermissionsSet = Method[ClientPermissionSettings, ClientPermissionSettings]{"clientPermissions/set"}
 var CallClientPermissionsState = Method[Empty, ClientPermissionSettings]{"clientPermissions/state"}

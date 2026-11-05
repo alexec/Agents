@@ -45,7 +45,7 @@ func TestAFullQueueDropsTheOldestAndSaysSo(t *testing.T) {
 	if q, d := o.Counts(); q != 3 || d != 2 {
 		t.Fatalf("queued %d, dropped %d", q, d)
 	}
-	lines, last, said := o.peek(10)
+	lines, last, said := o.peek(10, sinkBatchBytes)
 	h := func(n string) string { return Hash([]byte(`{"n":` + n + `}`)) }
 	if len(lines) != 3 || string(lines[0]) != `{"dropped":2,"key":"k2","hash":"`+h("2")+`","entry":{"n":2}}` ||
 		string(lines[1]) != `{"key":"k3","hash":"`+h("3")+`","entry":{"n":3}}` {
@@ -54,7 +54,7 @@ func TestAFullQueueDropsTheOldestAndSaysSo(t *testing.T) {
 	// One more goes while those are sent: said on the next line, not lost.
 	o.Add("k5", []byte(`{"n":5}`))
 	o.done(last, said)
-	lines, _, _ = o.peek(10)
+	lines, _, _ = o.peek(10, sinkBatchBytes)
 	if len(lines) != 1 || string(lines[0]) != `{"dropped":1,"key":"k5","hash":"`+h("5")+`","entry":{"n":5}}` {
 		t.Fatalf("%s", lines)
 	}
@@ -123,6 +123,60 @@ func TestAnHTTPSinkGetsEachEntry(t *testing.T) {
 	st := sinks.State()
 	if len(st) != 1 || st[0].Sink.Token != nil || st[0].Sink.HasToken == nil || !*st[0].Sink.HasToken || st[0].SentAt == nil ||
 		st[0].LastError != nil || st[0].Queued != 0 {
+		t.Fatalf("%+v", st)
+	}
+}
+
+// A send carries at most sinkBatchBytes, and one line however large it is.
+func TestABatchIsBoundedByBytes(t *testing.T) {
+	o := newOutbox(10)
+	pad := strings.Repeat("x", sinkBatchBytes/4)
+	for i := range 6 {
+		o.Add("k"+strconv.Itoa(i), []byte(`{"pad":"`+pad+`"}`))
+	}
+	lines, _, _ := o.peek(10, sinkBatchBytes)
+	size := 0
+	for _, l := range lines {
+		size += len(l) + 1
+	}
+	if len(lines) != 3 || size > sinkBatchBytes {
+		t.Fatalf("%d lines, %d bytes", len(lines), size)
+	}
+	if lines, _, _ = o.peek(10, 10); len(lines) != 1 {
+		t.Fatalf("%d lines over the size", len(lines))
+	}
+}
+
+// A sink that answers 413 gets half as many lines a send, until it takes them (#3417:
+// Graylog's Raw HTTP input refused 500 lines).
+func TestASinkThatAnswers413GetsSmallerBatches(t *testing.T) {
+	var mu sync.Mutex
+	got := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		n := strings.Count(string(b), "\n")
+		if n > 100 {
+			http.Error(w, "too large", http.StatusRequestEntityTooLarge)
+			return
+		}
+		mu.Lock()
+		got += n
+		mu.Unlock()
+	}))
+	defer srv.Close()
+
+	sinks := &Sinks{From: SinkFrom{Host: "control", ProcID: "aaaa1111"}}
+	defer sinks.Stop()
+	sinks.Set([]wire.AuditSink{{Kind: wire.AuditSinkKindHttp, Address: srv.URL}})
+	for i := range 1000 {
+		sinks.Add("k"+strconv.Itoa(i), []byte(`{"n":`+strconv.Itoa(i)+`}`))
+	}
+	waitUntil(t, "1000 lines", func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return got == 1000
+	})
+	if st := sinks.State(); st[0].Queued != 0 || st[0].LastError != nil {
 		t.Fatalf("%+v", st)
 	}
 }

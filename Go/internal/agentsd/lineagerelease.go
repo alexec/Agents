@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/lineage"
-	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -112,31 +111,31 @@ func (d *Daemon) markReleaseTagDone(repo forgeRepo, tag string) {
 }
 
 // checkReleaseTagsEveryHour reads every folder's tags a minute after the start, then every
-// hour.
+// hour, until Shutdown (#3522).
 func (d *Daemon) checkReleaseTagsEveryHour() {
-	safe.Go("release tags", func() {
+	d.goLoop("release tags", func(ctx context.Context) {
 		wait := time.NewTimer(releaseTagsDelay)
 		defer wait.Stop()
 		for {
 			select {
-			case <-d.ctx.Done():
+			case <-ctx.Done():
 				return
 			case <-wait.C:
 			}
-			d.checkReleaseTags()
+			d.checkReleaseTags(ctx)
 			wait.Reset(releaseTagsInterval)
 		}
 	})
 }
 
 // checkReleaseTags looks at every folder with a forge repo for a tag not yet linked.
-func (d *Daemon) checkReleaseTags() {
+func (d *Daemon) checkReleaseTags(ctx context.Context) {
 	for _, folder := range d.folderPaths() {
 		repo := d.folderRepo(folder)
 		if repo.forge == "" {
 			continue
 		}
-		d.checkReleaseTagsForFolder(d.ctx, folder, repo)
+		d.checkReleaseTagsForFolder(ctx, folder, repo)
 	}
 }
 

@@ -534,7 +534,15 @@ struct RemoteChatView: View {
             openLease: openLease,
             fromLine: { [model] sender in model.work.fromLine(sender) },
             // Ask for More on a Stopped by a policy card (#3262); the Remote has no Spending.
-            askForMore: { [model] in try await PolicyLayersWords.askForMore(on: model.controlPlane) })
+            askForMore: { [model] in try await PolicyLayersWords.askForMore(on: model.controlPlane) },
+            undoTurn: undoTurn)
+    }
+
+    /// Undo These Changes on a turn's card (#3437): not on an archived session, nor on a
+    /// host too old to undo.
+    private var undoTurn: (@MainActor (UUID, Bool) async throws -> DaemonAPI.UndoTurnResult)? {
+        guard let agent, agent.state != .archived, model.host(agent.host, has: Capability.changesUndo1) else { return nil }
+        return { [model] turn, confirmed in try await model.undoTurn(turn, of: agent.id, confirmed: confirmed) }
     }
 
     /// What a view in the chat may ask of the phone (#187): the Mac it is on, the person's

@@ -35,8 +35,11 @@ const (
 	SinksMost = 4
 	// OutboxMost bounds each sink's queue.
 	OutboxMost = 10_000
-	// sinkBatch is the most lines one send carries.
-	sinkBatch = 500
+	// sinkBatch is the most lines one send carries, and sinkBatchBytes the most bytes:
+	// a send holds one line at least. 64 KiB is the body Graylog's Raw HTTP input takes
+	// by default (#3417); a sink that answers 413 to less gets half as many lines.
+	sinkBatch      = 500
+	sinkBatchBytes = 64 << 10
 	// sinkWait bounds one send.
 	sinkWait = 10 * time.Second
 	// sinkBackoffMost is the longest wait after a send that failed.
@@ -80,11 +83,12 @@ func (o *Outbox) Add(key string, data []byte) {
 	}
 }
 
-// peek is up to n lines from the front, the place of the last, and the drops the first
-// line says.
-func (o *Outbox) peek(n int) (lines [][]byte, last, said int64) {
+// peek is up to n lines from the front, of at most size bytes with a newline after each
+// (one line at least), the place of the last, and the drops the first line says.
+func (o *Outbox) peek(n, size int) (lines [][]byte, last, said int64) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
+	total := 0
 	for i, q := range o.items {
 		if i == n {
 			break
@@ -93,7 +97,11 @@ func (o *Outbox) peek(n int) (lines [][]byte, last, said int64) {
 		if i == 0 {
 			drop = o.unsaid
 		}
-		lines = append(lines, SinkLine(q.key, q.data, drop))
+		line := SinkLine(q.key, q.data, drop)
+		if total += len(line) + 1; i > 0 && total > size {
+			break
+		}
+		lines = append(lines, line)
 		last = q.n
 	}
 	return lines, last, o.unsaid
@@ -167,6 +175,9 @@ type sender interface {
 	close()
 }
 
+// errTooLarge is a sink that took no batch as large as the one sent.
+var errTooLarge = errors.New("the batch is too large")
+
 type httpSender struct {
 	url, token string
 	client     *http.Client
@@ -189,6 +200,9 @@ func (h *httpSender) send(ctx context.Context, lines [][]byte) error {
 	}
 	defer resp.Body.Close()
 	io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
+	if resp.StatusCode == http.StatusRequestEntityTooLarge {
+		return fmt.Errorf("%s answered %s: %w", h.url, resp.Status, errTooLarge)
+	}
 	if resp.StatusCode/100 != 2 {
 		return fmt.Errorf("%s answered %s", h.url, resp.Status)
 	}
@@ -305,9 +319,9 @@ func newSink(c wire.AuditSink, out *Outbox, from SinkFrom) *Sink {
 func (k *Sink) run() {
 	defer close(k.ended)
 	defer k.sender.close()
-	backoff := time.Second
+	backoff, most := time.Second, sinkBatch
 	for {
-		lines, last, said := k.out.peek(sinkBatch)
+		lines, last, said := k.out.peek(most, sinkBatchBytes)
 		if len(lines) == 0 {
 			select {
 			case <-k.stop:
@@ -329,6 +343,10 @@ func (k *Sink) run() {
 		if err == nil {
 			k.out.done(last, said)
 			backoff = time.Second
+			continue
+		}
+		if errors.Is(err, errTooLarge) && len(lines) > 1 {
+			most = len(lines) / 2
 			continue
 		}
 		select {

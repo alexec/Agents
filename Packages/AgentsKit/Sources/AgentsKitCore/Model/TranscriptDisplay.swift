@@ -235,6 +235,9 @@ public struct TranscriptDisplayBuilder: Sendable {
     /// Where in `drawn` each notice's line is (#2860), by its entry's id: where it went
     /// comes after it, and is said on it.
     private var noticeAt: [UUID: Int] = [:]
+    /// Where in `drawn` each turn's Changed files card is (#3437), by its turn: an undo
+    /// is said on it.
+    private var changesAt: [UUID: Int] = [:]
     /// The last entry taken, as it stands after joining, for the chunk that
     /// continues it.
     private var last: TranscriptEntry?
@@ -318,6 +321,20 @@ public struct TranscriptDisplayBuilder: Sendable {
                 notice.to = delivery.to
                 line.kind = .notified(notice)
                 drawn[at] = .entry(line)
+            }
+        case .turnChanged(let changes):
+            // The card stands on its own at the end of the turn (#3437).
+            closeRun()
+            changesAt[changes.turn] = drawn.count
+            drawn.append(.entry(entry))
+        case .turnUndone(let undo):
+            // Said on the turn's card, never a line of its own. One whose card is on an
+            // earlier page is left out.
+            if let at = changesAt[undo.turn], drawn.indices.contains(at),
+               case .entry(var card) = drawn[at], case .turnChanged(var changes) = card.kind {
+                changes.undone = undo
+                card.kind = .turnChanged(changes)
+                drawn[at] = .entry(card)
             }
         case .compaction(_, _, let id, _):
             if let at = compactionAt(for: id), case .entry(let first) = drawn[at],

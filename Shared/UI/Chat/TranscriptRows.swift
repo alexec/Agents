@@ -478,6 +478,13 @@ private struct EntryRow: View {
             // Said on the notice's line by `TranscriptEntry.display` (#2860), never here.
             EmptyView()
 
+        case .turnChanged(let changes):
+            TurnChangesCard(changes: changes)
+
+        case .turnUndone:
+            // Said on the turn's card by `TranscriptEntry.display` (#3437), never here.
+            EmptyView()
+
         case .unrecognised:
             // Written by a newer version of this app. Kept in the record, skipped here.
             EmptyView()

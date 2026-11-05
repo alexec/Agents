@@ -52,8 +52,10 @@ Since 058 the Mac runs:
   Mac's host, registered under Login Items. The script swaps the new bundle in and
   `launchctl kickstart -k`s both jobs. The jobs name their app by bundle id only, so
   launchd can start them from any copy that LaunchServices knows (#3451). Before the
-  restart, the script unregisters every other copy that is on disk, then checks that
-  both jobs run from `~/Applications`. `ship.sh --check-host` shows the copies and where
+  restart, the script unregisters every other copy that is on disk. launchd keeps the
+  copy it found while that copy is on disk (#3521), so the script also moves aside the
+  copy the jobs run from, restarts them, and puts it back. Then it checks that both jobs
+  run from `~/Applications`. `ship.sh --check-host` shows the copies and where
   the jobs run from, and changes nothing.
 - **The window**: the `AgentsStore` build, a client of the control plane. It runs from
   `~/Applications/AgentsLive/<sha>-<time>/Agents.app`, never from `build/DD-store`. Any

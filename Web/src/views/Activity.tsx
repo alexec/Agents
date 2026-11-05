@@ -20,7 +20,7 @@ import { forCleanup, pageLine, tally as worktreeTally, worktreesIntro } from "..
 import { BackToList } from "./BackToList";
 import { Modal } from "./Modal";
 import { folderKey, folderPath } from "../model/groups";
-import { accountChoices, accountRows, accountState, agentsHolding, allowanceLine, defaultAccountName, isOrgRow, orgAllowanceLine, ownRow, ownSignInID, reachesFoot, reachesTheModelBy, machineSignInLine, offersMachineSignIn, removeMessage, rowTitle, runtimeTime, runtimesHint, signInOnTheMac } from "../model/runtimes";
+import { accountChoices, accountRows, accountState, agentsHolding, allowanceLine, allowancePace, allowancePaceLine, pastWeeksLine, defaultAccountName, isOrgRow, orgAllowanceLine, ownRow, ownSignInID, reachesFoot, reachesTheModelBy, machineSignInLine, offersMachineSignIn, removeMessage, rowTitle, runtimeTime, runtimesHint, signInOnTheMac } from "../model/runtimes";
 import { RuntimeSignInDialog } from "./RuntimeSignInDialog";
 import { limitsHint, noResourcesHint } from "../model/onTheMac";
 import { fromOrganisation } from "../model/orgAccounts";
@@ -127,6 +127,33 @@ function AllowanceBar({ reading }: { reading: AllowanceReading }) {
   if (used == null) return null;
   const tone = reading.spent || used >= 1 ? " spent" : reading.nearlySpent || used >= 0.8 ? " nearly-spent" : "";
   return <div class={`allowance-bar${tone}`} aria-hidden="true"><span style={{ width: `${Math.round(used * 100)}%` }} /></div>;
+}
+
+/**
+ * A plan's week against an even pace, and its past weeks as short bars, oldest first, with the
+ * share under each (#3438), as PastWeeksChart on the Mac. A full bar is the whole week's
+ * allowance. Screen readers read the words.
+ */
+function AllowancePace({ state, now }: { state: AllowanceState; now: Date }) {
+  const line = allowancePaceLine(state, now);
+  const words = pastWeeksLine(state, now);
+  const past = allowancePace(state, now)?.past ?? [];
+  return <>
+    {line && <p class="quiet small">{line}</p>}
+    {words && <div class="past-weeks" role="img" aria-label={words}>
+      <p class="quiet small" aria-hidden="true">Past weeks</p>
+      <ol aria-hidden="true">
+        {past.map((w) => {
+          const used = w.spent ? 1 : w.used ?? 0;
+          const tone = used >= 1 ? " spent" : used >= 0.8 ? " nearly-spent" : "";
+          return <li key={`${w.window}-${w.resetsAt}`} title={w.resetsAt ? `Week to ${fromWireDate(w.resetsAt).toLocaleDateString([], { day: "numeric", month: "short" })}` : undefined}>
+            <span class={`week-bar${tone}`}><span style={{ height: `${Math.max(Math.round(used * 100), 4)}%` }} /></span>
+            <span class="quiet small">{Math.round(used * 100)}%</span>
+          </li>;
+        })}
+      </ol>
+    </div>}
+  </>;
 }
 
 /**
@@ -278,6 +305,7 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
                         <p class="quiet small">{allowanceReading(allowance.state, now)}</p>
                         {allowance.state.reading && <AllowanceBar reading={allowance.state.reading} />}
                       </>}
+                      {allowance && !allowance.unusable && <AllowancePace state={allowance.state} now={now} />}
                       {/* A runtime the organisation does not allow here: shown, with why (#998). */}
                       <OrgPolicyLine mark={status.setBy} />
                       {status.poolNote && <p class="quiet small">{status.poolNote}</p>}
@@ -310,6 +338,7 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
                           <p class="quiet small">{allowanceReading(row.state, now)}</p>
                           {row.state.reading && <AllowanceBar reading={row.state.reading} />}
                         </>}
+                        {!row.unusable && <AllowancePace state={row.state} now={now} />}
                         {account && !account.signedIn && store.isMac(host.id) && <p class="quiet small">{signInOnTheMac}</p>}
                         {out && <button onClick={() => void store.markRuntimeAvailable(host.id, row.credentialKey)}>Mark available</button>}
                         {account && <RemoveAccount store={store} host={host.id} account={account}

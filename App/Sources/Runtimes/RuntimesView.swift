@@ -179,6 +179,16 @@ private struct RuntimeStatusRow<Actions: View>: View {
                         AllowanceBar(reading: current)
                     }
                 }
+                if allowance?.unusable == nil, let pace = PoolWords.pace(allowance?.state, now: at) {
+                    Text(pace)
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                }
+                if allowance?.unusable == nil, let past = AllowancePace(allowance?.state, now: at)?.past, !past.isEmpty,
+                   let words = PoolWords.pastWeeks(allowance?.state, now: at) {
+                    PastWeeksChart(past: past, words: words)
+                        .padding(.top, 2)
+                }
                 if let note = allowance?.setupNote {
                     Text(LocalizedStringKey(note))
                         .appText(.fine)

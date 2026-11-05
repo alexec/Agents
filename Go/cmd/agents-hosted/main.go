@@ -30,6 +30,9 @@
 //	AGENTS_HOSTED_VIEWS_DOMAIN     the views' sandbox proxy's name, or none
 //	AGENTS_HOSTED_PORT             the port to listen on, 8795
 //	AGENTS_CONTROL_TRUSTED_PROXIES the proxies in front, whose X-Forwarded-For is believed
+//	AGENTS_WEBPUSH_KEY_FILE        the VAPID key every account's control plane sends Web Push
+//	                               to a browser with (#1486, #3515); none, or an empty file, sends none
+//	AGENTS_WEBPUSH_SUBJECT         the mailto: or https: address a push service may write to about it
 //
 // Who may sign up, and the limits that keep the service whole (#2152, spec 1003):
 //
@@ -73,6 +76,7 @@ import (
 	"github.com/alexec/agents/Go/internal/connections"
 	"github.com/alexec/agents/Go/internal/controlplane"
 	"github.com/alexec/agents/Go/internal/controlplane/kms"
+	"github.com/alexec/agents/Go/internal/controlplane/webpush"
 	"github.com/alexec/agents/Go/internal/hosted"
 )
 
@@ -151,6 +155,9 @@ func serve() error {
 	} else if os.Getenv("AGENTS_HOSTED_MIN_GITHUB_AGE") == "0" {
 		cfg.MinGitHubAge = -1
 	}
+	if p := webPusher(logf); p != nil {
+		cfg.WebPush = p
+	}
 	if cfg.MetricsFrom, err = controlplane.ParseTrustedProxies(os.Getenv("AGENTS_HOSTED_METRICS_FROM")); err != nil {
 		return fmt.Errorf("AGENTS_HOSTED_METRICS_FROM: %w", err)
 	}
@@ -193,11 +200,33 @@ func serve() error {
 	if cfg.StripeKey != "" {
 		billing = "on"
 	}
-	logf("agents-hosted " + buildinfo.Version + " listening on :" + port + ", billing " + billing)
+	webPush := "off"
+	if cfg.WebPush != nil {
+		webPush = "on"
+	}
+	logf("agents-hosted " + buildinfo.Version + " listening on :" + port + ", billing " + billing + ", Web Push " + webPush)
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
 	return nil
+}
+
+// webPusher is the VAPID key, a compose secret as agents-control's is: nil when there is
+// none. One key for the service: every account's copy sends with it.
+func webPusher(logf func(string)) controlplane.WebPusher {
+	file := os.Getenv("AGENTS_WEBPUSH_KEY_FILE")
+	if file == "" {
+		return nil
+	}
+	if info, err := os.Stat(file); err != nil || info.Size() == 0 {
+		return nil
+	}
+	client, err := webpush.New(webpush.Config{KeyFile: file, Subject: strings.TrimSpace(os.Getenv("AGENTS_WEBPUSH_SUBJECT"))})
+	if err != nil {
+		logf("no Web Push: " + err.Error())
+		return nil
+	}
+	return client
 }
 
 // number is a whole number from the environment, 0 when unset.

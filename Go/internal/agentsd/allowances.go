@@ -297,10 +297,20 @@ func (d *Daemon) applyAllowances(states []wire.AllowanceState) bool {
 			if ok && isOutState(had) && isOutState(s) && had.Since < s.Since {
 				s.Since = had.Since
 			}
+			if ok {
+				s.Weeks, _ = withWeeks(s.Weeks, had.Weeks)
+			}
 			mine[s.CredentialKey], changed = s, true
-		case s.Reading != nil && (had.Reading == nil || s.Reading.At > had.Reading.At):
-			had.Reading = s.Reading
-			mine[s.CredentialKey], changed = had, true
+		default:
+			newer := s.Reading != nil && (had.Reading == nil || s.Reading.At > had.Reading.At)
+			if newer {
+				had.Reading = s.Reading
+			}
+			weeks, more := withWeeks(had.Weeks, s.Weeks)
+			if newer || more {
+				had.Weeks = weeks
+				mine[s.CredentialKey], changed = had, true
+			}
 		}
 	}
 	if changed {

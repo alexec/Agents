@@ -1,6 +1,7 @@
 package agentsd
 
 import (
+	"cmp"
 	"errors"
 	"log"
 	"slices"
@@ -502,6 +503,9 @@ func (d *Daemon) notePlanWindow(l *live, key string, w *wire.RateLimitInfo) {
 		if b := s.Reading; b == nil || !sameReading(*b, r) || at.Sub(b.At.Time()) >= readingKeptFor {
 			s.Reading, changed = &r, true
 		}
+		if weeks, ok := withWeek(s.Weeks, r); ok {
+			s.Weeks, changed = weeks, true
+		}
 	}
 	if o := s.Status.Out; rateLimitRejected(w) && w.ResetsAt != nil && w.ResetsAt.Time().After(at) && o != nil &&
 		o.Until == nil && o.Why == wire.AllowanceStateOutReasonAllowanceSpent && at.Sub(s.ChangedAt.Time()) < time.Minute {
@@ -515,6 +519,75 @@ func (d *Daemon) notePlanWindow(l *live, key string, w *wire.RateLimitInfo) {
 	if changed {
 		d.tellAllowances()
 	}
+}
+
+// weeksKept is how many weeks of one window a credential keeps (#3438): a few, for the
+// Runtimes page's chart of past weeks.
+const weeksKept = 6
+
+// isWeekly is a weekly plan window: Claude's seven_day ones, Grok's weekly.
+func isWeekly(window *string) bool {
+	if window == nil {
+		return false
+	}
+	switch *window {
+	case "seven_day", "seven_day_opus", "seven_day_sonnet", "weekly":
+		return true
+	}
+	return false
+}
+
+// withWeek is weeks with r as the last reading of its week (#3438): the entry with the same
+// window and reset time takes it, or a new entry does, and the oldest of that window goes past
+// weeksKept. False when r is no weekly reading with an amount and a reset time, or says nothing
+// new.
+func withWeek(weeks []wire.AllowanceReading, r wire.AllowanceReading) ([]wire.AllowanceReading, bool) {
+	if !isWeekly(r.Window) || r.ResetsAt == nil || (r.Used == nil && !r.Spent) {
+		return weeks, false
+	}
+	out := make([]wire.AllowanceReading, 0, len(weeks)+1)
+	found := false
+	for _, w := range weeks {
+		if *w.Window == *r.Window && *w.ResetsAt == *r.ResetsAt {
+			if w.At >= r.At || sameReading(w, r) {
+				return weeks, false
+			}
+			w, found = r, true
+		}
+		out = append(out, w)
+	}
+	if !found {
+		out = append(out, r)
+	}
+	slices.SortStableFunc(out, func(a, b wire.AllowanceReading) int { return cmp.Compare(*a.ResetsAt, *b.ResetsAt) })
+	sameWindow := func(w wire.AllowanceReading) bool { return *w.Window == *r.Window }
+	over := 0
+	for _, w := range out {
+		if sameWindow(w) {
+			over++
+		}
+	}
+	over -= weeksKept
+	return slices.DeleteFunc(out, func(w wire.AllowanceReading) bool {
+		if over > 0 && sameWindow(w) {
+			over--
+			return true
+		}
+		return false
+	}), true
+}
+
+// withWeeks is weeks with each of more taken in, as withWeek takes one: another machine's
+// weeks of a shared sign-in (pool/applyAllowances). True when one of them was news.
+func withWeeks(weeks, more []wire.AllowanceReading) ([]wire.AllowanceReading, bool) {
+	changed := false
+	for _, r := range more {
+		var ok bool
+		if weeks, ok = withWeek(weeks, r); ok {
+			changed = true
+		}
+	}
+	return weeks, changed
 }
 
 func sameReading(a, b wire.AllowanceReading) bool {

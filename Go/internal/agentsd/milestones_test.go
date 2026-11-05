@@ -136,7 +136,7 @@ func TestALandedPullRequestIsCounted(t *testing.T) {
 		`{"url":"https://github.com/o/r/pull/2","mergedAt":"` + merged + `","headRefName":"someone-else"}]`
 	gh := filepath.Join(t.TempDir(), "gh")
 	os.WriteFile(gh, []byte("#!/bin/sh\ncat <<'END'\n"+pulls+"\nEND\n"), 0o755)
-	d.countMergedPRsWith(gh)
+	d.countMergedPRsWith(context.Background(), gh)
 	h := d.timeHistory()
 	if r := h.Recap[dayStamp(day)]; r.PrsMerged == nil || *r.PrsMerged != 1 {
 		t.Fatalf("%+v", r)

@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -136,14 +135,14 @@ func (d *Daemon) countAppTool(agent wire.UUID, tool string) {
 }
 
 // saveFeaturesEveryMinute writes the counts when they changed, and once more when the
-// host stops.
+// host stops (Shutdown waits for it, #3522).
 func (d *Daemon) saveFeaturesEveryMinute() {
-	safe.Go("feature counts", func() {
+	d.goLoop("feature counts", func(ctx context.Context) {
 		tick := time.NewTicker(featuresSaveEvery)
 		defer tick.Stop()
 		for {
 			select {
-			case <-d.ctx.Done():
+			case <-ctx.Done():
 				d.saveFeatures()
 				return
 			case <-tick.C:
