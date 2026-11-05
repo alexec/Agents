@@ -1210,6 +1210,41 @@ export interface BringBackRequest {
 }
 
 /**
+ * browser/clear (#3535): clear one site's cookies and storage in the machine's browser, or every
+ * site's when site is left out.
+ */
+export interface BrowserClearRequest {
+  /** A site as browser/state names it (github.com). Left out: every site. */
+  site?: string;
+}
+
+/**
+ * One site that keeps cookies in the machine's browser (#3535), which is how a site remembers a
+ * sign-in.
+ */
+export interface BrowserSite {
+  /** The site's registrable domain (github.com), with every subdomain's cookies under it. */
+  site: string;
+  cookies: number;
+}
+
+/**
+ * Settings ▸ Browser (#3535): the machine's browser (#3533). Whether Chromium is downloaded, its
+ * size on disk, whether it runs, and the sites its kept profile has cookies for, most cookies
+ * first.
+ */
+export interface BrowserState {
+  /** Chromium is downloaded on this machine. False until an agent first uses the browser. */
+  installed: boolean;
+  running: boolean;
+  /** The size on disk of the Chromium download, in bytes. */
+  downloadBytes: number;
+  sites: BrowserSite[];
+  /** Why the sites could not be read, when they could not. */
+  problem?: string;
+}
+
+/**
  * A budget raised for one person for one UTC day (#998, FR-019), kept in the policy and swept the
  * day after.
  */
@@ -10914,6 +10949,8 @@ export interface Methods {
   "bots/make": { params: BotMake; result: BotMade };
   "bots/setCaps": { params: BotCaps; result: Empty };
   "bots/stopRun": { params: BotStopRun; result: Empty };
+  "browser/clear": { params: BrowserClearRequest; result: BrowserState };
+  "browser/state": { params: Empty; result: BrowserState };
   "changes/file": { params: ChangesFileRequest; result: ChangedFileDetail };
   "changes/list": { params: ChangesListRequest; result: ChangesList };
   "changes/undoTurn": { params: UndoTurnRequest; result: UndoTurnResult };
@@ -11270,6 +11307,8 @@ export const MethodTarget = {
   "bots/make": "control",
   "bots/setCaps": "control",
   "bots/stopRun": "control",
+  "browser/clear": "host",
+  "browser/state": "host",
   "changes/file": "host",
   "changes/list": "host",
   "changes/undoTurn": "host",
@@ -11722,6 +11761,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BranchSummary: { required: ["name"], optional: ["remote"] },
   BringBack: { required: ["moved", "applied"], optional: [] },
   BringBackRequest: { required: ["folder", "branches"], optional: ["bundle", "patch", "patchOn"] },
+  BrowserClearRequest: { required: [], optional: ["site"] },
+  BrowserSite: { required: ["site", "cookies"], optional: [] },
+  BrowserState: { required: ["installed", "running", "downloadBytes", "sites"], optional: ["problem"] },
   BudgetRaise: { required: ["user", "day", "by"], optional: ["daily", "dailyTokens", "request"] },
   BudgetRequest: { required: ["id", "user", "userName", "day", "at", "state"], optional: ["why", "daily", "dailyTokens", "decidedBy", "decidedAt"] },
   BudgetRequestList: { required: ["requests"], optional: [] },

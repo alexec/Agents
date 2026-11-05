@@ -456,6 +456,10 @@ public enum DaemonAPI {
         public static let sandboxSet = "sandbox/set"
         /// Desktop control's own off-by-default switch (#3004, US2): whether `drive_screen`
         /// may run at all. Setting is the person's own clients only.
+        /// Settings ▸ Browser (#3535): the machine's browser's sites with sign-ins, Clear,
+        /// and its download's size. The person's own clients only.
+        public static let browserState = "browser/state"
+        public static let browserClear = "browser/clear"
         public static let desktopControlState = "desktopControl/state"
         public static let desktopControlSet = "desktopControl/set"
         public static let desktopControlResume = "desktopControl/resume"

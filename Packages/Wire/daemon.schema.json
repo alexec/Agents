@@ -2845,6 +2845,69 @@
       ],
       "additionalProperties": false
     },
+    "BrowserClearRequest": {
+      "type": "object",
+      "description": "browser/clear (#3535): clear one site's cookies and storage in the machine's browser, or every site's when site is left out.",
+      "properties": {
+        "site": {
+          "type": "string",
+          "description": "A site as browser/state names it (github.com). Left out: every site."
+        }
+      },
+      "additionalProperties": false
+    },
+    "BrowserSite": {
+      "type": "object",
+      "description": "One site that keeps cookies in the machine's browser (#3535), which is how a site remembers a sign-in.",
+      "properties": {
+        "site": {
+          "type": "string",
+          "description": "The site's registrable domain (github.com), with every subdomain's cookies under it."
+        },
+        "cookies": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "site",
+        "cookies"
+      ],
+      "additionalProperties": false
+    },
+    "BrowserState": {
+      "type": "object",
+      "description": "Settings ▸ Browser (#3535): the machine's browser (#3533). Whether Chromium is downloaded, its size on disk, whether it runs, and the sites its kept profile has cookies for, most cookies first.",
+      "properties": {
+        "installed": {
+          "type": "boolean",
+          "description": "Chromium is downloaded on this machine. False until an agent first uses the browser."
+        },
+        "running": {
+          "type": "boolean"
+        },
+        "downloadBytes": {
+          "type": "integer",
+          "description": "The size on disk of the Chromium download, in bytes."
+        },
+        "sites": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BrowserSite"
+          }
+        },
+        "problem": {
+          "type": "string",
+          "description": "Why the sites could not be read, when they could not."
+        }
+      },
+      "required": [
+        "installed",
+        "running",
+        "downloadBytes",
+        "sites"
+      ],
+      "additionalProperties": false
+    },
     "BudgetRaise": {
       "type": "object",
       "description": "A budget raised for one person for one UTC day (#998, FR-019), kept in the policy and swept the day after.",

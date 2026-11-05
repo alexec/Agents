@@ -12,6 +12,7 @@ import { SecretsSection } from "../UserScope";
 import { AgentRuntimesSection } from "./AgentRuntimes";
 import { AgentsPolicySection } from "./AgentsPolicy";
 import { BackupsSection, ServerBackupsSection } from "./Backups";
+import { BrowserSection } from "./Browser";
 import { DesktopControlSection } from "./DesktopControl";
 import { ForgeLoginsSection } from "./ForgeLogins";
 import { GitAccessSection } from "./GitAccess";
@@ -43,6 +44,8 @@ export const settingsSections: readonly SettingsSection[] = [
   { name: "backups", scope: "machines", order: 30, Section: BackupsSection },
   // The bots that run the team's workflows, apart from the people (#2132): an admin's.
   { name: "bots", scope: "controlPlane", order: 15, Section: BotsSection, shows: (store) => store.person.value?.role === "admin" },
+  // The machine's browser that agents drive (#3535): its sites with sign-ins, Clear, and its download.
+  { name: "browser", scope: "machines", order: 55, Section: BrowserSection },
   // Channel identities linked to people (#1762).
   { name: "channels", scope: "controlPlane", order: 30, Section: ChannelsSection },
   // The off-by-default switch for drive_screen (#3004, US2).

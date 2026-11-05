@@ -162,7 +162,7 @@ struct SettingsWindow: View {
     private var scopeOnEveryMachine: Bool? {
         return switch pane.wrappedValue {
         case .agentsPolicy, .spending, .runtimes: true
-        case .resources: false
+        case .resources, .browser: false
         case .agentConfiguration: nil
         default: nil
         }
@@ -221,6 +221,7 @@ struct SettingsWindow: View {
                                                          unsaved: $unsaved)
         case .spending: FormColumn { CostSettingsView() }
         case .resources: FormColumn { ResourcesSettingsView() }
+        case .browser: FormColumn { BrowserSettingsView() }
         case .controlPlane:
             if let control { ControlSettingsView(control: control, page: .overview) }
         case .providers:
@@ -263,7 +264,7 @@ extension SettingsScope {
         case .thisApp: [.appearance, .sidebar, .voice]
         // What agents may do, what they spend and what they take (#2957, FR-018).
         case .agents: [.agentsPolicy, .spending, .resources]
-        case .machines: [.machines, .runtimes, .agentConfiguration, .secrets]
+        case .machines: [.machines, .runtimes, .browser, .agentConfiguration, .secrets]
         // The person's account first, shown with no control plane too (#2157).
         case .controlPlane: [.account, .signIns, .people, .bots, .groups, .channels, .signIn, .policy, .providers, .clients, .controlPlane]
         }
@@ -283,6 +284,8 @@ enum SettingsPane: String, Hashable, CaseIterable {
     /// what a window left open on it kept.
     case machines = "mac"
     case runtimes, spending, resources
+    /// This Mac's browser, which agents drive (#3535): its sites with sign-ins and its download.
+    case browser
     /// The control plane's Overview.
     case controlPlane
     /// The control plane's machine providers (#691) and its clients, pages of Control plane
@@ -316,7 +319,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
     /// Machines is one only on its This Mac page.
     var isThisMacs: Bool {
         switch self {
-        case .runtimes, .agentConfiguration, .spending, .resources: true
+        case .runtimes, .agentConfiguration, .spending, .resources, .browser: true
         case .appearance, .sidebar, .agentsPolicy, .voice, .account, .machines, .controlPlane, .providers, .clients, .people, .bots, .groups,
              .channels, .signIn, .signIns, .secrets, .policy: false
         }
@@ -341,6 +344,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .agentConfiguration: "Agent Configuration"
         case .spending: "Spending"
         case .resources: "Resources"
+        case .browser: BrowserSettingsWords.title
         case .controlPlane: "Overview"
         case .providers: "Machine Providers"
         case .clients: "Clients"
@@ -367,6 +371,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .agentConfiguration: "square.on.square"
         case .spending: "dollarsign.circle"
         case .resources: "lock"
+        case .browser: BrowserSettingsWords.symbol
         case .controlPlane: "point.3.connected.trianglepath.dotted"
         case .providers: "cloud"
         case .clients: "iphone"

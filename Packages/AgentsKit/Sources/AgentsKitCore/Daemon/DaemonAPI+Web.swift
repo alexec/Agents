@@ -63,6 +63,8 @@ public extension DaemonAPI {
                 Row(Method.sandboxState, params: Empty.self, result: SandboxSettings.self, kind: .hostRequest),
                 // Desktop control's own off-by-default switch (#3004, US2), for Settings.
                 Row(Method.desktopControlState, params: Empty.self, result: DesktopControlSettings.self, kind: .hostRequest),
+                Row(Method.browserState, params: Empty.self, result: BrowserState.self, kind: .hostRequest),
+                Row(Method.browserClear, params: BrowserClearRequest.self, result: BrowserState.self, kind: .hostRequest),
                 Row(Method.desktopControlSet, params: DesktopControlSettings.self, result: DesktopControlSettings.self,
                     kind: .hostRequest),
                 // Pause on touch's two answers (#3004, US3).

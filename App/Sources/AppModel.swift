@@ -2126,6 +2126,22 @@ final class AppModel {
         }
     }
 
+    /// Settings ▸ Browser (#3535): this Mac's browser, its sites with sign-ins and its
+    /// download. Nil from a daemon too old to know the method.
+    func browserState() async -> BrowserState? {
+        try? await macClient.call(DaemonAPI.Method.browserState, DaemonAPI.Empty(), returning: BrowserState.self)
+    }
+
+    /// Clear one site's sign-ins in this Mac's browser, or every site's with nil (#3535).
+    func clearBrowser(site: String?) async -> BrowserState? {
+        var cleared: BrowserState?
+        await attempt {
+            cleared = try await self.macClient.call(DaemonAPI.Method.browserClear, BrowserClearRequest(site: site),
+                                                    returning: BrowserState.self)
+        }
+        return cleared
+    }
+
     /// The daily summary's control (#3351). A daemon too old to know the method leaves this nil.
     func refreshDailySummarySettings() async {
         dailySummarySettings = try? await macClient.call(DaemonAPI.Method.dailySummarySettings,

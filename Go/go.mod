@@ -4,6 +4,7 @@ go 1.26.9
 
 require (
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.2
+	github.com/chromedp/cdproto v0.159.0
 	github.com/chromedp/chromedp v0.22.1
 	github.com/coder/acp-go-sdk v0.13.5
 	github.com/coder/websocket v1.8.15
@@ -40,7 +41,6 @@ require (
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/chromedp/cdproto v0.159.0 // indirect
 	github.com/emersion/go-sasl v0.0.0-20241020182733-b788ff22d5a6 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect

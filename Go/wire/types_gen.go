@@ -1392,6 +1392,36 @@ type BringBackRequest struct {
 	Branches []SentBranch `json:"branches"`
 }
 
+// browser/clear (#3535): clear one site's cookies and storage in the machine's browser, or every site's when site is left out.
+type BrowserClearRequest struct {
+	// A site as browser/state names it (github.com). Left out: every site.
+	Site *string `json:"site,omitzero"`
+}
+
+// One site that keeps cookies in the machine's browser (#3535), which is how a site remembers a sign-in.
+type BrowserSite struct {
+	// The site's registrable domain (github.com), with every subdomain's cookies under it.
+	Site string `json:"site"`
+
+	Cookies int64 `json:"cookies"`
+}
+
+// Settings ▸ Browser (#3535): the machine's browser (#3533). Whether Chromium is downloaded, its size on disk, whether it runs, and the sites its kept profile has cookies for, most cookies first.
+type BrowserState struct {
+	// Chromium is downloaded on this machine. False until an agent first uses the browser.
+	Installed bool `json:"installed"`
+
+	Running bool `json:"running"`
+
+	// The size on disk of the Chromium download, in bytes.
+	DownloadBytes int64 `json:"downloadBytes"`
+
+	Sites []BrowserSite `json:"sites"`
+
+	// Why the sites could not be read, when they could not.
+	Problem *string `json:"problem,omitzero"`
+}
+
 // A budget raised for one person for one UTC day (#998, FR-019), kept in the policy and swept the day after.
 type BudgetRaise struct {
 	User string `json:"user"`
