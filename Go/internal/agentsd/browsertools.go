@@ -28,7 +28,8 @@ import (
 // at the machine's browser with --cdp-endpoint. agentsd stays in the path for three
 // things: the first call takes the lease browser:agents, so one agent at a time drives the
 // browser; every result goes through the machine's browser.Filter (text and images) before
-// the agent gets it; and a later story holds the calls while the person has the page.
+// the agent gets it, and calls that could read a filled secret past it are refused
+// (browserfill.go, #3530); and a later story holds the calls while the person has the page.
 //
 // The tools are listed from browsertools.json, which scripts/browser-tools.sh writes from
 // the pinned @playwright/mcp, so a session sees them before Node or Chromium is on the
@@ -87,6 +88,9 @@ var browserTools = sync.OnceValues(func() ([]json.RawMessage, map[string]bool) {
 		b, _ := json.Marshal(t)
 		out = append(out, b)
 	}
+	// The app's own fill (#3530), listed and called with Playwright's tools.
+	names[fillSecretName] = true
+	out = append(out, fillSecretTool)
 	return out, names
 })
 
@@ -204,6 +208,13 @@ func (d *Daemon) driveBrowser(ctx context.Context, agent wire.UUID, name string,
 	if !d.offersBrowser() {
 		return failed("The browser can't be installed on " + thisMachine() + ".")
 	}
+	var secret, value string
+	if name == fillSecretName {
+		var refusal string
+		if secret, value, refusal = d.fillSecretValue(args); refusal != "" {
+			return failed(refusal)
+		}
+	}
 	reply, err := d.leaseResource(agent, browserLeaseName)
 	if err != nil {
 		return failed(browserWords(err))
@@ -217,6 +228,12 @@ func (d *Daemon) driveBrowser(ctx context.Context, agent wire.UUID, name string,
 	drive, err := d.browserDriveFor(ctx, agent, folderPath(a))
 	if err != nil {
 		return failed("The browser did not start: " + browserWords(err))
+	}
+	if name == fillSecretName {
+		return d.fillSecret(ctx, drive, secret, value, args)
+	}
+	if refusal := d.browserRefusal(ctx, drive, name, args); refusal != "" {
+		return failed(refusal)
 	}
 	res, err := drive.call(ctx, name, args)
 	if err != nil {
