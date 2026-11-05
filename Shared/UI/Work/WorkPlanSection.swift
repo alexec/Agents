@@ -145,7 +145,7 @@ struct WorkPlanSection: View {
                     .help(mark.words).accessibilityLabel(mark.words)
                 Text(child.item.level ?? "").foregroundStyle(.secondary).frame(width: 40, alignment: .leading)
                 Text(WorkList.shortRef(child.item.node.ref)).foregroundStyle(.secondary).monospacedDigit()
-                Text(child.item.title).lineLimit(1).truncationMode(.tail)
+                Text.forgeTitle(child.item.title).lineLimit(1).truncationMode(.tail)
                 Spacer(minLength: 8)
                 if let words = WorkPlan.workWords(pr: pr, states: states) ?? WorkPlan.blockedWords(child) {
                     Text(words).foregroundStyle(.secondary).lineLimit(1)

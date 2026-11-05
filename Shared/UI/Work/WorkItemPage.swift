@@ -135,7 +135,7 @@ struct WorkItemPage: View {
     @ViewBuilder
     private func titleLine(_ title: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(title)
+            Text.forgeTitle(title)
                 .appText(.title).fontWeight(.semibold)
                 .textSelection(.enabled)
             if !WorkList.titleSaysRef(title, node.ref) {
@@ -195,7 +195,7 @@ struct WorkItemPage: View {
         if got.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             Text("No description.").foregroundStyle(.secondary)
         } else {
-            MarkdownText(markdown: got.body)
+            MarkdownText(markdown: ForgeMarkdown.markdown(got.body))
         }
         if !got.comments.isEmpty || got.cursor != nil {
             Text("Comments").appText(.reading).fontWeight(.semibold).padding(.top, 8)
@@ -209,7 +209,7 @@ struct WorkItemPage: View {
                     Divider()
                     Text("\(c.author)\(c.bot == true ? " (bot)" : "") · \(c.at.formatted(.relative(presentation: .named)))")
                         .appText(.fine).foregroundStyle(.secondary)
-                    MarkdownText(markdown: c.body)
+                    MarkdownText(markdown: ForgeMarkdown.markdown(c.body))
                 }
             }
         }
