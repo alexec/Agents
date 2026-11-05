@@ -172,6 +172,7 @@ public enum ChannelLinkWords {
         case "discord": "Discord"
         case "teams": "Teams"
         case "whatsapp": "WhatsApp"
+        case "googlechat": "Google Chat"
         case "email": "Email"
         default: channel.prefix(1).uppercased() + channel.dropFirst()
         }

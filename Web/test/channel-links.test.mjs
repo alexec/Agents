@@ -18,6 +18,12 @@ test("the card asks to link the identity to you, or tells an admin it names nobo
   assert.match(c.explanation(request()), /^Approve lets/);
 });
 
+test("channels have their own names", () => {
+  assert.equal(c.channelName("googlechat"), "Google Chat");
+  assert.equal(c.channelName("whatsapp"), "WhatsApp");
+  assert.equal(c.channelName("matrix"), "Matrix");
+});
+
 test("a link says whose it is", () => {
   const link = { channel: "slack", identity: "T1/U42", name: "@sam", user: "sam", userName: "Sam", approvedBy: "sam", approvedAt: 0 };
   assert.equal(c.linkTitle(link), "Slack user @sam");
