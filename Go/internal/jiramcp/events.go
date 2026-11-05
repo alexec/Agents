@@ -71,7 +71,7 @@ func (s schema) lookup(name string) (property, bool) {
 // args are an event's checked arguments.
 type args struct {
 	project, label, issue string
-	anyone                bool
+	anyone             bool
 }
 
 // check reads raw (null or missing as {}) and checks it: no unknown keys, types, shapes.

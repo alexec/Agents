@@ -60,20 +60,18 @@ type releaseTagsBook struct {
 	releaseFile *releaseTagsFile
 	// releaseTags, releaseCommitTime, releaseCompare, releaseCommitPR and releaseMilestones,
 	// when set, are asked in place of the package defaults; only tests set them.
-	releaseTags       func(folder string) ([]string, error)
-	releaseCommitTime func(ctx context.Context, folder string, repo forgeRepo, ref string) (time.Time, error)
-	releaseCompare    func(ctx context.Context, folder string, repo forgeRepo, base, head string) ([]compareCommit, error)
-	releaseCommitPR   func(ctx context.Context, folder string, repo forgeRepo, sha string) (int, error)
-	releaseMilestones func(ctx context.Context, folder string, repo forgeRepo) ([]forgeMilestone, error)
+	releaseTags        func(folder string) ([]string, error)
+	releaseCommitTime  func(ctx context.Context, folder string, repo forgeRepo, ref string) (time.Time, error)
+	releaseCompare     func(ctx context.Context, folder string, repo forgeRepo, base, head string) ([]compareCommit, error)
+	releaseCommitPR    func(ctx context.Context, folder string, repo forgeRepo, sha string) (int, error)
+	releaseMilestones  func(ctx context.Context, folder string, repo forgeRepo) ([]forgeMilestone, error)
 }
 
 func (r forgeRepo) release(tag string) wire.LineageNode {
 	return wire.LineageNode{Kind: lineage.KindRelease, Ref: r.forge + ":" + r.path + "/release/" + tag}
 }
 
-func (d *Daemon) releaseTagsPath() string {
-	return filepath.Join(d.Store.Loc.Root, "release-tags.json")
-}
+func (d *Daemon) releaseTagsPath() string { return filepath.Join(d.Store.Loc.Root, "release-tags.json") }
 
 func (d *Daemon) releaseTagsFileLocked() *releaseTagsFile {
 	if d.releaseFile == nil {

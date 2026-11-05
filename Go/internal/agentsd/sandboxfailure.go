@@ -27,7 +27,7 @@ var sandboxFailurePatterns = map[string]struct {
 }{
 	"claude": {patterns: []string{"Sandbox required but unavailable", seatbelt}},
 	"codex":  {patterns: []string{seatbelt, "bwrap: No permissions to create a new namespace"}, readsReply: true},
-	"grok":   {patterns: []string{"Refusing to start with its protections missing", "sandbox initialization failed"}},
+	"grok": {patterns: []string{"Refusing to start with its protections missing", "sandbox initialization failed"}},
 }
 
 const carryOnWithoutSandbox = "The command sandbox is now off. Carry on with the task."
@@ -186,7 +186,7 @@ func (d *Daemon) recordSandboxFailure(id wire.UUID, detail string, completed int
 		return
 	}
 	rec := wire.SandboxFailureRecord{RuntimeID: a.RuntimeID, Detail: detail,
-		RecoveryOffered:    slices.Contains(sandboxChoices(a.RuntimeID), wire.SandboxChoiceOff) && !d.sandboxRequired(),
+		RecoveryOffered: slices.Contains(sandboxChoices(a.RuntimeID), wire.SandboxChoiceOff) && !d.sandboxRequired(),
 		CompletedToolCalls: completed}
 	d.change(id, func(a *wire.Agent) { r := rec; a.PendingSandboxFailure = &r })
 	d.record(id, wire.TranscriptEntryKind{SandboxFailure: &wire.TranscriptEntryKindSandboxFailure{Value: rec}})

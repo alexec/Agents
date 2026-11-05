@@ -26,7 +26,6 @@ import (
 //	hosted/v1/blocked/<who>.json   a sign-in that may not sign up
 //
 // <who> is a GitHub user's id, as before #3386, or apple/<sub> or google/<sub>.
-//
 //	hosted/v1/stripe/<event>.json  a Stripe event acted on, so once (#2225, billing.go)
 //	accounts/<id>/v1/…             the account's control plane's store, its sealed key too
 const (
@@ -139,7 +138,6 @@ type accounts struct {
 }
 
 func accountKey(id string) string { return hostedPrefix + "v1/accounts/" + id + ".json" }
-
 // signInKey is a sign-in's link to its account: hosted/v1/github/<id>.json for a GitHub
 // user, as before #3386.
 func signInKey(si SignIn) string {

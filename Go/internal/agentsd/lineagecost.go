@@ -37,7 +37,7 @@ const (
 	costNodesSent = 1_000
 	// costSessionsSent bounds a node's sessions as they are sent.
 	costSessionsSent = 20
-	costNodeKeep     = lineage.KeepEnded
+	costNodeKeep  = lineage.KeepEnded
 )
 
 type costLedgerFile struct {

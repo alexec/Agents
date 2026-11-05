@@ -178,9 +178,7 @@ func TestABlockClearedTwiceAtOnceResumesOnce(t *testing.T) {
 	defer d.Shutdown()
 	dir := t.TempDir()
 	title := func(s string) *string { return &s }
-	stopped := func(a *wire.Agent) {
-		a.State, a.EndedReason = wire.AgentStateStopped, reason(wire.EndedReasonCancelled)
-	}
+	stopped := func(a *wire.Agent) { a.State, a.EndedReason = wire.AgentStateStopped, reason(wire.EndedReasonCancelled) }
 	one := seeded(t, d, dir, func(a *wire.Agent) { a.Title = title("Security review"); stopped(a) })
 	two := seeded(t, d, dir, func(a *wire.Agent) { a.Title = title("Performance review"); stopped(a) })
 	ending := &wire.WaitEnding{At: now(), How: wire.WaitEndingHow{Stopped: &wire.WaitEndingHowStopped{Value: reason(wire.EndedReasonCancelled)}}}

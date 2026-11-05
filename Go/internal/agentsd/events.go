@@ -680,7 +680,7 @@ var endedSummary = map[wire.EndedReason]string{
 	wire.EndedReasonStoppedByAgent: "Stopped by the agent that started it", wire.EndedReasonSignInRefused: "Its sign-in was refused",
 	wire.EndedReasonRuntimeError: "The runtime reported an error", wire.EndedReasonAllowanceSpent: "Its allowance ran out",
 	wire.EndedReasonRateLimited: "Rate limited, and still limited after retrying", wire.EndedReasonSandboxFailed: "Its sandbox could not start",
-	wire.EndedReasonImported:       "Imported from another set-up, so not run here",
+	wire.EndedReasonImported: "Imported from another set-up, so not run here",
 	wire.EndedReasonStoppedByAdmin: "Stopped by an admin in the Console",
 }
 

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
 )
 
 // What a draft's check may run without asking (#858, FR-013, FR-014), and what its agent
@@ -143,3 +144,4 @@ func TestSecretsAreLaidOverAndTakenAway(t *testing.T) {
 		t.Error("Swift's file not read")
 	}
 }
+

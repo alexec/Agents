@@ -61,9 +61,9 @@ const (
 func allowKey(login string) string {
 	return hostedPrefix + "v1/allow/" + strings.ToLower(login) + ".json"
 }
-func inviteKey(code string) string    { return hostedPrefix + "v1/invites/" + code + ".json" }
-func waitingKey(user SignIn) string   { return hostedPrefix + "v1/waiting/" + user.who() + ".json" }
-func blockedKey(user SignIn) string   { return hostedPrefix + "v1/blocked/" + user.who() + ".json" }
+func inviteKey(code string) string { return hostedPrefix + "v1/invites/" + code + ".json" }
+func waitingKey(user SignIn) string { return hostedPrefix + "v1/waiting/" + user.who() + ".json" }
+func blockedKey(user SignIn) string { return hostedPrefix + "v1/blocked/" + user.who() + ".json" }
 func waitlistKey(place string) string { return hostedPrefix + "v1/waitlist/" + place + ".json" }
 
 const waitlistFolder = hostedPrefix + "v1/waitlist/"

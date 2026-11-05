@@ -349,9 +349,7 @@ func TestAProjectsSlotsFillItsFolders(t *testing.T) {
 		AccessExpiresAt: time.Now().Add(time.Hour), ConnectedAt: time.Now()})
 	var mu sync.Mutex
 	readRepos := map[string]bool{}
-	d.newSetupReader = func(token string) setupReader {
-		return &recordingGitHub{fakeSetupGitHub: &fakeSetupGitHub{}, mu: &mu, repos: readRepos}
-	}
+	d.newSetupReader = func(token string) setupReader { return &recordingGitHub{fakeSetupGitHub: &fakeSetupGitHub{}, mu: &mu, repos: readRepos} }
 	folder := gitFolder(t, "")
 	c.call(t, 1, "folders/add", map[string]any{"folder": "file://" + folder})
 	id, _, _ := d.folderProject(folder)

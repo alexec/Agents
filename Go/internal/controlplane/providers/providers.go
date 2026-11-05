@@ -235,8 +235,8 @@ type Providers struct {
 	// (#3348): one try each time one starts.
 	broughtBack map[string]bool
 	joining     map[string]*joining
-	done        chan struct{}
-	stopOnce    sync.Once
+	done      chan struct{}
+	stopOnce  sync.Once
 }
 
 // NewProviders is WorkspaceProviders.init.

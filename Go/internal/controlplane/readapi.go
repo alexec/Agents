@@ -25,9 +25,9 @@ import (
 // made it is an admin.
 
 const (
-	readTokensPrefix   = "v1/read/tokens/"
-	readTokenPrefix    = "agread_"
-	readAPIPath        = "/v1/read/reports"
+	readTokensPrefix = "v1/read/tokens/"
+	readTokenPrefix  = "agread_"
+	readAPIPath      = "/v1/read/reports"
 	mostLiveReadTokens = 10
 	// mostReadTokens bounds what is kept, revoked ones too: the oldest revoked go first.
 	mostReadTokens   = 50

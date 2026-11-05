@@ -1,6 +1,7 @@
 package agentsd
 
 import (
+	"slices"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -11,7 +12,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"strings"
 	"sync"
 	"time"

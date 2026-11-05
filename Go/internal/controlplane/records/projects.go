@@ -34,13 +34,13 @@ type Project struct {
 }
 
 type projectJSON struct {
-	ID        string              `json:"id"`
-	Name      string              `json:"name"`
-	Owner     string              `json:"owner"`
-	MadeAt    Stamp               `json:"madeAt"`
-	Rev       int                 `json:"rev,omitempty"`
-	Removed   *bool               `json:"removed,omitempty"`
-	RemovedAt *Stamp              `json:"removedAt,omitempty"`
+	ID        string             `json:"id"`
+	Name      string             `json:"name"`
+	Owner     string             `json:"owner"`
+	MadeAt    Stamp              `json:"madeAt"`
+	Rev       int                `json:"rev,omitempty"`
+	Removed   *bool              `json:"removed,omitempty"`
+	RemovedAt *Stamp             `json:"removedAt,omitempty"`
 	Slots     []wire.ProjectSlot  `json:"slots,omitempty"`
 	Boards    []wire.ProjectBoard `json:"boards,omitempty"`
 }

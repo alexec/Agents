@@ -199,9 +199,7 @@ func TestOnlyTheStarterReachesASessionFromAnotherMachine(t *testing.T) {
 	}
 
 	// Its starter's message goes at once, and the end goes back to its machine.
-	d.change(id, func(a *wire.Agent) {
-		a.Report = &wire.WorkReport{Outcome: wire.WorkOutcomeDone, Message: "Done.", At: now()}
-	})
+	d.change(id, func(a *wire.Agent) { a.Report = &wire.WorkReport{Outcome: wire.WorkOutcomeDone, Message: "Done.", At: now()} })
 	mu.Lock()
 	ended = nil
 	mu.Unlock()

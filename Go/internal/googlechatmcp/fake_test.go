@@ -19,14 +19,14 @@ type fakeGoogle struct {
 	t   *testing.T
 	srv *httptest.Server
 
-	mu     sync.Mutex
-	queue  []map[string]any // waiting to be pulled
-	acked  []string
-	posted []map[string]any
-	edited []map[string]any
-	nextID int
-	refuse int // the status every call gets, when set
-	pulled chan struct{}
+	mu      sync.Mutex
+	queue   []map[string]any // waiting to be pulled
+	acked   []string
+	posted  []map[string]any
+	edited  []map[string]any
+	nextID  int
+	refuse  int // the status every call gets, when set
+	pulled  chan struct{}
 	spaces []map[string]any
 }
 

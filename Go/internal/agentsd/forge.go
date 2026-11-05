@@ -465,9 +465,7 @@ func (d *Daemon) gitlabProjectAt(ctx context.Context, folder, connected string) 
 
 // folderLinearTeams is the Linear teams, by key, that a folder's .agents/folder.json names for
 // its tasks: "linearTeams": ["ENG"].
-func (d *Daemon) folderLinearTeams(folder string) []string {
-	return d.folderKeys(folder, "linearTeams")
-}
+func (d *Daemon) folderLinearTeams(folder string) []string { return d.folderKeys(folder, "linearTeams") }
 
 // linearFolder is the first folder whose .agents/folder.json names team, or, when no folder
 // names any, the folder the whole workspace acts from (#3311); else "".
@@ -515,9 +513,7 @@ func (d *Daemon) linearHome() string {
 
 // folderJiraProjects is the Jira projects, by key, that a folder's .agents/folder.json names
 // for its tasks: "jiraProjects": ["PROJ"] (#3260).
-func (d *Daemon) folderJiraProjects(folder string) []string {
-	return d.folderKeys(folder, "jiraProjects")
-}
+func (d *Daemon) folderJiraProjects(folder string) []string { return d.folderKeys(folder, "jiraProjects") }
 
 // folderKeys is the team or project keys (ENG, PROJ) a folder's .agents/folder.json lists
 // under name, in capitals.

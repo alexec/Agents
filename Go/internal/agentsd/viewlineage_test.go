@@ -14,19 +14,19 @@ import (
 // #2941: a page's address is its issue or pull request, as lineage refs name it.
 func TestNodeOfURL(t *testing.T) {
 	for raw, want := range map[string]string{
-		"https://github.com/alexec/Agents/issues/7":                   "issue github:alexec/agents#7",
-		"https://github.com/alexec/Agents/pull/9/files":               "pr github:alexec/agents#9",
-		"https://gitlab.com/group/sub/project/-/issues/3":             "issue gitlab:group/sub/project#3",
+		"https://github.com/alexec/Agents/issues/7":                  "issue github:alexec/agents#7",
+		"https://github.com/alexec/Agents/pull/9/files":              "pr github:alexec/agents#9",
+		"https://gitlab.com/group/sub/project/-/issues/3":            "issue gitlab:group/sub/project#3",
 		"https://gitlab.example.com/group/project/-/merge_requests/4": "pr gitlab:group/project!4",
-		"https://linear.app/acme/issue/eng-4/fix-the-walk":            "issue linear:ENG-4",
-		"https://acme.atlassian.net/browse/proj-12":                   "issue jira:PROJ-12",
-		"https://jira.example.com/browse/OPS-3?focusedCommentId=1":    "issue jira:OPS-3",
-		"https://github.com/browse/ENG-1":                             "",
-		"https://acme.atlassian.net/browse/PROJ":                      "",
-		"https://github.com/alexec/Agents/-/issues/7":                 "",
-		"https://example.com/a/b/issues/7":                            "",
-		"javascript:alert(1)":                                         "",
-		"":                                                            "",
+		"https://linear.app/acme/issue/eng-4/fix-the-walk":           "issue linear:ENG-4",
+		"https://acme.atlassian.net/browse/proj-12":                  "issue jira:PROJ-12",
+		"https://jira.example.com/browse/OPS-3?focusedCommentId=1":   "issue jira:OPS-3",
+		"https://github.com/browse/ENG-1":                            "",
+		"https://acme.atlassian.net/browse/PROJ":                     "",
+		"https://github.com/alexec/Agents/-/issues/7":                "",
+		"https://example.com/a/b/issues/7":                           "",
+		"javascript:alert(1)":                                        "",
+		"":                                                           "",
 	} {
 		n, _, ok := nodeOfURL(raw)
 		got := ""

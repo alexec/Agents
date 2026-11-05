@@ -250,7 +250,7 @@ func TestMetricsReadNoStorePerScrape(t *testing.T) {
 	clk := &clock{now: time.Date(2026, 11, 1, 9, 0, 0, 0, time.UTC)}
 	s, _ := startWith(t, Config{Store: st, SignUp: SignUpOpen, Now: clk.Now})
 	for i := range 3 {
-		if _, _, err := s.accounts.make(ctx, gitHubSignIn(int64(600+i), "u")); err != nil {
+		if _, _, err := s.accounts.make(ctx, gitHubSignIn(int64(600 + i), "u")); err != nil {
 			t.Fatal(err)
 		}
 	}

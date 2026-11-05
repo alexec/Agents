@@ -40,13 +40,13 @@ const (
 	// KindDoc is a doc behind the work (#3308): a file under specs/ or docs/, or a docs page.
 	KindDoc = "doc"
 
-	RelWorksOn = "works-on"
-	RelOpens   = "opens"
-	RelFixes   = "fixes"
-	RelStarted = "started"
-	RelReviews = "reviews"
-	RelCloses  = "closes"
-	RelPartOf  = "part-of"
+	RelWorksOn   = "works-on"
+	RelOpens     = "opens"
+	RelFixes     = "fixes"
+	RelStarted   = "started"
+	RelReviews   = "reviews"
+	RelCloses    = "closes"
+	RelPartOf    = "part-of"
 	// RelShippedIn is a milestone shipped in a release (#3023).
 	RelShippedIn = "shipped-in"
 	// RelReads and RelLinksTo are a session that read a doc, or named it in what it said (#3308).
@@ -121,9 +121,9 @@ func checkWord(what, w string) error {
 
 // line is one line of lineage.jsonl: a link started, or a link ended.
 type line struct {
-	Link *wire.LineageLink       `json:"link,omitempty"`
+	Link *wire.LineageLink      `json:"link,omitempty"`
 	End  *wire.LineageEndRequest `json:"end,omitempty"`
-	At   *wire.Date              `json:"at,omitempty"`
+	At   *wire.Date             `json:"at,omitempty"`
 }
 
 type key struct {

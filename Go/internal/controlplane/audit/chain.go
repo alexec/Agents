@@ -39,7 +39,7 @@ type Chain struct {
 	head, day string
 	// The last entry known to be in the store, and its day: what a seal holds, so a seal
 	// never names an entry still on its way.
-	landedSeq             int64
+	landedSeq           int64
 	landedHead, landedDay string
 	// sealed is the head the last seal of day holds, so an unchanged one is not written.
 	sealed map[string]int64

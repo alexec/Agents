@@ -16,7 +16,7 @@ import (
 )
 
 // PersonalFile is <home>/.agents/mcp.json; FolderFile is <folder>/.agents/mcp.json.
-func PersonalFile(home string) string { return filepath.Join(home, ".agents", "mcp.json") }
+func PersonalFile(home string) string  { return filepath.Join(home, ".agents", "mcp.json") }
 func FolderFile(folder string) string { return filepath.Join(folder, ".agents", "mcp.json") }
 
 // RemovedFile is <home>/.agents/mcp.removed.json: the entries last taken out of the personal

@@ -31,7 +31,7 @@ const (
 	// OldMachinesPrefix is where builds before #2316 kept machines: moved to
 	// MachinesPrefix when a store opens or is copied (#2662).
 	OldMachinesPrefix = "v1/hosts/"
-	SettingsKey       = "v1/control.json"
+	SettingsKey    = "v1/control.json"
 )
 
 // ClientKey is where a client is kept: its UUID in lower case.

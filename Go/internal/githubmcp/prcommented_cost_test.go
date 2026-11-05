@@ -75,9 +75,7 @@ func (a *commentAPI) comment(id, n int, at string) {
 	a.comments = append(a.comments, map[string]any{"id": id, "html_url": fmt.Sprintf("c%d", id),
 		"issue_url": fmt.Sprintf("%srepos/%s/issues/%d", a.URL+"/", repo, n), "body": "a person's words",
 		"user": map[string]any{"login": "alexec"}, "author_association": "OWNER", "created_at": at})
-	sort.SliceStable(a.comments, func(i, j int) bool {
-		return before(a.comments[j]["created_at"].(string), a.comments[i]["created_at"].(string))
-	})
+	sort.SliceStable(a.comments, func(i, j int) bool { return before(a.comments[j]["created_at"].(string), a.comments[i]["created_at"].(string)) })
 }
 
 func (a *commentAPI) taken() (listings, items int) {

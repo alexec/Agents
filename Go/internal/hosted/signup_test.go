@@ -222,7 +222,7 @@ func TestTheCertificateCaps(t *testing.T) {
 	s, _, now, ids := idleService(t, 0)
 	s.cfg.CertsPerHour, s.cfg.CertsPerWeek = 2, 3
 	for i := range 4 {
-		acc, _, _ := s.accounts.make(context.Background(), gitHubSignIn(int64(4000+i), "c"))
+		acc, _, _ := s.accounts.make(context.Background(), gitHubSignIn(int64(4000 + i), "c"))
 		ids = append(ids, acc.ID)
 	}
 	ask := func(id string) int {

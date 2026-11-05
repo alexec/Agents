@@ -59,16 +59,16 @@ const (
 // mcpSubscription is one server's event, as the workflows' triggers ask for it.
 type mcpSubscription struct {
 	id, key, folder, server, event string
-	arguments                      map[string]json.RawMessage
+	arguments                       map[string]json.RawMessage
 	// workflows are the ids of the workflows whose triggers make it, sorted.
 	workflows []string
 	// waits are the agents whose open waits hold it (#577), sorted.
 	waits []wire.UUID
 	// archives is whether Archive a session when its pull request merges holds it (#2886).
 	archives bool
-	pool     string
-	filled   sdk.McpServer
-	cwd      string
+	pool   string
+	filled sdk.McpServer
+	cwd    string
 	// fingerprint is what a stopped subscription waits to see change: the event as the
 	// server lists it, the server's entry, and the workflows' files.
 	fingerprint string

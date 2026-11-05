@@ -42,16 +42,16 @@ type fakeGitLab struct {
 	members  map[int]int // user id → access level
 	// memberLists counts the calls that list members by user_ids[] (#2952).
 	memberLists int
-	requests    []string
-	posted      []obj         // what was POSTed or PUT, with its path
-	diffs       map[int][]obj // merge request → its files
-	discuss     map[int][]obj // merge request → its discussions
-	traces      map[int]string
-	labelled    map[int][]obj // issue → its resource label events
-	status      int           // answer every request with this, when set
-	header      http.Header
-	sent        int // bytes of the bodies answered
-	server      *httptest.Server
+	requests []string
+	posted   []obj         // what was POSTed or PUT, with its path
+	diffs    map[int][]obj // merge request → its files
+	discuss  map[int][]obj // merge request → its discussions
+	traces   map[int]string
+	labelled map[int][]obj // issue → its resource label events
+	status   int           // answer every request with this, when set
+	header   http.Header
+	sent     int // bytes of the bodies answered
+	server   *httptest.Server
 }
 
 func newFake(t *testing.T) *fakeGitLab {
