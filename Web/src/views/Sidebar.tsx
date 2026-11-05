@@ -999,10 +999,11 @@ export const SidebarSession = memo(function SidebarSession({ store, host, folder
   const parent = tree !== undefined && tree.children > 0;
   // A folded parent's mark is the most urgent of it and the sessions it started (#835).
   const markAgent = parent && !tree.isUnfolded ? markAgentOf(agent, startedBy(store, host, agent)) : undefined;
-  const treeClass = tree?.isChild ? " child" : parent ? " parent" : "";
+  const treeClass = `${tree?.isChild ? " child" : ""}${parent ? " parent" : ""}`;
   return (
     <>
-    <div class={`nav-item${treeClass}${drop.targeted ? " drop-target" : ""}`} onContextMenu={(e) => openContextMenu(e, menu())}
+    <div class={`nav-item${treeClass}${drop.targeted ? " drop-target" : ""}`}
+      style={tree?.isChild ? { "--indent": tree.indent } : undefined} onContextMenu={(e) => openContextMenu(e, menu())}
       onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu()); }} {...holdForMenu(menu)} {...drop.props}
       // A double-click edits its title in the row, as the window's does (#1518).
       onDblClick={(e) => {
