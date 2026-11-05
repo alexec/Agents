@@ -12,6 +12,7 @@ import (
 	"github.com/alexec/agents/Go/internal/jiramcp"
 	"github.com/alexec/agents/Go/internal/linearmcp"
 	"github.com/alexec/agents/Go/internal/slackmcp"
+	"github.com/alexec/agents/Go/internal/whatsappmcp"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -174,6 +175,26 @@ func TestGoogleChatAsksForItsKey(t *testing.T) {
 	}
 	if len(built.Variables) != 2 || !built.Variables[0].Required || built.Variables[0].AlreadySet ||
 		built.Variables[1].Required || !built.Variables[1].AlreadySet || built.Variables[0].Kind != wire.MCPVariableKindSecret {
+		t.Fatalf("variables: %+v", built.Variables)
+	}
+}
+
+// WhatsApp (#1352) asks for the Cloud API's four values, kept in the person's secrets, and
+// declares the events its server raises.
+func TestWhatsAppAsksForItsSecrets(t *testing.T) {
+	wa, ok := OursByID("agents/whatsapp")
+	if !ok || wa.Command != "whatsapp-mcp" || !wa.Declares.Tools || wa.Declares.Views ||
+		!reflect.DeepEqual(wa.Declares.Events, whatsappmcp.EventNames()) {
+		t.Fatalf("whatsapp: %+v %v, the server's %v", wa, ok, whatsappmcp.EventNames())
+	}
+	built := BuildOurs(wa, func(name string) bool { return name == "WHATSAPP_TOKEN" })
+	want := `{"command":"whatsapp-mcp","hosted":true,"env":{"WHATSAPP_TOKEN":"${WHATSAPP_TOKEN}","WHATSAPP_PHONE_NUMBER_ID":"${WHATSAPP_PHONE_NUMBER_ID}",` +
+		`"WHATSAPP_APP_SECRET":"${WHATSAPP_APP_SECRET}","WHATSAPP_VERIFY_TOKEN":"${WHATSAPP_VERIFY_TOKEN}","WHATSAPP_WEBHOOK_ADDR":"${WHATSAPP_WEBHOOK_ADDR}"}}`
+	if got := strings.Join(strings.Fields(built.Entry.Stringified()), ""); got != want {
+		t.Fatalf("entry: %s", got)
+	}
+	if len(built.Variables) != 5 || !built.Variables[0].Required || !built.Variables[0].AlreadySet || built.Variables[1].AlreadySet ||
+		built.Variables[4].Required || built.Variables[0].Kind != wire.MCPVariableKindSecret {
 		t.Fatalf("variables: %+v", built.Variables)
 	}
 }

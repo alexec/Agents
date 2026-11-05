@@ -21,6 +21,7 @@ control exchange. The Mac window, the Remote, `Shared/UI`, the web page, Agents 
 | `cmd/email-mcp/`, `internal/emailmcp/` | The `email` MCP server (#1780): one IMAP mailbox's new mail as `email.received`, and tools that read it; it never sends | email |
 | `cmd/slack-mcp/`, `internal/slackmcp/` | The `slack` MCP server (#1351): a Slack app's bot over Socket Mode, `message.received` and `question.answered`, and tools that read, send and ask | channels |
 | `cmd/googlechat-mcp/`, `internal/googlechatmcp/` | The `googlechat` MCP server (#1016): a Google Chat app's messages and answers as `message.received` and `question.answered`, pulled from Pub/Sub, and tools that post as the app | googlechat |
+| `cmd/whatsapp-mcp/`, `internal/whatsappmcp/` | The `whatsapp` MCP server (#1352): a WhatsApp Business number's messages and answers as `message.received` and `question.answered`, by Meta's signed webhook, and tools that send as the number | whatsapp |
 | `cmd/gitlab-mcp/`, `internal/gitlabmcp/` | The `gitlab` MCP server (#1629): merge requests, pipelines and issues on GitLab, tools and events on REST v4 | gitlab |
 | `cmd/workspace-commands/`, `internal/workspacecommands/` | The command machine provider (#691, in Go since #1364): workspaces as shell commands and presets, an MCP server the control plane runs | workspaces |
 
@@ -267,6 +268,38 @@ The tests run it against a fake Pub/Sub and Chat API over HTTP (`fake_test.go`;
 carries it (`scripts/go-github-mcp.sh googlechat-mcp`) and every Linux host installs
 `googlechat-mcp-linux-<arch>`; the catalogue lists it as `agents/googlechat`, which asks for
 the key. See `docs/how-to/use-google-chat.md`.
+
+## The WhatsApp MCP server (`whatsapp-mcp`, #1352)
+
+The Google Chat server's shape for one WhatsApp Business number on Meta's Cloud API, with Go's
+own `net/http`: the Cloud API is one JSON call (`POST /<phone number id>/messages`) and a
+signed webhook. `WHATSAPP_TOKEN` (a system user's token), `WHATSAPP_PHONE_NUMBER_ID`,
+`WHATSAPP_APP_SECRET` and `WHATSAPP_VERIFY_TOKEN` are read at each call.
+
+- **The webhook:** the Cloud API has no pull and no socket, so the server serves Meta's
+  webhook itself, on `WHATSAPP_WEBHOOK_ADDR` (`127.0.0.1:8797` when left out), from its start
+  when the account is set, else from the first poll. The person puts a public HTTPS address in
+  front of it (a tunnel, or the machine's reverse proxy). `GET` answers Meta's check with the
+  verify token; a `POST` is taken only when its `X-Hub-Signature-256` is the app secret's
+  HMAC, so nobody else can fake a sender. When the address is taken, a poll says so.
+- **Events** `message.received` (filters `space`, the person's number, `text`, a glob, and
+  `direct`, which is every message) and `question.answered` (filters `space` and `question`),
+  polled, with the Google Chat server's inbox and cursor: the newest 1,000 for a day, a call
+  Meta sends again kept once. Each event's `sender` is the number (`wa_id`) and the profile's
+  name, for a channel link (#1762); WhatsApp gives no email address. A text, a template's
+  quick reply, and a photo, video or document's caption are raised; a sticker, a voice note
+  and a status are not. Each message kept is marked read.
+- **Tools:** `send_message`, `ask_question` (reply buttons for up to three options, a list
+  for up to ten; each option's id is `agents|<question>|<option>`, and the first press is
+  `question.answered`), `send_template` (an approved template: the only message Meta takes
+  more than 24 hours after the person last wrote) and `read_messages`, the inbox, marked as
+  outside content. A refusal for the 24-hour window says to use `send_template`.
+
+The tests run it against a fake Cloud API over HTTP and signed webhook calls (`fake_test.go`;
+`WHATSAPP_API_URL` points a real run at one). Agents Host carries it
+(`scripts/go-github-mcp.sh whatsapp-mcp`) and every Linux host installs
+`whatsapp-mcp-linux-<arch>`; the catalogue lists it as `agents/whatsapp`, which asks for the
+four values as secrets. See `docs/how-to/use-whatsapp.md`.
 
 ## The command machine provider (`workspace-commands`, #691, #1364)
 

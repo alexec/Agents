@@ -7,7 +7,7 @@ description: Channel identities linked to people, so a chat or email message act
 # Channels
 
 A channel is a chat app or a mailbox that an MCP server brings in (#1223), such as Slack,
-Google Chat (`googlechat`, #1016) or email. A message on it can start a workflow. A channel identity (a Slack user, an email
+Google Chat (`googlechat`, #1016), WhatsApp (`whatsapp`, #1352) or email. A message on it can start a workflow. A channel identity (a Slack user, an email
 address) can be faked or given to someone else, so it acts as a person only once that person
 has linked it (#1762, spec 736 FR-037).
 
@@ -64,6 +64,14 @@ The slack server (`slack-mcp`, #1351) names a Slack user as `team/user`, such as
 that Slack has for the user, so the first message asks the person with that sign-in email. A
 message and a question's answer both carry the sender. See
 [Reach agents from Slack](../how-to/reach-agents-from-slack.md).
+
+## WhatsApp
+
+The whatsapp server (`whatsapp-mcp`, #1352) names a person by their number in international
+form, digits only, such as `15551234567`: WhatsApp checked it when they signed up, and it
+does not change. It gives the profile's name too, but no email address, so the first message
+from a number asks the admins, who send it on to the person. See
+[Use WhatsApp](../how-to/use-whatsapp.md).
 
 Channel servers still run on the machines whose workflows hear them. Running them on the
 control plane itself (FR-036) is for the Channels milestone.
