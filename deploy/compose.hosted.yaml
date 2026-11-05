@@ -17,6 +17,10 @@
 # https://AGENTS_HOSTED_DOMAIN/signin/callback, and its client secret is
 # AGENTS_HOSTED_GITHUB_SECRET (in deploy/.env). Without it the sign-up page says sign-up is
 # not open.
+#
+# The VAPID key for Web Push to a browser (#1486, #3515), deploy/secrets/vapid-key: make-secrets.sh
+# makes it once and keeps it, since a new one ends every browser's subscription. Every
+# account's control plane sends with this one key. Empty, none sends Web Push.
 name: agents-hosted
 
 # Docker's json-file driver keeps every log line for ever on the one disk (#2290): each service
@@ -79,6 +83,9 @@ services:
       AGENTS_HOSTED_STRIPE_KEY: ${AGENTS_HOSTED_STRIPE_KEY:-}
       AGENTS_HOSTED_STRIPE_PRICE: ${AGENTS_HOSTED_STRIPE_PRICE:-}
       AGENTS_HOSTED_STRIPE_WEBHOOK_SECRET: ${AGENTS_HOSTED_STRIPE_WEBHOOK_SECRET:-}
+      # The VAPID key's file (#3515), and the address a push service may write to about it.
+      AGENTS_WEBPUSH_KEY_FILE: /run/secrets/vapid-key
+      AGENTS_WEBPUSH_SUBJECT: ${AGENTS_WEBPUSH_SUBJECT:-}
       # Caddy's address below: only its X-Forwarded-For says where a request came from.
       AGENTS_CONTROL_TRUSTED_PROXIES: 172.30.62.250
       # Metrics (#2226) on a port Caddy does not pass, for this machine only: its published
@@ -86,7 +93,7 @@ services:
       AGENTS_HOSTED_METRICS_PORT: 9795
       AGENTS_HOSTED_METRICS_FROM: 172.30.62.1
     ports: ["127.0.0.1:9795:9795"]
-    secrets: [gcp-service-account]
+    secrets: [gcp-service-account, vapid-key]
     volumes:
       - data:/data
 
@@ -116,6 +123,8 @@ networks:
 secrets:
   gcp-service-account:
     file: ./secrets/gcp-service-account
+  vapid-key:
+    file: ./secrets/vapid-key
 
 volumes:
   data:

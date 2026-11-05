@@ -55,6 +55,10 @@ service's own ssh. Machines join with a code or their join command, from the web
     deploy/make-secrets.sh --public --kms projects/P/locations/L/keyRings/R/cryptoKeys/K
     ```
 
+    It also makes `deploy/secrets/vapid-key` the first time, the VAPID key that every
+    account's control plane sends Web Push to a browser with (#3515). Keep it: a new key
+    ends every browser's subscription.
+
 2. Put the names and the secret in `deploy/.env`:
 
     ```sh

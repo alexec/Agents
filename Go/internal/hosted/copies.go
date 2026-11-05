@@ -111,16 +111,8 @@ func (s *Service) startCopy(ctx context.Context, id string) (*copyRunning, error
 	if err != nil {
 		return nil, fmt.Errorf("its control key: %w", err)
 	}
-	trusted := append(append([]netip.Prefix(nil), loopback...), s.cfg.TrustedProxies...)
-	views := ""
-	if s.cfg.ViewsDomain != "" {
-		views = "https://" + s.cfg.ViewsDomain
-	}
 	agents := &agentsCap{plan: PlanOf(acc), account: "https://" + s.cfg.Domain + "/account"}
-	cfg := controlplane.Config{Store: st, PrivateKey: key, URL: s.accountURL(id), Bind: "127.0.0.1", Port: 0,
-		Name: "Your control plane", MachineID: "hosted-" + id, PublicWeb: s.cfg.Web, PublicViews: views,
-		TrustedProxies: trusted, Hosted: true, SecretKeeper: s.cfg.Keeper, AgentsRunningGate: agents.gate, SignIn: s.cfg.CopySignIn,
-		Log: func(line string) { s.log(id + ": " + line) }}
+	cfg := s.copyConfig(id, st, key, agents)
 	service, err := controlplane.New(cfg)
 	if err != nil {
 		return nil, err
@@ -146,6 +138,20 @@ func (s *Service) startCopy(ctx context.Context, id string) (*copyRunning, error
 	s.log(fmt.Sprintf("%s: started at %s", id, cfg.URL))
 	// Its old events go at the next minute's sweep, not before its first answer (#3104).
 	return &copyRunning{service: service, proxy: proxy, limits: st, agents: agents}, nil
+}
+
+// copyConfig is an account's control plane's config: its own store and control key, on
+// loopback, behind this service.
+func (s *Service) copyConfig(id string, st *limitedStore, key []byte, agents *agentsCap) controlplane.Config {
+	trusted := append(append([]netip.Prefix(nil), loopback...), s.cfg.TrustedProxies...)
+	views := ""
+	if s.cfg.ViewsDomain != "" {
+		views = "https://" + s.cfg.ViewsDomain
+	}
+	return controlplane.Config{Store: st, PrivateKey: key, URL: s.accountURL(id), Bind: "127.0.0.1", Port: 0,
+		Name: "Your control plane", MachineID: "hosted-" + id, PublicWeb: s.cfg.Web, PublicViews: views,
+		TrustedProxies: trusted, Hosted: true, SecretKeeper: s.cfg.Keeper, AgentsRunningGate: agents.gate, SignIn: s.cfg.CopySignIn,
+		WebPush: s.cfg.WebPush, Log: func(line string) { s.log(id + ": " + line) }}
 }
 
 // clientOf is the address a request comes from: the last X-Forwarded-For entry when the
