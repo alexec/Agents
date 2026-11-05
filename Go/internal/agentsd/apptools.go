@@ -176,7 +176,7 @@ func (d *Daemon) mcpServersFor(id wire.UUID) []sdk.McpServer {
 	// Then the folder's approved servers and the person's own (SessionServers.plan), each
 	// hosted one swapped for its route on this endpoint (#488).
 	if a != nil {
-		servers = append(servers, d.hostedSwapped(d.sessionEntries(folderPath(a)), port, token, a.RuntimeID)...)
+		servers = append(servers, d.hostedSwapped(d.sessionEntries(folderPath(a), id), port, token, a.RuntimeID)...)
 	}
 	return servers
 }

@@ -47,11 +47,32 @@ public struct ElicitationRequest: Codable, Hashable, Sendable, Identifiable {
         public var url: String?
         /// One is saved already, and what is typed replaces it.
         public var isSet: Bool
+        /// The host can keep it for this session only (#3548). False from an older host.
+        public var canBeSessionOnly: Bool
 
-        public init(name: String, url: String? = nil, isSet: Bool = false) {
+        public init(name: String, url: String? = nil, isSet: Bool = false, canBeSessionOnly: Bool = false) {
             self.name = name
             self.url = url
             self.isSet = isSet
+            self.canBeSessionOnly = canBeSessionOnly
+        }
+
+        private enum CodingKeys: String, CodingKey { case name, url, isSet, canBeSessionOnly }
+
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            name = try c.decode(String.self, forKey: .name)
+            url = try c.decodeIfPresent(String.self, forKey: .url)
+            isSet = try c.decode(Bool.self, forKey: .isSet)
+            canBeSessionOnly = try c.decodeIfPresent(Bool.self, forKey: .canBeSessionOnly) ?? false
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var c = encoder.container(keyedBy: CodingKeys.self)
+            try c.encode(name, forKey: .name)
+            try c.encodeIfPresent(url, forKey: .url)
+            try c.encode(isSet, forKey: .isSet)
+            if canBeSessionOnly { try c.encode(true, forKey: .canBeSessionOnly) }
         }
     }
 
@@ -113,6 +134,15 @@ public struct ElicitationRequest: Codable, Hashable, Sendable, Identifiable {
 
     /// The one field of a secret's form, as the daemon names it.
     public static let secretField = "value"
+    /// The answer's choice to keep the secret for this session only (#3548), beside the field.
+    public static let sessionOnlyField = "sessionOnly"
+
+    /// A secret card's answer: the value, and the choice to keep it for this session only.
+    public static func secretAnswer(_ typed: String, sessionOnly: Bool) -> [String: JSONValue] {
+        var content: [String: JSONValue] = [secretField: .string(typed)]
+        if sessionOnly { content[sessionOnlyField] = .bool(true) }
+        return content
+    }
 
     /// Why the agent asks for its secret: the one field's title.
     public var secretReason: String? {

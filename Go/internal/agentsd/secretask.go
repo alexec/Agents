@@ -20,6 +20,10 @@ import (
 // secretField is the one field of a secret's form.
 const secretField = "value"
 
+// sessionOnlyField is the answer's choice to keep it for this session only (#3548): not a
+// field of the form, so a client that does not offer it sends none, and it goes to secrets.env.
+const sessionOnlyField = "sessionOnly"
+
 var secretAskName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]{0,63}$`)
 
 // askSecret is ask_secret: the person asked for a secret, as a form held like ask_question's.
@@ -40,7 +44,8 @@ func (d *Daemon) askSecret(id wire.UUID, args map[string]json.RawMessage) (strin
 		return "", err
 	}
 	path := skillcatalog.SecretsPath(home)
-	secret := wire.ElicitationSecret{Name: name, IsSet: skillcatalog.LoadSecrets(path).IsSet(name)}
+	sessionOnly := true
+	secret := wire.ElicitationSecret{Name: name, IsSet: skillcatalog.LoadSecrets(path).IsSet(name), CanBeSessionOnly: &sessionOnly}
 	if u := strings.TrimSpace(argString(args, "url")); strings.HasPrefix(u, "https://") || strings.HasPrefix(u, "http://") {
 		secret.URL = &u
 	}
@@ -55,14 +60,22 @@ func (d *Daemon) askSecret(id wire.UUID, args map[string]json.RawMessage) (strin
 	if !answered {
 		return formStillOpen, nil
 	}
-	return secretNote(name, path, r.action), nil
+	return d.secretNote(id, name, r.action), nil
 }
 
 // secretNote is the words an agent reads for the answer to its ask_secret: the name and
 // where it is, never the value.
-func secretNote(name, path string, action wire.AnswerElicitationRequestAction) string {
+func (d *Daemon) secretNote(agent wire.UUID, name string, action wire.AnswerElicitationRequestAction) string {
+	path := skillcatalog.SecretsPath(d.personalHome())
 	switch action {
 	case wire.AnswerElicitationRequestActionAccept:
+		if _, ok, _ := d.sessionSecret(agent, name); ok {
+			return name + " is kept for this session only, and deleted when the session is archived (#3548). " +
+				"It is in your environment as $" + name + " from your next start, and fills ${" + name + "} in your MCP servers. " +
+				"To type it into a page, call fill_secret with secret " + name + ". " +
+				"Read it now, without printing it, from " + d.sessionSecretsPath(agent) + " (JSON; .secrets." + name + ".value). " +
+				"Never echo, cat or log it, and never write it into a file in the folder."
+		}
 		return name + " is saved in the person's secrets file, " + path + " (NAME=value lines, readable only by this user). " +
 			"Use it without printing it, for example `" + name + "=\"$(sed -n 's/^" + name + "=//p' " + path + ")\" your-command`, " +
 			"or as ${" + name + "} in a connector in .agents/mcp.json. Never echo, cat or log it, and never write it into a file in the folder."
@@ -72,17 +85,27 @@ func secretNote(name, path string, action wire.AnswerElicitationRequestAction) s
 	return "They cancelled, and gave no " + name + "."
 }
 
-// secretAnswered is what the record keeps of an answered ask_secret: that it was saved.
-func secretAnswered(s wire.ElicitationSecret, action wire.AnswerElicitationRequestAction) []wire.ElicitationAnswer {
+// secretAnswered is what the record keeps of an answered ask_secret: that it was saved,
+// and where.
+func secretAnswered(s wire.ElicitationSecret, action wire.AnswerElicitationRequestAction, sessionOnly bool) []wire.ElicitationAnswer {
 	if action != wire.AnswerElicitationRequestActionAccept {
 		return nil
+	}
+	if sessionOnly {
+		return []wire.ElicitationAnswer{{Question: s.Name, Answer: "Saved for this session only"}}
 	}
 	return []wire.ElicitationAnswer{{Question: s.Name, Answer: "Saved to your secrets"}}
 }
 
-// saveAskedSecret saves the value typed into a secret's form. An error is the person's to
-// read on the card, and never holds the value.
-func (d *Daemon) saveAskedSecret(s wire.ElicitationSecret, content map[string]wire.JSONValue) error {
+// askedSessionOnly is whether the answer keeps the secret for this session only (#3548).
+func askedSessionOnly(content map[string]wire.JSONValue) bool {
+	b, _ := value(content[sessionOnlyField]).(bool)
+	return b
+}
+
+// saveAskedSecret saves the value typed into a secret's form: for the asking session only,
+// or to secrets.env. An error is the person's to read on the card, and never holds the value.
+func (d *Daemon) saveAskedSecret(agent wire.UUID, s wire.ElicitationSecret, content map[string]wire.JSONValue) error {
 	v, _ := text(value(content[secretField]))
 	v = strings.TrimSpace(v)
 	if v == "" {
@@ -90,6 +113,9 @@ func (d *Daemon) saveAskedSecret(s wire.ElicitationSecret, content map[string]wi
 	}
 	if strings.ContainsAny(v, "\n\r\x00") {
 		return Invalid("%s has to be one line.", s.Name)
+	}
+	if askedSessionOnly(content) {
+		return d.setSessionSecret(agent, s.Name, v)
 	}
 	if err := d.saveSecret(s.Name, v); err != nil {
 		return Invalid("%s was not saved: %s", s.Name, err.Error())

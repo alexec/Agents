@@ -65,6 +65,9 @@ public extension DaemonAPI {
                 Row(Method.desktopControlState, params: Empty.self, result: DesktopControlSettings.self, kind: .hostRequest),
                 Row(Method.browserState, params: Empty.self, result: BrowserState.self, kind: .hostRequest),
                 Row(Method.browserClear, params: BrowserClearRequest.self, result: BrowserState.self, kind: .hostRequest),
+                Row(Method.secretsSessionList, params: Empty.self, result: SessionSecrets.self, kind: .hostRequest),
+                Row(Method.secretsSessionSet, params: SessionSecretSetRequest.self, result: SessionSecrets.self, kind: .hostRequest),
+                Row(Method.secretsSessionRemove, params: SessionSecretRemoveRequest.self, result: SessionSecrets.self, kind: .hostRequest),
                 Row(Method.desktopControlSet, params: DesktopControlSettings.self, result: DesktopControlSettings.self,
                     kind: .hostRequest),
                 // Pause on touch's two answers (#3004, US3).

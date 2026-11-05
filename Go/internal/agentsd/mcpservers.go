@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -370,7 +371,7 @@ type sessionEntry struct {
 
 // sessionMCP is the person's and the folder's servers a session is given, after the app's.
 func (d *Daemon) sessionMCP(folder string) []sdk.McpServer {
-	entries := d.sessionEntries(folder)
+	entries := d.sessionEntries(folder, "")
 	out := make([]sdk.McpServer, 0, len(entries))
 	for _, e := range entries {
 		out = append(out, e.server)
@@ -378,9 +379,11 @@ func (d *Daemon) sessionMCP(folder string) []sdk.McpServer {
 	return out
 }
 
-// sessionEntries is sessionMCP's servers, signed in, with the file each came from.
-func (d *Daemon) sessionEntries(folder string) []sessionEntry {
+// sessionEntries is sessionMCP's servers, signed in, with the file each came from. An
+// agent's own secrets for this session only (#3548) fill its ${NAME} first.
+func (d *Daemon) sessionEntries(folder string, agent wire.UUID) []sessionEntry {
 	secrets := d.secrets()
+	maps.Copy(secrets, d.sessionSecretValues(agent))
 	folderEntries, _, _, _ := d.folderMCP(folder, secrets)
 	personal, _, _ := d.personalMCP(secrets)
 	var out []sessionEntry

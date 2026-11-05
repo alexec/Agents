@@ -43,9 +43,9 @@ struct ElicitationView: View {
                 } else if let secret = request.secret {
                     // A masked field of its own (#2885), never the form's open one.
                     SecretAskCard(secret: secret, reason: request.secretReason,
-                                  host: model.answerRecipient(request.agentID), sending: sending != nil) { typed in
+                                  host: model.answerRecipient(request.agentID), sending: sending != nil) { typed, sessionOnly in
                         if let typed {
-                            send("save", .accept, content: [ElicitationRequest.secretField: .string(typed)])
+                            send("save", .accept, content: ElicitationRequest.secretAnswer(typed, sessionOnly: sessionOnly))
                         } else {
                             send("no thanks", .decline)
                         }
