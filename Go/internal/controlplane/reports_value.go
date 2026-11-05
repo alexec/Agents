@@ -153,6 +153,18 @@ func mergeNode(have *wire.LineageCostNode, n wire.LineageCostNode) {
 	if n.EndedAt != nil && (have.EndedAt == nil || *n.EndedAt > *have.EndedAt) {
 		have.EndedAt = n.EndedAt
 	}
+	// The first start any machine saw, and the level, feature, area and epic of the copy
+	// that knows them, the newest first (#3562).
+	if n.StartedAt != nil && (have.StartedAt == nil || *n.StartedAt < *have.StartedAt) {
+		have.StartedAt = n.StartedAt
+	}
+	newer := n.LastAt > have.LastAt
+	for _, f := range []struct{ have, n **string }{{&have.Level, &n.Level}, {&have.Feature, &n.Feature},
+		{&have.Area, &n.Area}, {&have.Parent, &n.Parent}} {
+		if *f.n != nil && (*f.have == nil || newer) {
+			*f.have = *f.n
+		}
+	}
 	if n.LastAt > have.LastAt {
 		have.LastAt = n.LastAt
 	}
@@ -222,14 +234,24 @@ func valueOf(nodes []wire.LineageCostNode, since wire.Date) wire.ReportValue {
 		}
 		return append(parts, fixers[ref]...)
 	}
-	var leads []float64
+	children := childrenOf(nodes)
+	var leads, cycles []float64
 	for _, ref := range issues {
 		row, ok := valueRow(wire.LineageNode{Kind: lineage.KindIssue, Ref: ref}, issueParts(ref), since)
 		if !ok {
 			continue
 		}
+		if n, ok := byRef[ref]; ok {
+			row.Level = n.Level
+		}
+		if kids := children[ref]; len(kids) > 0 {
+			_, row.CycleTimeSeconds = cycleOf(epicParts(ref, kids, issueParts))
+		}
 		if row.LeadTimeSeconds != nil {
 			leads = append(leads, *row.LeadTimeSeconds)
+		}
+		if row.CycleTimeSeconds != nil {
+			cycles = append(cycles, *row.CycleTimeSeconds)
 		}
 		out.Issues = append(out.Issues, row)
 	}
@@ -261,14 +283,7 @@ func valueOf(nodes []wire.LineageCostNode, since wire.Date) wire.ReportValue {
 			out.Releases = append(out.Releases, row)
 		}
 	}
-	if len(leads) > 0 {
-		sort.Float64s(leads)
-		m := leads[len(leads)/2]
-		if len(leads)%2 == 0 {
-			m = (leads[len(leads)/2-1] + m) / 2
-		}
-		out.LeadTimeSeconds = &m
-	}
+	out.LeadTimeSeconds, out.CycleTimeSeconds = median(leads), median(cycles)
 	limited := false
 	out.Issues, limited = mostCostly(out.Issues)
 	var more bool
@@ -280,6 +295,60 @@ func valueOf(nodes []wire.LineageCostNode, since wire.Date) wire.ReportValue {
 		out.Limited = &t
 	}
 	return out
+}
+
+// median is the middle of values, or none when there are none.
+func median(values []float64) *float64 {
+	if len(values) == 0 {
+		return nil
+	}
+	sort.Float64s(values)
+	m := values[len(values)/2]
+	if len(values)%2 == 0 {
+		m = (values[len(values)/2-1] + m) / 2
+	}
+	return &m
+}
+
+// childrenOf is each epic's children, by ref, as their issues' parent says (#3562).
+func childrenOf(nodes []wire.LineageCostNode) map[string][]string {
+	out := map[string][]string{}
+	for _, n := range nodes {
+		if n.Node.Kind == lineage.KindIssue && n.Parent != nil && *n.Parent != n.Node.Ref {
+			out[*n.Parent] = append(out[*n.Parent], n.Node.Ref)
+		}
+	}
+	return out
+}
+
+// epicParts is an epic's parts for its cycle time (#3562): its own and its children's, so its
+// start is its first child's start and its end its children's last PR merged.
+func epicParts(ref string, kids []string, issueParts func(string) []wire.LineageCostNode) []wire.LineageCostNode {
+	parts := issueParts(ref)
+	for _, k := range kids {
+		parts = append(parts, issueParts(k)...)
+	}
+	return parts
+}
+
+// cycleOf is the first start of work on any of parts, and the time from it to the last of
+// their PRs merged (#3562); none before a merge or with no start.
+func cycleOf(parts []wire.LineageCostNode) (*wire.Date, *float64) {
+	var start, merged *wire.Date
+	for _, n := range parts {
+		if n.StartedAt != nil && (start == nil || *n.StartedAt < *start) {
+			start = n.StartedAt
+		}
+		if n.Node.Kind == lineage.KindPR && n.Outcome != nil && *n.Outcome == lineage.OutcomeMerged && n.EndedAt != nil &&
+			(merged == nil || *n.EndedAt > *merged) {
+			merged = n.EndedAt
+		}
+	}
+	if start == nil || merged == nil || *merged < *start {
+		return start, nil
+	}
+	cycle := float64(*merged - *start)
+	return start, &cycle
 }
 
 // dedupParts is base's nodes, each once, plus each one's related nodes (also each once),
@@ -303,7 +372,8 @@ func dedupParts(base []wire.LineageCostNode, related func(wire.LineageCostNode) 
 }
 
 // valueRow adds up of's parts, or says no when none of them changed since. Its lead time
-// is from the first work on any part to the last of its PRs merged.
+// is from the first work on any part to the last of its PRs merged, and its cycle time from
+// the first start of work on any part (#3562).
 func valueRow(of wire.LineageNode, parts []wire.LineageCostNode, since wire.Date) (wire.ReportValueRow, bool) {
 	row := wire.ReportValueRow{Node: of, Total: wire.LineageCost{Cost: map[string]float64{}},
 		Waste: wire.LineageCost{Cost: map[string]float64{}}}
@@ -328,6 +398,7 @@ func valueRow(of wire.LineageNode, parts []wire.LineageCostNode, since wire.Date
 		lead := float64(*merged - *first)
 		row.LeadTimeSeconds = &lead
 	}
+	_, row.CycleTimeSeconds = cycleOf(parts)
 	return row, recent
 }
 

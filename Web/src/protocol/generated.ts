@@ -4619,6 +4619,23 @@ export interface LineageCostNode {
    * time.
    */
   firstAt?: WireDate;
+  /**
+   * When work on an issue or PR started (#3562): its first works-on, opens or started link from a
+   * session, or for an issue the first PR that fixes it, whichever came first. Kept the earliest
+   * the machine saw, so it does not change when the links end.
+   */
+  startedAt?: WireDate;
+  /**
+   * An issue's level from its labels (#3562): epic, story, task, spike or bug. Kept once known, so
+   * a closed issue keeps it.
+   */
+  level?: string;
+  /** An issue's feature: the name of its feature:<name> label (#3562). */
+  feature?: string;
+  /** An issue's area: the name of its area:<name> label (#3562). */
+  area?: string;
+  /** An issue's epic, by ref, as the forge's plan says it (#3562). */
+  parent?: string;
   /** When a PR ended (#2351): merged, closed or reverted. Absent while open. */
   endedAt?: WireDate;
   lastAt: WireDate;
@@ -8075,6 +8092,17 @@ export interface ReportNode {
   cost: ReportNodeCost;
   sessions: number;
   leadTimeSeconds?: number;
+  /**
+   * From the start of work on it (its own, its PRs' or, for an epic, its children's startedAt) to
+   * its last PR merged (#3562); absent before a merge or with no start.
+   */
+  cycleTimeSeconds?: number;
+  /** The first start of work on it or its parts (#3562). */
+  startedAt?: WireDate;
+  /** An issue's level, as LineageCostNode's (#3562). */
+  level?: string;
+  feature?: string;
+  area?: string;
   /** A PR's end, as LineageCostNode's; absent while open. */
   outcome?: string;
   /** The last change to it or any of its parts. */
@@ -8266,6 +8294,8 @@ export interface ReportValue {
   prsReverted: number;
   failedChecks: number;
   leadTimeSeconds?: number;
+  /** The median of the issues' cycle times (#3562). */
+  cycleTimeSeconds?: number;
   issues: ReportValueRow[];
   milestones: ReportValueRow[];
   /**
@@ -8290,6 +8320,10 @@ export interface ReportValueRow {
   failedChecks: number;
   /** From the first work on it to its last PR merged; absent before a merge. */
   leadTimeSeconds?: number;
+  /** From the start of work on it to its last PR merged, as ReportNode's (#3562). */
+  cycleTimeSeconds?: number;
+  /** An issue's level, as LineageCostNode's (#3562). */
+  level?: string;
 }
 
 /**
@@ -12371,7 +12405,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Levels: { required: [], optional: ["model", "permission", "permissionRequests"] },
   LineMember: { required: ["agentID", "askedAt", "isCallOpen"], optional: [] },
   LineageCost: { required: ["cost", "inputTokens", "outputTokens", "turns", "workingSeconds", "waitingSeconds"], optional: ["limitTokens"] },
-  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["repo", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "endedAt", "resolved", "sessions"] },
+  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["repo", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "startedAt", "level", "feature", "area", "parent", "endedAt", "resolved", "sessions"] },
   LineageCostRollup: { required: ["node", "own", "total", "waste", "unlinked", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "parts"], optional: ["limited"] },
   LineageEndRequest: { required: ["from", "to", "rel"], optional: [] },
   LineageGraph: { required: ["nodes", "links"], optional: ["limited", "resolving", "resolved"] },
@@ -12692,7 +12726,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RenameRequest: { required: ["agentID", "title"], optional: [] },
   ReportCounts: { required: ["sessions", "failedSessions", "prsOpened", "prsMerged", "prsReverted", "mergeSeconds", "waits", "waitBuckets", "workflowRuns", "workflowFailures"], optional: [] },
   ReportExport: { required: ["text", "count", "format"], optional: [] },
-  ReportNode: { required: ["node", "cost", "sessions", "lastAt"], optional: ["repo", "resolved", "leadTimeSeconds", "outcome"] },
+  ReportNode: { required: ["node", "cost", "sessions", "lastAt"], optional: ["repo", "resolved", "leadTimeSeconds", "cycleTimeSeconds", "startedAt", "level", "feature", "area", "outcome"] },
   ReportNodeCost: { required: ["own", "total", "waste"], optional: [] },
   ReportNodes: { required: ["nodes", "limited", "unresolved"], optional: ["cursor"] },
   ReportNodesQuery: { required: ["kind"], optional: ["state", "repo", "label", "since", "sort", "cursor", "limit", "scope"] },
@@ -12702,8 +12736,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ReportScope: { required: ["kind"], optional: ["group"] },
   ReportScopeOption: { required: ["scope", "name"], optional: [] },
   ReportScopes: { required: ["scopes", "admin"], optional: [] },
-  ReportValue: { required: ["range", "scope", "total", "waste", "unlinked", "perMergedPR", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "issues", "milestones", "releases"], optional: ["leadTimeSeconds", "limited"] },
-  ReportValueRow: { required: ["node", "total", "waste", "prsMerged", "prsClosed", "prsReverted", "failedChecks"], optional: ["leadTimeSeconds"] },
+  ReportValue: { required: ["range", "scope", "total", "waste", "unlinked", "perMergedPR", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "issues", "milestones", "releases"], optional: ["leadTimeSeconds", "cycleTimeSeconds", "limited"] },
+  ReportValueRow: { required: ["node", "total", "waste", "prsMerged", "prsClosed", "prsReverted", "failedChecks"], optional: ["leadTimeSeconds", "cycleTimeSeconds", "level"] },
   ReportView: { required: ["id", "name", "page", "scope", "range"], optional: ["by"] },
   ReportViewID: { required: ["id"], optional: [] },
   ReportViews: { required: ["views"], optional: [] },

@@ -10,8 +10,8 @@ import (
 
 	"github.com/alexec/agents/Go/internal/githubmcp"
 	"github.com/alexec/agents/Go/internal/gitlabmcp"
-	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/internal/jiramcp"
+	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/internal/linearmcp"
 	"github.com/alexec/agents/Go/wire"
 )

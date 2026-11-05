@@ -11766,6 +11766,26 @@
           "$ref": "#/definitions/WireDate",
           "description": "When the machine first banked or noted the node (#2351): the start of the work on it, for lead time."
         },
+        "startedAt": {
+          "$ref": "#/definitions/WireDate",
+          "description": "When work on an issue or PR started (#3562): its first works-on, opens or started link from a session, or for an issue the first PR that fixes it, whichever came first. Kept the earliest the machine saw, so it does not change when the links end."
+        },
+        "level": {
+          "type": "string",
+          "description": "An issue's level from its labels (#3562): epic, story, task, spike or bug. Kept once known, so a closed issue keeps it."
+        },
+        "feature": {
+          "type": "string",
+          "description": "An issue's feature: the name of its feature:<name> label (#3562)."
+        },
+        "area": {
+          "type": "string",
+          "description": "An issue's area: the name of its area:<name> label (#3562)."
+        },
+        "parent": {
+          "type": "string",
+          "description": "An issue's epic, by ref, as the forge's plan says it (#3562)."
+        },
         "endedAt": {
           "$ref": "#/definitions/WireDate",
           "description": "When a PR ended (#2351): merged, closed or reverted. Absent while open."
@@ -20752,6 +20772,24 @@
         "leadTimeSeconds": {
           "type": "number"
         },
+        "cycleTimeSeconds": {
+          "type": "number",
+          "description": "From the start of work on it (its own, its PRs' or, for an epic, its children's startedAt) to its last PR merged (#3562); absent before a merge or with no start."
+        },
+        "startedAt": {
+          "$ref": "#/definitions/WireDate",
+          "description": "The first start of work on it or its parts (#3562)."
+        },
+        "level": {
+          "type": "string",
+          "description": "An issue's level, as LineageCostNode's (#3562)."
+        },
+        "feature": {
+          "type": "string"
+        },
+        "area": {
+          "type": "string"
+        },
         "outcome": {
           "type": "string",
           "description": "A PR's end, as LineageCostNode's; absent while open."
@@ -21154,6 +21192,10 @@
         "leadTimeSeconds": {
           "type": "number"
         },
+        "cycleTimeSeconds": {
+          "type": "number",
+          "description": "The median of the issues' cycle times (#3562)."
+        },
         "issues": {
           "type": "array",
           "items": {
@@ -21222,6 +21264,14 @@
         "leadTimeSeconds": {
           "type": "number",
           "description": "From the first work on it to its last PR merged; absent before a merge."
+        },
+        "cycleTimeSeconds": {
+          "type": "number",
+          "description": "From the start of work on it to its last PR merged, as ReportNode's (#3562)."
+        },
+        "level": {
+          "type": "string",
+          "description": "An issue's level, as LineageCostNode's (#3562)."
         }
       },
       "required": [

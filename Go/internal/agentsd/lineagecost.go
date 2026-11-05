@@ -37,7 +37,7 @@ const (
 	costNodesSent = 1_000
 	// costSessionsSent bounds a node's sessions as they are sent.
 	costSessionsSent = 20
-	costNodeKeep  = lineage.KeepEnded
+	costNodeKeep     = lineage.KeepEnded
 )
 
 type costLedgerFile struct {
@@ -201,15 +201,22 @@ func (d *Daemon) notePROutcome(pr wire.LineageNode, event, title string) {
 	d.costChangedLocked()
 }
 
-// refreshCostLinksLocked sets each node's fixes, partOf and sessions from the graph, marking
-// the nodes whose links changed unsent. Ended links count: a PR closed without a merge stays
-// against its issue, as waste, and a session that worked on a node stays one of its sessions.
+// refreshCostLinksLocked sets each node's fixes, partOf and sessions from the graph, and its
+// start (#3562), marking the nodes whose links changed unsent. Ended links count: a PR closed
+// without a merge stays against its issue, as waste, and a session that worked on a node stays
+// one of its sessions. The start is kept the earliest seen, so it outlives the links it came
+// from, and a node already banked gets it from the links still kept.
 func (d *Daemon) refreshCostLinksLocked() {
 	f := d.costLedgerLocked()
 	for k, c := range f.Nodes {
 		var fixes, partOf, sessions []string
+		started := c.StartedAt
 		seen := map[string]bool{}
 		for _, l := range d.lineage().Links(c.Node).Links {
+			if startsWork(c.Node, l) && (started == nil || l.At < *started) {
+				at := l.At
+				started = &at
+			}
 			if l.To == c.Node && l.From.Kind == lineage.KindSession && !seen["session "+l.From.Ref] &&
 				(l.Rel == lineage.RelWorksOn || l.Rel == lineage.RelOpens || l.Rel == lineage.RelReviews) {
 				seen["session "+l.From.Ref] = true
@@ -231,33 +238,80 @@ func (d *Daemon) refreshCostLinksLocked() {
 		sort.Strings(sessions)
 		// reports/nodes counts them (#3118); a node more sessions worked on says the first.
 		sessions = sessions[:min(len(sessions), costSessionsSent)]
-		if slices.Equal(fixes, c.Fixes) && slices.Equal(partOf, c.PartOf) && slices.Equal(sessions, c.Sessions) {
+		if slices.Equal(fixes, c.Fixes) && slices.Equal(partOf, c.PartOf) && slices.Equal(sessions, c.Sessions) &&
+			reflect.DeepEqual(started, c.StartedAt) {
 			continue
 		}
-		c.Fixes, c.PartOf, c.Sessions = fixes, partOf, sessions
+		c.Fixes, c.PartOf, c.Sessions, c.StartedAt = fixes, partOf, sessions, started
 		f.Nodes[k] = c
 		f.Seq++
 		f.Unsent[k] = f.Seq
 	}
 }
 
-// refreshCostResolvedLocked puts on each issue, PR and milestone node the title, state and labels the
-// resolve cache has for it (#3118), for reports/nodes, marking the nodes whose answer
-// changed unsent. It asks no forge: a node is resolved when a lineage walk asks for it.
+// startsWork says l starts work on n (#3562): a session's works-on, opens or started link to
+// it, or a PR's fixes link to an issue.
+func startsWork(n wire.LineageNode, l wire.LineageLink) bool {
+	if l.To != n {
+		return false
+	}
+	switch l.From.Kind {
+	case lineage.KindSession:
+		return l.Rel == lineage.RelWorksOn || l.Rel == lineage.RelOpens || l.Rel == lineage.RelStarted
+	case lineage.KindPR:
+		return n.Kind == lineage.KindIssue && l.Rel == lineage.RelFixes
+	}
+	return false
+}
+
+// refreshCostResolvedLocked puts on each issue, PR and milestone node the title, state and
+// labels the resolve cache has for it (#3118), for reports/nodes, and on an issue its level,
+// feature, area and epic (#3562), marking the nodes whose answer changed unsent. A level,
+// feature, area or epic once known is kept: the cache forgets, and a closed issue keeps them.
+// It asks the forge only for the issues with no level yet that nothing has resolved, at most
+// resolvePerWalk at a time, so the issues already banked get one (the backfill).
 func (d *Daemon) refreshCostResolvedLocked() {
 	f := d.costLedgerLocked()
 	d.resolveMu.Lock()
 	defer d.resolveMu.Unlock()
+	var ask []wire.LineageNode
+	now := nowFunc()
 	for k, c := range f.Nodes {
 		e, ok := d.resolveCache[c.Node]
-		if !ok || !e.ok || c.Resolved != nil && reflect.DeepEqual(*c.Resolved, e.resolved) {
+		if !ok || !e.ok {
+			if c.Node.Kind == lineage.KindIssue && c.Level == nil && c.Resolved == nil && len(ask) < resolvePerWalk &&
+				!d.resolveAsking[c.Node] && (!ok || now.Sub(e.at) >= resolveRecheck) {
+				if _, _, can := nodeOfRepo(c.Node); can {
+					ask = append(ask, c.Node)
+				}
+			}
 			continue
 		}
+		before := c
 		r := e.resolved
 		c.Resolved = &r
+		if c.Node.Kind == lineage.KindIssue {
+			keep := func(have **string, v string) {
+				if v != "" {
+					*have = &v
+				}
+			}
+			keep(&c.Level, lineage.LevelOf(r.Labels))
+			keep(&c.Feature, lineage.LabelValue(r.Labels, "feature:"))
+			keep(&c.Area, lineage.LabelValue(r.Labels, "area:"))
+			if e.parent != nil {
+				keep(&c.Parent, e.parent.Ref)
+			}
+		}
+		if reflect.DeepEqual(before, c) {
+			continue
+		}
 		f.Nodes[k] = c
 		f.Seq++
 		f.Unsent[k] = f.Seq
+	}
+	if len(ask) > 0 {
+		d.askResolveLocked(ask)
 	}
 }
 

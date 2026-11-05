@@ -3,6 +3,7 @@ package agentsd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strconv"
 	"testing"
 	"time"
@@ -197,6 +198,10 @@ func TestSentCostSaysSessionsAndResolved(t *testing.T) {
 	defer d.Shutdown()
 	folder := t.TempDir()
 	d.repos = map[string]forgeRepo{folder: {"github", "alexec/agents"}}
+	// The backfill (#3562) asks for an issue with no level: never the real forge.
+	d.resolveLookup = func(context.Context, string, forgeRepo, string, int) (wire.LineageResolved, error) {
+		return wire.LineageResolved{}, errors.New("no forge in tests")
+	}
 	a := seeded(t, d, folder, func(a *wire.Agent) {
 		a.Labels = []wire.SessionLabel{{Value: "#12", Owner: wire.SessionLabelOwnerPerson}}
 	})
@@ -235,5 +240,74 @@ func TestSentCostSaysSessionsAndResolved(t *testing.T) {
 	}
 	if _, again := sentNode(); again {
 		t.Fatal("sent again with the same answer")
+	}
+}
+
+// #3562: an issue's start is its first works-on link, kept when the link ends; its level,
+// feature, area and epic come from its labels and the forge's plan, kept when the cache
+// forgets them; and an issue with none is asked of the forge, as the backfill.
+func TestCostNodeKeepsStartAndLevel(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	folder := t.TempDir()
+	d.repos = map[string]forgeRepo{folder: {"github", "alexec/agents"}}
+	issue := wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#12"}
+	epic := wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#10"}
+	seeded(t, d, folder, nil)
+	asked := make(chan int, 4)
+	d.resolveLookup = func(_ context.Context, _ string, _ forgeRepo, _ string, n int) (wire.LineageResolved, error) {
+		asked <- n
+		return wire.LineageResolved{Title: "Fix it", Labels: []string{"Story", "feature:estimates", "area:lineage"}}, nil
+	}
+	s := wire.LineageNode{Kind: "session", Ref: "session:a"}
+	began := time.Now().Add(-3 * time.Hour)
+	d.linkAt(s, issue, lineage.RelWorksOn, lineage.SourceStart, began)
+	d.linkAt(s, issue, lineage.RelOpens, lineage.SourceStart, began.Add(time.Hour))
+	d.workMu.Lock()
+	d.noteCostLocked(issue, time.Now(), func(*wire.LineageCostNode) {})
+	d.workMu.Unlock()
+	d.unlink(s, issue, lineage.RelWorksOn)
+
+	node := func() wire.LineageCostNode {
+		t.Helper()
+		_, sent := d.unsentCost()
+		d.costSent(sent)
+		d.workMu.Lock()
+		defer d.workMu.Unlock()
+		return d.costLedgerLocked().Nodes[costKey(issue)]
+	}
+	n := node()
+	if n.StartedAt == nil || *n.StartedAt != wire.DateOf(began) {
+		t.Fatalf("started %v, want %v", n.StartedAt, wire.DateOf(began))
+	}
+	// Asked of the forge, as it had no level.
+	select {
+	case got := <-asked:
+		if got != 12 {
+			t.Fatalf("asked #%d", got)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the backfill did not ask the forge")
+	}
+	d.resolveSettle(5 * time.Second)
+	d.resolveMu.Lock()
+	e := d.resolveCache[issue]
+	e.parent = &epic
+	d.resolveCache[issue] = e
+	d.resolveMu.Unlock()
+	n = node()
+	if n.Level == nil || *n.Level != "story" || n.Feature == nil || *n.Feature != "estimates" ||
+		n.Area == nil || *n.Area != "lineage" || n.Parent == nil || *n.Parent != epic.Ref {
+		t.Fatalf("%+v", n)
+	}
+
+	// The cache forgets it and the links go: the node keeps them all.
+	d.resolveMu.Lock()
+	d.resolveCache = map[wire.LineageNode]resolvedEntry{}
+	d.resolveMu.Unlock()
+	d.unlink(s, issue, lineage.RelOpens)
+	n = node()
+	if n.StartedAt == nil || *n.StartedAt != wire.DateOf(began) || n.Level == nil || *n.Level != "story" || n.Parent == nil {
+		t.Fatalf("%+v", n)
 	}
 }

@@ -19,9 +19,9 @@ const (
 	tombstonesKept       = 7 * 24 * time.Hour
 	// A removed person goes once every code they made has run out (FR-029, #3126).
 	removedPeopleKept = inviteLifetime + tombstonesKept
-	leftoversKept        = time.Hour
-	sweepEvery           = time.Hour
-	mostPerSweep         = 1000
+	leftoversKept     = time.Hour
+	sweepEvery        = time.Hour
+	mostPerSweep      = 1000
 	// Between two rounds of one hour's sweep, while a round stops at mostPerSweep (#2291).
 	sweepPause     = 5 * time.Second
 	eventsPrefix   = "v1/events/"

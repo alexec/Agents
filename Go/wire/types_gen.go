@@ -5353,6 +5353,21 @@ type LineageCostNode struct {
 	// When the machine first banked or noted the node (#2351): the start of the work on it, for lead time.
 	FirstAt *Date `json:"firstAt,omitzero"`
 
+	// When work on an issue or PR started (#3562): its first works-on, opens or started link from a session, or for an issue the first PR that fixes it, whichever came first. Kept the earliest the machine saw, so it does not change when the links end.
+	StartedAt *Date `json:"startedAt,omitzero"`
+
+	// An issue's level from its labels (#3562): epic, story, task, spike or bug. Kept once known, so a closed issue keeps it.
+	Level *string `json:"level,omitzero"`
+
+	// An issue's feature: the name of its feature:<name> label (#3562).
+	Feature *string `json:"feature,omitzero"`
+
+	// An issue's area: the name of its area:<name> label (#3562).
+	Area *string `json:"area,omitzero"`
+
+	// An issue's epic, by ref, as the forge's plan says it (#3562).
+	Parent *string `json:"parent,omitzero"`
+
 	// When a PR ended (#2351): merged, closed or reverted. Absent while open.
 	EndedAt *Date `json:"endedAt,omitzero"`
 
@@ -9256,6 +9271,19 @@ type ReportNode struct {
 
 	LeadTimeSeconds *float64 `json:"leadTimeSeconds,omitzero"`
 
+	// From the start of work on it (its own, its PRs' or, for an epic, its children's startedAt) to its last PR merged (#3562); absent before a merge or with no start.
+	CycleTimeSeconds *float64 `json:"cycleTimeSeconds,omitzero"`
+
+	// The first start of work on it or its parts (#3562).
+	StartedAt *Date `json:"startedAt,omitzero"`
+
+	// An issue's level, as LineageCostNode's (#3562).
+	Level *string `json:"level,omitzero"`
+
+	Feature *string `json:"feature,omitzero"`
+
+	Area *string `json:"area,omitzero"`
+
 	// A PR's end, as LineageCostNode's; absent while open.
 	Outcome *string `json:"outcome,omitzero"`
 
@@ -9466,6 +9494,9 @@ type ReportValue struct {
 
 	LeadTimeSeconds *float64 `json:"leadTimeSeconds,omitzero"`
 
+	// The median of the issues' cycle times (#3562).
+	CycleTimeSeconds *float64 `json:"cycleTimeSeconds,omitzero"`
+
 	Issues []ReportValueRow `json:"issues"`
 
 	Milestones []ReportValueRow `json:"milestones"`
@@ -9494,6 +9525,12 @@ type ReportValueRow struct {
 
 	// From the first work on it to its last PR merged; absent before a merge.
 	LeadTimeSeconds *float64 `json:"leadTimeSeconds,omitzero"`
+
+	// From the start of work on it to its last PR merged, as ReportNode's (#3562).
+	CycleTimeSeconds *float64 `json:"cycleTimeSeconds,omitzero"`
+
+	// An issue's level, as LineageCostNode's (#3562).
+	Level *string `json:"level,omitzero"`
 }
 
 // A saved view of Reports (#2019, R8): a page with its scope, range and way to add up, kept for the person who saved it.
