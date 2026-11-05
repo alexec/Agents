@@ -1,0 +1,48 @@
+name: walk3417
+services:
+  mongo:
+    image: mongo:7.0
+  opensearch:
+    image: opensearchproject/opensearch:2.15.0
+    environment:
+      - discovery.type=single-node
+      - plugins.security.disabled=true
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+      - action.auto_create_index=false
+      - DISABLE_INSTALL_DEMO_CONFIG=true
+  graylog:
+    image: graylog/graylog:6.1
+    depends_on: [mongo, opensearch]
+    environment:
+      - GRAYLOG_PASSWORD_SECRET=walk3417walk3417walk3417walk3417
+      - GRAYLOG_ROOT_PASSWORD_SHA2=8e22f63237f784aca94e247f8843a7c772aebbd239cf590ae0514795e372353e
+      - GRAYLOG_HTTP_EXTERNAL_URI=http://127.0.0.1:19000/
+      - GRAYLOG_ELASTICSEARCH_HOSTS=http://opensearch:9200
+      - GRAYLOG_MONGODB_URI=mongodb://mongo:27017/graylog
+      - GRAYLOG_SERVER_JAVA_OPTS=-Xms512m -Xmx768m
+    volumes:
+      - ./run/certs:/certs:ro
+    ports:
+      - 127.0.0.1:19000:9000
+      - 127.0.0.1:16514:6514
+      - 127.0.0.1:18090:8090
+  collector:
+    image: otel/opentelemetry-collector-contrib:0.116.1
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otelcol.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - 127.0.0.1:14318:4318
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - 127.0.0.1:19090:9090
+  grafana:
+    image: grafana/grafana-oss:11.4.0
+    environment:
+      - GF_INSTALL_PLUGINS=yesoreyeram-infinity-datasource
+      - GF_SECURITY_ADMIN_PASSWORD=walk-3417-admin
+    ports:
+      - 127.0.0.1:13000:3000
