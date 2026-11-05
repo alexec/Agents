@@ -615,6 +615,7 @@ var CallProvidersAdd = Method[ProviderAdd, ProviderSummary]{"providers/add"}
 var CallProvidersCreate = Method[ProviderCreate, ProviderCreated]{"providers/create"}
 var CallProvidersDraftAnswer = Method[ProviderDraftAnswer, Empty]{"providers/draftAnswer"}
 var CallProvidersDraftCancel = Method[ProviderDraftRequest, Empty]{"providers/draftCancel"}
+var CallProvidersDraftSigned = Method[ProviderDraftSigned, Empty]{"providers/draftSigned"}
 var CallProvidersDraftStart = Method[ProviderDraftStart, ProviderDraftStarted]{"providers/draftStart"}
 var CallProvidersList = Method[Empty, ProviderList]{"providers/list"}
 var CallProvidersOptions = Method[ProviderRequest, ProviderOptions]{"providers/options"}

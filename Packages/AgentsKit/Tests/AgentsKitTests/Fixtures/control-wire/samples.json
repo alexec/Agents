@@ -421,6 +421,25 @@
         "k": "v"
       },
       "preset": "preset"
+    },
+    "sign": {
+      "machine": "box",
+      "method": "agents/start",
+      "params": "{\"runtimeID\":\"claude\"}"
+    }
+  },
+  "ProviderDraftSign": {
+    "machine": "box",
+    "method": "agents/start",
+    "params": "{\"runtimeID\":\"claude\"}"
+  },
+  "ProviderDraftSigned": {
+    "draft": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
+    "lock": {
+      "to": "box",
+      "at": 1793880000,
+      "key": "AQID",
+      "sig": "AQID"
     }
   },
   "ProviderDraftRequest": {

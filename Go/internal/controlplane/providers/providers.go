@@ -238,8 +238,8 @@ type Providers struct {
 	// (#3348): one try each time one starts.
 	broughtBack map[string]bool
 	joining     map[string]*joining
-	done      chan struct{}
-	stopOnce  sync.Once
+	done        chan struct{}
+	stopOnce    sync.Once
 }
 
 // NewProviders is WorkspaceProviders.init.
@@ -782,6 +782,16 @@ func (p *Providers) answer(method string, params json.RawMessage, caller Caller,
 			drafts.Cancel(string(request.Draft), caller)
 		}
 		return map[string]any{}, nil
+	case MethodDraftSigned:
+		drafts := p.Drafts()
+		if drafts == nil {
+			return nil, invalid("That draft has ended.")
+		}
+		var request ProviderDraftSigned
+		if err := requireParams(params, &request, "ProviderDraftSigned", "draft", "lock"); err != nil {
+			return nil, err
+		}
+		return map[string]any{}, drafts.Signed(request, caller)
 	case MethodDraftAnswer:
 		drafts := p.Drafts()
 		if drafts == nil {

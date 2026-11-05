@@ -755,6 +755,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"providers/create", "providers/1"},
 	{"providers/draftAnswer", "providers/1"},
 	{"providers/draftCancel", "providers/1"},
+	{"providers/draftSigned", "providers/1"},
 	{"providers/draftStart", "providers/1"},
 	{"providers/list", "providers/1"},
 	{"providers/options", "providers/1"},

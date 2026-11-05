@@ -8607,6 +8607,22 @@ type ProviderDraftRequest struct {
 	Draft UUID `json:"draft"`
 }
 
+// The writing agent's start, for the client that asked for the draft to sign (#3542): the machine that holds its person's lock takes no start the control plane sends in its own words. The client checks that it starts only a draft's writer (agents/start, the draft's purpose, sandboxed, no MCP servers or other folders), signs method and params as they are (a LockSignature to machine), and sends the signature with providers/draftSigned.
+type ProviderDraftSign struct {
+	Machine MachineRef `json:"machine"`
+
+	Method string `json:"method"`
+
+	Params string `json:"params"`
+}
+
+// providers/draftSigned (#3542): the signature of a draft's sign, which the control plane delivers with the start as it came.
+type ProviderDraftSigned struct {
+	Draft UUID `json:"draft"`
+
+	Lock LockSignature `json:"lock"`
+}
+
 // providers/draftStart (#858).
 type ProviderDraftStart struct {
 	Form ProviderAdd `json:"form"`
@@ -8622,6 +8638,8 @@ type ProviderDraftStarted struct {
 	Draft UUID `json:"draft"`
 
 	Answered *ProviderDraftAnswered `json:"answered,omitzero"`
+
+	Sign *ProviderDraftSign `json:"sign,omitzero"`
 }
 
 // control/providerDraft: how a draft stands, to the client that started it.

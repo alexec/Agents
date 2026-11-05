@@ -19361,6 +19361,44 @@
       ],
       "additionalProperties": false
     },
+    "ProviderDraftSign": {
+      "type": "object",
+      "description": "The writing agent's start, for the client that asked for the draft to sign (#3542): the machine that holds its person's lock takes no start the control plane sends in its own words. The client checks that it starts only a draft's writer (agents/start, the draft's purpose, sandboxed, no MCP servers or other folders), signs method and params as they are (a LockSignature to machine), and sends the signature with providers/draftSigned.",
+      "properties": {
+        "machine": {
+          "$ref": "#/definitions/MachineRef"
+        },
+        "method": {
+          "type": "string"
+        },
+        "params": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "machine",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderDraftSigned": {
+      "type": "object",
+      "description": "providers/draftSigned (#3542): the signature of a draft's sign, which the control plane delivers with the start as it came.",
+      "properties": {
+        "draft": {
+          "$ref": "#/definitions/UUID"
+        },
+        "lock": {
+          "$ref": "#/definitions/LockSignature"
+        }
+      },
+      "required": [
+        "draft",
+        "lock"
+      ],
+      "additionalProperties": false
+    },
     "ProviderDraftStart": {
       "type": "object",
       "description": "providers/draftStart (#858).",
@@ -19395,6 +19433,9 @@
         },
         "answered": {
           "$ref": "#/definitions/ProviderDraftAnswered"
+        },
+        "sign": {
+          "$ref": "#/definitions/ProviderDraftSign"
         }
       },
       "required": [
