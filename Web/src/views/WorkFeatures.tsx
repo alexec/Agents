@@ -15,6 +15,7 @@ import {
   epicLead, epicProgressWords, featureCountWords, featureTitle, leadRowWords, mergeFeatures, noFeatures, nothingOpen, openedFeature,
 } from "../model/workFeatures";
 import { go } from "../route";
+import { ForgeTitle } from "../render/ForgeTitle";
 
 // The list's state lives for the tab, so Back from an epic's page finds it as it was left.
 const features = signal<ForgeFeature[] | null>(null);
@@ -162,7 +163,7 @@ function ItemButton({ item, children }: { item: ForgeItem; children?: ComponentC
     <button type="button" class="work-feature-row" title={`Open ${shortRef(item.node.ref)}'s page`}
       onClick={() => go({ nav: "work", section: "issue", item: item.node.ref })}>
       <span class="work-ref">{shortRef(item.node.ref)}</span>
-      <span class="name">{item.title}</span>
+      <span class="name"><ForgeTitle text={item.title} /></span>
       {children}
     </button>
   );

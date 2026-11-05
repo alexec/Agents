@@ -1883,6 +1883,7 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .work-row-head { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
 .work-ref { color: var(--accent); font-variant-numeric: tabular-nums; }
 .work-title { font-weight: 600; }
+.work-title code, .work-plan-title code, .work-feature-row .name code { font: 0.92em var(--font-mono); }
 .work-figures { padding-left: 2px; }
 /* Docs (#3321): a source's heading, its subfolders, and a search's matches under each doc. */
 .docs-source { margin-top: 14px; }
