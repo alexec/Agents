@@ -125,6 +125,12 @@ struct ChannelLinkWordsTests {
         #expect(ChannelLinkWords.explanation(nobody).hasPrefix("Send asks"))
     }
 
+    @Test func channelsHaveTheirOwnNames() {
+        #expect(ChannelLinkWords.channel("googlechat") == "Google Chat")
+        #expect(ChannelLinkWords.channel("whatsapp") == "WhatsApp")
+        #expect(ChannelLinkWords.channel("matrix") == "Matrix")
+    }
+
     @Test func aLinkSaysWhoseItIs() {
         let link = DaemonAPI.ChannelLink(channel: "slack", identity: "T1/U42", name: "@sam", user: "sam", userName: "Sam",
                                          approvedBy: "sam", approvedAt: expires)

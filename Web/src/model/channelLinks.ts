@@ -6,7 +6,7 @@ import { fromWireDate } from "../protocol/dates";
 
 export const title = "Channels";
 
-const named: Record<string, string> = { slack: "Slack", discord: "Discord", teams: "Teams", whatsapp: "WhatsApp", email: "Email" };
+const named: Record<string, string> = { slack: "Slack", discord: "Discord", teams: "Teams", whatsapp: "WhatsApp", googlechat: "Google Chat", email: "Email" };
 
 /** A channel's name as people say it: Slack, Discord; an unknown one as it is sent. */
 export function channelName(channel: string): string {
