@@ -186,5 +186,50 @@ func Enroll(ctx context.Context, root string, code *Code, private []byte, hello 
 			return nil, fmt.Errorf("enrol: pin the person key: %w", err)
 		}
 	}
+	if len(code.Invite) > 0 && code.Lock != nil {
+		// The invite a signer put in the code (#3491, D3): agentsd signs this machine's own
+		// addMachine with it, and pins the lock from the code, not from the control plane.
+		if err := SaveLockInvite(root, LockInvite{Key: code.Invite, Person: code.Lock.Person, Count: code.Lock.Count, Head: code.Lock.Head}); err != nil {
+			return nil, fmt.Errorf("enrol: keep the invite: %w", err)
+		}
+	}
 	return m, m.Save(root)
 }
+
+// LockInviteFile is the invite from the code this machine joined with (#3491), in the root,
+// 0600, until the machine's own addMachine is on the lock or the invite has expired.
+const LockInviteFile = "lock-invite.json"
+
+// LockInvite is an invite's private key and the lock as it stood after it.
+type LockInvite struct {
+	Key    []byte `json:"key"`
+	Person string `json:"person"`
+	Count  int    `json:"count"`
+	Head   []byte `json:"head"`
+}
+
+// SaveLockInvite keeps an invite in the root.
+func SaveLockInvite(root string, invite LockInvite) error {
+	b, _ := json.Marshal(invite)
+	tmp := filepath.Join(root, "."+LockInviteFile+".tmp")
+	if err := os.WriteFile(tmp, b, 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, filepath.Join(root, LockInviteFile))
+}
+
+// LoadLockInvite is the invite kept in the root, or nil.
+func LoadLockInvite(root string) *LockInvite {
+	b, err := os.ReadFile(filepath.Join(root, LockInviteFile))
+	if err != nil {
+		return nil
+	}
+	var invite LockInvite
+	if json.Unmarshal(b, &invite) != nil || len(invite.Key) != 32 {
+		return nil
+	}
+	return &invite
+}
+
+// DropLockInvite removes the invite: spent, expired, or not this lock's.
+func DropLockInvite(root string) { os.Remove(filepath.Join(root, LockInviteFile)) }

@@ -83,10 +83,13 @@ because the control plane cannot open the key.
 
 ## What this does not protect against
 
-- **The control plane gives out the public keys.** The admin's app gets each machine's and
-  each app's public key from the control plane. Until the machine lock (#3400) signs these
-  keys with the person's own devices, a control plane that is compromised or misused could
-  give out a key of its own, and get a copy sealed to it. The machine lock closes this.
+- **The control plane gives out the apps' public keys.** The admin's app gets each
+  machine's and each app's public key from the control plane. It seals to a machine only
+  when that machine's key is in its person's machine lock (#3491), which the person's own
+  devices sign, so a control plane cannot give out a machine key of its own. A machine
+  that is not in the lock yet gets its copy once its person approves it. An app's key is
+  not in the lock: a control plane that is compromised or misused could give out an app
+  key of its own, and get a copy sealed to it.
 - **Agents Host runs as the member.** Hosts never escalate. A member who reads the
   machine's memory with a debugger while a request is sent can find a key that is open
   there. Sealing keeps keys out of files, logs, messages and the runtime's environment. It

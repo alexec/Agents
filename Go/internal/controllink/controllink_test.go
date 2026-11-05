@@ -251,6 +251,37 @@ func TestACodeWithAPersonKeyIsVersion3(t *testing.T) {
 	}
 }
 
+// TestACodeWithAnInviteIsVersion4 covers #3491 (specs/3399-machine-lock D3): a host code a
+// signer added an invite to carries the invite's key and the lock's pin, with or without a
+// person key, and a client code or a short field is refused.
+func TestACodeWithAnInviteIsVersion4(t *testing.T) {
+	priv := NewPrivateKey()
+	pub, _ := PublicKey(priv)
+	_, secret := MakeCodeSecret(priv)
+	invite := bytes.Repeat([]byte{7}, 32)
+	head := bytes.Repeat([]byte{9}, 32)
+	c := &Code{Host: true, ControlKey: pub, Secret: secret, URL: "https://control.example", Name: "Sam's plane",
+		Invite: invite, Lock: &LockPin{Person: "sam.p", Count: 3, Head: head}}
+	text := c.Text()
+	if !strings.HasPrefix(text, "agents-control:4:h:-:") || !strings.Contains(text, ":-:"+B64URL(invite)+":sam.p:3:") {
+		t.Fatal(text)
+	}
+	back, err := ParseCode(text)
+	if err != nil || !bytes.Equal(back.Invite, invite) || back.Lock == nil || back.Lock.Person != "sam.p" || back.Lock.Count != 3 ||
+		!bytes.Equal(back.Lock.Head, head) || len(back.PersonKey) != 0 {
+		t.Fatalf("%v %+v", err, back)
+	}
+	for _, bad := range []string{
+		strings.Replace(text, ":4:h:", ":4:c:", 1),
+		strings.Replace(text, ":sam.p:3:", ":sam.p:0:", 1),
+		strings.Replace(text, ":"+B64URL(invite)+":", ":"+B64URL(invite[:16])+":", 1),
+	} {
+		if _, err := ParseCode(bad); err == nil {
+			t.Errorf("took %s", bad)
+		}
+	}
+}
+
 func TestCodesSwiftRefuses(t *testing.T) {
 	pub, _ := PublicKey(NewPrivateKey())
 	_, secret := MakeCodeSecret(NewPrivateKey())

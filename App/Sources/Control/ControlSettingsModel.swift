@@ -520,7 +520,10 @@ final class ControlSettingsModel {
     func startCode(forHost: Bool, browser: Bool = false) async -> DaemonAPI.ControlCodeShown? {
         do {
             let shown: DaemonAPI.ControlCodeShown = if forHost {
-                try await client.call(DaemonAPI.Method.hostsStartEnroll, returning: DaemonAPI.ControlCodeShown.self)
+                // With an invite on the lock in the code, so the machine adds itself (#3491, D3).
+                try await LockState.invite(client.call(DaemonAPI.Method.hostsStartEnroll, returning: DaemonAPI.ControlCodeShown.self),
+                                           on: client, pins: LockPins(defaults: WindowDefaults.store, name: ControlConfig.lockPinName),
+                                           account: ControlConfig.lockAccount)
             } else {
                 try await client.call(DaemonAPI.Method.clientsStartPairing,
                                       JSONValue.object(browser ? ["kind": .string(ClientRecord.Kind.browser.rawValue)] : [:]),

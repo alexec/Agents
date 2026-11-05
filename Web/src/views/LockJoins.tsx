@@ -1,7 +1,8 @@
 // The machine lock's cards (#3490, specs/3399-machine-lock D2), beside the sign-in cards and in
 // their look: this browser's own card while it is not in its person's lock, and a card for each
-// other device that asks to join. The words are the window's and the Remote's, so the three
-// clients match. A control plane without lock-join/1 shows nothing.
+// other device that asks to join, and for each machine that asks (#3491, D3). The words are the
+// window's and the Remote's, so the three clients match. A control plane without lock-join/1
+// shows nothing.
 import type { Store } from "../model/store";
 import { brokenWords, type SignerCard, type ThisDevice } from "../model/machineLock";
 import { spaced } from "../wire/machineLock";
@@ -47,10 +48,13 @@ function RequestCard({ store, card, down }: { store: Store; card: SignerCard; do
   let title;
   let subtitle = null;
   let prominent = null;
+  const machine = request.machine !== undefined;
   switch (view.kind) {
     case "compare":
-      title = <><strong>{request.name}</strong> asks to join your devices.</>;
-      subtitle = <>Compare the digits on both screens before you approve it.</>;
+      title = machine ? <>Approve the new machine <strong>{request.name}</strong>?</> : <><strong>{request.name}</strong> asks to join your devices.</>;
+      subtitle = machine
+        ? <>Compare the digits with the ones in its log before you approve it.</>
+        : <>Compare the digits on both screens before you approve it.</>;
       prominent = <button type="button" class="prominent" disabled={down} onClick={() => void lock.compare(request.request)}>Compare Digits</button>;
       break;
     case "another":
@@ -60,7 +64,9 @@ function RequestCard({ store, card, down }: { store: Store; card: SignerCard; do
       title = <>Waiting for {request.name} to show its digits…</>;
       break;
     case "digits":
-      title = <>Approve only if {request.name} shows <code>{spaced(view.digits)}</code>.</>;
+      title = machine
+        ? <>Approve only if the log of {request.name} shows <code>{spaced(view.digits)}</code>.</>
+        : <>Approve only if {request.name} shows <code>{spaced(view.digits)}</code>.</>;
       prominent = <button type="button" class="prominent" disabled={down} onClick={() => void lock.approve(request.request)}>Approve</button>;
       break;
     case "notPromised":
@@ -68,7 +74,7 @@ function RequestCard({ store, card, down }: { store: Store; card: SignerCard; do
       break;
   }
   return (
-    <li class="join-request" aria-label={`${request.name} asks to join your devices`}>
+    <li class="join-request" aria-label={machine ? `The new machine ${request.name} asks to join` : `${request.name} asks to join your devices`}>
       <ApprovalMark />
       <div class="body">
         <span class="title">{title}</span>

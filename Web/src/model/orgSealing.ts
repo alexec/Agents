@@ -2,7 +2,7 @@
 // secrets to each machine that may use it and to each admin's client, and sends only the envelopes. A save that
 // changes where the key goes (the kind, the API or a setting) seals every value again: this page opens its own copy
 // for those not typed anew. A value is in this page's memory only while it is sealed.
-import type { OrgRoute, OrgRouteKept, OrgRouteSealed } from "../protocol/generated";
+import type { OrgRoute, OrgRouteKept, OrgRouteSealed, SealRecipient } from "../protocol/generated";
 import type { Link } from "../wire/link";
 import { fingerprint, openItem, sealRoute } from "../wire/sealing";
 
@@ -41,7 +41,8 @@ export const noCopyHere = "This browser has no copy of the route’s key yet, so
  * takes; typed are the values typed now, which take the place of the ones kept.
  */
 export async function sealedFor(link: Link, route: OrgRoute, kept: OrgRouteKept | null, typed: Record<string, string>,
-  fields: readonly string[]): Promise<OrgRouteSealed | undefined | { problem: string }> {
+  fields: readonly string[], signed: (recipients: SealRecipient[]) => Promise<SealRecipient[]> = async (r) => r,
+): Promise<OrgRouteSealed | undefined | { problem: string }> {
   const keptFields = kept?.route.secretFields ?? [];
   const moved = kept !== null && bindingChanged(kept.route, route);
   if (Object.keys(typed).length === 0 && !(keptFields.length > 0 && moved)) return undefined;
@@ -58,7 +59,8 @@ export async function sealedFor(link: Link, route: OrgRoute, kept: OrgRouteKept 
     }
   }
   Object.assign(values, typed);
-  const { recipients } = await link.call("orgRoutes/recipients", { groups: route.groups ?? [] });
+  // Each machine only when its owner's lock names its key (#3491, D7, D8).
+  const recipients = await signed((await link.call("orgRoutes/recipients", { groups: route.groups ?? [] })).recipients);
   const sealVersion = (kept?.route.sealVersion ?? 0) + 1;
   const print: Record<string, string> = {};
   for (const [field, value] of Object.entries(values)) print[field] = await fingerprint(value);

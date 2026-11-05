@@ -165,6 +165,8 @@ fi
 STRIP=()
 for name in $(env | grep -oE '^(CLAUDE[A-Z_]*|AGENTS_[A-Z_]*)='); do STRIP+=(-u "${name%=}"); done
 if [ "$HOST_FIRST" = 1 ]; then HOST_ARGS=(--control-network); else HOST_ARGS=(--control-code "$(code --host)"); fi
+# HOST_NAME names the scratch machine in place of this Mac's own name, for pictures (#3491).
+if [ -n "${HOST_NAME:-}" ]; then HOST_ARGS+=(--host-name "$HOST_NAME"); fi
 env ${STRIP[@]+"${STRIP[@]}"} AGENTS_ROOT="$ROOT" ${EXTRA_ENV[@]+"${EXTRA_ENV[@]}"} \
   nohup "$AGENTSD" "${HOST_ARGS[@]}" >"$ROOT/host.out" 2>&1 &
 JOINED="uplink: connected to the control plane"

@@ -4,6 +4,7 @@
 import { useEffect, useState } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { ControlCodeShown } from "../protocol/generated";
+import { Capability } from "../protocol/capabilities.generated";
 import type { Store } from "../model/store";
 import { describe } from "../model/errors";
 import { makers } from "../model/machineFromRepository";
@@ -79,7 +80,9 @@ function EnrollCode({ store, command, close }: { store: Store; command: boolean;
   const copied = useSignal(false);
   const [before] = useState(() => new Set(store.hosts.peek().map((h) => h.id)));
   useEffect(() => {
+    // With an invite on the lock in the code, so the machine adds itself (#3491, D3).
     store.link.call("hosts/startEnroll", {})
+      .then((code) => (store.planeHas(Capability.lockJoin1) ? store.machineLock.invite(code) : code))
       .then((code) => { shown.value = code; })
       .catch((error) => { problem.value = describe(error); });
   }, []);

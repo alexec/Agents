@@ -1,6 +1,7 @@
 package controlplane
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
@@ -30,22 +31,79 @@ func (m *Methods) lockMethod(ctx context.Context, method string, params json.Raw
 	person := m.callerPerson(from)
 	switch method {
 	case "lock/get":
+		var request wire.LockGet
+		json.Unmarshal(params, &request)
+		if other := deref(request.Person); other != "" && other != person {
+			// Another person's lock, for an admin's client to check the machine keys it seals
+			// an org route to (#3491, D7, D8). It holds only public keys and names.
+			if !m.s.isAdmin(person) {
+				return nil, fail(notPermitted, "Only an admin can read another person's lock.")
+			}
+			person = other
+		}
 		return m.s.locks.Get(ctx, person)
 	case "lock/add":
 		request, err := require[wire.LockAdd](params, "LockAdd")
 		if err != nil {
 			return nil, err
 		}
-		head, err := m.s.locks.Add(ctx, person, request.Entries)
+		return m.s.addToLock(ctx, person, request.Entries, from.Client)
+	}
+	return nil, fail(methodNotFound, "No method %s.", method)
+}
+
+// addToLock puts a client's or a machine's entries on a person's lock, and tells everyone
+// who keeps a copy.
+func (s *Service) addToLock(ctx context.Context, person string, entries []wire.LockEntry, by string) (any, error) {
+	head, err := s.locks.Add(ctx, person, entries)
+	if err != nil {
+		return nil, lockFailure(err)
+	}
+	s.log(fmt.Sprintf("%d entries put on %s's lock, now %d", len(entries), person, head.Count))
+	s.announce("lockChanged", person, by)
+	s.lockChangedHere(person)
+	// A request whose client or machine is now in the lock is approved (#3490, #3491).
+	s.lockJoins.lockGrew(ctx, person, by)
+	return head, nil
+}
+
+// hostLockMethod is a machine joining its person's lock (#3491, D3), on its channel 0.
+func (m *Methods) hostLockMethod(ctx context.Context, host, method string, params json.RawMessage) (any, error) {
+	person := m.s.ownerOf(host)
+	record := m.s.records.Host(host)
+	if person == "" || record == nil {
+		return nil, fail(notPermitted, "This machine is not joined.")
+	}
+	switch method {
+	case "host/lockAdd":
+		// Only the machine's own addMachine, signed with an invite: the lock checks the
+		// invite, and this checks that the machine adds itself and nothing else.
+		request, err := require[wire.LockAdd](params, "LockAdd")
 		if err != nil {
-			return nil, lockFailure(err)
+			return nil, err
 		}
-		m.s.log(fmt.Sprintf("%d entries put on %s's lock, now %d", len(request.Entries), person, head.Count))
-		m.s.announce("lockChanged", person, from.Client)
-		m.s.lockChangedHere(person)
-		// A request whose client is now in the lock is approved (#3490).
-		m.s.lockJoins.lockGrew(ctx, person, from.Client)
-		return head, nil
+		for _, e := range request.Entries {
+			body, err := machinelock.Open(e)
+			if err != nil || body.Kind != wire.LockEntryKindAddMachine || !bytes.Equal(body.Key, record.PublicKey) {
+				return nil, fail(invalidParams, "A machine puts only its own addMachine on the lock.")
+			}
+		}
+		return m.s.addToLock(ctx, person, request.Entries, host)
+	case "host/lockJoin":
+		request, err := require[wire.LockJoin](params, "LockJoin")
+		if err != nil {
+			return nil, err
+		}
+		return m.s.lockJoins.askMachine(ctx, host, request)
+	case "host/lockJoinReveal":
+		request, err := require[wire.LockJoinNonce](params, "LockJoinNonce")
+		if err != nil {
+			return nil, err
+		}
+		if err := m.s.lockJoins.nonce(ctx, person, host, false, request); err != nil {
+			return nil, err
+		}
+		return wire.Empty{}, nil
 	}
 	return nil, fail(methodNotFound, "No method %s.", method)
 }

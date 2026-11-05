@@ -16,6 +16,8 @@ final class UserScopeState {
     var left: DaemonAPI.SecretsLeft?
     /// Why the user scope could not be read, or nil.
     private(set) var problem: String?
+    /// The machine lock, so a secret is sealed only to the machines it names (#3491, D8).
+    @ObservationIgnored weak var lock: LockState?
 
     func load(_ control: DaemonClient?) async {
         guard let control else {
@@ -69,7 +71,9 @@ final class UserScopeState {
             let to = try await control.call(DaemonAPI.Method.userSecretRecipients, DaemonAPI.Empty(),
                                             returning: DaemonAPI.SealRecipients.self)
             let version = UserScopeWords.nextVersion(replacing ?? secrets?.secrets.first { $0.name == name }, now: Date())
-            let values = try ClientSealing.sealSecret(user: to.user ?? "", name: name, version: version, value: value, to: to.recipients)
+            // Only to the machines the lock names (#3491, D8): the control plane cannot add a key of its own.
+            let recipients = if let lock { await lock.signed(to.recipients, on: control) } else { to.recipients }
+            let values = try ClientSealing.sealSecret(user: to.user ?? "", name: name, version: version, value: value, to: recipients)
             _ = try await control.call(DaemonAPI.Method.userSetSecret, DaemonAPI.UserSecretSet(name: name, version: version, values: values))
             await load(control)
             return nil

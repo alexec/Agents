@@ -6,7 +6,8 @@ give a client a key of its own. This is the decision of the spike #3399. The bui
 #3400 (epic #3401). The model is Tailscale's
 [Tailnet Lock](https://tailscale.com/kb/1226/tailnet-lock).
 
-Steps 1 (#3489) and 2 (#3490) of "The build" are built: the chain, and clients that sign.
+Steps 1 (#3489), 2 (#3490) and 3 (#3491) of "The build" are built: the chain, clients
+that sign, and machines that join signed.
 
 How step 2 is built (#3490):
 
@@ -30,6 +31,45 @@ How step 2 is built (#3490):
 - Decided: each client pins the head it last checked (defaults on the Mac and the Remote,
   `localStorage` on the web page), and signs nothing on a lock that does not follow it.
 - Nothing refuses yet (step 4); the fingerprint in Settings ▸ Clients (D1) is not built yet.
+
+How step 3 is built (#3491):
+
+- **The invite in a join code.** When a signer shows a host code (Add a Machine on the Mac
+  and the web page), it puts an `invite` on the lock, signed with its own key, and adds the
+  invite's private key and the lock's pin to the code: a version 4 code,
+  `agents-control:4:h:-:<key>:<secret>:<url>:<pin>:<name>:<personKey or ->:<invite>:<person>:<count>:<head>`.
+  The control plane makes the version 2 code; the invite's key never goes through it.
+  `agentsd` keeps the invite at `<root>/lock-invite.json` (0600), pins the lock from the
+  code's head, and when `host/lock` comes signs its own `addMachine` with the invite key
+  and sends it with `host/lockAdd`. The control plane takes only the machine's own
+  `addMachine` there.
+- **A machine that asks.** A machine that is not in the lock and has no invite (it asked
+  to join, a provider or `hosts/install` made its code, or it joined before the lock) asks
+  as a client does, on its channel 0: `host/lockJoin` with its own key and a commitment.
+  The request is a `lock/joinRequests` row with `machine` set, so every client of the
+  person shows "Approve the new machine dev-3?". A signer's Compare Digits reaches the
+  machine as `host/lockJoinChanged`; it reveals with `host/lockJoinReveal`, and writes the
+  six digits to its log and to `<root>/lock-join-shown`. Approve signs the machine's
+  `addMachine`. Capability `host.lock/2`.
+- **The sealing key in the lock (D8).** A machine's key is also its sealing key: the key
+  org routes and secrets are sealed to. A client seals to a machine only when its owner's
+  lock names that key as an `addMachine`'s sealing key; `SealRecipient.owner` says whose
+  lock, and an admin's client reads another person's lock with `lock/get {person}` and pins
+  it on first use. A machine left out gets its copy through `sealing/work` once it is in
+  the lock. A client recipient's key is still the control plane's: `addClient` names a
+  client's signing key, not its sealing key.
+- Decided: a machine that asks to join the control plane (`/v1/join`) joins the lock as a
+  step of its own after it is approved, through the same request a client makes, because
+  one flow then serves every machine with no invite: one that asked, one a provider
+  started with no client there, and one that joined before the lock (D9).
+- Decided: a provider's machine asks too, and `AGENTS_JOIN_TOKEN` is not built here,
+  because today the control plane, not a client, makes a provider machine's code
+  (`workspaces.go` `HostCommand`), so an invite in it would go through the control plane.
+  When a provider runs on the customer's machine with a client there (#3398), that client
+  can put a version 4 code in `AGENTS_JOIN_TOKEN`.
+- Decided: a machine's key and sealing key are the same key, the one it proves itself
+  with, because org routes and secrets are sealed to that key today, and a second key is
+  one more thing to keep on every machine for no gain while nothing refuses (step 4).
 
 ## What is wrong today
 

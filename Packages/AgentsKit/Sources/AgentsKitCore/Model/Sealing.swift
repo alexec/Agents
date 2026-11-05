@@ -14,12 +14,15 @@ public extension DaemonAPI {
     struct SealRecipient: Codable, Sendable, Hashable {
         public var id: String
         public var name: String
+        /// A machine's person, whose lock names its key (#3491, D8); nil for a client.
+        public var owner: String?
         /// P256, X9.63, 65 bytes.
         public var publicKey: Data
 
-        public init(id: String, name: String, publicKey: Data) {
+        public init(id: String, name: String, owner: String? = nil, publicKey: Data) {
             self.id = id
             self.name = name
+            self.owner = owner
             self.publicKey = publicKey
         }
     }
@@ -176,10 +179,14 @@ public enum ClientSealing {
     }
 
     /// Seals what waits for a copy this client can make: `sealing/work`, then `sealing/add`.
-    /// Quiet when the control plane is older, or nothing waits.
-    public static func sealWaiting(on control: DaemonClient, key: DeviceKey, client: UUID) async {
-        guard let work = try? await control.call(DaemonAPI.Method.sealingWork, DaemonAPI.Empty(),
+    /// Quiet when the control plane is older, or nothing waits. `signed` leaves out each machine
+    /// whose key its owner's lock does not name (#3491, D8).
+    public static func sealWaiting(on control: DaemonClient, key: DeviceKey, client: UUID, isolation: isolated (any Actor)? = #isolation,
+                                   signed: ([DaemonAPI.SealRecipient]) async -> [DaemonAPI.SealRecipient]) async {
+        guard var work = try? await control.call(DaemonAPI.Method.sealingWork, DaemonAPI.Empty(),
                                                  returning: DaemonAPI.SealingWork.self), !work.items.isEmpty else { return }
+        for i in work.items.indices { work.items[i].missing = await signed(work.items[i].missing) }
+        work.items.removeAll { $0.missing.isEmpty }
         let items = seal(work, with: key, client: client)
         guard !items.isEmpty else { return }
         _ = try? await control.call(DaemonAPI.Method.sealingAdd, DaemonAPI.SealingAdd(items: items))
