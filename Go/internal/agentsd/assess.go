@@ -107,6 +107,10 @@ func appToolMethod(tool string) string {
 	if tool == fillSecretName {
 		return "secrets/fill"
 	}
+	// hand_to_person (#3529), the same.
+	if tool == handToPersonName {
+		return "browser/handToPerson"
+	}
 	// A browser tool (#3534) is browser/<the rest, in camelCase>: browser/takeScreenshot.
 	if rest, ok := strings.CutPrefix(tool, "browser_"); ok && rest != "" {
 		words := strings.Split(rest, "_")

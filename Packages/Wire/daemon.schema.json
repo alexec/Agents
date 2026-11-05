@@ -7835,6 +7835,22 @@
       ],
       "additionalProperties": false
     },
+    "ElicitationHandOff": {
+      "description": "An agent's hand_to_person (#3529): one step the person does on the page in the machine's browser (solve a CAPTCHA, sign in). The form's one choice is Done or Can't do it; a client that can show the machine's browser offers Open the page.",
+      "type": "object",
+      "properties": {
+        "step": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "step"
+      ],
+      "additionalProperties": false
+    },
     "ElicitationNotification": {
       "type": "object",
       "properties": {
@@ -7880,6 +7896,9 @@
         },
         "secret": {
           "$ref": "#/definitions/ElicitationSecret"
+        },
+        "handOff": {
+          "$ref": "#/definitions/ElicitationHandOff"
         }
       },
       "required": [

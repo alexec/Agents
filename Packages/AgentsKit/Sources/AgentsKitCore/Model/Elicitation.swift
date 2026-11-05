@@ -21,6 +21,23 @@ public struct ElicitationRequest: Codable, Hashable, Sendable, Identifiable {
     /// An agent's `ask_secret` (#2885): the form's one field is drawn masked, and the host
     /// saves what is typed to the person's secrets.env. Nil for every other form.
     public var secret: Secret?
+    /// An agent's `hand_to_person` (#3529): one step the person does on the page in the
+    /// machine's browser. The form is one choice, Done or Can't do it; a client that shows
+    /// the machine's browser adds Open the page. Nil for every other form.
+    public var handOff: HandOff?
+
+    /// One step on a page, handed to the person.
+    public struct HandOff: Codable, Hashable, Sendable {
+        /// What the person does: "Solve the CAPTCHA".
+        public var step: String
+        /// Why the agent needs them.
+        public var reason: String?
+
+        public init(step: String, reason: String? = nil) {
+            self.step = step
+            self.reason = reason
+        }
+    }
 
     /// One named secret an agent asks for.
     public struct Secret: Codable, Hashable, Sendable {
@@ -51,7 +68,7 @@ public struct ElicitationRequest: Codable, Hashable, Sendable, Identifiable {
 
     public init(id: UUID = UUID(), elicitationID: String? = nil, agentID: UUID,
                 message: String? = nil, mode: Mode, scope: Scope = .request,
-                askedAt: Date = Date(), secret: Secret? = nil) {
+                askedAt: Date = Date(), secret: Secret? = nil, handOff: HandOff? = nil) {
         self.id = id
         self.elicitationID = elicitationID
         self.agentID = agentID
@@ -60,6 +77,7 @@ public struct ElicitationRequest: Codable, Hashable, Sendable, Identifiable {
         self.scope = scope
         self.askedAt = askedAt
         self.secret = secret
+        self.handOff = handOff
     }
 
     /// Read a request off the wire. Nil when we cannot draw it, which is a decline
@@ -82,6 +100,15 @@ public struct ElicitationRequest: Codable, Hashable, Sendable, Identifiable {
                   // Tied to a session, unless it names the request it belongs to —
                   // which is how a runtime asks before there is a session at all.
                   scope: wire["requestId"] == nil ? .session : .request)
+    }
+
+    /// A hand-off's answer, as its form takes it: Done, or Can't do it with what stopped
+    /// them (#3529). The daemon names the choice `outcome` and the line beside it
+    /// `outcome_note`, as `ask_question` names a choice and its note.
+    public static func handOffAnswer(done: Bool, note: String = "") -> [String: JSONValue] {
+        guard !done else { return ["outcome": .string("done")] }
+        let note = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        return note.isEmpty ? ["outcome": .string("cannot")] : ["outcome": .string("cannot"), "outcome_note": .string(note)]
     }
 
     /// The one field of a secret's form, as the daemon names it.

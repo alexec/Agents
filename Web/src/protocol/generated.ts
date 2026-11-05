@@ -3213,6 +3213,16 @@ export interface ElicitationAnswer {
   answer: string;
 }
 
+/**
+ * An agent's hand_to_person (#3529): one step the person does on the page in the machine's browser
+ * (solve a CAPTCHA, sign in). The form's one choice is Done or Can't do it; a client that can show
+ * the machine's browser offers Open the page.
+ */
+export interface ElicitationHandOff {
+  step: string;
+  reason?: string;
+}
+
 export interface ElicitationNotification {
   agentID: UUID;
   requestID: UUID;
@@ -3228,6 +3238,7 @@ export interface ElicitationRequest {
   scope: ElicitationRequestScope;
   askedAt: WireDate;
   secret?: ElicitationSecret;
+  handOff?: ElicitationHandOff;
 }
 
 export type ElicitationRequestMode =
@@ -12135,8 +12146,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   EffectiveRule: { required: ["rule", "value", "words", "layers"], optional: ["decides", "cap", "capLine"] },
   EffectiveSandbox: { required: ["state", "requested"], optional: ["reason"] },
   ElicitationAnswer: { required: ["question", "answer"], optional: [] },
+  ElicitationHandOff: { required: ["step"], optional: ["reason"] },
   ElicitationNotification: { required: ["agentID", "requestID"], optional: ["request"] },
-  ElicitationRequest: { required: ["id", "agentID", "mode", "scope", "askedAt"], optional: ["elicitationID", "message", "secret"] },
+  ElicitationRequest: { required: ["id", "agentID", "mode", "scope", "askedAt"], optional: ["elicitationID", "message", "secret", "handOff"] },
   ElicitationSchema: { required: ["properties"], optional: ["title", "description"] },
   ElicitationSchemaProperty: { required: ["name", "isRequired", "kind"], optional: ["title", "description", "defaultValue"] },
   ElicitationSchemaPropertyChoice: { required: ["value", "title"], optional: ["description"] },

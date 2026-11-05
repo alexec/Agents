@@ -3676,6 +3676,13 @@ type ElicitationAnswer struct {
 	Answer string `json:"answer"`
 }
 
+// An agent's hand_to_person (#3529): one step the person does on the page in the machine's browser (solve a CAPTCHA, sign in). The form's one choice is Done or Can't do it; a client that can show the machine's browser offers Open the page.
+type ElicitationHandOff struct {
+	Step string `json:"step"`
+
+	Reason *string `json:"reason,omitzero"`
+}
+
 type ElicitationNotification struct {
 	AgentID UUID `json:"agentID"`
 
@@ -3700,6 +3707,8 @@ type ElicitationRequest struct {
 	AskedAt Date `json:"askedAt"`
 
 	Secret *ElicitationSecret `json:"secret,omitzero"`
+
+	HandOff *ElicitationHandOff `json:"handOff,omitzero"`
 }
 
 type ElicitationRequestMode struct {

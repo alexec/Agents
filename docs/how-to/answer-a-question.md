@@ -54,6 +54,12 @@ Whichever it is, the agent and its folder say **Needs you** until you answer.
      and the agent gets its name, never the value; the chat shows only that it was saved.
      **No thanks** tells the agent you did not give it. A notification of it has no **Reply**:
      open the conversation to answer it.
+   - **A step on a page.** An agent that drives the app's browser can hand you one step it
+     cannot do, such as a CAPTCHA or a sign-in, with a raised hand beside it and why. On the
+     Mac or the web page, choose **Open the page**: the Agent Browser opens beside the chat
+     at the agent's page. Do the step there, then choose **Done**, or **Can't do it** and say
+     what stopped you. On iPhone and iPad, do the step on the Mac or the web page; you can
+     still answer the card there. The agent carries on from the same page.
    - **A link to open.** Some agents ask you to do something in the browser, such as
      sign in. Click **Open**, do it, then click **Done**, or **Gave up** if you could not.
 3. For a question in words (the agent's turn has ended and its summary says **Waiting on

@@ -297,7 +297,7 @@ func (d *Daemon) answerElicitation(r wire.AnswerElicitationRequest) error {
 	d.formDown(l.id, r.RequestID)
 	// A form whose call came back already (#1641): the answer starts the agent again.
 	if pe.left {
-		if err := d.promptFromApp(l.id, d.formAnsweredWords(pe.req, action, said)); err != nil {
+		if err := d.promptFromApp(l.id, d.formAnsweredWords(pe.req, action, content, said)); err != nil {
 			log.Printf("agent %s: form answer: %v", l.id, err)
 		}
 		return nil
@@ -308,10 +308,13 @@ func (d *Daemon) answerElicitation(r wire.AnswerElicitationRequest) error {
 }
 
 // formAnsweredWords is the prompt that brings an answer to a form left open.
-func (d *Daemon) formAnsweredWords(req wire.ElicitationRequest, action wire.AnswerElicitationRequestAction, said []wire.ElicitationAnswer) string {
+func (d *Daemon) formAnsweredWords(req wire.ElicitationRequest, action wire.AnswerElicitationRequestAction, content map[string]wire.JSONValue, said []wire.ElicitationAnswer) string {
 	if req.Secret != nil {
 		return "The person replied to your ask_secret for " + req.Secret.Name + ". " +
 			secretNote(req.Secret.Name, skillcatalog.SecretsPath(d.personalHome()), action)
+	}
+	if req.HandOff != nil {
+		return "The person replied to your hand_to_person. " + handOffNoteFor(req.HandOff.Step, action, content)
 	}
 	form := "your form"
 	if req.Message != nil && strings.TrimSpace(*req.Message) != "" {

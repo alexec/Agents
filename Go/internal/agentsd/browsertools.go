@@ -29,7 +29,8 @@ import (
 // things: the first call takes the lease browser:agents, so one agent at a time drives the
 // browser; every result goes through the machine's browser.Filter (text and images) before
 // the agent gets it, and calls that could read a filled secret past it are refused
-// (browserfill.go, #3530); and a later story holds the calls while the person has the page.
+// (browserfill.go, #3530); and while the person has the page (hand_to_person, handoff.go,
+// #3529), the agent's calls are held off.
 //
 // The tools are listed from browsertools.json, which scripts/browser-tools.sh writes from
 // the pinned @playwright/mcp, so a session sees them before Node or Chromium is on the
@@ -91,6 +92,9 @@ var browserTools = sync.OnceValues(func() ([]json.RawMessage, map[string]bool) {
 	// The app's own fill (#3530), listed and called with Playwright's tools.
 	names[fillSecretName] = true
 	out = append(out, fillSecretTool)
+	// The hand-off to the person (#3529), the same.
+	names[handToPersonName] = true
+	out = append(out, handToPersonTool)
 	return out, names
 })
 
@@ -208,6 +212,12 @@ func (d *Daemon) driveBrowser(ctx context.Context, agent wire.UUID, name string,
 	if !d.offersBrowser() {
 		return failed("The browser can't be installed on " + thisMachine() + ".")
 	}
+	if name == handToPersonName && d.isBot() {
+		return failed(noOneAnswersWords)
+	}
+	if h := d.handOffOpen(agent); h != nil {
+		return failed(handOffHolds(h))
+	}
 	var fill secretFill
 	if name == fillSecretName {
 		var refusal string
@@ -222,6 +232,11 @@ func (d *Daemon) driveBrowser(ctx context.Context, agent wire.UUID, name string,
 	if !d.holdsBrowser(agent) {
 		// In line behind another agent: told its place, started again on lease.granted.
 		return []any{map[string]any{"type": "text", "text": reply}}, false, reply
+	}
+	if name == handToPersonName {
+		// The person drives: no Playwright is needed for it.
+		said, isError := d.handToPerson(agent, args)
+		return []any{map[string]any{"type": "text", "text": said}}, isError, said
 	}
 	ctx, cancel := context.WithTimeout(ctx, browserCallLongest)
 	defer cancel()
@@ -378,10 +393,12 @@ func (d *Daemon) endBrowserSession(agent wire.UUID) {
 
 // endBrowserDrive is what a turn's end does to the browser: the agent's @playwright/mcp
 // ends and browser:agents goes to the next agent in line. The browser itself, its pages
-// and its sign-ins stay, until it is idle (browser.IdleAfter).
+// and its sign-ins stay, until it is idle (browser.IdleAfter). An agent whose hand-off is
+// still open (#3529) keeps the lease, so no other agent takes the page from the person;
+// the answer starts it again, and the lease's own length ends it if nobody answers.
 func (d *Daemon) endBrowserDrive(agent wire.UUID) {
 	d.endBrowserSession(agent)
-	if d.holdsBrowser(agent) {
+	if d.holdsBrowser(agent) && d.handOffOpen(agent) == nil {
 		d.releaseResource(agent, browserLeaseName)
 	}
 }

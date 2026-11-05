@@ -102,9 +102,9 @@ func toolTimeKind(name string) string {
 	switch {
 	// The app's ask_question, any runtime's own (Antigravity's has the same name, and is the
 	// person's time all the same), ask_form, its name before #2298, in older records, and
-	// ask_secret (#2885).
+	// ask_secret (#2885) and hand_to_person (#3529).
 	case strings.HasSuffix(n, "askuserquestion") || strings.HasSuffix(n, "ask_question") || strings.HasSuffix(n, "ask_form") ||
-		strings.HasSuffix(n, "ask_secret"):
+		strings.HasSuffix(n, "ask_secret") || strings.HasSuffix(n, "hand_to_person"):
 		return "person"
 	case strings.HasSuffix(n, "release_resource"):
 		// release_resource ends with lease_resource: a release is quick, and a tool.
