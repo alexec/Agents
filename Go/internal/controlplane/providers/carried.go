@@ -255,3 +255,77 @@ func (p *Providers) hostKey(host string, link WorkspaceLink, destination, trust 
 	json.Unmarshal(raw, &result)
 	return deref(result.KnownHosts), deref(result.NeedsTrust), nil
 }
+
+// carriedInstallPatience is how long an install in a codespace is waited for: as long as
+// the carrying machine gives it, and a minute more: within the page's 15 minutes.
+var carriedInstallPatience = StandardCalls.Long + 2*time.Minute
+
+// InstallCarried is hosts/install for Add as Machine… on a codespace whose provider a
+// machine carries (#3497): that machine installs Agents in it over ssh, with the token it
+// keeps, and the codespace joins with code, a host code made here for person. It has no
+// tunnel: the codespace dials this control plane's own address (the tunnel would be ssh
+// with the token too). False when request is not for such a codespace: it is installed as
+// any server is. The answer is hosts/install's: {needsTrust, name} for a host key to trust
+// first, else {started: true, name, tunnel: false}.
+func (p *Providers) InstallCarried(request wire.MachineInstall, person string, code func() (string, error)) (any, bool, error) {
+	if request.Provider == nil || request.Workspace == nil {
+		return nil, false, nil
+	}
+	link := WorkspaceLink{Provider: string(*request.Provider), Workspace: *request.Workspace}
+	destination := strings.TrimSpace(request.Destination)
+	r := p.carriedCodespace(link, destination)
+	if r == nil {
+		return nil, false, nil
+	}
+	machine := *r.Machine
+	if p.hooks.OwnerOf(machine) != person {
+		return nil, true, fail(CodeNotPermitted, "%s carries %s, and it isn’t yours: only its person can add its codespaces.",
+			p.hostName(machine), r.Name)
+	}
+	name := strings.TrimSpace(deref(request.Name))
+	if name == "" {
+		name = link.Workspace
+	}
+	// A code that a call showing the host key leaves unspent expires in five minutes.
+	text, err := code()
+	if err != nil {
+		return nil, true, err
+	}
+	ask := wire.ProviderSSH{Provider: wire.ProviderID(r.ID), Op: "install", Destination: destination,
+		Codespace: &link.Workspace, Name: &name, Trust: request.Trust, HostCode: &text}
+	p.mu.Lock()
+	if p.installing == nil {
+		p.installing = map[string]int{}
+	}
+	p.installing[machine]++
+	p.mu.Unlock()
+	defer func() {
+		p.mu.Lock()
+		if p.installing[machine]--; p.installing[machine] <= 0 {
+			delete(p.installing, machine)
+		}
+		p.mu.Unlock()
+	}()
+	p.router.BroadcastControl("control/installProgress", wire.ControlInstallProgress{Name: name, Step: "connect"})
+	raw, err := Ask(p.router, machine, p.hostName(machine), wire.CallProvidersSSH.Name, ask, carriedInstallPatience)
+	if err != nil {
+		return nil, true, err
+	}
+	var result SSHResult
+	json.Unmarshal(raw, &result)
+	if trust := deref(result.NeedsTrust); trust != "" {
+		return map[string]any{"needsTrust": trust, "name": name}, true, nil
+	}
+	return map[string]any{"started": true, "name": name, "tunnel": false}, true, nil
+}
+
+// installProgress says a step of a carried install to clients, from the machine that
+// runs it (#3497); a machine that runs none is not heard.
+func (p *Providers) installProgress(host string, step wire.ControlInstallProgress) {
+	p.mu.Lock()
+	running := p.installing[host] > 0
+	p.mu.Unlock()
+	if running {
+		p.router.BroadcastControl("control/installProgress", step)
+	}
+}

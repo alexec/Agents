@@ -305,6 +305,20 @@ var writes = methodSet(
 	"user/setSettings",
 )
 
+// installCarried is hosts/install from the machine that carries a codespace's provider,
+// with a host code that makes the codespace the caller's; false for any other install.
+func (m *Methods) installCarried(params json.RawMessage, from Caller) (any, bool, error) {
+	var request wire.MachineInstall
+	if json.Unmarshal(params, &request) != nil {
+		return nil, false, nil
+	}
+	person := m.callerPerson(from)
+	return m.s.providers.InstallCarried(request, person, func() (string, error) {
+		text, _, err := m.s.codes.HostCode(withCodeOwner(context.Background(), person), "")
+		return text, err
+	})
+}
+
 func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (any, error) {
 	ctx := context.Background()
 	m.mu.Lock()
@@ -313,6 +327,14 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 	readsOnly := method == "providers/list" || method == "providers/refresh" || method == "hosts/listKept"
 	if frozen && (writes[method] || workspaceMethods[method] && !readsOnly) {
 		return nil, fail(storeUnavailable, "The control plane is moving to another machine. Nothing was changed; try again in a minute.")
+	}
+	// Add as Machine… on a codespace whose provider a machine carries (#3497): that
+	// machine's ssh installs it, not this one's, so neither a hosted copy's refusal nor the
+	// owner's ssh applies.
+	if method == "hosts/install" && m.s.providers != nil {
+		if answer, carried, err := m.installCarried(params, from); carried {
+			return answer, err
+		}
 	}
 	if m.s.cfg.Hosted && overSSH[method] {
 		return nil, noSSHHere
@@ -1262,9 +1284,9 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 			return nil, err
 		}
 		return m.s.links.check(ctx, sender)
-	case "host/machines", "host/providerDraft", "host/status":
+	case "host/machines", "host/providerDraft", "host/status", "host/installProgress":
 		if m.s.providers == nil {
-			if method == "host/status" {
+			if method == "host/status" || method == "host/installProgress" {
 				return map[string]any{}, nil
 			}
 			return nil, m.s.providersOff()

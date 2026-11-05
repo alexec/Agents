@@ -238,7 +238,10 @@ type Providers struct {
 	// (#3348): one try each time one starts.
 	broughtBack map[string]bool
 	joining     map[string]*joining
-	done        chan struct{}
+	// The machines installing Agents in a codespace for Add as Machine… (#3497), by how
+	// many installs: only their host/installProgress is said to clients.
+	installing map[string]int
+	done       chan struct{}
 	stopOnce    sync.Once
 }
 
@@ -415,7 +418,7 @@ func (p *Providers) Answer(method string, params json.RawMessage, from Caller) (
 	return p.answer(method, params, from, "client "+shortID(from.Client))
 }
 
-// HostSaid answers host/machines, host/providerDraft and host/status, which a host says
+// HostSaid answers host/machines, host/providerDraft, host/status and host/installProgress, which a host says
 // on its channel 0, as ControlMethods.hostSaid does for them.
 func (p *Providers) HostSaid(host, method string, params json.RawMessage) (any, error) {
 	switch method {
@@ -441,6 +444,12 @@ func (p *Providers) HostSaid(host, method string, params json.RawMessage) (any, 
 		var status MachineStatus
 		if requireParams(params, &status, "MachineStatus", "idle", "running") == nil {
 			p.Heard(host, status)
+		}
+		return map[string]any{}, nil
+	case wire.NotifyHostInstallProgress.Name:
+		var step wire.ControlInstallProgress
+		if requireParams(params, &step, "ControlInstallProgress", "name", "step") == nil {
+			p.installProgress(host, step)
 		}
 		return map[string]any{}, nil
 	}

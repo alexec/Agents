@@ -123,7 +123,8 @@ export class Providers {
 
   /**
    * Add as Machine… (#3365), as the window's: the control plane installs Agents on `workspace` over
-   * its own ssh (gh's, for a codespace), and the machine is linked to it once it joins, so its
+   * its own ssh, or a codespace from the machine that carries its provider (#3497), and the machine
+   * is linked to it once it joins, so its
    * provider starts it again (#3348). `trust` is the host key's fingerprint, when the person said
    * it is the one the machine shows.
    */
@@ -134,7 +135,11 @@ export class Providers {
     const asked = name || destination;
     this.linkOnJoin.set(asked, { provider, workspace, trust });
     try {
-      const answer = await this.caller.call("hosts/install", { destination, name, ...(trust ? { trust } : {}) }) as
+      // The provider and workspace let the control plane install a carried codespace from its
+      // carrying machine, with the token kept there (#3497).
+      const answer = await this.caller.call("hosts/install", {
+        destination, name, provider: provider as ProviderID, workspace, ...(trust ? { trust } : {}),
+      }) as
         { needsTrust?: string; name?: string } | null;
       this.linkOnJoin.delete(asked);
       if (answer?.needsTrust) return { needsTrust: answer.needsTrust };
