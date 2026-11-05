@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
+	"sort"
 	"testing"
 
 	"github.com/alexec/agents/Go/wire"
@@ -119,9 +121,12 @@ func TestATurnOutsideTheFolderCannotBeUndone(t *testing.T) {
 	if tc := turnChanges(d, id); len(tc) != 0 {
 		t.Fatalf("%+v", tc)
 	}
-	if got := cannotUndo(dir, map[string]bool{ignored: true, "/elsewhere/x": true}, map[string]bool{}); len(got) != 2 ||
-		got[0] != "/elsewhere/x" || got[1] != ignored {
-		t.Fatalf("%v", got)
+	// cannotUndo sorts its paths; where the temp folder sorts against /elsewhere differs
+	// by machine (/tmp on Linux, /Users/runner/… on CI's macOS: #3517).
+	want := []string{ignored, "/elsewhere/x"}
+	sort.Strings(want)
+	if got := cannotUndo(dir, map[string]bool{ignored: true, "/elsewhere/x": true}, map[string]bool{}); !slices.Equal(got, want) {
+		t.Fatalf("%v, want %v", got, want)
 	}
 }
 
