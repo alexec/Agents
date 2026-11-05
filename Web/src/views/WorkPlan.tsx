@@ -19,6 +19,7 @@ import {
 import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { offerStart } from "./NewAgent";
 import { go } from "../route";
+import { ForgeTitle } from "../render/ForgeTitle";
 
 const markClass: Record<PlanMark, string> = { "✓": "done", "◐": "working", "⚠": "attention", "○": "waiting", "⊘": "blocked" };
 const holdsRuntime = (s: AgentState) => s === "starting" || s === "running" || s === "waitingOnUser";
@@ -158,7 +159,7 @@ export function WorkPlan({ store, host, lineageHost, detail, asked, writes, wrot
                               <span class={`work-plan-mark ${markClass[mark]}`} title={markWords[mark]} aria-label={markWords[mark]}>{mark}</span>
                               <span class="quiet work-plan-level">{c.item.level ?? ""}</span>
                               <span class="work-ref">{shortRef(c.item.node.ref)}</span>
-                              <span class="work-plan-title">{c.item.title}</span>
+                              <span class="work-plan-title"><ForgeTitle text={c.item.title} /></span>
                               {work && <span class="quiet small">{work}</span>}
                               {cost && <span class="quiet small work-plan-cost">{cost}</span>}
                             </button>

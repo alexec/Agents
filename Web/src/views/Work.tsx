@@ -22,6 +22,8 @@ import { nodeName } from "../model/value";
 import { ago } from "../model/connectorSetup";
 import { fromWireDate } from "../protocol/dates";
 import { Markdown } from "../render/markdown";
+import { forgeMarkdown } from "../model/forgeMarkdown";
+import { ForgeTitle } from "../render/ForgeTitle";
 import { Graph, useLayout, useWalk } from "./Lineage";
 import { WorkActions, WorkCommentBox } from "./WorkActions";
 import { WorkPlan } from "./WorkPlan";
@@ -153,7 +155,7 @@ function WorkRowView({ row, several, open }: { row: WorkRow; several: boolean; o
       <button type="button" class="work-row" onClick={open}>
         <span class="work-row-head">
           {!titleSaysRef(row) && <span class="work-ref">{shortRef(row.node.ref)}</span>}
-          <span class="work-title">{row.title}</span>
+          <span class="work-title"><ForgeTitle text={row.title} /></span>
           <StatePill state={row.state} draft={row.draft} status={row.status} />
           {row.labels.map((l) => <LabelChip key={l.name} label={l} />)}
           {several && <span class="quiet small">{repoName(row.repo)}</span>}
@@ -277,7 +279,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
         <Stepper store={store} kind={kind} at={ref} />
       </div>
       <header class="work-page-head">
-        <h2><span class="work-title">{title}</span> {!titleSaysRef({ title, node }) && <span class="work-ref">{shortRef(ref)}</span>}</h2>
+        <h2><span class="work-title"><ForgeTitle text={title} /></span> {!titleSaysRef({ title, node }) && <span class="work-ref">{shortRef(ref)}</span>}</h2>
         <div class="work-row-head">
           <StatePill state={state} draft={item?.draft} status={item?.status} />
           {labels.map((l) => <LabelChip key={l.name} label={l} />)}
@@ -297,7 +299,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
       )}
       {detail.value && (
         <section class="work-body" aria-label="Description">
-          {detail.value.got.body.trim() ? <Markdown text={detail.value.got.body} /> : <p class="quiet">No description.</p>}
+          {detail.value.got.body.trim() ? <Markdown text={forgeMarkdown(detail.value.got.body)} /> : <p class="quiet">No description.</p>}
         </section>
       )}
       {detail.value && (detail.value.got.comments.length > 0 || detail.value.got.cursor) && (
@@ -308,7 +310,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
           {detail.value.got.comments.map((c, i) => (
             <div key={`${c.at}-${i}`} class="work-comment">
               <p class="quiet small"><span class="strong">{c.author}</span>{c.bot ? " (bot)" : ""} · {ago(fromWireDate(c.at))}</p>
-              <Markdown text={c.body} />
+              <Markdown text={forgeMarkdown(c.body)} />
             </div>
           ))}
         </section>

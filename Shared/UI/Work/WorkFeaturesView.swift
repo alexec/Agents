@@ -218,7 +218,7 @@ struct WorkFeaturesPane: View {
         return open(epic) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(WorkList.shortRef(epic.node.ref)).foregroundStyle(.tint).monospacedDigit()
-                Text(epic.title).lineLimit(1).truncationMode(.tail)
+                Text.forgeTitle(epic.title).lineLimit(1).truncationMode(.tail)
                 Spacer(minLength: 8)
                 Text(WorkFeatures.progressWords(epic)).monospacedDigit().foregroundStyle(.secondary)
                     .help("Sub-issues closed, of all")
@@ -233,7 +233,7 @@ struct WorkFeaturesPane: View {
         open(issue) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(WorkList.shortRef(issue.node.ref)).foregroundStyle(.tint).monospacedDigit()
-                Text(issue.title).lineLimit(1).truncationMode(.tail)
+                Text.forgeTitle(issue.title).lineLimit(1).truncationMode(.tail)
                 if let level = issue.level { Text(level).foregroundStyle(.secondary) }
                 Spacer(minLength: 0)
             }

@@ -289,7 +289,7 @@ private struct WorkRowView: View {
                 if !WorkList.titleSaysRef(row.title, row.node.ref) {
                     Text(WorkList.shortRef(row.node.ref)).foregroundStyle(.tint).monospacedDigit()
                 }
-                Text(row.title).fontWeight(.semibold).lineLimit(2)
+                Text.forgeTitle(row.title).fontWeight(.semibold).lineLimit(2)
             }
             WrappingHStack(spacing: 4) {
                 WorkStatePill(state: row.state, draft: row.draft, status: row.status)
@@ -318,7 +318,7 @@ private struct WorkRowView: View {
                 if !WorkList.titleSaysRef(row.title, row.node.ref) {
                     Text(WorkList.shortRef(row.node.ref)).foregroundStyle(.tint).monospacedDigit()
                 }
-                Text(row.title).fontWeight(.semibold).lineLimit(1)
+                Text.forgeTitle(row.title).fontWeight(.semibold).lineLimit(1)
                 WorkStatePill(state: row.state, draft: row.draft, status: row.status)
                 ForEach(row.labels, id: \.name) { WorkLabelChip(label: $0) }
                 if several {
