@@ -383,7 +383,7 @@ export class MachineLock {
         const key = await openRecovery(secret, recovery, recoverySealed);
         const entry = await sign(key, recovery, {
           kind: "addClient", person: read.state.person, previous: b64(read.state.head), at: this.now(), key: b64(publicRaw),
-          id: this.client || undefined, clientKind: "web",
+          ...(this.client ? { id: this.client } : {}), clientKind: "web",
         });
         try {
           await this.link.call("lock/add", { entries: [entry] });
