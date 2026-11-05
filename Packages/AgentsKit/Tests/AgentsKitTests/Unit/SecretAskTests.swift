@@ -23,6 +23,21 @@ struct SecretAskTests {
         #expect(ElicitationRequest.secretField == "value")
     }
 
+    @Test("says when it can be kept for this session only, and answers with the choice (#3548)")
+    func sessionOnly() throws {
+        let request = try StoreCoding.decoder.decode(ElicitationRequest.self, from: Data(Self.wire.utf8))
+        #expect(request.secret?.canBeSessionOnly == false)
+        let newer = Self.wire.replacingOccurrences(of: "\"isSet\":true", with: "\"isSet\":true,\"canBeSessionOnly\":true")
+        let offered = try StoreCoding.decoder.decode(ElicitationRequest.self, from: Data(newer.utf8))
+        #expect(offered.secret?.canBeSessionOnly == true)
+        #expect(ElicitationRequest.secretAnswer("v", sessionOnly: false) == ["value": .string("v")])
+        #expect(ElicitationRequest.secretAnswer("v", sessionOnly: true) == ["value": .string("v"), "sessionOnly": .bool(true)])
+        #expect(SessionSecretWords.keeping(on: "your Mac")
+            == "Kept on your Mac for this session only, and deleted when it is archived. The agent gets its name, never the value.")
+        let secret = SessionSecret(agentID: UUID(), title: "Sign up to the shop", name: "SHOP_PASSWORD", setAt: Date())
+        #expect(SessionSecretWords.removeQuestion(secret) == "Remove SHOP_PASSWORD from “Sign up to the shop”?")
+    }
+
     @Test("has no Reply in a notification, and voice mode says it needs the screen")
     func onlyItsCard() throws {
         let request = try StoreCoding.decoder.decode(ElicitationRequest.self, from: Data(Self.wire.utf8))

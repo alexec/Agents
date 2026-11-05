@@ -3807,6 +3807,9 @@ type ElicitationSecret struct {
 	URL *string `json:"url,omitzero"`
 
 	IsSet bool `json:"isSet"`
+
+	// The host can keep it for this session only (#3548): an answer whose content has sessionOnly true is kept for the asking session and deleted when it is archived, not saved to secrets.env. Left out by an older host.
+	CanBeSessionOnly *bool `json:"canBeSessionOnly,omitzero"`
 }
 
 type Empty struct {
@@ -10425,6 +10428,39 @@ type SessionNotice struct {
 	Title string `json:"title"`
 
 	Detail *string `json:"detail,omitzero"`
+}
+
+// A secret kept for one session only (#3548): only that session's agent can use it (fill_secret, its environment, its MCP servers), and its host deletes it when the session is archived. No value.
+type SessionSecret struct {
+	AgentID UUID `json:"agentID"`
+
+	// The session's title, as the session list shows it.
+	Title string `json:"title"`
+
+	Name string `json:"name"`
+
+	SetAt Date `json:"setAt"`
+}
+
+// secrets/sessionRemove (#3548): take one session's secret out now.
+type SessionSecretRemoveRequest struct {
+	AgentID UUID `json:"agentID"`
+
+	Name string `json:"name"`
+}
+
+// secrets/sessionSet (#3548): set a secret for one session that is not archived. The value is one line.
+type SessionSecretSetRequest struct {
+	AgentID UUID `json:"agentID"`
+
+	Name string `json:"name"`
+
+	Value string `json:"value"`
+}
+
+// secrets/sessionList (#3548): every secret this machine keeps for one session only, by session title then name. No value.
+type SessionSecrets struct {
+	Secrets []SessionSecret `json:"secrets"`
 }
 
 type SessionsListRequest struct {

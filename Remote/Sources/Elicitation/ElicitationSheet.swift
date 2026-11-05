@@ -48,9 +48,9 @@ struct ElicitationSheet: View {
                 // A masked field of its own (#2885), kept on screen while it goes, so
                 // what was typed is still there if it did not.
                 SecretAskCard(secret: secret, reason: request.secretReason,
-                              host: model.answerRecipient(request.agentID), sending: chosen != nil) { typed in
+                              host: model.answerRecipient(request.agentID), sending: chosen != nil) { typed, sessionOnly in
                     if let typed {
-                        send("Save", action: .accept, content: [ElicitationRequest.secretField: .string(typed)])
+                        send("Save", action: .accept, content: ElicitationRequest.secretAnswer(typed, sessionOnly: sessionOnly))
                     } else {
                         send("No thanks", action: .decline)
                     }

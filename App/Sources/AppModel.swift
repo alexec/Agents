@@ -2149,6 +2149,40 @@ final class AppModel {
         return cleared
     }
 
+    /// Settings ▸ Secrets (#3548): this Mac's secrets for one session only. Nil from a daemon
+    /// too old to know the method.
+    func sessionSecrets() async -> SessionSecrets? {
+        try? await macClient.call(DaemonAPI.Method.secretsSessionList, DaemonAPI.Empty(), returning: SessionSecrets.self)
+    }
+
+    /// Keep a secret for one session on this Mac (#3548): the list after, or why not.
+    func setSessionSecret(_ request: SessionSecretSetRequest) async -> Result<SessionSecrets, Error> {
+        do {
+            return .success(try await macClient.call(DaemonAPI.Method.secretsSessionSet, request, returning: SessionSecrets.self))
+        } catch {
+            return .failure(error)
+        }
+    }
+
+    /// Take a session's secret out now (#3548): its agent is told it expired.
+    func removeSessionSecret(_ secret: SessionSecret) async -> SessionSecrets? {
+        var after: SessionSecrets?
+        await attempt {
+            after = try await self.macClient.call(DaemonAPI.Method.secretsSessionRemove,
+                                                  SessionSecretRemoveRequest(agentID: secret.agentID, name: secret.name),
+                                                  returning: SessionSecrets.self)
+        }
+        return after
+    }
+
+    /// The sessions on this Mac that can take a secret for one session (#3548): not archived,
+    /// latest first.
+    var sessionsForSecrets: [Agent] {
+        let mine = macHostElsewhere ?? .mac
+        return work.agents.filter { $0.host == mine && $0.state != .archived }
+            .sorted { $0.lastActivityAt > $1.lastActivityAt }
+    }
+
     /// The daily summary's control (#3351). A daemon too old to know the method leaves this nil.
     func refreshDailySummarySettings() async {
         dailySummarySettings = try? await macClient.call(DaemonAPI.Method.dailySummarySettings,
