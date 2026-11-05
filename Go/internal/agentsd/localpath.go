@@ -178,6 +178,10 @@ func (d *Daemon) Told(method string, params json.RawMessage) {
 		d.toldLock(params)
 		return
 	}
+	if method == wire.NotifyHostLockJoinChanged.Name {
+		d.toldLockJoin(params)
+		return
+	}
 	if method == wire.NotifyHostUser.Name {
 		d.toldHostUser(params)
 		return

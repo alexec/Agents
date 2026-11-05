@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -14,10 +15,11 @@ import (
 // CodeLifetime is how long a code works: five minutes, once.
 const CodeLifetime = 5 * time.Minute
 
-// Code is ControlCode, version 2 or 3: what a new client or host needs and nothing more.
+// Code is ControlCode, version 2, 3 or 4: what a new client or host needs and nothing more.
 //
 //	agents-control:2:<c|h>:-:<key>:<secret>:<url>:<pin or ->:<name>
 //	agents-control:3:<c|h>:-:<key>:<secret>:<url>:<pin or ->:<name>:<personKey or ->
+//	agents-control:4:h:-:<key>:<secret>:<url>:<pin or ->:<name>:<personKey or ->:<invite>:<person>:<count>:<head>
 //
 // with the key and the secret in base64url, and the URL and name percent-encoded. The
 // fourth field was a client's grant; every client may do everything now (#111), so it is
@@ -26,7 +28,12 @@ const CodeLifetime = 5 * time.Minute
 // addresses) is not read: no control plane has made one since the first build. Version 3
 // (#2957, research R3 path 1) adds a tenth field, the person key's public half in
 // base64url, so a host code from the person's own Mac window pins it (PinFromJoinCode); "-"
-// when the code carries none, as every version 2 code does.
+// when the code carries none, as every version 2 code does. Version 4 (#3491,
+// specs/3399-machine-lock D3) is a host code a signer added an invite to: the invite's
+// private key (32 bytes, base64url), and the lock as it stood after the invite (the
+// person, percent-encoded, the count of entries and the head, base64url). The control
+// plane makes a version 2 code; the person's client adds the rest before it shows it, so
+// the invite key never goes through the control plane.
 type Code struct {
 	Host       bool
 	ControlKey []byte // X9.63, 65 bytes
@@ -37,11 +44,24 @@ type Code struct {
 	// PersonKey is the person key's public half (X9.63), present only on a version 3 host
 	// code the person's own Mac window made (research R3 path 1). nil for none.
 	PersonKey []byte
+	// Invite is the private key of an invite on the person's lock (version 4), and Lock the
+	// lock's pin as it stood after it: the machine signs its own addMachine with the one and
+	// pins the other. nil for none.
+	Invite []byte
+	Lock   *LockPin
 }
 
-// Text is the code as one line, to paste or to put in a QR code: version 3 when PersonKey
-// is set, version 2 otherwise, so a code that carries no person key keeps working with an
-// older copy that only reads version 2.
+// LockPin is where a person's lock stood when a code was made: whose, its count of
+// entries and its head (machinelock.Pin, kept here so controllink does not import it).
+type LockPin struct {
+	Person string
+	Count  int
+	Head   []byte
+}
+
+// Text is the code as one line, to paste or to put in a QR code: version 4 with an invite,
+// version 3 when PersonKey is set, version 2 otherwise, so a code that carries neither keeps
+// working with an older copy that only reads version 2.
 func (c *Code) Text() string {
 	kind := "c"
 	if c.Host {
@@ -53,20 +73,29 @@ func (c *Code) Text() string {
 	}
 	fields := []string{"agents-control", "2", kind, "-", B64URL(c.ControlKey), B64URL(c.Secret),
 		escape(c.URL), pin, escape(c.Name)}
-	if len(c.PersonKey) > 0 {
+	if len(c.PersonKey) > 0 || len(c.Invite) > 0 {
 		fields[1] = "3"
-		fields = append(fields, B64URL(c.PersonKey))
+		personKey := "-"
+		if len(c.PersonKey) > 0 {
+			personKey = B64URL(c.PersonKey)
+		}
+		fields = append(fields, personKey)
+	}
+	if len(c.Invite) > 0 && c.Lock != nil {
+		fields[1] = "4"
+		fields = append(fields, B64URL(c.Invite), escape(c.Lock.Person), strconv.Itoa(c.Lock.Count), B64URL(c.Lock.Head))
 	}
 	return strings.Join(fields, ":")
 }
 
-// ParseCode reads a version 2 or 3 code back from its text; whitespace around it, as a
+// ParseCode reads a version 2, 3 or 4 code back from its text; whitespace around it, as a
 // paste brings, is let go.
 func ParseCode(text string) (*Code, error) {
 	parts := strings.Split(strings.TrimSpace(text), ":")
-	v3 := len(parts) == 10 && parts[1] == "3"
+	v4 := len(parts) == 14 && parts[1] == "4"
+	v3 := len(parts) == 10 && parts[1] == "3" || v4
 	if !v3 && (len(parts) != 9 || parts[1] != "2") || parts[0] != "agents-control" {
-		return nil, errors.New("not a version 2 or 3 control code")
+		return nil, errors.New("not a version 2, 3 or 4 control code")
 	}
 	key, err := FromB64URL(parts[4])
 	if err != nil || len(key) != 65 || key[0] != 4 {
@@ -103,6 +132,22 @@ func ParseCode(text string) (*Code, error) {
 			return nil, errors.New("the code's person key is not a P-256 public key")
 		}
 		c.PersonKey = personKey
+	}
+	if v4 {
+		if parts[2] != "h" {
+			return nil, errors.New("only a host code carries an invite")
+		}
+		invite, err := FromB64URL(parts[10])
+		if err != nil || len(invite) != 32 {
+			return nil, errors.New("the code's invite is not a 32-byte key")
+		}
+		person, err := url.PathUnescape(parts[11])
+		count, cerr := strconv.Atoi(parts[12])
+		head, herr := FromB64URL(parts[13])
+		if err != nil || person == "" || cerr != nil || count < 1 || herr != nil || len(head) != 32 {
+			return nil, errors.New("the code's lock is not a person, a count and a head")
+		}
+		c.Invite, c.Lock = invite, &LockPin{Person: person, Count: count, Head: head}
 	}
 	switch {
 	case parts[2] == "c" && parts[3] != "":

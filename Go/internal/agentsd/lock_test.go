@@ -3,9 +3,14 @@ package agentsd
 import (
 	"crypto/ecdsa"
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"slices"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/machinelock"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -68,5 +73,125 @@ func TestTheHostPinsTheHeadAndRefusesNothingYet(t *testing.T) {
 		if pin := d.LockPin(); pin.Count != grown.Count || string(pin.Head) != string(grown.Head) {
 			t.Fatalf("%s moved the pin: %+v", name, pin)
 		}
+	}
+}
+
+// joinedMachine is a host that joined a control plane as h-1, and what it tells it.
+func joinedMachine(t *testing.T) (*Daemon, []byte, func() []told) {
+	t.Helper()
+	root := t.TempDir()
+	d, _ := start(t, root)
+	private, err := controllink.HostPrivateKey(d.HostKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key, _ := controllink.PublicKey(private)
+	m := &controllink.Membership{Host: "h-1", Addresses: []string{}}
+	if err := m.Save(root); err != nil {
+		t.Fatal(err)
+	}
+	var mu sync.Mutex
+	var said []told
+	d.SetControl(func(method string, params any) {
+		b, _ := json.Marshal(params)
+		mu.Lock()
+		said = append(said, told{method, b})
+		mu.Unlock()
+	})
+	return d, key, func() []told { mu.Lock(); defer mu.Unlock(); return slices.Clone(said) }
+}
+
+type told struct {
+	method string
+	params json.RawMessage
+}
+
+func lastOf(t *testing.T, said []told, method string) json.RawMessage {
+	t.Helper()
+	for i := len(said) - 1; i >= 0; i-- {
+		if wire.OldMethodName(said[i].method) == method {
+			return said[i].params
+		}
+	}
+	t.Fatalf("no %s in %+v", method, said)
+	return nil
+}
+
+// #3491 (D3): a machine whose code carried an invite pins the lock from the code, signs its
+// own addMachine with the invite, and once it is in the lock drops the invite.
+func TestAMachineAddsItselfWithTheInviteFromItsCode(t *testing.T) {
+	d, key, said := joinedMachine(t)
+	mac, invite := newLockKey(t), newLockKey(t)
+	root := lockEntry(t, mac, wire.LockEntryKindRoot, mac, nil)
+	h := machinelock.HashOf(root)
+	inv, err := machinelock.Sign(mac, wire.LockBody{Kind: wire.LockEntryKindInvite, Person: "sam", Previous: h[:],
+		At: wire.DateOf(time.Now()), Expires: new(wire.DateOf(time.Now().Add(5 * time.Minute))), Key: machinelock.PublicKey(invite)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ih := machinelock.HashOf(inv)
+	raw, _ := invite.Bytes()
+	controllink.SaveLockInvite(d.Store.Loc.Root, controllink.LockInvite{Key: raw, Person: "sam", Count: 2, Head: ih[:]})
+
+	// A lock the control plane made up, with no invite, does not follow the code's head.
+	stranger := newLockKey(t)
+	other := lockEntry(t, stranger, wire.LockEntryKindRoot, stranger, nil)
+	if d.TakeLock(wire.Lock{Person: "sam", Entries: []wire.LockEntry{other}}) {
+		t.Fatal("a lock that is not the code's was taken")
+	}
+	if !d.TakeLock(wire.Lock{Person: "sam", Entries: []wire.LockEntry{root, inv}}) {
+		t.Fatal("the code's lock was not taken")
+	}
+	var add wire.LockAdd
+	json.Unmarshal(lastOf(t, said(), wire.CallHostLockAdd.Name), &add)
+	state, err := machinelock.Check([]wire.LockEntry{root, inv, add.Entries[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m, ok := state.Member(key); !ok || m.Kind != wire.LockEntryKindAddMachine || m.ID != "h-1" || string(m.SealingKey) != string(key) {
+		t.Fatalf("%+v", m)
+	}
+	d.TakeLock(wire.Lock{Person: "sam", Entries: []wire.LockEntry{root, inv, add.Entries[0]}})
+	if controllink.LoadLockInvite(d.Store.Loc.Root) != nil {
+		t.Fatal("the invite was kept after the machine was in the lock")
+	}
+}
+
+// #3491 (D3): a machine with no invite asks with a commitment, reveals its nonce once a
+// signer sent one, and shows the digits the signer makes.
+func TestAMachineWithNoInviteAsksAndShowsTheDigits(t *testing.T) {
+	d, key, said := joinedMachine(t)
+	mac := newLockKey(t)
+	root := lockEntry(t, mac, wire.LockEntryKindRoot, mac, nil)
+	d.TakeLock(wire.Lock{Person: "sam", Entries: []wire.LockEntry{root}})
+	var ask wire.LockJoin
+	json.Unmarshal(lastOf(t, said(), wire.CallHostLockJoin.Name), &ask)
+	if string(ask.Key) != string(key) || len(ask.Commitment) != 32 {
+		t.Fatalf("%+v", ask)
+	}
+	// Asked again on the next lock: not while this one waits.
+	d.TakeLock(wire.Lock{Person: "sam", Entries: []wire.LockEntry{root}})
+	asks := 0
+	for _, s := range said() {
+		if wire.OldMethodName(s.method) == wire.CallHostLockJoin.Name {
+			asks++
+		}
+	}
+	if asks != 1 {
+		t.Fatalf("asked %d times", asks)
+	}
+	signerNonce := make([]byte, machinelock.NonceSize)
+	signerNonce[0] = 7
+	row, _ := json.Marshal(wire.LockJoinRequest{Request: "r1", Client: "h-1", Key: ask.Key, Commitment: ask.Commitment, Nonce: signerNonce})
+	d.Told(wire.NotifyHostLockJoinChanged.Name, row)
+	var reveal wire.LockJoinNonce
+	json.Unmarshal(lastOf(t, said(), wire.CallHostLockJoinReveal.Name), &reveal)
+	if reveal.Request != "r1" || string(machinelock.Commitment(key, reveal.Nonce)) != string(ask.Commitment) {
+		t.Fatalf("%+v", reveal)
+	}
+	digits := machinelock.Digits(key, reveal.Nonce, signerNonce)
+	shown, _ := os.ReadFile(filepath.Join(d.Store.Loc.Root, lockShownFile))
+	if string(shown) != digits[:3]+" "+digits[3:]+"\n" {
+		t.Fatalf("shown %q, digits %s", shown, digits)
 	}
 }

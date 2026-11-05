@@ -5489,6 +5489,11 @@ const LockEntryKindInvite LockEntryKind = "invite"
 const LockEntryKindRemove LockEntryKind = "remove"
 const LockEntryKindRecovery LockEntryKind = "recovery"
 
+// lock/get (#3399): with no person, the caller's own lock. With person, that person's: only an admin may read another's (#3491), to check the machine keys an org route is sealed to (specs/3399-machine-lock D7, D8).
+type LockGet struct {
+	Person *string `json:"person,omitzero"`
+}
+
 // Where a machine lock stands (#3399): how many entries it has, and head, the SHA-256 of the newest one's body. lock/add's answer, and control/lockChanged.
 type LockHead struct {
 	Count int64 `json:"count"`
@@ -5522,11 +5527,13 @@ type LockJoinNonce struct {
 	Nonce Data `json:"nonce"`
 }
 
-// lock/joinRequests and control/lockJoinRequested (#3490): a client asking to join its person's lock, to every client of that person, and sent again in place as it goes on. client is the asking client's id, so it knows its own. nonce is the signer's, once one sent it (lock/joinAnswer), and answeredBy is that signer's client id; reveal is the asking client's nonce, once it showed it. Each screen makes the six digits from key, reveal and nonce.
+// lock/joinRequests and control/lockJoinRequested (#3490): a client asking to join its person's lock, to every client of that person, and sent again in place as it goes on. client is the asking client's id, so it knows its own. nonce is the signer's, once one sent it (lock/joinAnswer), and answeredBy is that signer's client id; reveal is the asking client's nonce, once it showed it. Each screen makes the six digits from key, reveal and nonce. machine is set when a machine asks (#3491, D3): client is then the machine's id, kind is unknown, and a signer approves it with an addMachine whose key and sealing key are both key, the machine's own.
 type LockJoinRequest struct {
 	Request string `json:"request"`
 
 	Client string `json:"client"`
+
+	Machine *MachineRef `json:"machine,omitzero"`
 
 	Name string `json:"name"`
 
@@ -9910,11 +9917,13 @@ const SandboxStateOff SandboxState = "off"
 const SandboxStateRuntimeControlled SandboxState = "runtimeControlled"
 const SandboxStateNone SandboxState = "none"
 
-// A machine or a client to seal a secret to (#3397): its id as the associated data names it (m:<machine id> or c:<client id>), its name, and its P-256 key, X9.63. The control plane gives the key: until the machine lock (#3400) signs it, a control plane could give one of its own.
+// A machine or a client to seal a secret to (#3397): its id as the associated data names it (m:<machine id> or c:<client id>), its name, and its P-256 key, X9.63. The control plane gives the key, and a client checks a machine's against the sealing key of that machine's addMachine in its person's lock before it seals to it (#3491, specs/3399-machine-lock D8), so a control plane cannot give one of its own. owner is the person whose machine it is, so an admin's client knows whose lock to read; none for a client recipient.
 type SealRecipient struct {
 	ID string `json:"id"`
 
 	Name string `json:"name"`
+
+	Owner *string `json:"owner,omitzero"`
 
 	PublicKey Data `json:"publicKey"`
 }

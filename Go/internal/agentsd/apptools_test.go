@@ -91,6 +91,11 @@ func TestTheAppsToolsAreServedToEachRuntime(t *testing.T) {
 		t.Fatal("desktop control is on before anyone turned it on")
 	}
 	want := len(appToolCalls()) - 3
+	// After them, Playwright's browser tools, where this host can install the browser (#3534).
+	if d.offersBrowser() {
+		list, _ := browserTools()
+		want += len(list)
+	}
 	if len(tools.Tools) != want || tools.Tools[0].Name != "show_file" || tools.Tools[0].Description == "" ||
 		!strings.Contains(string(tools.Tools[0].InputSchema["properties"]), `"description"`) {
 		t.Fatalf("%s", list["result"])

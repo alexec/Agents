@@ -1344,6 +1344,8 @@ export class Store extends Work {
       }
       if (method === "control/lockChanged" || method === "control/lockJoinRequested" || method === "control/lockJoinDecided") {
         if (this.planeHas(Capability.lockJoin1)) this.machineLock.notify(method, params);
+        // A machine just added to the lock may now be sealed to (#3491, D8).
+        if (method === "control/lockChanged") void this.sealWaiting();
         return;
       }
       if (method === "control/signInDecided") {
@@ -1441,8 +1443,17 @@ export class Store extends Work {
     const record = await this.link.keyRecord();
     const work = record ? await this.link.call("sealing/work", {}).catch(() => null) : null;
     if (!record || !work || work.items.length === 0) return;
-    const items = await sealWork(record, work);
+    const checked = { items: await Promise.all(work.items.map(async (item) => ({ ...item, missing: await this.signedRecipients(item.missing) }))) };
+    const items = await sealWork(record, { items: checked.items.filter((item) => item.missing.length > 0) });
     if (items.length > 0) await this.link.call("sealing/add", { items }).catch(() => undefined);
+  }
+
+  /**
+   * The recipients this page may seal a secret to (#3491, D8): a machine only when its owner's
+   * lock names its key. A control plane before the lock has none to check against.
+   */
+  async signedRecipients<R extends { id: string; owner?: string; publicKey: string }>(recipients: R[]): Promise<R[]> {
+    return this.planeHas(Capability.lock1) ? this.machineLock.signed(recipients) : recipients;
   }
 
   /** The machine lock's check and join (#3490), at each connection; a control plane before it has none. */

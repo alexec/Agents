@@ -154,9 +154,10 @@ straight to each machine that may use them, and to each app that may seal them a
 (#3397). The control plane keeps and forwards only that ciphertext: it holds no key that
 opens it, in its store or in its memory. Each envelope is bound to its machine, its field,
 its version and, for an org key, to where the key goes, so a control plane that changes a
-gateway's address cannot get the key sent elsewhere. Until the machine lock (#3400), the
-client takes each machine's public key from the control plane, so a misused control plane
-could hand out a key of its own; see [Org keys and gateways](../org-keys-and-gateways.md).
+gateway's address cannot get the key sent elsewhere. The client seals to a machine only
+when the machine's key is in its person's machine lock (#3491), signed by that person's
+own devices, so a misused control plane cannot hand out a machine key of its own. An app's
+key still comes from the control plane; see [Org keys and gateways](../org-keys-and-gateways.md).
 
 The control plane holds no machine provider's secret (#3398): a provider runs on one of
 its person's machines, which keeps its tokens and keys and runs its server, and the

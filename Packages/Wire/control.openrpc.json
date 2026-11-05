@@ -1924,6 +1924,85 @@
       ]
     },
     {
+      "name": "host/lockAdd",
+      "x-capability": "host.lock/2",
+      "description": "A machine, on its channel 0 (#3491, specs/3399-machine-lock D3): its own addMachine, signed with the invite key from the join code it used, put on its person's lock as lock/add puts a client's. Refused with changedElsewhere when another entry took the head first; the machine signs again on the next host/lock.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LockAdd"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LockHead"
+        }
+      }
+    },
+    {
+      "name": "host/lockJoin",
+      "x-capability": "host.lock/2",
+      "description": "A machine that is not in its person's lock and has no invite (#3491, D3: it asked to join, a provider started it with no client there, or it joined before the lock): it asks to be added, with its own key and a commitment, as lock/join does for a client. Every client of the person is shown the request; host/lockJoinChanged tells the machine how it goes on.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LockJoin"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LockJoinStarted"
+        }
+      }
+    },
+    {
+      "name": "host/lockJoinChanged",
+      "x-capability": "host.lock/2",
+      "description": "To a machine that asked with host/lockJoin (#3491): its request, each time it changes. Once nonce is set, the machine reveals its own nonce and shows the six digits in its log and in agentsd status.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LockJoinRequest"
+          }
+        }
+      ]
+    },
+    {
+      "name": "host/lockJoinReveal",
+      "x-capability": "host.lock/2",
+      "description": "A machine, once a signer sent its nonce (host/lockJoinChanged): its own nonce, which must match its commitment, as lock/joinReveal does for a client (#3491).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LockJoinNonce"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "host/machines",
       "x-capability": "host/1",
       "description": "A host, on its channel 0, for an agent there (#691 US6).",
@@ -2971,14 +3050,14 @@
           "name": "web"
         }
       ],
-      "description": "A client's: the caller's machine lock, with no entries when there is none yet (#3399).",
+      "description": "A client's: the caller's machine lock, or with person another person's (an admin's client, to seal an org route to that person's machines, #3491), with no entries when there is none yet (#3399).",
       "paramStructure": "by-name",
       "params": [
         {
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
+            "$ref": "daemon.schema.json#/definitions/LockGet"
           }
         }
       ],

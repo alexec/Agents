@@ -1,27 +1,53 @@
 package agentsd
 
 import (
+	"bytes"
+	"crypto/rand"
 	"encoding/json"
 	"log"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/machinelock"
 	"github.com/alexec/agents/Go/wire"
 )
 
 // The machine lock (#3399, specs/3399-machine-lock): host/lock is the person's whole lock.
 // This host checks it, and pins the head it took in <root>/lock-pin.json; it takes only a
-// lock that grows from that pin. The first lock it is sent is taken on trust (D9). Until
+// lock that grows from that pin. The first lock it is sent is taken on trust (D9), unless
+// the code it joined with carried the lock's head (D3): then it pins that one. Until
 // #3400's later steps it refuses nothing: a lock that fails the check is logged, and the
 // pin stays where it was.
+//
+// A machine joins the lock (#3491, D3): with the invite from its join code it signs its
+// own addMachine (host/lockAdd). With none (it asked to join, a provider started it with no
+// client there, or it joined before the lock) it asks as a client does (host/lockJoin): a
+// signer sends a nonce, this machine reveals its own, and it shows the six digits in its
+// log and in <root>/lock-join-shown for the person to compare.
 
-const lockPinFile = "lock-pin.json"
+const (
+	lockPinFile   = "lock-pin.json"
+	lockShownFile = "lock-join-shown"
+	// lockAskAgain is how long one request to join waits before the machine asks again, as
+	// the control plane's requests last.
+	lockAskAgain = 10 * time.Minute
+)
 
 type lockState struct {
 	lockMu sync.Mutex
+	// lockAsk is this machine's request to join the lock, while it waits.
+	lockAsk *lockAsk
+}
+
+type lockAsk struct {
+	nonce    []byte
+	asked    time.Time
+	request  string
+	revealed bool
 }
 
 func (d *Daemon) lockPinPath() string { return filepath.Join(d.Store.Loc.Root, lockPinFile) }
@@ -45,31 +71,135 @@ func (d *Daemon) toldLock(params json.RawMessage) {
 	d.TakeLock(lock)
 }
 
-// TakeLock checks a lock against the pin and, when it passes, pins its head. It says
-// whether it took it. A lock that fails is only logged, as what this host would refuse.
+// TakeLock checks a lock against the pin and, when it passes, pins its head and joins it
+// when this machine is not in it yet. It says whether it took it. A lock that fails is only
+// logged, as what this host would refuse.
 func (d *Daemon) TakeLock(lock wire.Lock) bool {
 	d.lockMu.Lock()
 	defer d.lockMu.Unlock()
-	pin := d.LockPin()
+	kept := d.LockPin()
+	pin := kept
+	invite := controllink.LoadLockInvite(d.Store.Loc.Root)
+	if pin.Count == 0 && invite != nil {
+		// The head from the code, not the control plane's (D3).
+		pin = machinelock.Pin{Person: invite.Person, Count: invite.Count, Head: invite.Head}
+	}
 	state, err := machinelock.Follow(pin, lock)
 	if err != nil {
 		log.Printf("lock: would refuse %s's lock of %d entries: %v", lock.Person, len(lock.Entries), err)
 		return false
 	}
-	if state.Count() == pin.Count {
-		return true
+	if state.Count() != kept.Count {
+		b, _ := json.Marshal(state.Pin())
+		if err := store.WriteAtomically(d.lockPinPath(), b, 0o644); err != nil {
+			log.Printf("lock: the head could not be pinned: %v", err)
+			return false
+		}
+		if pin.Count == 0 {
+			log.Printf("lock: pinned %s's lock on first use, %d entries, root %s, head %s",
+				state.Person, state.Count(), state.Root.Short(), state.Head().Short())
+		} else {
+			log.Printf("lock: %s's lock grew from %d to %d entries, head %s",
+				state.Person, pin.Count, state.Count(), state.Head().Short())
+		}
 	}
-	b, _ := json.Marshal(state.Pin())
-	if err := store.WriteAtomically(d.lockPinPath(), b, 0o644); err != nil {
-		log.Printf("lock: the head could not be pinned: %v", err)
-		return false
-	}
-	if pin.Count == 0 {
-		log.Printf("lock: pinned %s's lock on first use, %d entries, root %s, head %s",
-			state.Person, state.Count(), state.Root.Short(), state.Head().Short())
-	} else {
-		log.Printf("lock: %s's lock grew from %d to %d entries, head %s",
-			state.Person, pin.Count, state.Count(), state.Head().Short())
-	}
+	d.joinLockLocked(state, invite, time.Now())
 	return true
+}
+
+// lockIdentity is this machine's id, name and public key; ok false before it joined a
+// control plane.
+func (d *Daemon) lockIdentity() (host, name string, key []byte, ok bool) {
+	member, err := controllink.LoadMembership(d.Store.Loc.Root)
+	if err != nil || member.Host == "" || d.HostKey == nil {
+		return "", "", nil, false
+	}
+	private, found, err := d.HostKey.Load()
+	if err != nil || !found {
+		return "", "", nil, false
+	}
+	key, err = controllink.PublicKey(private)
+	if err != nil {
+		return "", "", nil, false
+	}
+	name, _ = os.Hostname()
+	return member.Host, name, key, true
+}
+
+// joinLockLocked puts this machine on the lock when it is not on it: its own addMachine
+// with the invite, else a request to join.
+func (d *Daemon) joinLockLocked(state *machinelock.State, invite *controllink.LockInvite, now time.Time) {
+	root := d.Store.Loc.Root
+	host, name, key, ok := d.lockIdentity()
+	if !ok {
+		return
+	}
+	if m, in := state.Member(key); in && m.Kind == wire.LockEntryKindAddMachine {
+		if invite != nil || d.lockAsk != nil {
+			log.Printf("lock: this machine is in %s's lock", state.Person)
+		}
+		controllink.DropLockInvite(root)
+		os.Remove(filepath.Join(root, lockShownFile))
+		d.lockAsk = nil
+		return
+	}
+	tell := d.tellControl.Load()
+	if tell == nil {
+		return
+	}
+	if invite != nil {
+		signer, err := machinelock.InviteKey(invite.Key)
+		if err == nil && invite.Person == state.Person {
+			if _, open := state.Invite(machinelock.PublicKey(signer), now); open {
+				entry, err := machinelock.AddMachine(signer, state, key, host, name, now)
+				if err == nil {
+					(*tell)(wire.NewMethodName(wire.CallHostLockAdd.Name), wire.LockAdd{Entries: []wire.LockEntry{entry}})
+					log.Printf("lock: added this machine to %s's lock with the invite from its join code", state.Person)
+					return
+				}
+			}
+		}
+		log.Printf("lock: the invite from the join code is spent, expired or not this lock's; asking to join")
+		controllink.DropLockInvite(root)
+	}
+	if d.lockAsk != nil && now.Sub(d.lockAsk.asked) < lockAskAgain {
+		return
+	}
+	nonce := make([]byte, machinelock.NonceSize)
+	rand.Read(nonce)
+	d.lockAsk = &lockAsk{nonce: nonce, asked: now}
+	os.Remove(filepath.Join(root, lockShownFile))
+	(*tell)(wire.NewMethodName(wire.CallHostLockJoin.Name), wire.LockJoin{Key: key, Commitment: machinelock.Commitment(key, nonce)})
+	log.Printf("lock: this machine is not in %s's lock: asking to join; approve it on one of your devices", state.Person)
+}
+
+// toldLockJoin is host/lockJoinChanged: this machine's request, as it goes on.
+func (d *Daemon) toldLockJoin(params json.RawMessage) {
+	var r wire.LockJoinRequest
+	if err := json.Unmarshal(params, &r); err != nil {
+		log.Printf("lock: %v", err)
+		return
+	}
+	d.lockMu.Lock()
+	defer d.lockMu.Unlock()
+	ask := d.lockAsk
+	if ask == nil || !bytes.Equal(r.Commitment, machinelock.Commitment(r.Key, ask.nonce)) {
+		return
+	}
+	ask.request = r.Request
+	if len(r.Nonce) != machinelock.NonceSize || ask.revealed {
+		return
+	}
+	tell := d.tellControl.Load()
+	if tell == nil {
+		return
+	}
+	ask.revealed = true
+	(*tell)(wire.NewMethodName(wire.CallHostLockJoinReveal.Name), wire.LockJoinNonce{Request: r.Request, Nonce: ask.nonce})
+	// The digits made here, from this machine's own key and nonce: a control plane that
+	// passed on another key could only pass on that key's digits.
+	digits := machinelock.Digits(r.Key, ask.nonce, r.Nonce)
+	shown := digits[:3] + " " + digits[3:]
+	os.WriteFile(filepath.Join(d.Store.Loc.Root, lockShownFile), []byte(shown+"\n"), 0o600)
+	log.Printf("lock: to add this machine to the lock, check that your device shows the digits %s, then approve it", shown)
 }

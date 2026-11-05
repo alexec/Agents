@@ -68,6 +68,7 @@ public enum Capability {
     public static let hostBrowserSettings1 = "host.browser-settings/1"
     public static let hostDesktopControl1 = "host.desktop-control/1"
     public static let hostLock1 = "host.lock/1"
+    public static let hostLock2 = "host.lock/2"
     public static let hostOrgRoutes1 = "host.org-routes/1"
     public static let hostOrgRoutes2 = "host.org-routes/2"
     public static let hostPolicyLayers1 = "host.policy-layers/1"
@@ -601,6 +602,9 @@ public enum Capability {
         "groups/setRole": "org-identity/1",
         "handover/status": "handover/1",
         "host/hello": "host/1",
+        "host/lockAdd": "host.lock/2",
+        "host/lockJoin": "host.lock/2",
+        "host/lockJoinReveal": "host.lock/2",
         "host/machines": "host/1",
         "host/orgRouteCheck": "host.org-routes/2",
         "host/orgRoutesAgain": "host.org-routes/2",
@@ -794,6 +798,7 @@ public enum Capability {
         "folders/detect": "folders/1",
         "host/clients": "host/1",
         "host/lock": "host.lock/1",
+        "host/lockJoinChanged": "host.lock/2",
         "host/orgRoutes": "host.org-routes/2",
         "host/policy": "host.policy/1",
         "host/projects": "projects/1",
@@ -827,6 +832,7 @@ public enum Capability {
             "host.org-routes/2",
             "host.user-settings/2",
             "host.lock/1",
+            "host.lock/2",
         ],
     ]
 }

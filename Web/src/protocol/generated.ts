@@ -4749,6 +4749,15 @@ export type LockEntryKind =
   | "recovery";
 
 /**
+ * lock/get (#3399): with no person, the caller's own lock. With person, that person's: only an
+ * admin may read another's (#3491), to check the machine keys an org route is sealed to
+ * (specs/3399-machine-lock D7, D8).
+ */
+export interface LockGet {
+  person?: string;
+}
+
+/**
  * Where a machine lock stands (#3399): how many entries it has, and head, the SHA-256 of the newest
  * one's body. lock/add's answer, and control/lockChanged.
  */
@@ -4796,11 +4805,14 @@ export interface LockJoinNonce {
  * lock, to every client of that person, and sent again in place as it goes on. client is the asking
  * client's id, so it knows its own. nonce is the signer's, once one sent it (lock/joinAnswer), and
  * answeredBy is that signer's client id; reveal is the asking client's nonce, once it showed it.
- * Each screen makes the six digits from key, reveal and nonce.
+ * Each screen makes the six digits from key, reveal and nonce. machine is set when a machine asks
+ * (#3491, D3): client is then the machine's id, kind is unknown, and a signer approves it with an
+ * addMachine whose key and sealing key are both key, the machine's own.
  */
 export interface LockJoinRequest {
   request: string;
   client: string;
+  machine?: MachineRef;
   name: string;
   kind: ClientKind;
   key: Base64;
@@ -8527,11 +8539,15 @@ export type SandboxState =
 /**
  * A machine or a client to seal a secret to (#3397): its id as the associated data names it
  * (m:<machine id> or c:<client id>), its name, and its P-256 key, X9.63. The control plane gives
- * the key: until the machine lock (#3400) signs it, a control plane could give one of its own.
+ * the key, and a client checks a machine's against the sealing key of that machine's addMachine in
+ * its person's lock before it seals to it (#3491, specs/3399-machine-lock D8), so a control plane
+ * cannot give one of its own. owner is the person whose machine it is, so an admin's client knows
+ * whose lock to read; none for a client recipient.
  */
 export interface SealRecipient {
   id: string;
   name: string;
+  owner?: string;
   publicKey: Base64;
 }
 
@@ -11072,7 +11088,7 @@ export interface Methods {
   "links/remove": { params: ChannelLinkRemove; result: Empty };
   "links/requests": { params: Empty; result: ChannelLinkRequest[] };
   "lock/add": { params: LockAdd; result: LockHead };
-  "lock/get": { params: Empty; result: Lock };
+  "lock/get": { params: LockGet; result: Lock };
   "lock/join": { params: LockJoin; result: LockJoinStarted };
   "lock/joinAnswer": { params: LockJoinNonce; result: Empty };
   "lock/joinDeny": { params: LockJoinEnd; result: Empty };
@@ -12074,12 +12090,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LockAdd: { required: ["entries"], optional: [] },
   LockBody: { required: ["v", "kind", "person", "signer", "at", "key"], optional: ["previous", "sealingKey", "id", "name", "clientKind", "expires"] },
   LockEntry: { required: ["body", "sig"], optional: [] },
+  LockGet: { required: [], optional: ["person"] },
   LockHead: { required: ["count", "head"], optional: [] },
   LockJoin: { required: ["key", "commitment"], optional: [] },
   LockJoinDecided: { required: ["request", "result"], optional: [] },
   LockJoinEnd: { required: ["request"], optional: [] },
   LockJoinNonce: { required: ["request", "nonce"], optional: [] },
-  LockJoinRequest: { required: ["request", "client", "name", "kind", "key", "commitment", "expires"], optional: ["nonce", "answeredBy", "reveal"] },
+  LockJoinRequest: { required: ["request", "client", "name", "kind", "key", "commitment", "expires"], optional: ["machine", "nonce", "answeredBy", "reveal"] },
   LockJoinStarted: { required: ["request", "expires"], optional: [] },
   MCPAddAnswer: { required: [], optional: ["server", "error"] },
   MCPAddByHandRequest: { required: ["verifyID", "destination"], optional: [] },
@@ -12426,7 +12443,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SaidSearchResult: { required: ["matches"], optional: [] },
   SandboxFailureRecord: { required: ["runtimeID", "detail", "hang", "recoveryOffered", "completedToolCalls"], optional: [] },
   SandboxSettings: { required: ["defaults"], optional: ["setBy"] },
-  SealRecipient: { required: ["id", "name", "publicKey"], optional: [] },
+  SealRecipient: { required: ["id", "name", "publicKey"], optional: ["owner"] },
   SealRecipients: { required: ["recipients"], optional: ["user"] },
   SealedEnvelope: { required: ["encapsulated", "ciphertext"], optional: [] },
   SealedUserSecret: { required: ["name", "version", "sealed"], optional: [] },

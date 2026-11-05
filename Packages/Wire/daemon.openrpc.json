@@ -55,6 +55,11 @@
       "name": "host.lock/1",
       "by": "host",
       "description": "The host checks its person's machine lock (#3399, specs/3399-machine-lock) as host/lock sends it, and pins the head: it takes a lock only when it grows from the head it pinned last. Until #3400's later steps it refuses nothing and only logs what it would refuse. Declared: host/lock is the control plane's (control.openrpc.json)."
+    },
+    {
+      "name": "host.lock/2",
+      "by": "host",
+      "description": "The host joins its person's lock (#3491, specs/3399-machine-lock D3): with an invite key from its join code it signs its own addMachine (host/lockAdd); with none it asks (host/lockJoin), and shows the six digits once a signer answered (host/lockJoinChanged). Declared: those methods are the control plane's (control.openrpc.json)."
     }
   ],
   "methods": [

@@ -67,6 +67,7 @@ const CapHandover1 = "handover/1"
 const CapHostBrowserSettings1 = "host.browser-settings/1"
 const CapHostDesktopControl1 = "host.desktop-control/1"
 const CapHostLock1 = "host.lock/1"
+const CapHostLock2 = "host.lock/2"
 const CapHostOrgRoutes1 = "host.org-routes/1"
 const CapHostOrgRoutes2 = "host.org-routes/2"
 const CapHostPolicyLayers1 = "host.policy-layers/1"
@@ -654,6 +655,9 @@ var ControlCapabilities = pairs([][2]string{
 	{"groups/setRole", "org-identity/1"},
 	{"handover/status", "handover/1"},
 	{"host/hello", "host/1"},
+	{"host/lockAdd", "host.lock/2"},
+	{"host/lockJoin", "host.lock/2"},
+	{"host/lockJoinReveal", "host.lock/2"},
 	{"host/machines", "host/1"},
 	{"host/orgRouteCheck", "host.org-routes/2"},
 	{"host/orgRoutesAgain", "host.org-routes/2"},
@@ -847,6 +851,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"folders/detect", "folders/1"},
 	{"host/clients", "host/1"},
 	{"host/lock", "host.lock/1"},
+	{"host/lockJoinChanged", "host.lock/2"},
 	{"host/orgRoutes", "host.org-routes/2"},
 	{"host/policy", "host.policy/1"},
 	{"host/projects", "projects/1"},
@@ -902,6 +907,7 @@ var ControlNotifications = set([]string{
 	"folders/detect",
 	"host/clients",
 	"host/lock",
+	"host/lockJoinChanged",
 	"host/orgRoutes",
 	"host/policy",
 	"host/projects",
@@ -936,5 +942,6 @@ var DeclaredCapabilities = map[string][]string{
 		"host.org-routes/2",
 		"host.user-settings/2",
 		"host.lock/1",
+		"host.lock/2",
 	},
 }
