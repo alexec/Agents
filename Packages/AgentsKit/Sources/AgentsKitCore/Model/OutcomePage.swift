@@ -331,6 +331,9 @@ extension TranscriptItem {
         // And what the agent told the person (#2805): why a notification opened this chat.
         case .notified:
             return true
+        // And what the turn changed (#3437): the card that undoes it.
+        case .turnChanged:
+            return true
         case .stateChanged(let state, _):
             return state == .stopped
         case .notice(let notice):

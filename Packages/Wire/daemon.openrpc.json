@@ -1841,6 +1841,32 @@
       }
     },
     {
+      "name": "changes/undoTurn",
+      "x-capability": "changes.undo/1",
+      "description": "Put the files a turn changed back as they were before it (#3437), from the snapshot the host took as the turn began. Refused while the agent's turn runs.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/UndoTurnRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/UndoTurnResult"
+        }
+      }
+    },
+    {
       "name": "client/catchUp",
       "x-capability": "client/1",
       "paramStructure": "by-name",

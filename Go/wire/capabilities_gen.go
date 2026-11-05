@@ -19,6 +19,7 @@ const CapBackupsStore1 = "backups.store/1"
 const CapBackups1 = "backups/1"
 const CapBots1 = "bots/1"
 const CapCatalog1 = "catalog/1"
+const CapChangesUndo1 = "changes.undo/1"
 const CapChanges1 = "changes/1"
 const CapChatBranch1 = "chat.branch/1"
 const CapChatContinueWhenBack1 = "chat.continue-when-back/1"
@@ -220,6 +221,7 @@ var HostCapabilities = pairs([][2]string{
 	{"catalog/search", "catalog/1"},
 	{"changes/file", "changes/1"},
 	{"changes/list", "changes/1"},
+	{"changes/undoTurn", "changes.undo/1"},
 	{"client/catchUp", "client/1"},
 	{"clientPermissions/set", "client-permissions/1"},
 	{"clientPermissions/state", "client-permissions/1"},

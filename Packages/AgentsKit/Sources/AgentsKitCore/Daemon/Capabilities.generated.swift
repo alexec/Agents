@@ -20,6 +20,7 @@ public enum Capability {
     public static let backups1 = "backups/1"
     public static let bots1 = "bots/1"
     public static let catalog1 = "catalog/1"
+    public static let changesUndo1 = "changes.undo/1"
     public static let changes1 = "changes/1"
     public static let chatBranch1 = "chat.branch/1"
     public static let chatContinueWhenBack1 = "chat.continue-when-back/1"
@@ -221,6 +222,7 @@ public enum Capability {
         "catalog/search": "catalog/1",
         "changes/file": "changes/1",
         "changes/list": "changes/1",
+        "changes/undoTurn": "changes.undo/1",
         "client/catchUp": "client/1",
         "clientPermissions/set": "client-permissions/1",
         "clientPermissions/state": "client-permissions/1",

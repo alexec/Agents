@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac, iphone, ipad]
-description: See what an agent changed, open a local page in the Browser pane, and browse its folder.
+description: See what an agent changed, undo what one turn changed, open a local page in the Browser pane, and browse its folder.
 ---
 
 # Read an agent's changes
@@ -47,6 +47,34 @@ work than this agent's. An agent in its own worktree has no such note; see
    that made it, with the lines before and after.
 2. Click **Show in Changes** under an edit to jump to it in the **Changes** pane, among
    everything else the agent changed.
+
+**Undo what one turn changed**
+
+When the agent works in a git folder, a **Changed N files** card comes at the end of each
+turn that changed files. It lists the files that turn added, changed or deleted: also the
+ones a command changed, not only the agent's edits. It is the same on the Mac, on iPhone
+and iPad, and on the web page.
+
+1. On the card, click **Undo These Changes**. The files go back as they were before that
+   turn: a file the turn made is removed, and a file it deleted comes back.
+2. If a file changed again after that turn, by a later turn or by you, the app asks first.
+   Click **Undo Anyway** to put it back as it was before the turn. The later changes to that
+   file go too.
+3. The card then says **Undone** and how many files are back. The agent is told before its
+   next prompt, so it reads them again.
+
+Undo puts back only what the folder's snapshot holds:
+
+- Files that git ignores, such as build output, and files outside the folder are not in
+  it. The card names the ones the agent edited, as files Undo cannot put back.
+- If another agent worked in the same folder during the turn, the card lists only the files
+  this agent edited, so the other agent's work stays.
+- Wait for the agent's turn to end, or stop it, before you undo.
+- A snapshot lasts as long as git keeps objects that nothing refers to: two weeks by
+  default. After that the card says the snapshot is gone.
+- A folder that is not a git repository gets no card.
+
+To undo by hand instead, use the **Terminal** pane and git.
 
 **Browse the folder (Mac)**
 

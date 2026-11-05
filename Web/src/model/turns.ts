@@ -146,7 +146,7 @@ function entryIsPassing(entry: TranscriptEntry): boolean {
 const knownKinds = new Set(["userMessage", "agentMessage", "agentThought", "toolCall", "toolCallUpdate", "planUpdated",
   "usageRecorded", "servedRequest", "elicitationAsked", "elicitationAnswered", "compaction", "notice", "permissionAsked",
   "permissionAnswered", "optionChanged", "stateChanged", "background", "workReported", "runtimeNote",
-  "sandboxFailure", "policyStopped", "fileShown", "notified"]);
+  "sandboxFailure", "policyStopped", "fileShown", "notified", "turnChanged"]);
 
 function isDrawn(item: Item): boolean {
   return item.kind === "run" || knownKinds.has(kindOf(item.entry));
@@ -263,6 +263,8 @@ export class DisplayBuilder {
   private viewAt = new Map<string, number>();
   /** Where each notice's line is (#2860), by its entry's id: where it went is said on it. */
   private noticeAt = new Map<string, number>();
+  /** Where each turn's Changed files card is (#3437), by its turn: an undo is said on it. */
+  private changesAt = new Map<string, number>();
   private last: TranscriptEntry | undefined;
   /** How much of `drawn` is past the agent carrying on (#394). */
   private settled = 0;
@@ -335,6 +337,25 @@ export class DisplayBuilder {
       const notice = line?.kind === "entry" ? fields(line.entry, "notified") : undefined;
       if (at !== undefined && line?.kind === "entry" && notice) {
         this.drawn[at] = { kind: "entry", id: line.id, entry: { ...line.entry, kind: { notified: { _0: { ...notice._0, to: delivered._0.to } } } } };
+      }
+      return;
+    }
+    const changes = fields(entry, "turnChanged");
+    if (changes) {
+      // The card stands on its own at the end of the turn (#3437).
+      this.closeRun();
+      this.changesAt.set(changes._0.turn, this.drawn.length);
+      this.drawn.push({ kind: "entry", id: entry.id, entry });
+      return;
+    }
+    const undone = fields(entry, "turnUndone");
+    if (undone) {
+      // Said on the turn's card, never a line of its own.
+      const at = this.changesAt.get(undone._0.turn);
+      const card = at === undefined ? undefined : this.drawn[at];
+      const drawn = card?.kind === "entry" ? fields(card.entry, "turnChanged") : undefined;
+      if (at !== undefined && card?.kind === "entry" && drawn) {
+        this.drawn[at] = { kind: "entry", id: card.id, entry: { ...card.entry, kind: { turnChanged: { _0: { ...drawn._0, undone: undone._0 } } } } };
       }
       return;
     }
@@ -527,6 +548,8 @@ export function isOutcome(item: Item): boolean {
   if (kind === "fileShown") return true;
   // And what the agent told the person (#2805): why a notification opened this chat.
   if (kind === "notified") return true;
+  // And what the turn changed (#3437): the card that undoes it.
+  if (kind === "turnChanged") return true;
   const state = fields(item.entry, "stateChanged");
   if (state) return state._0 === "stopped";
   // Where a branch was cut (#1749): drawn at every level, after the reply it keeps.

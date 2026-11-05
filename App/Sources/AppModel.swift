@@ -6212,6 +6212,15 @@ final class AppModel {
     /// Branch from Here (#1658): a new session from just before one of the person's prompts,
     /// opened as Branch opens one, with that prompt in its bar to change and send. The words
     /// go in as the new session's draft, so its bar has them however it comes on screen.
+    /// Undo These Changes on a turn's card (#3437): the turn's files back as they were
+    /// before it. Thrown errors are the card's to say.
+    func undoTurn(_ turn: UUID, of agentID: UUID, confirmed: Bool) async throws -> DaemonAPI.UndoTurnResult {
+        try await client(forAgent: agentID).call(DaemonAPI.Method.changesUndoTurn,
+                                                 DaemonAPI.UndoTurnRequest(agentID: agentID, turn: turn,
+                                                                           confirmed: confirmed ? true : nil),
+                                                 returning: DaemonAPI.UndoTurnResult.self)
+    }
+
     func branch(from entryID: UUID, of agentID: UUID, text: String) async {
         do {
             let branch = try await client(forAgent: agentID).call(DaemonAPI.Method.agentsBranchFrom,

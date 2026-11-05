@@ -280,6 +280,21 @@ func (f *fakeRuntime) Prompt(ctx context.Context, p sdk.PromptRequest) (sdk.Prom
 	if strings.Contains(text, "a form") {
 		return f.form(ctx, p.SessionId, strings.Contains(text, "withdraw"), say)
 	}
+	// Writes "agent's\n" to the file the words name, and reports the edit (#3437).
+	if _, path, ok := strings.Cut(text, "write the file "); ok {
+		path = strings.Fields(path)[0]
+		var old []string
+		if b, err := os.ReadFile(path); err == nil {
+			old = []string{string(b)}
+		}
+		os.MkdirAll(filepath.Dir(path), 0o755)
+		os.WriteFile(path, []byte("agent's\n"), 0o644)
+		f.conn.SessionUpdate(ctx, sdk.SessionNotification{SessionId: p.SessionId, Update: sdk.StartToolCall("call_w", "Write "+filepath.Base(path),
+			sdk.WithStartKind(sdk.ToolKindEdit), sdk.WithStartStatus(sdk.ToolCallStatusCompleted),
+			sdk.WithStartContent([]sdk.ToolCallContent{sdk.ToolDiffContent(path, "agent's\n", old...)}))})
+		say("Written.")
+		return sdk.PromptResponse{StopReason: sdk.StopReasonEndTurn}, nil
+	}
 	f.conn.SessionUpdate(ctx, sdk.SessionNotification{SessionId: p.SessionId, Update: sdk.StartToolCall("call_1", "Write hi.txt",
 		sdk.WithStartKind(sdk.ToolKindEdit), sdk.WithStartStatus(sdk.ToolCallStatusPending))})
 	if strings.Contains(text, "Please ask") {

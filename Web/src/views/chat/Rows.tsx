@@ -7,7 +7,7 @@ import { createContext } from "preact";
 import { useContext, useEffect, useRef } from "preact/hooks";
 import type {
   AgentState, BackgroundItem, BudgetRequest, ContentBlock, EndedReason, FileReading, JSONValue, MessageSender, Plan, ToolCall, ToolCallContent, ToolCallLocation,
-  PolicySetBy, SandboxFailureRecord, TranscriptEntry, WorkReport,
+  PolicySetBy, SandboxFailureRecord, TranscriptEntry, UndoTurnResult, WorkReport,
 } from "../../protocol/generated";
 import { lineDiff } from "../../model/diff";
 import { fromLine } from "../../model/asker";
@@ -27,6 +27,7 @@ import type { Shown } from "../../model/shownFile";
 import { continueWithout, keepStopped, sandboxCard } from "../../model/sandboxWords";
 import { OrgPolicyLine } from "../OrgPolicyLine";
 import { PolicyStopCard } from "./PolicyStopCard";
+import { TurnChangesCard } from "./TurnChangesCard";
 import { memo } from "../../render/memo";
 import { terminalOutput } from "../../model/onTheMac";
 
@@ -160,6 +161,8 @@ export interface CallActions {
   fromLine?: ((sender: MessageSender | undefined) => string) | undefined;
   /** Ask for More on a Stopped by a policy card at the organisation's budget (ChatActions.askForMore, #3262). */
   askForMore?: (() => Promise<BudgetRequest>) | undefined;
+  /** Undo These Changes on a turn's card (ChatActions.undoTurn, #3437). Not on an archived session, nor a host too old. */
+  undoTurn?: ((turn: string, confirmed: boolean) => Promise<UndoTurnResult>) | undefined;
 }
 export const CallActionsContext = createContext<CallActions | null>(null);
 
@@ -440,6 +443,8 @@ function entryBody(entry: TranscriptEntry, from: (sender: MessageSender | undefi
       return <AppView call={fields(entry, "appView")!._0} />;
     case "fileShown":
       return <FileCard file={fields(entry, "fileShown")!._0} />;
+    case "turnChanged":
+      return <TurnChangesCard changes={fields(entry, "turnChanged")!._0} />;
     case "notified": {
       // What the agent told the person (#2805): Shared/UI/Chat/NotifiedLine.swift.
       const notice = fields(entry, "notified")!._0;

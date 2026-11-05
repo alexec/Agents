@@ -94,6 +94,12 @@ extension TranscriptEntry.Kind {
         case "noticeDelivered":
             guard let delivery = try? payload["_0"]?.decode(NoticeDelivery.self) else { return nil }
             return .noticeDelivered(delivery)
+        case "turnChanged":
+            guard let changes = try? payload["_0"]?.decode(TurnChanges.self) else { return nil }
+            return .turnChanged(changes)
+        case "turnUndone":
+            guard let undo = try? payload["_0"]?.decode(TurnUndo.self) else { return nil }
+            return .turnUndone(undo)
         case "workReported":
             // An outcome this build does not know is a report that never arrived, and
             // the entry falls to `.unrecognised` rather than being rounded to `done`.
@@ -179,6 +185,10 @@ extension TranscriptEntry.Kind {
             return ["notified": ["_0": (try? JSONValue.encoding(notice)) ?? .null]]
         case .noticeDelivered(let delivery):
             return ["noticeDelivered": ["_0": (try? JSONValue.encoding(delivery)) ?? .null]]
+        case .turnChanged(let changes):
+            return ["turnChanged": ["_0": (try? JSONValue.encoding(changes)) ?? .null]]
+        case .turnUndone(let undo):
+            return ["turnUndone": ["_0": (try? JSONValue.encoding(undo)) ?? .null]]
         case .unrecognised(let raw):
             // Written back exactly as it was read, so passing a record through an
             // older build does not quietly delete what it did not understand.
