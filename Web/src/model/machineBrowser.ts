@@ -1,7 +1,7 @@
 // The browser on the session's machine, which agents drive (#3528, spike #3527): what the Agent
 // Browser tab says, where a click lands in the page, and what a key says to it. The window's
 // AgentBrowserPane.swift and MachineBrowser.swift say the same.
-import type { BrowserInputRequest, BrowserState } from "../protocol/generated";
+import type { BrowserInputRequest, BrowserPageState } from "../protocol/generated";
 
 export const words = {
   tab: "Agent Browser",
@@ -50,4 +50,4 @@ export function keyInput(e: { key: string; code: string; keyCode: number; altKey
 }
 
 /** The state shown before the host has said one. */
-export const stopped: BrowserState = { status: "stopped" };
+export const stopped: BrowserPageState = { status: "stopped" };

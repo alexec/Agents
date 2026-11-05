@@ -30,7 +30,8 @@ function SecretSheet({ store, replacing, close }: { store: Store; replacing: Use
       const chosen = name.value.trim();
       const version = nextVersion(replacing, Date.now());
       const { recipients, user } = await store.link.call("user/secretRecipients", {});
-      const values = await sealSecret(user ?? "", chosen, version, value.value, recipients);
+      // Only to the machines the lock names (#3491, D8): the control plane cannot add a key of its own.
+      const values = await sealSecret(user ?? "", chosen, version, value.value, await store.signedRecipients(recipients));
       await store.link.call("user/setSecret", { name: chosen as never, version, values });
       value.value = "";
       close();

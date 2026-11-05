@@ -14,7 +14,7 @@ public extension DaemonAPI {
         }
     }
 
-    enum BrowserStatus: String, Codable, Sendable, Hashable {
+    enum BrowserPageStatus: String, Codable, Sendable, Hashable {
         case stopped, starting, running, failed
 
         /// A status this build does not know reads as stopped, not as a failed decode.
@@ -23,14 +23,14 @@ public extension DaemonAPI {
         }
     }
 
-    /// The machine's browser as a client shows it: browser/watch's answer and browser/state.
-    struct BrowserState: Codable, Sendable, Hashable {
-        public var status: BrowserStatus
+    /// The machine's browser as a client shows it: browser/watch's answer and browser/pageChanged.
+    struct BrowserPageState: Codable, Sendable, Hashable {
+        public var status: BrowserPageStatus
         /// starting: the step, such as Downloading Chromium. failed: why.
         public var detail: String?
         public var url: String?
         public var title: String?
-        public init(status: BrowserStatus, detail: String? = nil, url: String? = nil, title: String? = nil) {
+        public init(status: BrowserPageStatus, detail: String? = nil, url: String? = nil, title: String? = nil) {
             self.status = status
             self.detail = detail
             self.url = url

@@ -65,8 +65,11 @@ const CapGit1 = "git/1"
 const CapGovernance1 = "governance/1"
 const CapGroups1 = "groups/1"
 const CapHandover1 = "handover/1"
+const CapHostBrowserSettings1 = "host.browser-settings/1"
 const CapHostDesktopControl1 = "host.desktop-control/1"
 const CapHostLock1 = "host.lock/1"
+const CapHostLock2 = "host.lock/2"
+const CapHostLock3 = "host.lock/3"
 const CapHostOrgRoutes1 = "host.org-routes/1"
 const CapHostOrgRoutes2 = "host.org-routes/2"
 const CapHostPolicyLayers1 = "host.policy-layers/1"
@@ -225,8 +228,10 @@ var HostCapabilities = pairs([][2]string{
 	{"backups/restore", "backups/1"},
 	{"backups/state", "backups/1"},
 	{"browser/ack", "browser/1"},
+	{"browser/clear", "host.browser-settings/1"},
 	{"browser/input", "browser/1"},
 	{"browser/navigate", "browser/1"},
+	{"browser/state", "host.browser-settings/1"},
 	{"browser/unwatch", "browser/1"},
 	{"browser/watch", "browser/1"},
 	{"catalog/destination-state", "catalog/1"},
@@ -338,6 +343,7 @@ var HostCapabilities = pairs([][2]string{
 	{"lineage/link", "lineage/1"},
 	{"lineage/links", "lineage/1"},
 	{"lineage/walk", "lineage/1"},
+	{"lock/hello", "host.lock/3"},
 	{"mac/open", "mac/1"},
 	{"mac/reveal", "mac/1"},
 	{"mac/terminal", "mac/1"},
@@ -512,7 +518,7 @@ var HostCapabilities = pairs([][2]string{
 	{"auto/changed", "auto/1"},
 	{"backups/changed", "backups/1"},
 	{"browser/frame", "browser/1"},
-	{"browser/state", "browser/1"},
+	{"browser/pageChanged", "browser/1"},
 	{"clientPermissions/changed", "client-permissions/1"},
 	{"clone/changed", "clone/1"},
 	{"cost/changed", "cost/1"},
@@ -568,7 +574,7 @@ var HostNotifications = set([]string{
 	"auto/changed",
 	"backups/changed",
 	"browser/frame",
-	"browser/state",
+	"browser/pageChanged",
 	"clientPermissions/changed",
 	"clone/changed",
 	"cost/changed",
@@ -661,6 +667,9 @@ var ControlCapabilities = pairs([][2]string{
 	{"groups/setRole", "org-identity/1"},
 	{"handover/status", "handover/1"},
 	{"host/hello", "host/1"},
+	{"host/lockAdd", "host.lock/2"},
+	{"host/lockJoin", "host.lock/2"},
+	{"host/lockJoinReveal", "host.lock/2"},
 	{"host/machines", "host/1"},
 	{"host/orgRouteCheck", "host.org-routes/2"},
 	{"host/orgRoutesAgain", "host.org-routes/2"},
@@ -854,6 +863,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"folders/detect", "folders/1"},
 	{"host/clients", "host/1"},
 	{"host/lock", "host.lock/1"},
+	{"host/lockJoinChanged", "host.lock/2"},
 	{"host/orgRoutes", "host.org-routes/2"},
 	{"host/policy", "host.policy/1"},
 	{"host/projects", "projects/1"},
@@ -909,6 +919,7 @@ var ControlNotifications = set([]string{
 	"folders/detect",
 	"host/clients",
 	"host/lock",
+	"host/lockJoinChanged",
 	"host/orgRoutes",
 	"host/policy",
 	"host/projects",
@@ -938,9 +949,11 @@ var DeclaredCapabilities = map[string][]string{
 		"host.team/1",
 		"host.suspend/1",
 		"host.policy-layers/1",
+		"host.browser-settings/1",
 		"host.desktop-control/1",
 		"host.org-routes/2",
 		"host.user-settings/2",
 		"host.lock/1",
+		"host.lock/2",
 	},
 }

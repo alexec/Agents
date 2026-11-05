@@ -4,13 +4,20 @@
 // commitment, a signer sends its nonce, the browser shows its own, and both screens show six
 // digits. When this browser is a signer, it shows the other devices that ask, and adds one
 // with an addClient entry that it signs.
+//
+// Machines (#3491, D3, D8): a machine that asks is shown the same way and added with an
+// addMachine; a host code this browser shows carries an invite it put on the lock; and a
+// secret is sealed only to a machine whose key its owner's lock names.
 import { signal } from "@preact/signals";
-import { Failure, type Lock, type LockJoinDecided, type LockJoinRequest, type LockJoinStarted, type WireDate } from "../protocol/generated";
+import {
+  Failure, type ControlCodeShown, type Lock, type LockJoinDecided, type LockJoinRequest, type LockJoinStarted, type WireDate,
+} from "../protocol/generated";
 import { base64, same } from "../wire/bytes";
 import {
-  b64, commitment, digits, follow, fromBase64, isClient, LockCheckError, lockClientKind, makeSigningKey, newNonce,
-  sign, wireNow, zeroPin, type LockPin, type LockState,
+  b64, commitment, digits, follow, fromBase64, inviteCode, isClient, LockCheckError, lockClientKind, makeInviteKey, makeSigningKey,
+  newNonce, sign, signedRecipients, wireNow, zeroPin, type LockPin, type LockState,
 } from "../wire/machineLock";
+import type { LockSigner } from "../wire/lockChannel";
 
 /** What the model needs of the link: the control plane's calls and this page's keys. */
 export interface LockLink {
@@ -28,26 +35,34 @@ export interface PinStore {
 
 const pinKey = "agents-lock-pin";
 
-export const localPins: PinStore = {
-  load() {
-    try {
-      const said = JSON.parse(globalThis.localStorage?.getItem(pinKey) ?? "null") as Partial<LockPin> | null;
-      if (said && typeof said.person === "string" && typeof said.count === "number" && typeof said.head === "string") {
-        return { person: said.person, count: said.count, head: said.head };
+/** The pin kept in localStorage under key. */
+export function pinsAt(key: string): PinStore {
+  return {
+    load() {
+      try {
+        const said = JSON.parse(globalThis.localStorage?.getItem(key) ?? "null") as Partial<LockPin> | null;
+        if (said && typeof said.person === "string" && typeof said.count === "number" && typeof said.head === "string") {
+          return { person: said.person, count: said.count, head: said.head };
+        }
+      } catch {
+        // A pin that does not read is none.
       }
-    } catch {
-      // A pin that does not read is none.
-    }
-    return zeroPin;
-  },
-  save(pin) {
-    try {
-      globalThis.localStorage?.setItem(pinKey, JSON.stringify(pin));
-    } catch {
-      // Storage that is full or off keeps no pin.
-    }
-  },
-};
+      return zeroPin;
+    },
+    save(pin) {
+      try {
+        globalThis.localStorage?.setItem(key, JSON.stringify(pin));
+      } catch {
+        // Storage that is full or off keeps no pin.
+      }
+    },
+  };
+}
+
+export const localPins: PinStore = pinsAt(pinKey);
+
+/** Another person's lock, as an admin's page pins it to check the machines it seals to (D7). */
+export const localPinsOf = (person: string): PinStore => pinsAt(`${pinKey}:${person}`);
 
 export class MemoryPins implements PinStore {
   pin: LockPin = zeroPin;
@@ -80,6 +95,9 @@ export interface SignerCard {
   view: SignerView;
 }
 
+/** An invite works for five minutes, as a code does (D3). */
+const inviteLifetime = 5 * 60;
+
 const isChangedElsewhere = (error: unknown) => (error as { code?: unknown } | null)?.code === Failure.changedElsewhere;
 
 /** The words of a broken lock. */
@@ -101,12 +119,15 @@ export class MachineLock {
   /** The nonce this browser sent for each request, kept only in memory. */
   private readonly sent = new Map<string, Uint8Array>();
   private rows: LockJoinRequest[] = [];
+  /** The lock as this page last checked it. */
+  private state: LockState | null = null;
   private running: Promise<void> | null = null;
   private again = false;
   private timer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(private readonly link: LockLink, private readonly pins: PinStore = localPins,
-    private readonly say: (error: unknown) => void = () => undefined, private readonly now: () => WireDate = () => wireNow()) {}
+    private readonly say: (error: unknown) => void = () => undefined, private readonly now: () => WireDate = () => wireNow(),
+    private readonly pinsOf: (person: string) => PinStore = localPinsOf) {}
 
   /** The flow, once at a time: asked again while it runs, it runs once more after. */
   run(): Promise<void> {
@@ -145,6 +166,19 @@ export class MachineLock {
     }
   }
 
+  /**
+   * This page's lock key and its checked lock, for the channels it opens to machines (#3492,
+   * D6); null until this page is in its lock, and then it talks to machines as before.
+   */
+  async signer(): Promise<{ signer: LockSigner; state: LockState } | null> {
+    if (this.running) await this.running;
+    const state = this.state;
+    if (this.device.value.kind !== "member" || !state || !this.key) return null;
+    const member = state.member(this.key.publicRaw);
+    if (!member || !isClient(member)) return null;
+    return { signer: { privateKey: this.key.pair.privateKey, publicRaw: this.key.publicRaw }, state };
+  }
+
   private async signingKey(): Promise<{ pair: CryptoKeyPair; publicRaw: Uint8Array }> {
     if (this.key) return this.key;
     let pair = await this.link.lockKey();
@@ -162,6 +196,7 @@ export class MachineLock {
     try {
       const state = await follow(this.pins.load(), lock);
       this.pins.save(state.pin());
+      this.state = state;
       return { lock, state };
     } catch (error) {
       if (!(error instanceof LockCheckError)) throw error;
@@ -334,10 +369,16 @@ export class MachineLock {
       for (let tries = 0; ; tries++) {
         const read = await this.checked();
         if (!read) return;
-        const entry = await sign(pair.privateKey, publicRaw, {
-          kind: "addClient", person: read.state.person, previous: b64(read.state.head), at: this.now(), key: row.key,
-          name: row.name, clientKind: lockClientKind(row.kind),
-        });
+        // A machine's key is also its sealing key (D8).
+        const entry = await sign(pair.privateKey, publicRaw, row.machine
+          ? {
+            kind: "addMachine", person: read.state.person, previous: b64(read.state.head), at: this.now(), key: row.key,
+            sealingKey: row.key, id: row.machine, name: row.name,
+          }
+          : {
+            kind: "addClient", person: read.state.person, previous: b64(read.state.head), at: this.now(), key: row.key,
+            name: row.name, clientKind: lockClientKind(row.kind),
+          });
         try {
           await this.link.call("lock/add", { entries: [entry] });
           await read.state.add(entry);
@@ -353,6 +394,58 @@ export class MachineLock {
     } catch (error) {
       this.say(error);
     }
+  }
+
+  /**
+   * A host code with an invite (#3491, D3): this browser puts an invite on the lock and adds its
+   * key to the code, so the machine adds itself. A browser that is not a signer, or a lock that
+   * does not check, gives the code back as it was: the machine then asks to join.
+   */
+  async invite(shown: ControlCodeShown): Promise<ControlCodeShown> {
+    if (this.device.peek().kind !== "member") return shown;
+    try {
+      const { pair, publicRaw } = await this.signingKey();
+      const invite = await makeInviteKey();
+      for (let tries = 0; ; tries++) {
+        const read = await this.checked();
+        if (!read || !read.state.signer(publicRaw)) return shown;
+        const at = this.now();
+        const entry = await sign(pair.privateKey, publicRaw, {
+          kind: "invite", person: read.state.person, previous: b64(read.state.head), at, key: b64(invite.publicRaw),
+          expires: (at + inviteLifetime) as WireDate,
+        });
+        try {
+          await this.link.call("lock/add", { entries: [entry] });
+        } catch (error) {
+          if (!isChangedElsewhere(error) || tries > 0) throw error;
+          continue;
+        }
+        await read.state.add(entry);
+        this.pins.save(read.state.pin());
+        const text = inviteCode(shown.text, invite.privateRaw, read.state.pin());
+        return { ...shown, text, ...(shown.command ? { command: shown.command.replace(shown.text, text) } : {}) };
+      }
+    } catch (error) {
+      this.say(error);
+      return shown;
+    }
+  }
+
+  /**
+   * The recipients this browser may seal to (#3491, D8): every client, and each machine whose
+   * key its owner's lock names. Another person's lock (an admin sealing an org route) is pinned
+   * here too, on first use.
+   */
+  async signed<R extends { id: string; owner?: string; publicKey: string }>(recipients: R[]): Promise<R[]> {
+    const own = await this.checked().catch(() => null);
+    return signedRecipients(recipients, async (person) => {
+      if (!person || person === own?.state.person) return own?.state ?? null;
+      const lock = (await this.link.call("lock/get", { person })) as Lock;
+      const pins = this.pinsOf(person);
+      const state = await follow(pins.load(), lock);
+      pins.save(state.pin());
+      return state;
+    });
   }
 
   /** Deny: the request ends. */

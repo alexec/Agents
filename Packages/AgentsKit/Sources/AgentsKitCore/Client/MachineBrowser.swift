@@ -13,7 +13,7 @@ import Observation
 @MainActor
 @Observable
 public final class MachineBrowser {
-    public private(set) var state = DaemonAPI.BrowserState(status: .stopped)
+    public private(set) var state = DaemonAPI.BrowserPageState(status: .stopped)
     /// The newest frame: a JPEG, and the page's size in CSS pixels.
     public private(set) var frame: DaemonAPI.BrowserFrame?
     /// A call that failed, said under the page; cleared by the next one that works.
@@ -45,7 +45,7 @@ public final class MachineBrowser {
         do {
             state = try await client.call(DaemonAPI.Method.browserWatch,
                                           DaemonAPI.BrowserWatchRequest(width: size.width, height: size.height),
-                                          returning: DaemonAPI.BrowserState.self)
+                                          returning: DaemonAPI.BrowserPageState.self)
             problem = nil
         } catch {
             problem = describe(error)
@@ -67,15 +67,15 @@ public final class MachineBrowser {
         await sayWatch()
     }
 
-    /// browser/frame or browser/state from this host.
+    /// browser/frame or browser/pageChanged from this host.
     public func received(_ method: String, _ params: JSONValue?) {
         switch method {
         case DaemonAPI.Notification.browserFrame:
             guard watchers > 0, let f = try? params?.decode(DaemonAPI.BrowserFrame.self) else { return }
             frame = f
             Task { _ = try? await self.client.call(DaemonAPI.Method.browserAck, DaemonAPI.BrowserAckRequest(ack: f.ack)) }
-        case DaemonAPI.Notification.browserState:
-            guard let s = try? params?.decode(DaemonAPI.BrowserState.self) else { return }
+        case DaemonAPI.Notification.browserPageChanged:
+            guard let s = try? params?.decode(DaemonAPI.BrowserPageState.self) else { return }
             state = s
             if s.status != .running { frame = nil }
         default:

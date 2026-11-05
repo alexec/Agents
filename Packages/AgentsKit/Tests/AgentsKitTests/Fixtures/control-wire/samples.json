@@ -370,6 +370,16 @@
     "method": "method",
     "params": {
       "k": "v"
+    },
+    "signed": {
+      "method": "method",
+      "params": "{\"k\":\"v\"}",
+      "lock": {
+        "to": "box",
+        "at": 1793880000,
+        "key": "AQID",
+        "sig": "AQID"
+      }
     }
   },
   "ProviderDraftStart": {
@@ -1157,6 +1167,7 @@
       {
         "id": "m:box",
         "name": "Sam's box",
+        "owner": "sam",
         "publicKey": "BKzbiazQR4LGtRgQPSlIVEoCcE1zvM05lm29rjZefnVpuo68H773EO5R7jmXVga9BvIRe/w1Lo2D/Wckk23ZZh4="
       }
     ],
@@ -1242,6 +1253,9 @@
       }
     ]
   },
+  "LockGet": {
+    "person": "sam"
+  },
   "LockHead": {
     "count": 2,
     "head": "AAEC"
@@ -1280,6 +1294,31 @@
   "LockJoinNonce": {
     "request": "request",
     "nonce": "AQID"
+  },
+  "LockHello": {
+    "key": "AQID",
+    "ephemeral": "AQID",
+    "sig": "AQID"
+  },
+  "LockHelloReply": {
+    "key": "AQID",
+    "ephemeral": "AQID",
+    "sig": "AQID"
+  },
+  "LockSignature": {
+    "to": "box",
+    "at": 1793880000,
+    "key": "AQID",
+    "sig": "AQID"
+  },
+  "LockDelivery": {
+    "method": "agents/prompt",
+    "params": "{\"text\":\"go\"}",
+    "lock": {
+      "at": 1793880000,
+      "key": "AQID",
+      "sig": "AQID"
+    }
   },
   "LockJoinEnd": {
     "request": "request"

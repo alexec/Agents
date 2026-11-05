@@ -344,7 +344,9 @@ final class RemoteModel {
 
     init(link: any DaemonLink) {
         baseLink = link
-        client = DaemonClient(link: link)
+        // Each request to the home host checked end to end once this device is in its lock (#3492).
+        let lock = lock
+        client = DaemonClient(link: LockedLink(link, host: .mac) { await lock.channelSigner() })
         files = RemoteFiles(client: client)
         pictures = PhonePictures(files: files)
         // From the start, not once connected: a banner tapped to launch or wake the app
@@ -2260,8 +2262,10 @@ final class RemoteModel {
             problem = "The control plane isn’t answering, so that was not sent."
             return nil
         }
+        // Signed by this device, so a host that holds the lock takes it when it connects (#3492).
+        let signed = await lock.channelSigner().flatMap { try? LockChannel.delivery($0.key, to: host.rawValue, method: method, params: params) }
         do {
-            _ = try await control.call(DaemonAPI.Method.hostsKeep, DaemonAPI.KeepRequest(host: host, method: method, params: params))
+            _ = try await control.call(DaemonAPI.Method.hostsKeep, DaemonAPI.KeepRequest(host: host, method: method, params: params, signed: signed))
             return nil
         } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.kept {
             guard let said = try? error.data?.decode(DaemonAPI.KeptRequest.self) else { return nil }
@@ -2434,16 +2438,20 @@ final class RemoteModel {
                     await self?.people.connected(control)
                     await self?.signIn.connected(control)
                     if let client = RemoteControl.membership?.client { await self?.lock.connected(control, client: client) }
-                    await Self.sealWaiting(on: control)
+                    await Self.sealWaiting(on: control, lock: self?.lock)
                     for await change in control.notifications() {
                         guard let self, !Task.isCancelled else { return }
                         if change.method == DaemonAPI.Notification.controlSealingWanted {
-                            await Self.sealWaiting(on: control)
+                            await Self.sealWaiting(on: control, lock: self.lock)
                             continue
                         }
                         if await self.people.heard(change.method, change.params, on: control) { continue }
                         if self.signIn.heard(change.method, change.params) { continue }
-                        if await self.lock.heard(change.method, change.params, on: control) { continue }
+                        if await self.lock.heard(change.method, change.params, on: control) {
+                            // A machine just added to the lock may now be sealed to (#3491, D8).
+                            if change.method == DaemonAPI.Notification.controlLockChanged { await Self.sealWaiting(on: control, lock: self.lock) }
+                            continue
+                        }
                         if change.method == DaemonAPI.Notification.controlKeptChanged
                             || change.method == DaemonAPI.Notification.controlKeptDelivered {
                             await self.heardKept(change.method, change.params)
@@ -2470,9 +2478,11 @@ final class RemoteModel {
 
     /// Seals what waits for a copy this device can make (#3397): a machine that joined, or a
     /// client paired, after an org route or one of the person's secrets was sealed.
-    private static func sealWaiting(on control: DaemonClient) async {
+    private static func sealWaiting(on control: DaemonClient, lock: LockState?) async {
+        // Only to the machines the lock names (#3491, D8).
+        guard let lock else { return }
         guard let (key, client) = RemoteControl.sealing() else { return }
-        await ClientSealing.sealWaiting(on: control, key: key, client: client)
+        await ClientSealing.sealWaiting(on: control, key: key, client: client) { await lock.signed($0, on: control) }
     }
 
     /// Everything this model dials, ended for good: a new pairing has made a new model
@@ -2510,7 +2520,8 @@ final class RemoteModel {
         RemoteControl.keepRelayKey(status.relayKey)
         let others = listed.filter { $0.id != status.homeHost && $0.answers && $0.runsAgents }
         for host in others {
-            let other = otherHosts[host.id] ?? DaemonClient(link: link.link(for: host.id))
+            let lock = lock
+            let other = otherHosts[host.id] ?? DaemonClient(link: LockedLink(link.link(for: host.id), host: host.id) { await lock.channelSigner() })
             otherHosts[host.id] = other
             if await other.isConnected { continue }
             reachableHosts.remove(host.id)

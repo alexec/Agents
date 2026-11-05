@@ -1203,6 +1203,8 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 	case "host/orgRoutesAgain":
 		m.s.orgRoutesAgain(host)
 		return map[string]any{}, nil
+	case "host/lockAdd", "host/lockJoin", "host/lockJoinReveal":
+		return m.hostLockMethod(ctx, host, method, params)
 	case "attention/turn":
 		turn, err := require[wire.AttentionTurn](params, "AttentionTurn")
 		if err != nil {

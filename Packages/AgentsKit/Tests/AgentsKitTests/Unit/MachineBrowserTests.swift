@@ -59,12 +59,12 @@ struct MachineBrowserTests {
         try check(DaemonAPI.BrowserInputRequest(kind: .wheel, x: 1, y: 2, deltaX: 0, deltaY: 40), "BrowserInputRequest")
         try check(BrowserKeys.input(down: true, characters: "a", bare: "a", macKeyCode: 0, modifiers: 0), "BrowserInputRequest")
         try check(DaemonAPI.BrowserInputRequest(kind: .text, text: "pasted"), "BrowserInputRequest")
-        try check(DaemonAPI.BrowserState(status: .starting, detail: "Downloading Chromium"), "BrowserState")
+        try check(DaemonAPI.BrowserPageState(status: .starting, detail: "Downloading Chromium"), "BrowserPageState")
         try check(DaemonAPI.BrowserFrame(image: Data([0xFF, 0xD8]), ack: 1, width: 800, height: 600), "BrowserFrame")
     }
 
     @Test func aStatusThisBuildDoesNotKnowIsStopped() throws {
-        let s = try JSONDecoder().decode(DaemonAPI.BrowserState.self, from: Data(#"{"status":"paused"}"#.utf8))
+        let s = try JSONDecoder().decode(DaemonAPI.BrowserPageState.self, from: Data(#"{"status":"paused"}"#.utf8))
         #expect(s.status == .stopped)
     }
 }

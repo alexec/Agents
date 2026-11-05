@@ -104,6 +104,9 @@ type message struct {
 	Params json.RawMessage `json:"params,omitempty"`
 	Result json.RawMessage `json:"result,omitempty"`
 	Error  json.RawMessage `json:"error,omitempty"`
+	// Lock is a request's "lock" member: a client's or a machine's signature, or a
+	// channel's MAC (#3492). It is never changed here.
+	Lock json.RawMessage `json:"lock,omitempty"`
 }
 
 // decode reads a line, with a machine/* or machines/* method under its old name (#2653).
@@ -143,6 +146,13 @@ func replyError(id json.RawMessage, err error) string {
 func notification(method string, params any) string {
 	b, _ := json.Marshal(params)
 	return `{"jsonrpc":"2.0","method":` + strconv.Quote(method) + `,"params":` + string(b) + `}`
+}
+
+// signedRequest is a request its sender signed (#3492): the params and the signature as
+// they came, so not a byte of what was signed changes.
+func signedRequest(id string, d wire.LockDelivery) string {
+	sig, _ := json.Marshal(d.Lock)
+	return `{"id":` + strconv.Quote(id) + `,"jsonrpc":"2.0","method":` + strconv.Quote(d.Method) + `,"params":` + d.Params + `,"lock":` + string(sig) + `}`
 }
 
 func request(id, method string, params any) string {

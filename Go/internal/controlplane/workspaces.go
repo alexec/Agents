@@ -147,7 +147,14 @@ func (a providerRouter) TellPerson(person, method string, params any) {
 }
 
 func (a providerRouter) DeliverKept(method string, params json.RawMessage, client, kind, host string, patience time.Duration) *providers.Reply {
-	m := a.r.DeliverKept(method, params, client, kind, host, patience)
+	return providerReply(a.r.DeliverKept(method, params, client, kind, host, patience))
+}
+
+func (a providerRouter) DeliverSigned(d wire.LockDelivery, client, kind, host string, patience time.Duration) *providers.Reply {
+	return providerReply(a.r.DeliverSigned(d, client, kind, host, patience))
+}
+
+func providerReply(m *message) *providers.Reply {
 	if m == nil {
 		return nil
 	}

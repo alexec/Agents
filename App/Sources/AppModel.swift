@@ -1073,6 +1073,7 @@ final class AppModel {
     private var controlLink: ControlLink? = ControlConfig.endpoint.flatMap(ControlConfig.link)
 
     init() {
+        userScope.lock = lock
         // On `controlLink` itself, not a link of its own (#445): a second connection that
         // nothing else knew of was never let go of, so a wedged one stayed for good.
         if let controlLink { client = DaemonClient(link: hostLink(.mac, through: controlLink)) }
@@ -1219,14 +1220,17 @@ final class AppModel {
     /// A host's link: through the control plane, and first directly over the host's local
     /// socket when it may be on this Mac (#1118). The host's own answer says whether it is
     /// the one asked for, so `.mac` is tried even before the control plane has listed it.
+    /// Each request on it is checked end to end once this Mac is in its lock (#3492).
     private func hostLink(_ host: MachineRef, through controlLink: ControlLink, onThisMac: Bool = true) -> any DaemonLink {
         let fallback = controlLink.link(for: host)
+        let lock = lock
         guard onThisMac, let endpoint = ControlConfig.endpoint, let local = ControlConfig.localLink(endpoint, host: host) else {
-            return fallback
+            return LockedLink(fallback, host: host) { await lock.channelSigner() }
         }
-        return LocalFirstLink(local: local, fallback: fallback) { [weak self] direct in
+        let first = LocalFirstLink(local: local, fallback: fallback) { [weak self] direct in
             Task { @MainActor in self?.wentDirect(host, direct) }
         }
+        return LockedLink(first, host: host) { await lock.channelSigner() }
     }
 
     private func wentDirect(_ host: MachineRef, _ direct: Bool) {
@@ -2127,6 +2131,22 @@ final class AppModel {
                                                                      DesktopControlSettings(enabled: on),
                                                                      returning: DesktopControlSettings.self)
         }
+    }
+
+    /// Settings ▸ Browser (#3535): this Mac's browser, its sites with sign-ins and its
+    /// download. Nil from a daemon too old to know the method.
+    func browserState() async -> BrowserState? {
+        try? await macClient.call(DaemonAPI.Method.browserState, DaemonAPI.Empty(), returning: BrowserState.self)
+    }
+
+    /// Clear one site's sign-ins in this Mac's browser, or every site's with nil (#3535).
+    func clearBrowser(site: String?) async -> BrowserState? {
+        var cleared: BrowserState?
+        await attempt {
+            cleared = try await self.macClient.call(DaemonAPI.Method.browserClear, BrowserClearRequest(site: site),
+                                                    returning: BrowserState.self)
+        }
+        return cleared
     }
 
     /// The daily summary's control (#3351). A daemon too old to know the method leaves this nil.
@@ -3534,15 +3554,19 @@ final class AppModel {
                     await self?.people.connected(control)
                     await self?.signIn.connected(control)
                     if let client = ControlConfig.client { await self?.lock.connected(control, client: client) }
-                    await Self.sealWaiting(on: control)
+                    await Self.sealWaiting(on: control, lock: self?.lock)
                     for await note in control.notifications() {
                         if note.method == DaemonAPI.Notification.controlSealingWanted {
-                            await Self.sealWaiting(on: control)
+                            await Self.sealWaiting(on: control, lock: self?.lock)
                             continue
                         }
                         if await self?.people.heard(note.method, note.params, on: control) == true { continue }
                         if self?.signIn.heard(note.method, note.params) == true { continue }
-                        if await self?.lock.heard(note.method, note.params, on: control) == true { continue }
+                        if await self?.lock.heard(note.method, note.params, on: control) == true {
+                            // A machine just added to the lock may now be sealed to (#3491, D8).
+                            if note.method == DaemonAPI.Notification.controlLockChanged { await Self.sealWaiting(on: control, lock: self?.lock) }
+                            continue
+                        }
                         if await self?.userScope.heard(note.method, note.params, on: control) == true {
                             // The host writes what it is sent a moment later: its panes read again.
                             try? await Task.sleep(for: .milliseconds(500))
@@ -3582,9 +3606,11 @@ final class AppModel {
 
     /// Seals what waits for a copy this window can make (#3397): a machine that joined, or a
     /// client paired, after an org route or one of the person's secrets was sealed.
-    private static func sealWaiting(on control: DaemonClient) async {
+    private static func sealWaiting(on control: DaemonClient, lock: LockState?) async {
+        // Only to the machines the lock names (#3491, D8).
+        guard let lock else { return }
         guard let (key, client) = ControlConfig.sealing() else { return }
-        await ClientSealing.sealWaiting(on: control, key: key, client: client)
+        await ClientSealing.sealWaiting(on: control, key: key, client: client) { await lock.signed($0, on: control) }
     }
 
     private func controlPlaneDidAnswer() {
@@ -3690,9 +3716,11 @@ final class AppModel {
             problem = "Not sent — the control plane can’t be reached."
             return nil
         }
+        // Signed by this Mac, so a host that holds the lock takes it when it connects (#3492).
+        let signed = await lock.channelSigner().flatMap { try? LockChannel.delivery($0.key, to: host.rawValue, method: method, params: params) }
         do {
             _ = try await controlRequests.call(DaemonAPI.Method.hostsKeep,
-                                               DaemonAPI.KeepRequest(host: host, method: method, params: params))
+                                               DaemonAPI.KeepRequest(host: host, method: method, params: params, signed: signed))
             return nil
         } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.kept {
             return noteKept(error)
@@ -5775,7 +5803,7 @@ final class AppModel {
 
     /// What a host says about its browser (#3528): for the Agent Browser pane alone.
     private static let browserNotifications: Set<String> = [
-        DaemonAPI.Notification.browserFrame, DaemonAPI.Notification.browserState,
+        DaemonAPI.Notification.browserFrame, DaemonAPI.Notification.browserPageChanged,
     ]
 
     /// The Agent Browser pane's view of the browser on a session's host (#3528), made once

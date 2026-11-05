@@ -45,6 +45,9 @@ type Router interface {
 	// its own, bound to the client that asked, and its reply. Nil when the host is not here,
 	// goes before it answers, or takes longer than patience.
 	DeliverKept(method string, params json.RawMessage, client, kind, host string, patience time.Duration) *Reply
+	// DeliverSigned is DeliverKept for a request its sender signed (#3492): its params and
+	// signature go as they came.
+	DeliverSigned(d wire.LockDelivery, client, kind, host string, patience time.Duration) *Reply
 	// TellControl tells one client session a control notification; false when it has gone.
 	TellControl(session, method string, params any) bool
 	// HasSession says a client session is still here.
@@ -424,7 +427,7 @@ func (p *Providers) HostSaid(host, method string, params json.RawMessage) (any, 
 		if !AgentWorkspaceMethods[call.Method] {
 			return nil, fail(CodeNotPermitted, "Agents can’t ask that of the control plane.")
 		}
-		return p.AgentCall(host, call.Agent, call.Method, call.Params)
+		return p.AgentCall(host, call.Agent, call.Method, call.Params, call.Deliver)
 	case MethodHostProviderDraft:
 		var call MachineProviderDraftCall
 		if err := requireParams(params, &call, "MachineProviderDraftCall", "agentID", "draft", "tool"); err != nil {
@@ -456,7 +459,8 @@ func (p *Providers) DraftCall(host string, call MachineProviderDraftCall) (any, 
 
 // AgentCall is WorkspaceHandling.agentCall: an agent on host asked through its workspace
 // tools (US6), one of AgentWorkspaceMethods, logged as that agent's.
-func (p *Providers) AgentCall(host, agent, method string, params json.RawMessage) (any, error) {
+// deliver is what the other machine is to get, as this machine signed it (#3492, D7).
+func (p *Providers) AgentCall(host, agent, method string, params json.RawMessage, deliver *wire.LockDelivery) (any, error) {
 	hostName := host
 	if h := p.records.Host(host); h != nil {
 		hostName = h.Name
@@ -490,13 +494,13 @@ func (p *Providers) AgentCall(host, agent, method string, params json.RawMessage
 	}
 	switch method {
 	case MethodSessionOnMachine:
-		return p.startSessionOn(hostName, agent, rawOf(given), caller)
+		return p.startSessionOn(hostName, agent, rawOf(given), caller, deliver)
 	case MethodSessionCall:
-		return p.sessionCall(host, hostName, agent, rawOf(given), caller)
+		return p.sessionCall(host, hostName, agent, rawOf(given), caller, deliver)
 	case MethodSessionEnded:
-		return p.sessionEnded(hostName, rawOf(given), caller)
+		return p.sessionEnded(hostName, rawOf(given), caller, deliver)
 	case MethodSendFolder:
-		return p.sendFolder(hostName, agent, rawOf(given), caller)
+		return p.sendFolder(hostName, agent, rawOf(given), caller, deliver)
 	case MethodProjectFolders:
 		return p.projectFolders(rawOf(given), caller)
 	case MethodProjectSessions:
@@ -709,7 +713,7 @@ func (p *Providers) answer(method string, params json.RawMessage, caller Caller,
 		kept := p.Kept()
 		var answer *Failure
 		if kept != nil {
-			answer = kept.Keep(string(request.Host), request.Method, request.Params, caller)
+			answer = kept.Keep(string(request.Host), request.Method, request.Params, caller, request.Signed)
 		}
 		if answer == nil {
 			name := "That machine"

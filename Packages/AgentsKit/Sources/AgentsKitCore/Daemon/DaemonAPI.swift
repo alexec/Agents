@@ -463,6 +463,10 @@ public enum DaemonAPI {
         public static let sandboxSet = "sandbox/set"
         /// Desktop control's own off-by-default switch (#3004, US2): whether `drive_screen`
         /// may run at all. Setting is the person's own clients only.
+        /// Settings ▸ Browser (#3535): the machine's browser's sites with sign-ins, Clear,
+        /// and its download's size. The person's own clients only.
+        public static let browserState = "browser/state"
+        public static let browserClear = "browser/clear"
         public static let desktopControlState = "desktopControl/state"
         public static let desktopControlSet = "desktopControl/set"
         public static let desktopControlResume = "desktopControl/resume"
@@ -515,7 +519,7 @@ public enum DaemonAPI {
         /// A frame of the machine's browser's page, and its state, to the clients that
         /// watch it (#3528).
         public static let browserFrame = "browser/frame"
-        public static let browserState = "browser/state"
+        public static let browserPageChanged = "browser/pageChanged"
         public static let agentPermission = "agent/permission"
         /// A server's runtime refused the credential it was started with, or found none
         /// (043, FR-016). `CredentialRefused`.
@@ -2871,6 +2875,10 @@ public enum DaemonAPI {
         /// A change another copy of the control plane made first: the store refused this
         /// one's write, and nothing was changed. Try again (058, contracts/store.md).
         public static let changedElsewhere = -32093
+        /// A machine that holds its person's lock took a request no key of the lock vouched
+        /// for (#3492, specs/3399-machine-lock D6): this device is not in the lock yet, or the
+        /// control plane sent it.
+        public static let notInLock = -32104
         /// The control plane's store cannot be reached. Live connections carry on;
         /// nothing new can be remembered until it is back.
         public static let storeUnavailable = -32094

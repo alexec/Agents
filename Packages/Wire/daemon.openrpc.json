@@ -32,6 +32,11 @@
       "description": "A host resolves the effective policy from the organisation, your and a folder's layers through policylayers.Resolve (#2957), instead of only the organisation's ceiling. Declared so slice 2's policy/effective, policy/yours and policy/setYours, and the organisation's new rules of FR-003, have a capability to require."
     },
     {
+      "name": "host.browser-settings/1",
+      "by": "host",
+      "description": "The host serves browser/state and browser/clear (#3535): Settings ▸ Browser, the sites the machine's browser keeps cookies for, Clear, and the size of the Chromium download."
+    },
+    {
       "name": "host.desktop-control/1",
       "by": "host",
       "description": "The host serves the app tool drive_screen (#3004, US1): an agent drives an app on this Mac through its own screen, mouse and keyboard, holding the screen lease while it does, only while the person has turned desktop control on (desktopControl/state, desktopControl/set; Off by default). Mac only."
@@ -50,6 +55,11 @@
       "name": "host.lock/1",
       "by": "host",
       "description": "The host checks its person's machine lock (#3399, specs/3399-machine-lock) as host/lock sends it, and pins the head: it takes a lock only when it grows from the head it pinned last. Until #3400's later steps it refuses nothing and only logs what it would refuse. Declared: host/lock is the control plane's (control.openrpc.json)."
+    },
+    {
+      "name": "host.lock/2",
+      "by": "host",
+      "description": "The host joins its person's lock (#3491, specs/3399-machine-lock D3): with an invite key from its join code it signs its own addMachine (host/lockAdd); with none it asks (host/lockJoin), and shows the six digits once a signer answered (host/lockJoinChanged). Declared: those methods are the control plane's (control.openrpc.json)."
     }
   ],
   "methods": [
@@ -1771,6 +1781,32 @@
       }
     },
     {
+      "name": "browser/clear",
+      "x-capability": "host.browser-settings/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Clear the cookies and site data of one site, or of every site, in the machine's browser's kept profile (#3535). The person's own clients only.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BrowserClearRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BrowserState"
+        }
+      }
+    },
+    {
       "name": "browser/frame",
       "x-capability": "browser/1",
       "description": "A frame of the machine's browser's page (#3528), to each client that watches it.",
@@ -1844,7 +1880,7 @@
       }
     },
     {
-      "name": "browser/state",
+      "name": "browser/pageChanged",
       "x-capability": "browser/1",
       "description": "The machine's browser started, stopped, failed or moved to another page (#3528), to each client that watches it.",
       "tags": [
@@ -1859,10 +1895,36 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/BrowserState"
+            "$ref": "daemon.schema.json#/definitions/BrowserPageState"
           }
         }
       ]
+    },
+    {
+      "name": "browser/state",
+      "x-capability": "host.browser-settings/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Settings ▸ Browser (#3535): the machine's browser's download and the sites its kept profile has cookies for. It starts Chromium to read them when it is downloaded and not running. The person's own clients only.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BrowserState"
+        }
+      }
     },
     {
       "name": "browser/unwatch",
@@ -1893,7 +1955,7 @@
     {
       "name": "browser/watch",
       "x-capability": "browser/1",
-      "description": "The client watches the machine's browser (#3528, spike #3527): the host sends browser/frame and browser/state to it until browser/unwatch. It starts nothing: browser/navigate with go does.",
+      "description": "The client watches the machine's browser (#3528, spike #3527): the host sends browser/frame and browser/pageChanged to it until browser/unwatch. It starts nothing: browser/navigate with go does.",
       "tags": [
         {
           "name": "web"
@@ -1912,7 +1974,7 @@
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "daemon.schema.json#/definitions/BrowserState"
+          "$ref": "daemon.schema.json#/definitions/BrowserPageState"
         }
       }
     },
@@ -4746,6 +4808,32 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/LineageGraph"
+        }
+      }
+    },
+    {
+      "name": "lock/hello",
+      "x-capability": "host.lock/3",
+      "description": "A client opens a checked channel to this machine (#3492, specs/3399-machine-lock D6): the machine checks the client's signing key against its person's lock and answers with its own key, and from then on every request and answer on the channel carries an HMAC and a count. Once the machine holds a lock, it refuses a request on a channel from the control plane that has no HMAC from a channel opened this way, or no signature of a key in the lock (LockSignature), except the few the control plane asks for itself.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LockHello"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LockHelloReply"
         }
       }
     },
@@ -9135,6 +9223,10 @@
       "notConfirmed": {
         "code": -32010,
         "message": "notConfirmed"
+      },
+      "notInLock": {
+        "code": -32104,
+        "message": "notInLock"
       },
       "notInWorkflowFolder": {
         "code": -32016,

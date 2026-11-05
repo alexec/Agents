@@ -63,6 +63,8 @@ public extension DaemonAPI {
                 Row(Method.sandboxState, params: Empty.self, result: SandboxSettings.self, kind: .hostRequest),
                 // Desktop control's own off-by-default switch (#3004, US2), for Settings.
                 Row(Method.desktopControlState, params: Empty.self, result: DesktopControlSettings.self, kind: .hostRequest),
+                Row(Method.browserState, params: Empty.self, result: BrowserState.self, kind: .hostRequest),
+                Row(Method.browserClear, params: BrowserClearRequest.self, result: BrowserState.self, kind: .hostRequest),
                 Row(Method.desktopControlSet, params: DesktopControlSettings.self, result: DesktopControlSettings.self,
                     kind: .hostRequest),
                 // Pause on touch's two answers (#3004, US3).
@@ -240,6 +242,8 @@ public extension DaemonAPI {
                 Row(Method.docsSearch, params: DocsSearchRequest.self, result: DocsSearch.self, kind: .hostRequest),
                 Row(Method.docsRead, params: DocsReadRequest.self, result: DocsReading.self, kind: .hostRequest),
                 Row(Method.lineageWalk, params: LineageNodeRequest.self, result: LineageGraph.self, kind: .hostRequest),
+                // The checked channel to a machine (#3492).
+                Row(Method.lockHello, params: LockHello.self, result: LockHelloReply.self, kind: .hostRequest),
                 Row(Method.lineageCost, params: LineageNodeRequest.self, result: LineageCostRollup.self,
                     kind: .hostRequest),
                 Row(Method.simulatorsList, params: Empty.self, result: SimulatorList.self, kind: .hostRequest),
@@ -249,7 +253,7 @@ public extension DaemonAPI {
                     kind: .hostRequest),
                 Row(Method.simulatorsTap, params: SimulatorTapRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.simulatorsHome, params: SimulatorRequest.self, result: Empty.self, kind: .hostRequest),
-                Row(Method.browserWatch, params: BrowserWatchRequest.self, result: BrowserState.self, kind: .hostRequest),
+                Row(Method.browserWatch, params: BrowserWatchRequest.self, result: BrowserPageState.self, kind: .hostRequest),
                 Row(Method.browserUnwatch, params: Empty.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.browserAck, params: BrowserAckRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.browserInput, params: BrowserInputRequest.self, result: Empty.self, kind: .hostRequest),
@@ -571,7 +575,7 @@ public extension DaemonAPI {
                 Row(Notification.desktopControlLiveFrame, params: DesktopControlLiveFrame.self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.browserFrame, params: BrowserFrame.self, result: Empty.self, kind: .hostNotification),
-                Row(Notification.browserState, params: BrowserState.self, result: Empty.self, kind: .hostNotification),
+                Row(Notification.browserPageChanged, params: BrowserPageState.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.agentRemoved, params: AgentRemovedNotification.self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.agentResuming, params: ResumingNotification.self, result: Empty.self,

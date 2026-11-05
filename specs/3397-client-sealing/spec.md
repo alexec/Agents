@@ -148,6 +148,12 @@ plane. Until the machine lock (#3400) signs these keys on the person's own devic
 control plane could hand out a key of its own and get a copy sealed to it. The docs say
 so.
 
+Closed for machines by #3491: a client seals to a machine only when its key is the
+sealing key of that machine's addMachine in its owner's lock, and a machine not in the
+lock yet gets its copy through `sealing/work` once it is approved. A client recipient's
+key is not in the lock (addClient names its signing key, not its sealing key), so that
+part of the limit stays.
+
 ## Principles (direction.md)
 
 - **6 (holds nothing it could misuse):** this change. The control plane keeps only

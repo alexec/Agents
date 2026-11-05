@@ -416,7 +416,13 @@ func (d *Daemon) appToolsHandle(ctx context.Context, g *appGrant, method string,
 	case "ping":
 		return map[string]any{}, nil
 	case "tools/list":
-		return map[string]any{"tools": offeredTools(g.movesItself, d.isBot(), d.offersDriveScreen(), d.inPersonalHome(g.agent))}, nil
+		tools := offeredTools(g.movesItself, d.isBot(), d.offersDriveScreen(), d.inPersonalHome(g.agent))
+		// The machine's browser, driven through Playwright's own tools (#3534).
+		if d.offersBrowser() {
+			list, _ := browserTools()
+			tools = append(tools, list...)
+		}
+		return map[string]any{"tools": tools}, nil
 	case "resources/list":
 		return map[string]any{"resources": []any{}}, nil
 	case "resources/read":
@@ -431,6 +437,9 @@ func (d *Daemon) appToolsHandle(ctx context.Context, g *appGrant, method string,
 			Arguments map[string]json.RawMessage `json:"arguments"`
 		}
 		json.Unmarshal(params, &p)
+		if name, ok := browserToolNamed(p.Name); ok && d.offersBrowser() {
+			return d.callBrowserTool(ctx, g.agent, name, p.Arguments), nil
+		}
 		// Matched by the end of the name: a runtime is free to put its own prefix on it.
 		var tool *appTool
 		calls := appToolCalls()

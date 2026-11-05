@@ -36,7 +36,8 @@ something the app does not know about, such as a network port.
 Every machine also offers `browser:agents`, **This machine's browser** (#3533): one
 Chromium that the host downloads on first use, runs with no window and a kept profile, so
 sign-ins carry over from one session to the next, and stops after 15 minutes with no use
-and no lease. One agent drives it at a time. The tools that drive it come with #3526.
+and no lease. One agent drives it at a time, through the `browser_*` tools (#3534): the
+first call takes the lease, and the agent's turn ending lets it go.
 You see it in the inspector's **Agent Browser** pane, or the web page's **Agent Browser**
 tab (#3528): its newest tab, live, while the pane is open. You can click, scroll, type
 and paste in it at any time, and an address typed in its bar starts it.

@@ -7,7 +7,7 @@ import type { ExportImportBusy } from "./exports";
 import type { HeardLiveFrame } from "./desktopControl";
 import { batch, computed, signal, type ReadonlySignal, type Signal } from "@preact/signals";
 import type {
-  Agent, AgentRemovedNotification, ResumingNotification, BrowserFrame, BrowserState, DesktopControlLiveFrame, ControlMachine, MachineRef, MachineWorkspace, ElicitationNotification, ElicitationRequest, EntryNotification,
+  Agent, AgentRemovedNotification, ResumingNotification, BrowserFrame, BrowserPageState, DesktopControlLiveFrame, ControlMachine, MachineRef, MachineWorkspace, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, FolderSummary, HelperLimits, DiskThresholds, NotCommittedResponse, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, FolderRemovedNotification, DraftOptionsNotification, JSONValue, Methods, AccountProfile, RuntimeAccount, RuntimeSignInStep, RuntimeStatus,
   StartRequest, UUID, AutoMappings, AutoPreview, AutoPreviewRequest, AutoSettings, ClientPermissionMode, Levels, ModelLevel, PermissionLevel, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
@@ -255,7 +255,7 @@ export class Work {
    */
   readonly liveFrame = signal<HeardLiveFrame | null>(null);
   /** Each host's browser as the Agent Browser tab shows it (#3528): its state, by host. */
-  readonly browserStates = signal<Record<string, BrowserState>>({});
+  readonly browserStates = signal<Record<string, BrowserPageState>>({});
   /** The newest frame of the browser the tab watches (#3528). Replaced by the next, never kept. */
   readonly browserFrame = signal<{ host: string; frame: BrowserFrame } | null>(null);
   /** The last file an agent asked to be put in front of the person (`agent/showFile`). */
@@ -654,8 +654,8 @@ export class Work {
       case "browser/frame":
         this.browserFrame.value = { host, frame: params as BrowserFrame };
         return true;
-      case "browser/state":
-        this.browserStates.value = { ...this.browserStates.peek(), [host]: params as BrowserState };
+      case "browser/pageChanged":
+        this.browserStates.value = { ...this.browserStates.peek(), [host]: params as BrowserPageState };
         return true;
       case "desktopControl/liveFrame":
         this.liveFrame.value = { host, frame: params as DesktopControlLiveFrame, heardAt: Date.now() };
@@ -1297,6 +1297,8 @@ export class Store extends Work {
       lockKey: () => link.lockKey(),
       saveLockKey: (pair) => link.saveLockKey(pair),
     }, undefined, (error) => this.say(describe(error)));
+    // A test's fake link has none.
+    link.setLock?.(() => this.machineLock.signer());
     link.onNotification((method, params, host) => {
       // A browser frame is acked as it lands (#3528): the host sends the next only then, so a
       // slow link gets fewer frames, not a backlog.
@@ -1359,6 +1361,8 @@ export class Store extends Work {
       }
       if (method === "control/lockChanged" || method === "control/lockJoinRequested" || method === "control/lockJoinDecided") {
         if (this.planeHas(Capability.lockJoin1)) this.machineLock.notify(method, params);
+        // A machine just added to the lock may now be sealed to (#3491, D8).
+        if (method === "control/lockChanged") void this.sealWaiting();
         return;
       }
       if (method === "control/signInDecided") {
@@ -1442,7 +1446,7 @@ export class Store extends Work {
       }
     });
     link.onState((state) => {
-      if (state.kind === "open") void this.load().then(() => Promise.all([this.sealWaiting(), this.lockStep()]));
+      if (state.kind === "open") void this.load().then(() => this.sealWaiting());
     });
   }
 
@@ -1456,8 +1460,17 @@ export class Store extends Work {
     const record = await this.link.keyRecord();
     const work = record ? await this.link.call("sealing/work", {}).catch(() => null) : null;
     if (!record || !work || work.items.length === 0) return;
-    const items = await sealWork(record, work);
+    const checked = { items: await Promise.all(work.items.map(async (item) => ({ ...item, missing: await this.signedRecipients(item.missing) }))) };
+    const items = await sealWork(record, { items: checked.items.filter((item) => item.missing.length > 0) });
     if (items.length > 0) await this.link.call("sealing/add", { items }).catch(() => undefined);
+  }
+
+  /**
+   * The recipients this page may seal a secret to (#3491, D8): a machine only when its owner's
+   * lock names its key. A control plane before the lock has none to check against.
+   */
+  async signedRecipients<R extends { id: string; owner?: string; publicKey: string }>(recipients: R[]): Promise<R[]> {
+    return this.planeHas(Capability.lock1) ? this.machineLock.signed(recipients) : recipients;
   }
 
   /** The machine lock's check and join (#3490), at each connection; a control plane before it has none. */
@@ -1488,6 +1501,9 @@ export class Store extends Work {
           this.loadRemoveRequests()])),
         this.loadSignInRequests()]);
       this.takeHosts(hosts);
+      // This page's place in its lock first: a machine that holds the lock takes a call only
+      // on a channel this page opens with its lock key (#3492).
+      await this.lockStep().catch(() => undefined);
       await Promise.all(this.hosts.value.filter((host) => hostAnswers(host.state)).map((host) => this.onHost(host.id, async () => {
         // A removal that landed while this waited is not loaded back (#291).
         if (!this.hostIsOnline(host.id)) return;

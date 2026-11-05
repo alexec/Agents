@@ -35,7 +35,7 @@ func nextBrowserFrame(c *conn, wait time.Duration) *wire.BrowserFrame {
 
 func TestWatchingTheBrowserStartsNothing(t *testing.T) {
 	d, c := start(t, t.TempDir())
-	var s wire.BrowserState
+	var s wire.BrowserPageState
 	if err := json.Unmarshal(c.call(t, 1, "browser/watch", wire.BrowserWatchRequest{Width: 800, Height: 600}), &s); err != nil {
 		t.Fatal(err)
 	}

@@ -2858,6 +2858,17 @@
       ],
       "additionalProperties": false
     },
+    "BrowserClearRequest": {
+      "type": "object",
+      "description": "browser/clear (#3535): clear one site's cookies and storage in the machine's browser, or every site's when site is left out.",
+      "properties": {
+        "site": {
+          "type": "string",
+          "description": "A site as browser/state names it (github.com). Left out: every site."
+        }
+      },
+      "additionalProperties": false
+    },
     "BrowserFrame": {
       "type": "object",
       "description": "browser/frame: a JPEG of the machine's browser's page (#3528, spike #3527), from CDP Page.startScreencast, sent only to the clients that watch it. Never recorded.",
@@ -2975,9 +2986,9 @@
       ],
       "additionalProperties": false
     },
-    "BrowserState": {
+    "BrowserPageState": {
       "type": "object",
-      "description": "The machine's browser as a client shows it (#3528): browser/watch's answer, and browser/state to the clients that watch it when it changes.",
+      "description": "The machine's browser's page as a client shows it (#3528): browser/watch's answer, and browser/pageChanged to the clients that watch it when it changes. Not BrowserState, which is Settings ▸ Browser's.",
       "properties": {
         "status": {
           "$ref": "#/definitions/BrowserStatus"
@@ -2995,6 +3006,58 @@
       },
       "required": [
         "status"
+      ],
+      "additionalProperties": false
+    },
+    "BrowserSite": {
+      "type": "object",
+      "description": "One site that keeps cookies in the machine's browser (#3535), which is how a site remembers a sign-in.",
+      "properties": {
+        "site": {
+          "type": "string",
+          "description": "The site's registrable domain (github.com), with every subdomain's cookies under it."
+        },
+        "cookies": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "site",
+        "cookies"
+      ],
+      "additionalProperties": false
+    },
+    "BrowserState": {
+      "type": "object",
+      "description": "Settings ▸ Browser (#3535): the machine's browser (#3533). Whether Chromium is downloaded, its size on disk, whether it runs, and the sites its kept profile has cookies for, most cookies first.",
+      "properties": {
+        "installed": {
+          "type": "boolean",
+          "description": "Chromium is downloaded on this machine. False until an agent first uses the browser."
+        },
+        "running": {
+          "type": "boolean"
+        },
+        "downloadBytes": {
+          "type": "integer",
+          "description": "The size on disk of the Chromium download, in bytes."
+        },
+        "sites": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BrowserSite"
+          }
+        },
+        "problem": {
+          "type": "string",
+          "description": "Why the sites could not be read, when they could not."
+        }
+      },
+      "required": [
+        "installed",
+        "running",
+        "downloadBytes",
+        "sites"
       ],
       "additionalProperties": false
     },
@@ -11271,7 +11334,7 @@
       },
     "KeepRequest": {
       "type": "object",
-      "description": "hosts/keep: a request for a stopped host, kept until it is up.",
+      "description": "hosts/keep: a request for a stopped host, kept until it is up. signed is the same request signed by the client (#3492, D6): a host that holds its person's lock takes only that, so the control plane keeps and delivers it as it is.",
       "properties": {
         "host": {
           "$ref": "#/definitions/MachineRef"
@@ -11281,6 +11344,9 @@
         },
         "params": {
           "$ref": "#/definitions/JSONValue"
+        },
+        "signed": {
+          "$ref": "#/definitions/LockDelivery"
         }
       },
       "required": [
@@ -12196,6 +12262,27 @@
       ],
       "additionalProperties": false
     },
+    "LockDelivery": {
+      "type": "object",
+      "description": "A request signed for a machine (#3492), as the control plane keeps it and delivers it: the method, the params as the sender wrote them (text, so no byte of them changes on the way), and the signature.",
+      "properties": {
+        "method": {
+          "type": "string"
+        },
+        "params": {
+          "type": "string"
+        },
+        "lock": {
+          "$ref": "#/definitions/LockSignature"
+        }
+      },
+      "required": [
+        "method",
+        "params",
+        "lock"
+      ],
+      "additionalProperties": false
+    },
     "LockEntry": {
       "type": "object",
       "description": "One entry of a machine lock (#3399): body is a LockBody's JSON, kept as the signer wrote it, so no language has to write it again the same way. sig is ECDSA P-256 with SHA-256 over \"agents-lock/1\\n\" then body, the 64 bytes r then s (as WebCrypto and CryptoKit's rawRepresentation write it). The entry's hash is the SHA-256 of body.",
@@ -12225,6 +12312,16 @@
       ],
       "description": "What a lock entry changes (#3399): root names the first signing key; addClient a client's signing key; addMachine a machine's key and sealing key, signed by a signer or an invite; invite a one-use key that may add one machine; remove a client, machine or invite no longer trusted; recovery the recovery key, or a new one."
     },
+    "LockGet": {
+      "type": "object",
+      "description": "lock/get (#3399): with no person, the caller's own lock. With person, that person's: only an admin may read another's (#3491), to check the machine keys an org route is sealed to (specs/3399-machine-lock D7, D8).",
+      "properties": {
+        "person": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
     "LockHead": {
       "type": "object",
       "description": "Where a machine lock stands (#3399): how many entries it has, and head, the SHA-256 of the newest one's body. lock/add's answer, and control/lockChanged.",
@@ -12239,6 +12336,48 @@
       "required": [
         "count",
         "head"
+      ],
+      "additionalProperties": false
+    },
+    "LockHello": {
+      "type": "object",
+      "description": "lock/hello (#3492, specs/3399-machine-lock D6): a client opens a checked channel to a machine. key is its signing key (P-256, X9.63), which the machine's lock must name as a client; ephemeral is a new ECDH P-256 key for this channel alone; sig is ECDSA P-256 (r then s) with SHA-256 over \"agents-lock-channel/1\\nclient\\n\" then ephemeral.",
+      "properties": {
+        "key": {
+          "$ref": "#/definitions/Base64"
+        },
+        "ephemeral": {
+          "$ref": "#/definitions/Base64"
+        },
+        "sig": {
+          "$ref": "#/definitions/Base64"
+        }
+      },
+      "required": [
+        "key",
+        "ephemeral",
+        "sig"
+      ],
+      "additionalProperties": false
+    },
+    "LockHelloReply": {
+      "type": "object",
+      "description": "lock/hello's answer (#3492): key is the machine's own key, which the client's lock must name as an addMachine; ephemeral is the machine's new ECDH P-256 key; sig is ECDSA with the machine's key over \"agents-lock-channel/1\\nmachine\\n\", the client's ephemeral, the machine's ephemeral, then the client's key. Each side then makes a key for each direction with HKDF-SHA256 (the ECDH secret; salt the client's then the machine's ephemeral; info \"agents-lock-channel/1 client\" or \"… machine\"), and every request and answer carries \"lock\":{\"n\":…,\"mac\":…} last: HMAC-SHA256 over the count (8 bytes, big-endian) then the message without that member.",
+      "properties": {
+        "key": {
+          "$ref": "#/definitions/Base64"
+        },
+        "ephemeral": {
+          "$ref": "#/definitions/Base64"
+        },
+        "sig": {
+          "$ref": "#/definitions/Base64"
+        }
+      },
+      "required": [
+        "key",
+        "ephemeral",
+        "sig"
       ],
       "additionalProperties": false
     },
@@ -12308,13 +12447,16 @@
     },
     "LockJoinRequest": {
       "type": "object",
-      "description": "lock/joinRequests and control/lockJoinRequested (#3490): a client asking to join its person's lock, to every client of that person, and sent again in place as it goes on. client is the asking client's id, so it knows its own. nonce is the signer's, once one sent it (lock/joinAnswer), and answeredBy is that signer's client id; reveal is the asking client's nonce, once it showed it. Each screen makes the six digits from key, reveal and nonce.",
+      "description": "lock/joinRequests and control/lockJoinRequested (#3490): a client asking to join its person's lock, to every client of that person, and sent again in place as it goes on. client is the asking client's id, so it knows its own. nonce is the signer's, once one sent it (lock/joinAnswer), and answeredBy is that signer's client id; reveal is the asking client's nonce, once it showed it. Each screen makes the six digits from key, reveal and nonce. machine is set when a machine asks (#3491, D3): client is then the machine's id, kind is unknown, and a signer approves it with an addMachine whose key and sealing key are both key, the machine's own.",
       "properties": {
         "request": {
           "type": "string"
         },
         "client": {
           "type": "string"
+        },
+        "machine": {
+          "$ref": "#/definitions/MachineRef"
         },
         "name": {
           "type": "string"
@@ -12366,6 +12508,30 @@
       "required": [
         "request",
         "expires"
+      ],
+      "additionalProperties": false
+    },
+    "LockSignature": {
+      "type": "object",
+      "description": "A request signed by its sender's own key (#3492, D6, D7): a client's kept request for a machine that is not there, or a machine's call to another of its person's machines. It goes as the request's \"lock\" member. sig is ECDSA P-256 (r then s) with SHA-256 over \"agents-lock-request/1\\n\", to, \"\\n\", at in decimal, \"\\n\", the method, \"\\n\", then the params as sent. to is the machine's id; a machine may leave it out for another machine it named by name. at is seconds since 1970. The machine refuses one whose key its lock does not name, older than a day, or seen before.",
+      "properties": {
+        "to": {
+          "type": "string"
+        },
+        "at": {
+          "type": "integer"
+        },
+        "key": {
+          "$ref": "#/definitions/Base64"
+        },
+        "sig": {
+          "$ref": "#/definitions/Base64"
+        }
+      },
+      "required": [
+        "at",
+        "key",
+        "sig"
       ],
       "additionalProperties": false
     },
@@ -14968,7 +15134,7 @@
     },
     "MachineWorkspaceCall": {
       "type": "object",
-      "description": "host/machines, for an agent there: who asked, for the log, and its call.",
+      "description": "host/machines, for an agent there: who asked, for the log, and its call. deliver is what the other machine is to get, signed by this one (#3492, D7): the control plane delivers it as it is, in place of its own words.",
       "properties": {
         "agent": {
           "type": "string"
@@ -14978,6 +15144,9 @@
         },
         "params": {
           "$ref": "#/definitions/JSONValue"
+        },
+        "deliver": {
+          "$ref": "#/definitions/LockDelivery"
         }
       },
       "required": [
@@ -22360,12 +22529,15 @@
     },
     "SealRecipient": {
       "type": "object",
-      "description": "A machine or a client to seal a secret to (#3397): its id as the associated data names it (m:<machine id> or c:<client id>), its name, and its P-256 key, X9.63. The control plane gives the key: until the machine lock (#3400) signs it, a control plane could give one of its own.",
+      "description": "A machine or a client to seal a secret to (#3397): its id as the associated data names it (m:<machine id> or c:<client id>), its name, and its P-256 key, X9.63. The control plane gives the key, and a client checks a machine's against the sealing key of that machine's addMachine in its person's lock before it seals to it (#3491, specs/3399-machine-lock D8), so a control plane cannot give one of its own. owner is the person whose machine it is, so an admin's client knows whose lock to read; none for a client recipient.",
       "properties": {
         "id": {
           "type": "string"
         },
         "name": {
+          "type": "string"
+        },
+        "owner": {
           "type": "string"
         },
         "publicKey": {

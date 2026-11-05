@@ -60,6 +60,7 @@ export const Failure = {
   notAllowed: -32060,
   notChanged: -32034,
   notConfirmed: -32010,
+  notInLock: -32104,
   notInWorkflowFolder: -32016,
   notKeeper: -32101,
   notLinked: -32065,
@@ -1219,6 +1220,15 @@ export interface BrowserAckRequest {
 }
 
 /**
+ * browser/clear (#3535): clear one site's cookies and storage in the machine's browser, or every
+ * site's when site is left out.
+ */
+export interface BrowserClearRequest {
+  /** A site as browser/state names it (github.com). Left out: every site. */
+  site?: string;
+}
+
+/**
  * browser/frame: a JPEG of the machine's browser's page (#3528, spike #3527), from CDP
  * Page.startScreencast, sent only to the clients that watch it. Never recorded.
  */
@@ -1283,15 +1293,42 @@ export interface BrowserNavigateRequest {
 }
 
 /**
- * The machine's browser as a client shows it (#3528): browser/watch's answer, and browser/state to
- * the clients that watch it when it changes.
+ * The machine's browser's page as a client shows it (#3528): browser/watch's answer, and
+ * browser/pageChanged to the clients that watch it when it changes. Not BrowserState, which is
+ * Settings ▸ Browser's.
  */
-export interface BrowserState {
+export interface BrowserPageState {
   status: BrowserStatus;
   /** starting: the step, such as Downloading Chromium. failed: why. */
   detail?: string;
   url?: string;
   title?: string;
+}
+
+/**
+ * One site that keeps cookies in the machine's browser (#3535), which is how a site remembers a
+ * sign-in.
+ */
+export interface BrowserSite {
+  /** The site's registrable domain (github.com), with every subdomain's cookies under it. */
+  site: string;
+  cookies: number;
+}
+
+/**
+ * Settings ▸ Browser (#3535): the machine's browser (#3533). Whether Chromium is downloaded, its
+ * size on disk, whether it runs, and the sites its kept profile has cookies for, most cookies
+ * first.
+ */
+export interface BrowserState {
+  /** Chromium is downloaded on this machine. False until an agent first uses the browser. */
+  installed: boolean;
+  running: boolean;
+  /** The size on disk of the Chromium download, in bytes. */
+  downloadBytes: number;
+  sites: BrowserSite[];
+  /** Why the sites could not be read, when they could not. */
+  problem?: string;
 }
 
 export type BrowserStatus =
@@ -4403,11 +4440,16 @@ export interface JoinedFolder {
   project: string;
 }
 
-/** hosts/keep: a request for a stopped host, kept until it is up. */
+/**
+ * hosts/keep: a request for a stopped host, kept until it is up. signed is the same request signed
+ * by the client (#3492, D6): a host that holds its person's lock takes only that, so the control
+ * plane keeps and delivers it as it is.
+ */
 export interface KeepRequest {
   host: MachineRef;
   method: string;
   params: JSONValue;
+  signed?: LockDelivery;
 }
 
 export interface KeptDelivered {
@@ -4789,6 +4831,17 @@ export interface LockBody {
 }
 
 /**
+ * A request signed for a machine (#3492), as the control plane keeps it and delivers it: the
+ * method, the params as the sender wrote them (text, so no byte of them changes on the way), and
+ * the signature.
+ */
+export interface LockDelivery {
+  method: string;
+  params: string;
+  lock: LockSignature;
+}
+
+/**
  * One entry of a machine lock (#3399): body is a LockBody's JSON, kept as the signer wrote it, so
  * no language has to write it again the same way. sig is ECDSA P-256 with SHA-256 over
  * "agents-lock/1\n" then body, the 64 bytes r then s (as WebCrypto and CryptoKit's
@@ -4814,12 +4867,48 @@ export type LockEntryKind =
   | "recovery";
 
 /**
+ * lock/get (#3399): with no person, the caller's own lock. With person, that person's: only an
+ * admin may read another's (#3491), to check the machine keys an org route is sealed to
+ * (specs/3399-machine-lock D7, D8).
+ */
+export interface LockGet {
+  person?: string;
+}
+
+/**
  * Where a machine lock stands (#3399): how many entries it has, and head, the SHA-256 of the newest
  * one's body. lock/add's answer, and control/lockChanged.
  */
 export interface LockHead {
   count: number;
   head: Base64;
+}
+
+/**
+ * lock/hello (#3492, specs/3399-machine-lock D6): a client opens a checked channel to a machine.
+ * key is its signing key (P-256, X9.63), which the machine's lock must name as a client; ephemeral
+ * is a new ECDH P-256 key for this channel alone; sig is ECDSA P-256 (r then s) with SHA-256 over
+ * "agents-lock-channel/1\nclient\n" then ephemeral.
+ */
+export interface LockHello {
+  key: Base64;
+  ephemeral: Base64;
+  sig: Base64;
+}
+
+/**
+ * lock/hello's answer (#3492): key is the machine's own key, which the client's lock must name as
+ * an addMachine; ephemeral is the machine's new ECDH P-256 key; sig is ECDSA with the machine's key
+ * over "agents-lock-channel/1\nmachine\n", the client's ephemeral, the machine's ephemeral, then
+ * the client's key. Each side then makes a key for each direction with HKDF-SHA256 (the ECDH
+ * secret; salt the client's then the machine's ephemeral; info "agents-lock-channel/1 client" or "…
+ * machine"), and every request and answer carries "lock":{"n":…,"mac":…} last: HMAC-SHA256 over the
+ * count (8 bytes, big-endian) then the message without that member.
+ */
+export interface LockHelloReply {
+  key: Base64;
+  ephemeral: Base64;
+  sig: Base64;
 }
 
 /**
@@ -4861,11 +4950,14 @@ export interface LockJoinNonce {
  * lock, to every client of that person, and sent again in place as it goes on. client is the asking
  * client's id, so it knows its own. nonce is the signer's, once one sent it (lock/joinAnswer), and
  * answeredBy is that signer's client id; reveal is the asking client's nonce, once it showed it.
- * Each screen makes the six digits from key, reveal and nonce.
+ * Each screen makes the six digits from key, reveal and nonce. machine is set when a machine asks
+ * (#3491, D3): client is then the machine's id, kind is unknown, and a signer approves it with an
+ * addMachine whose key and sealing key are both key, the machine's own.
  */
 export interface LockJoinRequest {
   request: string;
   client: string;
+  machine?: MachineRef;
   name: string;
   kind: ClientKind;
   key: Base64;
@@ -4880,6 +4972,22 @@ export interface LockJoinRequest {
 export interface LockJoinStarted {
   request: string;
   expires: WireDate;
+}
+
+/**
+ * A request signed by its sender's own key (#3492, D6, D7): a client's kept request for a machine
+ * that is not there, or a machine's call to another of its person's machines. It goes as the
+ * request's "lock" member. sig is ECDSA P-256 (r then s) with SHA-256 over
+ * "agents-lock-request/1\n", to, "\n", at in decimal, "\n", the method, "\n", then the params as
+ * sent. to is the machine's id; a machine may leave it out for another machine it named by name. at
+ * is seconds since 1970. The machine refuses one whose key its lock does not name, older than a
+ * day, or seen before.
+ */
+export interface LockSignature {
+  to?: string;
+  at: number;
+  key: Base64;
+  sig: Base64;
 }
 
 export interface MCPAddAnswer {
@@ -5623,11 +5731,16 @@ export interface MachineWorkspace {
   wakeAt?: WireDate;
 }
 
-/** host/machines, for an agent there: who asked, for the log, and its call. */
+/**
+ * host/machines, for an agent there: who asked, for the log, and its call. deliver is what the
+ * other machine is to get, signed by this one (#3492, D7): the control plane delivers it as it is,
+ * in place of its own words.
+ */
 export interface MachineWorkspaceCall {
   agent: string;
   method: string;
   params: JSONValue;
+  deliver?: LockDelivery;
 }
 
 /**
@@ -8592,11 +8705,15 @@ export type SandboxState =
 /**
  * A machine or a client to seal a secret to (#3397): its id as the associated data names it
  * (m:<machine id> or c:<client id>), its name, and its P-256 key, X9.63. The control plane gives
- * the key: until the machine lock (#3400) signs it, a control plane could give one of its own.
+ * the key, and a client checks a machine's against the sealing key of that machine's addMachine in
+ * its person's lock before it seals to it (#3491, specs/3399-machine-lock D8), so a control plane
+ * cannot give one of its own. owner is the person whose machine it is, so an admin's client knows
+ * whose lock to read; none for a client recipient.
  */
 export interface SealRecipient {
   id: string;
   name: string;
+  owner?: string;
   publicKey: Base64;
 }
 
@@ -11015,10 +11132,12 @@ export interface Methods {
   "bots/setCaps": { params: BotCaps; result: Empty };
   "bots/stopRun": { params: BotStopRun; result: Empty };
   "browser/ack": { params: BrowserAckRequest; result: Empty };
+  "browser/clear": { params: BrowserClearRequest; result: BrowserState };
   "browser/input": { params: BrowserInputRequest; result: Empty };
   "browser/navigate": { params: BrowserNavigateRequest; result: Empty };
+  "browser/state": { params: Empty; result: BrowserState };
   "browser/unwatch": { params: Empty; result: Empty };
-  "browser/watch": { params: BrowserWatchRequest; result: BrowserState };
+  "browser/watch": { params: BrowserWatchRequest; result: BrowserPageState };
   "changes/file": { params: ChangesFileRequest; result: ChangedFileDetail };
   "changes/list": { params: ChangesListRequest; result: ChangesList };
   "changes/undoTurn": { params: UndoTurnRequest; result: UndoTurnResult };
@@ -11140,7 +11259,8 @@ export interface Methods {
   "links/remove": { params: ChannelLinkRemove; result: Empty };
   "links/requests": { params: Empty; result: ChannelLinkRequest[] };
   "lock/add": { params: LockAdd; result: LockHead };
-  "lock/get": { params: Empty; result: Lock };
+  "lock/get": { params: LockGet; result: Lock };
+  "lock/hello": { params: LockHello; result: LockHelloReply };
   "lock/join": { params: LockJoin; result: LockJoinStarted };
   "lock/joinAnswer": { params: LockJoinNonce; result: Empty };
   "lock/joinDeny": { params: LockJoinEnd; result: Empty };
@@ -11376,8 +11496,10 @@ export const MethodTarget = {
   "bots/setCaps": "control",
   "bots/stopRun": "control",
   "browser/ack": "host",
+  "browser/clear": "host",
   "browser/input": "host",
   "browser/navigate": "host",
+  "browser/state": "host",
   "browser/unwatch": "host",
   "browser/watch": "host",
   "changes/file": "host",
@@ -11502,6 +11624,7 @@ export const MethodTarget = {
   "links/requests": "control",
   "lock/add": "control",
   "lock/get": "control",
+  "lock/hello": "host",
   "lock/join": "control",
   "lock/joinAnswer": "control",
   "lock/joinDeny": "control",
@@ -11685,7 +11808,7 @@ export interface Notifications {
   "auto/changed": AutoSettings;
   "backups/changed": BackupState;
   "browser/frame": BrowserFrame;
-  "browser/state": BrowserState;
+  "browser/pageChanged": BrowserPageState;
   "clientPermissions/changed": ClientPermissionSettings;
   "clone/changed": CloneNotification;
   "control/budgetRequested": BudgetRequest;
@@ -11835,10 +11958,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BringBack: { required: ["moved", "applied"], optional: [] },
   BringBackRequest: { required: ["folder", "branches"], optional: ["bundle", "patch", "patchOn"] },
   BrowserAckRequest: { required: ["ack"], optional: [] },
+  BrowserClearRequest: { required: [], optional: ["site"] },
   BrowserFrame: { required: ["image", "ack", "width", "height"], optional: [] },
   BrowserInputRequest: { required: ["kind"], optional: ["type", "x", "y", "button", "clickCount", "deltaX", "deltaY", "key", "code", "keyCode", "text", "modifiers"] },
   BrowserNavigateRequest: { required: ["action"], optional: ["url"] },
-  BrowserState: { required: ["status"], optional: ["detail", "url", "title"] },
+  BrowserPageState: { required: ["status"], optional: ["detail", "url", "title"] },
+  BrowserSite: { required: ["site", "cookies"], optional: [] },
+  BrowserState: { required: ["installed", "running", "downloadBytes", "sites"], optional: ["problem"] },
   BrowserWatchRequest: { required: ["width", "height"], optional: [] },
   BudgetRaise: { required: ["user", "day", "by"], optional: ["daily", "dailyTokens", "request"] },
   BudgetRequest: { required: ["id", "user", "userName", "day", "at", "state"], optional: ["why", "daily", "dailyTokens", "decidedBy", "decidedAt"] },
@@ -12114,7 +12240,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   JoinRequest: { required: ["request", "name", "platform", "code", "expires", "for"], optional: ["forName"] },
   JoinRequestDecide: { required: ["request"], optional: [] },
   JoinedFolder: { required: ["folder", "name", "project"], optional: [] },
-  KeepRequest: { required: ["host", "method", "params"], optional: [] },
+  KeepRequest: { required: ["host", "method", "params"], optional: ["signed"] },
   KeptDelivered: { required: ["host", "id"], optional: ["agentID"] },
   KeptList: { required: ["kept"], optional: [] },
   KeptRequest: { required: ["id", "host", "kind", "text", "at"], optional: ["agentID", "folder", "runtimeID", "failed"] },
@@ -12149,14 +12275,19 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Lock: { required: ["person", "entries"], optional: [] },
   LockAdd: { required: ["entries"], optional: [] },
   LockBody: { required: ["v", "kind", "person", "signer", "at", "key"], optional: ["previous", "sealingKey", "id", "name", "clientKind", "expires"] },
+  LockDelivery: { required: ["method", "params", "lock"], optional: [] },
   LockEntry: { required: ["body", "sig"], optional: [] },
+  LockGet: { required: [], optional: ["person"] },
   LockHead: { required: ["count", "head"], optional: [] },
+  LockHello: { required: ["key", "ephemeral", "sig"], optional: [] },
+  LockHelloReply: { required: ["key", "ephemeral", "sig"], optional: [] },
   LockJoin: { required: ["key", "commitment"], optional: [] },
   LockJoinDecided: { required: ["request", "result"], optional: [] },
   LockJoinEnd: { required: ["request"], optional: [] },
   LockJoinNonce: { required: ["request", "nonce"], optional: [] },
-  LockJoinRequest: { required: ["request", "client", "name", "kind", "key", "commitment", "expires"], optional: ["nonce", "answeredBy", "reveal"] },
+  LockJoinRequest: { required: ["request", "client", "name", "kind", "key", "commitment", "expires"], optional: ["machine", "nonce", "answeredBy", "reveal"] },
   LockJoinStarted: { required: ["request", "expires"], optional: [] },
+  LockSignature: { required: ["at", "key", "sig"], optional: ["to"] },
   MCPAddAnswer: { required: [], optional: ["server", "error"] },
   MCPAddByHandRequest: { required: ["verifyID", "destination"], optional: [] },
   MCPAddRequest: { required: ["previewID", "destination", "secrets", "plain", "replace"], optional: [] },
@@ -12232,7 +12363,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineUser: { required: ["user", "kind", "name", "labels"], optional: ["capReachedUntil", "bots"] },
   MachineUserSettings: { required: ["user", "settings", "secrets"], optional: [] },
   MachineWorkspace: { required: ["provider", "providerName", "workspace", "workspaceName", "workspaceState", "canStart", "canStop", "startWhenUsed", "current"], optional: ["hostState", "phase", "since", "problem", "stoppedBy", "stopWhenIdleMinutes", "cost", "startForSchedules", "tellsSchedule", "nextWorkflow", "nextWorkflowAt", "wakeAt"] },
-  MachineWorkspaceCall: { required: ["agent", "method", "params"], optional: [] },
+  MachineWorkspaceCall: { required: ["agent", "method", "params"], optional: ["deliver"] },
   MachinesSummaryFacts: { required: ["machines"], optional: [] },
   ManagedMCPServer: { required: ["name", "registryName", "version", "run", "addedAt", "destination"], optional: ["byHand"] },
   ManagedSkill: { required: ["destination", "name", "source", "edited", "update"], optional: ["skillPath", "recordedHash", "commit", "committedAt", "catalogue"] },
@@ -12502,7 +12633,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SaidSearchResult: { required: ["matches"], optional: [] },
   SandboxFailureRecord: { required: ["runtimeID", "detail", "hang", "recoveryOffered", "completedToolCalls"], optional: [] },
   SandboxSettings: { required: ["defaults"], optional: ["setBy"] },
-  SealRecipient: { required: ["id", "name", "publicKey"], optional: [] },
+  SealRecipient: { required: ["id", "name", "publicKey"], optional: ["owner"] },
   SealRecipients: { required: ["recipients"], optional: ["user"] },
   SealedEnvelope: { required: ["encapsulated", "ciphertext"], optional: [] },
   SealedUserSecret: { required: ["name", "version", "sealed"], optional: [] },

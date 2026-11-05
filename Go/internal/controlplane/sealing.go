@@ -66,7 +66,9 @@ func (s *Service) machineRecipients(takes func(host string) bool) []wire.SealRec
 		if !keyed(h.PublicKey) || !takes(h.ID) {
 			continue
 		}
-		out = append(out, wire.SealRecipient{ID: controllink.MachineRecipient(h.ID), Name: cmpOr(h.Name, h.ID), PublicKey: h.PublicKey})
+		// Its owner, so a client knows whose lock to check its key in (#3491, D8).
+		out = append(out, wire.SealRecipient{ID: controllink.MachineRecipient(h.ID), Name: cmpOr(h.Name, h.ID), PublicKey: h.PublicKey,
+			Owner: optional(s.ownerOf(h.ID))})
 	}
 	return out
 }

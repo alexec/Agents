@@ -25,6 +25,11 @@ import (
 // are made on the two screens. Requests are kept in the store (v1/lockjoins/<id>.json) so
 // any copy can take the next step, and each change is told to the person's clients at
 // every copy.
+//
+// A machine that is not in the lock and has no invite asks the same way (#3491, D3), on its
+// channel 0: host/lockJoin and host/lockJoinReveal, told how it goes with
+// host/lockJoinChanged. Its request names the machine, and a signer approves it with an
+// addMachine whose key is the machine's.
 
 const (
 	lockJoinsPrefix = "v1/lockjoins/"
@@ -37,6 +42,7 @@ type lockJoinRecord struct {
 	ID         string        `json:"id"`
 	Person     string        `json:"person"`
 	Client     string        `json:"client"`
+	Machine    bool          `json:"machine,omitempty"`
 	Name       string        `json:"name"`
 	Kind       string        `json:"kind"`
 	Key        []byte        `json:"key"`
@@ -115,12 +121,21 @@ func (j *lockJoins) write(ctx context.Context, r lockJoinRecord, condition store
 }
 
 func (j *lockJoins) row(r lockJoinRecord) wire.LockJoinRequest {
-	return wire.LockJoinRequest{Request: r.ID, Client: r.Client, Name: r.Name, Kind: wire.ClientKind(r.Kind), Key: r.Key,
+	row := wire.LockJoinRequest{Request: r.ID, Client: r.Client, Name: r.Name, Kind: wire.ClientKind(r.Kind), Key: r.Key,
 		Commitment: r.Commitment, Expires: dateOf(r.Expires.Time), Nonce: r.Nonce, AnsweredBy: optional(r.AnsweredBy), Reveal: r.Reveal}
+	if r.Machine {
+		host := wire.MachineRef(r.Client)
+		row.Machine = &host
+	}
+	return row
 }
 
-// tell is a request's change, to the person's clients here.
+// tell is a request's change, to the person's clients here, and to the machine that asks
+// when it is held here.
 func (j *lockJoins) tell(r lockJoinRecord) {
+	if r.Machine && r.Result == "" {
+		j.s.router.Tell(r.Client, wire.NewMethodName(wire.NotifyHostLockJoinChanged.Name), j.row(r))
+	}
 	if r.Result != "" {
 		j.s.router.TellPerson(r.Person, wire.NotifyControlLockJoinDecided.Name, wire.LockJoinDecided{Request: r.ID, Result: r.Result})
 		return
@@ -184,39 +199,9 @@ func (m *Methods) lockJoinMethod(ctx context.Context, method string, params json
 		if err != nil {
 			return nil, err
 		}
-		if len(request.Nonce) != machinelock.NonceSize {
-			return nil, fail(invalidParams, "A nonce is %d bytes.", machinelock.NonceSize)
-		}
-		j.mu.Lock()
-		defer j.mu.Unlock()
-		r, etag, err := j.mine(ctx, request.Request, person)
-		if err != nil {
+		if err := j.nonce(ctx, person, from.Client, method == "lock/joinAnswer", request); err != nil {
 			return nil, err
 		}
-		if method == "lock/joinAnswer" {
-			if r.Client == from.Client {
-				return nil, fail(notPermitted, "A device cannot approve itself.")
-			}
-			if len(r.Nonce) != 0 {
-				return nil, fail(notPermitted, "Another of your devices is comparing the digits already.")
-			}
-			r.Nonce, r.AnsweredBy = request.Nonce, from.Client
-		} else {
-			if r.Client != from.Client {
-				return nil, fail(invalidParams, "There is no such request.")
-			}
-			if len(r.Nonce) == 0 || len(r.Reveal) != 0 {
-				return nil, fail(notPermitted, "The request is not waiting for this device's digits.")
-			}
-			if !bytes.Equal(machinelock.Commitment(r.Key, request.Nonce), r.Commitment) {
-				return nil, fail(invalidParams, "That nonce is not the one the request named.")
-			}
-			r.Reveal = request.Nonce
-		}
-		if err := j.write(ctx, *r, store.Matching(etag)); err != nil {
-			return nil, err
-		}
-		j.changed(*r, from.Client)
 		return wire.Empty{}, nil
 	case "lock/joinDeny":
 		request, err := require[wire.LockJoinEnd](params, "LockJoinEnd")
@@ -244,17 +229,77 @@ func (m *Methods) lockJoinMethod(ctx context.Context, method string, params json
 	return nil, fail(methodNotFound, "No method %s.", method)
 }
 
+// nonce is lock/joinAnswer (a signer's, answer) or lock/joinReveal and host/lockJoinReveal
+// (the asking client's or machine's own).
+func (j *lockJoins) nonce(ctx context.Context, person, from string, answer bool, request wire.LockJoinNonce) error {
+	if len(request.Nonce) != machinelock.NonceSize {
+		return fail(invalidParams, "A nonce is %d bytes.", machinelock.NonceSize)
+	}
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	r, etag, err := j.mine(ctx, request.Request, person)
+	if err != nil {
+		return err
+	}
+	if answer {
+		if r.Client == from {
+			return fail(notPermitted, "A device cannot approve itself.")
+		}
+		if len(r.Nonce) != 0 {
+			return fail(notPermitted, "Another of your devices is comparing the digits already.")
+		}
+		r.Nonce, r.AnsweredBy = request.Nonce, from
+	} else {
+		if r.Client != from {
+			return fail(invalidParams, "There is no such request.")
+		}
+		if len(r.Nonce) == 0 || len(r.Reveal) != 0 {
+			return fail(notPermitted, "The request is not waiting for this device's digits.")
+		}
+		if !bytes.Equal(machinelock.Commitment(r.Key, request.Nonce), r.Commitment) {
+			return fail(invalidParams, "That nonce is not the one the request named.")
+		}
+		r.Reveal = request.Nonce
+	}
+	if err := j.write(ctx, *r, store.Matching(etag)); err != nil {
+		return err
+	}
+	j.changed(*r, from)
+	return nil
+}
+
 // ask is lock/join: a new request, in place of any the same client still has open.
 func (j *lockJoins) ask(ctx context.Context, person, client string, request wire.LockJoin) (any, error) {
+	record := j.s.records.Client(client)
+	if record == nil {
+		return nil, fail(notPermitted, "This client is not paired.")
+	}
+	return j.open1(ctx, lockJoinRecord{Person: person, Client: client, Name: record.Name, Kind: record.Kind}, request)
+}
+
+// askMachine is host/lockJoin: a machine of the person asks, as a client does (#3491).
+func (j *lockJoins) askMachine(ctx context.Context, host string, request wire.LockJoin) (any, error) {
+	record := j.s.records.Host(host)
+	person := j.s.ownerOf(host)
+	if record == nil || person == "" {
+		return nil, fail(notPermitted, "This machine is not joined.")
+	}
+	if !bytes.Equal(record.PublicKey, request.Key) {
+		// A machine asks with its own key, the one it joined with, and nothing else.
+		return nil, fail(invalidParams, "That is not this machine's key.")
+	}
+	return j.open1(ctx, lockJoinRecord{Person: person, Client: host, Machine: true, Name: cmpOr(record.Name, host),
+		Kind: string(wire.ClientKindUnknown)}, request)
+}
+
+// open1 opens a request of the client or machine in r, in place of any it still has open.
+func (j *lockJoins) open1(ctx context.Context, asking lockJoinRecord, request wire.LockJoin) (any, error) {
+	person, client := asking.Person, asking.Client
 	if _, err := ecdh.P256().NewPublicKey(request.Key); err != nil {
 		return nil, fail(invalidParams, "The key is not a P-256 key.")
 	}
 	if len(request.Commitment) != sha256.Size {
 		return nil, fail(invalidParams, "The commitment is %d bytes.", sha256.Size)
-	}
-	record := j.s.records.Client(client)
-	if record == nil {
-		return nil, fail(notPermitted, "This client is not paired.")
 	}
 	lock, err := j.s.locks.Get(ctx, person)
 	if err != nil {
@@ -264,7 +309,7 @@ func (j *lockJoins) ask(ctx context.Context, person, client string, request wire
 		return nil, fail(notPermitted, "There is no lock yet: this device makes it.")
 	}
 	if state, err := machinelock.Check(lock.Entries); err == nil {
-		if member, ok := state.Member(request.Key); ok && member.Client() {
+		if member, ok := state.Member(request.Key); ok && member.Client() == !asking.Machine {
 			return nil, fail(notPermitted, "This device is in the lock already.")
 		}
 	}
@@ -302,8 +347,8 @@ func (j *lockJoins) ask(ctx context.Context, person, client string, request wire
 		return nil, fail(notPermitted, "Too many devices are waiting to join. Try again in a few minutes.")
 	}
 	now := records.At(j.now())
-	r := lockJoinRecord{ID: newJoinID(), Person: person, Client: client, Name: record.Name, Kind: record.Kind, Key: request.Key,
-		Commitment: request.Commitment, Created: now, Expires: records.At(now.Add(joinLifetime))}
+	r := asking
+	r.ID, r.Key, r.Commitment, r.Created, r.Expires = newJoinID(), request.Key, request.Commitment, now, records.At(now.Add(joinLifetime))
 	if err := j.write(ctx, r, store.Absent); err != nil {
 		return nil, err
 	}
@@ -333,7 +378,7 @@ func (j *lockJoins) lockGrew(ctx context.Context, person string, by string) {
 		if r.Person != person || !j.open(r) {
 			continue
 		}
-		if member, ok := state.Member(r.Key); !ok || !member.Client() {
+		if member, ok := state.Member(r.Key); !ok || member.Client() == r.Machine {
 			continue
 		}
 		_, etag, err := j.read(ctx, r.ID)

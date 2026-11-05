@@ -12,7 +12,7 @@ import (
 )
 
 // Watching the machine's browser (#3528, spike #3527): a client that shows the page says
-// browser/watch, and hears browser/frame (a JPEG of the page) and browser/state until it
+// browser/watch, and hears browser/frame (a JPEG of the page) and browser/pageChanged until it
 // says browser/unwatch or its connection ends. Every watcher shares one screencast of the
 // browser's newest tab; the person's clicks, keys and the bar's buttons come back as
 // browser/input and browser/navigate. Watching starts nothing: an address typed in the bar
@@ -31,7 +31,7 @@ type browserWatch struct {
 	casting bool
 	// gen is the cast's generation: a callback of a cast that has ended says nothing.
 	gen   int
-	state wire.BrowserState
+	state wire.BrowserPageState
 	// pending is the frame the watchers have and have not acked yet; 0 for none.
 	pending int64
 	// starting is true while browser/navigate installs or starts the browser.
@@ -47,7 +47,7 @@ type browserWatcher struct {
 }
 
 func (d *Daemon) registerBrowserWatch() {
-	On(d, wire.CallBrowserWatch, func(ctx context.Context, c *Client, r wire.BrowserWatchRequest) (wire.BrowserState, error) {
+	On(d, wire.CallBrowserWatch, func(ctx context.Context, c *Client, r wire.BrowserWatchRequest) (wire.BrowserPageState, error) {
 		return d.watchBrowser(c, r.Width, r.Height), nil
 	})
 	On(d, wire.CallBrowserUnwatch, func(ctx context.Context, c *Client, _ wire.Empty) (wire.Empty, error) {
@@ -99,9 +99,9 @@ func browserInput(r wire.BrowserInputRequest) browser.Input {
 
 // watchBrowser adds c as a watcher of a view of width by height, or changes its size, and
 // starts the cast when the browser runs. It answers the browser's state now.
-func (d *Daemon) watchBrowser(c *Client, width, height int64) wire.BrowserState {
+func (d *Daemon) watchBrowser(c *Client, width, height int64) wire.BrowserPageState {
 	if d.browser == nil {
-		return wire.BrowserState{Status: wire.BrowserStatusStopped}
+		return wire.BrowserPageState{Status: wire.BrowserStatusStopped}
 	}
 	d.browser.Touch()
 	w := &d.bw
@@ -132,7 +132,7 @@ func (d *Daemon) watchBrowser(c *Client, width, height int64) wire.BrowserState 
 }
 
 // browserStateLocked is the state a watcher sees now. Under bw.mu.
-func (d *Daemon) browserStateLocked() wire.BrowserState {
+func (d *Daemon) browserStateLocked() wire.BrowserPageState {
 	s := d.bw.state
 	if s.Status == "" {
 		s.Status = wire.BrowserStatusStopped
@@ -143,7 +143,7 @@ func (d *Daemon) browserStateLocked() wire.BrowserState {
 	if d.browser.Running() {
 		s.Status = wire.BrowserStatusRunning
 	} else if s.Status == wire.BrowserStatusRunning || s.Status == wire.BrowserStatusStarting {
-		s = wire.BrowserState{Status: wire.BrowserStatusStopped}
+		s = wire.BrowserPageState{Status: wire.BrowserStatusStopped}
 	}
 	return s
 }
@@ -274,7 +274,7 @@ func (d *Daemon) browserPage(gen int, p browser.Page) {
 		w.mu.Unlock()
 		return
 	}
-	w.state = wire.BrowserState{Status: wire.BrowserStatusRunning, URL: optional(p.URL), Title: optional(p.Title)}
+	w.state = wire.BrowserPageState{Status: wire.BrowserStatusRunning, URL: optional(p.URL), Title: optional(p.Title)}
 	d.tellBrowserStateLocked()
 	w.mu.Unlock()
 }
@@ -290,7 +290,7 @@ func (d *Daemon) browserCastEnded(gen int) {
 	w.cast, w.pending, w.last = nil, 0, nil
 	w.gen++
 	if !w.starting {
-		w.state = wire.BrowserState{Status: wire.BrowserStatusStopped}
+		w.state = wire.BrowserPageState{Status: wire.BrowserStatusStopped}
 		d.tellBrowserStateLocked()
 	}
 }
@@ -308,7 +308,7 @@ func (d *Daemon) browserChanged(running bool) {
 	w.cast, w.pending, w.last = nil, 0, nil
 	w.gen++
 	if !w.starting {
-		w.state = wire.BrowserState{Status: wire.BrowserStatusStopped}
+		w.state = wire.BrowserPageState{Status: wire.BrowserStatusStopped}
 		d.tellBrowserStateLocked()
 	}
 	w.mu.Unlock()
@@ -338,7 +338,7 @@ func (d *Daemon) navigateBrowser(r wire.BrowserNavigateRequest) error {
 	cast := w.cast
 	if cast == nil && r.Action == wire.BrowserNavigateActionGo && !w.starting {
 		w.starting = true
-		w.state = wire.BrowserState{Status: wire.BrowserStatusStarting}
+		w.state = wire.BrowserPageState{Status: wire.BrowserStatusStarting}
 		d.tellBrowserStateLocked()
 		w.mu.Unlock()
 		go d.startBrowserFor(address)
@@ -355,20 +355,20 @@ func (d *Daemon) navigateBrowser(r wire.BrowserNavigateRequest) error {
 // and opens address in it.
 func (d *Daemon) startBrowserFor(address string) {
 	w := &d.bw
-	say := func(s wire.BrowserState) {
+	say := func(s wire.BrowserPageState) {
 		w.mu.Lock()
 		w.state = s
 		d.tellBrowserStateLocked()
 		w.mu.Unlock()
 	}
 	_, err := d.browser.Endpoint(func(step string) {
-		say(wire.BrowserState{Status: wire.BrowserStatusStarting, Detail: optional(step)})
+		say(wire.BrowserPageState{Status: wire.BrowserStatusStarting, Detail: optional(step)})
 	})
 	if err != nil {
 		w.mu.Lock()
 		w.starting = false
 		w.mu.Unlock()
-		say(wire.BrowserState{Status: wire.BrowserStatusFailed, Detail: optional(err.Error())})
+		say(wire.BrowserPageState{Status: wire.BrowserStatusFailed, Detail: optional(err.Error())})
 		return
 	}
 	// Changed(true) starts the cast too; this one waits for it, or starts it.
@@ -400,7 +400,7 @@ func (d *Daemon) startBrowserFor(address string) {
 func (d *Daemon) tellBrowserStateLocked() {
 	s := d.bw.state
 	for _, c := range d.bw.clientsLocked() {
-		Notify(c, wire.NotifyBrowserState, s)
+		Notify(c, wire.NotifyBrowserPageChanged, s)
 	}
 }
 

@@ -6,7 +6,9 @@ give a client a key of its own. This is the decision of the spike #3399. The bui
 #3400 (epic #3401). The model is Tailscale's
 [Tailnet Lock](https://tailscale.com/kb/1226/tailnet-lock).
 
-Steps 1 (#3489) and 2 (#3490) of "The build" are built: the chain, and clients that sign.
+Steps 1 (#3489), 2 (#3490), 3 (#3491) and 4 (#3492) of "The build" are built: the chain,
+clients that sign, machines that join signed, and machines that check each request. Step
+6's docs went with step 4.
 
 How step 2 is built (#3490):
 
@@ -29,7 +31,108 @@ How step 2 is built (#3490):
   try at the digits.
 - Decided: each client pins the head it last checked (defaults on the Mac and the Remote,
   `localStorage` on the web page), and signs nothing on a lock that does not follow it.
-- Nothing refuses yet (step 4); the fingerprint in Settings ▸ Clients (D1) is not built yet.
+- Nothing refused yet (step 4 refuses); the fingerprint in Settings ▸ Clients (D1) is not built yet.
+
+How step 3 is built (#3491):
+
+- **The invite in a join code.** When a signer shows a host code (Add a Machine on the Mac
+  and the web page), it puts an `invite` on the lock, signed with its own key, and adds the
+  invite's private key and the lock's pin to the code: a version 4 code,
+  `agents-control:4:h:-:<key>:<secret>:<url>:<pin>:<name>:<personKey or ->:<invite>:<person>:<count>:<head>`.
+  The control plane makes the version 2 code; the invite's key never goes through it.
+  `agentsd` keeps the invite at `<root>/lock-invite.json` (0600), pins the lock from the
+  code's head, and when `host/lock` comes signs its own `addMachine` with the invite key
+  and sends it with `host/lockAdd`. The control plane takes only the machine's own
+  `addMachine` there.
+- **A machine that asks.** A machine that is not in the lock and has no invite (it asked
+  to join, a provider or `hosts/install` made its code, or it joined before the lock) asks
+  as a client does, on its channel 0: `host/lockJoin` with its own key and a commitment.
+  The request is a `lock/joinRequests` row with `machine` set, so every client of the
+  person shows "Approve the new machine dev-3?". A signer's Compare Digits reaches the
+  machine as `host/lockJoinChanged`; it reveals with `host/lockJoinReveal`, and writes the
+  six digits to its log and to `<root>/lock-join-shown`. Approve signs the machine's
+  `addMachine`. Capability `host.lock/2`.
+- **The sealing key in the lock (D8).** A machine's key is also its sealing key: the key
+  org routes and secrets are sealed to. A client seals to a machine only when its owner's
+  lock names that key as an `addMachine`'s sealing key; `SealRecipient.owner` says whose
+  lock, and an admin's client reads another person's lock with `lock/get {person}` and pins
+  it on first use. A machine left out gets its copy through `sealing/work` once it is in
+  the lock. A client recipient's key is still the control plane's: `addClient` names a
+  client's signing key, not its sealing key.
+- Decided: a machine that asks to join the control plane (`/v1/join`) joins the lock as a
+  step of its own after it is approved, through the same request a client makes, because
+  one flow then serves every machine with no invite: one that asked, one a provider
+  started with no client there, and one that joined before the lock (D9).
+- Decided: a provider's machine asks too, and `AGENTS_JOIN_TOKEN` is not built here,
+  because today the control plane, not a client, makes a provider machine's code
+  (`workspaces.go` `HostCommand`), so an invite in it would go through the control plane.
+  When a provider runs on the customer's machine with a client there (#3398), that client
+  can put a version 4 code in `AGENTS_JOIN_TOKEN`.
+- Decided: a machine's key and sealing key are the same key, the one it proves itself
+  with, because org routes and secrets are sealed to that key today, and a second key is
+  one more thing to keep on every machine for no gain while nothing refuses (step 4).
+
+How step 4 is built (#3492):
+
+- **The channel.** `lock/hello` (capability `host.lock/3`) carries the client's lock key, a
+  new ECDH P-256 key and an ECDSA signature over `agents-lock-channel/1\nclient\n` and that
+  key. The machine checks the key is a client of its lock and answers with its own key, a
+  new ECDH key and a signature over `agents-lock-channel/1\nmachine\n`, both ephemeral keys
+  and the client's key. HKDF-SHA256 (salt: both ephemeral keys; info
+  `agents-lock-channel/1 client` or `… machine`) makes a key for each direction. Each request
+  and answer then ends with `"lock":{"n":N,"mac":M}`: HMAC-SHA256 over N (8 bytes, big-endian)
+  and the message without that member. The control plane passes each message on as it came,
+  so the bytes MAC'd are the bytes read. Go (`machinelock/channel.go`), CryptoKit
+  (`LockChannel.swift`, `LockedLink.swift`) and WebCrypto (`Web/src/wire/lockChannel.ts`,
+  `link.ts`) read the same vectors (`Fixtures/lock/channel.json`).
+- **Signed requests** (`LockSignature`): ECDSA over `agents-lock-request/1\n`, the machine's
+  id, the time in seconds, the method and the params as sent. A client signs a prompt or a
+  start for a machine it has no channel to; `hosts/keep` and the router's keeper keep it as a
+  `LockDelivery` and deliver it byte for byte. The machine takes one at most a day old, once
+  (`<root>/lock-seen.json`).
+- **The machine** keeps the lock it took (`<root>/lock.json`), so it checks requests after a
+  restart before the control plane sends it again. Once it holds a lock, a request on a
+  channel from the control plane, or on the window's local socket, is refused with
+  `notInLock` (-32104) unless it has the channel's MAC or a signature of the lock, or is one
+  the control plane asks for itself. `daemon.sock` is not checked.
+- **The clients** open a channel at the first call to each machine on each connection, once
+  the device is in its lock. The Mac and the Remote keep the lock they last checked with its
+  pin, so the window's channel to its own machine opens with the control plane away.
+- Decided: a peer machine's call (D7) is a signed request, not an HMAC from a channel
+  between the two machines, because no channel runs between two machines (each talks only to
+  the control plane) and a start can be kept for a machine that is away. The asking machine
+  writes what the other is to get, in its own words (its name from its join code), and signs
+  it (`MachineWorkspaceCall.deliver`); the control plane delivers it as it is. A machine may
+  leave out `to`, since an agent names the other machine by name.
+- Decided: a peer machine may call `agents/start`, `agents/fromStarter`,
+  `agents/endedElsewhere`, and the steps of send and bring back (`folders/receiveState`,
+  `receiveUpload`, `receive`, `sendFacts`, `sendPack`, `sendRead`), because those are the
+  steps of `start_session` (#2887, #2927) and of send and bring_back (#2929, #2947), which
+  would stop working with D7's two methods alone. Terminals and every other file method stay
+  out.
+- Decided: the control plane may ask, unsigned, `daemon/ping`, `daemon/status`,
+  `agents/list`, `worktrees/all`, `agents/summaryFacts`, `backups/make` and `folders/clone`,
+  because the Console, projects, reports, a backup before a delete and a new workspace's
+  clone ask for them in its own name, and none starts an agent, runs a command or reads a
+  file. A provider draft's agent on a Mac control plane (`drafts.go`) is a start, and is
+  refused once the person has a lock; it waits on #3542.
+- Decided: the machine MACs its answers, not what it says unasked (`agent/changed`, a
+  question card), because one frame carries a notification to every channel (#167), and a
+  MAC for each channel would undo that. A control plane can show a card the machine did not
+  raise; the answer to it is a checked request. It waits on #3541.
+- Decided: a client takes an error with no MAC (the control plane's own: offline, no such
+  machine), and refuses a result with none from a machine it has a channel to, or that its
+  lock names, because the control plane can always refuse to route.
+- Decided: a client opens a channel with a machine its lock does not name yet (one that
+  waits for approval, D9) and takes its key on its word, because the machine holds the lock
+  from its first `host/lock` and would otherwise refuse every client of its person until a
+  signer approves it. The requests to it are still the client's alone; its answers are only
+  as good as the control plane's, as before the lock. A machine the lock names must answer
+  with its addMachine's key. The window's `.mac` and the web page's `mac` name no id, so they
+  take any machine of the lock, or one it does not name.
+- Decided: who did it in the audit stays the control plane's word (`ChannelOpen.actor`),
+  because an addClient names a key, not a client id. The machine knows the device by its key
+  (#3543).
 
 ## What is wrong today
 

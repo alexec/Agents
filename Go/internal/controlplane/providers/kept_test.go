@@ -79,7 +79,7 @@ func TestAPromptForAStoppedHostIsKeptStartsItAndGoesOnceItConnects(t *testing.T)
 	h := newHarness(t)
 	h.link(h.add(), devbox, "agents-devbox")
 	kept := h.keeper()
-	f := kept.Keep(devbox, MethodAgentsPrompt, promptParams("run the migration again"), h.caller)
+	f := kept.Keep(devbox, MethodAgentsPrompt, promptParams("run the migration again"), h.caller, nil)
 	if f == nil || f.Message != "devbox is starting. This is sent when it connects." {
 		t.Fatalf("%v", f)
 	}
@@ -118,7 +118,7 @@ func TestAKeptStartSaysWhichAgentItMade(t *testing.T) {
 	h.link(h.add(), devbox, "agents-devbox")
 	kept := h.keeper()
 	start := map[string]any{"runtimeID": "claude", "cwd": "file:///home/alex/app", "prompt": "fix the login", "draftID": records.NewUUID()}
-	s := keptSummary(t, kept.Keep(devbox, MethodAgentsStart, rawOf(start), h.caller))
+	s := keptSummary(t, kept.Keep(devbox, MethodAgentsStart, rawOf(start), h.caller, nil))
 	if s.Kind != "start" || deref(s.Folder) != "file:///home/alex/app" || deref(s.RuntimeID) != "claude" || s.Text != "fix the login" {
 		t.Errorf("%+v", s)
 	}
@@ -141,9 +141,9 @@ func TestWhatIsKeptOutlivesARestartOfTheControlPlane(t *testing.T) {
 	h := newHarness(t)
 	h.link(h.add(), devbox, "agents-devbox")
 	kept := h.keeper()
-	kept.Keep(devbox, MethodAgentsPrompt, promptParams("one"), h.caller)
+	kept.Keep(devbox, MethodAgentsPrompt, promptParams("one"), h.caller, nil)
 	time.Sleep(2 * time.Millisecond)
-	kept.Keep(devbox, MethodAgentsPrompt, promptParams("two"), h.caller)
+	kept.Keep(devbox, MethodAgentsPrompt, promptParams("two"), h.caller, nil)
 	again := h.keeper()
 	var texts []string
 	for _, k := range again.All() {
@@ -169,7 +169,7 @@ func TestADroppedPromptIsNotSentAndTheStartGoesOn(t *testing.T) {
 	h := newHarness(t)
 	h.link(h.add(), devbox, "agents-devbox")
 	kept := h.keeper()
-	s := keptSummary(t, kept.Keep(devbox, MethodAgentsPrompt, promptParams("never"), h.caller))
+	s := keptSummary(t, kept.Keep(devbox, MethodAgentsPrompt, promptParams("never"), h.caller, nil))
 	h.must(MethodHostsDropKept, KeptRequestID{Host: devbox, ID: s.ID})
 	if len(kept.All()) != 0 || h.row(devbox).State != "starting" {
 		t.Errorf("%v %+v", kept.All(), h.row(devbox))
@@ -186,11 +186,11 @@ func TestTwentyArePlentyForOneHost(t *testing.T) {
 	h.link(h.add(), devbox, "agents-devbox")
 	kept := h.keeper()
 	for range KeptLimit {
-		if f := kept.Keep(devbox, MethodAgentsPrompt, promptParams("n"), h.caller); f == nil || f.Code != CodeKept {
+		if f := kept.Keep(devbox, MethodAgentsPrompt, promptParams("n"), h.caller, nil); f == nil || f.Code != CodeKept {
 			t.Fatalf("%v", f)
 		}
 	}
-	f := kept.Keep(devbox, MethodAgentsPrompt, promptParams("more"), h.caller)
+	f := kept.Keep(devbox, MethodAgentsPrompt, promptParams("more"), h.caller, nil)
 	if f == nil || f.Code != CodeHostOffline || f.Message != "devbox is starting; too many prompts are waiting." {
 		t.Errorf("%v", f)
 	}
@@ -200,7 +200,7 @@ func TestAReadIsNeverKept(t *testing.T) {
 	h := newHarness(t)
 	h.link(h.add(), devbox, "agents-devbox")
 	kept := h.keeper()
-	if f := kept.Keep(devbox, "agents/transcript", rawOf(map[string]string{"agentID": records.NewUUID()}), h.caller); f != nil {
+	if f := kept.Keep(devbox, "agents/transcript", rawOf(map[string]string{"agentID": records.NewUUID()}), h.caller, nil); f != nil {
 		t.Errorf("%v", f)
 	}
 	// The router answers it with the offline refusal, which says it is stopped (FR-022).
@@ -218,7 +218,7 @@ func TestWithStartWhenUsedOffAPromptIsRefusedAsToday(t *testing.T) {
 	off := false
 	h.must(MethodHostsSetOptions, MachineOptions{Host: devbox, StartWhenUsed: &off})
 	kept := h.keeper()
-	if f := kept.Keep(devbox, MethodAgentsPrompt, promptParams("hello"), h.caller); f != nil {
+	if f := kept.Keep(devbox, MethodAgentsPrompt, promptParams("hello"), h.caller, nil); f != nil {
 		t.Errorf("%v", f)
 	}
 	if starts, _ := h.provider.count(); starts != 0 {
@@ -231,7 +231,7 @@ func TestAFailedStartLeavesWhatWasKeptNotSentWithWhyAndTryAgainStartsAgain(t *te
 	h.link(h.add(), devbox, "agents-devbox")
 	h.provider.set("", "Error: droplet is locked", 0)
 	kept := h.keeper()
-	s := keptSummary(t, kept.Keep(devbox, MethodAgentsPrompt, promptParams("go"), h.caller))
+	s := keptSummary(t, kept.Keep(devbox, MethodAgentsPrompt, promptParams("go"), h.caller, nil))
 	eventually(t, func() bool { return deref(kept.All()[0].Failed) != "" })
 	if deref(kept.All()[0].Failed) != "Couldn’t start devbox: Error: droplet is locked" {
 		t.Errorf("%q", deref(kept.All()[0].Failed))
@@ -251,7 +251,7 @@ func TestAPromptTheHostRefusesIsShownNotSentInItsWords(t *testing.T) {
 	h := newHarness(t)
 	h.link(h.add(), devbox, "agents-devbox")
 	kept := h.keeper()
-	kept.Keep(devbox, MethodAgentsPrompt, promptParams("go"), h.caller)
+	kept.Keep(devbox, MethodAgentsPrompt, promptParams("go"), h.caller, nil)
 	host := &keptHost{refuse: "Its folder has gone."}
 	h.router.mu.Lock()
 	h.router.answer = host.answer
@@ -268,7 +268,7 @@ func TestARemovedHostTakesWhatWasKeptForIt(t *testing.T) {
 	h := newHarness(t)
 	h.link(h.add(), devbox, "agents-devbox")
 	kept := h.keeper()
-	kept.Keep(devbox, MethodAgentsPrompt, promptParams("go"), h.caller)
+	kept.Keep(devbox, MethodAgentsPrompt, promptParams("go"), h.caller, nil)
 	kept.Forget(devbox)
 	keys, _ := h.store.List(context.Background(), KeptPrefix)
 	if len(kept.All()) != 0 || len(keys) != 0 {
@@ -295,7 +295,7 @@ func TestAKeptRecordIsStoredAsSwiftStoresIt(t *testing.T) {
 	h := newHarness(t)
 	h.link(h.add(), devbox, "agents-devbox")
 	kept := h.keeper()
-	kept.Keep(devbox, MethodAgentsPrompt, promptParams("go"), h.caller)
+	kept.Keep(devbox, MethodAgentsPrompt, promptParams("go"), h.caller, nil)
 	keys, _ := h.store.List(context.Background(), KeptPrefix+devbox+"/")
 	if len(keys) != 1 || !strings.HasSuffix(keys[0].Key, ".json") {
 		t.Fatalf("%v", keys)

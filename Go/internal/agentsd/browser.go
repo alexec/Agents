@@ -1,10 +1,13 @@
 package agentsd
 
 import (
+	"context"
 	"embed"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/browser"
 	"github.com/alexec/agents/Go/wire"
@@ -80,4 +83,56 @@ func (d *Daemon) browserBusy() bool {
 	defer d.leaseMu.Unlock()
 	e := d.book.Entries[wire.ResourceName(browser.Resource)]
 	return e != nil && (len(e.Leases) > 0 || len(e.Line) > 0)
+}
+
+// Settings ▸ Browser (#3535): the sites the kept profile has cookies for, Clear, and the size
+// of the download. Only the person's own clients reach them (Role.Allows): the sites say
+// where the person signed in, and Clear signs agents out.
+
+// browserReadTimeout bounds a read or a clear, which may first start Chromium.
+const browserReadTimeout = 30 * time.Second
+
+func (d *Daemon) browserState(ctx context.Context) wire.BrowserState {
+	st := wire.BrowserState{Sites: []wire.BrowserSite{}}
+	if d.browser == nil {
+		return st
+	}
+	st.Installed = d.browser.Installed()
+	if st.Installed {
+		ctx, cancel := context.WithTimeout(ctx, browserReadTimeout)
+		defer cancel()
+		sites, err := d.browser.Sites(ctx)
+		if err != nil {
+			problem := "The sites could not be read: " + err.Error()
+			st.Problem = &problem
+		}
+		for _, s := range sites {
+			st.Sites = append(st.Sites, wire.BrowserSite{Site: s.Site, Cookies: int64(s.Cookies)})
+		}
+	}
+	// After the sites, which may have finished a download.
+	st.DownloadBytes = d.browser.DownloadBytes()
+	st.Running = d.browser.Running()
+	return st
+}
+
+func (d *Daemon) registerBrowserSettings() {
+	On(d, wire.CallBrowserState, func(ctx context.Context, _ *Client, _ wire.Empty) (wire.BrowserState, error) {
+		return d.browserState(ctx), nil
+	})
+	On(d, wire.CallBrowserClear, func(ctx context.Context, _ *Client, in wire.BrowserClearRequest) (wire.BrowserState, error) {
+		if d.browser != nil {
+			site := ""
+			if in.Site != nil {
+				site = strings.TrimSpace(*in.Site)
+			}
+			cleared, cancel := context.WithTimeout(ctx, browserReadTimeout)
+			err := d.browser.Clear(cleared, site)
+			cancel()
+			if err != nil {
+				return wire.BrowserState{}, &Error{Code: CodeInternal, Message: "The browser's sites were not cleared: " + err.Error()}
+			}
+		}
+		return d.browserState(ctx), nil
+	})
 }

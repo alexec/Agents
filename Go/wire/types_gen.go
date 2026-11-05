@@ -1397,6 +1397,12 @@ type BrowserAckRequest struct {
 	Ack int64 `json:"ack"`
 }
 
+// browser/clear (#3535): clear one site's cookies and storage in the machine's browser, or every site's when site is left out.
+type BrowserClearRequest struct {
+	// A site as browser/state names it (github.com). Left out: every site.
+	Site *string `json:"site,omitzero"`
+}
+
 // browser/frame: a JPEG of the machine's browser's page (#3528, spike #3527), from CDP Page.startScreencast, sent only to the clients that watch it. Never recorded.
 type BrowserFrame struct {
 	Image Data `json:"image"`
@@ -1467,8 +1473,8 @@ type BrowserNavigateRequest struct {
 	URL *string `json:"url,omitzero"`
 }
 
-// The machine's browser as a client shows it (#3528): browser/watch's answer, and browser/state to the clients that watch it when it changes.
-type BrowserState struct {
+// The machine's browser's page as a client shows it (#3528): browser/watch's answer, and browser/pageChanged to the clients that watch it when it changes. Not BrowserState, which is Settings ▸ Browser's.
+type BrowserPageState struct {
 	Status BrowserStatus `json:"status"`
 
 	// starting: the step, such as Downloading Chromium. failed: why.
@@ -1477,6 +1483,30 @@ type BrowserState struct {
 	URL *string `json:"url,omitzero"`
 
 	Title *string `json:"title,omitzero"`
+}
+
+// One site that keeps cookies in the machine's browser (#3535), which is how a site remembers a sign-in.
+type BrowserSite struct {
+	// The site's registrable domain (github.com), with every subdomain's cookies under it.
+	Site string `json:"site"`
+
+	Cookies int64 `json:"cookies"`
+}
+
+// Settings ▸ Browser (#3535): the machine's browser (#3533). Whether Chromium is downloaded, its size on disk, whether it runs, and the sites its kept profile has cookies for, most cookies first.
+type BrowserState struct {
+	// Chromium is downloaded on this machine. False until an agent first uses the browser.
+	Installed bool `json:"installed"`
+
+	Running bool `json:"running"`
+
+	// The size on disk of the Chromium download, in bytes.
+	DownloadBytes int64 `json:"downloadBytes"`
+
+	Sites []BrowserSite `json:"sites"`
+
+	// Why the sites could not be read, when they could not.
+	Problem *string `json:"problem,omitzero"`
 }
 
 type BrowserStatus string
@@ -5128,13 +5158,15 @@ type JoinedFolder struct {
 	Project string `json:"project"`
 }
 
-// hosts/keep: a request for a stopped host, kept until it is up.
+// hosts/keep: a request for a stopped host, kept until it is up. signed is the same request signed by the client (#3492, D6): a host that holds its person's lock takes only that, so the control plane keeps and delivers it as it is.
 type KeepRequest struct {
 	Host MachineRef `json:"host"`
 
 	Method string `json:"method"`
 
 	Params JSONValue `json:"params"`
+
+	Signed *LockDelivery `json:"signed,omitzero"`
 }
 
 type KeptDelivered struct {
@@ -5543,6 +5575,15 @@ type LockBody struct {
 	Expires *Date `json:"expires,omitzero"`
 }
 
+// A request signed for a machine (#3492), as the control plane keeps it and delivers it: the method, the params as the sender wrote them (text, so no byte of them changes on the way), and the signature.
+type LockDelivery struct {
+	Method string `json:"method"`
+
+	Params string `json:"params"`
+
+	Lock LockSignature `json:"lock"`
+}
+
 // One entry of a machine lock (#3399): body is a LockBody's JSON, kept as the signer wrote it, so no language has to write it again the same way. sig is ECDSA P-256 with SHA-256 over "agents-lock/1\n" then body, the 64 bytes r then s (as WebCrypto and CryptoKit's rawRepresentation write it). The entry's hash is the SHA-256 of body.
 type LockEntry struct {
 	Body Data `json:"body"`
@@ -5560,11 +5601,34 @@ const LockEntryKindInvite LockEntryKind = "invite"
 const LockEntryKindRemove LockEntryKind = "remove"
 const LockEntryKindRecovery LockEntryKind = "recovery"
 
+// lock/get (#3399): with no person, the caller's own lock. With person, that person's: only an admin may read another's (#3491), to check the machine keys an org route is sealed to (specs/3399-machine-lock D7, D8).
+type LockGet struct {
+	Person *string `json:"person,omitzero"`
+}
+
 // Where a machine lock stands (#3399): how many entries it has, and head, the SHA-256 of the newest one's body. lock/add's answer, and control/lockChanged.
 type LockHead struct {
 	Count int64 `json:"count"`
 
 	Head Data `json:"head"`
+}
+
+// lock/hello (#3492, specs/3399-machine-lock D6): a client opens a checked channel to a machine. key is its signing key (P-256, X9.63), which the machine's lock must name as a client; ephemeral is a new ECDH P-256 key for this channel alone; sig is ECDSA P-256 (r then s) with SHA-256 over "agents-lock-channel/1\nclient\n" then ephemeral.
+type LockHello struct {
+	Key Data `json:"key"`
+
+	Ephemeral Data `json:"ephemeral"`
+
+	Sig Data `json:"sig"`
+}
+
+// lock/hello's answer (#3492): key is the machine's own key, which the client's lock must name as an addMachine; ephemeral is the machine's new ECDH P-256 key; sig is ECDSA with the machine's key over "agents-lock-channel/1\nmachine\n", the client's ephemeral, the machine's ephemeral, then the client's key. Each side then makes a key for each direction with HKDF-SHA256 (the ECDH secret; salt the client's then the machine's ephemeral; info "agents-lock-channel/1 client" or "… machine"), and every request and answer carries "lock":{"n":…,"mac":…} last: HMAC-SHA256 over the count (8 bytes, big-endian) then the message without that member.
+type LockHelloReply struct {
+	Key Data `json:"key"`
+
+	Ephemeral Data `json:"ephemeral"`
+
+	Sig Data `json:"sig"`
 }
 
 // lock/join (#3490, specs/3399-machine-lock D2): a client that is not in its person's lock asks to be added. key is its signing key (P-256, X9.63); commitment is the SHA-256 of "agents-lock-join/1\n", key, then a 16-byte nonce that the client shows only after a signer sent its own (lock/joinReveal), so a control plane cannot try the six digits again and again.
@@ -5593,11 +5657,13 @@ type LockJoinNonce struct {
 	Nonce Data `json:"nonce"`
 }
 
-// lock/joinRequests and control/lockJoinRequested (#3490): a client asking to join its person's lock, to every client of that person, and sent again in place as it goes on. client is the asking client's id, so it knows its own. nonce is the signer's, once one sent it (lock/joinAnswer), and answeredBy is that signer's client id; reveal is the asking client's nonce, once it showed it. Each screen makes the six digits from key, reveal and nonce.
+// lock/joinRequests and control/lockJoinRequested (#3490): a client asking to join its person's lock, to every client of that person, and sent again in place as it goes on. client is the asking client's id, so it knows its own. nonce is the signer's, once one sent it (lock/joinAnswer), and answeredBy is that signer's client id; reveal is the asking client's nonce, once it showed it. Each screen makes the six digits from key, reveal and nonce. machine is set when a machine asks (#3491, D3): client is then the machine's id, kind is unknown, and a signer approves it with an addMachine whose key and sealing key are both key, the machine's own.
 type LockJoinRequest struct {
 	Request string `json:"request"`
 
 	Client string `json:"client"`
+
+	Machine *MachineRef `json:"machine,omitzero"`
 
 	Name string `json:"name"`
 
@@ -5621,6 +5687,17 @@ type LockJoinStarted struct {
 	Request string `json:"request"`
 
 	Expires Date `json:"expires"`
+}
+
+// A request signed by its sender's own key (#3492, D6, D7): a client's kept request for a machine that is not there, or a machine's call to another of its person's machines. It goes as the request's "lock" member. sig is ECDSA P-256 (r then s) with SHA-256 over "agents-lock-request/1\n", to, "\n", at in decimal, "\n", the method, "\n", then the params as sent. to is the machine's id; a machine may leave it out for another machine it named by name. at is seconds since 1970. The machine refuses one whose key its lock does not name, older than a day, or seen before.
+type LockSignature struct {
+	To *string `json:"to,omitzero"`
+
+	At int64 `json:"at"`
+
+	Key Data `json:"key"`
+
+	Sig Data `json:"sig"`
 }
 
 type MCPAddAnswer struct {
@@ -6644,13 +6721,15 @@ type MachineWorkspace struct {
 	WakeAt *Date `json:"wakeAt,omitzero"`
 }
 
-// host/machines, for an agent there: who asked, for the log, and its call.
+// host/machines, for an agent there: who asked, for the log, and its call. deliver is what the other machine is to get, signed by this one (#3492, D7): the control plane delivers it as it is, in place of its own words.
 type MachineWorkspaceCall struct {
 	Agent string `json:"agent"`
 
 	Method string `json:"method"`
 
 	Params JSONValue `json:"params"`
+
+	Deliver *LockDelivery `json:"deliver,omitzero"`
 }
 
 // machines/summaryFacts (#3354): the daily summary's facts from each of the person's other machines, by name.
@@ -9981,11 +10060,13 @@ const SandboxStateOff SandboxState = "off"
 const SandboxStateRuntimeControlled SandboxState = "runtimeControlled"
 const SandboxStateNone SandboxState = "none"
 
-// A machine or a client to seal a secret to (#3397): its id as the associated data names it (m:<machine id> or c:<client id>), its name, and its P-256 key, X9.63. The control plane gives the key: until the machine lock (#3400) signs it, a control plane could give one of its own.
+// A machine or a client to seal a secret to (#3397): its id as the associated data names it (m:<machine id> or c:<client id>), its name, and its P-256 key, X9.63. The control plane gives the key, and a client checks a machine's against the sealing key of that machine's addMachine in its person's lock before it seals to it (#3491, specs/3399-machine-lock D8), so a control plane cannot give one of its own. owner is the person whose machine it is, so an admin's client knows whose lock to read; none for a client recipient.
 type SealRecipient struct {
 	ID string `json:"id"`
 
 	Name string `json:"name"`
+
+	Owner *string `json:"owner,omitzero"`
 
 	PublicKey Data `json:"publicKey"`
 }

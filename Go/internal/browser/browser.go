@@ -1,7 +1,8 @@
 // Package browser is the machine's browser (#3533, spike #3527): one Chromium per
 // machine, which agentsd downloads on first use, starts with no window and a kept profile,
 // listening on 127.0.0.1 only, and stops when nobody has used it for a while. Agents drive
-// it through Playwright (the next story); clients watch it by a screencast (screencast.go).
+// it through Playwright (#3534, agentsd's browsertools.go); clients watch it by a screencast
+// (screencast.go, #3528).
 //
 // The Chromium is Playwright's own build, installed by Playwright's own installer
 // (`playwright-core install chromium`) from the pinned @playwright/mcp toolset, so the
@@ -45,7 +46,7 @@ type Toolset struct {
 // CLI is playwright-core's command line in the toolset.
 func (t Toolset) CLI() string { return filepath.Join(t.Packages, "playwright-core", "cli.js") }
 
-// MCP is @playwright/mcp's command line in the toolset (the next story starts it).
+// MCP is @playwright/mcp's command line in the toolset, which agentsd starts per session.
 func (t Toolset) MCP() string { return filepath.Join(t.Packages, "@playwright", "mcp", "cli.js") }
 
 // Machine is this machine's browser. Make one with New; it starts nothing until Endpoint.
@@ -61,6 +62,9 @@ type Machine struct {
 	Busy func() bool
 	// Env is the environment Node and Chromium run with.
 	Env func() []string
+	// Filter is what every browser tool's result goes through (#3534): the values filled
+	// into its pages come out, and its images are masked.
+	Filter Filter
 	// Changed hears that Chromium started (true) or stopped (false), off the machine's
 	// lock: the clients that watch the page are told (#3528).
 	Changed func(running bool)
@@ -72,6 +76,7 @@ type Machine struct {
 
 	mu       sync.Mutex
 	running  *process
+	toolset  Toolset
 	lastUsed time.Time
 	stopLoop chan struct{}
 	loopDone chan struct{}
@@ -84,6 +89,8 @@ type process struct {
 	pid      int
 	done     <-chan struct{}
 	stop     func()
+	// store is its cookies, for Settings ▸ Browser (sites.go).
+	store cookieStore
 }
 
 // New is the machine's browser with its binaries under cache and its profile under root.
@@ -114,6 +121,7 @@ func (m *Machine) Endpoint(progress func(string)) (string, error) {
 		case <-m.running.done:
 			log.Printf("browser: Chromium (pid %d) exited; starting it again", m.running.pid)
 			m.running = nil
+			m.Filter.Forget()
 		default:
 			return m.running.endpoint, nil
 		}
@@ -128,6 +136,7 @@ func (m *Machine) Endpoint(progress func(string)) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	m.toolset = t
 	env := m.environment()
 	exe, err := m.locate(t, env)
 	if err != nil || !executable(exe) {
@@ -159,6 +168,14 @@ func (m *Machine) Endpoint(progress func(string)) (string, error) {
 	m.changed(true)
 	log.Printf("browser: Chromium (pid %d) started with the profile in %s", p.pid, m.Profile)
 	return p.endpoint, nil
+}
+
+// Toolset is Node and @playwright/mcp as the last start installed them: what drives the
+// browser at Endpoint's address. Empty before the first start.
+func (m *Machine) Toolset() Toolset {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.toolset
 }
 
 // Running is whether Chromium is up now.
@@ -215,6 +232,8 @@ func (m *Machine) stopLocked() {
 	m.running.stop()
 	log.Printf("browser: Chromium (pid %d) stopped", m.running.pid)
 	m.running = nil
+	// The pages are gone, and every value filled into them with the pages.
+	m.Filter.Forget()
 	os.Remove(m.pidFile())
 	m.changed(false)
 }
@@ -357,7 +376,7 @@ func launchChromium(exe, profile string, env []string) (*process, error) {
 		stop()
 		return nil, err
 	}
-	return &process{endpoint: endpoint, pid: b.Process().Pid, done: ctx.Done(), stop: stop}, nil
+	return &process{endpoint: endpoint, pid: b.Process().Pid, done: ctx.Done(), stop: stop, store: cdpStore{ctx}}, nil
 }
 
 // activePort is the CDP address Chromium wrote in its profile's DevToolsActivePort:

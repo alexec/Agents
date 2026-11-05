@@ -3,8 +3,10 @@ import SwiftUI
 
 /// Another of the person's clients asks to join their machine lock (#3490, D2): Compare
 /// Digits sends this device's nonce, and once the other shows its own, both screens show six
-/// digits; Approve signs its addClient. At the top of the sidebar on the Mac and the Remote,
-/// beside the sign-in cards; the web page's is `Web/src/views/LockJoins.tsx`.
+/// digits; Approve signs its addClient. A machine that asks (#3491, D3) has the same card,
+/// asked as "Approve the new machine …?", and Approve signs its addMachine. At the top of the
+/// sidebar on the Mac and the Remote, beside the sign-in cards; the web page's is
+/// `Web/src/views/LockJoins.tsx`.
 struct LockJoinCard: View {
     let request: DaemonAPI.LockJoinRequest
     let step: LockState.Step
@@ -15,10 +17,18 @@ struct LockJoinCard: View {
     let approve: () -> Void
     let deny: () -> Void
 
+    private var isMachine: Bool { request.machine != nil }
+
     var body: some View {
-        LockCardFrame(label: "\(request.name) \(LockWords.asks)") {
-            Text("\(Text(request.name).fontWeight(.semibold)) \(LockWords.asks)")
-                .fixedSize(horizontal: false, vertical: true)
+        LockCardFrame(label: isMachine ? LockWords.newMachine(request.name) : "\(request.name) \(LockWords.asks)") {
+            Group {
+                if isMachine {
+                    Text("Approve the new machine \(Text(request.name).fontWeight(.semibold))?")
+                } else {
+                    Text("\(Text(request.name).fontWeight(.semibold)) \(LockWords.asks)")
+                }
+            }
+            .fixedSize(horizontal: false, vertical: true)
             line
             if let failure {
                 Text(failure)
@@ -50,7 +60,7 @@ struct LockJoinCard: View {
     @ViewBuilder private var line: some View {
         switch step {
         case .waiting:
-            Text(LockWords.compareFirst).fixedSize(horizontal: false, vertical: true)
+            Text(isMachine ? LockWords.compareMachine : LockWords.compareFirst).fixedSize(horizontal: false, vertical: true)
         case .elsewhere:
             Text(LockWords.elsewhere).fixedSize(horizontal: false, vertical: true)
         case .revealing:
@@ -58,11 +68,18 @@ struct LockJoinCard: View {
         case .mismatch:
             Text(LockWords.mismatch(request.name)).fixedSize(horizontal: false, vertical: true)
         case .compare(let digits):
-            // The digits in the code face, as the other screen shows them.
-            Text("Approve only if \(request.name) shows \(Text(MachineLock.shown(digits)).monospaced().fontWeight(.semibold)).")
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(LockWords.approveOnly(request.name, digits))
+            // The digits in the code face, as the other screen (or the machine's log) shows them.
+            let shown = Text(MachineLock.shown(digits)).monospaced().fontWeight(.semibold)
+            Group {
+                if isMachine {
+                    Text("Approve only if the log of \(request.name) shows \(shown).")
+                } else {
+                    Text("Approve only if \(request.name) shows \(shown).")
+                }
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(isMachine ? LockWords.approveMachineOnly(request.name, digits) : LockWords.approveOnly(request.name, digits))
         }
     }
 }

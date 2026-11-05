@@ -66,8 +66,11 @@ public enum Capability {
     public static let governance1 = "governance/1"
     public static let groups1 = "groups/1"
     public static let handover1 = "handover/1"
+    public static let hostBrowserSettings1 = "host.browser-settings/1"
     public static let hostDesktopControl1 = "host.desktop-control/1"
     public static let hostLock1 = "host.lock/1"
+    public static let hostLock2 = "host.lock/2"
+    public static let hostLock3 = "host.lock/3"
     public static let hostOrgRoutes1 = "host.org-routes/1"
     public static let hostOrgRoutes2 = "host.org-routes/2"
     public static let hostPolicyLayers1 = "host.policy-layers/1"
@@ -226,8 +229,10 @@ public enum Capability {
         "backups/restore": "backups/1",
         "backups/state": "backups/1",
         "browser/ack": "browser/1",
+        "browser/clear": "host.browser-settings/1",
         "browser/input": "browser/1",
         "browser/navigate": "browser/1",
+        "browser/state": "host.browser-settings/1",
         "browser/unwatch": "browser/1",
         "browser/watch": "browser/1",
         "catalog/destination-state": "catalog/1",
@@ -339,6 +344,7 @@ public enum Capability {
         "lineage/link": "lineage/1",
         "lineage/links": "lineage/1",
         "lineage/walk": "lineage/1",
+        "lock/hello": "host.lock/3",
         "mac/open": "mac/1",
         "mac/reveal": "mac/1",
         "mac/terminal": "mac/1",
@@ -513,7 +519,7 @@ public enum Capability {
         "auto/changed": "auto/1",
         "backups/changed": "backups/1",
         "browser/frame": "browser/1",
-        "browser/state": "browser/1",
+        "browser/pageChanged": "browser/1",
         "clientPermissions/changed": "client-permissions/1",
         "clone/changed": "clone/1",
         "cost/changed": "cost/1",
@@ -606,6 +612,9 @@ public enum Capability {
         "groups/setRole": "org-identity/1",
         "handover/status": "handover/1",
         "host/hello": "host/1",
+        "host/lockAdd": "host.lock/2",
+        "host/lockJoin": "host.lock/2",
+        "host/lockJoinReveal": "host.lock/2",
         "host/machines": "host/1",
         "host/orgRouteCheck": "host.org-routes/2",
         "host/orgRoutesAgain": "host.org-routes/2",
@@ -799,6 +808,7 @@ public enum Capability {
         "folders/detect": "folders/1",
         "host/clients": "host/1",
         "host/lock": "host.lock/1",
+        "host/lockJoinChanged": "host.lock/2",
         "host/orgRoutes": "host.org-routes/2",
         "host/policy": "host.policy/1",
         "host/projects": "projects/1",
@@ -827,10 +837,12 @@ public enum Capability {
             "host.team/1",
             "host.suspend/1",
             "host.policy-layers/1",
+            "host.browser-settings/1",
             "host.desktop-control/1",
             "host.org-routes/2",
             "host.user-settings/2",
             "host.lock/1",
+            "host.lock/2",
         ],
     ]
 }

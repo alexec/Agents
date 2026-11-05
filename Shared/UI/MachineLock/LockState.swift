@@ -13,6 +13,10 @@ import Observation
 /// key and a nonce, and shows its nonce only once a signer sent one, so both screens show six
 /// digits that the control plane cannot choose. A client in the lock is a signer: it shows a
 /// card for each client that asks, and approves one by signing its addClient.
+///
+/// Machines (#3491, D3, D8): a machine that asks is shown the same way and approved with an
+/// addMachine; a host code made here carries an invite this client put on the lock; and a
+/// secret is sealed only to a machine whose key its owner's lock names.
 @MainActor @Observable
 final class LockState {
     /// This device's place in the lock.
@@ -43,6 +47,11 @@ final class LockState {
     }
 
     private(set) var place: Place = .unknown
+    /// The lock as this device last checked it, kept with the pin so a channel to a machine
+    /// opens before the control plane answers, and with it away (#3492).
+    private(set) var checked: MachineLock.State?
+    /// The control plane answered and the lock was read, or it has none.
+    private var settled = false
     private(set) var requests: [DaemonAPI.LockJoinRequest] = []
     /// Requests answered from here and not decided yet: their buttons wait.
     private(set) var answering: Set<String> = []
@@ -65,6 +74,25 @@ final class LockState {
         self.name = name
         self.kind = kind
         self.account = account
+        if let lock = pins.loadLock(), let state = try? MachineLock.follow(pins.load(), lock) { checked = state }
+    }
+
+    /// This device's lock key and its checked lock, for the channels it opens to machines
+    /// (#3492, D6); nil when it is not in its lock, and then it talks to machines as before.
+    /// With no lock kept yet, it waits a little for the control plane's.
+    func channelSigner() async -> LockChannel.Signer? {
+        for _ in 0..<50 where checked == nil && !settled {
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        guard let state = checked, let key = signingKey(), state.members[key.publicKey]?.isClient == true else { return nil }
+        return LockChannel.Signer(key: key, state: state)
+    }
+
+    /// Takes a lock this device checked: kept, with its pin.
+    private func took(_ state: MachineLock.State, _ lock: DaemonAPI.Lock) {
+        checked = state
+        pins.save(state.pin)
+        pins.saveLock(lock)
     }
 
     /// The cards to show now: other clients' open requests.
@@ -85,6 +113,7 @@ final class LockState {
     func connected(_ control: DaemonClient, client: UUID) async {
         self.client = client.uuidString
         await refresh(control)
+        settled = true
         let listed = try? await control.call(DaemonAPI.Method.lockJoinRequests, DaemonAPI.Empty(),
                                              returning: [DaemonAPI.LockJoinRequest].self)
         requests = listed ?? []
@@ -94,7 +123,8 @@ final class LockState {
     func heard(_ method: String, _ params: JSONValue?, on control: DaemonClient) async -> Bool {
         switch method {
         case DaemonAPI.Notification.controlLockChanged:
-            if place != .member { await refresh(control) }
+            // A member reads it too: the machines it opens channels to are in it (#3492).
+            await refresh(control)
         case DaemonAPI.Notification.controlLockJoinRequested:
             guard let request = try? params?.decode(DaemonAPI.LockJoinRequest.self) else { return true }
             if let index = requests.firstIndex(where: { $0.request == request.request }) {
@@ -150,13 +180,65 @@ final class LockState {
         }
     }
 
-    /// Approve: the client's addClient, signed here, on the lock.
+    /// Approve: the client's addClient, or the machine's addMachine, signed here, on the lock.
+    /// A machine's key is also its sealing key (D8).
     func approve(_ request: DaemonAPI.LockJoinRequest, on control: DaemonClient?) async {
         guard case .compare = step(request) else { return }
         await answering(request, on: control) { control in
-            let body = DaemonAPI.LockBody(kind: .addClient, person: "", key: request.key, name: request.name,
-                                          clientKind: MachineLock.clientKind(request.kind))
+            let body = if let machine = request.machine {
+                DaemonAPI.LockBody(kind: .addMachine, person: "", key: request.key, sealingKey: request.key, id: machine, name: request.name)
+            } else {
+                DaemonAPI.LockBody(kind: .addClient, person: "", key: request.key, name: request.name,
+                                   clientKind: MachineLock.clientKind(request.kind))
+            }
             try await self.put(body, on: control)
+        }
+    }
+
+    /// A host code with an invite (#3491, D3): this client puts an invite on the lock and adds
+    /// its key to the code, so the machine adds itself. A client that is not a signer gives the
+    /// code back as it was: the machine then asks to join.
+    func invite(_ shown: DaemonAPI.ControlCodeShown, on control: DaemonClient) async -> DaemonAPI.ControlCodeShown {
+        guard let key = signingKey() else { return shown }
+        return await Self.invite(shown, on: control, pins: pins, key: key)
+    }
+
+    /// `invite` for a caller with no `LockState` of its own: Add a Machine, on its own
+    /// connection. A control plane with no lock, or no signing key, gives the code back.
+    static func invite(_ shown: DaemonAPI.ControlCodeShown, on control: DaemonClient, pins: LockPins,
+                       account: String) async -> DaemonAPI.ControlCodeShown {
+        guard let key = try? LockSigningKey.load(account: account) else { return shown }
+        return await invite(shown, on: control, pins: pins, key: key)
+    }
+
+    static func invite(_ shown: DaemonAPI.ControlCodeShown, on control: DaemonClient, pins: LockPins,
+                       key: LockSigningKey) async -> DaemonAPI.ControlCodeShown {
+        let invite = MachineLock.inviteKey()
+        let body = DaemonAPI.LockBody(kind: .invite, person: "", key: invite.publicKey.x963Representation,
+                                      expires: Date().addingTimeInterval(inviteLifetime))
+        guard let after = try? await put(body, on: control, pins: pins, key: key, signerOnly: true) else { return shown }
+        let text = MachineLock.inviteCode(shown.text, invite: invite.rawRepresentation, pin: after.pin)
+        return DaemonAPI.ControlCodeShown(text: text, expires: shown.expires,
+                                          command: shown.command?.replacingOccurrences(of: shown.text, with: text))
+    }
+
+    /// An invite works for five minutes, as a code does (D3).
+    static let inviteLifetime: TimeInterval = 5 * 60
+
+    /// The recipients this client may seal to (#3491, D8): every client, and each machine whose
+    /// key its owner's lock names. Another person's lock is pinned here too, on first use.
+    func signed(_ recipients: [DaemonAPI.SealRecipient], on control: DaemonClient) async -> [DaemonAPI.SealRecipient] {
+        let pins = pins
+        let own = try? await control.call(DaemonAPI.Method.lockGet, DaemonAPI.LockGet(), returning: DaemonAPI.Lock.self)
+        let ownState = own.flatMap { try? MachineLock.follow(pins.load(), $0) }
+        if let ownState { pins.save(ownState.pin) }
+        return await MachineLock.signedRecipients(recipients) { person in
+            guard let person, person != ownState?.person else { return ownState }
+            let theirs = LockPins(defaults: pins.defaults, name: "\(pins.name):\(person)")
+            guard let lock = try? await control.call(DaemonAPI.Method.lockGet, DaemonAPI.LockGet(person: person), returning: DaemonAPI.Lock.self),
+                  let state = try? MachineLock.follow(theirs.load(), lock) else { return nil }
+            theirs.save(state.pin)
+            return state
         }
     }
 
@@ -187,14 +269,14 @@ final class LockState {
     /// Reads the lock and takes this device's place in it.
     private func refresh(_ control: DaemonClient) async {
         guard let key = signingKey() else { return }
-        guard let lock = try? await control.call(DaemonAPI.Method.lockGet, DaemonAPI.Empty(), returning: DaemonAPI.Lock.self) else { return }
+        guard let lock = try? await control.call(DaemonAPI.Method.lockGet, DaemonAPI.LockGet(), returning: DaemonAPI.Lock.self) else { return }
         if lock.entries.isEmpty {
             let root = DaemonAPI.LockBody(kind: .root, person: lock.person, key: key.publicKey, name: name,
                                           clientKind: MachineLock.clientKind(kind))
             // Another device may make the root at the same moment: then this one asks to join it.
             do {
                 try await put(root, on: control, first: true)
-                return
+                return await refresh(control)
             } catch LockTrouble.changed {
                 return await refresh(control)
             } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.changedElsewhere {
@@ -210,7 +292,7 @@ final class LockState {
             place = .broken(error)
             return
         }
-        pins.save(state.pin)
+        took(state, lock)
         if state.members[key.publicKey]?.isClient == true {
             place = .member
             return
@@ -235,10 +317,20 @@ final class LockState {
     /// device put an entry first.
     private func put(_ body: DaemonAPI.LockBody, on control: DaemonClient, first: Bool = false) async throws {
         guard let key = signingKey() else { throw LockTrouble.noKey }
+        try await Self.put(body, on: control, pins: pins, key: key, first: first)
+        if first { place = .member }
+    }
+
+    /// `put` with the pins and key given: the lock after the entry. `signerOnly` refuses when
+    /// the key is not a signer of the lock as it is (an invite from a client still asking).
+    @discardableResult
+    private static func put(_ body: DaemonAPI.LockBody, on control: DaemonClient, pins: LockPins, key: LockSigningKey,
+                            first: Bool = false, signerOnly: Bool = false) async throws -> MachineLock.State {
         for attempt in 0..<2 {
-            let lock = try await control.call(DaemonAPI.Method.lockGet, DaemonAPI.Empty(), returning: DaemonAPI.Lock.self)
+            let lock = try await control.call(DaemonAPI.Method.lockGet, DaemonAPI.LockGet(), returning: DaemonAPI.Lock.self)
             if first, !lock.entries.isEmpty { throw LockTrouble.changed }
             let state = lock.entries.isEmpty ? nil : try MachineLock.follow(pins.load(), lock)
+            if signerOnly, state?.isSigner(key.publicKey) != true { throw LockTrouble.noKey }
             let entry = try MachineLock.sign(body, after: state, with: key)
             do {
                 let head = try await control.call(DaemonAPI.Method.lockAdd, DaemonAPI.LockAdd(entries: [entry]),
@@ -246,8 +338,7 @@ final class LockState {
                 var after = state ?? MachineLock.State()
                 try after.add(entry)
                 if after.head == head.head { pins.save(after.pin) }
-                if first { place = .member }
-                return
+                return after
             } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.changedElsewhere && attempt == 0 && !first {
                 continue
             }
@@ -275,5 +366,14 @@ struct LockPins {
 
     func save(_ pin: MachineLock.Pin) {
         if let data = try? JSONEncoder().encode(pin) { defaults.set(data, forKey: name) }
+    }
+
+    /// The whole lock last checked (#3492), beside its pin.
+    func loadLock() -> DaemonAPI.Lock? {
+        defaults.data(forKey: name + ".lock").flatMap { try? JSONDecoder().decode(DaemonAPI.Lock.self, from: $0) }
+    }
+
+    func saveLock(_ lock: DaemonAPI.Lock) {
+        if let data = try? JSONEncoder().encode(lock) { defaults.set(data, forKey: name + ".lock") }
     }
 }

@@ -2,9 +2,11 @@ package controlplane
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"encoding/json"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -165,5 +167,122 @@ func TestALockJoinIsDeniedOrAskedAgain(t *testing.T) {
 	}
 	if e := callError(t, mac, "", "lock/joinAnswer", wire.LockJoinNonce{Request: second.Request, Nonce: make([]byte, 16)}); !strings.Contains(e, "ended") {
 		t.Fatal(e)
+	}
+}
+
+// machineNotes is what the fake machines are told of their requests to join the lock.
+type machineNotes struct {
+	mu  sync.Mutex
+	got []wire.LockJoinRequest
+}
+
+func (n *machineNotes) heard(host, method string, params json.RawMessage) {
+	if method != wire.NewMethodName(wire.NotifyHostLockJoinChanged.Name) {
+		return
+	}
+	var r wire.LockJoinRequest
+	json.Unmarshal(params, &r)
+	n.mu.Lock()
+	n.got = append(n.got, r)
+	n.mu.Unlock()
+}
+
+func (n *machineNotes) answered() *wire.LockJoinRequest {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	for _, r := range n.got {
+		if r.Nonce != nil {
+			return &r
+		}
+	}
+	return nil
+}
+
+// #3491 (D3): a machine with no invite asks to join its person's lock as a client does; a
+// signer compares the digits and approves it with an addMachine. A machine with an invite
+// adds itself, and only itself.
+func TestAMachineJoinsTheLock(t *testing.T) {
+	t.Parallel()
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	notes := &machineNotes{}
+	p.told = notes.heard
+	_, mac := p.client("Mac")
+	macKey := lockKey(t)
+	signOnto(t, mac, macKey, wire.LockBody{Kind: wire.LockEntryKindRoot, Key: machinelock.PublicKey(macKey)})
+	box := p.host("box")
+	boxKey, _ := controllink.PublicKey(box.private)
+	ctx := context.Background()
+
+	// A machine asks with its own key only.
+	nonce := bytes.Repeat([]byte{3}, machinelock.NonceSize)
+	other, _ := controllink.PublicKey(controllink.NewPrivateKey())
+	if _, err := box.uplink.Ask(ctx, "host/lockJoin", wire.LockJoin{Key: other, Commitment: machinelock.Commitment(other, nonce)}); err == nil ||
+		!strings.Contains(err.Error(), "this machine's key") {
+		t.Fatal(err)
+	}
+	var started wire.LockJoinStarted
+	b, err := box.uplink.Ask(ctx, "host/lockJoin", wire.LockJoin{Key: boxKey, Commitment: machinelock.Commitment(boxKey, nonce)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	json.Unmarshal(b, &started)
+	asked := joinNote(t, mac, started.Request, func(wire.LockJoinRequest) bool { return true })
+	if asked.Machine == nil || string(*asked.Machine) != box.member.Host || asked.Name != "box box" {
+		t.Fatalf("%+v", asked)
+	}
+	signerNonce := bytes.Repeat([]byte{4}, machinelock.NonceSize)
+	call(t, mac, "", "lock/joinAnswer", wire.LockJoinNonce{Request: started.Request, Nonce: signerNonce})
+	p.waitFor(func() bool { return notes.answered() != nil }, "the machine told the signer's nonce")
+	if !bytes.Equal(notes.answered().Nonce, signerNonce) {
+		t.Fatalf("%+v", notes.answered())
+	}
+	if _, err := box.uplink.Ask(ctx, "host/lockJoinReveal", wire.LockJoinNonce{Request: started.Request, Nonce: nonce}); err != nil {
+		t.Fatal(err)
+	}
+	revealed := joinNote(t, mac, started.Request, func(r wire.LockJoinRequest) bool { return r.Reveal != nil })
+	if machinelock.Digits(boxKey, revealed.Reveal, signerNonce) != machinelock.Digits(boxKey, nonce, signerNonce) {
+		t.Fatal("the two screens show different digits")
+	}
+	signOnto(t, mac, macKey, wire.LockBody{Kind: wire.LockEntryKindAddMachine, Key: boxKey, SealingKey: boxKey, ID: new(box.member.Host)})
+	var decided wire.LockJoinDecided
+	json.Unmarshal(waitNote(t, mac, "control/lockJoinDecided").Params, &decided)
+	if decided.Request != started.Request || decided.Result != "approved" {
+		t.Fatalf("%+v", decided)
+	}
+
+	// An invite: the machine adds itself with it, and cannot add another key.
+	inviteKey := lockKey(t)
+	signOnto(t, mac, macKey, wire.LockBody{Kind: wire.LockEntryKindInvite, Key: machinelock.PublicKey(inviteKey),
+		Expires: new(wire.DateOf(time.Now().Add(5 * time.Minute)))})
+	dev := p.host("dev")
+	devKey, _ := controllink.PublicKey(dev.private)
+	var lock wire.Lock
+	json.Unmarshal(call(t, mac, "", "lock/get", nil), &lock)
+	state, err := machinelock.Check(lock.Entries)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stolen, _ := machinelock.AddMachine(inviteKey, state, other, "", "", time.Now())
+	if _, err := dev.uplink.Ask(ctx, "host/lockAdd", wire.LockAdd{Entries: []wire.LockEntry{stolen}}); err == nil ||
+		!strings.Contains(err.Error(), "only its own") {
+		t.Fatal(err)
+	}
+	own, _ := machinelock.AddMachine(inviteKey, state, devKey, dev.member.Host, "dev", time.Now())
+	if _, err := dev.uplink.Ask(ctx, "host/lockAdd", wire.LockAdd{Entries: []wire.LockEntry{own}}); err != nil {
+		t.Fatal(err)
+	}
+	json.Unmarshal(call(t, mac, "", "lock/get", nil), &lock)
+	state, err = machinelock.Check(lock.Entries)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range [][]byte{boxKey, devKey} {
+		if m, ok := state.Member(key); !ok || m.Kind != wire.LockEntryKindAddMachine {
+			t.Fatalf("%x is not a machine of the lock", key)
+		}
+	}
+	// The invite was spent.
+	if _, open := state.Invite(machinelock.PublicKey(inviteKey), time.Now()); open {
+		t.Fatal("the invite is still open")
 	}
 }
