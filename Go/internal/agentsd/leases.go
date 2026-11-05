@@ -15,6 +15,7 @@ import (
 	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/internal/safe"
+	"github.com/alexec/agents/Go/internal/browser"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -460,6 +461,11 @@ func (d *Daemon) leaseSnapshot() wire.LeaseSnapshot {
 	if !drawn["screen"] {
 		rows = append(rows, row("screen", "screen", "Screen, mouse and keyboard", false, nil))
 		drawn["screen"] = true
+	}
+	// The machine's browser (#3533), which one agent at a time drives.
+	if b := wire.ResourceName(browser.Resource); !drawn[b] {
+		rows = append(rows, row(b, "browser", browser.DisplayName, false, nil))
+		drawn[b] = true
 	}
 	for name, e := range d.book.Entries {
 		if !drawn[name] {
