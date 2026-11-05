@@ -51,6 +51,11 @@ type Router interface {
 	HasSession(session string) bool
 	// Holds says this copy has the host's real uplink.
 	Holds(host string) bool
+	// Ask is a request of a host on its channel 0, which only the control plane writes:
+	// its result, or nil when it is not here, goes or takes longer than patience (#3398).
+	Ask(host, method string, params any, patience time.Duration) json.RawMessage
+	// HostCan says a host said the capability in its host/hello (#1748).
+	HostCan(host, capability string) bool
 }
 
 // Methods is what Providers needs of ControlMethods.
@@ -103,7 +108,9 @@ type Hooks struct {
 	// is the fingerprint of a key nobody trusts yet, kept only once trust is that one. Nil
 	// keeps none.
 	HostKey func(host, destination, trust string) (knownHosts, needsTrust string, err error)
-	// Connect is a connection to a provider, as its record says.
+	// Connect is a connection to a provider, as its record says: through the machine that
+	// carries it (Carried, #3398). secrets are only those a draft, an add or an update was
+	// given, sent with each call and kept by neither side; nil for a kept provider.
 	Connect func(record ProviderRecord, secrets map[string]string) (Provider, error)
 	// HostCommand is the one line that installs a host with a new host code, for a new
 	// workspace's first boot (US5).
@@ -138,7 +145,6 @@ type Config struct {
 	Records MachineRecords
 	Router  Router
 	Methods Methods
-	Secrets *Secrets
 	Timing  Timing
 	Hooks   Hooks
 	Log     func(string)
@@ -199,7 +205,6 @@ type Providers struct {
 	records MachineRecords
 	router  Router
 	methods Methods
-	secrets *Secrets
 	timing  Timing
 	hooks   Hooks
 	log     func(string)
@@ -269,7 +274,7 @@ func NewProviders(cfg Config) *Providers {
 		h.OwnerOf = func(string) string { return "" }
 	}
 	return &Providers{store: cfg.Store, records: cfg.Records, router: cfg.Router, methods: cfg.Methods,
-		secrets: cfg.Secrets, timing: cfg.Timing, hooks: cfg.Hooks, log: cfg.Log,
+		timing: cfg.Timing, hooks: cfg.Hooks, log: cfg.Log,
 		providers: map[string]heldProvider{}, connections: map[string]Provider{}, listed: map[string]*listed{},
 		activities: map[string]*activity{}, problems: map[string]string{}, statuses: map[string]MachineStatus{},
 		idleTimers: map[string]*time.Timer{}, idleStopping: map[string]int{}, stoppedBy: map[string]string{},
@@ -591,7 +596,7 @@ func (p *Providers) answer(method string, params json.RawMessage, caller Caller,
 		if !knownKind(request.Kind) || (request.Draft != nil && *request.Draft != "" && !isUUID(string(*request.Draft))) {
 			return nil, invalid("Those parameters are not a ProviderAdd.")
 		}
-		return p.save(request, method == MethodProvidersUpdate)
+		return p.save(request, method == MethodProvidersUpdate, caller)
 	case MethodProvidersRemove:
 		var request providerRequest
 		if err := requireParams(params, &request, "ProviderRequest"); err != nil {
@@ -744,7 +749,13 @@ func (p *Providers) answer(method string, params json.RawMessage, caller Caller,
 			if !ok {
 				return nil, invalid("There is no such provider.")
 			}
-			existing = &ExistingProvider{Record: held.record, Secrets: p.secrets.Values(provider), Problem: problem}
+			// Its secrets stay on its machine, which lays the sheet's over them (#3398): here,
+			// only their names, with no value.
+			names := map[string]string{}
+			for _, name := range held.record.SecretNames {
+				names[name] = ""
+			}
+			existing = &ExistingProvider{Record: held.record, Secrets: names, Problem: problem}
 			// Written again from the provider as it is kept: the sheet knows only its name.
 			cli := ""
 			if request.Form.CLI != nil {
@@ -811,13 +822,10 @@ func (p *Providers) Summaries() []ProviderSummary {
 	out := []ProviderSummary{}
 	for _, h := range held {
 		r := h.record
-		had := p.secrets.Values(r.ID)
+		// Its machine keeps each one it was given (#3398).
 		secrets := map[string]bool{}
 		for _, name := range r.SecretNames {
-			if _, seen := secrets[name]; !seen {
-				_, has := had[name]
-				secrets[name] = has
-			}
+			secrets[name] = true
 		}
 		l, ok := lists[r.ID]
 		if !ok {
@@ -835,7 +843,18 @@ func (p *Providers) Summaries() []ProviderSummary {
 		s := ProviderSummary{ID: wire.ProviderID(r.ID), Name: r.Name, Kind: r.Kind, Secrets: secrets, Capabilities: caps,
 			Contract: int64(r.Contract), Mapped: r.Map != nil, Preset: optional(r.preset()), Workspaces: workspaces,
 			Current: l.current, Problem: optional(l.problem), Group: r.Group}
-		if tool := sshTool(r.preset()); tool != "" && !p.hasTool(tool) {
+		if machine := deref(r.Machine); machine != "" {
+			s.Machine = optional(wire.MachineRef(machine))
+			if h := p.records.Host(machine); h != nil {
+				s.MachineName = optional(h.Name)
+			}
+			if !p.router.Online(machine) {
+				yes := true
+				s.MachineOffline = &yes
+			}
+		}
+		// A carried codespace is reached over ssh from its machine, not from here (#3398).
+		if tool := sshTool(r.preset()); tool != "" && !(r.preset() == "codespaces-api" && deref(r.Machine) != "") && !p.hasTool(tool) {
 			s.SshToolMissing = &tool
 		}
 		if l.listedAt != nil {
@@ -848,7 +867,7 @@ func (p *Providers) Summaries() []ProviderSummary {
 
 // save adds or changes a provider: connected, checked and listed before it is kept
 // (US2 AS1–2).
-func (p *Providers) save(request ProviderAdd, updating bool) (ProviderSummary, error) {
+func (p *Providers) save(request ProviderAdd, updating bool, caller Caller) (ProviderSummary, error) {
 	var id, etag string
 	var heldBefore *ProviderRecord
 	p.mu.Lock()
@@ -871,9 +890,9 @@ func (p *Providers) save(request ProviderAdd, updating bool) (ProviderSummary, e
 		}
 	}
 	p.mu.Unlock()
-	before := map[string]string{}
-	if updating {
-		before = p.secrets.Values(id)
+	machine, err := p.carrier(request, heldBefore, caller)
+	if err != nil {
+		return ProviderSummary{}, err
 	}
 	// An update keeps what it leaves out, as it keeps the secrets (#858 US4).
 	if heldBefore != nil && request.Kind == heldBefore.Kind {
@@ -897,30 +916,43 @@ func (p *Providers) save(request ProviderAdd, updating bool) (ProviderSummary, e
 			request.Map = jsonValue(heldBefore.Map)
 		}
 	}
-	values := before
+	// The secrets it is given go on to its machine; the control plane keeps their names.
+	given := map[string]string{}
+	named := map[string]bool{}
 	for k, v := range request.Secrets {
 		if v != "" {
-			values[k] = v
+			given[k] = v
+			named[k] = true
 		}
 	}
-	names := make([]string, 0, len(values))
-	for k := range values {
+	if heldBefore != nil {
+		moved := deref(heldBefore.Machine) != machine
+		for _, k := range heldBefore.SecretNames {
+			if moved && !named[k] {
+				return ProviderSummary{}, invalid("Give its %s again: its secrets stay on the machine that carried it.", k)
+			}
+			named[k] = true
+		}
+	}
+	names := make([]string, 0, len(named))
+	for k := range named {
 		names = append(names, k)
 	}
 	sort.Strings(names)
 	record := ProviderRecord{ID: id, Name: trimSpaces(request.Name), Kind: request.Kind, Command: request.Command,
-		Args: request.Args, URL: request.URL, Headers: request.Headers, SecretNames: names, Contract: 1}
+		Args: request.Args, URL: request.URL, Headers: request.Headers, SecretNames: names, Contract: 1,
+		Machine: &machine}
 	record.Commands, record.Map = valueOf(request.Commands), valueOf(request.Map)
 	if problem := record.Problem(); problem != "" {
 		return ProviderSummary{}, invalid("%s", problem)
 	}
-	connection, err := p.hooks.Connect(record, values)
+	// Checked with what it was given, laid over what its machine keeps, before either keeps
+	// anything.
+	trying, err := p.hooks.Connect(record, given)
 	var checked Checked
 	if err == nil {
-		checked, err = connection.Check()
-		if err != nil {
-			connection.End()
-		}
+		checked, err = trying.Check()
+		trying.End()
 	}
 	if err != nil {
 		return ProviderSummary{}, invalid("%s", errorWords(err))
@@ -941,19 +973,27 @@ func (p *Providers) save(request ProviderAdd, updating bool) (ProviderSummary, e
 	}
 	data, err := records.Encode(record)
 	if err != nil {
-		connection.End()
 		return ProviderSummary{}, err
+	}
+	if len(given) > 0 {
+		if _, err := Ask(p.router, machine, p.hostName(machine), wire.CallProvidersKeepSecrets.Name,
+			wire.ProviderSecretsKeep{Provider: wire.ProviderID(id), Secrets: given}, time.Minute); err != nil {
+			return ProviderSummary{}, invalid("%s", errorWords(err))
+		}
 	}
 	condition := store.Absent
 	if etag != "" {
 		condition = store.Matching(etag)
 	}
 	newTag, err := p.store.Put(context.Background(), ProviderKey(id), data, condition)
-	if err == nil {
-		err = p.secrets.Set(id, values)
-	}
 	if err != nil {
-		connection.End()
+		return ProviderSummary{}, err
+	}
+	if heldBefore != nil && deref(heldBefore.Machine) != "" && deref(heldBefore.Machine) != machine {
+		p.forget(*heldBefore)
+	}
+	connection, err := p.hooks.Connect(record, nil)
+	if err != nil {
 		return ProviderSummary{}, err
 	}
 	now := time.Now()
@@ -1058,7 +1098,7 @@ func (p *Providers) remove(id string) error {
 	if connection != nil {
 		connection.End()
 	}
-	p.secrets.Remove(id)
+	p.forget(held.record)
 	for _, h := range p.records.Hosts() {
 		if link := LinkOf(&h); link != nil && link.Provider == id {
 			setLink(&h, nil)
@@ -1164,6 +1204,7 @@ func startsNoHost(preset string) bool { return preset == "codespaces" || preset 
 func (p *Providers) bringBack() {
 	type due struct {
 		host        records.MachineRecord
+		link        WorkspaceLink
 		destination string
 	}
 	var all []due
@@ -1197,12 +1238,12 @@ func (p *Providers) bringBack() {
 		p.mu.Lock()
 		p.broughtBack[h.ID] = true
 		p.mu.Unlock()
-		all = append(all, due{h, destination})
+		all = append(all, due{h, *link, destination})
 	}
 	for _, d := range all {
 		go func() {
 			p.hooks.OpenTunnel(d.host.ID)
-			if err := p.hooks.SSHStart(d.host, d.destination, false); err != nil {
+			if err := p.sshStart(d.host, d.link, d.destination, false); err != nil {
 				p.log(fmt.Sprintf("workspace: ssh start %s, running with its host offline: failed: %s", d.host.Name, errorWords(err)))
 				return
 			}
@@ -1223,7 +1264,7 @@ func (p *Providers) connection(id string) (Provider, error) {
 	if !known {
 		return nil, providerFailure("That provider was removed.")
 	}
-	made, err := p.hooks.Connect(record.record, p.secrets.Values(id))
+	made, err := p.hooks.Connect(record.record, nil)
 	if err != nil {
 		var failure *ProviderFailure
 		if errors.As(err, &failure) {
@@ -1356,7 +1397,7 @@ func (p *Providers) linkHostKey(host string, link WorkspaceLink, trust string) (
 	if destination == "" {
 		return "", nil
 	}
-	knownHosts, needsTrust, err := p.hooks.HostKey(host, SSHDestination(destination), trust)
+	knownHosts, needsTrust, err := p.hostKey(host, link, destination, trust)
 	if err != nil {
 		p.log(fmt.Sprintf("workspace: link %s: no host key kept: %s", host, errorWords(err)))
 		return "", nil
@@ -1576,7 +1617,7 @@ func (p *Providers) run(kind activityKind, host string, link WorkspaceLink, who 
 					p.setPhase(host, "sshStart")
 					w := p.workspace(link)
 					renew := w != nil && w.HostKeyRenews != nil && *w.HostKeyRenews
-					if err := p.hooks.SSHStart(*record, destination, renew); err != nil {
+					if err := p.sshStart(*record, link, destination, renew); err != nil {
 						// Nothing else will bring it online, so the start ends now, with why (#960).
 						reason := errorWords(err)
 						p.log(fmt.Sprintf("workspace: ssh start %s: failed: %s", name, reason))
@@ -2172,36 +2213,6 @@ func (p *Providers) Listed(host string) string {
 		return SSHDestination(*w.SSH)
 	}
 	return ""
-}
-
-// Codespace is the codespace a codespaces-api provider lists with the ssh destination, and
-// the provider's GitHub token, for gh to reach it (#3347). "" and "" when no such provider
-// lists it, or it has no token.
-func (p *Providers) Codespace(destination string) (name, token string) {
-	if !strings.HasPrefix(destination, "cs.") {
-		return "", ""
-	}
-	type found struct{ provider, workspace string }
-	var all []found
-	p.mu.Lock()
-	for id, held := range p.providers {
-		if held.record.preset() != "codespaces-api" || p.listed[id] == nil {
-			continue
-		}
-		for _, w := range p.listed[id].workspaces {
-			if deref(w.SSH) == destination {
-				all = append(all, found{id, w.ID})
-			}
-		}
-	}
-	p.mu.Unlock()
-	// Out of the lock: sealed secrets are read from the store.
-	for _, f := range all {
-		if t := p.secrets.Values(f.provider)[workspacecommands.GitHubSecret]; t != "" {
-			return f.workspace, t
-		}
-	}
-	return "", ""
 }
 
 // sshDestination is where agentsd is started over ssh: the provider's destination, or the

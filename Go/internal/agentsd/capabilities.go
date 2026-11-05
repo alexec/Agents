@@ -14,7 +14,7 @@ import (
 func (d *Daemon) Capabilities() []string {
 	list := wire.Served(wire.HostCapabilities, wire.HostNotifications, func(m string) bool {
 		_, ok := d.handlers[m]
-		return ok
+		return ok || slices.Contains(carriedMethods, m)
 	}, wire.DeclaredCapabilities["host"]...)
 	if drop := os.Getenv("AGENTS_TEST_DROP_CAPABILITIES"); drop != "" {
 		gone := strings.Split(drop, ",")

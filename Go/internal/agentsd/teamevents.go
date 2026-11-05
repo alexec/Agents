@@ -81,8 +81,9 @@ func (d *Daemon) sendTrigger(fr fireRequest, w wire.Workflow) (taken, ok bool) {
 	return sent.Taken, true
 }
 
-// Asked answers what the control plane asks on channel 0: workflows/fire, and git/fill
-// for a lend a person allowed (#1122). git/fill is not registered as a window method.
+// Asked answers what the control plane asks on channel 0: workflows/fire, git/fill
+// for a lend a person allowed (#1122), and providers/* for a provider carried here
+// (#3398). git/fill is not registered as a window method, nor are providers/*.
 func (d *Daemon) Asked(method string, params json.RawMessage) (any, bool) {
 	switch method {
 	case wire.CallWorkflowsFire.Name:
@@ -95,7 +96,8 @@ func (d *Daemon) Asked(method string, params json.RawMessage) (any, bool) {
 	case wire.CallGitFill.Name:
 		return d.fillGit(params), true
 	default:
-		return nil, false
+		// A machine provider this machine carries (#3398).
+		return d.askedProvider(method, params)
 	}
 }
 

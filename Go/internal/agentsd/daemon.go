@@ -27,6 +27,10 @@ type Daemon struct {
 	// nil when this host has no control plane.
 	Tunneler Tunneler
 
+	// The machine providers this machine carries (#3398), made at the first ask.
+	carriedOnce sync.Once
+	carriedHeld *carriedProviders
+
 	mu      sync.Mutex
 	clients map[int64]*Client
 	unknown map[string]int

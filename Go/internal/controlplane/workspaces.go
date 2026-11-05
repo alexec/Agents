@@ -4,54 +4,39 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/controlplane/kms"
 	"github.com/alexec/agents/Go/internal/controlplane/providers"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Machine providers (#691), as ControlService.takeUp wires them: on a single copy with
-// a home for their secrets, beside the tunnels. They keep prompts and starts for a
+// Machine providers (#691), as ControlService.takeUp wires them: on a single copy, beside
+// the tunnels. Each runs on the machine that carries it (#3398). They keep prompts and starts for a
 // stopped workspace (US3), and an agent on this machine's own host writes a map for a new
 // one (Write It for Me, #858).
 
-// providerSecrets is where providers keep their secrets: in the store, sealed by the keeper
-// for secrets, so a store copy, a handover or a backup carries them (#2138); or, with no
-// keeper, in home.
-func (s *Service) providerSecrets(home string) *providers.Secrets {
-	if s.cfg.SecretKeeper == "" {
-		return providers.NewSecrets(home)
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), userDeliveryTimeout)
-	defer cancel()
-	k, err := kms.Keeper(ctx, s.cfg.SecretKeeper)
-	if err != nil {
-		s.log(fmt.Sprintf("providers: the keeper for secrets %s does not open (%v); their secrets stay in %s", kms.Describe(s.cfg.SecretKeeper), err, home))
-		return providers.NewSecrets(home)
-	}
-	return providers.NewSealedSecrets(s.cfg.Store, k, s.cfg.SecretKeeper)
-}
-
 // makeProviders makes the providers, their kept requests and their drafts.
 func (s *Service) makeProviders(home string) *providers.Providers {
-	commandProvider := s.cfg.CommandProvider
-	if commandProvider == "" {
-		commandProvider = providers.CommandProvider()
-	}
 	timing := s.cfg.ProviderTiming
 	if timing.ListEvery == 0 {
 		timing = providers.StandardTiming
 	}
+	adapter := providerRouter{s.router, s.records}
+	// Every provider runs on the machine that carries it, with the secrets it keeps there:
+	// the control plane holds none (#3398).
 	connect := func(record providers.ProviderRecord, secrets map[string]string) (providers.Provider, error) {
-		return providers.NewConnection(record, secrets, home, timing.Calls, commandProvider, s.log)
+		return &providers.Carried{Record: record, Router: adapter, Secrets: secrets, Timing: timing.Calls,
+			Name: func(host string) string {
+				if h := s.records.Host(host); h != nil {
+					return h.Name
+				}
+				return ""
+			}}, nil
 	}
-	adapter := providerRouter{s.router}
 	p := providers.NewProviders(providers.Config{
 		Store: s.cfg.Store, Records: s.records, Router: adapter, Methods: providerMethods{s.methods},
-		Secrets: s.providerSecrets(home), Timing: timing, Log: s.log,
+		Timing: timing, Log: s.log,
 		Hooks: providers.Hooks{
 			SSHStart: s.sshStart,
 			OpenTunnel: func(string) {
@@ -130,7 +115,10 @@ func (s *Service) backUpBeforeDelete(host string, caller providers.Caller) (bool
 }
 
 // providerRouter is the router as the providers see it (their Router).
-type providerRouter struct{ r *Router }
+type providerRouter struct {
+	r       *Router
+	records *records.Records
+}
 
 func (a providerRouter) Online(host string) bool {
 	state, ok := a.r.State(host)
@@ -179,6 +167,19 @@ func (a providerRouter) TellControl(session, method string, params any) bool {
 func (a providerRouter) HasSession(session string) bool { return a.r.HasSession(session) }
 
 func (a providerRouter) Holds(host string) bool { return a.r.Holds(host) }
+
+func (a providerRouter) Ask(host, method string, params any, patience time.Duration) json.RawMessage {
+	m := a.r.Ask(host, method, params, patience)
+	if m == nil {
+		return nil
+	}
+	return m.Result
+}
+
+func (a providerRouter) HostCan(host, capability string) bool {
+	h := a.records.Host(host)
+	return h != nil && wire.Has(hostCapabilities(*h), capability)
+}
 
 // providerMethods is the methods as the providers see them (their Methods).
 type providerMethods struct{ m *Methods }

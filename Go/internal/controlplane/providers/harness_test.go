@@ -30,6 +30,10 @@ type fakeRouter struct {
 	delivered []delivered
 	// stopped: the hosts the Stopped hook closed (#1701).
 	stopped []string
+	// asked: the asks on channel 0 (#3398), which the carrying machine answers: {} for
+	// each, or what asking says.
+	asked  []delivered
+	asking func(host, method string, params json.RawMessage) json.RawMessage
 }
 
 type delivered struct {
@@ -124,6 +128,29 @@ func (r *fakeRouter) HasSession(session string) bool {
 }
 
 func (r *fakeRouter) Holds(host string) bool { return r.Online(host) }
+
+// Ask is the carrying machine's end (#3398): it keeps what it is given, and answers.
+func (r *fakeRouter) Ask(host, method string, params any, patience time.Duration) json.RawMessage {
+	r.mu.Lock()
+	r.asked = append(r.asked, delivered{host: host, method: method, params: rawOf(params)})
+	online, asking := r.online[host], r.asking
+	r.mu.Unlock()
+	if !online {
+		return nil
+	}
+	if asking != nil {
+		return asking(host, method, rawOf(params))
+	}
+	return json.RawMessage(`{}`)
+}
+
+func (r *fakeRouter) asks() []delivered {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]delivered{}, r.asked...)
+}
+
+func (r *fakeRouter) HostCan(string, string) bool { return true }
 
 // row is a hosts/list row, as far as the tests read it.
 type row struct {
@@ -315,6 +342,10 @@ type harness struct {
 
 const devbox, other = "devbox01", "other001"
 
+// carrier is the machine that carries the providers the tests add (#3398): online, and
+// first by name. Enrolled at the first add, so a test that adds none lists no more hosts.
+const carrier = "carrier1"
+
 type harnessOptions struct {
 	timing        Timing
 	workspaces    []MachineInfo
@@ -344,7 +375,7 @@ func newHarness(t *testing.T, opts ...func(*harnessOptions)) *harness {
 	h.methods = &fakeMethods{router: h.router, records: h.records}
 	provider, ssh := h.provider, h.ssh
 	h.providers = NewProviders(Config{Store: h.store, Records: h.records, Router: h.router, Methods: h.methods,
-		Secrets: NewSecrets(h.home), Timing: o.timing, Hooks: Hooks{
+		Timing: o.timing, Hooks: Hooks{
 			SSHStart: func(_ records.MachineRecord, destination string, renewKey bool) error {
 				if renewKey {
 					destination += " (new key taken)"
@@ -385,7 +416,19 @@ func (h *harness) enroll(id, name string) {
 }
 
 func (h *harness) call(method string, params any) (any, error) {
+	if method == MethodProvidersAdd || method == MethodProvidersUpdate {
+		h.carry()
+	}
 	return h.providers.Answer(method, rawOf(params), h.caller)
+}
+
+// carry enrolls the machine that carries the providers the tests add, online, the first
+// time one is added (#3398).
+func (h *harness) carry() {
+	if h.records.Host(carrier) == nil {
+		h.enroll(carrier, "carrier")
+		h.router.setOnline(carrier, true)
+	}
 }
 
 func (h *harness) must(method string, params any) any {

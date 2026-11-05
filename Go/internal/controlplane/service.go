@@ -98,12 +98,10 @@ type Config struct {
 	// How often a copy beats, looks for the others and renews its leases; shorter in
 	// tests. 0 is 10 s.
 	CopyBeat time.Duration
-	// The machine providers' home (#691): their connections' files, and their secrets
-	// when there is no SecretKeeper; with one, the secrets are sealed in the store (#2138).
-	// "" for none, and no providers.
+	// The machine providers' home (#691): where help and ssh -G run for a draft. "" for
+	// none, and no providers. Their servers and secrets are on the machines that carry
+	// them (#3398).
 	ProviderHome string
-	// The command provider's binary, when not beside agents-control (tests).
-	CommandProvider string
 	// How long provider calls, starts and lists take; shorter in tests. Zero is standard.
 	ProviderTiming providers.Timing
 	// Start empty, for a handover to fill (R16): no settings made, every member refused,

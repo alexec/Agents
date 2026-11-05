@@ -671,7 +671,7 @@ func TestAFailedPrepareIsSaidAndNothingRuns(t *testing.T) {
 	var steps []string
 	i := f.installer(&fakeCodes{}, &steps)
 	i.Prepare = func(context.Context, string) ([]string, error) {
-		return nil, errors.New("This control plane has no GitHub CLI (gh) to reach the codespace fuzzy over SSH")
+		return nil, errors.New("This machine has no GitHub CLI (gh) to reach the codespace fuzzy over SSH")
 	}
 	_, err := i.Install(context.Background(), json.RawMessage(`{"destination":"cs.fuzzy.main"}`))
 	if got := failure(t, err); got.Code != NotAllowed || !strings.Contains(got.Message, "no GitHub CLI") {

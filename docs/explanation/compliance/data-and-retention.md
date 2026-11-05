@@ -119,8 +119,9 @@ The first HADR review (2026-10-21, #1557) found these. Each one is an open issue
 - **A copy of the store does not restore a control plane on its own** (#2137). A restore
   also needs the control key, the `secrets-key` and the TLS certificate from the old home.
   With all of them, a machine joined again in 26 seconds in the review's drill.
-- **Machine providers' secrets are outside the store** (#2138). A copy of the store does not
-  carry them.
+- **Machine providers' secrets are on the machine that carries each provider** (#3398), not
+  on the control plane. A copy of the store does not carry them, and nor does a machine's
+  backup: when that machine is lost, add the provider again on another one.
 - **A machine's backups are on its own disk by default** (#2139).
 - **Not in a machine's backup:** settings, workflows, secrets, attachments, events and the
   runtimes' own session files. A folder's `.agents/` folder is in the folder, and so in its

@@ -111,6 +111,7 @@ public enum Capability {
     public static let projectsBoards1 = "projects.boards/1"
     public static let projectsSessions1 = "projects.sessions/1"
     public static let projects1 = "projects/1"
+    public static let providersCarry1 = "providers.carry/1"
     public static let providers1 = "providers/1"
     public static let readapi1 = "readapi/1"
     public static let relay1 = "relay/1"
@@ -385,6 +386,10 @@ public enum Capability {
         "preferences/get": "preferences/1",
         "preferences/set": "preferences/1",
         "presence/report": "presence/1",
+        "providers/carry": "providers.carry/1",
+        "providers/forget": "providers.carry/1",
+        "providers/keepSecrets": "providers.carry/1",
+        "providers/ssh": "providers.carry/1",
         "relay/grant": "relay/1",
         "relay/offer": "relay/1",
         "relay/register": "relay/1",

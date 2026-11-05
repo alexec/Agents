@@ -12,7 +12,6 @@ import (
 
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/kms"
-	"github.com/alexec/agents/Go/internal/controlplane/providers"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 )
 
@@ -55,9 +54,6 @@ func TestABackupRestoresAControlPlaneInANewHome(t *testing.T) {
 	}
 	p := &plane{t: t, s: s, url: s.cfg.URL}
 	member, _ := p.client("Window")
-	if err := s.providerSecrets(old).Set("prov", map[string]string{"TOKEN": "dop_v1_secret"}); err != nil {
-		t.Fatal(err)
-	}
 	s.Stop()
 
 	backup := filepath.Join(t.TempDir(), "backup")
@@ -97,8 +93,7 @@ func TestABackupRestoresAControlPlaneInANewHome(t *testing.T) {
 	if _, err := Restore(ctx, backup, HomePartsIn(home), store.NewFolder(filepath.Join(home, "store")), false); err == nil {
 		t.Fatal("a restore went over a home")
 	}
-	restored, err := homePlane(t, home, port)
-	if err != nil {
+	if _, err := homePlane(t, home, port); err != nil {
 		t.Fatal(err)
 	}
 	session, err := controllink.DialClient(ctx, member)
@@ -106,12 +101,6 @@ func TestABackupRestoresAControlPlaneInANewHome(t *testing.T) {
 		t.Fatalf("the member was refused by the restored control plane: %v", err)
 	}
 	session.Close()
-	if v := restored.providerSecrets(home).Values("prov"); v["TOKEN"] != "dop_v1_secret" {
-		t.Fatalf("the provider's secrets after the restore: %v", v)
-	}
-	if _, err := os.Stat(filepath.Join(home, providers.SecretsFileName)); err == nil {
-		t.Fatal("the provider's secrets were in a file, not the store")
-	}
 	// The certificate members are pinned to.
 	if _, again, err := SelfSigned(filepath.Join(home, "tls"), "control.test"); err != nil || again != pin {
 		t.Fatalf("the restored certificate's pin is %s, not %s (%v)", again, pin, err)

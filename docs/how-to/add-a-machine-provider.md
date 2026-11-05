@@ -10,6 +10,30 @@ A machine provider is an MCP server that lists machines, starts them and stops t
 Agents talks to every provider in the same way, so it has no code for any one cloud. There
 are three ways to make one, and only the last needs any code.
 
+## Where a provider runs
+
+A provider runs on one of your machines, which **carries** it (#3398). Its server, its
+commands and its CLI run there, as you, and its tokens and keys are kept there, in
+`~/.agents-secrets/provider-secrets.json`, which only you can read. The control plane keeps
+the provider's name, kind and settings, never a secret. It sends each list, start, stop,
+make and delete to the machine that carries the provider, and that machine answers.
+
+- Add Provider asks which of your machines carries it. With none chosen, it is your first
+  machine that is online, by name. The machine must be online when you add the provider.
+- The tokens you type go through the control plane to that machine once, and the control
+  plane keeps none. Until clients seal secrets to machines (#3397), the control plane can
+  read them as they pass.
+- When the machine that carries a provider is offline, the provider's machines can't be
+  listed, started, stopped, made or deleted. The Providers page says so on the provider.
+- To move a provider to another machine, edit it, choose the machine and type its secrets
+  again: the old machine keeps them until you remove the provider.
+- Removing a provider tells its machine to delete its secrets. A machine that is offline
+  then keeps them: delete the provider's entry from that file by hand.
+- A provider added before this change has no machine: remove it and add it again.
+
+No provider needs a cloud's workload identity (OIDC federation) instead: every preset, a
+command provider and an MCP server can run on a machine of yours.
+
 ## A preset, or your own commands
 
 Agents ships one provider, the **command provider**. Each of its machines is a few
@@ -28,12 +52,15 @@ in, as before.
 | Google Cloud Workstations | — | `gcloud`, signed in | one cluster and configuration's workstations |
 | AWS EC2 Instances | an IAM user's access key (the policy is below) | — | instances with a tag in one region |
 
-The token goes in only as the provider's secret. It is sent in a request's header, never in
-an address, a log or an error. A codespace and a Coder machine have no ssh port of their
-own, so ssh to them still goes through `gh` or `coder`, as the ssh ProxyCommand; the
-Providers page says "needs gh for ssh" or "needs coder for ssh" when the machine that runs
-the control plane does not have that CLI (#3367). A droplet is reached with
-plain ssh to its public address, and so is an EC2 instance.
+The token goes in only as the provider's secret, kept on the machine that carries it. It is
+sent in a request's header, never in an address, a log or an error. A codespace and a Coder
+machine have no ssh port of their own, so ssh to them still goes through `gh` or `coder`, as
+the ssh ProxyCommand. A codespace's agentsd is started over ssh from the machine that
+carries its provider, with the token there, so that machine needs `gh`. The control plane
+has no token for a codespace, so it can't install Agents in one over ssh or keep a tunnel
+to it: run the codespace's join command in it once. The Providers page says "needs coder
+for ssh" when the machine that runs the control plane does not have `coder` (#3367). A
+droplet is reached with plain ssh to its public address, and so is an EC2 instance.
 
 AWS EC2 Instances is through its API only, with an IAM user's access key ID and secret
 access key. The smallest policy lists the instances and starts and stops only the ones with
@@ -59,11 +86,11 @@ For anything else, choose **Your commands** and give:
 - **Start** and **Stop**: the commands you would type, such as `cws start devstack-1`.
 - **Status** (optional): a command that prints `running` or `stopped`. Without it, Agents
   goes by what it last did.
-- **ssh**: how the control plane's Mac reaches it, such as `devstack-1.cws` or
+- **ssh**: how the control plane's machine reaches it, such as `devstack-1.cws` or
   `alex@devbox.example -p 2222`. Agents uses it to add the machine as a server, and to start
   agentsd if it doesn't start on boot.
 
-The commands run with `/bin/sh` on the Mac that runs the control plane, as you, never as
+The commands run with `/bin/sh` on the machine that carries the provider, as you, never as
 root. A secret you add goes to them as an environment variable of the same name: write
 `$TOKEN` in a command to use it.
 
@@ -90,8 +117,9 @@ installs Agents as that user, never as root. The host starts with the droplet. D
 Machine… deletes the droplet. Any other preset needs **An MCP server** or a provider
 configured by hand to make machines.
 
-The command provider is the `machine-commands` binary. The control plane looks for it
-beside itself, then where `AGENTS_WORKSPACE_COMMANDS` says, then on its `PATH`. Its configuration is described in full in
+The command provider is the `workspace-commands` binary. The machine that carries the
+provider looks for it beside its `agentsd`, then where `AGENTS_WORKSPACE_COMMANDS` says, then
+on its `PATH`. Its configuration is described in full in
 [Machine providers](../reference/machine-providers.md#the-command-provider).
 
 ## A tool map, for a provider's own MCP server
@@ -102,7 +130,7 @@ its tools lists, starts and stops, and where the machines are in what it answers
 
 Agents ships one for DigitalOcean's server: choose **Use DigitalOcean's** under the tool map.
 It fills in `npx -y @digitalocean/mcp`, the map below, and a `DIGITALOCEAN_API_TOKEN`
-secret for your token. It needs Node where the control plane runs.
+secret for your token. It needs Node on the machine that carries it.
 
 ```json
 {
@@ -139,7 +167,8 @@ real ones. When you add it, Agents checks every tool the map names is there, and
 that isn't.
 
 For a server at an address, its one secret is sent as `Authorization: Bearer` and the
-secret. For a command, secrets are its environment.
+secret. For a command, secrets are its environment. Either way, the machine that carries
+it fills them in.
 
 ## Let an agent write it
 
@@ -150,7 +179,8 @@ than one runtime can write.
 
 1. Give the server's command or address, or the **CLI** that your commands use (`cws`).
    Add the secrets the server or CLI needs.
-2. Click **Write It for Me**. The control plane reads the server's tools, or runs
+2. Click **Write It for Me**. The control plane reads the server's tools through the
+   machine that carries it (the Mac, unless you chose another), or runs
    `cws --help`. Then it starts the agent with what it read.
 3. Under the field, a line shows each step: "Writing… read 41 tools · checked: listed 3".
    **Details…** shows every step. Click **×** to stop. Nothing is kept.
@@ -196,7 +226,7 @@ GitHub Codespaces, Coder machines, Google Compute Engine VMs and AWS EC2 instanc
   Provider…**.
 
 Each one asks for the same fields and the same token as the Mac. The token goes to the
-control plane, and the page never shows it again. **List Again**, **Edit…** and
+machine that carries the provider, and the page never shows it again. **List Again**, **Edit…** and
 **Remove…** are on each provider, and **Stop** and **Unlink** on each linked host.
 
 Add Docker, Cloud Workstations, your own commands and MCP servers in the Mac app. They need

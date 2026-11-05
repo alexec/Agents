@@ -41,7 +41,8 @@ func TestAProviderIsListedWithItsWorkspacesAndNeverItsSecret(t *testing.T) {
 	if strings.Contains(string(rawOf(s)), "hunter2") {
 		t.Error("the summary holds the secret")
 	}
-	// Not in the store: only in the home's file, which only its user can read (FR-003).
+	// Not in the store, nor in the control plane's home: only on the machine that carries
+	// it (#3398).
 	keys, _ := h.store.List(context.Background(), "")
 	for _, k := range keys {
 		object, _ := h.store.Get(context.Background(), k.Key)
@@ -49,14 +50,12 @@ func TestAProviderIsListedWithItsWorkspacesAndNeverItsSecret(t *testing.T) {
 			t.Errorf("%s holds the secret", k.Key)
 		}
 	}
-	file := filepath.Join(h.home, SecretsFileName)
-	data, err := os.ReadFile(file)
-	if err != nil || !strings.Contains(string(data), "hunter2") {
-		t.Errorf("secrets file %q %v", data, err)
-	}
-	if info, _ := os.Stat(file); info.Mode().Perm() != 0o600 {
-		t.Errorf("mode %v", info.Mode())
-	}
+	filepath.WalkDir(h.home, func(path string, d os.DirEntry, err error) error {
+		if data, _ := os.ReadFile(path); err == nil && !d.IsDir() && strings.Contains(string(data), "hunter2") {
+			t.Errorf("%s holds the secret", path)
+		}
+		return nil
+	})
 }
 
 func TestTheProviderRecordIsKeptAtTheSwiftKey(t *testing.T) {
@@ -108,7 +107,7 @@ func TestProvidersAreReadBackAfterARestart(t *testing.T) {
 	h := newHarness(t)
 	id := h.add()
 	again := NewProviders(Config{Store: h.store, Records: h.records, Router: h.router, Methods: h.methods,
-		Secrets: NewSecrets(h.home), Timing: quickTiming(),
+		Timing: quickTiming(),
 		Hooks: Hooks{Connect: func(ProviderRecord, map[string]string) (Provider, error) { return h.provider, nil }}})
 	again.Start()
 	defer again.Stop()
@@ -846,8 +845,11 @@ func TestASuspendedPersonsMachinesAreStoppedNotDeleted(t *testing.T) {
 	h := newHarness(t)
 	suspended := false
 	h.providers.hooks.OwnerOf = func(host string) string {
-		if host == devbox {
+		switch host {
+		case devbox:
 			return "kim"
+		case carrier:
+			return ""
 		}
 		return "lee"
 	}
@@ -886,8 +888,11 @@ func TestAMemberCannotLinkAnotherPersonsWorkspace(t *testing.T) {
 	h.providers.hooks.IsAdmin = func(person string) bool { return person == "admin" }
 	h.providers.hooks.InGroup = func(string, string) bool { return true }
 	h.providers.hooks.OwnerOf = func(host string) string {
-		if host == devbox {
+		switch host {
+		case devbox:
 			return "lee"
+		case carrier:
+			return "admin"
 		}
 		return "kim"
 	}
@@ -918,37 +923,72 @@ func TestAMemberCannotLinkAnotherPersonsWorkspace(t *testing.T) {
 	}
 }
 
-// A codespace is reached through gh with its provider's token (#3347): only a
-// codespaces-api provider's, and only for the cs. host it lists.
-func TestACodespaceIsFoundWithItsProvidersToken(t *testing.T) {
+// A codespace is reached through gh with its provider's token (#3347), which stays on the
+// machine that carries the provider (#3398): its agentsd is started over ssh from there,
+// and the control plane's own ssh start is not used. The token went to that machine once,
+// and is in no record.
+func TestACarriedCodespaceIsStartedOverSSHFromItsMachine(t *testing.T) {
 	h := newHarness(t, func(o *harnessOptions) {
 		o.workspaces = []MachineInfo{{ID: "fuzzy-space", Name: "fuzzy", State: "running", SSH: new("cs.fuzzy-space.main")}}
 	})
 	out := h.must(MethodProvidersAdd, map[string]any{"name": "Codespaces", "kind": "commands",
 		"commands": map[string]any{"preset": "codespaces-api"}, "secrets": map[string]string{"GITHUB_TOKEN": "ghp_test"}})
 	h.link(string(out.(ProviderSummary).ID), devbox, "fuzzy-space")
-	if !eventually(t, func() bool { name, _ := h.providers.Codespace("cs.fuzzy-space.main"); return name != "" }) {
-		t.Fatal("never found")
+	if !eventually(t, func() bool { return len(sshAsks(h, "start")) == 1 }) {
+		t.Fatalf("asks %v", h.router.asks())
 	}
-	if name, token := h.providers.Codespace("cs.fuzzy-space.main"); name != "fuzzy-space" || token != "ghp_test" {
-		t.Errorf("%q %q", name, token)
+	start := sshAsks(h, "start")[0]
+	if start.Provider != out.(ProviderSummary).ID || deref(start.Codespace) != "fuzzy-space" ||
+		start.Destination != "cs.fuzzy-space.main" || deref(start.Name) != "devbox" {
+		t.Errorf("%+v", start)
 	}
-	for _, destination := range []string{"cs.fuzzy-space.other", "alex@127.0.0.1 -p 2222", ""} {
-		if name, token := h.providers.Codespace(destination); name != "" || token != "" {
-			t.Errorf("%q: %q %q", destination, name, token)
+	if got := h.ssh.all(); len(got) != 0 {
+		t.Errorf("the control plane started it over ssh itself: %v", got)
+	}
+	kept := 0
+	for _, a := range h.router.asks() {
+		if a.host == carrier && a.method == wire.CallProvidersKeepSecrets.Name &&
+			strings.Contains(string(a.params), "ghp_test") {
+			kept++
+		}
+	}
+	if kept != 1 {
+		t.Errorf("the token went to its machine %d times", kept)
+	}
+	listed, _ := h.store.List(context.Background(), "")
+	for _, key := range listed {
+		object, _ := h.store.Get(context.Background(), key.Key)
+		if strings.Contains(string(object.Data), "ghp_test") {
+			t.Errorf("%s holds the token", key.Key)
 		}
 	}
 }
 
-// A codespaces-api provider says it needs gh for ssh only when this machine has no gh
-// (#3367); a provider that reaches its machines without a CLI never says it.
-func TestAProviderSaysItNeedsGhOnlyWhenThisMachineHasNone(t *testing.T) {
+// sshAsks is each providers/ssh asked of the carrying machine, with op.
+func sshAsks(h *harness, op string) []wire.ProviderSSH {
+	var out []wire.ProviderSSH
+	for _, a := range h.router.asks() {
+		var request wire.ProviderSSH
+		if a.host == carrier && a.method == wire.CallProvidersSSH.Name && json.Unmarshal(a.params, &request) == nil &&
+			request.Op == op {
+			out = append(out, request)
+		}
+	}
+	return out
+}
+
+// A coder-api provider says it needs coder for ssh only when this machine has no coder
+// (#3367); a provider that reaches its machines without a CLI never says it, nor does a
+// codespaces-api one, whose codespaces are reached from the machine that carries it (#3398).
+func TestAProviderSaysItNeedsCoderOnlyWhenThisMachineHasNone(t *testing.T) {
 	for _, has := range []bool{true, false} {
-		h := newHarness(t, func(o *harnessOptions) { o.hasTool = func(name string) bool { return has && name == "gh" } })
-		out := h.must(MethodProvidersAdd, map[string]any{"name": "Codespaces", "kind": "commands",
+		h := newHarness(t, func(o *harnessOptions) { o.hasTool = func(name string) bool { return has && name == "coder" } })
+		out := h.must(MethodProvidersAdd, map[string]any{"name": "Coder", "kind": "commands",
+			"commands": map[string]any{"preset": "coder-api", "url": "https://coder.example"}, "secrets": map[string]string{"CODER_SESSION_TOKEN": "t"}})
+		h.must(MethodProvidersAdd, map[string]any{"name": "Codespaces", "kind": "commands",
 			"commands": map[string]any{"preset": "codespaces-api"}, "secrets": map[string]string{"GITHUB_TOKEN": "ghp_test"}})
 		h.add()
-		want := map[string]string{string(out.(ProviderSummary).ID): "gh"}
+		want := map[string]string{string(out.(ProviderSummary).ID): "coder"}
 		if has {
 			want = map[string]string{}
 		}
@@ -964,14 +1004,20 @@ func TestAProviderSaysItNeedsGhOnlyWhenThisMachineHasNone(t *testing.T) {
 	}
 }
 
-func TestADoctlProviderGivesNoCodespaceToken(t *testing.T) {
+// A provider other than codespaces-api is started over ssh by the control plane, as
+// before: only a codespace's token is on its machine.
+func TestADoctlProviderIsStartedOverSSHByTheControlPlane(t *testing.T) {
 	h := newHarness(t, func(o *harnessOptions) {
-		o.workspaces = []MachineInfo{{ID: "ws-1", Name: "ws-1", State: "running", SSH: new("cs.ws-1.main")}}
+		o.timing.SSHAfter = 0
+		o.workspaces = []MachineInfo{{ID: "ws-1", Name: "ws-1", State: "stopped", SSH: new("cs.ws-1.main")}}
 	})
 	h.link(h.add(), devbox, "ws-1")
-	h.waitFor("offline", devbox, 5, func(r row) bool { return r.Workspace.WorkspaceState == "running" })
-	if name, token := h.providers.Codespace("cs.ws-1.main"); name != "" || token != "" {
-		t.Errorf("%q %q", name, token)
+	h.must(MethodHostsStart, map[string]string{"host": devbox})
+	if !eventually(t, func() bool { return len(h.ssh.all()) == 1 }) {
+		t.Fatalf("ssh %v", h.ssh.all())
+	}
+	if got := sshAsks(h, "start"); len(got) != 0 {
+		t.Errorf("%v", got)
 	}
 }
 
@@ -986,13 +1032,13 @@ func TestARunningCodespaceWithItsHostOfflineIsStartedOverSSH(t *testing.T) {
 		"commands": map[string]any{"preset": "codespaces-api"}, "secrets": map[string]string{"GITHUB_TOKEN": "ghp_test"}})
 	id := string(out.(ProviderSummary).ID)
 	h.link(id, devbox, "fuzzy-space")
-	if !eventually(t, func() bool { return len(h.ssh.all()) == 1 }) {
-		t.Fatalf("ssh %v", h.ssh.all())
+	if !eventually(t, func() bool { return len(sshAsks(h, "start")) == 1 }) {
+		t.Fatalf("ssh %v", sshAsks(h, "start"))
 	}
 	// Listed again, still running and offline: not tried again.
 	h.providers.Refresh(id)
 	time.Sleep(50 * time.Millisecond)
-	if got := h.ssh.all(); !reflect.DeepEqual(got, []string{"cs.fuzzy-space.main"}) {
+	if got := sshAsks(h, "start"); len(got) != 1 || got[0].Destination != "cs.fuzzy-space.main" {
 		t.Fatalf("ssh %v", got)
 	}
 	// Stopped and started again from GitHub: tried again.
@@ -1000,8 +1046,8 @@ func TestARunningCodespaceWithItsHostOfflineIsStartedOverSSH(t *testing.T) {
 	h.providers.Refresh(id)
 	h.provider.setStateLocked("fuzzy-space", "running")
 	h.providers.Refresh(id)
-	if !eventually(t, func() bool { return len(h.ssh.all()) == 2 }) {
-		t.Fatalf("ssh %v", h.ssh.all())
+	if !eventually(t, func() bool { return len(sshAsks(h, "start")) == 2 }) {
+		t.Fatalf("ssh %v", sshAsks(h, "start"))
 	}
 	// Online: nothing to start.
 	h.router.setOnline(devbox, true)
@@ -1010,7 +1056,7 @@ func TestARunningCodespaceWithItsHostOfflineIsStartedOverSSH(t *testing.T) {
 	h.provider.setStateLocked("fuzzy-space", "running")
 	h.providers.Refresh(id)
 	time.Sleep(50 * time.Millisecond)
-	if got := h.ssh.all(); len(got) != 2 {
+	if got := sshAsks(h, "start"); len(got) != 2 {
 		t.Fatalf("ssh %v", got)
 	}
 }
