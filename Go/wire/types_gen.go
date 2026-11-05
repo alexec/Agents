@@ -8279,7 +8279,7 @@ type PromptRequest struct {
 	Voice *bool `json:"voice,omitzero"`
 }
 
-// providers/add and providers/update. `secrets` only ever goes to the control plane; `cli` is not kept; `draft` is the draft this accepts (#858).
+// providers/add and providers/update. `machine` is the machine that carries the provider (#3398): it runs the provider's server, and `secrets` go on to it, never kept by the control plane. None picks the caller's first online machine; an update without it keeps the one it has. `cli` is not kept; `draft` is the draft this accepts (#858).
 type ProviderAdd struct {
 	ID *ProviderID `json:"id,omitzero"`
 
@@ -8299,11 +8299,39 @@ type ProviderAdd struct {
 
 	Map JSONValue `json:"map,omitzero"`
 
+	Machine *MachineRef `json:"machine,omitzero"`
+
 	Secrets map[string]string `json:"secrets,omitzero"`
 
 	CLI *string `json:"cli,omitzero"`
 
 	Draft *UUID `json:"draft,omitzero"`
+}
+
+// What a provider's machine answers to providers/carry, providers/keepSecrets, providers/forget and providers/ssh (#3398): the call's result, or why it failed, in words for the person. Channel 0 has no error path.
+type ProviderCarried struct {
+	Result JSONValue `json:"result,omitzero"`
+
+	Error *string `json:"error,omitzero"`
+}
+
+// providers/carry (#3398): the control plane asks the machine that carries a provider to call it. `record` is the provider's record, which never holds a secret; the machine runs its server with the secrets it keeps. `secrets` is only a draft's, for this call, and is not kept.
+type ProviderCarry struct {
+	Provider ProviderID `json:"provider"`
+
+	Record JSONValue `json:"record"`
+
+	Call string `json:"call"`
+
+	Workspace *string `json:"workspace,omitzero"`
+
+	Name *string `json:"name,omitzero"`
+
+	Options JSONValue `json:"options,omitzero"`
+
+	FirstBoot *string `json:"firstBoot,omitzero"`
+
+	Secrets map[string]string `json:"secrets,omitzero"`
 }
 
 // providers/create.
@@ -8388,6 +8416,11 @@ type ProviderDraftUpdate struct {
 	Note *string `json:"note,omitzero"`
 }
 
+// providers/forget (#3398): the provider was removed; its machine ends its server and deletes its secrets.
+type ProviderForget struct {
+	Provider ProviderID `json:"provider"`
+}
+
 // providers/setGroup (#1761): the group whose users may use the provider. No group is the admins' alone.
 type ProviderGroup struct {
 	Provider ProviderID `json:"provider"`
@@ -8429,6 +8462,40 @@ type ProviderRuntimes struct {
 	Why *string `json:"why,omitzero"`
 }
 
+// providers/ssh (#3398): the machine that carries a codespaces provider starts a codespace's agentsd over ssh (`start`), or reads its host key (`hostKey`), with the token it keeps. Its result is ProviderSSHResult.
+type ProviderSSH struct {
+	Provider ProviderID `json:"provider"`
+
+	Op string `json:"op"`
+
+	Destination string `json:"destination"`
+
+	// The codespace's name, for gh.
+	Codespace *string `json:"codespace,omitzero"`
+
+	KnownHosts *string `json:"knownHosts,omitzero"`
+
+	Name *string `json:"name,omitzero"`
+
+	Renew *bool `json:"renew,omitzero"`
+
+	Trust *string `json:"trust,omitzero"`
+}
+
+// providers/ssh's result (#3398): the host key taken, in known_hosts form, and for hostKey a fingerprint to trust first.
+type ProviderSSHResult struct {
+	KnownHosts *string `json:"knownHosts,omitzero"`
+
+	NeedsTrust *string `json:"needsTrust,omitzero"`
+}
+
+// providers/keepSecrets (#3398): secrets for a provider the machine carries, laid over what it has in ~/.agents-secrets; an empty value takes one away. The control plane passes them on and keeps none.
+type ProviderSecretsKeep struct {
+	Provider ProviderID `json:"provider"`
+
+	Secrets map[string]string `json:"secrets"`
+}
+
 // A provider for the Providers page, never its commands, headers or secrets' values.
 type ProviderSummary struct {
 	ID ProviderID `json:"id"`
@@ -8461,7 +8528,15 @@ type ProviderSummary struct {
 	// The caller may start machines from it (#1761): they are in its group. Absent from an older control plane, which lets everyone.
 	MayUse *bool `json:"mayUse,omitzero"`
 
-	// The CLI its machines are reached through over ssh (gh, coder) when the machine that runs the provider has none (#3367). Absent when it needs none or has it.
+	// The machine that carries it: runs its server and keeps its secrets (#3398). Absent for one made before, which must be added again.
+	Machine *MachineRef `json:"machine,omitzero"`
+
+	MachineName *string `json:"machineName,omitzero"`
+
+	// Its machine is offline: its machines can't be started, stopped, made or deleted until it is back (#3398).
+	MachineOffline *bool `json:"machineOffline,omitzero"`
+
+	// The CLI its machines are reached through over ssh (gh, coder) when the control plane's machine has none (#3367). Absent when it needs none or has it.
 	SshToolMissing *string `json:"sshToolMissing,omitzero"`
 }
 

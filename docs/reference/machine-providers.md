@@ -89,20 +89,27 @@ logged.
   installing anything. After ten minutes it gives up.
 - **Linking what it made.** A machine made with `firstBootRuns` is linked to its host
   when a host of its name joins, within ten minutes.
-- **Where it runs.** Providers run on the control plane, never on a host, so they can start
-  a host that is down. A control plane with several copies doesn't run them yet.
+- **Where it runs.** The control plane keeps each provider's record and runs its lists,
+  starts and stops, timers and wake-ups, but the provider's server runs on the machine that
+  carries it (`machine` in its record, #3398). Each call goes to that machine on its uplink's
+  channel 0, which only the control plane writes, as `providers/carry`; the machine runs the
+  server and answers. A provider whose machine is offline can't be called until it is back.
+  A control plane with several copies doesn't run providers yet.
 
 ## Secrets
 
-- **Where they live.** A provider's secrets are kept in the store at
-  `v1/providersecrets/<provider>.json`, sealed by the keeper that seals people's secrets:
-  `secrets-key` in the control plane's folder on a Mac, the KMS on a cloud machine (#2138).
-  No value is in the store in clear, and a sealed record opens only at its own key. A store
-  copy, a handover and a [backup](../how-to/back-up-a-control-plane.md) keep them. A control
-  plane with no keeper keeps them in `provider-secrets.json` in its own folder, readable by
-  its user only. They are never sent to a host or a client, and never logged.
-- **How the provider gets them.** A server the control plane runs gets them as environment
-  variables. A server at an address gets them through `${NAME}` in its configured headers.
+- **Where they live.** On the machine that carries the provider, in
+  `~/.agents-secrets/provider-secrets.json`, readable by its user only (#3398). The control
+  plane passes the values an add or an update is given on to that machine once, as
+  `providers/keepSecrets`, and keeps only their names. `providers/forget` deletes them when
+  the provider is removed. They are not in the store, a store copy, a handover or a backup.
+- **How the provider gets them.** The machine fills them in: a server it runs gets them as
+  environment variables, and a server at an address gets them through `${NAME}` in its
+  configured headers. What the server answers goes back with each value said as `${NAME}`.
+- **A codespace over ssh.** The machine that carries a codespaces provider starts a
+  codespace's agentsd over ssh with `gh` and the token (`providers/ssh`), and reads its host
+  key for a link. The control plane has no token, so it can't install Agents in a codespace
+  or keep a tunnel to one.
 
 ## Tool maps
 

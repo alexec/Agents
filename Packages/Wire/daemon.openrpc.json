@@ -6194,6 +6194,90 @@
       }
     },
     {
+      "name": "providers/carry",
+      "x-capability": "providers.carry/1",
+      "description": "Asked by the control plane on channel 0 of the machine that carries a provider (#3398): call the provider's server, which runs here with the secrets kept here.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ProviderCarry"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ProviderCarried"
+        }
+      }
+    },
+    {
+      "name": "providers/forget",
+      "x-capability": "providers.carry/1",
+      "description": "Asked by the control plane on channel 0 (#3398): a provider carried here was removed.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ProviderForget"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ProviderCarried"
+        }
+      }
+    },
+    {
+      "name": "providers/keepSecrets",
+      "x-capability": "providers.carry/1",
+      "description": "Asked by the control plane on channel 0 (#3398): keep a carried provider's secrets here, in ~/.agents-secrets.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ProviderSecretsKeep"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ProviderCarried"
+        }
+      }
+    },
+    {
+      "name": "providers/ssh",
+      "x-capability": "providers.carry/1",
+      "description": "Asked by the control plane on channel 0 (#3398): start a codespace's agentsd over ssh, or read its host key, with the token of the codespaces provider carried here.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ProviderSSH"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ProviderCarried"
+        }
+      }
+    },
+    {
       "name": "relay/grant",
       "x-capability": "relay/1",
       "paramStructure": "by-name",

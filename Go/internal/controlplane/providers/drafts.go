@@ -240,6 +240,9 @@ type draft struct {
 	redact      Redaction
 
 	host     string
+	// The machine that runs its provider's server (#3398): the form's, the provider's, or
+	// the host where the control plane runs.
+	machine  string
 	agent    string
 	state    string
 	steps    []DraftStep
@@ -358,6 +361,15 @@ func (s *Drafts) Start(request ProviderDraftStart, owner Caller, existing *Exist
 	d := &draft{id: id, owner: owner, form: request.Form, secrets: secrets, provider: string(deref(request.Provider)),
 		runtimeID: request.RuntimeID, runtimeName: runtimeName(request.RuntimeID), redact: NewRedaction(secrets),
 		state: "reading", stop: make(chan struct{})}
+	d.machine = string(deref(request.Form.Machine))
+	if d.machine == "" && existing != nil {
+		d.machine = deref(existing.Record.Machine)
+	}
+	if d.machine == "" {
+		if local := s.hooks.LocalHost(); local != nil {
+			d.machine = local.ID
+		}
+	}
 	// What it starts from: the tools, or the CLI's own help.
 	var seed string
 	if d.isCommands() {
@@ -1070,7 +1082,9 @@ func RunHelp(cli string, words []string, secrets map[string]string, folder strin
 	cmd := exec.CommandContext(ctx, "/usr/bin/env", append(append([]string{cli}, words...), "--help")...)
 	cmd.Env = os.Environ()
 	for k, v := range secrets {
-		cmd.Env = append(cmd.Env, k+"="+v)
+		if v != "" {
+			cmd.Env = append(cmd.Env, k+"="+v)
+		}
 	}
 	cmd.Dir = folder
 	var out, errOut limitedBuffer
@@ -1156,7 +1170,7 @@ func draftRecord(d *draft, m any) ProviderRecord {
 	}
 	sort.Strings(names)
 	r := ProviderRecord{ID: id, Name: name, Kind: form.Kind, Command: form.Command, Args: form.Args, URL: form.URL,
-		Headers: form.Headers, SecretNames: names, Capabilities: []string{}, Contract: 1}
+		Headers: form.Headers, SecretNames: names, Capabilities: []string{}, Contract: 1, Machine: optional(d.machine)}
 	if form.Kind == KindCommands {
 		r.Commands = m
 	} else {

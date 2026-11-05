@@ -34,7 +34,7 @@ const ProvidersPrefix = "v1/providers/"
 func ProviderKey(id string) string { return ProvidersPrefix + id + ".json" }
 
 // ProviderRecord is ProviderRecord (v1/providers/<id>.json): never its secrets' values,
-// which stay in the control plane's own home (research R3).
+// which stay on the machine that carries it (#3398).
 type ProviderRecord struct {
 	ID      string
 	Name    string
@@ -59,6 +59,9 @@ type ProviderRecord struct {
 	// The group whose users may see it and start machines from it (#1761, FR-028); nil
 	// for the admins' alone, as every provider made before groups is.
 	Group *string
+	// The machine that carries it (#3398): runs its server and keeps its secrets. Nil for
+	// one made before, which is added again on a machine.
+	Machine *string
 	// What a later build wrote that this one does not know, written back as it was.
 	Extra records.Extra
 }
@@ -86,11 +89,12 @@ type providerJSON struct {
 	Forgotten    *bool             `json:"forgotten,omitempty"`
 	WrittenBy    *WrittenBy        `json:"writtenBy,omitempty"`
 	Group        *string           `json:"group,omitempty"`
+	Machine      *string           `json:"machine,omitempty"`
 }
 
 func (p ProviderRecord) MarshalJSON() ([]byte, error) {
 	j := providerJSON{p.ID, p.Name, p.Kind, p.Command, p.Args, p.URL, p.Headers, p.Commands, p.SecretNames, p.Map,
-		p.Capabilities, p.Contract, p.Rev, p.Forgotten, p.WrittenBy, p.Group}
+		p.Capabilities, p.Contract, p.Rev, p.Forgotten, p.WrittenBy, p.Group, p.Machine}
 	if j.SecretNames == nil {
 		j.SecretNames = []string{}
 	}
@@ -110,7 +114,7 @@ func (p *ProviderRecord) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("no provider kind %q", j.Kind)
 	}
 	*p = ProviderRecord{j.ID, j.Name, j.Kind, j.Command, j.Args, j.URL, j.Headers, j.Commands, j.SecretNames, j.Map,
-		j.Capabilities, j.Contract, j.Rev, j.Forgotten, j.WrittenBy, j.Group, extra}
+		j.Capabilities, j.Contract, j.Rev, j.Forgotten, j.WrittenBy, j.Group, j.Machine, extra}
 	return nil
 }
 

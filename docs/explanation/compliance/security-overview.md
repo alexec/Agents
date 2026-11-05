@@ -141,6 +141,7 @@ An organisation will be able to require a sandbox by policy (T5, below).
 | Runtime keys that a Mac lends to its servers | Keychain, this device only, when unlocked | Borrowed for each run |
 | MCP sign-ins (OAuth) | `~/.agents-secrets/mcp-sign-ins.json`, mode 0600 | The same |
 | A person's secrets from the control plane | `~/.agents-secrets/secrets.env`, mode 0600 | The same |
+| A machine provider's tokens and keys, on the machine that carries it (#3398) | `~/.agents-secrets/provider-secrets.json`, mode 0600 | The same |
 | The machine's own key | A file of mode 0600 in its data folder | The same |
 | The control plane's key | Keychain (Agents Host), or a file of mode 0600 | A file of mode 0600, or sealed in the store by KMS |
 
@@ -149,8 +150,11 @@ Keychain, on this device only.
 
 On the control plane, a person's secrets are sealed in the store (AES-256-GCM, with a data
 key wrapped by KMS or a local `secrets-key`). A control plane with neither refuses to keep
-them. Machine providers' secrets stay in the control plane's own folder, mode 0600, and
-never go in the store.
+them. The control plane holds no machine provider's secret (#3398): a provider runs on
+one of its person's machines, which keeps its tokens and keys and runs its server, and the
+control plane sends it each list, start and stop. The tokens go through the control plane
+once, on their way to that machine, over TLS. Until clients seal secrets to machines
+(#3397), a control plane could read them as they pass.
 
 **Org keys** for runtimes, kept by the control plane and sealed to each machine, are
 planned (T6, #999).

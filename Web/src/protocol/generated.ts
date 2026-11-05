@@ -7079,7 +7079,9 @@ export interface PromptRequest {
 }
 
 /**
- * providers/add and providers/update. `secrets` only ever goes to the control plane; `cli` is not
+ * providers/add and providers/update. `machine` is the machine that carries the provider (#3398):
+ * it runs the provider's server, and `secrets` go on to it, never kept by the control plane. None
+ * picks the caller's first online machine; an update without it keeps the one it has. `cli` is not
  * kept; `draft` is the draft this accepts (#858).
  */
 export interface ProviderAdd {
@@ -7092,9 +7094,36 @@ export interface ProviderAdd {
   headers?: Record<string, string>;
   commands?: JSONValue;
   map?: JSONValue;
+  machine?: MachineRef;
   secrets?: Record<string, string>;
   cli?: string;
   draft?: UUID;
+}
+
+/**
+ * What a provider's machine answers to providers/carry, providers/keepSecrets, providers/forget and
+ * providers/ssh (#3398): the call's result, or why it failed, in words for the person. Channel 0
+ * has no error path.
+ */
+export interface ProviderCarried {
+  result?: JSONValue;
+  error?: string;
+}
+
+/**
+ * providers/carry (#3398): the control plane asks the machine that carries a provider to call it.
+ * `record` is the provider's record, which never holds a secret; the machine runs its server with
+ * the secrets it keeps. `secrets` is only a draft's, for this call, and is not kept.
+ */
+export interface ProviderCarry {
+  provider: ProviderID;
+  record: JSONValue;
+  call: "check" | "list" | "start" | "stop" | "options" | "create" | "delete" | "tools";
+  workspace?: string;
+  name?: string;
+  options?: JSONValue;
+  firstBoot?: string;
+  secrets?: Record<string, string>;
 }
 
 /** providers/create. */
@@ -7163,6 +7192,14 @@ export interface ProviderDraftUpdate {
 }
 
 /**
+ * providers/forget (#3398): the provider was removed; its machine ends its server and deletes its
+ * secrets.
+ */
+export interface ProviderForget {
+  provider: ProviderID;
+}
+
+/**
  * providers/setGroup (#1761): the group whose users may use the provider. No group is the admins'
  * alone.
  */
@@ -7199,6 +7236,42 @@ export interface ProviderRuntimes {
   why?: string;
 }
 
+/**
+ * providers/ssh (#3398): the machine that carries a codespaces provider starts a codespace's
+ * agentsd over ssh (`start`), or reads its host key (`hostKey`), with the token it keeps. Its
+ * result is ProviderSSHResult.
+ */
+export interface ProviderSSH {
+  provider: ProviderID;
+  op: "start" | "hostKey";
+  destination: string;
+  /** The codespace's name, for gh. */
+  codespace?: string;
+  knownHosts?: string;
+  name?: string;
+  renew?: boolean;
+  trust?: string;
+}
+
+/**
+ * providers/ssh's result (#3398): the host key taken, in known_hosts form, and for hostKey a
+ * fingerprint to trust first.
+ */
+export interface ProviderSSHResult {
+  knownHosts?: string;
+  needsTrust?: string;
+}
+
+/**
+ * providers/keepSecrets (#3398): secrets for a provider the machine carries, laid over what it has
+ * in ~/.agents-secrets; an empty value takes one away. The control plane passes them on and keeps
+ * none.
+ */
+export interface ProviderSecretsKeep {
+  provider: ProviderID;
+  secrets: Record<string, string>;
+}
+
 /** A provider for the Providers page, never its commands, headers or secrets' values. */
 export interface ProviderSummary {
   id: ProviderID;
@@ -7221,8 +7294,19 @@ export interface ProviderSummary {
    */
   mayUse?: boolean;
   /**
-   * The CLI its machines are reached through over ssh (gh, coder) when the machine that runs the
-   * provider has none (#3367). Absent when it needs none or has it.
+   * The machine that carries it: runs its server and keeps its secrets (#3398). Absent for one made
+   * before, which must be added again.
+   */
+  machine?: MachineRef;
+  machineName?: string;
+  /**
+   * Its machine is offline: its machines can't be started, stopped, made or deleted until it is
+   * back (#3398).
+   */
+  machineOffline?: boolean;
+  /**
+   * The CLI its machines are reached through over ssh (gh, coder) when the control plane's machine
+   * has none (#3367). Absent when it needs none or has it.
    */
   sshToolMissing?: string;
 }
@@ -11816,7 +11900,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProjectsChanged: { required: [], optional: ["id", "removed"] },
   ProjectsJoined: { required: ["folders"], optional: [] },
   PromptRequest: { required: ["agentID", "text", "attachments", "from"], optional: ["sendID", "voice"] },
-  ProviderAdd: { required: ["name", "kind"], optional: ["id", "command", "args", "url", "headers", "commands", "map", "secrets", "cli", "draft"] },
+  ProviderAdd: { required: ["name", "kind"], optional: ["id", "command", "args", "url", "headers", "commands", "map", "machine", "secrets", "cli", "draft"] },
+  ProviderCarried: { required: [], optional: ["result", "error"] },
+  ProviderCarry: { required: ["provider", "record", "call"], optional: ["workspace", "name", "options", "firstBoot", "secrets"] },
   ProviderCreate: { required: ["id", "name"], optional: ["options", "clones", "repository"] },
   ProviderCreated: { required: ["workspace", "joining"], optional: [] },
   ProviderDraftAnswer: { required: ["draft", "question", "yes"], optional: [] },
@@ -11825,13 +11911,17 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProviderDraftStart: { required: ["form", "runtimeID"], optional: ["secrets", "provider"] },
   ProviderDraftStarted: { required: ["draft"], optional: ["answered"] },
   ProviderDraftUpdate: { required: ["draft", "state", "runtimeName", "steps"], optional: ["cost", "draftJSON", "check", "question", "note"] },
+  ProviderForget: { required: ["provider"], optional: [] },
   ProviderGroup: { required: ["provider"], optional: ["group"] },
   ProviderList: { required: ["providers"], optional: [] },
   ProviderOptions: { required: ["schema"], optional: [] },
   ProviderRequest: { required: [], optional: ["id"] },
   ProviderRuntime: { required: ["id", "name", "isDefault"], optional: [] },
   ProviderRuntimes: { required: ["runtimes"], optional: ["host", "why"] },
-  ProviderSummary: { required: ["id", "name", "kind", "secrets", "capabilities", "contract", "mapped", "workspaces", "current"], optional: ["preset", "listedAt", "problem", "group", "mayUse", "sshToolMissing"] },
+  ProviderSSH: { required: ["provider", "op", "destination"], optional: ["codespace", "knownHosts", "name", "renew", "trust"] },
+  ProviderSSHResult: { required: [], optional: ["knownHosts", "needsTrust"] },
+  ProviderSecretsKeep: { required: ["provider", "secrets"], optional: [] },
+  ProviderSummary: { required: ["id", "name", "kind", "secrets", "capabilities", "contract", "mapped", "workspaces", "current"], optional: ["preset", "listedAt", "problem", "group", "mayUse", "machine", "machineName", "machineOffline", "sshToolMissing"] },
   PushToken: { required: ["environment"], optional: ["token"] },
   QueuedPrompt: { required: ["id", "text", "attachments", "queuedAt", "from"], optional: ["preface", "sender"] },
   QueuedStart: { required: ["labels"], optional: ["runtimeID", "permissionMode", "model", "worktree"] },

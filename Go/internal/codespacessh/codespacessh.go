@@ -141,7 +141,7 @@ func Prepare(ctx context.Context, path, name, destination, token string, env []s
 	output, err := cmd.Output()
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) || errors.Is(err, fs.ErrNotExist) {
-			return fmt.Errorf("This control plane has no GitHub CLI (gh) to reach the codespace %s over SSH", name)
+			return fmt.Errorf("This machine has no GitHub CLI (gh) to reach the codespace %s over SSH", name)
 		}
 		said := strings.TrimSpace(stderr.String())
 		if said == "" {

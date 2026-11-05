@@ -8,7 +8,8 @@ import (
 )
 
 // The host's list is what its handlers make (#1748): a capability is in it when every method
-// that names it is registered, and the ones a host declares are in it.
+// that names it is registered, or asked on channel 0 (#3398), and the ones a host declares are
+// in it.
 func TestCapabilitiesAreWhatTheHostServes(t *testing.T) {
 	d, _ := start(t, t.TempDir())
 	list := d.Capabilities()
@@ -18,7 +19,9 @@ func TestCapabilitiesAreWhatTheHostServes(t *testing.T) {
 		}
 	}
 	for method, c := range wire.HostCapabilities {
-		if _, served := d.handlers[method]; !served && !wire.HostNotifications[method] && slices.Contains(list, c) {
+		_, served := d.handlers[method]
+		served = served || slices.Contains(carriedMethods, method)
+		if !served && !wire.HostNotifications[method] && slices.Contains(list, c) {
 			t.Errorf("%s is in the list, and %s, one of its methods, is not served", c, method)
 		}
 	}
