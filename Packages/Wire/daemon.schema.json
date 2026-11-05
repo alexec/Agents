@@ -26408,6 +26408,50 @@
             "noticeDelivered"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "The files a turn changed (#3437), recorded as the turn ends when they differ from the snapshot the host took as it began. The chat draws it as the Changed files card at the end of the turn, with Undo These Changes.",
+          "properties": {
+            "turnChanged": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/TurnChanges"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "turnChanged"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "A turn's changes put back (#3437), recorded after the turn's turnChanged entry. A client draws it on that card, never as a line of its own.",
+          "properties": {
+            "turnUndone": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/TurnUndo"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "turnUndone"
+          ],
+          "additionalProperties": false
         }
       ],
       "x-fallback": "keep",
@@ -26475,6 +26519,70 @@
       ],
       "additionalProperties": false
     },
+    "TurnChangedFile": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "relativePath": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/definitions/ChangeState"
+        }
+      },
+      "required": [
+        "path",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "TurnChanges": {
+      "type": "object",
+      "description": "What one turn changed (#3437): the files that differ between the snapshots the host took as the turn began and as it ended, at most 50 (more counts the rest), and the files the agent edited that a snapshot does not hold (cannotUndo: outside the folder, or ignored by git).",
+      "properties": {
+        "turn": {
+          "$ref": "#/definitions/UUID"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TurnChangedFile"
+          }
+        },
+        "more": {
+          "type": "integer"
+        },
+        "cannotUndo": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "onlyReported": {
+          "type": "boolean",
+          "description": "Another agent's turn ran in the same folder, so files names only what this agent reported editing."
+        },
+        "before": {
+          "type": "string",
+          "description": "The git tree of the snapshot as the turn began, for the host's undo."
+        },
+        "after": {
+          "type": "string",
+          "description": "The git tree of the snapshot as the turn ended."
+        },
+        "undone": {
+          "$ref": "#/definitions/TurnUndo",
+          "description": "Never recorded: the later turnUndone entry, said on this card by the fold that draws it (the clients' and the host's turn summary)."
+        }
+      },
+      "required": [
+        "turn",
+        "files"
+      ],
+      "additionalProperties": false
+    },
     "TurnPhase": {
       "type": "string",
       "enum": [
@@ -26521,6 +26629,26 @@
         "id",
         "start",
         "end"
+      ],
+      "additionalProperties": false
+    },
+    "TurnUndo": {
+      "type": "object",
+      "description": "The files changes/undoTurn put back as they were before turn `turn` (#3437).",
+      "properties": {
+        "turn": {
+          "$ref": "#/definitions/UUID"
+        },
+        "putBack": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "turn",
+        "putBack"
       ],
       "additionalProperties": false
     },
@@ -26625,6 +26753,49 @@
       "x-swift-type": "UUID",
       "x-go-type": "UUID",
       "x-ts-type": "string & { readonly __brand: \"UUID\" }"
+    },
+    "UndoTurnRequest": {
+      "type": "object",
+      "description": "changes/undoTurn (#3437): put the files turn `turn` (its prompt's entry) changed back as they were before it. Without confirmed, a file that changed again after the turn puts nothing back, and the result names it.",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "turn": {
+          "$ref": "#/definitions/UUID"
+        },
+        "confirmed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "agentID",
+        "turn"
+      ],
+      "additionalProperties": false
+    },
+    "UndoTurnResult": {
+      "type": "object",
+      "description": "What changes/undoTurn did: the files it put back, or, when it put nothing back for want of confirmed, the files that changed again after the turn (changedSince).",
+      "properties": {
+        "putBack": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "changedSince": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "putBack",
+        "changedSince"
+      ],
+      "additionalProperties": false
     },
     "UnpushedWork": {
       "type": "object",

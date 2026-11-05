@@ -11,7 +11,7 @@ import { openTurnsHeld, rememberOpen, type Store } from "../model/store";
 import { backgroundAge, backgroundEnded, backgroundNoun, isRunning, subagentNoSteps, subagentStatus } from "../model/background";
 import { display, isPersonsAsk, isWorking, type ChatTurn, type Item } from "../model/turns";
 import { fromWireDate, toWireDate } from "../protocol/dates";
-import type { Agent, AppViewCall, BackgroundItem, ClientPermissionSettings, FileMentionDTO, FindMatch, FindResult, TranscriptEntry, TurnSummary } from "../protocol/generated";
+import type { Agent, AppViewCall, BackgroundItem, ClientPermissionSettings, FileMentionDTO, FindMatch, FindResult, TranscriptEntry, TurnSummary, UUID } from "../protocol/generated";
 import { replace, route } from "../route";
 import { useWaitingCards, type WaitingCard } from "./Cards";
 import { OfflineStrip } from "./OfflineStrip";
@@ -211,10 +211,15 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       readFile: (path) => store.readFile(host, session, path),
       // Ask for More at the organisation's budget (#3262): on the control plane, not the host.
       askForMore: () => store.link.call("policy/askForMore", {}),
+      // Undo These Changes on a turn's card (#3437): never on an archived session, nor on a host too old to undo.
+      undoTurn: agent && agent.state !== "archived" && store.has(host, Capability.changesUndo1)
+        ? (turn, confirmed) => store.link.call("changes/undoTurn", { agentID: session as UUID, turn: turn as UUID, ...(confirmed ? { confirmed } : {}) }, host)
+        : undefined,
       // With no Mac, no window shows terminal output (#3425).
       hasMac: store.hasMac.value,
     };
   }, [host, session, agent?.pendingSandboxFailure, down, !agent || agent.state === "archived", store.has(host, Capability.chatBranch1),
+    store.has(host, Capability.changesUndo1),
     store.hasMac.value]);
 
   const scroller = useRef<HTMLDivElement>(null);

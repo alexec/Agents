@@ -97,6 +97,10 @@ struct ChatActions {
     /// Ask for More on that card at the organisation's budget (#3262): sends
     /// `policy/askForMore` on the control plane. Nil draws the card without it.
     var askForMore: (@MainActor () async throws -> DaemonAPI.BudgetRequest)? = nil
+    /// Undo These Changes on a turn's Changed files card (#3437): `changes/undoTurn` for the
+    /// open agent, by the turn, confirmed or not. Nil, where the host is too old or the
+    /// session is archived, draws the card without it.
+    var undoTurn: (@MainActor (UUID, Bool) async throws -> DaemonAPI.UndoTurnResult)? = nil
 }
 
 extension EnvironmentValues {

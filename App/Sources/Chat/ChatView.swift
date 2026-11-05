@@ -272,7 +272,15 @@ struct ChatView: View {
             openPolicy: { [model, requests, openSettings] action in
                 Self.openPolicy(action, model: model, requests: requests, openSettings: openSettings)
             },
-            askForMore: { [model] in try await PolicyLayersWords.askForMore(on: model.controlRequests) })
+            askForMore: { [model] in try await PolicyLayersWords.askForMore(on: model.controlRequests) },
+            undoTurn: undoTurn)
+    }
+
+    /// Undo These Changes on a turn's card (#3437): not on an archived session, nor on a
+    /// host too old to undo.
+    private var undoTurn: (@MainActor (UUID, Bool) async throws -> DaemonAPI.UndoTurnResult)? {
+        guard let agent, agent.state != .archived, model.host(agent.host, has: Capability.changesUndo1) else { return nil }
+        return { [model] turn, confirmed in try await model.undoTurn(turn, of: agent.id, confirmed: confirmed) }
     }
 
     /// A Stopped by a policy card's button (#2957, FR-025): the pane of the layer that

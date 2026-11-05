@@ -9807,7 +9807,9 @@ export type TranscriptEntryKind =
   | { appView: { _0: AppViewCall } }
   | { fileShown: { _0: ShownFile } }
   | { notified: { _0: SentNotice } }
-  | { noticeDelivered: { _0: NoticeDelivery } };
+  | { noticeDelivered: { _0: NoticeDelivery } }
+  | { turnChanged: { _0: TurnChanges } }
+  | { turnUndone: { _0: TurnUndo } };
 
 export interface TranscriptPage {
   firstIndex: number;
@@ -9826,6 +9828,38 @@ export interface TranscriptRequest {
 export interface TunnelOpen {
   runtime: string;
   ref: string;
+}
+
+export interface TurnChangedFile {
+  path: string;
+  relativePath?: string;
+  state: ChangeState;
+}
+
+/**
+ * What one turn changed (#3437): the files that differ between the snapshots the host took as the
+ * turn began and as it ended, at most 50 (more counts the rest), and the files the agent edited
+ * that a snapshot does not hold (cannotUndo: outside the folder, or ignored by git).
+ */
+export interface TurnChanges {
+  turn: UUID;
+  files: TurnChangedFile[];
+  more?: number;
+  cannotUndo?: string[];
+  /**
+   * Another agent's turn ran in the same folder, so files names only what this agent reported
+   * editing.
+   */
+  onlyReported?: boolean;
+  /** The git tree of the snapshot as the turn began, for the host's undo. */
+  before?: string;
+  /** The git tree of the snapshot as the turn ended. */
+  after?: string;
+  /**
+   * Never recorded: the later turnUndone entry, said on this card by the fold that draws it (the
+   * clients' and the host's turn summary).
+   */
+  undone?: TurnUndo;
 }
 
 /**
@@ -9854,6 +9888,12 @@ export interface TurnSummary {
   usage?: TurnUsage;
 }
 
+/** The files changes/undoTurn put back as they were before turn `turn` (#3437). */
+export interface TurnUndo {
+  turn: UUID;
+  putBack: string[];
+}
+
 export interface TurnUsage {
   totalTokens: number;
   inputTokens: number;
@@ -9879,6 +9919,26 @@ export interface TurnsRequest {
   agentID: UUID;
   before?: number;
   limit: number;
+}
+
+/**
+ * changes/undoTurn (#3437): put the files turn `turn` (its prompt's entry) changed back as they
+ * were before it. Without confirmed, a file that changed again after the turn puts nothing back,
+ * and the result names it.
+ */
+export interface UndoTurnRequest {
+  agentID: UUID;
+  turn: UUID;
+  confirmed?: boolean;
+}
+
+/**
+ * What changes/undoTurn did: the files it put back, or, when it put nothing back for want of
+ * confirmed, the files that changed again after the turn (changedSince).
+ */
+export interface UndoTurnResult {
+  putBack: string[];
+  changedSince: string[];
 }
 
 /**
@@ -10796,6 +10856,7 @@ export interface Methods {
   "bots/stopRun": { params: BotStopRun; result: Empty };
   "changes/file": { params: ChangesFileRequest; result: ChangedFileDetail };
   "changes/list": { params: ChangesListRequest; result: ChangesList };
+  "changes/undoTurn": { params: UndoTurnRequest; result: UndoTurnResult };
   "clientPermissions/set": { params: ClientPermissionSettings; result: ClientPermissionSettings };
   "clientPermissions/state": { params: Empty; result: ClientPermissionSettings };
   "clients/forgetSelf": { params: Empty; result: Empty };
@@ -11144,6 +11205,7 @@ export const MethodTarget = {
   "bots/stopRun": "control",
   "changes/file": "host",
   "changes/list": "host",
+  "changes/undoTurn": "host",
   "clientPermissions/set": "host",
   "clientPermissions/state": "host",
   "clients/forgetSelf": "control",
@@ -12387,10 +12449,15 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   TranscriptPage: { required: ["firstIndex", "total", "entries"], optional: [] },
   TranscriptRequest: { required: ["agentID", "limit"], optional: ["before", "from"] },
   TunnelOpen: { required: ["runtime", "ref"], optional: [] },
+  TurnChangedFile: { required: ["path", "state"], optional: ["relativePath"] },
+  TurnChanges: { required: ["turn", "files"], optional: ["more", "cannotUndo", "onlyReported", "before", "after", "undone"] },
   TurnSummary: { required: ["id", "start", "end"], optional: ["ask", "outcome", "steps", "usage"] },
+  TurnUndo: { required: ["turn", "putBack"], optional: [] },
   TurnUsage: { required: ["totalTokens", "inputTokens", "outputTokens"], optional: ["thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "cost", "route", "relayTokens"] },
   TurnsPage: { required: ["turns", "firstTurn", "openStart"], optional: ["firstPrompt"] },
   TurnsRequest: { required: ["agentID", "limit"], optional: ["before"] },
+  UndoTurnRequest: { required: ["agentID", "turn"], optional: ["confirmed"] },
+  UndoTurnResult: { required: ["putBack", "changedSince"], optional: [] },
   UnpushedWork: { required: ["worktree", "folder"], optional: ["branch", "ahead", "unmerged", "uncommitted"] },
   UnqueueRequest: { required: ["agentID", "promptID"], optional: [] },
   UntrustedYourPolicy: { required: ["file", "rules", "revision", "changed", "keeper", "keyID", "lines"], optional: [] },

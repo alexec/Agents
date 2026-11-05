@@ -124,6 +124,7 @@ public extension DaemonAPI {
                 Row(Method.filesRead, params: FilesReadRequest.self, result: FileReading.self, kind: .hostRequest),
                 Row(Method.changesList, params: ChangesListRequest.self, result: ChangesList.self, kind: .hostRequest),
                 Row(Method.changesFile, params: ChangesFileRequest.self, result: ChangedFileDetail.self, kind: .hostRequest),
+                Row(Method.changesUndoTurn, params: UndoTurnRequest.self, result: UndoTurnResult.self, kind: .hostRequest),
                 Row(Method.agentsLabelVocabulary, params: LabelVocabularyRequest.self, result: [String].self,
                     kind: .hostRequest),
                 Row(Method.costState, params: Empty.self, result: CostState.self, kind: .hostRequest),

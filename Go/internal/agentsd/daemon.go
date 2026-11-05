@@ -108,7 +108,9 @@ type Daemon struct {
 	orgRouteState
 	teamPeopleCache
 	// pageEdits is what the person changed on live pages since each agent's last turn.
-	pageEdits  pageEdits
+	pageEdits pageEdits
+	// undoNotes is the files put back by Undo These Changes since each agent's last turn (#3437).
+	undoNotes  undoNotes
 	policyOnce sync.Once
 	policy     SocketPolicy
 	// SettingsDir is the person's settings on this host (StoreLocations.personalSettings):

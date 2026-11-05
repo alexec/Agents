@@ -216,6 +216,8 @@ public enum DaemonAPI {
         public static let changesList = "changes/list"
         /// One file from `changes/list`: its reported edits, and git's view of it.
         public static let changesFile = "changes/file"
+        /// Undo These Changes (#3437): a turn's files back as they were before it.
+        public static let changesUndoTurn = "changes/undoTurn"
         public static let agentsSetOption = "agents/setOption"
         /// Letting one agent carry on past the per-agent limit, or giving it a
         /// tighter ceiling of its own. The reader's call, never an agent's.
@@ -1197,6 +1199,29 @@ public enum DaemonAPI {
     public struct ChangesListRequest: Codable, Sendable {
         public var agentID: UUID
         public init(agentID: UUID) { self.agentID = agentID }
+    }
+
+    /// `changes/undoTurn` (#3437): put the files turn `turn` changed back as they were
+    /// before it. Without `confirmed`, a file that changed again after the turn puts
+    /// nothing back, and the result names it.
+    public struct UndoTurnRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var turn: UUID
+        public var confirmed: Bool?
+        public init(agentID: UUID, turn: UUID, confirmed: Bool? = nil) {
+            self.agentID = agentID
+            self.turn = turn
+            self.confirmed = confirmed
+        }
+    }
+
+    public struct UndoTurnResult: Codable, Sendable, Hashable {
+        public var putBack: [String]
+        public var changedSince: [String]
+        public init(putBack: [String], changedSince: [String]) {
+            self.putBack = putBack
+            self.changedSince = changedSince
+        }
     }
 
     public struct ChangesFileRequest: Codable, Sendable {

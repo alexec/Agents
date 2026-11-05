@@ -727,9 +727,15 @@ func (l *live) turn() bool {
 	// as it goes rather than kept on the queued prompt, which every client is sent on each
 	// change (#1851); before the prompt is recorded, so the record is the one it went on from.
 	branch := d.branchPreface(a)
+	turnEntry := store.NewUUID()
 	if !resent {
-		d.recordFrom(l.id, wire.TranscriptEntryKind{UserMessage: um}, q.Sender)
+		d.recordEntry(l.id, turnEntry, wire.TranscriptEntryKind{UserMessage: um}, q.Sender)
+	} else if id, ok := d.lastPrompt(l.id); ok {
+		turnEntry = id
 	}
+	// The folder as the turn begins, for Undo These Changes (#3437); its end is the second.
+	snap := d.snapshotTurn(l.id, turnEntry)
+	defer d.endTurnSnapshot(snap)
 	// What was suggested has been answered, taken or typed past; only by the person.
 	if from == wire.PromptOriginPerson {
 		d.change(l.id, func(a *wire.Agent) {
@@ -764,6 +770,10 @@ func (l *live) turn() bool {
 	// What the person changed on a live page since this agent's last turn (022 FR-016),
 	// whoever sent the prompt, told once: the edit itself is in the file.
 	if note := d.pageEdits.take(l.id); note != "" {
+		bs = append([]wire.ContentBlock{textBlock(note)}, bs...)
+	}
+	// And the files the person put back with Undo These Changes (#3437).
+	if note := d.undoNotes.take(l.id); note != "" {
 		bs = append([]wire.ContentBlock{textBlock(note)}, bs...)
 	}
 	if q.Preface != nil {

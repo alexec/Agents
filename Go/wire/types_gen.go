@@ -11405,6 +11405,10 @@ type TranscriptEntryKind struct {
 
 	NoticeDelivered *TranscriptEntryKindNoticeDelivered `json:"noticeDelivered,omitzero"`
 
+	TurnChanged *TranscriptEntryKindTurnChanged `json:"turnChanged,omitzero"`
+
+	TurnUndone *TranscriptEntryKindTurnUndone `json:"turnUndone,omitzero"`
+
 	// Unrecognised is a case this build does not know, written back as it was read.
 	Unrecognised JSONValue `json:"-"`
 }
@@ -11422,7 +11426,7 @@ func (v TranscriptEntryKind) MarshalJSON() ([]byte, error) {
 func (v *TranscriptEntryKind) UnmarshalJSON(b []byte) error {
 	type plain TranscriptEntryKind
 	var p plain
-	if err := json.Unmarshal(b, &p); err != nil || (p.UserMessage == nil && p.AgentMessage == nil && p.AgentThought == nil && p.ToolCall == nil && p.ToolCallUpdate == nil && p.PlanUpdated == nil && p.UsageRecorded == nil && p.ServedRequest == nil && p.ElicitationAsked == nil && p.ElicitationAnswered == nil && p.Compaction == nil && p.Notice == nil && p.PermissionAsked == nil && p.PermissionAnswered == nil && p.OptionChanged == nil && p.StateChanged == nil && p.Background == nil && p.WorkReported == nil && p.RuntimeNote == nil && p.SandboxFailure == nil && p.PolicyStopped == nil && p.AppView == nil && p.FileShown == nil && p.Notified == nil && p.NoticeDelivered == nil) {
+	if err := json.Unmarshal(b, &p); err != nil || (p.UserMessage == nil && p.AgentMessage == nil && p.AgentThought == nil && p.ToolCall == nil && p.ToolCallUpdate == nil && p.PlanUpdated == nil && p.UsageRecorded == nil && p.ServedRequest == nil && p.ElicitationAsked == nil && p.ElicitationAnswered == nil && p.Compaction == nil && p.Notice == nil && p.PermissionAsked == nil && p.PermissionAnswered == nil && p.OptionChanged == nil && p.StateChanged == nil && p.Background == nil && p.WorkReported == nil && p.RuntimeNote == nil && p.SandboxFailure == nil && p.PolicyStopped == nil && p.AppView == nil && p.FileShown == nil && p.Notified == nil && p.NoticeDelivered == nil && p.TurnChanged == nil && p.TurnUndone == nil) {
 		*v = TranscriptEntryKind{Unrecognised: append(JSONValue(nil), b...)}
 		return nil
 	}
@@ -11557,6 +11561,14 @@ type TranscriptEntryKindNoticeDelivered struct {
 	Value NoticeDelivery `json:"_0"`
 }
 
+type TranscriptEntryKindTurnChanged struct {
+	Value TurnChanges `json:"_0"`
+}
+
+type TranscriptEntryKindTurnUndone struct {
+	Value TurnUndo `json:"_0"`
+}
+
 type TranscriptPage struct {
 	FirstIndex int64 `json:"firstIndex"`
 
@@ -11580,6 +11592,37 @@ type TunnelOpen struct {
 	Runtime string `json:"runtime"`
 
 	Ref string `json:"ref"`
+}
+
+type TurnChangedFile struct {
+	Path string `json:"path"`
+
+	RelativePath *string `json:"relativePath,omitzero"`
+
+	State ChangeState `json:"state"`
+}
+
+// What one turn changed (#3437): the files that differ between the snapshots the host took as the turn began and as it ended, at most 50 (more counts the rest), and the files the agent edited that a snapshot does not hold (cannotUndo: outside the folder, or ignored by git).
+type TurnChanges struct {
+	Turn UUID `json:"turn"`
+
+	Files []TurnChangedFile `json:"files"`
+
+	More *int64 `json:"more,omitzero"`
+
+	CannotUndo []string `json:"cannotUndo,omitzero"`
+
+	// Another agent's turn ran in the same folder, so files names only what this agent reported editing.
+	OnlyReported *bool `json:"onlyReported,omitzero"`
+
+	// The git tree of the snapshot as the turn began, for the host's undo.
+	Before *string `json:"before,omitzero"`
+
+	// The git tree of the snapshot as the turn ended.
+	After *string `json:"after,omitzero"`
+
+	// Never recorded: the later turnUndone entry, said on this card by the fold that draws it (the clients' and the host's turn summary).
+	Undone *TurnUndo `json:"undone,omitzero"`
 }
 
 // Where a session's turn is, as its Live Activity says it (#1744): working; a question or an approval waiting on the person; done; ended cleanly but wanting the person, as Needs you in the sidebars (#1861); stopped on purpose, as Paused in the sidebars (#1869); or ended in error, as Unexpected stop; or gone (archived or deleted).
@@ -11608,6 +11651,13 @@ type TurnSummary struct {
 	Steps *int64 `json:"steps,omitzero"`
 
 	Usage *TurnUsage `json:"usage,omitzero"`
+}
+
+// The files changes/undoTurn put back as they were before turn `turn` (#3437).
+type TurnUndo struct {
+	Turn UUID `json:"turn"`
+
+	PutBack []string `json:"putBack"`
 }
 
 type TurnUsage struct {
@@ -11648,6 +11698,22 @@ type TurnsRequest struct {
 	Before *int64 `json:"before,omitzero"`
 
 	Limit int64 `json:"limit"`
+}
+
+// changes/undoTurn (#3437): put the files turn `turn` (its prompt's entry) changed back as they were before it. Without confirmed, a file that changed again after the turn puts nothing back, and the result names it.
+type UndoTurnRequest struct {
+	AgentID UUID `json:"agentID"`
+
+	Turn UUID `json:"turn"`
+
+	Confirmed *bool `json:"confirmed,omitzero"`
+}
+
+// What changes/undoTurn did: the files it put back, or, when it put nothing back for want of confirmed, the files that changed again after the turn (changedSince).
+type UndoTurnResult struct {
+	PutBack []string `json:"putBack"`
+
+	ChangedSince []string `json:"changedSince"`
 }
 
 // A worktree with work that is not pushed: commits ahead of its upstream (`ahead`), or on a branch with no upstream (`unmerged`, commits not on the base), and changes not committed (`uncommitted`).

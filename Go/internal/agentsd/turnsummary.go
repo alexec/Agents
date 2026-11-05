@@ -89,7 +89,8 @@ func (it item) isOutcome() bool {
 	switch {
 	case it.isRun():
 		return false
-	case k.ElicitationAnswered != nil, k.WorkReported != nil, k.SandboxFailure != nil, k.AppView != nil, k.FileShown != nil, k.Notified != nil:
+	case k.ElicitationAnswered != nil, k.WorkReported != nil, k.SandboxFailure != nil, k.AppView != nil, k.FileShown != nil, k.Notified != nil,
+		k.TurnChanged != nil:
 		return true
 	case k.StateChanged != nil:
 		return k.StateChanged.Value == wire.AgentStateStopped
@@ -267,7 +268,8 @@ func totalUsage(entries []wire.TranscriptEntry) *wire.TurnUsage {
 
 // display is TranscriptEntry.display, for the agent's own entries (no subagent's).
 func display(entries []wire.TranscriptEntry) []item {
-	b := &displayBuilder{suppressed: map[string]bool{}, closedRunAt: map[string]int{}, viewAt: map[wire.UUID]int{}, noticeAt: map[wire.UUID]int{}}
+	b := &displayBuilder{suppressed: map[string]bool{}, closedRunAt: map[string]int{}, viewAt: map[wire.UUID]int{}, noticeAt: map[wire.UUID]int{},
+		changesAt: map[wire.UUID]int{}}
 	for i := range entries {
 		b.add(entries[i])
 	}
@@ -286,6 +288,9 @@ type displayBuilder struct {
 	settled     int
 	// noticeAt is where each notice's line is (#2860): where it went is said on it.
 	noticeAt map[wire.UUID]int
+	// changesAt is where each turn's Changed files card is (#3437), by its turn: an undo
+	// is said on it.
+	changesAt map[wire.UUID]int
 }
 
 func (b *displayBuilder) add(e wire.TranscriptEntry) {
@@ -376,6 +381,23 @@ func (b *displayBuilder) add(e wire.TranscriptEntry) {
 				notice.To = &to
 				line.Kind = wire.TranscriptEntryKind{Notified: &wire.TranscriptEntryKindNotified{Value: notice}}
 				b.drawn[at] = item{entry: &line}
+			}
+		}
+	case k.TurnChanged != nil:
+		// The card stands on its own at the end of the turn (#3437).
+		b.closeRun()
+		b.changesAt[k.TurnChanged.Value.Turn] = len(b.drawn)
+		b.drawn = append(b.drawn, item{entry: &e})
+	case k.TurnUndone != nil:
+		// Said on the turn's card, never a line of its own.
+		undo := k.TurnUndone.Value
+		if at, ok := b.changesAt[undo.Turn]; ok && at < len(b.drawn) && b.drawn[at].entry != nil {
+			card := *b.drawn[at].entry
+			if card.Kind.TurnChanged != nil {
+				changes := card.Kind.TurnChanged.Value
+				changes.Undone = &undo
+				card.Kind = wire.TranscriptEntryKind{TurnChanged: &wire.TranscriptEntryKindTurnChanged{Value: changes}}
+				b.drawn[at] = item{entry: &card}
 			}
 		}
 	case k.Compaction != nil:

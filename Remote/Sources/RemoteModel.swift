@@ -4876,6 +4876,14 @@ final class RemoteModel {
     /// Branch from Here (#1658): a new session from just before one of the person's prompts,
     /// opened as Branch opens one, with that prompt in its bar to change and send. The words
     /// go in as the new session's draft, so its bar has them however it comes on screen.
+    /// Undo These Changes on a turn's card (#3437), on the agent's Mac. Thrown errors are
+    /// the card's to say.
+    func undoTurn(_ turn: UUID, of agentID: UUID, confirmed: Bool) async throws -> DaemonAPI.UndoTurnResult {
+        try await sendOnce(DaemonAPI.Method.changesUndoTurn,
+                           DaemonAPI.UndoTurnRequest(agentID: agentID, turn: turn, confirmed: confirmed ? true : nil))
+            .decode(DaemonAPI.UndoTurnResult.self)
+    }
+
     func branch(from entryID: UUID, of agentID: UUID, text: String) async {
         guard !isStale(on: work.agent(agentID)?.host ?? .mac) else {
             problem = "Your Mac is not answering, so that could not be sent."
