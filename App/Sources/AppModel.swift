@@ -3664,6 +3664,12 @@ final class AppModel {
     func approveLock(_ request: DaemonAPI.LockJoinRequest) async { await lock.approve(request, on: controlRequests) }
     func denyLock(_ request: DaemonAPI.LockJoinRequest) async { await lock.deny(request, on: controlRequests) }
     func askLockAgain() async { await lock.askAgain(on: controlRequests) }
+    /// The recovery key (#3493, D4): Use Recovery Key, Start a New Lock, Make Recovery Key, and
+    /// I Saved It or Skip.
+    func useLockRecovery(_ text: String) async -> String? { await lock.useRecoveryKey(text, on: controlRequests) }
+    func startNewLock() async { await lock.startNewLock(on: controlRequests) }
+    func makeLockRecovery() async { await lock.makeRecoveryKey(on: controlRequests) }
+    func dismissLockRecovery() { lock.dismissRecovery() }
 
     /// Approve, Deny or Send on a channel link's card (#1762): a refusal is the window's alert.
     func answerLink(_ request: DaemonAPI.ChannelLinkRequest, approve: Bool, to person: String?) async {

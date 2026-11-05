@@ -5447,7 +5447,7 @@ type LockAdd struct {
 	Entries []LockEntry `json:"entries"`
 }
 
-// What a lock entry says (#3399), as its signer wrote it: the JSON that LockEntry.body carries, byte for byte. v is 1. Every entry names its person and, except the root, previous: the SHA-256 of the entry before's body. signer is the P-256 signing key that signed it, X9.63. key is the root's first signing key, the client, machine or invite added, the key removed, or the recovery key's public half. sealingKey and id are a machine's (addMachine); clientKind is a client's (addClient: mac, remote or web); expires is an invite's.
+// What a lock entry says (#3399), as its signer wrote it: the JSON that LockEntry.body carries, byte for byte. v is 1. Every entry names its person and, except the root, previous: the SHA-256 of the entry before's body. signer is the P-256 signing key that signed it, X9.63. key is the root's first signing key, the client, machine or invite added, the key removed, or the recovery key's public half. sealingKey and id are a machine's (addMachine); clientKind is a client's (addClient: mac, remote or web); expires is an invite's; sealed is a recovery entry's (#3493, D4): the recovery key's private half, AES-256-GCM under a key made from the recovery secret the person keeps (a 12-byte nonce, then the sealed 32 bytes and the tag), so a new client that is typed the secret signs with it.
 type LockBody struct {
 	V int64 `json:"v"`
 
@@ -5472,6 +5472,8 @@ type LockBody struct {
 	ClientKind *string `json:"clientKind,omitzero"`
 
 	Expires *Date `json:"expires,omitzero"`
+
+	Sealed Data `json:"sealed,omitzero"`
 }
 
 // A request signed for a machine (#3492), as the control plane keeps it and delivers it: the method, the params as the sender wrote them (text, so no byte of them changes on the way), and the signature.

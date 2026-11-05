@@ -2290,6 +2290,12 @@ final class RemoteModel {
     func approveLock(_ request: DaemonAPI.LockJoinRequest) async { await lock.approve(request, on: controlPlane) }
     func denyLock(_ request: DaemonAPI.LockJoinRequest) async { await lock.deny(request, on: controlPlane) }
     func askLockAgain() async { await lock.askAgain(on: controlPlane) }
+    /// The recovery key (#3493, D4): Use Recovery Key, Start a New Lock, Make Recovery Key, and
+    /// I Saved It or Skip.
+    func useLockRecovery(_ text: String) async -> String? { await lock.useRecoveryKey(text, on: controlPlane) }
+    func startNewLock() async { await lock.startNewLock(on: controlPlane) }
+    func makeLockRecovery() async { await lock.makeRecoveryKey(on: controlPlane) }
+    func dismissLockRecovery() { lock.dismissRecovery() }
 
     func answerSignIn(_ request: DaemonAPI.SignInRequest, approve: Bool, code: String? = nil) async {
         if let refused = await signIn.answer(request, approve: approve, code: code, on: controlPlane) {

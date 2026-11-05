@@ -109,6 +109,8 @@ export class LockState {
   readonly hashes: Uint8Array[] = [];
   readonly members = new Map<string, LockMember>();
   recovery: Uint8Array | null = null;
+  /** The recovery key's private half, sealed under the person's secret (#3493); null for none. */
+  recoverySealed: Uint8Array | null = null;
 
   get count(): number {
     return this.hashes.length;
@@ -205,6 +207,7 @@ export class LockState {
     } else if (body.kind === "recovery") {
       if (this.members.has(keyID(key))) throw bad("invalid", "the recovery key is a member of the lock");
       this.recovery = key;
+      this.recoverySealed = body.sealed ? fromBase64(body.sealed) : null;
     } else {
       if (this.members.has(keyID(key)) || (this.recovery !== null && same(key, this.recovery))) throw bad("invalid", "its key is in the lock already");
       this.take(body, i);
@@ -250,7 +253,7 @@ export async function open(entry: LockEntry, index = 0): Promise<LockBody> {
   if (typeof body !== "object" || body === null) throw bad("invalid", "its body does not read");
   if (body.v !== version) throw bad("invalid", `version ${String(body.v)}, not ${version}`);
   if (typeof body.at !== "number" || typeof body.person !== "string" || typeof body.kind !== "string" ||
-    !["signer", "key", "previous", "sealingKey"].every((field) => readsAsBase64((body as unknown as Record<string, unknown>)[field]))) {
+    !["signer", "key", "previous", "sealingKey", "sealed"].every((field) => readsAsBase64((body as unknown as Record<string, unknown>)[field]))) {
     throw bad("invalid", "its body does not read");
   }
   const key = await verifyKey(fromBase64(body.signer));
@@ -293,7 +296,7 @@ export async function sign(privateKey: CryptoKey, publicRaw: Uint8Array, draft: 
   full["signer"] = base64(publicRaw);
   full["at"] = draft.at;
   full["key"] = draft.key;
-  for (const field of ["sealingKey", "id", "name", "clientKind", "expires"] as const) {
+  for (const field of ["sealingKey", "id", "name", "clientKind", "expires", "sealed"] as const) {
     if (draft[field] !== undefined) full[field] = draft[field];
   }
   const body = utf8(JSON.stringify(full));
@@ -408,4 +411,106 @@ export function inviteCode(text: string, invite: Uint8Array, pin: LockPin): stri
   fields[1] = "4";
   fields.push(base64URL(invite), escapeField(pin.person), String(pin.count), base64URL(fromBase64(pin.head)));
   return fields.join(":");
+}
+
+// The recovery key (#3493, specs/3399-machine-lock D4), as Go's machinelock/recovery.go makes
+// it: a P-256 signing key made at random, its public half a signer of the lock, its private half
+// sealed in the recovery entry under a 16-byte secret that only the person keeps. The person sees
+// the secret with a 4-byte check as 32 letters and digits in groups of four (Crockford's base32).
+
+export const recoverySecretSize = 16;
+const recoveryCheckDomain = "agents-lock-recovery-check/1\n";
+const recoverySealDomain = "agents-lock-recovery/1\n";
+const crockford = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+/** Typed text that is not a recovery key, or one that is not this lock's. */
+export class RecoveryError extends Error {
+  constructor(readonly typo: boolean) {
+    super(typo ? "That is not a recovery key. Check it for a typo." : "That recovery key is not your lock’s.");
+  }
+}
+
+async function recoveryCheck(secret: Uint8Array): Promise<Uint8Array> {
+  return (await sha256(utf8(recoveryCheckDomain), secret)).slice(0, 4);
+}
+
+/** The secret as the person sees it: "ABCD-EFGH-…", eight groups of four. */
+export async function recoveryText(secret: Uint8Array): Promise<string> {
+  const raw = concat(secret, await recoveryCheck(secret));
+  let out = "";
+  let acc = 0;
+  let bits = 0;
+  let n = 0;
+  for (const b of raw) {
+    acc = ((acc << 8) | b) & 0xffff;
+    bits += 8;
+    while (bits >= 5) {
+      bits -= 5;
+      if (n > 0 && n % 4 === 0) out += "-";
+      out += crockford[(acc >> bits) & 31];
+      n++;
+    }
+  }
+  return out;
+}
+
+/** Reads a secret as typed: any case, dashes and spaces or none, O as 0, I and L as 1. */
+export async function parseRecovery(text: string): Promise<Uint8Array> {
+  const raw: number[] = [];
+  let acc = 0;
+  let bits = 0;
+  let count = 0;
+  for (let c of text.toUpperCase()) {
+    if (c === "-" || /\s/.test(c)) continue;
+    if (c === "O") c = "0";
+    if (c === "I" || c === "L") c = "1";
+    const v = crockford.indexOf(c);
+    if (v < 0) throw new RecoveryError(true);
+    count++;
+    acc = ((acc << 5) | v) & 0xffff;
+    bits += 5;
+    if (bits >= 8) {
+      bits -= 8;
+      raw.push((acc >> bits) & 0xff);
+    }
+  }
+  if (count !== 32 || raw.length !== recoverySecretSize + 4) throw new RecoveryError(true);
+  const secret = Uint8Array.from(raw.slice(0, recoverySecretSize));
+  if (!same(await recoveryCheck(secret), Uint8Array.from(raw.slice(recoverySecretSize)))) throw new RecoveryError(true);
+  return secret;
+}
+
+async function recoveryAEADKey(secret: Uint8Array, publicRaw: Uint8Array): Promise<CryptoKey> {
+  const base = await crypto.subtle.importKey("raw", secret as BufferSource, "HKDF", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({ name: "HKDF", hash: "SHA-256", salt: new Uint8Array(), info: concat(utf8(recoverySealDomain), publicRaw) as BufferSource },
+    base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+}
+
+/** A new recovery key: the secret to show once, and its public half and sealed private half for the entry. */
+export async function makeRecovery(): Promise<{ text: string; publicRaw: Uint8Array; sealed: Uint8Array }> {
+  const secret = crypto.getRandomValues(new Uint8Array(recoverySecretSize));
+  const pair = (await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"])) as CryptoKeyPair;
+  const publicRaw = new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey));
+  const jwk = await crypto.subtle.exportKey("jwk", pair.privateKey);
+  const nonce = crypto.getRandomValues(new Uint8Array(12));
+  const sealed = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce, additionalData: publicRaw as BufferSource },
+    await recoveryAEADKey(secret, publicRaw), fromBase64URL(jwk.d ?? "") as BufferSource));
+  return { text: await recoveryText(secret), publicRaw, sealed: concat(nonce, sealed) };
+}
+
+/** Opens the lock's recovery key with the secret the person typed: a key that signs, not one that leaves. */
+export async function openRecovery(secret: Uint8Array, publicRaw: Uint8Array, sealed: Uint8Array): Promise<CryptoKey> {
+  let d: Uint8Array;
+  try {
+    d = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: sealed.slice(0, 12) as BufferSource, additionalData: publicRaw as BufferSource },
+      await recoveryAEADKey(secret, publicRaw), sealed.slice(12) as BufferSource));
+  } catch {
+    throw new RecoveryError(false);
+  }
+  const jwk = { kty: "EC", crv: "P-256", d: base64URL(d), x: base64URL(publicRaw.slice(1, 33)), y: base64URL(publicRaw.slice(33, 65)) };
+  try {
+    return await crypto.subtle.importKey("jwk", jwk, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
+  } catch {
+    throw new RecoveryError(false);
+  }
 }

@@ -1945,6 +1945,27 @@
       }
     },
     {
+      "name": "host/lockAgain",
+      "x-capability": "host.lock/4",
+      "description": "A machine, on its channel 0 (#3493, specs/3399-machine-lock D4): its lock was reset with agentsd lock reset, so send it its person's lock again, though it was sent that one already. The machine pins it on first use.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "host/lockJoin",
       "x-capability": "host.lock/2",
       "description": "A machine that is not in its person's lock and has no invite (#3491, D3: it asked to join, a provider started it with no client there, or it joined before the lock): it asks to be added, with its own key and a commitment, as lock/join does for a client. Every client of the person is shown the request; host/lockJoinChanged tells the machine how it goes on.",
@@ -3191,6 +3212,32 @@
           "required": true,
           "schema": {
             "$ref": "daemon.schema.json#/definitions/LockJoinNonce"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "lock/reset",
+      "x-capability": "lock-reset/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "A client's (#3493, specs/3399-machine-lock D4): start a new lock, when every signer and the recovery key are lost. The control plane drops the caller's lock; the client then signs a new root. Every client and machine that pinned the old lock refuses the new one until it joins again: a machine after agentsd lock reset in its shell. The control plane could always drop a lock, so this gives it nothing new.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
           }
         }
       ],

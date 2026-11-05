@@ -6,9 +6,9 @@ give a client a key of its own. This is the decision of the spike #3399. The bui
 #3400 (epic #3401). The model is Tailscale's
 [Tailnet Lock](https://tailscale.com/kb/1226/tailnet-lock).
 
-Steps 1 (#3489), 2 (#3490), 3 (#3491) and 4 (#3492) of "The build" are built: the chain,
-clients that sign, machines that join signed, and machines that check each request. Step
-6's docs went with step 4.
+Every step of "The build" is built: the chain (#3489), clients that sign (#3490), machines
+that join signed (#3491), machines that check each request (#3492) and recovery (#3493).
+Step 6's docs went with step 4.
 
 How step 2 is built (#3490):
 
@@ -133,6 +133,48 @@ How step 4 is built (#3492):
 - Decided: who did it in the audit stays the control plane's word (`ChannelOpen.actor`),
   because an addClient names a key, not a client id. The machine knows the device by its key
   (#3543).
+
+How step 5 is built (#3493):
+
+- **The recovery key.** The client that signs the root puts a `recovery` entry on with it, in
+  the same `lock/add`, and shows the key once: "Save your recovery key." with Copy, I Saved It
+  and Skip. The person sees 16 random bytes and a 4-byte check (SHA-256 of
+  `agents-lock-recovery-check/1\n` and the bytes) as 32 letters and digits in groups of four,
+  Crockford's base32, so a typo is found before anything is sent; O reads as 0, I and L as 1.
+- **The recovery key is a P-256 key made at random**, its public half the entry's `key`. The
+  entry's `sealed` is its private half under AES-256-GCM, with a key that HKDF-SHA256 makes from
+  the 16 bytes (info `agents-lock-recovery/1\n` and the public half), the public half as the
+  additional data: a 12-byte nonce, then the sealed bytes and the tag. **Use Recovery Key**, on
+  a client that is not in the lock, opens it and signs that client's own `addClient`. Go
+  (`machinelock/recovery.go`), CryptoKit and WebCrypto read the same vectors
+  (`Fixtures/lock/recovery.json`).
+- **Start a New Lock** (`lock/reset`, capability `lock-reset/1`): the control plane drops the
+  person's lock; the client forgets its pin and signs a new root and recovery key. Each client
+  and machine that pinned the old lock refuses the new one ("The lock changed in a way your
+  devices did not sign.").
+- **`agentsd lock reset`** calls `daemon/lockReset` on `daemon.sock`, any process of the
+  machine's own account (the stranger role), and is refused on a channel from the control
+  plane or the window's local socket, also one a client of the lock signed. The machine drops
+  its pin, the lock it kept, its invite and its request to join, and asks again with
+  `host/lockAgain` (capability `host.lock/4`); it then pins the next lock on first use and asks
+  to join. With no agentsd running, the command removes the files itself.
+- Decided: the recovery key is a random key whose private half the lock keeps sealed, not a
+  key made from the secret, because WebCrypto cannot make a P-256 public key from a private
+  one in every browser, and a sealed key needs only HKDF and AES-GCM, which all three
+  platforms have. The control plane keeps the sealed key; without the 128-bit secret it
+  cannot open it.
+- Decided: letters and digits in groups of four (as Apple's recovery key), not a line of
+  words, because a word list would be one more file to keep the same in Go, Swift and the web
+  page, and a password manager keeps either.
+- Decided: a device asks again, with "Make a recovery key." (Make Recovery Key, Skip), while
+  the lock has one client and the person neither saved nor skipped a key on that device. A key
+  that was shown and not saved is gone once the app closes, so Make Recovery Key puts a new
+  `recovery` entry on, which takes the old key's place.
+- Decided: Use Recovery Key and Start a New Lock are on the card of a device that waits for
+  approval, and Start a New Lock asks first, because a person who still has a device should
+  approve the new one from it.
+- Not built: a device that pinned the old lock (the broken card) has no way to forget it but
+  removing the app's data; the fingerprint in Settings ▸ Clients and in `agentsd status` (D1).
 
 ## What is wrong today
 

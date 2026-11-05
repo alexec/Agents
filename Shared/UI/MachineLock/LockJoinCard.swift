@@ -85,10 +85,19 @@ struct LockJoinCard: View {
 }
 
 /// This device is not in the person's lock yet (#3490): it waits for approval on another of
-/// their devices, and shows the digits to compare once that device sent its nonce.
+/// their devices, and shows the digits to compare once that device sent its nonce. With no
+/// other device left, Use Recovery Key adds it with the key the person kept, and Start a New
+/// Lock, with no key either, starts the lock again (#3493, D4).
 struct ThisDeviceLockCard: View {
     let place: LockState.Place
+    let isBusy: Bool
     let askAgain: () -> Void
+    let useRecovery: (String) async -> String?
+    let startNewLock: () -> Void
+    @State private var recovering = false
+    @State private var typed = ""
+    @State private var failure: String?
+    @State private var confirmsNewLock = false
 
     var body: some View {
         LockCardFrame(label: title) {
@@ -101,17 +110,83 @@ struct ThisDeviceLockCard: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(LockWords.checkOther(digits))
+                recovery
             case .asking:
                 Text(LockWords.openOther).fixedSize(horizontal: false, vertical: true)
+                recovery
             case .ended:
-                Button(LockWords.askAgain, action: askAgain)
-                    .buttonStyle(.bordered)
-                    .cardButtons()
-                    .padding(.top, 2)
+                HStack(spacing: 8) {
+                    if !recovering {
+                        Button(LockWords.useRecovery) { recovering = true }
+                            .buttonStyle(.bordered)
+                    }
+                    Button(LockWords.askAgain, action: askAgain)
+                        .buttonStyle(.bordered)
+                }
+                .cardButtons()
+                .padding(.top, 2)
+                if recovering { form }
             case .broken, .member, .unknown:
                 EmptyView()
             }
         }
+        .confirmationDialog(LockWords.newLockTitle, isPresented: $confirmsNewLock, titleVisibility: .visible) {
+            Button(LockWords.startNewLock, role: .destructive, action: startNewLock)
+        } message: {
+            Text(LockWords.newLockMessage)
+        }
+    }
+
+    @ViewBuilder private var recovery: some View {
+        if recovering {
+            form
+        } else {
+            Button(LockWords.useRecovery) { recovering = true }
+                .buttonStyle(.bordered)
+                .cardButtons()
+                .padding(.top, 2)
+        }
+    }
+
+    /// The field for the recovery key, and its buttons.
+    private var form: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            TextField(LockWords.typeRecovery, text: $typed)
+                .textFieldStyle(.roundedBorder)
+                .monospaced()
+                .autocorrectionDisabled()
+                #if os(iOS)
+                .textInputAutocapitalization(.characters)
+                #endif
+                .onSubmit(use)
+            if let failure {
+                Text(failure)
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack(spacing: 8) {
+                Button(LockWords.use, action: use)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(typed.trimmingCharacters(in: .whitespaces).isEmpty)
+                Button("Cancel") {
+                    recovering = false
+                    failure = nil
+                }
+                .buttonStyle(.bordered)
+                Button(LockWords.startNewLock) { confirmsNewLock = true }
+                    .buttonStyle(.bordered)
+                if isBusy { ProgressView().controlSize(.small) }
+            }
+            .cardButtons()
+            .disabled(isBusy)
+        }
+        .padding(.top, 2)
+    }
+
+    private func use() {
+        let text = typed
+        Task { failure = await useRecovery(text) }
     }
 
     private var title: String {
@@ -119,6 +194,62 @@ struct ThisDeviceLockCard: View {
         case .ended(let denied): denied ? LockWords.denied : LockWords.expired
         case .broken(let failure): failure.isFork ? LockWords.forked : LockWords.broken(failure.why)
         default: LockWords.thisDevice
+        }
+    }
+}
+
+/// The recovery key on a device in the lock (#3493, D4): shown once after it is made, to keep
+/// in a password manager; or an offer to make one while the lock has only this device. The web
+/// page's is `RecoveryKeyCard` in `Web/src/views/LockJoins.tsx`.
+struct RecoveryKeyCard: View {
+    let card: LockState.RecoveryCard
+    let isBusy: Bool
+    let make: () -> Void
+    let dismiss: () -> Void
+    @State private var copied = false
+
+    var body: some View {
+        switch card {
+        case .none:
+            EmptyView()
+        case .offer:
+            LockCardFrame(label: LockWords.makeRecovery) {
+                Text(LockWords.makeRecovery).fontWeight(.semibold)
+                Text(LockWords.recoveryWhy).fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 8) {
+                    Button(LockWords.makeRecoveryButton, action: make)
+                        .buttonStyle(.borderedProminent)
+                    Button(LockWords.skip, action: dismiss)
+                        .buttonStyle(.bordered)
+                    if isBusy { ProgressView().controlSize(.small) }
+                }
+                .cardButtons()
+                .disabled(isBusy)
+                .padding(.top, 2)
+            }
+        case .show(let text):
+            LockCardFrame(label: LockWords.saveRecovery) {
+                Text(LockWords.saveRecovery).fontWeight(.semibold)
+                Text(text)
+                    .monospaced()
+                    .fontWeight(.semibold)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(LockWords.recoveryShownOnce).fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 8) {
+                    Button(LockWords.savedIt, action: dismiss)
+                        .buttonStyle(.borderedProminent)
+                    Button(copied ? "Copied" : "Copy") {
+                        Clipboard.copy(text)
+                        copied = true
+                    }
+                    .buttonStyle(.bordered)
+                    Button(LockWords.skip, action: dismiss)
+                        .buttonStyle(.bordered)
+                }
+                .cardButtons()
+                .padding(.top, 2)
+            }
         }
     }
 }

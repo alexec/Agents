@@ -29,10 +29,12 @@ public extension DaemonAPI {
         public var name: String?
         public var clientKind: String?
         public var expires: Date?
+        /// A recovery entry's (#3493): the recovery key's private half, sealed under the secret.
+        public var sealed: Data?
 
         public init(kind: LockEntryKind, person: String, previous: Data? = nil, signer: Data = Data(), at: Date = Date(),
                     key: Data, sealingKey: Data? = nil, id: String? = nil, name: String? = nil, clientKind: String? = nil,
-                    expires: Date? = nil) {
+                    expires: Date? = nil, sealed: Data? = nil) {
             v = 1
             self.kind = kind
             self.person = person
@@ -45,6 +47,7 @@ public extension DaemonAPI {
             self.name = name
             self.clientKind = clientKind
             self.expires = expires
+            self.sealed = sealed
         }
     }
 
@@ -240,6 +243,8 @@ public extension DaemonAPI.Method {
     static let lockJoinReveal = "lock/joinReveal"
     /// `LockJoinEnd` → `{}` (#3490).
     static let lockJoinDeny = "lock/joinDeny"
+    /// `{}` → `{}` (#3493): start a new lock, when every signer and the recovery key are lost.
+    static let lockReset = "lock/reset"
 }
 
 public extension DaemonAPI.Notification {
@@ -324,6 +329,8 @@ public enum MachineLock {
         public private(set) var hashes: [Data] = []
         public private(set) var members: [Data: Member] = [:]
         public private(set) var recovery: Data?
+        /// The recovery key's private half, sealed under the person's secret (#3493).
+        public private(set) var recoverySealed: Data?
 
         public init() {}
 
@@ -385,6 +392,7 @@ public enum MachineLock {
             case .recovery:
                 guard members[body.key] == nil else { throw .invalid("entry \(i): the recovery key is a member of the lock") }
                 recovery = body.key
+                recoverySealed = body.sealed
             default:
                 guard members[body.key] == nil, body.key != recovery else { throw .invalid("entry \(i): its key is in the lock already") }
                 take(body, at: i)
@@ -546,6 +554,90 @@ public enum MachineLock {
     }
 }
 
+/// The recovery key (#3493, `specs/3399-machine-lock` D4), as Go's `machinelock/recovery.go`
+/// makes it: a P-256 signing key made at random, its public half a signer of the lock, its
+/// private half sealed in the recovery entry under a 16-byte secret that only the person keeps.
+/// The person sees the secret with a 4-byte check as 32 letters and digits in groups of four
+/// (Crockford's base32), so a typo is found before anything is sent.
+public extension MachineLock {
+    static let recoverySecretSize = 16
+    private static let recoveryCheckDomain = Data("agents-lock-recovery-check/1\n".utf8)
+    private static let recoverySealDomain = Data("agents-lock-recovery/1\n".utf8)
+    private static let crockford = Array("0123456789ABCDEFGHJKMNPQRSTVWXYZ")
+
+    /// Typed text that is not a recovery key, or a key that is not this lock's.
+    enum RecoveryError: Error, Equatable {
+        case typo, notThisLock
+    }
+
+    private static func recoveryCheck(_ secret: Data) -> Data { Data(SHA256.hash(data: recoveryCheckDomain + secret).prefix(4)) }
+
+    /// The secret as the person sees it: "ABCD-EFGH-…", eight groups of four.
+    static func recoveryText(_ secret: Data) -> String {
+        var out = ""
+        var acc = 0, bits = 0, n = 0
+        for byte in secret + recoveryCheck(secret) {
+            acc = (acc << 8 | Int(byte)) & 0xFFFF
+            bits += 8
+            while bits >= 5 {
+                bits -= 5
+                if n > 0, n % 4 == 0 { out.append("-") }
+                out.append(crockford[(acc >> bits) & 31])
+                n += 1
+            }
+        }
+        return out
+    }
+
+    /// Reads a secret as typed: any case, dashes and spaces or none, O as 0, I and L as 1.
+    static func parseRecovery(_ text: String) throws(RecoveryError) -> Data {
+        var raw = Data()
+        var acc = 0, bits = 0, count = 0
+        for var c in text.uppercased() {
+            if c == "-" || c.isWhitespace { continue }
+            if c == "O" { c = "0" }
+            if c == "I" || c == "L" { c = "1" }
+            guard let v = crockford.firstIndex(of: c) else { throw .typo }
+            count += 1
+            acc = (acc << 5 | v) & 0xFFFF
+            bits += 5
+            if bits >= 8 {
+                bits -= 8
+                raw.append(UInt8((acc >> bits) & 0xFF))
+            }
+        }
+        guard count == 32, raw.count == recoverySecretSize + 4 else { throw .typo }
+        let secret = raw.prefix(recoverySecretSize)
+        guard recoveryCheck(Data(secret)) == raw.suffix(4) else { throw .typo }
+        return Data(secret)
+    }
+
+    private static func recoveryKey(_ secret: Data, _ publicKey: Data) -> SymmetricKey {
+        HKDF<SHA256>.deriveKey(inputKeyMaterial: SymmetricKey(data: secret), salt: Data(), info: recoverySealDomain + publicKey,
+                               outputByteCount: 32)
+    }
+
+    /// A new recovery key: the text to show once, and the public half and the sealed private
+    /// half for its entry.
+    static func makeRecovery() throws -> (text: String, publicKey: Data, sealed: Data) {
+        let secret = Data((0..<recoverySecretSize).map { _ in UInt8.random(in: 0...255) })
+        let key = P256.Signing.PrivateKey()
+        let publicKey = key.publicKey.x963Representation
+        let box = try AES.GCM.seal(key.rawRepresentation, using: recoveryKey(secret, publicKey), authenticating: publicKey)
+        return (recoveryText(secret), publicKey, box.nonce.withUnsafeBytes { Data($0) } + box.ciphertext + box.tag)
+    }
+
+    /// Opens the lock's recovery key with the secret the person typed.
+    static func openRecovery(_ secret: Data, publicKey: Data, sealed: Data) throws(RecoveryError) -> LockSigningKey {
+        guard sealed.count > 28,
+              let box = try? AES.GCM.SealedBox(combined: sealed),
+              let raw = try? AES.GCM.open(box, using: recoveryKey(secret, publicKey), authenticating: publicKey),
+              let key = try? P256.Signing.PrivateKey(rawRepresentation: raw),
+              key.publicKey.x963Representation == publicKey else { throw .notThisLock }
+        return LockSigningKey.recovery(key)
+    }
+}
+
 /// A client's signing key for the lock (D5): P-256, used only to sign. In the Secure Enclave
 /// where there is one, so it cannot leave the device; else a software key in the keychain,
 /// this device only. The ECDH key the client proves itself with stays as it is.
@@ -583,6 +675,11 @@ public struct LockSigningKey: Sendable {
         if try keychain.add(representation, account: account) { return made }
         // Made by another call at the same moment: that one is the key.
         return try load(account: account, accessGroup: accessGroup)
+    }
+
+    /// The lock's recovery key, opened from its entry with the person's secret (#3493).
+    static func recovery(_ key: P256.Signing.PrivateKey) -> LockSigningKey {
+        LockSigningKey(publicKey: key.publicKey.x963Representation, holder: .software(key))
     }
 
     /// A key that lives only for this process: for tests.
@@ -639,4 +736,23 @@ public enum LockWords {
     public static let forked = "The lock changed in a way your devices did not sign."
     public static func broken(_ why: String) -> String { "Your lock does not check: \(why)." }
     public static let unreachable = "The control plane can’t be reached, so nothing was answered."
+
+    /// The recovery key (#3493, D4).
+    public static let saveRecovery = "Save your recovery key."
+    public static let recoveryShownOnce = "Keep it in your password manager. You see it only this once. If you lose every device, it adds a new one."
+    public static let makeRecovery = "Make a recovery key."
+    public static let recoveryWhy = "If you lose this device, the recovery key adds your next one. Without it, each machine must join again."
+    public static let makeRecoveryButton = "Make Recovery Key"
+    public static let savedIt = "I Saved It"
+    public static let skip = "Skip"
+    public static let useRecovery = "Use Recovery Key"
+    public static let typeRecovery = "Type your recovery key."
+    public static let use = "Use"
+    public static let recoveryTypo = "That is not a recovery key. Check it for a typo."
+    public static let recoveryNotThisLock = "That recovery key is not your lock’s."
+    public static let noRecovery = "Your lock has no recovery key. Start a new lock instead."
+    public static let recoveryFailed = "The recovery key could not be used. Try again."
+    public static let startNewLock = "Start a New Lock"
+    public static let newLockTitle = "Start a new lock?"
+    public static let newLockMessage = "Do this only if you lost every device and your recovery key. Each machine refuses the new lock until you run agentsd lock reset in its shell, and approve it here."
 }

@@ -48,6 +48,17 @@ func (m *Methods) lockMethod(ctx context.Context, method string, params json.Raw
 			return nil, err
 		}
 		return m.s.addToLock(ctx, person, request.Entries, from.Client)
+	case "lock/reset":
+		// A new lock, when every signer and the recovery key are lost (#3493, D4). The
+		// control plane could always drop a lock; the person's machines and devices refuse
+		// the new one until each joins again.
+		if err := m.s.locks.Reset(ctx, person); err != nil {
+			return nil, lockFailure(err)
+		}
+		m.s.log(person + "'s lock was reset; the next client signs a new root")
+		m.s.announce("lockChanged", person, from.Client)
+		m.s.lockChangedHere(person)
+		return wire.Empty{}, nil
 	}
 	return nil, fail(methodNotFound, "No method %s.", method)
 }
@@ -89,6 +100,10 @@ func (m *Methods) hostLockMethod(ctx context.Context, host, method string, param
 			}
 		}
 		return m.s.addToLock(ctx, person, request.Entries, host)
+	case "host/lockAgain":
+		// The machine's lock was reset with agentsd lock reset (#3493): send it again.
+		go m.s.sendLock(host, true)
+		return wire.Empty{}, nil
 	case "host/lockJoin":
 		request, err := require[wire.LockJoin](params, "LockJoin")
 		if err != nil {

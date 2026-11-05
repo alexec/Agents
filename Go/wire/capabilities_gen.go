@@ -69,6 +69,7 @@ const CapHostDesktopControl1 = "host.desktop-control/1"
 const CapHostLock1 = "host.lock/1"
 const CapHostLock2 = "host.lock/2"
 const CapHostLock3 = "host.lock/3"
+const CapHostLock4 = "host.lock/4"
 const CapHostOrgRoutes1 = "host.org-routes/1"
 const CapHostOrgRoutes2 = "host.org-routes/2"
 const CapHostPolicyLayers1 = "host.policy-layers/1"
@@ -87,6 +88,7 @@ const CapLineage1 = "lineage/1"
 const CapLinks1 = "links/1"
 const CapLiveactivity1 = "liveactivity/1"
 const CapLockJoin1 = "lock-join/1"
+const CapLockReset1 = "lock-reset/1"
 const CapLock1 = "lock/1"
 const CapMac1 = "mac/1"
 const CapMachine1 = "machine/1"
@@ -252,6 +254,7 @@ var HostCapabilities = pairs([][2]string{
 	{"cost/setLimits", "cost/1"},
 	{"cost/state", "cost/1"},
 	{"credentials/offer", "credentials/1"},
+	{"daemon/lockReset", "host.lock/4"},
 	{"daemon/ping", "daemon/1"},
 	{"daemon/policyState", "host.policy/1"},
 	{"daemon/quit", "daemon/1"},
@@ -658,6 +661,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"handover/status", "handover/1"},
 	{"host/hello", "host/1"},
 	{"host/lockAdd", "host.lock/2"},
+	{"host/lockAgain", "host.lock/4"},
 	{"host/lockJoin", "host.lock/2"},
 	{"host/lockJoinReveal", "host.lock/2"},
 	{"host/machines", "host/1"},
@@ -706,6 +710,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"lock/joinDeny", "lock-join/1"},
 	{"lock/joinRequests", "lock-join/1"},
 	{"lock/joinReveal", "lock-join/1"},
+	{"lock/reset", "lock-reset/1"},
 	{"machines/forAgent", "machines/1"},
 	{"machines/projectFolders", "sessions.project/1"},
 	{"machines/projectSessions", "sessions.project/1"},

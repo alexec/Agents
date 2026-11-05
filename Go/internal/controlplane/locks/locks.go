@@ -127,6 +127,26 @@ func (b *Book) Add(ctx context.Context, person string, entries []wire.LockEntry)
 	return HeadOf(state), nil
 }
 
+// Reset drops the person's lock, so the next client signs a new root (#3493, D4): the
+// person lost every signer and the recovery key. It deletes the newest entry first, so a
+// reader at the same moment reads a shorter chain, never one with a hole. Every client and
+// machine that pinned the old lock refuses the new one until it joins again.
+func (b *Book) Reset(ctx context.Context, person string) error {
+	if err := checkPerson(person); err != nil {
+		return err
+	}
+	keys, err := b.store.List(ctx, entriesPrefix(person))
+	if err != nil {
+		return err
+	}
+	for i := len(keys) - 1; i >= 0; i-- {
+		if err := b.store.Delete(ctx, keys[i].Key); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // HeadOf is where a checked lock stands, as the wire says it.
 func HeadOf(s *machinelock.State) wire.LockHead {
 	h := s.Head()

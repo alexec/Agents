@@ -49,8 +49,9 @@ var pairingMethods = methodSet(append([]string{"devices/announce"}, strangerMeth
 var hostAppMethods = methodSet(append([]string{"folders/list", "agents/list"}, strangerMethods...))
 
 // A Linux host's git, through `agentsd git-credential` (#1122), is any process of the
-// account, as git runs it for every one of them.
-var strangerOnly = methodSet(append([]string{"git/credential"}, strangerMethods...))
+// account, as git runs it for every one of them. So is `agentsd lock reset` (#3493): the
+// spec lets this machine's own account reset its lock, from any shell of it.
+var strangerOnly = methodSet(append([]string{"git/credential", "daemon/lockReset"}, strangerMethods...))
 
 func methodSet(names []string) map[string]bool {
 	s := make(map[string]bool, len(names))

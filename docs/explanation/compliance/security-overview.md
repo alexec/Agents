@@ -100,6 +100,12 @@ signs nothing in it.
   command or reads a file.
 - **A new device or machine** joins the lock only when one of the person's devices approves
   it, with six digits that both screens show and that the control plane cannot choose.
+- **A recovery key** (#3493) is made with the lock and shown once, to keep in a password
+  manager: 128 random bits as 32 letters and digits. It is a key of the lock, so a person who
+  lost every device types it on a new one, which adds itself. The lock holds the key's
+  private half sealed (AES-256-GCM) under a key made from those bits, which the control plane
+  never sees. With no device and no recovery key, the person starts a new lock: each machine
+  refuses it until its own account runs `agentsd lock reset` in its shell.
 
 What the control plane can and cannot do:
 

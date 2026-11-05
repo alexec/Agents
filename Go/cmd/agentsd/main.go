@@ -52,6 +52,9 @@ func main() {
 		supervise(os.Args[2:])
 		return
 	}
+	if len(os.Args) > 1 && os.Args[1] == "lock" {
+		os.Exit(lockCommand(os.Args[2:]))
+	}
 	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "version") {
 		fmt.Println(buildinfo.String())
 		return

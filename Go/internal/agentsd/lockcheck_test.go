@@ -3,7 +3,10 @@ package agentsd
 import (
 	"crypto/ecdsa"
 	"encoding/json"
+	"os"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -237,5 +240,70 @@ func TestTheLockIsKeptAcrossARestart(t *testing.T) {
 	}
 	if m, ok := state.Member(machinelock.PublicKey(phone)); !ok || !m.Client() {
 		t.Fatal("the client is not in the kept lock")
+	}
+}
+
+// #3493 (D4): only agentsd lock reset, on daemon.sock, resets a machine's lock. The control
+// plane cannot, nor can a client of the lock through it. After the reset the machine pins
+// the next lock on first use: the new lock the person started.
+func TestOnlyTheMachinesOwnAccountResetsItsLock(t *testing.T) {
+	d, phone, _, state := lockedMachine(t)
+	pinned := d.LockPin()
+
+	cp := channelTo(d)
+	cp.send(requestLine(1, wire.CallDaemonLockReset.Name, map[string]any{}))
+	if line := cp.answer(t, 1); !notInLockAnswer(line) {
+		t.Fatalf("the control plane's reset was taken: %s", line)
+	}
+	phoneChannel := channelTo(d)
+	ch := hello(t, phoneChannel, state, phone)
+	phoneChannel.send(ch.Seal(requestLine(2, wire.CallDaemonLockReset.Name, map[string]any{})))
+	body, err := ch.Open(phoneChannel.answer(t, 2))
+	if err != nil || !strings.Contains(body, `"code":-32045`) {
+		t.Fatalf("a client's reset through the control plane: %s, %v", body, err)
+	}
+	if pin := d.LockPin(); pin.Count != pinned.Count {
+		t.Fatalf("the pin moved: %+v", pin)
+	}
+
+	d.ResetLock()
+	if pin := d.LockPin(); pin.Count != 0 {
+		t.Fatalf("the pin after the reset: %+v", pin)
+	}
+	if _, held := d.heldLock(); held {
+		t.Fatal("the machine still holds the old lock")
+	}
+	if fileExists(d.lockFilePath()) {
+		t.Fatal("the old lock is still kept")
+	}
+	laptop := newLockKey(t)
+	fresh := lockEntry(t, laptop, wire.LockEntryKindRoot, laptop, nil)
+	if !d.TakeLock(wire.Lock{Person: "sam", Entries: []wire.LockEntry{fresh}}) {
+		t.Fatal("the new lock was not pinned on first use")
+	}
+	if pin := d.LockPin(); pin.Count != 1 {
+		t.Fatalf("the pin of the new lock: %+v", pin)
+	}
+}
+
+func TestLockResetOnDaemonSockAsksForTheLockAgain(t *testing.T) {
+	d, path := serveWith(t, fixedPolicy{role: RoleStranger, ok: true})
+	var mu sync.Mutex
+	var said []string
+	d.SetControl(func(method string, _ any) { mu.Lock(); said = append(said, method); mu.Unlock() })
+	os.WriteFile(d.lockPinPath(), []byte(`{"person":"sam","count":1,"head":"AA=="}`), 0o644)
+	if m := socketCall(t, path, wire.CallDaemonLockReset.Name); m == nil || m.Error != nil {
+		t.Fatalf("this account's reset: %+v", m)
+	}
+	if d.LockPin().Count != 0 {
+		t.Fatal("the pin is still there")
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if !slices.ContainsFunc(said, func(m string) bool { return wire.OldMethodName(m) == wire.CallHostLockAgain.Name }) {
+		t.Fatalf("the machine did not ask for its lock again: %v", said)
+	}
+	if RoleAgent.Allows(wire.CallDaemonLockReset.Name) {
+		t.Fatal("an agent's helper may reset the lock")
 	}
 }

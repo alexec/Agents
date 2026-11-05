@@ -129,10 +129,20 @@ struct FolderListView: View {
                 }
             }
             // This window, not in the person's machine lock yet, and the clients asking to join it (#3490).
-            if model.lock.showsThisDevice || !model.lock.open().isEmpty {
+            if model.lock.showsThisDevice || model.lock.recoveryCard != .none || !model.lock.open().isEmpty {
                 Section {
                     if model.lock.showsThisDevice {
-                        ThisDeviceLockCard(place: model.lock.place, askAgain: { Task { await model.askLockAgain() } })
+                        ThisDeviceLockCard(place: model.lock.place, isBusy: model.lock.recoveryBusy,
+                                           askAgain: { Task { await model.askLockAgain() } },
+                                           useRecovery: { await model.useLockRecovery($0) },
+                                           startNewLock: { Task { await model.startNewLock() } })
+                            .listRowSeparator(.hidden)
+                            .selectionDisabled()
+                    }
+                    if model.lock.recoveryCard != .none {
+                        RecoveryKeyCard(card: model.lock.recoveryCard, isBusy: model.lock.recoveryBusy,
+                                        make: { Task { await model.makeLockRecovery() } },
+                                        dismiss: { model.dismissLockRecovery() })
                             .listRowSeparator(.hidden)
                             .selectionDisabled()
                     }

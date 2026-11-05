@@ -12034,7 +12034,7 @@
     },
     "LockBody": {
       "type": "object",
-      "description": "What a lock entry says (#3399), as its signer wrote it: the JSON that LockEntry.body carries, byte for byte. v is 1. Every entry names its person and, except the root, previous: the SHA-256 of the entry before's body. signer is the P-256 signing key that signed it, X9.63. key is the root's first signing key, the client, machine or invite added, the key removed, or the recovery key's public half. sealingKey and id are a machine's (addMachine); clientKind is a client's (addClient: mac, remote or web); expires is an invite's.",
+      "description": "What a lock entry says (#3399), as its signer wrote it: the JSON that LockEntry.body carries, byte for byte. v is 1. Every entry names its person and, except the root, previous: the SHA-256 of the entry before's body. signer is the P-256 signing key that signed it, X9.63. key is the root's first signing key, the client, machine or invite added, the key removed, or the recovery key's public half. sealingKey and id are a machine's (addMachine); clientKind is a client's (addClient: mac, remote or web); expires is an invite's; sealed is a recovery entry's (#3493, D4): the recovery key's private half, AES-256-GCM under a key made from the recovery secret the person keeps (a 12-byte nonce, then the sealed 32 bytes and the tag), so a new client that is typed the secret signs with it.",
       "properties": {
         "v": {
           "type": "integer"
@@ -12071,6 +12071,9 @@
         },
         "expires": {
           "$ref": "#/definitions/WireDate"
+        },
+        "sealed": {
+          "$ref": "#/definitions/Base64"
         }
       },
       "required": [

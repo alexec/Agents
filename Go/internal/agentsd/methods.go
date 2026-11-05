@@ -32,6 +32,7 @@ func (d *Daemon) register() {
 	d.registerHost()
 	d.registerBackups()
 	d.registerLockHello()
+	d.registerLockReset()
 	d.registerReceive()
 	d.registerSend()
 	d.registerExports()

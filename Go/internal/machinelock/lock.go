@@ -168,6 +168,8 @@ type State struct {
 	hashes   []Hash
 	members  map[string]Member
 	recovery []byte
+	// recoverySealed is the recovery key's private half, sealed under the secret (#3493).
+	recoverySealed []byte
 }
 
 func keyID(key []byte) string { return string(key) }
@@ -319,6 +321,7 @@ func (s *State) Add(e wire.LockEntry) error {
 			return bad(ErrInvalid, "the recovery key is a member of the lock")
 		}
 		s.recovery = slices.Clone(body.Key)
+		s.recoverySealed = slices.Clone(body.Sealed)
 	default:
 		if _, ok := s.members[keyID(body.Key)]; ok || bytes.Equal(body.Key, s.recovery) {
 			return bad(ErrInvalid, "its key is in the lock already")
