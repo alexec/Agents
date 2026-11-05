@@ -7,15 +7,19 @@ import (
 	"html/template"
 	"net/http"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/controlplane/signin"
 )
 
 // The pages at the service's own domain (#1807):
 //
-//	/                  Sign up (or Sign in) with GitHub; an account signed in goes to /account;
-//	                   ?invite=<code> carries an invite link to the sign-in (#2152)
-//	/signin            to GitHub
-//	/signin/callback   back from GitHub: a new account gets its control plane, and this
-//	                   browser is sent to it to pair, with nothing to type
+//	/                  Sign up (or Sign in) with Apple, Google or GitHub (#3386); an account
+//	                   signed in goes to /account; ?invite=<code> carries an invite link to
+//	                   the sign-in (#2152)
+//	/signin?with=<provider>  to Apple, Google or GitHub (none is GitHub, as links before)
+//	/signin/callback   back from the provider: a new account gets its control plane, whose
+//	                   first person signs in with the same provider, and this browser is
+//	                   sent to it to pair, with nothing to type
 //	/account           the control plane's address, Open in This Browser, Sign Out, Delete
 //	/account/open      a new code for this browser, then to the control plane
 //	/account/delete    the account and its store, once its name is typed
@@ -44,16 +48,25 @@ func (s *Service) pages(w http.ResponseWriter, r *http.Request) {
 		if !validInvite(invite) {
 			invite = ""
 		}
-		s.page(w, http.StatusOK, page{Title: "Agents", Welcome: true, Invite: invite})
+		s.page(w, http.StatusOK, page{Title: "Agents", Welcome: true, Invite: invite, Providers: s.offered()})
 	case r.URL.Path == "/signin" && r.Method == http.MethodGet:
-		if s.github.clientID == "" || s.github.secret == "" {
+		provider := r.URL.Query().Get("with")
+		if provider == "" {
+			provider = signin.GitHub
+		}
+		if !s.offers(provider) {
 			s.page(w, http.StatusServiceUnavailable, page{Title: "Agents", Problem: "Sign-up is not open yet."})
 			return
 		}
 		if invite := r.URL.Query().Get("invite"); validInvite(invite) {
 			setCookie(w, inviteCookie, s.sessions.sign(invite), stateLife)
 		}
-		http.Redirect(w, r, s.github.authorize(s.sessions.newState(w)), http.StatusSeeOther)
+		state := s.sessions.newState(w, provider)
+		to := s.github.authorize(state)
+		if o := s.oidc[provider]; o != nil {
+			to = o.authorize(state, s.sessions.derived("nonce", state), s.sessions.derived("pkce", state))
+		}
+		http.Redirect(w, r, to, http.StatusSeeOther)
 	case r.URL.Path == "/signin/callback" && r.Method == http.MethodGet:
 		s.callback(w, r)
 	case r.URL.Path == "/account" && r.Method == http.MethodGet:
@@ -87,31 +100,60 @@ func (s *Service) pages(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// callback is GitHub's answer: the account the user has, or a new one.
+// offers says a provider's web sign-in is set up.
+func (s *Service) offers(provider string) bool {
+	if provider == signin.GitHub {
+		return s.github.clientID != "" && s.github.secret != ""
+	}
+	return s.oidc[provider] != nil
+}
+
+// offered is the sign-up page's buttons: each provider set up, in the order the control
+// plane lists them (Apple, Google, GitHub).
+func (s *Service) offered() []offer {
+	var out []offer
+	for _, p := range signin.Providers {
+		if s.offers(p) {
+			out = append(out, offer{With: p, Title: signin.Title(p)})
+		}
+	}
+	return out
+}
+
+// callback is the provider's answer: the account the person has, or a new one.
 func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	if !s.sessions.stateOK(r, q.Get("state")) {
-		s.page(w, http.StatusBadRequest, page{Title: "Agents", Welcome: true,
+	state := q.Get("state")
+	if !s.sessions.stateOK(r, state) || !s.offers(providerOf(state)) {
+		s.page(w, http.StatusBadRequest, page{Title: "Agents", Welcome: true, Providers: s.offered(),
 			Problem: "That sign-in was not started here, or took too long. Sign in again."})
 		return
 	}
 	endCookie(w, stateCookie)
+	provider := providerOf(state)
+	title := signin.Title(provider)
 	if q.Get("error") != "" || q.Get("code") == "" {
-		s.page(w, http.StatusOK, page{Title: "Agents", Welcome: true, Problem: "GitHub did not sign you in. Try again."})
+		s.page(w, http.StatusOK, page{Title: "Agents", Welcome: true, Providers: s.offered(), Problem: title + " did not sign you in. Try again."})
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
 	defer cancel()
-	user, err := s.github.user(ctx, q.Get("code"))
+	var user SignIn
+	var err error
+	if o := s.oidc[provider]; o != nil {
+		user, err = o.user(ctx, q.Get("code"), s.sessions.derived("nonce", state), s.sessions.derived("pkce", state))
+	} else {
+		user, err = s.github.user(ctx, q.Get("code"))
+	}
 	if err != nil {
-		s.log("sign-in: " + err.Error())
-		s.page(w, http.StatusBadGateway, page{Title: "Agents", Welcome: true, Problem: "GitHub could not be asked who you are. Try again."})
+		s.log("sign-in with " + title + ": " + err.Error())
+		s.page(w, http.StatusBadGateway, page{Title: "Agents", Welcome: true, Providers: s.offered(), Problem: title + " could not be asked who you are. Try again."})
 		return
 	}
-	acc, err := s.accounts.byGitHub(ctx, user.ID)
+	acc, err := s.accounts.bySignIn(ctx, user)
 	if err != nil {
 		s.log("accounts: " + errText(err))
-		s.page(w, http.StatusServiceUnavailable, page{Title: "Agents", Welcome: true, Problem: "Your account could not be read or made. Try again in a moment."})
+		s.page(w, http.StatusServiceUnavailable, page{Title: "Agents", Welcome: true, Providers: s.offered(), Problem: "Your account could not be read or made. Try again in a moment."})
 		return
 	}
 	made := false
@@ -126,8 +168,8 @@ func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case got.refused != "":
 			s.metrics.refused(got.kind)
-			s.log(fmt.Sprintf("sign-up refused: github %d: %s", user.ID, got.refused))
-			s.page(w, got.status, page{Title: "Agents", Welcome: true, Problem: got.refused})
+			s.log(fmt.Sprintf("sign-up refused: %s: %s", user, got.refused))
+			s.page(w, got.status, page{Title: "Agents", Welcome: true, Providers: s.offered(), Problem: got.refused})
 			return
 		case got.account == nil:
 			s.page(w, http.StatusOK, page{Title: "The waitlist", Place: got.place, Why: whyText(got.why, s.cfg.MinGitHubAge)})
@@ -141,9 +183,25 @@ func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.metrics.signedUp("account")
-	s.log("signed up: " + acc.ID)
+	s.log("signed up: " + acc.ID + " with " + title)
+	// Its first person signs in with the same provider, from any client (#3386). A
+	// failure here leaves the code below, which pairs this browser all the same.
+	if err := s.ownerSignsIn(ctx, acc); err != nil {
+		s.log(acc.ID + ": the first person's sign-in: " + err.Error())
+	}
 	// The browser that signed up is the first client: to its control plane, to pair.
 	s.openIn(w, r, acc.ID)
+}
+
+// ownerSignsIn gives an account's control plane's first person the sign-in it was made
+// with, and turns that provider on there.
+func (s *Service) ownerSignsIn(ctx context.Context, acc *Account) error {
+	c, err := s.copyFor(ctx, acc.ID)
+	if err != nil {
+		return err
+	}
+	defer s.done(c)
+	return c.service.AddOwnerSignIn(ctx, acc.SignIn.Provider, acc.SignIn.Subject, acc.SignIn.Login)
 }
 
 // openIn sends this browser to its control plane with a code it pairs itself with.
@@ -176,7 +234,7 @@ func (s *Service) accountPage(w http.ResponseWriter, r *http.Request, account, p
 	acc, err := s.accounts.get(r.Context(), account)
 	if err != nil || acc == nil {
 		endCookie(w, sessionCookie)
-		s.page(w, http.StatusOK, page{Title: "Agents", Welcome: true, Problem: "That account is gone. Sign up again."})
+		s.page(w, http.StatusOK, page{Title: "Agents", Welcome: true, Providers: s.offered(), Problem: "That account is gone. Sign up again."})
 		return
 	}
 	if problem == "" && acc.Certificate == nil && !s.certificateRoom() {
@@ -218,7 +276,7 @@ func (s *Service) deleteAccount(w http.ResponseWriter, r *http.Request, account 
 	}
 	s.log("deleted: " + account)
 	endCookie(w, sessionCookie)
-	s.page(w, http.StatusOK, page{Title: "Agents", Welcome: true, Problem: "Your account and its control plane are deleted."})
+	s.page(w, http.StatusOK, page{Title: "Agents", Welcome: true, Providers: s.offered(), Problem: "Your account and its control plane are deleted."})
 }
 
 func errText(err error) string {
@@ -237,6 +295,8 @@ type page struct {
 	Token   string
 	// An invite link's code, carried to the sign-in.
 	Invite string
+	// The providers to sign up with, one button each.
+	Providers []offer
 	// A place on the waitlist, and why, when not 0.
 	Place int
 	Why   string
@@ -248,6 +308,9 @@ type page struct {
 	// is back from Checkout before Stripe's event came.
 	Upgrade, ManageBilling, Confirming bool
 }
+
+// offer is a provider on the sign-up page: its name in /signin?with=, and as people read it.
+type offer struct{ With, Title string }
 
 func (s *Service) page(w http.ResponseWriter, status int, p page) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -268,6 +331,7 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!doctype html>
   h1 { font-size: 1.6rem; margin-bottom: .25rem; }
   .quiet { color: #6e6e73; }
   .problem { color: #b3261e; }
+  a.signup { min-width: 14rem; text-align: center; }
   a.button, button { display: inline-block; font: inherit; padding: .5rem 1rem; border-radius: .5rem; border: 1px solid #c7c7cc; background: #fff; color: inherit; text-decoration: none; cursor: pointer; }
   a.prominent, button.prominent { background: #2c5fd6; border-color: #2c5fd6; color: #fff; }
   button.destructive { color: #b3261e; }
@@ -290,14 +354,15 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!doctype html>
 <p>Run many coding agents at once, and watch and answer them from a browser, a Mac or a phone.</p>
 <p>Sign up and you get a control plane of your own. You type no command and hold no key.</p>
 {{if .Problem}}<p class="problem" role="alert">{{.Problem}}</p>{{end}}
-{{if .Invite}}<p>You have an invite.</p>
-<p><a class="button prominent" href="/signin?invite={{.Invite}}">Sign Up with GitHub</a></p>
-{{else}}<p><a class="button prominent" href="/signin">Sign Up with GitHub</a></p>
-<p class="quiet">Sign-up is by invitation while Agents is in beta. Without an invite, you join the waitlist.</p>{{end}}
+{{if .Invite}}<p>You have an invite.</p>{{end}}
+{{range .Providers}}<p><a class="button prominent signup" href="/signin?with={{.With}}{{if $.Invite}}&amp;invite={{$.Invite}}{{end}}">Sign Up with {{.Title}}</a></p>
+{{else}}<p>Sign-up is not open yet.</p>
+{{end}}
+{{if not .Invite}}<p class="quiet">Sign-up is by invitation while Agents is in beta. Without an invite, you join the waitlist.</p>{{end}}
 <p class="quiet">Signed up before? The same button signs you in.</p>
 {{else if .Account.Suspended}}
 <h1>Your account</h1>
-<p class="quiet">Signed in with GitHub as {{.Account.GitHub.Login}}.</p>
+<p class="quiet">Signed in with {{.Account.SignIn.Shown}}.</p>
 <p class="problem" role="alert">This account is suspended: {{.Account.Suspended.Reason}}</p>
 <p>Your control plane is stopped, and its records are kept.</p>
 <form method="post" action="/signout"><button>Sign Out</button></form>
@@ -308,7 +373,7 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!doctype html>
 </section>
 {{else}}
 <h1>Your account</h1>
-<p class="quiet">Signed in with GitHub as {{.Account.GitHub.Login}}.</p>
+<p class="quiet">Signed in with {{.Account.SignIn.Shown}}.</p>
 {{if .Problem}}<p class="problem" role="alert">{{.Problem}}</p>{{end}}
 <section>
 <p>Your control plane is at <a href="{{.Address}}">{{.Address}}</a>. Each browser, Mac and phone you use pairs with it once.</p>

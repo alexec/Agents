@@ -1,4 +1,4 @@
-# The hosted service (#1807): people sign up on the web with GitHub, and each gets a control
+# The hosted service (#1807): people sign up on the web with Apple, Google or GitHub, and each gets a control
 # plane of their own at https://<account>.AGENTS_HOSTED_ACCOUNTS_DOMAIN, each with its own
 # store prefix and its own control key, sealed by Google Cloud KMS. One agents-hosted runs
 # them all, and Caddy in front gets each name's certificate when it is first asked for. The
@@ -55,6 +55,13 @@ services:
       AGENTS_HOSTED_ACCOUNTS_DOMAIN: ${AGENTS_HOSTED_ACCOUNTS_DOMAIN:-}
       AGENTS_HOSTED_GITHUB_CLIENT_ID: ${AGENTS_HOSTED_GITHUB_CLIENT_ID:-}
       AGENTS_HOSTED_GITHUB_SECRET: ${AGENTS_HOSTED_GITHUB_SECRET:-}
+      # Sign up with Apple and Google (#3386): each is offered only with all its settings.
+      AGENTS_HOSTED_APPLE_SERVICES_ID: ${AGENTS_HOSTED_APPLE_SERVICES_ID:-}
+      AGENTS_HOSTED_APPLE_TEAM_ID: ${AGENTS_HOSTED_APPLE_TEAM_ID:-}
+      AGENTS_HOSTED_APPLE_KEY_ID: ${AGENTS_HOSTED_APPLE_KEY_ID:-}
+      AGENTS_HOSTED_APPLE_KEY: ${AGENTS_HOSTED_APPLE_KEY:-}
+      AGENTS_HOSTED_GOOGLE_CLIENT_ID: ${AGENTS_HOSTED_GOOGLE_CLIENT_ID:-}
+      AGENTS_HOSTED_GOOGLE_SECRET: ${AGENTS_HOSTED_GOOGLE_SECRET:-}
       # The web page each control plane serves, built into the image.
       AGENTS_HOSTED_WEB: /web
       AGENTS_HOSTED_VIEWS_DOMAIN: ${AGENTS_HOSTED_VIEWS_DOMAIN:-}

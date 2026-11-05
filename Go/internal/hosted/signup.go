@@ -3,24 +3,30 @@ package hosted
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/controlplane/signin"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 )
 
-// Who may sign up (#2152, spec 1003 FR-001–FR-012). A GitHub user with an account signs in
-// as before, never limited. A new one is checked in order: blocked, the mode, allowed (the
+// Who may sign up (#2152, spec 1003 FR-001–FR-012). A person with an account signs in as
+// before, never limited. A new one is checked in order: blocked, the mode, allowed (the
 // allowlist, an invite, or open), the GitHub account's age, the cap on accounts. One who
 // may not have an account yet goes on the waitlist. Making an account or a waitlist entry
 // counts against the rates; showing a place already kept does not.
+//
+// Apple and Google (#3386) have no account age, and no login for the allowlist: they sign
+// up only with an invite, also when sign-up is open, until the open sign-up spike (#3387)
+// says what checks them instead.
 
 // The modes of Config.SignUp.
 const (
@@ -56,12 +62,8 @@ func allowKey(login string) string {
 	return hostedPrefix + "v1/allow/" + strings.ToLower(login) + ".json"
 }
 func inviteKey(code string) string { return hostedPrefix + "v1/invites/" + code + ".json" }
-func waitingKey(user int64) string {
-	return hostedPrefix + "v1/waiting/" + strconv.FormatInt(user, 10) + ".json"
-}
-func blockedKey(user int64) string {
-	return hostedPrefix + "v1/blocked/" + strconv.FormatInt(user, 10) + ".json"
-}
+func waitingKey(user SignIn) string { return hostedPrefix + "v1/waiting/" + user.who() + ".json" }
+func blockedKey(user SignIn) string { return hostedPrefix + "v1/blocked/" + user.who() + ".json" }
 func waitlistKey(place string) string { return hostedPrefix + "v1/waitlist/" + place + ".json" }
 
 const waitlistFolder = hostedPrefix + "v1/waitlist/"
@@ -74,20 +76,37 @@ type Invite struct {
 
 // Used is who used an invite, and when.
 type Used struct {
-	GitHub int64     `json:"github"`
+	By *SignIn `json:"by,omitempty"`
+	// The GitHub user who used it before #3386.
+	GitHub int64     `json:"github,omitempty"`
 	At     time.Time `json:"at"`
 }
 
-// Waiting is a GitHub user on the waitlist.
+// Waiting is a sign-in on the waitlist.
 type Waiting struct {
-	GitHub GitHubID  `json:"github"`
+	SignIn SignIn `json:"signIn"`
+	// The GitHub user of an entry made before #3386, read as its SignIn.
+	GitHub *GitHubID `json:"github,omitempty"`
 	At     time.Time `json:"at"`
 	Why    string    `json:"why"`
 	// Its key in the waitlist folder, whose order is the waitlist's.
 	Place string `json:"place"`
 }
 
-// Block is a GitHub user who may not sign up.
+// waitlistLink is a place's record: whose it is. One from before #3386 says only GitHub.
+type waitlistLink struct {
+	SignIn *SignIn `json:"signIn,omitempty"`
+	GitHub int64   `json:"github,omitempty"`
+}
+
+func (l waitlistLink) signIn() SignIn {
+	if l.SignIn != nil {
+		return *l.SignIn
+	}
+	return signInOf(SignIn{}, &GitHubID{ID: l.GitHub})
+}
+
+// Block is a sign-in that may not sign up.
 type Block struct {
 	Login  string    `json:"login,omitempty"`
 	Reason string    `json:"reason,omitempty"`
@@ -142,26 +161,32 @@ type signUpResult struct {
 	status int
 }
 
-// gate decides what a GitHub user with no account gets.
-func (s *Service) gate(ctx context.Context, from string, user GitHubID, invite string) signUpResult {
+// gate decides what a sign-in with no account gets.
+func (s *Service) gate(ctx context.Context, from string, user SignIn, invite string) signUpResult {
 	st := s.cfg.Store
-	if o, err := st.Get(ctx, blockedKey(user.ID)); err != nil {
+	if !user.valid() {
+		return unreadable(fmt.Errorf("%s is not a sign-in", user))
+	}
+	if o, err := st.Get(ctx, blockedKey(user)); err != nil {
 		return unreadable(err)
 	} else if o != nil {
-		return signUpResult{refused: "Sign-up is not open to this GitHub account.", status: http.StatusForbidden, kind: "blocked"}
+		return signUpResult{refused: "Sign-up is not open to this " + signin.Title(user.Provider) + " account.", status: http.StatusForbidden, kind: "blocked"}
 	}
 	if s.cfg.SignUp == SignUpClosed {
 		return signUpResult{refused: "Sign-up is not open yet.", status: http.StatusServiceUnavailable, kind: "closed"}
 	}
+	gitHub := user.Provider == signin.GitHub
 	listed := false
-	if validLogin(user.Login) {
+	if gitHub && validLogin(user.Login) {
 		o, err := st.Get(ctx, allowKey(user.Login))
 		if err != nil {
 			return unreadable(err)
 		}
 		listed = o != nil
 	}
-	allowed := s.cfg.SignUp == SignUpOpen || listed
+	// Open is open to GitHub alone: its account's age is the check (#3387 decides Apple's
+	// and Google's).
+	allowed := s.cfg.SignUp == SignUpOpen && gitHub || listed
 	var inv *store.Object
 	if !allowed && validInvite(invite) {
 		o, err := st.Get(ctx, inviteKey(invite))
@@ -179,7 +204,7 @@ func (s *Service) gate(ctx context.Context, from string, user GitHubID, invite s
 		why = whyInviteUsed
 	case !allowed:
 		why = whyNoInvite
-	case !listed && s.cfg.Now().Sub(user.Created) < s.cfg.MinGitHubAge:
+	case gitHub && !listed && s.cfg.Now().Sub(user.Created) < s.cfg.MinGitHubAge:
 		why = whyAge
 	default:
 		n, err := s.accounts.count(ctx)
@@ -202,7 +227,8 @@ func (s *Service) gate(ctx context.Context, from string, user GitHubID, invite s
 		if inv != nil {
 			var rec Invite
 			_ = json.Unmarshal(inv.Data, &rec)
-			rec.Used = &Used{GitHub: user.ID, At: s.cfg.Now().UTC()}
+			by := SignIn{Provider: user.Provider, Subject: user.Subject, Login: user.Login}
+			rec.Used = &Used{By: &by, At: s.cfg.Now().UTC()}
 			data, _ := json.Marshal(rec)
 			if _, err := st.Put(ctx, inviteKey(invite), data, store.Matching(inv.ETag)); err != nil {
 				if !store.IsConflict(err) {
@@ -216,18 +242,18 @@ func (s *Service) gate(ctx context.Context, from string, user GitHubID, invite s
 		if err != nil || acc == nil {
 			return unreadable(err)
 		}
-		s.leaveWaitlist(ctx, user.ID)
+		s.leaveWaitlist(ctx, user)
 		return signUpResult{account: acc, made: made}
 	}
 	return s.wait(ctx, from, user, why, why == whyCap, false)
 }
 
-// wait puts a user on the waitlist, at the front for one who may sign up once there is
+// wait puts a sign-in on the waitlist, at the front for one who may sign up once there is
 // room, or gives their place when they are on it already. counted says the rates have
 // counted this sign-up already.
-func (s *Service) wait(ctx context.Context, from string, user GitHubID, why string, front, counted bool) signUpResult {
+func (s *Service) wait(ctx context.Context, from string, user SignIn, why string, front, counted bool) signUpResult {
 	st := s.cfg.Store
-	o, err := st.Get(ctx, waitingKey(user.ID))
+	o, err := st.Get(ctx, waitingKey(user))
 	if err != nil {
 		return unreadable(err)
 	}
@@ -251,22 +277,25 @@ func (s *Service) wait(ctx context.Context, from string, user GitHubID, why stri
 	if front {
 		order = "a"
 	}
-	entry = Waiting{GitHub: GitHubID{ID: user.ID, Login: user.Login}, At: now, Why: why,
-		Place: fmt.Sprintf("%s%020d-%d", order, now.UnixNano(), user.ID)}
+	kept := SignIn{Provider: user.Provider, Subject: user.Subject, Login: user.Login}
+	// The place's key ends with a short hash of the sign-in, so two at once have two.
+	sum := sha256.Sum256([]byte(user.String()))
+	entry = Waiting{SignIn: kept, At: now, Why: why,
+		Place: fmt.Sprintf("%s%020d-%s", order, now.UnixNano(), hex.EncodeToString(sum[:6]))}
 	data, _ := json.Marshal(entry)
-	if _, err := st.Put(ctx, waitingKey(user.ID), data, store.Absent); err != nil {
+	if _, err := st.Put(ctx, waitingKey(user), data, store.Absent); err != nil {
 		if store.IsConflict(err) {
 			// Another tab put them on it at the same time.
 			return s.wait(ctx, from, user, why, front, true)
 		}
 		return unreadable(err)
 	}
-	link, _ := json.Marshal(map[string]int64{"github": user.ID})
+	link, _ := json.Marshal(waitlistLink{SignIn: &SignIn{Provider: user.Provider, Subject: user.Subject}})
 	if _, err := st.Put(ctx, waitlistKey(entry.Place), link, store.Absent); err != nil {
 		return unreadable(err)
 	}
 	s.metrics.signedUp("waitlist")
-	s.log(fmt.Sprintf("waitlist: github %d (%s)", user.ID, why))
+	s.log(fmt.Sprintf("waitlist: %s (%s)", user, why))
 	return s.placeOf(ctx, entry)
 }
 
@@ -280,12 +309,12 @@ func (s *Service) placeOf(ctx context.Context, entry Waiting) signUpResult {
 	return signUpResult{place: place, why: entry.Why}
 }
 
-// leaveWaitlist takes a user off the waitlist, once they have an account or are blocked.
-func (s *Service) leaveWaitlist(ctx context.Context, user int64) {
+// leaveWaitlist takes a sign-in off the waitlist, once they have an account or are blocked.
+func (s *Service) leaveWaitlist(ctx context.Context, user SignIn) {
 	leaveWaitlist(ctx, s.cfg.Store, user)
 }
 
-func leaveWaitlist(ctx context.Context, st store.Store, user int64) {
+func leaveWaitlist(ctx context.Context, st store.Store, user SignIn) {
 	o, err := st.Get(ctx, waitingKey(user))
 	if err != nil || o == nil {
 		return

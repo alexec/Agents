@@ -32,7 +32,7 @@ func TestMetrics(t *testing.T) {
 		MetricsFrom: []netip.Prefix{netip.MustParsePrefix("172.30.62.1/32")}})
 	b := newBrowser()
 	b.signIn("good")
-	acc, _ := s.accounts.byGitHub(context.Background(), 42)
+	acc, _ := s.accounts.bySignIn(context.Background(), gitHubSignIn(42, ""))
 	if err := (Admin{Store: st}).Suspend(context.Background(), acc.ID, "spam"); err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +98,7 @@ func TestPruneBackupsKeepsTheNewest(t *testing.T) {
 	ctx := context.Background()
 	st := store.NewMemory()
 	a := Admin{Store: st}
-	if _, _, err := a.accounts().make(ctx, GitHubID{ID: 1, Login: "ana"}); err != nil {
+	if _, _, err := a.accounts().make(ctx, gitHubSignIn(1, "ana")); err != nil {
 		t.Fatal(err)
 	}
 	root := t.TempDir()
@@ -148,8 +148,8 @@ func TestBackupAndRestoreOneAccount(t *testing.T) {
 	st := store.NewMemory()
 	now := time.Now()
 	a := Admin{Store: st, Now: func() time.Time { return now }}
-	ana, _, _ := a.accounts().make(ctx, GitHubID{ID: 1, Login: "ana"})
-	bo, _, _ := a.accounts().make(ctx, GitHubID{ID: 2, Login: "bo"})
+	ana, _, _ := a.accounts().make(ctx, gitHubSignIn(1, "ana"))
+	bo, _, _ := a.accounts().make(ctx, gitHubSignIn(2, "bo"))
 	for _, id := range []string{ana.ID, bo.ID} {
 		for _, k := range []string{"v1/hosts/a.json", "v1/clients/b.json", "v1/keys/control.sealed"} {
 			if _, err := accountStore(st, id).Put(ctx, k, []byte(id+k), store.Absent); err != nil {
@@ -211,12 +211,12 @@ func TestBackupAndRestoreOneAccount(t *testing.T) {
 	if _, err := a.Restore(ctx, dir, bo.ID); err != nil {
 		t.Fatal(err)
 	}
-	if acc, _ := a.accounts().byGitHub(ctx, 2); acc == nil || acc.ID != bo.ID {
+	if acc, _ := a.accounts().bySignIn(ctx, gitHubSignIn(2, "")); acc == nil || acc.ID != bo.ID {
 		t.Fatal("the deleted account did not come back", acc)
 	}
 	same(bo.ID, "v1/hosts/a.json", bo.ID+"v1/hosts/a.json")
 	_ = a.accounts().remove(ctx, bo)
-	again, _, _ := a.accounts().make(ctx, GitHubID{ID: 2, Login: "bo"})
+	again, _, _ := a.accounts().make(ctx, gitHubSignIn(2, "bo"))
 	if _, err := a.Restore(ctx, dir, bo.ID); err == nil || !strings.Contains(err.Error(), again.ID) {
 		t.Fatal("restored over the user's new account:", err)
 	}
@@ -237,7 +237,7 @@ func TestBackupAndRestoreOneAccount(t *testing.T) {
 	if keys, _ := accountStore(st, again.ID).List(ctx, ""); len(keys) != 0 {
 		t.Fatal("records left:", keys)
 	}
-	if acc, _ := a.accounts().byGitHub(ctx, 2); acc != nil {
+	if acc, _ := a.accounts().bySignIn(ctx, gitHubSignIn(2, "")); acc != nil {
 		t.Fatal("the account is still there")
 	}
 }
@@ -250,7 +250,7 @@ func TestMetricsReadNoStorePerScrape(t *testing.T) {
 	clk := &clock{now: time.Date(2026, 11, 1, 9, 0, 0, 0, time.UTC)}
 	s, _ := startWith(t, Config{Store: st, SignUp: SignUpOpen, Now: clk.Now})
 	for i := range 3 {
-		if _, _, err := s.accounts.make(ctx, GitHubID{ID: int64(600 + i), Login: "u"}); err != nil {
+		if _, _, err := s.accounts.make(ctx, gitHubSignIn(int64(600 + i), "u")); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -270,7 +270,7 @@ func TestMetricsReadNoStorePerScrape(t *testing.T) {
 		t.Fatalf("scrapes read the store: %d gets, %d lists", st.gets.Load()-gets, st.lists.Load()-lists)
 	}
 
-	if _, _, err := s.accounts.make(ctx, GitHubID{ID: 700, Login: "u"}); err != nil {
+	if _, _, err := s.accounts.make(ctx, gitHubSignIn(700, "u")); err != nil {
 		t.Fatal(err)
 	}
 	s.sweepCounts(ctx)
@@ -278,7 +278,7 @@ func TestMetricsReadNoStorePerScrape(t *testing.T) {
 	accounts(text, 4)
 
 	// No sweep for countsLife: the scrape counts itself.
-	if _, _, err := s.accounts.make(ctx, GitHubID{ID: 701, Login: "u"}); err != nil {
+	if _, _, err := s.accounts.make(ctx, gitHubSignIn(701, "u")); err != nil {
 		t.Fatal(err)
 	}
 	clk.add(countsLife)

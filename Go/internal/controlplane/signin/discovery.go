@@ -147,9 +147,12 @@ type Tokens struct {
 
 // Exchange trades an authorization code and its PKCE verifier for tokens, as a
 // confidential client: client_secret_basic, or client_secret_post when the issuer lists
-// only that.
+// only that. No verifier sends none, for an issuer with no PKCE (Apple).
 func Exchange(ctx context.Context, client *http.Client, d *Discovery, clientID, secret, code, redirectURI, verifier, name string) (*Tokens, error) {
-	form := url.Values{"grant_type": {"authorization_code"}, "code": {code}, "redirect_uri": {redirectURI}, "code_verifier": {verifier}}
+	form := url.Values{"grant_type": {"authorization_code"}, "code": {code}, "redirect_uri": {redirectURI}}
+	if verifier != "" {
+		form.Set("code_verifier", verifier)
+	}
 	post := len(d.TokenAuthMethods) > 0 && !slices.Contains(d.TokenAuthMethods, "client_secret_basic")
 	if post {
 		form.Set("client_id", clientID)

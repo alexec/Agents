@@ -115,7 +115,7 @@ func TestACountReadsNoObject(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(s.Stop)
-	acc, _, err := s.accounts.make(ctx, GitHubID{ID: 7, Login: "user"})
+	acc, _, err := s.accounts.make(ctx, gitHubSignIn(7, "user"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -193,7 +193,7 @@ func TestEventsPastThePlanGo(t *testing.T) {
 func TestEventsGoAfterTheFirstAnswerABoundedRunAtATime(t *testing.T) {
 	s, _, now, _ := idleService(t, 0)
 	ctx := context.Background()
-	acc, _, err := s.accounts.make(ctx, GitHubID{ID: 3104, Login: "user"})
+	acc, _, err := s.accounts.make(ctx, gitHubSignIn(3104, "user"))
 	if err != nil {
 		t.Fatal(err)
 	}

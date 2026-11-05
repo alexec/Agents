@@ -185,7 +185,7 @@ func (a Admin) Delete(ctx context.Context, id string) error {
 
 // Restore makes one account's records what dir holds for it: each record put back, and
 // each record it did not hold deleted. Nothing outside accounts/<id>/ changes, except an
-// account that was deleted: its record, and its GitHub user's link, come back.
+// account that was deleted: its record, and its sign-in's link, come back.
 //
 // The account must be suspended, or gone, so no running copy writes over it: suspend,
 // restore, unsuspend.
@@ -202,6 +202,7 @@ func (a Admin) Restore(ctx context.Context, dir, id string) (int, error) {
 	if err := json.Unmarshal(data, &backed); err != nil || backed.ID != id {
 		return 0, fmt.Errorf("%s/account.json is not %s's record", from, id)
 	}
+	backed.SignIn = signInOf(backed.SignIn, backed.GitHub)
 	now, err := a.accounts().get(ctx, id)
 	if err != nil {
 		return 0, err
@@ -214,16 +215,16 @@ func (a Admin) Restore(ctx context.Context, dir, id string) (int, error) {
 		return 0, fmt.Errorf("%s was suspended %s ago: its control plane may still be running; try again in a minute", id, a.now().Sub(now.Suspended.At).Round(time.Second))
 	}
 	if now == nil {
-		// The GitHub user may have signed up again since: then this backup is not theirs to
-		// take back, and the operator decides.
-		if o, err := a.Store.Get(ctx, gitHubKey(backed.GitHub.ID)); err != nil {
+		// The person may have signed up again since: then this backup is not theirs to take
+		// back, and the operator decides.
+		if o, err := a.Store.Get(ctx, signInKey(backed.SignIn)); err != nil {
 			return 0, err
 		} else if o != nil {
 			var link struct {
 				Account string `json:"account"`
 			}
 			if json.Unmarshal(o.Data, &link) == nil && link.Account != id {
-				return 0, fmt.Errorf("GitHub user %d has another account now, %s: delete it first", backed.GitHub.ID, link.Account)
+				return 0, fmt.Errorf("%s has another account now, %s: delete it first", backed.SignIn, link.Account)
 			}
 		}
 	}
@@ -267,7 +268,7 @@ func (a Admin) Restore(ctx context.Context, dir, id string) (int, error) {
 	}
 	if now == nil {
 		link, _ := json.Marshal(map[string]string{"account": id})
-		if _, err := a.Store.Put(ctx, gitHubKey(backed.GitHub.ID), link, store.Absent); err != nil && !store.IsConflict(err) {
+		if _, err := a.Store.Put(ctx, signInKey(backed.SignIn), link, store.Absent); err != nil && !store.IsConflict(err) {
 			return len(kept), err
 		}
 		if _, err := a.Store.Put(ctx, accountKey(id), data, store.Absent); err != nil && !store.IsConflict(err) {

@@ -76,8 +76,9 @@ A self-hosted control plane uses none of these.
 **The hosted service** ([Run the hosted service](../../how-to/run-the-hosted-service.md))
 gives each account a control plane of its own, with its records under `accounts/<id>/` in
 the store and its control key sealed by Google Cloud KMS. It runs on any machine with
-Docker. Sign-up with GitHub reads your GitHub user id and login once, and then forgets the
-token ([Privacy](../../privacy.md#the-hosted-service)).
+Docker. Sign-up with Apple, Google or GitHub reads the provider's id for you once (and your
+login, for GitHub), and then forgets the token. It asks Apple and Google for no email
+address and no name ([Privacy](../../privacy.md#the-hosted-service)).
 
 ## Delivering the apps
 
