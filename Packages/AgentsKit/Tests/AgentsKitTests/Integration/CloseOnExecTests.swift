@@ -73,11 +73,8 @@ struct CloseOnExecTests {
         let server = DaemonServer(url: url) { _, _, _ in .success([:]) }
         try server.start()
 
-        let mine = try connect(to: url)
+        let mine = try await connectCounted(to: url, by: server)
         defer { close(mine) }
-        // `connect` returns as soon as the kernel has queued it; the server counts it
-        // when its accept loop gets round to it, which is a hand-off away.
-        await eventually("the server counted the connection") { server.connectionCount == 1 }
         #expect(server.connectionCount == 1)
 
         // A terminal is started while the window is connected, which is the ordinary
@@ -127,8 +124,7 @@ struct CloseOnExecTests {
         let rounds = 100
         let before = try socketsBound(to: url)
         for _ in 0..<rounds {
-            let mine = try connect(to: url)
-            await eventually("the server counted the connection") { server.connectionCount == 1 }
+            let mine = try await connectCounted(to: url, by: server)
             close(mine)
             await eventually("the server let the connection go") { server.connectionCount == 0 }
         }
@@ -207,6 +203,40 @@ struct CloseOnExecTests {
         try server.start()
         defer { server.stop() }
         #expect(isCloseOnExec(server.listenFD))
+    }
+
+    /// A connection `server` has counted, dialled again for as long as it is turned away.
+    ///
+    /// `connect` returns as soon as the kernel has queued it; the server counts it when
+    /// its accept loop gets round to it, which is a hand-off away. And a server out of
+    /// descriptors takes the oldest waiting client and closes it, so that client can try
+    /// again (#201). A full suite with coverage on runs out of them now and then, and a
+    /// test that dialled once then waited 45 seconds for a count that could not come
+    /// (#3458). A real window dials again; so does this.
+    private func connectCounted(to url: URL, by server: DaemonServer,
+                                sourceLocation: SourceLocation = #_sourceLocation) async throws -> Int32 {
+        let deadline = ContinuousClock.now.advanced(by: Eventually.timeout)
+        var fd = try connect(to: url)
+        while server.connectionCount != 1 {
+            guard ContinuousClock.now < deadline else {
+                Issue.record("the server counted the connection never became true, waited \(Eventually.timeout)",
+                             sourceLocation: sourceLocation)
+                break
+            }
+            if wasTurnedAway(fd) {
+                close(fd)
+                fd = try connect(to: url)
+            }
+            try await Task.sleep(for: Eventually.interval)
+        }
+        return fd
+    }
+
+    /// Whether the server has closed `fd` without a word: it reads end of file. The
+    /// server sends nothing on a connection that has asked for nothing.
+    private func wasTurnedAway(_ fd: Int32) -> Bool {
+        var byte: UInt8 = 0
+        return recv(fd, &byte, 1, MSG_PEEK | MSG_DONTWAIT) == 0
     }
 
     private func connect(to url: URL) throws -> Int32 {
