@@ -64,6 +64,7 @@ const CapGit1 = "git/1"
 const CapGovernance1 = "governance/1"
 const CapGroups1 = "groups/1"
 const CapHandover1 = "handover/1"
+const CapHostBrowserSettings1 = "host.browser-settings/1"
 const CapHostDesktopControl1 = "host.desktop-control/1"
 const CapHostLock1 = "host.lock/1"
 const CapHostLock2 = "host.lock/2"
@@ -224,6 +225,8 @@ var HostCapabilities = pairs([][2]string{
 	{"backups/make", "backups/1"},
 	{"backups/restore", "backups/1"},
 	{"backups/state", "backups/1"},
+	{"browser/clear", "host.browser-settings/1"},
+	{"browser/state", "host.browser-settings/1"},
 	{"catalog/destination-state", "catalog/1"},
 	{"catalog/preview", "catalog/1"},
 	{"catalog/search", "catalog/1"},
@@ -934,6 +937,7 @@ var DeclaredCapabilities = map[string][]string{
 		"host.team/1",
 		"host.suspend/1",
 		"host.policy-layers/1",
+		"host.browser-settings/1",
 		"host.desktop-control/1",
 		"host.org-routes/2",
 		"host.user-settings/2",

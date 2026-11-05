@@ -86,6 +86,8 @@ type process struct {
 	pid      int
 	done     <-chan struct{}
 	stop     func()
+	// store is its cookies, for Settings ▸ Browser (sites.go).
+	store cookieStore
 }
 
 // New is the machine's browser with its binaries under cache and its profile under root.
@@ -362,7 +364,7 @@ func launchChromium(exe, profile string, env []string) (*process, error) {
 		stop()
 		return nil, err
 	}
-	return &process{endpoint: endpoint, pid: b.Process().Pid, done: ctx.Done(), stop: stop}, nil
+	return &process{endpoint: endpoint, pid: b.Process().Pid, done: ctx.Done(), stop: stop, store: cdpStore{ctx}}, nil
 }
 
 // activePort is the CDP address Chromium wrote in its profile's DevToolsActivePort:

@@ -85,3 +85,30 @@ func TestTheBrowserNeedsAToolsHome(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestBrowserStateBeforeTheDownload(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	var st wire.BrowserState
+	if err := json.Unmarshal(c.call(t, 1, "browser/state", wire.Empty{}), &st); err != nil {
+		t.Fatal(err)
+	}
+	if st.Installed || st.Running || st.DownloadBytes != 0 || st.Sites == nil || len(st.Sites) != 0 || st.Problem != nil {
+		t.Fatalf("%+v", st)
+	}
+	if err := json.Unmarshal(c.call(t, 2, "browser/clear", wire.BrowserClearRequest{}), &st); err != nil || st.Installed {
+		t.Fatal(err, st)
+	}
+	if d.browser.Running() {
+		t.Fatal("Settings ▸ Browser started the browser before its download")
+	}
+	// The sites say where the person signed in, and Clear signs agents out: the person's
+	// own clients only.
+	for _, role := range []Role{RoleAgent, RoleHostApp, RoleWindow, RoleStranger, RolePairing} {
+		for _, m := range []string{"browser/state", "browser/clear"} {
+			if role.Allows(m) {
+				t.Fatalf("the %s role may call %s", role, m)
+			}
+		}
+	}
+}

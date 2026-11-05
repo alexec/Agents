@@ -65,6 +65,7 @@ public enum Capability {
     public static let governance1 = "governance/1"
     public static let groups1 = "groups/1"
     public static let handover1 = "handover/1"
+    public static let hostBrowserSettings1 = "host.browser-settings/1"
     public static let hostDesktopControl1 = "host.desktop-control/1"
     public static let hostLock1 = "host.lock/1"
     public static let hostLock2 = "host.lock/2"
@@ -225,6 +226,8 @@ public enum Capability {
         "backups/make": "backups/1",
         "backups/restore": "backups/1",
         "backups/state": "backups/1",
+        "browser/clear": "host.browser-settings/1",
+        "browser/state": "host.browser-settings/1",
         "catalog/destination-state": "catalog/1",
         "catalog/preview": "catalog/1",
         "catalog/search": "catalog/1",
@@ -824,6 +827,7 @@ public enum Capability {
             "host.team/1",
             "host.suspend/1",
             "host.policy-layers/1",
+            "host.browser-settings/1",
             "host.desktop-control/1",
             "host.org-routes/2",
             "host.user-settings/2",
