@@ -137,6 +137,39 @@
           }
         }
       }
+    },
+    {
+      "server": {
+        "name": "agents/slack",
+        "title": "Slack",
+        "description": "One Slack workspace, as your Slack app's bot over Socket Mode: events when a message comes or a question is answered, and tools to list channels, read messages, send a message and ask a question with buttons"
+      },
+      "_meta": {
+        "dev.agentloops/connector": {
+          "command": "slack-mcp",
+          "hosted": true,
+          "secrets": [
+            {
+              "name": "SLACK_BOT_TOKEN",
+              "description": "The Slack app's Bot User OAuth Token, xoxb-…",
+              "required": true
+            },
+            {
+              "name": "SLACK_APP_TOKEN",
+              "description": "An app-level token with connections:write, xapp-…",
+              "required": true
+            }
+          ],
+          "declares": {
+            "tools": true,
+            "events": [
+              "message.received",
+              "question.answered"
+            ],
+            "views": false
+          }
+        }
+      }
     }
   ]
 }

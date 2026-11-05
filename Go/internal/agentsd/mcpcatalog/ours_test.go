@@ -10,6 +10,7 @@ import (
 	"github.com/alexec/agents/Go/internal/gitlabmcp"
 	"github.com/alexec/agents/Go/internal/jiramcp"
 	"github.com/alexec/agents/Go/internal/linearmcp"
+	"github.com/alexec/agents/Go/internal/slackmcp"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -35,6 +36,10 @@ func TestOursDeclareWhatTheirServersDeclare(t *testing.T) {
 	jira, _ := OursByID("agents/jira")
 	if !reflect.DeepEqual(jira.Declares.Events, jiramcp.EventNames()) || !jira.Declares.Tools || !jira.Declares.Views {
 		t.Fatalf("jira: %v, the server's %v", jira.Declares, jiramcp.EventNames())
+	}
+	slack, _ := OursByID("agents/slack")
+	if !reflect.DeepEqual(slack.Declares.Events, slackmcp.EventNames()) || !slack.Declares.Tools || slack.Declares.Views {
+		t.Fatalf("slack: %v, the server's %v", slack.Declares, slackmcp.EventNames())
 	}
 	// linear-mcp has show_issues (TestTheViewListsOpenIssues); github-mcp has the official ones.
 	if !linear.Declares.Tools || !linear.Declares.Views || !github.Declares.Tools {
@@ -121,5 +126,34 @@ func TestJiraAsksForNoSecret(t *testing.T) {
 	}
 	if r.Marketplace == nil || *r.Marketplace != AgentsMarketplace || r.Levels == nil || !r.Levels.Tools || !r.Levels.Views || !r.Levels.Events {
 		t.Fatalf("result: %+v", r)
+	}
+}
+
+// Slack has no connection to read (#3475): it asks for the Slack app's two tokens, kept in
+// the person's secrets.env and named in its entry.
+func TestSlackAsksForItsTwoTokens(t *testing.T) {
+	slack, ok := OursByID("agents/slack")
+	if !ok || slack.Command != "slack-mcp" {
+		t.Fatalf("slack: %+v %v", slack, ok)
+	}
+	if o, ok := OursByCommand("slack-mcp"); !ok || o.ID != "agents/slack" {
+		t.Fatalf("by command: %+v %v", o, ok)
+	}
+	built := BuildOurs(slack, func(name string) bool { return name == "SLACK_BOT_TOKEN" })
+	want := `{"command":"slack-mcp","hosted":true,"env":{"SLACK_BOT_TOKEN":"${SLACK_BOT_TOKEN}","SLACK_APP_TOKEN":"${SLACK_APP_TOKEN}"}}`
+	if got := strings.Join(strings.Fields(built.Entry.Stringified()), ""); got != want {
+		t.Fatalf("entry: %s", got)
+	}
+	if built.NameHere != "slack" || len(built.Variables) != 2 {
+		t.Fatalf("built: %+v", built)
+	}
+	bot, app := built.Variables[0], built.Variables[1]
+	if bot.Name != "SLACK_BOT_TOKEN" || bot.Kind != wire.MCPVariableKindSecret || !bot.Required || !bot.AlreadySet ||
+		app.Name != "SLACK_APP_TOKEN" || app.Kind != wire.MCPVariableKindSecret || !app.Required || app.AlreadySet {
+		t.Fatalf("variables: %+v", built.Variables)
+	}
+	r := OursResult(slack, slack.Declares)
+	if r.Levels == nil || !r.Levels.Tools || !r.Levels.Events || r.Levels.Views || r.Levels.Workflows || r.Levels.Tested {
+		t.Fatalf("levels: %+v", r.Levels)
 	}
 }
