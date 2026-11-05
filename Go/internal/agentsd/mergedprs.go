@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -49,19 +48,19 @@ type mergedPull struct {
 }
 
 // countMergedPRsEveryHour asks a minute after the start, then every hour, and looks for a
-// running cloud machine each time too.
+// running cloud machine each time too, until Shutdown (#3522).
 func (d *Daemon) countMergedPRsEveryHour() {
-	safe.Go("merged pull requests", func() {
+	d.goLoop("merged pull requests", func(ctx context.Context) {
 		wait := time.NewTimer(mergedPRsDelay)
 		defer wait.Stop()
 		for {
 			select {
-			case <-d.ctx.Done():
+			case <-ctx.Done():
 				return
 			case <-wait.C:
 			}
 			d.checkCloudHosts()
-			d.countMergedPRs()
+			d.countMergedPRs(ctx)
 			d.checkMilestonesSoon()
 			wait.Reset(mergedPRsInterval)
 		}
@@ -69,15 +68,15 @@ func (d *Daemon) countMergedPRsEveryHour() {
 }
 
 // countMergedPRs asks every folder's gh, when the person has one.
-func (d *Daemon) countMergedPRs() {
+func (d *Daemon) countMergedPRs(ctx context.Context) {
 	if gh := findGH(); gh != "" {
-		d.countMergedPRsWith(gh)
+		d.countMergedPRsWith(ctx, gh)
 	}
 }
 
 // countMergedPRsWith asks every folder's gh, and writes what they said for the days asked
 // about. The first answer goes back as far as the Time page keeps days.
-func (d *Daemon) countMergedPRsWith(gh string) {
+func (d *Daemon) countMergedPRsWith(ctx context.Context, gh string) {
 	d.timeMu.Lock()
 	days := usageDaysKept
 	for _, r := range d.timeLocked().Recap {
@@ -100,7 +99,7 @@ func (d *Daemon) countMergedPRsWith(gh string) {
 		if _, err := os.Stat(filepath.Join(f, ".git")); err != nil {
 			continue
 		}
-		found, err := mergedPullRequests(d.ctx, gh, f, stamps[len(stamps)-1])
+		found, err := mergedPullRequests(ctx, gh, f, stamps[len(stamps)-1])
 		if err != nil {
 			continue
 		}

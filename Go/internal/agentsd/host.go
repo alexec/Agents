@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -511,12 +510,12 @@ func (d *Daemon) diskState() wire.DiskState {
 // watchDisk looks once now and every minute after, as startWatchingDisk does.
 func (d *Daemon) watchDisk() {
 	d.checkDisk() // before any client, which hears only a change after it
-	safe.Go("disk", func() {
+	d.goLoop("disk", func(ctx context.Context) {
 		t := time.NewTicker(time.Minute)
 		defer t.Stop()
 		for {
 			select {
-			case <-d.ctx.Done():
+			case <-ctx.Done():
 				return
 			case <-t.C:
 				d.checkDisk()

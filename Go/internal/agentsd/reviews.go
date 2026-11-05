@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -257,20 +256,20 @@ func (d *Daemon) registerReviews() {
 	})
 }
 
-// readReviewsEvery reads For Review's pull requests until the daemon ends.
-func (d *Daemon) readReviewsEvery() {
+// readReviewsEvery reads For Review's pull requests until ctx ends, at Shutdown (#3522).
+func (d *Daemon) readReviewsEvery(ctx context.Context) {
 	t := time.NewTimer(reviewFirst)
 	defer t.Stop()
 	for {
 		select {
-		case <-d.ctx.Done():
+		case <-ctx.Done():
 			return
 		case <-t.C:
 		}
-		d.readReviews(d.ctx)
+		d.readReviews(ctx)
 		t.Reset(reviewEvery)
 	}
 }
 
 // startReviews starts the poll.
-func (d *Daemon) startReviews() { safe.Go("for review", d.readReviewsEvery) }
+func (d *Daemon) startReviews() { d.goLoop("for review", d.readReviewsEvery) }
