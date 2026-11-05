@@ -19,6 +19,7 @@ public enum Capability {
     public static let backupsStore1 = "backups.store/1"
     public static let backups1 = "backups/1"
     public static let bots1 = "bots/1"
+    public static let browser1 = "browser/1"
     public static let catalog1 = "catalog/1"
     public static let changesUndo1 = "changes.undo/1"
     public static let changes1 = "changes/1"
@@ -229,8 +230,13 @@ public enum Capability {
         "backups/make": "backups/1",
         "backups/restore": "backups/1",
         "backups/state": "backups/1",
+        "browser/ack": "browser/1",
         "browser/clear": "host.browser-settings/1",
+        "browser/input": "browser/1",
+        "browser/navigate": "browser/1",
         "browser/state": "host.browser-settings/1",
+        "browser/unwatch": "browser/1",
+        "browser/watch": "browser/1",
         "catalog/destination-state": "catalog/1",
         "catalog/preview": "catalog/1",
         "catalog/search": "catalog/1",
@@ -515,6 +521,8 @@ public enum Capability {
         "attention/changed": "attention/1",
         "auto/changed": "auto/1",
         "backups/changed": "backups/1",
+        "browser/frame": "browser/1",
+        "browser/pageChanged": "browser/1",
         "clientPermissions/changed": "client-permissions/1",
         "clone/changed": "clone/1",
         "cost/changed": "cost/1",

@@ -28,6 +28,7 @@ const browserToolsetID = "browser"
 // startBrowser makes the machine's browser. It starts nothing.
 func (d *Daemon) startBrowser() {
 	d.browser = browser.New(d.Store.Loc.Cache, d.Store.Loc.Root, d.installBrowserToolset, d.browserBusy, loginEnvironment)
+	d.browser.Changed = d.browserChanged
 }
 
 // installBrowserToolset installs the pinned toolset, unless it is whole already.

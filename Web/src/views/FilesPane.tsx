@@ -1,7 +1,7 @@
 // The files pane (071 US4; frame B): a fourth column from 1440, over the chat below that. Four
 // tabs: Files (the session's folder, browsed, a file opened), Changes (what the agent changed),
 // Page (a live page the agent shows), Exchanged (what the conversation handed over, #258), Simulator,
-// and Lineage (what the session is linked to, #2940).
+// Lineage (what the session is linked to, #2940), and Agent Browser (the machine's browser, #3528).
 import { signal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { Agent, DirectoryEntry } from "../protocol/generated";
@@ -19,12 +19,15 @@ import { LiveDocument } from "./LiveDocument";
 import { Exchanged } from "./Exchanged";
 import { SimulatorPane } from "./SimulatorPane";
 import { Lineage } from "./Lineage";
+import { AgentBrowserPane } from "./AgentBrowserPane";
+import { words as browserWords } from "../model/machineBrowser";
 import { Capability } from "../protocol/capabilities.generated";
 import { hostNeedsUpdate } from "../model/capabilities";
 
 const tabs: { tab: Tab; label: string }[] = [
   { tab: "files", label: "Files" }, { tab: "changes", label: "Changes" }, { tab: "page", label: "Page" },
   { tab: "exchanged", label: "Exchanged" }, { tab: "simulator", label: "Simulator" }, { tab: "lineage", label: "Lineage" },
+  { tab: "browser", label: browserWords.tab },
 ];
 
 /** Below 760 the page is the phone's one column at a time, and Files lists one folder at a time, as the Remote does. */
@@ -159,6 +162,9 @@ export function FilesPane({ store, host, session }: { store: Store; host: string
           : <p class="hint">{hostNeedsUpdate}</p>)}
         {pane.tab === "lineage" && (store.has(host, Capability.lineage1)
           ? <Lineage key={session} store={store} host={host} session={session} />
+          : <p class="hint">{hostNeedsUpdate}</p>)}
+        {pane.tab === "browser" && (store.has(host, Capability.browser1)
+          ? <AgentBrowserPane store={store} host={host} />
           : <p class="hint">{hostNeedsUpdate}</p>)}
       </div>
     </aside>

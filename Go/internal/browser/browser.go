@@ -2,7 +2,7 @@
 // machine, which agentsd downloads on first use, starts with no window and a kept profile,
 // listening on 127.0.0.1 only, and stops when nobody has used it for a while. Agents drive
 // it through Playwright (#3534, agentsd's browsertools.go); clients watch it by a screencast
-// (a later story).
+// (screencast.go, #3528).
 //
 // The Chromium is Playwright's own build, installed by Playwright's own installer
 // (`playwright-core install chromium`) from the pinned @playwright/mcp toolset, so the
@@ -65,6 +65,9 @@ type Machine struct {
 	// Filter is what every browser tool's result goes through (#3534): the values filled
 	// into its pages come out, and its images are masked.
 	Filter Filter
+	// Changed hears that Chromium started (true) or stopped (false), off the machine's
+	// lock: the clients that watch the page are told (#3528).
+	Changed func(running bool)
 
 	// launch starts Chromium and says how to reach it; a test gives its own.
 	launch func(exe, profile string, env []string) (*process, error)
@@ -162,6 +165,7 @@ func (m *Machine) Endpoint(progress func(string)) (string, error) {
 	}
 	m.running = p
 	m.startLoop()
+	m.changed(true)
 	log.Printf("browser: Chromium (pid %d) started with the profile in %s", p.pid, m.Profile)
 	return p.endpoint, nil
 }
@@ -231,6 +235,14 @@ func (m *Machine) stopLocked() {
 	// The pages are gone, and every value filled into them with the pages.
 	m.Filter.Forget()
 	os.Remove(m.pidFile())
+	m.changed(false)
+}
+
+// changed tells Changed, on its own goroutine, as mu is held.
+func (m *Machine) changed(running bool) {
+	if m.Changed != nil {
+		go m.Changed(running)
+	}
 }
 
 // idle stops Chromium when it has not been used for IdleAfter and no agent holds or waits
