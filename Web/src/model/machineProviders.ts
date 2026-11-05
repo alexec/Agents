@@ -1,16 +1,20 @@
 // Settings ▸ Machine Providers on the web (#1808), as the window's ControlProvidersPage:
 // each machine provider as a card of its workspaces, Add Provider, Edit, List Again, Remove,
-// and a workspace's host linked, started and stopped. Only the providers that work through
-// their API with a token (#1119) are offered here: a CLI preset needs its CLI signed in where
-// the control plane runs, and a person who starts in a browser has no shell there.
-import type { ControlMachine, ProviderAdd, ProviderSummary, MachineInfo } from "../protocol/generated";
+// and a workspace's host linked, started and stopped. A machine of the person's carries each
+// provider (#3398): it runs its server and keeps its tokens, and Add and Edit… choose it (#3496).
+// Only the providers that work through their API with a token (#1119) are offered here: a CLI
+// preset needs its CLI signed in on that machine, and a person who starts in a browser has no
+// shell there.
+import type { ControlMachine, MachineRef, ProviderAdd, ProviderSummary, MachineInfo } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
+import { Capability } from "../protocol/capabilities.generated";
+import { hostAnswers } from "./capabilities";
 
 export type ProviderKind = "digitalOcean" | "codespaces" | "coder" | "aws" | "compute";
 
 export const providerKinds: readonly ProviderKind[] = ["digitalOcean", "codespaces", "coder", "aws", "compute"];
 
-/** One field of a kind's form. A secret goes only to the control plane, never in the configuration. */
+/** One field of a kind's form. A secret goes only to the machine that carries it, never in the configuration. */
 export interface ProviderField {
   id: string;
   label: string;
@@ -42,7 +46,7 @@ const kinds: Record<ProviderKind, KindInfo> = {
   codespaces: {
     title: "GitHub Codespaces",
     preset: "codespaces-api",
-    needs: "Needs a GitHub token: fine-grained, with Codespaces lifecycle admin (read and write), or classic, with the codespace scope. ssh still goes through gh where the control plane runs.",
+    needs: "Needs a GitHub token: fine-grained, with Codespaces lifecycle admin (read and write), or classic, with the codespace scope. ssh still goes through gh on the machine that carries it.",
     fields: [
       { id: "token", label: "GitHub token", secret: true },
       { id: "repo", label: "Repository", prompt: "owner/name, or empty for all", optional: true },
@@ -51,7 +55,7 @@ const kinds: Record<ProviderKind, KindInfo> = {
   coder: {
     title: "Coder Workspaces",
     preset: "coder-api",
-    needs: "Needs your deployment’s address and a session token (`coder tokens create`). ssh still goes through coder where the control plane runs.",
+    needs: "Needs your deployment’s address and a session token (`coder tokens create`). ssh still goes through coder on the machine that carries it.",
     fields: [
       { id: "url", label: "Deployment", prompt: "Your deployment’s address" },
       { id: "token", label: "Session token", secret: true },
@@ -88,12 +92,20 @@ export const providerWords = {
   heading: "Machine providers",
   /** Under the list: what a provider is, and the kinds only the Mac app adds (#3425). */
   footer: (hasMac: boolean) => "A provider starts and stops your machines: DigitalOcean Droplets, GitHub Codespaces, Coder workspaces, "
-    + "Google Compute Engine VMs or AWS EC2 instances, through their API. It runs on the control plane, so it can start a machine that is down. "
+    + "Google Compute Engine VMs or AWS EC2 instances, through their API. One of your machines carries it: it runs there and keeps its tokens, and the control plane keeps none. "
     + (hasMac ? "Docker, Cloud Workstations, your own commands and MCP servers are added in the Mac app."
       : "The web page cannot add Docker, Cloud Workstations, your own commands or MCP servers yet."),
   off: "Machine providers are off on this control plane.",
   add: "Add Provider…",
-  secretsFoot: "Tokens and keys go to the control plane and are never shown again. This page does not keep them.",
+  /** Under the form: where its tokens and keys go (#3496). */
+  secretsFoot: (machine: string | undefined) => `Tokens and keys go to ${machine ?? "the machine that carries it"}, which keeps them. The control plane keeps none.`,
+  carriedBy: "Carried by",
+  /** In Edit…, when another machine is chosen. */
+  movedNote: "Its secrets stay on the machine that carried it: give them again.",
+  giveAgain: "Give it again.",
+  /** In place of the menu when none of the person's machines can carry it. */
+  noneOnline: "None of your machines is online to carry it: its server runs there, with its secrets. Start one, then add it.",
+  notCarried: "No machine carries it: choose one with Edit…, and give its secrets again.",
   editSecret: "Leave empty to keep the one it has.",
   removeTitle: (name: string) => `Remove ${name}?`,
   removeNote: "Its machines stay as they are, unlinked: nothing here can start or stop them any more.",
@@ -129,7 +141,8 @@ export function defaultName(kind: ProviderKind): string { return kinds[kind].tit
  * configuration is left out, so the control plane keeps it, and an empty secret keeps the one it
  * has. Answers a sentence that says what is missing, or the request.
  */
-export function providerRequest(kind: ProviderKind, name: string, values: Record<string, string>, editing?: ProviderSummary): ProviderAdd | string {
+export function providerRequest(kind: ProviderKind, name: string, values: Record<string, string>, editing?: ProviderSummary,
+  carrier?: string): ProviderAdd | string {
   const v = (id: string) => (values[id] ?? "").trim();
   const title = name.trim() || defaultName(kind);
   const secretNames: Record<string, string> = kind === "aws"
@@ -141,9 +154,9 @@ export function providerRequest(kind: ProviderKind, name: string, values: Record
     // The secret key is not trimmed: a key is what it is.
     const value = field === "secretKey" || field === "serviceKey" ? (values[field] ?? "") : v(field);
     if (value) secrets[secret] = value;
-    else if (!editing) return `Give the ${kinds[kind].fields.find((f) => f.id === field)?.label ?? field}.`;
+    else if (!editing || movesTo(editing, carrier)) return `Give the ${kinds[kind].fields.find((f) => f.id === field)?.label ?? field}.`;
   }
-  if (editing) return { id: editing.id, name: title, kind: "commands", secrets };
+  if (editing) return { id: editing.id, name: title, kind: "commands", ...(carrier && movesTo(editing, carrier) ? { machine: carrier as MachineRef } : {}), secrets };
   const commands: Record<string, string | string[]> = { preset: kinds[kind].preset };
   switch (kind) {
     case "digitalOcean":
@@ -172,7 +185,39 @@ export function providerRequest(kind: ProviderKind, name: string, values: Record
       if (v("sshKey")) commands["sshKeys"] = [v("sshKey")];
       break;
   }
-  return { name: title, kind: "commands", commands, secrets };
+  return { name: title, kind: "commands", commands, ...(carrier ? { machine: carrier as MachineRef } : {}), secrets };
+}
+
+/**
+ * The machines that may carry a provider (#3496), as the window's ProviderCarrier.choices: the
+ * person's own, online, able to, and running agents; `own` (the person's Mac) first, then by name.
+ */
+export function carrierChoices(hosts: readonly ControlMachine[], person: string | undefined, own?: string): ControlMachine[] {
+  return hosts
+    .filter((h) => h.relay == null && hostAnswers(h.state) && (h.capabilities?.includes(Capability.providersCarry1) ?? true)
+      && (!person || !h.owner || h.owner === person))
+    .sort((a, b) => Number(b.id === own) - Number(a.id === own) || a.name.localeCompare(b.name, undefined, { numeric: true }));
+}
+
+/** What Add and Edit… start at: the one it has, when it can still carry it, else the first choice. */
+export function carrierStart(provider: ProviderSummary | undefined, choices: readonly ControlMachine[]): string | undefined {
+  if (provider?.machine && choices.some((h) => h.id === provider.machine)) return provider.machine;
+  return choices[0]?.id;
+}
+
+/** Whether Edit… moves the provider to `carrier`: then its secrets must be given again. */
+export function movesTo(provider: ProviderSummary, carrier: string | undefined): boolean {
+  return !!carrier && carrier !== provider.machine;
+}
+
+/**
+ * The card's line for the machine that carries it (#3496): offline, carried by, or, for one made
+ * before #3398 that an admin can edit, that none does.
+ */
+export function carrierLine(provider: ProviderSummary, canEdit: boolean): string | undefined {
+  if (provider.machineOffline) return `${provider.machineName ?? "Its machine"} is offline: its machines can’t be started or stopped until it is back.`;
+  if (provider.machine) return `Carried by ${provider.machineName ?? "a machine"}`;
+  return canEdit ? providerWords.notCarried : undefined;
 }
 
 /** The chip on a card, as the window's: "command provider · digitalocean-api · API". */
