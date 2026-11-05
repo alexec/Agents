@@ -119,6 +119,8 @@ private struct LockCardFrame<Content: View>: View {
                 .foregroundStyle(StateTint.attention.style(or: .primary))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) { content }
+                .lineLimit(nil)
+                .frame(maxWidth: .infinity, alignment: .leading)
             Spacer(minLength: 0)
         }
         .appText(.supporting)

@@ -6,7 +6,30 @@ give a client a key of its own. This is the decision of the spike #3399. The bui
 #3400 (epic #3401). The model is Tailscale's
 [Tailnet Lock](https://tailscale.com/kb/1226/tailnet-lock).
 
-Nothing here is built yet.
+Steps 1 (#3489) and 2 (#3490) of "The build" are built: the chain, and clients that sign.
+
+How step 2 is built (#3490):
+
+- `lock/join`, `lock/joinAnswer`, `lock/joinReveal`, `lock/joinDeny` and `lock/joinRequests`
+  (capability `lock-join/1`), with `control/lockJoinRequested` and `control/lockJoinDecided`.
+  The control plane keeps each request at `v1/lockjoins/<id>.json` and passes the commitment
+  and the nonces on; Approve is the signer's own `addClient` through `lock/add`.
+- The commitment is SHA-256 of `agents-lock-join/1\n`, the key and a 16-byte nonce. The
+  digits are the first four bytes of SHA-256 of `agents-lock-digits/1\n`, the key, the new
+  client's nonce and the signer's nonce, modulo a million. A signer makes the digits with the
+  nonce it sent, never the one the control plane sends back. Go, AgentsKit and the web page
+  read the same vectors (`Packages/AgentsKit/Tests/AgentsKitTests/Fixtures/lock/vectors.json`).
+- Decided: joining the lock is a step of its own after sign-in, on the paired connection, and
+  not part of `signIn/approve`, because the control plane's sign-in and the lock are two
+  trusts: every sign-in method then needs the lock's approval (D2), and the sign-in flow is
+  unchanged.
+- Decided: a signer presses **Compare Digits** before its nonce is sent, and only the first
+  signer's nonce is taken, because a nonce sent by every open device at once would leave the
+  person comparing on a device they are not looking at, and a second nonce would be a second
+  try at the digits.
+- Decided: each client pins the head it last checked (defaults on the Mac and the Remote,
+  `localStorage` on the web page), and signs nothing on a lock that does not follow it.
+- Nothing refuses yet (step 4); the fingerprint in Settings ▸ Clients (D1) is not built yet.
 
 ## What is wrong today
 
