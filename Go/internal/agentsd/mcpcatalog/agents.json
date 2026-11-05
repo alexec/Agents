@@ -170,6 +170,38 @@
           }
         }
       }
+    },
+    {
+      "server": {
+        "name": "agents/googlechat",
+        "title": "Google Chat",
+        "description": "A Google Chat app: an event when a person writes to it or answers its question, and tools to post in its spaces and ask a question with a button per option"
+      },
+      "_meta": {
+        "dev.agentloops/connector": {
+          "command": "googlechat-mcp",
+          "hosted": true,
+          "declares": {
+            "tools": true,
+            "events": [
+              "message.received",
+              "question.answered"
+            ]
+          },
+          "secrets": [
+            {
+              "name": "GOOGLE_CHAT_CREDENTIALS",
+              "description": "The Chat app's service account key: its JSON, or the path of its file",
+              "required": true
+            },
+            {
+              "name": "GOOGLE_CHAT_SUBSCRIPTION",
+              "description": "The app's Pub/Sub subscription: projects/<project>/subscriptions/<name>, or a name in the key's project; agents-chat when left out",
+              "required": false
+            }
+          ]
+        }
+      }
     }
   ]
 }

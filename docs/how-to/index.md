@@ -163,6 +163,8 @@ something particular done.
   given to the session that waits for them.
 - [Reach agents from Slack](reach-agents-from-slack.md): a Slack app for Agents, a workflow
   that starts on a Slack message, and questions with options as buttons.
+- [Use Google Chat](use-google-chat.md): a Google Chat app that starts agents, brings their
+  questions to a space and takes the answer back.
 - [Pin a page to a folder](pin-a-page-to-a-folder.md): a document or an HTML page
   under its folder in the sidebar, live as it changes.
 - [Hand files to a workflow](hand-files-to-a-workflow.md): drop a file into a folder's

@@ -8,6 +8,7 @@ import (
 	"github.com/alexec/agents/Go/internal/emailmcp"
 	"github.com/alexec/agents/Go/internal/githubmcp"
 	"github.com/alexec/agents/Go/internal/gitlabmcp"
+	"github.com/alexec/agents/Go/internal/googlechatmcp"
 	"github.com/alexec/agents/Go/internal/jiramcp"
 	"github.com/alexec/agents/Go/internal/linearmcp"
 	"github.com/alexec/agents/Go/internal/slackmcp"
@@ -155,5 +156,24 @@ func TestSlackAsksForItsTwoTokens(t *testing.T) {
 	r := OursResult(slack, slack.Declares)
 	if r.Levels == nil || !r.Levels.Tools || !r.Levels.Events || r.Levels.Views || r.Levels.Workflows || r.Levels.Tested {
 		t.Fatalf("levels: %+v", r.Levels)
+	}
+}
+
+// Google Chat (#1016) has no connection to read: it asks for the Chat app's key, kept in the
+// person's secrets, and declares the events its server raises.
+func TestGoogleChatAsksForItsKey(t *testing.T) {
+	chat, ok := OursByID("agents/googlechat")
+	if !ok || chat.Command != "googlechat-mcp" || !chat.Declares.Tools || chat.Declares.Views ||
+		!reflect.DeepEqual(chat.Declares.Events, googlechatmcp.EventNames()) {
+		t.Fatalf("googlechat: %+v %v, the server's %v", chat, ok, googlechatmcp.EventNames())
+	}
+	built := BuildOurs(chat, func(name string) bool { return name == "GOOGLE_CHAT_SUBSCRIPTION" })
+	want := `{"command":"googlechat-mcp","hosted":true,"env":{"GOOGLE_CHAT_CREDENTIALS":"${GOOGLE_CHAT_CREDENTIALS}","GOOGLE_CHAT_SUBSCRIPTION":"${GOOGLE_CHAT_SUBSCRIPTION}"}}`
+	if got := strings.Join(strings.Fields(built.Entry.Stringified()), ""); got != want {
+		t.Fatalf("entry: %s", got)
+	}
+	if len(built.Variables) != 2 || !built.Variables[0].Required || built.Variables[0].AlreadySet ||
+		built.Variables[1].Required || !built.Variables[1].AlreadySet || built.Variables[0].Kind != wire.MCPVariableKindSecret {
+		t.Fatalf("variables: %+v", built.Variables)
 	}
 }
