@@ -123,6 +123,7 @@ var own = methodSet(
 	"lock/joinDeny",
 	"lock/joinRequests",
 	"lock/joinReveal",
+	"lock/reset",
 	"orgRoutes/check",
 	"orgRoutes/list",
 	"orgRoutes/mine",
@@ -260,6 +261,7 @@ var writes = methodSet(
 	"lock/joinAnswer",
 	"lock/joinDeny",
 	"lock/joinReveal",
+	"lock/reset",
 	"orgRoutes/remove",
 	"orgRoutes/replaceKey",
 	"orgRoutes/set",
@@ -371,7 +373,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return m.sealingMethod(ctx, method, params, from)
 	case "links/list", "links/requests", "links/approve", "links/deny", "links/remove":
 		return m.linksMethod(ctx, method, params, from)
-	case "lock/get", "lock/add":
+	case "lock/get", "lock/add", "lock/reset":
 		return m.lockMethod(ctx, method, params, from)
 	case "lock/join", "lock/joinRequests", "lock/joinAnswer", "lock/joinReveal", "lock/joinDeny":
 		return m.lockJoinMethod(ctx, method, params, from)
@@ -1203,7 +1205,7 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 	case "host/orgRoutesAgain":
 		m.s.orgRoutesAgain(host)
 		return map[string]any{}, nil
-	case "host/lockAdd", "host/lockJoin", "host/lockJoinReveal":
+	case "host/lockAdd", "host/lockAgain", "host/lockJoin", "host/lockJoinReveal":
 		return m.hostLockMethod(ctx, host, method, params)
 	case "attention/turn":
 		turn, err := require[wire.AttentionTurn](params, "AttentionTurn")

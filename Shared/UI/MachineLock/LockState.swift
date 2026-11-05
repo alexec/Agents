@@ -46,7 +46,20 @@ final class LockState {
         case mismatch
     }
 
+    /// The recovery key's card on a device in the lock (#3493, D4).
+    enum RecoveryCard: Equatable {
+        case none
+        /// Shown once, just after it was made.
+        case show(String)
+        /// The lock has one client, and the person neither saved nor skipped a key here.
+        case offer
+    }
+
     private(set) var place: Place = .unknown
+    /// The recovery key made here, kept only in memory until the person saved or skipped it.
+    private var recoveryShown: String?
+    /// A recovery step in flight: Make Recovery Key, Use, or Start a New Lock.
+    private(set) var recoveryBusy = false
     /// The lock as this device last checked it, kept with the pin so a channel to a machine
     /// opens before the control plane answers, and with it away (#3492).
     private(set) var checked: MachineLock.State?
@@ -93,6 +106,82 @@ final class LockState {
         checked = state
         pins.save(state.pin)
         pins.saveLock(lock)
+    }
+
+    /// The recovery key's card now: the key just made, or an offer to make one while the lock
+    /// has only this client (a key shown before is gone once the app closes).
+    var recoveryCard: RecoveryCard {
+        guard place == .member, let state = checked else { return .none }
+        if let recoveryShown { return .show(recoveryShown) }
+        let clients = state.members.values.filter(\.isClient).count
+        return clients <= 1 && !pins.recoveryDone(state.person) ? .offer : .none
+    }
+
+    /// I Saved It, or Skip: not asked again on this device.
+    func dismissRecovery() {
+        if let person = checked?.person { pins.setRecoveryDone(person) }
+        recoveryShown = nil
+    }
+
+    /// Make Recovery Key: a new recovery entry, which takes the old key's place, shown once.
+    func makeRecoveryKey(on control: DaemonClient?) async {
+        guard let control, !recoveryBusy else { return }
+        recoveryBusy = true
+        defer { recoveryBusy = false }
+        guard let made = try? MachineLock.makeRecovery() else { return }
+        let body = DaemonAPI.LockBody(kind: .recovery, person: "", key: made.publicKey, sealed: made.sealed)
+        guard let after = try? await put(body, on: control) else { return }
+        checked = after
+        recoveryShown = made.text
+    }
+
+    /// Use Recovery Key (#3493, D4): this device, not in its lock, opens the lock's recovery key
+    /// with the secret the person typed and signs its own addClient with it. Nil when it is in;
+    /// else the words to show under the field.
+    func useRecoveryKey(_ text: String, on control: DaemonClient?) async -> String? {
+        guard let control else { return LockWords.unreachable }
+        guard !recoveryBusy else { return nil }
+        recoveryBusy = true
+        defer { recoveryBusy = false }
+        let secret: Data
+        do { secret = try MachineLock.parseRecovery(text) } catch { return LockWords.recoveryTypo }
+        guard let key = signingKey() else { return LockWords.recoveryFailed }
+        for attempt in 0..<2 {
+            guard let lock = try? await control.call(DaemonAPI.Method.lockGet, DaemonAPI.LockGet(), returning: DaemonAPI.Lock.self),
+                  let state = try? MachineLock.follow(pins.load(), lock) else { return LockWords.recoveryFailed }
+            guard let public_ = state.recovery, let sealed = state.recoverySealed else { return LockWords.noRecovery }
+            let recovery: LockSigningKey
+            do { recovery = try MachineLock.openRecovery(secret, publicKey: public_, sealed: sealed) } catch { return LockWords.recoveryNotThisLock }
+            let body = DaemonAPI.LockBody(kind: .addClient, person: "", key: key.publicKey, name: name, clientKind: MachineLock.clientKind(kind))
+            do {
+                let entry = try MachineLock.sign(body, after: state, with: recovery)
+                _ = try await control.call(DaemonAPI.Method.lockAdd, DaemonAPI.LockAdd(entries: [entry]), returning: DaemonAPI.LockHead.self)
+            } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.changedElsewhere && attempt == 0 {
+                continue
+            } catch {
+                return PeopleWords.refusal(error)
+            }
+            ownNonce = nil
+            place = .unknown
+            await refresh(control)
+            return nil
+        }
+        return LockWords.recoveryFailed
+    }
+
+    /// Start a New Lock (#3493, D4): every signer and the recovery key are lost. The control plane
+    /// drops the lock, this device forgets its pin and signs a new root with a new recovery key.
+    /// Each machine joins again after agentsd lock reset.
+    func startNewLock(on control: DaemonClient?) async {
+        guard let control, !recoveryBusy else { return }
+        recoveryBusy = true
+        defer { recoveryBusy = false }
+        guard (try? await control.call(DaemonAPI.Method.lockReset, DaemonAPI.Empty())) != nil else { return }
+        pins.clear()
+        checked = nil
+        ownNonce = nil
+        place = .unknown
+        await refresh(control)
     }
 
     /// The cards to show now: other clients' open requests.
@@ -275,7 +364,7 @@ final class LockState {
                                           clientKind: MachineLock.clientKind(kind))
             // Another device may make the root at the same moment: then this one asks to join it.
             do {
-                try await put(root, on: control, first: true)
+                try await putRoot(root, on: control, key: key)
                 return await refresh(control)
             } catch LockTrouble.changed {
                 return await refresh(control)
@@ -305,6 +394,20 @@ final class LockState {
         place = .asking(request: started.request, digits: nil)
     }
 
+    /// The root, and the recovery key with it in the same lock/add (D4): the key is shown once.
+    private func putRoot(_ root: DaemonAPI.LockBody, on control: DaemonClient, key: LockSigningKey) async throws {
+        let rootEntry = try MachineLock.sign(root, after: nil, with: key)
+        var state = MachineLock.State()
+        try state.add(rootEntry)
+        let made = try MachineLock.makeRecovery()
+        let recovery = DaemonAPI.LockBody(kind: .recovery, person: state.person, key: made.publicKey, sealed: made.sealed)
+        let recoveryEntry = try MachineLock.sign(recovery, after: state, with: key)
+        _ = try await control.call(DaemonAPI.Method.lockAdd, DaemonAPI.LockAdd(entries: [rootEntry, recoveryEntry]),
+                                   returning: DaemonAPI.LockHead.self)
+        place = .member
+        recoveryShown = made.text
+    }
+
     /// This device's own request, once a signer sent its nonce: show ours, and the digits.
     private func answerOwn(_ request: DaemonAPI.LockJoinRequest, on control: DaemonClient) async {
         guard case .asking(let id, let digits) = place, id == request.request, digits == nil,
@@ -315,10 +418,12 @@ final class LockState {
 
     /// Signs `body` onto the lock as it is now, read and checked here; once more when another
     /// device put an entry first.
-    private func put(_ body: DaemonAPI.LockBody, on control: DaemonClient, first: Bool = false) async throws {
+    @discardableResult
+    private func put(_ body: DaemonAPI.LockBody, on control: DaemonClient, first: Bool = false) async throws -> MachineLock.State {
         guard let key = signingKey() else { throw LockTrouble.noKey }
-        try await Self.put(body, on: control, pins: pins, key: key, first: first)
+        let after = try await Self.put(body, on: control, pins: pins, key: key, first: first)
         if first { place = .member }
+        return after
     }
 
     /// `put` with the pins and key given: the lock after the entry. `signerOnly` refuses when
@@ -376,4 +481,15 @@ struct LockPins {
     func saveLock(_ lock: DaemonAPI.Lock) {
         if let data = try? JSONEncoder().encode(lock) { defaults.set(data, forKey: name + ".lock") }
     }
+
+    /// Forgets the lock, for a new one (#3493): the next lock read is taken on first use.
+    func clear() {
+        defaults.removeObject(forKey: name)
+        defaults.removeObject(forKey: name + ".lock")
+    }
+
+    /// The person saved or skipped the recovery key on this device (#3493).
+    func recoveryDone(_ person: String) -> Bool { defaults.bool(forKey: "\(name).recoveryDone.\(person)") }
+
+    func setRecoveryDone(_ person: String) { defaults.set(true, forKey: "\(name).recoveryDone.\(person)") }
 }

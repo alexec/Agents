@@ -162,6 +162,10 @@ function controlPlane(person = "alex") {
           changed(r);
           return {};
         }
+        case "lock/reset":
+          lock.entries.length = 0;
+          tell("control/lockChanged", { count: 0, head: "" });
+          return {};
       }
       throw fail(-32601, `No method ${method}.`);
     },
@@ -174,9 +178,11 @@ test("the first browser makes the root; a second asks, compares digits and is ap
   const mac = plane.connect("AAAA-1111", "Mac");
   await mac.lock.run();
   assert.equal(mac.lock.device.value.kind, "member");
-  assert.equal(plane.lock.entries.length, 1);
-  assert.equal(mac.pins.pin.count, 1);
+  // The root, and the recovery key with it (#3493), shown once.
+  assert.equal(plane.lock.entries.length, 2);
+  assert.equal(mac.pins.pin.count, 2);
   assert.equal(mac.keys.pair.privateKey.extractable, false);
+  assert.equal(mac.lock.recovery.value.kind, "show");
 
   const web = plane.connect("BBBB-2222", "A browser");
   await web.lock.run();
@@ -199,10 +205,12 @@ test("the first browser makes the root; a second asks, compares digits and is ap
 
   await mac.lock.approve(card.request.request);
   await wait(50);
-  assert.equal(plane.lock.entries.length, 2);
+  assert.equal(plane.lock.entries.length, 3);
   assert.equal(web.lock.device.value.kind, "member");
   assert.equal(mac.lock.cards.value.length, 0);
-  assert.equal(web.pins.pin.count, 2);
+  assert.equal(web.pins.pin.count, 3);
+  // A second device: the lock is not offered a recovery key again there.
+  assert.equal(web.lock.recovery.value.kind, "none");
   const state = await m.check(plane.lock.entries);
   assert.equal(state.membersOf("addClient")[1].clientKind, "web");
   assert.deepEqual(mac.said, []);
@@ -270,7 +278,7 @@ test("digits come from this signer's nonce, and a reveal that breaks its promise
   await wait();
   assert.equal(mac.lock.cards.value[0].view.kind, "notPromised");
   await mac.lock.approve(request);
-  assert.equal(plane.lock.entries.length, 1);
+  assert.equal(plane.lock.entries.length, 2);
 });
 
 test("a lock that forks from the pin is broken, and says so", async () => {
@@ -379,4 +387,86 @@ test("a host code with an invite is the version 4 text Go reads, as AgentsKit ma
     "agents-control:4:h:-:KEY:SECRET:https%3A%2F%2Fx:-:Sam%27s:-:BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc:sam.p:3:CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk");
   const client = code.replace(":h:", ":c:");
   assert.equal(m.inviteCode(client, new Uint8Array(32).fill(7), pin), client);
+});
+
+const recovery = JSON.parse(readFileSync(new URL("../../Packages/AgentsKit/Tests/AgentsKitTests/Fixtures/lock/recovery.json", import.meta.url)));
+
+test("the recovery key's text and its sealed key are Go's (#3493)", async () => {
+  assert.equal(await m.recoveryText(bytes(recovery.secret)), recovery.text);
+  for (const typed of [recovery.text, ...recovery.typed]) assert.equal(b64(await m.parseRecovery(typed)), recovery.secret);
+  for (const typo of recovery.typos) await assert.rejects(m.parseRecovery(typo), (error) => error.typo === true);
+  const state = await m.check(recovery.lock.entries);
+  assert.equal(b64(state.recovery), recovery.public);
+  const key = await m.openRecovery(bytes(recovery.secret), state.recovery, state.recoverySealed);
+  // It signs as the lock's recovery key: Go's check takes what it signs.
+  const laptop = await signer();
+  const entry = await m.sign(key, state.recovery, { kind: "addClient", person: state.person, previous: b64(state.head), at: m.wireNow(), key: b64(laptop.publicRaw) });
+  await state.add(entry);
+  assert.ok(state.signer(laptop.publicRaw));
+  await assert.rejects(m.openRecovery(await m.parseRecovery(recovery.other), state.recovery, state.recoverySealed), (error) => error.typo === false);
+  // One made here opens with its own text.
+  const made = await m.makeRecovery();
+  await m.openRecovery(await m.parseRecovery(made.text.toLowerCase()), made.publicRaw, made.sealed);
+});
+
+test("a browser that lost every device adds itself with the recovery key, or starts a new lock (#3493)", async () => {
+  const plane = controlPlane();
+  const mac = plane.connect("AAAA-1111", "Mac");
+  await mac.lock.run();
+  const shown = mac.lock.recovery.value;
+  assert.equal(shown.kind, "show");
+  mac.lock.recoveryDismissed();
+  assert.equal(mac.lock.recovery.value.kind, "none");
+
+  // The Mac is lost. A new browser asks; nobody can approve it, so it types the key.
+  const web = plane.connect("BBBB-2222", "A browser");
+  await web.lock.run();
+  await wait();
+  assert.equal(web.lock.device.value.kind, "asking");
+  assert.match(await web.lock.useRecoveryKey("not a key"), /typo/);
+  assert.match(await web.lock.useRecoveryKey(recovery.other), /not your lock/);
+  assert.equal(await web.lock.useRecoveryKey(shown.text.replace(/-/g, " ")), null);
+  await wait(50);
+  assert.equal(web.lock.device.value.kind, "member");
+  const state = await m.check(plane.lock.entries);
+  assert.ok(state.signer(web.keys.publicRaw ?? new Uint8Array(await crypto.subtle.exportKey("raw", web.keys.pair.publicKey))));
+  // Its own request was approved by its addClient.
+  assert.ok([...plane.requests.values()].every((r) => r.result));
+
+  // Every device and the key lost: a third browser starts a new lock, with a new key.
+  const fresh = plane.connect("CCCC-3333", "Another browser");
+  await fresh.lock.run();
+  await wait();
+  await fresh.lock.startNewLock();
+  await wait(50);
+  assert.equal(fresh.lock.device.value.kind, "member");
+  assert.equal(fresh.lock.recovery.value.kind, "show");
+  assert.notEqual(fresh.lock.recovery.value.text, shown.text);
+  const fresher = await m.check(plane.lock.entries);
+  assert.equal(fresher.count, 2);
+  assert.ok(fresher.signer(new Uint8Array(await crypto.subtle.exportKey("raw", fresh.keys.pair.publicKey))));
+  // The browser that pinned the old lock refuses the new one.
+  await web.lock.run();
+  assert.equal(web.lock.device.value.kind, "broken");
+  assert.deepEqual(fresh.said, []);
+});
+
+test("a lock with one client offers a recovery key until it is saved or skipped (#3493)", async () => {
+  const plane = controlPlane();
+  const mac = plane.connect("AAAA-1111", "Mac");
+  await mac.lock.run();
+  // The page closed before the key was saved: the next page offers a new one.
+  const again = new model.MachineLock({
+    call: (method, params) => plane.answer("AAAA-1111", "Mac", "browser", method, structuredClone(params)),
+    keyRecord: async () => ({ client: "AAAA-1111" }), lockKey: async () => mac.keys.pair, saveLockKey: async () => {},
+  }, mac.pins, () => {}, undefined, undefined, new model.MemoryRecoveryDone());
+  await again.run();
+  assert.equal(again.recovery.value.kind, "offer");
+  await again.makeRecoveryKey();
+  assert.equal(again.recovery.value.kind, "show");
+  const state = await m.check(plane.lock.entries);
+  assert.equal(state.count, 3);
+  again.recoveryDismissed();
+  await again.run();
+  assert.equal(again.recovery.value.kind, "none");
 });

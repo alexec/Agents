@@ -147,6 +147,13 @@ Everything else is refused with `notInLock` (-32104). A machine with no lock yet
 it took before, so nothing stops working until the person has a lock. A device that is not
 in the lock yet is refused until one of the person's other devices approves it.
 
+**When every device is lost** (#3493): the first device of a lock shows a **recovery key**
+once, for a password manager. Typed on a new device (**Use Recovery Key**), it adds that
+device to the lock. With no recovery key either, **Start a New Lock** drops the old lock and
+signs a new one; each machine refuses the new lock until you run `agentsd lock reset` in its
+shell, and then asks to join it. Only the machine's own account can reset its lock: the
+command talks to `daemon.sock`, and a channel from the control plane is refused.
+
 | It can | It cannot |
 |---|---|
 | route, or refuse to route, any request | add a client or a machine to a lock |

@@ -70,6 +70,7 @@ public enum Capability {
     public static let hostLock1 = "host.lock/1"
     public static let hostLock2 = "host.lock/2"
     public static let hostLock3 = "host.lock/3"
+    public static let hostLock4 = "host.lock/4"
     public static let hostOrgRoutes1 = "host.org-routes/1"
     public static let hostOrgRoutes2 = "host.org-routes/2"
     public static let hostPolicyLayers1 = "host.policy-layers/1"
@@ -88,6 +89,7 @@ public enum Capability {
     public static let links1 = "links/1"
     public static let liveactivity1 = "liveactivity/1"
     public static let lockJoin1 = "lock-join/1"
+    public static let lockReset1 = "lock-reset/1"
     public static let lock1 = "lock/1"
     public static let mac1 = "mac/1"
     public static let machine1 = "machine/1"
@@ -253,6 +255,7 @@ public enum Capability {
         "cost/setLimits": "cost/1",
         "cost/state": "cost/1",
         "credentials/offer": "credentials/1",
+        "daemon/lockReset": "host.lock/4",
         "daemon/ping": "daemon/1",
         "daemon/policyState": "host.policy/1",
         "daemon/quit": "daemon/1",
@@ -605,6 +608,7 @@ public enum Capability {
         "handover/status": "handover/1",
         "host/hello": "host/1",
         "host/lockAdd": "host.lock/2",
+        "host/lockAgain": "host.lock/4",
         "host/lockJoin": "host.lock/2",
         "host/lockJoinReveal": "host.lock/2",
         "host/machines": "host/1",
@@ -653,6 +657,7 @@ public enum Capability {
         "lock/joinDeny": "lock-join/1",
         "lock/joinRequests": "lock-join/1",
         "lock/joinReveal": "lock-join/1",
+        "lock/reset": "lock-reset/1",
         "machines/forAgent": "machines/1",
         "machines/projectFolders": "sessions.project/1",
         "machines/projectSessions": "sessions.project/1",

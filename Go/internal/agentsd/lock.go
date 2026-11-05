@@ -2,6 +2,7 @@ package agentsd
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/json"
@@ -262,4 +263,42 @@ func (d *Daemon) toldLockJoin(params json.RawMessage) {
 	shown := digits[:3] + " " + digits[3:]
 	os.WriteFile(filepath.Join(d.Store.Loc.Root, lockShownFile), []byte(shown+"\n"), 0o600)
 	log.Printf("lock: to add this machine to the lock, check that your device shows the digits %s, then approve it", shown)
+}
+
+// registerLockReset serves daemon/lockReset, which `agentsd lock reset` calls (#3493, D4):
+// only on daemon.sock, which this machine's own account alone reaches, never on a channel
+// the control plane opened nor on the window's local socket, whose requests are checked.
+func (d *Daemon) registerLockReset() {
+	On(d, wire.CallDaemonLockReset, func(_ context.Context, c *Client, _ wire.Empty) (wire.Empty, error) {
+		if c.checked {
+			return wire.Empty{}, &Error{Code: CodeNotPermitted, Message: "Only agentsd lock reset, in this machine's shell, resets its lock."}
+		}
+		d.ResetLock()
+		return wire.Empty{}, nil
+	})
+}
+
+// ResetLock forgets the lock this machine pinned (#3493, D4): the person started a new
+// lock, because every signer and the recovery key were lost. It drops the pin, the lock it
+// kept, the invite and the request to join, and asks the control plane for the person's
+// lock again, which it then pins on first use. Until then it checks nothing, as before the
+// lock.
+func (d *Daemon) ResetLock() {
+	d.lockMu.Lock()
+	defer d.lockMu.Unlock()
+	ResetLockFiles(d.Store.Loc.Root)
+	d.lockHeld, d.lockRead, d.lockAsk = nil, false, nil
+	log.Printf("lock: reset by agentsd lock reset; the next lock the control plane sends is pinned on first use")
+	if tell := d.tellControl.Load(); tell != nil {
+		(*tell)(wire.NewMethodName(wire.CallHostLockAgain.Name), wire.Empty{})
+	}
+}
+
+// ResetLockFiles removes the lock's files from a root: what `agentsd lock reset` does
+// itself when no agentsd runs on that root.
+func ResetLockFiles(root string) {
+	for _, name := range []string{lockPinFile, lockFile, lockShownFile} {
+		os.Remove(filepath.Join(root, name))
+	}
+	controllink.DropLockInvite(root)
 }

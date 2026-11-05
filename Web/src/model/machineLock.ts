@@ -14,8 +14,9 @@ import {
 } from "../protocol/generated";
 import { base64, same } from "../wire/bytes";
 import {
-  b64, commitment, digits, follow, fromBase64, inviteCode, isClient, LockCheckError, lockClientKind, makeInviteKey, makeSigningKey,
-  newNonce, sign, signedRecipients, wireNow, zeroPin, type LockPin, type LockState,
+  b64, commitment, digits, follow, fromBase64, hashOf, inviteCode, isClient, LockCheckError, lockClientKind, makeInviteKey, makeRecovery,
+  makeSigningKey, newNonce, openRecovery, parseRecovery, RecoveryError, sign, signedRecipients, wireNow, zeroPin, type LockPin,
+  type LockState,
 } from "../wire/machineLock";
 import type { LockSigner } from "../wire/lockChannel";
 
@@ -61,6 +62,42 @@ export function pinsAt(key: string): PinStore {
 
 export const localPins: PinStore = pinsAt(pinKey);
 
+/**
+ * Whether the person saved or skipped the recovery key on this device (#3493, D4), by person:
+ * localStorage in the page, memory in the tests.
+ */
+export interface RecoveryDone {
+  done(person: string): boolean;
+  set(person: string): void;
+}
+
+export const localRecoveryDone: RecoveryDone = {
+  done(person) {
+    try {
+      return globalThis.localStorage?.getItem(`agents-lock-recovery-done:${person}`) === "1";
+    } catch {
+      return false;
+    }
+  },
+  set(person) {
+    try {
+      globalThis.localStorage?.setItem(`agents-lock-recovery-done:${person}`, "1");
+    } catch {
+      // Storage that is full or off asks again next time.
+    }
+  },
+};
+
+export class MemoryRecoveryDone implements RecoveryDone {
+  readonly people = new Set<string>();
+  done(person: string): boolean {
+    return this.people.has(person);
+  }
+  set(person: string): void {
+    this.people.add(person);
+  }
+}
+
 /** Another person's lock, as an admin's page pins it to check the machines it seals to (D7). */
 export const localPinsOf = (person: string): PinStore => pinsAt(`${pinKey}:${person}`);
 
@@ -90,6 +127,13 @@ export type SignerView =
   | { kind: "digits"; digits: string }
   | { kind: "notPromised" };
 
+/**
+ * The recovery key's card on a device in the lock (#3493, D4): the key, shown once after it is
+ * made; or, while the lock has one client and the person neither saved nor skipped it here, an
+ * offer to make one (the key shown before is gone once the page closes).
+ */
+export type RecoveryCard = { kind: "none" } | { kind: "show"; text: string } | { kind: "offer" };
+
 export interface SignerCard {
   request: LockJoinRequest;
   view: SignerView;
@@ -100,6 +144,10 @@ const inviteLifetime = 5 * 60;
 
 const isChangedElsewhere = (error: unknown) => (error as { code?: unknown } | null)?.code === Failure.changedElsewhere;
 
+/** What Start a New Lock asks before it drops the lock (#3493, D4); the Mac and the Remote say the same. */
+export const newLockWords =
+  "Start a new lock? Do this only if you lost every device and your recovery key. Each machine refuses the new lock until you run agentsd lock reset in its shell, and approve it here.";
+
 /** The words of a broken lock. */
 export function brokenWords(device: { forked: boolean; why: string }): string {
   return device.forked ? "The lock changed in a way your devices did not sign." : `Your lock does not check: ${device.why}.`;
@@ -109,6 +157,7 @@ export class MachineLock {
   readonly device = signal<ThisDevice>({ kind: "unknown" });
   /** The signer's cards: other devices of this person that ask to join. */
   readonly cards = signal<SignerCard[]>([]);
+  readonly recovery = signal<RecoveryCard>({ kind: "none" });
 
   private client = "";
   private key: { pair: CryptoKeyPair; publicRaw: Uint8Array } | null = null;
@@ -127,7 +176,8 @@ export class MachineLock {
 
   constructor(private readonly link: LockLink, private readonly pins: PinStore = localPins,
     private readonly say: (error: unknown) => void = () => undefined, private readonly now: () => WireDate = () => wireNow(),
-    private readonly pinsOf: (person: string) => PinStore = localPinsOf) {}
+    private readonly pinsOf: (person: string) => PinStore = localPinsOf,
+    private readonly recoveryDone: RecoveryDone = localRecoveryDone) {}
 
   /** The flow, once at a time: asked again while it runs, it runs once more after. */
   run(): Promise<void> {
@@ -217,8 +267,15 @@ export class MachineLock {
       const root = await sign(pair.privateKey, publicRaw, {
         kind: "root", person: read.lock.person, at: this.now(), key: b64(publicRaw), clientKind: "web",
       });
+      // The recovery key goes on with the root, and is shown once (D4).
+      const made = await makeRecovery();
+      const recovery = await sign(pair.privateKey, publicRaw, {
+        kind: "recovery", person: read.lock.person, previous: b64(await hashOf(root)), at: this.now(), key: b64(made.publicRaw),
+        sealed: b64(made.sealed),
+      });
       try {
-        await this.link.call("lock/add", { entries: [root] });
+        await this.link.call("lock/add", { entries: [root, recovery] });
+        this.recovery.value = { kind: "show", text: made.text };
       } catch (error) {
         // Another device made the root at the same time: read it again, once.
         if (!isChangedElsewhere(error)) throw error;
@@ -231,6 +288,7 @@ export class MachineLock {
       this.own = null;
       this.ended = false;
       this.device.value = { kind: "member" };
+      this.offerRecovery(read.state);
       const listed = (await this.link.call("lock/joinRequests", {}).catch(() => [])) as LockJoinRequest[];
       this.rows = [];
       for (const row of listed) await this.take(row);
@@ -239,6 +297,7 @@ export class MachineLock {
     }
     this.rows = [];
     this.cards.value = [];
+    this.recovery.value = { kind: "none" };
     if (this.ended) return;
     if (this.own && this.own.expires > this.now()) {
       // The request goes on: its row may wait for this browser's nonce.
@@ -264,6 +323,104 @@ export class MachineLock {
     this.own = null;
     this.device.value = { kind: "unknown" };
     await this.run();
+  }
+
+  /** The offer of a recovery key, while the lock has one client and none was saved or skipped here. */
+  private offerRecovery(state: LockState): void {
+    if (this.recovery.peek().kind === "show") return;
+    const clients = state.membersOf("addClient").length;
+    this.recovery.value = clients <= 1 && !this.recoveryDone.done(state.person) ? { kind: "offer" } : { kind: "none" };
+  }
+
+  /** I Saved It, or Skip: not asked again on this device. */
+  recoveryDismissed(): void {
+    if (this.state) this.recoveryDone.set(this.state.person);
+    this.recovery.value = { kind: "none" };
+  }
+
+  /** Make Recovery Key: a new recovery entry, which takes the old key's place, and its key shown once. */
+  async makeRecoveryKey(): Promise<void> {
+    try {
+      const { pair, publicRaw } = await this.signingKey();
+      const made = await makeRecovery();
+      for (let tries = 0; ; tries++) {
+        const read = await this.checked();
+        if (!read || !read.state.signer(publicRaw)) return;
+        const entry = await sign(pair.privateKey, publicRaw, {
+          kind: "recovery", person: read.state.person, previous: b64(read.state.head), at: this.now(), key: b64(made.publicRaw),
+          sealed: b64(made.sealed),
+        });
+        try {
+          await this.link.call("lock/add", { entries: [entry] });
+        } catch (error) {
+          if (!isChangedElsewhere(error) || tries > 0) throw error;
+          continue;
+        }
+        await read.state.add(entry);
+        this.pins.save(read.state.pin());
+        this.recovery.value = { kind: "show", text: made.text };
+        return;
+      }
+    } catch (error) {
+      this.say(error);
+    }
+  }
+
+  /**
+   * Use Recovery Key (#3493, D4): this browser, not in its lock, opens the lock's recovery key
+   * with the secret the person typed, and signs its own addClient with it. Null when it is in;
+   * else the words to show under the field.
+   */
+  async useRecoveryKey(text: string): Promise<string | null> {
+    try {
+      const secret = await parseRecovery(text);
+      const { publicRaw } = await this.signingKey();
+      for (let tries = 0; ; tries++) {
+        const read = await this.checked();
+        if (!read) return "Your lock does not check, so the recovery key cannot be used.";
+        const { recovery, recoverySealed } = read.state;
+        if (!recovery || !recoverySealed) return "Your lock has no recovery key. Start a new lock instead.";
+        const key = await openRecovery(secret, recovery, recoverySealed);
+        const entry = await sign(key, recovery, {
+          kind: "addClient", person: read.state.person, previous: b64(read.state.head), at: this.now(), key: b64(publicRaw),
+          clientKind: "web",
+        });
+        try {
+          await this.link.call("lock/add", { entries: [entry] });
+        } catch (error) {
+          if (!isChangedElsewhere(error) || tries > 0) throw error;
+          continue;
+        }
+        await read.state.add(entry);
+        this.pins.save(read.state.pin());
+        this.own = null;
+        this.ended = false;
+        await this.run();
+        return null;
+      }
+    } catch (error) {
+      if (error instanceof RecoveryError) return error.message;
+      this.say(error);
+      return "The recovery key could not be used. Try again.";
+    }
+  }
+
+  /**
+   * Start a New Lock (#3493, D4): every signer and the recovery key are lost. The control plane
+   * drops the lock, this browser forgets its pin and signs a new root, and shows a new recovery
+   * key. Each machine joins again after agentsd lock reset.
+   */
+  async startNewLock(): Promise<void> {
+    try {
+      await this.link.call("lock/reset", {});
+      this.pins.save(zeroPin);
+      this.own = null;
+      this.ended = false;
+      this.device.value = { kind: "unknown" };
+      await this.run();
+    } catch (error) {
+      this.say(error);
+    }
   }
 
   /** A row from lock/joinRequests or control/lockJoinRequested. */

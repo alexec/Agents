@@ -77,10 +77,21 @@ struct RemoteSidebar: View {
                 }
             }
             // This device, not in the person's machine lock yet, and the clients asking to join it (#3490).
-            if model.lock.showsThisDevice || !model.lock.open().isEmpty {
+            if model.lock.showsThisDevice || model.lock.recoveryCard != .none || !model.lock.open().isEmpty {
                 Section {
                     if model.lock.showsThisDevice {
-                        ThisDeviceLockCard(place: model.lock.place, askAgain: { Task { await model.askLockAgain() } })
+                        ThisDeviceLockCard(place: model.lock.place, isBusy: model.lock.recoveryBusy,
+                                           askAgain: { Task { await model.askLockAgain() } },
+                                           useRecovery: { await model.useLockRecovery($0) },
+                                           startNewLock: { Task { await model.startNewLock() } })
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                            .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
+                    }
+                    if model.lock.recoveryCard != .none {
+                        RecoveryKeyCard(card: model.lock.recoveryCard, isBusy: model.lock.recoveryBusy,
+                                        make: { Task { await model.makeLockRecovery() } },
+                                        dismiss: { model.dismissLockRecovery() })
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)
                             .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
@@ -259,7 +270,7 @@ struct RemoteSidebar: View {
             // Not over a machine's ask to join (#994): the card is the list's, and the
             // waiting view in the middle would lie over the rows under it.
             if model.folders.isEmpty, model.people.open().isEmpty, model.people.openLinks().isEmpty, model.signIn.open().isEmpty,
-               model.lock.open().isEmpty, !model.lock.showsThisDevice {
+               model.lock.open().isEmpty, !model.lock.showsThisDevice, model.lock.recoveryCard == .none {
                 Waiting()
             }
         }

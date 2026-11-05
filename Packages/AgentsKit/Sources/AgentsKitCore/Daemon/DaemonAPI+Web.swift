@@ -505,6 +505,7 @@ public extension DaemonAPI {
                 Row(Method.lockJoinAnswer, params: LockJoinNonce.self, result: Empty.self, kind: .controlRequest),
                 Row(Method.lockJoinReveal, params: LockJoinNonce.self, result: Empty.self, kind: .controlRequest),
                 Row(Method.lockJoinDeny, params: LockJoinEnd.self, result: Empty.self, kind: .controlRequest),
+                Row(Method.lockReset, params: Empty.self, result: Empty.self, kind: .controlRequest),
                 // The user scope (#1760): what follows the person to their machines, under You.
                 Row(Method.userSettings, params: Empty.self, result: UserSettings.self, kind: .controlRequest),
                 Row(Method.userSetSettings, params: UserSettingsPart.self, result: Empty.self, kind: .controlRequest),

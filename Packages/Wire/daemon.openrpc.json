@@ -2436,6 +2436,27 @@
       }
     },
     {
+      "name": "daemon/lockReset",
+      "x-capability": "host.lock/4",
+      "description": "agentsd lock reset (#3493, specs/3399-machine-lock D4): this machine forgets the lock it pinned, the invite and the request to join, and asks the control plane for its person's lock again, which it then pins on first use. Only on daemon.sock, from this machine's own account: never on a channel the control plane opened, nor on the window's local socket.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "daemon/ping",
       "x-capability": "daemon/1",
       "paramStructure": "by-name",

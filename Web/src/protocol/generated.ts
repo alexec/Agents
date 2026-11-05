@@ -4712,7 +4712,10 @@ export interface LockAdd {
  * of the entry before's body. signer is the P-256 signing key that signed it, X9.63. key is the
  * root's first signing key, the client, machine or invite added, the key removed, or the recovery
  * key's public half. sealingKey and id are a machine's (addMachine); clientKind is a client's
- * (addClient: mac, remote or web); expires is an invite's.
+ * (addClient: mac, remote or web); expires is an invite's; sealed is a recovery entry's (#3493,
+ * D4): the recovery key's private half, AES-256-GCM under a key made from the recovery secret the
+ * person keeps (a 12-byte nonce, then the sealed 32 bytes and the tag), so a new client that is
+ * typed the secret signs with it.
  */
 export interface LockBody {
   v: number;
@@ -4727,6 +4730,7 @@ export interface LockBody {
   name?: string;
   clientKind?: string;
   expires?: WireDate;
+  sealed?: Base64;
 }
 
 /**
@@ -11160,6 +11164,7 @@ export interface Methods {
   "lock/joinDeny": { params: LockJoinEnd; result: Empty };
   "lock/joinRequests": { params: Empty; result: LockJoinRequest[] };
   "lock/joinReveal": { params: LockJoinNonce; result: Empty };
+  "lock/reset": { params: Empty; result: Empty };
   "mcp/health": { params: Empty; result: MCPHealthSnapshot };
   "mcp/health/check": { params: MCPHealthCheckRequest; result: MCPHealthSnapshot };
   "mcp/hosted": { params: Empty; result: HostedMCPSnapshot };
@@ -11519,6 +11524,7 @@ export const MethodTarget = {
   "lock/joinDeny": "control",
   "lock/joinRequests": "control",
   "lock/joinReveal": "control",
+  "lock/reset": "control",
   "mcp/health": "host",
   "mcp/health/check": "host",
   "mcp/hosted": "host",
@@ -12155,7 +12161,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LiveBoard: { required: ["agents"], optional: [] },
   Lock: { required: ["person", "entries"], optional: [] },
   LockAdd: { required: ["entries"], optional: [] },
-  LockBody: { required: ["v", "kind", "person", "signer", "at", "key"], optional: ["previous", "sealingKey", "id", "name", "clientKind", "expires"] },
+  LockBody: { required: ["v", "kind", "person", "signer", "at", "key"], optional: ["previous", "sealingKey", "id", "name", "clientKind", "expires", "sealed"] },
   LockDelivery: { required: ["method", "params", "lock"], optional: [] },
   LockEntry: { required: ["body", "sig"], optional: [] },
   LockGet: { required: [], optional: ["person"] },

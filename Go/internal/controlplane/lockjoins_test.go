@@ -286,3 +286,45 @@ func TestAMachineJoinsTheLock(t *testing.T) {
 		t.Fatal("the invite is still open")
 	}
 }
+
+// #3493 (D4): a client with no signer types the recovery key, and signs its own addClient
+// with it; with no recovery key either, it starts a new lock with lock/reset.
+func TestTheRecoveryKeyAndANewLock(t *testing.T) {
+	t.Parallel()
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	_, mac := p.client("Mac")
+	_, phone := p.client("Phone")
+	macKey, recoveryKey, phoneKey := lockKey(t), lockKey(t), lockKey(t)
+	secret := bytes.Repeat([]byte{3}, machinelock.RecoverySecretSize)
+	sealed, err := machinelock.SealRecovery(secret, recoveryKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signOnto(t, mac, macKey, wire.LockBody{Kind: wire.LockEntryKindRoot, Key: machinelock.PublicKey(macKey)})
+	signOnto(t, mac, macKey, wire.LockBody{Kind: wire.LockEntryKindRecovery, Key: machinelock.PublicKey(recoveryKey), Sealed: sealed})
+
+	// The Mac is lost. The phone reads the sealed key from the lock and opens it.
+	var lock wire.Lock
+	json.Unmarshal(call(t, phone, "", "lock/get", nil), &lock)
+	state, err := machinelock.Check(lock.Entries)
+	if err != nil {
+		t.Fatal(err)
+	}
+	opened, err := machinelock.OpenRecovery(secret, state.Recovery(), state.RecoverySealed())
+	if err != nil {
+		t.Fatal(err)
+	}
+	signOnto(t, phone, opened, wire.LockBody{Kind: wire.LockEntryKindAddClient, Key: machinelock.PublicKey(phoneKey), ClientKind: new("remote")})
+	json.Unmarshal(call(t, phone, "", "lock/get", nil), &lock)
+	if state, _ = machinelock.Check(lock.Entries); !state.Signer(machinelock.PublicKey(phoneKey)) {
+		t.Fatal("the recovered phone is not a signer")
+	}
+
+	// Every signer and the recovery key lost: a new lock, which a new root starts.
+	call(t, phone, "", "lock/reset", nil)
+	json.Unmarshal(call(t, phone, "", "lock/get", nil), &lock)
+	if len(lock.Entries) != 0 {
+		t.Fatalf("the lock after a reset: %d entries", len(lock.Entries))
+	}
+	signOnto(t, phone, phoneKey, wire.LockBody{Kind: wire.LockEntryKindRoot, Key: machinelock.PublicKey(phoneKey)})
+}
