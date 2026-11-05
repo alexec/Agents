@@ -483,6 +483,7 @@ host reads
   "open": {
     "client": "<UUID>",
     "fanOut": true,
+    "fanOutLock": true,
     "actor": {
       "user": "<uuid>",
       "userName": "Local owner",

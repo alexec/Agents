@@ -81,10 +81,13 @@ func lockChecked(conn any) bool {
 	return true
 }
 
-// clientLock is a connection's checked channel, once a client opened one.
+// clientLock is a connection's checked channel, once a client opened one. write is held while
+// a line goes to the connection, so the answer to lock/hello goes before the first MAC'd line,
+// and the counts go out in order (#3541).
 type clientLock struct {
 	mu      sync.Mutex
 	channel *machinelock.Channel
+	write   sync.Mutex
 }
 
 func (l *clientLock) get() *machinelock.Channel {
@@ -97,6 +100,18 @@ func (l *clientLock) set(c *machinelock.Channel) {
 	l.mu.Lock()
 	l.channel = c
 	l.mu.Unlock()
+}
+
+// write sends a line from this machine: what it answers and what it says unasked (agent/changed,
+// a question card), with the channel's MAC once a client opened one, so the control plane can
+// forge neither (#3492, #3541). Refusals go with send: an error with no MAC is taken.
+func (c *Client) write(line string) {
+	c.lock.write.Lock()
+	defer c.lock.write.Unlock()
+	if ch := c.lock.get(); ch != nil {
+		line = ch.Seal(line)
+	}
+	_ = c.conn.Write(line)
 }
 
 func notInLock(why string) *Error {
@@ -216,9 +231,12 @@ func (d *Daemon) answerHello(c *Client, m message) {
 		answer(nil, err)
 		return
 	}
-	// The answer goes before the channel is set: it is not MAC'd, its signature is its proof.
+	// The answer goes before the channel is set, and nothing goes between them: it is not
+	// MAC'd, its signature is its proof, and every line after it is.
+	c.lock.write.Lock()
 	answer(reply, nil)
 	c.lock.set(channel)
+	c.lock.write.Unlock()
 	who := channel.Member.Name
 	if who == "" {
 		who = "a device"

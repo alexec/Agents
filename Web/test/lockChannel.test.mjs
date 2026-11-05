@@ -123,6 +123,34 @@ test("a call to a machine of the lock goes on a channel, with a MAC, and its ans
   l.stop();
 });
 
+test("once the channel is open, what the machine says unasked is taken only with its MAC (#3541)", async () => {
+  const lock = await lockWithMachine();
+  const { l, s } = await openLink(lock.source);
+  const heard = [];
+  l.onNotification((method, params, host) => heard.push({ method, params, host }));
+  const listed = l.call("folders/list", {}, "k3v9");
+  await wait();
+  // Before the hello is answered, a notification has no MAC, and is taken.
+  s.line(JSON.stringify({ h: "k3v9", m: { jsonrpc: "2.0", method: "agent/changed", params: { id: "before" } } }));
+  const hello = JSON.parse(s.raw[0]);
+  const { reply, channel } = await lock.answer(hello.m.params);
+  s.line(JSON.stringify({ h: "k3v9", m: { jsonrpc: "2.0", id: hello.m.id, result: reply } }));
+  // The control plane shows a card the machine did not raise: no MAC, not taken.
+  s.line(JSON.stringify({ h: "k3v9", m: { jsonrpc: "2.0", method: "agent/changed", params: { id: "forged" } } }));
+  // The machine's own, MAC'd as a fan-out frame's copy is: taken without its lock member.
+  s.line(`{"h":"k3v9","m":${await channel.seal('{"jsonrpc":"2.0","method":"agent/changed","params":{"id":"real"}}')}}`);
+  // One whose bytes were changed on the way: not taken.
+  s.line(`{"h":"k3v9","m":${(await channel.seal('{"jsonrpc":"2.0","method":"agent/changed","params":{"id":"realer"}}')).replace("realer", "forged")}}`);
+  await wait(50);
+  assert.deepEqual(heard.map((n) => n.params.id), ["before", "real"]);
+  assert.equal(heard[1].params.lock, undefined);
+  // The call after them still opens in order.
+  const sent = JSON.parse(await channel.open(messageOf(s.raw[1])));
+  s.line(`{"h":"k3v9","m":${await channel.seal(`{"jsonrpc":"2.0","id":${sent.id},"result":[]}`)}}`);
+  assert.deepEqual(await listed, []);
+  l.stop();
+});
+
 test("with no channel, a prompt goes signed for its machine, so it can be kept", async () => {
   const lock = await lockWithMachine();
   const { l, s } = await openLink(lock.source);

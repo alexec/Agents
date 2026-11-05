@@ -147,9 +147,16 @@ struct LockChannelTests {
         machine.say.yield(channel.seal(#"{"id":2,"jsonrpc":"2.0","result":[]}"#))
         #expect(try await heard.next() == #"{"id":2,"jsonrpc":"2.0","result":[]}"#)
 
-        // A notification goes as it came.
-        machine.say.yield(#"{"jsonrpc":"2.0","method":"agent/changed","params":{}}"#)
-        #expect(try await heard.next() == #"{"jsonrpc":"2.0","method":"agent/changed","params":{}}"#)
+        // What the machine says unasked is taken only with its MAC (#3541): the control plane
+        // shows a card the machine did not raise, and changes one it did; neither is taken.
+        machine.say.yield(#"{"jsonrpc":"2.0","method":"agent/changed","params":{"id":"forged"}}"#)
+        machine.say.yield(channel.seal(#"{"jsonrpc":"2.0","method":"agent/changed","params":{"id":"realer"}}"#)
+            .replacingOccurrences(of: "realer", with: "forged"))
+        machine.say.yield(channel.seal(#"{"jsonrpc":"2.0","method":"agent/changed","params":{"id":"real"}}"#))
+        #expect(try await heard.next() == #"{"jsonrpc":"2.0","method":"agent/changed","params":{"id":"real"}}"#)
+        // The control plane's own notifications are not the machine's.
+        machine.say.yield(#"{"jsonrpc":"2.0","method":"control/cutOff","params":{}}"#)
+        #expect(try await heard.next() == #"{"jsonrpc":"2.0","method":"control/cutOff","params":{}}"#)
         transport.close()
     }
 

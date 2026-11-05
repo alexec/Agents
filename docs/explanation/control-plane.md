@@ -161,7 +161,7 @@ command talks to `daemon.sock`, and a channel from the control plane is refused.
 | keep the chain, and keep it back from a machine | change or remove an entry, or put one in a different order |
 | sign the org policy, which can only make a machine do less | give a client a machine key of its own to seal to |
 | ask a machine for its sessions and worktrees, a backup, or a clone, as above | start an agent, run a command or read a file on a machine |
-| fire a workflow that you set up on a machine, when its event comes | change what a machine answers |
+| fire a workflow that you set up on a machine, when its event comes | change what a machine answers, or show a card it did not raise |
 | serve a changed web page (below) | sign with a Mac's or a phone's key |
 
 **The limits.**
@@ -170,9 +170,6 @@ command talks to `daemon.sock`, and a channel from the control plane is refused.
   changed page can use that browser's key while the page is open. Every web product with
   keys in the browser has this limit. The Mac window and the Remote are signed apps, so they
   do not have it.
-- **What a machine says unasked** (an agent's changes, a question card) is not signed in
-  this release: a control plane can show a client a card that the machine did not raise. Your
-  answer to it is a signed request, which the machine checks.
 - **Who did it, in the audit,** is still the control plane's word. The machine knows which of
   your devices sent a request by its key.
 - **A denial of service.** The control plane can always refuse to route anything.

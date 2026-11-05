@@ -663,6 +663,7 @@ func (r *Router) OpenFromPeer(peer, host string, c int, open wire.ChannelOpen) {
 	h.proxied[key] = channel
 	yes := true
 	open.FanOut = &yes
+	open.FanOutLock = &yes
 	h.conn.Send(openFrame(channel, open))
 }
 
@@ -873,7 +874,9 @@ func openFrame(c int, open wire.ChannelOpen) string {
 type hostFrame struct {
 	channel  int
 	channels []int
-	msg      string
+	// tails is a fan-out frame's l: each channel's lock member, "" for none (#3541).
+	tails []string
+	msg   string
 	close    bool
 	open     bool
 }
@@ -882,7 +885,7 @@ type hostFrame struct {
 // path finds where it starts; anything else is parsed whole.
 func readHostFrame(line string) (hostFrame, bool) {
 	if strings.HasPrefix(line, `{"f":[`) && strings.HasSuffix(line, "}") {
-		if end := strings.IndexByte(line, ']'); end > 0 && strings.HasPrefix(line[end+1:], `,"m":`) {
+		if end := strings.IndexByte(line, ']'); end > 0 {
 			var chans []int
 			ok := true
 			for _, p := range strings.Split(line[6:end], ",") {
@@ -893,8 +896,19 @@ func readHostFrame(line string) (hostFrame, bool) {
 				}
 				chans = append(chans, n)
 			}
-			if ok {
-				return hostFrame{channels: chans, msg: line[end+6 : len(line)-1]}, true
+			var tails []string
+			rest := line[end+1:]
+			if ok && strings.HasPrefix(rest, `,"l":[`) {
+				// A lock member has digits and base64, so the first ] ends the list.
+				if stop := strings.IndexByte(rest, ']'); stop > 0 {
+					tails, ok = readTails(json.RawMessage(rest[5:stop+1]), len(chans))
+					rest = rest[stop+1:]
+				} else {
+					ok = false
+				}
+			}
+			if ok && strings.HasPrefix(rest, `,"m":`) {
+				return hostFrame{channels: chans, tails: tails, msg: rest[5 : len(rest)-1]}, true
 			}
 		}
 	}
@@ -923,7 +937,13 @@ func readHostFrame(line string) (hostFrame, bool) {
 				return hostFrame{}, false
 			}
 		}
-		return hostFrame{channels: chans, msg: string(o["m"])}, true
+		var tails []string
+		if l, ok := o["l"]; ok {
+			if tails, ok = readTails(l, len(chans)); !ok {
+				return hostFrame{}, false
+			}
+		}
+		return hostFrame{channels: chans, tails: tails, msg: string(o["m"])}, true
 	}
 	var c int
 	if json.Unmarshal(o["c"], &c) != nil || c < 0 {
@@ -941,6 +961,25 @@ func readHostFrame(line string) (hostFrame, bool) {
 	return hostFrame{}, false
 }
 
+// readTails is a fan-out frame's l: a lock member (an object) or null for each channel.
+func readTails(raw json.RawMessage, channels int) ([]string, bool) {
+	var l []json.RawMessage
+	if json.Unmarshal(raw, &l) != nil || len(l) != channels {
+		return nil, false
+	}
+	tails := make([]string, len(l))
+	for i, t := range l {
+		switch {
+		case string(t) == "null":
+		case len(t) > 0 && t[0] == '{':
+			tails[i] = string(t)
+		default:
+			return nil, false
+		}
+	}
+	return tails, true
+}
+
 func (r *Router) hostLine(line, host string) {
 	f, ok := readHostFrame(line)
 	// Only the control plane opens channels. A host that tries is ignored.
@@ -948,7 +987,7 @@ func (r *Router) hostLine(line, host string) {
 		return
 	}
 	if f.channels != nil {
-		r.fanOut(f.msg, f.channels, host)
+		r.fanOut(f.msg, f.channels, f.tails, host)
 		return
 	}
 	if f.channel == 0 && !f.close {
@@ -1032,8 +1071,9 @@ func (r *Router) hostLine(line, host string) {
 }
 
 // fanOut is a host's broadcast said once for every channel named (#167), copied here to
-// each one's client, wrapped once for them all.
-func (r *Router) fanOut(msg string, channels []int, host string) {
+// each one's client, wrapped once for them all. A channel with a lock member in tails gets
+// its own copy, the member added last, as the machine MAC'd it (#3541).
+func (r *Router) fanOut(msg string, channels []int, tails []string, host string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	h := r.hosts[host]
@@ -1041,11 +1081,15 @@ func (r *Router) fanOut(msg string, channels []int, host string) {
 		return
 	}
 	wrapped := ""
-	for _, c := range channels {
+	for i, c := range channels {
+		m := msg
+		if tails != nil {
+			m = withLock(msg, tails[i])
+		}
 		t, ok := h.channels[c]
 		if ok && t.peer != "" {
 			// Channel by channel, which a copy of any age reads.
-			r.tellPeerLocked(t.peer, peerFrame(host, channelFrame(t.peerChannel, msg)))
+			r.tellPeerLocked(t.peer, peerFrame(host, channelFrame(t.peerChannel, m)))
 			continue
 		}
 		if !ok || t.session == "" {
@@ -1056,14 +1100,28 @@ func (r *Router) fanOut(msg string, channels []int, host string) {
 			continue
 		}
 		if s.wrapped {
-			if wrapped == "" {
+			switch {
+			case m != msg:
+				r.writeLocked(t.session, wrap(host, m))
+			case wrapped == "":
 				wrapped = wrap(host, msg)
+				fallthrough
+			default:
+				r.writeLocked(t.session, wrapped)
 			}
-			r.writeLocked(t.session, wrapped)
 		} else if host == r.homeHost {
-			r.writeLocked(t.session, msg)
+			r.writeLocked(t.session, m)
 		}
 	}
+}
+
+// withLock is a channel's copy of a fan-out message: its lock member added last, as the
+// machine MAC'd it (#3541); the message itself for a channel with none.
+func withLock(msg, tail string) string {
+	if tail == "" || !strings.HasSuffix(msg, "}") {
+		return msg
+	}
+	return msg[:len(msg)-1] + `,"lock":` + tail + `}`
 }
 
 func (r *Router) channelZero(msg, host string) {
@@ -1373,7 +1431,7 @@ func (r *Router) openReachedLocked(sessionID, host string) {
 	// Bound to the client unless it is a Mac's window, which is the Mac, as a window on
 	// the socket is: presence is reported as it, and it names no other device.
 	yes := true
-	open := wire.ChannelOpen{Client: s.caller.Client, FanOut: &yes}
+	open := wire.ChannelOpen{Client: s.caller.Client, FanOut: &yes, FanOutLock: &yes}
 	if s.caller.Kind != records.KindMac {
 		open.Device = new(wire.UUID(s.caller.Client))
 	}

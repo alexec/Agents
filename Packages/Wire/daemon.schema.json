@@ -4377,6 +4377,10 @@
         "fanOut": {
           "type": "boolean"
         },
+        "fanOutLock": {
+          "type": "boolean",
+          "description": "The control plane reads a fan-out frame's l, each channel's lock member, and adds it to that channel's copy (#3541)."
+        },
         "actor": {
           "$ref": "#/definitions/AuditActor",
           "description": "Who the channel's calls are from, written by the control plane (#996)."

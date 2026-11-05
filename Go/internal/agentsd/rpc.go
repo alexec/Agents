@@ -94,11 +94,7 @@ func (c *Client) answer(m message) {
 		log.Printf("encode: %v", err)
 		return
 	}
-	if ch := c.lock.get(); ch != nil {
-		_ = ch.SealThen(string(b), c.conn.Write)
-		return
-	}
-	_ = c.conn.Write(string(b))
+	c.write(string(b))
 }
 
 // Notify sends a notification to this client.
@@ -108,7 +104,12 @@ func Notify[P any](c *Client, n wire.Notification[P], params P) {
 		log.Printf("encode %s: %v", n.Name, err)
 		return
 	}
-	c.send(message{JSONRPC: "2.0", Method: n.Name, Params: p})
+	b, err := json.Marshal(message{JSONRPC: "2.0", Method: n.Name, Params: p})
+	if err != nil {
+		log.Printf("encode %s: %v", n.Name, err)
+		return
+	}
+	c.write(string(b))
 }
 
 // Handler answers one method's params.

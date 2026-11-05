@@ -309,6 +309,46 @@ func TestLockResetOnDaemonSockAsksForTheLockAgain(t *testing.T) {
 	}
 }
 
+// What a machine says unasked carries the channel's MAC too (#3541): a client with a channel
+// takes a notification only when it checks, in order with the answers.
+func TestWhatAMachineSaysUnaskedCarriesItsMAC(t *testing.T) {
+	d, phone, _, state := lockedMachine(t)
+	cp := channelTo(d)
+	phoneChannel := channelTo(d)
+	ch := hello(t, phoneChannel, state, phone)
+	// Every client is reached: the control plane's own channel unsealed, the phone's with its MAC.
+	cp.send(requestLine(1, "daemon/ping", map[string]any{}))
+	cp.answer(t, 1)
+	Broadcast(d, wire.NotifyWorkflowRemoved, wire.WorkflowRemovedNotification{})
+	note := func(c *conn) string {
+		t.Helper()
+		deadline := time.After(5 * time.Second)
+		for {
+			select {
+			case line := <-c.out:
+				if strings.Contains(line, wire.NotifyWorkflowRemoved.Name) {
+					return line
+				}
+			case <-deadline:
+				t.Fatal("no notification")
+			}
+		}
+	}
+	if line := note(cp); machinelock.Sealed(line) {
+		t.Fatalf("a channel with no lock/hello got a MAC: %s", line)
+	}
+	line := note(phoneChannel)
+	body, err := ch.Open(line)
+	if err != nil || !strings.Contains(body, wire.NotifyWorkflowRemoved.Name) {
+		t.Fatalf("the notification %s: %v", line, err)
+	}
+	// An answer after it has the next count.
+	phoneChannel.send(ch.Seal(requestLine(2, "daemon/ping", map[string]any{})))
+	if _, err := ch.Open(phoneChannel.answer(t, 2)); err != nil {
+		t.Fatalf("the answer after: %v", err)
+	}
+}
+
 // #3542: the control plane may stop, unsigned, the writer of a provider draft it holds,
 // whose start a client of the lock signed; no other agent.
 func TestTheControlPlaneStopsOnlyADraftsWriter(t *testing.T) {

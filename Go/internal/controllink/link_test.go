@@ -245,9 +245,14 @@ func TestEnrolThenUplink(t *testing.T) {
 	if _, err := u.Ask(ctx, "host/machines", map[string]any{"method": "refuse"}); !errors.As(err, &refused) || refused.Code != -32010 || refused.Message != "Agents can’t ask that of the control plane." {
 		t.Fatalf("refused %v", err)
 	}
-	u.WriteFanOut([]int{1, 3}, `{"jsonrpc":"2.0","method":"agent/changed","params":{}}`)
+	u.WriteFanOut([]int{1, 3}, nil, `{"jsonrpc":"2.0","method":"agent/changed","params":{}}`)
 	if line := <-f.channel; line != `{"f":[1,3],"m":{"jsonrpc":"2.0","method":"agent/changed","params":{}}}` {
 		t.Fatalf("fan-out frame %s", line)
+	}
+	// Each checked channel's lock member, null for one with none (#3541).
+	u.WriteFanOut([]int{1, 3}, []string{"", `{"n":2,"mac":"M"}`}, `{"jsonrpc":"2.0","method":"agent/changed","params":{}}`)
+	if line := <-f.channel; line != `{"f":[1,3],"l":[null,{"n":2,"mac":"M"}],"m":{"jsonrpc":"2.0","method":"agent/changed","params":{}}}` {
+		t.Fatalf("fan-out frame with lock members %s", line)
 	}
 }
 
