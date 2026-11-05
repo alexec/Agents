@@ -3810,6 +3810,9 @@ type ElicitationSecret struct {
 	URL *string `json:"url,omitzero"`
 
 	IsSet bool `json:"isSet"`
+
+	// The host can keep it for this session only (#3548): an answer whose content has sessionOnly true is kept for the asking session and deleted when it is archived, not saved to secrets.env. Left out by an older host.
+	CanBeSessionOnly *bool `json:"canBeSessionOnly,omitzero"`
 }
 
 type Empty struct {
@@ -8711,6 +8714,22 @@ type ProviderDraftRequest struct {
 	Draft UUID `json:"draft"`
 }
 
+// The writing agent's start, for the client that asked for the draft to sign (#3542): the machine that holds its person's lock takes no start the control plane sends in its own words. The client checks that it starts only a draft's writer (agents/start, the draft's purpose, sandboxed, no MCP servers or other folders), signs method and params as they are (a LockSignature to machine), and sends the signature with providers/draftSigned.
+type ProviderDraftSign struct {
+	Machine MachineRef `json:"machine"`
+
+	Method string `json:"method"`
+
+	Params string `json:"params"`
+}
+
+// providers/draftSigned (#3542): the signature of a draft's sign, which the control plane delivers with the start as it came.
+type ProviderDraftSigned struct {
+	Draft UUID `json:"draft"`
+
+	Lock LockSignature `json:"lock"`
+}
+
 // providers/draftStart (#858).
 type ProviderDraftStart struct {
 	Form ProviderAdd `json:"form"`
@@ -8726,6 +8745,8 @@ type ProviderDraftStarted struct {
 	Draft UUID `json:"draft"`
 
 	Answered *ProviderDraftAnswered `json:"answered,omitzero"`
+
+	Sign *ProviderDraftSign `json:"sign,omitzero"`
 }
 
 // control/providerDraft: how a draft stands, to the client that started it.
@@ -10410,6 +10431,39 @@ type SessionNotice struct {
 	Title string `json:"title"`
 
 	Detail *string `json:"detail,omitzero"`
+}
+
+// A secret kept for one session only (#3548): only that session's agent can use it (fill_secret, its environment, its MCP servers), and its host deletes it when the session is archived. No value.
+type SessionSecret struct {
+	AgentID UUID `json:"agentID"`
+
+	// The session's title, as the session list shows it.
+	Title string `json:"title"`
+
+	Name string `json:"name"`
+
+	SetAt Date `json:"setAt"`
+}
+
+// secrets/sessionRemove (#3548): take one session's secret out now.
+type SessionSecretRemoveRequest struct {
+	AgentID UUID `json:"agentID"`
+
+	Name string `json:"name"`
+}
+
+// secrets/sessionSet (#3548): set a secret for one session that is not archived. The value is one line.
+type SessionSecretSetRequest struct {
+	AgentID UUID `json:"agentID"`
+
+	Name string `json:"name"`
+
+	Value string `json:"value"`
+}
+
+// secrets/sessionList (#3548): every secret this machine keeps for one session only, by session title then name. No value.
+type SessionSecrets struct {
+	Secrets []SessionSecret `json:"secrets"`
 }
 
 type SessionsListRequest struct {

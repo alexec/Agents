@@ -9,6 +9,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/alexec/agents/Go/internal/agentsd/skillcatalog"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // fill_secret (#3530, spike #3527): the agent names a secret from Settings ▸ Secrets and a
@@ -128,9 +129,10 @@ func parseCard(value string) (map[string]string, bool) {
 		"cvc": c.CVC, "name": c.Name, "zip": c.Zip}, true
 }
 
-// fillSecretValue is what the call fills, read from secrets.env, or the words that say why
-// nothing. It runs before the lease, so a call that cannot fill starts nothing.
-func (d *Daemon) fillSecretValue(args map[string]json.RawMessage) (fill secretFill, refusal string) {
+// fillSecretValue is what the call fills, read from the session's own secrets (#3548) or
+// secrets.env, or the words that say why nothing. It runs before the lease, so a call that
+// cannot fill starts nothing.
+func (d *Daemon) fillSecretValue(agent wire.UUID, args map[string]json.RawMessage) (fill secretFill, refusal string) {
 	name := strings.TrimSpace(argString(args, "secret"))
 	if !secretAskName.MatchString(name) {
 		return fill, "Nothing was filled: `secret` is the secret's name, letters, digits and underscores, e.g. GITLAB_PASSWORD."
@@ -142,7 +144,13 @@ func (d *Daemon) fillSecretValue(args map[string]json.RawMessage) (fill secretFi
 	if home == "" {
 		return fill, "Nothing was filled: this machine has no personal home to keep secrets in."
 	}
-	v, ok := skillcatalog.LoadSecrets(skillcatalog.SecretsPath(home)).Value(name)
+	v, ok, expired := d.sessionSecret(agent, name)
+	if !ok {
+		v, ok = skillcatalog.LoadSecrets(skillcatalog.SecretsPath(home)).Value(name)
+	}
+	if expired && (!ok || v == "") {
+		return fill, name + " was for this session only and has expired. Ask the person for it again with ask_secret if you still need it."
+	}
 	if !ok || v == "" {
 		return fill, name + " is not set. Ask the person for it with ask_secret, then call fill_secret again."
 	}

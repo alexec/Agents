@@ -14,6 +14,7 @@ import { AgentsPolicySection } from "./AgentsPolicy";
 import { BackupsSection, ServerBackupsSection } from "./Backups";
 import { BrowserSection } from "./Browser";
 import { DesktopControlSection } from "./DesktopControl";
+import { SessionSecretsSection } from "./SessionSecrets";
 import { ForgeLoginsSection } from "./ForgeLogins";
 import { GitAccessSection } from "./GitAccess";
 import { VersionsSection } from "./Machines";
@@ -67,6 +68,8 @@ export const settingsSections: readonly SettingsSection[] = [
   // The secrets the control plane keeps for you and sends to each machine of yours (#1760, #2157).
   { name: "secrets", scope: "machines", order: 60, Section: SecretsSection },
   { name: "serverBackups", scope: "machines", order: 40, Section: ServerBackupsSection },
+  // A machine's secrets for one session only, after the person's (#3548).
+  { name: "sessionSecrets", scope: "machines", order: 61, Section: SessionSecretsSection },
   // Kept on the Mac's host, the same on every client (#1033, #2079); its subject is the app (#2157).
   { name: "sidebar", scope: "thisApp", order: 20, Section: SidebarGroupsSection },
   // Which providers people sign in with (#995): an admin's.

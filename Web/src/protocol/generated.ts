@@ -3285,6 +3285,12 @@ export interface ElicitationSecret {
   name: string;
   url?: string;
   isSet: boolean;
+  /**
+   * The host can keep it for this session only (#3548): an answer whose content has sessionOnly
+   * true is kept for the asking session and deleted when it is archived, not saved to secrets.env.
+   * Left out by an older host.
+   */
+  canBeSessionOnly?: boolean;
 }
 
 export interface Empty {}
@@ -7569,6 +7575,28 @@ export interface ProviderDraftRequest {
   draft: UUID;
 }
 
+/**
+ * The writing agent's start, for the client that asked for the draft to sign (#3542): the machine
+ * that holds its person's lock takes no start the control plane sends in its own words. The client
+ * checks that it starts only a draft's writer (agents/start, the draft's purpose, sandboxed, no MCP
+ * servers or other folders), signs method and params as they are (a LockSignature to machine), and
+ * sends the signature with providers/draftSigned.
+ */
+export interface ProviderDraftSign {
+  machine: MachineRef;
+  method: string;
+  params: string;
+}
+
+/**
+ * providers/draftSigned (#3542): the signature of a draft's sign, which the control plane delivers
+ * with the start as it came.
+ */
+export interface ProviderDraftSigned {
+  draft: UUID;
+  lock: LockSignature;
+}
+
 /** providers/draftStart (#858). */
 export interface ProviderDraftStart {
   form: ProviderAdd;
@@ -7580,6 +7608,7 @@ export interface ProviderDraftStart {
 export interface ProviderDraftStarted {
   draft: UUID;
   answered?: ProviderDraftAnswered;
+  sign?: ProviderDraftSign;
 }
 
 /** control/providerDraft: how a draft stands, to the client that started it. */
@@ -9013,6 +9042,43 @@ export interface SessionNotice {
   severity: string;
   title: string;
   detail?: string;
+}
+
+/**
+ * A secret kept for one session only (#3548): only that session's agent can use it (fill_secret,
+ * its environment, its MCP servers), and its host deletes it when the session is archived. No
+ * value.
+ */
+export interface SessionSecret {
+  agentID: UUID;
+  /** The session's title, as the session list shows it. */
+  title: string;
+  name: string;
+  setAt: WireDate;
+}
+
+/** secrets/sessionRemove (#3548): take one session's secret out now. */
+export interface SessionSecretRemoveRequest {
+  agentID: UUID;
+  name: string;
+}
+
+/**
+ * secrets/sessionSet (#3548): set a secret for one session that is not archived. The value is one
+ * line.
+ */
+export interface SessionSecretSetRequest {
+  agentID: UUID;
+  name: string;
+  value: string;
+}
+
+/**
+ * secrets/sessionList (#3548): every secret this machine keeps for one session only, by session
+ * title then name. No value.
+ */
+export interface SessionSecrets {
+  secrets: SessionSecret[];
 }
 
 export interface SessionsListRequest {
@@ -11392,6 +11458,9 @@ export interface Methods {
   "scim/tokens/revoke": { params: SCIMTokenRequest; result: Empty };
   "sealing/add": { params: SealingAdd; result: Empty };
   "sealing/work": { params: Empty; result: SealingWork };
+  "secrets/sessionList": { params: Empty; result: SessionSecrets };
+  "secrets/sessionRemove": { params: SessionSecretRemoveRequest; result: SessionSecrets };
+  "secrets/sessionSet": { params: SessionSecretSetRequest; result: SessionSecrets };
   "settings/passThrough": { params: Empty; result: PassThroughState };
   "signIn/approve": { params: SignInDecide; result: Empty };
   "signIn/configure": { params: SignInConfigure; result: SignInProviders };
@@ -11757,6 +11826,9 @@ export const MethodTarget = {
   "scim/tokens/revoke": "control",
   "sealing/add": "control",
   "sealing/work": "control",
+  "secrets/sessionList": "host",
+  "secrets/sessionRemove": "host",
+  "secrets/sessionSet": "host",
   "settings/passThrough": "host",
   "signIn/approve": "control",
   "signIn/configure": "control",
@@ -12145,7 +12217,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ElicitationSchema: { required: ["properties"], optional: ["title", "description"] },
   ElicitationSchemaProperty: { required: ["name", "isRequired", "kind"], optional: ["title", "description", "defaultValue"] },
   ElicitationSchemaPropertyChoice: { required: ["value", "title"], optional: ["description"] },
-  ElicitationSecret: { required: ["name", "isSet"], optional: ["url"] },
+  ElicitationSecret: { required: ["name", "isSet"], optional: ["url", "canBeSessionOnly"] },
   Empty: { required: [], optional: [] },
   EntryNotification: { required: ["agentID", "entry"], optional: ["index", "oversized"] },
   Event: { required: ["position", "name", "at", "count", "scope", "sentence", "details", "chainDepth", "consequences"], optional: ["lastAt", "publisher", "message", "actor"] },
@@ -12550,8 +12622,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProviderDraftAnswer: { required: ["draft", "question", "yes"], optional: [] },
   ProviderDraftAnswered: { required: ["note"], optional: ["map", "preset"] },
   ProviderDraftRequest: { required: ["draft"], optional: [] },
+  ProviderDraftSign: { required: ["machine", "method", "params"], optional: [] },
+  ProviderDraftSigned: { required: ["draft", "lock"], optional: [] },
   ProviderDraftStart: { required: ["form", "runtimeID"], optional: ["secrets", "provider"] },
-  ProviderDraftStarted: { required: ["draft"], optional: ["answered"] },
+  ProviderDraftStarted: { required: ["draft"], optional: ["answered", "sign"] },
   ProviderDraftUpdate: { required: ["draft", "state", "runtimeName", "steps"], optional: ["cost", "draftJSON", "check", "question", "note"] },
   ProviderForget: { required: ["provider"], optional: [] },
   ProviderGroup: { required: ["provider"], optional: ["group"] },
@@ -12682,6 +12756,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SessionEnded: { required: ["machine", "session", "starter", "how"], optional: ["title"] },
   SessionLabel: { required: ["value", "owner", "addedAt"], optional: [] },
   SessionNotice: { required: ["severity", "title"], optional: ["detail"] },
+  SessionSecret: { required: ["agentID", "title", "name", "setAt"], optional: [] },
+  SessionSecretRemoveRequest: { required: ["agentID", "name"], optional: [] },
+  SessionSecretSetRequest: { required: ["agentID", "name", "value"], optional: [] },
+  SessionSecrets: { required: ["secrets"], optional: [] },
   SessionsListRequest: { required: ["runtimeID", "cwd"], optional: [] },
   SetCeilingRequest: { required: ["agentID"], optional: ["ceiling", "tokenCeiling"] },
   SetClientPermissionRequest: { required: ["agentID"], optional: ["mode"] },

@@ -23,6 +23,7 @@ import { planOf } from "../model/plan";
 import { Markdown } from "../render/markdown";
 import { inputType, momentFromInput, momentToInput, placeholder } from "../model/formInputs";
 import { getIt, keeping, secretField } from "../model/secretAsk";
+import { keepingForSession, sessionOnlyField, sessionSecretWords } from "../model/sessionSecrets";
 
 type Held = (
   | { kind: "permission"; request: PermissionRequest }
@@ -365,7 +366,8 @@ function ElicitationCard({ request, asker, hold, answer, active }: {
     const reason = "form" in request.mode ? request.mode.form._0.properties[0]?.title : undefined;
     body = <SecretField secret={request.secret} reason={reason} recipient={hold.recipient} inert={inert}
       save={button("save", "prominent")} decline={decline}
-      send={(typed) => (typed === null ? go("decline", "decline") : go("save", "accept", { [secretField]: typed }))} />;
+      send={(typed, sessionOnly) => (typed === null ? go("decline", "decline")
+        : go("save", "accept", sessionOnly ? { [secretField]: typed, [sessionOnlyField]: true } : { [secretField]: typed }))} />;
   } else if ("url" in request.mode) {
     const url = request.mode.url._0;
     body = (
@@ -461,15 +463,18 @@ interface AnswerButton { class: string | undefined; disabled: boolean; telling: 
 
 /**
  * An agent's ask_secret (#2885): its name, why, where to get it, and a masked field. What is
- * typed goes to the host, which saves it to the person's secrets.env; the chat, the agent and
- * every other client get the name only. As the window's and the Remote's SecretAskCard.
+ * typed goes to the host, which saves it to the person's secrets.env, or keeps it for this
+ * session only (#3548); the chat, the agent and every other client get the name only. As the
+ * window's and the Remote's SecretAskCard.
  */
 function SecretField({ secret, reason, recipient, inert, save, decline, send }: {
   secret: ElicitationSecret; reason: string | undefined; recipient: string; inert: boolean;
   save: AnswerButton; decline: AnswerButton;
-  send: (typed: string | null) => void;
+  send: (typed: string | null, sessionOnly: boolean) => void;
 }) {
   const text = useSignal("");
+  const sessionOnly = useSignal(false);
+  const forSession = sessionOnly.value && secret.canBeSessionOnly === true;
   const typed = text.value.trim();
   const link = getIt(secret.url);
   return (
@@ -484,16 +489,23 @@ function SecretField({ secret, reason, recipient, inert, save, decline, send }: 
           onKeyDown={(e) => {
             if (e.key === "Enter" && typed) {
               e.preventDefault();
-              send(typed);
+              send(typed, forSession);
             }
           }} />
-        <span class="quiet small">{keeping(secret, recipient)}</span>
+        <span class="quiet small">{forSession ? keepingForSession(recipient) : keeping(secret, recipient)}</span>
       </label>
+      {secret.canBeSessionOnly && (
+        <label class="field check">
+          <input type="checkbox" checked={sessionOnly.value} disabled={inert}
+            onChange={(e) => (sessionOnly.value = (e.currentTarget as HTMLInputElement).checked)} />
+          {" "}{sessionSecretWords.toggle}
+        </label>
+      )}
       <div class="form-row">
         <span class="spacer" />
-        <button class={decline.class} aria-disabled={decline.disabled} onClick={() => send(null)}>No thanks{decline.telling}</button>
+        <button class={decline.class} aria-disabled={decline.disabled} onClick={() => send(null, false)}>No thanks{decline.telling}</button>
         <button class={save.class} disabled={!typed} aria-disabled={save.disabled} data-default=""
-          onClick={() => send(typed)}>Save securely{save.telling}</button>
+          onClick={() => send(typed, forSession)}>Save securely{save.telling}</button>
       </div>
     </>
   );

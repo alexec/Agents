@@ -43,6 +43,13 @@ type ProviderDraftStarted = wire.ProviderDraftStarted
 // with the shipped map that fits, or the preset whose CLI this is.
 type DraftAnswered = wire.ProviderDraftAnswered
 
+// ProviderDraftSign is DaemonAPI.ProviderDraftStarted.Sign: the writer's start, for the
+// sheet's client to sign (#3542).
+type ProviderDraftSign = wire.ProviderDraftSign
+
+// ProviderDraftSigned is DaemonAPI.ProviderDraftSigned: providers/draftSigned.
+type ProviderDraftSigned = wire.ProviderDraftSigned
+
 // ProviderDraftRequest is DaemonAPI.ProviderDraftRequest: providers/draftCancel.
 type ProviderDraftRequest = wire.ProviderDraftRequest
 
@@ -151,7 +158,10 @@ type DraftHooks struct {
 	LocalHost func() *LocalHost
 	// StartAgent starts the writing agent on host, as the sheet's client: its id.
 	StartAgent func(host string, request StartRequest, owner Caller) (string, error)
-	StopAgent  func(host, agent string, owner Caller)
+	// SignedStart starts it with the start as the sheet's client signed it (#3542), for a
+	// host that holds its person's lock; nil when this control plane cannot.
+	SignedStart func(host string, start wire.LockDelivery, owner Caller) (string, error)
+	StopAgent   func(host, agent string, owner Caller)
 	// Notify tells the sheet; false when its session has gone.
 	Notify func(owner Caller, update DraftUpdate) bool
 	// OwnerHere says the sheet's session is still here.
@@ -240,6 +250,10 @@ type draft struct {
 	redact      Redaction
 
 	host     string
+	hostName string
+	// The writer's start while it waits for the sheet's client to sign it (#3542); nil once
+	// it went.
+	toSign *wire.LockDelivery
 	// The machine that runs its provider's server (#3398): the form's, the provider's, or
 	// the host where the control plane runs.
 	machine  string
@@ -431,6 +445,7 @@ func (s *Drafts) Start(request ProviderDraftStart, owner Caller, existing *Exist
 		return ProviderDraftStarted{}, refusal("No host runs where the control plane runs, so no agent can write here.")
 	}
 	d.host = host.ID
+	d.hostName = host.Name
 	s.mu.Lock()
 	s.drafts[id] = d
 	s.mu.Unlock()
@@ -445,16 +460,76 @@ func (s *Drafts) Start(request ProviderDraftStart, owner Caller, existing *Exist
 		RequestID: new(wire.UUID(records.NewUUID())), Sandbox: new(wire.SandboxChoiceOn),
 		Purpose: &wire.AgentPurpose{ProviderDraft: &wire.AgentPurposeProviderDraft{ID: wire.UUID(id)}}}
 	agent, err := s.hooks.StartAgent(host.ID, start, owner)
+	if notInLock(err) && s.hooks.SignedStart != nil {
+		// The host holds its person's lock, so it takes the start only as a device of the
+		// lock signed it: the sheet's client signs it, and it goes as it came (#3542).
+		toSign := &wire.LockDelivery{Method: MethodAgentsStart, Params: string(rawOf(start))}
+		s.mu.Lock()
+		d.state = "signing"
+		d.toSign = toSign
+		s.mu.Unlock()
+		time.AfterFunc(s.timing.Answer, func() {
+			s.mu.Lock()
+			waiting := d.toSign != nil && !d.ended
+			s.mu.Unlock()
+			if waiting {
+				s.end(d, "failed", "The writer’s start was not signed in time.")
+			}
+		})
+		return ProviderDraftStarted{Draft: wire.UUID(id),
+			Sign: &ProviderDraftSign{Machine: wire.MachineRef(host.ID), Method: toSign.Method, Params: toSign.Params}}, nil
+	}
 	if err != nil {
 		s.mu.Lock()
 		delete(s.drafts, id)
 		s.mu.Unlock()
 		return ProviderDraftStarted{}, refusal("%s", d.redact.Text(errorWords(err)))
 	}
+	s.started(d, agent)
+	return ProviderDraftStarted{Draft: wire.UUID(id)}, nil
+}
+
+// Signed is providers/draftSigned (#3542): the writer's start as the sheet's client signed
+// it, delivered as it came. The signature is over the start the control plane wrote, so it
+// starts nothing else.
+func (s *Drafts) Signed(request ProviderDraftSigned, owner Caller) error {
+	s.mu.Lock()
+	d := s.drafts[strings.ToUpper(string(request.Draft))]
+	if d == nil || !strings.EqualFold(d.owner.Client, owner.Client) || d.ended || d.toSign == nil {
+		s.mu.Unlock()
+		return refusal("That draft has ended.")
+	}
+	start := *d.toSign
+	d.toSign = nil
+	s.mu.Unlock()
+	start.Lock = request.Lock
+	agent, err := s.hooks.SignedStart(d.host, start, owner)
+	if err != nil {
+		s.end(d, "failed", errorWords(err))
+		return refusal("%s", d.redact.Text(errorWords(err)))
+	}
+	s.started(d, agent)
+	return nil
+}
+
+// notInLock says the host refused a request for want of a signature of its person's lock.
+func notInLock(err error) bool {
+	var refused *Failure
+	return errors.As(err, &refused) && refused.Code == wire.FailureNotInLock
+}
+
+// started is a draft's writer started: it writes.
+func (s *Drafts) started(d *draft, agent string) {
 	s.mu.Lock()
 	d.agent = uuidOf(agent)
 	if d.agent == "" {
 		d.agent = agent
+	}
+	if d.ended {
+		// Cancelled while its signed start was on the way.
+		s.mu.Unlock()
+		go s.hooks.StopAgent(d.host, d.agent, d.owner)
+		return
 	}
 	d.state = "writing"
 	s.mu.Unlock()
@@ -462,10 +537,9 @@ func (s *Drafts) Start(request ProviderDraftStart, owner Caller, existing *Exist
 	if d.isCommands() {
 		what = "commands for " + d.cli()
 	}
-	s.log(fmt.Sprintf("provider draft %s: %s writing %s on %s", shortID(id), d.runtimeName, what, host.Name))
+	s.log(fmt.Sprintf("provider draft %s: %s writing %s on %s", shortID(d.id), d.runtimeName, what, d.hostName))
 	go s.watch(d)
 	s.tell(d)
-	return ProviderDraftStarted{Draft: wire.UUID(id)}, nil
 }
 
 // Cancel is providers/draftCancel: ×, Back and Cancel.
@@ -1457,18 +1531,10 @@ func NewDraftsFor(p *Providers, w DraftWiring) *Drafts {
 			return nil
 		},
 		StartAgent: func(host string, request StartRequest, owner Caller) (string, error) {
-			reply := router.DeliverKept(MethodAgentsStart, rawOf(request), owner.Client, owner.Kind, host, 120*time.Second)
-			switch {
-			case reply == nil:
-				return "", providerFailure("The host on this machine didn’t answer.")
-			case reply.Error != nil:
-				return "", reply.Error
-			}
-			var agent string
-			if json.Unmarshal(reply.Result, &agent) != nil || !isUUID(agent) {
-				return "", providerFailure("The host on this machine didn’t answer.")
-			}
-			return strings.ToUpper(agent), nil
+			return startedAgent(router.DeliverKept(MethodAgentsStart, rawOf(request), owner.Client, owner.Kind, host, 120*time.Second))
+		},
+		SignedStart: func(host string, start wire.LockDelivery, owner Caller) (string, error) {
+			return startedAgent(router.DeliverSigned(start, owner.Client, owner.Kind, host, 120*time.Second))
 		},
 		StopAgent: func(host, agent string, owner Caller) {
 			router.DeliverKept(MethodAgentsStop, rawOf(map[string]string{"agentID": agent}), owner.Client, owner.Kind, host,
@@ -1484,4 +1550,19 @@ func NewDraftsFor(p *Providers, w DraftWiring) *Drafts {
 	d := NewDrafts(w.Timing, hooks, w.Log, nil)
 	p.DraftWith(d)
 	return d
+}
+
+// startedAgent is the agent id a host answered agents/start with.
+func startedAgent(reply *Reply) (string, error) {
+	switch {
+	case reply == nil:
+		return "", providerFailure("The host on this machine didn’t answer.")
+	case reply.Error != nil:
+		return "", reply.Error
+	}
+	var agent string
+	if json.Unmarshal(reply.Result, &agent) != nil || !isUUID(agent) {
+		return "", providerFailure("The host on this machine didn’t answer.")
+	}
+	return strings.ToUpper(agent), nil
 }

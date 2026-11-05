@@ -62,6 +62,7 @@ func (d *Daemon) register() {
 	d.registerSandbox()
 	d.registerDesktopControl()
 	d.registerBrowserSettings()
+	d.registerSessionSecrets()
 	d.registerDesktopControlPause()
 	d.registerAuto()
 	d.registerMoves()
@@ -399,6 +400,8 @@ func (d *Daemon) archiveBy(id wire.UUID, by wire.AgentArchivedReason) error {
 		a.ArchiveRequest, a.AfterTurn, a.ContinueWhenBack, a.RunningTool = nil, nil, nil, nil
 	})
 	d.record(id, stateChanged(wire.AgentStateArchived, nil))
+	// Its secrets for this session only go now (#3548): its agent is told they expired.
+	d.expireSessionSecrets(id)
 	// Archived first, then its turn and runtime ended: the turn's ending finds it archived
 	// and leaves it so (#1611).
 	d.live(id).halt()

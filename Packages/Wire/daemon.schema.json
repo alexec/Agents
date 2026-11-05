@@ -8159,6 +8159,10 @@
         },
         "isSet": {
           "type": "boolean"
+        },
+        "canBeSessionOnly": {
+          "type": "boolean",
+          "description": "The host can keep it for this session only (#3548): an answer whose content has sessionOnly true is kept for the asking session and deleted when it is archived, not saved to secrets.env. Left out by an older host."
         }
       },
       "required": [
@@ -19544,6 +19548,44 @@
       ],
       "additionalProperties": false
     },
+    "ProviderDraftSign": {
+      "type": "object",
+      "description": "The writing agent's start, for the client that asked for the draft to sign (#3542): the machine that holds its person's lock takes no start the control plane sends in its own words. The client checks that it starts only a draft's writer (agents/start, the draft's purpose, sandboxed, no MCP servers or other folders), signs method and params as they are (a LockSignature to machine), and sends the signature with providers/draftSigned.",
+      "properties": {
+        "machine": {
+          "$ref": "#/definitions/MachineRef"
+        },
+        "method": {
+          "type": "string"
+        },
+        "params": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "machine",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderDraftSigned": {
+      "type": "object",
+      "description": "providers/draftSigned (#3542): the signature of a draft's sign, which the control plane delivers with the start as it came.",
+      "properties": {
+        "draft": {
+          "$ref": "#/definitions/UUID"
+        },
+        "lock": {
+          "$ref": "#/definitions/LockSignature"
+        }
+      },
+      "required": [
+        "draft",
+        "lock"
+      ],
+      "additionalProperties": false
+    },
     "ProviderDraftStart": {
       "type": "object",
       "description": "providers/draftStart (#858).",
@@ -19578,6 +19620,9 @@
         },
         "answered": {
           "$ref": "#/definitions/ProviderDraftAnswered"
+        },
+        "sign": {
+          "$ref": "#/definitions/ProviderDraftSign"
         }
       },
       "required": [
@@ -23328,6 +23373,86 @@
       "required": [
         "severity",
         "title"
+      ],
+      "additionalProperties": false
+    },
+    "SessionSecret": {
+      "type": "object",
+      "description": "A secret kept for one session only (#3548): only that session's agent can use it (fill_secret, its environment, its MCP servers), and its host deletes it when the session is archived. No value.",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "title": {
+          "type": "string",
+          "description": "The session's title, as the session list shows it."
+        },
+        "name": {
+          "type": "string"
+        },
+        "setAt": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "agentID",
+        "title",
+        "name",
+        "setAt"
+      ],
+      "additionalProperties": false
+    },
+    "SessionSecretRemoveRequest": {
+      "type": "object",
+      "description": "secrets/sessionRemove (#3548): take one session's secret out now.",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "agentID",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "SessionSecretSetRequest": {
+      "type": "object",
+      "description": "secrets/sessionSet (#3548): set a secret for one session that is not archived. The value is one line.",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "agentID",
+        "name",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "SessionSecrets": {
+      "type": "object",
+      "description": "secrets/sessionList (#3548): every secret this machine keeps for one session only, by session title then name. No value.",
+      "properties": {
+        "secrets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SessionSecret"
+          }
+        }
+      },
+      "required": [
+        "secrets"
       ],
       "additionalProperties": false
     },

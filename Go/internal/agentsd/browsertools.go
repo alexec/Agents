@@ -211,7 +211,7 @@ func (d *Daemon) driveBrowser(ctx context.Context, agent wire.UUID, name string,
 	var fill secretFill
 	if name == fillSecretName {
 		var refusal string
-		if fill, refusal = d.fillSecretValue(args); refusal != "" {
+		if fill, refusal = d.fillSecretValue(agent, args); refusal != "" {
 			return failed(refusal)
 		}
 	}
