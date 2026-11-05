@@ -23,6 +23,9 @@ public struct AllowanceState: Codable, Hashable, Sendable {
     public var lastRateLimit: RateLimitInfo?
     /// A measured plan window. This is display data, never evidence that a turn can run.
     public var reading: AllowanceReading?
+    /// The last reading of each weekly plan window, oldest first, a few per window (#3438):
+    /// the daemon keeps them for the pace line and the past weeks. Nil when none.
+    public var weeks: [AllowanceReading]?
     /// What the app has recorded spending on this credential, for credit entries.
     public var spent: Spent
     /// Rate limits in a row, trimmed to the policy's window (R7).
@@ -33,7 +36,7 @@ public struct AllowanceState: Codable, Hashable, Sendable {
 
     public init(credentialKey: String, entryID: UUID, status: Status = .available, since: Date,
                 learnedFrom: Source = .person, lastRateLimit: RateLimitInfo? = nil,
-                reading: AllowanceReading? = nil,
+                reading: AllowanceReading? = nil, weeks: [AllowanceReading]? = nil,
                 spent: Spent = .known(nil), rateLimitStreak: [Date] = [], modelsOut: [ModelOut]? = nil,
                 changedAt: Date? = nil) {
         self.credentialKey = credentialKey
@@ -44,6 +47,7 @@ public struct AllowanceState: Codable, Hashable, Sendable {
         self.learnedFrom = learnedFrom
         self.lastRateLimit = lastRateLimit
         self.reading = reading
+        self.weeks = weeks
         self.spent = spent
         self.rateLimitStreak = rateLimitStreak
         self.modelsOut = modelsOut
@@ -51,7 +55,7 @@ public struct AllowanceState: Codable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case credentialKey, entryID, status, since, changedAt, learnedFrom, lastRateLimit, reading,
-             spent, rateLimitStreak, modelsOut
+             weeks, spent, rateLimitStreak, modelsOut
     }
 
     /// A state saved before `changedAt` existed, or sent by a host that has none, reads
@@ -66,6 +70,7 @@ public struct AllowanceState: Codable, Hashable, Sendable {
         learnedFrom = try c.decode(Source.self, forKey: .learnedFrom)
         lastRateLimit = try c.decodeIfPresent(RateLimitInfo.self, forKey: .lastRateLimit)
         reading = try c.decodeIfPresent(AllowanceReading.self, forKey: .reading)
+        weeks = try c.decodeIfPresent([AllowanceReading].self, forKey: .weeks)
         spent = try c.decode(Spent.self, forKey: .spent)
         rateLimitStreak = try c.decode([Date].self, forKey: .rateLimitStreak)
         modelsOut = try c.decodeIfPresent([ModelOut].self, forKey: .modelsOut)

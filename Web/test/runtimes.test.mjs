@@ -185,3 +185,26 @@ test("runtimes hint: the Mac's panes with a Mac, the machines' own rows with non
   assert.match(none, /Add a Machine…/);
   assert.match(none, /Sign In…/);
 });
+
+// A plan's week against an even pace, and its past weeks (#3438), as AllowancePaceTests.
+const paceNow = new Date(Date.UTC(2026, 10, 4, 12));
+const wire = (date) => (date.getTime() - Date.UTC(2001, 0, 1)) / 1000;
+const week = (used, days, window = "seven_day") => ({ window, used, spent: false, nearlySpent: false,
+  resetsAt: wire(new Date(paceNow.getTime() + days * 86400e3)), at: wire(paceNow) });
+
+test("runtimes: a week used faster than an even pace says so", () => {
+  const current = week(0.72, 3);
+  assert.equal(r.allowancePaceLine({ reading: current, weeks: [current] }, paceNow),
+    "3 days to go · used faster than an even pace (43% left)");
+  assert.equal(r.allowancePaceLine({ weeks: [week(0.2, 3)] }, paceNow),
+    "80% left this week · 3 days to go · used slower than an even pace (43% left)");
+  assert.equal(r.allowancePaceLine({ weeks: [week(0.53, 3.4)] }, paceNow), "47% left this week · 3 days to go · on an even pace");
+});
+
+test("runtimes: past weeks are their final shares, of one window", () => {
+  const state = { weeks: [week(0.62, -14), week(0.71, -7), week(0.9, -0.5), week(0.3, 5), week(0.4, 5, "seven_day_opus")] };
+  assert.equal(r.pastWeeksLine(state, paceNow), "Past weeks: 62%, 71%, 90% used");
+  assert.equal(r.allowancePace(state, paceNow).current.used, 0.3);
+  assert.equal(r.pastWeeksLine({ weeks: [] }, paceNow), null);
+  assert.equal(r.allowancePaceLine({ weeks: [week(0.6, -1)] }, paceNow), null);
+});
