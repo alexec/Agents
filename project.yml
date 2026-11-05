@@ -510,6 +510,10 @@ targets:
       - name: Build the Google Chat MCP server
         script: sh "$SRCROOT/scripts/go-github-mcp.sh" googlechat-mcp
         basedOnDependencyAnalysis: false
+      # The WhatsApp MCP server (#1352), built and carried the same way.
+      - name: Build the WhatsApp MCP server
+        script: sh "$SRCROOT/scripts/go-github-mcp.sh" whatsapp-mcp
+        basedOnDependencyAnalysis: false
       # The command machine provider (#691, in Go since #1364), which agents-control looks
       # for beside itself, built and carried the same way.
       - name: Build the command machine provider
@@ -544,6 +548,9 @@ targets:
         basedOnDependencyAnalysis: false
       - name: Carry the Google Chat MCP server
         script: sh "$SRCROOT/scripts/go-github-mcp.sh" --carry googlechat-mcp
+        basedOnDependencyAnalysis: false
+      - name: Carry the WhatsApp MCP server
+        script: sh "$SRCROOT/scripts/go-github-mcp.sh" --carry whatsapp-mcp
         basedOnDependencyAnalysis: false
       - name: Carry the command machine provider
         script: sh "$SRCROOT/scripts/go-github-mcp.sh" --carry workspace-commands

@@ -202,6 +202,53 @@
           ]
         }
       }
+    },
+    {
+      "server": {
+        "name": "agents/whatsapp",
+        "title": "WhatsApp",
+        "description": "A WhatsApp Business number on Meta's Cloud API: an event when a person writes to it or answers its question, and tools to send a message, ask a question with buttons and send an approved template"
+      },
+      "_meta": {
+        "dev.agentloops/connector": {
+          "command": "whatsapp-mcp",
+          "hosted": true,
+          "declares": {
+            "tools": true,
+            "events": [
+              "message.received",
+              "question.answered"
+            ]
+          },
+          "secrets": [
+            {
+              "name": "WHATSAPP_TOKEN",
+              "description": "A system user's access token with whatsapp_business_messaging",
+              "required": true
+            },
+            {
+              "name": "WHATSAPP_PHONE_NUMBER_ID",
+              "description": "The business number's id, from the app's WhatsApp ▸ API Setup page",
+              "required": true
+            },
+            {
+              "name": "WHATSAPP_APP_SECRET",
+              "description": "The Meta app's secret, which signs each webhook call",
+              "required": true
+            },
+            {
+              "name": "WHATSAPP_VERIFY_TOKEN",
+              "description": "A word of your own, which you also give Meta when you set up the webhook",
+              "required": true
+            },
+            {
+              "name": "WHATSAPP_WEBHOOK_ADDR",
+              "description": "Where the webhook listens, behind your tunnel or reverse proxy; 127.0.0.1:8797 when left out",
+              "required": false
+            }
+          ]
+        }
+      }
     }
   ]
 }

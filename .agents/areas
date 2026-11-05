@@ -336,6 +336,11 @@ Go/cmd/googlechat-mcp/                                 googlechat
 Go/internal/googlechatmcp/                             googlechat
 docs/how-to/use-google-chat.md                         googlechat
 
+# whatsapp: the WhatsApp MCP server (#1352): a business number's messages and answers by webhook, and sends.
+Go/cmd/whatsapp-mcp/                                   whatsapp
+Go/internal/whatsappmcp/                               whatsapp
+docs/how-to/use-whatsapp.md                            whatsapp
+
 # control-plane: the control plane's core: joining, membership, grants, copies and
 # handover, routing, its store, keys, its server and its deploy. Team, reports, channels
 # and sign-in are areas of their own below (#2017), so that more lanes can work on the

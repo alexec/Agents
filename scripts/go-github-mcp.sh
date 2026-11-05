@@ -1,6 +1,6 @@
 #!/bin/sh
 # The github MCP server (#1232), or another Go MCP server named last (linear-mcp, #839, gitlab-mcp, #1629, email-mcp, #1780, jira-mcp, #3247, slack-mcp, #1351,
-# googlechat-mcp, #1016, or
+# googlechat-mcp, #1016, whatsapp-mcp, #1352, or
 # workspace-commands, #1364, the command machine provider agents-control looks for beside
 # itself), for Agents Host to carry beside agentsd (#700): what Agents Host's build runs first. Builds
 # Go/out/helpers/<name>, for both Mac architectures, when a Go source is newer than it. With no
@@ -18,6 +18,7 @@
 #   scripts/go-github-mcp.sh [--force|--carry] jira-mcp
 #   scripts/go-github-mcp.sh [--force|--carry] slack-mcp
 #   scripts/go-github-mcp.sh [--force|--carry] googlechat-mcp
+#   scripts/go-github-mcp.sh [--force|--carry] whatsapp-mcp
 #   scripts/go-github-mcp.sh [--force|--carry] workspace-commands
 #
 # agentsd puts Contents/Helpers first on an MCP server's PATH, so `.agents/mcp.json` names it
@@ -27,7 +28,7 @@ set -eu
 mode=
 case "${1:-}" in --force | --carry) mode=$1; shift ;; esac
 name=${1:-github-mcp}
-case "$name" in github-mcp | linear-mcp | gitlab-mcp | email-mcp | jira-mcp | slack-mcp | googlechat-mcp | workspace-commands) ;; *) echo "go-github-mcp.sh: no Go MCP server $name" >&2; exit 2 ;; esac
+case "$name" in github-mcp | linear-mcp | gitlab-mcp | email-mcp | jira-mcp | slack-mcp | googlechat-mcp | whatsapp-mcp | workspace-commands) ;; *) echo "go-github-mcp.sh: no Go MCP server $name" >&2; exit 2 ;; esac
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 out="$root/Go/out/helpers/$name"
