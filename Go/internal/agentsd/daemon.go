@@ -53,6 +53,7 @@ type Daemon struct {
 	attachmentBook
 	settingsState
 	userScopeState
+	sessionSecretsState
 	lockState
 	selfUpdateState
 	quitState
@@ -153,6 +154,8 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	d.loadEvents()
 	d.beginMCPApprovals()
 	d.recover()
+	// A session archived or deleted while the host was not running loses its secrets (#3548).
+	d.sweepSessionSecrets()
 	d.startErasures()
 	// How long nothing ran, and the waits open over it (#1219): before anything below can
 	// raise an event that wakes one, so its wake says so.

@@ -732,6 +732,8 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 .card .form-row button { border: 1px solid var(--paper-rule); border-radius: var(--radius-control); background: var(--paper-ground); padding: 4px 10px; }
 .card .form-row button.prominent { background: var(--accent); color: var(--paper-ground); }
 .card .field { display: flex; flex-direction: column; gap: 4px; }
+/* A checkbox and its words on one line: a yes/no field, and the secret card's For this session only (#3548). */
+.card .field.check { flex-direction: row; align-items: center; gap: 6px; }
 .card .field input[type="text"], .card .field input[type="number"], .card .field input[type="password"] {
   font: inherit;
   padding: 5px 8px;

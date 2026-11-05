@@ -4,10 +4,18 @@ import SwiftUI
 /// Machines ▸ Secrets (#1760, #2157): the person's secrets, by name only, kept by the control
 /// plane and sent to each machine of theirs. The window and the Remote draw it; the web page
 /// draws the same in `Web/src/views/UserScope.tsx`. A card (#3531) is a secret of its own kind.
-struct SecretsPane: View {
+/// `extra` is what a client draws after them: the window's secrets for one session (#3548).
+struct SecretsPane<Extra: View>: View {
     /// The control plane, or nil while it cannot be reached.
     let control: DaemonClient?
     let state: UserScopeState
+    let extra: Extra
+
+    init(control: DaemonClient?, state: UserScopeState, @ViewBuilder extra: () -> Extra) {
+        self.control = control
+        self.state = state
+        self.extra = extra()
+    }
 
     @State private var problem: String?
     @State private var isAdding = false
@@ -33,6 +41,7 @@ struct SecretsPane: View {
                 .paperListRow()
             }
             secretsSection
+            extra
         }
         .paperForm()
         .task(id: control != nil) { await state.load(control) }
@@ -109,6 +118,12 @@ struct SecretsPane: View {
             Text(UserScopeWords.secretsFoot).appText(.fine).foregroundStyle(.secondary)
         }
         .paperListRow()
+    }
+}
+
+extension SecretsPane where Extra == EmptyView {
+    init(control: DaemonClient?, state: UserScopeState) {
+        self.init(control: control, state: state) { EmptyView() }
     }
 }
 

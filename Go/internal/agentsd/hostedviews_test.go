@@ -41,7 +41,7 @@ func TestAHostedServersViewsComeThroughItsOneCopy(t *testing.T) {
 	}
 
 	// A session on the same copy: one process, and no merge.
-	entries := d.sessionEntries(t.TempDir())
+	entries := d.sessionEntries(t.TempDir(), "")
 	got := d.hostedSwapped(entries, 4242, "tok", "claude")
 	if len(got) != 1 || got[0].Http == nil {
 		t.Fatalf("the session is not handed the copy: %+v", got)

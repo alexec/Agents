@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/agentsd/skillcatalog"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -267,11 +266,12 @@ func (d *Daemon) answerElicitation(r wire.AnswerElicitationRequest) error {
 	}
 	form := pe.req.Mode.Form
 	secret := pe.req.Secret
+	sessionOnly := secret != nil && askedSessionOnly(content)
 	switch {
 	case action != wire.AnswerElicitationRequestActionAccept:
 	case secret != nil:
 		// A secret is saved here (#2885), and from here on only its name goes anywhere.
-		if err := d.saveAskedSecret(*secret, content); err != nil {
+		if err := d.saveAskedSecret(l.id, *secret, content); err != nil {
 			return err
 		}
 		content = map[string]wire.JSONValue{}
@@ -287,7 +287,7 @@ func (d *Daemon) answerElicitation(r wire.AnswerElicitationRequest) error {
 	var said []wire.ElicitationAnswer
 	switch {
 	case secret != nil:
-		said = secretAnswered(*secret, action)
+		said = secretAnswered(*secret, action, sessionOnly)
 	case action == wire.AnswerElicitationRequestActionAccept && form != nil:
 		said = answers(form.Value, content, pe.req.Message)
 	}
@@ -311,7 +311,7 @@ func (d *Daemon) answerElicitation(r wire.AnswerElicitationRequest) error {
 func (d *Daemon) formAnsweredWords(req wire.ElicitationRequest, action wire.AnswerElicitationRequestAction, said []wire.ElicitationAnswer) string {
 	if req.Secret != nil {
 		return "The person replied to your ask_secret for " + req.Secret.Name + ". " +
-			secretNote(req.Secret.Name, skillcatalog.SecretsPath(d.personalHome()), action)
+			d.secretNote(req.AgentID, req.Secret.Name, action)
 	}
 	form := "your form"
 	if req.Message != nil && strings.TrimSpace(*req.Message) != "" {

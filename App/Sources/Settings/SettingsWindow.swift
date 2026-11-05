@@ -230,7 +230,8 @@ struct SettingsWindow: View {
             if let control { ControlSettingsView(control: control, page: .clients) }
         case .secrets:
             // Through the window's own connection, which hears when they change (#1760).
-            FormColumn { SecretsPane(control: model.controlRequests, state: model.userScope) }
+            // Then this Mac's secrets for one session (#3548), kept by its host.
+            FormColumn { SecretsPane(control: model.controlRequests, state: model.userScope) { SessionSecretsSection() } }
         case .people:
             // Through the window's own connection to the control plane, which hears when
             // people change (#994).

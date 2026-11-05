@@ -37,6 +37,11 @@
       "description": "The host serves browser/state and browser/clear (#3535): Settings ▸ Browser, the sites the machine's browser keeps cookies for, Clear, and the size of the Chromium download."
     },
     {
+      "name": "host.session-secrets/1",
+      "by": "host",
+      "description": "The host keeps secrets for one session only (#3548): an ask_secret answer with sessionOnly, and secrets/sessionList, secrets/sessionSet and secrets/sessionRemove for Settings ▸ Secrets. Only that session's agent can use one, and the host deletes it when the session is archived."
+    },
+    {
       "name": "host.desktop-control/1",
       "by": "host",
       "description": "The host serves the app tool drive_screen (#3004, US1): an agent drives an app on this Mac through its own screen, mouse and keyboard, holding the screen lease while it does, only while the person has turned desktop control on (desktopControl/state, desktopControl/set; Off by default). Mac only."
@@ -7367,6 +7372,84 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/SandboxSettings"
+        }
+      }
+    },
+    {
+      "name": "secrets/sessionList",
+      "x-capability": "host.session-secrets/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Settings ▸ Secrets (#3548): every secret this machine keeps for one session only, with its session. No value. The person's own clients only.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SessionSecrets"
+        }
+      }
+    },
+    {
+      "name": "secrets/sessionRemove",
+      "x-capability": "host.session-secrets/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Take one session's secret out now (#3548), as archiving the session does. The person's own clients only.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SessionSecretRemoveRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SessionSecrets"
+        }
+      }
+    },
+    {
+      "name": "secrets/sessionSet",
+      "x-capability": "host.session-secrets/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Set a secret for one session only (#3548), on the machine that runs it: only that session's agent can use it, and it is deleted when the session is archived. The person's own clients only.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SessionSecretSetRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SessionSecrets"
         }
       }
     },
