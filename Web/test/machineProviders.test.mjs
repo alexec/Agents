@@ -59,6 +59,44 @@ test("the card's chip and lines are the window's", () => {
   assert.equal(w.workspaceLine({ id: "a", name: "a", state: "stopped" }, hosts), "Stopped · not joined");
 });
 
+test("Carried by offers the person's online machines that can carry it, their Mac first (#3496)", () => {
+  const can = ["providers.carry/1"];
+  const hosts = [
+    { id: "b", name: "box", state: "online", owner: "alex", capabilities: can },
+    { id: "m", name: "mac", state: "online", owner: "alex", capabilities: can },
+    { id: "a", name: "attic", state: "needsUpdate", owner: "alex", capabilities: can },
+    { id: "o", name: "off", state: "offline", owner: "alex", capabilities: can },
+    { id: "s", name: "sam's", state: "online", owner: "sam", capabilities: can },
+    { id: "x", name: "old", state: "online", owner: "alex", capabilities: [] },
+    { id: "r", name: "relay", state: "online", owner: "alex", relay: true },
+  ];
+  assert.deepEqual(w.carrierChoices(hosts, "alex", "m").map((h) => h.name), ["mac", "attic", "box"]);
+  assert.deepEqual(w.carrierChoices(hosts, "alex").map((h) => h.name), ["attic", "box", "mac"]);
+  const choices = w.carrierChoices(hosts, "alex");
+  assert.equal(w.carrierStart(undefined, choices), "a");
+  assert.equal(w.carrierStart({ machine: "b" }, choices), "b");
+  assert.equal(w.carrierStart({ machine: "o" }, choices), "a");
+});
+
+test("Add names its machine; Edit… moves it only with its secrets again (#3496)", () => {
+  assert.equal(w.providerRequest("digitalOcean", "", { token: "t" }, undefined, "m").machine, "m");
+  const editing = { id: "do", name: "DO", preset: "digitalocean-api", machine: "b" };
+  assert.equal(w.providerRequest("digitalOcean", "DO", {}, editing, "b").machine, undefined);
+  assert.equal(w.providerRequest("digitalOcean", "DO", {}, editing, "m"), "Give the API token.");
+  assert.deepEqual(w.providerRequest("digitalOcean", "DO", { token: "t" }, editing, "m"),
+    { id: "do", name: "DO", kind: "commands", machine: "m", secrets: { DIGITALOCEAN_API_TOKEN: "t" } });
+});
+
+test("the card says which machine carries it, and when it is offline (#3496)", () => {
+  assert.equal(w.carrierLine(summary({ machine: "b", machineName: "box" }), true), "Carried by box");
+  assert.equal(w.carrierLine(summary({ machine: "b", machineName: "box", machineOffline: true }), true),
+    "box is offline: its machines can’t be started or stopped until it is back.");
+  assert.equal(w.carrierLine(summary(), true), w.providerWords.notCarried);
+  assert.equal(w.carrierLine(summary(), false), undefined);
+  assert.equal(w.providerWords.secretsFoot("box"), "Tokens and keys go to box, which keeps them. The control plane keeps none.");
+  assert.ok(!w.providerWords.footer(true).includes("runs on the control plane"));
+});
+
 test("Link to Host offers free hosts that run agents, the likely one first", () => {
   const hosts = [
     { id: "1", name: "other" }, { id: "2", name: "cws.devbox" }, { id: "3", name: "relay", relay: true },

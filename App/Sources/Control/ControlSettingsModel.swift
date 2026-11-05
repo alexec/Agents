@@ -73,6 +73,10 @@ final class ControlSettingsModel {
 
     /// The host on this Mac: shown first and without buttons (the look gate's decision).
     var thisMacHost: DaemonAPI.ControlMachine? { hosts.first { $0.machineID == MachineID.current && $0.runsAgents } }
+    /// The machines that may carry a provider (#3496): the person's online ones, this Mac first.
+    var carriers: [DaemonAPI.ControlMachine] {
+        ProviderCarrier.choices(hosts, person: status?.person?.id, own: thisMacHost?.id)
+    }
     /// Every other host, and this Mac's relay: it shares the Mac's machine but is not its host.
     var otherHosts: [DaemonAPI.ControlMachine] { hosts.filter { $0.machineID != MachineID.current || $0.relay != nil } }
 

@@ -297,12 +297,22 @@ public extension DaemonAPI {
         /// The CLI its machines are reached through over ssh (gh, coder) when the machine
         /// that runs the provider has none (#3367). Nil when it needs none or has it.
         public var sshToolMissing: String?
+        /// The machine that carries it: runs its server and keeps its secrets (#3398). Nil for
+        /// one made before, which must be added again.
+        public var machine: MachineRef?
+        public var machineName: String?
+        /// Its machine is offline: its machines can't be started or stopped until it is back.
+        public var machineOffline: Bool?
 
         public init(id: ProviderID, name: String, kind: String, secrets: [String: Bool] = [:],
                     capabilities: [String] = [], contract: Int = 1, mapped: Bool = false, preset: String? = nil,
                     workspaces: [MachineInfo] = [], listedAt: Date? = nil, current: Bool = true,
                     problem: String? = nil, group: String? = nil, mayUse: Bool? = nil,
-                    sshToolMissing: String? = nil) {
+                    sshToolMissing: String? = nil, machine: MachineRef? = nil, machineName: String? = nil,
+                    machineOffline: Bool? = nil) {
+            self.machine = machine
+            self.machineName = machineName
+            self.machineOffline = machineOffline
             self.id = id
             self.name = name
             self.kind = kind
@@ -405,7 +415,10 @@ public extension DaemonAPI {
         public var headers: [String: String]?
         public var commands: JSONValue?
         public var map: JSONValue?
-        /// Name to value. Only ever sent to the control plane; never given back.
+        /// The machine that carries it (#3398). Nil: the person's first online machine on an
+        /// add, the one it has on an update.
+        public var machine: MachineRef?
+        /// Name to value. Passed on to `machine`, which keeps them; never given back.
         public var secrets: [String: String]?
         /// Your commands: the program its commands use, for Write It for Me (#858). Not kept.
         public var cli: String?
@@ -415,8 +428,9 @@ public extension DaemonAPI {
 
         public init(id: ProviderID? = nil, name: String, kind: ProviderRecord.Kind, command: String? = nil,
                     args: [String]? = nil, url: String? = nil, headers: [String: String]? = nil,
-                    commands: JSONValue? = nil, map: JSONValue? = nil, secrets: [String: String]? = nil,
-                    cli: String? = nil, draft: UUID? = nil) {
+                    commands: JSONValue? = nil, map: JSONValue? = nil, machine: MachineRef? = nil,
+                    secrets: [String: String]? = nil, cli: String? = nil, draft: UUID? = nil) {
+            self.machine = machine
             self.cli = cli
             self.draft = draft
             self.id = id
