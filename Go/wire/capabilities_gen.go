@@ -64,6 +64,7 @@ const CapGovernance1 = "governance/1"
 const CapGroups1 = "groups/1"
 const CapHandover1 = "handover/1"
 const CapHostDesktopControl1 = "host.desktop-control/1"
+const CapHostLock1 = "host.lock/1"
 const CapHostOrgRoutes1 = "host.org-routes/1"
 const CapHostOrgRoutes2 = "host.org-routes/2"
 const CapHostPolicyLayers1 = "host.policy-layers/1"
@@ -81,6 +82,7 @@ const CapLineageComment1 = "lineage.comment/1"
 const CapLineage1 = "lineage/1"
 const CapLinks1 = "links/1"
 const CapLiveactivity1 = "liveactivity/1"
+const CapLock1 = "lock/1"
 const CapMac1 = "mac/1"
 const CapMachine1 = "machine/1"
 const CapMachines1 = "machines/1"
@@ -685,6 +687,8 @@ var ControlCapabilities = pairs([][2]string{
 	{"links/list", "links/1"},
 	{"links/remove", "links/1"},
 	{"links/requests", "links/1"},
+	{"lock/add", "lock/1"},
+	{"lock/get", "lock/1"},
 	{"machines/forAgent", "machines/1"},
 	{"machines/projectFolders", "sessions.project/1"},
 	{"machines/projectSessions", "sessions.project/1"},
@@ -807,6 +811,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"control/linkDecided", "links/1"},
 	{"control/linkRequested", "links/1"},
 	{"control/linksChanged", "links/1"},
+	{"control/lockChanged", "lock/1"},
 	{"control/moved", "control/1"},
 	{"control/notice", "org-identity/1"},
 	{"control/orgRoutesChanged", "org-routes/2"},
@@ -828,6 +833,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"control/webChanged", "control/1"},
 	{"folders/detect", "folders/1"},
 	{"host/clients", "host/1"},
+	{"host/lock", "host.lock/1"},
 	{"host/orgRoutes", "host.org-routes/2"},
 	{"host/policy", "host.policy/1"},
 	{"host/projects", "projects/1"},
@@ -858,6 +864,7 @@ var ControlNotifications = set([]string{
 	"control/linkDecided",
 	"control/linkRequested",
 	"control/linksChanged",
+	"control/lockChanged",
 	"control/moved",
 	"control/notice",
 	"control/orgRoutesChanged",
@@ -879,6 +886,7 @@ var ControlNotifications = set([]string{
 	"control/webChanged",
 	"folders/detect",
 	"host/clients",
+	"host/lock",
 	"host/orgRoutes",
 	"host/policy",
 	"host/projects",
@@ -911,5 +919,6 @@ var DeclaredCapabilities = map[string][]string{
 		"host.desktop-control/1",
 		"host.org-routes/2",
 		"host.user-settings/2",
+		"host.lock/1",
 	},
 }

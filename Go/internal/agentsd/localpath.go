@@ -174,6 +174,10 @@ func (d *Daemon) Told(method string, params json.RawMessage) {
 		d.toldUserSettings(params)
 		return
 	}
+	if method == wire.NotifyHostLock.Name {
+		d.toldLock(params)
+		return
+	}
 	if method == wire.NotifyHostUser.Name {
 		d.toldHostUser(params)
 		return

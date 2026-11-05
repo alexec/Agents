@@ -30,6 +30,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controlplane/audit"
 	"github.com/alexec/agents/Go/internal/controlplane/hostinstall"
 	"github.com/alexec/agents/Go/internal/controlplane/hosttunnels"
+	"github.com/alexec/agents/Go/internal/controlplane/locks"
 	"github.com/alexec/agents/Go/internal/controlplane/notices"
 	"github.com/alexec/agents/Go/internal/controlplane/providers"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
@@ -210,6 +211,9 @@ type Service struct {
 	// Each person's settings and secrets (#1760), and what each machine here was sent.
 	users     *usersettings.Book
 	toldUsers toldUsers
+	// Each person's machine lock (#3399), and the head each machine here was sent.
+	locks     *locks.Book
+	toldLocks toldLocks
 	// Which bots are at a spend cap today (#1761).
 	caps botCaps
 	// The organisation's policy as this copy knows it, and what each machine was sent (#998).
@@ -301,6 +305,7 @@ func New(cfg Config) (*Service, error) {
 	if s.users, err = openUserBook(cfg); err != nil {
 		return nil, err
 	}
+	s.locks = locks.New(cfg.Store)
 	s.backups = newBackupStore(cfg.Store, s.records, s.currentKeys)
 	if cfg.PeerURL != "" {
 		if s.peerOrigin, err = controllink.Origin(cfg.PeerURL); err != nil {

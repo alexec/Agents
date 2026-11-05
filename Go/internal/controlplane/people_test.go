@@ -320,6 +320,7 @@ func TestEveryClientMethodChecksTheOwner(t *testing.T) {
 		"orgRoutes/mine": true, "orgRoutes/list": true, "orgRoutes/set": true, "orgRoutes/replaceKey": true,
 		"orgRoutes/check": true, "orgRoutes/remove": true, "orgRoutes/recipients": true, "orgRoutes/sealed": true,
 		"sealing/work": true, "sealing/add": true, "user/secretRecipients": true,
+		"lock/get": true, "lock/add": true,
 		"scim/set": true, "scim/tokens/list": true, "scim/tokens/make": true, "scim/tokens/revoke": true,
 		"groups/setRole": true, "people/removeRequests": true,
 		"projects/list": true, "projects/set": true, "projects/remove": true, "projects/setSlot": true, "projects/setBoards": true, "projects/sessions": true,

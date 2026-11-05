@@ -234,6 +234,9 @@ func (s *Service) machineLeft(host, user, name string) {
 	s.toldUsers.mu.Lock()
 	delete(s.toldUsers.last, host)
 	s.toldUsers.mu.Unlock()
+	s.toldLocks.mu.Lock()
+	delete(s.toldLocks.last, host)
+	s.toldLocks.mu.Unlock()
 	if s.users == nil {
 		return
 	}

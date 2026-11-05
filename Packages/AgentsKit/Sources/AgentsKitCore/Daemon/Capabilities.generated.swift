@@ -65,6 +65,7 @@ public enum Capability {
     public static let groups1 = "groups/1"
     public static let handover1 = "handover/1"
     public static let hostDesktopControl1 = "host.desktop-control/1"
+    public static let hostLock1 = "host.lock/1"
     public static let hostOrgRoutes1 = "host.org-routes/1"
     public static let hostOrgRoutes2 = "host.org-routes/2"
     public static let hostPolicyLayers1 = "host.policy-layers/1"
@@ -82,6 +83,7 @@ public enum Capability {
     public static let lineage1 = "lineage/1"
     public static let links1 = "links/1"
     public static let liveactivity1 = "liveactivity/1"
+    public static let lock1 = "lock/1"
     public static let mac1 = "mac/1"
     public static let machine1 = "machine/1"
     public static let machines1 = "machines/1"
@@ -632,6 +634,8 @@ public enum Capability {
         "links/list": "links/1",
         "links/remove": "links/1",
         "links/requests": "links/1",
+        "lock/add": "lock/1",
+        "lock/get": "lock/1",
         "machines/forAgent": "machines/1",
         "machines/projectFolders": "sessions.project/1",
         "machines/projectSessions": "sessions.project/1",
@@ -754,6 +758,7 @@ public enum Capability {
         "control/linkDecided": "links/1",
         "control/linkRequested": "links/1",
         "control/linksChanged": "links/1",
+        "control/lockChanged": "lock/1",
         "control/moved": "control/1",
         "control/notice": "org-identity/1",
         "control/orgRoutesChanged": "org-routes/2",
@@ -775,6 +780,7 @@ public enum Capability {
         "control/webChanged": "control/1",
         "folders/detect": "folders/1",
         "host/clients": "host/1",
+        "host/lock": "host.lock/1",
         "host/orgRoutes": "host.org-routes/2",
         "host/policy": "host.policy/1",
         "host/projects": "projects/1",
@@ -806,6 +812,7 @@ public enum Capability {
             "host.desktop-control/1",
             "host.org-routes/2",
             "host.user-settings/2",
+            "host.lock/1",
         ],
     ]
 }

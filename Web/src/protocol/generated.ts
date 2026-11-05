@@ -4642,6 +4642,81 @@ export interface LiveBoard {
   agents: LiveAgent[];
 }
 
+/**
+ * A person's machine lock (#3399, specs/3399-machine-lock): its chain of entries, the root first.
+ * lock/get, and host/lock to a machine.
+ */
+export interface Lock {
+  person: string;
+  entries: LockEntry[];
+}
+
+/**
+ * lock/add (#3399): entries to put on the end of the caller's lock, in order. The first names the
+ * head as its previous; the control plane writes each with a conditional write on the head, so two
+ * entries cannot both follow one head.
+ */
+export interface LockAdd {
+  entries: LockEntry[];
+}
+
+/**
+ * What a lock entry says (#3399), as its signer wrote it: the JSON that LockEntry.body carries,
+ * byte for byte. v is 1. Every entry names its person and, except the root, previous: the SHA-256
+ * of the entry before's body. signer is the P-256 signing key that signed it, X9.63. key is the
+ * root's first signing key, the client, machine or invite added, the key removed, or the recovery
+ * key's public half. sealingKey and id are a machine's (addMachine); clientKind is a client's
+ * (addClient: mac, remote or web); expires is an invite's.
+ */
+export interface LockBody {
+  v: number;
+  kind: LockEntryKind;
+  person: string;
+  previous?: Base64;
+  signer: Base64;
+  at: WireDate;
+  key: Base64;
+  sealingKey?: Base64;
+  id?: string;
+  name?: string;
+  clientKind?: string;
+  expires?: WireDate;
+}
+
+/**
+ * One entry of a machine lock (#3399): body is a LockBody's JSON, kept as the signer wrote it, so
+ * no language has to write it again the same way. sig is ECDSA P-256 with SHA-256 over
+ * "agents-lock/1\n" then body, the 64 bytes r then s (as WebCrypto and CryptoKit's
+ * rawRepresentation write it). The entry's hash is the SHA-256 of body.
+ */
+export interface LockEntry {
+  body: Base64;
+  sig: Base64;
+}
+
+/**
+ * What a lock entry changes (#3399): root names the first signing key; addClient a client's signing
+ * key; addMachine a machine's key and sealing key, signed by a signer or an invite; invite a
+ * one-use key that may add one machine; remove a client, machine or invite no longer trusted;
+ * recovery the recovery key, or a new one.
+ */
+export type LockEntryKind =
+  | "root"
+  | "addClient"
+  | "addMachine"
+  | "invite"
+  | "remove"
+  | "recovery";
+
+/**
+ * Where a machine lock stands (#3399): how many entries it has, and head, the SHA-256 of the newest
+ * one's body. lock/add's answer, and control/lockChanged.
+ */
+export interface LockHead {
+  count: number;
+  head: Base64;
+}
+
 export interface MCPAddAnswer {
   server?: ManagedMCPServer;
   error?: MCPCatalogError;
@@ -11809,6 +11884,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ListedSkill: { required: ["name", "folder"], optional: ["description", "managed"] },
   LiveAgent: { required: ["host", "hostName", "owner", "ownerName", "bot", "agent", "runtime", "state"], optional: ["waitsOnOthers", "workflow", "since", "costToDate", "heardAt"] },
   LiveBoard: { required: ["agents"], optional: [] },
+  Lock: { required: ["person", "entries"], optional: [] },
+  LockAdd: { required: ["entries"], optional: [] },
+  LockBody: { required: ["v", "kind", "person", "signer", "at", "key"], optional: ["previous", "sealingKey", "id", "name", "clientKind", "expires"] },
+  LockEntry: { required: ["body", "sig"], optional: [] },
+  LockHead: { required: ["count", "head"], optional: [] },
   MCPAddAnswer: { required: [], optional: ["server", "error"] },
   MCPAddByHandRequest: { required: ["verifyID", "destination"], optional: [] },
   MCPAddRequest: { required: ["previewID", "destination", "secrets", "plain", "replace"], optional: [] },

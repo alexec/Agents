@@ -5400,6 +5400,69 @@ type LiveBoard struct {
 	Agents []LiveAgent `json:"agents"`
 }
 
+// A person's machine lock (#3399, specs/3399-machine-lock): its chain of entries, the root first. lock/get, and host/lock to a machine.
+type Lock struct {
+	Person string `json:"person"`
+
+	Entries []LockEntry `json:"entries"`
+}
+
+// lock/add (#3399): entries to put on the end of the caller's lock, in order. The first names the head as its previous; the control plane writes each with a conditional write on the head, so two entries cannot both follow one head.
+type LockAdd struct {
+	Entries []LockEntry `json:"entries"`
+}
+
+// What a lock entry says (#3399), as its signer wrote it: the JSON that LockEntry.body carries, byte for byte. v is 1. Every entry names its person and, except the root, previous: the SHA-256 of the entry before's body. signer is the P-256 signing key that signed it, X9.63. key is the root's first signing key, the client, machine or invite added, the key removed, or the recovery key's public half. sealingKey and id are a machine's (addMachine); clientKind is a client's (addClient: mac, remote or web); expires is an invite's.
+type LockBody struct {
+	V int64 `json:"v"`
+
+	Kind LockEntryKind `json:"kind"`
+
+	Person string `json:"person"`
+
+	Previous Data `json:"previous,omitzero"`
+
+	Signer Data `json:"signer"`
+
+	At Date `json:"at"`
+
+	Key Data `json:"key"`
+
+	SealingKey Data `json:"sealingKey,omitzero"`
+
+	ID *string `json:"id,omitzero"`
+
+	Name *string `json:"name,omitzero"`
+
+	ClientKind *string `json:"clientKind,omitzero"`
+
+	Expires *Date `json:"expires,omitzero"`
+}
+
+// One entry of a machine lock (#3399): body is a LockBody's JSON, kept as the signer wrote it, so no language has to write it again the same way. sig is ECDSA P-256 with SHA-256 over "agents-lock/1\n" then body, the 64 bytes r then s (as WebCrypto and CryptoKit's rawRepresentation write it). The entry's hash is the SHA-256 of body.
+type LockEntry struct {
+	Body Data `json:"body"`
+
+	Sig Data `json:"sig"`
+}
+
+// What a lock entry changes (#3399): root names the first signing key; addClient a client's signing key; addMachine a machine's key and sealing key, signed by a signer or an invite; invite a one-use key that may add one machine; remove a client, machine or invite no longer trusted; recovery the recovery key, or a new one.
+type LockEntryKind string
+
+const LockEntryKindRoot LockEntryKind = "root"
+const LockEntryKindAddClient LockEntryKind = "addClient"
+const LockEntryKindAddMachine LockEntryKind = "addMachine"
+const LockEntryKindInvite LockEntryKind = "invite"
+const LockEntryKindRemove LockEntryKind = "remove"
+const LockEntryKindRecovery LockEntryKind = "recovery"
+
+// Where a machine lock stands (#3399): how many entries it has, and head, the SHA-256 of the newest one's body. lock/add's answer, and control/lockChanged.
+type LockHead struct {
+	Count int64 `json:"count"`
+
+	Head Data `json:"head"`
+}
+
 type MCPAddAnswer struct {
 	Server *ManagedMCPServer `json:"server,omitzero"`
 

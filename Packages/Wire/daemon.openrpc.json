@@ -45,6 +45,11 @@
       "name": "host.user-settings/2",
       "by": "host",
       "description": "The host opens its person's secrets as their client sealed them to its own key (#3397), with associated data usersecret.v1, and refuses a lower version than it holds. Only a host that says it is sent its secrets in host/userSettings. Declared: host/userSettings is the control plane's (control.openrpc.json)."
+    },
+    {
+      "name": "host.lock/1",
+      "by": "host",
+      "description": "The host checks its person's machine lock (#3399, specs/3399-machine-lock) as host/lock sends it, and pins the head: it takes a lock only when it grows from the head it pinned last. Until #3400's later steps it refuses nothing and only logs what it would refuse. Declared: host/lock is the control plane's (control.openrpc.json)."
     }
   ],
   "methods": [
