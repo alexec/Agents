@@ -132,6 +132,14 @@ function controlPlane(person = "alex") {
           return { request: r.request, expires: r.expires };
         }
         case "lock/joinRequests": return [...requests.values()].filter((r) => !r.result).map(row);
+        case "lock/joinRequests:machine": {
+          // A machine asks on its channel 0 (#3491): host/lockJoin, as lockjoins.go's askMachine.
+          const r = { request: `r${++n}`, client: params.host, machine: params.host, name: params.name, kind: "unknown",
+            key: params.key, commitment: params.commitment, expires: m.wireNow() + 600 };
+          requests.set(r.request, r);
+          changed(r);
+          return r;
+        }
         case "lock/joinAnswer": {
           const r = requests.get(params.request);
           if (r.client === client) throw fail(-32003, "A device cannot approve itself.");
@@ -276,4 +284,99 @@ test("a lock that forks from the pin is broken, and says so", async () => {
   assert.equal(mac.lock.device.value.kind, "broken");
   assert.equal(model.brokenWords(mac.lock.device.value), "The lock changed in a way your devices did not sign.");
   assert.equal(model.brokenWords({ forked: false, why: "entry 1: x" }), "Your lock does not check: entry 1: x.");
+});
+
+/** A machine's key and a request it makes on the fake plane, as agentsd's host/lockJoin does. */
+async function machineAsks(plane, host, name) {
+  const { publicRaw } = await m.makeSigningKey();
+  const nonce = m.newNonce();
+  const r = await plane.answer(host, name, "unknown", "lock/joinRequests:machine",
+    { host, name, key: b64(publicRaw), commitment: b64(await m.commitment(publicRaw, nonce)) });
+  return { key: publicRaw, nonce, request: r.request };
+}
+
+test("a machine that asks is approved with an addMachine, its key its sealing key (#3491)", async () => {
+  const plane = controlPlane();
+  const mac = plane.connect("AAAA-1111", "Mac");
+  await mac.lock.run();
+  const box = await machineAsks(plane, "h-box", "dev-3");
+  await wait();
+  const card = mac.lock.cards.value[0];
+  assert.equal(card.request.machine, "h-box");
+  assert.equal(card.view.kind, "compare");
+  await mac.lock.compare(box.request);
+  await wait();
+  // The machine reveals its nonce, as agentsd does once it hears the signer's.
+  const r = plane.requests.get(box.request);
+  await plane.answer("h-box", "dev-3", "unknown", "lock/joinReveal", { request: box.request, nonce: b64(box.nonce) });
+  await wait(50);
+  const shown = await m.digits(box.key, box.nonce, bytes(r.nonce));
+  assert.deepEqual(mac.lock.cards.value[0].view, { kind: "digits", digits: shown });
+  await mac.lock.approve(box.request);
+  await wait(50);
+  const state = await m.check(plane.lock.entries);
+  const added = state.member(box.key);
+  assert.equal(added.kind, "addMachine");
+  assert.equal(added.id, "h-box");
+  assert.equal(added.name, "dev-3");
+  assert.equal(b64(added.sealingKey), b64(box.key));
+  assert.equal(plane.requests.get(box.request).result, "approved");
+  assert.deepEqual(mac.said, []);
+});
+
+test("a host code gets an invite on the lock, and only machines the lock names are sealed to (#3491)", async () => {
+  const plane = controlPlane();
+  const mac = plane.connect("AAAA-1111", "Mac");
+  await mac.lock.run();
+  const code = "agents-control:2:h:-:KEY:SECRET:https%3A%2F%2Fcontrol.example:-:Sam%27s";
+  const shown = await mac.lock.invite({ text: code, expires: m.wireNow() + 300, command: `curl … | sh -s -- '${code}'` });
+  const fields = shown.text.split(":");
+  assert.equal(fields.length, 14);
+  assert.deepEqual(fields.slice(0, 2), ["agents-control", "4"]);
+  assert.equal(fields[9], "-");
+  assert.equal(shown.command, `curl … | sh -s -- '${shown.text}'`);
+  const state = await m.check(plane.lock.entries);
+  assert.equal(fields[11], "alex");
+  assert.equal(fields[12], String(state.count));
+  assert.equal(Buffer.from(fields[13], "base64url").toString("hex"), hex(state.head));
+  // The invite's key in the code is the private half of the invite on the lock.
+  const invite = state.membersOf("invite")[0];
+  const d = Buffer.from(fields[10], "base64url");
+  assert.equal(d.length, 32);
+  const jwk = { kty: "EC", crv: "P-256", d: fields[10], x: Buffer.from(invite.key.slice(1, 33)).toString("base64url"),
+    y: Buffer.from(invite.key.slice(33)).toString("base64url") };
+  await crypto.subtle.importKey("jwk", jwk, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
+  assert.ok(invite.expires > m.wireNow());
+
+  // A browser that is not a signer gives the code back as it was.
+  const web = plane.connect("BBBB-2222", "A browser");
+  await web.lock.run();
+  assert.equal((await web.lock.invite({ text: code, expires: 0 })).text, code);
+
+  // Sealing: a client, a machine the lock names, and one it does not.
+  const box = await machineAsks(plane, "h-box", "dev-3");
+  await wait();
+  await mac.lock.compare(box.request);
+  await wait();
+  await plane.answer("h-box", "dev-3", "unknown", "lock/joinReveal", { request: box.request, nonce: b64(box.nonce) });
+  await wait(50);
+  await mac.lock.approve(box.request);
+  await wait(50);
+  const { publicRaw: stranger } = await m.makeSigningKey();
+  const recipients = [
+    { id: "c:BBBB-2222", name: "A browser", publicKey: b64(stranger) },
+    { id: "m:h-box", name: "dev-3", owner: "alex", publicKey: b64(box.key) },
+    { id: "m:h-evil", name: "not mine", owner: "alex", publicKey: b64(stranger) },
+  ];
+  assert.deepEqual((await mac.lock.signed(recipients)).map((r) => r.id), ["c:BBBB-2222", "m:h-box"]);
+  assert.deepEqual(mac.said, []);
+});
+
+test("a host code with an invite is the version 4 text Go reads, as AgentsKit makes it (#3491)", () => {
+  const code = "agents-control:2:h:-:KEY:SECRET:https%3A%2F%2Fx:-:Sam%27s";
+  const pin = { person: "sam.p", count: 3, head: b64(new Uint8Array(32).fill(9)) };
+  assert.equal(m.inviteCode(code, new Uint8Array(32).fill(7), pin),
+    "agents-control:4:h:-:KEY:SECRET:https%3A%2F%2Fx:-:Sam%27s:-:BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc:sam.p:3:CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk");
+  const client = code.replace(":h:", ":c:");
+  assert.equal(m.inviteCode(client, new Uint8Array(32).fill(7), pin), client);
 });

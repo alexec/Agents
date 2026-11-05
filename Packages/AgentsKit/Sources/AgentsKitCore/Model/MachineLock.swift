@@ -100,11 +100,20 @@ public extension DaemonAPI {
         public var expires: Date
     }
 
+    /// `lock/get`: with `person`, another person's lock, an admin's only (#3491).
+    struct LockGet: Codable, Sendable, Hashable {
+        public var person: String?
+
+        public init(person: String? = nil) { self.person = person }
+    }
+
     /// `lock/joinRequests` and `control/lockJoinRequested`: a client asking to join, sent
-    /// again in place as it goes on.
+    /// again in place as it goes on. `machine` is set when a machine asks (#3491): `client` is
+    /// then its id, and a signer approves it with an addMachine.
     struct LockJoinRequest: Codable, Sendable, Hashable, Identifiable {
         public var request: String
         public var client: String
+        public var machine: String?
         public var name: String
         public var kind: ClientRecord.Kind
         public var key: Data
@@ -116,10 +125,11 @@ public extension DaemonAPI {
         /// The asking client's nonce, once it showed it.
         public var reveal: Data?
 
-        public init(request: String, client: String, name: String, kind: ClientRecord.Kind, key: Data, commitment: Data,
-                    expires: Date, nonce: Data? = nil, answeredBy: String? = nil, reveal: Data? = nil) {
+        public init(request: String, client: String, machine: String? = nil, name: String, kind: ClientRecord.Kind, key: Data,
+                    commitment: Data, expires: Date, nonce: Data? = nil, answeredBy: String? = nil, reveal: Data? = nil) {
             self.request = request
             self.client = client
+            self.machine = machine
             self.name = name
             self.kind = kind
             self.key = key
@@ -159,7 +169,7 @@ public extension DaemonAPI {
 }
 
 public extension DaemonAPI.Method {
-    /// `Empty` → `Lock` (#3399).
+    /// `LockGet` → `Lock` (#3399, #3491).
     static let lockGet = "lock/get"
     /// `LockAdd` → `LockHead` (#3399).
     static let lockAdd = "lock/add"
@@ -413,6 +423,59 @@ public enum MachineLock {
         }
     }
 
+    /// The lock names `key` as a machine's sealing key (#3491, D8).
+    public static func sealsTo(_ state: State, key: Data) -> Bool {
+        state.members.values.contains { $0.kind == .addMachine && $0.sealingKey == key }
+    }
+
+    /// The recipients a client may seal to (#3491, D8): every client, and each machine whose
+    /// key its owner's lock names as a sealing key. `stateOf` is a person's checked lock (nil:
+    /// the caller's own), or nil when it does not check; a machine whose lock is nil is left out.
+    public static func signedRecipients(_ recipients: [DaemonAPI.SealRecipient], isolation: isolated (any Actor)? = #isolation,
+                                        stateOf: (String?) async -> State?) async -> [DaemonAPI.SealRecipient] {
+        var states: [String: State?] = [:]
+        var out: [DaemonAPI.SealRecipient] = []
+        for r in recipients {
+            guard r.id.hasPrefix("m:") else {
+                out.append(r)
+                continue
+            }
+            let person = r.owner ?? ""
+            if states[person] == nil { states[person] = .some(await stateOf(r.owner)) }
+            if let state = states[person] ?? nil, sealsTo(state, key: r.publicKey) { out.append(r) }
+        }
+        return out
+    }
+
+    /// An invite's key (D3): a software key, since its private half goes in a join code.
+    public static func inviteKey() -> P256.Signing.PrivateKey { P256.Signing.PrivateKey() }
+
+    /// A host code with an invite (#3491, D3): version 4, the control plane's version 2 or 3
+    /// code with the invite's private key and the lock's pin after the invite, as Go's
+    /// `controllink.Code` reads it. A code that is not a host's version 2 or 3 comes back as it was.
+    public static func inviteCode(_ text: String, invite: Data, pin: Pin) -> String {
+        var fields = text.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: ":", omittingEmptySubsequences: false).map(String.init)
+        guard fields.count >= 3, fields[0] == "agents-control", fields[2] == "h",
+              fields.count == 9 && fields[1] == "2" || fields.count == 10 && fields[1] == "3" else { return text }
+        if fields.count == 9 { fields.append("-") }
+        fields[1] = "4"
+        fields += [base64URL(invite), escapeField(pin.person), String(pin.count), base64URL(pin.head)]
+        return fields.joined(separator: ":")
+    }
+
+    static func base64URL(_ data: Data) -> String {
+        data.base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+
+    /// Percent-encoding as Go's `controllink` escape: only ASCII letters, digits, ".", "-" and "_" stay.
+    static func escapeField(_ text: String) -> String {
+        Data(text.utf8).map { byte in
+            let c = Character(UnicodeScalar(byte))
+            return byte < 0x80 && (c.isLetter || c.isNumber || c == "." || c == "-" || c == "_") ? String(c) : String(format: "%%%02X", byte)
+        }.joined()
+    }
+
     /// Signs `body` as the next entry of `state` with `key`: sets previous, person and signer.
     public static func sign(_ body: DaemonAPI.LockBody, after state: State?, with key: LockSigningKey) throws -> DaemonAPI.LockEntry {
         var body = body
@@ -499,6 +562,13 @@ public enum LockWords {
         "Approve only if \(name) shows \(MachineLock.shown(digits))."
     }
     public static func mismatch(_ name: String) -> String { "\(name) did not show the digits it promised. Deny it." }
+
+    /// A machine that asks (#3491, D3), on every client.
+    public static func newMachine(_ name: String) -> String { "Approve the new machine \(name)?" }
+    public static let compareMachine = "Compare the digits with the ones in its log before you approve it."
+    public static func approveMachineOnly(_ name: String, _ digits: String) -> String {
+        "Approve only if the log of \(name) shows \(MachineLock.shown(digits))."
+    }
 
     /// This device, not in the lock yet.
     public static let thisDevice = "Approve this device on another of your devices."

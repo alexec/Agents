@@ -55,7 +55,7 @@ export function ModelAccessPage({ store, down }: { store: Store; down: boolean }
     if ("problem" in made) { problem.value = made.problem; return null; }
     // The id is in each secret's associated data, so a new route's is made here.
     if (!kept) made.route.id = routeIDFrom(made.route.name);
-    const sealed = await sealedFor(store.link, made.route, kept, made.secrets, secretFields[made.route.kind].map((f) => f.key));
+    const sealed = await sealedFor(store.link, made.route, kept, made.secrets, secretFields[made.route.kind].map((f) => f.key), (r) => store.signedRecipients(r));
     if (sealed && "problem" in sealed) { problem.value = sealed.problem; return null; }
     const params = { route: made.route, ...(sealed && { sealed }), ...(kept && { rev: kept.rev }) };
     const result = await store.link.call("orgRoutes/set", params);
@@ -66,7 +66,7 @@ export function ModelAccessPage({ store, down }: { store: Store; down: boolean }
   const replace = (kept: OrgRouteKept, secrets: Record<string, string>) => run(async () => {
     const typed = Object.fromEntries(Object.entries(secrets).map(([k, v]) => [k, v.trim()]).filter(([, v]) => v !== ""));
     if (Object.keys(typed).length === 0) { problem.value = "Type the new key."; return null; }
-    const sealed = await sealedFor(store.link, kept.route, kept, typed, secretFields[kept.route.kind].map((f) => f.key));
+    const sealed = await sealedFor(store.link, kept.route, kept, typed, secretFields[kept.route.kind].map((f) => f.key), (r) => store.signedRecipients(r));
     if (!sealed || "problem" in sealed) { problem.value = sealed?.problem ?? "Type the new key."; return null; }
     await store.link.call("orgRoutes/replaceKey", { id: kept.route.id, sealed, rev: kept.rev });
     open.value = { kind: "list" };

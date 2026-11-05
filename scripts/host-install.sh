@@ -22,8 +22,9 @@ else
         if [ -z "$code" ]; then code=$1; elif [ -z "$name" ]; then name=$1; fi; shift
     done
     [ -n "$code" ] || { echo "Say the host code the control plane showed." >&2; exit 2; }
-    case "$code" in agents-control:2:h:*) ;; *) echo "That is not a host code." >&2; exit 2 ;; esac
-    # The code's own fields: agents-control:2:h:-:<key>:<secret>:<url>:<pin>:<name>
+    case "$code" in agents-control:[234]:h:*) ;; *) echo "That is not a host code." >&2; exit 2 ;; esac
+    # The code's own fields: agents-control:2:h:-:<key>:<secret>:<url>:<pin>:<name>, and in a
+    # version 3 or 4 code more after them (a person key, an invite: #3491).
     url=$(printf %s "$code" | cut -d: -f7 | sed 's/%3[Aa]/:/g; s/%2[Ff]/\//g; s/%25/%/g')
     pin=$(printf %s "$code" | cut -d: -f8)
 fi

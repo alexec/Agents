@@ -385,3 +385,30 @@ func Follow(pin Pin, lock wire.Lock) (*State, error) {
 	}
 	return s, nil
 }
+
+// InviteKey reads an invite's private key, as a join code carries it (32 bytes, D3).
+func InviteKey(raw []byte) (*ecdsa.PrivateKey, error) {
+	return ecdsa.ParseRawPrivateKey(elliptic.P256(), raw)
+}
+
+// AddMachine is a machine's own addMachine, signed with the invite key from its join code
+// (#3491, D3), following the state's head. The machine's key is also its sealing key: the
+// key org routes and secrets are sealed to (D8).
+func AddMachine(invite *ecdsa.PrivateKey, s *State, machineKey []byte, id, name string, at time.Time) (wire.LockEntry, error) {
+	head := s.Head()
+	body := wire.LockBody{Kind: wire.LockEntryKindAddMachine, Person: s.Person, Previous: head[:], At: wire.DateOf(at),
+		Key: machineKey, SealingKey: machineKey}
+	if id != "" {
+		body.ID = &id
+	}
+	if name != "" {
+		body.Name = &name
+	}
+	return Sign(invite, body)
+}
+
+// Invite is the open invite of that key, if the lock names one that has not expired.
+func (s *State) Invite(key []byte, now time.Time) (Member, bool) {
+	m, ok := s.members[keyID(key)]
+	return m, ok && m.Kind == wire.LockEntryKindInvite && now.Before(m.Expires)
+}

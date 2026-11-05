@@ -340,3 +340,72 @@ export function lockClientKind(kind: string): string {
   if (kind === "browser") return "web";
   return kind;
 }
+
+/** Whether the lock names key as a machine's sealing key (#3491, D8). */
+export function sealsTo(state: LockState, key: Uint8Array): boolean {
+  for (const m of state.members.values()) {
+    if (m.kind === "addMachine" && same(m.sealingKey, key)) return true;
+  }
+  return false;
+}
+
+/**
+ * The recipients a client may seal to (#3491, D8): every client, and each machine whose key its
+ * owner's lock names as a sealing key. stateOf is the checked lock of a person (undefined: the
+ * caller's own), or null when it does not check; a machine whose lock is null is left out.
+ */
+export async function signedRecipients<R extends { id: string; owner?: string; publicKey: string }>(recipients: R[],
+  stateOf: (person: string | undefined) => Promise<LockState | null>): Promise<R[]> {
+  const states = new Map<string, LockState | null>();
+  const out: R[] = [];
+  for (const r of recipients) {
+    if (!r.id.startsWith("m:")) {
+      out.push(r);
+      continue;
+    }
+    const person = r.owner ?? "";
+    if (!states.has(person)) states.set(person, await stateOf(r.owner).catch(() => null));
+    const state = states.get(person);
+    if (state && sealsTo(state, fromBase64(r.publicKey))) out.push(r);
+  }
+  return out;
+}
+
+/** An invite's key: P-256, extractable, since its private half goes in a join code (D3). */
+export async function makeInviteKey(): Promise<{ privateKey: CryptoKey; publicRaw: Uint8Array; privateRaw: Uint8Array }> {
+  const pair = (await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"])) as CryptoKeyPair;
+  const publicRaw = new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey));
+  const jwk = await crypto.subtle.exportKey("jwk", pair.privateKey);
+  return { privateKey: pair.privateKey, publicRaw, privateRaw: fromBase64URL(jwk.d ?? "") };
+}
+
+function fromBase64URL(text: string): Uint8Array {
+  const plain = text.replace(/-/g, "+").replace(/_/g, "/");
+  return fromBase64(plain + "=".repeat((4 - (plain.length % 4)) % 4));
+}
+
+function base64URL(bytes: Uint8Array): string {
+  return base64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+/** Percent-encoding as Go's controllink escape: only letters, digits, ".", "-" and "_" stay. */
+function escapeField(text: string): string {
+  return Array.from(utf8(text), (c) =>
+    /[A-Za-z0-9._-]/.test(String.fromCharCode(c)) ? String.fromCharCode(c) : `%${c.toString(16).toUpperCase().padStart(2, "0")}`).join("");
+}
+
+/**
+ * A host code with an invite (#3491, D3): version 4, the control plane's version 2 or 3 code
+ * with the invite's private key and the lock's pin after the invite added. The control plane
+ * never sees the invite's key. A code that is not a host's version 2 or 3 is given back as it was.
+ */
+export function inviteCode(text: string, invite: Uint8Array, pin: LockPin): string {
+  const fields = text.trim().split(":");
+  if (fields[0] !== "agents-control" || fields[2] !== "h" || !(fields.length === 9 && fields[1] === "2" || fields.length === 10 && fields[1] === "3")) {
+    return text;
+  }
+  if (fields.length === 9) fields.push("-");
+  fields[1] = "4";
+  fields.push(base64URL(invite), escapeField(pin.person), String(pin.count), base64URL(fromBase64(pin.head)));
+  return fields.join(":");
+}

@@ -2434,16 +2434,20 @@ final class RemoteModel {
                     await self?.people.connected(control)
                     await self?.signIn.connected(control)
                     if let client = RemoteControl.membership?.client { await self?.lock.connected(control, client: client) }
-                    await Self.sealWaiting(on: control)
+                    await Self.sealWaiting(on: control, lock: self?.lock)
                     for await change in control.notifications() {
                         guard let self, !Task.isCancelled else { return }
                         if change.method == DaemonAPI.Notification.controlSealingWanted {
-                            await Self.sealWaiting(on: control)
+                            await Self.sealWaiting(on: control, lock: self.lock)
                             continue
                         }
                         if await self.people.heard(change.method, change.params, on: control) { continue }
                         if self.signIn.heard(change.method, change.params) { continue }
-                        if await self.lock.heard(change.method, change.params, on: control) { continue }
+                        if await self.lock.heard(change.method, change.params, on: control) {
+                            // A machine just added to the lock may now be sealed to (#3491, D8).
+                            if change.method == DaemonAPI.Notification.controlLockChanged { await Self.sealWaiting(on: control, lock: self.lock) }
+                            continue
+                        }
                         if change.method == DaemonAPI.Notification.controlKeptChanged
                             || change.method == DaemonAPI.Notification.controlKeptDelivered {
                             await self.heardKept(change.method, change.params)
@@ -2470,9 +2474,11 @@ final class RemoteModel {
 
     /// Seals what waits for a copy this device can make (#3397): a machine that joined, or a
     /// client paired, after an org route or one of the person's secrets was sealed.
-    private static func sealWaiting(on control: DaemonClient) async {
+    private static func sealWaiting(on control: DaemonClient, lock: LockState?) async {
+        // Only to the machines the lock names (#3491, D8).
+        guard let lock else { return }
         guard let (key, client) = RemoteControl.sealing() else { return }
-        await ClientSealing.sealWaiting(on: control, key: key, client: client)
+        await ClientSealing.sealWaiting(on: control, key: key, client: client) { await lock.signed($0, on: control) }
     }
 
     /// Everything this model dials, ended for good: a new pairing has made a new model

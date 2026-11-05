@@ -276,6 +276,7 @@ struct WireSchemaTests {
             "LockEntry": Self.through(DaemonAPI.LockEntry.self),
             "LockAdd": Self.through(DaemonAPI.LockAdd.self),
             "LockHead": Self.through(DaemonAPI.LockHead.self),
+            "LockGet": Self.through(DaemonAPI.LockGet.self),
             "LockBody": Self.through(DaemonAPI.LockBody.self),
             "LockJoin": Self.through(DaemonAPI.LockJoin.self),
             "LockJoinStarted": Self.through(DaemonAPI.LockJoinStarted.self),

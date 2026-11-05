@@ -1073,6 +1073,7 @@ final class AppModel {
     private var controlLink: ControlLink? = ControlConfig.endpoint.flatMap(ControlConfig.link)
 
     init() {
+        userScope.lock = lock
         // On `controlLink` itself, not a link of its own (#445): a second connection that
         // nothing else knew of was never let go of, so a wedged one stayed for good.
         if let controlLink { client = DaemonClient(link: hostLink(.mac, through: controlLink)) }
@@ -3526,15 +3527,19 @@ final class AppModel {
                     await self?.people.connected(control)
                     await self?.signIn.connected(control)
                     if let client = ControlConfig.client { await self?.lock.connected(control, client: client) }
-                    await Self.sealWaiting(on: control)
+                    await Self.sealWaiting(on: control, lock: self?.lock)
                     for await note in control.notifications() {
                         if note.method == DaemonAPI.Notification.controlSealingWanted {
-                            await Self.sealWaiting(on: control)
+                            await Self.sealWaiting(on: control, lock: self?.lock)
                             continue
                         }
                         if await self?.people.heard(note.method, note.params, on: control) == true { continue }
                         if self?.signIn.heard(note.method, note.params) == true { continue }
-                        if await self?.lock.heard(note.method, note.params, on: control) == true { continue }
+                        if await self?.lock.heard(note.method, note.params, on: control) == true {
+                            // A machine just added to the lock may now be sealed to (#3491, D8).
+                            if note.method == DaemonAPI.Notification.controlLockChanged { await Self.sealWaiting(on: control, lock: self?.lock) }
+                            continue
+                        }
                         if await self?.userScope.heard(note.method, note.params, on: control) == true {
                             // The host writes what it is sent a moment later: its panes read again.
                             try? await Task.sleep(for: .milliseconds(500))
@@ -3574,9 +3579,11 @@ final class AppModel {
 
     /// Seals what waits for a copy this window can make (#3397): a machine that joined, or a
     /// client paired, after an org route or one of the person's secrets was sealed.
-    private static func sealWaiting(on control: DaemonClient) async {
+    private static func sealWaiting(on control: DaemonClient, lock: LockState?) async {
+        // Only to the machines the lock names (#3491, D8).
+        guard let lock else { return }
         guard let (key, client) = ControlConfig.sealing() else { return }
-        await ClientSealing.sealWaiting(on: control, key: key, client: client)
+        await ClientSealing.sealWaiting(on: control, key: key, client: client) { await lock.signed($0, on: control) }
     }
 
     private func controlPlaneDidAnswer() {
