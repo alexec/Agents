@@ -57,5 +57,13 @@ a machine on its channel 0 (`Packages/Wire/control.openrpc.json`). An admin's
 kept in the control plane's store at `v1/links/<channel>/<sha256(identity)>.json`, and
 requests at `v1/linkRequests/<request>.json`.
 
+## Slack
+
+The slack server (`slack-mcp`, #1351) names a Slack user as `team/user`, such as
+`T0123/U0456`: a user's id is unique only in its workspace. It also gives the name and email
+that Slack has for the user, so the first message asks the person with that sign-in email. A
+message and a question's answer both carry the sender. See
+[Reach agents from Slack](../how-to/reach-agents-from-slack.md).
+
 Channel servers still run on the machines whose workflows hear them. Running them on the
 control plane itself (FR-036) is for the Channels milestone.
