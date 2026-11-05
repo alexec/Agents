@@ -17,6 +17,9 @@ export interface KeyStore {
   load(): Promise<KeyRecord | null>;
   save(record: KeyRecord): Promise<void>;
   forget(): Promise<void>;
+  /** The machine lock's signing key (#3490): ECDSA P-256, the private half non-extractable. */
+  loadLockKey(): Promise<CryptoKeyPair | null>;
+  saveLockKey(pair: CryptoKeyPair): Promise<void>;
 }
 
 export class UnsupportedBrowser extends Error {
@@ -63,7 +66,10 @@ export function codeKey(secret: Uint8Array): Promise<CryptoKey> {
   return hmacFromHKDF(secret, "agents-control-code-v1", new Uint8Array());
 }
 
-/** The record in IndexedDB: database `agents`, store `key`, key `self`. */
+/**
+ * The record in IndexedDB: database `agents`, store `key`, key `self`. The machine lock's
+ * signing key is in the same store, key `lockSigning`, so a forget drops it too.
+ */
 export class IndexedKeyStore implements KeyStore {
   private open(): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {
@@ -107,6 +113,17 @@ export class IndexedKeyStore implements KeyStore {
     if (!back || back.client !== record.client) throw new UnsupportedBrowser();
   }
 
+  async loadLockKey(): Promise<CryptoKeyPair | null> {
+    const pair = (await this.run("readonly", (store) => store.get("lockSigning"))) as CryptoKeyPair | undefined;
+    if (!pair || !(pair.privateKey instanceof CryptoKey) || pair.privateKey.extractable) return null;
+    return pair;
+  }
+
+  async saveLockKey(pair: CryptoKeyPair): Promise<void> {
+    await navigator.storage?.persist?.().catch(() => false);
+    await this.run("readwrite", (store) => store.put(pair, "lockSigning"));
+  }
+
   async forget(): Promise<void> {
     await new Promise<void>((resolve) => {
       const request = indexedDB.deleteDatabase("agents");
@@ -118,6 +135,13 @@ export class IndexedKeyStore implements KeyStore {
 /** For the tests: the same contract, in memory. */
 export class MemoryKeyStore implements KeyStore {
   record: KeyRecord | null = null;
+  lockKey: CryptoKeyPair | null = null;
+  async loadLockKey(): Promise<CryptoKeyPair | null> {
+    return this.lockKey;
+  }
+  async saveLockKey(pair: CryptoKeyPair): Promise<void> {
+    this.lockKey = pair;
+  }
   async load(): Promise<KeyRecord | null> {
     return this.record;
   }
@@ -126,5 +150,6 @@ export class MemoryKeyStore implements KeyStore {
   }
   async forget(): Promise<void> {
     this.record = null;
+    this.lockKey = null;
   }
 }

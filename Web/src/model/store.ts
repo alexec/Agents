@@ -57,6 +57,7 @@ import { withRequest, withoutRequest } from "./channelLinks";
 import { withSignIn, withoutSignIn } from "./signIn";
 import type { ChartHint } from "./chart";
 import { Providers } from "./providers";
+import { MachineLock } from "./machineLock";
 import { isLead, leadEpic, leadProgressWords } from "./leadProgress";
 
 export { folderKey } from "./groups";
@@ -1221,6 +1222,8 @@ export const sentBeforeEdit = "That prompt was sent before your change. Your wor
 export class Store extends Work {
   /** The control plane's workspace providers (#1808), for Settings ▸ Control plane. */
   readonly providers: Providers;
+  /** This browser in its person's machine lock, and the devices that ask to join it (#3490). */
+  readonly machineLock: MachineLock;
 
   /** A machine Add as Machine… installed is linked to its workspace once it joins (#3365). */
   override takeHosts(hosts: ControlMachine[], now = Date.now()): void {
@@ -1278,6 +1281,12 @@ export class Store extends Work {
         .then((said) => preferencesSaid(said)).catch(() => undefined);
     });
     this.providers = new Providers(link);
+    this.machineLock = new MachineLock({
+      call: (method, params) => link.call(method as never, params as never),
+      keyRecord: () => link.keyRecord(),
+      lockKey: () => link.lockKey(),
+      saveLockKey: (pair) => link.saveLockKey(pair),
+    }, undefined, (error) => this.say(describe(error)));
     link.onNotification((method, params, host) => {
       if (method === "control/providersChanged") {
         this.providers.take(params);
@@ -1331,6 +1340,10 @@ export class Store extends Work {
       if (method === "control/signInRequested") {
         const request = params as SignInRequest | null;
         if (request?.request) this.signInRequests.value = withSignIn(this.signInRequests.value, request);
+        return;
+      }
+      if (method === "control/lockChanged" || method === "control/lockJoinRequested" || method === "control/lockJoinDecided") {
+        if (this.planeHas(Capability.lockJoin1)) this.machineLock.notify(method, params);
         return;
       }
       if (method === "control/signInDecided") {
@@ -1414,7 +1427,7 @@ export class Store extends Work {
       }
     });
     link.onState((state) => {
-      if (state.kind === "open") void this.load().then(() => this.sealWaiting());
+      if (state.kind === "open") void this.load().then(() => Promise.all([this.sealWaiting(), this.lockStep()]));
     });
   }
 
@@ -1430,6 +1443,11 @@ export class Store extends Work {
     if (!record || !work || work.items.length === 0) return;
     const items = await sealWork(record, work);
     if (items.length > 0) await this.link.call("sealing/add", { items }).catch(() => undefined);
+  }
+
+  /** The machine lock's check and join (#3490), at each connection; a control plane before it has none. */
+  async lockStep(): Promise<void> {
+    if (this.planeHas(Capability.lockJoin1)) await this.machineLock.run();
   }
 
   /** A workflow's newest runs, including archived sessions, in a growing page. */

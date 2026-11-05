@@ -10968,6 +10968,13 @@ export interface Methods {
   "links/list": { params: Empty; result: ChannelLink[] };
   "links/remove": { params: ChannelLinkRemove; result: Empty };
   "links/requests": { params: Empty; result: ChannelLinkRequest[] };
+  "lock/add": { params: LockAdd; result: LockHead };
+  "lock/get": { params: Empty; result: Lock };
+  "lock/join": { params: LockJoin; result: LockJoinStarted };
+  "lock/joinAnswer": { params: LockJoinNonce; result: Empty };
+  "lock/joinDeny": { params: LockJoinEnd; result: Empty };
+  "lock/joinRequests": { params: Empty; result: LockJoinRequest[] };
+  "lock/joinReveal": { params: LockJoinNonce; result: Empty };
   "mcp/health": { params: Empty; result: MCPHealthSnapshot };
   "mcp/health/check": { params: MCPHealthCheckRequest; result: MCPHealthSnapshot };
   "mcp/hosted": { params: Empty; result: HostedMCPSnapshot };
@@ -11316,6 +11323,13 @@ export const MethodTarget = {
   "links/list": "control",
   "links/remove": "control",
   "links/requests": "control",
+  "lock/add": "control",
+  "lock/get": "control",
+  "lock/join": "control",
+  "lock/joinAnswer": "control",
+  "lock/joinDeny": "control",
+  "lock/joinRequests": "control",
+  "lock/joinReveal": "control",
   "mcp/health": "host",
   "mcp/health/check": "host",
   "mcp/hosted": "host",
@@ -11507,6 +11521,9 @@ export interface Notifications {
   "control/linkDecided": ChannelLinkDecided;
   "control/linkRequested": ChannelLinkRequest;
   "control/linksChanged": Empty;
+  "control/lockChanged": LockHead;
+  "control/lockJoinDecided": LockJoinDecided;
+  "control/lockJoinRequested": LockJoinRequest;
   "control/orgRoutesChanged": Empty;
   "control/peopleChanged": PeopleChanged;
   "control/policyChanged": PolicyView;

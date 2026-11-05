@@ -59,6 +59,13 @@ enum RemoteControl {
 
     static var kind: ClientRecord.Kind { UIDevice.current.userInterfaceIdiom == .pad ? .iPad : .iPhone }
 
+    /// Where this device keeps the head of the machine lock it last checked (#3490): one for
+    /// each control plane.
+    static var lockPinName: String {
+        guard let membership else { return "machineLockPin" }
+        return "machineLockPin." + membership.controlKey.prefix(8).map { String(format: "%02x", $0) }.joined()
+    }
+
     /// The phone's dial: `URLSession`'s WebSocket, which checks the pin, given as long as
     /// the link allows the address (#884).
     static let dial: ControlCodeUse.Dial = { url, pin in

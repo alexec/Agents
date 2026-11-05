@@ -1220,5 +1220,72 @@
         }
       }
     }
+  },
+  "LockEntry": {
+    "body": "eyJ2IjoxfQ==",
+    "sig": "AAEC"
+  },
+  "Lock": {
+    "person": "alex",
+    "entries": [
+      {
+        "body": "eyJ2IjoxfQ==",
+        "sig": "AAEC"
+      }
+    ]
+  },
+  "LockAdd": {
+    "entries": [
+      {
+        "body": "eyJ2IjoxfQ==",
+        "sig": "AAEC"
+      }
+    ]
+  },
+  "LockHead": {
+    "count": 2,
+    "head": "AAEC"
+  },
+  "LockBody": {
+    "v": 1,
+    "kind": "addClient",
+    "person": "alex",
+    "previous": "AAEC",
+    "signer": "BAEC",
+    "at": 815486400.5,
+    "key": "BAED",
+    "name": "Sam's iPhone",
+    "clientKind": "remote"
+  },
+  "LockJoin": {
+    "key": "BAEC",
+    "commitment": "AAEC"
+  },
+  "LockJoinStarted": {
+    "request": "request",
+    "expires": 812345678.5
+  },
+  "LockJoinRequest": {
+    "request": "request",
+    "client": "00000000-0000-0000-0000-000000000001",
+    "name": "Sam's iPhone",
+    "kind": "iPhone",
+    "key": "BAEC",
+    "commitment": "AAEC",
+    "expires": 812345678.5,
+    "nonce": "AQID",
+    "answeredBy": "00000000-0000-0000-0000-000000000002",
+    "reveal": "AgME"
+  },
+  "LockJoinNonce": {
+    "request": "request",
+    "nonce": "AQID"
+  },
+  "LockJoinEnd": {
+    "request": "request"
+  },
+  "LockJoinDecided": {
+    "request": "request",
+    "result": "approved"
   }
 }

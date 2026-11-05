@@ -226,6 +226,15 @@ export class Link {
     return this.options.keys.load().catch(() => null);
   }
 
+  /** The machine lock's signing key (#3490), kept beside the page's key; null when none yet. */
+  lockKey(): Promise<CryptoKeyPair | null> {
+    return this.options.keys.loadLockKey().catch(() => null);
+  }
+
+  saveLockKey(pair: CryptoKeyPair): Promise<void> {
+    return this.options.keys.saveLockKey(pair);
+  }
+
   onState(listener: (state: LinkState) => void): () => void {
     this.stateListeners.add(listener);
     return () => this.stateListeners.delete(listener);
