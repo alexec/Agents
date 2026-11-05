@@ -2,8 +2,8 @@ import AgentsKitCore
 import AppKit
 import SwiftUI
 
-/// A folder's Connectors set-up (#1336, frames A, C, D and G): one Connect GitHub…, then five
-/// slots (Tasks, Code review, CI, Docs, Where agents run), each proving itself with one real read,
+/// A folder's Connectors set-up (#1336, frames A, C, D and G): one Connect GitHub…, then six
+/// slots (Tasks, Code review, CI, Docs, Messaging, Where agents run), each proving itself with one real read,
 /// then the events it turned on. The page is the set-up: Change… opens a slot in place, and
 /// the only sheet is Connect. The state is the host's, so the Remote and the web page show
 /// the same ticks.
@@ -32,6 +32,10 @@ struct ConnectorSetupView: View {
     /// next, at the Jira connector.
     @State private var connectingJira = false
     @State private var jiraConnected = false
+    /// Connect Email, from the Messaging slot (#1787), and whether it connected: the catalogue
+    /// opens next, at the email connector.
+    @State private var connectingEmail = false
+    @State private var emailConnected = false
     /// The control plane, for Where agents run (#2131): the machines and providers, and Add a
     /// Machine… in place. Nil with none.
     @State private var control: ControlSettingsModel?
@@ -130,6 +134,11 @@ struct ConnectorSetupView: View {
             if jiraConnected { jiraConnected = false; addOurs(ConnectJiraSheet.search) }
         }) {
             ConnectJiraSheet(host: folder.host, onConnected: { jiraConnected = true })
+        }
+        .sheet(isPresented: $connectingEmail, onDismiss: {
+            if emailConnected { emailConnected = false; addOurs(Self.emailSearch) }
+        }) {
+            ConnectEmailSheet(host: folder.host, onConnected: { emailConnected = true })
         }
     }
 
@@ -258,6 +267,9 @@ struct ConnectorSetupView: View {
         case linear
         /// Jira for Tasks (#3304): Connect Jira first when it is not connected, then the catalogue.
         case jira
+        /// Email for Messaging (#1787): Connect Email first when it is not connected, then the
+        /// catalogue.
+        case email
     }
 
     private func act(_ action: Action) {
@@ -270,6 +282,7 @@ struct ConnectorSetupView: View {
         case .search(let words): addConnector(words, nil)
         case .linear: Task { await useLinear() }
         case .jira: Task { await useJira() }
+        case .email: Task { await useEmail() }
         case .open(let address): open(address)
         case .addMachine: addingMachine = .machine
         case .addProvider: addingMachine = .provider
@@ -297,6 +310,19 @@ struct ConnectorSetupView: View {
             connectingJira = true
         }
     }
+
+    /// The email connector reads the person's email connection (#1780), as Linear's does.
+    private func useEmail() async {
+        if case .success(let list) = await model.connections(on: folder.host),
+           list.contains(where: { $0.provider == .email && $0.state == .connected }) {
+            addOurs(Self.emailSearch)
+        } else {
+            connectingEmail = true
+        }
+    }
+
+    /// The catalogue's search for the email connector.
+    static let emailSearch = "email"
 
     /// The catalogue's search for the Linear connector.
     static let linearSearch = "linear"
@@ -363,12 +389,23 @@ private struct SlotCard: View {
                 Spacer(minLength: 4)
                 if canChange {
                     Button("Change\u{2026}", action: change).buttonStyle(.link).appText(.fine)
+                        .accessibilityIdentifier("change-\(slot.slot.rawValue)")
                 }
             }
             Text(slot.slot == .workspace ? place.title : ConnectorSetupWords.title(slot))
                 .appText(.supporting).fontWeight(.semibold)
-            proofOrLine
-            if let found = slot.docsServers, !found.isEmpty {
+            if let talk = slot.messagingServers, !talk.isEmpty, slot.state != .skipped {
+                // Each messaging connector with its one real read and its events (#1787), in
+                // the place of the slot's one proof.
+                ForEach(talk, id: \.name) { server in
+                    Text(ConnectorSetupWords.Messaging.serverLine(server)).appText(.fine).foregroundStyle(.secondary).lineLimit(2)
+                }
+            } else {
+                proofOrLine
+            }
+            if slot.slot == .messaging {
+                EmptyView()
+            } else if let found = slot.docsServers, !found.isEmpty {
                 // Each docs connector with its one real search (#3307).
                 ForEach(found, id: \.name) { server in
                     Text(ConnectorSetupWords.Docs.serverLine(server)).appText(.fine).foregroundStyle(.secondary).lineLimit(2)
@@ -390,7 +427,7 @@ private struct SlotCard: View {
     }
 
     private var canChange: Bool {
-        slot.slot == .workspace || (!slot.isFromProject && [.read, .refused, .failed].contains(slot.state))
+        slot.slot == .workspace || slot.slot == .messaging || (!slot.isFromProject && [.read, .refused, .failed].contains(slot.state))
     }
 
     @ViewBuilder private var proofOrLine: some View {
@@ -440,6 +477,11 @@ private struct SlotCard: View {
                 Button(ConnectorSetupWords.grantButton(setup)) { act(.open(ConnectorSetupWords.grantURL(setup))) }
                     .buttonStyle(.paper)
                 Button("Try Again") { act(.tryAgain) }.buttonStyle(.paper)
+            case .skipped where slot.slot == .messaging && (slot.servers ?? []).isEmpty:
+                // None, with no connector yet (#1787): the ways to add one.
+                Button("Slack\u{2026}") { act(.search(ConnectorSetupWords.Messaging.slackSearch)) }.buttonStyle(.paper)
+                Button("Email\u{2026}") { act(.email) }.buttonStyle(.paper)
+                Button("From a catalogue\u{2026}") { act(.catalogue) }.buttonStyle(.link)
             case .skipped where !slot.isFromProject:
                 Button("Set Up") { act(.setUp(slot.slot)) }.buttonStyle(.link)
             case .skipped:
@@ -565,6 +607,7 @@ private struct SlotChange: View {
         case .codeReview: "Where do agents ask for review?"
         case .ci: "Where do agents see checks?"
         case .docs: ConnectorSetupWords.Docs.question
+        case .messaging: ConnectorSetupWords.Messaging.question
         case .workspace: "Where should agents run?"
         }
     }
@@ -616,6 +659,27 @@ private struct SlotChange: View {
                        pick: { act(.catalogue) }),
                 Choice(title: "None", note: words.noneNote, chosen: skipped, pick: { act(.skip(.docs)) }),
             ]
+        case .messaging:
+            let words = ConnectorSetupWords.Messaging.self
+            let none = slot.state == .skipped
+            let servers = slot.servers ?? []
+            var choices: [Choice] = []
+            if !servers.isEmpty {
+                // The connectors there now: picking it takes a skip back.
+                choices.append(Choice(title: slot.choice,
+                                      note: ConnectorSetupWords.proof(slot) ?? servers.joined(separator: ", "),
+                                      chosen: !none, pick: { if none { act(.setUp(.messaging)) }; done() }))
+            }
+            choices += [
+                Choice(title: "Slack\u{2026}", note: words.slackNote, chosen: false, pick: { act(.search(words.slackSearch)) }),
+                Choice(title: "Email\u{2026}", note: words.emailNote, chosen: false, pick: { act(.email) }),
+                Choice(title: "Google Chat\u{2026}", note: words.googleChatNote, chosen: false,
+                       pick: { act(.search(words.googleChatSearch)) }),
+                Choice(title: "From a catalogue\u{2026}", note: words.catalogueNote, chosen: false, pick: { act(.catalogue) }),
+                Choice(title: "None", note: words.noneNote, chosen: none,
+                       pick: { if servers.isEmpty || none { done() } else { act(.skip(.messaging)) } }),
+            ]
+            return choices
         case .codeReview, .ci:
             return [
                 Choice(title: slot.choice, note: ConnectorSetupWords.proof(slot) ?? ConnectorSetupWords.comesWith(setup.forgeOrGitHub),

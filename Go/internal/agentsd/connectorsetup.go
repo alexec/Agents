@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"time"
 
@@ -23,7 +24,8 @@ import (
 // person's GitHub connection (#1335), and five slots. Tasks, Code review and CI come with the
 // connection, and each proves itself with one real read: the newest issue, the newest pull
 // request, the last workflow run. Docs is this folder's own and its docs connectors (#3248,
-// docsslot.go). Where agents run is This Mac. A tick is a read: once a slot
+// docsslot.go). Messaging is the folder's and the person's chat and email connectors (#1787,
+// messagingslot.go), None by default. Where agents run is This Mac. A tick is a read: once a slot
 // has read, a read that does not reach GitHub keeps the tick, and only GitHub's refusal takes
 // it away. Skips are the folder's (.agents/folder.json "connectors"); the reads are this
 // host's (<root>/connector-setup.json, one record per folder, only folders kept). Once a slot
@@ -160,6 +162,8 @@ type slotRecord struct {
 	Forge string `json:"forge,omitempty"`
 	// Servers is the Docs slot's: each mapped docs connector's last search (#3307).
 	Servers []docsServerRecord `json:"servers,omitempty"`
+	// Messaging is the Messaging slot's: each messaging connector's last read (#1787).
+	Messaging []wire.MessagingServer `json:"messaging,omitempty"`
 }
 
 // forgeName is the record's name for f's forge: gitlab, or empty for GitHub.
@@ -273,7 +277,7 @@ func (d *Daemon) skipConnectorSlot(ctx context.Context, r wire.ConnectorSkipRequ
 	if err != nil {
 		return wire.ConnectorSetup{}, err
 	}
-	if _, known := slotChoice[r.Slot]; (!known && r.Slot != wire.ConnectorSlotKindDocs) || r.Slot == wire.ConnectorSlotKindWorkspace {
+	if _, known := slotChoice[r.Slot]; (!known && r.Slot != wire.ConnectorSlotKindDocs && r.Slot != wire.ConnectorSlotKindMessaging) || r.Slot == wire.ConnectorSlotKindWorkspace {
 		return wire.ConnectorSetup{}, invalid("That slot cannot be skipped.")
 	}
 	if _, set := d.projectSlot(folder, r.Slot); set {
@@ -285,7 +289,7 @@ func (d *Daemon) skipConnectorSlot(ctx context.Context, r wire.ConnectorSkipRequ
 	skipped := d.skippedSlots(folder)
 	skipped[r.Slot] = r.Skipped
 	var list []string
-	for _, s := range []wire.ConnectorSlotKind{wire.ConnectorSlotKindTasks, wire.ConnectorSlotKindCodeReview, wire.ConnectorSlotKindCi, wire.ConnectorSlotKindDocs} {
+	for _, s := range []wire.ConnectorSlotKind{wire.ConnectorSlotKindTasks, wire.ConnectorSlotKindCodeReview, wire.ConnectorSlotKindCi, wire.ConnectorSlotKindDocs, wire.ConnectorSlotKindMessaging} {
 		if skipped[s] {
 			list = append(list, string(s))
 		}
@@ -427,6 +431,7 @@ func (d *Daemon) connectorSetup(ctx context.Context, folder string, reading wire
 	}
 	docsMaps := d.docsMaps(folder)
 	docsNames, docsWords := d.docsServers(folder, docsMaps)
+	messaging := d.messagingServers(folder)
 
 	d.setupMu.Lock()
 	rec := d.setupRecordsLocked()[folder]
@@ -441,10 +446,14 @@ func (d *Daemon) connectorSetup(ctx context.Context, folder string, reading wire
 	docsDue := !skipped[wire.ConnectorSlotKindDocs] && (reading == wire.ConnectorSetupReadingFresh ||
 		(reading == wire.ConnectorSetupReadingCached && (docs == nil || time.Since(docs.ReadAt) > setupFresh ||
 			docsSearchesDue(docs, docsNames, docsMaps))))
+	// The Messaging slot reads each of its connectors once (#1787), again as soon as one is added.
+	talk := rec.Slots[wire.ConnectorSlotKindMessaging]
+	messagingRead := !skipped[wire.ConnectorSlotKindMessaging] && len(messaging) > 0 && (reading == wire.ConnectorSetupReadingFresh ||
+		(reading == wire.ConnectorSetupReadingCached && (talk == nil || time.Since(talk.ReadAt) > setupFresh || messagingDue(talk, messaging))))
 	rec = cloneRecord(rec)
 	d.setupMu.Unlock()
 
-	if (due && readable) || docsDue {
+	if (due && readable) || docsDue || messagingRead {
 		if due && readable {
 			d.readSetup(ctx, f, usable, conn.Access, rec, sources, skipped)
 		}
@@ -452,6 +461,9 @@ func (d *Daemon) connectorSetup(ctx context.Context, folder string, reading wire
 			read := readDocs(folder, time.Now())
 			read.Servers = d.searchDocsServers(ctx, folder, docsNames, docsMaps, read.ReadAt)
 			rec.Slots[wire.ConnectorSlotKindDocs] = read
+		}
+		if messagingRead {
+			rec.Slots[wire.ConnectorSlotKindMessaging] = d.readMessaging(ctx, folder, messaging, time.Now())
 		}
 		d.setupMu.Lock()
 		d.setupRecordsLocked()[folder] = rec
@@ -499,6 +511,7 @@ func (d *Daemon) connectorSetup(ctx context.Context, folder string, reading wire
 		}
 	}
 	out.Slots = append(out.Slots, docsSlot(rec.Slots[wire.ConnectorSlotKindDocs], skipped[wire.ConnectorSlotKindDocs], docsNames, docsWords, docsMaps))
+	out.Slots = append(out.Slots, messagingSlot(rec.Slots[wire.ConnectorSlotKindMessaging], skipped[wire.ConnectorSlotKindMessaging], messaging))
 	out.Slots = append(out.Slots, wire.ConnectorSlot{Slot: wire.ConnectorSlotKindWorkspace,
 		Choice: slotChoice[wire.ConnectorSlotKindWorkspace], State: wire.ConnectorSlotStateRead})
 	for _, s := range out.Slots {
@@ -515,6 +528,7 @@ func cloneRecord(r *setupRecord) *setupRecord {
 	c.Slots = map[wire.ConnectorSlotKind]*slotRecord{}
 	for k, v := range r.Slots {
 		s := *v
+		s.Messaging = slices.Clone(v.Messaging)
 		c.Slots[k] = &s
 	}
 	return &c
@@ -697,7 +711,8 @@ func (d *Daemon) setupEvents(ctx context.Context, f forge, folder string, rec *s
 	server, taken := d.ourServerFor(folder, ours)
 	reads := false
 	for _, s := range slots {
-		reads = reads || (s.Slot != wire.ConnectorSlotKindWorkspace && s.Slot != wire.ConnectorSlotKindDocs && s.State == wire.ConnectorSlotStateRead)
+		reads = reads || (s.Slot != wire.ConnectorSlotKindWorkspace && s.Slot != wire.ConnectorSlotKindDocs &&
+			s.Slot != wire.ConnectorSlotKindMessaging && s.State == wire.ConnectorSlotStateRead)
 	}
 	switch {
 	case server != "":

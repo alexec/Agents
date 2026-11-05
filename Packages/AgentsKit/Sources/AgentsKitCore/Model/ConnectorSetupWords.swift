@@ -98,6 +98,7 @@ public enum ConnectorSetupWords {
         case .codeReview: "Code review"
         case .ci: "CI"
         case .docs: "Docs"
+        case .messaging: "Messaging"
         case .workspace: "Where agents run"
         }
     }
@@ -105,6 +106,7 @@ public enum ConnectorSetupWords {
     /// The slot's title.
     public static func title(_ slot: Slot) -> String {
         switch slot.state {
+        case .skipped where slot.slot == .messaging: "None"
         case .skipped: "Skipped"
         case .noRemote where slot.slot == .tasks: "Choose a tracker"
         default: slot.choice
@@ -124,6 +126,7 @@ public enum ConnectorSetupWords {
                 : "Agents won't use pull requests here. Nothing is turned on."
             case .ci: "Agents won't wait on checks here. Nothing is turned on."
             case .docs: "Agents won't look for docs before they work. Nothing is turned on."
+            case .messaging: Messaging.noneLine(skipped: !(slot.servers ?? []).isEmpty)
             case .workspace: "Agents run on this Mac."
             }
         case .noRemote:
@@ -141,7 +144,7 @@ public enum ConnectorSetupWords {
             case .tasks: "No issues yet in \(repo)."
             case .codeReview: gitlab ? "No merge requests yet in \(repo)." : "No pull requests yet in \(repo)."
             case .ci: gitlab ? "No pipelines yet in \(repo)." : "No workflow runs yet in \(repo)."
-            case .docs, .workspace: ""
+            case .docs, .messaging, .workspace: ""
             }
         case .notConnected:
             return switch slot.slot {
@@ -151,6 +154,7 @@ public enum ConnectorSetupWords {
             case .ci: gitlab ? "Agents see pipelines pass and fail, and wait on them. " + comesWith(forge)
                 : "Agents see checks pass and fail, and wait on them. " + comesWith(forge)
             case .docs: Docs.none
+            case .messaging: Messaging.noneLine(skipped: false)
             case .workspace: "Nothing to set up."
             }
         }
@@ -193,9 +197,49 @@ public enum ConnectorSetupWords {
         }
     }
 
-    /// The proof's lead word: "Newest" or "Last run".
+    /// The Messaging slot (#1787): where agents reach you. Slack, email and chat apps are MCP
+    /// servers with events and tools, so the slot is the connectors that reach the folder.
+    public enum Messaging {
+        public static let question = "Where do agents reach you?"
+        public static let slackNote = "A Slack connector: messages to and from your channels."
+        public static let emailNote = "Connect Email, then add its connector. It reads mail and never sends it."
+        public static let googleChatNote = "A Google Chat connector."
+        public static let catalogueNote = "WhatsApp, Discord, Telegram, Teams or another chat connector."
+        public static let noneNote = "Agents reach you in the app only."
+
+        /// The catalogue's search for each choice.
+        public static let slackSearch = "slack"
+        public static let googleChatSearch = "google chat"
+
+        /// The line of a slot that is None: with no connector yet, or skipped with some.
+        public static func noneLine(skipped: Bool) -> String {
+            skipped ? "Agents reach you in the app only. Its connectors stay, and their events with them."
+                : "Agents reach you in the app only. Add a Slack, email or chat connector to reach you there too."
+        }
+
+        /// One messaging connector's line: what its one read found and the events it declares,
+        /// or why not.
+        public static func serverLine(_ server: DaemonAPI.MessagingServer) -> String {
+            let label = server.word == server.name ? server.name : "\(server.word) (\(server.name))"
+            var words: String = switch server.state {
+            case .read: "read \(server.proof?.title ?? "it")"
+            case .notRead: "reading\u{2026}"
+            case .failed: server.message ?? "the read didn't work."
+            }
+            if server.state == .read, let events = server.events, !events.isEmpty {
+                words += "; events " + events.joined(separator: ", ")
+            }
+            return "\(label): \(words)"
+        }
+    }
+
+    /// The proof's lead word: "Newest", "Last run" or "Read".
     public static func proofLead(_ kind: DaemonAPI.ConnectorSlotKind) -> String {
-        kind == .ci ? "Last run" : "Newest"
+        switch kind {
+        case .ci: "Last run"
+        case .messaging: "Read"
+        default: "Newest"
+        }
     }
 
     /// The proof after its number, such as "Fix the walk", or "CI on main, passed 4 min ago".

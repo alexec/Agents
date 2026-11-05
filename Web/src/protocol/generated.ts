@@ -2102,7 +2102,7 @@ export interface ConnectorSlot {
   slot: ConnectorSlotKind;
   /**
    * What fills it, in words: GitHub Issues, GitHub pull requests, GitHub Actions, This folder
-   * (docs), This Mac.
+   * (docs), Slack and Email or None (messaging), This Mac.
    */
   choice: string;
   state: ConnectorSlotState;
@@ -2130,17 +2130,26 @@ export interface ConnectorSlot {
    * found. Absent with none.
    */
   docsServers?: DocsServer[];
+  /**
+   * Messaging only (#1787): each messaging connector in the folder's or the person's mcp.json
+   * (Slack, email, Google Chat and the like) with its one real read, in the order of servers.
+   * Present also when the slot is skipped, so a client can offer Set Up; absent with none, when the
+   * slot is None.
+   */
+  messagingServers?: MessagingServer[];
 }
 
 /**
  * One slot of a folder's set-up (#1336), in the page's order: tasks (the tracker), codeReview, ci,
- * docs (where the docs live, #3248), and workspace (where agents run).
+ * docs (where the docs live, #3248), messaging (where agents reach the person: Slack, email, chat
+ * connectors, #1787), and workspace (where agents run).
  */
 export type ConnectorSlotKind =
   | "tasks"
   | "codeReview"
   | "ci"
   | "docs"
+  | "messaging"
   | "workspace";
 
 /**
@@ -5470,6 +5479,41 @@ export interface MessageSender {
   agentID: UUID;
   title: string;
 }
+
+/**
+ * One messaging connector in the Messaging slot (#1787): its name in mcp.json, what it is in words
+ * (Slack, Email, Google Chat, or its name), its one real read (a list of its channels, folders or
+ * spaces) and the events it declares.
+ */
+export interface MessagingServer {
+  name: string;
+  /**
+   * What it is, in words: Slack, Email, Google Chat, WhatsApp, Discord, Telegram, Microsoft Teams,
+   * or its name.
+   */
+  word: string;
+  state: MessagingServerState;
+  /**
+   * What the read found: how many channels, folders or spaces, or its first line. Absent when it
+   * did not read.
+   */
+  proof?: ConnectorProof;
+  /** failed: why, in a sentence. */
+  message?: string;
+  /**
+   * The events it declares (slack.message, email.received), from its events/list. Absent with none.
+   */
+  events?: string[];
+}
+
+/**
+ * notRead: not read yet. read: its one read worked. failed: the read did not work; message says
+ * why.
+ */
+export type MessagingServerState =
+  | "notRead"
+  | "read"
+  | "failed";
 
 export interface Milestones {
   earned: EarnedMilestone[];
@@ -11306,7 +11350,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConnectorSetup: { required: ["folder", "slots", "events", "done"], optional: ["repository", "forge", "site", "repositoryURL", "connection", "installed", "installURL", "repositories", "project", "projectName"] },
   ConnectorSetupRequest: { required: ["folder"], optional: ["reading"] },
   ConnectorSkipRequest: { required: ["folder", "slot", "skipped"], optional: [] },
-  ConnectorSlot: { required: ["slot", "choice", "state"], optional: ["proof", "readAt", "message", "repository", "fromProject", "servers", "docsServers"] },
+  ConnectorSlot: { required: ["slot", "choice", "state"], optional: ["proof", "readAt", "message", "repository", "fromProject", "servers", "docsServers", "messagingServers"] },
   ConnectorWorkflow: { required: ["id", "name"], optional: [] },
   ConsoleStopAgent: { required: ["host", "agent"], optional: [] },
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
@@ -11628,6 +11672,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MarketplacesListAnswer: { required: ["marketplaces"], optional: ["problem"] },
   MarketplacesListRequest: { required: [], optional: ["kind", "destination"] },
   MessageSender: { required: ["agentID", "title"], optional: [] },
+  MessagingServer: { required: ["name", "word", "state"], optional: ["proof", "message", "events"] },
   Milestones: { required: ["earned"], optional: [] },
   MissingFolder: { required: ["branchKept"], optional: [] },
   MoveAnswer: { required: ["when", "message"], optional: ["agent"] },

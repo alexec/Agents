@@ -99,7 +99,7 @@ func TestAFoldersConnectorSetUp(t *testing.T) {
 	var setup wire.ConnectorSetup
 	json.Unmarshal(c.call(t, 2, "connectors/setup", map[string]any{"folder": folder}), &setup)
 	slots := slotsByKind(setup)
-	if setup.Repository == nil || *setup.Repository != "alexec/agents-walk" || setup.Connection != nil || setup.Done != 2 ||
+	if setup.Repository == nil || *setup.Repository != "alexec/agents-walk" || setup.Connection != nil || setup.Done != 3 ||
 		slots[wire.ConnectorSlotKindTasks].State != wire.ConnectorSlotStateNotConnected ||
 		slots[wire.ConnectorSlotKindWorkspace].State != wire.ConnectorSlotStateRead ||
 		setup.Events.State != wire.ConnectorEventsStateOff || gh.reads != 0 {
@@ -124,7 +124,7 @@ func TestAFoldersConnectorSetUp(t *testing.T) {
 	if ci.State != wire.ConnectorSlotStateRefused || ci.Message == nil || !strings.Contains(*ci.Message, "Actions runs in alexec/agents-walk") {
 		t.Fatalf("ci: %+v", ci)
 	}
-	if setup.Done != 4 || setup.Installed == nil || !*setup.Installed || *setup.Repositories != 3 ||
+	if setup.Done != 5 || setup.Installed == nil || !*setup.Installed || *setup.Repositories != 3 ||
 		setup.Connection == nil || *setup.Connection.Login != "alexec" {
 		t.Fatalf("connected: %+v", setup)
 	}
@@ -160,7 +160,7 @@ func TestAFoldersConnectorSetUp(t *testing.T) {
 	}
 
 	json.Unmarshal(c.call(t, 6, "connectors/setup/skip", map[string]any{"folder": folder, "slot": "codeReview", "skipped": true}), &setup)
-	if s := slotsByKind(setup)[wire.ConnectorSlotKindCodeReview]; s.State != wire.ConnectorSlotStateSkipped || setup.Done != 5 {
+	if s := slotsByKind(setup)[wire.ConnectorSlotKindCodeReview]; s.State != wire.ConnectorSlotStateSkipped || setup.Done != 6 {
 		t.Fatalf("skipped: %+v %d", s, setup.Done)
 	}
 	if b, _ := os.ReadFile(filepath.Join(folder, ".agents", "folder.json")); !strings.Contains(string(b), `"codeReview"`) {
@@ -181,7 +181,7 @@ func TestAFoldersConnectorSetUp(t *testing.T) {
 	// Disconnected, the slots wait for the connection again.
 	file.Delete(connections.GitHub)
 	json.Unmarshal(c.call(t, 9, "connectors/setup", map[string]any{"folder": folder, "reading": "stored"}), &setup)
-	if s := slotsByKind(setup)[wire.ConnectorSlotKindTasks]; s.State != wire.ConnectorSlotStateNotConnected || setup.Done != 2 {
+	if s := slotsByKind(setup)[wire.ConnectorSlotKindTasks]; s.State != wire.ConnectorSlotStateNotConnected || setup.Done != 3 {
 		t.Fatalf("disconnected: %+v", setup)
 	}
 }
@@ -322,7 +322,7 @@ func TestAGitLabFoldersConnectorSetUp(t *testing.T) {
 	if ci.State != wire.ConnectorSlotStateRefused || ci.Message == nil || *ci.Message != "GitLab refused: Agents can't see pipelines in agentstest-group/agents-walk." {
 		t.Fatalf("ci: %+v", ci)
 	}
-	if setup.Done != 4 || setup.Connection == nil || setup.Connection.Provider != wire.ConnectionProviderGitlab || setup.Installed != nil {
+	if setup.Done != 5 || setup.Connection == nil || setup.Connection.Provider != wire.ConnectionProviderGitlab || setup.Installed != nil {
 		t.Fatalf("connected: %+v", setup)
 	}
 	if setup.Events.State != wire.ConnectorEventsStateOn || deref(setup.Events.Server) != "gitlab" {
