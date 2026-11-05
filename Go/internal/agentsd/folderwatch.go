@@ -97,8 +97,14 @@ func (d *Daemon) kickFolderWatches() {
 }
 
 // syncFolderWatches watches each live folder not yet watched, and lets go of the ones
-// archived, deleted or gone.
+// archived, deleted or gone. It is watch work, so stopFolderWatches waits for it: the
+// folder list it reads makes your policy's first-start move, which writes into the root
+// (#3518).
 func (d *Daemon) syncFolderWatches() {
+	if !d.pwEnter("") {
+		return
+	}
+	defer d.pwBusy.Done()
 	d.pwSyncMu.Lock()
 	defer d.pwSyncMu.Unlock()
 	live := map[string]bool{}
