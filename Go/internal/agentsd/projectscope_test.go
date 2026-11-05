@@ -30,7 +30,9 @@ func TestSessionToolsReachTheProjectOnThisMachine(t *testing.T) {
 	defer d.Shutdown()
 	mine, clone, other := projectFolder(t, "p-agents"), projectFolder(t, "p-agents"), projectFolder(t, "p-other")
 	running := func(title string) func(a *wire.Agent) {
-		return func(a *wire.Agent) { a.State, a.EndedReason, a.RuntimeID, a.Title = wire.AgentStateRunning, nil, "claude", &title }
+		return func(a *wire.Agent) {
+			a.State, a.EndedReason, a.RuntimeID, a.Title = wire.AgentStateRunning, nil, "claude", &title
+		}
 	}
 	me := seeded(t, d, mine, running("lead"))
 	lane := seeded(t, d, clone, running("lane in the clone"))

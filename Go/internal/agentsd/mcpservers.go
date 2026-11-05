@@ -365,7 +365,7 @@ func (d *Daemon) personalMCP(secrets map[string]string) (servers []mcpEntry, mis
 type sessionEntry struct {
 	mcpEntry
 	folder *string
-	cwd     string
+	cwd    string
 }
 
 // sessionMCP is the person's and the folder's servers a session is given, after the app's.

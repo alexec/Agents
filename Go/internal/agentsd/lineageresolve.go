@@ -50,6 +50,8 @@ type resolvedEntry struct {
 	resolved wire.LineageResolved
 	ok       bool
 	at       time.Time
+	// parent is an issue's epic, as the forge's plan last said it (#3562); a lookup keeps it.
+	parent *wire.LineageNode
 }
 
 type lineageResolveBook struct {
@@ -188,10 +190,11 @@ func (d *Daemon) resolveNode(ctx context.Context, n wire.LineageNode) {
 	if d.resolveCache == nil {
 		d.resolveCache = map[wire.LineageNode]resolvedEntry{}
 	}
-	if _, cached := d.resolveCache[n]; !cached && len(d.resolveCache) >= resolvedCached {
+	had, cached := d.resolveCache[n]
+	if !cached && len(d.resolveCache) >= resolvedCached {
 		d.dropOldestResolvedLocked()
 	}
-	d.resolveCache[n] = resolvedEntry{resolved: r, ok: err == nil, at: nowFunc()}
+	d.resolveCache[n] = resolvedEntry{resolved: r, ok: err == nil, at: nowFunc(), parent: had.parent}
 }
 
 // dropOldestResolvedLocked makes room for one more cached node.

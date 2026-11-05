@@ -53,3 +53,28 @@ func TestRollupOfARepo(t *testing.T) {
 		t.Fatalf("%+v", got)
 	}
 }
+
+// #3562: a hierarchy level wins over bug; a label's value in any case.
+func TestLevelOfAndLabelValue(t *testing.T) {
+	for _, c := range []struct {
+		labels []string
+		want   string
+	}{
+		{[]string{"bug", "Task"}, "task"},
+		{[]string{"bug"}, "bug"},
+		{[]string{"enhancement", "epic"}, "epic"},
+		{[]string{"enhancement"}, ""},
+		{nil, ""},
+	} {
+		if got := LevelOf(c.labels); got != c.want {
+			t.Errorf("LevelOf(%v) = %q, want %q", c.labels, got, c.want)
+		}
+	}
+	labels := []string{"area:", "Feature: estimates ", "area:lineage"}
+	if got := LabelValue(labels, "feature:"); got != "estimates" {
+		t.Errorf("feature %q", got)
+	}
+	if got := LabelValue(labels, "area:"); got != "lineage" {
+		t.Errorf("area %q", got)
+	}
+}

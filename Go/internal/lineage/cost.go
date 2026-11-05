@@ -1,6 +1,7 @@
 package lineage
 
 import (
+	"slices"
 	"sort"
 	"strings"
 
@@ -216,4 +217,38 @@ func Rollup(nodes []wire.LineageCostNode, of wire.LineageNode) wire.LineageCostR
 		r.Limited = &t
 	}
 	return r
+}
+
+// The levels of an issue (#3265, #3562): a hierarchy level from its labels, else bug.
+var hierarchyLevels = []string{"epic", "story", "task", "spike"}
+
+// LevelOf is an issue's level from its labels: epic, story, task or spike, else bug, else
+// none. A hierarchy level wins over bug, as a bug can be an epic's child.
+func LevelOf(labels []string) string {
+	bug := false
+	for _, l := range labels {
+		name := strings.ToLower(strings.TrimSpace(l))
+		if slices.Contains(hierarchyLevels, name) {
+			return name
+		}
+		bug = bug || name == "bug"
+	}
+	if bug {
+		return "bug"
+	}
+	return ""
+}
+
+// LabelValue is the value of the first label with prefix, such as feature: or area:, in any
+// case: work for feature:work.
+func LabelValue(labels []string, prefix string) string {
+	for _, l := range labels {
+		l = strings.TrimSpace(l)
+		if len(l) > len(prefix) && strings.EqualFold(l[:len(prefix)], prefix) {
+			if v := strings.TrimSpace(l[len(prefix):]); v != "" {
+				return v
+			}
+		}
+	}
+	return ""
 }

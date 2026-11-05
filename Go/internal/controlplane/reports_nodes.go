@@ -241,16 +241,21 @@ func nodeRows(nodes []wire.LineageCostNode, kind string) []wire.ReportNode {
 			}
 		}
 	}
+	children := childrenOf(nodes)
+	issueParts := func(ref string) []wire.LineageCostNode {
+		var parts []wire.LineageCostNode
+		if n, ok := issues[ref]; ok {
+			parts = append(parts, n)
+		}
+		return append(parts, fixers[ref]...)
+	}
 	rows := make([]wire.ReportNode, 0, len(refs))
 	for _, ref := range refs {
 		of := wire.LineageNode{Kind: kind, Ref: ref}
 		var parts []wire.LineageCostNode
 		switch kind {
 		case lineage.KindIssue:
-			if n, ok := issues[ref]; ok {
-				parts = append(parts, n)
-			}
-			parts = append(parts, fixers[ref]...)
+			parts = issueParts(ref)
 		case lineage.KindPR:
 			parts = []wire.LineageCostNode{byNode[of]}
 		case lineage.KindMilestone:
@@ -271,20 +276,27 @@ func nodeRows(nodes []wire.LineageCostNode, kind string) []wire.ReportNode {
 				return fixed
 			})
 		}
-		rows = append(rows, nodeRow(of, byNode, parts))
+		row := nodeRow(of, byNode, parts)
+		if kids := children[ref]; kind == lineage.KindIssue && len(kids) > 0 {
+			row.StartedAt, row.CycleTimeSeconds = cycleOf(epicParts(ref, kids, issueParts))
+		}
+		rows = append(rows, row)
 	}
 	return rows
 }
 
 // nodeRow is of's row from its parts; its own node, when a machine sent one, says its own
-// cost, project, title, state and labels, and how a PR ended.
+// cost, project, title, state and labels, how a PR ended, and an issue's level, feature and
+// area (#3562).
 func nodeRow(of wire.LineageNode, byNode map[wire.LineageNode]wire.LineageCostNode, parts []wire.LineageCostNode) wire.ReportNode {
 	sum, _ := valueRow(of, parts, wire.Date(-math.MaxFloat64))
 	row := wire.ReportNode{Node: of, Cost: wire.ReportNodeCost{Own: wire.LineageCost{Cost: map[string]float64{}},
 		Total: sum.Total, Waste: sum.Waste}, LeadTimeSeconds: sum.LeadTimeSeconds}
+	row.StartedAt, row.CycleTimeSeconds = cycleOf(parts)
 	if own, ok := byNode[of]; ok {
 		lineage.AddCost(&row.Cost.Own, own.Banked)
 		row.Repo, row.Resolved, row.Outcome = own.Repo, own.Resolved, own.Outcome
+		row.Level, row.Feature, row.Area = own.Level, own.Feature, own.Area
 	}
 	if row.Repo == nil {
 		if p := lineage.RepoOf(of); p != "" {

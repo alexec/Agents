@@ -465,7 +465,9 @@ func (d *Daemon) gitlabProjectAt(ctx context.Context, folder, connected string) 
 
 // folderLinearTeams is the Linear teams, by key, that a folder's .agents/folder.json names for
 // its tasks: "linearTeams": ["ENG"].
-func (d *Daemon) folderLinearTeams(folder string) []string { return d.folderKeys(folder, "linearTeams") }
+func (d *Daemon) folderLinearTeams(folder string) []string {
+	return d.folderKeys(folder, "linearTeams")
+}
 
 // linearFolder is the first folder whose .agents/folder.json names team, or, when no folder
 // names any, the folder the whole workspace acts from (#3311); else "".
@@ -513,7 +515,9 @@ func (d *Daemon) linearHome() string {
 
 // folderJiraProjects is the Jira projects, by key, that a folder's .agents/folder.json names
 // for its tasks: "jiraProjects": ["PROJ"] (#3260).
-func (d *Daemon) folderJiraProjects(folder string) []string { return d.folderKeys(folder, "jiraProjects") }
+func (d *Daemon) folderJiraProjects(folder string) []string {
+	return d.folderKeys(folder, "jiraProjects")
+}
 
 // folderKeys is the team or project keys (ENG, PROJ) a folder's .agents/folder.json lists
 // under name, in capitals.
@@ -899,11 +903,17 @@ func (d *Daemon) resolvedFromForge(items []wire.ForgeItem) {
 		for n, l := range i.Labels {
 			labels[n] = l.Name
 		}
-		if _, cached := d.resolveCache[i.Node]; !cached && len(d.resolveCache) >= resolvedCached {
+		had, cached := d.resolveCache[i.Node]
+		if !cached && len(d.resolveCache) >= resolvedCached {
 			d.dropOldestResolvedLocked()
 		}
 		state := i.State
-		d.resolveCache[i.Node] = resolvedEntry{resolved: wire.LineageResolved{Title: i.Title, State: &state, Labels: labels}, ok: true, at: now}
+		parent := had.parent
+		if i.Parent != nil {
+			p := *i.Parent
+			parent = &p
+		}
+		d.resolveCache[i.Node] = resolvedEntry{resolved: wire.LineageResolved{Title: i.Title, State: &state, Labels: labels}, ok: true, at: now, parent: parent}
 	}
 }
 
