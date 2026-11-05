@@ -340,7 +340,7 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!doctype html>
   form { display: inline; }
   td { padding: .15rem 1.5rem .15rem 0; }
   input { font: inherit; padding: .4rem .5rem; border: 1px solid #c7c7cc; border-radius: .4rem; }
-  @media (prefers-color-scheme: dark) { body { background: #1c1c1e; color: #f2f2f7; } a.button, button, input { background: #2c2c2e; color: #f2f2f7; border-color: #48484a; } code { background: #2c2c2e; } }
+  @media (prefers-color-scheme: dark) { body { background: #1c1c1e; color: #f2f2f7; } a.button, button, input { background: #2c2c2e; color: #f2f2f7; border-color: #48484a; } a.prominent, button.prominent { background: #2c5fd6; border-color: #2c5fd6; color: #fff; } code { background: #2c2c2e; } }
 </style>
 </head>
 <body>
