@@ -61,6 +61,7 @@ type Daemon struct {
 	actorBook
 	appToolsState
 	screenDriveState
+	browserDriveState
 	hostUserState
 	userSuspendState
 	machinePinState
@@ -269,6 +270,7 @@ func (d *Daemon) Shutdown() {
 	d.allowMu.Unlock()
 	d.stopEventWaits()
 	d.stopShells()
+	d.stopBrowserDrives()
 	d.browser.Shutdown()
 	d.stopFolderWatches()
 	d.stopPins()
