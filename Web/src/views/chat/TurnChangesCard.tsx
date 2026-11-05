@@ -47,7 +47,7 @@ export function TurnChangesCard({ changes }: { changes: TurnChanges }) {
       {done && <p class="quiet small">↩︎ {undoneWords(done)}</p>}
       {problem.value && <p class="failure small" role="alert">{problem.value}</p>}
       {!done && changes.files.length > 0 && undoTurn && (
-        <p class="answers">
+        <p class="undo">
           <button title={undoHelp} disabled={working.value} onClick={() => void run(undoTurn)}>{working.value ? undoing : undoTitle}</button>
         </p>
       )}

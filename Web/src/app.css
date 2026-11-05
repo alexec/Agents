@@ -484,10 +484,11 @@ button.link.reading:hover { text-decoration: underline; }
 .policy-stop p { margin: 0; }
 .policy-stop .answers { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
 /* What a turn changed, and Undo These Changes (#3437). */
+.turn-changes { background: var(--paper-well); border-radius: var(--radius-card); padding: 12px 14px; }
 .turn-changes p { margin: 0; }
 .turn-changes .turn-files { list-style: none; margin: 2px 0; padding: 0; }
 .turn-changes .turn-files li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.turn-changes .answers { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
+.turn-changes .undo { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
 /* A change to a folder's own files, asked over the prompt or on the folder's page (#531). */
 .guarded-change { border-color: color-mix(in srgb, var(--tint-attention) 25%, transparent); }
 .guarded-change p { margin: 0; }

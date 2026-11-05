@@ -305,10 +305,16 @@ func (d *Daemon) undoTurn(r wire.UndoTurnRequest) (wire.UndoTurnResult, error) {
 		}
 	} else {
 		for _, f := range tc.Files {
-			if rel, ok := relativeTo(f.Path, root); ok {
+			// The path within the repository, as the turn's end recorded it.
+			if f.RelativePath != nil {
+				rels = append(rels, *f.RelativePath)
+			} else if rel, ok := relativeTo(changeKey(f.Path), root); ok {
 				rels = append(rels, rel)
 			}
 		}
+	}
+	if len(rels) == 0 {
+		return wire.UndoTurnResult{}, Invalid("That turn changed no files the app can put back.")
 	}
 	if _, err := git(root, "cat-file", "-e", *tc.Before+"^{tree}"); err != nil {
 		return wire.UndoTurnResult{}, &Error{Code: wire.FailureNotChanged, Message: "The snapshot of that turn is gone, so its changes cannot be put back."}
