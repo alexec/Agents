@@ -120,8 +120,8 @@ What the control plane can and cannot do:
 | serve a changed web page | sign with a Mac's or a phone's key |
 
 **Limits.** A control plane that serves a changed web page can use that browser's key while
-the page is open; the Mac and the Remote are signed apps and do not have this limit. The client
-and person in the audit are still the control plane's word. The control plane can always refuse
+the page is open; the Mac and the Remote are signed apps and do not have this limit. The person in
+a machine's audit is still the control plane's word; the client is the lock's (#3543). The control plane can always refuse
 to route. See [What the control plane can and cannot do](../control-plane.md#what-the-control-plane-can-and-cannot-do).
 
 ## Who did what

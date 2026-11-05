@@ -154,13 +154,13 @@ func (d *Daemon) register() {
 	On(d, wire.CallAgentsStart, func(ctx context.Context, c *Client, r wire.StartRequest) (wire.UUID, error) {
 		// An agent on another machine asked for it (#2887): its labels are an agent's.
 		if r.StartedFrom != nil {
-			id, err := d.startFor(r, startedBy{owner: wire.SessionLabelOwnerAgent, actor: c.actor})
+			id, err := d.startFor(r, startedBy{owner: wire.SessionLabelOwnerAgent, actor: c.actor()})
 			if err == nil {
 				d.noteStartedHere(id, *r.StartedFrom)
 			}
 			return id, err
 		}
-		return d.startAs(r, c.actor)
+		return d.startAs(r, c.actor())
 	})
 	// Sessions on another machine (#2927), from the control plane.
 	On(d, wire.CallAgentsFromStarter, func(ctx context.Context, c *Client, r wire.SessionCall) (wire.SessionCallReply, error) {
@@ -173,7 +173,7 @@ func (d *Daemon) register() {
 		if d.Store.Agent(r.AgentID) == nil {
 			return wire.Empty{}, &Error{Code: CodeNoSuchAgent, Message: "no agent " + string(r.AgentID)}
 		}
-		d.actedOn(r.AgentID, c.actor)
+		d.actedOn(r.AgentID, c.actor())
 		d.noteAdminStop(r.AgentID, r.ByAdmin != nil && *r.ByAdmin)
 		d.live(r.AgentID).cancel()
 		d.cancelContinue(r.AgentID)
@@ -182,7 +182,7 @@ func (d *Daemon) register() {
 		return wire.Empty{}, nil
 	})
 	On(d, wire.CallAgentsArchive, func(ctx context.Context, c *Client, r wire.AgentRequest) (wire.Empty, error) {
-		d.actedOn(r.AgentID, c.actor)
+		d.actedOn(r.AgentID, c.actor())
 		return wire.Empty{}, d.archive(r.AgentID)
 	})
 	On(d, wire.CallAgentsSetUnread, func(ctx context.Context, c *Client, r wire.SetUnreadRequest) (wire.Empty, error) {

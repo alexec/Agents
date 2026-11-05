@@ -137,9 +137,13 @@ How step 4 is built (#3492):
   as good as the control plane's, as before the lock. A machine the lock names must answer
   with its addMachine's key. The window's `.mac` and the web page's `mac` name no id, so they
   take any machine of the lock, or one it does not name.
-- Decided: who did it in the audit stays the control plane's word (`ChannelOpen.actor`),
-  because an addClient names a key, not a client id. The machine knows the device by its key
-  (#3543).
+- Decided: who did it in the audit names the device from the lock (#3543). A root and an
+  addClient carry the client's id (`id`), as an addMachine does: the signer puts in the asking
+  client's `LockJoinRequest.client`, and a client that signs its own entry (the root, Use
+  Recovery Key) its own. The machine refuses a hello on a channel whose `ChannelOpen.actor`
+  names another client than the lock member, and writes that member's id and name into each
+  event's actor; the person stays the control plane's word. An entry made before #3543 names
+  no id, so the actor stays the control plane's until that device joins again.
 
 How step 5 is built (#3493):
 

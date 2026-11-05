@@ -152,7 +152,8 @@ final class LockState {
             guard let public_ = state.recovery, let sealed = state.recoverySealed else { return LockWords.noRecovery }
             let recovery: LockSigningKey
             do { recovery = try MachineLock.openRecovery(secret, publicKey: public_, sealed: sealed) } catch { return LockWords.recoveryNotThisLock }
-            let body = DaemonAPI.LockBody(kind: .addClient, person: "", key: key.publicKey, name: name, clientKind: MachineLock.clientKind(kind))
+            let body = DaemonAPI.LockBody(kind: .addClient, person: "", key: key.publicKey, id: client, name: name,
+                                         clientKind: MachineLock.clientKind(kind))
             do {
                 let entry = try MachineLock.sign(body, after: state, with: recovery)
                 _ = try await control.call(DaemonAPI.Method.lockAdd, DaemonAPI.LockAdd(entries: [entry]), returning: DaemonAPI.LockHead.self)
@@ -277,7 +278,7 @@ final class LockState {
             let body = if let machine = request.machine {
                 DaemonAPI.LockBody(kind: .addMachine, person: "", key: request.key, sealingKey: request.key, id: machine, name: request.name)
             } else {
-                DaemonAPI.LockBody(kind: .addClient, person: "", key: request.key, name: request.name,
+                DaemonAPI.LockBody(kind: .addClient, person: "", key: request.key, id: request.client, name: request.name,
                                    clientKind: MachineLock.clientKind(request.kind))
             }
             try await self.put(body, on: control)
@@ -360,7 +361,7 @@ final class LockState {
         guard let key = signingKey() else { return }
         guard let lock = try? await control.call(DaemonAPI.Method.lockGet, DaemonAPI.LockGet(), returning: DaemonAPI.Lock.self) else { return }
         if lock.entries.isEmpty {
-            let root = DaemonAPI.LockBody(kind: .root, person: lock.person, key: key.publicKey, name: name,
+            let root = DaemonAPI.LockBody(kind: .root, person: lock.person, key: key.publicKey, id: client, name: name,
                                           clientKind: MachineLock.clientKind(kind))
             // Another device may make the root at the same moment: then this one asks to join it.
             do {

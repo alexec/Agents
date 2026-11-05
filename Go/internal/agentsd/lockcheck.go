@@ -231,6 +231,12 @@ func (d *Daemon) answerHello(c *Client, m message) {
 		answer(nil, err)
 		return
 	}
+	if !sameClient(channel.Member.ID, c.said) {
+		// The control plane opened the channel for one client, and the lock's key is another's.
+		log.Printf("lock: refused a channel: the control plane names client %s, the lock %s", *c.said.Client, channel.Member.ID)
+		answer(nil, notInLock("the control plane opened this channel for another of your devices"))
+		return
+	}
 	// The answer goes before the channel is set, and nothing goes between them: it is not
 	// MAC'd, its signature is its proof, and every line after it is.
 	c.lock.write.Lock()

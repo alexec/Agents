@@ -170,8 +170,11 @@ command talks to `daemon.sock`, and a channel from the control plane is refused.
   changed page can use that browser's key while the page is open. Every web product with
   keys in the browser has this limit. The Mac window and the Remote are signed apps, so they
   do not have it.
-- **Who did it, in the audit,** is still the control plane's word. The machine knows which of
-  your devices sent a request by its key.
+- **Who did it, in a machine's audit,** names the person by the control plane's word. The
+  device comes from the lock (#3543): each device's entry names its client id, so the
+  machine writes the device that opened the channel, and refuses a channel that the control
+  plane opened for another device. A device added before #3543 is still named by the
+  control plane until it joins again.
 - **A denial of service.** The control plane can always refuse to route anything.
 
 `daemon.sock`, on the machine itself, is not checked: only the machine's own user reaches it.
