@@ -37,6 +37,9 @@ Every machine also offers `browser:agents`, **This machine's browser** (#3533): 
 Chromium that the host downloads on first use, runs with no window and a kept profile, so
 sign-ins carry over from one session to the next, and stops after 15 minutes with no use
 and no lease. One agent drives it at a time. The tools that drive it come with #3526.
+You see it in the inspector's **Agent Browser** pane, or the web page's **Agent Browser**
+tab (#3528): its newest tab, live, while the pane is open. You can click, scroll, type
+and paste in it at any time, and an address typed in its bar starts it.
 
 The screen lease is now actually acquired by a shipped tool (#3004): `drive_screen` takes
 it the first time an agent drives an app through its own screen, mouse and keyboard, and

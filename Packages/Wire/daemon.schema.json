@@ -2845,6 +2845,185 @@
       ],
       "additionalProperties": false
     },
+    "BrowserAckRequest": {
+      "type": "object",
+      "description": "browser/ack: the client drew browser/frame number ack, so the host may send the next one (#3528). The host asks Chromium for a new frame only after an ack, so a slow client gets fewer frames, not a backlog.",
+      "properties": {
+        "ack": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ack"
+      ],
+      "additionalProperties": false
+    },
+    "BrowserFrame": {
+      "type": "object",
+      "description": "browser/frame: a JPEG of the machine's browser's page (#3528, spike #3527), from CDP Page.startScreencast, sent only to the clients that watch it. Never recorded.",
+      "properties": {
+        "image": {
+          "$ref": "#/definitions/Base64"
+        },
+        "ack": {
+          "type": "integer",
+          "description": "Send it back in browser/ack once the frame is drawn."
+        },
+        "width": {
+          "type": "number",
+          "description": "The page's width in CSS pixels: browser/input's x is from 0 to this."
+        },
+        "height": {
+          "type": "number",
+          "description": "The page's height in CSS pixels: browser/input's y is from 0 to this."
+        }
+      },
+      "required": [
+        "image",
+        "ack",
+        "width",
+        "height"
+      ],
+      "additionalProperties": false
+    },
+    "BrowserInputKind": {
+      "type": "string",
+      "enum": [
+        "mouse",
+        "wheel",
+        "key",
+        "text"
+      ]
+    },
+    "BrowserInputRequest": {
+      "type": "object",
+      "description": "browser/input: the person's input in the page (#3528). mouse and wheel are CDP Input.dispatchMouseEvent, key is Input.dispatchKeyEvent, text is Input.insertText (a paste). x and y are in the page's CSS pixels.",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/BrowserInputKind"
+        },
+        "type": {
+          "type": "string",
+          "description": "mouse: mousePressed, mouseReleased or mouseMoved. key: keyDown, keyUp or char."
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "button": {
+          "type": "string",
+          "description": "left, middle, right or none."
+        },
+        "clickCount": {
+          "type": "integer"
+        },
+        "deltaX": {
+          "type": "number"
+        },
+        "deltaY": {
+          "type": "number"
+        },
+        "key": {
+          "type": "string",
+          "description": "The DOM key value, such as Enter or a."
+        },
+        "code": {
+          "type": "string",
+          "description": "The DOM code value, such as KeyA."
+        },
+        "keyCode": {
+          "type": "integer",
+          "description": "The Windows virtual key code, which Chromium needs for keys such as Backspace and the arrows."
+        },
+        "text": {
+          "type": "string"
+        },
+        "modifiers": {
+          "type": "integer",
+          "description": "Alt 1, Control 2, Meta 4, Shift 8, as CDP has them."
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "BrowserNavigateAction": {
+      "type": "string",
+      "enum": [
+        "go",
+        "back",
+        "forward",
+        "reload"
+      ]
+    },
+    "BrowserNavigateRequest": {
+      "type": "object",
+      "description": "browser/navigate: the bar over the page (#3528). go opens url, and starts the browser when it does not run.",
+      "properties": {
+        "action": {
+          "$ref": "#/definitions/BrowserNavigateAction"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "additionalProperties": false
+    },
+    "BrowserState": {
+      "type": "object",
+      "description": "The machine's browser as a client shows it (#3528): browser/watch's answer, and browser/state to the clients that watch it when it changes.",
+      "properties": {
+        "status": {
+          "$ref": "#/definitions/BrowserStatus"
+        },
+        "detail": {
+          "type": "string",
+          "description": "starting: the step, such as Downloading Chromium. failed: why."
+        },
+        "url": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "BrowserStatus": {
+      "type": "string",
+      "enum": [
+        "stopped",
+        "starting",
+        "running",
+        "failed"
+      ]
+    },
+    "BrowserWatchRequest": {
+      "type": "object",
+      "description": "browser/watch: the client shows the machine's browser in a view of this size, in points (#3528). The page is laid out at that size. Watch again to change it.",
+      "properties": {
+        "width": {
+          "type": "integer"
+        },
+        "height": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "width",
+        "height"
+      ],
+      "additionalProperties": false
+    },
     "BudgetRaise": {
       "type": "object",
       "description": "A budget raised for one person for one UTC day (#998, FR-019), kept in the policy and swept the day after.",

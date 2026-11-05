@@ -1384,6 +1384,9 @@ final class AppModel {
     /// window, so each one keeps only the shells it is actually showing and ignores
     /// the rest.
     @ObservationIgnored private var shellClients: [ShellKey: ShellClient] = [:]
+    /// Each host's browser as this window watches it (#3528): one per host, shared by the
+    /// Agent Browser panes of every session on it.
+    @ObservationIgnored private var machineBrowsers: [MachineRef: MachineBrowser] = [:]
     /// How many screens show each of those shells (#213).
     @ObservationIgnored private var shellScreens: [ShellKey: Int] = [:]
     /// Shells no screen shows, kept with their emulator for a while, most recent last,
@@ -3242,6 +3245,7 @@ final class AppModel {
                 await serverFilesByHost[.mac]?.reconnected()
                 await refreshEverything()
                 for shell in shellClients(on: .mac) { await shell.reattachIfLost() }
+                await machineBrowsers[.mac]?.rewatchIfWatching()
             }
             // Servers the control plane reaches are its clients. HostSet is the old
             // path, and it stays only while this window has no control plane (R7).
@@ -3291,6 +3295,10 @@ final class AppModel {
     }
 
     private func received(_ method: String, _ params: JSONValue?, _ update: AgentsModel.Update?) async {
+        if Self.browserNotifications.contains(method) {
+            machineBrowsers[.mac]?.received(method, params)
+            return
+        }
         // What every notification about the work means is written once, in the kit,
         // so the window and the phone cannot drift apart. What is left here is the
         // Mac's own: the shells and terminals a phone has no business with.
@@ -3844,6 +3852,11 @@ final class AppModel {
 
     private func receivedFromServer(_ host: MachineRef, _ method: String, _ params: JSONValue?,
                                     _ update: AgentsModel.Update?) async {
+        // The machine's browser is each host's own (#3528).
+        if Self.browserNotifications.contains(method) {
+            machineBrowsers[host]?.received(method, params)
+            return
+        }
         // This Mac's host by an id of its own (#1496): what it says of this Mac is the
         // window's own, as `.mac`'s is.
         if host == macHostElsewhere, Self.aboutThisMac.contains(method) {
@@ -5758,6 +5771,22 @@ final class AppModel {
     func tellAgent(about command: String, in agentID: UUID) async {
         let report = ShellCommandActions.report(command, recent: shellClient(for: agentID).recent)
         _ = await send(report, to: agentID)
+    }
+
+    /// What a host says about its browser (#3528): for the Agent Browser pane alone.
+    private static let browserNotifications: Set<String> = [
+        DaemonAPI.Notification.browserFrame, DaemonAPI.Notification.browserState,
+    ]
+
+    /// The Agent Browser pane's view of the browser on a session's host (#3528), made once
+    /// per host per window.
+    func machineBrowser(for agentID: UUID) -> MachineBrowser {
+        let host = host(ofAgent: agentID)
+        if let existing = machineBrowsers[host] { return existing }
+        let fresh = MachineBrowser(client: client(for: host),
+                                   describe: { [weak self] error in self?.describeForShell(error) ?? "\(error)" })
+        machineBrowsers[host] = fresh
+        return fresh
     }
 
     /// The pane's end of one of an agent's shells, made once per shell per window.

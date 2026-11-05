@@ -1210,6 +1210,106 @@ export interface BringBackRequest {
 }
 
 /**
+ * browser/ack: the client drew browser/frame number ack, so the host may send the next one (#3528).
+ * The host asks Chromium for a new frame only after an ack, so a slow client gets fewer frames, not
+ * a backlog.
+ */
+export interface BrowserAckRequest {
+  ack: number;
+}
+
+/**
+ * browser/frame: a JPEG of the machine's browser's page (#3528, spike #3527), from CDP
+ * Page.startScreencast, sent only to the clients that watch it. Never recorded.
+ */
+export interface BrowserFrame {
+  image: Base64;
+  /** Send it back in browser/ack once the frame is drawn. */
+  ack: number;
+  /** The page's width in CSS pixels: browser/input's x is from 0 to this. */
+  width: number;
+  /** The page's height in CSS pixels: browser/input's y is from 0 to this. */
+  height: number;
+}
+
+export type BrowserInputKind =
+  | "mouse"
+  | "wheel"
+  | "key"
+  | "text";
+
+/**
+ * browser/input: the person's input in the page (#3528). mouse and wheel are CDP
+ * Input.dispatchMouseEvent, key is Input.dispatchKeyEvent, text is Input.insertText (a paste). x
+ * and y are in the page's CSS pixels.
+ */
+export interface BrowserInputRequest {
+  kind: BrowserInputKind;
+  /** mouse: mousePressed, mouseReleased or mouseMoved. key: keyDown, keyUp or char. */
+  type?: string;
+  x?: number;
+  y?: number;
+  /** left, middle, right or none. */
+  button?: string;
+  clickCount?: number;
+  deltaX?: number;
+  deltaY?: number;
+  /** The DOM key value, such as Enter or a. */
+  key?: string;
+  /** The DOM code value, such as KeyA. */
+  code?: string;
+  /**
+   * The Windows virtual key code, which Chromium needs for keys such as Backspace and the arrows.
+   */
+  keyCode?: number;
+  text?: string;
+  /** Alt 1, Control 2, Meta 4, Shift 8, as CDP has them. */
+  modifiers?: number;
+}
+
+export type BrowserNavigateAction =
+  | "go"
+  | "back"
+  | "forward"
+  | "reload";
+
+/**
+ * browser/navigate: the bar over the page (#3528). go opens url, and starts the browser when it
+ * does not run.
+ */
+export interface BrowserNavigateRequest {
+  action: BrowserNavigateAction;
+  url?: string;
+}
+
+/**
+ * The machine's browser as a client shows it (#3528): browser/watch's answer, and browser/state to
+ * the clients that watch it when it changes.
+ */
+export interface BrowserState {
+  status: BrowserStatus;
+  /** starting: the step, such as Downloading Chromium. failed: why. */
+  detail?: string;
+  url?: string;
+  title?: string;
+}
+
+export type BrowserStatus =
+  | "stopped"
+  | "starting"
+  | "running"
+  | "failed";
+
+/**
+ * browser/watch: the client shows the machine's browser in a view of this size, in points (#3528).
+ * The page is laid out at that size. Watch again to change it.
+ */
+export interface BrowserWatchRequest {
+  width: number;
+  height: number;
+}
+
+/**
  * A budget raised for one person for one UTC day (#998, FR-019), kept in the policy and swept the
  * day after.
  */
@@ -10914,6 +11014,11 @@ export interface Methods {
   "bots/make": { params: BotMake; result: BotMade };
   "bots/setCaps": { params: BotCaps; result: Empty };
   "bots/stopRun": { params: BotStopRun; result: Empty };
+  "browser/ack": { params: BrowserAckRequest; result: Empty };
+  "browser/input": { params: BrowserInputRequest; result: Empty };
+  "browser/navigate": { params: BrowserNavigateRequest; result: Empty };
+  "browser/unwatch": { params: Empty; result: Empty };
+  "browser/watch": { params: BrowserWatchRequest; result: BrowserState };
   "changes/file": { params: ChangesFileRequest; result: ChangedFileDetail };
   "changes/list": { params: ChangesListRequest; result: ChangesList };
   "changes/undoTurn": { params: UndoTurnRequest; result: UndoTurnResult };
@@ -11270,6 +11375,11 @@ export const MethodTarget = {
   "bots/make": "control",
   "bots/setCaps": "control",
   "bots/stopRun": "control",
+  "browser/ack": "host",
+  "browser/input": "host",
+  "browser/navigate": "host",
+  "browser/unwatch": "host",
+  "browser/watch": "host",
   "changes/file": "host",
   "changes/list": "host",
   "changes/undoTurn": "host",
@@ -11574,6 +11684,8 @@ export interface Notifications {
   "attention/changed": AttentionNotification;
   "auto/changed": AutoSettings;
   "backups/changed": BackupState;
+  "browser/frame": BrowserFrame;
+  "browser/state": BrowserState;
   "clientPermissions/changed": ClientPermissionSettings;
   "clone/changed": CloneNotification;
   "control/budgetRequested": BudgetRequest;
@@ -11722,6 +11834,12 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BranchSummary: { required: ["name"], optional: ["remote"] },
   BringBack: { required: ["moved", "applied"], optional: [] },
   BringBackRequest: { required: ["folder", "branches"], optional: ["bundle", "patch", "patchOn"] },
+  BrowserAckRequest: { required: ["ack"], optional: [] },
+  BrowserFrame: { required: ["image", "ack", "width", "height"], optional: [] },
+  BrowserInputRequest: { required: ["kind"], optional: ["type", "x", "y", "button", "clickCount", "deltaX", "deltaY", "key", "code", "keyCode", "text", "modifiers"] },
+  BrowserNavigateRequest: { required: ["action"], optional: ["url"] },
+  BrowserState: { required: ["status"], optional: ["detail", "url", "title"] },
+  BrowserWatchRequest: { required: ["width", "height"], optional: [] },
   BudgetRaise: { required: ["user", "day", "by"], optional: ["daily", "dailyTokens", "request"] },
   BudgetRequest: { required: ["id", "user", "userName", "day", "at", "state"], optional: ["why", "daily", "dailyTokens", "decidedBy", "decidedAt"] },
   BudgetRequestList: { required: ["requests"], optional: [] },

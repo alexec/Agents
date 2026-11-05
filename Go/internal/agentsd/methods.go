@@ -40,6 +40,7 @@ func (d *Daemon) register() {
 	d.registerWorktrees()
 	d.registerChanges()
 	d.registerTurnUndo()
+	d.registerBrowserWatch()
 	d.registerFolders()
 	d.registerGuarded()
 	d.registerEvents()

@@ -1746,6 +1746,177 @@
       }
     },
     {
+      "name": "browser/ack",
+      "x-capability": "browser/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BrowserAckRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "browser/frame",
+      "x-capability": "browser/1",
+      "description": "A frame of the machine's browser's page (#3528), to each client that watches it.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BrowserFrame"
+          }
+        }
+      ]
+    },
+    {
+      "name": "browser/input",
+      "x-capability": "browser/1",
+      "description": "The person's click, scroll, key or paste in the machine's browser's page (#3528).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BrowserInputRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "browser/navigate",
+      "x-capability": "browser/1",
+      "description": "Back, Forward, Reload or an address in the machine's browser (#3528).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BrowserNavigateRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "browser/state",
+      "x-capability": "browser/1",
+      "description": "The machine's browser started, stopped, failed or moved to another page (#3528), to each client that watches it.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BrowserState"
+          }
+        }
+      ]
+    },
+    {
+      "name": "browser/unwatch",
+      "x-capability": "browser/1",
+      "description": "The client stops watching the machine's browser (#3528). The host also stops when the connection ends.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "browser/watch",
+      "x-capability": "browser/1",
+      "description": "The client watches the machine's browser (#3528, spike #3527): the host sends browser/frame and browser/state to it until browser/unwatch. It starts nothing: browser/navigate with go does.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BrowserWatchRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BrowserState"
+        }
+      }
+    },
+    {
       "name": "catalog/destination-state",
       "x-capability": "catalog/1",
       "paramStructure": "by-name",

@@ -7,7 +7,7 @@ import type { ExportImportBusy } from "./exports";
 import type { HeardLiveFrame } from "./desktopControl";
 import { batch, computed, signal, type ReadonlySignal, type Signal } from "@preact/signals";
 import type {
-  Agent, AgentRemovedNotification, ResumingNotification, DesktopControlLiveFrame, ControlMachine, MachineRef, MachineWorkspace, ElicitationNotification, ElicitationRequest, EntryNotification,
+  Agent, AgentRemovedNotification, ResumingNotification, BrowserFrame, BrowserState, DesktopControlLiveFrame, ControlMachine, MachineRef, MachineWorkspace, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, FolderSummary, HelperLimits, DiskThresholds, NotCommittedResponse, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, FolderRemovedNotification, DraftOptionsNotification, JSONValue, Methods, AccountProfile, RuntimeAccount, RuntimeSignInStep, RuntimeStatus,
   StartRequest, UUID, AutoMappings, AutoPreview, AutoPreviewRequest, AutoSettings, ClientPermissionMode, Levels, ModelLevel, PermissionLevel, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
@@ -254,6 +254,10 @@ export class Work {
    * frames only to the page showing that agent. Replaced by the next, never kept (FR-016).
    */
   readonly liveFrame = signal<HeardLiveFrame | null>(null);
+  /** Each host's browser as the Agent Browser tab shows it (#3528): its state, by host. */
+  readonly browserStates = signal<Record<string, BrowserState>>({});
+  /** The newest frame of the browser the tab watches (#3528). Replaced by the next, never kept. */
+  readonly browserFrame = signal<{ host: string; frame: BrowserFrame } | null>(null);
   /** The last file an agent asked to be put in front of the person (`agent/showFile`). */
   readonly shownFile = signal<{ host: string; agentID: string; path: string; line?: number | undefined; at: number } | null>(null);
   /** A new agent a view filled in (#834, agents/start-agent), for the new-agent form on that
@@ -647,6 +651,12 @@ export class Work {
         if (held) this.writeWorkflows(key, held.filter((w) => w.workflow.workflowID !== note.workflowID));
         return true;
       }
+      case "browser/frame":
+        this.browserFrame.value = { host, frame: params as BrowserFrame };
+        return true;
+      case "browser/state":
+        this.browserStates.value = { ...this.browserStates.peek(), [host]: params as BrowserState };
+        return true;
       case "desktopControl/liveFrame":
         this.liveFrame.value = { host, frame: params as DesktopControlLiveFrame, heardAt: Date.now() };
         return true;
@@ -1288,6 +1298,11 @@ export class Store extends Work {
       saveLockKey: (pair) => link.saveLockKey(pair),
     }, undefined, (error) => this.say(describe(error)));
     link.onNotification((method, params, host) => {
+      // A browser frame is acked as it lands (#3528): the host sends the next only then, so a
+      // slow link gets fewer frames, not a backlog.
+      if (method === "browser/frame" && host) {
+        void link.call("browser/ack", { ack: (params as BrowserFrame).ack }, host).catch(() => {});
+      }
       if (method === "control/providersChanged") {
         this.providers.take(params);
         return;

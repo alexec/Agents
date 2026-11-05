@@ -154,6 +154,13 @@ public enum DaemonAPI {
         /// A touch on a booted simulator's screen, and its Home button (#842).
         public static let simulatorsTap = "simulators/tap"
         public static let simulatorsHome = "simulators/home"
+        /// The machine's browser (#3528): watch its page, and send the person's input and
+        /// the bar's buttons to it.
+        public static let browserWatch = "browser/watch"
+        public static let browserUnwatch = "browser/unwatch"
+        public static let browserAck = "browser/ack"
+        public static let browserInput = "browser/input"
+        public static let browserNavigate = "browser/navigate"
         /// Stop one shell or task an agent left running in the background, and nothing
         /// else it is doing (057).
         public static let agentsStopBackground = "agents/stopBackground"
@@ -505,6 +512,10 @@ public enum DaemonAPI {
         public static let agentEntry = "agent/entry"
         /// The live tile's frame for an agent holding the screen (#3004, US4).
         public static let desktopControlLiveFrame = "desktopControl/liveFrame"
+        /// A frame of the machine's browser's page, and its state, to the clients that
+        /// watch it (#3528).
+        public static let browserFrame = "browser/frame"
+        public static let browserState = "browser/state"
         public static let agentPermission = "agent/permission"
         /// A server's runtime refused the credential it was started with, or found none
         /// (043, FR-016). `CredentialRefused`.

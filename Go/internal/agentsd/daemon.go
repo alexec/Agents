@@ -30,6 +30,8 @@ type Daemon struct {
 
 	// browser is the machine's browser (#3533): one Chromium, started on first use.
 	browser *browser.Machine
+	// bw is who watches the machine's browser, and their screencast (#3528).
+	bw browserWatch
 
 	// The machine providers this machine carries (#3398), made at the first ask.
 	carriedOnce sync.Once
@@ -196,6 +198,7 @@ func (d *Daemon) removeClient(c *Client) {
 	d.mu.Unlock()
 	d.forgetWatches(c)
 	d.forgetPresence(c)
+	d.unwatchBrowser(c)
 }
 
 // Broadcast sends a notification to every client.
