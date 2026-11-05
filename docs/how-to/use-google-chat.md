@@ -10,13 +10,13 @@ The `googlechat` connector brings a Google Chat app to your agents (#1016). It i
 `googlechat-mcp`, a small server that Agents ships. Agents Host carries it, and every Linux
 host installs it beside agentsd.
 
-- **The events:** `chat.message`, a person wrote to the app (a direct message, or a message
-  that @mentions it in a space), with the text; and `chat.answered`, a person pressed an
+- **The events:** `message.received`, a person wrote to the app (a direct message, or a message
+  that @mentions it in a space), with the text; and `question.answered`, a person pressed an
   option on a question the app asked. A workflow or a wait can use them. See
   [Start a workflow from an MCP event](start-a-workflow-from-an-mcp-event.md).
 - **The tools:** `list_spaces`, the spaces the app is in; `send_message`, a message as the
   app, in a thread when given; and `ask_question`, a question with a button for each option.
-  The first press comes back as `chat.answered`, and the card then says who answered and what.
+  The first press comes back as `question.answered`, and the card then says who answered and what.
 
 The server pulls the app's events from a Pub/Sub subscription. It connects out to Google, so
 the machine needs no public address. The app can post only in a space where a person added
@@ -71,14 +71,14 @@ is the user's email to approve the link. See [Channels](../reference/channels.md
 
 ## Start an agent from Google Chat
 
-A workflow on `chat.message` starts an agent on each message. Save this as
+A workflow on `message.received` starts an agent on each message. Save this as
 `.agents/workflows/start-from-google-chat.md`:
 
 ```markdown
 ---
 name: Start from Google Chat
 on:
-  - chat.message:
+  - message.received:
       server: googlechat
       direct: "true"
 agent: new
@@ -99,7 +99,7 @@ messages.
 
 Two workflows bring an agent's question to a space and its answer back. The first runs when
 an agent asks a question, and posts it with `ask_question`. Give it the id of the session, so
-the answer can find its way back. The second runs on `chat.answered`.
+the answer can find its way back. The second runs on `question.answered`.
 
 ```markdown
 ---
@@ -120,7 +120,7 @@ session's id as id.
 ---
 name: Answer from Google Chat
 on:
-  - chat.answered:
+  - question.answered:
       server: googlechat
 agent: new
 when-done: archive

@@ -1,11 +1,12 @@
 // Project Settings and Folder Settings (#3280, specs/3273-project-unit), as the window's
 // App/Sources/Folders/ProjectSettingsSheet.swift and FolderSettingsSheet.swift. Project Settings is
 // what every folder of the project shares, kept in this folder's .agents and committed; Folder
-// Settings is one folder's alone: where it is, its project, and its disk space lines.
+// Settings is one folder's alone: where it is, its project, its disk space lines, and what in its
+// .agents is not committed.
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { Store } from "../model/store";
-import type { FolderSummary, HelperLimits, PRCostComment, Project } from "../protocol/generated";
+import type { FolderSummary, HelperLimits, NotCommittedResponse, PRCostComment, Project } from "../protocol/generated";
 import { Capability } from "../protocol/capabilities.generated";
 import { describe } from "../model/errors";
 import { go } from "../route";
@@ -13,7 +14,7 @@ import { policyItem } from "../model/policyLayers";
 import { prCostCommentChoices, prCostCommentHelp, prCostCommentTitle, prCostCommentWords } from "../model/prCostComment";
 import {
   diskChoices, diskDefaults, folderPanes, folderPathOf, helperDefaults, projectPanes, projectSettingsWords, queuedChoices,
-  withDiskLine, withLimit, writtenIn, type FolderPane, type ProjectPane,
+  removeQuestion, withDiskLine, withLimit, writtenIn, type FolderPane, type ProjectPane,
 } from "../model/projectSettings";
 import { Modal } from "./Modal";
 import { ProjectModal } from "./ProjectPicker";
@@ -52,6 +53,8 @@ export function ProjectSettingsModal({ store, host, folder, summary, down, close
   const owner = useSignal<string | undefined>(undefined);
   const config = useSignal(false);
   const { problem, busy, save } = useSaving();
+  // Read again once a folder has left the project (Remove from Project…).
+  const left = useSignal(0);
   useEffect(() => {
     if (summary.project === undefined) { project.value = undefined; return; }
     void store.link.call("projects/list", {})
@@ -61,7 +64,7 @@ export function ProjectSettingsModal({ store, host, folder, summary, down, close
         owner.value = people?.people.find((p) => p.id === project.value?.owner)?.name;
       })
       .catch(() => { project.value = undefined; });
-  }, [summary.project]);
+  }, [summary.project, left.value]);
   const limits = summary.folder.helperLimits;
   const setLimits = (next: HelperLimits) => save(() => store.setFolderHelperLimits(host, folder, next));
   const note = <p class="sheet-note">{writtenIn(folderPathOf(folder), machineName(store, host))}</p>;
@@ -89,6 +92,16 @@ export function ProjectSettingsModal({ store, host, folder, summary, down, close
               <span class="path" title={folderPathOf(m.summary.folder.folder)}>{folderPathOf(m.summary.folder.folder)}</span>
               <span class="sheet-note">{!m.summary.exists ? "missing" : store.hostIsOnline(m.host) ? "online" : "offline"}</span>
               <button type="button" onClick={() => openFolder(m.host, m.summary.folder.folder)}>{projectSettingsWords.folderMenuItem}</button>
+              {mine.length + others.length > 1 && (
+                <button type="button" title={projectSettingsWords.removeHelp} disabled={off || !store.hostIsOnline(m.host)}
+                  onClick={() => {
+                    if (!window.confirm(removeQuestion(folderPathOf(m.summary.folder.folder)))) return;
+                    void save(async () => {
+                      await store.removeFolderFromProject(m.host, m.summary.folder.folder, m.summary.name);
+                      left.value += 1;
+                    });
+                  }}>{projectSettingsWords.removeFromProject}</button>
+              )}
             </li>
           ))}
           {others.map((f) => (
@@ -274,7 +287,11 @@ export function FolderSettingsModal({ store, host, folder, summary, down, close,
           {folderPanes.map((p) => <button type="button" key={p.id} role="tab" aria-selected={pane.value === p.id}
             class={pane.value === p.id ? "on" : ""} onClick={() => (pane.value = p.id)}>{p.title}</button>)}
         </div>
-        <div role="tabpanel">{pane.value === "general" ? general : diskSpace}</div>
+        <div role="tabpanel">{{
+          general,
+          diskSpace,
+          notCommitted: <NotCommitted store={store} host={host} folder={folder} />,
+        }[pane.value]}</div>
         {problem.value && <p class="sheet-note failure" role="alert">{problem.value}</p>}
         <div class="sheet-actions">
           <button type="button" onClick={openProject}>{projectSettingsWords.menuItem}</button>
@@ -284,6 +301,31 @@ export function FolderSettingsModal({ store, host, folder, summary, down, close,
       {choosing.value && <ProjectModal store={store} host={host} folder={folder} summary={summary}
         close={() => { choosing.value = false; }} />}
     </Modal>
+  );
+}
+
+/** What in this folder's .agents Git ignores (#3448), as the window's Folder Settings ▸ Not Committed. */
+function NotCommitted({ store, host, folder }: { store: Store; host: string; folder: string }) {
+  const reading = useSignal<NotCommittedResponse | undefined>(undefined);
+  const problem = useSignal<string | null>(null);
+  useEffect(() => {
+    void store.notCommitted(host, folder)
+      .then((got) => { reading.value = got; problem.value = null; })
+      .catch((error) => { problem.value = describe(error); });
+  }, [host, folder]);
+  const got = reading.value;
+  return (
+    <div class="not-committed">
+      <p class="sheet-note">{projectSettingsWords.notCommittedNote}</p>
+      {problem.value ? <p class="sheet-note failure" role="alert">{problem.value}</p>
+        : got === undefined ? <p class="sheet-note">Reading…</p>
+        : !got.isRepository ? <p>{projectSettingsWords.notARepository}</p>
+        : got.paths.length === 0 ? <p>{projectSettingsWords.nothingIgnored}</p>
+        : <ul class="not-committed-paths">
+          {got.paths.map((p) => <li key={p}><code title={p}>{p}</code></li>)}
+          {got.more > 0 && <li class="sheet-note">and {got.more} more</li>}
+        </ul>}
+    </div>
   );
 }
 

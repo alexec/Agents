@@ -774,6 +774,9 @@ func (d *Daemon) registerFolders() {
 		r.Folder = store.FolderURL(folderOf(r.Folder))
 		return d.setProject(r)
 	})
+	On(d, wire.CallFoldersNotCommitted, func(ctx context.Context, c *Client, r wire.FolderRequest) (wire.NotCommittedResponse, error) {
+		return notCommitted(folderOf(r.Folder))
+	})
 	On(d, wire.CallFoldersFind, func(ctx context.Context, c *Client, r wire.FoldersFindRequest) ([]wire.FoundFolder, error) {
 		return d.findFolders(r), nil
 	})

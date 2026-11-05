@@ -12,13 +12,13 @@ import (
 	"time"
 )
 
-// The MCP events chat.message and chat.answered (#1016), polled only: `events/list` and
+// The MCP events message.received and question.answered (#1016), polled only: `events/list` and
 // `events/poll` of the events draft (experimental-ext-triggers-events), which the Agents
 // daemon speaks, in the shape of the email server's (Go/internal/emailmcp/events.go). Each
 // carries `sender`, the person on Google Chat, so the machine raises it only when that person
 // has linked their Google Chat user to themselves (#1762): a message starts nothing for
-// anyone else. The names are not Google Chat's own, so another chat server can raise the
-// same ones and one workflow can listen to both.
+// anyone else. The names are the slack server's (Go/internal/slackmcp), so one workflow can
+// listen to both chat servers.
 
 // rpcError is a JSON-RPC error answer.
 type rpcError struct {
@@ -35,9 +35,9 @@ func invalidParams(format string, args ...any) *rpcError {
 
 const (
 	// MessageEvent: a person wrote to the app, in a direct message or with an @mention.
-	MessageEvent = "chat.message"
+	MessageEvent = "message.received"
 	// AnswerEvent: a person pressed an option of a question the app asked.
-	AnswerEvent = "chat.answered"
+	AnswerEvent = "question.answered"
 )
 
 // EventNames is the events it declares, by name.

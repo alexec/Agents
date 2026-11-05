@@ -502,6 +502,10 @@ targets:
       - name: Build the jira MCP server
         script: sh "$SRCROOT/scripts/go-github-mcp.sh" jira-mcp
         basedOnDependencyAnalysis: false
+      # The slack MCP server (#1351, #3475), built and carried the same way.
+      - name: Build the slack MCP server
+        script: sh "$SRCROOT/scripts/go-github-mcp.sh" slack-mcp
+        basedOnDependencyAnalysis: false
       # The Google Chat MCP server (#1016), built and carried the same way.
       - name: Build the Google Chat MCP server
         script: sh "$SRCROOT/scripts/go-github-mcp.sh" googlechat-mcp
@@ -534,6 +538,9 @@ targets:
         basedOnDependencyAnalysis: false
       - name: Carry the jira MCP server
         script: sh "$SRCROOT/scripts/go-github-mcp.sh" --carry jira-mcp
+        basedOnDependencyAnalysis: false
+      - name: Carry the slack MCP server
+        script: sh "$SRCROOT/scripts/go-github-mcp.sh" --carry slack-mcp
         basedOnDependencyAnalysis: false
       - name: Carry the Google Chat MCP server
         script: sh "$SRCROOT/scripts/go-github-mcp.sh" --carry googlechat-mcp

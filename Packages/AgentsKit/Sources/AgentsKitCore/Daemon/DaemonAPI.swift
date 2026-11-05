@@ -243,6 +243,8 @@ public enum DaemonAPI {
         public static let foldersSetPinned = "folders/setPinned"
         /// A folder's disk space lines (#195), kept in its `.agents/folder.json`.
         public static let foldersSetDiskSpace = "folders/setDiskSpace"
+        /// What in a folder's `.agents` Git ignores (#3448): Folder Settings ▸ Not Committed.
+        public static let foldersNotCommitted = "folders/notCommitted"
         /// What the host says on a folder's pull requests when they merge (#2352), kept in
         /// its `.agents/folder.json`. Not in `ConnectionRole.agentMethods`: an agent cannot
         /// choose to publish what its work cost.
@@ -648,6 +650,24 @@ public enum DaemonAPI {
     public struct FolderRequest: Codable, Sendable {
         public var folder: URL
         public init(folder: URL) { self.folder = folder }
+    }
+
+    /// `folders/notCommitted` (#3448): what in the folder's `.agents` Git ignores, so it stays on
+    /// this machine and the project's other folders do not get it.
+    public struct NotCommittedResponse: Codable, Hashable, Sendable {
+        /// False when the folder is not in a Git repository: then nothing in `.agents` is committed.
+        public var isRepository: Bool
+        /// Paths from the folder, such as `.agents/worktrees/`. A folder that Git ignores whole
+        /// is one path, with a slash at its end. At most 500.
+        public var paths: [String]
+        /// How many more paths there are after the first 500.
+        public var more: Int
+
+        public init(isRepository: Bool, paths: [String] = [], more: Int = 0) {
+            self.isRepository = isRepository
+            self.paths = paths
+            self.more = more
+        }
     }
 
     /// `folders/find` (#656). `~` is the host's own home, in both.

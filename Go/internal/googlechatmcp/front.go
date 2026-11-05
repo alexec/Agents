@@ -19,8 +19,8 @@ import (
 // `events` capability and the events' words to its answer to initialize.
 
 // Instructions are the server's words.
-const Instructions = "One Google Chat app: what people send it as events, and tools to post as it. chat.message is a message to the app " +
-	"(a direct message, or an @mention in a space), with its text; chat.answered is a press of an option on a question that ask_question posted. " +
+const Instructions = "One Google Chat app: what people send it as events, and tools to post as it. message.received is a message to the app " +
+	"(a direct message, or an @mention in a space), with its text; question.answered is a press of an option on a question that ask_question posted. " +
 	"Both are raised only for a person who linked their Google Chat user, and act as that person. list_spaces lists the spaces the app is in; " +
 	"send_message posts in one, in a thread when given; ask_question posts a question with a button per option. " +
 	"Everyone in a space sees what the app posts there. It cannot read a space's history, only what is sent to the app."

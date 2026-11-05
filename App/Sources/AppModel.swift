@@ -2905,6 +2905,26 @@ final class AppModel {
         }
     }
 
+    /// Remove from Project… (#3448): the folder leaves its project for a new one of its own,
+    /// named after it (with " 2" when that name is taken). With no control plane, its machine
+    /// is told an id made here, and the control plane takes it up when there is one. Nil, or
+    /// why not.
+    func removeFromProject(_ summary: DaemonAPI.FolderSummary) async -> String? {
+        var id = String((0..<12).map { _ in "abcdefghijklmnopqrstuvwxyz0123456789".randomElement()! })
+        if let control = controlRequests {
+            do {
+                let projects = try await control.call(DaemonAPI.Method.projectsList, DaemonAPI.Empty(),
+                                                      returning: DaemonAPI.ProjectList.self).projects
+                id = try await control.call(DaemonAPI.Method.projectsSet,
+                                            DaemonAPI.ProjectSet(name: ProjectWords.freeName(summary.name, among: projects)),
+                                            returning: DaemonAPI.Project.self).id
+            } catch {
+                return PeopleWords.refusal(error)
+            }
+        }
+        return await setProject(id, for: summary.key)
+    }
+
     /// A folder pinned to the top of the sidebar, or not.
     func setPinned(_ pinned: Bool, for key: FolderKey) async {
         do {
@@ -3001,6 +3021,13 @@ final class AppModel {
         } catch {
             problem = describe(error)
         }
+    }
+
+    /// What in a folder's `.agents` Git ignores (#3448), read by its own machine.
+    func notCommitted(in key: FolderKey) async throws -> DaemonAPI.NotCommittedResponse {
+        try await client(for: key.host).call(
+            DaemonAPI.Method.foldersNotCommitted, DaemonAPI.FolderRequest(folder: key.folder),
+            returning: DaemonAPI.NotCommittedResponse.self)
     }
 
     func setPRCostComment(_ choice: PRCostComment, for key: FolderKey) async {

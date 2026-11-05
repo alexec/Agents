@@ -2102,7 +2102,7 @@ export interface ConnectorSlot {
   slot: ConnectorSlotKind;
   /**
    * What fills it, in words: GitHub Issues, GitHub pull requests, GitHub Actions, This folder
-   * (docs), This Mac.
+   * (docs), Slack and Email or None (messaging), This Mac.
    */
   choice: string;
   state: ConnectorSlotState;
@@ -2130,17 +2130,26 @@ export interface ConnectorSlot {
    * found. Absent with none.
    */
   docsServers?: DocsServer[];
+  /**
+   * Messaging only (#1787): each messaging connector in the folder's or the person's mcp.json
+   * (Slack, email, Google Chat and the like) with its one real read, in the order of servers.
+   * Present also when the slot is skipped, so a client can offer Set Up; absent with none, when the
+   * slot is None.
+   */
+  messagingServers?: MessagingServer[];
 }
 
 /**
  * One slot of a folder's set-up (#1336), in the page's order: tasks (the tracker), codeReview, ci,
- * docs (where the docs live, #3248), and workspace (where agents run).
+ * docs (where the docs live, #3248), messaging (where agents reach the person: Slack, email, chat
+ * connectors, #1787), and workspace (where agents run).
  */
 export type ConnectorSlotKind =
   | "tasks"
   | "codeReview"
   | "ci"
   | "docs"
+  | "messaging"
   | "workspace";
 
 /**
@@ -5471,6 +5480,41 @@ export interface MessageSender {
   title: string;
 }
 
+/**
+ * One messaging connector in the Messaging slot (#1787): its name in mcp.json, what it is in words
+ * (Slack, Email, Google Chat, or its name), its one real read (a list of its channels, folders or
+ * spaces) and the events it declares.
+ */
+export interface MessagingServer {
+  name: string;
+  /**
+   * What it is, in words: Slack, Email, Google Chat, WhatsApp, Discord, Telegram, Microsoft Teams,
+   * or its name.
+   */
+  word: string;
+  state: MessagingServerState;
+  /**
+   * What the read found: how many channels, folders or spaces, or its first line. Absent when it
+   * did not read.
+   */
+  proof?: ConnectorProof;
+  /** failed: why, in a sentence. */
+  message?: string;
+  /**
+   * The events it declares (slack.message, email.received), from its events/list. Absent with none.
+   */
+  events?: string[];
+}
+
+/**
+ * notRead: not read yet. read: its one read worked. failed: the read did not work; message says
+ * why.
+ */
+export type MessagingServerState =
+  | "notRead"
+  | "read"
+  | "failed";
+
 export interface Milestones {
   earned: EarnedMilestone[];
 }
@@ -5553,6 +5597,25 @@ export type NeedKind =
   | "report"
   | "guardedChange"
   | "notice";
+
+/**
+ * folders/notCommitted (#3448): what in the folder's .agents Git ignores, so it stays on this
+ * machine and the project's other folders do not get it.
+ */
+export interface NotCommittedResponse {
+  /**
+   * False when the folder is not in a Git repository: then nothing in .agents is committed, and
+   * paths is empty.
+   */
+  isRepository: boolean;
+  /**
+   * Paths from the folder, such as .agents/worktrees/. A folder that Git ignores whole is one path,
+   * with a slash at its end. At most 500.
+   */
+  paths: string[];
+  /** How many more paths there are after the first 500. */
+  more: number;
+}
 
 /**
  * notices/delivered (#2860): the control plane sent a host's notice to one of the person's devices.
@@ -10496,6 +10559,7 @@ export interface Methods {
   "folders/delete": { params: FolderRequest; result: Empty };
   "folders/keepGuardedChange": { params: GuardedChangeRequest; result: FolderSummary };
   "folders/list": { params: FoldersListRequest; result: FolderSummary[] };
+  "folders/notCommitted": { params: FolderRequest; result: NotCommittedResponse };
   "folders/readGuardedChange": { params: GuardedChangeRequest; result: GuardedChangeReading };
   "folders/setDiskSpace": { params: SetDiskSpaceRequest; result: FolderSummary };
   "folders/setHelperLimits": { params: SetHelperLimitsRequest; result: FolderSummary };
@@ -10838,6 +10902,7 @@ export const MethodTarget = {
   "folders/delete": "host",
   "folders/keepGuardedChange": "host",
   "folders/list": "host",
+  "folders/notCommitted": "host",
   "folders/readGuardedChange": "host",
   "folders/setDiskSpace": "host",
   "folders/setHelperLimits": "host",
@@ -11285,7 +11350,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConnectorSetup: { required: ["folder", "slots", "events", "done"], optional: ["repository", "forge", "site", "repositoryURL", "connection", "installed", "installURL", "repositories", "project", "projectName"] },
   ConnectorSetupRequest: { required: ["folder"], optional: ["reading"] },
   ConnectorSkipRequest: { required: ["folder", "slot", "skipped"], optional: [] },
-  ConnectorSlot: { required: ["slot", "choice", "state"], optional: ["proof", "readAt", "message", "repository", "fromProject", "servers", "docsServers"] },
+  ConnectorSlot: { required: ["slot", "choice", "state"], optional: ["proof", "readAt", "message", "repository", "fromProject", "servers", "docsServers", "messagingServers"] },
   ConnectorWorkflow: { required: ["id", "name"], optional: [] },
   ConsoleStopAgent: { required: ["host", "agent"], optional: [] },
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
@@ -11607,12 +11672,14 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MarketplacesListAnswer: { required: ["marketplaces"], optional: ["problem"] },
   MarketplacesListRequest: { required: [], optional: ["kind", "destination"] },
   MessageSender: { required: ["agentID", "title"], optional: [] },
+  MessagingServer: { required: ["name", "word", "state"], optional: ["proof", "message", "events"] },
   Milestones: { required: ["earned"], optional: [] },
   MissingFolder: { required: ["branchKept"], optional: [] },
   MoveAnswer: { required: ["when", "message"], optional: ["agent"] },
   MoveRequest: { required: ["agentID", "removeLeft", "discardChanges"], optional: ["target"] },
   NativeSetting: { required: [], optional: ["options", "sandbox", "clientPermission"] },
   Need: { required: ["id", "folder", "kind", "raisedAt", "headline"], optional: ["agentID"] },
+  NotCommittedResponse: { required: ["isRepository", "paths", "more"], optional: [] },
   NoticeDelivered: { required: ["need", "to"], optional: [] },
   NoticeDelivery: { required: ["notice", "to"], optional: [] },
   NoticeLimits: { required: ["burst", "cooldownMinutes"], optional: [] },

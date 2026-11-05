@@ -161,6 +161,8 @@ something particular done.
   own tools, and an agent when an issue is opened, labelled, commented on or assigned to you.
 - [Wait for mail](wait-for-mail.md): a mailbox for agents, the Mail page, and sign-up codes
   given to the session that waits for them.
+- [Reach agents from Slack](reach-agents-from-slack.md): a Slack app for Agents, a workflow
+  that starts on a Slack message, and questions with options as buttons.
 - [Use Google Chat](use-google-chat.md): a Google Chat app that starts agents, brings their
   questions to a space and takes the answer back.
 - [Pin a page to a folder](pin-a-page-to-a-folder.md): a document or an HTML page

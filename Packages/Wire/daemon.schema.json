@@ -5094,7 +5094,7 @@
         },
         "choice": {
           "type": "string",
-          "description": "What fills it, in words: GitHub Issues, GitHub pull requests, GitHub Actions, This folder (docs), This Mac."
+          "description": "What fills it, in words: GitHub Issues, GitHub pull requests, GitHub Actions, This folder (docs), Slack and Email or None (messaging), This Mac."
         },
         "state": {
           "$ref": "#/definitions/ConnectorSlotState"
@@ -5130,6 +5130,13 @@
             "$ref": "#/definitions/DocsServer"
           },
           "description": "Docs only (#3307): each docs connector's own read, in the order of servers: one real search through the map an agent wrote of its tools (.agents/docs-maps.json), and the first doc it found. Absent with none."
+        },
+        "messagingServers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MessagingServer"
+          },
+          "description": "Messaging only (#1787): each messaging connector in the folder's or the person's mcp.json (Slack, email, Google Chat and the like) with its one real read, in the order of servers. Present also when the slot is skipped, so a client can offer Set Up; absent with none, when the slot is None."
         }
       },
       "required": [
@@ -5141,12 +5148,13 @@
     },
     "ConnectorSlotKind": {
       "type": "string",
-      "description": "One slot of a folder's set-up (#1336), in the page's order: tasks (the tracker), codeReview, ci, docs (where the docs live, #3248), and workspace (where agents run).",
+      "description": "One slot of a folder's set-up (#1336), in the page's order: tasks (the tracker), codeReview, ci, docs (where the docs live, #3248), messaging (where agents reach the person: Slack, email, chat connectors, #1787), and workspace (where agents run).",
       "enum": [
         "tasks",
         "codeReview",
         "ci",
         "docs",
+        "messaging",
         "workspace"
       ]
     },
@@ -14794,6 +14802,52 @@
       ],
       "additionalProperties": false
     },
+    "MessagingServer": {
+      "type": "object",
+      "description": "One messaging connector in the Messaging slot (#1787): its name in mcp.json, what it is in words (Slack, Email, Google Chat, or its name), its one real read (a list of its channels, folders or spaces) and the events it declares.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "word": {
+          "type": "string",
+          "description": "What it is, in words: Slack, Email, Google Chat, WhatsApp, Discord, Telegram, Microsoft Teams, or its name."
+        },
+        "state": {
+          "$ref": "#/definitions/MessagingServerState"
+        },
+        "proof": {
+          "$ref": "#/definitions/ConnectorProof",
+          "description": "What the read found: how many channels, folders or spaces, or its first line. Absent when it did not read."
+        },
+        "message": {
+          "type": "string",
+          "description": "failed: why, in a sentence."
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The events it declares (slack.message, email.received), from its events/list. Absent with none."
+        }
+      },
+      "required": [
+        "name",
+        "word",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "MessagingServerState": {
+      "type": "string",
+      "description": "notRead: not read yet. read: its one read worked. failed: the read did not work; message says why.",
+      "enum": [
+        "notRead",
+        "read",
+        "failed"
+      ]
+    },
     "Milestones": {
       "type": "object",
       "properties": {
@@ -15098,6 +15152,33 @@
         "guardedChange",
         "notice"
       ]
+    },
+    "NotCommittedResponse": {
+      "type": "object",
+      "description": "folders/notCommitted (#3448): what in the folder's .agents Git ignores, so it stays on this machine and the project's other folders do not get it.",
+      "properties": {
+        "isRepository": {
+          "type": "boolean",
+          "description": "False when the folder is not in a Git repository: then nothing in .agents is committed, and paths is empty."
+        },
+        "paths": {
+          "type": "array",
+          "description": "Paths from the folder, such as .agents/worktrees/. A folder that Git ignores whole is one path, with a slash at its end. At most 500.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "more": {
+          "type": "integer",
+          "description": "How many more paths there are after the first 500."
+        }
+      },
+      "required": [
+        "isRepository",
+        "paths",
+        "more"
+      ],
+      "additionalProperties": false
     },
     "NoticeDelivered": {
       "type": "object",

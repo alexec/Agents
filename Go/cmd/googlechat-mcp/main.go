@@ -1,6 +1,6 @@
 // googlechat-mcp: the `googlechat` MCP server (#1016), on stdio, in the email server's shape
 // (Go/cmd/email-mcp): one Google Chat app's messages and answers as the polled events
-// chat.message and chat.answered, pulled from the app's Pub/Sub subscription (outbound, so
+// message.received and question.answered, pulled from the app's Pub/Sub subscription (outbound, so
 // the machine needs no public address), and tools that list the app's spaces, post as it, and
 // ask a question with a button per option. Each event names its sender, so it acts only for a
 // person who linked their Google Chat user (#1762). The app's service account key is

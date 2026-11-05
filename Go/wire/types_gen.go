@@ -2466,7 +2466,7 @@ type ConnectorSkipRequest struct {
 type ConnectorSlot struct {
 	Slot ConnectorSlotKind `json:"slot"`
 
-	// What fills it, in words: GitHub Issues, GitHub pull requests, GitHub Actions, This folder (docs), This Mac.
+	// What fills it, in words: GitHub Issues, GitHub pull requests, GitHub Actions, This folder (docs), Slack and Email or None (messaging), This Mac.
 	Choice string `json:"choice"`
 
 	State ConnectorSlotState `json:"state"`
@@ -2489,15 +2489,19 @@ type ConnectorSlot struct {
 
 	// Docs only (#3307): each docs connector's own read, in the order of servers: one real search through the map an agent wrote of its tools (.agents/docs-maps.json), and the first doc it found. Absent with none.
 	DocsServers []DocsServer `json:"docsServers,omitzero"`
+
+	// Messaging only (#1787): each messaging connector in the folder's or the person's mcp.json (Slack, email, Google Chat and the like) with its one real read, in the order of servers. Present also when the slot is skipped, so a client can offer Set Up; absent with none, when the slot is None.
+	MessagingServers []MessagingServer `json:"messagingServers,omitzero"`
 }
 
-// One slot of a folder's set-up (#1336), in the page's order: tasks (the tracker), codeReview, ci, docs (where the docs live, #3248), and workspace (where agents run).
+// One slot of a folder's set-up (#1336), in the page's order: tasks (the tracker), codeReview, ci, docs (where the docs live, #3248), messaging (where agents reach the person: Slack, email, chat connectors, #1787), and workspace (where agents run).
 type ConnectorSlotKind string
 
 const ConnectorSlotKindTasks ConnectorSlotKind = "tasks"
 const ConnectorSlotKindCodeReview ConnectorSlotKind = "codeReview"
 const ConnectorSlotKindCi ConnectorSlotKind = "ci"
 const ConnectorSlotKindDocs ConnectorSlotKind = "docs"
+const ConnectorSlotKindMessaging ConnectorSlotKind = "messaging"
 const ConnectorSlotKindWorkspace ConnectorSlotKind = "workspace"
 
 // notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach the provider; message says why. refused: the provider refused the read, so the person grants it on the provider's site. noRemote: the folder has no GitHub or GitLab remote. skipped: the person skipped it; it counts as done.
@@ -6544,6 +6548,32 @@ type MessageSender struct {
 	Title string `json:"title"`
 }
 
+// One messaging connector in the Messaging slot (#1787): its name in mcp.json, what it is in words (Slack, Email, Google Chat, or its name), its one real read (a list of its channels, folders or spaces) and the events it declares.
+type MessagingServer struct {
+	Name string `json:"name"`
+
+	// What it is, in words: Slack, Email, Google Chat, WhatsApp, Discord, Telegram, Microsoft Teams, or its name.
+	Word string `json:"word"`
+
+	State MessagingServerState `json:"state"`
+
+	// What the read found: how many channels, folders or spaces, or its first line. Absent when it did not read.
+	Proof *ConnectorProof `json:"proof,omitzero"`
+
+	// failed: why, in a sentence.
+	Message *string `json:"message,omitzero"`
+
+	// The events it declares (slack.message, email.received), from its events/list. Absent with none.
+	Events []string `json:"events,omitzero"`
+}
+
+// notRead: not read yet. read: its one read worked. failed: the read did not work; message says why.
+type MessagingServerState string
+
+const MessagingServerStateNotRead MessagingServerState = "notRead"
+const MessagingServerStateRead MessagingServerState = "read"
+const MessagingServerStateFailed MessagingServerState = "failed"
+
 type Milestones struct {
 	Earned []EarnedMilestone `json:"earned"`
 }
@@ -6678,6 +6708,18 @@ const NeedKindElicitation NeedKind = "elicitation"
 const NeedKindReport NeedKind = "report"
 const NeedKindGuardedChange NeedKind = "guardedChange"
 const NeedKindNotice NeedKind = "notice"
+
+// folders/notCommitted (#3448): what in the folder's .agents Git ignores, so it stays on this machine and the project's other folders do not get it.
+type NotCommittedResponse struct {
+	// False when the folder is not in a Git repository: then nothing in .agents is committed, and paths is empty.
+	IsRepository bool `json:"isRepository"`
+
+	// Paths from the folder, such as .agents/worktrees/. A folder that Git ignores whole is one path, with a slash at its end. At most 500.
+	Paths []string `json:"paths"`
+
+	// How many more paths there are after the first 500.
+	More int64 `json:"more"`
+}
 
 // notices/delivered (#2860): the control plane sent a host's notice to one of the person's devices.
 type NoticeDelivered struct {

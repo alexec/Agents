@@ -12,8 +12,10 @@ require (
 	github.com/emersion/go-message v0.18.2
 	github.com/github/github-mcp-server/v2 v2.0.2
 	github.com/google/go-github/v92 v92.0.0
+	github.com/gorilla/websocket v1.5.3
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/shurcooL/githubv4 v0.0.0-20260209031235-2402fdf4a9ed
+	github.com/slack-go/slack v0.34.0
 	github.com/ulikunitz/xz v0.5.17
 	github.com/yuin/goldmark v1.8.5
 	gocloud.dev v0.46.0

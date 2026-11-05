@@ -19,7 +19,8 @@ control exchange. The Mac window, the Remote, `Shared/UI`, the web page, Agents 
 | `cmd/linear-mcp/`, `internal/linearmcp/` | The `linear` MCP server (#839): Linear's issue events, in github-mcp's shape (tools are Linear's own server's) | ci-server |
 | `cmd/jira-mcp/`, `internal/jiramcp/` | The `jira` MCP server (#3247): Jira's issue events and Issues page, in linear-mcp's shape (tools are Atlassian's own server's) | ci-server |
 | `cmd/email-mcp/`, `internal/emailmcp/` | The `email` MCP server (#1780): one IMAP mailbox's new mail as `email.received`, and tools that read it; it never sends | email |
-| `cmd/googlechat-mcp/`, `internal/googlechatmcp/` | The `googlechat` MCP server (#1016): a Google Chat app's messages and answers as `chat.message` and `chat.answered`, pulled from Pub/Sub, and tools that post as the app | googlechat |
+| `cmd/slack-mcp/`, `internal/slackmcp/` | The `slack` MCP server (#1351): a Slack app's bot over Socket Mode, `message.received` and `question.answered`, and tools that read, send and ask | channels |
+| `cmd/googlechat-mcp/`, `internal/googlechatmcp/` | The `googlechat` MCP server (#1016): a Google Chat app's messages and answers as `message.received` and `question.answered`, pulled from Pub/Sub, and tools that post as the app | googlechat |
 | `cmd/gitlab-mcp/`, `internal/gitlabmcp/` | The `gitlab` MCP server (#1629): merge requests, pipelines and issues on GitLab, tools and events on REST v4 | gitlab |
 | `cmd/workspace-commands/`, `internal/workspacecommands/` | The command machine provider (#691, in Go since #1364): workspaces as shell commands and presets, an MCP server the control plane runs | workspaces |
 
@@ -216,6 +217,30 @@ carries it (`scripts/go-github-mcp.sh email-mcp`) and every Linux host installs
 `email-mcp-linux-<arch>`; the catalogue lists it as `agents/email`, which asks for no secret:
 it reads the connection.
 
+## The Slack MCP server (`slack-mcp`, #1351)
+
+The email server's shape for one Slack workspace (`github.com/slack-go/slack`): a stdio front
+(`slackmcp.Front`) answers `events/list` and `events/poll` and passes everything else to a
+go-sdk server with its tools. The bot token (`SLACK_BOT_TOKEN`, `xoxb-`) calls the Web API;
+the app-level token (`SLACK_APP_TOKEN`, `xapp-`, `connections:write`) holds a Socket Mode
+connection open (`slackmcp.Listener`), so Slack needs no public address. Each request is
+acknowledged at once and put in an inbox in memory (the last 1,000); a poll reads it, so the
+pace is 3 s and a poll costs Slack nothing. A cursor from an earlier run starts from now.
+
+- **Events** `message.received` (`channel`, `user`, `thread`, `mentions`) and
+  `question.answered` (`question`, `channel`). Neither has a message's text. Each has a
+  `sender` (`slack`, `team/user`, and the name and email from `users.info`) for a channel
+  link (#1762). Edits, deletions, joins and bots' messages are left out.
+- **Tools:** `list_channels`, `read_messages` (its text inside
+  `<untrusted-content source="slack">`), `send_message` and `ask_question` (the options as
+  buttons in an `actions` block, `agents-question:<id>`; the first press is the answer, and
+  `chat.update` puts who answered in their place). No `@channel`, `@here` or `@everyone`.
+
+The tests run it against a fake Web API and Socket Mode over a WebSocket (`fake_test.go`).
+Agents Host carries it (`scripts/go-github-mcp.sh slack-mcp`) and every Linux host installs
+`slack-mcp-linux-<arch>` (#3475); the catalogue lists it as `agents/slack`, which asks for
+the two tokens as secrets. See `docs/how-to/reach-agents-from-slack.md`.
+
 ## The Google Chat MCP server (`googlechat-mcp`, #1016)
 
 The email server's shape for one Google Chat app, with Google's own REST clients
@@ -225,8 +250,8 @@ tools. The app's service account key (`GOOGLE_CHAT_CREDENTIALS`: its JSON, or it
 signs in to both APIs; `GOOGLE_CHAT_SUBSCRIPTION` names the Pub/Sub subscription
 (`agents-chat` in the key's project when left out). Both are read at each call.
 
-- **Events** `chat.message` (filters `space`, `text`, a glob, and `direct`) and
-  `chat.answered` (filters `space` and `question`), polled. One loop, started by the first
+- **Events** `message.received` (filters `space`, `text`, a glob, and `direct`) and
+  `question.answered` (filters `space` and `question`), polled. One loop, started by the first
   poll, pulls the subscription into an inbox in memory and acknowledges what it pulled; each
   poll's cursor is a place in that inbox (the run and a number), so every workflow reads the
   same list. The inbox keeps the newest 1,000 for a day; the pace is 3 s. Each event's
@@ -235,7 +260,7 @@ signs in to both APIs; `GOOGLE_CHAT_SUBSCRIPTION` names the Pub/Sub subscription
   are not.
 - **Tools:** `list_spaces`, `send_message` and `ask_question`, a card with a button per
   option whose press calls `agents.answer` with the question's id; the first press is
-  `chat.answered`, and the server then edits the card to say who answered.
+  `question.answered`, and the server then edits the card to say who answered.
 
 The tests run it against a fake Pub/Sub and Chat API over HTTP (`fake_test.go`;
 `GOOGLE_CHAT_API_URL` and `GOOGLE_CHAT_PUBSUB_URL` point a real run at one). Agents Host

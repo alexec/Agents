@@ -28,8 +28,8 @@ servers=$root/App/Resources/servers
 cd $root
 
 for arch in x86_64 aarch64; do
-    [[ -f $servers/agentsd-linux-$arch && -f $servers/github-mcp-linux-$arch && -f $servers/linear-mcp-linux-$arch && -f $servers/gitlab-mcp-linux-$arch && -f $servers/email-mcp-linux-$arch && -f $servers/jira-mcp-linux-$arch && -f $servers/googlechat-mcp-linux-$arch ]] || {
-        print -u2 "No $servers/agentsd-linux-$arch, github-mcp-linux-$arch, linear-mcp-linux-$arch, gitlab-mcp-linux-$arch, email-mcp-linux-$arch, jira-mcp-linux-$arch or googlechat-mcp-linux-$arch: run scripts/build-linux-agentsd.sh first (with Docker or Go)."
+    [[ -f $servers/agentsd-linux-$arch && -f $servers/github-mcp-linux-$arch && -f $servers/linear-mcp-linux-$arch && -f $servers/gitlab-mcp-linux-$arch && -f $servers/email-mcp-linux-$arch && -f $servers/jira-mcp-linux-$arch && -f $servers/slack-mcp-linux-$arch && -f $servers/googlechat-mcp-linux-$arch ]] || {
+        print -u2 "No $servers/agentsd-linux-$arch, github-mcp-linux-$arch, linear-mcp-linux-$arch, gitlab-mcp-linux-$arch, email-mcp-linux-$arch, jira-mcp-linux-$arch, slack-mcp-linux-$arch or googlechat-mcp-linux-$arch: run scripts/build-linux-agentsd.sh first (with Docker or Go)."
         exit 1
     }
 done
@@ -82,7 +82,7 @@ fi
 
 # What the bundle must hold, signed: the helpers, the MCP servers it ships (#700) and the
 # Linux agentsd.
-for helper in agentsd agents-control agents-relay.app github-mcp linear-mcp gitlab-mcp email-mcp jira-mcp googlechat-mcp workspace-commands; do
+for helper in agentsd agents-control agents-relay.app github-mcp linear-mcp gitlab-mcp email-mcp jira-mcp slack-mcp googlechat-mcp workspace-commands; do
     [[ -e "$app/Contents/Helpers/$helper" ]] || { print -u2 "Agents Host has no Helpers/$helper"; exit 1 }
 done
 codesign --verify --deep --strict "$app"
@@ -118,6 +118,7 @@ for arch in x86_64 aarch64; do
         gitlab-mcp-linux-$arch gitlab-mcp-linux-$arch.sha256 \
         email-mcp-linux-$arch email-mcp-linux-$arch.sha256 \
         jira-mcp-linux-$arch jira-mcp-linux-$arch.sha256 \
+        slack-mcp-linux-$arch slack-mcp-linux-$arch.sha256 \
         googlechat-mcp-linux-$arch googlechat-mcp-linux-$arch.sha256 VERSION
 done
 (cd $out && shasum -a 256 *.dmg *.zip *.tar.gz > SHA256SUMS)

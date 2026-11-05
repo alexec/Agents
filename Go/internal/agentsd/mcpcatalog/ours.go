@@ -16,9 +16,10 @@ import (
 //
 // github-mcp, linear-mcp, gitlab-mcp and jira-mcp read the person's GitHub, Linear, GitLab
 // and Atlassian connections (#1343, #1630, #3304) and ask for no secret; email-mcp reads the
-// person's email connection (Connect Email, #1780) and never sends mail. A token set by hand in
-// mcp.json's env still goes first. tested is when each was last tested on a real account
-// (docs/reference/integrations.md).
+// person's email connection (Connect Email, #1780) and never sends mail. slack-mcp has no
+// connection to read: it asks for the Slack app's bot and app-level tokens (#3475). A token
+// set by hand in mcp.json's env still goes first. tested is when each was last tested on a
+// real account (docs/reference/integrations.md).
 
 //go:embed agents.json
 var agentsFile []byte

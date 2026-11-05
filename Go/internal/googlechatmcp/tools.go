@@ -17,7 +17,7 @@ import (
 
 // The Google Chat server's tools (#1016): list the spaces the app is in, post a message as
 // the app, and ask a question with its options as buttons, whose answer comes back as the
-// event chat.answered. The app can post only where a person added it, so a space it is not
+// event question.answered. The app can post only where a person added it, so a space it is not
 // in cannot be reached. Nothing reads a space's history: the app sees only what is sent to it.
 
 const (
@@ -52,7 +52,7 @@ type askArgs struct {
 	Question string   `json:"question" jsonschema:"the question, at most 4000 characters"`
 	Options  []choice `json:"options" jsonschema:"two to six options, one button each"`
 	Thread   string   `json:"thread,omitempty" jsonschema:"the thread to ask in; a new thread when left out"`
-	ID       string   `json:"id,omitempty" jsonschema:"the question's id, given back in chat.answered, such as the session it is for; made up when left out"`
+	ID       string   `json:"id,omitempty" jsonschema:"the question's id, given back in question.answered, such as the session it is for; made up when left out"`
 	Title    string   `json:"title,omitempty" jsonschema:"a line above the question, such as the asking session's title"`
 }
 
@@ -126,7 +126,7 @@ func AddTools(server *mcp.Server, g *Google) {
 		})
 
 	tool(server, &mcp.Tool{Name: "send_message", Title: "Send a message",
-		Description: "Posts a message as the Chat app in a space it is in, in a thread when one is given (answer a chat.message in its thread). " +
+		Description: "Posts a message as the Chat app in a space it is in, in a thread when one is given (answer a message.received in its thread). " +
 			"Everyone in the space sees it: write only what they may read.",
 		Annotations: posts},
 		func(ctx context.Context, in sendArgs) (*mcp.CallToolResult, error) {
@@ -146,7 +146,7 @@ func AddTools(server *mcp.Server, g *Google) {
 		})
 
 	tool(server, &mcp.Tool{Name: "ask_question", Title: "Ask a question",
-		Description: "Posts a question as the Chat app, with a button for each option. The first press comes back as the event chat.answered, with the question's id " +
+		Description: "Posts a question as the Chat app, with a button for each option. The first press comes back as the event question.answered, with the question's id " +
 			"and the option's id; the card then says who answered and what. Use it to bring an agent's question to a person who is not at the app.",
 		Annotations: posts},
 		func(ctx context.Context, in askArgs) (*mcp.CallToolResult, error) {

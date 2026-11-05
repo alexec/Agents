@@ -76,6 +76,29 @@ struct ConnectorSetupWordsTests {
         #expect(ConnectorSetupWords.disconnectMessage(.github, folders: [("walk", setup)]).hasPrefix("walk loses Tasks."))
     }
 
+    /// The Messaging slot (#1787): None until a chat or email connector is there, then each
+    /// connector's one read and its events.
+    @Test func theMessagingSlot() throws {
+        let slot = try JSONDecoder().decode(DaemonAPI.ConnectorSlot.self, from: Data("""
+        {"slot":"messaging","choice":"Slack and Email","state":"read","servers":["slack","gmail"],
+         "messagingServers":[{"name":"slack","word":"Slack","state":"read","proof":{"title":"3 channels"},
+          "events":["slack.message"]},{"name":"gmail","word":"Email","state":"failed","message":"It wants a sign-in first."},
+          {"name":"Slack","word":"Slack","state":"notRead"}]}
+        """.utf8))
+        #expect(!slot.slot.isProjects && ConnectorSetupWords.heading(.messaging) == "Messaging")
+        #expect(ConnectorSetupWords.title(slot) == "Slack and Email")
+        #expect((slot.messagingServers ?? []).map(ConnectorSetupWords.Messaging.serverLine) == [
+            "Slack (slack): read 3 channels; events slack.message",
+            "Email (gmail): It wants a sign-in first.",
+            "Slack: reading\u{2026}",
+        ])
+        let none = DaemonAPI.ConnectorSlot(slot: .messaging, choice: "None", state: .skipped)
+        #expect(ConnectorSetupWords.title(none) == "None")
+        #expect(ConnectorSetupWords.line(none, folder: "walk", repository: nil).hasSuffix("to reach you there too."))
+        let skipped = DaemonAPI.ConnectorSlot(slot: .messaging, choice: "Slack", state: .skipped, servers: ["slack"])
+        #expect(ConnectorSetupWords.line(skipped, folder: "walk", repository: nil).hasSuffix("their events with them."))
+    }
+
     @Test func aRunSaysWhenItRan() {
         let now = Date(timeIntervalSinceReferenceDate: 800_000_000)
         let run = DaemonAPI.ConnectorProof(title: "CI on main", outcome: "passed", at: now.addingTimeInterval(-240))
