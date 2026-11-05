@@ -27,14 +27,14 @@ func TestASuspendedPersonsMachineGetsNoRouteAndStartsNothing(t *testing.T) {
 	host := box.member.Host
 	p.waitFor(func() bool { _, ok := told.last(host); return ok }, "Sam's machine told at its join")
 	setRoute(t, admin, wire.OrgRoute{ID: "org-openai", Name: "Org OpenAI", Kind: wire.OrgRouteKindKey,
-		Vendor: vendor(wire.OrgRouteVendorOpenai), Runtimes: []string{"codex"}}, map[string]string{"apiKey": "sk-org-key"}, nil)
-	p.waitFor(func() bool { return told.route(host, "org-openai") != nil }, "Sam's machine told the route")
+		Vendor: vendor(wire.OrgRouteVendorOpenai), Runtimes: []string{"codex"}}, map[string]string{"apiKey": "sk-org-key"}, nil, 0)
+	p.waitFor(func() bool { return told.sealed(host, "org-openai") != nil }, "Sam's machine told the route")
 
 	ctx := context.Background()
 	p.s.suspend(ctx, sam.id, records.Suspension{By: "scim", Provider: "acme-okta", At: records.Now(), Why: "made inactive"},
 		wire.AuditActor{User: "scim:acme-okta"})
 	p.waitFor(func() bool { return told.route(host, "org-openai") == nil }, "Sam's machine told no route")
-	delivery, _, err := p.s.orgDelivery(ctx, host)
+	delivery, _, _, err := p.s.orgDelivery(ctx, host)
 	if err != nil || len(delivery.Routes) != 0 {
 		t.Fatalf("%d routes, %v", len(delivery.Routes), err)
 	}
@@ -42,7 +42,7 @@ func TestASuspendedPersonsMachineGetsNoRouteAndStartsNothing(t *testing.T) {
 	if _, err := box.uplink.Ask(t.Context(), wire.CallHostOrgRoutesAgain.Name, wire.Empty{}); err != nil {
 		t.Fatal(err)
 	}
-	if delivery, _, _ := p.s.orgDelivery(ctx, host); len(delivery.Routes) != 0 {
+	if delivery, _, _, _ := p.s.orgDelivery(ctx, host); len(delivery.Routes) != 0 {
 		t.Fatal("a suspended person's machine may use a route")
 	}
 

@@ -8,11 +8,12 @@
 //	v1/users/<user>/notices.json           the person's notice bucket (#2859)
 //	v1/users/<user>/secrets/<NAME>.json    a secret, sealed (FR-025, SC-007)
 //
-// Each secret is sealed in an envelope (kms.SealFor): a data key of its own encrypts it,
-// and the keeper wraps the data key. The keeper is Google Cloud KMS on a cloud machine, or
-// a local key in a 0600 file outside the store on a Mac. The envelope is bound to its key
-// in the store, so a record copied to another person's secrets does not open. No value is
-// in the store, a log line or an event.
+// Each secret is sealed by the person's client, with HPKE, to each of their machines and
+// clients (#3397, specs/3397-client-sealing): the record keeps one envelope a recipient,
+// and the control plane opens none. The associated data binds the person, the recipient,
+// the name and the version, so a record copied to another person's secrets, or an older
+// version, does not open. No value is in the store, the control plane's memory, a log line
+// or an event.
 package usersettings
 
 import (
@@ -25,7 +26,6 @@ import (
 	"slices"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"gocloud.dev/secrets"
@@ -45,10 +45,12 @@ const (
 	MaxPart    = 256 << 10
 	MaxSecret  = 16 << 10
 	MaxSecrets = 200
+	// MaxRecipients bounds the machines and clients a secret is sealed to (#3397).
+	MaxRecipients = 200
 )
 
 var (
-	// ErrNoSealing is user/setSecret on a control plane with no keeper for secrets.
+	// ErrNoSealing is SealFor or OpenFor on a control plane with no keeper for secrets.
 	ErrNoSealing = errors.New("this control plane has no key to seal secrets with")
 	// ErrInvalid is a part or a secret that is not what it must be. Its words never hold a
 	// secret's value.
@@ -66,28 +68,18 @@ type Book struct {
 	keeper    *secrets.Keeper
 	keeperURL string
 	now       func() time.Time
-
-	mu sync.Mutex
-	// opened keeps each secret's value by its record's tag, so a machine's join does not
-	// ask the keeper again for what did not change.
-	opened map[string]openedSecret
 }
 
-type openedSecret struct {
-	tag   string
-	value string
-}
-
-// New is a book over s. keeper seals and opens the secrets; nil refuses every secret.
+// New is a book over s. keeper seals and opens what other parts of the control plane keep
+// (SealFor, OpenFor); a person's own secrets are sealed by their clients and need none.
 func New(s store.Store, keeper *secrets.Keeper, keeperURL string) *Book {
-	return &Book{store: s, keeper: keeper, keeperURL: keeperURL, now: time.Now, opened: map[string]openedSecret{}}
+	return &Book{store: s, keeper: keeper, keeperURL: keeperURL, now: time.Now}
 }
 
-// Sealing says whether this book can keep secrets.
+// Sealing says whether this book has a keeper for SealFor and OpenFor.
 func (b *Book) Sealing() bool { return b != nil && b.keeper != nil }
 
-// SealFor seals a value with this book's keeper, bound to the store key it is kept at. The
-// organisation's route secrets (#999) are sealed with the same keeper as a person's.
+// SealFor seals a value with this book's keeper, bound to the store key it is kept at.
 func (b *Book) SealFor(ctx context.Context, plaintext, boundTo []byte) (*kms.Sealed, error) {
 	if !b.Sealing() {
 		return nil, ErrNoSealing
@@ -113,11 +105,14 @@ func noticesKey(user string) string      { return Prefix + user + "/notices.json
 // secretRecord is a secret as stored. Sealed is nil once the secret is removed: the record
 // stays, as a tombstone, so a removal is a conditional write like any other.
 type secretRecord struct {
-	Name     string              `json:"name"`
-	Sealed   *kms.Sealed         `json:"sealed,omitempty"`
-	Updated  string              `json:"updated"`
-	Machines []string            `json:"machines,omitempty"`
-	LeftOn   []wire.SecretLeftOn `json:"leftOn,omitempty"`
+	Name    string `json:"name"`
+	Version int64  `json:"version,omitempty"`
+	// Sealed is each recipient's envelope (m:<machine> or c:<client>), as the person's
+	// client sealed it (#3397). Nothing here opens one.
+	Sealed   map[string]wire.SealedEnvelope `json:"sealed,omitempty"`
+	Updated  string                         `json:"updated"`
+	Machines []string                       `json:"machines,omitempty"`
+	LeftOn   []wire.SecretLeftOn            `json:"leftOn,omitempty"`
 }
 
 func checkUser(user string) error {
@@ -376,31 +371,47 @@ func (b *Book) TakeNotice(ctx context.Context, user string, given wire.NoticeLim
 
 func partSent(v wire.JSONValue) bool { return len(v) > 0 && string(v) != "null" }
 
-// CheckSecret says whether a secret may be kept, with words that never hold its value.
-func CheckSecret(name, value string) error {
+// CheckName says whether a secret's name may be kept. Its value is sealed by the person's
+// client (#3397): the client checks it, and only its envelopes' sizes are checked here.
+func CheckName(name string) error {
 	if !secretName.MatchString(name) {
 		return fmt.Errorf("%w: a secret's name is capital letters, digits and _, such as GITHUB_TOKEN", ErrInvalid)
-	}
-	if value == "" || len(value) > MaxSecret {
-		return fmt.Errorf("%w: a secret is 1 byte to %d KB", ErrInvalid, MaxSecret>>10)
-	}
-	if strings.ContainsAny(value, "\n\r\x00") {
-		return fmt.Errorf("%w: a secret is one line", ErrInvalid)
 	}
 	return nil
 }
 
-// SetSecret seals a secret and keeps it. A secret set again forgets the machines that were
-// removed with the old value on them: the person has changed it.
-func (b *Book) SetSecret(ctx context.Context, user, name, value string) error {
+// checkEnvelopes bounds a secret's envelopes: at least one, at most MaxRecipients, each the
+// size a value of at most MaxSecret seals to.
+func checkEnvelopes(values map[string]wire.SealedEnvelope) error {
+	if len(values) == 0 {
+		return fmt.Errorf("%w: seal the secret to at least one machine or app", ErrInvalid)
+	}
+	if len(values) > MaxRecipients {
+		return fmt.Errorf("%w: a secret is sealed to at most %d machines and apps", ErrInvalid, MaxRecipients)
+	}
+	for _, e := range values {
+		if len(e.Encapsulated) != 65 || len(e.Ciphertext) < 17 || len(e.Ciphertext) > MaxSecret+16 {
+			return fmt.Errorf("%w: a secret is 1 byte to %d KB", ErrInvalid, MaxSecret>>10)
+		}
+	}
+	return nil
+}
+
+// SetSecret keeps a secret as the person's client sealed it, at a version above the kept
+// one, a removed one's too, to the recipients allowed names. A client sets the kept one plus
+// one, or for a name it has none of, the time in milliseconds: above a removed one's, which
+// it cannot see. A secret set again forgets
+// the machines that were removed with the old value on them: the person has changed it.
+func (b *Book) SetSecret(ctx context.Context, user string, set wire.UserSecretSet, allowed map[string]bool) error {
 	if err := checkUser(user); err != nil {
 		return err
 	}
-	if err := CheckSecret(name, value); err != nil {
+	name := string(set.Name)
+	if err := CheckName(name); err != nil {
 		return err
 	}
-	if !b.Sealing() {
-		return ErrNoSealing
+	if err := checkEnvelopes(set.Values); err != nil {
+		return err
 	}
 	key := secretKey(user, name)
 	if names, err := b.liveNames(ctx, user); err != nil {
@@ -408,9 +419,14 @@ func (b *Book) SetSecret(ctx context.Context, user, name, value string) error {
 	} else if len(names) >= MaxSecrets && !slices.Contains(names, name) {
 		return fmt.Errorf("%w: a person keeps at most %d secrets", ErrInvalid, MaxSecrets)
 	}
-	sealed, err := kms.SealFor(ctx, b.keeper, b.keeperURL, []byte(value), []byte(key))
-	if err != nil {
-		return err
+	sealed := map[string]wire.SealedEnvelope{}
+	for recipient, e := range set.Values {
+		if allowed[recipient] {
+			sealed[recipient] = e
+		}
+	}
+	if len(sealed) == 0 {
+		return fmt.Errorf("%w: none of the machines or apps it was sealed to is yours now; try again", ErrInvalid)
 	}
 	return b.change(ctx, key, func(raw []byte) ([]byte, error) {
 		var r secretRecord
@@ -419,12 +435,59 @@ func (b *Book) SetSecret(ctx context.Context, user, name, value string) error {
 				return nil, err
 			}
 		}
-		r = secretRecord{Name: name, Sealed: sealed, Updated: b.stamp(), Machines: r.Machines}
+		if set.Version <= r.Version {
+			return nil, fmt.Errorf("%w: the secret changed in another app; load it again, then set it", ErrInvalid)
+		}
+		r = secretRecord{Name: name, Version: set.Version, Sealed: sealed, Updated: b.stamp(), Machines: r.Machines}
 		return records.Encode(r)
 	})
 }
 
-// RemoveSecret removes a secret. It says whether there was one.
+// AddSealed keeps the copies a client sealed for a secret's recipients that had none, at
+// its current version, and drops those that are no longer recipients. It says whether one
+// was added.
+func (b *Book) AddSealed(ctx context.Context, user, name string, version int64, values map[string]wire.SealedEnvelope,
+	allowed map[string]bool) (bool, error) {
+	if err := checkUser(user); err != nil {
+		return false, err
+	}
+	if CheckName(name) != nil || len(values) == 0 {
+		return false, nil
+	}
+	if err := checkEnvelopes(values); err != nil {
+		return false, err
+	}
+	added := false
+	err := b.change(ctx, secretKey(user, name), func(raw []byte) ([]byte, error) {
+		added = false
+		var r secretRecord
+		if raw == nil || json.Unmarshal(raw, &r) != nil || r.Sealed == nil || r.Version != version {
+			return nil, nil
+		}
+		next := map[string]wire.SealedEnvelope{}
+		for recipient, e := range r.Sealed {
+			if allowed[recipient] {
+				next[recipient] = e
+			}
+		}
+		for recipient, e := range values {
+			if _, ok := next[recipient]; ok || !allowed[recipient] {
+				continue
+			}
+			next[recipient] = e
+			added = true
+		}
+		if !added {
+			return nil, nil
+		}
+		r.Sealed = next
+		return records.Encode(r)
+	})
+	return added, err
+}
+
+// RemoveSecret removes a secret. It says whether there was one. The tombstone keeps the
+// version, so a secret set again under the name takes the next one.
 func (b *Book) RemoveSecret(ctx context.Context, user, name string) (bool, error) {
 	if err := checkUser(user); err != nil {
 		return false, err
@@ -445,7 +508,7 @@ func (b *Book) RemoveSecret(ctx context.Context, user, name string) (bool, error
 			return nil, nil
 		}
 		had = true
-		return records.Encode(secretRecord{Name: name, Updated: b.stamp()})
+		return records.Encode(secretRecord{Name: name, Version: r.Version, Updated: b.stamp()})
 	})
 	return had, err
 }
@@ -493,9 +556,10 @@ func (b *Book) liveNames(ctx context.Context, user string) ([]string, error) {
 	return names, nil
 }
 
-// Names is user/secretNames: each secret's name, when it changed, the machines it went to
-// and the removed machines it was on. Never a value.
-func (b *Book) Names(ctx context.Context, user string) ([]wire.UserSecretRow, error) {
+// Names is user/secretNames: each secret's name, its version, when it changed, the
+// machines it went to, the removed machines it was on, and which of machines (the person's
+// that take secrets, as recipients) wait for a copy. Never a value.
+func (b *Book) Names(ctx context.Context, user string, machines []string) ([]wire.UserSecretRow, error) {
 	if err := checkUser(user); err != nil {
 		return nil, err
 	}
@@ -508,9 +572,16 @@ func (b *Book) Names(ctx context.Context, user string) ([]wire.UserSecretRow, er
 		if r.Sealed == nil {
 			continue
 		}
-		row := wire.UserSecretRow{Name: wire.UserSecretName(r.Name), Updated: r.Updated, Machines: []wire.MachineRef{}, LeftOn: r.LeftOn}
+		version := r.Version
+		row := wire.UserSecretRow{Name: wire.UserSecretName(r.Name), Version: &version, Updated: r.Updated, Machines: []wire.MachineRef{},
+			LeftOn: r.LeftOn}
 		for _, m := range r.Machines {
 			row.Machines = append(row.Machines, wire.MachineRef(m))
+		}
+		for _, recipient := range machines {
+			if _, ok := r.Sealed[recipient]; !ok {
+				row.Waiting = append(row.Waiting, wire.MachineRef(strings.TrimPrefix(recipient, "m:")))
+			}
 		}
 		rows = append(rows, row)
 	}
@@ -518,45 +589,73 @@ func (b *Book) Names(ctx context.Context, user string) ([]wire.UserSecretRow, er
 	return rows, nil
 }
 
-// Delivery is host/userSettings for a machine of user's: the settings and every secret,
-// opened. Only for that user's own machine's link (FR-025). A secret that will not open
-// (sealed by another keeper, as after a move) is left out, and named in skipped.
-func (b *Book) Delivery(ctx context.Context, user string) (out wire.MachineUserSettings, skipped []string, err error) {
+// Work is sealing/work's part for a person's client (#3397): each secret the client has a
+// copy of that one of recipients has not, with those recipients; and the asks for the
+// secrets this client has no copy of, for the person's other clients.
+func (b *Book) Work(ctx context.Context, user, client string, recipients []wire.SealRecipient) ([]wire.SealingItem, []string, error) {
+	if checkUser(user) != nil {
+		return nil, nil, nil
+	}
+	all, _, err := b.secretRecords(ctx, user)
+	if err != nil {
+		return nil, nil, err
+	}
+	var items []wire.SealingItem
+	var lacks []string
+	for _, r := range all {
+		if r.Sealed == nil {
+			continue
+		}
+		mine, ok := r.Sealed[client]
+		if !ok {
+			lacks = append(lacks, fmt.Sprintf("secret|%s|%s|%d|%s", user, r.Name, r.Version, client))
+			continue
+		}
+		missing := []wire.SealRecipient{}
+		for _, recipient := range recipients {
+			if _, ok := r.Sealed[recipient.ID]; !ok {
+				missing = append(missing, recipient)
+			}
+		}
+		if len(missing) > 0 {
+			u := user
+			items = append(items, wire.SealingItem{Item: wire.SealingItemKindUserSecret, ID: r.Name, User: &u, Version: r.Version,
+				Mine: map[string]wire.SealedEnvelope{"value": mine}, Missing: missing})
+		}
+	}
+	return items, lacks, nil
+}
+
+// Delivery is host/userSettings for a machine of user's: the settings, and each secret as
+// the person's client sealed it to recipient, the machine. Only for that user's own
+// machine's link (FR-025). A secret with no copy for it is left out, and named in waiting
+// as <name>|<version>.
+// Nothing here opens a secret.
+func (b *Book) Delivery(ctx context.Context, user, recipient string) (out wire.MachineUserSettings, waiting []string, err error) {
 	settings, err := b.Settings(ctx, user)
 	if err != nil {
 		return out, nil, err
 	}
-	out = wire.MachineUserSettings{User: user, Settings: settings, Secrets: []wire.UserSecret{}}
-	all, tags, err := b.secretRecords(ctx, user)
+	out = wire.MachineUserSettings{User: user, Settings: settings, Secrets: []wire.SealedUserSecret{}}
+	if recipient == "" {
+		return out, nil, nil
+	}
+	all, _, err := b.secretRecords(ctx, user)
 	if err != nil {
 		return out, nil, err
 	}
-	for i, r := range all {
+	for _, r := range all {
 		if r.Sealed == nil {
 			continue
 		}
-		if !b.Sealing() {
-			skipped = append(skipped, r.Name)
+		e, ok := r.Sealed[recipient]
+		if !ok {
+			waiting = append(waiting, fmt.Sprintf("%s|%d", r.Name, r.Version))
 			continue
 		}
-		key := secretKey(user, r.Name)
-		b.mu.Lock()
-		kept, ok := b.opened[key]
-		b.mu.Unlock()
-		if !ok || kept.tag != tags[i] {
-			plain, err := kms.OpenFor(ctx, b.keeper, r.Sealed, []byte(key))
-			if err != nil {
-				skipped = append(skipped, r.Name)
-				continue
-			}
-			kept = openedSecret{tag: tags[i], value: string(plain)}
-			b.mu.Lock()
-			b.opened[key] = kept
-			b.mu.Unlock()
-		}
-		out.Secrets = append(out.Secrets, wire.UserSecret{Name: wire.UserSecretName(r.Name), Value: kept.value})
+		out.Secrets = append(out.Secrets, wire.SealedUserSecret{Name: wire.UserSecretName(r.Name), Version: r.Version, Sealed: e})
 	}
-	return out, skipped, nil
+	return out, waiting, nil
 }
 
 // Sent notes that a machine was given these secrets, for user/secretNames and for the

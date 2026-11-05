@@ -3522,7 +3522,12 @@ final class AppModel {
                     await self?.loadKept(control)
                     await self?.people.connected(control)
                     await self?.signIn.connected(control)
+                    await Self.sealWaiting(on: control)
                     for await note in control.notifications() {
+                        if note.method == DaemonAPI.Notification.controlSealingWanted {
+                            await Self.sealWaiting(on: control)
+                            continue
+                        }
                         if await self?.people.heard(note.method, note.params, on: control) == true { continue }
                         if self?.signIn.heard(note.method, note.params) == true { continue }
                         if await self?.userScope.heard(note.method, note.params, on: control) == true {
@@ -3560,6 +3565,13 @@ final class AppModel {
     private func hostCameOnline(_ params: JSONValue?) {
         guard !isConnected, DaemonAPI.ControlMachine.answers(params?["state"]?.stringValue) else { return }
         backoff.nudge()
+    }
+
+    /// Seals what waits for a copy this window can make (#3397): a machine that joined, or a
+    /// client paired, after an org route or one of the person's secrets was sealed.
+    private static func sealWaiting(on control: DaemonClient) async {
+        guard let (key, client) = ControlConfig.sealing() else { return }
+        await ClientSealing.sealWaiting(on: control, key: key, client: client)
     }
 
     private func controlPlaneDidAnswer() {

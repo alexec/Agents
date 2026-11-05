@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -15,6 +16,7 @@ import (
 func TestUserSettingsGoIntoTheMachinesFiles(t *testing.T) {
 	root, home := t.TempDir(), t.TempDir()
 	t.Setenv("AGENTS_PERSONAL_HOME", home)
+	_, public := machineKeys(t, root)
 	d, c := start(t, root)
 	defer d.Shutdown()
 	d.SettingsDir = t.TempDir()
@@ -28,7 +30,8 @@ func TestUserSettingsGoIntoTheMachinesFiles(t *testing.T) {
 		McpServers:  json.RawMessage(`{"github":{"url":"https://api.githubcopilot.com/mcp/","headers":{"Authorization":"Bearer ${GITHUB_TOKEN}"}}}`),
 		AgentConfig: mustJSON(wire.UserAgentConfig{Instructions: &instructions, Personas: map[string]string{"reviewer": "You review."}, Skills: map[string]string{"release": "---\nname: release\n---\n"}}),
 		Runtimes:    json.RawMessage(`{"sandbox":{"defaults":{"claude":"on"}}}`),
-	}, Secrets: []wire.UserSecret{{Name: "GITHUB_TOKEN", Value: "ghp_sams"}}}
+	}, Secrets: []wire.SealedUserSecret{sealedSecret(t, public, "sam", "GITHUB_TOKEN", 1, "ghp_sams"),
+		sealedSecret(t, controllinkPublic(t), "sam", "OTHERS", 1, "for-another-machine")}}
 	d.Told(wire.NotifyHostUserSettings.Name, mustJSON(sent))
 
 	read := func(parts ...string) string {
@@ -46,8 +49,23 @@ func TestUserSettingsGoIntoTheMachinesFiles(t *testing.T) {
 		t.Fatal(read(d.SettingsDir, "sandbox.json"))
 	}
 	secrets := read(home, ".agents-secrets", "secrets.env")
-	if !strings.Contains(secrets, "GITHUB_TOKEN=ghp_sams") || !strings.Contains(secrets, "MINE=kept") {
+	if !strings.Contains(secrets, "GITHUB_TOKEN=ghp_sams") || !strings.Contains(secrets, "MINE=kept") || strings.Contains(secrets, "OTHERS") {
 		t.Fatal("secrets.env")
+	}
+	// An older version, which a control plane could send back, is refused: the newer stays.
+	sent.Secrets = []wire.SealedUserSecret{sealedSecret(t, public, "sam", "GITHUB_TOKEN", 2, "ghp_rotated")}
+	d.Told(wire.NotifyHostUserSettings.Name, mustJSON(sent))
+	sent.Secrets = []wire.SealedUserSecret{sealedSecret(t, public, "sam", "GITHUB_TOKEN", 1, "ghp_sams")}
+	d.Told(wire.NotifyHostUserSettings.Name, mustJSON(sent))
+	if secrets := read(home, ".agents-secrets", "secrets.env"); !strings.Contains(secrets, "GITHUB_TOKEN=ghp_rotated") {
+		t.Fatal("an older version was taken")
+	}
+	// Sealed as another person's, it does not open.
+	sent.Secrets = []wire.SealedUserSecret{sealedSecret(t, public, "sam", "GITHUB_TOKEN", 2, "ghp_rotated"),
+		sealedSecret(t, public, "kim", "KIMS_TOKEN", 1, "ghp_kims")}
+	d.Told(wire.NotifyHostUserSettings.Name, mustJSON(sent))
+	if secrets := read(home, ".agents-secrets", "secrets.env"); strings.Contains(secrets, "ghp_kims") {
+		t.Fatal("another person's secret opened")
 	}
 	if info, _ := os.Stat(filepath.Join(home, ".agents-secrets", "secrets.env")); info.Mode().Perm() != 0o600 {
 		t.Fatal(info.Mode())
@@ -78,6 +96,27 @@ func TestUserSettingsGoIntoTheMachinesFiles(t *testing.T) {
 		t.Fatal("secrets.env after")
 	}
 	c.call(t, 4, "cost/setLimits", map[string]any{"dailyTokens": 1})
+}
+
+// sealedSecret is what a person's client seals to this machine (#3397).
+func sealedSecret(t *testing.T, public []byte, user, name string, version int64, value string) wire.SealedUserSecret {
+	t.Helper()
+	ad := controllink.UserSecretAD(user, controllink.MachineRecipient(orgTestHost), name, version)
+	e, err := controllink.Seal(public, controllink.UserSecretPurpose, ad, []byte(value))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return wire.SealedUserSecret{Name: wire.UserSecretName(name), Version: version, Sealed: e}
+}
+
+// controllinkPublic is another machine's key.
+func controllinkPublic(t *testing.T) []byte {
+	t.Helper()
+	public, err := controllink.PublicKey(controllink.NewPrivateKey())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return public
 }
 
 // The agent configuration files another machine sent are neither written nor removed here,

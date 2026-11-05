@@ -135,6 +135,15 @@ public struct DeviceKey: Sendable {
         }
     }
 
+    /// Open something sealed to this device under `info` and bound to `ad` (#3397,
+    /// `ClientSealing`): an org route's secret, or a person's.
+    public func open(_ envelope: Envelope, info: String, authenticating ad: Data) throws -> Data {
+        switch holder {
+        case .enclave(let key): return try Envelope.open(envelope, with: key, info: Data(info.utf8), authenticating: ad)
+        case .software(let key): return try Envelope.open(envelope, with: key, info: Data(info.utf8), authenticating: ad)
+        }
+    }
+
     /// The device's keychain, and nothing else: one generic-password item per account.
     struct Keychain {
         var accessGroup: String?

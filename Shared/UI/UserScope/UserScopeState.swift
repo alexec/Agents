@@ -60,10 +60,17 @@ final class UserScopeState {
         }
     }
 
-    func setSecret(_ name: String, value: String, on control: DaemonClient?) async -> String? {
+    /// Seals the value here to each of the person's machines and apps (#3397), and sends only
+    /// the envelopes: the control plane never has it. `replacing` is the row replaced, for its
+    /// version.
+    func setSecret(_ name: String, value: String, replacing: DaemonAPI.UserSecretRow? = nil, on control: DaemonClient?) async -> String? {
         guard let control else { return "The control plane can’t be reached." }
         do {
-            _ = try await control.call(DaemonAPI.Method.userSetSecret, DaemonAPI.UserSecret(name: name, value: value))
+            let to = try await control.call(DaemonAPI.Method.userSecretRecipients, DaemonAPI.Empty(),
+                                            returning: DaemonAPI.SealRecipients.self)
+            let version = UserScopeWords.nextVersion(replacing ?? secrets?.secrets.first { $0.name == name }, now: Date())
+            let values = try ClientSealing.sealSecret(user: to.user ?? "", name: name, version: version, value: value, to: to.recipients)
+            _ = try await control.call(DaemonAPI.Method.userSetSecret, DaemonAPI.UserSecretSet(name: name, version: version, values: values))
             await load(control)
             return nil
         } catch {

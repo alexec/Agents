@@ -1,7 +1,6 @@
 package controlplane
 
 import (
-	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"slices"
@@ -71,18 +70,41 @@ func (d *deliveries) last(host string) (wire.MachineUserSettings, bool) {
 	return list[len(list)-1], true
 }
 
-func secretsOf(u wire.MachineUserSettings) map[string]string {
+// secretsOf is what a machine opens of its delivery's secrets with its own key; a copy
+// that does not open is left out.
+func secretsOf(box *fakeHost, u wire.MachineUserSettings) map[string]string {
 	out := map[string]string{}
 	for _, s := range u.Secrets {
-		out[string(s.Name)] = s.Value
+		ad := controllink.UserSecretAD(u.User, controllink.MachineRecipient(box.member.Host), string(s.Name), s.Version)
+		if plain, err := controllink.Open(box.private, controllink.UserSecretPurpose, ad, s.Sealed); err == nil {
+			out[string(s.Name)] = string(plain)
+		}
 	}
 	return out
 }
 
-// takingHello is a machine that writes host/userSettings (it serves settings/userPart).
+// setSecret is what a person's client does (#3397): seal the value to each of their
+// machines and clients, at the version after was.
+func setSecret(t *testing.T, who *person, name, value string, was int64) {
+	t.Helper()
+	var recipients wire.SealRecipients
+	json.Unmarshal(call(t, who.window, "", "user/secretRecipients", nil), &recipients)
+	set := wire.UserSecretSet{Name: wire.UserSecretName(name), Version: was + 1, Values: map[string]wire.SealedEnvelope{}}
+	for _, r := range recipients.Recipients {
+		e, err := controllink.Seal(r.PublicKey, controllink.UserSecretPurpose, controllink.UserSecretAD(who.id, r.ID, name, was+1), []byte(value))
+		if err != nil {
+			t.Fatal(err)
+		}
+		set.Values[r.ID] = e
+	}
+	call(t, who.window, "", "user/setSecret", set)
+}
+
+// takingHello is a machine that writes host/userSettings (it serves settings/userPart),
+// and opens the secrets sealed to it.
 func takingHello(name string) controllink.MachineHello {
 	hello := fakeHello(name)
-	hello.Capabilities = append(slices.Clone(hello.Capabilities), CapHostUserSettings)
+	hello.Capabilities = append(slices.Clone(hello.Capabilities), CapHostUserSettings, wire.CapHostUserSettings2)
 	return hello
 }
 
@@ -93,14 +115,13 @@ func notTakingHello(name string) controllink.MachineHello {
 	return hello
 }
 
+// #3397: a person's client seals each secret to their machines; the control plane, with no
+// keeper, keeps and sends the envelopes; a machine that joins later waits, and the
+// person's client seals it for that machine.
 func TestSettingsAndSecretsGoOnlyToTheirPersonsMachines(t *testing.T) {
 	t.Parallel()
-	key := make([]byte, 32)
-	rand.Read(key)
 	st := store.NewMemory()
-	p := startPlaneWith(t, st, controllink.NewPrivateKey(), func(c *Config) {
-		c.SecretKeeper = "base64key://" + base64.URLEncoding.EncodeToString(key)
-	})
+	p := startPlane(t, st, controllink.NewPrivateKey())
 	told := &deliveries{got: map[string][]wire.MachineUserSettings{}}
 	p.told = told.heard
 	_, alexWindow := p.client("Alex's Mac")
@@ -114,11 +135,11 @@ func TestSettingsAndSecretsGoOnlyToTheirPersonsMachines(t *testing.T) {
 	// Sam's server and token, under You.
 	call(t, sam.window, "", "user/setSettings", map[string]any{"part": "mcpServers",
 		"value": map[string]any{"github": map[string]any{"url": "https://api.githubcopilot.com/mcp/"}}})
-	call(t, sam.window, "", "user/setSecret", wire.UserSecret{Name: "GITHUB_TOKEN", Value: "ghp_sams-own-token"})
+	setSecret(t, sam, "GITHUB_TOKEN", "ghp_sams-own-token", 0)
 	waitNote(t, sam.window, wire.NotifyControlUserSettingsChanged.Name)
 	p.waitFor(func() bool {
 		u, _ := told.last(samBox.member.Host)
-		return secretsOf(u)["GITHUB_TOKEN"] == "ghp_sams-own-token" && u.Settings.McpServers != nil
+		return secretsOf(samBox, u)["GITHUB_TOKEN"] == "ghp_sams-own-token" && u.Settings.McpServers != nil
 	}, "Sam's machine has the server and the token")
 
 	// Nobody else's machine gets them, nor one that does not take them.
@@ -134,12 +155,23 @@ func TestSettingsAndSecretsGoOnlyToTheirPersonsMachines(t *testing.T) {
 		t.Fatalf("%+v", alexSettings)
 	}
 
-	// A machine Sam starts the next day has them with no further step.
+	// A machine Sam starts the next day waits for the token, and Sam's client is asked to
+	// seal it; once it has, the machine has it.
 	next := p.machineSaying(sam, takingHello("MACHINE-23"))
+	p.waitFor(func() bool { u, ok := told.last(next.member.Host); return ok && len(u.Secrets) == 0 }, "Sam's new machine told its settings")
+	var waiting wire.UserSecretNames
+	json.Unmarshal(call(t, sam.window, "", "user/secretNames", nil), &waiting)
+	if len(waiting.Secrets) != 1 || len(waiting.Secrets[0].Waiting) != 1 || string(waiting.Secrets[0].Waiting[0]) != next.member.Host {
+		t.Fatalf("%+v", waiting)
+	}
+	waitNote(t, sam.window, wire.NotifyControlSealingWanted.Name)
+	if n := sealForMissing(t, sam.window, sam.member); n != 1 {
+		t.Fatalf("%d items to seal", n)
+	}
 	p.waitFor(func() bool {
 		u, _ := told.last(next.member.Host)
-		return secretsOf(u)["GITHUB_TOKEN"] == "ghp_sams-own-token"
-	}, "Sam's new machine has the token at its join")
+		return secretsOf(next, u)["GITHUB_TOKEN"] == "ghp_sams-own-token"
+	}, "Sam's new machine has the token")
 
 	// The names, and the machines each went to; never a value.
 	var names wire.UserSecretNames
@@ -149,11 +181,8 @@ func TestSettingsAndSecretsGoOnlyToTheirPersonsMachines(t *testing.T) {
 			t.Fatalf("a value went back to a client: %s", raw)
 		}
 		json.Unmarshal(raw, &names)
-		return len(names.Secrets) == 1 && len(names.Secrets[0].Machines) == 2
+		return len(names.Secrets) == 1 && len(names.Secrets[0].Machines) == 2 && len(names.Secrets[0].Waiting) == 0
 	}, "both of Sam's machines noted")
-	if !names.Sealing {
-		t.Fatal("not sealing")
-	}
 
 	// SC-007: the store holds no readable secret.
 	listed, _ := st.List(t.Context(), "")
@@ -188,10 +217,10 @@ func TestSettingsAndSecretsGoOnlyToTheirPersonsMachines(t *testing.T) {
 	}
 	count := func() int { told.mu.Lock(); defer told.mu.Unlock(); return len(told.got[next.member.Host]) }
 	before := count()
-	call(t, sam.window, "", "user/setSecret", wire.UserSecret{Name: "GITHUB_TOKEN", Value: "ghp_rotated"})
+	setSecret(t, sam, "GITHUB_TOKEN", "ghp_rotated", 1)
 	p.waitFor(func() bool {
 		u, _ := told.last(samBox.member.Host)
-		return secretsOf(u)["GITHUB_TOKEN"] == "ghp_rotated"
+		return secretsOf(samBox, u)["GITHUB_TOKEN"] == "ghp_rotated"
 	}, "the new token")
 	if count() != before {
 		t.Fatal("a removed machine was sent the new token")
@@ -202,28 +231,37 @@ func TestSettingsAndSecretsGoOnlyToTheirPersonsMachines(t *testing.T) {
 	p.waitFor(func() bool { u, _ := told.last(samBox.member.Host); return len(u.Secrets) == 0 }, "the token gone")
 }
 
-func TestNoKeeperKeepsNoSecrets(t *testing.T) {
+// #3397: a secret sealed to nobody of the person's, or with a bad name, is refused; and a
+// machine from before #3397 is sent the settings but no secret.
+func TestSecretsAreSealedOrRefused(t *testing.T) {
 	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	told := &deliveries{got: map[string][]wire.MachineUserSettings{}, more: make(chan struct{}, 1)}
+	p.told = told.heard
 	_, window := p.client("Alex's Mac")
-	if e := callError(t, window, "", "user/setSecret", wire.UserSecret{Name: "TOKEN", Value: "v"}); !strings.Contains(e, "-32009") || strings.Contains(e, `"v"`) {
+	alex := &person{id: p.s.localOwner(), window: window}
+	if e := callError(t, window, "", "user/setSecret", wire.UserSecretSet{Name: "TOKEN", Version: 1, Values: map[string]wire.SealedEnvelope{}}); !strings.Contains(e, "-32602") {
 		t.Fatal(e)
 	}
-	var names wire.UserSecretNames
-	json.Unmarshal(call(t, window, "", "user/secretNames", nil), &names)
-	if names.Sealing {
-		t.Fatalf("%+v", names)
-	}
-	if e := callError(t, window, "", "user/setSecret", wire.UserSecret{Name: "lower", Value: "v"}); !strings.Contains(e, "-32602") {
+	if e := callError(t, window, "", "user/setSecret", wire.UserSecretSet{Name: "lower", Version: 1}); !strings.Contains(e, "-32602") {
 		t.Fatal(e)
 	}
-	// Settings still follow the person.
+	older := hello1x("MACHINE-24")
+	box := p.machineSaying(alex, older)
+	setSecret(t, alex, "TOKEN", "v-alex", 0)
 	call(t, window, "", "user/setSettings", map[string]any{"part": "costLimits", "value": map[string]any{"dailyTokens": 1000}})
-	var got wire.UserSettings
-	json.Unmarshal(call(t, window, "", "user/settings", nil), &got)
-	if got.CostLimits == nil {
-		t.Fatalf("%+v", got)
+	told.waitTold(t, box.member.Host, func(u wire.MachineUserSettings) bool { return u.Settings.CostLimits != nil }, "the settings")
+	if u, _ := told.last(box.member.Host); len(u.Secrets) != 0 {
+		t.Fatalf("a machine that cannot open secrets was sent %+v", u.Secrets)
 	}
+}
+
+// hello1x is a machine that takes host/userSettings but not the secrets sealed to it.
+func hello1x(name string) controllink.MachineHello {
+	hello := fakeHello(name)
+	hello.Capabilities = append(slices.DeleteFunc(slices.Clone(hello.Capabilities), func(c string) bool { return c == wire.CapHostUserSettings2 }),
+		CapHostUserSettings)
+	return hello
 }
 
 // A machine does not send its agent configuration files to its person's other machines: the

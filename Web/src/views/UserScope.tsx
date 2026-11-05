@@ -7,9 +7,10 @@ import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
 import type { UserSecretNames, UserSecretRow } from "../protocol/generated";
 import { CallFailed } from "../wire/link";
+import { sealSecret } from "../wire/sealing";
 import { describe, methodNotFound } from "../model/errors";
-import { addSecret, isSecretName, leftOn, machines, nameHint, noSealing,
-  secretsFoot, secretsLeft, secretsTitle } from "../model/userScope";
+import { addSecret, isSecretName, leftOn, machines, nameHint, nextVersion,
+  secretsFoot, secretsLeft, secretsTitle, waitingOn } from "../model/userScope";
 import { Modal } from "./Modal";
 
 function sentence(error: unknown): string {
@@ -17,15 +18,20 @@ function sentence(error: unknown): string {
   return describe(error);
 }
 
-function SecretSheet({ store, replacing, close }: { store: Store; replacing: string | null; close: () => void }) {
-  const name = useSignal(replacing ?? "");
+function SecretSheet({ store, replacing, close }: { store: Store; replacing: UserSecretRow | null; close: () => void }) {
+  const name = useSignal(replacing?.name ?? "");
   const value = useSignal("");
   const problem = useSignal<string | null>(null);
   const busy = useSignal(false);
   const save = async () => {
     busy.value = true;
     try {
-      await store.link.call("user/setSecret", { name: name.value.trim(), value: value.value });
+      // Sealed here to each of the person's machines and apps (#3397): the control plane never has the value.
+      const chosen = name.value.trim();
+      const version = nextVersion(replacing, Date.now());
+      const { recipients, user } = await store.link.call("user/secretRecipients", {});
+      const values = await sealSecret(user ?? "", chosen, version, value.value, recipients);
+      await store.link.call("user/setSecret", { name: chosen as never, version, values });
       value.value = "";
       close();
     } catch (error) {
@@ -36,9 +42,9 @@ function SecretSheet({ store, replacing, close }: { store: Store; replacing: str
   };
   const chosen = name.value.trim();
   return (
-    <Modal label={replacing ? `Replace ${replacing}` : "Add a Secret"} close={close}>
+    <Modal label={replacing ? `Replace ${replacing.name}` : "Add a Secret"} close={close}>
       <form method="dialog" class="sheet-body" onSubmit={(e) => { e.preventDefault(); void save(); }}>
-        <h2>{replacing ? `Replace ${replacing}` : "Add a Secret"}</h2>
+        <h2>{replacing ? `Replace ${replacing.name}` : "Add a Secret"}</h2>
         {!replacing && (
           <input type="text" aria-label="Name" placeholder="GITHUB_TOKEN" autofocus autocomplete="off" spellcheck={false}
             value={name.value} onInput={(e) => (name.value = (e.currentTarget as HTMLInputElement).value.toUpperCase())} />
@@ -57,10 +63,12 @@ function SecretSheet({ store, replacing, close }: { store: Store; replacing: str
 
 function SecretItem({ row, replace, remove, down }: { row: UserSecretRow; replace: () => void; remove: () => void; down: boolean }) {
   const left = leftOn(row);
+  const waiting = waitingOn(row);
   return (
     <li class="user-secret">
       <code>{row.name}</code>
       <span class="hint">{machines(row)}</span>
+      {waiting && <p class="hint attention">{waiting}</p>}
       {left && <p class="hint attention">{left}</p>}
       <span class="row-actions">
         <button type="button" disabled={down} onClick={replace}>Replace…</button>
@@ -91,7 +99,7 @@ function useUserScope(store: Store, down: boolean) {
 export function SecretsSection({ store, down }: { store: Store; down: boolean }) {
   const { names, problem, load } = useUserScope(store, down);
   const adding = useSignal(false);
-  const replacing = useSignal<string | null>(null);
+  const replacing = useSignal<UserSecretRow | null>(null);
   const remove = async (name: string) => {
     if (!window.confirm(`Remove ${name}? It is taken out of secrets.env on every machine of yours.`)) return;
     try {
@@ -114,12 +122,10 @@ export function SecretsSection({ store, down }: { store: Store; down: boolean })
       )}
       <ul class="user-secrets">
         {(names.value?.secrets ?? []).map((row) => (
-          <SecretItem key={row.name} row={row} down={down} replace={() => { replacing.value = row.name; }} remove={() => void remove(row.name)} />
+          <SecretItem key={row.name} row={row} down={down} replace={() => { replacing.value = row; }} remove={() => void remove(row.name)} />
         ))}
       </ul>
-      {names.value && !names.value.sealing
-        ? <p class="hint">{noSealing}</p>
-        : <button type="button" disabled={down} onClick={() => { adding.value = true; }}>{addSecret}</button>}
+      <button type="button" disabled={down} onClick={() => { adding.value = true; }}>{addSecret}</button>
       <p class="hint">{secretsFoot}</p>
       {adding.value && <SecretSheet store={store} replacing={null} close={() => { adding.value = false; void load(); }} />}
       {replacing.value && <SecretSheet store={store} replacing={replacing.value} close={() => { replacing.value = null; void load(); }} />}

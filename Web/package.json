@@ -10,6 +10,7 @@
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
+    "@hpke/core": "1.10.0",
     "@preact/signals": "2.11.3",
     "markdown-it": "15.0.3",
     "preact": "11.0.0"

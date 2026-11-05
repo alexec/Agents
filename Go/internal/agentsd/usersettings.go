@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -44,6 +45,9 @@ const userSettingsSyncFile = "user-settings-sync.json"
 type userSettingsSyncState struct {
 	User    string   `json:"user,omitempty"`
 	Secrets []string `json:"secrets"`
+	// Versions is the version of each secret opened here (#3397): an older one, which a
+	// control plane could send back after the person changed it, is refused.
+	Versions map[string]int64 `json:"versions,omitempty"`
 	// The agentConfig files written, relative to ~/.agents, so a persona or skill the
 	// control plane no longer sends is taken away again.
 	Files []string `json:"files,omitempty"`
@@ -126,12 +130,16 @@ func (d *Daemon) ApplyUserSettings(u wire.MachineUserSettings) error {
 	if partSent(s.Policy) {
 		note(wire.UserSettingsPartNamePolicy, d.applyYoursFromControlPlane(s.Policy))
 	}
-	names, err := writeSecrets(home, u.Secrets, before.Secrets)
+	opened, versions, kept := d.openUserSecrets(u, before)
+	names, err := writeSecrets(home, opened, before.Secrets, kept)
+	for i := range opened {
+		opened[i].Value = ""
+	}
 	if err != nil {
 		problems = append(problems, "secrets: "+err.Error())
-		names = before.Secrets
+		names, versions = before.Secrets, before.Versions
 	}
-	mark.Secrets = names
+	mark.Secrets, mark.Versions = names, versions
 	b, _ := diskjson.Marshal(mark)
 	if err := store.WriteAtomically(d.userSettingsSyncPath(), b, 0o644); err != nil {
 		problems = append(problems, err.Error())
@@ -377,7 +385,44 @@ func (d *Daemon) applyYoursFromControlPlane(raw wire.JSONValue) error {
 // writeSecrets sets each secret in secrets.env, and takes out the ones the control plane
 // set before and no longer sends. A secret the person set here by hand, under a name the
 // control plane never sent, is left alone. It gives the names now from the control plane.
-func writeSecrets(home string, secrets []wire.UserSecret, before []string) ([]string, error) {
+// openUserSecrets opens each secret the person's client sealed to this machine (#3397):
+// the values, the version of each, and the names to keep as they are in the file, those
+// whose version here is newer than the one sent. One that does not open is left out.
+func (d *Daemon) openUserSecrets(u wire.MachineUserSettings, before userSettingsSyncState) ([]wire.UserSecret, map[string]int64, []string) {
+	d.orgRouteMu.Lock()
+	id := d.identityLocked()
+	d.orgRouteMu.Unlock()
+	var out []wire.UserSecret
+	versions := map[string]int64{}
+	var kept []string
+	for _, s := range u.Secrets {
+		name := string(s.Name)
+		if had := before.Versions[name]; s.Version < had && slices.Contains(before.Secrets, name) {
+			log.Printf("user settings: %s version %d is older than the %d here; kept the one here", name, s.Version, had)
+			versions[name] = had
+			kept = append(kept, name)
+			continue
+		}
+		if id == nil {
+			log.Printf("user settings: %s: this machine has not joined a control plane", name)
+			continue
+		}
+		ad := controllink.UserSecretAD(u.User, controllink.MachineRecipient(id.host), name, s.Version)
+		plain, err := controllink.Open(id.private, controllink.UserSecretPurpose, ad, s.Sealed)
+		if err != nil {
+			log.Printf("user settings: %s version %d does not open here: %v", name, s.Version, err)
+			continue
+		}
+		out = append(out, wire.UserSecret{Name: s.Name, Value: string(plain)})
+		clear(plain)
+		versions[name] = s.Version
+	}
+	return out, versions, kept
+}
+
+// writeSecrets writes the secrets into ~/.agents-secrets/secrets.env and takes out those
+// written before that are not sent now, but for kept, which stay as they are.
+func writeSecrets(home string, secrets []wire.UserSecret, before, kept []string) ([]string, error) {
 	if len(secrets) == 0 && len(before) == 0 {
 		return []string{}, nil
 	}
@@ -399,6 +444,12 @@ func writeSecrets(home string, secrets []wire.UserSecret, before []string) ([]st
 		file.Set(name, s.Value)
 		sent[name] = true
 		names = append(names, name)
+	}
+	for _, name := range kept {
+		if !sent[name] {
+			sent[name] = true
+			names = append(names, name)
+		}
 	}
 	for _, name := range before {
 		if !sent[name] {

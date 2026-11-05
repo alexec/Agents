@@ -18,18 +18,19 @@ import (
 )
 
 // The user scope (#1760, spec 736 US4): each person's settings and secrets, kept here and
-// sent to each machine of theirs on its channel 0 when it joins and when they change. Only
-// a person's own clients change them; a machine only receives them, so a machine taken over
-// cannot put an MCP server (a command) on its person's other machines. For the same reason a
-// machine does not send its agent configuration files to the person's other machines:
-// user/setAgentConfigFile is refused.
+// sent to each machine of theirs on its channel 0 when it joins and when they change. The
+// secrets are sealed by the person's clients to each machine (#3397): the control plane
+// keeps and sends the envelopes, and opens none. Only a person's own clients change them; a
+// machine only receives them, so a machine taken over cannot put an MCP server (a command)
+// on its person's other machines. For the same reason a machine does not send its agent
+// configuration files to the person's other machines: user/setAgentConfigFile is refused.
 
 // CapHostUserSettings is what a machine says when it writes host/userSettings into its
-// ~/.agents and ~/.agents-secrets. A machine that does not say it is sent nothing: no
-// secret goes where it would not be used.
+// ~/.agents. A machine that does not say it is sent nothing. Only one that also says
+// host.user-settings/2 is sent its secrets, sealed to it, for ~/.agents-secrets.
 const CapHostUserSettings = wire.CapHostUserSettings1
 
-// userDeliveryTimeout bounds opening a person's secrets for one machine.
+// userDeliveryTimeout bounds reading a person's settings and secrets for one machine.
 const userDeliveryTimeout = 30 * time.Second
 
 // userDeliveryMost is the largest host/userSettings sent, with room for the frame around it
@@ -53,11 +54,19 @@ func (m *Methods) userMethod(ctx context.Context, method string, params json.Raw
 	case "user/setAgentConfigFile":
 		return nil, agentConfigFileRefused()
 	case "user/secretNames":
-		rows, err := book.Names(ctx, user)
+		var machines []string
+		for _, r := range m.s.userRecipients(user) {
+			if machineOfRecipient(r.ID) != "" {
+				machines = append(machines, r.ID)
+			}
+		}
+		rows, err := book.Names(ctx, user, machines)
 		if err != nil {
 			return nil, err
 		}
-		return wire.UserSecretNames{Secrets: rows, Sealing: book.Sealing()}, nil
+		return wire.UserSecretNames{Secrets: rows}, nil
+	case "user/secretRecipients":
+		return wire.SealRecipients{Recipients: m.s.userRecipients(user), User: &user}, nil
 	case "user/setSettings":
 		request, err := require[wire.UserSettingsPart](params, "UserSettingsPart")
 		if err != nil {
@@ -74,11 +83,11 @@ func (m *Methods) userMethod(ctx context.Context, method string, params json.Raw
 		}
 		return wire.Empty{}, nil
 	case "user/setSecret":
-		request, err := require[wire.UserSecret](params, "UserSecret")
+		request, err := require[wire.UserSecretSet](params, "UserSecretSet")
 		if err != nil {
 			return nil, err
 		}
-		if err := book.SetSecret(ctx, user, string(request.Name), request.Value); err != nil {
+		if err := book.SetSecret(ctx, user, request, recipientIDs(m.s.userRecipients(user))); err != nil {
 			return nil, userFailure(err)
 		}
 		m.s.log("secret " + string(request.Name) + " set for " + user)
@@ -158,7 +167,11 @@ func (s *Service) sendUserSettings(host string, always bool) {
 	user := s.ownerOf(host)
 	ctx, cancel := context.WithTimeout(context.Background(), userDeliveryTimeout)
 	defer cancel()
-	delivery, skipped, err := s.users.Delivery(ctx, user)
+	recipient := ""
+	if s.takesUserSecrets(host) {
+		recipient = controllink.MachineRecipient(host)
+	}
+	delivery, waiting, err := s.users.Delivery(ctx, user, recipient)
 	if err != nil {
 		s.log("user settings for " + host + " could not be read: " + err.Error())
 		return
@@ -169,9 +182,9 @@ func (s *Service) sendUserSettings(host string, always bool) {
 	if h := s.records.Host(host); h == nil || !slices.Contains(hostCapabilities(*h), wire.CapHostPolicyLayers1) {
 		delivery.Settings.Policy = nil
 	}
-	if len(skipped) > 0 {
-		s.log(fmt.Sprintf("user settings for %s: %d secrets do not open with this control plane's key and were not sent: %s",
-			host, len(skipped), strings.Join(skipped, ", ")))
+	var asks []string
+	for _, name := range waiting {
+		asks = append(asks, "secret|"+user+"|"+name+"|"+recipient)
 	}
 	b, _ := json.Marshal(delivery)
 	if len(b) > userDeliveryMost {
@@ -189,7 +202,7 @@ func (s *Service) sendUserSettings(host string, always bool) {
 	if same && !always {
 		return
 	}
-	// The person may have changed while the secrets were opened: a machine that is no
+	// The person may have changed while the secrets were read: a machine that is no
 	// longer theirs is sent nothing.
 	if s.records.Host(host) == nil || s.ownerOf(host) != user || !s.router.Tell(host, wire.NewMethodName(wire.NotifyHostUserSettings.Name), delivery) {
 		s.toldUsers.mu.Lock()
@@ -208,6 +221,11 @@ func (s *Service) sendUserSettings(host string, always bool) {
 		s.log("which secrets " + host + " has could not be kept: " + err.Error())
 	}
 	s.log(fmt.Sprintf("user settings sent to %s (%d secrets)", host, len(names)))
+	if len(waiting) > 0 {
+		s.log(fmt.Sprintf("user settings for %s: %d secrets wait for %s's client to seal them: %s",
+			host, len(waiting), user, strings.Join(waiting, ", ")))
+		s.wantSealingBy(user, asks...)
+	}
 }
 
 // machineLeft is a machine removed (FR-026): it is sent nothing more, and its person is

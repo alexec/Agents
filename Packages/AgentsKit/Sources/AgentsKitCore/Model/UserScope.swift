@@ -87,14 +87,18 @@ public extension DaemonAPI {
         }
     }
 
-    /// `user/setSecret`. The name is capital letters, digits and `_`, as `${NAME}` in mcp.json.
-    struct UserSecret: Codable, Sendable, Hashable {
+    /// `user/setSecret` (#3397): a secret as the person's client sealed it to each recipient of
+    /// `user/secretRecipients`, by recipient. The name is capital letters, digits and `_`, as
+    /// `${NAME}` in mcp.json. The control plane never has the value.
+    struct UserSecretSet: Codable, Sendable, Hashable {
         public var name: String
-        public var value: String
+        public var version: Int
+        public var values: [String: Envelope]
 
-        public init(name: String, value: String) {
+        public init(name: String, version: Int, values: [String: Envelope]) {
             self.name = name
-            self.value = value
+            self.version = version
+            self.values = values
         }
     }
 
@@ -118,14 +122,16 @@ public extension DaemonAPI {
         public var updated: String
         public var machines: [String]
         public var leftOn: [SecretLeftOn]?
+        public var version: Int?
+        /// The person's machines that have no copy yet (#3397).
+        public var waiting: [String]?
 
         public var id: String { name }
     }
 
-    /// `user/secretNames`. `sealing` is false on a control plane with no key for secrets.
+    /// `user/secretNames`.
     struct UserSecretNames: Codable, Sendable, Hashable {
         public var secrets: [UserSecretRow]
-        public var sealing: Bool
     }
 
     /// `control/userSettingsChanged`: read the user scope again.
@@ -165,8 +171,10 @@ public extension DaemonAPI.Method {
     static let userSetSettings = "user/setSettings"
     /// `AgentConfigFileRequest` → `{}` (#2129).
     static let userSetAgentConfigFile = "user/setAgentConfigFile"
-    /// `UserSecret` → `{}` (#1760).
+    /// `UserSecretSet` → `{}` (#1760, #3397).
     static let userSetSecret = "user/setSecret"
+    /// `{}` → `SealRecipients`: the person's machines and clients, to seal a secret to (#3397).
+    static let userSecretRecipients = "user/secretRecipients"
     /// `UserSecretRequest` → `{}` (#1760).
     static let userRemoveSecret = "user/removeSecret"
     /// `{}` → `UserSecretNames` (#1760).
@@ -196,10 +204,23 @@ public enum UserScopeWords {
     public static let thisMacOnly = "This Mac's"
     public static let addSecret = "Add a Secret…"
 
-    public static let secretsFoot = "A secret goes only to your own machines, into ~/.agents-secrets/secrets.env. "
-        + "Write ${NAME} for it in an MCP server's env or headers. Nobody can read it back, you included: to change it, replace it."
-    public static let noSealing = "This control plane has no key to seal secrets with, so it keeps none. "
-        + "Its operator starts it with a key file or AGENTS_CONTROL_KMS."
+    public static let secretsFoot = "A secret is sealed in this app to each of your own machines, and goes into ~/.agents-secrets/secrets.env "
+        + "there; the control plane cannot open it. Write ${NAME} for it in an MCP server's env or headers. Nobody can read it back, "
+        + "you included: to change it, replace it."
+
+    /// Under a secret that one of the person's machines has no copy of yet (#3397).
+    public static func waiting(_ row: DaemonAPI.UserSecretRow) -> String? {
+        let n = row.waiting?.count ?? 0
+        guard n > 0 else { return nil }
+        return "\(n == 1 ? "1 machine waits" : "\(n) machines wait") for one of your apps to seal it there. This happens when you open Agents."
+    }
+
+    /// The version a secret is set at (#3397): the kept one plus one; for a new name, the time
+    /// in milliseconds, above a removed one's, which the client cannot see.
+    public static func nextVersion(_ row: DaemonAPI.UserSecretRow?, now: Date) -> Int {
+        if let version = row?.version { return version + 1 }
+        return Int(now.timeIntervalSince1970 * 1000)
+    }
     /// A secret's row: where it is.
     public static func machines(_ row: DaemonAPI.UserSecretRow) -> String {
         switch row.machines.count {

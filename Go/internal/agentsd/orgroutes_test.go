@@ -2,14 +2,15 @@ package agentsd
 
 import (
 	"bytes"
-	"crypto/ecdh"
-	"crypto/hpke"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"io"
 	"io/fs"
 	"log"
@@ -21,11 +22,13 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/internal/controllink"
+	"github.com/alexec/agents/Go/internal/orgtoken"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -41,6 +44,7 @@ func orgMachine(t *testing.T, root string, k controlKeys) (*Daemon, *conn, []byt
 	t.Helper()
 	_, public := machineKeys(t, root)
 	d, c := joined(t, root, k)
+	d.orgEndpoints = newFakeClouds(t).endpoints()
 	return d, c, public
 }
 
@@ -63,39 +67,25 @@ func machineKeys(t *testing.T, root string) ([]byte, []byte) {
 	return private, public
 }
 
-// sealTo is the control plane's seal of one of r's values for a machine (FR-005): r is
+// sealTo is an admin's client's seal of one of r's values for this machine (#3397): r is
 // as delivered, all but its sealed values.
-func sealTo(t *testing.T, public []byte, r wire.DeliveredRoute, host string, value string) wire.SealedEnvelope {
+func sealTo(t *testing.T, public []byte, r wire.DeliveredRoute, host, field, value string) wire.SealedEnvelope {
 	t.Helper()
-	ad, err := controllink.OrgRouteAD(r, host)
+	e, err := controllink.Seal(public, orgRoutePurpose, controllink.DeliveredRouteAD(r, controllink.MachineRecipient(host), field), []byte(value))
 	if err != nil {
 		t.Fatal(err)
 	}
-	key, err := ecdh.P256().NewPublicKey(public)
-	if err != nil {
-		t.Fatal(err)
-	}
-	recipient, err := hpke.NewDHKEMPublicKey(key)
-	if err != nil {
-		t.Fatal(err)
-	}
-	enc, sender, err := hpke.NewSender(recipient, hpke.HKDFSHA256(), hpke.AES256GCM(), []byte(orgRoutePurpose))
-	if err != nil {
-		t.Fatal(err)
-	}
-	ct, err := sender.Seal(ad, []byte(value))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return wire.SealedEnvelope{Encapsulated: enc, Ciphertext: ct}
+	return e
 }
 
-// testRoute is a delivered route of a kind, for runtimes, its secrets sealed to public.
+// testRoute is a delivered route of a kind, for runtimes, its secrets sealed to public, at
+// seal version version. A secret named for a token (googleToken, entraToken, awsSession)
+// is sealed as the cloud credential that fakeClouds makes that token from.
 func testRoute(t *testing.T, public []byte, id string, version int64, kind wire.OrgRouteKind, vendor wire.OrgRouteVendor,
 	address string, secrets map[string]string, runtimes ...string) wire.DeliveredRoute {
 	t.Helper()
 	r := wire.DeliveredRoute{ID: id, Name: "Acme " + id, Kind: kind, Runtimes: runtimes, DefaultFor: []string{}, Version: version,
-		Sealed: map[string]wire.SealedEnvelope{}, Settings: &wire.OrgRouteSettings{}}
+		SealVersion: version, Sealed: map[string]wire.SealedEnvelope{}, Settings: &wire.OrgRouteSettings{}}
 	if vendor != "" {
 		r.Vendor = &vendor
 	}
@@ -108,6 +98,10 @@ func testRoute(t *testing.T, public []byte, id string, version int64, kind wire.
 	case wire.OrgRouteKindVertex:
 		r.Settings.Project, r.Settings.Location = new("acme-proj"), new("us-east5")
 	}
+	secrets = credentialsFor(t, secrets)
+	if _, ok := secrets["entraClientSecret"]; ok {
+		r.Settings.Tenant, r.Settings.ClientID = new("acme.onmicrosoft.com"), new("00000000-0000-0000-0000-000000000001")
+	}
 	for field := range secrets {
 		r.SecretFields = append(r.SecretFields, field)
 	}
@@ -115,15 +109,132 @@ func testRoute(t *testing.T, public []byte, id string, version int64, kind wire.
 	return sealed(t, public, r, secrets)
 }
 
+// credentialsFor is secrets with each token in it as the credential fakeClouds makes it
+// from: a service account whose email is the Google token, an Entra secret that is the
+// token, an AWS access key id that holds the session.
+func credentialsFor(t *testing.T, secrets map[string]string) map[string]string {
+	t.Helper()
+	out := map[string]string{}
+	for field, value := range secrets {
+		switch field {
+		case "googleToken":
+			out["serviceAccount"] = fakeServiceAccount(t, value)
+		case "entraToken":
+			out["entraClientSecret"] = value
+		case "awsSession":
+			out["awsAccessKeyId"] = "AKIA" + base64.RawURLEncoding.EncodeToString([]byte(value))
+			out["awsSecretAccessKey"] = "aws-long-lived-secret"
+		default:
+			out[field] = value
+		}
+	}
+	return out
+}
+
 // sealed is r with secrets sealed to public, for r as it is now: a test that changes a
 // delivered route seals it again after.
 func sealed(t *testing.T, public []byte, r wire.DeliveredRoute, secrets map[string]string) wire.DeliveredRoute {
 	t.Helper()
 	r.Sealed = map[string]wire.SealedEnvelope{}
-	for field, v := range secrets {
-		r.Sealed[field] = sealTo(t, public, r, orgTestHost, v)
+	for field, v := range credentialsFor(t, secrets) {
+		r.Sealed[field] = sealTo(t, public, r, orgTestHost, field, v)
 	}
 	return r
+}
+
+var (
+	serviceKeyOnce sync.Once
+	serviceKey     *rsa.PrivateKey
+)
+
+// fakeServiceAccount is a service account's JSON key, with email as its client_email.
+func fakeServiceAccount(t *testing.T, email string) string {
+	t.Helper()
+	serviceKeyOnce.Do(func() { serviceKey, _ = rsa.GenerateKey(rand.Reader, 2048) })
+	der, _ := x509.MarshalPKCS8PrivateKey(serviceKey)
+	raw, _ := json.Marshal(map[string]string{"type": "service_account", "client_email": email, "private_key_id": "kid1",
+		"private_key": string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}))})
+	return string(raw)
+}
+
+// fakeClouds is AWS STS, Google's OAuth and Entra (#3397): each makes the token that
+// credentialsFor put in the credential, and counts them; refuse makes each refuse.
+type fakeClouds struct {
+	server             *httptest.Server
+	sts, google, entra atomic.Int32
+	refuse             atomic.Bool
+	mu                 sync.Mutex
+	stsAuth            []string
+	clock              atomic.Int64
+}
+
+func newFakeClouds(t *testing.T) *fakeClouds {
+	f := &fakeClouds{}
+	f.clock.Store(time.Now().UnixNano())
+	f.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		refused := func(n *atomic.Int32) bool {
+			n.Add(1)
+			if f.refuse.Load() {
+				w.WriteHeader(http.StatusForbidden)
+				return true
+			}
+			return false
+		}
+		ends := f.now().Add(2 * time.Hour).UTC().Format(time.RFC3339)
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/sts/"):
+			if refused(&f.sts) {
+				return
+			}
+			auth := r.Header.Get("Authorization")
+			f.mu.Lock()
+			f.stsAuth = append(f.stsAuth, auth)
+			f.mu.Unlock()
+			akid, _, _ := strings.Cut(strings.TrimPrefix(auth, "AWS4-HMAC-SHA256 Credential="), "/")
+			raw, _ := base64.RawURLEncoding.DecodeString(strings.TrimPrefix(akid, "AKIA"))
+			var session map[string]string
+			json.Unmarshal(raw, &session)
+			w.Write([]byte(`<GetSessionTokenResponse><GetSessionTokenResult><Credentials><AccessKeyId>` + session["accessKeyId"] +
+				`</AccessKeyId><SecretAccessKey>` + session["secretAccessKey"] + `</SecretAccessKey><SessionToken>` + session["sessionToken"] +
+				`</SessionToken><Expiration>` + ends + `</Expiration></Credentials></GetSessionTokenResult></GetSessionTokenResponse>`))
+		case r.URL.Path == "/google":
+			if refused(&f.google) {
+				return
+			}
+			parts := strings.Split(r.PostForm.Get("assertion"), ".")
+			if len(parts) != 3 {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			raw, _ := base64.RawURLEncoding.DecodeString(parts[1])
+			var claims map[string]any
+			json.Unmarshal(raw, &claims)
+			json.NewEncoder(w).Encode(map[string]any{"access_token": claims["iss"], "expires_in": 3599})
+		case strings.HasPrefix(r.URL.Path, "/entra/"):
+			if refused(&f.entra) {
+				return
+			}
+			json.NewEncoder(w).Encode(map[string]any{"access_token": r.PostForm.Get("client_secret"), "expires_in": 86400})
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(f.server.Close)
+	return f
+}
+
+func (f *fakeClouds) now() time.Time { return time.Unix(0, f.clock.Load()) }
+
+func (f *fakeClouds) endpoints() *orgtoken.Endpoints {
+	return &orgtoken.Endpoints{
+		STS:         func(region string) string { return f.server.URL + "/sts/" + region },
+		GoogleToken: f.server.URL + "/google",
+		Entra:       func(tenant string) string { return f.server.URL + "/entra/" + tenant },
+		Vendor:      map[wire.OrgRouteVendor]string{},
+		Client:      f.server.Client(),
+		Now:         f.now,
+	}
 }
 
 func deliver(t *testing.T, d *Daemon, routes ...wire.DeliveredRoute) {
@@ -273,8 +384,9 @@ func TestNoOrgRouteChangesNothing(t *testing.T) {
 	if !slices.Contains(told, wire.NewMethodName(wire.CallHostOrgRoutesApplied.Name)) {
 		t.Fatalf("%v", told)
 	}
-	if !slices.Contains(d.Capabilities(), wire.CapHostOrgRoutes1) {
-		t.Fatal("the machine does not say host.org-routes/1")
+	if !slices.Contains(d.Capabilities(), wire.CapHostOrgRoutes1) || !slices.Contains(d.Capabilities(), wire.CapHostOrgRoutes2) ||
+		!slices.Contains(d.Capabilities(), wire.CapHostUserSettings2) {
+		t.Fatal("the machine does not say host.org-routes/1 and /2, and host.user-settings/2")
 	}
 }
 
@@ -957,7 +1069,8 @@ func TestAnOrgKeyReplacedAndRemoved(t *testing.T) {
 }
 
 // T018, US7: the route holds across a restart with no control plane; a file that does not
-// open is deleted and asked for again; an ended token says so and puts the account out.
+// open is deleted and asked for again; a token that cannot be made says so and puts the
+// account out.
 func TestOrgRoutesOffline(t *testing.T) {
 	root := t.TempDir()
 	k := newControlKeys(t)
@@ -998,13 +1111,13 @@ func TestOrgRoutesOffline(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	// A Bedrock token that ended while offline.
+	// A Bedrock credential whose token cannot be made here: offline, its provider unreached.
 	p := newFakeProvider(t)
-	tok := testRoute(t, public, "acme-bedrock", 1, wire.OrgRouteKindBedrock, "", p.URL,
-		map[string]string{"awsSession": `{"accessKeyId":"A","secretAccessKey":"S","sessionToken":"T"}`}, "claude")
-	ends := wire.DateOf(time.Now().Add(-time.Minute))
-	tok.Expires = &ends
-	deliver(t, d2, sealed(t, public, tok, map[string]string{"awsSession": `{"accessKeyId":"A","secretAccessKey":"S","sessionToken":"T"}`}))
+	clouds := newFakeClouds(t)
+	clouds.refuse.Store(true)
+	d2.orgEndpoints = clouds.endpoints()
+	deliver(t, d2, testRoute(t, public, "acme-bedrock", 1, wire.OrgRouteKindBedrock, "", p.URL,
+		map[string]string{"awsSession": `{"accessKeyId":"A","secretAccessKey":"S","sessionToken":"T"}`}, "claude"))
 	r, _ := d2.relay()
 	token := r.standInFor(standIn{route: "acme-bedrock", runtime: "claude", account: "org:acme-bedrock"})
 	req, _ := http.NewRequest("POST", "https://127.0.0.1:"+strconv.Itoa(r.port)+"/acme-bedrock/~"+token+"/model/m/invoke", strings.NewReader(`{}`))
@@ -1014,7 +1127,8 @@ func TestOrgRoutesOffline(t *testing.T) {
 	}
 	body, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
-	if resp.StatusCode != 401 || !strings.Contains(string(body), "Your organisation's Bedrock access ended while this machine is offline. Connect to the network.") || p.count() != 0 {
+	if resp.StatusCode != 401 || !strings.Contains(string(body), "Your organisation's Bedrock access could not be renewed on this machine. Connect to the network.") ||
+		p.count() != 0 || strings.Contains(string(body), "aws-long-lived-secret") {
 		t.Fatalf("%d %s", resp.StatusCode, body)
 	}
 	if s := d2.allowancesLocked()["claude:account:org:acme-bedrock"]; s.Status.Out == nil {
@@ -1308,5 +1422,132 @@ func TestARemovedRoutesFolderGoes(t *testing.T) {
 	}
 	if _, err := os.Stat(folder); err != nil {
 		t.Fatalf("a held route's folder went: %v", err)
+	}
+}
+
+// #3397: a route this machine may use but has no copy of comes as waiting. It is no
+// account here, and a session that needs the org path says it waits for an admin's app.
+// A copy that comes later is kept; an older seal than the one held is refused; and a
+// waiting delivery keeps the copy held from before.
+func TestAWaitingRouteAndAnOlderSeal(t *testing.T) {
+	fakeRuntimes(t)
+	k := newControlKeys(t)
+	root := t.TempDir()
+	d, c, public := orgMachine(t, root, k)
+	os.MkdirAll(d.SettingsDir, 0o755)
+	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 1, map[string]any{
+		"runtimes": map[string]any{"claude": map[string]any{"reach": []string{"orgKey", "gateway"}}}, "requires": []string{wire.CapHostPolicy1, wire.CapHostOrgRoutes2}}))
+	waiting := testRoute(t, public, "acme", 1, wire.OrgRouteKindKey, wire.OrgRouteVendorAnthropic, "", map[string]string{"apiKey": "k1"}, "claude")
+	waiting.Sealed, waiting.Waiting = map[string]wire.SealedEnvelope{}, new(true)
+	deliver(t, d, waiting)
+	if d.accountProfile("claude", "org:acme") != nil {
+		t.Fatal("a waiting route is an account")
+	}
+	if e := c.callError(t, 1, "agents/start", startParams(t.TempDir(), "claude", nil)); e == nil || e.Code != wire.FailureOrgRouteMissing ||
+		!strings.Contains(e.Message, "Acme acme is waiting for an admin's app to seal its key for this machine") {
+		t.Fatalf("%+v", e)
+	}
+	// The copy comes; then seal 2 waits: seal 1 goes on.
+	deliver(t, d, testRoute(t, public, "acme", 1, wire.OrgRouteKindKey, wire.OrgRouteVendorAnthropic, "", map[string]string{"apiKey": "k1"}, "claude"))
+	if d.accountProfile("claude", "org:acme") == nil {
+		t.Fatal("the copy was not taken")
+	}
+	next := testRoute(t, public, "acme", 2, wire.OrgRouteKindKey, wire.OrgRouteVendorAnthropic, "", map[string]string{"apiKey": "k2"}, "claude")
+	next.Sealed, next.Waiting = map[string]wire.SealedEnvelope{}, new(true)
+	deliver(t, d, next)
+	if r, ok := d.heldOrgRoute("acme"); !ok || r.SealVersion != 1 {
+		t.Fatalf("%+v %v", r, ok)
+	}
+	// Seal 2 comes; then seal 1 again, which a control plane could send back, is refused.
+	deliver(t, d, testRoute(t, public, "acme", 2, wire.OrgRouteKindKey, wire.OrgRouteVendorAnthropic, "", map[string]string{"apiKey": "k2"}, "claude"))
+	deliver(t, d, testRoute(t, public, "acme", 3, wire.OrgRouteKindKey, wire.OrgRouteVendorAnthropic, "", map[string]string{"apiKey": "k1"}, "claude"))
+	older := testRoute(t, public, "acme", 1, wire.OrgRouteKindKey, wire.OrgRouteVendorAnthropic, "", map[string]string{"apiKey": "k1"}, "claude")
+	deliver(t, d, older)
+	if r, ok := d.heldOrgRoute("acme"); !ok || r.SealVersion != 3 {
+		t.Fatalf("%+v %v", r, ok)
+	}
+	if v, ok := d.orgSecret(func() wire.DeliveredRoute { r, _ := d.heldOrgRoute("acme"); return r }(), "apiKey"); !ok || string(v) != "k1" {
+		t.Fatalf("%q", v)
+	}
+}
+
+// #3397: the machine makes its own token from a cloud credential, one for each route
+// however many requests, a new one when the last has less than 10 minutes left, and backs
+// off after one that failed; the token is in no file.
+func TestTheMachineMakesItsOwnTokens(t *testing.T) {
+	root := t.TempDir()
+	d, _, public := orgMachine(t, root, newControlKeys(t))
+	clouds := newFakeClouds(t)
+	d.orgEndpoints = clouds.endpoints()
+	route := testRoute(t, public, "vertex", 1, wire.OrgRouteKindVertex, "", "", map[string]string{"googleToken": "ya29.made-here"}, "claude")
+	deliver(t, d, route)
+	r, _ := d.heldOrgRoute("vertex")
+	token := func() (string, error) { return d.routeToken(t.Context(), r, d.routeValues(r)) }
+	for range 3 {
+		if got, err := token(); err != nil || got != "ya29.made-here" {
+			t.Fatal(got, err)
+		}
+	}
+	if clouds.google.Load() != 1 {
+		t.Fatal(clouds.google.Load())
+	}
+	clouds.clock.Add(int64(52 * time.Minute))
+	token()
+	if clouds.google.Load() != 2 {
+		t.Fatal("no new token near the end of the last")
+	}
+	// Refused: the last token goes on until it ends; tries back off 1, 2, 4 … minutes.
+	clouds.refuse.Store(true)
+	clouds.clock.Add(int64(52 * time.Minute))
+	if got, err := token(); err != nil || got != "ya29.made-here" {
+		t.Fatal(got, err)
+	}
+	for range 20 {
+		clouds.clock.Add(int64(time.Minute))
+		token()
+	}
+	if got := clouds.google.Load(); got != 3+4 {
+		t.Fatalf("%d calls to Google", got)
+	}
+	if _, err := token(); err == nil {
+		t.Fatal("an ended token was used")
+	}
+	if found := leaksUnder(t, "ya29.made-here", root); len(found) > 0 {
+		t.Fatalf("%v", found)
+	}
+}
+
+// #3397: host/orgRouteCheck checks a route with this machine's copy.
+func TestAMachineChecksARoute(t *testing.T) {
+	root := t.TempDir()
+	d, _, public := orgMachine(t, root, newControlKeys(t))
+	const key = "sk-ant-checked-here"
+	vendorAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/models" || r.Header.Get("x-api-key") != key {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.Write([]byte(`{"data":[]}`))
+	}))
+	t.Cleanup(vendorAPI.Close)
+	d.orgEndpoints = &orgtoken.Endpoints{Vendor: map[wire.OrgRouteVendor]string{wire.OrgRouteVendorAnthropic: vendorAPI.URL},
+		Client: vendorAPI.Client(), Now: time.Now}
+	deliver(t, d, testRoute(t, public, "acme", 1, wire.OrgRouteKindKey, wire.OrgRouteVendorAnthropic, "", map[string]string{"apiKey": key}, "claude"),
+		testRoute(t, public, "wrong", 1, wire.OrgRouteKindKey, wire.OrgRouteVendorAnthropic, "", map[string]string{"apiKey": "sk-ant-wrong"}, "claude"))
+	ask := func(id string) wire.OrgRouteCheck {
+		got, ok := d.Asked(wire.NewMethodName(wire.CallHostOrgRouteCheck.Name), []byte(`{"id":"`+id+`"}`))
+		if !ok {
+			t.Fatal("not answered")
+		}
+		return got.(wire.OrgRouteCheck)
+	}
+	if check := ask("acme"); !check.Ok {
+		t.Fatalf("%+v", check)
+	}
+	if check := ask("wrong"); check.Ok || !strings.Contains(check.Words, "refused the key (401)") || strings.Contains(check.Words, "sk-ant") {
+		t.Fatalf("%+v", check)
+	}
+	if check := ask("none"); check.Ok || !strings.Contains(check.Words, "does not hold") {
+		t.Fatalf("%+v", check)
 	}
 }

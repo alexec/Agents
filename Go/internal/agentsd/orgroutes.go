@@ -1,8 +1,6 @@
 package agentsd
 
 import (
-	"crypto/ecdh"
-	"crypto/hpke"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,12 +17,15 @@ import (
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/internal/controllink"
+	"github.com/alexec/agents/Go/internal/orgtoken"
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Org routes on the machine (#999, spec 999 slice 2). The control plane sends each machine
-// the routes its person (or bot) may use, on channel 0 (host/orgRoutes), each secret sealed
-// with HPKE to this machine's own key. The machine keeps each route as it came, still
+// Org routes on the machine (#999, spec 999 slice 2; #3397). The control plane sends each
+// machine the routes its person (or bot) may use, on channel 0 (host/orgRoutes), each
+// secret as an admin's client sealed it with HPKE to this machine's own key: the control
+// plane never had the value. A route this machine has no copy of yet comes as waiting; it
+// is no account here until a copy comes, and a session that needs it says why. The machine keeps each route as it came, still
 // sealed, in <root>/org-routes/<id>.json (0600), and opens a secret in memory only when the
 // model relay (modelrelay.go) sends a request with it. A route is one more account of each
 // runtime it serves (#840), id org:<route id>, made here from the delivery and never kept
@@ -65,9 +66,17 @@ var orgRouteVendors = map[string][]wire.OrgRouteVendor{
 }
 
 type orgRouteState struct {
-	orgRouteMu     sync.Mutex
-	orgRoutesRead  bool
-	orgRoutesHeld  map[string]heldRoute
+	orgRouteMu    sync.Mutex
+	orgRoutesRead bool
+	orgRoutesHeld map[string]heldRoute
+	// orgRoutesWaiting is the routes this machine may use and has no copy of, by id (#3397).
+	orgRoutesWaiting map[string]wire.DeliveredRoute
+	// orgTokens is each route's token, made here from its cloud credential (#3397), under
+	// orgTokenMu, which is held while one is made so sessions that start at once share it.
+	orgTokenMu sync.Mutex
+	orgTokens  map[string]orgToken
+	// orgEndpoints is where tokens and checks go; nil is the providers' own. Tests set it.
+	orgEndpoints   *orgtoken.Endpoints
 	orgIdentity    *machineIdentity
 	orgDefaultRead bool
 	orgDefaults    map[string]string
@@ -109,35 +118,24 @@ func (d *Daemon) identityLocked() *machineIdentity {
 }
 
 // openSealed opens one of a route's secrets with this machine's key. The associated data
-// is the machine and the whole route as kept (controllink.OrgRouteAD): a file whose
-// address, header or kind differs from what was delivered does not open.
-func openSealed(id *machineIdentity, r wire.DeliveredRoute, sealed wire.SealedEnvelope) ([]byte, error) {
+// (controllink.OrgRouteAD) is the route, this machine, the field, the seal's version and
+// where the key goes: a file whose address, header or kind differs from what the admin's
+// client sealed does not open.
+func openSealed(id *machineIdentity, r wire.DeliveredRoute, field string, sealed wire.SealedEnvelope) ([]byte, error) {
 	if id == nil {
 		return nil, errors.New("this machine has not joined a control plane")
 	}
-	ad, err := controllink.OrgRouteAD(r, id.host)
-	if err != nil {
-		return nil, err
-	}
-	private, err := ecdh.P256().NewPrivateKey(id.private)
-	if err != nil {
-		return nil, err
-	}
-	key, err := hpke.NewDHKEMPrivateKey(private)
-	if err != nil {
-		return nil, err
-	}
-	recipient, err := hpke.NewRecipient(sealed.Encapsulated, key, hpke.HKDFSHA256(), hpke.AES256GCM(), []byte(orgRoutePurpose))
-	if err != nil {
-		return nil, err
-	}
-	return recipient.Open(ad, sealed.Ciphertext)
+	ad := controllink.DeliveredRouteAD(r, controllink.MachineRecipient(id.host), field)
+	return controllink.Open(id.private, orgRoutePurpose, ad, sealed)
 }
 
 // opens says each of a route's secrets opens here; the values are dropped at once.
 func opens(id *machineIdentity, r wire.DeliveredRoute) error {
+	if len(r.Sealed) != len(r.SecretFields) {
+		return errors.New("it does not have every secret")
+	}
 	for field, sealed := range r.Sealed {
-		v, err := openSealed(id, r, sealed)
+		v, err := openSealed(id, r, field, sealed)
 		clear(v)
 		if err != nil {
 			return fmt.Errorf("%s: %w", field, err)
@@ -230,7 +228,7 @@ func (d *Daemon) orgSecret(r wire.DeliveredRoute, field string) ([]byte, bool) {
 	d.orgRouteMu.Lock()
 	id := d.identityLocked()
 	d.orgRouteMu.Unlock()
-	v, err := openSealed(id, r, sealed)
+	v, err := openSealed(id, r, field, sealed)
 	if err != nil {
 		log.Printf("org routes: %s's %s did not open: %v", r.ID, field, err)
 		return nil, false
@@ -262,9 +260,25 @@ func (d *Daemon) toldOrgRoutes(params json.RawMessage) {
 	id := d.identityLocked()
 	again := false
 	next := map[string]heldRoute{}
+	waiting := map[string]wire.DeliveredRoute{}
 	for _, r := range delivery.Routes {
 		if err := routeWellFormed(r); err != nil {
 			log.Printf("host/orgRoutes: %v", err)
+			continue
+		}
+		old, had := held[r.ID]
+		// An older seal than this machine holds is one a control plane sent back: refused.
+		if had && r.SealVersion < old.route.SealVersion {
+			log.Printf("host/orgRoutes: %s seal %d is older than the %d held here; refused", r.ID, r.SealVersion, old.route.SealVersion)
+			next[r.ID] = old
+			continue
+		}
+		// No copy for this machine yet: the one held, sealed by an admin before, goes on.
+		if r.Waiting != nil && *r.Waiting {
+			waiting[r.ID] = r
+			if had {
+				next[r.ID] = old
+			}
 			continue
 		}
 		if err := opens(id, r); err != nil {
@@ -295,14 +309,14 @@ func (d *Daemon) toldOrgRoutes(params json.RawMessage) {
 			os.Remove(filepath.Join(d.orgRoutesDir(), routeID+".json"))
 		}
 	}
-	d.orgRoutesHeld = next
+	d.orgRoutesHeld, d.orgRoutesWaiting = next, waiting
 	applied := wire.OrgRoutesApplied{Routes: []wire.OrgRouteVersion{}}
 	for _, h := range next {
 		applied.Routes = append(applied.Routes, wire.OrgRouteVersion{ID: h.route.ID, Version: h.route.Version})
 	}
 	d.orgRouteMu.Unlock()
 	sort.Slice(applied.Routes, func(i, j int) bool { return applied.Routes[i].ID < applied.Routes[j].ID })
-	log.Printf("host/orgRoutes: %d kept, %d removed", len(next), len(gone))
+	log.Printf("host/orgRoutes: %d kept, %d removed, %d waiting for an admin's app", len(next), len(gone), len(waiting))
 	d.stopRemovedOrgSessions(gone)
 	d.dropStandInsOfGoneRoutes()
 	if len(gone) > 0 {
@@ -625,10 +639,32 @@ func (d *Daemon) reachWordsFor(runtimeID string) *string {
 }
 
 // orgRouteMissingError is the org path required and no route for it on this machine
-// (US3 scenario 2, D11).
-func orgRouteMissingError() error {
+// (US3 scenario 2, D11); or (#3397) a route this machine waits for, by name.
+func orgRouteMissingError(waiting string) error {
+	if waiting != "" {
+		return &Error{Code: wire.FailureOrgRouteMissing,
+			Message: "Your organisation's " + waiting + " is waiting for an admin's app to seal its key for this machine. It comes when an admin opens Agents."}
+	}
 	return &Error{Code: wire.FailureOrgRouteMissing,
 		Message: "Your organisation's way to this model has not reached this machine. Connect to the network."}
+}
+
+// waitingRouteFor is the name of a route for a runtime that this machine waits for, or "".
+func (d *Daemon) waitingRouteFor(runtimeID string) string {
+	d.orgRouteMu.Lock()
+	defer d.orgRouteMu.Unlock()
+	d.orgRoutesLocked()
+	var names []string
+	for _, r := range d.orgRoutesWaiting {
+		if routeServes(r, runtimeID) {
+			names = append(names, r.Name)
+		}
+	}
+	if len(names) == 0 {
+		return ""
+	}
+	slices.Sort(names)
+	return names[0]
 }
 
 // accountRefusal is the policy's reach applied to a session's account: a refusal with the
@@ -642,7 +678,7 @@ func (d *Daemon) accountRefusal(runtimeID string, account *wire.AccountProfile) 
 	if account == nil && !slices.ContainsFunc(d.orgAccounts(), func(a wire.AccountProfile) bool {
 		return a.RuntimeID == runtimeID && reachRefusal(p, runtimeID, &a, nil) == nil
 	}) {
-		return orgRouteMissingError()
+		return orgRouteMissingError(d.waitingRouteFor(runtimeID))
 	}
 	return reachRefusal(p, runtimeID, account, words)
 }

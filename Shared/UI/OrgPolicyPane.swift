@@ -98,6 +98,10 @@ struct OrgPolicyPane: View {
                                 Text(route.name).appText(.reading)
                                 Text(OrgAccountWords.mineLine(route)).appText(.fine).foregroundStyle(.secondary)
                                 Text(OrgAccountWords.fromOrganisation).appText(.fine).foregroundStyle(.secondary)
+                                if route.waiting == true {
+                                    Text(OrgAccountWords.routeWaiting).appText(.fine).tinted(.attention)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
                             }
                         }
                     } header: {

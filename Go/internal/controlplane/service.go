@@ -132,9 +132,6 @@ type Config struct {
 	// The sign-in providers this copy can check, and where it asks them (#995); nil is the
 	// app's own client ids, or AGENTS_SIGNIN_* over them.
 	SignIn *signin.Config
-	// Where the org routes' token and check calls go (#999); nil is the providers' own.
-	// Tests point them at fakes.
-	orgEndpoints *orgEndpoints
 }
 
 // WebConfig is ControlService.Configuration.Web.
@@ -220,6 +217,8 @@ type Service struct {
 	// The organisation's routes to the model (#999): opened secrets, tokens, and what each
 	// machine here was sent.
 	orgRoutes orgRouteBook
+	// sealingWants is who is told control/sealingWanted next (#3397).
+	sealingWants sealingWants
 	// A bot's machine started for its triggers (#2011, FR-034).
 	starts botStarts
 	// What Reports and the Console read from the store, by entity tag (#2054, #2056).
@@ -456,7 +455,6 @@ func (s *Service) Start(ctx context.Context) (int, error) {
 	}
 	go s.refreshEvery(15 * time.Second)
 	go s.sweepEveryHour()
-	go s.renewTokensEvery(time.Minute)
 	go s.signIns.checkEvery(time.Hour, s.stop)
 	if s.tunnels != nil {
 		s.tunnels.Start(0)

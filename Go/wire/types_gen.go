@@ -2988,7 +2988,7 @@ type DeleteSessionRequest struct {
 	Confirmed *bool `json:"confirmed,omitzero"`
 }
 
-// One org route as a machine gets it (#999, FR-005): the route without its groups, fingerprint and stamps, and each secret sealed with HPKE to the machine's key (SealedEnvelope), info com.alexecollins.agents.orgroute.v2, associated data <route id>|<host id>|<version>|<hex SHA-256 of the route as JSON without sealed>, so a route whose settings changed after delivery does not open. A cloud credential is sent only as a token that ends at expires (Q1 A): awsSession, googleToken or entraToken.
+// One org route as a machine gets it (#999, FR-005, #3397): the route without its groups, fingerprint and stamps, and each secret as an admin's client sealed it to this machine (OrgRouteSealed's envelope). A cloud credential comes as it is, and the machine makes its own token. waiting: the machine may use the route but has no copy yet, and sealed is empty.
 type DeliveredRoute struct {
 	ID string `json:"id"`
 
@@ -3010,10 +3010,12 @@ type DeliveredRoute struct {
 
 	Version int64 `json:"version"`
 
-	// Each secret value, or token, by field.
+	// Each secret value, by field.
 	Sealed map[string]SealedEnvelope `json:"sealed"`
 
-	Expires *Date `json:"expires,omitzero"`
+	SealVersion int64 `json:"sealVersion"`
+
+	Waiting *bool `json:"waiting,omitzero"`
 }
 
 // The live tile's latest look at the Mac's screen while an agent holds the screen lease (#3004, US4, FR-011): a downscaled JPEG of the whole screen, base64, or, while the screen is locked, locked and no image (FR-012). Sent only to the clients showing that agent, never recorded, never replayed (FR-016).
@@ -6366,13 +6368,13 @@ type MachineUser struct {
 	Bots []string `json:"bots,omitzero"`
 }
 
-// host/userSettings (#1760, FR-024, FR-025): to a machine, on its channel 0, when it joins and when its user's settings or secrets change. Sent only on the links of that user's own machines. secrets is every secret the user has: a name missing from it was removed.
+// host/userSettings (#1760, FR-024, FR-025): to a machine, on its channel 0, when it joins and when its user's settings or secrets change. Sent only on the links of that user's own machines. secrets is every secret the user has that is sealed to this machine (#3397): a name missing from it was removed, or waits for the person's client to seal it.
 type MachineUserSettings struct {
 	User string `json:"user"`
 
 	Settings UserSettings `json:"settings"`
 
-	Secrets []UserSecret `json:"secrets"`
+	Secrets []SealedUserSecret `json:"secrets"`
 }
 
 type MachineWorkspace struct {
@@ -6963,7 +6965,7 @@ type OrgProviderSet struct {
 	Rev *string `json:"rev,omitzero"`
 }
 
-// An organisation's way to the model for one or more runtimes (#999, spec FR-001): an org key or a gateway. The control plane keeps it at v1/org/routes/<id>.json; its secrets are in an envelope beside it, never in this record. The control plane sets version, secretFields, fingerprint, created and changed; machines is how many machines hold its version, for an admin.
+// An organisation's way to the model for one or more runtimes (#999, spec FR-001): an org key or a gateway. The control plane keeps it at v1/org/routes/<id>.json; its secrets are sealed by an admin's client to each machine and client that may hold them (#3397), in a record beside it, never in this one. The control plane sets version, secretFields, created and changed; the admin's client says fingerprint and sealVersion. machines is how many machines hold its version, and waiting how many may use it and have no copy yet, for an admin.
 type OrgRoute struct {
 	// [a-z0-9-]{1,40}, made from the name when absent at add, never changed.
 	ID string `json:"id"`
@@ -6992,10 +6994,10 @@ type OrgRoute struct {
 	// The names of the secret fields that are set (apiKey, awsAccessKeyId, serviceAccount, entraClientSecret, …), never a value.
 	SecretFields []string `json:"secretFields,omitzero"`
 
-	// The first 8 hex of SHA-256 of each secret value (spec D14), by field.
+	// The first 8 hex of SHA-256 of each secret value (spec D14), by field, as the admin's client worked it out.
 	Fingerprint map[string]string `json:"fingerprint,omitzero"`
 
-	// One more at each change, a replaced key included.
+	// One more at each change.
 	Version *int64 `json:"version,omitzero"`
 
 	Created *OrgRouteStamp `json:"created,omitzero"`
@@ -7004,9 +7006,15 @@ type OrgRoute struct {
 
 	// How many machines said they keep this version (host/orgRoutesApplied). Only in orgRoutes/list.
 	Machines *int64 `json:"machines,omitzero"`
+
+	// One more each time the secrets, the kind, the vendor or the settings change: what each secret's associated data binds (#3397). 0 with no secret.
+	SealVersion *int64 `json:"sealVersion,omitzero"`
+
+	// How many machines may use the route and have no copy of its secrets yet: they wait for an admin's client to seal it for them (#3397). Only in orgRoutes/list.
+	Waiting *int64 `json:"waiting,omitzero"`
 }
 
-// orgRoutes/check (#999): what one small request from the control plane found, in words.
+// orgRoutes/check (#999, #3397): what one small request from a machine that holds the route found, in words.
 type OrgRouteCheck struct {
 	Ok bool `json:"ok"`
 
@@ -7036,11 +7044,9 @@ const OrgRouteKindVertex OrgRouteKind = "vertex"
 const OrgRouteKindAzure OrgRouteKind = "azure"
 const OrgRouteKindBaseURL OrgRouteKind = "baseURL"
 
-// orgRoutes/list (#999), an admin's: every route, and whether this control plane can seal a secret.
+// orgRoutes/list (#999), an admin's: every route.
 type OrgRouteList struct {
 	Routes []OrgRouteKept `json:"routes"`
-
-	Sealing bool `json:"sealing"`
 }
 
 // A route the caller may use (#999): no settings, no fingerprint.
@@ -7054,13 +7060,21 @@ type OrgRouteMine struct {
 	Runtimes []string `json:"runtimes"`
 
 	DefaultFor []string `json:"defaultFor"`
+
+	// One of the caller's machines may use it and waits for an admin's client to seal it (#3397).
+	Waiting *bool `json:"waiting,omitzero"`
 }
 
-// orgRoutes/replaceKey (#999): new values for a route's secret fields.
+// orgRoutes/recipients (#3397): the groups the route is for; none for everyone.
+type OrgRouteRecipientsRequest struct {
+	Groups []string `json:"groups,omitzero"`
+}
+
+// orgRoutes/replaceKey (#999, #3397): new values for every one of a route's secret fields, sealed by the client.
 type OrgRouteReplaceKey struct {
 	ID string `json:"id"`
 
-	Secrets map[string]string `json:"secrets"`
+	Sealed OrgRouteSealed `json:"sealed"`
 
 	Rev string `json:"rev"`
 }
@@ -7072,11 +7086,23 @@ type OrgRouteRequest struct {
 	Rev *string `json:"rev,omitzero"`
 }
 
-// orgRoutes/set (#999): add a route, or change one. secrets are written only, never read back; an absent field keeps its value. rev is the tag the admin read; none to add.
+// An org route's secrets as an admin's client sealed them (#3397, specs/3397-client-sealing): every field, to every recipient of orgRoutes/recipients. Each envelope is HPKE to the recipient's key, info com.alexecollins.agents.orgroute.v3, associated data orgroute.v3|<route id>|<recipient>|<field>|<sealVersion>|<kind>|<vendor or empty>|<hex SHA-256 of the settings, one name=value line each>.
+type OrgRouteSealed struct {
+	// The kept sealVersion plus one; 1 for a route with no secret yet.
+	SealVersion int64 `json:"sealVersion"`
+
+	// The first 8 hex of SHA-256 of each value, by field.
+	Fingerprint map[string]string `json:"fingerprint"`
+
+	// By recipient (m:<machine id> or c:<client id>), then by field.
+	Values map[string]map[string]SealedEnvelope `json:"values"`
+}
+
+// orgRoutes/set (#999, #3397): add a route, or change one. sealed carries every secret, sealed by the client; it is needed when the secrets, the kind, the vendor or the settings change, and absent keeps the secrets as they are. rev is the tag the admin read; none to add.
 type OrgRouteSet struct {
 	Route OrgRoute `json:"route"`
 
-	Secrets map[string]string `json:"secrets,omitzero"`
+	Sealed *OrgRouteSealed `json:"sealed,omitzero"`
 
 	Rev *string `json:"rev,omitzero"`
 }
@@ -9732,11 +9758,84 @@ const SandboxStateOff SandboxState = "off"
 const SandboxStateRuntimeControlled SandboxState = "runtimeControlled"
 const SandboxStateNone SandboxState = "none"
 
+// A machine or a client to seal a secret to (#3397): its id as the associated data names it (m:<machine id> or c:<client id>), its name, and its P-256 key, X9.63. The control plane gives the key: until the machine lock (#3400) signs it, a control plane could give one of its own.
+type SealRecipient struct {
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	PublicKey Data `json:"publicKey"`
+}
+
+// orgRoutes/recipients and user/secretRecipients (#3397). user is, for user/secretRecipients, the person whose secret it is, as its associated data names them.
+type SealRecipients struct {
+	Recipients []SealRecipient `json:"recipients"`
+
+	User *string `json:"user,omitzero"`
+}
+
 // Envelope: HPKE (P-256, HKDF-SHA256, AES-256-GCM) to one device's key. Nothing in it is legible but to that device.
 type SealedEnvelope struct {
 	Encapsulated Data `json:"encapsulated"`
 
 	Ciphertext Data `json:"ciphertext"`
+}
+
+// One secret in host/userSettings (#3397): sealed to this machine by its person's client.
+type SealedUserSecret struct {
+	Name UserSecretName `json:"name"`
+
+	Version int64 `json:"version"`
+
+	Sealed SealedEnvelope `json:"sealed"`
+}
+
+// sealing/add (#3397).
+type SealingAdd struct {
+	Items []SealingAddItem `json:"items"`
+}
+
+// One item of sealing/add (#3397): new copies at the item's version, by recipient, then by field.
+type SealingAddItem struct {
+	Item SealingItemKind `json:"item"`
+
+	ID string `json:"id"`
+
+	Version int64 `json:"version"`
+
+	Values map[string]map[string]SealedEnvelope `json:"values"`
+}
+
+// sealing/work and orgRoutes/sealed (#3397): a secret the calling client holds a copy of, and the recipients that have none. id is the route's id or the secret's name; user is the person whose secret it is. kind, vendor and settings are the route's, to make the associated data; a copy opens only if they are what the admin sealed. mine is the client's copy by field (a person's secret has the one field value).
+type SealingItem struct {
+	Item SealingItemKind `json:"item"`
+
+	ID string `json:"id"`
+
+	User *string `json:"user,omitzero"`
+
+	Version int64 `json:"version"`
+
+	Kind *OrgRouteKind `json:"kind,omitzero"`
+
+	Vendor *OrgRouteVendor `json:"vendor,omitzero"`
+
+	Settings *OrgRouteSettings `json:"settings,omitzero"`
+
+	Mine map[string]SealedEnvelope `json:"mine"`
+
+	Missing []SealRecipient `json:"missing"`
+}
+
+// What a sealing item is (#3397).
+type SealingItemKind string
+
+const SealingItemKindOrgRoute SealingItemKind = "orgRoute"
+const SealingItemKindUserSecret SealingItemKind = "userSecret"
+
+// sealing/work (#3397).
+type SealingWork struct {
+	Items []SealingItem `json:"items"`
 }
 
 // A machine that was removed with a secret on it (#1760, FR-026): change the secret where it was issued.
@@ -11709,9 +11808,6 @@ type UserSecretName string
 // user/secretNames (#1760).
 type UserSecretNames struct {
 	Secrets []UserSecretRow `json:"secrets"`
-
-	// False when this control plane has no key to seal secrets with, and user/setSecret is refused.
-	Sealing bool `json:"sealing"`
 }
 
 // user/removeSecret (#1760).
@@ -11730,6 +11826,21 @@ type UserSecretRow struct {
 
 	// Machines removed with it on them, since it was last set.
 	LeftOn []SecretLeftOn `json:"leftOn,omitzero"`
+
+	Version *int64 `json:"version,omitzero"`
+
+	// The person's machines that have no copy yet: they wait for one of the person's clients to seal it (#3397).
+	Waiting []MachineRef `json:"waiting,omitzero"`
+}
+
+// user/setSecret (#1760, FR-025, #3397): a secret as the person's client sealed it to each recipient of user/secretRecipients, info com.alexecollins.agents.usersecret.v1, associated data usersecret.v1|<person id>|<recipient>|<name>|<version>. version is above the kept one: the kept one plus one, or for a name the client has none of, the time in milliseconds, above a removed one's. The control plane never has the value.
+type UserSecretSet struct {
+	Name UserSecretName `json:"name"`
+
+	Version int64 `json:"version"`
+
+	// By recipient.
+	Values map[string]SealedEnvelope `json:"values"`
 }
 
 // user/settings (#1760, #2410): the person's settings that follow them to each of their machines. An omitted part has no value yet, but does not make that setting machine-local. The control plane does not read inside a part.

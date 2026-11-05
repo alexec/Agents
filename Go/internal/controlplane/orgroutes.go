@@ -3,10 +3,7 @@ package controlplane
 import (
 	"bytes"
 	"context"
-	"crypto/ecdh"
-	"crypto/hpke"
 	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,48 +18,54 @@ import (
 
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/audit"
-	"github.com/alexec/agents/Go/internal/controlplane/kms"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Org routes (#999, spec 999 slice 1): an organisation's way to the model, an org key or a
-// gateway, that an admin keeps here. The record is plain JSON with no secret; its secrets
-// are one envelope beside it, sealed with the keeper for secrets (#1760) and bound to its
-// store key, so only ciphertext is in the store. Each machine that says host.org-routes/1
-// is sent the routes its person (or bot) may use, on channel 0, each secret sealed with
-// HPKE to that machine's own key: a log, a relay or another copy that sees the message
-// cannot open it. A cloud credential never leaves here: a machine gets a token that ends
-// within an hour (orgtokens.go). The machine's side (keep, relay, launch) is slice 2.
+// Org routes (#999, spec 999 slice 1; #3397): an organisation's way to the model, an org
+// key or a gateway, that an admin keeps here. The record is plain JSON with no secret. Its
+// secrets are one record beside it, of envelopes that an admin's client sealed with HPKE
+// to each machine that may use the route and to each admin's client
+// (specs/3397-client-sealing). The control plane keeps and sends those envelopes, and
+// never opens one: it holds no key that does. Each machine that says host.org-routes/2 is
+// sent the routes its person (or bot) may use, on channel 0, with its own copies; a
+// machine with no copy yet gets the route as waiting, and the admins' clients are asked to
+// seal for it (sealing.go). A cloud credential goes to the machine as it is, and the
+// machine makes its own token (Go/internal/orgtoken).
 
-// CapHostOrgRoutes is what a machine says when it keeps org routes. A machine that does
-// not say it is sent nothing.
-const CapHostOrgRoutes = wire.CapHostOrgRoutes1
+// CapHostOrgRoutes is what a machine says when it keeps org routes as clients seal them.
+// A machine that does not say it is sent nothing.
+const CapHostOrgRoutes = wire.CapHostOrgRoutes2
 
 const (
 	orgRoutesPrefix = "v1/org/routes/"
 	orgSecretSuffix = ".secret.json"
-	// OrgRoutePurpose is the HPKE info a route's secret is sealed under (research R4).
-	OrgRoutePurpose = controllink.OrgRoutePurpose
 	// The bounds of data-model.md.
-	mostOrgRoutes      = 50
-	mostRouteSecrets   = 10
-	mostRouteSecret    = 16 << 10
-	mostRouteName      = 60
-	mostRouteSetting   = 500
-	mostRouteModels    = 200
+	mostOrgRoutes    = 50
+	mostRouteSecrets = 10
+	mostRouteSecret  = 16 << 10
+	mostRouteName    = 60
+	mostRouteSetting = 500
+	mostRouteModels  = 200
+	// mostRecipients bounds the machines and clients one value is sealed to, and
+	// mostSealedRecord one route's sealed record (#3397).
+	mostRecipients     = 200
+	mostSealedRecord   = 4 << 20
 	orgRouteRetries    = 5
 	orgRoutesApplied   = "orgRoutes"
 	orgDeliveryTimeout = 30 * time.Second
+	// orgCheckPatience is how long orgRoutes/check waits for a machine's answer.
+	orgCheckPatience = 30 * time.Second
 )
 
 var (
-	orgRouteID      = regexp.MustCompile(`^[a-z0-9-]{1,40}$`)
-	routeHeaderName = regexp.MustCompile(`^[A-Za-z0-9-]{1,64}$`)
-	routeRegion     = regexp.MustCompile(`^[a-z0-9-]{1,40}$`)
-	routeWord       = regexp.MustCompile(`^[A-Za-z0-9._:-]{1,100}$`)
-	routeModel      = regexp.MustCompile(`^\S{1,200}$`)
+	orgRouteID       = regexp.MustCompile(`^[a-z0-9-]{1,40}$`)
+	routeHeaderName  = regexp.MustCompile(`^[A-Za-z0-9-]{1,64}$`)
+	routeRegion      = regexp.MustCompile(`^[a-z0-9-]{1,40}$`)
+	routeWord        = regexp.MustCompile(`^[A-Za-z0-9._:-]{1,100}$`)
+	routeModel       = regexp.MustCompile(`^\S{1,200}$`)
+	routeFingerprint = regexp.MustCompile(`^[0-9a-f]{8}$`)
 )
 
 // orgRouteKinds is the spec's table "What each runtime can use": the kinds each runtime's
@@ -82,7 +85,7 @@ var orgRouteVendors = map[string][]wire.OrgRouteVendor{
 }
 
 // routeSecretFields is each kind's secret fields. A cloud credential (Bedrock's access
-// keys, Vertex's service account, Azure's Entra secret) is made into a token here.
+// keys, Vertex's service account, Azure's Entra secret) is made into a token on the machine.
 var routeSecretFields = map[wire.OrgRouteKind][]string{
 	wire.OrgRouteKindKey:     {"apiKey"},
 	wire.OrgRouteKindBaseURL: {"apiKey"},
@@ -91,33 +94,21 @@ var routeSecretFields = map[wire.OrgRouteKind][]string{
 	wire.OrgRouteKindAzure:   {"apiKey", "entraClientSecret"},
 }
 
-// orgRouteBook is what this copy holds of the routes: each route's opened secrets by its
-// envelope's tag, so a machine's join does not ask the keeper again, what each machine
-// here was last sent, by a digest of what went into it (a sealed envelope differs each
-// time), and the tokens made for cloud credentials.
+// orgRouteBook is what this copy holds of the routes: what each machine here was last sent,
+// by a digest of what went into it.
 type orgRouteBook struct {
-	mu     sync.Mutex
-	opened map[string]openedRoute
-	told   map[string][sha256.Size]byte
-	tokens map[string]orgToken
+	mu   sync.Mutex
+	told map[string][sha256.Size]byte
 	// resending is a resend running; again is another asked for while it ran (#2424).
 	resending, again bool
-	// resent is when the last resend to every machine here began, once it ended: a token
-	// that ended before it and that it did not ask for is one nobody here uses (#2431).
-	resent time.Time
-	// making is held while a token is made, so machines that join at once share one.
-	making sync.Mutex
 }
 
-type openedRoute struct {
-	tag    string
-	values map[string]string
-}
-
-// orgSecretRecord is a route's secrets as stored: one envelope over {field: value}.
+// orgSecretRecord is a route's secrets as stored: each recipient's envelopes, by field, at
+// one seal version. Nothing in it opens here.
 type orgSecretRecord struct {
-	ID     string      `json:"id"`
-	Sealed *kms.Sealed `json:"sealed"`
+	ID          string                                    `json:"id"`
+	SealVersion int64                                     `json:"sealVersion"`
+	Sealed      map[string]map[string]wire.SealedEnvelope `json:"sealed"`
 }
 
 // keptRoute is a route as the store has it.
@@ -129,53 +120,11 @@ type keptRoute struct {
 func orgRouteKey(id string) string  { return orgRoutesPrefix + id + ".json" }
 func orgSecretKey(id string) string { return orgRoutesPrefix + id + orgSecretSuffix }
 
-// SealOrgRoute is one of a delivered route's secrets sealed to a machine's P-256 key: HPKE
-// (P-256, HKDF-SHA256, AES-256-GCM), info OrgRoutePurpose, with the machine and the whole
-// route as it goes (all but its sealed values) as associated data (FR-005).
-func SealOrgRoute(publicKey []byte, r wire.DeliveredRoute, host string, value []byte) (wire.SealedEnvelope, error) {
-	ad, err := controllink.OrgRouteAD(r, host)
-	if err != nil {
-		return wire.SealedEnvelope{}, err
-	}
-	key, err := ecdh.P256().NewPublicKey(publicKey)
-	if err != nil {
-		return wire.SealedEnvelope{}, fmt.Errorf("the machine's key: %w", err)
-	}
-	recipient, err := hpke.NewDHKEMPublicKey(key)
-	if err != nil {
-		return wire.SealedEnvelope{}, err
-	}
-	enc, sender, err := hpke.NewSender(recipient, hpke.HKDFSHA256(), hpke.AES256GCM(), []byte(OrgRoutePurpose))
-	if err != nil {
-		return wire.SealedEnvelope{}, err
-	}
-	ciphertext, err := sender.Seal(ad, value)
-	if err != nil {
-		return wire.SealedEnvelope{}, err
-	}
-	return wire.SealedEnvelope{Encapsulated: enc, Ciphertext: ciphertext}, nil
-}
-
-// OpenOrgRoute is SealOrgRoute's other side, with the machine's own key: the machine's
-// (slice 2) and the tests'.
-func OpenOrgRoute(privateKey []byte, r wire.DeliveredRoute, host string, sealed wire.SealedEnvelope) ([]byte, error) {
-	ad, err := controllink.OrgRouteAD(r, host)
-	if err != nil {
-		return nil, err
-	}
-	private, err := ecdh.P256().NewPrivateKey(privateKey)
-	if err != nil {
-		return nil, err
-	}
-	key, err := hpke.NewDHKEMPrivateKey(private)
-	if err != nil {
-		return nil, err
-	}
-	recipient, err := hpke.NewRecipient(sealed.Encapsulated, key, hpke.HKDFSHA256(), hpke.AES256GCM(), []byte(OrgRoutePurpose))
-	if err != nil {
-		return nil, err
-	}
-	return recipient.Open(ad, sealed.Ciphertext)
+// sameBinding says two routes send their keys to the same place: the kind, the vendor and
+// the settings that the secrets' associated data binds (#3397).
+func sameBinding(a, b wire.OrgRoute) bool {
+	return a.Kind == b.Kind && deref(a.Vendor) == deref(b.Vendor) &&
+		controllink.OrgRouteBinding(a.Settings) == controllink.OrgRouteBinding(b.Settings)
 }
 
 // MARK: The methods
@@ -194,8 +143,12 @@ func (m *Methods) orgRoutesMethod(ctx context.Context, method string, params jso
 		out := wire.OrgRoutesMine{Routes: []wire.OrgRouteMine{}}
 		for _, r := range routes {
 			if m.s.mayUseRoute(user, r.route) {
-				out.Routes = append(out.Routes, wire.OrgRouteMine{ID: r.route.ID, Name: r.route.Name, Kind: r.route.Kind,
-					Runtimes: r.route.Runtimes, DefaultFor: nonNil(r.route.DefaultFor)})
+				mine := wire.OrgRouteMine{ID: r.route.ID, Name: r.route.Name, Kind: r.route.Kind,
+					Runtimes: r.route.Runtimes, DefaultFor: nonNil(r.route.DefaultFor)}
+				if m.s.routeWaitsFor(ctx, r.route, func(owner string) bool { return owner == user }) > 0 {
+					mine.Waiting = optional(true)
+				}
+				out.Routes = append(out.Routes, mine)
 			}
 		}
 		return out, nil
@@ -211,29 +164,59 @@ func (m *Methods) orgRoutesMethod(ctx context.Context, method string, params jso
 			return nil, err
 		}
 		held := m.s.routesHeld()
-		out := wire.OrgRouteList{Routes: []wire.OrgRouteKept{}, Sealing: m.s.users.Sealing()}
+		out := wire.OrgRouteList{Routes: []wire.OrgRouteKept{}}
 		for _, r := range routes {
 			route := r.route
 			count := int64(held[route.ID+"|"+fmt.Sprint(deref(route.Version))])
-			route.Machines = &count
+			waiting := int64(m.s.routeWaitsFor(ctx, route, nil))
+			route.Machines, route.Waiting = &count, &waiting
 			out.Routes = append(out.Routes, wire.OrgRouteKept{Route: route, Rev: r.rev})
 		}
 		return out, nil
+	case "orgRoutes/recipients":
+		request, err := require[wire.OrgRouteRecipientsRequest](params, "OrgRouteRecipientsRequest")
+		if err != nil {
+			return nil, err
+		}
+		for _, group := range request.Groups {
+			if m.s.records.Group(group) == nil {
+				return nil, fail(invalidParams, "There is no group %q.", group)
+			}
+		}
+		return wire.SealRecipients{Recipients: m.s.routeRecipients(request.Groups)}, nil
+	case "orgRoutes/sealed":
+		request, err := require[wire.OrgRouteRequest](params, "OrgRouteRequest")
+		if err != nil {
+			return nil, err
+		}
+		kept, err := m.s.readOrgRoute(ctx, request.ID)
+		if err != nil {
+			return nil, err
+		}
+		if kept == nil {
+			return nil, fail(invalidParams, "There is no route %q.", request.ID)
+		}
+		record, _, err := m.s.readRouteSecrets(ctx, kept.route.ID)
+		if err != nil {
+			return nil, err
+		}
+		mine := record.Sealed[controllink.ClientRecipient(from.Client)]
+		if record.SealVersion != deref(kept.route.SealVersion) || !hasFields(mine, kept.route.SecretFields) {
+			return nil, fail(notSupported, "This app has no copy of the route's key yet. Wait for another admin's app to seal it for this one, or enter the key again.")
+		}
+		return routeItem(kept.route, mine, []wire.SealRecipient{}), nil
 	case "orgRoutes/set":
 		request, err := require[wire.OrgRouteSet](params, "OrgRouteSet")
 		if err != nil {
 			return nil, err
 		}
-		return m.s.setOrgRoute(ctx, actor, method, request.Route, request.Secrets, request.Rev, false)
+		return m.s.setOrgRoute(ctx, actor, method, request.Route, request.Sealed, request.Rev, false)
 	case "orgRoutes/replaceKey":
 		request, err := require[wire.OrgRouteReplaceKey](params, "OrgRouteReplaceKey")
 		if err != nil {
 			return nil, err
 		}
-		if len(request.Secrets) == 0 {
-			return nil, fail(invalidParams, "Say the new key.")
-		}
-		return m.s.setOrgRoute(ctx, actor, method, wire.OrgRoute{ID: request.ID}, request.Secrets, &request.Rev, true)
+		return m.s.setOrgRoute(ctx, actor, method, wire.OrgRoute{ID: request.ID}, &request.Sealed, &request.Rev, true)
 	case "orgRoutes/remove":
 		request, err := require[wire.OrgRouteRequest](params, "OrgRouteRequest")
 		if err != nil {
@@ -252,12 +235,8 @@ func (m *Methods) orgRoutesMethod(ctx context.Context, method string, params jso
 		if kept == nil {
 			return nil, fail(invalidParams, "There is no route %q.", request.ID)
 		}
-		values, err := m.s.openRouteSecrets(ctx, kept.route.ID)
-		if err != nil {
-			return nil, err
-		}
 		m.s.auditRoute(actor, method, kept.route.ID, "")
-		return m.s.checkOrgRoute(ctx, kept.route, values), nil
+		return m.s.checkOnMachine(kept.route), nil
 	}
 	return nil, notFound(method)
 }
@@ -275,19 +254,47 @@ func (s *Service) auditRoute(actor wire.AuditActor, method, id, what string) {
 	s.auditTo(actor, method, action, target)
 }
 
-// routeFailure is a sealing error in words, as userFailure.
-func routeFailure(err error) error {
-	var rpc *RPCError
-	if errors.As(err, &rpc) {
-		return rpc
+// checkOnMachine is orgRoutes/check (#3397): the control plane cannot open the route's
+// credential, so it asks a machine here that holds the route's version, and gives its words.
+func (s *Service) checkOnMachine(r wire.OrgRoute) wire.OrgRouteCheck {
+	if len(r.SecretFields) == 0 && r.Kind != wire.OrgRouteKindBaseURL {
+		return wire.OrgRouteCheck{Words: "The route has no key yet."}
 	}
-	return userFailure(err)
+	version := deref(r.Version)
+	for _, host := range s.router.HostsHeldHere() {
+		h := s.records.Host(host)
+		if h == nil || !s.takesOrgRoutes(host) {
+			continue
+		}
+		if !slices.ContainsFunc(appliedOrgRoutes(*h), func(v wire.OrgRouteVersion) bool { return v.ID == r.ID && v.Version == version }) {
+			continue
+		}
+		reply := s.router.Ask(host, wire.NewMethodName(wire.CallHostOrgRouteCheck.Name), wire.OrgRouteRequest{ID: r.ID}, orgCheckPatience)
+		if reply == nil || len(reply.Error) > 0 {
+			continue
+		}
+		var check wire.OrgRouteCheck
+		if json.Unmarshal(reply.Result, &check) != nil || check.Words == "" {
+			continue
+		}
+		check.Words = fmt.Sprintf("%s, checked on %s.", strings.TrimSuffix(check.Words, "."), cmpOr(h.Name, host))
+		return check
+	}
+	return wire.OrgRouteCheck{Words: "No machine that holds this route is online here to check it. Check again when one is."}
 }
 
-// setOrgRoute adds or changes a route, and its secrets with it (FR-001 to FR-004). keyOnly
-// is orgRoutes/replaceKey: only the secrets change.
+func cmpOr(a, b string) string {
+	if a != "" {
+		return a
+	}
+	return b
+}
+
+// setOrgRoute adds or changes a route, and its sealed secrets with it (FR-001 to FR-004,
+// #3397). keyOnly is orgRoutes/replaceKey: only the secrets change. sealed is nil to keep
+// the secrets as they are, which a change to where the key goes cannot.
 func (s *Service) setOrgRoute(ctx context.Context, actor wire.AuditActor, method string, next wire.OrgRoute,
-	secrets map[string]string, rev *string, keyOnly bool) (wire.OrgRouteKept, error) {
+	sealed *wire.OrgRouteSealed, rev *string, keyOnly bool) (wire.OrgRouteKept, error) {
 	if rev == nil && next.ID == "" {
 		next.ID = routeIDFrom(next.Name)
 	}
@@ -316,52 +323,59 @@ func (s *Service) setOrgRoute(ctx context.Context, actor wire.AuditActor, method
 		if keyOnly {
 			route = kept.route
 		}
-		// What was there, and what is now: an absent field keeps its value, an empty one
-		// takes it out.
-		values := map[string]string{}
+		// The secrets: those kept, or those the client sealed now.
+		var fields []string
+		fingerprint := map[string]string{}
+		sealVersion := int64(0)
+		if kept != nil {
+			fields, sealVersion = kept.route.SecretFields, deref(kept.route.SealVersion)
+			maps.Copy(fingerprint, kept.route.Fingerprint)
+		}
+		var record *orgSecretRecord
 		secretTag := ""
-		if kept != nil && len(kept.route.SecretFields) > 0 {
-			opened, tag, err := s.openRouteSecretsTagged(ctx, next.ID)
-			if err != nil {
+		if sealed != nil {
+			if record, err = s.checkSealedRoute(route, *sealed, sealVersion); err != nil {
 				return wire.OrgRouteKept{}, err
 			}
-			values, secretTag = maps.Clone(opened), tag
-		}
-		for field, value := range secrets {
-			if value == "" {
-				delete(values, field)
-			} else {
-				values[field] = value
+			fields, sealVersion, fingerprint = sealedFields(*sealed), sealed.SealVersion, maps.Clone(sealed.Fingerprint)
+			if kept != nil {
+				if _, tag, err := s.readRouteSecrets(ctx, next.ID); err != nil {
+					return wire.OrgRouteKept{}, err
+				} else {
+					secretTag = tag
+				}
 			}
+		} else if kept != nil && len(fields) > 0 && !sameBinding(kept.route, route) {
+			return wire.OrgRouteKept{}, fail(invalidParams, "A change to the kind, the API or the settings seals the key again: save it from an admin's app that has a copy, or enter the key again.")
 		}
-		if err := s.boundOrgRoute(route, values); err != nil {
+		if err := s.boundOrgRoute(route, fields); err != nil {
 			return wire.OrgRouteKept{}, err
 		}
 		now := time.Now().UTC()
 		stamp := &wire.OrgRouteStamp{By: actor, At: wire.DateOf(now)}
-		route.Version, route.Created, route.Changed, route.Machines = optional(int64(1)), stamp, stamp, nil
+		route.Version, route.Created, route.Changed, route.Machines, route.Waiting = optional(int64(1)), stamp, stamp, nil, nil
 		if kept != nil {
 			route.Version, route.Created = optional(deref(kept.route.Version)+1), kept.route.Created
 		}
-		route.SecretFields = slices.Sorted(maps.Keys(values))
-		route.Fingerprint = map[string]string{}
-		for field, value := range values {
-			sum := sha256.Sum256([]byte(value))
-			route.Fingerprint[field] = hex.EncodeToString(sum[:])[:8]
+		route.SecretFields, route.SealVersion = slices.Sorted(slices.Values(fields)), nil
+		if sealVersion > 0 {
+			route.SealVersion = &sealVersion
 		}
+		route.Fingerprint = fingerprint
 		route.DefaultFor, route.Groups = nonNil(route.DefaultFor), nonNil(route.Groups)
 		// The secrets first, then the record (data-model.md): a record that names a secret
 		// always finds one. Undone when the record's write loses.
 		var undo func()
-		if len(secrets) > 0 {
-			if undo, err = s.writeRouteSecrets(ctx, next.ID, values, secretTag); err != nil {
+		if record != nil {
+			record.ID = next.ID
+			if undo, err = s.writeRouteSecrets(ctx, *record, secretTag); err != nil {
 				if store.IsConflict(err) && try < orgRouteRetries && rev == nil {
 					continue
 				}
 				if store.IsConflict(err) {
 					return wire.OrgRouteKept{}, fail(changedElsewhere, "Another admin changed this route. Load it again, then save.")
 				}
-				return wire.OrgRouteKept{}, routeFailure(err)
+				return wire.OrgRouteKept{}, fail(storeUnavailable, "The route's key could not be kept: %v", err)
 			}
 		}
 		data, err := records.Encode(route)
@@ -386,32 +400,97 @@ func (s *Service) setOrgRoute(ctx context.Context, actor wire.AuditActor, method
 		if kept != nil {
 			before = &kept.route
 		}
-		s.auditRoute(actor, method, route.ID, routeChanges(before, route, secrets))
+		s.auditRoute(actor, method, route.ID, routeChanges(before, route, sealed != nil))
 		s.log(fmt.Sprintf("org route %s is now version %d", route.ID, deref(route.Version)))
 		s.orgRoutesChanged(route.ID, actor.User)
 		return wire.OrgRouteKept{Route: route, Rev: tag}, nil
 	}
 }
 
-// writeRouteSecrets keeps a route's secrets as one envelope, conditional on the tag read
-// ("" for none), and says how to put back what was there.
-func (s *Service) writeRouteSecrets(ctx context.Context, id string, values map[string]string, tag string) (func(), error) {
-	key := orgSecretKey(id)
+// sealedFields is the fields a client sealed: those of its first recipient, which
+// checkSealedRoute has made every recipient's.
+func sealedFields(sealed wire.OrgRouteSealed) []string {
+	for _, byField := range sealed.Values {
+		return slices.Sorted(maps.Keys(byField))
+	}
+	return nil
+}
+
+// hasFields says a recipient's envelopes are those of every field.
+func hasFields(mine map[string]wire.SealedEnvelope, fields []string) bool {
+	if len(mine) != len(fields) || len(fields) == 0 {
+		return false
+	}
+	for _, f := range fields {
+		if _, ok := mine[f]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// checkSealedRoute bounds what a client sealed for a route (#3397): one version more than
+// kept, the same fields for every recipient, a fingerprint for each, each envelope bounded.
+// A recipient that is not one now (a machine removed since the client asked) is left out.
+func (s *Service) checkSealedRoute(r wire.OrgRoute, sealed wire.OrgRouteSealed, kept int64) (*orgSecretRecord, error) {
+	if sealed.SealVersion != kept+1 {
+		return nil, fail(changedElsewhere, "Another admin changed this route's key. Load it again, then save.")
+	}
+	if len(sealed.Values) == 0 {
+		return nil, fail(invalidParams, "Seal the key to at least one machine or app.")
+	}
+	if len(sealed.Values) > mostRecipients {
+		return nil, fail(invalidParams, "A key is sealed to at most %d machines and apps.", mostRecipients)
+	}
+	fields := sealedFields(sealed)
+	if len(fields) > mostRouteSecrets {
+		return nil, fail(invalidParams, "A route has at most %d secrets.", mostRouteSecrets)
+	}
+	allowed := map[string]bool{}
+	for _, recipient := range s.routeRecipients(r.Groups) {
+		allowed[recipient.ID] = true
+	}
+	out := &orgSecretRecord{SealVersion: sealed.SealVersion, Sealed: map[string]map[string]wire.SealedEnvelope{}}
+	size := 0
+	for recipient, byField := range sealed.Values {
+		if !slices.Equal(slices.Sorted(maps.Keys(byField)), fields) {
+			return nil, fail(invalidParams, "Every machine and app gets every one of the route's secrets.")
+		}
+		for _, e := range byField {
+			if len(e.Encapsulated) != 65 || len(e.Ciphertext) > mostRouteSecret+16 || len(e.Ciphertext) < 17 {
+				return nil, fail(invalidParams, "A secret is at most %d KiB.", mostRouteSecret>>10)
+			}
+			size += len(e.Encapsulated) + len(e.Ciphertext)
+		}
+		if allowed[recipient] {
+			out.Sealed[recipient] = byField
+		}
+	}
+	if size > mostSealedRecord/2 {
+		return nil, fail(invalidParams, "The route's key, sealed to every machine, is over %d MiB.", mostSealedRecord>>21)
+	}
+	if len(sealed.Fingerprint) != len(fields) {
+		return nil, fail(invalidParams, "Say a fingerprint for each secret.")
+	}
+	for _, f := range fields {
+		if !routeFingerprint.MatchString(sealed.Fingerprint[f]) {
+			return nil, fail(invalidParams, "A fingerprint is the first 8 hex digits of the value's SHA-256.")
+		}
+	}
+	return out, nil
+}
+
+// writeRouteSecrets keeps a route's sealed record, conditional on the tag read ("" for
+// none), and says how to put back what was there.
+func (s *Service) writeRouteSecrets(ctx context.Context, record orgSecretRecord, tag string) (func(), error) {
+	key := orgSecretKey(record.ID)
 	var previous []byte
 	if tag != "" {
 		if object, err := s.cfg.Store.Get(ctx, key); err == nil && object != nil && object.ETag == tag {
 			previous = object.Data
 		}
 	}
-	plain, err := json.Marshal(values)
-	if err != nil {
-		return nil, err
-	}
-	sealed, err := s.users.SealFor(ctx, plain, []byte(key))
-	if err != nil {
-		return nil, err
-	}
-	data, err := records.Encode(orgSecretRecord{ID: id, Sealed: sealed})
+	data, err := records.Encode(record)
 	if err != nil {
 		return nil, err
 	}
@@ -429,7 +508,7 @@ func (s *Service) writeRouteSecrets(ctx context.Context, id string, values map[s
 			return
 		}
 		if _, err := s.cfg.Store.Put(context.Background(), key, previous, store.Matching(written)); err != nil {
-			s.log("org route " + id + ": its secrets could not be put back: " + err.Error())
+			s.log("org route " + record.ID + ": its secrets could not be put back: " + err.Error())
 		}
 	}, nil
 }
@@ -459,9 +538,6 @@ func (s *Service) removeOrgRoute(ctx context.Context, actor wire.AuditActor, met
 	if err := s.cfg.Store.Delete(ctx, orgRouteKey(id)); err != nil {
 		s.log("org route " + id + ": its record could not be deleted: " + err.Error())
 	}
-	s.orgRoutes.mu.Lock()
-	delete(s.orgRoutes.tokens, id)
-	s.orgRoutes.mu.Unlock()
 	s.auditRoute(actor, method, id, kept.route.Name)
 	s.log("org route " + id + " removed")
 	s.orgRoutesChanged(id, actor.User)
@@ -470,7 +546,7 @@ func (s *Service) removeOrgRoute(ctx context.Context, actor wire.AuditActor, met
 
 // routeChanges is what a save changed, in words for the audit: the fields, and "key
 // replaced" for a secret, never its value.
-func routeChanges(before *wire.OrgRoute, after wire.OrgRoute, secrets map[string]string) string {
+func routeChanges(before *wire.OrgRoute, after wire.OrgRoute, sealed bool) string {
 	if before == nil {
 		return "added " + after.Name
 	}
@@ -489,7 +565,7 @@ func routeChanges(before *wire.OrgRoute, after wire.OrgRoute, secrets map[string
 			changed = append(changed, f.name)
 		}
 	}
-	if len(secrets) > 0 {
+	if sealed && !slices.Equal(slices.Sorted(maps.Values(before.Fingerprint)), slices.Sorted(maps.Values(after.Fingerprint))) {
 		changed = append(changed, "key replaced")
 	}
 	if len(changed) == 0 {
@@ -528,13 +604,14 @@ func nonNil(list []string) []string {
 // MARK: The bounds
 
 // boundOrgRoute refuses a route out of bounds or a kind a runtime cannot use, in words for
-// the admin (FR-002, the spec's table).
-func (s *Service) boundOrgRoute(r wire.OrgRoute, values map[string]string) error {
+// the admin (FR-002, the spec's table). fields is the secret fields it has: their values
+// are sealed, so the client checks what is in them.
+func (s *Service) boundOrgRoute(r wire.OrgRoute, fields []string) error {
 	name := strings.TrimSpace(r.Name)
 	if name == "" || utf8.RuneCountInString(name) > mostRouteName || name != r.Name {
 		return fail(invalidParams, "A route's name is 1 to %d characters, with no space at either end.", mostRouteName)
 	}
-	fields, ok := routeSecretFields[r.Kind]
+	kindFields, ok := routeSecretFields[r.Kind]
 	if !ok {
 		return fail(invalidParams, "A route is a key, bedrock, vertex, azure or baseURL.")
 	}
@@ -579,22 +656,15 @@ func (s *Service) boundOrgRoute(r wire.OrgRoute, values map[string]string) error
 	if err := checkRouteSettings(r); err != nil {
 		return err
 	}
-	// The secrets: each a field of this kind, bounded.
-	if len(values) > 0 && !s.users.Sealing() {
-		return fail(notSupported, "This control plane has no key to seal secrets with. Start it with a key file or AGENTS_CONTROL_KMS.")
-	}
-	if len(values) > mostRouteSecrets {
+	if len(fields) > mostRouteSecrets {
 		return fail(invalidParams, "A route has at most %d secrets.", mostRouteSecrets)
 	}
-	for field, value := range values {
-		if !slices.Contains(fields, field) {
-			return fail(invalidParams, "A %s route has no secret %q. It takes %s.", r.Kind, field, strings.Join(fields, ", "))
-		}
-		if len(value) > mostRouteSecret {
-			return fail(invalidParams, "A secret is at most %d KiB.", mostRouteSecret>>10)
+	for _, field := range fields {
+		if !slices.Contains(kindFields, field) {
+			return fail(invalidParams, "A %s route has no secret %q. It takes %s.", r.Kind, field, strings.Join(kindFields, ", "))
 		}
 	}
-	has := func(f string) bool { return values[f] != "" }
+	has := func(f string) bool { return slices.Contains(fields, f) }
 	settings := deref(r.Settings)
 	switch r.Kind {
 	case wire.OrgRouteKindKey:
@@ -615,9 +685,6 @@ func (s *Service) boundOrgRoute(r wire.OrgRoute, values map[string]string) error
 	case wire.OrgRouteKindVertex:
 		if !has("serviceAccount") {
 			return fail(invalidParams, "Say the service account's key, as Google gives it in JSON.")
-		}
-		if _, err := parseServiceAccount(values["serviceAccount"]); err != nil {
-			return fail(invalidParams, "The service account's key is not one Google gives: %v.", err)
 		}
 		if settings.Project == nil || settings.Location == nil {
 			return fail(invalidParams, "Say the Google Cloud project and location.")
@@ -640,15 +707,16 @@ func (s *Service) boundOrgRoute(r wire.OrgRoute, values map[string]string) error
 	return nil
 }
 
-// checkRouteSettings bounds the settings that are not secret.
+// checkRouteSettings bounds the settings that are not secret. None holds a line break:
+// each is one line of the binding the secrets are sealed with (#3397).
 func checkRouteSettings(r wire.OrgRoute) error {
 	if r.Settings == nil {
 		return nil
 	}
 	st := *r.Settings
 	for _, v := range []*string{st.Address, st.ApiVersion, st.ClientID, st.Header, st.Location, st.Project, st.Region, st.Resource, st.Tenant} {
-		if v != nil && (len(*v) > mostRouteSetting || *v == "") {
-			return fail(invalidParams, "A setting is 1 to %d characters.", mostRouteSetting)
+		if v != nil && (len(*v) > mostRouteSetting || *v == "" || strings.ContainsAny(*v, "\r\n")) {
+			return fail(invalidParams, "A setting is one line of 1 to %d characters.", mostRouteSetting)
 		}
 	}
 	if st.Address != nil {
@@ -719,47 +787,22 @@ func (s *Service) readOrgRoutes(ctx context.Context) ([]keptRoute, error) {
 	return out, nil
 }
 
-// openRouteSecrets is a route's secrets, opened with the keeper: here only, never sent
-// back to a client.
-func (s *Service) openRouteSecrets(ctx context.Context, id string) (map[string]string, error) {
-	values, _, err := s.openRouteSecretsTagged(ctx, id)
-	return values, err
-}
-
-func (s *Service) openRouteSecretsTagged(ctx context.Context, id string) (map[string]string, string, error) {
+// readRouteSecrets is a route's sealed record, and its tag ("" for none): ciphertext only,
+// which nothing here opens.
+func (s *Service) readRouteSecrets(ctx context.Context, id string) (orgSecretRecord, string, error) {
 	key := orgSecretKey(id)
 	object, err := s.cfg.Store.Get(ctx, key)
 	if err != nil {
-		return nil, "", fail(storeUnavailable, "The route's secrets could not be read: %v", err)
+		return orgSecretRecord{}, "", fail(storeUnavailable, "The route's secrets could not be read: %v", err)
 	}
 	if object == nil {
-		return map[string]string{}, "", nil
+		return orgSecretRecord{ID: id}, "", nil
 	}
-	s.orgRoutes.mu.Lock()
-	if o, ok := s.orgRoutes.opened[id]; ok && o.tag == object.ETag {
-		s.orgRoutes.mu.Unlock()
-		return maps.Clone(o.values), object.ETag, nil
-	}
-	s.orgRoutes.mu.Unlock()
 	var record orgSecretRecord
-	if err := json.Unmarshal(object.Data, &record); err != nil || record.Sealed == nil {
-		return nil, "", fmt.Errorf("%s: not a sealed envelope", key)
+	if err := json.Unmarshal(object.Data, &record); err != nil {
+		return orgSecretRecord{}, "", fmt.Errorf("%s: not a sealed record", key)
 	}
-	plain, err := s.users.OpenFor(ctx, record.Sealed, []byte(key))
-	if err != nil {
-		return nil, "", fmt.Errorf("the secrets of route %s do not open with this control plane's key: %w", id, err)
-	}
-	values := map[string]string{}
-	if err := json.Unmarshal(plain, &values); err != nil {
-		return nil, "", err
-	}
-	s.orgRoutes.mu.Lock()
-	if s.orgRoutes.opened == nil {
-		s.orgRoutes.opened = map[string]openedRoute{}
-	}
-	s.orgRoutes.opened[id] = openedRoute{tag: object.ETag, values: values}
-	s.orgRoutes.mu.Unlock()
-	return maps.Clone(values), object.ETag, nil
+	return record, object.ETag, nil
 }
 
 // MARK: Who gets which
@@ -767,13 +810,17 @@ func (s *Service) openRouteSecretsTagged(ctx context.Context, id string) (map[st
 // mayUseRoute says a person (or bot) may use a route: it names no group, or one of theirs
 // (spec D6). A removed or suspended person may use none (D13).
 func (s *Service) mayUseRoute(user string, r wire.OrgRoute) bool {
+	return s.mayUseGroups(user, r.Groups)
+}
+
+func (s *Service) mayUseGroups(user string, groups []string) bool {
 	if p := s.records.Person(user); (p != nil && p.IsRemoved()) || s.suspended(user) {
 		return false
 	}
-	if len(r.Groups) == 0 {
+	if len(groups) == 0 {
 		return true
 	}
-	for _, g := range r.Groups {
+	for _, g := range groups {
 		if s.inGroup(user, g) {
 			return true
 		}
@@ -787,61 +834,86 @@ func (s *Service) takesOrgRoutes(host string) bool {
 	return h != nil && slices.Contains(hostCapabilities(*h), CapHostOrgRoutes)
 }
 
-// orgDelivery is host/orgRoutes for one machine: each route its person may use, each
-// secret (or a cloud credential's token) sealed to its key; and a digest of what went in.
-func (s *Service) orgDelivery(ctx context.Context, host string) (wire.OrgRouteDelivery, [sha256.Size]byte, error) {
+// routeItem is a route as sealing/work and orgRoutes/sealed give it: what makes its
+// associated data, the caller's copy, and who has none.
+func routeItem(r wire.OrgRoute, mine map[string]wire.SealedEnvelope, missing []wire.SealRecipient) wire.SealingItem {
+	kind := r.Kind
+	return wire.SealingItem{Item: wire.SealingItemKindOrgRoute, ID: r.ID, Version: deref(r.SealVersion), Kind: &kind,
+		Vendor: r.Vendor, Settings: r.Settings, Mine: mine, Missing: missing}
+}
+
+// routeWaitsFor counts the machines that may use a route and have no copy of its
+// secrets: those whose owner passes of, or all when of is nil.
+func (s *Service) routeWaitsFor(ctx context.Context, r wire.OrgRoute, of func(owner string) bool) int {
+	if len(r.SecretFields) == 0 {
+		return 0
+	}
+	record, _, err := s.readRouteSecrets(ctx, r.ID)
+	if err != nil {
+		return 0
+	}
+	n := 0
+	for _, recipient := range s.routeRecipients(r.Groups) {
+		host, ok := strings.CutPrefix(recipient.ID, "m:")
+		if !ok || of != nil && !of(s.ownerOf(host)) {
+			continue
+		}
+		if record.SealVersion != deref(r.SealVersion) || !hasFields(record.Sealed[recipient.ID], r.SecretFields) {
+			n++
+		}
+	}
+	return n
+}
+
+// orgDelivery is host/orgRoutes for one machine: each route its person may use, with this
+// machine's own copies, or waiting when it has none; and a digest of what went in.
+func (s *Service) orgDelivery(ctx context.Context, host string) (wire.OrgRouteDelivery, [sha256.Size]byte, []string, error) {
 	out := wire.OrgRouteDelivery{Routes: []wire.DeliveredRoute{}, At: wire.DateOf(time.Now())}
 	h := s.records.Host(host)
 	if h == nil {
-		return out, [sha256.Size]byte{}, errors.New("no such machine")
+		return out, [sha256.Size]byte{}, nil, errors.New("no such machine")
 	}
 	user := s.ownerOf(host)
 	routes, err := s.readOrgRoutes(ctx)
 	if err != nil {
-		return out, [sha256.Size]byte{}, err
+		return out, [sha256.Size]byte{}, nil, err
 	}
 	digest := sha256.New()
 	fmt.Fprintf(digest, "%s|%s|%x\n", host, user, h.PublicKey)
+	var waits []string
+	recipient := controllink.MachineRecipient(host)
 	for _, kept := range routes {
 		r := kept.route
 		if !s.mayUseRoute(user, r) {
 			continue
 		}
-		values, err := s.openRouteSecrets(ctx, r.ID)
-		if err != nil {
-			s.log(fmt.Sprintf("org route %s was not sent to %s: %v", r.ID, host, err))
-			continue
-		}
-		send, expires, err := s.routeValuesToSend(ctx, r, values)
-		if err != nil {
-			s.log(fmt.Sprintf("org route %s was not sent to %s: %v", r.ID, host, err))
-			continue
-		}
 		d := wire.DeliveredRoute{ID: r.ID, Name: r.Name, Kind: r.Kind, Vendor: r.Vendor, Runtimes: r.Runtimes, Settings: r.Settings,
-			Models: r.Models, DefaultFor: nonNil(r.DefaultFor), SecretFields: slices.Sorted(maps.Keys(send)), Version: deref(r.Version),
-			Sealed: map[string]wire.SealedEnvelope{}}
-		if !expires.IsZero() {
-			at := wire.DateOf(expires)
-			d.Expires = &at
-		}
-		// Sealed last: what was delivered with them is in the secrets' associated data.
-		for field, value := range send {
-			sealed, err := SealOrgRoute(h.PublicKey, d, host, []byte(value))
+			Models: r.Models, DefaultFor: nonNil(r.DefaultFor), SecretFields: nonNil(r.SecretFields), Version: deref(r.Version),
+			SealVersion: deref(r.SealVersion), Sealed: map[string]wire.SealedEnvelope{}}
+		if len(r.SecretFields) > 0 {
+			record, _, err := s.readRouteSecrets(ctx, r.ID)
 			if err != nil {
-				return out, [sha256.Size]byte{}, err
+				s.log(fmt.Sprintf("org route %s was not sent to %s: %v", r.ID, host, err))
+				continue
 			}
-			d.Sealed[field] = sealed
+			mine := record.Sealed[recipient]
+			if record.SealVersion == d.SealVersion && hasFields(mine, r.SecretFields) {
+				d.Sealed = maps.Clone(mine)
+			} else {
+				d.Waiting, waits = optional(true), append(waits, routeAsk(r, recipient))
+			}
 		}
-		fmt.Fprintf(digest, "%s|%d|%d\n", r.ID, deref(r.Version), expires.Unix())
+		fmt.Fprintf(digest, "%s|%d|%d|%t\n", r.ID, d.Version, d.SealVersion, d.Waiting != nil)
 		out.Routes = append(out.Routes, d)
 	}
 	var sum [sha256.Size]byte
 	copy(sum[:], digest.Sum(nil))
-	return out, sum, nil
+	return out, sum, waits, nil
 }
 
 // sendOrgRoutes sends a machine its routes on its channel 0 (FR-005). always sends even
-// what it was sent last (a hello, or the machine asked again).
+// what it was sent last (a hello, or the machine asked again). A route the machine waits
+// for asks the admins' clients to seal it (#3397).
 func (s *Service) sendOrgRoutes(host string, always bool) {
 	if !s.takesOrgRoutes(host) {
 		return
@@ -849,7 +921,7 @@ func (s *Service) sendOrgRoutes(host string, always bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), orgDeliveryTimeout)
 	defer cancel()
 	user := s.ownerOf(host)
-	delivery, sum, err := s.orgDelivery(ctx, host)
+	delivery, sum, waits, err := s.orgDelivery(ctx, host)
 	if err != nil {
 		s.log("org routes for " + host + " could not be made: " + err.Error())
 		return
@@ -863,7 +935,7 @@ func (s *Service) sendOrgRoutes(host string, always bool) {
 	if same && !always {
 		return
 	}
-	// The machine may have changed hands while the secrets were opened.
+	// The machine may have changed hands while its routes were read.
 	if s.records.Host(host) == nil || s.ownerOf(host) != user || !s.router.Tell(host, wire.NewMethodName(wire.NotifyHostOrgRoutes.Name), delivery) {
 		s.orgRoutes.mu.Lock()
 		delete(s.orgRoutes.told, host)
@@ -874,6 +946,7 @@ func (s *Service) sendOrgRoutes(host string, always bool) {
 	s.orgRoutes.told[host] = sum
 	s.orgRoutes.mu.Unlock()
 	s.log(fmt.Sprintf("org routes sent to %s (%d)", host, len(delivery.Routes)))
+	s.wantSealingByAdmins(waits...)
 }
 
 // orgRoutesChanged is a route changed here: the other copies are told, then this copy's.
@@ -917,14 +990,8 @@ func (s *Service) resendOrgRoutes() {
 	}()
 }
 
-// resendTo sends each of hosts, every machine here, its routes, and notes when it began.
-func (s *Service) resendTo(hosts []string) {
-	began := s.endpoints().Now()
-	s.sendOrgRoutesTo(hosts)
-	s.orgRoutes.mu.Lock()
-	s.orgRoutes.resent = began
-	s.orgRoutes.mu.Unlock()
-}
+// resendTo sends each of hosts, every machine here, its routes.
+func (s *Service) resendTo(hosts []string) { s.sendOrgRoutesTo(hosts) }
 
 // orgResendWorkers is how many machines a resend sends to at once.
 const orgResendWorkers = 8
