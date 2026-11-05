@@ -116,13 +116,12 @@ What the control plane can and cannot do:
 | keep the chain, and keep it back from a machine | change or remove an entry, or put one in a different order |
 | sign the org policy, which can only make a machine do less | give a client a machine key of its own to seal to |
 | ask a machine for its sessions and worktrees, a backup, or a clone | start an agent, run a command or read a file on a machine |
-| fire a workflow that the person set up on a machine | change what a machine answers |
+| fire a workflow that the person set up on a machine | change what a machine answers, or show a card it did not raise |
 | serve a changed web page | sign with a Mac's or a phone's key |
 
 **Limits.** A control plane that serves a changed web page can use that browser's key while
-the page is open; the Mac and the Remote are signed apps and do not have this limit. What a
-machine says unasked (an agent's changes, a question card) is not signed yet. The client and
-person in the audit are still the control plane's word. The control plane can always refuse
+the page is open; the Mac and the Remote are signed apps and do not have this limit. The client
+and person in the audit are still the control plane's word. The control plane can always refuse
 to route. See [What the control plane can and cannot do](../control-plane.md#what-the-control-plane-can-and-cannot-do).
 
 ## Who did what

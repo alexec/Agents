@@ -116,10 +116,17 @@ How step 4 is built (#3492):
   clone ask for them in its own name, and none starts an agent, runs a command or reads a
   file. A provider draft's agent on a Mac control plane (`drafts.go`) is a start, and is
   refused once the person has a lock; it waits on #3542.
-- Decided: the machine MACs its answers, not what it says unasked (`agent/changed`, a
-  question card), because one frame carries a notification to every channel (#167), and a
-  MAC for each channel would undo that. A control plane can show a card the machine did not
-  raise; the answer to it is a checked request. It waits on #3541.
+- Decided: the machine MACs what it says unasked (`agent/changed`, `agent/entry`, a question
+  card) as it MACs its answers, on the same count (#3541). A fan-out frame (#167) carries a
+  lock member for each channel that has one, `{"f":[1,2],"l":[null,{"n":…,"mac":…}],"m":…}`,
+  and the control plane adds it last to that channel's copy, so the message goes up the
+  uplink once and only the 60-byte members are per channel. The control plane says it reads
+  them with `ChannelOpen.fanOutLock`; to one that does not, the machine writes those channels
+  one by one. Once lock/hello is answered, a client takes a notification from that machine
+  only with its MAC (the control plane's own, `control/…`, are not the machine's). Not a
+  signature by the machine key once per frame, because an HMAC costs 1.4 µs for 2 KB (Go,
+  `BenchmarkTail`) against 19 µs to sign and 37 µs for each client to verify, and the count
+  stops a replay with no list of ids.
 - Decided: a client takes an error with no MAC (the control plane's own: offline, no such
   machine), and refuses a result with none from a machine it has a channel to, or that its
   lock names, because the control plane can always refuse to route.

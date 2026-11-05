@@ -253,18 +253,23 @@ func (c *Channel) Seal(message string) string {
 	return c.sealLocked(message)
 }
 
-// SealThen seals a message and hands it to write while the next count waits, so two
-// writers on one channel send their counts in order.
-func (c *Channel) SealThen(message string, write func(string) error) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return write(c.sealLocked(message))
+func (c *Channel) sealLocked(message string) string {
+	return message[:len(message)-1] + `,"lock":` + c.tailLocked(message) + `}`
 }
 
-func (c *Channel) sealLocked(message string) string {
+// Tail is the "lock" member for a message, with the next count, without the message: what
+// a fan-out frame carries for each channel it names, which the control plane adds to that
+// channel's copy (#3541). The caller writes the frame before this channel's next message.
+func (c *Channel) Tail(message string) string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.tailLocked(message)
+}
+
+func (c *Channel) tailLocked(message string) string {
 	c.sent++
 	mac := base64.StdEncoding.EncodeToString(macOf(c.send, c.sent, message))
-	return message[:len(message)-1] + `,"lock":{"n":` + strconv.FormatUint(c.sent, 10) + `,"mac":"` + mac + `"}}`
+	return `{"n":` + strconv.FormatUint(c.sent, 10) + `,"mac":"` + mac + `"}`
 }
 
 // Sealed says a message ends with a MAC member, whether or not it checks.

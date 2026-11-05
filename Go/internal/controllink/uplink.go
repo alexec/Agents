@@ -506,6 +506,7 @@ func (u *Uplink) receive(line string) {
 			c.device = string(*frame.Open.Device)
 		}
 		c.fanOut = frame.Open.FanOut != nil && *frame.Open.FanOut
+		c.fanOutLock = frame.Open.FanOutLock != nil && *frame.Open.FanOutLock
 		c.actor = frame.Open.Actor
 		u.mu.Lock()
 		old := u.channels[c.number]
@@ -579,8 +580,9 @@ type channel struct {
 	up     *Uplink
 	in     chan string
 	device string
-	// fanOut is whether the control plane reads fan-out frames on this channel's uplink.
-	fanOut bool
+	// fanOut is whether the control plane reads fan-out frames on this channel's uplink, and
+	// fanOutLock whether it reads their lock members (#3541).
+	fanOut, fanOutLock bool
 	// Who the channel's calls are from, as the control plane wrote it (#996).
 	actor  *wire.AuditActor
 	once   sync.Once
@@ -600,7 +602,13 @@ func (c *channel) Actor() *wire.AuditActor { return c.actor }
 // uplink (#167).
 type FanOuter interface {
 	FanOutRoute() (*Uplink, int, bool)
+	// FanOutLock: the frame may carry this channel's lock member (#3541).
+	FanOutLock() bool
 }
+
+// FanOutLock is whether the control plane adds a fan-out frame's lock member for this channel
+// to its copy; an older one is written MAC'd messages channel by channel.
+func (c *channel) FanOutLock() bool { return c.fanOutLock }
 
 // FanOutRoute is the channel's uplink and number, when its control plane reads fan-out
 // frames and it is still open.
@@ -608,13 +616,25 @@ func (c *channel) FanOutRoute() (*Uplink, int, bool) {
 	return c.up, c.number, c.fanOut && !c.closed.Load()
 }
 
-// WriteFanOut writes one notification for every channel named (ControlWire.fanOut).
-func (u *Uplink) WriteFanOut(channels []int, line string) error {
+// WriteFanOut writes one notification for every channel named (ControlWire.fanOut). tails,
+// when not nil, is each channel's lock member, "" for a channel with none (#3541): the
+// frame's l, which the control plane adds to that channel's copy.
+func (u *Uplink) WriteFanOut(channels []int, tails []string, line string) error {
 	ns := make([]string, len(channels))
 	for i, n := range channels {
 		ns[i] = strconv.Itoa(n)
 	}
-	return u.write(`{"f":[` + strings.Join(ns, ",") + `],"m":` + line + `}`)
+	l := ""
+	if tails != nil {
+		ts := make([]string, len(tails))
+		for i, t := range tails {
+			if ts[i] = t; t == "" {
+				ts[i] = "null"
+			}
+		}
+		l = `,"l":[` + strings.Join(ts, ",") + `]`
+	}
+	return u.write(`{"f":[` + strings.Join(ns, ",") + `]` + l + `,"m":` + line + `}`)
 }
 
 func (c *channel) Write(line string) error {

@@ -1765,6 +1765,11 @@ export interface ChannelOpen {
   tunnel?: string;
   tunnelRef?: string;
   fanOut?: boolean;
+  /**
+   * The control plane reads a fan-out frame's l, each channel's lock member, and adds it to that
+   * channel's copy (#3541).
+   */
+  fanOutLock?: boolean;
   /** Who the channel's calls are from, written by the control plane (#996). */
   actor?: AuditActor;
 }
@@ -12019,7 +12024,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ChannelLinkDecided: { required: ["request", "result"], optional: [] },
   ChannelLinkRemove: { required: ["channel", "identity"], optional: [] },
   ChannelLinkRequest: { required: ["request", "channel", "identity", "expires"], optional: ["name", "email", "for", "forName"] },
-  ChannelOpen: { required: ["client"], optional: ["device", "relayed", "tunnel", "tunnelRef", "fanOut", "actor"] },
+  ChannelOpen: { required: ["client"], optional: ["device", "relayed", "tunnel", "tunnelRef", "fanOut", "fanOutLock", "actor"] },
   ChannelSender: { required: ["channel", "identity"], optional: ["name", "email", "dkim"] },
   ChartHint: { required: ["mark", "x", "y"], optional: ["color", "title"] },
   CheckSuggestion: { required: ["id", "title", "prompt", "at"], optional: ["link", "urgent"] },

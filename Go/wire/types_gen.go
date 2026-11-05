@@ -2081,6 +2081,9 @@ type ChannelOpen struct {
 
 	FanOut *bool `json:"fanOut,omitzero"`
 
+	// The control plane reads a fan-out frame's l, each channel's lock member, and adds it to that channel's copy (#3541).
+	FanOutLock *bool `json:"fanOutLock,omitzero"`
+
 	// Who the channel's calls are from, written by the control plane (#996).
 	Actor *AuditActor `json:"actor,omitzero"`
 }

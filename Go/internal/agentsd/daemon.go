@@ -217,20 +217,67 @@ func Broadcast[P any](d *Daemon, n wire.Notification[P], params P) {
 	}
 	d.mu.Unlock()
 	// Those on a control-plane uplink: one frame per uplink, naming who hears it (#167).
-	routed := map[*controllink.Uplink][]int{}
+	routed := map[*controllink.Uplink][]fanned{}
 	for _, c := range cs {
 		if f, ok := c.conn.(controllink.FanOuter); ok {
 			if up, n, yes := f.FanOutRoute(); yes {
-				routed[up] = append(routed[up], n)
+				routed[up] = append(routed[up], fanned{n: n, c: c, tails: f.FanOutLock()})
 				continue
 			}
 		}
-		_ = c.conn.Write(string(b))
+		c.write(string(b))
 	}
-	for up, ns := range routed {
-		sort.Ints(ns)
-		_ = up.WriteFanOut(ns, string(b))
+	for up, fs := range routed {
+		fanOut(up, fs, string(b))
 	}
+}
+
+// fanned is a client a broadcast reaches in a fan-out frame: its channel's number, and whether
+// the control plane reads the frame's lock members.
+type fanned struct {
+	n     int
+	c     *Client
+	tails bool
+}
+
+// fanOut writes one frame for the clients on an uplink. Each client with a checked channel
+// gets its own lock member in the frame (#3541): one HMAC each, and the message once. Their
+// writes are held until the frame is written, so the counts go out in order.
+func fanOut(up *controllink.Uplink, fs []fanned, line string) {
+	sort.Slice(fs, func(i, j int) bool { return fs[i].n < fs[j].n })
+	for _, f := range fs {
+		f.c.lock.write.Lock()
+	}
+	defer func() {
+		for _, f := range fs {
+			f.c.lock.write.Unlock()
+		}
+	}()
+	ns := make([]int, 0, len(fs))
+	tails := make([]string, 0, len(fs))
+	locked := false
+	for _, f := range fs {
+		ch := f.c.lock.get()
+		switch {
+		case ch == nil:
+			tails = append(tails, "")
+		case !f.tails:
+			// A control plane that reads no lock members: this one channel by channel.
+			_ = f.c.conn.Write(ch.Seal(line))
+			continue
+		default:
+			tails = append(tails, ch.Tail(line))
+			locked = true
+		}
+		ns = append(ns, f.n)
+	}
+	if len(ns) == 0 {
+		return
+	}
+	if !locked {
+		tails = nil
+	}
+	_ = up.WriteFanOut(ns, tails, line)
 }
 
 // Shutdown ends what the host runs: every runtime it started.

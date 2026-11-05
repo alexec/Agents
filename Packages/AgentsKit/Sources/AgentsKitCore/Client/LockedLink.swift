@@ -9,6 +9,8 @@ import Foundation
 /// With no lock key, or a device not in its lock yet, it is the link as before. With no
 /// channel (a machine with no lock, or one away), a prompt or a start goes signed, so the
 /// control plane can keep it; and a machine the lock names gives no answer that is not MAC'd.
+/// Once the channel is open, what the machine says unasked (`agent/changed`, a question card)
+/// is taken only with its MAC too (#3541).
 /// The web page's is `Web/src/wire/link.ts`.
 public struct LockedLink: DaemonLink {
     public typealias Source = @Sendable () async -> LockChannel.Signer?
@@ -50,6 +52,8 @@ final class LockedTransport: LineTransport, @unchecked Sendable {
     /// The ids of requests that went to the machine, until they are answered.
     private var asked: Set<JSONRPCID> = []
     private let helloID = JSONRPCID.string("lock-hello-" + UUID().uuidString)
+    /// The hello sent, so its answer makes the channel as it is read, before the next line.
+    private var hello: LockChannel.Hello?
     private var helloWait: CheckedContinuation<JSONRPCMessage?, Never>?
     private let stream: AsyncThrowingStream<String, any Error>
     private let continuation: AsyncThrowingStream<String, any Error>.Continuation
@@ -78,7 +82,10 @@ final class LockedTransport: LineTransport, @unchecked Sendable {
         guard let hello = try? LockChannel.hello(signer.key), let params = try? JSONValue.encoding(hello.params),
               let line = try? JSONRPCCodec.encode(.request(id: helloID, method: DaemonAPI.Method.lockHello, params: params)) else { return }
         let reply: JSONRPCMessage? = await withCheckedContinuation { wait in
-            lock.withLock { helloWait = wait }
+            lock.withLock {
+                helloWait = wait
+                self.hello = hello
+            }
             do {
                 try inner.write(line: line)
             } catch {
@@ -90,12 +97,19 @@ final class LockedTransport: LineTransport, @unchecked Sendable {
                 self?.resumeHello(nil)
             }
         }
-        guard case .success(_, let result)? = reply, let answer = try? result.decode(DaemonAPI.LockHelloReply.self),
-              let channel = try? LockChannel.finish(hello, state: signer.state, host: host, reply: answer) else {
+        if reply == nil || lock.withLock({ channel }) == nil {
             WireLog.write("lock: no checked channel to \(host.isEmpty ? "this Mac" : host)")
-            return
         }
-        lock.withLock { self.channel = channel }
+    }
+
+    /// The channel from lock/hello's answer, made as the answer is read: the machine MACs every
+    /// line after it, a notification too (#3541).
+    private func finish(_ reply: JSONRPCMessage) {
+        lock.withLock {
+            guard let hello, case .success(_, let result) = reply,
+                  let answer = try? result.decode(DaemonAPI.LockHelloReply.self) else { return }
+            channel = try? LockChannel.finish(hello, state: signer.state, host: host, reply: answer)
+        }
     }
 
     private func resumeHello(_ message: JSONRPCMessage?) {
@@ -137,7 +151,12 @@ final class LockedTransport: LineTransport, @unchecked Sendable {
             return
         }
         if message.id == helloID, lock.withLock({ helloWait != nil }) {
+            finish(message)
             resumeHello(message)
+            return
+        }
+        if case .notification(let method, _) = message, Capability.control[method] == nil {
+            if let line = notice(line, method) { continuation.yield(line) }
             return
         }
         guard let id = message.id, lock.withLock({ asked.remove(id) != nil }) else {
@@ -164,6 +183,16 @@ final class LockedTransport: LineTransport, @unchecked Sendable {
             return refusal(id, "The machine's answer was not signed, so it was not taken.")
         }
         return line
+    }
+
+    /// What the machine says unasked: with no channel, as it came; with one, only with its MAC,
+    /// so the control plane cannot show a card the machine did not raise (#3541). The control
+    /// plane's own notifications, on the Remote's one connection, are not the machine's.
+    private func notice(_ line: String, _ method: String) -> String? {
+        guard let channel = lock.withLock({ self.channel }) else { return line }
+        if LockChannel.sealed(line), let body = try? channel.open(line) { return body }
+        WireLog.write("lock: \(method) from \(host.isEmpty ? "this Mac" : host) does not check, so it was not taken")
+        return nil
     }
 
     private func refusal(_ id: JSONRPCID, _ words: String) -> String {

@@ -25,6 +25,8 @@ interface RouteLock {
   required: boolean;
   /** lock/hello's own id: its answer has no MAC, its signature is its proof. */
   helloID: number;
+  /** lock/hello was answered: every line from the machine after it carries the MAC (#3541). */
+  replied: boolean;
   /** Sends go out, and answers are read, one at a time and in order, so the counts do. */
   sends: Promise<void>;
   hears: Promise<void>;
@@ -346,7 +348,7 @@ export class Link {
   private routeLock(route: string): RouteLock {
     const had = this.routeLocks.get(route);
     if (had) return had;
-    const lock: RouteLock = { ready: Promise.resolve(null), channel: null, required: false, helloID: 0, sends: Promise.resolve(), hears: Promise.resolve() };
+    const lock: RouteLock = { ready: Promise.resolve(null), channel: null, required: false, helloID: 0, replied: false, sends: Promise.resolve(), hears: Promise.resolve() };
     this.routeLocks.set(route, lock);
     lock.ready = (async () => {
       const source = await this.lockSource?.().catch(() => null);
@@ -506,20 +508,26 @@ export class Link {
       return;
     }
     const lock = frame.h ? this.routeLocks.get(frame.h) : undefined;
-    if (lock && (lock.channel || lock.required)) {
+    if (lock && (lock.helloID || lock.channel || lock.required)) {
       lock.hears = lock.hears.then(() => this.heardLocked(line, frame, lock)).catch(() => undefined);
       return;
     }
     this.take(frame);
   }
 
-  /** A line from a machine with a channel, or one the lock names (#3492): an answer is taken only with its MAC. */
+  /**
+   * A line from a machine with a channel, or one the lock names (#3492): an answer is taken
+   * only with its MAC, and so is a notification once the channel is open (#3541).
+   */
   private async heardLocked(line: string, frame: Frame, lock: RouteLock): Promise<void> {
     const message = frame.m;
-    const answer = typeof message?.id === "number" && message.id !== lock.helloID && (message.result !== undefined || message.error);
-    if (!answer || !message) return this.take(frame);
+    if (!message) return;
+    if (lock.helloID && message.id === lock.helloID) lock.replied = true;
     const at = line.indexOf(',"m":');
     const text = at > 0 ? line.slice(at + 5, -1) : "";
+    if (typeof message.method === "string" && message.id === undefined) return this.heardNotice(text, frame, lock);
+    const answer = typeof message.id === "number" && message.id !== lock.helloID && (message.result !== undefined || message.error);
+    if (!answer) return this.take(frame);
     if (sealed(text)) {
       try {
         if (!lock.channel) throw new Error("no channel");
@@ -535,6 +543,23 @@ export class Link {
     // machine's refusal of a request it had no channel for opens one again at the next call.
     if (message.error?.code === Failure.notInLock && frame.h && this.routeLocks.get(frame.h) === lock) this.routeLocks.delete(frame.h);
     this.take(frame);
+  }
+
+  /**
+   * What a machine says unasked (agent/changed, a question card): before lock/hello's answer
+   * it has no MAC; after it, it is taken only with the channel's, so the control plane can
+   * show no card the machine did not raise (#3541). A channel that did not open: as before.
+   */
+  private async heardNotice(text: string, frame: Frame, lock: RouteLock): Promise<void> {
+    if (!lock.replied) return this.take(frame);
+    const channel = await lock.ready;
+    if (!channel) return this.take(frame);
+    try {
+      if (!sealed(text)) throw new Error("no MAC");
+      this.take({ h: frame.h, m: JSON.parse(await channel.open(text)) });
+    } catch {
+      log("lock.noticeRefused", frame.m?.method ?? "");
+    }
   }
 
   private take(frame: Frame): void {

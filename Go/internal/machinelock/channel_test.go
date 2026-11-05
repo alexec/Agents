@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/ecdh"
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
@@ -84,6 +85,62 @@ func TestAChannelCarriesCheckedRequestsBothWays(t *testing.T) {
 	got, err = client.Open(host.Seal(answer))
 	if err != nil || got != answer {
 		t.Fatalf("the answer = %q, %v", got, err)
+	}
+}
+
+// What a machine says unasked goes once in a fan-out frame, with a lock member for each
+// channel; the control plane adds it to that channel's copy, and the client opens it as
+// any answer, in order with them (#3541).
+func TestATailAddedToAMessageOpensInOrder(t *testing.T) {
+	mac, phone, machine := key(t), key(t), key(t)
+	s := lockWith(t, mac, phone, machine)
+	client, host := shake(t, s, phone, machine)
+	note := `{"jsonrpc":"2.0","method":"agent/changed","params":{"id":"A1"}}`
+	first := host.Seal(`{"jsonrpc":"2.0","id":1,"result":{}}`)
+	copied := note[:len(note)-1] + `,"lock":` + host.Tail(note) + `}`
+	if _, err := client.Open(first); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := client.Open(copied); err != nil || got != note {
+		t.Fatalf("the copy = %q, %v", got, err)
+	}
+	// The control plane changes a card, or shows one the machine did not raise.
+	forged := strings.Replace(note[:len(note)-1]+`,"lock":`+host.Tail(note)+`}`, "A1", "A2", 1)
+	if _, err := client.Open(forged); !errors.Is(err, ErrBadMAC) {
+		t.Fatalf("a changed notification: %v", err)
+	}
+	if _, err := client.Open(note); !errors.Is(err, ErrUnsigned) {
+		t.Fatalf("a notification with no MAC: %v", err)
+	}
+}
+
+// The cost of #3541 against #167: a fan-out frame carries one HMAC per checked channel. One
+// signature by the machine key per frame instead costs more than that for tens of channels
+// and a verify on every client.
+func BenchmarkTail(b *testing.B) {
+	host := &Channel{send: make([]byte, 32)}
+	note := `{"jsonrpc":"2.0","method":"agent/changed","params":` + `{"text":"` + strings.Repeat("x", 2000) + `"}}`
+	b.ReportAllocs()
+	for b.Loop() {
+		host.Tail(note)
+	}
+}
+
+func BenchmarkSignOnce(b *testing.B) {
+	k, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	note := []byte(`{"jsonrpc":"2.0","method":"agent/changed","params":` + `{"text":"` + strings.Repeat("x", 2000) + `"}}`)
+	for b.Loop() {
+		SignData(k, note)
+	}
+}
+
+func BenchmarkVerifyOnce(b *testing.B) {
+	k, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	note := []byte(`{"jsonrpc":"2.0","method":"agent/changed","params":` + `{"text":"` + strings.Repeat("x", 2000) + `"}}`)
+	sig, _ := SignData(k, note)
+	public := PublicKey(k)
+	for b.Loop() {
+		VerifyData(public, note, sig)
 	}
 }
 
