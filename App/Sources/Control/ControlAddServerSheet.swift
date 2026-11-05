@@ -402,7 +402,8 @@ struct ControlAddServerSheet: View {
             }
             let result = await control.install(destination: destination.trimmingCharacters(in: .whitespaces),
                                                name: name.trimmingCharacters(in: .whitespaces), key: key, trust: trusting,
-                                               tunnel: control.isOnThisMac ? tunnel : nil)
+                                               tunnel: control.isOnThisMac ? tunnel : nil,
+                                               provider: prefill?.provider, workspace: prefill?.workspace)
             working = false
             if case .needsTrust(let shownKey) = result {
                 fingerprint = shownKey

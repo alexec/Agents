@@ -1908,6 +1908,22 @@
       }
     },
     {
+      "name": "host/installProgress",
+      "x-capability": "host/1",
+      "description": "A host, on its channel 0 (#3497): a step of an install it runs for the control plane over ssh, in a codespace whose provider it carries. Said to clients as control/installProgress.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ControlInstallProgress"
+          }
+        }
+      ]
+    },
+    {
       "name": "host/lock",
       "x-capability": "host.lock/1",
       "description": "To a machine that says host.lock/1, on its channel 0, at each join and when an entry is put on its person's lock (#3399): the whole lock. The machine checks it and takes it only when it grows from the head it pinned last; until #3400's later steps it only logs what it would refuse.",

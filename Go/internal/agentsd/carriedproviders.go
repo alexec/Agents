@@ -82,7 +82,7 @@ func (d *Daemon) askedProvider(method string, params json.RawMessage) (any, bool
 		if err := json.Unmarshal(params, &request); err != nil {
 			return carriedError("The control plane's request was not understood."), true
 		}
-		return c.ssh(request), true
+		return c.ssh(request, d.installProgress), true
 	}
 	return nil, false
 }
@@ -252,16 +252,25 @@ func (c *carriedProviders) forget(provider string) wire.ProviderCarried {
 	return wire.ProviderCarried{}
 }
 
+// installProgress says a step of an install this machine runs to the control plane
+// (host/installProgress, #3497), which says it to the person's clients.
+func (d *Daemon) installProgress(name, step string) {
+	if tell := d.tellControl.Load(); tell != nil {
+		(*tell)(wire.NotifyHostInstallProgress.Name, wire.ControlInstallProgress{Name: name, Step: step})
+	}
+}
+
 // ssh is providers/ssh: a codespace reached through gh with the provider's token, which
-// stays here (#3347).
-func (c *carriedProviders) ssh(request wire.ProviderSSH) wire.ProviderCarried {
+// stays here (#3347). progress says an install's steps.
+func (c *carriedProviders) ssh(request wire.ProviderSSH, progress func(name, step string)) wire.ProviderCarried {
 	token := c.store.Values(string(request.Provider))[workspacecommands.GitHubSecret]
 	codespace := deref(request.Codespace)
 	if token == "" || codespace == "" {
 		return carriedError("This machine has no GitHub token for that codespace.")
 	}
 	installer := &hostinstall.Installer{
-		Log: func(format string, args ...any) { log.Printf(format, args...) },
+		Log:      func(format string, args ...any) { log.Printf(format, args...) },
+		Progress: progress,
 		Prepare: func(ctx context.Context, destination string) ([]string, error) {
 			if err := codespacessh.Prepare(ctx, sshConfigPath(), codespace, destination, token, os.Environ()); err != nil {
 				return nil, err
@@ -278,6 +287,20 @@ func (c *carriedProviders) ssh(request wire.ProviderSSH) wire.ProviderCarried {
 	case "hostKey":
 		known, trust, err := installer.HostKey(ctx, request.Destination, deref(request.Trust))
 		return carriedResult(wire.ProviderSSHResult{KnownHosts: optionalString(known), NeedsTrust: optionalString(trust)}, err)
+	case "install":
+		// Add as Machine… (#3497): the key the person's known_hosts trusts, or the one they
+		// were shown and trust, and then the control plane's install.sh with its host code.
+		name := deref(request.Name)
+		progress(name, "connect")
+		known, trust, err := installer.HostKey(ctx, request.Destination, deref(request.Trust))
+		if err != nil || trust != "" {
+			return carriedResult(wire.ProviderSSHResult{NeedsTrust: optionalString(trust)}, err)
+		}
+		progress(name, "checkSystem")
+		err = installer.InstallWithCode(ctx, providers.SSHDestination(request.Destination), known, deref(request.HostCode), name)
+		// What the install said goes back with the token's value taken out.
+		return redacted(providers.NewRedaction(map[string]string{workspacecommands.GitHubSecret: token}),
+			carriedResult(wire.ProviderSSHResult{KnownHosts: optionalString(known)}, err))
 	}
 	return carriedError("No ssh call is called " + request.Op + ".")
 }

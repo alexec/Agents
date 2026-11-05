@@ -728,6 +728,7 @@ var NotifyControlUserSettingsChanged = Notification[UserSettingsChanged]{"contro
 var NotifyControlWebChanged = Notification[WebRemoteStatus]{"control/webChanged"}
 var NotifyFoldersDetect = Notification[FolderDetection]{"folders/detect"}
 var NotifyHostClients = Notification[MachineClients]{"host/clients"}
+var NotifyHostInstallProgress = Notification[ControlInstallProgress]{"host/installProgress"}
 var NotifyHostLock = Notification[Lock]{"host/lock"}
 var NotifyHostLockJoinChanged = Notification[LockJoinRequest]{"host/lockJoinChanged"}
 var NotifyHostOrgRoutes = Notification[OrgRouteDelivery]{"host/orgRoutes"}

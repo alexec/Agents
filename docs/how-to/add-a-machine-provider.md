@@ -56,9 +56,14 @@ The token goes in only as the provider's secret, kept on the machine that carrie
 sent in a request's header, never in an address, a log or an error. A codespace and a Coder
 machine have no ssh port of their own, so ssh to them still goes through `gh` or `coder`, as
 the ssh ProxyCommand. A codespace's agentsd is started over ssh from the machine that
-carries its provider, with the token there, so that machine needs `gh`. The control plane
-has no token for a codespace, so it can't install Agents in one over ssh or keep a tunnel
-to it: run the codespace's join command in it once. The Providers page says "needs coder
+carries its provider, with the token there, so that machine needs `gh`. **Add as Machine…**
+on a codespace installs Agents in it from that machine too (#3497): the control plane makes a
+host code and sends it there, and the codespace runs the control plane's `install.sh` with
+it, as its join command would. The steps show as the install goes. The control plane has no
+token, so it keeps no tunnel to a codespace: the codespace joins over the control plane's own
+address, so that address must be one the internet reaches (agentloops.dev, or a control plane
+in the cloud). A control plane on a Mac with no such address can't take a codespace this way.
+The Providers page says "needs coder
 for ssh" when the machine that runs the control plane does not have `coder` (#3367). A
 droplet is reached with plain ssh to its public address, and so is an EC2 instance.
 

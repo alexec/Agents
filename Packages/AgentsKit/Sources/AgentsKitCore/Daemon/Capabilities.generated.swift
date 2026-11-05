@@ -817,6 +817,7 @@ public enum Capability {
         "control/webChanged": "control/1",
         "folders/detect": "folders/1",
         "host/clients": "host/1",
+        "host/installProgress": "host/1",
         "host/lock": "host.lock/1",
         "host/lockJoinChanged": "host.lock/2",
         "host/orgRoutes": "host.org-routes/2",

@@ -5508,7 +5508,8 @@ export interface MachineInfo {
 
 /**
  * hosts/install (MachineInstall.Request): a server over ssh, with its key, the fingerprint trusted,
- * a tunnel.
+ * a tunnel. Add as Machine… names the provider and the workspace too (#3497): a codespace whose
+ * provider a machine carries is installed from that machine, with the token kept there.
  */
 export interface MachineInstall {
   destination: string;
@@ -5516,6 +5517,8 @@ export interface MachineInstall {
   key?: string;
   trust?: string;
   tunnel?: boolean;
+  provider?: ProviderID;
+  workspace?: string;
 }
 
 /**
@@ -7684,12 +7687,18 @@ export interface ProviderRuntimes {
 
 /**
  * providers/ssh (#3398): the machine that carries a codespaces provider starts a codespace's
- * agentsd over ssh (`start`), or reads its host key (`hostKey`), with the token it keeps. Its
- * result is ProviderSSHResult.
+ * agentsd over ssh (`start`), reads its host key (`hostKey`), or installs Agents in it with a host
+ * code from the control plane (`install`, #3497), with the token it keeps. Its result is
+ * ProviderSSHResult.
  */
 export interface ProviderSSH {
   provider: ProviderID;
-  op: "start" | "hostKey";
+  op: "start" | "hostKey" | "install";
+  /**
+   * install's host code: the codespace runs the control plane's install.sh with it, from the
+   * address and pin it names.
+   */
+  hostCode?: string;
   destination: string;
   /** The codespace's name, for gh. */
   codespace?: string;
@@ -12444,7 +12453,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineFolderSent: { required: [], optional: ["state", "folder", "facts", "pack", "read"] },
   MachineHello: { required: ["version", "platform", "machineID"], optional: ["host", "name", "relay", "implementation", "capabilities"] },
   MachineInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "hostKeyRenews", "cost", "host"] },
-  MachineInstall: { required: ["destination"], optional: ["name", "key", "trust", "tunnel"] },
+  MachineInstall: { required: ["destination"], optional: ["name", "key", "trust", "tunnel", "provider", "workspace"] },
   MachineJoinAsk: { required: ["name", "platform", "publicKey"], optional: ["version", "machineID", "person"] },
   MachineJoinDecision: { required: ["result"], optional: ["host", "controlKey", "name"] },
   MachineJoinStatus: { required: ["member", "connected", "at"], optional: ["problem"] },
@@ -12648,7 +12657,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProviderRequest: { required: [], optional: ["id"] },
   ProviderRuntime: { required: ["id", "name", "isDefault"], optional: [] },
   ProviderRuntimes: { required: ["runtimes"], optional: ["host", "why"] },
-  ProviderSSH: { required: ["provider", "op", "destination"], optional: ["codespace", "knownHosts", "name", "renew", "trust"] },
+  ProviderSSH: { required: ["provider", "op", "destination"], optional: ["hostCode", "codespace", "knownHosts", "name", "renew", "trust"] },
   ProviderSSHResult: { required: [], optional: ["knownHosts", "needsTrust"] },
   ProviderSecretsKeep: { required: ["provider", "secrets"], optional: [] },
   ProviderSummary: { required: ["id", "name", "kind", "secrets", "capabilities", "contract", "mapped", "workspaces", "current"], optional: ["preset", "listedAt", "problem", "group", "mayUse", "machine", "machineName", "machineOffline", "sshToolMissing"] },

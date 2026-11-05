@@ -6,12 +6,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"unicode"
 
+	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/hosttunnels"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/wire"
@@ -509,39 +511,11 @@ func knownHostsOverride(resolved string) []string {
 // at each start (#1701): the key it offers is taken and returned, in known_hosts form, to be
 // pinned again. A failure is said in the install's words, for the person.
 func (i *Installer) StartDaemon(ctx context.Context, destination, knownHosts, name string, renew bool) (string, error) {
-	env, err := i.prepared(ctx, destination, i.env(true))
+	ssh, file, done, err := i.pinned(ctx, destination, knownHosts, renew)
 	if err != nil {
 		return "", err
 	}
-	ssh := sshCommand{executable: i.sshExecutable(), name: destination, env: env}
-	file := ""
-	if knownHosts != "" || renew {
-		folder, err := os.MkdirTemp("", "agents-start-")
-		if err != nil {
-			return "", err
-		}
-		defer os.RemoveAll(folder)
-		file = filepath.Join(folder, "known_hosts")
-		pinned := hosttunnels.Pinned(knownHosts)
-		if renew {
-			pinned = ""
-		}
-		if err := os.WriteFile(file, []byte(pinned), 0o600); err != nil {
-			return "", err
-		}
-	}
-	ssh.options = i.configFile()
-	if file != "" {
-		ssh.options = append(ssh.options, "-o", "HostKeyAlias="+hosttunnels.PinnedAlias)
-	}
-	if renew {
-		// ssh takes the first value it is given: this one, over options' "yes".
-		ssh.options = append(ssh.options, "-o", "StrictHostKeyChecking=accept-new")
-	}
-	ssh.options = append(ssh.options, options("", file)...)
-	if file == "" {
-		ssh.options = append(ssh.options, personsKnownHostsOptions(ctx, ssh)...)
-	}
+	defer done()
 	if err := (installer{ssh}).startDaemon(ctx, "--control-network", "--host-name", name); err != nil {
 		if p, ok := err.(*Problem); ok {
 			return "", errors.New(Say(p, false))
@@ -556,6 +530,87 @@ func (i *Installer) StartDaemon(ctx context.Context, destination, knownHosts, na
 		return "", err
 	}
 	return hosttunnels.Pinned(string(taken)), nil
+}
+
+// pinned is ssh to destination with knownHosts as its only known host, whatever address
+// the server has now (#1691), or the person's own known_hosts for "". With renew, the key
+// the server offers is taken, into file. done removes the folder file is in.
+func (i *Installer) pinned(ctx context.Context, destination, knownHosts string, renew bool) (ssh sshCommand, file string, done func(), err error) {
+	done = func() {}
+	env, err := i.prepared(ctx, destination, i.env(true))
+	if err != nil {
+		return ssh, "", done, err
+	}
+	ssh = sshCommand{executable: i.sshExecutable(), name: destination, env: env}
+	if knownHosts != "" || renew {
+		folder, err := os.MkdirTemp("", "agents-start-")
+		if err != nil {
+			return ssh, "", done, err
+		}
+		done = func() { os.RemoveAll(folder) }
+		file = filepath.Join(folder, "known_hosts")
+		pinned := hosttunnels.Pinned(knownHosts)
+		if renew {
+			pinned = ""
+		}
+		if err := os.WriteFile(file, []byte(pinned), 0o600); err != nil {
+			done()
+			return ssh, "", func() {}, err
+		}
+	}
+	ssh.options = i.configFile()
+	if file != "" {
+		ssh.options = append(ssh.options, "-o", "HostKeyAlias="+hosttunnels.PinnedAlias)
+	}
+	if renew {
+		// ssh takes the first value it is given: this one, over options' "yes".
+		ssh.options = append(ssh.options, "-o", "StrictHostKeyChecking=accept-new")
+	}
+	ssh.options = append(ssh.options, options("", file)...)
+	if file == "" {
+		ssh.options = append(ssh.options, personsKnownHostsOptions(ctx, ssh)...)
+	}
+	return ssh, file, done, nil
+}
+
+// fetchFailed is the exit status of InstallWithCode's script when the server could not
+// fetch install.sh from the control plane.
+const fetchFailed = 90
+
+// InstallWithCode installs Agents on a server that a provider's carrying machine reaches,
+// such as a codespace through gh (#3497): over ssh, checked against knownHosts as
+// StartDaemon checks it, the server fetches install.sh from the address and pin that code
+// names, and runs it with code, as the join command does. It has no tunnel: the server
+// dials that address itself. Progress says setUp, then started.
+func (i *Installer) InstallWithCode(ctx context.Context, destination, knownHosts, code, name string) error {
+	parsed, err := controllink.ParseCode(code)
+	if err != nil || !parsed.Host {
+		return errors.New("The control plane sent no host code to install with.")
+	}
+	ssh, _, done, err := i.pinned(ctx, destination, knownHosts, false)
+	if err != nil {
+		return err
+	}
+	defer done()
+	i.progress(name, "setUp")
+	script := `f=$(mktemp) || exit 1; ` + controllink.FetchScript(parsed.URL, parsed.Pin) + ` -o "$f" || { rm -f "$f"; exit ` +
+		strconv.Itoa(fetchFailed) + `; }; sh "$f" ` + quote(code) + ` ` + quote(name) + `; s=$?; rm -f "$f"; exit $s`
+	out, err := (installer{ssh}).run(ctx, script)
+	if err == nil && out.status == fetchFailed {
+		return fmt.Errorf("%s couldn’t reach the control plane at %s. It joins over that address, with no tunnel, so it has to be one the internet reaches.",
+			name, parsed.URL)
+	}
+	if err == nil && out.status != 0 {
+		err = orFailed(classify(out.status, out.stderr, true), out.stderr)
+	}
+	if err != nil {
+		if p, ok := err.(*Problem); ok {
+			return errors.New(Say(p, false))
+		}
+		return err
+	}
+	i.progress(name, "started")
+	return nil
 }
 
 // HostKey is the key to pin for a host that joined with no install, such as one that ran

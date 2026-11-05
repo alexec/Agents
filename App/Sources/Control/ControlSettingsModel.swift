@@ -474,11 +474,17 @@ final class ControlSettingsModel {
     /// key given here, which goes in this one call and is kept nowhere (058, T072). With no
     /// key, the control plane's ssh logs in as `ssh user@host` would (#413). `tunnel`: whether
     /// it dials back through an ssh tunnel; nil leaves it to whether it is behind a bastion.
+    /// `provider` and `workspace` are Add as Machine…'s: a codespace whose provider a machine
+    /// carries is installed from that machine, with the token kept there (#3497).
     func install(destination: String, name: String? = nil, key: String? = nil, trust: String? = nil,
-                 tunnel: Bool? = nil) async -> InstallOutcome {
+                 tunnel: Bool? = nil, provider: ProviderID? = nil, workspace: String? = nil) async -> InstallOutcome {
         installStep = nil
         var params: [String: JSONValue] = ["destination": .string(destination)]
         if let tunnel { params["tunnel"] = .bool(tunnel) }
+        if let provider, let workspace {
+            params["provider"] = .string(provider.rawValue)
+            params["workspace"] = .string(workspace)
+        }
         if let key { params["key"] = .string(key) }
         if let name, !name.isEmpty { params["name"] = .string(name) }
         if let trust { params["trust"] = .string(trust) }
