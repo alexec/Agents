@@ -25,7 +25,7 @@ const (
 
 const (
 	personalVersion = 3
-	folderVersion  = 1
+	folderVersion   = 1
 )
 
 // Entry is one lock entry, the fields the CLI writes for a GitHub skill.

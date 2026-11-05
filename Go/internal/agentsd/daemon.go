@@ -49,6 +49,7 @@ type Daemon struct {
 	attachmentBook
 	settingsState
 	userScopeState
+	lockState
 	selfUpdateState
 	quitState
 	leaseState

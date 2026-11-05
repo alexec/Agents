@@ -170,7 +170,9 @@ func (d *Daemon) adoptSession(ctx context.Context, r wire.AdoptRequest) (wire.UU
 		return id, nil
 	}
 	if opts := configOptions(s.NewResult.ConfigOptions); len(opts) > 0 {
-		d.change(id, func(a *wire.Agent) { a.AdvertisedOptions = d.markOptions(a.RuntimeID, withAppOptions(a.RuntimeID, a.StartOptions.Values, opts)) })
+		d.change(id, func(a *wire.Agent) {
+			a.AdvertisedOptions = d.markOptions(a.RuntimeID, withAppOptions(a.RuntimeID, a.StartOptions.Values, opts))
+		})
 	}
 	return id, nil
 }

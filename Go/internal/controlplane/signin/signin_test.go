@@ -62,20 +62,20 @@ func TestEveryBadIDTokenIsRefused(t *testing.T) {
 		nonce string
 		want  string
 	}{
-		"bad signature":        {issuer.Forge(good), nonce, "signature"},
-		"tampered":             {tamper(issuer.Mint(good)), nonce, "signature"},
-		"alg none":             {signintest.MintWith(stranger, "x", "none", with("iss", issuer.Issuer)), nonce, "RS256"},
-		"unknown key":          {signintest.MintWith(stranger, "nope", "RS256", with("iss", issuer.Issuer)), nonce, "signature"},
-		"wrong issuer":         {issuer.Mint(with("iss", "https://evil.example")), nonce, "not from google"},
-		"wrong aud":            {issuer.Mint(with("aud", "another-app")), nonce, "another app"},
-		"expired":              {issuer.Mint(with("exp", time.Now().Add(-10*time.Minute).Unix())), nonce, "expired"},
-		"from the future":      {issuer.Mint(with("iat", time.Now().Add(time.Hour).Unix())), nonce, "future"},
-		"no nonce":             {issuer.Mint(with("nonce", nil)), nonce, "another sign-in"},
-		"replayed nonce":       {issuer.Mint(with("nonce", signin.Nonce("key1", []byte("an earlier hello")))), nonce, "another sign-in"},
-		"other control plane":  {issuer.Mint(with("nonce", signin.Nonce("key2", []byte("hello-nonce")))), nonce, "another sign-in"},
-		"no nonce to check":    {issuer.Mint(good), "", "another sign-in"},
-		"names nobody":         {issuer.Mint(with("sub", nil)), nonce, "nobody"},
-		"not a token":          {"abc.def", nonce, "not an ID token"},
+		"bad signature":       {issuer.Forge(good), nonce, "signature"},
+		"tampered":            {tamper(issuer.Mint(good)), nonce, "signature"},
+		"alg none":            {signintest.MintWith(stranger, "x", "none", with("iss", issuer.Issuer)), nonce, "RS256"},
+		"unknown key":         {signintest.MintWith(stranger, "nope", "RS256", with("iss", issuer.Issuer)), nonce, "signature"},
+		"wrong issuer":        {issuer.Mint(with("iss", "https://evil.example")), nonce, "not from google"},
+		"wrong aud":           {issuer.Mint(with("aud", "another-app")), nonce, "another app"},
+		"expired":             {issuer.Mint(with("exp", time.Now().Add(-10*time.Minute).Unix())), nonce, "expired"},
+		"from the future":     {issuer.Mint(with("iat", time.Now().Add(time.Hour).Unix())), nonce, "future"},
+		"no nonce":            {issuer.Mint(with("nonce", nil)), nonce, "another sign-in"},
+		"replayed nonce":      {issuer.Mint(with("nonce", signin.Nonce("key1", []byte("an earlier hello")))), nonce, "another sign-in"},
+		"other control plane": {issuer.Mint(with("nonce", signin.Nonce("key2", []byte("hello-nonce")))), nonce, "another sign-in"},
+		"no nonce to check":   {issuer.Mint(good), "", "another sign-in"},
+		"names nobody":        {issuer.Mint(with("sub", nil)), nonce, "nobody"},
+		"not a token":         {"abc.def", nonce, "not an ID token"},
 	}
 	for name, c := range cases {
 		_, err := o.Check(context.Background(), c.token, c.nonce)

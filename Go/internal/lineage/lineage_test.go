@@ -16,7 +16,9 @@ var t0 = time.Date(2026, 10, 29, 12, 0, 0, 0, time.UTC)
 func issue(n string) wire.LineageNode {
 	return wire.LineageNode{Kind: KindIssue, Ref: "github:alexec/Agents#" + n}
 }
-func pr(n string) wire.LineageNode { return wire.LineageNode{Kind: KindPR, Ref: "github:alexec/Agents#" + n} }
+func pr(n string) wire.LineageNode {
+	return wire.LineageNode{Kind: KindPR, Ref: "github:alexec/Agents#" + n}
+}
 func session(id string) wire.LineageNode {
 	return wire.LineageNode{Kind: KindSession, Ref: "session:" + id}
 }

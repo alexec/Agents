@@ -116,6 +116,8 @@ var own = methodSet(
 	"links/list",
 	"links/remove",
 	"links/requests",
+	"lock/add",
+	"lock/get",
 	"orgRoutes/check",
 	"orgRoutes/list",
 	"orgRoutes/mine",
@@ -248,6 +250,7 @@ var writes = methodSet(
 	"links/approve",
 	"links/deny",
 	"links/remove",
+	"lock/add",
 	"orgRoutes/remove",
 	"orgRoutes/replaceKey",
 	"orgRoutes/set",
@@ -359,6 +362,8 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return m.sealingMethod(ctx, method, params, from)
 	case "links/list", "links/requests", "links/approve", "links/deny", "links/remove":
 		return m.linksMethod(ctx, method, params, from)
+	case "lock/get", "lock/add":
+		return m.lockMethod(ctx, method, params, from)
 	case "signIn/providers", "signIn/pair", "signIn/addToMe", "signIn/removeFromMe", "signIn/configure",
 		"signIn/requests", "signIn/approve", "signIn/deny", "signIn/discover", "signIn/orgStart", "signIn/ticket",
 		"signIn/orgProviders/check", "signIn/orgProviders/list", "signIn/orgProviders/remove", "signIn/orgProviders/set",
@@ -1379,6 +1384,8 @@ func (m *Methods) hello(ctx context.Context, host string, hello wire.MachineHell
 	m.s.sendUserSuspended(host)
 	// Its person's settings and secrets, at every join (#1760, FR-024).
 	go m.s.sendUserSettings(host, true)
+	// Its person's machine lock, at every join (#3399).
+	go m.s.sendLock(host, true)
 	// The organisation's policy, or none, at every join (#998, FR-006).
 	go m.s.sendPolicy(host, true)
 	// The organisation's routes it may use, or none, at every join (#999, FR-005).

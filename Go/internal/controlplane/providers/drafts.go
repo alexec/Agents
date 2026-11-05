@@ -239,7 +239,7 @@ type draft struct {
 	runtimeName string
 	redact      Redaction
 
-	host     string
+	host string
 	// The machine that runs its provider's server (#3398): the form's, the provider's, or
 	// the host where the control plane runs.
 	machine  string

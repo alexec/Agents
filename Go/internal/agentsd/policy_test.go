@@ -246,11 +246,11 @@ func TestEveryRuleAtEveryPath(t *testing.T) {
 	os.WriteFile(filepath.Join(d.SettingsDir, passThroughFile), []byte(`{"names":["AWS_PROFILE","MY_*"],"runtimes":{"claude":["SECRET_TOKEN"]}}`), 0o600)
 	rules := map[string]any{
 		"permissionMode": "approveForMe",
-		"sandbox":      "required",
-		"runtimes":     map[string]any{"claude": map[string]any{"models": []string{"claude-sonnet-*"}}, "codex": map[string]any{}},
-		"marketplaces": map[string]any{"allowed": []string{"provided:github-mcp"}, "customServers": "refuse"},
-		"helpers":      map[string]any{"mostRunning": 1, "mostNotArchived": 2},
-		"environment":  map[string]any{"passThrough": []string{"AWS_*"}},
+		"sandbox":        "required",
+		"runtimes":       map[string]any{"claude": map[string]any{"models": []string{"claude-sonnet-*"}}, "codex": map[string]any{}},
+		"marketplaces":   map[string]any{"allowed": []string{"provided:github-mcp"}, "customServers": "refuse"},
+		"helpers":        map[string]any{"mostRunning": 1, "mostNotArchived": 2},
+		"environment":    map[string]any{"passThrough": []string{"AWS_*"}},
 	}
 	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 1, rules))
 

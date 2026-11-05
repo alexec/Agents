@@ -53,7 +53,7 @@ func newFakeLinear(t *testing.T) *fakeLinear {
 				return
 			}
 			json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{
-				"viewer": map[string]any{"name": "Alex", "email": "alex@example.com"},
+				"viewer":       map[string]any{"name": "Alex", "email": "alex@example.com"},
 				"organization": map[string]any{"name": "Agents Walk"}}})
 		default:
 			w.WriteHeader(http.StatusNotFound)

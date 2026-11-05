@@ -32,7 +32,7 @@ func TestForReviewListsPullRequestsWaitingForApproval(t *testing.T) {
 	d, c, gh, _ := forgeDaemon(t)
 	pr := func(repo string, n int, updated string, labels ...string) githubmcp.Item {
 		return githubmcp.Item{Repo: repo, Number: n, PR: true, State: "open", Title: "PR " + updated,
-			URL: fmt.Sprintf("https://github.com/%s/pull/%d", repo, n),
+			URL:    fmt.Sprintf("https://github.com/%s/pull/%d", repo, n),
 			Author: "alexec", Labels: append([]string{"needs-approval"}, labels...), UpdatedAt: updated + "T10:00:00Z"}
 	}
 	older, newer := pr("alexec/agents", 1, "2026-11-01"), pr("alexec/agents", 2, "2026-11-02")

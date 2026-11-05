@@ -54,7 +54,7 @@ type Provider struct {
 	discovery func(map[string]any)
 	codes     map[string]grant
 	// secretOK checks the client secret in place of ClientSecret, when set.
-	secretOK func(secret string) bool
+	secretOK  func(secret string) bool
 	refreshes map[string]Claims
 	rsaKey    *rsa.PrivateKey
 	ecKey     *ecdsa.PrivateKey

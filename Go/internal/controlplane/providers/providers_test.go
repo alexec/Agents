@@ -108,7 +108,7 @@ func TestProvidersAreReadBackAfterARestart(t *testing.T) {
 	id := h.add()
 	again := NewProviders(Config{Store: h.store, Records: h.records, Router: h.router, Methods: h.methods,
 		Timing: quickTiming(),
-		Hooks: Hooks{Connect: func(ProviderRecord, map[string]string) (Provider, error) { return h.provider, nil }}})
+		Hooks:  Hooks{Connect: func(ProviderRecord, map[string]string) (Provider, error) { return h.provider, nil }}})
 	again.Start()
 	defer again.Stop()
 	if s := again.Summaries(); len(s) != 1 || string(s[0].ID) != id {

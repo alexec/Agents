@@ -27,7 +27,6 @@ import (
 
 var ctx = context.Background()
 
-
 func randomHex(n int) string {
 	b := make([]byte, n)
 	rand.Read(b)

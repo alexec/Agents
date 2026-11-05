@@ -26,6 +26,7 @@ type Secrets struct {
 func NewSecrets(folder string) *Secrets {
 	return &Secrets{file: filepath.Join(folder, SecretsFileName)}
 }
+
 // Values is a provider's secrets, by name.
 func (s *Secrets) Values(provider string) map[string]string {
 	s.mu.Lock()

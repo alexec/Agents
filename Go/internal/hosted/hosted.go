@@ -104,9 +104,9 @@ type Service struct {
 	sessions sessions
 	github   gitHub
 	// Apple's and Google's web sign-in, by provider; one not set up is not there.
-	oidc map[string]*oidcSignIn
-	rates    rates
-	certs    certificates
+	oidc  map[string]*oidcSignIn
+	rates rates
+	certs certificates
 	// Stripe, or nil when billing is off.
 	stripe billing.Stripe
 
