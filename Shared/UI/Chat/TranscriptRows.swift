@@ -1,5 +1,7 @@
 import AgentsKitCore
+import CodeText
 import SwiftUI
+import Yams
 #if os(macOS)
 import AppKit
 #else
@@ -895,10 +897,10 @@ private struct ToolCallLine: View {
             }
 
             if let argument = call.rawInput {
-                exchanged("Argument", Self.pretty(argument))
+                exchanged("Argument", argument)
             }
             if let returned = call.rawOutput {
-                exchanged("Return", Self.pretty(returned))
+                exchanged("Return", returned)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -930,7 +932,7 @@ private struct ToolCallLine: View {
             TerminalOutputView(text: actions.terminalOutput(id))
         case .unknown(let raw):
             // Kept rather than dropped: shown as what the runtime sent.
-            Text(Self.pretty(raw))
+            Text(Self.readable(raw).text)
                 .appText(.code)
                 .foregroundStyle(.tertiary)
                 .lineLimit(6)
@@ -950,12 +952,14 @@ private struct ToolCallLine: View {
 
     /// The argument or the return, under a word that says which. A runtime's own
     /// bytes — Grok sends a tool's output as a list of numbers — are read back into
-    /// text here, because a page of integers is not what came back.
-    private func exchanged(_ title: String, _ text: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+    /// text here, because a page of integers is not what came back. Anything with a
+    /// shape is YAML, coloured as YAML (#3569): a page of braces and quotes is hard to read.
+    private func exchanged(_ title: String, _ value: JSONValue) -> some View {
+        let (text, structured) = Self.readable(value)
+        return VStack(alignment: .leading, spacing: 3) {
             Text(title).appText(.reading).foregroundStyle(.tertiary)
             ScrollView(.horizontal, showsIndicators: false) {
-                Text(text)
+                CodeBlockText(text: text, language: structured ? .yaml : nil)
                     .appText(.code)
                     .textSelection(.enabled)
                     .padding(10)
@@ -965,11 +969,13 @@ private struct ToolCallLine: View {
         }
     }
 
-    private static func pretty(_ value: JSONValue) -> String {
+    /// What a value reads as: text as it came, anything with a shape as YAML (#3569).
+    private static func readable(_ value: JSONValue) -> (text: String, structured: Bool) {
         let readable = value.readingByteArraysAsText()
-        if let text = readable.stringValue { return text }
-        guard let data = try? JSONEncoder.pretty.encode(readable) else { return "" }
-        return String(decoding: data, as: UTF8.self)
+        if let text = readable.stringValue { return (text, false) }
+        let yaml = (try? Yams.serialize(node: readable.yamlNode, width: -1, allowUnicode: true)) ?? ""
+        // The emitter ends with a line break; the box does not need an empty last line.
+        return (yaml.hasSuffix("\n") ? String(yaml.dropLast()) : yaml, true)
     }
 }
 
@@ -1002,12 +1008,29 @@ private extension JSONValue {
     }
 }
 
-private extension JSONEncoder {
-    static let pretty: JSONEncoder = {
-        let e = JSONEncoder()
-        e.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-        return e
-    }()
+private extension JSONValue {
+    /// The value as a YAML node, keys sorted. Text of more than one line is a block, as
+    /// it reads; text that YAML would read as something else (`true`, `12`, `null`, nothing)
+    /// is quoted, so what is shown is still what was sent.
+    var yamlNode: Node {
+        switch self {
+        case .null: return Node("null", Tag(.null))
+        case .bool(let v): return Node(v ? "true" : "false", Tag(.bool))
+        case .int(let v): return Node(String(v), Tag(.int))
+        case .double(let v): return Node(String(v), Tag(.float))
+        case .string(let v): return Self.yamlText(v)
+        case .array(let values):
+            return Node(values.map(\.yamlNode))
+        case .object(let fields):
+            return Node(fields.sorted { $0.key < $1.key }.map { (Self.yamlText($0.key), $0.value.yamlNode) })
+        }
+    }
+
+    private static func yamlText(_ v: String) -> Node {
+        let style: Node.Scalar.Style = v.contains("\n") ? .literal
+            : v.isEmpty || Resolver.default.resolveTag(of: Node(v)) != .str ? .doubleQuoted : .any
+        return Node(v, Tag(.str), style)
+    }
 }
 
 /// The agent is at work and the person is waiting: the same mark the sidebar row shows,
