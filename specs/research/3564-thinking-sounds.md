@@ -4,10 +4,16 @@
 (Morse at 0.3 volume, every 3 s, #2869). Can the voice make the small sounds a person makes
 while they think ("hmm", "mm", "let me see") instead, and how?
 
-**Answer.** Yes. Kokoro, the voice we ship, says them well enough to try. It makes each one
-in 140–240 ms, and they need no new files, licence or download. Alex decides by ear: the
-demo files are in `~/.agents/research/3564-thinking-sounds/` (open `index.html`). The build
-is follow-up story #3565.
+**Answer.** Kokoro, the voice we ship, says all the fillers, at 140–240 ms each. It needs no
+new files, licence or download. But Alex listened, and the only one Alex likes is "Let me
+think." (Alex, 2026-11-05). So:
+
+- The Working sound stays the Morse click. The voice makes no fillers while the agent works.
+- "Let me think" becomes a choice for the "Stops listening" sound, the one that plays when
+  the prompt goes ("sent").
+
+The demo files are in `~/.agents/research/3564-thinking-sounds/` (open `index.html`). The
+build is story #3565.
 
 ## What was done
 
@@ -48,59 +54,49 @@ pass through as phonemes. "Uh…" goes to `/ˈʌ…/`, "Um…" to `/ˈʌm…/` a
 which are the right sounds. "Hmm." as text and `hmː` by hand both work. The page has both, so
 Alex can keep what sounds human.
 
-## Decisions on questions 1–5 (Alex can overrule)
+## Decisions
 
-1. **Where the sounds come from: Kokoro (a).** Decided: Kokoro says the fillers, made once
-   per voice and speed, because they then match the voice that answers, and it costs about
-   1 s of Neural Engine time and no new files. (b) Recorded sounds need a licence, add size
-   and do not match the voice. (c) A spoken line at a tool call is "Still working. Running
-   the tests." (#2358) already, after 45 s of silence. It stays as it is.
-2. **Does Kokoro say "hmm" well?** Measured: yes, it says all 23 without a failure, in the
-   time above. How human they sound is Alex's ear. The set to start with, before Alex
-   listens: "Hmm.", "Hmmm…", "Mm.", "Let me see.", "Right…", "Okay.". Change it after
-   listening to the page.
-3. **When and how often.** Decided:
-   - The first filler 1–2 s after the "sent" sound, so the click is not followed at once
-     by a voice.
-   - After that, one at a random gap of 2× to 4× "Working sound every" (6–12 s at the
-     default of 3 s). Never the same filler twice running.
-   - Only when `ticksInSilence` is true and nothing is in the speech queue. Never while the
-     voice speaks, asks a question, waits for a "no", or hears words.
-   - The fillers are played through `VoiceSpeaker`'s player on voice mode's engine, not
-     `NSSound`. Then the echo cancellation removes them from the microphone. If one gets
-     through, `VoiceModeWords.backchannel` already ignores "hmm", "mm", "okay" and "right"
-     as barge-in. But words heard while the agent works are a prompt, not barge-in. So the
-     story must also drop words heard that are only backchannel and match a filler said in
-     the last 2 s.
-   - Volume 0.5. That is quieter than the reply (1.0) and louder than Morse (0.3), because a
-     voice at 0.3 is hard to hear.
-4. **Which sound for which moment.** Decided: the "hmm" family while the agent works. "Huh?"
-   once in a turn, at the first tool call that fails. Not at a question card: a question
-   keeps its own sound ("Purr") and the spoken question. Two sounds there would say the same
-   thing twice.
-5. **The setting.** Decided: Settings ▸ Voice ▸ Voice mode sounds ▸ Working gets one more choice,
-   "Thinking sounds", above the system sounds. The default stays Morse until Alex has
-   listened on the installed app. Then the story changes the default when Alex says so.
-   "Working sound every" stays. For thinking sounds it sets the gap as in 3.
+Alex's answer (2026-11-05): "I don't love any of these except 'let me think'. Provide that as an
+option instead for the 'sent' sound."
+
+1. **Where the sound comes from: Kokoro (a).** It matches the voice that answers and costs one
+   synthesis, 172–215 ms. (b) Recorded sounds need a licence, add size and do not match the
+   voice. (c) "Still working. Running the tests." (#2358), after 45 s of silence, stays as it
+   is.
+2. **Which sounds.** Only "Let me think." The others ("Hmm.", "Mm.", "Huh?", "Let me see.",
+   "Right…", "Okay." and the phonemes by hand) are out.
+3. **When.** Once a prompt, in place of the "sent" sound, when the prompt goes. No fillers while
+   the agent works. Not for words said while the voice speaks (barge-in), because then the
+   voice stops at once and a spoken line would talk over the person. They keep the sound.
+4. **The Working sound** stays Morse, every 3 s. No "Huh?" at a failed tool call.
+5. **The setting.** Settings ▸ Voice ▸ Voice mode sounds ▸ Stops listening gets one more choice,
+   "Let me think", above the system sounds. The default stays Bottle. Alex can choose it, and
+   can make it the default later.
+
+Decided, Alex can overrule:
+
+- Decided: it plays through `VoiceSpeaker`'s player on voice mode's engine, not `NSSound`,
+  because then the echo cancellation removes it from the microphone. The microphone opens
+  again for words while the agent works. Words heard in the 2 s after it that are only "let me
+  think" are dropped, not sent as a prompt.
+- Decided: it is made once, at load, just after the "Hi." that warms the voice up, and again
+  when the voice or speed changes. One synthesis of about 200 ms there costs nothing a person
+  notices. It is ready at the first prompt.
+- Decided: the same on the Remote. Its "Stops listening" is system sound 1001 now
+  (`VoiceSound.play`, iOS). It plays "Let me think" when that is the choice.
 
 ## The Remote (6)
 
 `Shared/UI/Voice` is shared, and the Remote has Kokoro and `VoiceSpeaker` already. So the
-same code works on iPhone and iPad. Now the Remote plays system sound 1105 for "Working"
-(`VoiceSound.play`, iOS). The story replaces that with the same picker. Not measured on a
-phone: six fillers at about 0.2 s each is about 1 s of Neural Engine time once per voice. The
-story measures it on the iPhone with `devicectl` before it ships.
+same code works on iPhone and iPad. Not measured on a phone: one synthesis at load. The story
+measures it on the iPhone with `devicectl`.
 
 ## Cost (7)
 
-- **Do not make the fillers at load.** `KokoroVoice` runs one Core ML call at a time. Six
-  fillers at load would put about 1 s in front of the first reply.
-- Make each filler the first time it is needed, in the silence while the agent works, when
-  the voice is idle. Keep them in memory for the voice and speed.
-- A change of voice or speed in Settings drops them.
-- An on-disk cache is not needed for 1 s of work.
+One phrase: 172–215 ms of Neural Engine time at load (measured in five voices),
+0.70–0.98 s of audio, under 100 KB of memory.
 
 ## Follow-up
 
-Story #3565: "Thinking sounds" as a choice for the Working sound in voice mode (Mac and
-Remote). Web: by design, no voice mode.
+Story #3565: "Let me think" as a choice for the "Stops listening" sound in voice mode (Mac
+and Remote). Web: by design, no voice mode.
