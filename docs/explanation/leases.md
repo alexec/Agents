@@ -33,6 +33,11 @@ screen. An agent can list them and pick one by its name, so two agents asking fo
 thing always ask for it the same way. An agent can also lease a name of its own for
 something the app does not know about, such as a network port.
 
+Every machine also offers `browser:agents`, **This machine's browser** (#3533): one
+Chromium that the host downloads on first use, runs with no window and a kept profile, so
+sign-ins carry over from one session to the next, and stops after 15 minutes with no use
+and no lease. One agent drives it at a time. The tools that drive it come with #3526.
+
 The screen lease is now actually acquired by a shipped tool (#3004): `drive_screen` takes
 it the first time an agent drives an app through its own screen, mouse and keyboard, and
 lets it go when the agent's turn ends or you press **Stop**.

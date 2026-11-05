@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/browser"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -141,8 +142,8 @@ func (d *Daemon) takeNotices(agent wire.UUID) string {
 	return strings.Join(lines, "\n") + "\n\n"
 }
 
-// resolveResource is ResourceCatalog.resolve on a server: a declared name, the screen, or
-// a name of the agent's own. Under leaseMu.
+// resolveResource is ResourceCatalog.resolve on a server: a declared name, the screen, the
+// machine's browser (#3533), or a name of the agent's own. Under leaseMu.
 func (d *Daemon) resolveResource(given string) (wire.ResourceName, wire.ResourceKind, string, bool) {
 	name, ok := resourceName(given)
 	if !ok {
@@ -155,6 +156,9 @@ func (d *Daemon) resolveResource(given string) (wire.ResourceName, wire.Resource
 	}
 	if name == "screen" {
 		return name, "screen", "Screen, mouse and keyboard", true
+	}
+	if name == browser.Resource {
+		return name, "browser", browser.DisplayName, true
 	}
 	return name, "named", strings.TrimSpace(given), true
 }

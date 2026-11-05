@@ -145,7 +145,9 @@ The **Resources page** is not a Settings pane. It is a page of its own, opened f
 **View ▸ Resources** (Option-Command-L) or the **Resources** row at the foot of the
 folders column. It lists the declared resources first, free or held, with their
 descriptions, then every resource found on this Mac — each simulator, each installed
-browser, and the screen — whether it is free, who holds it and since when, when the lease
+browser, the screen, and **This machine's browser** (`browser:agents`, #3533: the one
+Chromium that agents on this machine drive, started on first use and stopped after 15
+minutes with no use and no lease) — whether it is free, who holds it and since when, when the lease
 runs out, and who is waiting. A declared resource more than one agent may hold says
 "2 of 3 held" and names each holder. You can end a lease or take an agent out of a line
 from here. See [Leases on shared resources](../explanation/leases.md).

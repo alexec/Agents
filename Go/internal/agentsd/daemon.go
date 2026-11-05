@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/alexec/agents/Go/internal/browser"
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
@@ -26,6 +27,9 @@ type Daemon struct {
 	// Tunneler opens tunnels through the control plane, to a host that lends a sign-in;
 	// nil when this host has no control plane.
 	Tunneler Tunneler
+
+	// browser is the machine's browser (#3533): one Chromium, started on first use.
+	browser *browser.Machine
 
 	// The machine providers this machine carries (#3398), made at the first ask.
 	carriedOnce sync.Once
@@ -143,6 +147,7 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	st.OnGap = d.tellEntry
 	d.setToolsHome()
 	d.register()
+	d.startBrowser()
 	d.loadAttention()
 	d.loadEvents()
 	d.beginMCPApprovals()
@@ -264,6 +269,7 @@ func (d *Daemon) Shutdown() {
 	d.allowMu.Unlock()
 	d.stopEventWaits()
 	d.stopShells()
+	d.browser.Shutdown()
 	d.stopFolderWatches()
 	d.stopPins()
 	d.stopSignInRelays()
