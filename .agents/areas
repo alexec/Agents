@@ -594,6 +594,9 @@ Web/src/model/channelLinks.ts                          channels
 Web/src/views/ChannelLinks.tsx                         channels
 Web/test/channel-links.test.mjs                        channels
 docs/reference/channels.md                             channels
+Go/cmd/slack-mcp/                                      channels
+Go/internal/slackmcp/                                  channels
+docs/how-to/reach-agents-from-slack.md                 channels
 
 # sign-in: signing a person in to the control plane with Google, Apple or GitHub (#995).
 # Not an agent runtime's sign-in (runtimes) or an MCP server's (marketplace).
