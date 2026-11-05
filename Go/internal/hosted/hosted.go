@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controllink"
+	"github.com/alexec/agents/Go/internal/controlplane"
 	"github.com/alexec/agents/Go/internal/controlplane/kms"
 	"github.com/alexec/agents/Go/internal/controlplane/signin"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
@@ -26,7 +27,7 @@ import (
 )
 
 // Config is what the service needs. Nothing in it is a secret except GitHubSecret,
-// GoogleSecret and AppleKey.
+// GoogleSecret, AppleKey and WebPush's key.
 type Config struct {
 	// The store every account's records are kept in, each under accounts/<id>/.
 	Store store.Store
@@ -55,6 +56,11 @@ type Config struct {
 	// The sign-in providers each account's control plane checks (controlplane.Config.SignIn);
 	// nil is the app's own client ids, or AGENTS_SIGNIN_* over them.
 	CopySignIn *signin.Config
+	// The service's VAPID key, which posts every account's Web Push to its browsers
+	// (#1486, #3515); nil sends none. One key for the service, as the APNs key is: a
+	// browser's subscription is kept in its own account's store, and the key tells a push
+	// service only that this service sent it.
+	WebPush controlplane.WebPusher
 	// The built web app (Web/dist) each control plane serves; "" serves none (tests).
 	Web string
 	// The views' sandbox proxy's domain for the copies' pages; "" draws no views.
