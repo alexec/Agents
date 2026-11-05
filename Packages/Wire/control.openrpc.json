@@ -985,6 +985,22 @@
       ]
     },
     {
+      "name": "control/lockChanged",
+      "x-capability": "lock/1",
+      "description": "To a person's clients when an entry is put on their machine lock (#3399): read it again with lock/get.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LockHead"
+          }
+        }
+      ]
+    },
+    {
       "name": "control/moved",
       "x-capability": "control/1",
       "x-notification": true,
@@ -1843,6 +1859,22 @@
           "$ref": "daemon.schema.json#/definitions/Empty"
         }
       }
+    },
+    {
+      "name": "host/lock",
+      "x-capability": "host.lock/1",
+      "description": "To a machine that says host.lock/1, on its channel 0, at each join and when an entry is put on its person's lock (#3399): the whole lock. The machine checks it and takes it only when it grows from the head it pinned last; until #3400's later steps it only logs what it would refuse.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Lock"
+          }
+        }
+      ]
     },
     {
       "name": "host/machines",
@@ -2855,6 +2887,48 @@
           "items": {
             "$ref": "daemon.schema.json#/definitions/ChannelLinkRequest"
           }
+        }
+      }
+    },
+    {
+      "name": "lock/add",
+      "x-capability": "lock/1",
+      "description": "A client's: put entries on the end of the caller's machine lock (#3399). Each must be signed, follow the head, and pass the checks; the first is the root when there is no lock yet. Refused with changedElsewhere when another entry took the head first.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LockAdd"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LockHead"
+        }
+      }
+    },
+    {
+      "name": "lock/get",
+      "x-capability": "lock/1",
+      "description": "A client's: the caller's machine lock, with no entries when there is none yet (#3399).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Lock"
         }
       }
     },
