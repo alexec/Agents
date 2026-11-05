@@ -6444,7 +6444,7 @@ type MachineInfo struct {
 	Host *MachineRef `json:"host,omitzero"`
 }
 
-// hosts/install (MachineInstall.Request): a server over ssh, with its key, the fingerprint trusted, a tunnel.
+// hosts/install (MachineInstall.Request): a server over ssh, with its key, the fingerprint trusted, a tunnel. Add as Machine… names the provider and the workspace too (#3497): a codespace whose provider a machine carries is installed from that machine, with the token kept there.
 type MachineInstall struct {
 	Destination string `json:"destination"`
 
@@ -6455,6 +6455,10 @@ type MachineInstall struct {
 	Trust *string `json:"trust,omitzero"`
 
 	Tunnel *bool `json:"tunnel,omitzero"`
+
+	Provider *ProviderID `json:"provider,omitzero"`
+
+	Workspace *string `json:"workspace,omitzero"`
 }
 
 // POST /v1/join (#994, spec 736 FR-017): a machine with no code asks to join. `person` names whose it is to be, by name or id; with none, an admin approves it.
@@ -8813,11 +8817,14 @@ type ProviderRuntimes struct {
 	Why *string `json:"why,omitzero"`
 }
 
-// providers/ssh (#3398): the machine that carries a codespaces provider starts a codespace's agentsd over ssh (`start`), or reads its host key (`hostKey`), with the token it keeps. Its result is ProviderSSHResult.
+// providers/ssh (#3398): the machine that carries a codespaces provider starts a codespace's agentsd over ssh (`start`), reads its host key (`hostKey`), or installs Agents in it with a host code from the control plane (`install`, #3497), with the token it keeps. Its result is ProviderSSHResult.
 type ProviderSSH struct {
 	Provider ProviderID `json:"provider"`
 
 	Op string `json:"op"`
+
+	// install's host code: the codespace runs the control plane's install.sh with it, from the address and pin it names.
+	HostCode *string `json:"hostCode,omitzero"`
 
 	Destination string `json:"destination"`
 

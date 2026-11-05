@@ -140,7 +140,9 @@ test("Add as Machine… installs, shows a new host key first, and links the mach
   });
   assert.deepEqual(await p.install("cs.cs-box", "cs-box", "gh", "cs-box-id"), { needsTrust: "SHA256:abc" });
   assert.deepEqual(await p.install("cs.cs-box", "cs-box", "gh", "cs-box-id", "SHA256:abc"), { added: "cs-box" });
-  assert.deepEqual(asked.at(-1).params, { destination: "cs.cs-box", name: "cs-box", trust: "SHA256:abc" });
+  // The provider and workspace go too: a carried codespace is installed from its machine (#3497).
+  assert.deepEqual(asked.at(-1).params,
+    { destination: "cs.cs-box", name: "cs-box", provider: "gh", workspace: "cs-box-id", trust: "SHA256:abc" });
   // Not joined yet: nothing to link.
   p.linkJoined([{ id: "1", name: "other" }]);
   assert.equal(asked.filter((a) => a.method === "hosts/link").length, 0);

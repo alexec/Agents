@@ -214,3 +214,24 @@ func B64URL(b []byte) string { return base64.RawURLEncoding.EncodeToString(b) }
 func FromB64URL(s string) ([]byte, error) {
 	return base64.RawURLEncoding.DecodeString(strings.TrimRight(s, "="))
 }
+
+// InstallCommand is HostInstallScript.command: the one line a server runs to become a host
+// of the control plane at url, for a host code.
+func InstallCommand(url, pin, code string) string {
+	return FetchScript(url, pin) + " | sh -s -- '" + code + "'"
+}
+
+// FetchScript fetches the control plane at url's install.sh, checked against pin when its
+// certificate is not publicly trusted.
+func FetchScript(url, pin string) string {
+	base := strings.TrimSuffix(url, "/")
+	curl := "curl -fsSL"
+	if pin != "" && pin != "-" {
+		standard := strings.NewReplacer("-", "+", "_", "/").Replace(pin)
+		for len(standard)%4 != 0 {
+			standard += "="
+		}
+		curl += " --insecure --pinnedpubkey sha256//" + standard
+	}
+	return curl + " " + base + "/v1/install.sh"
+}

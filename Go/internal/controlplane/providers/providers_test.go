@@ -964,6 +964,79 @@ func TestACarriedCodespaceIsStartedOverSSHFromItsMachine(t *testing.T) {
 	}
 }
 
+// Add as Machine… on a carried codespace (#3497): the machine that carries its provider
+// installs Agents in it, with a host code made here; the control plane's ssh is not used,
+// and no token comes back. A host key to trust first is shown, and only the machine that
+// runs an install says its progress.
+func TestACarriedCodespaceIsInstalledFromItsMachine(t *testing.T) {
+	h := newHarness(t, func(o *harnessOptions) {
+		o.workspaces = []MachineInfo{{ID: "fuzzy-space", Name: "fuzzy", State: "running", SSH: new("cs.fuzzy-space.main")}}
+	})
+	out := h.must(MethodProvidersAdd, map[string]any{"name": "Codespaces", "kind": "commands",
+		"commands": map[string]any{"preset": "codespaces-api"}, "secrets": map[string]string{"GITHUB_TOKEN": "ghp_test"}})
+	id := out.(ProviderSummary).ID
+	codes := 0
+	code := func() (string, error) { codes++; return "agents-control:2:h:code", nil }
+	h.router.asking = func(host, method string, params json.RawMessage) json.RawMessage {
+		var ask wire.ProviderSSH
+		json.Unmarshal(params, &ask)
+		if ask.Op != "install" {
+			return rawOf(wire.ProviderCarried{})
+		}
+		if deref(ask.Trust) != "SHA256:abc" {
+			return rawOf(wire.ProviderCarried{Result: rawOf(SSHResult{NeedsTrust: new("SHA256:abc")})})
+		}
+		h.providers.HostSaid(other, wire.NotifyHostInstallProgress.Name, rawOf(wire.ControlInstallProgress{Name: "fuzzy", Step: "not-this"}))
+		h.providers.HostSaid(carrier, wire.NotifyHostInstallProgress.Name, rawOf(wire.ControlInstallProgress{Name: "fuzzy", Step: "setUp"}))
+		return rawOf(wire.ProviderCarried{Result: rawOf(SSHResult{})})
+	}
+	request := wire.MachineInstall{Destination: "cs.fuzzy-space.main", Name: new("fuzzy"), Provider: &id,
+		Workspace: new("fuzzy-space")}
+	answer, carried, err := h.providers.InstallCarried(request, "", code)
+	if !carried || err != nil || !reflect.DeepEqual(answer, map[string]any{"needsTrust": "SHA256:abc", "name": "fuzzy"}) {
+		t.Fatalf("%v %v %v", answer, carried, err)
+	}
+	request.Trust = new("SHA256:abc")
+	answer, _, err = h.providers.InstallCarried(request, "", code)
+	if err != nil || !reflect.DeepEqual(answer, map[string]any{"started": true, "name": "fuzzy", "tunnel": false}) {
+		t.Fatalf("%v %v", answer, err)
+	}
+	installs := sshAsks(h, "install")
+	if len(installs) != 2 || codes != 2 {
+		t.Fatalf("%d asks, %d codes", len(installs), codes)
+	}
+	last := installs[1]
+	if last.Provider != id || deref(last.Codespace) != "fuzzy-space" || last.Destination != "cs.fuzzy-space.main" ||
+		deref(last.Name) != "fuzzy" || deref(last.HostCode) != "agents-control:2:h:code" || deref(last.Trust) != "SHA256:abc" {
+		t.Errorf("%+v", last)
+	}
+	if got := h.ssh.all(); len(got) != 0 {
+		t.Errorf("the control plane used its own ssh: %v", got)
+	}
+	if !h.router.heard(`"step":"connect"`) || !h.router.heard(`"step":"setUp"`) || h.router.heard("not-this") {
+		t.Error("the install's progress was not said as it should be")
+	}
+	// After the install, a machine's progress is not said.
+	h.providers.HostSaid(carrier, wire.NotifyHostInstallProgress.Name, rawOf(wire.ControlInstallProgress{Name: "fuzzy", Step: "late"}))
+	if h.router.heard("late") {
+		t.Error("progress said with no install running")
+	}
+	// Another person's: refused, and its machine is not asked.
+	if _, carried, err := h.providers.InstallCarried(request, "kim", code); !carried || err == nil ||
+		!strings.Contains(err.Error(), "isn’t yours") {
+		t.Fatalf("%v %v", carried, err)
+	}
+	// A provider no machine carries, or no workspace named: installed as any server is.
+	if _, carried, _ := h.providers.InstallCarried(wire.MachineInstall{Destination: "cs.fuzzy-space.main"}, "", code); carried {
+		t.Error("an install with no provider went to the carrying machine")
+	}
+	doctl := wire.ProviderID(h.add())
+	if _, carried, _ := h.providers.InstallCarried(wire.MachineInstall{Destination: "cs.fuzzy-space.main", Provider: &doctl,
+		Workspace: new("fuzzy-space")}, "", code); carried {
+		t.Error("a doctl workspace went to the carrying machine")
+	}
+}
+
 // sshAsks is each providers/ssh asked of the carrying machine, with op.
 func sshAsks(h *harness, op string) []wire.ProviderSSH {
 	var out []wire.ProviderSSH

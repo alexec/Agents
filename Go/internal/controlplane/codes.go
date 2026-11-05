@@ -204,9 +204,7 @@ var InstallScript string
 
 // InstallCommand is HostInstallScript.command: the one line a person runs on the server,
 // for a host code.
-func InstallCommand(url, pin, code string) string {
-	return fetchScript(url, pin) + " | sh -s -- '" + code + "'"
-}
+func InstallCommand(url, pin, code string) string { return controllink.InstallCommand(url, pin, code) }
 
 // JoinCommand is the one line that makes a server ask to join as a person, with no code
 // (#994): it shows a short code, and the person approves it on a client.
@@ -214,20 +212,7 @@ func JoinCommand(url, pin, person string) string {
 	if pin == "" {
 		pin = "-"
 	}
-	return fetchScript(url, pin) + " | sh -s -- --join '" + strings.TrimSuffix(url, "/") + "' '" + pin + "' '" + person + "'"
-}
-
-func fetchScript(url, pin string) string {
-	base := strings.TrimSuffix(url, "/")
-	curl := "curl -fsSL"
-	if pin != "" && pin != "-" {
-		standard := strings.NewReplacer("-", "+", "_", "/").Replace(pin)
-		for len(standard)%4 != 0 {
-			standard += "="
-		}
-		curl += " --insecure --pinnedpubkey sha256//" + standard
-	}
-	return curl + " " + base + "/v1/install.sh"
+	return controllink.FetchScript(url, pin) + " | sh -s -- --join '" + strings.TrimSuffix(url, "/") + "' '" + pin + "' '" + person + "'"
 }
 
 // serverFileNames is ServerFiles.names: the only files /v1/servers/ hands out.

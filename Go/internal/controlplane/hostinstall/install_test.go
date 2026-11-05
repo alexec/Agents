@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/hosttunnels"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 )
@@ -683,5 +684,55 @@ func TestAFailedPrepareIsSaidAndNothingRuns(t *testing.T) {
 	if _, err := i.StartDaemon(context.Background(), "cs.fuzzy.main", "", "fuzzy", false); err == nil ||
 		!strings.Contains(err.Error(), "no GitHub CLI") || f.logged() != "" {
 		t.Errorf("start: %v %q", err, f.logged())
+	}
+}
+
+// A codespace that a provider's carrying machine reaches is installed with the control
+// plane's install.sh and a host code, as its join command would (#3497): fetched from the
+// address and pin the code names, run with the code and the name, and the key trusted at
+// the install is the one checked. A server that can't reach the control plane says so.
+func TestAnInstallWithACodeRunsTheControlPlanesScript(t *testing.T) {
+	f := newFake(t)
+	f.write("bin/curl", `#!/bin/sh
+printf '%s\n' "$@" > "$HOME/curl-args"
+[ -n "$FAKE_CURL_FAIL" ] && exit 7
+while [ $# -gt 0 ]; do [ "$1" = -o ] && out="$2"; shift; done
+printf 'printf "%%s\\n" "$@" > "$HOME/install-args"\n' > "$out"
+`, 0o755)
+	var steps []string
+	i := f.installer(&fakeCodes{}, &steps)
+	key := append([]byte{4}, make([]byte, 64)...)
+	code := (&controllink.Code{Host: true, ControlKey: key, Secret: make([]byte, 32), URL: "https://cp.example",
+		Pin: controllink.B64URL(make([]byte, 32)), Name: "cp"}).Text()
+	if err := i.InstallWithCode(context.Background(), "cs.fuzzy.main", "cs.fuzzy.main "+hostKey+"\n", code, "fuzzy's"); err != nil {
+		t.Fatal(err)
+	}
+	args, _ := os.ReadFile(filepath.Join(f.home, "install-args"))
+	if string(args) != code+"\nfuzzy's\n" {
+		t.Errorf("install.sh ran with %q", args)
+	}
+	fetched, _ := os.ReadFile(filepath.Join(f.home, "curl-args"))
+	if !strings.Contains(string(fetched), "https://cp.example/v1/install.sh") ||
+		!strings.Contains(string(fetched), "sha256//AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=") {
+		t.Errorf("fetched with %q", fetched)
+	}
+	if !reflect.DeepEqual(steps, []string{"fuzzy's:setUp", "fuzzy's:started"}) {
+		t.Errorf("steps %v", steps)
+	}
+	if !strings.Contains(f.logged(), "HostKeyAlias="+hosttunnels.PinnedAlias) {
+		t.Errorf("not checked against the trusted key: %q", f.logged())
+	}
+
+	f.env["FAKE_CURL_FAIL"] = "1"
+	i = f.installer(&fakeCodes{}, &steps)
+	err := i.InstallWithCode(context.Background(), "cs.fuzzy.main", "cs.fuzzy.main "+hostKey+"\n", code, "fuzzy")
+	if err == nil || !strings.Contains(err.Error(), "couldn’t reach the control plane at https://cp.example") {
+		t.Errorf("%v", err)
+	}
+	if err := i.InstallWithCode(context.Background(), "cs.fuzzy.main", "", "not a code", "fuzzy"); err == nil {
+		t.Error("installed with no host code")
+	}
+	if left := f.leftInstallFolders(); len(left) != 0 {
+		t.Errorf("left %v", left)
 	}
 }

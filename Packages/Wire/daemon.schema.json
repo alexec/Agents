@@ -14517,7 +14517,7 @@
     },
     "MachineInstall": {
       "type": "object",
-      "description": "hosts/install (MachineInstall.Request): a server over ssh, with its key, the fingerprint trusted, a tunnel.",
+      "description": "hosts/install (MachineInstall.Request): a server over ssh, with its key, the fingerprint trusted, a tunnel. Add as Machine… names the provider and the workspace too (#3497): a codespace whose provider a machine carries is installed from that machine, with the token kept there.",
       "properties": {
         "destination": {
           "type": "string"
@@ -14533,6 +14533,12 @@
         },
         "tunnel": {
           "type": "boolean"
+        },
+        "provider": {
+          "$ref": "#/definitions/ProviderID"
+        },
+        "workspace": {
+          "type": "string"
         }
       },
       "required": [
@@ -19785,7 +19791,7 @@
     },
     "ProviderSSH": {
       "type": "object",
-      "description": "providers/ssh (#3398): the machine that carries a codespaces provider starts a codespace's agentsd over ssh (`start`), or reads its host key (`hostKey`), with the token it keeps. Its result is ProviderSSHResult.",
+      "description": "providers/ssh (#3398): the machine that carries a codespaces provider starts a codespace's agentsd over ssh (`start`), reads its host key (`hostKey`), or installs Agents in it with a host code from the control plane (`install`, #3497), with the token it keeps. Its result is ProviderSSHResult.",
       "properties": {
         "provider": {
           "$ref": "#/definitions/ProviderID"
@@ -19794,8 +19800,13 @@
           "type": "string",
           "enum": [
             "start",
-            "hostKey"
+            "hostKey",
+            "install"
           ]
+        },
+        "hostCode": {
+          "type": "string",
+          "description": "install's host code: the codespace runs the control plane's install.sh with it, from the address and pin it names."
         },
         "destination": {
           "type": "string"
