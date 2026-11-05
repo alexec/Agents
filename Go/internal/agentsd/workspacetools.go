@@ -63,7 +63,9 @@ func (d *Daemon) askWorkspacesCtx(ctx context.Context, agent wire.UUID, method s
 		return nil, &Error{Code: wire.FailureNotSupported, Message: "This machine isn’t on a control plane, so it has no machines."}
 	}
 	p, _ := json.Marshal(params)
-	out, err := (*ask)(ctx, "machine/machines", wire.MachineWorkspaceCall{Agent: d.agentWho(agent), Method: method, Params: json.RawMessage(p)})
+	call := wire.MachineWorkspaceCall{Agent: d.agentWho(agent), Method: method, Params: json.RawMessage(p),
+		Deliver: d.signedDelivery(agent, method, params)}
+	out, err := (*ask)(ctx, "machine/machines", call)
 	var refused *controllink.AskError
 	if errors.As(err, &refused) {
 		return nil, &Error{Code: refused.Code, Message: refused.Message}

@@ -108,6 +108,10 @@ func (r *fakeRouter) DeliverKept(method string, params json.RawMessage, client, 
 	return answer(host, method, params)
 }
 
+func (r *fakeRouter) DeliverSigned(d wire.LockDelivery, client, kind, host string, patience time.Duration) *Reply {
+	return r.DeliverKept(d.Method, json.RawMessage(d.Params), client, kind, host, patience)
+}
+
 func (r *fakeRouter) deliveries() []delivered {
 	r.mu.Lock()
 	defer r.mu.Unlock()

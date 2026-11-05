@@ -2,8 +2,10 @@ package agentsd
 
 import (
 	"bytes"
+	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"log"
 	"os"
 	"path/filepath"
@@ -19,9 +21,10 @@ import (
 // The machine lock (#3399, specs/3399-machine-lock): host/lock is the person's whole lock.
 // This host checks it, and pins the head it took in <root>/lock-pin.json; it takes only a
 // lock that grows from that pin. The first lock it is sent is taken on trust (D9), unless
-// the code it joined with carried the lock's head (D3): then it pins that one. Until
-// #3400's later steps it refuses nothing: a lock that fails the check is logged, and the
-// pin stays where it was.
+// the code it joined with carried the lock's head (D3): then it pins that one. A lock that
+// fails the check is logged, and the pin stays where it was. The lock it took is kept in
+// <root>/lock.json, so after a restart it checks requests before the control plane sends
+// the lock again (lockcheck.go, #3492).
 //
 // A machine joins the lock (#3491, D3): with the invite from its join code it signs its
 // own addMachine (host/lockAdd). With none (it asked to join, a provider started it with no
@@ -31,6 +34,7 @@ import (
 
 const (
 	lockPinFile   = "lock-pin.json"
+	lockFile      = "lock.json"
 	lockShownFile = "lock-join-shown"
 	// lockAskAgain is how long one request to join waits before the machine asks again, as
 	// the control plane's requests last.
@@ -41,6 +45,14 @@ type lockState struct {
 	lockMu sync.Mutex
 	// lockAsk is this machine's request to join the lock, while it waits.
 	lockAsk *lockAsk
+	// lockHeld is the lock this machine took last, checked; nil before it read one.
+	lockHeld *machinelock.State
+	lockRead bool
+	// lockSeen is each signed request taken, by machinelock.SignedID, and when it was
+	// signed, so each is taken once (lockcheck.go).
+	lockSeen map[string]int64
+	// lockSigner is this machine's key as a signer, read once.
+	lockSigner *ecdsa.PrivateKey
 }
 
 type lockAsk struct {
@@ -51,6 +63,48 @@ type lockAsk struct {
 }
 
 func (d *Daemon) lockPinPath() string { return filepath.Join(d.Store.Loc.Root, lockPinFile) }
+
+func (d *Daemon) lockFilePath() string { return filepath.Join(d.Store.Loc.Root, lockFile) }
+
+func fileExists(p string) bool {
+	_, err := os.Stat(p)
+	return err == nil
+}
+
+// heldLock is the lock this machine checks requests against, and whether it holds one at
+// all. pinned with a nil state is a lock pinned and not read yet: nothing is taken on it.
+func (d *Daemon) heldLock() (state *machinelock.State, pinned bool) {
+	d.lockMu.Lock()
+	defer d.lockMu.Unlock()
+	return d.heldLockLocked()
+}
+
+func (d *Daemon) heldLockLocked() (*machinelock.State, bool) {
+	if d.lockRead {
+		return d.lockHeld, d.lockHeld != nil
+	}
+	pin := d.LockPin()
+	if pin.Count == 0 {
+		return nil, false
+	}
+	var lock wire.Lock
+	b, err := os.ReadFile(d.lockFilePath())
+	if err == nil {
+		err = json.Unmarshal(b, &lock)
+	}
+	if err == nil {
+		state, ferr := machinelock.Follow(pin, lock)
+		if ferr == nil {
+			d.lockHeld, d.lockRead = state, true
+			return state, true
+		}
+		err = ferr
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		log.Printf("lock: the kept lock does not check (%v); waiting for the control plane's", err)
+	}
+	return nil, true
+}
 
 // LockPin is the head this host last took; zero when it has taken none.
 func (d *Daemon) LockPin() machinelock.Pin {
@@ -88,6 +142,12 @@ func (d *Daemon) TakeLock(lock wire.Lock) bool {
 	if err != nil {
 		log.Printf("lock: would refuse %s's lock of %d entries: %v", lock.Person, len(lock.Entries), err)
 		return false
+	}
+	d.lockHeld, d.lockRead = state, true
+	if b, err := json.Marshal(lock); err == nil && (state.Count() != kept.Count || !fileExists(d.lockFilePath())) {
+		if err := store.WriteAtomically(d.lockFilePath(), b, 0o644); err != nil {
+			log.Printf("lock: the lock could not be kept: %v", err)
+		}
 	}
 	if state.Count() != kept.Count {
 		b, _ := json.Marshal(state.Pin())

@@ -7,6 +7,31 @@ import type { Method, Params, Result } from "../protocol/methods";
 import { newMethodName, targetOf } from "../protocol/methods";
 import { type Admitted, connect, type LineSocket, Refused, WrongControlPlane } from "./auth";
 import { type KeyRecord, type KeyStore, UnsupportedBrowser } from "./keys";
+import { type Channel, finish, type LockSigner, names, newHello, sealed, signRequest } from "./lockChannel";
+import type { LockState } from "./machineLock";
+import { Failure, type LockHelloReply } from "../protocol/generated";
+
+/**
+ * The page's lock key and its checked lock (#3492), or null when it has none, or is not in
+ * its lock yet: then the page talks to machines as it did before the lock.
+ */
+export type LockSource = () => Promise<{ signer: LockSigner; state: LockState } | null>;
+
+/** A machine's checked channel (#3492, D6), opened at the first call to it on each connection. */
+interface RouteLock {
+  ready: Promise<Channel | null>;
+  channel: Channel | null;
+  /** The lock names this machine, so an answer with no MAC is not taken from it. */
+  required: boolean;
+  /** lock/hello's own id: its answer has no MAC, its signature is its proof. */
+  helloID: number;
+  /** Sends go out, and answers are read, one at a time and in order, so the counts do. */
+  sends: Promise<void>;
+  hears: Promise<void>;
+}
+
+/** What may be kept for a machine that is not there, and so goes signed when there is no channel. */
+const keptMethods = new Set(["agents/start", "agents/prompt"]);
 
 export type LinkState =
   | { kind: "connecting" }
@@ -184,6 +209,8 @@ export class Lines implements LineSocket {
   }
 }
 
+type Frame = { h?: string | undefined; m?: { id?: number | null | undefined; result?: unknown; error?: { code: number; message: string; data?: unknown }; method?: string; params?: unknown } | undefined };
+
 export class Link {
   private options: Required<Omit<LinkOptions, "open">> & { open: (url: string) => SocketLike };
   private socket: SocketLike | null = null;
@@ -201,6 +228,8 @@ export class Link {
   /** Counts dials, so a `/readyz` answer that comes after the next dial began is dropped. */
   private dials = 0;
   private stateListeners = new Set<(state: LinkState) => void>();
+  private lockSource: LockSource | null = null;
+  private routeLocks = new Map<string, RouteLock>();
   private noticeListeners = new Set<(method: string, params: unknown, host: string | null) => void>();
   state: LinkState = { kind: "connecting" };
 
@@ -233,6 +262,12 @@ export class Link {
 
   saveLockKey(pair: CryptoKeyPair): Promise<void> {
     return this.options.keys.saveLockKey(pair);
+  }
+
+  /** Checks every call to a machine end to end from now on (#3492): see LockSource. */
+  setLock(source: LockSource): void {
+    this.lockSource = source;
+    this.routeLocks.clear();
   }
 
   onState(listener: (state: LinkState) => void): () => void {
@@ -277,12 +312,19 @@ export class Link {
 
   /** Sends `method` to `host`, or to the control plane for its own methods. */
   call<M extends Method>(method: M, params: Params<M>, host?: string): Promise<Result<M>> {
-    if (this.state.kind !== "open" || !this.socket) return Promise.reject(new LinkDown());
+    return this.request(method, params, host).done;
+  }
+
+  private request<M extends Method>(method: M, params: Params<M>, host?: string): { id: number; done: Promise<Result<M>> } {
+    if (this.state.kind !== "open" || !this.socket) return { id: 0, done: Promise.reject(new LinkDown()) };
     const id = this.nextID++;
-    const message = { jsonrpc: "2.0", id, method: newMethodName(method), params };
+    const name = newMethodName(method);
+    // Written by hand, params last but for a MAC, so the bytes signed are the bytes sent.
+    const paramsText = JSON.stringify(params);
+    const text = `{"jsonrpc":"2.0","id":${id},"method":${JSON.stringify(name)}${paramsText === undefined ? "" : `,"params":${paramsText}`}}`;
     const route = targetOf(method) === "host" ? host ?? "mac" : null;
-    const line = route !== null ? JSON.stringify({ h: route, m: message }) : JSON.stringify({ m: message });
-    return new Promise<Result<M>>((resolve, reject) => {
+    const line = route !== null ? `{"h":${JSON.stringify(route)},"m":${text}}` : `{"m":${text}}`;
+    const done = new Promise<Result<M>>((resolve, reject) => {
       const timeout = callTimeoutFor(method, this.options.callTimeout === defaultCallTimeout ? undefined : this.options.callTimeout);
       const timer = setTimeout(() => {
         if (!this.pending.delete(id)) return;
@@ -294,7 +336,61 @@ export class Link {
         reject: (error) => { clearTimeout(timer); reject(error); },
         route,
       });
-      this.socket?.send(line);
+      if (route !== null && name !== "lock/hello" && this.lockSource) this.sendLocked(route, name, text, paramsText, id);
+      else this.socket?.send(line);
+    });
+    return { id, done };
+  }
+
+  /** The machine's channel, opened at the first call to it (#3492). */
+  private routeLock(route: string): RouteLock {
+    const had = this.routeLocks.get(route);
+    if (had) return had;
+    const lock: RouteLock = { ready: Promise.resolve(null), channel: null, required: false, helloID: 0, sends: Promise.resolve(), hears: Promise.resolve() };
+    this.routeLocks.set(route, lock);
+    lock.ready = (async () => {
+      const source = await this.lockSource?.().catch(() => null);
+      if (!source) {
+        // Not in the lock yet: as before the lock, and asked again at the next call.
+        if (this.routeLocks.get(route) === lock) this.routeLocks.delete(route);
+        return null;
+      }
+      // "mac" is the window's own machine, by no id of its own: any machine of the lock.
+      const id = route === "mac" ? "" : route;
+      lock.required = names(source.state, id);
+      try {
+        const hello = await newHello(source.signer);
+        const call = this.request("lock/hello", hello.params, route);
+        lock.helloID = call.id;
+        const channel = await finish(hello, source.state, id, (await call.done) as LockHelloReply);
+        if (this.routeLocks.get(route) === lock) lock.channel = channel;
+        return channel;
+      } catch (error) {
+        log("lock.noChannel", error instanceof CallFailed ? error.code : route);
+        return null;
+      }
+    })();
+    return lock;
+  }
+
+  /** A call to a machine: with the channel's MAC, or, with no channel, signed when it may be kept. */
+  private sendLocked(route: string, method: string, text: string, paramsText: string | undefined, id: number): void {
+    const lock = this.routeLock(route);
+    const socket = this.socket;
+    lock.sends = lock.sends.then(async () => {
+      const channel = await lock.ready;
+      let out = text;
+      if (channel) {
+        out = await channel.seal(text);
+      } else if (keptMethods.has(method) && route !== "mac" && paramsText !== undefined) {
+        const source = await this.lockSource?.().catch(() => null);
+        if (source) out = `${text.slice(0, -1)},"lock":${JSON.stringify(await signRequest(source.signer, route, method, paramsText))}}`;
+      }
+      if (this.socket === socket) socket?.send(`{"h":${JSON.stringify(route)},"m":${out}}`);
+    }).catch((error: unknown) => {
+      const pending = this.pending.get(id);
+      this.pending.delete(id);
+      pending?.reject(error instanceof Error ? error : new Error(String(error)));
     });
   }
 
@@ -403,12 +499,45 @@ export class Link {
   }
 
   private heard(line: string): void {
-    let frame: { h?: string; m?: { id?: number | null; result?: unknown; error?: { code: number; message: string; data?: unknown }; method?: string; params?: unknown } };
+    let frame: Frame;
     try {
       frame = JSON.parse(line);
     } catch {
       return;
     }
+    const lock = frame.h ? this.routeLocks.get(frame.h) : undefined;
+    if (lock && (lock.channel || lock.required)) {
+      lock.hears = lock.hears.then(() => this.heardLocked(line, frame, lock)).catch(() => undefined);
+      return;
+    }
+    this.take(frame);
+  }
+
+  /** A line from a machine with a channel, or one the lock names (#3492): an answer is taken only with its MAC. */
+  private async heardLocked(line: string, frame: Frame, lock: RouteLock): Promise<void> {
+    const message = frame.m;
+    const answer = typeof message?.id === "number" && message.id !== lock.helloID && (message.result !== undefined || message.error);
+    if (!answer || !message) return this.take(frame);
+    const at = line.indexOf(',"m":');
+    const text = at > 0 ? line.slice(at + 5, -1) : "";
+    if (sealed(text)) {
+      try {
+        if (!lock.channel) throw new Error("no channel");
+        return this.take({ h: frame.h, m: JSON.parse(await lock.channel.open(text)) });
+      } catch {
+        return this.take({ h: frame.h, m: { id: message.id, error: { code: Failure.notInLock, message: "The machine's answer does not check, so it was not taken." } } });
+      }
+    }
+    if (message.result !== undefined) {
+      return this.take({ h: frame.h, m: { id: message.id, error: { code: Failure.notInLock, message: "The machine's answer was not signed, so it was not taken." } } });
+    }
+    // The control plane's own refusal (offline, not routed) has no MAC, and is taken. The
+    // machine's refusal of a request it had no channel for opens one again at the next call.
+    if (message.error?.code === Failure.notInLock && frame.h && this.routeLocks.get(frame.h) === lock) this.routeLocks.delete(frame.h);
+    this.take(frame);
+  }
+
+  private take(frame: Frame): void {
     const message = frame.m;
     if (!message) return;
     if (message.id === null && message.error) {
@@ -439,6 +568,11 @@ export class Link {
     if (typeof message.method === "string") {
       // The close that follows is a suspension (#1002, D13), whatever its reason says.
       if (message.method === "control/cutOff") this.cutOff = true;
+      // A machine that went or came back has new channels: its next call opens one again.
+      if (message.method === "control/hostChanged") {
+        const host = (message.params as { host?: unknown } | null)?.host;
+        if (typeof host === "string") this.routeLocks.delete(host);
+      }
       for (const listener of this.noticeListeners) listener(message.method, message.params, frame.h ?? null);
     }
   }
@@ -469,6 +603,7 @@ export class Link {
   }
 
   private failPending(): void {
+    this.routeLocks.clear();
     for (const pending of this.pending.values()) pending.reject(new LinkDown());
     this.pending.clear();
   }

@@ -114,6 +114,66 @@ always `operator`, which an older copy, machine, Remote or web page reads as eve
 record written before as `device` is read as a full client. An older window that tries to
 change a grant is told there is nothing to change.
 
+## What the control plane can and cannot do
+
+Each person has a **machine lock** (#3399, `specs/3399-machine-lock`): a chain of entries,
+each signed by one of the person's own devices, that says which clients and which machines
+are theirs. The control plane keeps the chain but cannot sign an entry. Each client and each
+machine checks the chain and keeps the newest entry it saw, so a chain that the control
+plane changed, put in another order or kept back does not check.
+
+A machine that holds its person's lock takes a request from the control plane only when a
+key of the lock vouches for it (#3492):
+
+- **A channel.** When a client first calls a machine on a connection, it opens a channel
+  with `lock/hello`: a new ECDH key, signed with its lock key. The machine answers with one
+  of its own, signed with its machine key, and each checks the other against the lock. Every
+  request and every answer then carries an HMAC and a count. The machine refuses a request
+  with no HMAC, a bad one, or a count it saw before. The client takes an answer only with
+  the machine's HMAC, so the control plane cannot forge what a machine said.
+- **A signed request.** A prompt or a start for a machine that is away is signed by the
+  client itself, and the control plane keeps it as it came. The machine takes it once, when
+  it connects, at most a day later.
+- **Another of your machines.** When an agent starts a session on another of your machines
+  (`start_session`), calls the session it started, or sends or brings back a folder, its
+  machine signs the call. The other machine takes only those calls from a machine, not a
+  terminal or any other file.
+- **What the control plane asks for itself.** It may ask a machine whether it is there, for
+  its list of sessions and worktrees (the Console, a project, a report), for a backup before
+  you remove it, and to clone the folders of a new workspace. None of these starts an agent,
+  runs a command or reads a file.
+
+Everything else is refused with `notInLock` (-32104). A machine with no lock yet takes what
+it took before, so nothing stops working until the person has a lock. A device that is not
+in the lock yet is refused until one of the person's other devices approves it.
+
+| It can | It cannot |
+|---|---|
+| route, or refuse to route, any request | add a client or a machine to a lock |
+| read requests and answers (they are signed, not encrypted) | send a request that a machine takes as a client's |
+| keep the chain, and keep it back from a machine | change or remove an entry, or put one in a different order |
+| sign the org policy, which can only make a machine do less | give a client a machine key of its own to seal to |
+| ask a machine for its sessions and worktrees, a backup, or a clone, as above | start an agent, run a command or read a file on a machine |
+| fire a workflow that you set up on a machine, when its event comes | change what a machine answers |
+| serve a changed web page (below) | sign with a Mac's or a phone's key |
+
+**The limits.**
+
+- **The web page.** The control plane serves the web page. A control plane that serves a
+  changed page can use that browser's key while the page is open. Every web product with
+  keys in the browser has this limit. The Mac window and the Remote are signed apps, so they
+  do not have it.
+- **What a machine says unasked** (an agent's changes, a question card) is not signed in
+  this release: a control plane can show a client a card that the machine did not raise. Your
+  answer to it is a signed request, which the machine checks.
+- **Who did it, in the audit,** is still the control plane's word. The machine knows which of
+  your devices sent a request by its key.
+- **A denial of service.** The control plane can always refuse to route anything.
+
+`daemon.sock`, on the machine itself, is not checked: only the machine's own user reaches it.
+The window's direct socket on a Mac is checked as a channel from the control plane is.
+
+## Key lifetimes and rotation
 ## Key lifetimes and rotation
 
 A client's or a machine's key expires 90 days after it was paired (#997). The control

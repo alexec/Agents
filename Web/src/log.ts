@@ -5,7 +5,9 @@ export type LogEvent =
   | "link.connecting" | "link.open" | "link.down" | "link.forgotten" | "link.refused"
   | "link.wrongControlPlane" | "link.unsupported" | "link.newKey" | "pair.ok" | "pair.fromLink" | "pair.failed" | "call.failed" | "call.timedOut"
   // Org identity (#1002): a suspension, and the org sign-in.
-  | "link.suspended" | "pair.ask" | "pair.org" | "pair.orgFailed" | "pair.suspended" | "signIn.orgStart" | "signIn.providersFailed";
+  | "link.suspended" | "pair.ask" | "pair.org" | "pair.orgFailed" | "pair.suspended" | "signIn.orgStart" | "signIn.providersFailed"
+  // The machine lock (#3492): no checked channel to a machine, and calls to it go as before.
+  | "lock.noChannel";
 
 /** `code` is a refusal reason, a JSON-RPC error number, or a close code. */
 export function log(event: LogEvent, code?: string | number): void {

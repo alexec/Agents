@@ -344,7 +344,9 @@ final class RemoteModel {
 
     init(link: any DaemonLink) {
         baseLink = link
-        client = DaemonClient(link: link)
+        // Each request to the home host checked end to end once this device is in its lock (#3492).
+        let lock = lock
+        client = DaemonClient(link: LockedLink(link, host: .mac) { await lock.channelSigner() })
         files = RemoteFiles(client: client)
         pictures = PhonePictures(files: files)
         // From the start, not once connected: a banner tapped to launch or wake the app
@@ -2260,8 +2262,10 @@ final class RemoteModel {
             problem = "The control plane isn’t answering, so that was not sent."
             return nil
         }
+        // Signed by this device, so a host that holds the lock takes it when it connects (#3492).
+        let signed = await lock.channelSigner().flatMap { try? LockChannel.delivery($0.key, to: host.rawValue, method: method, params: params) }
         do {
-            _ = try await control.call(DaemonAPI.Method.hostsKeep, DaemonAPI.KeepRequest(host: host, method: method, params: params))
+            _ = try await control.call(DaemonAPI.Method.hostsKeep, DaemonAPI.KeepRequest(host: host, method: method, params: params, signed: signed))
             return nil
         } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.kept {
             guard let said = try? error.data?.decode(DaemonAPI.KeptRequest.self) else { return nil }
@@ -2516,7 +2520,8 @@ final class RemoteModel {
         RemoteControl.keepRelayKey(status.relayKey)
         let others = listed.filter { $0.id != status.homeHost && $0.answers && $0.runsAgents }
         for host in others {
-            let other = otherHosts[host.id] ?? DaemonClient(link: link.link(for: host.id))
+            let lock = lock
+            let other = otherHosts[host.id] ?? DaemonClient(link: LockedLink(link.link(for: host.id), host: host.id) { await lock.channelSigner() })
             otherHosts[host.id] = other
             if await other.isConnected { continue }
             reachableHosts.remove(host.id)

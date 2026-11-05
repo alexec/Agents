@@ -1220,14 +1220,17 @@ final class AppModel {
     /// A host's link: through the control plane, and first directly over the host's local
     /// socket when it may be on this Mac (#1118). The host's own answer says whether it is
     /// the one asked for, so `.mac` is tried even before the control plane has listed it.
+    /// Each request on it is checked end to end once this Mac is in its lock (#3492).
     private func hostLink(_ host: MachineRef, through controlLink: ControlLink, onThisMac: Bool = true) -> any DaemonLink {
         let fallback = controlLink.link(for: host)
+        let lock = lock
         guard onThisMac, let endpoint = ControlConfig.endpoint, let local = ControlConfig.localLink(endpoint, host: host) else {
-            return fallback
+            return LockedLink(fallback, host: host) { await lock.channelSigner() }
         }
-        return LocalFirstLink(local: local, fallback: fallback) { [weak self] direct in
+        let first = LocalFirstLink(local: local, fallback: fallback) { [weak self] direct in
             Task { @MainActor in self?.wentDirect(host, direct) }
         }
+        return LockedLink(first, host: host) { await lock.channelSigner() }
     }
 
     private func wentDirect(_ host: MachineRef, _ direct: Bool) {
@@ -3689,9 +3692,11 @@ final class AppModel {
             problem = "Not sent — the control plane can’t be reached."
             return nil
         }
+        // Signed by this Mac, so a host that holds the lock takes it when it connects (#3492).
+        let signed = await lock.channelSigner().flatMap { try? LockChannel.delivery($0.key, to: host.rawValue, method: method, params: params) }
         do {
             _ = try await controlRequests.call(DaemonAPI.Method.hostsKeep,
-                                               DaemonAPI.KeepRequest(host: host, method: method, params: params))
+                                               DaemonAPI.KeepRequest(host: host, method: method, params: params, signed: signed))
             return nil
         } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.kept {
             return noteKept(error)

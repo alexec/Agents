@@ -28,6 +28,8 @@ type message struct {
 	Params  json.RawMessage `json:"params,omitempty"`
 	Result  json.RawMessage `json:"result,omitempty"`
 	Error   *Error          `json:"error,omitempty"`
+	// Lock is a request's LockSignature, when its sender signed it (lockcheck.go).
+	Lock json.RawMessage `json:"lock,omitempty"`
 }
 
 // Error is a JSON-RPC error, with DaemonAPI's codes.
@@ -69,12 +71,31 @@ type Client struct {
 	d    *Daemon
 	// actor is who the control plane says this connection's calls are from (#1751).
 	actor *wire.AuditActor
+	// checked: the connection's requests are checked against the lock (lockcheck.go), and
+	// lock is its channel once a client opened one.
+	checked bool
+	lock    clientLock
 }
 
 func (c *Client) send(v any) {
 	b, err := json.Marshal(v)
 	if err != nil {
 		log.Printf("encode: %v", err)
+		return
+	}
+	_ = c.conn.Write(string(b))
+}
+
+// answer sends a reply, with the channel's MAC when a client opened one, so the control
+// plane cannot forge what this machine said.
+func (c *Client) answer(m message) {
+	b, err := json.Marshal(m)
+	if err != nil {
+		log.Printf("encode: %v", err)
+		return
+	}
+	if ch := c.lock.get(); ch != nil {
+		_ = ch.SealThen(string(b), c.conn.Write)
 		return
 	}
 	_ = c.conn.Write(string(b))
@@ -119,7 +140,7 @@ var nextClient atomic.Int64
 
 // Accept serves one connection until it closes.
 func (d *Daemon) Accept(conn controllink.Conn) {
-	c := &Client{ID: nextClient.Add(1), Role: roleOf(conn), conn: conn, d: d, actor: actorOf(conn)}
+	c := &Client{ID: nextClient.Add(1), Role: roleOf(conn), conn: conn, d: d, actor: actorOf(conn), checked: lockChecked(conn)}
 	// Only a person's connection is one the host speaks to unasked (roles.go).
 	if c.Role.HearsNotifications() {
 		d.addClient(c)
@@ -127,7 +148,12 @@ func (d *Daemon) Accept(conn controllink.Conn) {
 	}
 	for line := range conn.In() {
 		var m message
-		if err := json.Unmarshal([]byte(line), &m); err != nil {
+		if c.checked {
+			var ok bool
+			if m, ok = d.readChecked(c, line); !ok {
+				continue
+			}
+		} else if err := json.Unmarshal([]byte(line), &m); err != nil {
 			c.send(message{JSONRPC: "2.0", ID: json.RawMessage("null"), Error: &Error{Code: CodeParse, Message: "parse error"}})
 			continue
 		}
@@ -162,15 +188,15 @@ func (d *Daemon) dispatch(c *Client, m message) {
 		if !errors.As(err, &re) {
 			re = &Error{Code: CodeServer, Message: err.Error()}
 		}
-		c.send(message{JSONRPC: "2.0", ID: m.ID, Error: re})
+		c.answer(message{JSONRPC: "2.0", ID: m.ID, Error: re})
 		return
 	}
 	b, merr := json.Marshal(result)
 	if merr != nil {
-		c.send(message{JSONRPC: "2.0", ID: m.ID, Error: &Error{Code: CodeInternal, Message: merr.Error()}})
+		c.answer(message{JSONRPC: "2.0", ID: m.ID, Error: &Error{Code: CodeInternal, Message: merr.Error()}})
 		return
 	}
-	c.send(message{JSONRPC: "2.0", ID: m.ID, Result: b})
+	c.answer(message{JSONRPC: "2.0", ID: m.ID, Result: b})
 }
 
 func (d *Daemon) logUnknown(method string) {
@@ -204,6 +230,8 @@ type sockConn struct {
 	once sync.Once
 	in   chan string
 	role Role
+	// local: the window's local socket (localpath.go), checked against the lock.
+	local bool
 }
 
 func newSockConn(c net.Conn, role Role) *sockConn {

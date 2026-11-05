@@ -11092,7 +11092,7 @@
       },
     "KeepRequest": {
       "type": "object",
-      "description": "hosts/keep: a request for a stopped host, kept until it is up.",
+      "description": "hosts/keep: a request for a stopped host, kept until it is up. signed is the same request signed by the client (#3492, D6): a host that holds its person's lock takes only that, so the control plane keeps and delivers it as it is.",
       "properties": {
         "host": {
           "$ref": "#/definitions/MachineRef"
@@ -11102,6 +11102,9 @@
         },
         "params": {
           "$ref": "#/definitions/JSONValue"
+        },
+        "signed": {
+          "$ref": "#/definitions/LockDelivery"
         }
       },
       "required": [
@@ -12017,6 +12020,27 @@
       ],
       "additionalProperties": false
     },
+    "LockDelivery": {
+      "type": "object",
+      "description": "A request signed for a machine (#3492), as the control plane keeps it and delivers it: the method, the params as the sender wrote them (text, so no byte of them changes on the way), and the signature.",
+      "properties": {
+        "method": {
+          "type": "string"
+        },
+        "params": {
+          "type": "string"
+        },
+        "lock": {
+          "$ref": "#/definitions/LockSignature"
+        }
+      },
+      "required": [
+        "method",
+        "params",
+        "lock"
+      ],
+      "additionalProperties": false
+    },
     "LockEntry": {
       "type": "object",
       "description": "One entry of a machine lock (#3399): body is a LockBody's JSON, kept as the signer wrote it, so no language has to write it again the same way. sig is ECDSA P-256 with SHA-256 over \"agents-lock/1\\n\" then body, the 64 bytes r then s (as WebCrypto and CryptoKit's rawRepresentation write it). The entry's hash is the SHA-256 of body.",
@@ -12070,6 +12094,48 @@
       "required": [
         "count",
         "head"
+      ],
+      "additionalProperties": false
+    },
+    "LockHello": {
+      "type": "object",
+      "description": "lock/hello (#3492, specs/3399-machine-lock D6): a client opens a checked channel to a machine. key is its signing key (P-256, X9.63), which the machine's lock must name as a client; ephemeral is a new ECDH P-256 key for this channel alone; sig is ECDSA P-256 (r then s) with SHA-256 over \"agents-lock-channel/1\\nclient\\n\" then ephemeral.",
+      "properties": {
+        "key": {
+          "$ref": "#/definitions/Base64"
+        },
+        "ephemeral": {
+          "$ref": "#/definitions/Base64"
+        },
+        "sig": {
+          "$ref": "#/definitions/Base64"
+        }
+      },
+      "required": [
+        "key",
+        "ephemeral",
+        "sig"
+      ],
+      "additionalProperties": false
+    },
+    "LockHelloReply": {
+      "type": "object",
+      "description": "lock/hello's answer (#3492): key is the machine's own key, which the client's lock must name as an addMachine; ephemeral is the machine's new ECDH P-256 key; sig is ECDSA with the machine's key over \"agents-lock-channel/1\\nmachine\\n\", the client's ephemeral, the machine's ephemeral, then the client's key. Each side then makes a key for each direction with HKDF-SHA256 (the ECDH secret; salt the client's then the machine's ephemeral; info \"agents-lock-channel/1 client\" or \"… machine\"), and every request and answer carries \"lock\":{\"n\":…,\"mac\":…} last: HMAC-SHA256 over the count (8 bytes, big-endian) then the message without that member.",
+      "properties": {
+        "key": {
+          "$ref": "#/definitions/Base64"
+        },
+        "ephemeral": {
+          "$ref": "#/definitions/Base64"
+        },
+        "sig": {
+          "$ref": "#/definitions/Base64"
+        }
+      },
+      "required": [
+        "key",
+        "ephemeral",
+        "sig"
       ],
       "additionalProperties": false
     },
@@ -12200,6 +12266,30 @@
       "required": [
         "request",
         "expires"
+      ],
+      "additionalProperties": false
+    },
+    "LockSignature": {
+      "type": "object",
+      "description": "A request signed by its sender's own key (#3492, D6, D7): a client's kept request for a machine that is not there, or a machine's call to another of its person's machines. It goes as the request's \"lock\" member. sig is ECDSA P-256 (r then s) with SHA-256 over \"agents-lock-request/1\\n\", to, \"\\n\", at in decimal, \"\\n\", the method, \"\\n\", then the params as sent. to is the machine's id; a machine may leave it out for another machine it named by name. at is seconds since 1970. The machine refuses one whose key its lock does not name, older than a day, or seen before.",
+      "properties": {
+        "to": {
+          "type": "string"
+        },
+        "at": {
+          "type": "integer"
+        },
+        "key": {
+          "$ref": "#/definitions/Base64"
+        },
+        "sig": {
+          "$ref": "#/definitions/Base64"
+        }
+      },
+      "required": [
+        "at",
+        "key",
+        "sig"
       ],
       "additionalProperties": false
     },
@@ -14802,7 +14892,7 @@
     },
     "MachineWorkspaceCall": {
       "type": "object",
-      "description": "host/machines, for an agent there: who asked, for the log, and its call.",
+      "description": "host/machines, for an agent there: who asked, for the log, and its call. deliver is what the other machine is to get, signed by this one (#3492, D7): the control plane delivers it as it is, in place of its own words.",
       "properties": {
         "agent": {
           "type": "string"
@@ -14812,6 +14902,9 @@
         },
         "params": {
           "$ref": "#/definitions/JSONValue"
+        },
+        "deliver": {
+          "$ref": "#/definitions/LockDelivery"
         }
       },
       "required": [

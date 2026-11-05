@@ -17,6 +17,7 @@ import {
   b64, commitment, digits, follow, fromBase64, inviteCode, isClient, LockCheckError, lockClientKind, makeInviteKey, makeSigningKey,
   newNonce, sign, signedRecipients, wireNow, zeroPin, type LockPin, type LockState,
 } from "../wire/machineLock";
+import type { LockSigner } from "../wire/lockChannel";
 
 /** What the model needs of the link: the control plane's calls and this page's keys. */
 export interface LockLink {
@@ -118,6 +119,8 @@ export class MachineLock {
   /** The nonce this browser sent for each request, kept only in memory. */
   private readonly sent = new Map<string, Uint8Array>();
   private rows: LockJoinRequest[] = [];
+  /** The lock as this page last checked it. */
+  private state: LockState | null = null;
   private running: Promise<void> | null = null;
   private again = false;
   private timer: ReturnType<typeof setTimeout> | undefined;
@@ -163,6 +166,19 @@ export class MachineLock {
     }
   }
 
+  /**
+   * This page's lock key and its checked lock, for the channels it opens to machines (#3492,
+   * D6); null until this page is in its lock, and then it talks to machines as before.
+   */
+  async signer(): Promise<{ signer: LockSigner; state: LockState } | null> {
+    if (this.running) await this.running;
+    const state = this.state;
+    if (this.device.value.kind !== "member" || !state || !this.key) return null;
+    const member = state.member(this.key.publicRaw);
+    if (!member || !isClient(member)) return null;
+    return { signer: { privateKey: this.key.pair.privateKey, publicRaw: this.key.publicRaw }, state };
+  }
+
   private async signingKey(): Promise<{ pair: CryptoKeyPair; publicRaw: Uint8Array }> {
     if (this.key) return this.key;
     let pair = await this.link.lockKey();
@@ -180,6 +196,7 @@ export class MachineLock {
     try {
       const state = await follow(this.pins.load(), lock);
       this.pins.save(state.pin());
+      this.state = state;
       return { lock, state };
     } catch (error) {
       if (!(error instanceof LockCheckError)) throw error;
