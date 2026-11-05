@@ -236,8 +236,9 @@ pace is 3 s and a poll costs Slack nothing. A cursor from an earlier run starts 
   `chat.update` puts who answered in their place). No `@channel`, `@here` or `@everyone`.
 
 The tests run it against a fake Web API and Socket Mode over a WebSocket (`fake_test.go`).
-Agents Host does not carry it yet, and the catalogue does not list it:
-`docs/how-to/reach-agents-from-slack.md` adds it by hand.
+Agents Host carries it (`scripts/go-github-mcp.sh slack-mcp`) and every Linux host installs
+`slack-mcp-linux-<arch>` (#3475); the catalogue lists it as `agents/slack`, which asks for
+the two tokens as secrets. See `docs/how-to/reach-agents-from-slack.md`.
 
 ## The command machine provider (`workspace-commands`, #691, #1364)
 

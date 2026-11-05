@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac]
-description: Make a Slack app for Agents, run the slack server with its two tokens, and let a workflow start an agent from a Slack message or a question's answer.
+description: Make a Slack app for Agents, add the Slack connector with its two tokens, and let a workflow start an agent from a Slack message or a question's answer.
 ---
 
 # Reach agents from Slack
@@ -33,11 +33,7 @@ asks the person whose sign-in email is that email.
 ## Before you start
 
 - A Slack workspace where you can make and install an app.
-- `slack-mcp` built for this Mac. Agents Host does not carry it yet. From the repository:
-
-  ```sh
-  GOOS=darwin GOARCH=arm64 Go/scripts/go.sh build -o slack-mcp ./cmd/slack-mcp
-  ```
+- Agents Host carries `slack-mcp`, and every Linux host installs it beside agentsd.
 
 ## Make the Slack app
 
@@ -88,12 +84,17 @@ asks the person whose sign-in email is that email.
 
 ## Add the connector
 
-1. Open **Settings ▸ Agent Configuration ▸ Connectors**, choose **Add Connector… ▸ Add by
-   hand…**, and give it the name `slack`.
-2. **Local command**: the path to `slack-mcp`.
-3. **Add variable** `SLACK_BOT_TOKEN` with the `xoxb-` token, and `SLACK_APP_TOKEN` with the
-   `xapp-` token. Tick **Secret** on both: their values go to `~/.agents-secrets/secrets.env`.
-4. Choose **Verify**, then **Add**. See [Add a connector by hand](add-a-connector-by-hand.md).
+1. Add **Slack** from the **Agents** marketplace in the catalogue (**Settings ▸ Agent
+   Configuration ▸ Connectors ▸ Add Connector…**, or **Change… ▸ Slack…** in the connectors
+   set-up's **Messaging** slot).
+2. It asks for `SLACK_BOT_TOKEN`, the `xoxb-` token, and `SLACK_APP_TOKEN`, the `xapp-`
+   token. Their values go to `~/.agents-secrets/secrets.env`.
+3. Choose **Add**. The entry it writes runs `slack-mcp` hosted, one copy on the host:
+
+   ```json
+   { "mcpServers": { "slack": { "command": "slack-mcp", "hosted": true,
+     "env": { "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}", "SLACK_APP_TOKEN": "${SLACK_APP_TOKEN}" } } } }
+   ```
 
 ## Start work from Slack
 
