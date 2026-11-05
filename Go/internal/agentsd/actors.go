@@ -1,6 +1,7 @@
 package agentsd
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/alexec/agents/Go/internal/controllink"
@@ -9,7 +10,8 @@ import (
 
 // Who did it (#1751, spec 736 FR-040): the control plane gives each channel the actor of
 // the client it opened it for (ChannelOpen.actor, #996), and the events a person's call
-// raises carry it into events.jsonl. A client's own word for who it is is never read.
+// raises carry it into events.jsonl. Once a client of the lock opens a checked channel, its
+// lock member names the client (#3543). A client's own word for who it is is never read.
 // What an agent, a workflow or the machine does carries none.
 
 // actorOf is the actor the control plane gave a connection; nil on daemon.sock, and from
@@ -19,6 +21,28 @@ func actorOf(conn any) *wire.AuditActor {
 		return a.Actor()
 	}
 	return nil
+}
+
+// actor is who a connection's calls are from. On a checked channel whose lock member names
+// its client id (#3543), the client is the lock's word, not the control plane's: the hello
+// refused a channel whose ids differ, and the name is the one a signer put on the lock.
+func (c *Client) actor() *wire.AuditActor {
+	ch := c.lock.get()
+	if c.said == nil || ch == nil || ch.Member.ID == "" {
+		return c.said
+	}
+	a := *c.said
+	a.Client = new(wire.UUID(ch.Member.ID))
+	if ch.Member.Name != "" {
+		a.ClientName = new(ch.Member.Name)
+	}
+	return &a
+}
+
+// sameClient says the lock member's client id is the control plane's for the channel: the
+// UUIDs are the same, whatever their case.
+func sameClient(member string, said *wire.AuditActor) bool {
+	return said == nil || said.Client == nil || strings.EqualFold(member, string(*said.Client))
 }
 
 // actorBook is the person whose call acted on an agent, until the event it raises (now,

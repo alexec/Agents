@@ -310,7 +310,9 @@ It is read only.
   acted on (`agents/stop · <agent>`).
 - **The control plane writes the actor itself.** It uses the client it knows the call came
   from. It ignores an actor that a client puts in its request. It also gives the actor to
-  the host when it opens the client's channel (`ChannelOpen.actor`).
+  the host when it opens the client's channel (`ChannelOpen.actor`). Once the client opens a
+  checked channel (`lock/hello`), the host takes the client's id and name from its lock entry
+  instead, and refuses the channel when the two ids differ (#3543).
 - **The host writes it into `events.jsonl` (#1751).** An event that a person's call
   raised carries that channel's actor as `actor`, and its detail shows a **By** row on all
   three clients: `agent.started` from `agents/start`, `agent.stopped` from `agents/stop`,

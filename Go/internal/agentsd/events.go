@@ -828,7 +828,7 @@ func (d *Daemon) registerEvents() {
 		if p := draftProblem(r.Draft); p != "" {
 			return wire.Event{}, eventRefused(p)
 		}
-		e := d.raiseAs(r.Draft, c.actor)
+		e := d.raiseAs(r.Draft, c.actor())
 		for _, c := range r.Consequences {
 			d.addConsequence(c, e.Position)
 		}
@@ -851,6 +851,6 @@ func (d *Daemon) registerEvents() {
 			name, sentence = "server.online", server+" came back."
 		}
 		return d.raiseAs(wire.EventDraft{Name: name, At: now(), Scope: macScope(), Sentence: sentence,
-			Details: map[string]string{"server": server}}, c.actor), nil
+			Details: map[string]string{"server": server}}, c.actor()), nil
 	})
 }

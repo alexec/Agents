@@ -265,7 +265,7 @@ export class MachineLock {
     if (!read) return;
     if (read.lock.entries.length === 0) {
       const root = await sign(pair.privateKey, publicRaw, {
-        kind: "root", person: read.lock.person, at: this.now(), key: b64(publicRaw), clientKind: "web",
+        kind: "root", person: read.lock.person, at: this.now(), key: b64(publicRaw), id: this.client, clientKind: "web",
       });
       // The recovery key goes on with the root, and is shown once (D4).
       const made = await makeRecovery();
@@ -383,7 +383,7 @@ export class MachineLock {
         const key = await openRecovery(secret, recovery, recoverySealed);
         const entry = await sign(key, recovery, {
           kind: "addClient", person: read.state.person, previous: b64(read.state.head), at: this.now(), key: b64(publicRaw),
-          clientKind: "web",
+          ...(this.client ? { id: this.client } : {}), clientKind: "web",
         });
         try {
           await this.link.call("lock/add", { entries: [entry] });
@@ -534,7 +534,7 @@ export class MachineLock {
           }
           : {
             kind: "addClient", person: read.state.person, previous: b64(read.state.head), at: this.now(), key: row.key,
-            name: row.name, clientKind: lockClientKind(row.kind),
+            id: row.client, name: row.name, clientKind: lockClientKind(row.kind),
           });
         try {
           await this.link.call("lock/add", { entries: [entry] });

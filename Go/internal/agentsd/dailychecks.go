@@ -531,7 +531,7 @@ func (d *Daemon) registerSuggestions() {
 		}
 		id, err := d.startAs(wire.StartRequest{RuntimeID: autoRuntimeID, Cwd: store.FolderURL(folder), Prompt: s.Prompt,
 			Attachments: []wire.Attachment{}, StartOptions: wire.StartOptions{Values: map[string]wire.JSONValue{}, ExtraArguments: []string{}},
-			AdditionalDirectories: []wire.URL{}, McpServers: []wire.MCPServer{}, Labels: []string{}}, c.actor)
+			AdditionalDirectories: []wire.URL{}, McpServers: []wire.MCPServer{}, Labels: []string{}}, c.actor())
 		if err != nil {
 			return "", err
 		}

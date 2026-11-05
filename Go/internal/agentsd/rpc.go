@@ -69,8 +69,9 @@ type Client struct {
 	Role Role
 	conn controllink.Conn
 	d    *Daemon
-	// actor is who the control plane says this connection's calls are from (#1751).
-	actor *wire.AuditActor
+	// said is who the control plane says this connection's calls are from (#1751); actor()
+	// is who they are from.
+	said *wire.AuditActor
 	// checked: the connection's requests are checked against the lock (lockcheck.go), and
 	// lock is its channel once a client opened one.
 	checked bool
@@ -141,7 +142,7 @@ var nextClient atomic.Int64
 
 // Accept serves one connection until it closes.
 func (d *Daemon) Accept(conn controllink.Conn) {
-	c := &Client{ID: nextClient.Add(1), Role: roleOf(conn), conn: conn, d: d, actor: actorOf(conn), checked: lockChecked(conn)}
+	c := &Client{ID: nextClient.Add(1), Role: roleOf(conn), conn: conn, d: d, said: actorOf(conn), checked: lockChecked(conn)}
 	// Only a person's connection is one the host speaks to unasked (roles.go).
 	if c.Role.HearsNotifications() {
 		d.addClient(c)

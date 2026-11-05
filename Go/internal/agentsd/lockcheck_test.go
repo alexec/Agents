@@ -31,7 +31,7 @@ func lockedMachine(t *testing.T) (d *Daemon, phone, peer *ecdsa.PrivateKey, stat
 		}
 		c = append(c, e)
 	}
-	add(wire.LockBody{Kind: wire.LockEntryKindAddClient, Key: machinelock.PublicKey(phone)})
+	add(wire.LockBody{Kind: wire.LockEntryKindAddClient, Key: machinelock.PublicKey(phone), ID: new(phoneClient), Name: new("Sam’s iPhone")})
 	add(wire.LockBody{Kind: wire.LockEntryKindAddMachine, Key: key, SealingKey: key, ID: new("h-1")})
 	add(wire.LockBody{Kind: wire.LockEntryKindAddMachine, Key: machinelock.PublicKey(peer), SealingKey: machinelock.PublicKey(peer), ID: new("h-2")})
 	if !d.TakeLock(wire.Lock{Person: "sam", Entries: c}) {
@@ -40,6 +40,9 @@ func lockedMachine(t *testing.T) (d *Daemon, phone, peer *ecdsa.PrivateKey, stat
 	state, _ = d.heldLock()
 	return d, phone, peer, state
 }
+
+// phoneClient is the phone's client id, as the signer put it on the lock (#3543).
+const phoneClient = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 
 // channelTo is a channel the control plane opened for a client: what the machine says
 // comes back as it came, MAC and all.
@@ -370,5 +373,48 @@ func TestTheControlPlaneStopsOnlyADraftsWriter(t *testing.T) {
 	cp.send(requestLine(3, wire.CallAgentsStop.Name, wire.AgentStopRequest{AgentID: writer.ID}))
 	if line := cp.answer(t, 3); notInLockAnswer(line) {
 		t.Fatalf("the control plane could not stop its draft's writer: %s", line)
+	}
+}
+
+// #3543: who did it names the device from the lock. The machine refuses a channel that the
+// control plane opened for another client than the lock's key, and writes the lock member's
+// client and name into the event; the person stays the control plane's word.
+func TestTheAuditNamesTheDeviceFromTheLock(t *testing.T) {
+	d, phone, _, state := lockedMachine(t)
+	d.RaiseByHand = true
+	said := func(client string) actorConn {
+		name, id := "Not the phone", wire.UUID(client)
+		c := actorConn{newConn(), &wire.AuditActor{User: "sam", Client: &id, ClientName: &name}}
+		go d.Accept(c)
+		t.Cleanup(func() { close(c.in) })
+		return c
+	}
+
+	// The control plane opens the channel for another of sam's clients: the hello is refused.
+	other := said("11111111-2222-3333-4444-555555555555")
+	h, _ := machinelock.NewHello(phone)
+	other.send(requestLine(1, wire.CallLockHello.Name, h.Params))
+	if line := other.answer(t, 1); !notInLockAnswer(line) {
+		t.Fatalf("a channel for another client was taken: %s", line)
+	}
+
+	// For the phone, in another case: taken, and the event names the phone as the lock does.
+	c := said(strings.ToUpper(phoneClient))
+	ch := hello(t, c.conn, state, phone)
+	draft := map[string]any{"name": "branch.moved", "at": now(), "scope": map[string]any{"mac": map[string]any{}},
+		"sentence": "moved.", "details": map[string]any{}, "chainDepth": 0}
+	c.send(ch.Seal(requestLine(2, "events/raise", map[string]any{"draft": draft})))
+	body, err := ch.Open(c.answer(t, 2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m struct{ Result wire.Event }
+	if err := json.Unmarshal([]byte(body), &m); err != nil {
+		t.Fatal(err)
+	}
+	a := m.Result.Actor
+	if a == nil || a.User != "sam" || a.Client == nil || !strings.EqualFold(string(*a.Client), phoneClient) ||
+		a.ClientName == nil || *a.ClientName != "Sam’s iPhone" {
+		t.Fatalf("the event's actor: %+v (%s)", a, body)
 	}
 }
