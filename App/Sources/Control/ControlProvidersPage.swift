@@ -261,6 +261,7 @@ struct ControlProvidersPage: View {
 /// provider card's Write Again… (US4): the same, from the map or commands it has, and Save.
 struct AddProviderSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppModel.self) private var model
     let control: ControlSettingsModel
     var editing: DaemonAPI.ProviderSummary?
     /// Inside Add a Machine (#2131): the provider added, to go on with, in place of closing.
@@ -808,7 +809,9 @@ struct AddProviderSheet: View {
         }
         startingDraft = true
         Task {
-            let result = await control.startDraft(.init(form: form, secrets: givenSecrets, provider: editing?.id, runtimeID: runtime))
+            let lock = model.lock
+            let result = await control.startDraft(.init(form: form, secrets: givenSecrets, provider: editing?.id, runtimeID: runtime),
+                                                   signer: { await lock.channelSigner() })
             startingDraft = false
             switch result {
             case .success(let started):

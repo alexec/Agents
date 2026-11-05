@@ -8,6 +8,9 @@ public extension DaemonAPI.Method {
     /// `ProviderDraftStart` → `ProviderDraftStarted`, once the agent has started, or at once
     /// when no agent is needed (research R8).
     static let providersDraftStart = "providers/draftStart"
+    /// `ProviderDraftSigned` → `{}`: the writer's start as the sheet's client signed it, for a
+    /// host that holds its person's lock (#3542).
+    static let providersDraftSigned = "providers/draftSigned"
     /// `ProviderDraftRequest` → `{}`: the agent stops, the draft is dropped.
     static let providersDraftCancel = "providers/draftCancel"
     /// `ProviderDraftAnswer` → `{}`: the person's answer to a start, stop or check question.
@@ -73,9 +76,35 @@ public extension DaemonAPI {
 
         public var draft: UUID
         public var answered: Answered?
-        public init(draft: UUID, answered: Answered? = nil) {
+        /// The writer's start, for this client to sign: its host holds its person's lock.
+        public var sign: ProviderDraftSign?
+        public init(draft: UUID, answered: Answered? = nil, sign: ProviderDraftSign? = nil) {
             self.draft = draft
             self.answered = answered
+            self.sign = sign
+        }
+    }
+
+    /// The writer's start as the control plane wrote it (#3542): this client checks it and
+    /// signs `method` and `params` as they are, for `machine`.
+    struct ProviderDraftSign: Codable, Sendable, Hashable {
+        public var machine: MachineRef
+        public var method: String
+        public var params: String
+        public init(machine: MachineRef, method: String, params: String) {
+            self.machine = machine
+            self.method = method
+            self.params = params
+        }
+    }
+
+    /// `providers/draftSigned`.
+    struct ProviderDraftSigned: Codable, Sendable, Hashable {
+        public var draft: UUID
+        public var lock: LockSignature
+        public init(draft: UUID, lock: LockSignature) {
+            self.draft = draft
+            self.lock = lock
         }
     }
 
@@ -234,3 +263,29 @@ public extension DaemonAPI {
         }
     }
 }
+
+#if canImport(CryptoKit)
+public extension DaemonAPI.ProviderDraftSign {
+    /// Why a start was not signed: it is not only the writer of that draft.
+    struct NotAWritersStart: Error, Equatable {
+        public var why: String
+    }
+
+    /// The signature of this start, once it is checked to start only the writer of `draft`
+    /// with `runtimeID`: sandboxed, in no folder, with no MCP server, attachment or worktree.
+    /// The control plane wrote the prompt; the writer has only the draft's tools.
+    func signed(for draft: UUID, runtimeID: String, by signer: LockSigningKey, at: Date = Date()) throws -> DaemonAPI.LockSignature {
+        guard method == DaemonAPI.Method.agentsStart else { throw NotAWritersStart(why: "it is not a start") }
+        guard let start = try? JSONDecoder().decode(DaemonAPI.StartRequest.self, from: Data(params.utf8)) else {
+            throw NotAWritersStart(why: "it could not be read")
+        }
+        guard start.purpose?.providerDraft == draft else { throw NotAWritersStart(why: "it is not this draft's writer") }
+        guard start.runtimeID == runtimeID, start.sandbox == .on, start.cwd.absoluteString == "file:///",
+              start.mcpServers.isEmpty, start.additionalDirectories.isEmpty, start.attachments.isEmpty,
+              start.worktree == nil else {
+            throw NotAWritersStart(why: "it asks for more than a writer has")
+        }
+        return try LockChannel.sign(signer, to: machine.rawValue, method: method, params: params, at: at)
+    }
+}
+#endif

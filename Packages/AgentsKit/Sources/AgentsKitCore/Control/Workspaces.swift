@@ -207,7 +207,7 @@ public extension DaemonAPI.Method {
         hostsLink, hostsUnlink, hostsSetMachineOptions, hostsStart, hostsStop,
         hostsKeep, hostsListKept, hostsDropKept, hostsRetryKept,
         providersOptions, providersCreate, hostsDeleteMachine,
-        providersDraftStart, providersDraftCancel, providersDraftAnswer, providersRuntimes,
+        providersDraftStart, providersDraftCancel, providersDraftAnswer, providersDraftSigned, providersRuntimes,
     ]
 }
 

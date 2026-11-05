@@ -208,10 +208,10 @@ func (d *Daemon) driveBrowser(ctx context.Context, agent wire.UUID, name string,
 	if !d.offersBrowser() {
 		return failed("The browser can't be installed on " + thisMachine() + ".")
 	}
-	var secret, value string
+	var fill secretFill
 	if name == fillSecretName {
 		var refusal string
-		if secret, value, refusal = d.fillSecretValue(args); refusal != "" {
+		if fill, refusal = d.fillSecretValue(args); refusal != "" {
 			return failed(refusal)
 		}
 	}
@@ -230,7 +230,7 @@ func (d *Daemon) driveBrowser(ctx context.Context, agent wire.UUID, name string,
 		return failed("The browser did not start: " + browserWords(err))
 	}
 	if name == fillSecretName {
-		return d.fillSecret(ctx, drive, secret, value, args)
+		return d.fillSecret(ctx, drive, fill, args)
 	}
 	if refusal := d.browserRefusal(ctx, drive, name, args); refusal != "" {
 		return failed(refusal)

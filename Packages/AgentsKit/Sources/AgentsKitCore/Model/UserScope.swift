@@ -94,11 +94,14 @@ public extension DaemonAPI {
         public var name: String
         public var version: Int
         public var values: [String: Envelope]
+        /// `card` for a card secret (#3531); nil for a plain value.
+        public var kind: String?
 
-        public init(name: String, version: Int, values: [String: Envelope]) {
+        public init(name: String, version: Int, values: [String: Envelope], kind: String? = nil) {
             self.name = name
             self.version = version
             self.values = values
+            self.kind = kind
         }
     }
 
@@ -125,8 +128,11 @@ public extension DaemonAPI {
         public var version: Int?
         /// The person's machines that have no copy yet (#3397).
         public var waiting: [String]?
+        /// `card` for a card secret (#3531); nil for a plain value.
+        public var kind: String? = nil
 
         public var id: String { name }
+        public var isCard: Bool { kind == CardSecret.kind }
     }
 
     /// `user/secretNames`.
@@ -251,6 +257,14 @@ public enum UserScopeWords {
 
     public static let nameHint = "Capital letters, digits and _, such as GITHUB_TOKEN."
 
+    // Card secrets (#3531).
+    public static let addCard = "Add a Card…"
+    public static let cardKind = "Card"
+    /// Where a person adds a card: what a card for agents must be.
+    public static let cardRule = "Add only a card that is locked to one merchant and has a spend limit, such as a Privacy.com card. "
+        + "An agent fills it into a page with fill_secret and never sees it. It stays sealed on your own machines."
+    public static let cardConfirm = "This card is locked to one merchant and has a spend limit"
+
     public static func refusal(_ error: any Error) -> String {
         if let error = error as? JSONRPCError {
             return error.code == JSONRPCError.methodNotFound
@@ -258,5 +272,71 @@ public enum UserScopeWords {
                 : error.message
         }
         return "The control plane can’t be reached."
+    }
+}
+
+/// A card secret (#3531): a payment card that is locked to one merchant and has a spend limit,
+/// kept as one secret whose value is a JSON object of its parts. agentsd's fill_secret reads it
+/// a part at a time (`Go/internal/agentsd/browserfill.go`); the web page writes the same in
+/// `Web/src/model/userScope.ts`.
+public struct CardSecret: Codable, Sendable, Hashable {
+    public static let kind = "card"
+
+    public var number: String
+    /// MM/YY.
+    public var expiry: String
+    public var cvc: String
+    public var name: String
+    public var zip: String
+
+    /// The card as the person typed it, tidied: the number's digits only, the expiry as MM/YY.
+    public init(number: String, expiry: String, cvc: String, name: String, zip: String) {
+        self.number = number.filter(Self.isDigit)
+        self.expiry = Self.tidyExpiry(expiry)
+        self.cvc = cvc.trimmingCharacters(in: .whitespaces)
+        self.name = name.trimmingCharacters(in: .whitespaces)
+        self.zip = zip.trimmingCharacters(in: .whitespaces)
+    }
+
+    /// What is wrong with it, or nil when it can be added.
+    public var problem: String? {
+        if !(12...19).contains(number.count) || !Self.luhn(number) { return "The card number is not right." }
+        guard let month = Int(expiry.prefix(2)), (1...12).contains(month),
+              expiry.range(of: #"^\d{2}/\d{2}$"#, options: .regularExpression) != nil
+        else { return "Write the expiry as MM/YY." }
+        if cvc.range(of: #"^\d{3,4}$"#, options: .regularExpression) == nil { return "The CVC is 3 or 4 digits." }
+        if name.isEmpty { return "Write the name on the card." }
+        if zip.isEmpty || zip.count > 10 { return "Write the billing ZIP or postal code." }
+        return nil
+    }
+
+    /// The secret's value: one line of JSON, so it fits a NAME=value line of secrets.env.
+    public var value: String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        return (try? encoder.encode(self)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
+    }
+
+    static func tidyExpiry(_ typed: String) -> String {
+        let parts = typed.split(whereSeparator: { !Self.isDigit($0) }).map(String.init)
+        if parts.count == 2 {
+            let month = parts[0].count == 1 ? "0" + parts[0] : parts[0]
+            let year = parts[1].count == 4 ? String(parts[1].suffix(2)) : parts[1]
+            return month + "/" + year
+        }
+        let digits = typed.filter(Self.isDigit)
+        return digits.count == 4 ? String(digits.prefix(2)) + "/" + String(digits.suffix(2)) : typed.trimmingCharacters(in: .whitespaces)
+    }
+
+    static func isDigit(_ c: Character) -> Bool { ("0"..."9").contains(c) }
+
+    static func luhn(_ digits: String) -> Bool {
+        var sum = 0
+        for (i, c) in digits.reversed().enumerated() {
+            guard var d = c.wholeNumberValue else { return false }
+            if i % 2 == 1 { d *= 2; if d > 9 { d -= 9 } }
+            sum += d
+        }
+        return sum % 10 == 0
     }
 }

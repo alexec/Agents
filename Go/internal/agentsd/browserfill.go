@@ -3,6 +3,7 @@ package agentsd
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -35,10 +36,12 @@ var fillSecretTool = json.RawMessage(`{"name":"fill_secret","title":"Fill a secr
 	`"description":"Type one of the person's secrets (Settings ▸ Secrets), such as a password or an API key, into a field on the browser's page, without you seeing it. ` +
 	`Name the secret and the field as browser_type does (target: a reference from browser_snapshot, or a selector). You get \"<NAME> filled\", never the value. ` +
 	`After it, the field shows as dots, page reads show the value as <secret NAME>, and browser_evaluate is refused on that page until it navigates. ` +
-	`When the secret is not set, ask for it with ask_secret first. Never ask for a secret's value or type it with browser_type.",` +
+	`When the secret is not set, ask for it with ask_secret first. Never ask for a secret's value or type it with browser_type. ` +
+	`A card secret (a payment card the person locked to one merchant, with a spend limit) is filled a part at a time: name the part for each field.",` +
 	`"inputSchema":{"type":"object","properties":{` +
 	`"secret":{"type":"string","description":"The secret's name, as in Settings ▸ Secrets, e.g. GITLAB_PASSWORD."},` +
 	`"element":{"type":"string","description":"The field, in words, for the person: e.g. \"Password field\"."},` +
+	`"part":{"type":"string","enum":["number","expiry","exp_month","exp_year","cvc","name","zip"],"description":"For a card secret only: which part goes in this field. expiry is MM/YY, exp_month MM, exp_year YYYY, zip the billing postal code."},` +
 	`"target":{"type":"string","description":"Exact target element reference from the page snapshot, or a unique element selector"},` +
 	`"submit":{"type":"boolean","description":"Whether to press Enter after the fill."}},` +
 	`"required":["secret","target"],"additionalProperties":false},` +
@@ -86,36 +89,105 @@ func fillWords(msg string) ([]any, bool, string) {
 	return []any{map[string]any{"type": "text", "text": msg}}, true, msg
 }
 
-// fillSecretValue is the secret the call names, read from secrets.env, or the words that
-// say why there is none. It runs before the lease, so a call that cannot fill starts nothing.
-func (d *Daemon) fillSecretValue(args map[string]json.RawMessage) (name, value, refusal string) {
-	name = strings.TrimSpace(argString(args, "secret"))
+// secretFill is what one fill_secret call types, read before the lease.
+type secretFill struct {
+	label string // the secret's name, and a card's part: what the agent is told was filled
+	value string
+	// hide is every value the call puts in the filter, by its label: for a card, all its
+	// parts, so none of them comes back once the card is in the page.
+	hide  map[string]string
+	codes map[string]string // a card's CVC, hidden as a whole number
+}
+
+// cardParts are a card secret's parts as fill_secret names them (#3531).
+var cardParts = []string{"number", "expiry", "exp_month", "exp_year", "cvc", "name", "zip"}
+
+// cardSecret is a card secret's value: one JSON object, as Settings ▸ Secrets writes it.
+type cardSecret struct {
+	Number string `json:"number"`
+	Expiry string `json:"expiry"` // MM/YY
+	CVC    string `json:"cvc"`
+	Name   string `json:"name"`
+	Zip    string `json:"zip"`
+}
+
+// parseCard is value's parts, or false when value is not a card.
+func parseCard(value string) (map[string]string, bool) {
+	if !strings.HasPrefix(value, "{") {
+		return nil, false
+	}
+	var c cardSecret
+	if json.Unmarshal([]byte(value), &c) != nil || c.Number == "" {
+		return nil, false
+	}
+	month, year, _ := strings.Cut(c.Expiry, "/")
+	if len(year) == 2 {
+		year = "20" + year
+	}
+	return map[string]string{"number": c.Number, "expiry": c.Expiry, "exp_month": month, "exp_year": year,
+		"cvc": c.CVC, "name": c.Name, "zip": c.Zip}, true
+}
+
+// fillSecretValue is what the call fills, read from secrets.env, or the words that say why
+// nothing. It runs before the lease, so a call that cannot fill starts nothing.
+func (d *Daemon) fillSecretValue(args map[string]json.RawMessage) (fill secretFill, refusal string) {
+	name := strings.TrimSpace(argString(args, "secret"))
 	if !secretAskName.MatchString(name) {
-		return "", "", "Nothing was filled: `secret` is the secret's name, letters, digits and underscores, e.g. GITLAB_PASSWORD."
+		return fill, "Nothing was filled: `secret` is the secret's name, letters, digits and underscores, e.g. GITLAB_PASSWORD."
 	}
 	if strings.TrimSpace(argString(args, "target")) == "" {
-		return "", "", "Nothing was filled: `target` is the field, a reference from browser_snapshot or a selector."
+		return fill, "Nothing was filled: `target` is the field, a reference from browser_snapshot or a selector."
 	}
 	home := d.personalHome()
 	if home == "" {
-		return "", "", "Nothing was filled: this machine has no personal home to keep secrets in."
+		return fill, "Nothing was filled: this machine has no personal home to keep secrets in."
 	}
 	v, ok := skillcatalog.LoadSecrets(skillcatalog.SecretsPath(home)).Value(name)
 	if !ok || v == "" {
-		return "", "", name + " is not set. Ask the person for it with ask_secret, then call fill_secret again."
+		return fill, name + " is not set. Ask the person for it with ask_secret, then call fill_secret again."
+	}
+	part := strings.TrimSpace(argString(args, "part"))
+	if parts, card := parseCard(v); card {
+		if !slices.Contains(cardParts, part) {
+			return fill, "Nothing was filled: " + name + " is a card. Name the part for this field in `part`: " + strings.Join(cardParts, ", ") + "."
+		}
+		if parts[part] == "" {
+			return fill, "Nothing was filled: " + name + " has no " + part + ". Ask the person to replace it in Settings ▸ Secrets."
+		}
+		fill = secretFill{label: name + " " + part, value: parts[part], hide: map[string]string{}, codes: map[string]string{}}
+		for p, value := range parts {
+			switch p {
+			case "cvc":
+				fill.codes[name+"."+p] = value
+			case "exp_month", "exp_year":
+				// Not secret on their own; expiry hides them together.
+			default:
+				fill.hide[name+"."+p] = value
+			}
+		}
+		return fill, ""
+	}
+	if part != "" {
+		return fill, "Nothing was filled: " + name + " is not a card, so leave out `part`."
 	}
 	// The filter does not hide a value this short: it would take half the page out.
 	if len([]rune(v)) < 4 {
-		return "", "", "Nothing was filled: " + name + " is shorter than four characters, too short to keep out of page reads."
+		return fill, "Nothing was filled: " + name + " is shorter than four characters, too short to keep out of page reads."
 	}
-	return name, v, ""
+	return secretFill{label: name, value: v, hide: map[string]string{name: v}}, ""
 }
 
 // fillSecret types the value into the field and masks it. The value is hidden by the
 // filter before it is typed, so even a failure's words have it out.
-func (d *Daemon) fillSecret(ctx context.Context, drive *browserDrive, name, value string, args map[string]json.RawMessage) ([]any, bool, string) {
+func (d *Daemon) fillSecret(ctx context.Context, drive *browserDrive, fill secretFill, args map[string]json.RawMessage) ([]any, bool, string) {
 	f := &d.browser.Filter
-	f.Hide(name, value)
+	for label, v := range fill.hide {
+		f.Hide(label, v)
+	}
+	for label, v := range fill.codes {
+		f.HideCode(label, v)
+	}
+	name, value := fill.label, fill.value
 	field := map[string]json.RawMessage{"target": args["target"]}
 	if e, ok := args["element"]; ok {
 		field["element"] = e

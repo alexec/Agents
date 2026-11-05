@@ -27,3 +27,16 @@ test("user scope: the ~/.agents editors say they are this Mac's, and what goes t
   assert.match(u.agentConfigurationFollows, /^Your other machines get this Mac's instructions/);
   assert.match(u.agentConfigurationFollows, /Workflows, plugins and a skill's other files stay on this Mac\.$/);
 });
+
+test("user scope: a card is one value of its parts, as the window writes it (#3531)", () => {
+  const card = u.tidyCard({ number: "4242 4242 4242 4242", expiry: "9/2031", cvc: "737", name: " Sam Lee ", zip: "94110" });
+  assert.equal(u.cardProblem(card), null);
+  assert.equal(u.cardValue(card), '{"cvc":"737","expiry":"09/31","name":"Sam Lee","number":"4242424242424242","zip":"94110"}');
+  assert.equal(u.tidyExpiry("0931"), "09/31");
+  const ok = { number: "4242424242424242", expiry: "09/31", cvc: "737", name: "S", zip: "1" };
+  assert.equal(u.cardProblem({ ...ok, number: "4242424242424241" }), "The card number is not right.");
+  assert.equal(u.cardProblem({ ...ok, expiry: "13/31" }), "Write the expiry as MM/YY.");
+  assert.equal(u.cardProblem({ ...ok, cvc: "73" }), "The CVC is 3 or 4 digits.");
+  assert.equal(u.cardProblem({ ...ok, name: "" }), "Write the name on the card.");
+  assert.match(u.cardRule, /locked to one merchant and has a spend limit/);
+});

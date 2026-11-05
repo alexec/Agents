@@ -4329,6 +4329,26 @@
       }
     },
     {
+      "name": "providers/draftSigned",
+      "x-capability": "providers/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ProviderDraftSigned"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "providers/draftStart",
       "x-capability": "providers/1",
       "paramStructure": "by-name",

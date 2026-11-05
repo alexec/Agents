@@ -107,6 +107,9 @@ func noticesKey(user string) string      { return Prefix + user + "/notices.json
 type secretRecord struct {
 	Name    string `json:"name"`
 	Version int64  `json:"version,omitempty"`
+	// Kind is what the value holds, such as a card (#3531); empty for a plain value. It is
+	// not secret: the clients draw a card's row and its sheet from it.
+	Kind string `json:"kind,omitempty"`
 	// Sealed is each recipient's envelope (m:<machine> or c:<client>), as the person's
 	// client sealed it (#3397). Nothing here opens one.
 	Sealed   map[string]wire.SealedEnvelope `json:"sealed,omitempty"`
@@ -413,6 +416,9 @@ func (b *Book) SetSecret(ctx context.Context, user string, set wire.UserSecretSe
 	if err := checkEnvelopes(set.Values); err != nil {
 		return err
 	}
+	if set.Kind != nil && *set.Kind != wire.UserSecretKindCard {
+		return fmt.Errorf("%w: a secret's kind is card, or left out", ErrInvalid)
+	}
 	key := secretKey(user, name)
 	if names, err := b.liveNames(ctx, user); err != nil {
 		return err
@@ -438,7 +444,11 @@ func (b *Book) SetSecret(ctx context.Context, user string, set wire.UserSecretSe
 		if set.Version <= r.Version {
 			return nil, fmt.Errorf("%w: the secret changed in another app; load it again, then set it", ErrInvalid)
 		}
-		r = secretRecord{Name: name, Version: set.Version, Sealed: sealed, Updated: b.stamp(), Machines: r.Machines}
+		var kind string
+		if set.Kind != nil {
+			kind = string(*set.Kind)
+		}
+		r = secretRecord{Name: name, Version: set.Version, Kind: kind, Sealed: sealed, Updated: b.stamp(), Machines: r.Machines}
 		return records.Encode(r)
 	})
 }
@@ -575,6 +585,10 @@ func (b *Book) Names(ctx context.Context, user string, machines []string) ([]wir
 		version := r.Version
 		row := wire.UserSecretRow{Name: wire.UserSecretName(r.Name), Version: &version, Updated: r.Updated, Machines: []wire.MachineRef{},
 			LeftOn: r.LeftOn}
+		if r.Kind != "" {
+			kind := wire.UserSecretKind(r.Kind)
+			row.Kind = &kind
+		}
 		for _, m := range r.Machines {
 			row.Machines = append(row.Machines, wire.MachineRef(m))
 		}

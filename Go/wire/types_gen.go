@@ -1392,10 +1392,97 @@ type BringBackRequest struct {
 	Branches []SentBranch `json:"branches"`
 }
 
+// browser/ack: the client drew browser/frame number ack, so the host may send the next one (#3528). The host asks Chromium for a new frame only after an ack, so a slow client gets fewer frames, not a backlog.
+type BrowserAckRequest struct {
+	Ack int64 `json:"ack"`
+}
+
 // browser/clear (#3535): clear one site's cookies and storage in the machine's browser, or every site's when site is left out.
 type BrowserClearRequest struct {
 	// A site as browser/state names it (github.com). Left out: every site.
 	Site *string `json:"site,omitzero"`
+}
+
+// browser/frame: a JPEG of the machine's browser's page (#3528, spike #3527), from CDP Page.startScreencast, sent only to the clients that watch it. Never recorded.
+type BrowserFrame struct {
+	Image Data `json:"image"`
+
+	// Send it back in browser/ack once the frame is drawn.
+	Ack int64 `json:"ack"`
+
+	// The page's width in CSS pixels: browser/input's x is from 0 to this.
+	Width float64 `json:"width"`
+
+	// The page's height in CSS pixels: browser/input's y is from 0 to this.
+	Height float64 `json:"height"`
+}
+
+type BrowserInputKind string
+
+const BrowserInputKindMouse BrowserInputKind = "mouse"
+const BrowserInputKindWheel BrowserInputKind = "wheel"
+const BrowserInputKindKey BrowserInputKind = "key"
+const BrowserInputKindText BrowserInputKind = "text"
+
+// browser/input: the person's input in the page (#3528). mouse and wheel are CDP Input.dispatchMouseEvent, key is Input.dispatchKeyEvent, text is Input.insertText (a paste). x and y are in the page's CSS pixels.
+type BrowserInputRequest struct {
+	Kind BrowserInputKind `json:"kind"`
+
+	// mouse: mousePressed, mouseReleased or mouseMoved. key: keyDown, keyUp or char.
+	Type *string `json:"type,omitzero"`
+
+	X *float64 `json:"x,omitzero"`
+
+	Y *float64 `json:"y,omitzero"`
+
+	// left, middle, right or none.
+	Button *string `json:"button,omitzero"`
+
+	ClickCount *int64 `json:"clickCount,omitzero"`
+
+	DeltaX *float64 `json:"deltaX,omitzero"`
+
+	DeltaY *float64 `json:"deltaY,omitzero"`
+
+	// The DOM key value, such as Enter or a.
+	Key *string `json:"key,omitzero"`
+
+	// The DOM code value, such as KeyA.
+	Code *string `json:"code,omitzero"`
+
+	// The Windows virtual key code, which Chromium needs for keys such as Backspace and the arrows.
+	KeyCode *int64 `json:"keyCode,omitzero"`
+
+	Text *string `json:"text,omitzero"`
+
+	// Alt 1, Control 2, Meta 4, Shift 8, as CDP has them.
+	Modifiers *int64 `json:"modifiers,omitzero"`
+}
+
+type BrowserNavigateAction string
+
+const BrowserNavigateActionGo BrowserNavigateAction = "go"
+const BrowserNavigateActionBack BrowserNavigateAction = "back"
+const BrowserNavigateActionForward BrowserNavigateAction = "forward"
+const BrowserNavigateActionReload BrowserNavigateAction = "reload"
+
+// browser/navigate: the bar over the page (#3528). go opens url, and starts the browser when it does not run.
+type BrowserNavigateRequest struct {
+	Action BrowserNavigateAction `json:"action"`
+
+	URL *string `json:"url,omitzero"`
+}
+
+// The machine's browser's page as a client shows it (#3528): browser/watch's answer, and browser/pageChanged to the clients that watch it when it changes. Not BrowserState, which is Settings ▸ Browser's.
+type BrowserPageState struct {
+	Status BrowserStatus `json:"status"`
+
+	// starting: the step, such as Downloading Chromium. failed: why.
+	Detail *string `json:"detail,omitzero"`
+
+	URL *string `json:"url,omitzero"`
+
+	Title *string `json:"title,omitzero"`
 }
 
 // One site that keeps cookies in the machine's browser (#3535), which is how a site remembers a sign-in.
@@ -1420,6 +1507,20 @@ type BrowserState struct {
 
 	// Why the sites could not be read, when they could not.
 	Problem *string `json:"problem,omitzero"`
+}
+
+type BrowserStatus string
+
+const BrowserStatusStopped BrowserStatus = "stopped"
+const BrowserStatusStarting BrowserStatus = "starting"
+const BrowserStatusRunning BrowserStatus = "running"
+const BrowserStatusFailed BrowserStatus = "failed"
+
+// browser/watch: the client shows the machine's browser in a view of this size, in points (#3528). The page is laid out at that size. Watch again to change it.
+type BrowserWatchRequest struct {
+	Width int64 `json:"width"`
+
+	Height int64 `json:"height"`
 }
 
 // A budget raised for one person for one UTC day (#998, FR-019), kept in the policy and swept the day after.
@@ -8607,6 +8708,22 @@ type ProviderDraftRequest struct {
 	Draft UUID `json:"draft"`
 }
 
+// The writing agent's start, for the client that asked for the draft to sign (#3542): the machine that holds its person's lock takes no start the control plane sends in its own words. The client checks that it starts only a draft's writer (agents/start, the draft's purpose, sandboxed, no MCP servers or other folders), signs method and params as they are (a LockSignature to machine), and sends the signature with providers/draftSigned.
+type ProviderDraftSign struct {
+	Machine MachineRef `json:"machine"`
+
+	Method string `json:"method"`
+
+	Params string `json:"params"`
+}
+
+// providers/draftSigned (#3542): the signature of a draft's sign, which the control plane delivers with the start as it came.
+type ProviderDraftSigned struct {
+	Draft UUID `json:"draft"`
+
+	Lock LockSignature `json:"lock"`
+}
+
 // providers/draftStart (#858).
 type ProviderDraftStart struct {
 	Form ProviderAdd `json:"form"`
@@ -8622,6 +8739,8 @@ type ProviderDraftStarted struct {
 	Draft UUID `json:"draft"`
 
 	Answered *ProviderDraftAnswered `json:"answered,omitzero"`
+
+	Sign *ProviderDraftSign `json:"sign,omitzero"`
 }
 
 // control/providerDraft: how a draft stands, to the client that started it.
@@ -12073,6 +12192,11 @@ type UserSecret struct {
 	Value string `json:"value"`
 }
 
+// What a secret holds, when it is more than one value (#3531). card: a payment card that is locked to one merchant and has a spend limit (Privacy.com or the same), as one JSON object of number, expiry (MM/YY), cvc, name and zip. fill_secret fills it a part at a time. Left out for a plain value.
+type UserSecretKind string
+
+const UserSecretKindCard UserSecretKind = "card"
+
 // A secret's name, as ${NAME} in mcp.json and NAME= in ~/.agents-secrets/secrets.env.
 type UserSecretName string
 
@@ -12089,6 +12213,8 @@ type UserSecretRequest struct {
 // One row of user/secretNames (#1760): a secret's name, never its value.
 type UserSecretRow struct {
 	Name UserSecretName `json:"name"`
+
+	Kind *UserSecretKind `json:"kind,omitzero"`
 
 	Updated string `json:"updated"`
 
@@ -12107,6 +12233,8 @@ type UserSecretRow struct {
 // user/setSecret (#1760, FR-025, #3397): a secret as the person's client sealed it to each recipient of user/secretRecipients, info com.alexecollins.agents.usersecret.v1, associated data usersecret.v1|<person id>|<recipient>|<name>|<version>. version is above the kept one: the kept one plus one, or for a name the client has none of, the time in milliseconds, above a removed one's. The control plane never has the value.
 type UserSecretSet struct {
 	Name UserSecretName `json:"name"`
+
+	Kind *UserSecretKind `json:"kind,omitzero"`
 
 	Version int64 `json:"version"`
 
