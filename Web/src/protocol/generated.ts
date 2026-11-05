@@ -4722,6 +4722,66 @@ export interface LockHead {
   head: Base64;
 }
 
+/**
+ * lock/join (#3490, specs/3399-machine-lock D2): a client that is not in its person's lock asks to
+ * be added. key is its signing key (P-256, X9.63); commitment is the SHA-256 of
+ * "agents-lock-join/1\n", key, then a 16-byte nonce that the client shows only after a signer sent
+ * its own (lock/joinReveal), so a control plane cannot try the six digits again and again.
+ */
+export interface LockJoin {
+  key: Base64;
+  commitment: Base64;
+}
+
+/**
+ * control/lockJoinDecided (#3490): how a request to join the lock ended: approved (a signer put the
+ * client's addClient on the lock), denied or expired.
+ */
+export interface LockJoinDecided {
+  request: string;
+  result: string;
+}
+
+/** lock/joinDeny (#3490): a signer says no, or the asking client gives up. */
+export interface LockJoinEnd {
+  request: string;
+}
+
+/**
+ * lock/joinAnswer (a signer's nonce, 16 bytes, sent once) and lock/joinReveal (the asking client's
+ * nonce, which must match its commitment) (#3490).
+ */
+export interface LockJoinNonce {
+  request: string;
+  nonce: Base64;
+}
+
+/**
+ * lock/joinRequests and control/lockJoinRequested (#3490): a client asking to join its person's
+ * lock, to every client of that person, and sent again in place as it goes on. client is the asking
+ * client's id, so it knows its own. nonce is the signer's, once one sent it (lock/joinAnswer), and
+ * answeredBy is that signer's client id; reveal is the asking client's nonce, once it showed it.
+ * Each screen makes the six digits from key, reveal and nonce.
+ */
+export interface LockJoinRequest {
+  request: string;
+  client: string;
+  name: string;
+  kind: ClientKind;
+  key: Base64;
+  commitment: Base64;
+  expires: WireDate;
+  nonce?: Base64;
+  answeredBy?: string;
+  reveal?: Base64;
+}
+
+/** lock/join's answer (#3490): the request, and when it ends unanswered. */
+export interface LockJoinStarted {
+  request: string;
+  expires: WireDate;
+}
+
 export interface MCPAddAnswer {
   server?: ManagedMCPServer;
   error?: MCPCatalogError;
@@ -10974,6 +11034,13 @@ export interface Methods {
   "links/list": { params: Empty; result: ChannelLink[] };
   "links/remove": { params: ChannelLinkRemove; result: Empty };
   "links/requests": { params: Empty; result: ChannelLinkRequest[] };
+  "lock/add": { params: LockAdd; result: LockHead };
+  "lock/get": { params: Empty; result: Lock };
+  "lock/join": { params: LockJoin; result: LockJoinStarted };
+  "lock/joinAnswer": { params: LockJoinNonce; result: Empty };
+  "lock/joinDeny": { params: LockJoinEnd; result: Empty };
+  "lock/joinRequests": { params: Empty; result: LockJoinRequest[] };
+  "lock/joinReveal": { params: LockJoinNonce; result: Empty };
   "mcp/health": { params: Empty; result: MCPHealthSnapshot };
   "mcp/health/check": { params: MCPHealthCheckRequest; result: MCPHealthSnapshot };
   "mcp/hosted": { params: Empty; result: HostedMCPSnapshot };
@@ -11323,6 +11390,13 @@ export const MethodTarget = {
   "links/list": "control",
   "links/remove": "control",
   "links/requests": "control",
+  "lock/add": "control",
+  "lock/get": "control",
+  "lock/join": "control",
+  "lock/joinAnswer": "control",
+  "lock/joinDeny": "control",
+  "lock/joinRequests": "control",
+  "lock/joinReveal": "control",
   "mcp/health": "host",
   "mcp/health/check": "host",
   "mcp/hosted": "host",
@@ -11514,6 +11588,9 @@ export interface Notifications {
   "control/linkDecided": ChannelLinkDecided;
   "control/linkRequested": ChannelLinkRequest;
   "control/linksChanged": Empty;
+  "control/lockChanged": LockHead;
+  "control/lockJoinDecided": LockJoinDecided;
+  "control/lockJoinRequested": LockJoinRequest;
   "control/orgRoutesChanged": Empty;
   "control/peopleChanged": PeopleChanged;
   "control/policyChanged": PolicyView;
@@ -11956,6 +12033,12 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LockBody: { required: ["v", "kind", "person", "signer", "at", "key"], optional: ["previous", "sealingKey", "id", "name", "clientKind", "expires"] },
   LockEntry: { required: ["body", "sig"], optional: [] },
   LockHead: { required: ["count", "head"], optional: [] },
+  LockJoin: { required: ["key", "commitment"], optional: [] },
+  LockJoinDecided: { required: ["request", "result"], optional: [] },
+  LockJoinEnd: { required: ["request"], optional: [] },
+  LockJoinNonce: { required: ["request", "nonce"], optional: [] },
+  LockJoinRequest: { required: ["request", "client", "name", "kind", "key", "commitment", "expires"], optional: ["nonce", "answeredBy", "reveal"] },
+  LockJoinStarted: { required: ["request", "expires"], optional: [] },
   MCPAddAnswer: { required: [], optional: ["server", "error"] },
   MCPAddByHandRequest: { required: ["verifyID", "destination"], optional: [] },
   MCPAddRequest: { required: ["previewID", "destination", "secrets", "plain", "replace"], optional: [] },

@@ -76,6 +76,28 @@ struct RemoteSidebar: View {
                     }
                 }
             }
+            // This device, not in the person's machine lock yet, and the clients asking to join it (#3490).
+            if model.lock.showsThisDevice || !model.lock.open().isEmpty {
+                Section {
+                    if model.lock.showsThisDevice {
+                        ThisDeviceLockCard(place: model.lock.place, askAgain: { Task { await model.askLockAgain() } })
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                            .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
+                    }
+                    ForEach(model.lock.open()) { request in
+                        LockJoinCard(request: request, step: model.lock.step(request),
+                                     isAnswering: model.lock.answering.contains(request.request),
+                                     failure: model.lock.failures[request.request],
+                                     compare: { Task { await model.compareLock(request) } },
+                                     approve: { Task { await model.approveLock(request) } },
+                                     deny: { Task { await model.denyLock(request) } })
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                            .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
+                    }
+                }
+            }
             // A new client that signed in with GitHub as this person (#995), beside them.
             let signingIn = model.signIn.open()
             if !signingIn.isEmpty {
@@ -236,7 +258,8 @@ struct RemoteSidebar: View {
         .overlay {
             // Not over a machine's ask to join (#994): the card is the list's, and the
             // waiting view in the middle would lie over the rows under it.
-            if model.folders.isEmpty, model.people.open().isEmpty, model.people.openLinks().isEmpty, model.signIn.open().isEmpty {
+            if model.folders.isEmpty, model.people.open().isEmpty, model.people.openLinks().isEmpty, model.signIn.open().isEmpty,
+               model.lock.open().isEmpty, !model.lock.showsThisDevice {
                 Waiting()
             }
         }

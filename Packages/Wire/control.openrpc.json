@@ -987,6 +987,11 @@
     {
       "name": "control/lockChanged",
       "x-capability": "lock/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "description": "To a person's clients when an entry is put on their machine lock (#3399): read it again with lock/get.",
       "x-notification": true,
       "paramStructure": "by-name",
@@ -996,6 +1001,48 @@
           "required": true,
           "schema": {
             "$ref": "daemon.schema.json#/definitions/LockHead"
+          }
+        }
+      ]
+    },
+    {
+      "name": "control/lockJoinDecided",
+      "x-capability": "lock-join/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "To a person's clients (#3490): a request to join the lock ended (approved, denied or expired).",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LockJoinDecided"
+          }
+        }
+      ]
+    },
+    {
+      "name": "control/lockJoinRequested",
+      "x-capability": "lock-join/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "To a person's clients (#3490): a client of theirs asks to join their machine lock, or its request went on (a signer sent its nonce, the client showed its own). Sent again in place.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LockJoinRequest"
           }
         }
       ]
@@ -2893,6 +2940,11 @@
     {
       "name": "lock/add",
       "x-capability": "lock/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "description": "A client's: put entries on the end of the caller's machine lock (#3399). Each must be signed, follow the head, and pass the checks; the first is the root when there is no lock yet. Refused with changedElsewhere when another entry took the head first.",
       "paramStructure": "by-name",
       "params": [
@@ -2914,6 +2966,11 @@
     {
       "name": "lock/get",
       "x-capability": "lock/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "description": "A client's: the caller's machine lock, with no entries when there is none yet (#3399).",
       "paramStructure": "by-name",
       "params": [
@@ -2929,6 +2986,139 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/Lock"
+        }
+      }
+    },
+    {
+      "name": "lock/join",
+      "x-capability": "lock-join/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "A client's that is not in its person's lock (#3490, D2): ask the person's other clients to add it. One open request for each client; asking again ends the one before.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LockJoin"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LockJoinStarted"
+        }
+      }
+    },
+    {
+      "name": "lock/joinAnswer",
+      "x-capability": "lock-join/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "A signer's (#3490): its own nonce for a request, once. The first signer's is kept; another's is refused. The control plane sends it to the asking client.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LockJoinNonce"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "lock/joinDeny",
+      "x-capability": "lock-join/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "A signer's, or the asking client's (#3490): end a request with no entry. Approve is lock/add with the client's addClient: the request then ends as approved.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LockJoinEnd"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "lock/joinRequests",
+      "x-capability": "lock-join/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "A client's (#3490): the open requests to join the caller's lock, its own too.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "daemon.schema.json#/definitions/LockJoinRequest"
+          }
+        }
+      }
+    },
+    {
+      "name": "lock/joinReveal",
+      "x-capability": "lock-join/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "The asking client's (#3490): its nonce, after a signer sent one. Refused unless it matches the commitment.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LockJoinNonce"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
         }
       }
     },

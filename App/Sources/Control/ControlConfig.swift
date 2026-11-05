@@ -88,6 +88,22 @@ enum ControlConfig {
         return (key, client)
     }
 
+    /// The window's client id, for the machine lock's requests (#3490); nil with no pairing.
+    static var client: UUID? {
+        guard case .remote(let membership)? = endpoint else { return nil }
+        return membership.client
+    }
+
+    /// The window's signing key for the machine lock (#3490), in the keychain apart from the
+    /// key it proves itself with; a walk's window has its own.
+    static var lockAccount: String { walk.map { "lock-signing-key.walk.\($0)" } ?? "lock-signing-key" }
+
+    /// Where the window keeps the head of the lock it last checked: one for each control plane.
+    static var lockPinName: String {
+        guard case .remote(let membership)? = endpoint else { return "machineLockPin" }
+        return "machineLockPin." + membership.controlKey.prefix(8).map { String(format: "%02x", $0) }.joined()
+    }
+
     /// This Mac's host directly (#1118): agentsd's socket in the app group, named by the
     /// control plane's key, proved with this window's own key. Nil with no pairing, or no
     /// group container for this build.

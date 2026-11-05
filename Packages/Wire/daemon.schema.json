@@ -12063,6 +12063,133 @@
       ],
       "additionalProperties": false
     },
+    "LockJoin": {
+      "type": "object",
+      "description": "lock/join (#3490, specs/3399-machine-lock D2): a client that is not in its person's lock asks to be added. key is its signing key (P-256, X9.63); commitment is the SHA-256 of \"agents-lock-join/1\\n\", key, then a 16-byte nonce that the client shows only after a signer sent its own (lock/joinReveal), so a control plane cannot try the six digits again and again.",
+      "properties": {
+        "key": {
+          "$ref": "#/definitions/Base64"
+        },
+        "commitment": {
+          "$ref": "#/definitions/Base64"
+        }
+      },
+      "required": [
+        "key",
+        "commitment"
+      ],
+      "additionalProperties": false
+    },
+    "LockJoinDecided": {
+      "type": "object",
+      "description": "control/lockJoinDecided (#3490): how a request to join the lock ended: approved (a signer put the client's addClient on the lock), denied or expired.",
+      "properties": {
+        "request": {
+          "type": "string"
+        },
+        "result": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "request",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "LockJoinEnd": {
+      "type": "object",
+      "description": "lock/joinDeny (#3490): a signer says no, or the asking client gives up.",
+      "properties": {
+        "request": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "LockJoinNonce": {
+      "type": "object",
+      "description": "lock/joinAnswer (a signer's nonce, 16 bytes, sent once) and lock/joinReveal (the asking client's nonce, which must match its commitment) (#3490).",
+      "properties": {
+        "request": {
+          "type": "string"
+        },
+        "nonce": {
+          "$ref": "#/definitions/Base64"
+        }
+      },
+      "required": [
+        "request",
+        "nonce"
+      ],
+      "additionalProperties": false
+    },
+    "LockJoinRequest": {
+      "type": "object",
+      "description": "lock/joinRequests and control/lockJoinRequested (#3490): a client asking to join its person's lock, to every client of that person, and sent again in place as it goes on. client is the asking client's id, so it knows its own. nonce is the signer's, once one sent it (lock/joinAnswer), and answeredBy is that signer's client id; reveal is the asking client's nonce, once it showed it. Each screen makes the six digits from key, reveal and nonce.",
+      "properties": {
+        "request": {
+          "type": "string"
+        },
+        "client": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/ClientKind"
+        },
+        "key": {
+          "$ref": "#/definitions/Base64"
+        },
+        "commitment": {
+          "$ref": "#/definitions/Base64"
+        },
+        "expires": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "nonce": {
+          "$ref": "#/definitions/Base64"
+        },
+        "answeredBy": {
+          "type": "string"
+        },
+        "reveal": {
+          "$ref": "#/definitions/Base64"
+        }
+      },
+      "required": [
+        "request",
+        "client",
+        "name",
+        "kind",
+        "key",
+        "commitment",
+        "expires"
+      ],
+      "additionalProperties": false
+    },
+    "LockJoinStarted": {
+      "type": "object",
+      "description": "lock/join's answer (#3490): the request, and when it ends unanswered.",
+      "properties": {
+        "request": {
+          "type": "string"
+        },
+        "expires": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "request",
+        "expires"
+      ],
+      "additionalProperties": false
+    },
     "MCPAddAnswer": {
       "type": "object",
       "properties": {

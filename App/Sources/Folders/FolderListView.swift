@@ -128,6 +128,26 @@ struct FolderListView: View {
                     }
                 }
             }
+            // This window, not in the person's machine lock yet, and the clients asking to join it (#3490).
+            if model.lock.showsThisDevice || !model.lock.open().isEmpty {
+                Section {
+                    if model.lock.showsThisDevice {
+                        ThisDeviceLockCard(place: model.lock.place, askAgain: { Task { await model.askLockAgain() } })
+                            .listRowSeparator(.hidden)
+                            .selectionDisabled()
+                    }
+                    ForEach(model.lock.open()) { request in
+                        LockJoinCard(request: request, step: model.lock.step(request),
+                                     isAnswering: model.lock.answering.contains(request.request),
+                                     failure: model.lock.failures[request.request],
+                                     compare: { Task { await model.compareLock(request) } },
+                                     approve: { Task { await model.approveLock(request) } },
+                                     deny: { Task { await model.denyLock(request) } })
+                            .listRowSeparator(.hidden)
+                            .selectionDisabled()
+                    }
+                }
+            }
             // A newcomer's checklist (#982), above everything until it has gone.
             if model.showsGetStarted {
                 Section {

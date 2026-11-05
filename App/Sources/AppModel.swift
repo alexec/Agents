@@ -1108,6 +1108,9 @@ final class AppModel {
     let people = PeopleState()
     /// The GitHub sign-ins waiting for this person's Approve (#995).
     let signIn = SignInState()
+    /// This window's place in the person's machine lock, and the clients asking to join it (#3490).
+    let lock = LockState(pins: LockPins(defaults: WindowDefaults.store, name: ControlConfig.lockPinName),
+                         name: Host.current().localizedName ?? "A Mac", kind: .mac, account: ControlConfig.lockAccount)
     /// The settings and secrets that follow the person to their machines (#1760).
     let userScope = UserScopeState()
     /// Hosts whose Start was pressed here and not answered yet.
@@ -3522,6 +3525,7 @@ final class AppModel {
                     await self?.loadKept(control)
                     await self?.people.connected(control)
                     await self?.signIn.connected(control)
+                    if let client = ControlConfig.client { await self?.lock.connected(control, client: client) }
                     await Self.sealWaiting(on: control)
                     for await note in control.notifications() {
                         if note.method == DaemonAPI.Notification.controlSealingWanted {
@@ -3530,6 +3534,7 @@ final class AppModel {
                         }
                         if await self?.people.heard(note.method, note.params, on: control) == true { continue }
                         if self?.signIn.heard(note.method, note.params) == true { continue }
+                        if await self?.lock.heard(note.method, note.params, on: control) == true { continue }
                         if await self?.userScope.heard(note.method, note.params, on: control) == true {
                             // The host writes what it is sent a moment later: its panes read again.
                             try? await Task.sleep(for: .milliseconds(500))
@@ -3584,6 +3589,7 @@ final class AppModel {
         guard controlLink != nil else { return }
         people.went()
         signIn.went()
+        lock.went()
         controlPlaneReachable = false
         controlPlaneMissed = true
     }
@@ -3626,6 +3632,12 @@ final class AppModel {
             problem = refused
         }
     }
+
+    /// Compare Digits, Approve or Deny on a lock card, and Ask Again on this window's own (#3490).
+    func compareLock(_ request: DaemonAPI.LockJoinRequest) async { await lock.compare(request, on: controlRequests) }
+    func approveLock(_ request: DaemonAPI.LockJoinRequest) async { await lock.approve(request, on: controlRequests) }
+    func denyLock(_ request: DaemonAPI.LockJoinRequest) async { await lock.deny(request, on: controlRequests) }
+    func askLockAgain() async { await lock.askAgain(on: controlRequests) }
 
     /// Approve, Deny or Send on a channel link's card (#1762): a refusal is the window's alert.
     func answerLink(_ request: DaemonAPI.ChannelLinkRequest, approve: Bool, to person: String?) async {

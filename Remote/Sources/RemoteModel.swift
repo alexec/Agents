@@ -321,6 +321,9 @@ final class RemoteModel {
     let people = PeopleState()
     /// The GitHub sign-ins waiting for this person's Approve (#995).
     let signIn = SignInState()
+    /// This device's place in the person's machine lock, and the clients asking to join it (#3490).
+    let lock = LockState(pins: LockPins(defaults: .standard, name: RemoteControl.lockPinName), name: UIDevice.current.name,
+                         kind: RemoteControl.kind, account: "lock-signing-key")
     /// What `hosts/list` last said, so the folder list can name each host (058, frame H).
     /// Empty when this phone is not a client of a control plane.
     private(set) var controlHosts: [DaemonAPI.ControlMachine] = []
@@ -2278,6 +2281,12 @@ final class RemoteModel {
     }
 
     /// Approve or Deny on a GitHub sign-in's card (#995): a refusal is the app's alert.
+    /// Compare Digits, Approve or Deny on a lock card, and Ask Again on this device's own (#3490).
+    func compareLock(_ request: DaemonAPI.LockJoinRequest) async { await lock.compare(request, on: controlPlane) }
+    func approveLock(_ request: DaemonAPI.LockJoinRequest) async { await lock.approve(request, on: controlPlane) }
+    func denyLock(_ request: DaemonAPI.LockJoinRequest) async { await lock.deny(request, on: controlPlane) }
+    func askLockAgain() async { await lock.askAgain(on: controlPlane) }
+
     func answerSignIn(_ request: DaemonAPI.SignInRequest, approve: Bool, code: String? = nil) async {
         if let refused = await signIn.answer(request, approve: approve, code: code, on: controlPlane) {
             problem = refused
@@ -2424,6 +2433,7 @@ final class RemoteModel {
                     await self?.loadKept(control)
                     await self?.people.connected(control)
                     await self?.signIn.connected(control)
+                    if let client = RemoteControl.membership?.client { await self?.lock.connected(control, client: client) }
                     await Self.sealWaiting(on: control)
                     for await change in control.notifications() {
                         guard let self, !Task.isCancelled else { return }
@@ -2433,6 +2443,7 @@ final class RemoteModel {
                         }
                         if await self.people.heard(change.method, change.params, on: control) { continue }
                         if self.signIn.heard(change.method, change.params) { continue }
+                        if await self.lock.heard(change.method, change.params, on: control) { continue }
                         if change.method == DaemonAPI.Notification.controlKeptChanged
                             || change.method == DaemonAPI.Notification.controlKeptDelivered {
                             await self.heardKept(change.method, change.params)
@@ -2448,6 +2459,7 @@ final class RemoteModel {
                         self?.controlPlane = nil
                         self?.people.went()
                         self?.signIn.went()
+                        self?.lock.went()
                     }
                 }
                 guard !Task.isCancelled, self != nil else { return }
@@ -2476,6 +2488,7 @@ final class RemoteModel {
         controlPlane = nil
         people.went()
         signIn.went()
+        lock.went()
         listening?.cancel()
         listening = nil
         for (_, other) in otherHosts { await other.disconnect() }

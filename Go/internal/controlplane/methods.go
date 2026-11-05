@@ -118,6 +118,11 @@ var own = methodSet(
 	"links/requests",
 	"lock/add",
 	"lock/get",
+	"lock/join",
+	"lock/joinAnswer",
+	"lock/joinDeny",
+	"lock/joinRequests",
+	"lock/joinReveal",
 	"orgRoutes/check",
 	"orgRoutes/list",
 	"orgRoutes/mine",
@@ -251,6 +256,10 @@ var writes = methodSet(
 	"links/deny",
 	"links/remove",
 	"lock/add",
+	"lock/join",
+	"lock/joinAnswer",
+	"lock/joinDeny",
+	"lock/joinReveal",
 	"orgRoutes/remove",
 	"orgRoutes/replaceKey",
 	"orgRoutes/set",
@@ -364,6 +373,8 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return m.linksMethod(ctx, method, params, from)
 	case "lock/get", "lock/add":
 		return m.lockMethod(ctx, method, params, from)
+	case "lock/join", "lock/joinRequests", "lock/joinAnswer", "lock/joinReveal", "lock/joinDeny":
+		return m.lockJoinMethod(ctx, method, params, from)
 	case "signIn/providers", "signIn/pair", "signIn/addToMe", "signIn/removeFromMe", "signIn/configure",
 		"signIn/requests", "signIn/approve", "signIn/deny", "signIn/discover", "signIn/orgStart", "signIn/ticket",
 		"signIn/orgProviders/check", "signIn/orgProviders/list", "signIn/orgProviders/remove", "signIn/orgProviders/set",

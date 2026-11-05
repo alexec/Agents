@@ -43,6 +43,8 @@ func (m *Methods) lockMethod(ctx context.Context, method string, params json.Raw
 		m.s.log(fmt.Sprintf("%d entries put on %s's lock, now %d", len(request.Entries), person, head.Count))
 		m.s.announce("lockChanged", person, from.Client)
 		m.s.lockChangedHere(person)
+		// A request whose client is now in the lock is approved (#3490).
+		m.s.lockJoins.lockGrew(ctx, person, from.Client)
 		return head, nil
 	}
 	return nil, fail(methodNotFound, "No method %s.", method)

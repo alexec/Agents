@@ -271,6 +271,18 @@ struct WireSchemaTests {
             "SealingWork": Self.through(DaemonAPI.SealingWork.self),
             "SealingAdd": Self.through(DaemonAPI.SealingAdd.self),
             "OrgRouteSealed": Self.through(DaemonAPI.OrgRouteSealed.self),
+            // The machine lock (#3399, #3490).
+            "Lock": Self.through(DaemonAPI.Lock.self),
+            "LockEntry": Self.through(DaemonAPI.LockEntry.self),
+            "LockAdd": Self.through(DaemonAPI.LockAdd.self),
+            "LockHead": Self.through(DaemonAPI.LockHead.self),
+            "LockBody": Self.through(DaemonAPI.LockBody.self),
+            "LockJoin": Self.through(DaemonAPI.LockJoin.self),
+            "LockJoinStarted": Self.through(DaemonAPI.LockJoinStarted.self),
+            "LockJoinRequest": Self.through(DaemonAPI.LockJoinRequest.self),
+            "LockJoinNonce": Self.through(DaemonAPI.LockJoinNonce.self),
+            "LockJoinEnd": Self.through(DaemonAPI.LockJoinEnd.self),
+            "LockJoinDecided": Self.through(DaemonAPI.LockJoinDecided.self),
         ]
         let all = samples.objectValue ?? [:]
         #expect(Set(all.keys) == Set(types.keys), "a sample with no Swift type, or a type with no sample")

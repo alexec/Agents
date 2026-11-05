@@ -56,6 +56,7 @@ import { CheckSuggestionRow } from "./CheckSuggestion";
 import { JoinRequests } from "./JoinRequest";
 import { LinkRequests } from "./ChannelLinks";
 import { SignInRequests } from "./SignInRequests";
+import { LockJoins } from "./LockJoins";
 import { approvalID, failedRuns, opensItsSubject } from "../model/approvals";
 import { memo } from "../render/memo";
 
@@ -239,6 +240,8 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
         {!held && <LinkRequests store={store} down={linkDown} />}
         {/* A new client that signed in with GitHub as this person (#995), beside them. */}
         {!held && <SignInRequests store={store} down={linkDown} />}
+        {/* This device in its person's machine lock, and the devices that ask to join it (#3490). */}
+        {!held && <LockJoins store={store} down={linkDown} />}
         {/* Pinned, Needs You, Working, Unread: a group each across every folder and host (#495, #773),
             each that is on in this browser's Settings (#846). */}
         {folders.length > 0 && smartRows.filter((row) => smartGroupsOn.value.has(row) && (!held || aloneRows.has(row))).map((row) => (

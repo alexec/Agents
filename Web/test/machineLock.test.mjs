@@ -1,0 +1,279 @@
+// The machine lock in the page (#3490, specs/3399-machine-lock): the chain Go made
+// (Fixtures/lock/vectors.json, from TestTheLockVectors) checks here, the forged one does not,
+// the commitment and the six digits are Go's, a chain this page signs checks, and Follow
+// refuses a fork or a lock kept back. Then the whole join, two browsers on a fake control plane.
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { load } from "./load.mjs";
+
+const m = await load("src/wire/machineLock.ts");
+const model = await load("src/model/machineLock.ts");
+const vectors = JSON.parse(readFileSync(new URL("../../Packages/AgentsKit/Tests/AgentsKitTests/Fixtures/lock/vectors.json", import.meta.url)));
+const b64 = (bytes) => Buffer.from(bytes).toString("base64");
+const bytes = (text) => new Uint8Array(Buffer.from(text, "base64"));
+const hex = (u) => Buffer.from(u).toString("hex");
+const wait = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
+
+test("Go's lock checks here, with its root, head and members", async () => {
+  const state = await m.check(vectors.lock.entries);
+  assert.equal(state.person, vectors.lock.person);
+  assert.equal(hex(state.root), vectors.root);
+  assert.equal(hex(state.head), vectors.head);
+  assert.equal(state.count, vectors.lock.entries.length);
+  const members = state.membersOf("addClient").map((member) => ({ key: b64(member.key), kind: member.kind, name: member.name, clientKind: member.clientKind }));
+  assert.deepEqual(members, vectors.members);
+});
+
+test("the forged lock fails as forged", async () => {
+  await assert.rejects(m.check(vectors.forged.entries), (error) => error.failure === "forged" && error.index === 1);
+});
+
+test("the commitment and the digits are Go's", async () => {
+  const j = vectors.join;
+  assert.equal(b64(await m.commitment(bytes(j.key), bytes(j.clientNonce))), j.commitment);
+  assert.equal(await m.digits(bytes(j.key), bytes(j.clientNonce), bytes(j.signerNonce)), j.digits);
+  assert.equal(m.spaced("562733"), "562 733");
+});
+
+async function signer() {
+  const { pair, publicRaw } = await m.makeSigningKey();
+  assert.equal(pair.privateKey.extractable, false);
+  assert.equal(publicRaw.length, 65);
+  return { pair, publicRaw };
+}
+
+test("a chain this page signs checks, and Follow refuses a fork and a lock kept back", async () => {
+  const a = await signer();
+  const b = await signer();
+  const root = await m.sign(a.pair.privateKey, a.publicRaw, { kind: "root", person: "alex", at: m.wireNow(), key: b64(a.publicRaw), clientKind: "web" });
+  const one = await m.check([root]);
+  const add = await m.sign(a.pair.privateKey, a.publicRaw, {
+    kind: "addClient", person: "alex", previous: b64(one.head), at: m.wireNow(), key: b64(b.publicRaw), name: "Sam’s iPhone", clientKind: m.lockClientKind("iPhone"),
+  });
+  const lock = { person: "alex", entries: [root, add] };
+  const two = await m.check(lock.entries);
+  assert.equal(two.count, 2);
+  assert.equal(two.member(b.publicRaw)?.clientKind, "remote");
+  assert.ok(two.signer(b.publicRaw));
+
+  // Followed from the pin of one entry, it grows; a zero pin takes it too.
+  assert.equal((await m.follow(one.pin(), lock)).count, 2);
+  assert.equal((await m.follow(m.zeroPin, lock)).count, 2);
+  // Kept back: fewer entries than pinned.
+  await assert.rejects(m.follow(two.pin(), { person: "alex", entries: [root] }), (error) => error.failure === "behind");
+  // A fork: another second entry after the same root.
+  const c = await signer();
+  const other = await m.sign(a.pair.privateKey, a.publicRaw, {
+    kind: "addClient", person: "alex", previous: b64(one.head), at: m.wireNow(), key: b64(c.publicRaw), clientKind: "web",
+  });
+  await assert.rejects(m.follow(two.pin(), { person: "alex", entries: [root, other] }), (error) => error.failure === "forked");
+  // Another person's lock.
+  await assert.rejects(m.follow({ ...two.pin(), person: "kim" }, lock), (error) => error.failure === "forked");
+  // An entry signed by a key that is not a client.
+  const stranger = await m.sign(c.pair.privateKey, c.publicRaw, {
+    kind: "addClient", person: "alex", previous: b64(two.head), at: m.wireNow(), key: b64(c.publicRaw), clientKind: "web",
+  });
+  await assert.rejects(m.check([root, add, stranger]), (error) => error.failure === "forged");
+  // Out of order.
+  await assert.rejects(m.check([add, root]), (error) => error.failure === "outOfOrder");
+  // A changed body.
+  const changed = { ...add, body: b64(Buffer.from(Buffer.from(add.body, "base64").toString().replace("Sam", "Kim"))) };
+  await assert.rejects(m.check([root, changed]), (error) => error.failure === "forged");
+});
+
+/** A control plane that keeps one person's lock and join requests, as lockjoins.go does. */
+function controlPlane(person = "alex") {
+  const lock = { person, entries: [] };
+  const requests = new Map();
+  const clients = [];
+  let n = 0;
+  const tell = (method, params) => { for (const c of clients) queueMicrotask(() => c.lock.notify(method, structuredClone(params))); };
+  const row = (r) => { const { result, ...rest } = r; return rest; };
+  const changed = (r) => (r.result ? tell("control/lockJoinDecided", { request: r.request, result: r.result }) : tell("control/lockJoinRequested", row(r)));
+  const fail = (code, message) => Object.assign(new Error(message), { code });
+  const plane = {
+    lock, requests, calls: [],
+    connect(client, name, kind = "browser", pins = new model.MemoryPins()) {
+      const keys = { pair: null };
+      const said = [];
+      const link = {
+        call: (method, params) => plane.answer(client, name, kind, method, structuredClone(params)),
+        keyRecord: async () => ({ client }),
+        lockKey: async () => keys.pair,
+        saveLockKey: async (pair) => { keys.pair = pair; },
+      };
+      const entry = { client, keys, said, pins, lock: new model.MachineLock(link, pins, (error) => said.push(error.message)) };
+      clients.push(entry);
+      return entry;
+    },
+    async answer(client, name, kind, method, params) {
+      plane.calls.push({ client, method, params });
+      switch (method) {
+        case "lock/get": return structuredClone(lock);
+        case "lock/add": {
+          const state = await m.check(lock.entries);
+          const first = await m.open(params.entries[0]);
+          if ((first.previous ?? "") !== (lock.entries.length ? b64(state.head) : "")) throw fail(-32093, "Another of your devices changed your lock at the same time.");
+          for (const e of params.entries) await state.add(e);
+          lock.entries.push(...params.entries);
+          tell("control/lockChanged", { count: state.count, head: b64(state.head) });
+          for (const r of requests.values()) {
+            const member = r.result ? undefined : state.member(bytes(r.key));
+            if (member) { r.result = "approved"; changed(r); }
+          }
+          return { count: state.count, head: b64(state.head) };
+        }
+        case "lock/join": {
+          for (const r of requests.values()) if (r.client === client && !r.result) { r.result = "expired"; changed(r); }
+          const r = { request: `r${++n}`, client, name, kind, key: params.key, commitment: params.commitment, expires: m.wireNow() + 600 };
+          requests.set(r.request, r);
+          changed(r);
+          return { request: r.request, expires: r.expires };
+        }
+        case "lock/joinRequests": return [...requests.values()].filter((r) => !r.result).map(row);
+        case "lock/joinAnswer": {
+          const r = requests.get(params.request);
+          if (r.client === client) throw fail(-32003, "A device cannot approve itself.");
+          if (r.nonce) throw fail(-32003, "Another of your devices is comparing the digits already.");
+          r.nonce = params.nonce;
+          r.answeredBy = client;
+          changed(r);
+          return {};
+        }
+        case "lock/joinReveal": {
+          const r = requests.get(params.request);
+          if (b64(await m.commitment(bytes(r.key), bytes(params.nonce))) !== r.commitment) throw fail(-32602, "That nonce is not the one the request named.");
+          r.reveal = params.nonce;
+          changed(r);
+          return {};
+        }
+        case "lock/joinDeny": {
+          const r = requests.get(params.request);
+          r.result = "denied";
+          changed(r);
+          return {};
+        }
+      }
+      throw fail(-32601, `No method ${method}.`);
+    },
+  };
+  return plane;
+}
+
+test("the first browser makes the root; a second asks, compares digits and is approved", async () => {
+  const plane = controlPlane();
+  const mac = plane.connect("AAAA-1111", "Mac");
+  await mac.lock.run();
+  assert.equal(mac.lock.device.value.kind, "member");
+  assert.equal(plane.lock.entries.length, 1);
+  assert.equal(mac.pins.pin.count, 1);
+  assert.equal(mac.keys.pair.privateKey.extractable, false);
+
+  const web = plane.connect("BBBB-2222", "A browser");
+  await web.lock.run();
+  await wait();
+  assert.equal(web.lock.device.value.kind, "asking");
+  assert.equal(web.lock.device.value.digits, undefined);
+  // The signer sees the request, and never its own.
+  assert.equal(mac.lock.cards.value.length, 1);
+  assert.equal(mac.lock.cards.value[0].view.kind, "compare");
+  assert.equal(mac.lock.cards.value[0].request.name, "A browser");
+  assert.equal(web.lock.cards.value.length, 0);
+
+  await mac.lock.compare(mac.lock.cards.value[0].request.request);
+  await wait(50);
+  // The browser showed its nonce on the signer's; both make the same digits.
+  const shown = web.lock.device.value.digits;
+  assert.match(shown, /^\d{6}$/);
+  const card = mac.lock.cards.value[0];
+  assert.deepEqual(card.view, { kind: "digits", digits: shown });
+
+  await mac.lock.approve(card.request.request);
+  await wait(50);
+  assert.equal(plane.lock.entries.length, 2);
+  assert.equal(web.lock.device.value.kind, "member");
+  assert.equal(mac.lock.cards.value.length, 0);
+  assert.equal(web.pins.pin.count, 2);
+  const state = await m.check(plane.lock.entries);
+  assert.equal(state.membersOf("addClient")[1].clientKind, "web");
+  assert.deepEqual(mac.said, []);
+  assert.deepEqual(web.said, []);
+});
+
+test("another signer sees that one is comparing; a deny ends the ask, and Ask Again asks anew", async () => {
+  const plane = controlPlane();
+  const mac = plane.connect("AAAA-1111", "Mac");
+  await mac.lock.run();
+  const phone = plane.connect("CCCC-3333", "iPhone", "iPhone");
+  // The phone is in the lock already, by an entry the Mac signed.
+  phone.keys.pair = (await m.makeSigningKey()).pair;
+  const phoneRaw = new Uint8Array(await crypto.subtle.exportKey("raw", phone.keys.pair.publicKey));
+  const head = (await m.check(plane.lock.entries)).head;
+  await plane.answer("AAAA-1111", "Mac", "mac", "lock/add", { entries: [await m.sign(mac.keys.pair.privateKey,
+    new Uint8Array(await crypto.subtle.exportKey("raw", mac.keys.pair.publicKey)),
+    { kind: "addClient", person: "alex", previous: b64(head), at: m.wireNow(), key: b64(phoneRaw), clientKind: "remote" })] });
+  await phone.lock.run();
+  await wait();
+  assert.equal(phone.lock.device.value.kind, "member");
+
+  const web = plane.connect("BBBB-2222", "A browser");
+  await web.lock.run();
+  await wait();
+  const request = mac.lock.cards.value[0].request.request;
+  await phone.lock.compare(request);
+  await wait(50);
+  assert.equal(mac.lock.cards.value[0].view.kind, "another");
+  assert.equal(phone.lock.cards.value[0].view.kind, "digits");
+
+  await mac.lock.deny(request);
+  await wait(50);
+  assert.deepEqual(web.lock.device.value, { kind: "ended", result: "denied" });
+  assert.equal(phone.lock.cards.value.length, 0);
+
+  // A change to the lock does not ask again by itself.
+  await web.lock.run();
+  assert.equal(web.lock.device.value.kind, "ended");
+  await web.lock.askAgain();
+  await wait();
+  assert.equal(web.lock.device.value.kind, "asking");
+  assert.equal(mac.lock.cards.value.length, 1);
+  assert.equal(mac.lock.cards.value[0].view.kind, "compare");
+});
+
+test("digits come from this signer's nonce, and a reveal that breaks its promise is refused", async () => {
+  const plane = controlPlane();
+  const mac = plane.connect("AAAA-1111", "Mac");
+  await mac.lock.run();
+  const web = plane.connect("BBBB-2222", "A browser");
+  await web.lock.run();
+  await wait();
+  const request = mac.lock.cards.value[0].request.request;
+  await mac.lock.compare(request);
+  await wait(50);
+  const honest = mac.lock.cards.value[0].view.digits;
+  // A control plane that puts its own nonce in the row does not change the signer's digits.
+  const r = plane.requests.get(request);
+  mac.lock.notify("control/lockJoinRequested", { ...r, nonce: b64(new Uint8Array(16).fill(9)) });
+  await wait();
+  assert.equal(mac.lock.cards.value[0].view.digits, honest);
+  // One that shows another reveal than the commitment named is caught.
+  mac.lock.notify("control/lockJoinRequested", { ...r, reveal: b64(new Uint8Array(16).fill(7)) });
+  await wait();
+  assert.equal(mac.lock.cards.value[0].view.kind, "notPromised");
+  await mac.lock.approve(request);
+  assert.equal(plane.lock.entries.length, 1);
+});
+
+test("a lock that forks from the pin is broken, and says so", async () => {
+  const plane = controlPlane();
+  const mac = plane.connect("AAAA-1111", "Mac");
+  await mac.lock.run();
+  // The control plane swaps the lock for one of its own.
+  const other = await signer();
+  plane.lock.entries = [await m.sign(other.pair.privateKey, other.publicRaw, { kind: "root", person: "alex", at: m.wireNow(), key: b64(other.publicRaw) })];
+  await mac.lock.run();
+  assert.equal(mac.lock.device.value.kind, "broken");
+  assert.equal(model.brokenWords(mac.lock.device.value), "The lock changed in a way your devices did not sign.");
+  assert.equal(model.brokenWords({ forked: false, why: "entry 1: x" }), "Your lock does not check: entry 1: x.");
+});

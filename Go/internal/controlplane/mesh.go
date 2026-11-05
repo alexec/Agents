@@ -717,6 +717,9 @@ func (s *Service) apply(e controlEvent) {
 	case "lockChanged":
 		// An entry put on a person's lock at another copy (#3399).
 		s.lockChangedHere(e.Subject)
+	case "lockJoinChanged":
+		// A request to join a lock went on at another copy (#3490).
+		s.lockJoins.changedHere(e.Subject)
 	case "orgRoutesChanged":
 		// An org route changed at another copy (#999): its machines and clients here.
 		s.orgRoutesChangedHere()

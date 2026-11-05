@@ -214,6 +214,8 @@ type Service struct {
 	// Each person's machine lock (#3399), and the head each machine here was sent.
 	locks     *locks.Book
 	toldLocks toldLocks
+	// The clients asking to join a person's lock (#3490).
+	lockJoins *lockJoins
 	// Which bots are at a spend cap today (#1761).
 	caps botCaps
 	// The organisation's policy as this copy knows it, and what each machine was sent (#998).
@@ -306,6 +308,7 @@ func New(cfg Config) (*Service, error) {
 		return nil, err
 	}
 	s.locks = locks.New(cfg.Store)
+	s.lockJoins = newLockJoins(s)
 	s.backups = newBackupStore(cfg.Store, s.records, s.currentKeys)
 	if cfg.PeerURL != "" {
 		if s.peerOrigin, err = controllink.Origin(cfg.PeerURL); err != nil {
