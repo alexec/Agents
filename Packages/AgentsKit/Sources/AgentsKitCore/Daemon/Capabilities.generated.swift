@@ -69,6 +69,7 @@ public enum Capability {
     public static let hostDesktopControl1 = "host.desktop-control/1"
     public static let hostLock1 = "host.lock/1"
     public static let hostLock2 = "host.lock/2"
+    public static let hostLock3 = "host.lock/3"
     public static let hostOrgRoutes1 = "host.org-routes/1"
     public static let hostOrgRoutes2 = "host.org-routes/2"
     public static let hostPolicyLayers1 = "host.policy-layers/1"
@@ -337,6 +338,7 @@ public enum Capability {
         "lineage/link": "lineage/1",
         "lineage/links": "lineage/1",
         "lineage/walk": "lineage/1",
+        "lock/hello": "host.lock/3",
         "mac/open": "mac/1",
         "mac/reveal": "mac/1",
         "mac/terminal": "mac/1",

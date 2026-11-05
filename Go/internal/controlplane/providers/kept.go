@@ -48,6 +48,9 @@ type keptRecord struct {
 	ClientKind string          `json:"clientKind"`
 	At         records.Stamp   `json:"at"`
 	Failed     string          `json:"failed,omitempty"`
+	// Signed is the request as its client signed it (#3492): delivered as it is, since a
+	// host that holds its person's lock takes nothing else.
+	Signed *wire.LockDelivery `json:"signed,omitempty"`
 }
 
 func (r keptRecord) kind() string {
@@ -152,10 +155,10 @@ func (k *Kept) Load() {
 
 // Keep is KeptHandling.keep: a prompt or an agent start for a host that cannot take it
 // now. The error to answer with, kept when it was kept, another refusal, or nil to refuse
-// it as today.
-func (k *Kept) Keep(host, method string, params json.RawMessage, caller Caller) *Failure {
+// it as today. signed, when the client signed it, is kept and delivered as it is.
+func (k *Kept) Keep(host, method string, params json.RawMessage, caller Caller, signed *wire.LockDelivery) *Failure {
 	k.Load()
-	if !KeptMethods[method] {
+	if !KeptMethods[method] || signed != nil && signed.Method != method {
 		return nil
 	}
 	name := k.hooks.Keepable(host)
@@ -174,7 +177,11 @@ func (k *Kept) Keep(host, method string, params json.RawMessage, caller Caller) 
 		return fail(CodeHostOffline, "%s is starting; too many prompts are waiting.", name)
 	}
 	record := keptRecord{ID: records.NewUUID(), Host: host, Method: method, Params: once(method, params),
-		Client: strings.ToUpper(caller.Client), ClientKind: caller.Kind, At: records.Now()}
+		Client: strings.ToUpper(caller.Client), ClientKind: caller.Kind, At: records.Now(), Signed: signed}
+	if signed != nil {
+		// Its ids are the client's own: a byte changed here would not check.
+		record.Params = json.RawMessage(signed.Params)
+	}
 	if record.ClientKind == "" {
 		record.ClientKind = "unknown"
 	}
@@ -231,7 +238,12 @@ func (k *Kept) Attached(host string) {
 		if next == nil {
 			break
 		}
-		reply := k.router.DeliverKept(next.Method, next.Params, next.Client, next.ClientKind, host, time.Minute)
+		var reply *Reply
+		if next.Signed != nil {
+			reply = k.router.DeliverSigned(*next.Signed, next.Client, next.ClientKind, host, time.Minute)
+		} else {
+			reply = k.router.DeliverKept(next.Method, next.Params, next.Client, next.ClientKind, host, time.Minute)
+		}
 		if reply == nil {
 			// Gone again before it answered, or not answering: it stays for next time.
 			return

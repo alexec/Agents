@@ -4641,6 +4641,32 @@
       }
     },
     {
+      "name": "lock/hello",
+      "x-capability": "host.lock/3",
+      "description": "A client opens a checked channel to this machine (#3492, specs/3399-machine-lock D6): the machine checks the client's signing key against its person's lock and answers with its own key, and from then on every request and answer on the channel carries an HMAC and a count. Once the machine holds a lock, it refuses a request on a channel from the control plane that has no HMAC from a channel opened this way, or no signature of a key in the lock (LockSignature), except the few the control plane asks for itself.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LockHello"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LockHelloReply"
+        }
+      }
+    },
+    {
       "name": "mac/open",
       "x-capability": "mac/1",
       "paramStructure": "by-name",
@@ -9026,6 +9052,10 @@
       "notConfirmed": {
         "code": -32010,
         "message": "notConfirmed"
+      },
+      "notInLock": {
+        "code": -32104,
+        "message": "notInLock"
       },
       "notInWorkflowFolder": {
         "code": -32016,

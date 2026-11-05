@@ -83,6 +83,61 @@ public extension DaemonAPI {
         public var head: Data
     }
 
+    /// `lock/hello` (#3492, D6): a client opens a checked channel to a machine.
+    struct LockHello: Codable, Sendable, Hashable {
+        public var key: Data
+        public var ephemeral: Data
+        public var sig: Data
+
+        public init(key: Data, ephemeral: Data, sig: Data) {
+            self.key = key
+            self.ephemeral = ephemeral
+            self.sig = sig
+        }
+    }
+
+    /// `lock/hello`'s answer: the machine's key, its ephemeral key, and its signature.
+    struct LockHelloReply: Codable, Sendable, Hashable {
+        public var key: Data
+        public var ephemeral: Data
+        public var sig: Data
+
+        public init(key: Data, ephemeral: Data, sig: Data) {
+            self.key = key
+            self.ephemeral = ephemeral
+            self.sig = sig
+        }
+    }
+
+    /// A request signed by its sender (#3492): a client's kept request, as a request's `lock`.
+    /// `at` is seconds since 1970.
+    struct LockSignature: Codable, Sendable, Hashable {
+        public var to: String?
+        public var at: Int64
+        public var key: Data
+        public var sig: Data
+
+        public init(to: String?, at: Int64, key: Data, sig: Data) {
+            self.to = to
+            self.at = at
+            self.key = key
+            self.sig = sig
+        }
+    }
+
+    /// A signed request as the control plane keeps and delivers it: its params as text.
+    struct LockDelivery: Codable, Sendable, Hashable {
+        public var method: String
+        public var params: String
+        public var lock: LockSignature
+
+        public init(method: String, params: String, lock: LockSignature) {
+            self.method = method
+            self.params = params
+            self.lock = lock
+        }
+    }
+
     /// `lock/join`.
     struct LockJoin: Codable, Sendable, Hashable {
         public var key: Data
@@ -171,6 +226,8 @@ public extension DaemonAPI {
 public extension DaemonAPI.Method {
     /// `LockGet` → `Lock` (#3399, #3491).
     static let lockGet = "lock/get"
+    /// `LockHello` → `LockHelloReply`: a host's, the checked channel's start (#3492).
+    static let lockHello = "lock/hello"
     /// `LockAdd` → `LockHead` (#3399).
     static let lockAdd = "lock/add"
     /// `LockJoin` → `LockJoinStarted` (#3490).

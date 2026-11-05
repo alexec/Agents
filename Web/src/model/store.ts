@@ -1287,6 +1287,8 @@ export class Store extends Work {
       lockKey: () => link.lockKey(),
       saveLockKey: (pair) => link.saveLockKey(pair),
     }, undefined, (error) => this.say(describe(error)));
+    // A test's fake link has none.
+    link.setLock?.(() => this.machineLock.signer());
     link.onNotification((method, params, host) => {
       if (method === "control/providersChanged") {
         this.providers.take(params);
@@ -1429,7 +1431,7 @@ export class Store extends Work {
       }
     });
     link.onState((state) => {
-      if (state.kind === "open") void this.load().then(() => Promise.all([this.sealWaiting(), this.lockStep()]));
+      if (state.kind === "open") void this.load().then(() => this.sealWaiting());
     });
   }
 
@@ -1484,6 +1486,9 @@ export class Store extends Work {
           this.loadRemoveRequests()])),
         this.loadSignInRequests()]);
       this.takeHosts(hosts);
+      // This page's place in its lock first: a machine that holds the lock takes a call only
+      // on a channel this page opens with its lock key (#3492).
+      await this.lockStep().catch(() => undefined);
       await Promise.all(this.hosts.value.filter((host) => hostAnswers(host.state)).map((host) => this.onHost(host.id, async () => {
         // A removal that landed while this waited is not loaded back (#291).
         if (!this.hostIsOnline(host.id)) return;

@@ -326,6 +326,7 @@ func (d *Daemon) acceptLocal(c net.Conn, policy SocketPolicy, host string, priva
 	c.SetDeadline(time.Time{})
 	// A Mac's window is the Mac, as on the control plane's channel: it names no device.
 	sc := newSockConn(c, RoleControl)
+	sc.local = true
 	d.localMu.Lock()
 	if d.localConns == nil {
 		d.localConns = map[*sockConn]string{}

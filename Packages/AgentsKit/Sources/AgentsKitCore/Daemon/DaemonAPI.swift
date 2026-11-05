@@ -2864,6 +2864,10 @@ public enum DaemonAPI {
         /// A change another copy of the control plane made first: the store refused this
         /// one's write, and nothing was changed. Try again (058, contracts/store.md).
         public static let changedElsewhere = -32093
+        /// A machine that holds its person's lock took a request no key of the lock vouched
+        /// for (#3492, specs/3399-machine-lock D6): this device is not in the lock yet, or the
+        /// control plane sent it.
+        public static let notInLock = -32104
         /// The control plane's store cannot be reached. Live connections carry on;
         /// nothing new can be remembered until it is back.
         public static let storeUnavailable = -32094

@@ -47,6 +47,11 @@ final class LockState {
     }
 
     private(set) var place: Place = .unknown
+    /// The lock as this device last checked it, kept with the pin so a channel to a machine
+    /// opens before the control plane answers, and with it away (#3492).
+    private(set) var checked: MachineLock.State?
+    /// The control plane answered and the lock was read, or it has none.
+    private var settled = false
     private(set) var requests: [DaemonAPI.LockJoinRequest] = []
     /// Requests answered from here and not decided yet: their buttons wait.
     private(set) var answering: Set<String> = []
@@ -69,6 +74,25 @@ final class LockState {
         self.name = name
         self.kind = kind
         self.account = account
+        if let lock = pins.loadLock(), let state = try? MachineLock.follow(pins.load(), lock) { checked = state }
+    }
+
+    /// This device's lock key and its checked lock, for the channels it opens to machines
+    /// (#3492, D6); nil when it is not in its lock, and then it talks to machines as before.
+    /// With no lock kept yet, it waits a little for the control plane's.
+    func channelSigner() async -> LockChannel.Signer? {
+        for _ in 0..<50 where checked == nil && !settled {
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        guard let state = checked, let key = signingKey(), state.members[key.publicKey]?.isClient == true else { return nil }
+        return LockChannel.Signer(key: key, state: state)
+    }
+
+    /// Takes a lock this device checked: kept, with its pin.
+    private func took(_ state: MachineLock.State, _ lock: DaemonAPI.Lock) {
+        checked = state
+        pins.save(state.pin)
+        pins.saveLock(lock)
     }
 
     /// The cards to show now: other clients' open requests.
@@ -89,6 +113,7 @@ final class LockState {
     func connected(_ control: DaemonClient, client: UUID) async {
         self.client = client.uuidString
         await refresh(control)
+        settled = true
         let listed = try? await control.call(DaemonAPI.Method.lockJoinRequests, DaemonAPI.Empty(),
                                              returning: [DaemonAPI.LockJoinRequest].self)
         requests = listed ?? []
@@ -98,7 +123,8 @@ final class LockState {
     func heard(_ method: String, _ params: JSONValue?, on control: DaemonClient) async -> Bool {
         switch method {
         case DaemonAPI.Notification.controlLockChanged:
-            if place != .member { await refresh(control) }
+            // A member reads it too: the machines it opens channels to are in it (#3492).
+            await refresh(control)
         case DaemonAPI.Notification.controlLockJoinRequested:
             guard let request = try? params?.decode(DaemonAPI.LockJoinRequest.self) else { return true }
             if let index = requests.firstIndex(where: { $0.request == request.request }) {
@@ -250,7 +276,7 @@ final class LockState {
             // Another device may make the root at the same moment: then this one asks to join it.
             do {
                 try await put(root, on: control, first: true)
-                return
+                return await refresh(control)
             } catch LockTrouble.changed {
                 return await refresh(control)
             } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.changedElsewhere {
@@ -266,7 +292,7 @@ final class LockState {
             place = .broken(error)
             return
         }
-        pins.save(state.pin)
+        took(state, lock)
         if state.members[key.publicKey]?.isClient == true {
             place = .member
             return
@@ -340,5 +366,14 @@ struct LockPins {
 
     func save(_ pin: MachineLock.Pin) {
         if let data = try? JSONEncoder().encode(pin) { defaults.set(data, forKey: name) }
+    }
+
+    /// The whole lock last checked (#3492), beside its pin.
+    func loadLock() -> DaemonAPI.Lock? {
+        defaults.data(forKey: name + ".lock").flatMap { try? JSONDecoder().decode(DaemonAPI.Lock.self, from: $0) }
+    }
+
+    func saveLock(_ lock: DaemonAPI.Lock) {
+        if let data = try? JSONEncoder().encode(lock) { defaults.set(data, forKey: name + ".lock") }
     }
 }

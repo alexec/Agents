@@ -18,7 +18,7 @@ type MachineSessionStart = wire.MachineSessionStart
 // found by name and checked is theirs. It goes as that machine's own agents/start, and its
 // chat names the agent and machine in the control plane's words, not the asking host's. A
 // stopped workspace is kept for and started, as a client's start would be.
-func (p *Providers) startSessionOn(fromName, agent string, params json.RawMessage, caller Caller) (any, error) {
+func (p *Providers) startSessionOn(fromName, agent string, params json.RawMessage, caller Caller, deliver *wire.LockDelivery) (any, error) {
 	var request MachineSessionStart
 	if err := requireParams(params, &request, "MachineSessionStart", "host", "start"); err != nil {
 		return nil, err
@@ -34,8 +34,11 @@ func (p *Providers) startSessionOn(fromName, agent string, params json.RawMessag
 	}
 	start.StartedFrom = &wire.StartedFrom{Machine: fromName, Agent: asker, Who: agent}
 	p.log(fmt.Sprintf("workspace: agent %s on %s starts a session on %s", agent, fromName, name))
+	if deliver != nil && deliver.Method != MethodAgentsStart {
+		return nil, invalid("The signed request is not the start.")
+	}
 	if p.router.Online(host) {
-		reply := p.router.DeliverKept(MethodAgentsStart, rawOf(start), caller.Client, caller.Kind, host, time.Minute)
+		reply := p.deliverPeer(deliver, MethodAgentsStart, rawOf(start), caller, host, time.Minute)
 		if reply == nil {
 			return nil, fail(CodeHostOffline, "%s did not answer.", name)
 		}
@@ -49,7 +52,7 @@ func (p *Providers) startSessionOn(fromName, agent string, params json.RawMessag
 		return id, nil
 	}
 	if kept := p.Kept(); kept != nil {
-		if f := kept.Keep(host, MethodAgentsStart, rawOf(start), caller); f != nil {
+		if f := kept.Keep(host, MethodAgentsStart, rawOf(start), caller, deliver); f != nil {
 			return nil, f
 		}
 	}
@@ -61,7 +64,7 @@ func (p *Providers) startSessionOn(fromName, agent string, params json.RawMessag
 // that machine's agents/fromStarter, which answers only the agent that started it; from
 // says which, in the control plane's words. With project (#3277), that machine also
 // answers for a session of the project, so the asking machine must have a folder of it.
-func (p *Providers) sessionCall(from, fromName, agent string, params json.RawMessage, caller Caller) (any, error) {
+func (p *Providers) sessionCall(from, fromName, agent string, params json.RawMessage, caller Caller, deliver *wire.LockDelivery) (any, error) {
 	var request wire.MachineSessionCall
 	if err := requireParams(params, &request, "MachineSessionCall", "host", "call"); err != nil {
 		return nil, err
@@ -78,7 +81,10 @@ func (p *Providers) sessionCall(from, fromName, agent string, params json.RawMes
 	if !p.router.Online(host) {
 		return nil, fail(CodeHostOffline, "%s is offline.", name)
 	}
-	reply := p.router.DeliverKept(MethodAgentsFromStarter, rawOf(call), caller.Client, caller.Kind, host, time.Minute)
+	if deliver != nil && deliver.Method != MethodAgentsFromStarter {
+		return nil, invalid("The signed request is not the call.")
+	}
+	reply := p.deliverPeer(deliver, MethodAgentsFromStarter, rawOf(call), caller, host, time.Minute)
 	if reply == nil {
 		return nil, fail(CodeHostOffline, "%s did not answer.", name)
 	}
@@ -96,7 +102,7 @@ func (p *Providers) sessionCall(from, fromName, agent string, params json.RawMes
 // another machine started has ended. That machine is told with agents/endedElsewhere,
 // naming fromName as the session's machine; one offline is not, and finds out when its
 // agent next asks.
-func (p *Providers) sessionEnded(fromName string, params json.RawMessage, caller Caller) (any, error) {
+func (p *Providers) sessionEnded(fromName string, params json.RawMessage, caller Caller, deliver *wire.LockDelivery) (any, error) {
 	var ended wire.SessionEnded
 	if err := requireParams(params, &ended, "SessionEnded", "machine", "session", "starter", "how"); err != nil {
 		return nil, err
@@ -113,8 +119,11 @@ func (p *Providers) sessionEnded(fromName string, params json.RawMessage, caller
 		return nil, fail(CodeNoSuchHost, "No machine is called %s.", ended.Machine)
 	}
 	ended.Machine = fromName
+	if deliver != nil && deliver.Method != MethodAgentsEndedThere {
+		return nil, invalid("The signed request is not the ending.")
+	}
 	if p.router.Online(host) {
-		p.router.DeliverKept(MethodAgentsEndedThere, rawOf(ended), caller.Client, caller.Kind, host, time.Minute)
+		p.deliverPeer(deliver, MethodAgentsEndedThere, rawOf(ended), caller, host, time.Minute)
 	}
 	return map[string]any{}, nil
 }
@@ -126,7 +135,7 @@ func (p *Providers) sessionEnded(fromName string, params json.RawMessage, caller
 // bring_back (#2947), the reverse, as Bring Back from ‹machine›… does: that machine's
 // folders/sendFacts, folders/sendPack, which makes the bundle, or a part of it with
 // folders/sendRead. Only an online machine takes it; nothing of a send is kept.
-func (p *Providers) sendFolder(fromName, agent string, params json.RawMessage, caller Caller) (any, error) {
+func (p *Providers) sendFolder(fromName, agent string, params json.RawMessage, caller Caller, deliver *wire.LockDelivery) (any, error) {
 	var request wire.MachineFolderSend
 	if err := requireParams(params, &request, "MachineFolderSend", "host"); err != nil {
 		return nil, err
@@ -173,7 +182,10 @@ func (p *Providers) sendFolder(fromName, agent string, params json.RawMessage, c
 	if !p.router.Online(host) {
 		return nil, fail(CodeHostOffline, "%s is offline.", name)
 	}
-	reply := p.router.DeliverKept(method, rawOf(step), caller.Client, caller.Kind, host, patience)
+	if deliver != nil && deliver.Method != method {
+		return nil, invalid("The signed request is not that step.")
+	}
+	reply := p.deliverPeer(deliver, method, rawOf(step), caller, host, patience)
 	if reply == nil {
 		return nil, fail(CodeHostOffline, "%s did not answer.", name)
 	}
@@ -231,4 +243,14 @@ func (p *Providers) projectSessions(host string, params json.RawMessage, caller 
 		return nil, fail(CodeNotPermitted, "This machine has no folder in that project.")
 	}
 	return p.hooks.ProjectSessions(request, caller)
+}
+
+// deliverPeer delivers a machine's call to another of its person's machines: as the asking
+// machine signed it, when it did (#3492, D7), since a machine that holds the lock takes no
+// other; else in the control plane's own words, as before.
+func (p *Providers) deliverPeer(deliver *wire.LockDelivery, method string, params json.RawMessage, caller Caller, host string, patience time.Duration) *Reply {
+	if deliver != nil {
+		return p.router.DeliverSigned(*deliver, caller.Client, caller.Kind, host, patience)
+	}
+	return p.router.DeliverKept(method, params, caller.Client, caller.Kind, host, patience)
 }

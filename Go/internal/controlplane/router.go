@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controllink"
+	"github.com/alexec/agents/Go/internal/machinelock"
 	"github.com/alexec/agents/Go/internal/controlplane/notices"
 	"github.com/alexec/agents/Go/internal/controlplane/providers"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
@@ -291,7 +292,7 @@ func (r *Router) describedLocked(host string) map[string]any {
 // keeper is KeptHandling: what keeps a request for a stopped host, and is told when a
 // host attaches.
 type keeper interface {
-	Keep(host, method string, params json.RawMessage, caller providers.Caller) *providers.Failure
+	Keep(host, method string, params json.RawMessage, caller providers.Caller, signed *wire.LockDelivery) *providers.Failure
 	Attached(host string)
 }
 
@@ -1146,6 +1147,19 @@ func (r *Router) Ask(host, method string, params any, patience time.Duration) *m
 // bound to the client that asked, and its reply. Nil when the host is not here, goes
 // before it answers, or takes longer than patience: the request stays kept.
 func (r *Router) DeliverKept(method string, params any, client, kind, host string, patience time.Duration) *message {
+	return r.deliver(func(id string) string { return request(id, method, params) }, client, kind, host, patience)
+}
+
+// DeliverSigned is DeliverKept for a request its sender signed (#3492): a client's kept
+// request, or a machine's call to another machine. It goes as it was signed.
+func (r *Router) DeliverSigned(d wire.LockDelivery, client, kind, host string, patience time.Duration) *message {
+	if !json.Valid([]byte(d.Params)) {
+		return nil
+	}
+	return r.deliver(func(id string) string { return signedRequest(id, d) }, client, kind, host, patience)
+}
+
+func (r *Router) deliver(line func(id string) string, client, kind, host string, patience time.Duration) *message {
 	r.mu.Lock()
 	h := r.hosts[host]
 	if _, relay := r.relays[host]; relay || h == nil {
@@ -1162,7 +1176,7 @@ func (r *Router) DeliverKept(method string, params any, client, kind, host strin
 	}
 	wait := make(chan *message, 1)
 	r.keptWaits[delivery] = wait
-	if !h.conn.Send(openFrame(c, open)) || !h.conn.Send(channelFrame(c, request("kept-"+delivery, method, params))) {
+	if !h.conn.Send(openFrame(c, open)) || !h.conn.Send(channelFrame(c, line("kept-"+delivery))) {
 		delete(h.channels, c)
 		delete(r.keptWaits, delivery)
 		r.mu.Unlock()
@@ -1556,9 +1570,21 @@ func (r *Router) toHostLocked(host, msg, sessionID string) {
 			if r.audited != nil {
 				r.audited(s.caller, host, m.Method, m.Params)
 			}
+			// A request with a channel's MAC cannot be delivered later, on another channel:
+			// the client keeps it, signed, itself (hosts/keep). One its client signed is
+			// kept as it came (#3492).
+			var signed *wire.LockDelivery
+			if len(m.Lock) > 0 {
+				if sig, ok := machinelock.SignatureOf(m.Lock); ok {
+					signed = &wire.LockDelivery{Method: m.Method, Params: string(m.Params), Lock: sig}
+				} else {
+					r.writeLocked(sessionID, s.wrap(host, replyError(m.ID, refusal)))
+					return
+				}
+			}
 			k, caller, id, wrapped, method, params := r.keeper, s.caller, m.ID, s.wrapped, m.Method, m.Params
 			r.keeping <- func() {
-				answer := k.Keep(host, method, params, providersCaller(caller))
+				answer := k.Keep(host, method, params, providersCaller(caller), signed)
 				var err error = refusal
 				if answer != nil {
 					err = answer

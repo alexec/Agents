@@ -68,6 +68,7 @@ const CapHostBrowserSettings1 = "host.browser-settings/1"
 const CapHostDesktopControl1 = "host.desktop-control/1"
 const CapHostLock1 = "host.lock/1"
 const CapHostLock2 = "host.lock/2"
+const CapHostLock3 = "host.lock/3"
 const CapHostOrgRoutes1 = "host.org-routes/1"
 const CapHostOrgRoutes2 = "host.org-routes/2"
 const CapHostPolicyLayers1 = "host.policy-layers/1"
@@ -336,6 +337,7 @@ var HostCapabilities = pairs([][2]string{
 	{"lineage/link", "lineage/1"},
 	{"lineage/links", "lineage/1"},
 	{"lineage/walk", "lineage/1"},
+	{"lock/hello", "host.lock/3"},
 	{"mac/open", "mac/1"},
 	{"mac/reveal", "mac/1"},
 	{"mac/terminal", "mac/1"},

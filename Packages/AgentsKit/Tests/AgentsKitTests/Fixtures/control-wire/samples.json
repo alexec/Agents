@@ -370,6 +370,16 @@
     "method": "method",
     "params": {
       "k": "v"
+    },
+    "signed": {
+      "method": "method",
+      "params": "{\"k\":\"v\"}",
+      "lock": {
+        "to": "box",
+        "at": 1793880000,
+        "key": "AQID",
+        "sig": "AQID"
+      }
     }
   },
   "ProviderDraftStart": {
@@ -1284,6 +1294,31 @@
   "LockJoinNonce": {
     "request": "request",
     "nonce": "AQID"
+  },
+  "LockHello": {
+    "key": "AQID",
+    "ephemeral": "AQID",
+    "sig": "AQID"
+  },
+  "LockHelloReply": {
+    "key": "AQID",
+    "ephemeral": "AQID",
+    "sig": "AQID"
+  },
+  "LockSignature": {
+    "to": "box",
+    "at": 1793880000,
+    "key": "AQID",
+    "sig": "AQID"
+  },
+  "LockDelivery": {
+    "method": "agents/prompt",
+    "params": "{\"text\":\"go\"}",
+    "lock": {
+      "at": 1793880000,
+      "key": "AQID",
+      "sig": "AQID"
+    }
   },
   "LockJoinEnd": {
     "request": "request"

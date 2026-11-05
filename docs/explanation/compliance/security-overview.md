@@ -79,6 +79,47 @@ since #111. A lost phone can do these things until you forget it from another sc
 Forgetting cuts it off at once. See
 [One grant for every client](../control-plane.md#one-grant-for-every-client).
 
+## The machine lock
+
+A machine takes a request only when one of its person's own devices vouches for it (#3399,
+#3492). Each person has a machine lock: a chain of entries, each signed by one of their
+devices, that names their clients and their machines. The control plane keeps the chain and
+signs nothing in it.
+
+- **Each request is checked by the machine.** A client opens a channel to each machine with
+  a new P-256 ECDH key, signed with its lock key (ECDSA P-256, in the Secure Enclave where
+  there is one; a key that script cannot read in the browser). The machine answers with its
+  own, signed with its machine key. HKDF-SHA256 makes a key for each direction, and each
+  request and answer carries an HMAC-SHA256 and a count. Requests are signed, not encrypted.
+- **A kept request** for a machine that is away is signed by the client, and taken once, at
+  most a day later. **A machine's call to another machine** of the same person is signed by
+  that machine, and limited to starting and calling a session, and sending and bringing back
+  a folder.
+- **What the control plane may ask unsigned:** whether a machine is there, its sessions and
+  worktrees, a backup, and a clone for a new workspace. Nothing that starts an agent, runs a
+  command or reads a file.
+- **A new device or machine** joins the lock only when one of the person's devices approves
+  it, with six digits that both screens show and that the control plane cannot choose.
+
+What the control plane can and cannot do:
+
+| It can | It cannot |
+|---|---|
+| route, or refuse to route, any request | add a client or a machine to a lock |
+| read requests and answers (they are signed, not encrypted) | send a request that a machine takes as a client's |
+| keep the chain, and keep it back from a machine | change or remove an entry, or put one in a different order |
+| sign the org policy, which can only make a machine do less | give a client a machine key of its own to seal to |
+| ask a machine for its sessions and worktrees, a backup, or a clone | start an agent, run a command or read a file on a machine |
+| fire a workflow that the person set up on a machine | change what a machine answers |
+| serve a changed web page | sign with a Mac's or a phone's key |
+
+**Limits.** A control plane that serves a changed web page can use that browser's key while
+the page is open; the Mac and the Remote are signed apps and do not have this limit. What a
+machine says unasked (an agent's changes, a question card) is not signed yet. The client and
+person in the audit are still the control plane's word. The control plane can always refuse
+to route. See [What the control plane can and cannot do](../control-plane.md#what-the-control-plane-can-and-cannot-do).
+
+## Who did what
 ## Who did what
 
 Each change made on a machine through the control plane carries its **actor**: the

@@ -85,10 +85,14 @@ public extension DaemonAPI {
         public var host: MachineRef
         public var method: String
         public var params: JSONValue
-        public init(host: MachineRef, method: String, params: JSONValue) {
+        /// The same request signed by this client (#3492): a host that holds its person's lock
+        /// takes only that, so the control plane keeps and delivers it as it is.
+        public var signed: LockDelivery?
+        public init(host: MachineRef, method: String, params: JSONValue, signed: LockDelivery? = nil) {
             self.host = host
             self.method = method
             self.params = params
+            self.signed = signed
         }
     }
 

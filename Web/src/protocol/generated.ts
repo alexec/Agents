@@ -60,6 +60,7 @@ export const Failure = {
   notAllowed: -32060,
   notChanged: -32034,
   notConfirmed: -32010,
+  notInLock: -32104,
   notInWorkflowFolder: -32016,
   notKeeper: -32101,
   notLinked: -32065,
@@ -4338,11 +4339,16 @@ export interface JoinedFolder {
   project: string;
 }
 
-/** hosts/keep: a request for a stopped host, kept until it is up. */
+/**
+ * hosts/keep: a request for a stopped host, kept until it is up. signed is the same request signed
+ * by the client (#3492, D6): a host that holds its person's lock takes only that, so the control
+ * plane keeps and delivers it as it is.
+ */
 export interface KeepRequest {
   host: MachineRef;
   method: string;
   params: JSONValue;
+  signed?: LockDelivery;
 }
 
 export interface KeptDelivered {
@@ -4724,6 +4730,17 @@ export interface LockBody {
 }
 
 /**
+ * A request signed for a machine (#3492), as the control plane keeps it and delivers it: the
+ * method, the params as the sender wrote them (text, so no byte of them changes on the way), and
+ * the signature.
+ */
+export interface LockDelivery {
+  method: string;
+  params: string;
+  lock: LockSignature;
+}
+
+/**
  * One entry of a machine lock (#3399): body is a LockBody's JSON, kept as the signer wrote it, so
  * no language has to write it again the same way. sig is ECDSA P-256 with SHA-256 over
  * "agents-lock/1\n" then body, the 64 bytes r then s (as WebCrypto and CryptoKit's
@@ -4764,6 +4781,33 @@ export interface LockGet {
 export interface LockHead {
   count: number;
   head: Base64;
+}
+
+/**
+ * lock/hello (#3492, specs/3399-machine-lock D6): a client opens a checked channel to a machine.
+ * key is its signing key (P-256, X9.63), which the machine's lock must name as a client; ephemeral
+ * is a new ECDH P-256 key for this channel alone; sig is ECDSA P-256 (r then s) with SHA-256 over
+ * "agents-lock-channel/1\nclient\n" then ephemeral.
+ */
+export interface LockHello {
+  key: Base64;
+  ephemeral: Base64;
+  sig: Base64;
+}
+
+/**
+ * lock/hello's answer (#3492): key is the machine's own key, which the client's lock must name as
+ * an addMachine; ephemeral is the machine's new ECDH P-256 key; sig is ECDSA with the machine's key
+ * over "agents-lock-channel/1\nmachine\n", the client's ephemeral, the machine's ephemeral, then
+ * the client's key. Each side then makes a key for each direction with HKDF-SHA256 (the ECDH
+ * secret; salt the client's then the machine's ephemeral; info "agents-lock-channel/1 client" or "…
+ * machine"), and every request and answer carries "lock":{"n":…,"mac":…} last: HMAC-SHA256 over the
+ * count (8 bytes, big-endian) then the message without that member.
+ */
+export interface LockHelloReply {
+  key: Base64;
+  ephemeral: Base64;
+  sig: Base64;
 }
 
 /**
@@ -4827,6 +4871,22 @@ export interface LockJoinRequest {
 export interface LockJoinStarted {
   request: string;
   expires: WireDate;
+}
+
+/**
+ * A request signed by its sender's own key (#3492, D6, D7): a client's kept request for a machine
+ * that is not there, or a machine's call to another of its person's machines. It goes as the
+ * request's "lock" member. sig is ECDSA P-256 (r then s) with SHA-256 over
+ * "agents-lock-request/1\n", to, "\n", at in decimal, "\n", the method, "\n", then the params as
+ * sent. to is the machine's id; a machine may leave it out for another machine it named by name. at
+ * is seconds since 1970. The machine refuses one whose key its lock does not name, older than a
+ * day, or seen before.
+ */
+export interface LockSignature {
+  to?: string;
+  at: number;
+  key: Base64;
+  sig: Base64;
 }
 
 export interface MCPAddAnswer {
@@ -5570,11 +5630,16 @@ export interface MachineWorkspace {
   wakeAt?: WireDate;
 }
 
-/** host/machines, for an agent there: who asked, for the log, and its call. */
+/**
+ * host/machines, for an agent there: who asked, for the log, and its call. deliver is what the
+ * other machine is to get, signed by this one (#3492, D7): the control plane delivers it as it is,
+ * in place of its own words.
+ */
 export interface MachineWorkspaceCall {
   agent: string;
   method: string;
   params: JSONValue;
+  deliver?: LockDelivery;
 }
 
 /**
@@ -11089,6 +11154,7 @@ export interface Methods {
   "links/requests": { params: Empty; result: ChannelLinkRequest[] };
   "lock/add": { params: LockAdd; result: LockHead };
   "lock/get": { params: LockGet; result: Lock };
+  "lock/hello": { params: LockHello; result: LockHelloReply };
   "lock/join": { params: LockJoin; result: LockJoinStarted };
   "lock/joinAnswer": { params: LockJoinNonce; result: Empty };
   "lock/joinDeny": { params: LockJoinEnd; result: Empty };
@@ -11447,6 +11513,7 @@ export const MethodTarget = {
   "links/requests": "control",
   "lock/add": "control",
   "lock/get": "control",
+  "lock/hello": "host",
   "lock/join": "control",
   "lock/joinAnswer": "control",
   "lock/joinDeny": "control",
@@ -12054,7 +12121,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   JoinRequest: { required: ["request", "name", "platform", "code", "expires", "for"], optional: ["forName"] },
   JoinRequestDecide: { required: ["request"], optional: [] },
   JoinedFolder: { required: ["folder", "name", "project"], optional: [] },
-  KeepRequest: { required: ["host", "method", "params"], optional: [] },
+  KeepRequest: { required: ["host", "method", "params"], optional: ["signed"] },
   KeptDelivered: { required: ["host", "id"], optional: ["agentID"] },
   KeptList: { required: ["kept"], optional: [] },
   KeptRequest: { required: ["id", "host", "kind", "text", "at"], optional: ["agentID", "folder", "runtimeID", "failed"] },
@@ -12089,15 +12156,19 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Lock: { required: ["person", "entries"], optional: [] },
   LockAdd: { required: ["entries"], optional: [] },
   LockBody: { required: ["v", "kind", "person", "signer", "at", "key"], optional: ["previous", "sealingKey", "id", "name", "clientKind", "expires"] },
+  LockDelivery: { required: ["method", "params", "lock"], optional: [] },
   LockEntry: { required: ["body", "sig"], optional: [] },
   LockGet: { required: [], optional: ["person"] },
   LockHead: { required: ["count", "head"], optional: [] },
+  LockHello: { required: ["key", "ephemeral", "sig"], optional: [] },
+  LockHelloReply: { required: ["key", "ephemeral", "sig"], optional: [] },
   LockJoin: { required: ["key", "commitment"], optional: [] },
   LockJoinDecided: { required: ["request", "result"], optional: [] },
   LockJoinEnd: { required: ["request"], optional: [] },
   LockJoinNonce: { required: ["request", "nonce"], optional: [] },
   LockJoinRequest: { required: ["request", "client", "name", "kind", "key", "commitment", "expires"], optional: ["machine", "nonce", "answeredBy", "reveal"] },
   LockJoinStarted: { required: ["request", "expires"], optional: [] },
+  LockSignature: { required: ["at", "key", "sig"], optional: ["to"] },
   MCPAddAnswer: { required: [], optional: ["server", "error"] },
   MCPAddByHandRequest: { required: ["verifyID", "destination"], optional: [] },
   MCPAddRequest: { required: ["previewID", "destination", "secrets", "plain", "replace"], optional: [] },
@@ -12173,7 +12244,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineUser: { required: ["user", "kind", "name", "labels"], optional: ["capReachedUntil", "bots"] },
   MachineUserSettings: { required: ["user", "settings", "secrets"], optional: [] },
   MachineWorkspace: { required: ["provider", "providerName", "workspace", "workspaceName", "workspaceState", "canStart", "canStop", "startWhenUsed", "current"], optional: ["hostState", "phase", "since", "problem", "stoppedBy", "stopWhenIdleMinutes", "cost", "startForSchedules", "tellsSchedule", "nextWorkflow", "nextWorkflowAt", "wakeAt"] },
-  MachineWorkspaceCall: { required: ["agent", "method", "params"], optional: [] },
+  MachineWorkspaceCall: { required: ["agent", "method", "params"], optional: ["deliver"] },
   MachinesSummaryFacts: { required: ["machines"], optional: [] },
   ManagedMCPServer: { required: ["name", "registryName", "version", "run", "addedAt", "destination"], optional: ["byHand"] },
   ManagedSkill: { required: ["destination", "name", "source", "edited", "update"], optional: ["skillPath", "recordedHash", "commit", "committedAt", "catalogue"] },

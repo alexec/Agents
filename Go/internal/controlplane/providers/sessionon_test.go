@@ -354,3 +354,37 @@ func TestTheSummaryAsksThePersonsOtherMachines(t *testing.T) {
 		}
 	}
 }
+
+// #3492 (D7): a machine that holds its person's lock signs what the other machine is to
+// get. The control plane delivers it as it came, not in its own words, and only as the
+// method the call is for.
+func TestASignedStartGoesAsTheAskingMachineSignedIt(t *testing.T) {
+	h := newHarness(t)
+	made := records.NewUUID()
+	h.router.mu.Lock()
+	h.router.answer = func(host, method string, params json.RawMessage) *Reply { return &Reply{Result: rawOf(made)} }
+	h.router.mu.Unlock()
+	h.router.setOnline(devbox, true)
+	signed := `{"runtimeID":"claude", "cwd":"file:///home/me/app","prompt":"<b>&</b>","startedFrom":{"machine":"other","agent":"AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE","who":"Claude"}}`
+	deliver := &wire.LockDelivery{Method: MethodAgentsStart, Params: signed, Lock: wire.LockSignature{At: time.Now().Unix(), Key: []byte{4}, Sig: []byte{1}}}
+	call := func(d *wire.LockDelivery) (any, error) {
+		return h.providers.HostSaid(other, MethodHostMachines, rawOf(MachineWorkspaceCall{Agent: "Claude (fix-login)", Method: MethodSessionOnMachine,
+			Params: rawOf(sessionOn("devbox")), Deliver: d}))
+	}
+	if out, err := call(deliver); err != nil || string(out.(wire.UUID)) != made {
+		t.Fatalf("%v %+v", err, out)
+	}
+	sent := h.router.deliveries()
+	if len(sent) != 1 || sent[0].method != MethodAgentsStart || string(sent[0].params) != signed {
+		t.Fatalf("not delivered as signed: %+v", sent)
+	}
+	// A signed request for another method is not delivered as the start.
+	terminal := *deliver
+	terminal.Method = "mac/terminal"
+	if _, err := call(&terminal); failureOf(err) == nil {
+		t.Fatal("a signed terminal went as a start")
+	}
+	if len(h.router.deliveries()) != 1 {
+		t.Fatal("it was delivered")
+	}
+}
