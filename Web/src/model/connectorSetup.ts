@@ -1,7 +1,7 @@
 // The words of a folder's Connectors set-up and the one Connect sheet (#1336), ported from
 // ConnectorSetupWords in AgentsKitCore so the Mac, the Remote and the page say the same.
 import type {
-  Connection, ConnectionProvider, ConnectionSignIn, ConnectionSignInCompleteRequest, UUID, ConnectorEvents, ConnectorProof, ConnectorSetup, ConnectorSlot, ConnectorSlotKind, DocsServer,
+  Connection, ConnectionProvider, ConnectionSignIn, ConnectionSignInCompleteRequest, UUID, ConnectorEvents, ConnectorProof, ConnectorSetup, ConnectorSlot, ConnectorSlotKind, DocsServer, MessagingServer,
 } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 
@@ -80,7 +80,7 @@ export function setUpHeading(setup: ConnectorSetup): string {
 }
 
 export function heading(kind: ConnectorSlotKind): string {
-  return { tasks: "Tasks", codeReview: "Code review", ci: "CI", docs: "Docs", workspace: "Where agents run" }[kind];
+  return { tasks: "Tasks", codeReview: "Code review", ci: "CI", docs: "Docs", messaging: "Messaging", workspace: "Where agents run" }[kind];
 }
 
 /** The slots a folder's project can set (#2669): the forge's three, not Docs or Where agents run. */
@@ -106,7 +106,33 @@ export const docs = {
   }[s.state]}`,
 };
 
+/** The Messaging slot (#1787), as the window's ConnectorSetupWords.Messaging. */
+export const messaging = {
+  question: "Where do agents reach you?",
+  /** The chat connectors the page has no catalogue for: on the Mac, or not here yet. */
+  addElsewhere: (hasMac: boolean): string => hasMac
+    ? "Slack, Email, Google Chat and other chat connectors: add them on the Mac, in Add Connector…."
+    : "Slack, Email, Google Chat and other chat connectors: the web page cannot add them yet.",
+  noneNote: "Agents reach you in the app only.",
+  /** The line of a slot that is None: with no connector yet, or skipped with some. */
+  noneLine: (skipped: boolean): string => skipped
+    ? "Agents reach you in the app only. Its connectors stay, and their events with them."
+    : "Agents reach you in the app only. Add a Slack, email or chat connector to reach you there too.",
+  /** One messaging connector's line: what its one read found and the events it declares, or why not. */
+  serverLine: (s: MessagingServer): string => {
+    const label = s.word === s.name ? s.name : `${s.word} (${s.name})`;
+    let words = {
+      read: `read ${s.proof?.title ?? "it"}`,
+      notRead: "reading…",
+      failed: s.message ?? "the read didn't work.",
+    }[s.state];
+    if (s.state === "read" && s.events?.length) words += `; events ${s.events.join(", ")}`;
+    return `${label}: ${words}`;
+  },
+};
+
 export function title(slot: ConnectorSlot): string {
+  if (slot.state === "skipped" && slot.slot === "messaging") return "None";
   if (slot.state === "skipped") return "Skipped";
   if (slot.state === "noRemote" && slot.slot === "tasks") return "Choose a tracker";
   return slot.choice;
@@ -123,6 +149,7 @@ export function line(slot: ConnectorSlot, folder: string, repository: string | u
         codeReview: gitlab ? "Agents won't use merge requests here. Nothing is turned on." : "Agents won't use pull requests here. Nothing is turned on.",
         ci: "Agents won't wait on checks here. Nothing is turned on.",
         docs: "Agents won't look for docs before they work. Nothing is turned on.",
+        messaging: messaging.noneLine((slot.servers ?? []).length > 0),
         workspace: "Agents run on this Mac.",
       }[slot.slot];
     case "noRemote":
@@ -138,6 +165,7 @@ export function line(slot: ConnectorSlot, folder: string, repository: string | u
         codeReview: gitlab ? `No merge requests yet in ${repo}.` : `No pull requests yet in ${repo}.`,
         ci: gitlab ? `No pipelines yet in ${repo}.` : `No workflow runs yet in ${repo}.`,
         docs: docs.none,
+        messaging: "",
         workspace: onMac ? "Nothing to set up. Other places are set up in Providers." : otherProvidersElsewhere,
       }[slot.slot];
     case "notConnected":
@@ -148,13 +176,14 @@ export function line(slot: ConnectorSlot, folder: string, repository: string | u
         ci: gitlab ? `Agents see pipelines pass and fail, and wait on them. ${comesWith(forge)}`
           : `Agents see checks pass and fail, and wait on them. ${comesWith(forge)}`,
         docs: docs.none,
+        messaging: messaging.noneLine(false),
         workspace: "Nothing to set up.",
       }[slot.slot];
   }
 }
 
 export function proofLead(kind: ConnectorSlotKind): string {
-  return kind === "ci" ? "Last run" : "Newest";
+  return kind === "ci" ? "Last run" : kind === "messaging" ? "Read" : "Newest";
 }
 
 export function ago(at: Date, now: Date = new Date()): string {
@@ -208,6 +237,8 @@ export const connectLinear = "Connect Linear…";
 
 /** The Tasks slot's way to Jira (#3304): the Atlassian connection first, then its connector. */
 export const connectJira = "Connect Jira…";
+/** The Messaging slot's Email (#1787): the connection its connector reads. */
+export const connectEmail = "Connect Email…";
 
 /** The Tasks slot's other trackers: the page has no catalogue. With no Mac, it says so (#3425). */
 export function otherTrackers(linearConnected: boolean, hasMac: boolean): string {

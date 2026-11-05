@@ -42,6 +42,8 @@ export function ConnectorSetupSection({ store, host, folder, folderName, go }: {
   const [linearConnected, setLinearConnected] = useState<boolean>();
   /** The same for the Atlassian connection, for the Tasks slot's Jira (#3304). */
   const [jiraConnected, setJiraConnected] = useState<boolean>();
+  /** The same for the email connection, for the Messaging slot's Email (#1787). */
+  const [emailConnected, setEmailConnected] = useState<boolean>();
   const path = folderPath(folder);
   /** Add a Machine… or Add Provider…, in place (#2131). */
   const [adding, setAdding] = useState<"machine" | "provider">();
@@ -59,6 +61,7 @@ export function ConnectorSetupSection({ store, host, folder, folderName, go }: {
       const { connections } = await store.link.call("connections/list", {}, host);
       setLinearConnected(connections.some((c) => c.provider === "linear" && c.state === "connected"));
       setJiraConnected(connections.some((c) => c.provider === "atlassian" && c.state === "connected"));
+      setEmailConnected(connections.some((c) => c.provider === "email" && c.state === "connected"));
     } catch {
       // Unknown: the slot says what it said before.
     }
@@ -106,6 +109,7 @@ export function ConnectorSetupSection({ store, host, folder, folderName, go }: {
                 tryAgain={() => void load("fresh")} skip={(s) => void skip(slot.slot, s)}
                 linearConnected={linearConnected} connectLinear={() => setConnecting("linear")}
                 jiraConnected={jiraConnected} connectJira={() => setConnecting("atlassian")}
+                emailConnected={emailConnected} connectEmail={() => setConnecting("email")}
                 place={place} admin={store.person.value?.role !== "member"} add={setAdding} hasMac={store.hasMac.value} />
             ))}
           </div>
@@ -137,7 +141,7 @@ export function ConnectorSetupSection({ store, host, folder, folderName, go }: {
       {!setup && !problem && <p class="quiet small">Reading…</p>}
       {connecting && (
         <ConnectDialog store={store} host={host} provider={connecting} folder={path}
-          connected={() => void (connecting === "linear" || connecting === "atlassian" ? readLinear() : load("fresh"))}
+          connected={() => void (connecting === "linear" || connecting === "atlassian" || connecting === "email" ? readLinear() : load("fresh"))}
           close={() => setConnecting(undefined)} />
       )}
       {adding && (
@@ -192,13 +196,16 @@ function SlotMark({ slot, reading }: { slot: ConnectorSlot; reading: boolean }) 
   return <span class={`slot-mark ${slot.state}`} role="img" aria-label={label}>{mark}</span>;
 }
 
-function SlotCard({ slot, setup, folderName, reading, tryAgain, skip, linearConnected, connectLinear, jiraConnected, connectJira, place, admin, add, hasMac }: {
+function SlotCard({ slot, setup, folderName, reading, tryAgain, skip, linearConnected, connectLinear, jiraConnected, connectJira,
+  emailConnected, connectEmail, place, admin, add, hasMac }: {
   slot: ConnectorSlot; setup: ConnectorSetup; folderName: string; reading: boolean;
   tryAgain: () => void; skip: (skipped: boolean) => void;
   /** Tasks only: whether Linear is connected, unknown until read (#1682). */
   linearConnected: boolean | undefined; connectLinear: () => void;
   /** Tasks only: whether the Atlassian connection is there, for Jira (#3304). */
   jiraConnected: boolean | undefined; connectJira: () => void;
+  /** Messaging only: whether the email connection is there, for its connector (#1787). */
+  emailConnected: boolean | undefined; connectEmail: () => void;
   /** Where agents run only (#2131): its machine and line, and Add a Machine… or Add Provider…. */
   place: { title: string; line: string }; admin: boolean; add: (what: "machine" | "provider") => void;
   /** Whether the person has a Mac (#3425): what only the Mac app adds is sent there, or said to be missing here. */
@@ -207,7 +214,9 @@ function SlotCard({ slot, setup, folderName, reading, tryAgain, skip, linearConn
   const [changing, setChanging] = useState(false);
   const workspace = slot.slot === "workspace";
   const fromProject = slot.fromProject === true;
-  const canChange = workspace || (!fromProject && ["read", "refused", "failed"].includes(slot.state));
+  const talk = slot.slot === "messaging";
+  const hasServers = (slot.servers ?? []).length > 0;
+  const canChange = workspace || talk || (!fromProject && ["read", "refused", "failed"].includes(slot.state));
   const proof = slot.proof;
   const title = workspace ? place.title : words.title(slot);
   return (
@@ -218,7 +227,10 @@ function SlotCard({ slot, setup, folderName, reading, tryAgain, skip, linearConn
         {canChange && !changing && <button class="link small" onClick={() => setChanging(true)}>Change…</button>}
       </p>
       <p class="strong">{title}</p>
-      {proof ? (
+      {talk && slot.state !== "skipped" && slot.messagingServers?.length ? (
+        // Each messaging connector with its one real read and its events (#1787), in the place of the slot's one proof.
+        slot.messagingServers.map((s) => <p key={s.name} class="quiet small">{words.messaging.serverLine(s)}</p>)
+      ) : proof ? (
         <p class="quiet small">
           {words.proofLead(slot.slot)}:{" "}
           {proof.number != null && (proof.url
@@ -231,9 +243,9 @@ function SlotCard({ slot, setup, folderName, reading, tryAgain, skip, linearConn
           {workspace ? place.line : words.line(slot, folderName, setup.repository, false, words.forgeOf(setup))}
         </p>
       )}
-      {slot.docsServers?.length
+      {!talk && (slot.docsServers?.length
         ? slot.docsServers.map((s) => <p key={s.name} class="quiet small">{words.docs.serverLine(s)}</p>)
-        : words.docs.servers(slot.servers ?? []) && <p class="quiet small">{words.docs.servers(slot.servers ?? [])}</p>}
+        : words.docs.servers(slot.servers ?? []) && <p class="quiet small">{words.docs.servers(slot.servers ?? [])}</p>)}
       {fromProject && <p class="quiet small">{setByProject(setup.projectName ?? projectWords.title)}</p>}
       <p class="slot-actions small">
         {(slot.state === "notConnected" || slot.state === "noRemote") && slot.slot === "tasks" && (
@@ -251,7 +263,10 @@ function SlotCard({ slot, setup, folderName, reading, tryAgain, skip, linearConn
             <button onClick={tryAgain}>Try Again</button>
           </>
         )}
-        {!fromProject && slot.state === "skipped" && <button class="link" onClick={() => skip(false)}>Set Up</button>}
+        {talk && slot.state === "skipped" && !hasServers && emailConnected === false && (
+          <button class="link" onClick={connectEmail}>{words.connectEmail}</button>
+        )}
+        {!fromProject && slot.state === "skipped" && (!talk || hasServers) && <button class="link" onClick={() => skip(false)}>Set Up</button>}
       </p>
       {changing && workspace && (
         <div class="slot-change">
@@ -270,16 +285,25 @@ function SlotCard({ slot, setup, folderName, reading, tryAgain, skip, linearConn
       {changing && !workspace && (
         <div class="slot-change">
           {slot.slot === "docs" && <p class="strong">{words.docs.question}</p>}
-          <button onClick={() => setChanging(false)}>{slot.choice}</button>
+          {talk && <p class="strong">{words.messaging.question}</p>}
+          {(!talk || hasServers) && (
+            <button onClick={() => { if (slot.state === "skipped") skip(false); setChanging(false); }}>{slot.choice}</button>
+          )}
+          {talk && emailConnected === false && (
+            <button onClick={() => { connectEmail(); setChanging(false); }}>{words.connectEmail}</button>
+          )}
           {slot.slot === "tasks" && linearConnected === false && (
             <button onClick={() => { connectLinear(); setChanging(false); }}>{words.connectLinear}</button>
           )}
           {slot.slot === "tasks" && jiraConnected === false && (
             <button title={words.jira.tasksNote(hasMac)} onClick={() => { connectJira(); setChanging(false); }}>{words.connectJira}</button>
           )}
-          <button onClick={() => { skip(true); setChanging(false); }}>None (skip)</button>
+          {(!talk || (hasServers && slot.state !== "skipped")) && (
+            <button onClick={() => { skip(true); setChanging(false); }}>None (skip)</button>
+          )}
           <button class="link" onClick={() => setChanging(false)}>Cancel</button>
           {slot.slot === "docs" && <p class="quiet small">{words.docs.addElsewhere(hasMac)}</p>}
+          {talk && <p class="quiet small">{words.messaging.addElsewhere(hasMac)}</p>}
         </div>
       )}
     </div>

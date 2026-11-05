@@ -192,9 +192,9 @@ extension DaemonAPI {
     }
 
     /// One slot of a folder's set-up, in the page's order. Docs is where the folder's docs live
-    /// (#3248).
+    /// (#3248); Messaging is where agents reach the person (#1787).
     public enum ConnectorSlotKind: String, Codable, Sendable, Hashable, CaseIterable {
-        case tasks, codeReview, ci, docs, workspace
+        case tasks, codeReview, ci, docs, messaging, workspace
 
         /// A slot that a folder's project can set (#2669): the forge's three.
         public var isProjects: Bool { [.tasks, .codeReview, .ci].contains(self) }
@@ -252,17 +252,44 @@ extension DaemonAPI {
         public var servers: [String]?
         /// Docs only (#3307): each docs connector's one real search, through its map.
         public var docsServers: [DocsServer]?
+        /// Messaging only (#1787): each messaging connector with its one real read. There also
+        /// when the slot is skipped; absent when it is None.
+        public var messagingServers: [MessagingServer]?
 
         public var id: ConnectorSlotKind { slot }
         public var isFromProject: Bool { fromProject == true }
 
         public init(slot: ConnectorSlotKind, choice: String, state: ConnectorSlotState, proof: ConnectorProof? = nil,
                     readAt: Date? = nil, message: String? = nil, repository: String? = nil, fromProject: Bool? = nil,
-                    servers: [String]? = nil, docsServers: [DocsServer]? = nil) {
+                    servers: [String]? = nil, docsServers: [DocsServer]? = nil, messagingServers: [MessagingServer]? = nil) {
             self.slot = slot; self.choice = choice; self.state = state; self.proof = proof
             self.readAt = readAt; self.message = message; self.repository = repository; self.fromProject = fromProject
-            self.servers = servers; self.docsServers = docsServers
+            self.servers = servers; self.docsServers = docsServers; self.messagingServers = messagingServers
         }
+    }
+
+    /// One messaging connector in the Messaging slot (#1787): its mcp.json name, what it is
+    /// (Slack, Email, Google Chat), its one real read and the events it declares.
+    public struct MessagingServer: Codable, Sendable, Hashable {
+        public var name: String
+        public var word: String
+        public var state: MessagingServerState
+        /// What the read found: "3 channels", or its first line.
+        public var proof: ConnectorProof?
+        /// failed: why, in a sentence.
+        public var message: String?
+        /// The events it declares, such as slack.message.
+        public var events: [String]?
+
+        public init(name: String, word: String, state: MessagingServerState, proof: ConnectorProof? = nil,
+                    message: String? = nil, events: [String]? = nil) {
+            self.name = name; self.word = word; self.state = state; self.proof = proof
+            self.message = message; self.events = events
+        }
+    }
+
+    public enum MessagingServerState: String, Codable, Sendable, Hashable {
+        case notRead, read, failed
     }
 
     /// One docs connector in the Docs slot (#3307): its mcp.json name, and what its one real
