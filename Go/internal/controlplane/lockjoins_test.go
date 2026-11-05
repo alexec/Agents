@@ -1,0 +1,169 @@
+package controlplane
+
+import (
+	"bytes"
+	"crypto/ecdsa"
+	"encoding/json"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/alexec/agents/Go/internal/controllink"
+	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/internal/machinelock"
+	"github.com/alexec/agents/Go/wire"
+)
+
+func lockKey(t *testing.T) *ecdsa.PrivateKey {
+	t.Helper()
+	k, err := machinelock.NewKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return k
+}
+
+// signOnto signs body as the next entry of the lock s reads, and puts it there.
+func signOnto(t *testing.T, s *controllink.Session, signer *ecdsa.PrivateKey, body wire.LockBody) wire.LockHead {
+	t.Helper()
+	var lock wire.Lock
+	json.Unmarshal(call(t, s, "", "lock/get", nil), &lock)
+	body.Person, body.At = lock.Person, wire.DateOf(time.Now())
+	if len(lock.Entries) > 0 {
+		h := machinelock.HashOf(lock.Entries[len(lock.Entries)-1])
+		body.Previous = h[:]
+	}
+	e, err := machinelock.Sign(signer, body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var head wire.LockHead
+	json.Unmarshal(call(t, s, "", "lock/add", wire.LockAdd{Entries: []wire.LockEntry{e}}), &head)
+	return head
+}
+
+func joinNote(t *testing.T, s *controllink.Session, request string, ok func(wire.LockJoinRequest) bool) wire.LockJoinRequest {
+	t.Helper()
+	for {
+		var r wire.LockJoinRequest
+		json.Unmarshal(waitNote(t, s, "control/lockJoinRequested").Params, &r)
+		if r.Request == request && ok(r) {
+			return r
+		}
+	}
+}
+
+// #3490 (D2): a new client joins the lock by approval on a device that is in it. The six
+// digits come from a commitment, so the control plane passes the nonces on but cannot
+// choose them, and only a signer's addClient approves.
+func TestANewClientJoinsTheLockByApproval(t *testing.T) {
+	t.Parallel()
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	_, mac := p.client("Mac")
+	browserMember, browser := p.client("Browser")
+	macKey, browserKey := lockKey(t), lockKey(t)
+
+	// With no lock, there is nothing to join: the first client makes the root.
+	commitmentOf := func(nonce []byte) []byte { return machinelock.Commitment(machinelock.PublicKey(browserKey), nonce) }
+	clientNonce := bytes.Repeat([]byte{7}, machinelock.NonceSize)
+	ask := wire.LockJoin{Key: machinelock.PublicKey(browserKey), Commitment: commitmentOf(clientNonce)}
+	if e := callError(t, browser, "", "lock/join", ask); !strings.Contains(e, "no lock yet") {
+		t.Fatal(e)
+	}
+	signOnto(t, mac, macKey, wire.LockBody{Kind: wire.LockEntryKindRoot, Key: machinelock.PublicKey(macKey), Name: new("Mac"), ClientKind: new("mac")})
+
+	var started wire.LockJoinStarted
+	json.Unmarshal(call(t, browser, "", "lock/join", ask), &started)
+	asked := joinNote(t, mac, started.Request, func(wire.LockJoinRequest) bool { return true })
+	if asked.Client != browserMember.Client || asked.Name != "Browser" || !bytes.Equal(asked.Commitment, ask.Commitment) || asked.Nonce != nil {
+		t.Fatalf("%+v", asked)
+	}
+	var listed []wire.LockJoinRequest
+	json.Unmarshal(call(t, mac, "", "lock/joinRequests", nil), &listed)
+	if len(listed) != 1 || listed[0].Request != started.Request {
+		t.Fatalf("%+v", listed)
+	}
+
+	// The browser cannot show its nonce before a signer sent one, nor approve itself.
+	if e := callError(t, browser, "", "lock/joinReveal", wire.LockJoinNonce{Request: started.Request, Nonce: clientNonce}); !strings.Contains(e, "not waiting") {
+		t.Fatal(e)
+	}
+	signerNonce := bytes.Repeat([]byte{9}, machinelock.NonceSize)
+	if e := callError(t, browser, "", "lock/joinAnswer", wire.LockJoinNonce{Request: started.Request, Nonce: signerNonce}); !strings.Contains(e, "approve itself") {
+		t.Fatal(e)
+	}
+	call(t, mac, "", "lock/joinAnswer", wire.LockJoinNonce{Request: started.Request, Nonce: signerNonce})
+	answered := joinNote(t, browser, started.Request, func(r wire.LockJoinRequest) bool { return r.Nonce != nil })
+	if !bytes.Equal(answered.Nonce, signerNonce) || deref(answered.AnsweredBy) == "" {
+		t.Fatalf("%+v", answered)
+	}
+	// One signer's nonce only: a second cannot be sent, so nobody tries the digits twice.
+	if e := callError(t, mac, "", "lock/joinAnswer", wire.LockJoinNonce{Request: started.Request, Nonce: clientNonce}); !strings.Contains(e, "already") {
+		t.Fatal(e)
+	}
+	// A nonce that is not the committed one is refused.
+	if e := callError(t, browser, "", "lock/joinReveal", wire.LockJoinNonce{Request: started.Request, Nonce: signerNonce}); !strings.Contains(e, "not the one") {
+		t.Fatal(e)
+	}
+	call(t, browser, "", "lock/joinReveal", wire.LockJoinNonce{Request: started.Request, Nonce: clientNonce})
+	revealed := joinNote(t, mac, started.Request, func(r wire.LockJoinRequest) bool { return r.Reveal != nil })
+	key := machinelock.PublicKey(browserKey)
+	if machinelock.Digits(key, revealed.Reveal, signerNonce) != machinelock.Digits(key, clientNonce, answered.Nonce) {
+		t.Fatal("the two screens show different digits")
+	}
+
+	// Approve: the signer puts the browser's addClient on the lock.
+	signOnto(t, mac, macKey, wire.LockBody{Kind: wire.LockEntryKindAddClient, Key: key, Name: new("Browser"), ClientKind: new("web")})
+	var decided wire.LockJoinDecided
+	json.Unmarshal(waitNote(t, browser, "control/lockJoinDecided").Params, &decided)
+	if decided.Request != started.Request || decided.Result != "approved" {
+		t.Fatalf("%+v", decided)
+	}
+	json.Unmarshal(call(t, mac, "", "lock/joinRequests", nil), &listed)
+	if len(listed) != 0 {
+		t.Fatalf("%+v", listed)
+	}
+	var lock wire.Lock
+	json.Unmarshal(call(t, browser, "", "lock/get", nil), &lock)
+	state, err := machinelock.Check(lock.Entries)
+	if err != nil || !state.Signer(key) {
+		t.Fatal(err)
+	}
+	// In the lock now, it does not ask again.
+	if e := callError(t, browser, "", "lock/join", ask); !strings.Contains(e, "already") {
+		t.Fatal(e)
+	}
+}
+
+// A signer that says no ends the request; the client asking again ends its old one.
+func TestALockJoinIsDeniedOrAskedAgain(t *testing.T) {
+	t.Parallel()
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	_, mac := p.client("Mac")
+	_, phone := p.client("Phone")
+	macKey, phoneKey := lockKey(t), lockKey(t)
+	signOnto(t, mac, macKey, wire.LockBody{Kind: wire.LockEntryKindRoot, Key: machinelock.PublicKey(macKey)})
+	ask := wire.LockJoin{Key: machinelock.PublicKey(phoneKey), Commitment: machinelock.Commitment(machinelock.PublicKey(phoneKey), make([]byte, 16))}
+	var first, second wire.LockJoinStarted
+	json.Unmarshal(call(t, phone, "", "lock/join", ask), &first)
+	json.Unmarshal(call(t, phone, "", "lock/join", ask), &second)
+	var listed []wire.LockJoinRequest
+	json.Unmarshal(call(t, mac, "", "lock/joinRequests", nil), &listed)
+	if len(listed) != 1 || listed[0].Request != second.Request {
+		t.Fatalf("%+v", listed)
+	}
+	call(t, mac, "", "lock/joinDeny", wire.LockJoinEnd{Request: second.Request})
+	for {
+		var decided wire.LockJoinDecided
+		json.Unmarshal(waitNote(t, phone, "control/lockJoinDecided").Params, &decided)
+		if decided.Request == second.Request {
+			if decided.Result != "denied" {
+				t.Fatalf("%+v", decided)
+			}
+			break
+		}
+	}
+	if e := callError(t, mac, "", "lock/joinAnswer", wire.LockJoinNonce{Request: second.Request, Nonce: make([]byte, 16)}); !strings.Contains(e, "ended") {
+		t.Fatal(e)
+	}
+}

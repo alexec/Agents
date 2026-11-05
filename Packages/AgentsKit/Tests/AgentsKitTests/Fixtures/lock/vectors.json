@@ -1,0 +1,51 @@
+{
+  "lock": {
+    "person": "alex",
+    "entries": [
+      {
+        "body": "eyJ2IjoxLCJraW5kIjoicm9vdCIsInBlcnNvbiI6ImFsZXgiLCJzaWduZXIiOiJCUHY1dmpLTTh3dk1UdzU5amd5N0pTOVoyOTdXQzZhcytBV1B6OUt0YXJzT2x5T3o5WjJvK3Y0ajR2Ry9QVTZlSmpjbFRxd0hBUWtnS2IzK1BNT055MkE9IiwiYXQiOjgxNTU1MzEyNy40OTAzNzExLCJrZXkiOiJCUHY1dmpLTTh3dk1UdzU5amd5N0pTOVoyOTdXQzZhcytBV1B6OUt0YXJzT2x5T3o5WjJvK3Y0ajR2Ry9QVTZlSmpjbFRxd0hBUWtnS2IzK1BNT055MkE9IiwibmFtZSI6Ik1hYyIsImNsaWVudEtpbmQiOiJtYWMifQ==",
+        "sig": "/n2l1htj2eiZnDGGKSM3Lgf+mdNJDpTs2bM0D6f8TxdVjMHm4eOigt+tK6czdMt1BOq/WaD9U5ZawEXVWqTqjg=="
+      },
+      {
+        "body": "eyJ2IjoxLCJraW5kIjoiYWRkQ2xpZW50IiwicGVyc29uIjoiYWxleCIsInByZXZpb3VzIjoiRDdRVy9CTm00amN4UlJ5RWl0Y1VMb2ExWmFUNHVySDFJU05mM25CUWt2Zz0iLCJzaWduZXIiOiJCUHY1dmpLTTh3dk1UdzU5amd5N0pTOVoyOTdXQzZhcytBV1B6OUt0YXJzT2x5T3o5WjJvK3Y0ajR2Ry9QVTZlSmpjbFRxd0hBUWtnS2IzK1BNT055MkE9IiwiYXQiOjgxNTQ4NjQwMCwia2V5IjoiQk9HWFc5UDl5cFp5U0FGUHZPbWFaK0tna004bStSODBDOTRzeWZHcUpnS0VUcERuQ1Vzd3RyWHJ2YnhUL3hKWTdxeTNHbk43YUp5Z0RVc1RMMmpVcS9ZPSIsIm5hbWUiOiJTYW3igJlzIGlQaG9uZSIsImNsaWVudEtpbmQiOiJyZW1vdGUifQ==",
+        "sig": "eeFk8WYE/GjRE4jVao3TxgzRg2h8RtI2lnNrkI1vQn3KkJdqv8HX7dRqt//Co2OFZp839+NbealwT+M/sIO7Iw=="
+      }
+    ]
+  },
+  "root": "0fb416fc1366e23731451c848ad7142e86b565a4f8bab1f521235fde705092f8",
+  "head": "108a0445bca8e02c5ad07555f4e13d672c6eba3908c6d448c1d26e8c46044567",
+  "members": [
+    {
+      "key": "BPv5vjKM8wvMTw59jgy7JS9Z297WC6as+AWPz9KtarsOlyOz9Z2o+v4j4vG/PU6eJjclTqwHAQkgKb3+PMONy2A=",
+      "kind": "root",
+      "name": "Mac",
+      "clientKind": "mac"
+    },
+    {
+      "key": "BOGXW9P9ypZySAFPvOmaZ+KgkM8m+R80C94syfGqJgKETpDnCUswtrXrvbxT/xJY7qy3GnN7aJygDUsTL2jUq/Y=",
+      "kind": "addClient",
+      "name": "Sam’s iPhone",
+      "clientKind": "remote"
+    }
+  ],
+  "forged": {
+    "person": "alex",
+    "entries": [
+      {
+        "body": "eyJ2IjoxLCJraW5kIjoicm9vdCIsInBlcnNvbiI6ImFsZXgiLCJzaWduZXIiOiJCUHY1dmpLTTh3dk1UdzU5amd5N0pTOVoyOTdXQzZhcytBV1B6OUt0YXJzT2x5T3o5WjJvK3Y0ajR2Ry9QVTZlSmpjbFRxd0hBUWtnS2IzK1BNT055MkE9IiwiYXQiOjgxNTU1MzEyNy40OTAzNzExLCJrZXkiOiJCUHY1dmpLTTh3dk1UdzU5amd5N0pTOVoyOTdXQzZhcytBV1B6OUt0YXJzT2x5T3o5WjJvK3Y0ajR2Ry9QVTZlSmpjbFRxd0hBUWtnS2IzK1BNT055MkE9IiwibmFtZSI6Ik1hYyIsImNsaWVudEtpbmQiOiJtYWMifQ==",
+        "sig": "/n2l1htj2eiZnDGGKSM3Lgf+mdNJDpTs2bM0D6f8TxdVjMHm4eOigt+tK6czdMt1BOq/WaD9U5ZawEXVWqTqjg=="
+      },
+      {
+        "body": "eyJ2IjoxLCJraW5kIjoiYWRkQ2xpZW50IiwicGVyc29uIjoiYWxleCIsInByZXZpb3VzIjoiRDdRVy9CTm00amN4UlJ5RWl0Y1VMb2ExWmFUNHVySDFJU05mM25CUWt2Zz0iLCJzaWduZXIiOiJCQjVmR3VGM1ZNcmc3Rnd1dDFlRGloMTlWYlczYi9KQmRpdmNXM2NIV3B5a3djL0FGLzlkSFNTZ1NRVFJvZGkzZUdvNGN0c3hJblNYQzN2TkZ5bHFiTnM9IiwiYXQiOjgxNTQ4NjQwMCwia2V5IjoiQk9HWFc5UDl5cFp5U0FGUHZPbWFaK0tna004bStSODBDOTRzeWZHcUpnS0VUcERuQ1Vzd3RyWHJ2YnhUL3hKWTdxeTNHbk43YUp5Z0RVc1RMMmpVcS9ZPSIsIm5hbWUiOiJOb3QgbWluZSIsImNsaWVudEtpbmQiOiJ3ZWIifQ==",
+        "sig": "9pQrQnc6cPF5vuR6wkn0wEwNhHM5le7Hz6+mSms+KOr73xbuB+DT702gjZzAC7Ih3nv4qG1HC7s8AISriCx7FQ=="
+      }
+    ]
+  },
+  "join": {
+    "key": "BOGXW9P9ypZySAFPvOmaZ+KgkM8m+R80C94syfGqJgKETpDnCUswtrXrvbxT/xJY7qy3GnN7aJygDUsTL2jUq/Y=",
+    "clientNonce": "AQEBAQEBAQEBAQEBAQEBAQ==",
+    "signerNonce": "AgICAgICAgICAgICAgICAg==",
+    "commitment": "Ve+3UCG5gag4kjB6e1KhY0ilRc51pjhFhfKe5MGw//A=",
+    "digits": "562733"
+  }
+}

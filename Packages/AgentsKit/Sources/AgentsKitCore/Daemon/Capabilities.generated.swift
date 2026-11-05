@@ -83,6 +83,7 @@ public enum Capability {
     public static let lineage1 = "lineage/1"
     public static let links1 = "links/1"
     public static let liveactivity1 = "liveactivity/1"
+    public static let lockJoin1 = "lock-join/1"
     public static let lock1 = "lock/1"
     public static let mac1 = "mac/1"
     public static let machine1 = "machine/1"
@@ -636,6 +637,11 @@ public enum Capability {
         "links/requests": "links/1",
         "lock/add": "lock/1",
         "lock/get": "lock/1",
+        "lock/join": "lock-join/1",
+        "lock/joinAnswer": "lock-join/1",
+        "lock/joinDeny": "lock-join/1",
+        "lock/joinRequests": "lock-join/1",
+        "lock/joinReveal": "lock-join/1",
         "machines/forAgent": "machines/1",
         "machines/projectFolders": "sessions.project/1",
         "machines/projectSessions": "sessions.project/1",
@@ -759,6 +765,8 @@ public enum Capability {
         "control/linkRequested": "links/1",
         "control/linksChanged": "links/1",
         "control/lockChanged": "lock/1",
+        "control/lockJoinDecided": "lock-join/1",
+        "control/lockJoinRequested": "lock-join/1",
         "control/moved": "control/1",
         "control/notice": "org-identity/1",
         "control/orgRoutesChanged": "org-routes/2",

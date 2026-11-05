@@ -82,6 +82,7 @@ const CapLineageComment1 = "lineage.comment/1"
 const CapLineage1 = "lineage/1"
 const CapLinks1 = "links/1"
 const CapLiveactivity1 = "liveactivity/1"
+const CapLockJoin1 = "lock-join/1"
 const CapLock1 = "lock/1"
 const CapMac1 = "mac/1"
 const CapMachine1 = "machine/1"
@@ -689,6 +690,11 @@ var ControlCapabilities = pairs([][2]string{
 	{"links/requests", "links/1"},
 	{"lock/add", "lock/1"},
 	{"lock/get", "lock/1"},
+	{"lock/join", "lock-join/1"},
+	{"lock/joinAnswer", "lock-join/1"},
+	{"lock/joinDeny", "lock-join/1"},
+	{"lock/joinRequests", "lock-join/1"},
+	{"lock/joinReveal", "lock-join/1"},
 	{"machines/forAgent", "machines/1"},
 	{"machines/projectFolders", "sessions.project/1"},
 	{"machines/projectSessions", "sessions.project/1"},
@@ -812,6 +818,8 @@ var ControlCapabilities = pairs([][2]string{
 	{"control/linkRequested", "links/1"},
 	{"control/linksChanged", "links/1"},
 	{"control/lockChanged", "lock/1"},
+	{"control/lockJoinDecided", "lock-join/1"},
+	{"control/lockJoinRequested", "lock-join/1"},
 	{"control/moved", "control/1"},
 	{"control/notice", "org-identity/1"},
 	{"control/orgRoutesChanged", "org-routes/2"},
@@ -865,6 +873,8 @@ var ControlNotifications = set([]string{
 	"control/linkRequested",
 	"control/linksChanged",
 	"control/lockChanged",
+	"control/lockJoinDecided",
+	"control/lockJoinRequested",
 	"control/moved",
 	"control/notice",
 	"control/orgRoutesChanged",

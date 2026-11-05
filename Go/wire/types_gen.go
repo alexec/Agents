@@ -5463,6 +5463,62 @@ type LockHead struct {
 	Head Data `json:"head"`
 }
 
+// lock/join (#3490, specs/3399-machine-lock D2): a client that is not in its person's lock asks to be added. key is its signing key (P-256, X9.63); commitment is the SHA-256 of "agents-lock-join/1\n", key, then a 16-byte nonce that the client shows only after a signer sent its own (lock/joinReveal), so a control plane cannot try the six digits again and again.
+type LockJoin struct {
+	Key Data `json:"key"`
+
+	Commitment Data `json:"commitment"`
+}
+
+// control/lockJoinDecided (#3490): how a request to join the lock ended: approved (a signer put the client's addClient on the lock), denied or expired.
+type LockJoinDecided struct {
+	Request string `json:"request"`
+
+	Result string `json:"result"`
+}
+
+// lock/joinDeny (#3490): a signer says no, or the asking client gives up.
+type LockJoinEnd struct {
+	Request string `json:"request"`
+}
+
+// lock/joinAnswer (a signer's nonce, 16 bytes, sent once) and lock/joinReveal (the asking client's nonce, which must match its commitment) (#3490).
+type LockJoinNonce struct {
+	Request string `json:"request"`
+
+	Nonce Data `json:"nonce"`
+}
+
+// lock/joinRequests and control/lockJoinRequested (#3490): a client asking to join its person's lock, to every client of that person, and sent again in place as it goes on. client is the asking client's id, so it knows its own. nonce is the signer's, once one sent it (lock/joinAnswer), and answeredBy is that signer's client id; reveal is the asking client's nonce, once it showed it. Each screen makes the six digits from key, reveal and nonce.
+type LockJoinRequest struct {
+	Request string `json:"request"`
+
+	Client string `json:"client"`
+
+	Name string `json:"name"`
+
+	Kind ClientKind `json:"kind"`
+
+	Key Data `json:"key"`
+
+	Commitment Data `json:"commitment"`
+
+	Expires Date `json:"expires"`
+
+	Nonce Data `json:"nonce,omitzero"`
+
+	AnsweredBy *string `json:"answeredBy,omitzero"`
+
+	Reveal Data `json:"reveal,omitzero"`
+}
+
+// lock/join's answer (#3490): the request, and when it ends unanswered.
+type LockJoinStarted struct {
+	Request string `json:"request"`
+
+	Expires Date `json:"expires"`
+}
+
 type MCPAddAnswer struct {
 	Server *ManagedMCPServer `json:"server,omitzero"`
 
