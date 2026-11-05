@@ -1153,6 +1153,7 @@
     ]
   },
   "UserSecretSet": {
+    "kind": "card",
     "name": "GITHUB_TOKEN",
     "version": 2,
     "values": {

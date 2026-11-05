@@ -206,3 +206,39 @@ func assertNotUnder(t *testing.T, root, s string) {
 		return nil
 	})
 }
+
+// #3531: a card secret is filled a part at a time, and once one part is in the page every
+// part is out of what the agent reads, the CVC as a whole number only.
+func TestACardIsFilledAPartAtATime(t *testing.T) {
+	card := `{"number":"4242424242424242","expiry":"09/31","cvc":"737","name":"Sam Lee","zip":"94110"}`
+	m, page, d := fillSetUp(t, map[string]string{"SHOP_CARD": card})
+	r := m.browserTool(2, "fill_secret", map[string]any{"secret": "SHOP_CARD", "target": "e7"})
+	if !r.IsError || !strings.Contains(replyText(r), "is a card. Name the part") || len(page.asked()) != 0 {
+		t.Fatalf("%+v", r)
+	}
+	for i, c := range []struct{ part, typed string }{
+		{"number", "4242424242424242"}, {"exp_month", "09"}, {"exp_year", "2031"}, {"expiry", "09/31"}, {"cvc", "737"}, {"zip", "94110"},
+	} {
+		r := m.browserTool(3+i, "fill_secret", map[string]any{"secret": "SHOP_CARD", "part": c.part, "target": "e7"})
+		if r.IsError || replyText(r) != "SHOP_CARD "+c.part+" filled." || page.value != c.typed {
+			t.Fatalf("%s: %+v %q", c.part, r, page.value)
+		}
+	}
+	page.value = "4242 4242 4242 4242, 09/31, 737, Sam Lee, 94110, $73.70"
+	got := replyText(m.browserTool(20, "browser_snapshot", nil))
+	want := "- textbox \"Password\": <secret SHOP_CARD.number ending 4242>, <secret SHOP_CARD.expiry>, <secret SHOP_CARD.cvc>, " +
+		"<secret SHOP_CARD.name>, <secret SHOP_CARD.zip>, $73.70"
+	if got != want {
+		t.Fatalf("got %q", got)
+	}
+	assertNotUnder(t, d.Store.Loc.Root, "4242424242424242")
+	assertNotUnder(t, d.Store.Loc.Root, `"cvc":"737"`)
+}
+
+func TestAPartIsOnlyForACard(t *testing.T) {
+	m, page, _ := fillSetUp(t, map[string]string{"GITLAB_PASSWORD": filledValue})
+	r := m.browserTool(2, "fill_secret", map[string]any{"secret": "GITLAB_PASSWORD", "part": "cvc", "target": "e7"})
+	if !r.IsError || !strings.Contains(replyText(r), "is not a card") || len(page.asked()) != 0 {
+		t.Fatalf("%+v", r)
+	}
+}

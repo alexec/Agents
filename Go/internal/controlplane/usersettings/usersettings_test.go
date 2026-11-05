@@ -219,6 +219,33 @@ func deref[T any](p *T) T {
 	return *p
 }
 
+func kinded(set wire.UserSecretSet, kind wire.UserSecretKind) wire.UserSecretSet {
+	set.Kind = &kind
+	return set
+}
+
+// #3531: a card's kind is kept with its name, so the clients draw it as a card, and a
+// plain value set again over it is plain.
+func TestACardsKindIsKeptWithItsName(t *testing.T) {
+	ctx := context.Background()
+	b := New(store.NewMemory(), nil, "")
+	box := newRecipient(t, "m:box")
+	card := `{"number":"4111111111111111","expiry":"12/30","cvc":"123","name":"Sam Lee","zip":"94110"}`
+	if err := b.SetSecret(ctx, "sam", kinded(sealed(t, "sam", "SHOP_CARD", 1, card, box), wire.UserSecretKindCard), allowing(box)); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := b.Names(ctx, "sam", nil)
+	if err != nil || len(rows) != 1 || rows[0].Kind == nil || *rows[0].Kind != wire.UserSecretKindCard {
+		t.Fatalf("%+v %v", rows, err)
+	}
+	if err := b.SetSecret(ctx, "sam", sealed(t, "sam", "SHOP_CARD", 2, "plain", box), allowing(box)); err != nil {
+		t.Fatal(err)
+	}
+	if rows, _ := b.Names(ctx, "sam", nil); rows[0].Kind != nil {
+		t.Fatalf("still a card: %+v", rows[0])
+	}
+}
+
 func TestSecretsAreChecked(t *testing.T) {
 	ctx := context.Background()
 	b := New(store.NewMemory(), nil, "")
@@ -233,6 +260,7 @@ func TestSecretsAreChecked(t *testing.T) {
 		{"too long", sealed(t, "sam", "X", 1, strings.Repeat("s3kr1t", MaxSecret), box)},
 		{"no version", sealed(t, "sam", "X", 0, "s3kr1t", box)},
 		{"to nobody of theirs", sealed(t, "sam", "X", 1, "s3kr1t", newRecipient(t, "m:kims"))},
+		{"an unknown kind", kinded(sealed(t, "sam", "X", 1, "s3kr1t", box), "bank")},
 	} {
 		err := b.SetSecret(ctx, "sam", c.set, allowing(box))
 		if !errors.Is(err, ErrInvalid) || strings.Contains(err.Error(), "s3kr1t") {

@@ -10327,6 +10327,14 @@ export interface UserSecret {
   value: string;
 }
 
+/**
+ * What a secret holds, when it is more than one value (#3531). card: a payment card that is locked
+ * to one merchant and has a spend limit (Privacy.com or the same), as one JSON object of number,
+ * expiry (MM/YY), cvc, name and zip. fill_secret fills it a part at a time. Left out for a plain
+ * value.
+ */
+export type UserSecretKind = "card";
+
 /** A secret's name, as ${NAME} in mcp.json and NAME= in ~/.agents-secrets/secrets.env. */
 export type UserSecretName = string;
 
@@ -10343,6 +10351,7 @@ export interface UserSecretRequest {
 /** One row of user/secretNames (#1760): a secret's name, never its value. */
 export interface UserSecretRow {
   name: UserSecretName;
+  kind?: UserSecretKind;
   updated: string;
   /** The machines it was sent to. */
   machines: MachineRef[];
@@ -10365,6 +10374,7 @@ export interface UserSecretRow {
  */
 export interface UserSecretSet {
   name: UserSecretName;
+  kind?: UserSecretKind;
   version: number;
   /** By recipient. */
   values: Record<string, SealedEnvelope>;
@@ -12693,8 +12703,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   UserSecret: { required: ["name", "value"], optional: [] },
   UserSecretNames: { required: ["secrets"], optional: [] },
   UserSecretRequest: { required: ["name"], optional: [] },
-  UserSecretRow: { required: ["name", "updated", "machines"], optional: ["leftOn", "version", "waiting"] },
-  UserSecretSet: { required: ["name", "version", "values"], optional: [] },
+  UserSecretRow: { required: ["name", "updated", "machines"], optional: ["kind", "leftOn", "version", "waiting"] },
+  UserSecretSet: { required: ["name", "version", "values"], optional: ["kind"] },
   UserSettings: { required: [], optional: ["mcpServers", "agentConfig", "agentConfigFiles", "runtimes", "costLimits", "notifications", "policy", "updated"] },
   UserSettingsChanged: { required: [], optional: ["parts", "agentConfigFiles", "secrets"] },
   UserSettingsPart: { required: ["part", "value"], optional: [] },

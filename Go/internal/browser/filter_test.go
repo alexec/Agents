@@ -45,6 +45,32 @@ func TestTheFilterTakesOutEachFormOfAValue(t *testing.T) {
 	}
 }
 
+// #3531: a card's CVC is hidden as a whole number only, so prices and longer numbers with
+// its digits stay.
+func TestTheFilterHidesACodeAsAWholeNumber(t *testing.T) {
+	var f Filter
+	f.HideCode("CARD.cvc", "abc") // not a number
+	if f.Hides() {
+		t.Fatal("hid a code that is not a number")
+	}
+	f.Hide("CARD.number", "4111111111111123")
+	f.HideCode("CARD.cvc", "123")
+	for in, want := range map[string]string{
+		`textbox "CVC": 123`:            `textbox "CVC": <secret CARD.cvc>`,
+		"cvc=123&x=1":                   "cvc=<secret CARD.cvc>&x=1",
+		"price $1234, ref e123, 0.1230": "price $1234, ref e123, 0.1230",
+		"4111111111111123":              "<secret CARD.number ending 1123>",
+	} {
+		if got := f.Text(in); got != want {
+			t.Errorf("%q: got %q, want %q", in, got, want)
+		}
+	}
+	f.Forget()
+	if f.Hides() || f.Text("123") != "123" {
+		t.Fatal("still hides after Forget")
+	}
+}
+
 func TestTheFilterMasksImages(t *testing.T) {
 	var f Filter
 	f.SetMask(func(data []byte, mime string) ([]byte, error) {

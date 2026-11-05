@@ -5,17 +5,27 @@
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
-import type { UserSecretNames, UserSecretRow } from "../protocol/generated";
+import type { UserSecretKind, UserSecretNames, UserSecretRow } from "../protocol/generated";
 import { CallFailed } from "../wire/link";
 import { sealSecret } from "../wire/sealing";
 import { describe, methodNotFound } from "../model/errors";
-import { addSecret, isSecretName, leftOn, machines, nameHint, nextVersion,
-  secretsFoot, secretsLeft, secretsTitle, waitingOn } from "../model/userScope";
+import { addCard, addSecret, cardConfirm, cardKind, cardKindLabel, cardProblem, cardRule, cardValue, isSecretName, leftOn,
+  machines, nameHint, nextVersion, secretsFoot, secretsLeft, secretsTitle, tidyCard, waitingOn } from "../model/userScope";
 import { Modal } from "./Modal";
 
 function sentence(error: unknown): string {
   if (error instanceof CallFailed && error.code === methodNotFound) return "This control plane does not keep settings for you yet. Update it.";
   return describe(error);
+}
+
+/** Seals the value here to each of the person's machines and apps (#3397), and sends only the envelopes: the
+ * control plane never has it. kind is "card" for a card (#3531). */
+async function setSecret(store: Store, name: string, value: string, replacing: UserSecretRow | null, kind?: UserSecretKind) {
+  const version = nextVersion(replacing, Date.now());
+  const { recipients, user } = await store.link.call("user/secretRecipients", {});
+  // Only to the machines the lock names (#3491, D8): the control plane cannot add a key of its own.
+  const values = await sealSecret(user ?? "", name, version, value, await store.signedRecipients(recipients));
+  await store.link.call("user/setSecret", { name: name as never, version, values, ...(kind ? { kind } : {}) });
 }
 
 function SecretSheet({ store, replacing, close }: { store: Store; replacing: UserSecretRow | null; close: () => void }) {
@@ -26,13 +36,7 @@ function SecretSheet({ store, replacing, close }: { store: Store; replacing: Use
   const save = async () => {
     busy.value = true;
     try {
-      // Sealed here to each of the person's machines and apps (#3397): the control plane never has the value.
-      const chosen = name.value.trim();
-      const version = nextVersion(replacing, Date.now());
-      const { recipients, user } = await store.link.call("user/secretRecipients", {});
-      // Only to the machines the lock names (#3491, D8): the control plane cannot add a key of its own.
-      const values = await sealSecret(user ?? "", chosen, version, value.value, await store.signedRecipients(recipients));
-      await store.link.call("user/setSecret", { name: chosen as never, version, values });
+      await setSecret(store, name.value.trim(), value.value, replacing);
       value.value = "";
       close();
     } catch (error) {
@@ -62,12 +66,79 @@ function SecretSheet({ store, replacing, close }: { store: Store; replacing: Use
   );
 }
 
+/** Add a Card… and a card's Replace… (#3531): only a card locked to a merchant with a spend limit. */
+function CardSheet({ store, replacing, close }: { store: Store; replacing: UserSecretRow | null; close: () => void }) {
+  const name = useSignal(replacing?.name ?? "");
+  const number = useSignal("");
+  const expiry = useSignal("");
+  const cvc = useSignal("");
+  const holder = useSignal("");
+  const zip = useSignal("");
+  const locked = useSignal(false);
+  const problem = useSignal<string | null>(null);
+  const busy = useSignal(false);
+  const save = async () => {
+    const card = tidyCard({ number: number.value, expiry: expiry.value, cvc: cvc.value, name: holder.value, zip: zip.value });
+    const wrong = cardProblem(card);
+    if (wrong) {
+      problem.value = wrong;
+      return;
+    }
+    busy.value = true;
+    try {
+      await setSecret(store, name.value.trim(), cardValue(card), replacing, cardKind);
+      number.value = "";
+      cvc.value = "";
+      close();
+    } catch (error) {
+      problem.value = sentence(error);
+    } finally {
+      busy.value = false;
+    }
+  };
+  const field = (label: string, signal: { value: string }, props: Record<string, unknown> = {}) => (
+    <input type="text" aria-label={label} placeholder={label} autocomplete="off" spellcheck={false} value={signal.value}
+      onInput={(e) => (signal.value = (e.currentTarget as HTMLInputElement).value)} {...props} />
+  );
+  const title = replacing ? `Replace ${replacing.name}` : "Add a Card";
+  return (
+    <Modal label={title} close={close}>
+      <form method="dialog" class="sheet-body" onSubmit={(e) => { e.preventDefault(); void save(); }}>
+        <h2>{title}</h2>
+        <p class="sheet-note">{cardRule}</p>
+        <label>
+          <input type="checkbox" checked={locked.value} onChange={(e) => (locked.value = (e.currentTarget as HTMLInputElement).checked)} />
+          {" "}{cardConfirm}
+        </label>
+        {!replacing && (
+          <input type="text" aria-label="Name" placeholder="SHOP_CARD" autocomplete="off" spellcheck={false}
+            value={name.value} onInput={(e) => (name.value = (e.currentTarget as HTMLInputElement).value.toUpperCase())} />
+        )}
+        {field("Card number", number, { type: "password", inputMode: "numeric" })}
+        {field("Expiry (MM/YY)", expiry, { inputMode: "numeric" })}
+        {field("CVC", cvc, { type: "password", inputMode: "numeric" })}
+        {field("Name on card", holder)}
+        {field("Billing ZIP", zip)}
+        <p class={problem.value ? "sheet-note failure" : "sheet-note"} role={problem.value ? "alert" : undefined}>{problem.value ?? nameHint}</p>
+        <div class="sheet-actions">
+          <button type="button" onClick={close}>Cancel</button>
+          <button type="submit" class="prominent"
+            disabled={busy.value || !locked.value || !number.value || !cvc.value || !isSecretName(name.value.trim())}>
+            {replacing ? "Replace" : "Add"}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 function SecretItem({ row, replace, remove, down }: { row: UserSecretRow; replace: () => void; remove: () => void; down: boolean }) {
   const left = leftOn(row);
   const waiting = waitingOn(row);
   return (
     <li class="user-secret">
       <code>{row.name}</code>
+      {row.kind === cardKind && <span class="hint">{cardKindLabel}</span>}
       <span class="hint">{machines(row)}</span>
       {waiting && <p class="hint attention">{waiting}</p>}
       {left && <p class="hint attention">{left}</p>}
@@ -100,6 +171,7 @@ function useUserScope(store: Store, down: boolean) {
 export function SecretsSection({ store, down }: { store: Store; down: boolean }) {
   const { names, problem, load } = useUserScope(store, down);
   const adding = useSignal(false);
+  const addingCard = useSignal(false);
   const replacing = useSignal<UserSecretRow | null>(null);
   const remove = async (name: string) => {
     if (!window.confirm(`Remove ${name}? It is taken out of secrets.env on every machine of yours.`)) return;
@@ -127,9 +199,13 @@ export function SecretsSection({ store, down }: { store: Store; down: boolean })
         ))}
       </ul>
       <button type="button" disabled={down} onClick={() => { adding.value = true; }}>{addSecret}</button>
+      <button type="button" disabled={down} onClick={() => { addingCard.value = true; }}>{addCard}</button>
       <p class="hint">{secretsFoot}</p>
       {adding.value && <SecretSheet store={store} replacing={null} close={() => { adding.value = false; void load(); }} />}
-      {replacing.value && <SecretSheet store={store} replacing={replacing.value} close={() => { replacing.value = null; void load(); }} />}
+      {addingCard.value && <CardSheet store={store} replacing={null} close={() => { addingCard.value = false; void load(); }} />}
+      {replacing.value && (replacing.value.kind === cardKind
+        ? <CardSheet store={store} replacing={replacing.value} close={() => { replacing.value = null; void load(); }} />
+        : <SecretSheet store={store} replacing={replacing.value} close={() => { replacing.value = null; void load(); }} />)}
     </section>
   );
 }

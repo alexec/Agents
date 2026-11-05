@@ -53,3 +53,59 @@ export function secretsLeft(left: SecretsLeft): string {
 export function isSecretName(name: string): boolean {
   return /^[A-Z_][A-Z0-9_]{0,63}$/.test(name);
 }
+
+// Card secrets (#3531), as CardSecret in Packages/AgentsKit: a payment card that is locked to one merchant
+// and has a spend limit, kept as one secret whose value is a JSON object of its parts. agentsd's fill_secret
+// reads it a part at a time.
+export const cardKind = "card";
+export const addCard = "Add a Card…";
+export const cardKindLabel = "Card";
+export const cardRule = "Add only a card that is locked to one merchant and has a spend limit, such as a Privacy.com card. "
+  + "An agent fills it into a page with fill_secret and never sees it. It stays sealed on your own machines.";
+export const cardConfirm = "This card is locked to one merchant and has a spend limit";
+
+export interface Card { number: string; expiry: string; cvc: string; name: string; zip: string }
+
+/** The expiry as MM/YY, from 9/2031, 09/31 or 0931. */
+export function tidyExpiry(typed: string): string {
+  const parts = typed.split(/\D+/).filter(Boolean);
+  if (parts.length === 2) {
+    const [month, year] = parts as [string, string];
+    return `${month.length === 1 ? `0${month}` : month}/${year.length === 4 ? year.slice(2) : year}`;
+  }
+  const digits = typed.replace(/\D/g, "");
+  return digits.length === 4 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : typed.trim();
+}
+
+/** The card as the person typed it, tidied: the number's digits only, the expiry as MM/YY. */
+export function tidyCard(typed: Card): Card {
+  return { number: typed.number.replace(/\D/g, ""), expiry: tidyExpiry(typed.expiry), cvc: typed.cvc.trim(),
+    name: typed.name.trim(), zip: typed.zip.trim() };
+}
+
+function luhn(digits: string): boolean {
+  let sum = 0;
+  [...digits].reverse().forEach((c, i) => {
+    let d = Number(c);
+    if (i % 2 === 1) { d *= 2; if (d > 9) d -= 9; }
+    sum += d;
+  });
+  return sum % 10 === 0;
+}
+
+/** What is wrong with a tidied card, or null when it can be added. */
+export function cardProblem(card: Card): string | null {
+  if (card.number.length < 12 || card.number.length > 19 || !luhn(card.number)) return "The card number is not right.";
+  const month = Number(card.expiry.slice(0, 2));
+  if (!/^\d{2}\/\d{2}$/.test(card.expiry) || month < 1 || month > 12) return "Write the expiry as MM/YY.";
+  if (!/^\d{3,4}$/.test(card.cvc)) return "The CVC is 3 or 4 digits.";
+  if (!card.name) return "Write the name on the card.";
+  if (!card.zip || card.zip.length > 10) return "Write the billing ZIP or postal code.";
+  return null;
+}
+
+/** The secret's value: one line of JSON with its keys in order, the same bytes as the window's. */
+export function cardValue(card: Card): string {
+  const { cvc, expiry, name, number, zip } = card;
+  return JSON.stringify({ cvc, expiry, name, number, zip });
+}
