@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/controlplane/signin"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 )
 
@@ -75,18 +76,17 @@ func (a Admin) Waitlist(ctx context.Context) ([]Waiting, error) {
 		if err != nil || o == nil {
 			continue
 		}
-		var link struct {
-			GitHub int64 `json:"github"`
-		}
-		if json.Unmarshal(o.Data, &link) != nil {
+		var link waitlistLink
+		if json.Unmarshal(o.Data, &link) != nil || !link.signIn().valid() {
 			continue
 		}
-		w, err := a.Store.Get(ctx, waitingKey(link.GitHub))
+		w, err := a.Store.Get(ctx, waitingKey(link.signIn()))
 		if err != nil || w == nil {
 			continue
 		}
 		var entry Waiting
 		if json.Unmarshal(w.Data, &entry) == nil {
+			entry.SignIn = signInOf(entry.SignIn, entry.GitHub)
 			list = append(list, entry)
 		}
 	}
@@ -116,19 +116,20 @@ func (a Admin) Unsuspend(ctx context.Context, id string) error {
 	return err
 }
 
-// Block refuses a GitHub user, by numeric id or by login (looked up in the accounts and
-// the waitlist), and suspends their account. It says the id it blocked.
-func (a Admin) Block(ctx context.Context, who, reason string) (int64, error) {
-	user, login, err := a.resolve(ctx, who)
+// Block refuses a sign-in, by provider:subject, a GitHub user's numeric id, or a GitHub
+// login (looked up in the accounts and the waitlist), and suspends their account. It says
+// the sign-in it blocked.
+func (a Admin) Block(ctx context.Context, who, reason string) (SignIn, error) {
+	user, err := a.resolve(ctx, who)
 	if err != nil {
-		return 0, err
+		return SignIn{}, err
 	}
-	data, _ := json.Marshal(Block{Login: login, Reason: reason, At: a.now()})
+	data, _ := json.Marshal(Block{Login: user.Login, Reason: reason, At: a.now()})
 	if _, err := a.Store.Put(ctx, blockedKey(user), data, store.Always); err != nil {
-		return 0, err
+		return SignIn{}, err
 	}
 	leaveWaitlist(ctx, a.Store, user)
-	if acc, err := a.accounts().byGitHub(ctx, user); err != nil {
+	if acc, err := a.accounts().bySignIn(ctx, user); err != nil {
 		return user, err
 	} else if acc != nil {
 		if reason == "" {
@@ -139,10 +140,28 @@ func (a Admin) Block(ctx context.Context, who, reason string) (int64, error) {
 	return user, nil
 }
 
-// Unblock lets a GitHub id sign up again. Its account, if any, stays suspended until
-// Unsuspend.
-func (a Admin) Unblock(ctx context.Context, user int64) error {
+// Unblock lets a sign-in, provider:subject or a GitHub id, sign up again. Its account, if
+// any, stays suspended until Unsuspend.
+func (a Admin) Unblock(ctx context.Context, who string) error {
+	user, ok := parseSignIn(who)
+	if !ok {
+		return fmt.Errorf("%q: %w", who, ErrNotSignIn)
+	}
 	return a.Store.Delete(ctx, blockedKey(user))
+}
+
+// ErrNotSignIn is a sign-in the operator typed that is neither provider:subject nor a
+// GitHub id.
+var ErrNotSignIn = errors.New("not provider:subject or a GitHub id")
+
+// parseSignIn is a sign-in as the operator types it: provider:subject, or a GitHub id.
+func parseSignIn(who string) (SignIn, bool) {
+	if n, err := strconv.ParseInt(who, 10, 64); err == nil && n > 0 {
+		return gitHubSignIn(n, ""), true
+	}
+	provider, subject, ok := strings.Cut(who, ":")
+	user := SignIn{Provider: strings.ToLower(provider), Subject: subject}
+	return user, ok && user.valid()
 }
 
 // SetPlan puts an account on a plan by hand (#2224): a running copy has its limits within
@@ -161,28 +180,29 @@ func (a Admin) SetPlan(ctx context.Context, id, plan string) error {
 // Accounts is every account.
 func (a Admin) Accounts(ctx context.Context) ([]Account, error) { return a.accounts().all(ctx) }
 
-// resolve is a GitHub id from a number, or from a login an account or the waitlist has.
-func (a Admin) resolve(ctx context.Context, who string) (int64, string, error) {
-	if n, err := strconv.ParseInt(who, 10, 64); err == nil && n > 0 {
-		return n, "", nil
+// resolve is a sign-in from provider:subject, a GitHub id, or a GitHub login an account or
+// the waitlist has.
+func (a Admin) resolve(ctx context.Context, who string) (SignIn, error) {
+	if user, ok := parseSignIn(who); ok {
+		return user, nil
 	}
 	list, err := a.Accounts(ctx)
 	if err != nil {
-		return 0, "", err
+		return SignIn{}, err
 	}
 	for _, acc := range list {
-		if strings.EqualFold(acc.GitHub.Login, who) {
-			return acc.GitHub.ID, acc.GitHub.Login, nil
+		if acc.SignIn.Provider == signin.GitHub && strings.EqualFold(acc.SignIn.Login, who) {
+			return acc.SignIn, nil
 		}
 	}
 	waiting, err := a.Waitlist(ctx)
 	if err != nil {
-		return 0, "", err
+		return SignIn{}, err
 	}
 	for _, w := range waiting {
-		if strings.EqualFold(w.GitHub.Login, who) {
-			return w.GitHub.ID, w.GitHub.Login, nil
+		if w.SignIn.Provider == signin.GitHub && strings.EqualFold(w.SignIn.Login, who) {
+			return w.SignIn, nil
 		}
 	}
-	return 0, "", fmt.Errorf("no account or waitlist entry has the login %q: give the GitHub id", who)
+	return SignIn{}, fmt.Errorf("no account or waitlist entry has the GitHub login %q: give provider:subject or the GitHub id", who)
 }

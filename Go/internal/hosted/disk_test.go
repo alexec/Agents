@@ -147,7 +147,7 @@ func TestAnUpgradePastTheTotalIsRefused(t *testing.T) {
 	if !madeAccount(b.signIn("good")) {
 		t.Fatal("not signed up")
 	}
-	acc, err := s.accounts.byGitHub(context.Background(), 42)
+	acc, err := s.accounts.bySignIn(context.Background(), gitHubSignIn(42, ""))
 	if err != nil || acc == nil {
 		t.Fatal("no account", err)
 	}

@@ -82,13 +82,29 @@ func (s sessions) formOK(r *http.Request, account string) bool {
 	return hmac.Equal([]byte(r.PostFormValue("token")), []byte(s.form(account)))
 }
 
-// newState is a sign-in's state, kept in its cookie.
-func (s sessions) newState(w http.ResponseWriter) string {
+// newState is a sign-in's state, kept in its cookie: the provider it went to, a dot, and
+// 24 random bytes.
+func (s sessions) newState(w http.ResponseWriter, provider string) string {
 	b := make([]byte, 24)
 	_, _ = rand.Read(b)
-	state := base64.RawURLEncoding.EncodeToString(b)
+	state := provider + "." + base64.RawURLEncoding.EncodeToString(b)
 	setCookie(w, stateCookie, s.sign(state), stateLife)
 	return state
+}
+
+// providerOf is the provider a state went to.
+func providerOf(state string) string {
+	provider, _, _ := strings.Cut(state, ".")
+	return provider
+}
+
+// derived is a value made from a sign-in's state under the session key, so the callback
+// makes it again with nothing more kept: the ID token's nonce, and the PKCE verifier,
+// which only this service can make.
+func (s sessions) derived(label, state string) string {
+	m := hmac.New(sha256.New, s.key)
+	m.Write([]byte(label + "|" + state))
+	return base64.RawURLEncoding.EncodeToString(m.Sum(nil))
 }
 
 func (s sessions) stateOK(r *http.Request, state string) bool {

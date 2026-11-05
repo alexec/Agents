@@ -43,7 +43,7 @@ func TestAnInviteLinkSignsUpOnce(t *testing.T) {
 		t.Fatal(link)
 	}
 	b := browserFor()
-	if _, page := b.get(link); !strings.Contains(page, "/signin?invite="+code) {
+	if _, page := b.get(link); !strings.Contains(page, "/signin?with=github&amp;invite="+code) {
 		t.Fatal("the page does not carry the invite:", page)
 	}
 	if res := b.signInWith("u.101.sam.400", code); !madeAccount(res) {
@@ -83,7 +83,7 @@ func TestTheWaitlistAndTheAllowlist(t *testing.T) {
 	if _, page := ana.signInPage("u.201.ana.400", ""); !strings.Contains(page, "number 1") {
 		t.Fatal(page)
 	}
-	if list, _ := admin.Waitlist(context.Background()); len(list) != 2 || list[0].GitHub.Login != "ana" {
+	if list, _ := admin.Waitlist(context.Background()); len(list) != 2 || list[0].SignIn.Login != "ana" {
 		t.Fatalf("%+v", list)
 	}
 	if err := admin.Allow(context.Background(), "ana"); err != nil {
@@ -92,7 +92,7 @@ func TestTheWaitlistAndTheAllowlist(t *testing.T) {
 	if res := ana.signIn("u.201.ana.400"); !madeAccount(res) {
 		t.Fatal("an admitted person was not signed up")
 	}
-	if list, _ := admin.Waitlist(context.Background()); len(list) != 1 || list[0].GitHub.Login != "bo" {
+	if list, _ := admin.Waitlist(context.Background()); len(list) != 1 || list[0].SignIn.Login != "bo" {
 		t.Fatalf("the account's entry is still on the waitlist: %+v", list)
 	}
 	// A login on the allowlist skips the age rule.
@@ -129,7 +129,7 @@ func TestABlockedUserGetsNothing(t *testing.T) {
 	if res := browserFor().signIn("u.401.spam.400"); !madeAccount(res) {
 		t.Fatal("not signed up")
 	}
-	if id, err := admin.Block(context.Background(), "spam", "Spam"); err != nil || id != 401 {
+	if id, err := admin.Block(context.Background(), "spam", "Spam"); err != nil || id.Subject != "401" {
 		t.Fatal(id, err)
 	}
 	list, _ := admin.Accounts(context.Background())
@@ -170,7 +170,8 @@ func TestSignUpRates(t *testing.T) {
 	// In all: 200 from 20 addresses make at most 30 (3 above, 27 more).
 	made := 0
 	for i := range 200 {
-		user := GitHubID{ID: int64(1000 + i), Login: "x" + itoa(i), Created: now.Now().Add(-400 * 24 * time.Hour)}
+		user := gitHubSignIn(int64(1000+i), "x"+itoa(i))
+		user.Created = now.Now().Add(-400 * 24 * time.Hour)
 		if got := s.gate(context.Background(), "198.51.100."+itoa(i%20), user, ""); got.account != nil {
 			made++
 		}
@@ -179,7 +180,7 @@ func TestSignUpRates(t *testing.T) {
 		t.Fatalf("%d made in the hour, want 27", made)
 	}
 	now.add(time.Hour + time.Second)
-	if got := s.gate(context.Background(), "203.0.113.1", GitHubID{ID: 2000, Login: "later", Created: now.Now().Add(-400 * 24 * time.Hour)}, ""); got.account == nil {
+	if got := s.gate(context.Background(), "203.0.113.1", aged(gitHubSignIn(2000, "later"), now.Now().Add(-400*24*time.Hour)), ""); got.account == nil {
 		t.Fatalf("refused an hour later: %+v", got)
 	}
 }
@@ -189,7 +190,7 @@ func TestSignUpRates(t *testing.T) {
 func TestTheMostCopies(t *testing.T) {
 	s, _, now, ids := idleService(t, 2)
 	s.cfg.MaxCopies = 2
-	acc, _, _ := s.accounts.make(context.Background(), GitHubID{ID: 3000, Login: "third"})
+	acc, _, _ := s.accounts.make(context.Background(), gitHubSignIn(3000, "third"))
 	now.add(time.Minute)
 	open(t, s, ids[1])
 	open(t, s, acc.ID)
@@ -221,7 +222,7 @@ func TestTheCertificateCaps(t *testing.T) {
 	s, _, now, ids := idleService(t, 0)
 	s.cfg.CertsPerHour, s.cfg.CertsPerWeek = 2, 3
 	for i := range 4 {
-		acc, _, _ := s.accounts.make(context.Background(), GitHubID{ID: int64(4000 + i), Login: "c"})
+		acc, _, _ := s.accounts.make(context.Background(), gitHubSignIn(int64(4000 + i), "c"))
 		ids = append(ids, acc.ID)
 	}
 	ask := func(id string) int {

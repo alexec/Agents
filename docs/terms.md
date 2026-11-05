@@ -6,7 +6,7 @@ description: The terms for using Agents, its docs site, the hosted service and i
 
 # Terms
 
-Last changed: 21 October 2026.
+Last changed: 4 November 2026.
 
 These terms are for the Agents apps (the Mac app, Agents Host, the Remote on iPhone and
 iPad, and the web page), this docs site, the hosted service, and the videos of Agents on
@@ -30,7 +30,8 @@ Agents does not change those terms and is not responsible for those services.
 
 ## The hosted service
 
-- You sign up with a GitHub account. One GitHub account gets one account on the service.
+- You sign up with an Apple, Google or GitHub account. Each of those accounts gets one
+  account on the service.
 - Do not use the service to break the law, to attack other systems, or to harm other people.
   The service can close an account that does.
 - The service can change, stop or delete accounts, mainly while it is in an early version.

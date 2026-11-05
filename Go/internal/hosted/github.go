@@ -31,7 +31,7 @@ func (g gitHub) authorize(state string) string {
 }
 
 // user trades a code for the GitHub user it signed in.
-func (g gitHub) user(ctx context.Context, code string) (GitHubID, error) {
+func (g gitHub) user(ctx context.Context, code string) (SignIn, error) {
 	form := url.Values{"client_id": {g.clientID}, "client_secret": {g.secret}, "code": {code}, "redirect_uri": {g.redirect}}
 	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, g.web+"/login/oauth/access_token", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -42,13 +42,13 @@ func (g gitHub) user(ctx context.Context, code string) (GitHubID, error) {
 		Description string `json:"error_description"`
 	}
 	if err := call(req, &token); err != nil {
-		return GitHubID{}, err
+		return SignIn{}, err
 	}
 	if token.AccessToken == "" {
 		if token.Description != "" {
-			return GitHubID{}, errors.New(token.Description)
+			return SignIn{}, errors.New(token.Description)
 		}
-		return GitHubID{}, fmt.Errorf("GitHub gave no token (%s)", token.Error)
+		return SignIn{}, fmt.Errorf("GitHub gave no token (%s)", token.Error)
 	}
 	req, _ = http.NewRequestWithContext(ctx, http.MethodGet, g.api+"/user", nil)
 	req.Header.Set("Authorization", "Bearer "+token.AccessToken)
@@ -59,12 +59,14 @@ func (g gitHub) user(ctx context.Context, code string) (GitHubID, error) {
 		Created time.Time `json:"created_at"`
 	}
 	if err := call(req, &who); err != nil {
-		return GitHubID{}, err
+		return SignIn{}, err
 	}
 	if who.ID == 0 {
-		return GitHubID{}, errors.New("GitHub did not say who signed in")
+		return SignIn{}, errors.New("GitHub did not say who signed in")
 	}
-	return GitHubID{ID: who.ID, Login: who.Login, Created: who.Created}, nil
+	user := gitHubSignIn(who.ID, who.Login)
+	user.Created = who.Created
+	return user, nil
 }
 
 func call(req *http.Request, into any) error {

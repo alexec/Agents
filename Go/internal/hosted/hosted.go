@@ -1,5 +1,6 @@
 // Package hosted is the hosted service (#1807, direction.md "From nothing to working"): a
-// person signs up on the web with GitHub, and gets a control plane of their own. Each
+// person signs up on the web with Apple, Google or GitHub (#3386), and gets a control
+// plane of their own. Each
 // account's control plane is the single-organisation one, unchanged: a copy of its own in
 // this process, with its own store prefix and its own control key. This service routes
 // <account>.<accounts domain> to that copy, and serves the sign-up and account pages at
@@ -19,11 +20,13 @@ import (
 
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/kms"
+	"github.com/alexec/agents/Go/internal/controlplane/signin"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 	"github.com/alexec/agents/Go/internal/hosted/billing"
 )
 
-// Config is what the service needs. Nothing in it is a secret except GitHubSecret.
+// Config is what the service needs. Nothing in it is a secret except GitHubSecret,
+// GoogleSecret and AppleKey.
 type Config struct {
 	// The store every account's records are kept in, each under accounts/<id>/.
 	Store store.Store
@@ -38,6 +41,20 @@ type Config struct {
 	GitHubClientID, GitHubSecret string
 	// github.com and api.github.com; other addresses in tests.
 	GitHubWeb, GitHubAPI string
+	// Sign in with Apple on the web (#3386): the Services ID, the team, and the Sign in
+	// with Apple key's id and its .p8 text. All four, or Apple is not offered.
+	AppleServicesID, AppleTeamID, AppleKeyID string
+	AppleKey                                 []byte
+	// Google's OAuth client of the web kind: its id and secret. Both, or Google is not
+	// offered.
+	GoogleClientID, GoogleSecret string
+	// Where Apple and Google are asked, and the client that asks them; zero is the real
+	// ones (tests give fakes).
+	AppleAt, GoogleAt Endpoints
+	SignInHTTP        *http.Client
+	// The sign-in providers each account's control plane checks (controlplane.Config.SignIn);
+	// nil is the app's own client ids, or AGENTS_SIGNIN_* over them.
+	CopySignIn *signin.Config
 	// The built web app (Web/dist) each control plane serves; "" serves none (tests).
 	Web string
 	// The views' sandbox proxy's domain for the copies' pages; "" draws no views.
@@ -86,6 +103,8 @@ type Service struct {
 	accounts *accounts
 	sessions sessions
 	github   gitHub
+	// Apple's and Google's web sign-in, by provider; one not set up is not there.
+	oidc map[string]*oidcSignIn
 	rates    rates
 	certs    certificates
 	// Stripe, or nil when billing is off.
@@ -161,7 +180,27 @@ func New(ctx context.Context, cfg Config) (*Service, error) {
 		github: gitHub{clientID: cfg.GitHubClientID, secret: cfg.GitHubSecret, web: cfg.GitHubWeb, api: cfg.GitHubAPI,
 			redirect: "https://" + cfg.Domain + "/signin/callback"},
 		stripe: stripe, copies: map[string]*copyRunning{}, starting: map[string]chan struct{}{}, stop: make(chan struct{}),
-		disk: &disk{read: cfg.Disk, now: cfg.Now}}
+		disk: &disk{read: cfg.Disk, now: cfg.Now}, oidc: map[string]*oidcSignIn{}}
+	redirect := "https://" + cfg.Domain + "/signin/callback"
+	if cfg.AppleServicesID != "" || cfg.AppleTeamID != "" || cfg.AppleKeyID != "" || len(cfg.AppleKey) > 0 {
+		if cfg.AppleServicesID == "" || cfg.AppleTeamID == "" || cfg.AppleKeyID == "" || len(cfg.AppleKey) == 0 {
+			return nil, errors.New("Sign in with Apple needs all four: AGENTS_HOSTED_APPLE_SERVICES_ID, AGENTS_HOSTED_APPLE_TEAM_ID, AGENTS_HOSTED_APPLE_KEY_ID and AGENTS_HOSTED_APPLE_KEY")
+		}
+		key, err := parseAppleKey(cfg.AppleKey)
+		if err != nil {
+			return nil, fmt.Errorf("AGENTS_HOSTED_APPLE_KEY: %w", err)
+		}
+		secret := appleSecret{team: cfg.AppleTeamID, keyID: cfg.AppleKeyID, servicesID: cfg.AppleServicesID, key: key, now: cfg.Now}
+		s.oidc[signin.Apple] = newOIDCSignIn(signin.Apple, cfg.AppleServicesID, secret.make, cfg.AppleAt, appleAt, redirect, cfg.SignInHTTP)
+	}
+	if (cfg.GoogleClientID == "") != (cfg.GoogleSecret == "") {
+		return nil, errors.New("Google sign-in needs both AGENTS_HOSTED_GOOGLE_CLIENT_ID and AGENTS_HOSTED_GOOGLE_SECRET")
+	}
+	if cfg.GoogleClientID != "" {
+		secret := cfg.GoogleSecret
+		s.oidc[signin.Google] = newOIDCSignIn(signin.Google, cfg.GoogleClientID, func() (string, error) { return secret, nil },
+			cfg.GoogleAt, googleAt, redirect, cfg.SignInHTTP)
+	}
 	go s.sweepIdleEvery(time.Minute)
 	return s, nil
 }

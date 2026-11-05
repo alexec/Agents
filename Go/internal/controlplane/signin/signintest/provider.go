@@ -42,6 +42,8 @@ type Provider struct {
 	Tokens atomic.Int64
 	// Forge signs ID tokens with a key that is not in the JWKS, under its key id.
 	Forge atomic.Bool
+	// NoPKCE takes a code flow with no PKCE, as Apple's (#3386).
+	NoPKCE atomic.Bool
 
 	mu sync.Mutex
 	// who is the person the next sign-in names, and what the test changes in the ID token.
@@ -51,6 +53,8 @@ type Provider struct {
 	// discovery changes the discovery document.
 	discovery func(map[string]any)
 	codes     map[string]grant
+	// secretOK checks the client secret in place of ClientSecret, when set.
+	secretOK func(secret string) bool
 	refreshes map[string]Claims
 	rsaKey    *rsa.PrivateKey
 	ecKey     *ecdsa.PrivateKey
@@ -123,6 +127,14 @@ func (p *Provider) Deny(code string) {
 	p.deny = code
 }
 
+// CheckSecret checks each client secret with ok in place of ClientSecret, as for Apple's,
+// which is a JWT the client signs (#3386).
+func (p *Provider) CheckSecret(ok func(secret string) bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.secretOK = ok
+}
+
 // ChangeDiscovery changes the discovery document the fake serves.
 func (p *Provider) ChangeDiscovery(f func(map[string]any)) {
 	p.mu.Lock()
@@ -193,7 +205,7 @@ func (p *Provider) serveAuthorize(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case deny != "":
 		answer.Set("error", deny)
-	case q.Get("code_challenge_method") != "S256" || q.Get("code_challenge") == "":
+	case !p.NoPKCE.Load() && (q.Get("code_challenge_method") != "S256" || q.Get("code_challenge") == ""):
 		answer.Set("error", "invalid_request")
 	default:
 		code := random(16)
@@ -220,7 +232,10 @@ func (p *Provider) serveToken(w http.ResponseWriter, r *http.Request) {
 	} else {
 		id, secret = r.PostForm.Get("client_id"), r.PostForm.Get("client_secret")
 	}
-	if id != p.ClientID || secret != p.ClientSecret {
+	p.mu.Lock()
+	secretOK := p.secretOK
+	p.mu.Unlock()
+	if id != p.ClientID || secretOK == nil && secret != p.ClientSecret || secretOK != nil && !secretOK(secret) {
 		tokenError(w, http.StatusUnauthorized, "invalid_client")
 		return
 	}
@@ -233,7 +248,8 @@ func (p *Provider) serveToken(w http.ResponseWriter, r *http.Request) {
 		delete(p.codes, r.PostForm.Get("code"))
 		p.mu.Unlock()
 		sum := sha256.Sum256([]byte(r.PostForm.Get("code_verifier")))
-		if !found || g.redirectURI != r.PostForm.Get("redirect_uri") || b64(sum[:]) != g.challenge {
+		pkce := b64(sum[:]) == g.challenge || p.NoPKCE.Load() && g.challenge == "" && r.PostForm.Get("code_verifier") == ""
+		if !found || g.redirectURI != r.PostForm.Get("redirect_uri") || !pkce {
 			tokenError(w, http.StatusBadRequest, "invalid_grant")
 			return
 		}

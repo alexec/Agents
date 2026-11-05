@@ -25,8 +25,9 @@ const adminUsage = `usage: agents-hosted admin <verb> …
   accounts                   every account
   suspend <account> <why>    stop its control plane; the person reads why
   unsuspend <account>        let it start again
-  block <github id|login> [why]  refuse a GitHub user, and suspend their account
-  unblock <github id>        let them sign up again
+  block <sign-in> [why]      refuse a sign-in, and suspend its account: provider:subject
+                             (apple:…, google:…, github:…), a GitHub id or a GitHub login
+  unblock <sign-in>          let it sign up again: provider:subject or a GitHub id
   plan <account> free|pro    put an account on a plan by hand
   backup [--keep N] <dir> [account…]
                              copy accounts (every one when none is named) into dir;
@@ -114,9 +115,9 @@ func runAdmin(ctx context.Context, a hosted.Admin, args []string, out io.Writer)
 			return err
 		}
 		tw := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
-		fmt.Fprintln(tw, "PLACE\tLOGIN\tGITHUB ID\tSINCE\tWHY")
+		fmt.Fprintln(tw, "PLACE\tSIGN-IN\tLOGIN\tSINCE\tWHY")
 		for i, w := range list {
-			fmt.Fprintf(tw, "%d\t%s\t%d\t%s\t%s\n", i+1, w.GitHub.Login, w.GitHub.ID, w.At.Format(time.RFC3339), w.Why)
+			fmt.Fprintf(tw, "%d\t%s\t%s\t%s\t%s\n", i+1, w.SignIn, w.SignIn.Login, w.At.Format(time.RFC3339), w.Why)
 		}
 		return tw.Flush()
 	case "accounts":
@@ -125,7 +126,7 @@ func runAdmin(ctx context.Context, a hosted.Admin, args []string, out io.Writer)
 			return err
 		}
 		tw := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
-		fmt.Fprintln(tw, "ACCOUNT\tLOGIN\tGITHUB ID\tPLAN\tSTATE\tCREATED")
+		fmt.Fprintln(tw, "ACCOUNT\tSIGN-IN\tLOGIN\tPLAN\tSTATE\tCREATED")
 		for _, acc := range list {
 			plan, state := acc.Plan, "active"
 			if plan == "" {
@@ -134,7 +135,7 @@ func runAdmin(ctx context.Context, a hosted.Admin, args []string, out io.Writer)
 			if acc.Suspended != nil {
 				state = "suspended: " + acc.Suspended.Reason
 			}
-			fmt.Fprintf(tw, "%s\t%s\t%d\t%s\t%s\t%s\n", acc.ID, acc.GitHub.Login, acc.GitHub.ID, plan, state, acc.Created.Format(time.RFC3339))
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", acc.ID, acc.SignIn, acc.SignIn.Login, plan, state, acc.Created.Format(time.RFC3339))
 		}
 		return tw.Flush()
 	case "suspend":
@@ -151,9 +152,9 @@ func runAdmin(ctx context.Context, a hosted.Admin, args []string, out io.Writer)
 		if err := need(1); err != nil {
 			return err
 		}
-		id, err := a.Block(ctx, rest[0], strings.Join(rest[1:], " "))
+		user, err := a.Block(ctx, rest[0], strings.Join(rest[1:], " "))
 		if err == nil {
-			fmt.Fprintf(out, "blocked GitHub id %d\n", id)
+			fmt.Fprintf(out, "blocked %s\n", user)
 		}
 		return err
 	case "plan":
@@ -212,11 +213,11 @@ func runAdmin(ctx context.Context, a hosted.Admin, args []string, out io.Writer)
 		if err := need(1); err != nil {
 			return err
 		}
-		id, err := strconv.ParseInt(rest[0], 10, 64)
-		if err != nil || id <= 0 {
+		err := a.Unblock(ctx, rest[0])
+		if errors.Is(err, hosted.ErrNotSignIn) {
 			return errUsage
 		}
-		return a.Unblock(ctx, id)
+		return err
 	}
 	return errUsage
 }

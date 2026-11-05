@@ -19,7 +19,9 @@ address of its own, and two browsers paired with it.
 
 ## Before you start
 
-- A GitHub account. One GitHub account gets one account on the service.
+- A GitHub account. One GitHub account gets one account on the service. The page also has
+  **Sign Up with Apple** and **Sign Up with Google**, which work the same way; this
+  tutorial uses GitHub.
 - The address of the hosted service, such as `agentloops.dev`. Whoever runs the service
   gives it to you. To run one yourself, see
   [Run the hosted service](../how-to/run-the-hosted-service.md).

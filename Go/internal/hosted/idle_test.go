@@ -68,7 +68,7 @@ func idleService(t *testing.T, n int) (*Service, *countingStore, *clock, []strin
 	t.Cleanup(s.Stop)
 	var ids []string
 	for i := range n {
-		acc, _, err := s.accounts.make(context.Background(), GitHubID{ID: int64(1000 + i), Login: "user"})
+		acc, _, err := s.accounts.make(context.Background(), gitHubSignIn(int64(1000 + i), "user"))
 		if err != nil {
 			t.Fatal(err)
 		}

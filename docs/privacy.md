@@ -6,7 +6,7 @@ description: What Agents keeps, where it keeps it, and what it sends to other se
 
 # Privacy
 
-Last changed: 30 October 2026.
+Last changed: 4 November 2026.
 
 Agents is local first. Your folders, conversations, settings and keys stay on machines
 that you control. Agents has no analytics, no tracking and no advertising. The people who
@@ -61,9 +61,12 @@ and where its code is.
 
 ## The hosted service
 
-If you sign up on the hosted service with GitHub, the service keeps your GitHub user id,
-your GitHub login and the date you signed up. It uses your GitHub token one time, to read
-your id and login, and then forgets it. Your control plane's records are kept apart from
+You sign up on the hosted service with Apple, Google or GitHub. The service keeps the id
+that provider gives you, which says nothing else about you, and the date you signed up.
+With GitHub it also keeps your GitHub login. It asks Apple and Google only who you are: not
+your email address and not your name. It uses the provider's token one time, to read that
+id, and then forgets it. Your control plane keeps the same id, so that you sign in to it
+with the same provider. Your control plane's records are kept apart from
 every other account's, and sealed with a key of their own. **Delete Account** on the
 account page stops your control plane and deletes everything it keeps, and the account too.
 

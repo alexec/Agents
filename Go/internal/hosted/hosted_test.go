@@ -86,6 +86,12 @@ func startBehind(t *testing.T, st store.Store, trusted []netip.Prefix) (*Service
 // makes browsers that reach it at every name, each with cookies of its own.
 func startWith(t *testing.T, cfg Config) (*Service, func() *browser) {
 	t.Helper()
+	return startWithServer(t, cfg, nil)
+}
+
+// startWithServer is startWith, and says the TLS server in *serving when not nil.
+func startWithServer(t *testing.T, cfg Config, serving **httptest.Server) (*Service, func() *browser) {
+	t.Helper()
 	g := fakeGitHub(t)
 	cfg.Keeper = "base64key://" + base64.URLEncoding.EncodeToString(bytes.Repeat([]byte{3}, 32))
 	cfg.Domain, cfg.GitHubClientID, cfg.GitHubSecret, cfg.GitHubWeb, cfg.GitHubAPI = domain, "Iv1.test", "secret", g.URL, g.URL
@@ -97,6 +103,9 @@ func startWith(t *testing.T, cfg Config) (*Service, func() *browser) {
 	t.Cleanup(s.Stop)
 	server := httptest.NewTLSServer(s)
 	t.Cleanup(server.Close)
+	if serving != nil {
+		*serving = server
+	}
 	address := server.Listener.Addr().String()
 	return s, func() *browser {
 		jar, _ := cookiejar.New(nil)

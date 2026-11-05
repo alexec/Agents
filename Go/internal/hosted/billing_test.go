@@ -50,7 +50,7 @@ func startBilling(t *testing.T, st store.Store, f *fakeStripe) (*Service, *brows
 		StripeWebhookSecret: webhookSecret})
 	b := newBrowser()
 	b.signIn("good")
-	acc, err := s.accounts.byGitHub(context.Background(), 42)
+	acc, err := s.accounts.bySignIn(context.Background(), gitHubSignIn(42, ""))
 	if err != nil || acc == nil {
 		t.Fatal("no account", err)
 	}
@@ -90,7 +90,7 @@ func planOf(t *testing.T, s *Service, id string) *Account {
 func TestNoStripeKeyIsNoBilling(t *testing.T) {
 	s, b := start(t, store.NewMemory())
 	b.signIn("good")
-	acc, _ := s.accounts.byGitHub(context.Background(), 42)
+	acc, _ := s.accounts.bySignIn(context.Background(), gitHubSignIn(42, ""))
 	_, page := b.get("https://" + domain + "/account")
 	if !strings.Contains(page, "Free Plan") || strings.Contains(page, "Upgrade") || strings.Contains(page, "Manage Billing") {
 		t.Fatal(page)

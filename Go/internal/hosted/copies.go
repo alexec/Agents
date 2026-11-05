@@ -119,7 +119,7 @@ func (s *Service) startCopy(ctx context.Context, id string) (*copyRunning, error
 	agents := &agentsCap{plan: PlanOf(acc), account: "https://" + s.cfg.Domain + "/account"}
 	cfg := controlplane.Config{Store: st, PrivateKey: key, URL: s.accountURL(id), Bind: "127.0.0.1", Port: 0,
 		Name: "Your control plane", MachineID: "hosted-" + id, PublicWeb: s.cfg.Web, PublicViews: views,
-		TrustedProxies: trusted, Hosted: true, SecretKeeper: s.cfg.Keeper, AgentsRunningGate: agents.gate,
+		TrustedProxies: trusted, Hosted: true, SecretKeeper: s.cfg.Keeper, AgentsRunningGate: agents.gate, SignIn: s.cfg.CopySignIn,
 		Log: func(line string) { s.log(id + ": " + line) }}
 	service, err := controlplane.New(cfg)
 	if err != nil {

@@ -1,13 +1,13 @@
 ---
 diataxis: how-to
 devices: [server]
-description: Run the hosted service, where a person signs up on the web with GitHub and gets a control plane of their own, with nothing to install.
+description: Run the hosted service, where a person signs up on the web with Apple, Google or GitHub and gets a control plane of their own, with nothing to install.
 ---
 
 # Run the hosted service
 
 The hosted service is the shortest way in: a person with only a browser signs up with
-GitHub, and gets a control plane of their own. They type no command and hold no key
+Apple, Google or GitHub, and gets a control plane of their own. They type no command and hold no key
 ([Direction](../explanation/direction.md)). This page is for whoever runs the service.
 
 Each account's control plane is the same single-organisation control plane that Agents
@@ -17,6 +17,8 @@ Host runs on a Mac. One `agents-hosted` process runs them all:
 - **Each account's control plane** is at a name of its own, such as
   `k3v9x0qa7b.cp.agentloops.dev`, with its own records under `accounts/<id>/` in the
   store, and its own control key, sealed in that place by Google Cloud KMS.
+- **The person who signed up** is their control plane's first person and admin. They sign
+  in to it with the same provider from the Mac app and the phone, with no code (#3386).
 - **The browser that signed up** is sent to its control plane with a pairing code in the
   address, and pairs itself. Nobody types a code. Any other browser pairs with **Open in
   This Browser** on the account page, after it signs in.
@@ -32,8 +34,18 @@ service's own ssh. Machines join with a code or their join command, from the web
 - Two DNS names pointing at it: the pages' name, and a wildcard for the control planes, such
   as `agentloops.dev` and `*.cp.agentloops.dev`.
 - A Google Cloud KMS key, as for [running a control plane in the cloud](run-the-control-plane-in-the-cloud.md).
-- The GitHub App's client secret, and `https://<your domain>/signin/callback` added to the
-  App's callback URLs.
+- At least one way to sign up. Each uses `https://<your domain>/signin/callback` as its
+  return address:
+  - **GitHub:** the GitHub App's client secret, with that address in the App's callback URLs.
+  - **Apple:** in the Apple Developer account, a Services ID with Sign in with Apple turned
+    on, your domain, and that return address; and a key with Sign in with Apple, its key id,
+    and its `.p8` file. The Services ID must be in the same team as the app, so a person has
+    the same Apple id here and in the app.
+  - **Google:** in Google Cloud ▸ APIs & Services ▸ Credentials, an OAuth client of the
+    **Web application** kind, with that return address. Its consent screen asks for no
+    scope beyond `openid`.
+
+  The service asks each provider only who the person is: no email address and no name.
 
 ## Start it
 
@@ -49,8 +61,17 @@ service's own ssh. Machines join with a code or their join command, from the web
     AGENTS_HOSTED_DOMAIN=agentloops.dev
     AGENTS_HOSTED_ACCOUNTS_DOMAIN=cp.agentloops.dev
     AGENTS_HOSTED_GITHUB_SECRET=…
+    AGENTS_HOSTED_APPLE_SERVICES_ID=dev.agentloops.signin
+    AGENTS_HOSTED_APPLE_TEAM_ID=…
+    AGENTS_HOSTED_APPLE_KEY_ID=…
+    AGENTS_HOSTED_APPLE_KEY=…
+    AGENTS_HOSTED_GOOGLE_CLIENT_ID=….apps.googleusercontent.com
+    AGENTS_HOSTED_GOOGLE_SECRET=…
     ACME_EMAIL=you@example.com
     ```
+
+    `AGENTS_HOSTED_APPLE_KEY` is the `.p8` file on one line: the text between its `BEGIN` and
+    `END` lines, with no line breaks. Leave out the lines of a provider you don't offer.
 
 3. Start it:
 
@@ -58,11 +79,13 @@ service's own ssh. Machines join with a code or their join command, from the web
     docker compose -f deploy/compose.hosted.yaml up -d --build
     ```
 
-4. Open `https://<your domain>/` and select **Sign Up with GitHub**.
+4. Open `https://<your domain>/` and select **Sign Up with Apple**, **Sign Up with
+   Google** or **Sign Up with GitHub**.
 
 Caddy gets a certificate for each control plane's name the first time it is asked for,
-and only for a name that `agents-hosted` says is an account's. Without the client secret,
-the sign-up page says that sign-up is not open.
+and only for a name that `agents-hosted` says is an account's. The sign-up page shows a
+button for each provider whose settings are all there; with none, it says that sign-up is
+not open.
 
 ## Deploy it on Google Cloud
 
@@ -120,8 +143,8 @@ the VM's `.env`; the others stay.
 
 ## Who can sign up
 
-Sign-up is by invitation at the start. A person with no invite who signs in with GitHub goes
-on a waitlist and sees their place in it. Agents keeps no email address, so they sign in
+Sign-up is by invitation at the start. A person with no invite goes on a waitlist and sees
+their place in it. Agents keeps no email address, so they sign in
 again later to see if their account is ready.
 
 - **Invite a person** with a link they can use once, within 14 days:
@@ -137,6 +160,9 @@ again later to see if their account is ready.
 These limits keep the service whole. Each is a setting below:
 
 - A GitHub account younger than 30 days waits, unless its login is allowed.
+- Apple and Google have no account age and no login to allow: they sign up only with an
+  invite, also when `AGENTS_HOSTED_SIGNUP` is `open`. The open sign-up spike (#3387) decides
+  what checks them instead.
 - 3 new accounts or waitlist entries an hour from one address, and 30 an hour in all. A
   person who has an account signs in whatever the rate.
 - At most 100 accounts. At the cap, even an invited person waits, at the front.
@@ -246,7 +272,7 @@ operators. To restore from the bucket, copy the folder back to `/data/backups` f
    and each record it did not hold is deleted. Only that account's records change.
 3. `admin unsuspend <account>`.
 
-An account that was deleted comes back whole, unless its GitHub user has signed up again:
+An account that was deleted comes back whole, unless the person has signed up again:
 then delete the new account first. Its control key is sealed with the service's KMS key, so a
 backup restores only with the same key.
 
@@ -256,11 +282,11 @@ Run these on the service's machine. A running service sees each change within a 
 
 | Command | What it does |
 | --- | --- |
-| `agents-hosted admin accounts` | Lists every account, its GitHub login, plan and state |
+| `agents-hosted admin accounts` | Lists every account, its sign-in (`apple:…`, `google:…` or `github:<id>`), GitHub login, plan and state |
 | `agents-hosted admin suspend <account> <why>` | Stops its control plane, which then refuses every request. Its records are kept. The person reads why on their account page, and can delete the account |
 | `agents-hosted admin unsuspend <account>` | Lets it start again |
-| `agents-hosted admin block <GitHub id or login> [why]` | Refuses that GitHub user, and suspends their account |
-| `agents-hosted admin unblock <GitHub id>` | Lets them sign up again |
+| `agents-hosted admin block <sign-in> [why]` | Refuses that sign-in, and suspends its account. Give `provider:subject` as `accounts` and `waitlist` list it, a GitHub id, or a GitHub login |
+| `agents-hosted admin unblock <sign-in>` | Lets it sign up again: `provider:subject` or a GitHub id |
 | `agents-hosted admin plan <account> free\|pro` | Puts an account on a plan by hand |
 | `agents-hosted admin delete <account>` | Deletes a suspended account and everything it keeps |
 | `agents-hosted admin backup [--keep N] <dir> [account…]` | Copies accounts' records into a folder, and keeps the newest N backups |
@@ -330,7 +356,13 @@ one line per event, and never a code, a key, a token or an email address.
 | `AGENTS_HOSTED_DOMAIN` | The sign-up and account pages' name |
 | `AGENTS_HOSTED_ACCOUNTS_DOMAIN` | The control planes are at `<account>.` this name; the pages' name when unset |
 | `AGENTS_HOSTED_GITHUB_CLIENT_ID` | The GitHub App's client id; `agents-loops`'s when unset |
-| `AGENTS_HOSTED_GITHUB_SECRET` | Its client secret |
+| `AGENTS_HOSTED_GITHUB_SECRET` | Its client secret; GitHub is not offered without it |
+| `AGENTS_HOSTED_APPLE_SERVICES_ID` | Sign in with Apple's Services ID; Apple is offered with this and the next three |
+| `AGENTS_HOSTED_APPLE_TEAM_ID` | The Apple Developer team that has the Services ID |
+| `AGENTS_HOSTED_APPLE_KEY_ID` | The Sign in with Apple key's id |
+| `AGENTS_HOSTED_APPLE_KEY` | That key: the `.p8` file's text, or the text between its `BEGIN` and `END` lines on one line |
+| `AGENTS_HOSTED_GOOGLE_CLIENT_ID` | Google's OAuth client, of the web kind; Google is offered with this and its secret |
+| `AGENTS_HOSTED_GOOGLE_SECRET` | Its client secret |
 | `AGENTS_HOSTED_VIEWS_DOMAIN` | The name where each page's MCP Apps views are drawn, or none |
 | `AGENTS_HOSTED_SIGNUP` | `invite` (the default), `open` or `closed` |
 | `AGENTS_HOSTED_MAX_ACCOUNTS` | The most accounts; 100 |

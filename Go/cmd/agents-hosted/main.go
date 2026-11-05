@@ -1,4 +1,5 @@
-// agents-hosted: the hosted service (#1807). A person signs up on the web with GitHub and
+// agents-hosted: the hosted service (#1807). A person signs up on the web with Apple,
+// Google or GitHub (#3386) and
 // gets a control plane of their own, at https://<account>.<accounts domain>, each a copy of
 // the single-organisation control plane with its own store prefix and control key. It
 // serves plain HTTP behind a proxy that ends TLS for the domain and every account's name
@@ -17,7 +18,14 @@
 //	AGENTS_HOSTED_ACCOUNTS_DOMAIN  where each account's control plane is, as <id>.<this>; the
 //	                               pages' domain when unset
 //	AGENTS_HOSTED_GITHUB_CLIENT_ID the GitHub App's client id (the agents-loops App's when unset)
-//	AGENTS_HOSTED_GITHUB_SECRET    its client secret; with none, sign-up is not open
+//	AGENTS_HOSTED_GITHUB_SECRET    its client secret; with none, GitHub is not offered
+//	AGENTS_HOSTED_APPLE_SERVICES_ID  Sign in with Apple's Services ID; with the next three, Apple is offered
+//	AGENTS_HOSTED_APPLE_TEAM_ID      the Apple Developer team that has it
+//	AGENTS_HOSTED_APPLE_KEY_ID       the Sign in with Apple key's id
+//	AGENTS_HOSTED_APPLE_KEY          that key: the .p8 file's text, or the base64 between its
+//	                                 BEGIN and END lines, on one line
+//	AGENTS_HOSTED_GOOGLE_CLIENT_ID   Google's OAuth client (web kind); with its secret, Google is offered
+//	AGENTS_HOSTED_GOOGLE_SECRET      its client secret
 //	AGENTS_HOSTED_WEB              the built web app (Web/dist) each control plane serves
 //	AGENTS_HOSTED_VIEWS_DOMAIN     the views' sandbox proxy's name, or none
 //	AGENTS_HOSTED_PORT             the port to listen on, 8795
@@ -110,6 +118,9 @@ func serve() error {
 	cfg := hosted.Config{Store: st, Keeper: os.Getenv("AGENTS_CONTROL_KMS"),
 		Domain: strings.ToLower(os.Getenv("AGENTS_HOSTED_DOMAIN")), AccountsDomain: strings.ToLower(os.Getenv("AGENTS_HOSTED_ACCOUNTS_DOMAIN")),
 		GitHubClientID: client, GitHubSecret: os.Getenv("AGENTS_HOSTED_GITHUB_SECRET"), Web: os.Getenv("AGENTS_HOSTED_WEB"),
+		AppleServicesID: os.Getenv("AGENTS_HOSTED_APPLE_SERVICES_ID"), AppleTeamID: os.Getenv("AGENTS_HOSTED_APPLE_TEAM_ID"),
+		AppleKeyID: os.Getenv("AGENTS_HOSTED_APPLE_KEY_ID"), AppleKey: []byte(os.Getenv("AGENTS_HOSTED_APPLE_KEY")),
+		GoogleClientID: os.Getenv("AGENTS_HOSTED_GOOGLE_CLIENT_ID"), GoogleSecret: os.Getenv("AGENTS_HOSTED_GOOGLE_SECRET"),
 		ViewsDomain: os.Getenv("AGENTS_HOSTED_VIEWS_DOMAIN"), TrustedProxies: trusted, Log: logf,
 		SignUp:    strings.ToLower(os.Getenv("AGENTS_HOSTED_SIGNUP")),
 		StripeKey: os.Getenv("AGENTS_HOSTED_STRIPE_KEY"), StripePrice: os.Getenv("AGENTS_HOSTED_STRIPE_PRICE"),

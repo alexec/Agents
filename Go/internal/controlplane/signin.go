@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net"
 	"regexp"
 	"slices"
@@ -482,6 +483,72 @@ func (si *signIns) removeFromMe(ctx context.Context, r wire.SignInRemove, user s
 	}
 	si.s.peopleChanged(user, false)
 	si.s.log("person " + user + " took off a sign-in with " + signin.Title(r.Provider))
+	return nil
+}
+
+// AddOwnerSignIn gives the local owner an outside sign-in and turns its provider on
+// (#3386): the hosted service's first person signs in to their own control plane with
+// the provider they signed up with. Account is the provider's subject, as check says it.
+// Done again, it changes nothing.
+func (s *Service) AddOwnerSignIn(ctx context.Context, provider, account, login string) error {
+	if !outsideProvider(provider) || account == "" {
+		return fmt.Errorf("%q is not an outside sign-in", provider)
+	}
+	owner := s.localOwner()
+	err := s.records.ChangePeople(ctx, func(all map[string]records.Person) ([]records.Person, error) {
+		me, ok := all[owner]
+		if !ok {
+			return nil, fmt.Errorf("the local owner %s has no record", owner)
+		}
+		for _, p := range all {
+			if p.HasSignIn(provider, account) {
+				if p.ID == owner {
+					return nil, nil
+				}
+				return nil, fmt.Errorf("that %s account is another person's sign-in", signin.Title(provider))
+			}
+		}
+		c := checked{provider: provider, account: account, login: login}
+		me.SignIns = append(me.SignIns, c.signIn())
+		return []records.Person{me}, nil
+	})
+	if err != nil {
+		return err
+	}
+	for {
+		settings, etag, err := s.signIns.settings(ctx)
+		if err != nil {
+			return err
+		}
+		if settings.on(provider) {
+			break
+		}
+		switch provider {
+		case signin.Google:
+			settings.Google.On = true
+		case signin.Apple:
+			settings.Apple.On = true
+		case signin.GitHub:
+			settings.GitHub.On = true
+		}
+		data, err := records.Encode(settings)
+		if err != nil {
+			return err
+		}
+		condition := store.Absent
+		if etag != "" {
+			condition = store.Matching(etag)
+		}
+		if _, err := s.cfg.Store.Put(ctx, signInKey, data, condition); err != nil {
+			if store.IsConflict(err) {
+				continue
+			}
+			return err
+		}
+		break
+	}
+	s.peopleChanged(owner, false)
+	s.log("person " + owner + " signs in with " + signin.Title(provider) + ", as at sign-up")
 	return nil
 }
 
