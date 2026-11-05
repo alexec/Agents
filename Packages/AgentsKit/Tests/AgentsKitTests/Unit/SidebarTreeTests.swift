@@ -3,7 +3,7 @@ import Testing
 @testable import AgentsKitCore
 
 /// Sessions under the session that started them (#835), as the window and the Remote draw
-/// them; the web's `sidebarTree` keeps the same rules.
+/// them; the web's `treeRows` keeps the same rules.
 @MainActor
 @Suite("The sidebar's tree")
 struct SidebarTreeTests {
@@ -20,32 +20,50 @@ struct SidebarTreeTests {
         return made
     }
 
-    /// One indent whatever the depth: a lane's helper sits under the lead with the lane,
-    /// oldest first, and the list's own order holds for the rows at the top.
-    @Test func everyDescendantSitsOneIndentUnderTheTopSession() throws {
+    /// Each session under the session that started it, at every depth (#3553): a lane's
+    /// helper under its lane, not under a later lane; the list's own order holds at the top.
+    @Test func eachSessionSitsUnderItsOwnStarter() {
         let lead = session(.finished, "lead", at: 1)
         let lane = session(.finished, "lane", at: 2, by: lead)
-        let helper = session(.finished, "helper", at: 3, by: lane)
-        let other = session(.finished, "other", at: 4)
-        let list = [other, helper, lane, lead]
+        let later = session(.finished, "later", at: 3, by: lead)
+        let helper = session(.finished, "helper", at: 4, by: lane)
+        let other = session(.finished, "other", at: 5)
+        let list = [other, helper, later, lane, lead]
         let nested = SidebarTree.nest(list) { _ in nil }
-        try #require(nested.map(\.agent.id) == [other.id, lead.id])
-        #expect(nested[1].children.map(\.id) == [lane.id, helper.id])
+        #expect(nested.tops.map(\.id) == [other.id, lead.id])
+        #expect(nested.children[lead.id]?.map(\.id) == [lane.id, later.id])
+        #expect(nested.children[lane.id]?.map(\.id) == [helper.id])
+
+        let rows = SidebarTree.rows(list, starter: { _ in nil }, isOpen: { _ in true })
+        #expect(rows.map(\.id) == [other.id, lead.id, lane.id, helper.id, later.id])
+        #expect(rows.map(\.depth) == [0, 0, 1, 2, 1])
+        #expect(rows.map(\.children) == [0, 2, 1, 0, 0])
+    }
+
+    /// Each parent keeps its own fold, and a deep row is drawn no further in than the cap.
+    @Test func eachParentFoldsAndTheIndentIsCapped() {
+        var chain = [session(.finished, "s0", at: 0)]
+        for level in 1...5 { chain.append(session(.finished, "s\(level)", at: Double(level), by: chain[level - 1])) }
+        let open = SidebarTree.rows(chain, starter: { _ in nil }, isOpen: { _ in true })
+        #expect(open.map(\.indent) == [0, 1, 2, 3, 3, 3])
+        let folded = SidebarTree.rows(chain, starter: { _ in nil }, isOpen: { $0 != chain[2].id })  // index-ok: six made above
+        #expect(folded.map(\.id) == chain.prefix(3).map(\.id))
+        #expect(folded.last?.isUnfolded == false && folded.last?.children == 1)
     }
 
     /// A tree in each list (#587): a child stands on its own where its parent is not
     /// listed, and is found under a listed grandparent through a starter listed elsewhere.
-    @Test func aChildWithoutItsParentInTheListStandsAlone() throws {
+    @Test func aChildWithoutItsParentInTheListStandsAlone() {
         let lead = session(.finished, "lead", at: 1)
         let lane = session(.running, "lane", at: 2, by: lead)
         let helper = session(.finished, "helper", at: 3, by: lane)
         let alone = SidebarTree.nest([helper]) { _ in nil }
-        try #require(alone.map(\.agent.id) == [helper.id])
-        #expect(alone[0].children.isEmpty)
+        #expect(alone.tops.map(\.id) == [helper.id])
+        #expect(alone.children.isEmpty)
         let starters = [lane.id: lead.id]
         let through = SidebarTree.nest([helper, lead]) { starters[$0] }
-        try #require(through.map(\.agent.id) == [lead.id])
-        #expect(through[0].children.map(\.id) == [helper.id])
+        #expect(through.tops.map(\.id) == [lead.id])
+        #expect(through.children[lead.id]?.map(\.id) == [helper.id])
     }
 
     /// A chain that loops is followed once and ends.
@@ -53,8 +71,8 @@ struct SidebarTreeTests {
         var first = session(.finished, "first", at: 1)
         let second = session(.finished, "second", at: 2, by: first)
         first.startedByAgent = second.id
-        let nested = SidebarTree.nest([first, second]) { _ in nil }
-        #expect(nested.flatMap { [$0.agent.id] + $0.children.map(\.id) }.count == 2)
+        let rows = SidebarTree.rows([first, second], starter: { _ in nil }, isOpen: { _ in true })
+        #expect(rows.count == 2)
     }
 
     /// Folded by default, the fold kept per row and across launches.

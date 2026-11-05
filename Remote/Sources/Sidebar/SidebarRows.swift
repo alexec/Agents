@@ -176,9 +176,9 @@ struct SidebarSessionRow: View {
             // When it last did anything, as the page's row has it (#341).
             ActivityTime(date: agent.lastActivityAt)
         }
-        // A child one indent in, under the mark's column (#835); in a Sessions fold, one
-        // more (#2312).
-        .padding(.leading, (tree?.isChild == true ? 26 : 0) + (isNested ? 20 * scale + 10 : 0))
+        // A child one indent a level in, under its parent's mark (#835, #3553); in a
+        // Sessions fold, one more (#2312).
+        .padding(.leading, CGFloat(tree?.indent ?? 0) * 26 + (isNested ? 20 * scale + 10 : 0))
         // Last known, not current: its host is not answering.
         .opacity(model.isStale(agent) ? 0.55 : 1)
         .accessibilityElement(children: .combine)

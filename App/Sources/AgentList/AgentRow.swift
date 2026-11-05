@@ -320,8 +320,8 @@ struct AgentRow: View {
             ActivityTime(date: agent.lastActivityAt)
                 .padding(.top, 1)
         }
-        // A child one indent in, under the mark's column (#835).
-        .padding(.leading, tree?.isChild == true ? 22 : 0)
+        // A child one indent a level in, under its parent's mark (#835, #3553).
+        .padding(.leading, CGFloat(tree?.indent ?? 0) * 22)
         .fixedSize(horizontal: false, vertical: true)
         .contextMenu {
             // Beside the main window or on another screen (#826).

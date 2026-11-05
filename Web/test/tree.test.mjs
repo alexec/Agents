@@ -1,5 +1,5 @@
 // Sessions under the session that started them (#835), as the window's and the Remote's
-// `SidebarTree`: one indent whatever the depth, folded by default with the fold kept per row, a
+// `SidebarTree`: each under its own starter at every depth (#3553), folded by default with the fold kept per row, a
 // tree in each list, and a folded parent's mark the most urgent of its own and its children's.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -15,31 +15,43 @@ const agent = (id, createdAt, fields = {}) => ({ id, createdAt, lastActivityAt: 
   endedReason: "endTurn", cwd: "file:///w/a", title: id, ...fields });
 const none = () => undefined;
 
-test("every descendant sits one indent under the top session, oldest first", async () => {
-  const { nest } = await load("src/model/tree.ts");
-  const lead = agent("lead", 1);
-  const lane = agent("lane", 2, { startedByAgent: "lead" });
-  const helper = agent("helper", 3, { startedByAgent: "lane" });
-  const other = agent("other", 4);
-  const nested = nest([other, helper, lane, lead], none);
-  assert.deepEqual(nested.map((n) => n.agent.id), ["other", "lead"]);
-  assert.deepEqual(nested[1].children.map((a) => a.id), ["lane", "helper"]);
+test("each session sits under its own starter, at every depth", async () => {
+  const { nest, treeRows } = await load("src/model/tree.ts");
+  const list = [agent("other", 5), agent("helper", 4, { startedByAgent: "lane" }),
+    agent("later", 3, { startedByAgent: "lead" }), agent("lane", 2, { startedByAgent: "lead" }), agent("lead", 1)];
+  const nested = nest(list, none);
+  assert.deepEqual(nested.tops.map((a) => a.id), ["other", "lead"]);
+  assert.deepEqual(nested.children.get("lead").map((a) => a.id), ["lane", "later"]);
+  assert.deepEqual(nested.children.get("lane").map((a) => a.id), ["helper"]);
+  const rows = treeRows(list, none, () => true);
+  assert.deepEqual(rows.map((r) => [r.agent.id, r.depth, r.children]),
+    [["other", 0, 0], ["lead", 0, 2], ["lane", 1, 1], ["helper", 2, 0], ["later", 1, 0]]);
+});
+
+test("each parent folds, and a deep row is drawn no further in than the cap", async () => {
+  const { treeRows } = await load("src/model/tree.ts");
+  const chain = [0, 1, 2, 3, 4, 5].map((i) => agent(`s${i}`, i, i > 0 ? { startedByAgent: `s${i - 1}` } : {}));
+  assert.deepEqual(treeRows(chain, none, () => true).map((r) => r.indent), [0, 1, 2, 3, 3, 3]);
+  const folded = treeRows(chain, none, (id) => id !== "s2");
+  assert.deepEqual(folded.map((r) => [r.agent.id, r.isUnfolded]), [["s0", true], ["s1", true], ["s2", false]]);
 });
 
 test("a child without its parent in the list stands alone, and is found through one listed elsewhere", async () => {
   const { nest } = await load("src/model/tree.ts");
   const lead = agent("lead", 1);
   const helper = agent("helper", 3, { startedByAgent: "lane" });
-  assert.deepEqual(nest([helper], none).map((n) => [n.agent.id, n.children.length]), [["helper", 0]]);
+  const alone = nest([helper], none);
+  assert.deepEqual(alone.tops.map((a) => a.id), ["helper"]);
+  assert.equal(alone.children.size, 0);
   const through = nest([helper, lead], (id) => (id === "lane" ? "lead" : undefined));
-  assert.deepEqual(through.map((n) => n.agent.id), ["lead"]);
-  assert.deepEqual(through[0].children.map((a) => a.id), ["helper"]);
+  assert.deepEqual(through.tops.map((a) => a.id), ["lead"]);
+  assert.deepEqual(through.children.get("lead").map((a) => a.id), ["helper"]);
 });
 
 test("a loop ends, every session still listed", async () => {
-  const { nest } = await load("src/model/tree.ts");
-  const nested = nest([agent("a", 1, { startedByAgent: "b" }), agent("b", 2, { startedByAgent: "a" })], none);
-  assert.equal(nested.flatMap((n) => [n.agent, ...n.children]).length, 2);
+  const { treeRows } = await load("src/model/tree.ts");
+  const rows = treeRows([agent("a", 1, { startedByAgent: "b" }), agent("b", 2, { startedByAgent: "a" })], none, () => true);
+  assert.equal(rows.length, 2);
 });
 
 test("a parent starts folded, and its fold is kept and bounded", async () => {
