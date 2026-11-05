@@ -16,6 +16,7 @@ import (
 type Filter struct {
 	mu     sync.Mutex
 	hidden map[string]string // value → its secret's name
+	codes  map[string]string // a short code (a card's CVC) → its secret's name; hidden as a whole number
 	forms  *regexp.Regexp    // every form of every value, longest first; nil for none
 	names  map[string]string // each form → its secret's name
 	// mask paints over what must not be seen in an image (the boxes of filled fields) and
@@ -38,18 +39,34 @@ func (f *Filter) Hide(name, value string) {
 	f.compile()
 }
 
+// HideCode takes a short number, such as a card's CVC (#3531), out of every text after this,
+// where it stands as a whole number: a code of three digits would take every price and
+// date with those digits out, so only the number on its own goes.
+func (f *Filter) HideCode(name, code string) {
+	if code == "" || strings.Trim(code, "0123456789") != "" {
+		return
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.codes == nil {
+		f.codes = map[string]string{}
+	}
+	f.codes[code] = name
+	f.compile()
+}
+
 // Forget hides nothing any more: the browser's pages, and the values in them, are gone.
 func (f *Filter) Forget() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.hidden, f.forms, f.names = nil, nil, nil
+	f.hidden, f.codes, f.forms, f.names = nil, nil, nil, nil
 }
 
 // Hides is whether any value is hidden now.
 func (f *Filter) Hides() bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return len(f.hidden) > 0
+	return len(f.hidden) > 0 || len(f.codes) > 0
 }
 
 // Text is s with every form of every hidden value replaced.
@@ -121,6 +138,22 @@ func (f *Filter) compile() {
 	}
 	// Longest first, so a value is not cut in two by a shorter one inside it.
 	sort.Slice(patterns, func(i, j int) bool { return len(patterns[i]) > len(patterns[j]) })
+	// A code goes last: a value with the code's digits in it is taken out whole first.
+	codes := make([]string, 0, len(f.codes))
+	for code, name := range f.codes {
+		if _, ok := f.names[code]; !ok {
+			f.names[code] = name
+		}
+		codes = append(codes, code)
+	}
+	sort.Strings(codes)
+	for _, code := range codes {
+		patterns = append(patterns, `\b`+code+`\b`)
+	}
+	if len(patterns) == 0 {
+		f.forms = nil
+		return
+	}
 	f.forms = regexp.MustCompile(strings.Join(patterns, "|"))
 }
 

@@ -13,6 +13,23 @@ struct UserScopeWordsTests {
             == "Sam's box was removed with this secret on it: A. Change it where it was issued.")
     }
 
+    /// #3531: a card is one JSON value of its parts, the same as `cardValue` in userScope.ts,
+    /// which agentsd's fill_secret reads a part at a time.
+    @Test func aCardIsOneValueOfItsParts() {
+        let card = CardSecret(number: "4242 4242 4242 4242", expiry: "9/2031", cvc: "737", name: " Sam Lee ", zip: "94110")
+        #expect(card.problem == nil)
+        #expect(card.value == #"{"cvc":"737","expiry":"09/31","name":"Sam Lee","number":"4242424242424242","zip":"94110"}"#)
+        #expect(CardSecret(number: "4242", expiry: "0931", cvc: "737", name: "S", zip: "1").expiry == "09/31")
+        #expect(CardSecret(number: "4242424242424241", expiry: "09/31", cvc: "737", name: "S", zip: "1").problem == "The card number is not right.")
+        #expect(CardSecret(number: "4242424242424242", expiry: "13/31", cvc: "737", name: "S", zip: "1").problem == "Write the expiry as MM/YY.")
+        #expect(CardSecret(number: "4242424242424242", expiry: "09/31", cvc: "73", name: "S", zip: "1").problem == "The CVC is 3 or 4 digits.")
+        #expect(CardSecret(number: "4242424242424242", expiry: "09/31", cvc: "737", name: "", zip: "1").problem == "Write the name on the card.")
+        var row = DaemonAPI.UserSecretRow(name: "SHOP_CARD", updated: "", machines: [])
+        #expect(!row.isCard)
+        row.kind = CardSecret.kind
+        #expect(row.isCard)
+    }
+
     @Test func aSecretsNameIsAnEnvironmentVariables() {
         #expect(UserScopeWords.isSecretName("GITHUB_TOKEN"))
         #expect(!UserScopeWords.isSecretName("github_token"))

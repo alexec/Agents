@@ -27607,6 +27607,13 @@
       ],
       "additionalProperties": false
     },
+    "UserSecretKind": {
+      "type": "string",
+      "enum": [
+        "card"
+      ],
+      "description": "What a secret holds, when it is more than one value (#3531). card: a payment card that is locked to one merchant and has a spend limit (Privacy.com or the same), as one JSON object of number, expiry (MM/YY), cvc, name and zip. fill_secret fills it a part at a time. Left out for a plain value."
+    },
     "UserSecretName": {
       "type": "string",
       "pattern": "^[A-Z_][A-Z0-9_]{0,63}$",
@@ -27647,6 +27654,9 @@
       "properties": {
         "name": {
           "$ref": "#/definitions/UserSecretName"
+        },
+        "kind": {
+          "$ref": "#/definitions/UserSecretKind"
         },
         "updated": {
           "type": "string",
@@ -27690,6 +27700,9 @@
       "properties": {
         "name": {
           "$ref": "#/definitions/UserSecretName"
+        },
+        "kind": {
+          "$ref": "#/definitions/UserSecretKind"
         },
         "version": {
           "type": "integer"

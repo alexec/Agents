@@ -12071,6 +12071,11 @@ type UserSecret struct {
 	Value string `json:"value"`
 }
 
+// What a secret holds, when it is more than one value (#3531). card: a payment card that is locked to one merchant and has a spend limit (Privacy.com or the same), as one JSON object of number, expiry (MM/YY), cvc, name and zip. fill_secret fills it a part at a time. Left out for a plain value.
+type UserSecretKind string
+
+const UserSecretKindCard UserSecretKind = "card"
+
 // A secret's name, as ${NAME} in mcp.json and NAME= in ~/.agents-secrets/secrets.env.
 type UserSecretName string
 
@@ -12087,6 +12092,8 @@ type UserSecretRequest struct {
 // One row of user/secretNames (#1760): a secret's name, never its value.
 type UserSecretRow struct {
 	Name UserSecretName `json:"name"`
+
+	Kind *UserSecretKind `json:"kind,omitzero"`
 
 	Updated string `json:"updated"`
 
@@ -12105,6 +12112,8 @@ type UserSecretRow struct {
 // user/setSecret (#1760, FR-025, #3397): a secret as the person's client sealed it to each recipient of user/secretRecipients, info com.alexecollins.agents.usersecret.v1, associated data usersecret.v1|<person id>|<recipient>|<name>|<version>. version is above the kept one: the kept one plus one, or for a name the client has none of, the time in milliseconds, above a removed one's. The control plane never has the value.
 type UserSecretSet struct {
 	Name UserSecretName `json:"name"`
+
+	Kind *UserSecretKind `json:"kind,omitzero"`
 
 	Version int64 `json:"version"`
 
