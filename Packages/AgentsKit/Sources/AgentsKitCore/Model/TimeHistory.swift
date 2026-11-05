@@ -241,9 +241,9 @@ public enum TimeMark: Sendable, Hashable {
         let name = name.lowercased()
         // Antigravity's own `ask_question` has the app's name, and is the person's time all the
         // same; `ask_form` is the app's name before #2298, in older records. `ask_secret` waits
-        // on the person too (#2885).
+        // on the person too (#2885), and so does `hand_to_person`, served with the browser tools (#3529).
         if name.hasSuffix("askuserquestion") || name.hasSuffix(AppTool.askQuestion) || name.hasSuffix("ask_form")
-            || name.hasSuffix(AppTool.askSecret) {
+            || name.hasSuffix(AppTool.askSecret) || name.hasSuffix("hand_to_person") {
             return .person
         }
         // `release_resource` ends with `lease_resource`: a release is quick, and a tool.

@@ -29,7 +29,7 @@ struct ElicitationSheet: View {
                     Text(asker).appText(.fine).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                if request.secret == nil {
+                if request.secret == nil && request.handOff == nil {
                     MarkdownText(markdown: request.title)
                         .appText(.reading).fontWeight(.semibold)
                         .fixedSize(horizontal: false, vertical: true)
@@ -44,7 +44,15 @@ struct ElicitationSheet: View {
                 }
             }
 
-            if let secret = request.secret {
+            if let handOff = request.handOff {
+                // A step on the page in the machine's browser (#3529). The Remote does not
+                // show that browser (tier mac+web, #3528), so it says where to do it.
+                HandOffCard(handOff: handOff, open: nil, elsewhere: "Do it on your Mac or the web page, in the Agent Browser.",
+                            host: model.answerRecipient(request.agentID), sending: chosen != nil) { done, note in
+                    send(done ? "Done" : "Can't do it", action: .accept, content: ElicitationRequest.handOffAnswer(done: done, note: note))
+                }
+                .disabled(isStale)
+            } else if let secret = request.secret {
                 // A masked field of its own (#2885), kept on screen while it goes, so
                 // what was typed is still there if it did not.
                 SecretAskCard(secret: secret, reason: request.secretReason,

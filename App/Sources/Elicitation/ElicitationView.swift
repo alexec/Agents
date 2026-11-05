@@ -9,6 +9,8 @@ import SwiftUI
 /// none.
 struct ElicitationView: View {
     @Environment(AppModel.self) private var model
+    @Environment(SidebarFrame.self) private var frame
+    @Environment(\.windowHasInspector) private var hasInspector
     let request: ElicitationRequest
 
     @State private var values: [String: JSONValue] = [:]
@@ -30,7 +32,15 @@ struct ElicitationView: View {
                 if let asker = model.work.askerLine(request.agentID) {
                     Text(asker).appText(.fine).foregroundStyle(.secondary)
                 }
-                if let secret = request.secret {
+                if let handOff = request.handOff {
+                    // A step on the page in the machine's browser (#3529): Open the page
+                    // shows it in the Agent Browser pane, beside this chat.
+                    HandOffCard(handOff: handOff, open: hasInspector ? openAgentBrowser : nil,
+                                elsewhere: "Open the page from the main window's Agent Browser (⌘9).",
+                                host: model.answerRecipient(request.agentID), sending: sending != nil) { done, note in
+                        send(done ? "done" : "cannot", .accept, content: ElicitationRequest.handOffAnswer(done: done, note: note))
+                    }
+                } else if let secret = request.secret {
                     // A masked field of its own (#2885), never the form's open one.
                     SecretAskCard(secret: secret, reason: request.secretReason,
                                   host: model.answerRecipient(request.agentID), sending: sending != nil) { typed, sessionOnly in
@@ -87,6 +97,12 @@ struct ElicitationView: View {
         // A second question arriving while the first is still on screen starts at
         // its own first page, not wherever the last one was left.
         .onChange(of: request.id) { _, _ in step = 0 }
+    }
+
+    /// The Agent Browser pane, beside this chat, at the agent's tab (#3528).
+    private func openAgentBrowser() {
+        frame.pane = .agentBrowser
+        if !frame.isOpen { frame.open() }
     }
 
     /// A form of several questions, one to a page.

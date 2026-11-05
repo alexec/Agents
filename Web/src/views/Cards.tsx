@@ -9,7 +9,7 @@ import type { ComponentChildren } from "preact";
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type {
-  ElicitationRequest, ElicitationSchema, ElicitationSchemaProperty, ElicitationSchemaPropertyChoice, ElicitationSecret, JSONValue,
+  ElicitationHandOff, ElicitationRequest, ElicitationSchema, ElicitationSchemaProperty, ElicitationSchemaPropertyChoice, ElicitationSecret, JSONValue,
   PermissionOption, PermissionRequest, UUID,
 } from "../protocol/generated";
 import type { Store } from "../model/store";
@@ -23,6 +23,9 @@ import { planOf } from "../model/plan";
 import { Markdown } from "../render/markdown";
 import { inputType, momentFromInput, momentToInput, placeholder } from "../model/formInputs";
 import { getIt, keeping, secretField } from "../model/secretAsk";
+import { handOffAnswer } from "../model/handOff";
+import { setPane } from "./files/paneState";
+import { replace, route } from "../route";
 import { keepingForSession, sessionOnlyField, sessionSecretWords } from "../model/sessionSecrets";
 
 type Held = (
@@ -154,6 +157,11 @@ export function useWaitingCards({ store, host, session, down = false }: {
           answer={(option) => send(card.request.id, option.optionID, (sendID) => store.link.call("permissions/answer",
             { permissionID: card.request.id, optionID: option.optionID, sendID }, host))} />
       : <ElicitationCard key={card.request.id} active={index === 0} request={card.request} asker={asker(card.request.agentID)}
+          openBrowser={() => {
+            // The Agent Browser tab beside the chat, at the agent's tab (#3528, #3529).
+            setPane(session, { tab: "browser" });
+            if (!route.peek().files) replace({ ...route.peek(), files: true });
+          }}
           hold={{ answered: card.answered, chosen: card.chosen, recipient, down }}
           answer={(key, action, content) => send(card.request.id, key, (sendID) => store.link.call("elicitations/answer",
             { requestID: card.request.id, action, content, sendID }, host))} />,
@@ -339,9 +347,9 @@ function defaultsOf(request: ElicitationRequest): Record<string, JSONValue> {
   return defaults;
 }
 
-function ElicitationCard({ request, asker, hold, answer, active }: {
+function ElicitationCard({ request, asker, hold, answer, active, openBrowser }: {
   request: ElicitationRequest; asker: string | null; hold: Hold; answer: (key: string, action: Action, content: Record<string, JSONValue>) => void;
-  active: boolean;
+  active: boolean; openBrowser: () => void;
 }) {
   const card = useRef<HTMLElement>(null);
   useCardKeys(card, active);
@@ -361,7 +369,12 @@ function ElicitationCard({ request, asker, hold, answer, active }: {
   const done = button("done"), gaveUp = button("gave-up"), none = button("none"), decline = button("decline");
 
   let body;
-  if (request.secret) {
+  if (request.handOff) {
+    // A step on the page in the machine's browser (#3529): Open the page shows it beside the chat.
+    body = <HandOffField handOff={request.handOff} inert={inert} open={openBrowser}
+      done={button("done")} cannot={button("cannot", "prominent")}
+      send={(isDone, note) => go(isDone ? "done" : "cannot", "accept", handOffAnswer(isDone, note))} />;
+  } else if (request.secret) {
     // A masked field of its own (#2885), never the form's open one.
     const reason = "form" in request.mode ? request.mode.form._0.properties[0]?.title : undefined;
     body = <SecretField secret={request.secret} reason={reason} recipient={hold.recipient} inert={inert}
@@ -450,8 +463,8 @@ function ElicitationCard({ request, asker, hold, answer, active }: {
   return (
     <section ref={card} class={cardClass(hold)} aria-label="Question">
       {asker && <p class="quiet small asker">{asker}</p>}
-      {!request.secret && <div class="strong"><Markdown text={title} /></div>}
-      {!request.secret && request.message && request.message !== title && <Markdown text={request.message} />}
+      {!request.secret && !request.handOff && <div class="strong"><Markdown text={title} /></div>}
+      {!request.secret && !request.handOff && request.message && request.message !== title && <Markdown text={request.message} />}
       {body}
       <AnsweredNote answered={hold.answered} />
     </section>
@@ -460,6 +473,51 @@ function ElicitationCard({ request, asker, hold, answer, active }: {
 
 /** One of a card's answers, as ElicitationCard's `button` gives it. */
 interface AnswerButton { class: string | undefined; disabled: boolean; telling: ComponentChildren }
+
+/**
+ * An agent's hand_to_person (#3529): the step, why, Open the page, Done, and Can't do it with a
+ * line for what stopped the person. As the window's and the Remote's HandOffCard.
+ */
+function HandOffField({ handOff, inert, open, done, cannot, send }: {
+  handOff: ElicitationHandOff; inert: boolean; open: () => void; done: AnswerButton; cannot: AnswerButton;
+  send: (done: boolean, note: string) => void;
+}) {
+  const saying = useSignal(false);
+  const note = useSignal("");
+  return (
+    <>
+      <p class="strong secret"><span aria-hidden="true">✋ </span>{handOff.step}</p>
+      {handOff.reason && <p class="secret">{handOff.reason}</p>}
+      {saying.value && (
+        <label class="field">
+          <input type="text" autofocus disabled={inert} placeholder="What stopped you (optional)" aria-label="What stopped you (optional)"
+            value={note.value} onInput={(e) => (note.value = (e.currentTarget as HTMLInputElement).value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                send(false, note.value);
+              }
+            }} />
+        </label>
+      )}
+      <div class="form-row">
+        {!saying.value && <button class="prominent" disabled={inert} data-default="" onClick={open}>Open the page</button>}
+        <span class="spacer" />
+        {saying.value ? (
+          <>
+            <button disabled={inert} onClick={() => (saying.value = false)}>Back</button>
+            <button class={cannot.class} aria-disabled={cannot.disabled} onClick={() => send(false, note.value)}>Send{cannot.telling}</button>
+          </>
+        ) : (
+          <>
+            <button disabled={inert} onClick={() => (saying.value = true)}>Can't do it</button>
+            <button class={done.class} aria-disabled={done.disabled} onClick={() => send(true, "")}>Done{done.telling}</button>
+          </>
+        )}
+      </div>
+    </>
+  );
+}
 
 /**
  * An agent's ask_secret (#2885): its name, why, where to get it, and a masked field. What is

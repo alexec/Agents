@@ -420,7 +420,13 @@ func (d *Daemon) appToolsHandle(ctx context.Context, g *appGrant, method string,
 		// The machine's browser, driven through Playwright's own tools (#3534).
 		if d.offersBrowser() {
 			list, _ := browserTools()
-			tools = append(tools, list...)
+			for _, t := range list {
+				// Nobody answers a hand-off on a bot's machine (#1761, FR-032).
+				if d.isBot() && strings.Contains(string(t), `"name":"`+handToPersonName+`"`) {
+					continue
+				}
+				tools = append(tools, t)
+			}
 		}
 		return map[string]any{"tools": tools}, nil
 	case "resources/list":
