@@ -43,8 +43,6 @@ public enum ControlWire {
     public struct ChannelOpen: Codable, Equatable, Sendable {
         public var client: String
         public var device: UUID?
-        /// The device reached the control plane through `agents-relay` (T096).
-        public var relayed: Bool?
         /// A tunnel between two hosts for a relayed sign-in (T091), not a client: the
         /// runtime whose sign-in it carries. Its messages are bytes, base64 in a JSON string.
         public var tunnel: String?
@@ -56,10 +54,9 @@ public enum ControlWire {
         /// control plane leaves it out and is written to channel by channel.
         public var fanOut: Bool?
 
-        public init(client: String, device: UUID? = nil, relayed: Bool? = nil,
+        public init(client: String, device: UUID? = nil,
                     tunnel: String? = nil, tunnelRef: String? = nil, fanOut: Bool? = nil) {
             self.fanOut = fanOut
-            self.relayed = relayed
             self.tunnel = tunnel
             self.tunnelRef = tunnelRef
             self.client = client

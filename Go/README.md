@@ -2,8 +2,8 @@
 
 The daemon (`agentsd`) and the control plane (`agents-control`), moved from Swift to Go
 (#1134; the Swift ones went in #1314). One module, so the two share the wire types and the
-control exchange. The Mac window, the Remote, `Shared/UI`, the web page, Agents Host and
-`agents-relay` stay as they are.
+control exchange. The Mac window, the Remote, `Shared/UI`, the web page and Agents Host
+stay as they are.
 
 | Path | What | Area |
 |---|---|---|
@@ -50,7 +50,7 @@ The Go `agents-control` took the Swift one's command line (`serve`, `serve --hom
 writes today's `control/` folder: the store, `control-key` (or the key on `--key-fd`),
 and `tls/`, so its certificate's pin is the one every member holds. Every one of the
 61 control-plane methods is answered; the handover's copy side is there too, so Agents
-Host's *Move to another machine* and *Relay for my devices* work with it.
+Host's *Move to another machine* works with it.
 
 **Its wire is `Go/wire`'s** (#1313): every method's params and result, what it says to
 clients and hosts, the exchange's lines and a channel's open frame are the generated types,
@@ -68,7 +68,7 @@ build added kept whole), the copies' own messages, and the JSON-RPC envelope.
 | `controlplane/kms` | The key sealed by a keeper (an option, `AGENTS_CONTROL_KMS`) |
 | `controlplane/web` | The web page's loopback listener |
 | `controlplane/hostinstall`, `hosttunnels` | Add a Machine over ssh, Detect, the ssh config's hosts, bastion tunnels |
-| `controlplane/notices` | Where a need shows (`Routing`), and the relay host's deliveries |
+| `controlplane/notices` | Where a need shows (`Routing`), and which device gets its notice (`Desk`) |
 | `controlplane/providers` | Machine providers, kept requests, Write It for Me |
 
 **Linux hosts run the Go agentsd** (#1136). `install.sh` installs it, from

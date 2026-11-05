@@ -80,8 +80,6 @@ struct ControlRow<Trailing: View>: View {
     var chip: String?
     var chipTone: SharedChip.Tone = .source
     let detail: String
-    /// The detail as drawn, when part of it is emphasised (frame N's relaying Mac).
-    var detailText: Text?
     @ViewBuilder var trailing: Trailing
 
     var body: some View {
@@ -92,7 +90,7 @@ struct ControlRow<Trailing: View>: View {
                     Text(title).appText(.reading).fontWeight(.semibold)
                     if let chip { SharedChip(text: chip, tone: chipTone) }
                 }
-                (detailText ?? Text(detail)).appText(.supporting).foregroundStyle(.secondary)
+                Text(detail).appText(.supporting).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .accessibilityElement(children: .ignore)
@@ -135,7 +133,7 @@ struct ControlOverviewPage: View {
                 Divider()
                 ControlRow(dot: .none, title: "Reachable away from home",
                            detail: reachableLine) {
-                    Text(control.publicAddress != nil || control.status?.awayFromHome == true ? "On" : "Off")
+                    Text(control.publicAddress != nil ? "On" : "Off")
                         .appText(.reading)
                         .foregroundStyle(.secondary)
                 }
@@ -182,12 +180,9 @@ struct ControlOverviewPage: View {
     }
 
     private var reachableLine: String {
-        // On the internet (#1498): every device reaches it from any network, with no relay.
+        // On the internet (#1498): every device reaches it from any network.
         if let address = control.publicAddress { return "On the internet at \(address): devices reach it from any network" }
-        if control.status?.awayFromHome == true { return "Through your iCloud account, sealed to each device" }
-        // A control plane with no Mac relaying for it, a server's alone included, gets one
-        // from Agents Host on any Mac (#824).
-        return "Off: devices reach it on this network only. Turn on Relay for my devices in Agents Host on a Mac."
+        return "Off: devices reach it on this network only."
     }
 
     private var runningLine: String {
@@ -206,7 +201,7 @@ struct ControlOverviewPage: View {
     }
 
     private func hostName(_ host: DaemonAPI.ControlMachine) -> String {
-        let name = host.machineID == MachineID.current && host.runsAgents ? "This Mac" : host.name
+        let name = host.machineID == MachineID.current ? "This Mac" : host.name
         return host.state == "online" ? name : "\(name) (\(UpdateWords.state(host)))"
     }
 }
@@ -420,17 +415,14 @@ struct ControlHostsPage: View {
                 Button("Update…") { updating = host }
                 Divider()
             }
-            // A relay runs no agents, so it has no folders, and nothing to back up.
-            if host.relay == nil {
-                Button("Choose Folders…") { choosing = host }.disabled(!host.answers)
-                if model.host(host.id, has: Capability.backups1) {
-                    Button("Backups…") { backingUp = host }.disabled(!host.answers)
-                }
+            Button("Choose Folders…") { choosing = host }.disabled(!host.answers)
+            if model.host(host.id, has: Capability.backups1) {
+                Button("Backups…") { backingUp = host }.disabled(!host.answers)
             }
             if host.workspace != nil {
                 Button("Check again") { Task { await control.checkAgain(host.id) } }
             }
-            if host.relay == nil, control.providersHere {
+            if control.providersHere {
                 Divider()
                 if let workspace = host.workspace {
                     Button("Unlink from \(workspace.workspaceName)") { Task { await control.unlink(host.id) } }
@@ -545,11 +537,6 @@ struct ControlHostsPage: View {
     }
 
     private func baseLine(_ host: DaemonAPI.ControlMachine) -> String {
-        // agents-relay (T096): it runs no agents, so the rest of the line is not its.
-        if host.relay != nil {
-            let state = host.state == "online" ? "" : "\(UpdateWords.state(host)) · "
-            return state + (host.relay == true ? "Relays your devices through iCloud" : "Relaying switched off")
-        }
         var parts: [String] = []
         if host.state != "online" { parts.append(UpdateWords.state(host)) }
         if !host.platform.isEmpty { parts.append(host.platform.replacingOccurrences(of: " ", with: " · ")) }

@@ -78,7 +78,7 @@ func prove(t *testing.T, path string, w window) (net.Conn, *bufio.Reader, contro
 	if err != nil {
 		t.Fatal(err)
 	}
-	auth, expect, err := controllink.Answer(m.Hello, controllink.Identity{Kind: 'c', ID: w.id}, key, localOrigin, "mac", nil, "", nil)
+	auth, expect, err := controllink.Answer(m.Hello, controllink.Identity{Kind: 'c', ID: w.id}, key, localOrigin, "mac", nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

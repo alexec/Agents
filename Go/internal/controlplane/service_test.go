@@ -638,7 +638,7 @@ func answerHello(l *controllink.Lines, id controllink.Identity, key []byte, at, 
 		return nil, nil, fmt.Errorf("no hello: %s", line)
 	}
 	origin, _ := controllink.Origin(at)
-	auth, expect, err := controllink.Answer(m.Hello, id, key, origin, kind, nil, "", nil)
+	auth, expect, err := controllink.Answer(m.Hello, id, key, origin, kind, nil, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -668,15 +668,15 @@ func TestHostsInstallAnswersInItsWords(t *testing.T) {
 	call(t, window, "", "hosts/checkAgain", map[string]string{"host": "x"})
 }
 
-// rawHost enrols and connects a host by hand, and returns its uplink's lines: for a
-// relay host (agents-relay), whose channel 0 the test reads itself.
-func (p *plane) rawHost(name string, relay bool) (string, *controllink.Lines) {
-	host, l, _ := p.rawHostKey(name, relay)
+// rawHost enrols and connects a host by hand, and returns its uplink's lines, whose
+// channel 0 the test reads itself.
+func (p *plane) rawHost(name string) (string, *controllink.Lines) {
+	host, l, _ := p.rawHostKey(name)
 	return host, l
 }
 
 // rawHostKey is rawHost, with the key the host proves itself with.
-func (p *plane) rawHostKey(name string, relay bool) (string, *controllink.Lines, []byte) {
+func (p *plane) rawHostKey(name string) (string, *controllink.Lines, []byte) {
 	ctx := context.Background()
 	code := p.code(true)
 	private := controllink.NewPrivateKey()
@@ -687,7 +687,7 @@ func (p *plane) rawHostKey(name string, relay bool) (string, *controllink.Lines,
 		p.t.Fatal(err)
 	}
 	params, _ := json.Marshal(wire.MachineAnnounce{PublicKey: public, Name: name, Platform: "macOS arm64", Version: "1",
-		MachineID: "RELAY-MAC", Relay: &relay})
+		MachineID: "RAW-MAC"})
 	l.Write(ctx, `{"jsonrpc":"2.0","id":1,"method":"hosts/announce","params":`+string(params)+`}`)
 	line, err := l.Read(ctx)
 	if err != nil {
@@ -705,7 +705,7 @@ func (p *plane) rawHostKey(name string, relay bool) (string, *controllink.Lines,
 	if err != nil {
 		p.t.Fatal(err)
 	}
-	hello, _ := json.Marshal(wire.MachineHello{Version: "1", Platform: "macOS arm64", MachineID: "RELAY-MAC", Relay: &relay})
+	hello, _ := json.Marshal(wire.MachineHello{Version: "1", Platform: "macOS arm64", MachineID: "RAW-MAC"})
 	l.Write(ctx, channelFrame(0, `{"jsonrpc":"2.0","id":1,"method":"host/hello","params":`+string(hello)+`}`))
 	p.t.Cleanup(l.Close)
 	return host, l, key
@@ -724,50 +724,6 @@ func readUntil(t *testing.T, l *controllink.Lines, want string) string {
 		if strings.Contains(line, want) {
 			return line
 		}
-	}
-}
-
-// A need a host raises goes to the relay host, sealed to the device the ladder picks
-// (T097): the iPhone that may notify, then taken back when the need is met.
-func TestANeedGoesToTheRelayHost(t *testing.T) {
-	t.Parallel()
-	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
-	relayID, relay := p.rawHost("relay mac", true)
-	if relayID == "mac" {
-		t.Fatal("a relay was made the home host")
-	}
-	box := p.host("MACHINE-2")
-	// A phone pairs and says it may notify; the relay host hears the devices.
-	m, err := controllink.PairClient(context.Background(), p.code(false), "phone")
-	if err != nil {
-		t.Fatal(err)
-	}
-	yes := true
-	if err := p.s.Records().ChangeClient(context.Background(), m.Client, func(c *records.ClientRecord) bool {
-		c.Kind, c.MayNotify = records.KindIPhone, &yes
-		return true
-	}); err != nil {
-		t.Fatal(err)
-	}
-	p.s.tellRelayDevices()
-	readUntil(t, relay, m.Client)
-	// The window was given no channel on the relay host.
-	if n := p.s.Router().Channels(relayID); n != 0 {
-		t.Fatal(n)
-	}
-
-	need := `{"need":{"id":{"permission":"E0000000-0000-4000-8000-000000000005"},"agentID":"A0000000-0000-4000-8000-000000000001",` +
-		`"folder":"file:///work","kind":"permission","raisedAt":800000000,"headline":{"h1":"work","h2":"Fix","h3":"may run"}},"buzz":true}`
-	if _, err := p.s.methods.HostSaid(box.member.Host, "attention/need", json.RawMessage(need)); err != nil {
-		t.Fatal(err)
-	}
-	line := readUntil(t, relay, "relay/deliver")
-	if !strings.Contains(line, `"device":"`+m.Client+`"`) || !strings.Contains(line, `"alert":true`) || !strings.Contains(line, `"h2":"Fix"`) {
-		t.Fatal(line)
-	}
-	p.s.methods.HostSaid(box.member.Host, "attention/need", json.RawMessage(`{"withdraw":{"permission":"E0000000-0000-4000-8000-000000000005"}}`))
-	if line := readUntil(t, relay, "relay/deliver"); strings.Contains(line, "headline") {
-		t.Fatal(line)
 	}
 }
 
@@ -892,7 +848,7 @@ func TestToolsetFilesAreTheNamedOnesOnly(t *testing.T) {
 func TestHostsHearThePairedWindows(t *testing.T) {
 	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
-	_, host := p.rawHost("this mac", false)
+	_, host := p.rawHost("this mac")
 	m, err := controllink.PairClient(context.Background(), p.code(false), "window")
 	if err != nil {
 		t.Fatal(err)
@@ -923,12 +879,12 @@ func TestHostsHearThePairedWindows(t *testing.T) {
 func TestAHostHearsThePairedWindowsOnlyWhenTheyChange(t *testing.T) {
 	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
-	_, host := p.rawHost("this mac", false)
+	_, host := p.rawHost("this mac")
 	if line := readUntil(t, host, "machine/clients"); !strings.Contains(line, `"clients":[]`) {
 		t.Fatal("the hello's machine/clients:", line)
 	}
 	for range 40 {
-		p.s.syncRelays()
+		p.s.tellHostClients()
 	}
 	m, err := controllink.PairClient(context.Background(), p.code(false), "window")
 	if err != nil {

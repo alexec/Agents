@@ -125,7 +125,7 @@ func TestTheExchangeBothWays(t *testing.T) {
 		t.Fatal(hello.Line())
 	}
 	hostKey, _ := HostKey(host, controlPub, "box-1")
-	auth, expect, err := Answer(got.Hello, Identity{'h', "box-1"}, hostKey, origin, "host", controlPub, "", nil)
+	auth, expect, err := Answer(got.Hello, Identity{'h', "box-1"}, hostKey, origin, "host", controlPub, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +152,7 @@ func TestTheExchangeBothWays(t *testing.T) {
 	other, _ := PublicKey(NewPrivateKey())
 	h2 := *got.Hello
 	h2.Control = B64URL(other)
-	if _, _, err := Answer(&h2, Identity{'h', "box-1"}, hostKey, origin, "host", controlPub, "", nil); !isRefusal(err, WrongControlPlane) {
+	if _, _, err := Answer(&h2, Identity{'h', "box-1"}, hostKey, origin, "host", controlPub, nil); !isRefusal(err, WrongControlPlane) {
 		t.Fatal(err)
 	}
 	// A forged ok is refused.

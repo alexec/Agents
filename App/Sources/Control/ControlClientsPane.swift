@@ -26,7 +26,7 @@ struct ControlClientsPage: View {
                 Button("Pair a Mac…") { pairingMac = true }.buttonStyle(.paper)
                 Button("Add a Browser…") { pairingBrowser = true }.buttonStyle(.paper)
             }
-            Text("Forgetting cuts a client off at once, directly and through the relay. To use it again, pair it again.")
+            Text("Forgetting cuts a client off at once. To use it again, pair it again.")
                 .appText(.supporting).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -53,11 +53,8 @@ struct ControlClientsPage: View {
 
     private func clientRow(_ client: ClientRecord) -> some View {
         let isYou = client.id == control.status?.you
-        let link = control.connections[client.id]
-        let away = link?.relayed == true
-        let line = clientLine(client, isYou: isYou)
-        return ControlRow(dot: .none, title: isYou ? "This window" : client.name, chip: isYou ? "you" : away ? "away" : nil,
-                          chipTone: away ? .attention : .source, detail: line.plain, detailText: line.drawn) {
+        return ControlRow(dot: .none, title: isYou ? "This window" : client.name, chip: isYou ? "you" : nil,
+                          detail: clientLine(client, isYou: isYou)) {
             if isYou {
                 Button("Forget This Mac…") { forgettingThisWindow = true }.buttonStyle(.paper)
                     .disabled(ControlConfig.leaveRefusal != nil)
@@ -68,9 +65,8 @@ struct ControlClientsPage: View {
         }
     }
 
-    /// Frame N: what it is, then how it reaches the control plane now: directly, through
-    /// a Mac's iCloud relay (named, and emphasised), or when it was last seen.
-    private func clientLine(_ client: ClientRecord, isYou: Bool) -> (plain: String, drawn: Text) {
+    /// Frame N: what it is, then whether it is connected now, or when it was last seen.
+    private func clientLine(_ client: ClientRecord, isYou: Bool) -> String {
         let kind = switch client.kind {
         case .mac: "Mac"
         case .iPhone: "iPhone"
@@ -78,19 +74,13 @@ struct ControlClientsPage: View {
         case .browser: "Browser"
         case .unknown: "Device"
         }
-        let link = control.connections[client.id]
-        if let link, link.relayed {
-            let through = link.through ?? "a Mac"
-            return ("\(kind) · connected through \(through) (iCloud relay)",
-                    Text("\(kind) · connected through \(Text(through).fontWeight(.semibold)) (iCloud relay)"))
-        }
-        let how: String = if link != nil || isYou {
+        let how: String = if control.connections[client.id] != nil || isYou {
             "connected directly"
         } else if let seen = client.lastSeen {
             "seen \(seen.formatted(.relative(presentation: .named)))"
         } else {
             "paired \(client.paired.formatted(.relative(presentation: .named)))"
         }
-        return ("\(kind) · \(how)", Text("\(kind) · \(how)"))
+        return "\(kind) · \(how)"
     }
 }

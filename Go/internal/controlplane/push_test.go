@@ -125,29 +125,6 @@ func TestANeedIsPushedThroughAPNsWithNoRelay(t *testing.T) {
 	}
 }
 
-// With a relay host online, it carries the need as before, and nothing is pushed: one
-// way, so one banner.
-func TestARelayHostMeansNoPush(t *testing.T) {
-	t.Parallel()
-	pusher := &fakePusher{}
-	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) { c.Push = pusher })
-	_, relay := p.rawHost("relay mac", true)
-	box := p.host("MACHINE-2")
-	m, _ := p.phoneWithToken()
-	p.s.tellRelayDevices()
-	readUntil(t, relay, m.Client)
-	if _, err := p.s.methods.HostSaid(box.member.Host, "attention/need", json.RawMessage(pushNeed)); err != nil {
-		t.Fatal(err)
-	}
-	if line := readUntil(t, relay, "relay/deliver"); !strings.Contains(line, `"h2":"Fix the gallery"`) {
-		t.Fatal(line)
-	}
-	time.Sleep(200 * time.Millisecond)
-	if n := len(pusher.sent()); n != 0 {
-		t.Fatal(n, "pushed beside the relay")
-	}
-}
-
 // Only a device sets a token, only its own, and only a token; a token Apple says is gone
 // is forgotten.
 func TestOnlyADeviceSetsItsOwnToken(t *testing.T) {
@@ -292,18 +269,6 @@ func TestAfterAMoveANeedReachesALockedPhone(t *testing.T) {
 		t.Fatal(item)
 	}
 
-	// With a relay host online at the new copy, the relay carries it.
-	_, relay := moved.rawHost("relay mac", true)
-	moved.s.tellRelayDevices()
-	readUntil(t, relay, m.Client)
-	moved.s.methods.HostSaid(host.member.Host, "attention/need", json.RawMessage(pushNeed))
-	if line := readUntil(t, relay, "relay/deliver"); !strings.Contains(line, m.Client) || !strings.Contains(line, `"h2":"Fix the gallery"`) {
-		t.Fatal(line)
-	}
-	time.Sleep(200 * time.Millisecond)
-	if n := len(pusher.sent()); n != 2 {
-		t.Fatal(n, "pushed beside the relay")
-	}
 }
 
 // A need with no device to go to says so in the log, so a need is never lost in silence.
@@ -330,7 +295,7 @@ func TestANoticeTellsItsHostWhereItWent(t *testing.T) {
 	t.Parallel()
 	pusher := &fakePusher{}
 	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) { c.Push = pusher })
-	host, lines := p.rawHost("mac", false)
+	host, lines := p.rawHost("mac")
 	p.phoneWithToken()
 	notice := `{"need":{"id":{"notice":"E0000000-0000-4000-8000-000000000007"},"agentID":"A0000000-0000-4000-8000-000000000001",` +
 		`"folder":"file:///work","kind":"notice","raisedAt":800000000,"headline":{"h1":"work","h2":"Fix the gallery","h3":"The deploy finished"}},"buzz":true}`

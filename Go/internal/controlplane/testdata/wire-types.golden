@@ -3,7 +3,7 @@ Admitted full
 Admitted zero
 {}
 ChannelOpen full
-{"client":"CLIENT","device":"DEVICE","relayed":true,"tunnel":"TUNNEL","tunnelRef":"TUNNELREF","fanOut":true}
+{"client":"CLIENT","device":"DEVICE","tunnel":"TUNNEL","tunnelRef":"TUNNELREF","fanOut":true}
 ChannelOpen zero
 {"client":""}
 ClientAnnounce full
@@ -11,9 +11,9 @@ ClientAnnounce full
 ClientAnnounce zero
 {"id":"","publicKey":null,"name":"","kind":"unknown"}
 ClientConnection full
-{"client":"CLIENT","relayed":true,"through":"THROUGH"}
+{"client":"CLIENT"}
 ClientConnection zero
-{"client":"","relayed":false}
+{"client":""}
 ClientRecord full
 {"id":"ID","name":"NAME","kind":"iPhone","publicKey":"AQID","paired":813922215.25,"lastSeen":813922215.25,"mayNotify":true,"owner":"OWNER","rev":7,"forgotten":true,"forgottenAt":813922215.25,"knownEpoch":7}
 ClientRecord zero
@@ -23,11 +23,11 @@ ControlCodeShown full
 ControlCodeShown zero
 {"text":"","expires":0}
 ControlMachine full
-{"id":"ID","name":"NAME","platform":"PLATFORM","version":"VERSION","state":"STATE","reach":"REACH","machineID":"MACHINEID","relay":true,"signInFrom":{"KEY":"SIGNINFROM"},"gitFrom":{"KEY":"GITFROM"},"gitAsks":[{"server":"SERVER","from":"FROM"}],"tunnel":{"up":true,"problem":"PROBLEM"},"workspace":{"provider":"PROVIDER","providerName":"PROVIDERNAME","workspace":"WORKSPACE","workspaceName":"WORKSPACENAME","workspaceState":"WORKSPACESTATE","hostState":"HOSTSTATE","phase":"PHASE","since":813922215.25,"problem":"PROBLEM","stoppedBy":"STOPPEDBY","canStart":true,"canStop":true,"startWhenUsed":true,"stopWhenIdleMinutes":7,"cost":"COST","current":true,"startForSchedules":true,"tellsSchedule":true,"nextWorkflow":"NEXTWORKFLOW","nextWorkflowAt":813922215.25,"wakeAt":813922215.25},"implementation":"IMPLEMENTATION"}
+{"id":"ID","name":"NAME","platform":"PLATFORM","version":"VERSION","state":"STATE","reach":"REACH","machineID":"MACHINEID","signInFrom":{"KEY":"SIGNINFROM"},"gitFrom":{"KEY":"GITFROM"},"gitAsks":[{"server":"SERVER","from":"FROM"}],"tunnel":{"up":true,"problem":"PROBLEM"},"workspace":{"provider":"PROVIDER","providerName":"PROVIDERNAME","workspace":"WORKSPACE","workspaceName":"WORKSPACENAME","workspaceState":"WORKSPACESTATE","hostState":"HOSTSTATE","phase":"PHASE","since":813922215.25,"problem":"PROBLEM","stoppedBy":"STOPPEDBY","canStart":true,"canStop":true,"startWhenUsed":true,"stopWhenIdleMinutes":7,"cost":"COST","current":true,"startForSchedules":true,"tellsSchedule":true,"nextWorkflow":"NEXTWORKFLOW","nextWorkflowAt":813922215.25,"wakeAt":813922215.25},"implementation":"IMPLEMENTATION"}
 ControlMachine zero
 {"id":"","name":"","platform":"","version":"","state":"","reach":""}
 ControlStatus full
-{"name":"NAME","version":"VERSION","homeHost":"HOMEHOST","machineID":"MACHINEID","startedAt":813922215.25,"port":7,"awayFromHome":true,"you":"YOU","relayKey":"AQID","web":{"port":7,"served":true,"reason":"REASON","detail":"DETAIL"},"thisMacHost":{"member":true,"connected":true,"problem":"PROBLEM","at":813922215.25},"folderDetection":{"enabled":true,"paths":["PATHS"]},"unjoinedTunnels":[{"name":"NAME","host":"HOST","tunnel":{"up":true,"problem":"PROBLEM"}}]}
+{"name":"NAME","version":"VERSION","homeHost":"HOMEHOST","machineID":"MACHINEID","startedAt":813922215.25,"port":7,"awayFromHome":true,"you":"YOU","web":{"port":7,"served":true,"reason":"REASON","detail":"DETAIL"},"thisMacHost":{"member":true,"connected":true,"problem":"PROBLEM","at":813922215.25},"folderDetection":{"enabled":true,"paths":["PATHS"]},"unjoinedTunnels":[{"name":"NAME","host":"HOST","tunnel":{"up":true,"problem":"PROBLEM"}}]}
 ControlStatus zero
 {"name":"","version":"","machineID":""}
 GitAsk full
@@ -47,21 +47,17 @@ HandoverStatus full
 HandoverStatus zero
 {"phase":"","controlKey":null,"hasRecords":false,"endpoints":null,"members":null}
 MachineAnnounce full
-{"publicKey":"AQID","name":"NAME","platform":"PLATFORM","version":"VERSION","machineID":"MACHINEID","relay":true,"implementation":"IMPLEMENTATION"}
+{"publicKey":"AQID","name":"NAME","platform":"PLATFORM","version":"VERSION","machineID":"MACHINEID","implementation":"IMPLEMENTATION"}
 MachineAnnounce zero
 {"publicKey":null,"name":"","platform":"","version":"","machineID":""}
 MachineHello full
-{"host":"HOST","version":"VERSION","platform":"PLATFORM","machineID":"MACHINEID","name":"NAME","relay":true,"implementation":"IMPLEMENTATION"}
+{"host":"HOST","version":"VERSION","platform":"PLATFORM","machineID":"MACHINEID","name":"NAME","implementation":"IMPLEMENTATION"}
 MachineHello zero
 {"version":"","platform":"","machineID":""}
 MachineJoinStatus full
 {"member":true,"connected":true,"problem":"PROBLEM","at":813922215.25}
 MachineJoinStatus zero
 {"member":false,"connected":false,"at":0}
-MachineRelayRequest full
-{"host":"HOST","relay":true}
-MachineRelayRequest zero
-{"host":"","relay":false}
 MachineRequest full
 {"host":"HOST","purge":true}
 MachineRequest zero

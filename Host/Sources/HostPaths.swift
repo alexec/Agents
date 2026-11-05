@@ -60,31 +60,19 @@ struct HostPaths: Sendable, Equatable {
 
     static let controlPlist = "com.alexecollins.agentshost.control.plist"
     static let daemonPlist = "com.alexecollins.agentshost.daemon.plist"
-    static let relayPlist = "com.alexecollins.agentshost.relay.plist"
 
     var controlLabel: String { scratch ? "com.alexecollins.agentshost.control.scratch-\(suffix)" : "com.alexecollins.agentshost.control" }
     var daemonLabel: String { scratch ? "com.alexecollins.agentshost.daemon.scratch-\(suffix)" : "com.alexecollins.agentshost.daemon" }
-    var relayLabel: String { scratch ? "com.alexecollins.agentshost.relay.scratch-\(suffix)" : "com.alexecollins.agentshost.relay" }
 
-    /// The scratch root itself, which `agents-relay` is given as `AGENTS_ROOT`.
+    /// The scratch root itself.
     var scratchRoot: URL? { scratch ? controlHome.deletingLastPathComponent() : nil }
 
-    /// `agents-relay`'s membership, key and first code (#809), where it looks for them:
-    /// `<root>/relay` on a scratch set-up, else `~/Library/Application Support/Agents Relay`.
-    var relayFiles: ControlRelay.Files {
-        let folder = scratchRoot?.appendingPathComponent("relay", isDirectory: true)
-            ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-                .appendingPathComponent("Agents Relay", isDirectory: true)
-        return ControlRelay.Files(folder: folder)
-    }
     /// Where the set-up's own logs go (#1030): the ordinary root's log folder,
     /// `~/Library/Logs/Agents`, beside the daemon's; a scratch set-up's root's own.
-    /// `agents-relay` works out the same folder for itself (`Host/Relay`).
     var logs: URL { Self.logs(scratchRoot: scratchRoot) }
     static func logs(scratchRoot: URL?) -> URL {
         (scratchRoot.map { StoreLocations(root: $0) } ?? StoreLocations.standard).logRoot
     }
-    var relayLog: URL { logs.appendingPathComponent("relay.log") }
     /// The daemon job's stdout and stderr, which launchd writes.
     var hostOut: URL { logs.appendingPathComponent("host.out") }
 
@@ -101,5 +89,4 @@ struct HostPaths: Sendable, Equatable {
     var webRemote: URL { Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/dist", isDirectory: true) }
     /// This Mac's host, Go since #1138; carried under its plain name (#1314).
     var agentsd: URL { helpers.appendingPathComponent("agentsd") }
-    var agentsRelay: URL { helpers.appendingPathComponent("agents-relay.app/Contents/MacOS/agents-relay") }
 }

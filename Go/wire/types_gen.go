@@ -2073,8 +2073,6 @@ type ChannelOpen struct {
 
 	Device *UUID `json:"device,omitzero"`
 
-	Relayed *bool `json:"relayed,omitzero"`
-
 	Tunnel *string `json:"tunnel,omitzero"`
 
 	TunnelRef *string `json:"tunnelRef,omitzero"`
@@ -2151,13 +2149,9 @@ type ClientAnnounce struct {
 	Kind ClientKind `json:"kind"`
 }
 
-// One row of clients/connections: a client connected now, and how.
+// One row of clients/connections: a client connected now.
 type ClientConnection struct {
 	Client UUID `json:"client"`
-
-	Relayed bool `json:"relayed"`
-
-	Through *string `json:"through,omitzero"`
 }
 
 // ClientRecord.Kind: a kind a later build added reads as `unknown`.
@@ -2775,7 +2769,7 @@ type ContinueWhenBack struct {
 	ResetKnown bool `json:"resetKnown"`
 }
 
-// The peer's answer: {"auth":…} (ControlAuth.Auth). `kind` is mac, iphone, ipad, browser, host, relay, copy or page.
+// The peer's answer: {"auth":…} (ControlAuth.Auth). `kind` is mac, iphone, ipad, browser, host, copy or page.
 type ControlAuth struct {
 	ID string `json:"id"`
 
@@ -2784,8 +2778,6 @@ type ControlAuth struct {
 	Mac string `json:"mac"`
 
 	Kind string `json:"kind"`
-
-	For *string `json:"for,omitzero"`
 
 	Epoch *int64 `json:"epoch,omitzero"`
 
@@ -2867,8 +2859,6 @@ type ControlMachine struct {
 
 	MachineID *string `json:"machineID,omitzero"`
 
-	Relay *bool `json:"relay,omitzero"`
-
 	SignInFrom map[string]MachineRef `json:"signInFrom,omitzero"`
 
 	GitFrom map[string]MachineRef `json:"gitFrom,omitzero"`
@@ -2926,8 +2916,6 @@ type ControlOK struct {
 
 	Host *MachineRef `json:"host,omitzero"`
 
-	Relayed *bool `json:"relayed,omitzero"`
-
 	Endpoints []ControlEndpoint `json:"endpoints,omitzero"`
 
 	Epoch *int64 `json:"epoch,omitzero"`
@@ -2976,8 +2964,6 @@ type ControlStatus struct {
 	AwayFromHome *bool `json:"awayFromHome,omitzero"`
 
 	You *UUID `json:"you,omitzero"`
-
-	RelayKey Data `json:"relayKey,omitzero"`
 
 	Web *WebRemoteStatus `json:"web,omitzero"`
 
@@ -6366,8 +6352,6 @@ type MachineAnnounce struct {
 
 	MachineID string `json:"machineID"`
 
-	Relay *bool `json:"relay,omitzero"`
-
 	Implementation *string `json:"implementation,omitzero"`
 }
 
@@ -6442,8 +6426,6 @@ type MachineHello struct {
 	MachineID string `json:"machineID"`
 
 	Name *string `json:"name,omitzero"`
-
-	Relay *bool `json:"relay,omitzero"`
 
 	Implementation *string `json:"implementation,omitzero"`
 
@@ -6597,13 +6579,6 @@ type MachineProviderDraftCall struct {
 }
 
 type MachineRef string
-
-// hosts/setRelay.
-type MachineRelayRequest struct {
-	Host MachineRef `json:"host"`
-
-	Relay bool `json:"relay"`
-}
 
 // host/release (#2178): the release the control plane names, as X.Y.Z.
 type MachineRelease struct {
@@ -8931,7 +8906,7 @@ type PushEnvironment string
 const PushEnvironmentDevelopment PushEnvironment = "development"
 const PushEnvironmentProduction PushEnvironment = "production"
 
-// clients/setPushToken (#1460): a device's own APNs token, in hex, for the control plane to push to when no Mac host relays its notices. No token takes it away.
+// clients/setPushToken (#1460): a device's own APNs token, in hex, for the control plane to push its notices to. No token takes it away.
 type PushToken struct {
 	Token *string `json:"token,omitzero"`
 
@@ -9090,16 +9065,7 @@ type ReceiveUploadRequest struct {
 	Data Data `json:"data"`
 }
 
-// relay/count (#1163): one device's Needs you count, posted as a silent push.
-type RelayCount struct {
-	Device UUID `json:"device"`
-
-	Waiting int64 `json:"waiting"`
-
-	CountedAt Date `json:"countedAt"`
-}
-
-// relay/deliver (T097): seal the headline to `publicKey` and post it for `device`; no headline is a withdrawal.
+// A notice for one device (T097), which the control plane sends through APNs or Web Push: seal the headline to `publicKey` and post it for `device`; no headline is a withdrawal.
 type RelayDelivery struct {
 	NeedID NeedID `json:"needID"`
 
@@ -9112,18 +9078,6 @@ type RelayDelivery struct {
 	Alert bool `json:"alert"`
 
 	Waiting *int64 `json:"waiting,omitzero"`
-}
-
-// A device a relay host may carry for, with the key its frames are sealed to.
-type RelayDevice struct {
-	ID UUID `json:"id"`
-
-	PublicKey Data `json:"publicKey"`
-}
-
-// relay/devices: every device client.
-type RelayDevices struct {
-	Devices []RelayDevice `json:"devices"`
 }
 
 type RelayGrantReply struct {
@@ -9151,11 +9105,6 @@ type RelayOffer struct {
 // relay/register: the public half of the Mac's relay key, X9.63.
 type RelayRegistration struct {
 	PublicKey Data `json:"publicKey"`
-}
-
-// relay/switch (#824): the relay host that says it, on or off.
-type RelaySwitch struct {
-	Relay bool `json:"relay"`
 }
 
 // The tokens the machine's model relay counted from the provider's own answers (#999, FR-019): fresh input, output, and cache reads and writes.

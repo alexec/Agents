@@ -10,7 +10,6 @@
 #
 # A release needs, on this Mac or the runner:
 #   - the "Developer ID Application" identity in a keychain;
-#   - the "Agents Relay Developer ID" profile installed (the relay reaches CloudKit);
 #   - ASC_KEY_ID, ASC_ISSUER_ID and ASC_KEY_PATH (the App Store Connect key's .p8), for
 #     notarytool.
 # The Linux agentsd (Go, #1136) has to be in App/Resources/servers already
@@ -68,9 +67,6 @@ else
   <key>teamID</key><string>6T4RVD5724</string>
   <key>signingStyle</key><string>manual</string>
   <key>signingCertificate</key><string>Developer ID Application</string>
-  <key>provisioningProfiles</key><dict>
-    <key>com.alexecollins.agents.bridge</key><string>Agents Relay Developer ID</string>
-  </dict>
 </dict></plist>
 EOF
     xcodebuild -exportArchive -archivePath $out/AgentsHost.xcarchive -exportPath $out/export \
@@ -82,7 +78,7 @@ fi
 
 # What the bundle must hold, signed: the helpers, the MCP servers it ships (#700) and the
 # Linux agentsd.
-for helper in agentsd agents-control agents-relay.app github-mcp linear-mcp gitlab-mcp email-mcp jira-mcp slack-mcp googlechat-mcp whatsapp-mcp workspace-commands; do
+for helper in agentsd agents-control github-mcp linear-mcp gitlab-mcp email-mcp jira-mcp slack-mcp googlechat-mcp whatsapp-mcp workspace-commands; do
     [[ -e "$app/Contents/Helpers/$helper" ]] || { print -u2 "Agents Host has no Helpers/$helper"; exit 1 }
 done
 codesign --verify --deep --strict "$app"

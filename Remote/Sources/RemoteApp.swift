@@ -22,9 +22,8 @@ struct RemoteApp: App {
     /// conversation long enough to page, neither of which a real Mac reliably has when
     /// somebody wants to look at a screen.
     ///
-    /// The real one is the control plane this phone paired with (058, US5): its address,
-    /// and the relay through iCloud when the address cannot be reached. Until it pairs,
-    /// there is nothing to reach.
+    /// The real one is the control plane this phone paired with (058, US5), at its
+    /// address. Until it pairs, there is nothing to reach.
     @State private var model = RemoteModel(link: RemoteApp.link())
 
     init() {

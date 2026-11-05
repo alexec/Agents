@@ -20,7 +20,6 @@ import (
 	"net/netip"
 	"os"
 	"slices"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -124,11 +123,11 @@ type Config struct {
 	// Logger takes a line for each request, at debug, with its fields (#2176): method,
 	// client, person, host and request id. Nil drops them.
 	Logger *slog.Logger
-	// Posts this copy's own pushes through APNs (#1460) when no Mac host relays a notice.
-	// Nil, with no key on the machine, sends none.
+	// Posts this copy's own pushes through APNs (#1460). Nil, with no key on the machine,
+	// sends none.
 	Push Pusher
-	// Posts this copy's own Web Push to a browser (#1486), relay or none: a browser has
-	// neither. Nil, with no VAPID key on the machine, sends none.
+	// Posts this copy's own Web Push to a browser (#1486). Nil, with no VAPID key on the
+	// machine, sends none.
 	WebPush WebPusher
 	// The sign-in providers this copy can check, and where it asks them (#995); nil is the
 	// app's own client ids, or AGENTS_SIGNIN_* over them.
@@ -162,9 +161,9 @@ type Service struct {
 	backups *backupStore
 	methods *Methods
 	started time.Time
-	// What this copy has told its relay host for each need (T097).
+	// What this copy has sent each device for each need (T097).
 	desk *notices.Desk
-	// This copy's own pushes, when no relay host is online (#1460); nil with no key.
+	// This copy's own pushes through APNs (#1460); nil with no key.
 	pushes *pushes
 	// This copy's Web Push to browsers (#1486); nil with no VAPID key.
 	webPush *webPushes
@@ -399,7 +398,7 @@ func (s *Service) Records() *records.Records { return s.records }
 // or the one the system chose for 0).
 func (s *Service) Start(ctx context.Context) (int, error) {
 	if s.pushes == nil {
-		s.log("notice: no APNs key, so this control plane sends no pushes; a Mac host that relays still does")
+		s.log("notice: no APNs key, so this control plane sends no pushes to a phone or an iPad")
 	}
 	if s.webPush == nil {
 		s.log("notice: no VAPID key, so this control plane sends no Web Push to a browser")
@@ -551,7 +550,7 @@ func (s *Service) takeUp(ctx context.Context) error {
 	if home := s.records.Settings().HomeHost; home != nil {
 		s.router.SetHomeHost(*home)
 	}
-	s.syncRelays()
+	s.tellHostClients()
 	return nil
 }
 
@@ -643,7 +642,7 @@ func (s *Service) refresh() {
 	s.reconcile()
 	s.router.HoldToOwners()
 	s.noteTeam()
-	s.syncRelays()
+	s.tellHostClients()
 }
 
 // reconcile holds every session here to the records as they are now. A client is closed
@@ -695,16 +694,6 @@ func (s *Service) watchJoinFile() {
 			last = now
 		}
 	}
-}
-
-// syncRelays holds the router to the records: which hosts only relay. Then every relay
-// host here hears the devices again.
-func (s *Service) syncRelays() {
-	for _, h := range s.records.Hosts() {
-		s.router.SetRelay(h.ID, h.Relay)
-	}
-	s.tellRelayDevices()
-	s.tellHostClients()
 }
 
 // hostClients is host/clients: every paired window of the host's owner and its key,
@@ -790,31 +779,6 @@ func (s *Service) tellHostClients(only ...string) {
 	}
 }
 
-// tellRelayDevices tells each relay host whose uplink ends here every device client and
-// its key: whom it may carry for (FR-008).
-func (s *Service) tellRelayDevices() {
-	relays := s.router.RelaysHeldHere()
-	if len(relays) == 0 {
-		return
-	}
-	type device struct {
-		ID        string `json:"id"`
-		PublicKey []byte `json:"publicKey"`
-	}
-	for _, relay := range relays {
-		// A relay carries only its own person's devices (#994).
-		owner := s.ownerOf(relay)
-		devices := []device{}
-		for _, c := range s.records.Clients() {
-			// A browser has no mailbox to carry for (071), and a Mac's window no relay.
-			if c.IsDevice() && len(c.PublicKey) > 0 && s.PersonOf(c.ID) == owner {
-				devices = append(devices, device{c.ID, c.PublicKey})
-			}
-		}
-		s.router.Tell(relay, "relay/devices", map[string]any{"devices": devices})
-	}
-}
-
 // startMesh starts the copies (T063–T066): leases let go when a host's uplink here ends
 // or another copy takes it, presence and links told to the others.
 func (s *Service) startMesh() {
@@ -830,11 +794,11 @@ func (s *Service) startMesh() {
 		s.router.CloseLocal(host)
 		m.released(host, epoch)
 	}
-	s.router.OnLinkChanged(func(client string, relayed *bool) {
-		if relayed == nil {
+	s.router.OnLinkChanged(func(client string, connected bool) {
+		if !connected {
 			s.log("client " + client + " disconnected")
 		}
-		m.broadcast(peerLinkLine(client, relayed))
+		m.broadcast(peerLinkLine(client, connected))
 	})
 	m.start()
 }
@@ -870,9 +834,8 @@ func (s *Service) keepMayNotify(client string, may bool) {
 	}
 }
 
-// heard is a host's attention/need (R6): what to post where, told to the relay host held
-// here. With no relay host here, a need reaches only the clients connected to its host,
-// over their own channels. It goes only to the devices of the host's owner (#994).
+// heard is a host's attention/need (R6): what to post where, pushed from this copy. It
+// goes only to the devices of the host's owner (#994).
 func (s *Service) heard(host string, params json.RawMessage) {
 	var need notices.AttentionNeed
 	if json.Unmarshal(params, &need) != nil {
@@ -882,54 +845,28 @@ func (s *Service) heard(host string, params json.RawMessage) {
 	if owner := s.ownerOf(host); s.isBot(owner) {
 		for _, p := range s.records.People() {
 			if p.IsAdmin() {
-				s.deliver(need, false, p.ID, host)
+				s.deliver(need, p.ID, host)
 			}
 		}
 		return
 	}
-	s.deliver(need, false, s.ownerOf(host), host)
+	s.deliver(need, s.ownerOf(host), host)
 }
 
-// deliver posts a need through the relay host if it is held here. With none here but one
-// online at another copy, it tells the other copies. With no relay host online anywhere,
-// the copy that heard the need from its host pushes it through APNs itself (#1460), and
-// no other copy does, so a notice goes one way and arrives once.
+// deliver pushes a need from the copy that heard it from its host: through APNs to a
+// phone or an iPad (#1460), and by Web Push to a browser (#1486). No other copy does, so a
+// notice goes one way and arrives once.
 //
-// owner is the person whose devices it goes to; "" (from an older copy) is every device.
-// host is the machine whose need it is, told where a notice went (#2860); "" from a peer.
-func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool, owner, host string) {
-	relays := []string{}
-	for _, r := range s.router.RelaysHeldHere() {
-		if owner == "" || s.ownerOf(r) == owner {
-			relays = append(relays, r)
+// owner is the person whose devices it goes to; "" is every device.
+// host is the machine whose need it is, told where a notice went (#2860).
+func (s *Service) deliver(need notices.AttentionNeed, owner, host string) {
+	if s.pushes == nil && s.webPush == nil {
+		// Each way a need ends here with nothing sent is said (#1509).
+		if need.Need != nil {
+			needID, _ := json.Marshal(need.Need.ID)
+			s.log(fmt.Sprintf("notice: %s goes to no device: this copy does not push", needID))
 		}
-	}
-	relay := ""
-	if len(relays) > 0 {
-		sort.Strings(relays)
-		relay = relays[0]
-	} else {
-		if fromPeer {
-			return
-		}
-		if s.pushes == nil && s.webPush == nil || s.router.RelayOnline() {
-			if s.mesh != nil {
-				s.mesh.broadcast(encodeNeed(need, owner))
-			}
-			// Each way a need ends here with nothing sent is said (#1509).
-			if need.Need != nil {
-				needID, _ := json.Marshal(need.Need.ID)
-				switch {
-				case s.router.RelayOnline():
-					s.log(fmt.Sprintf("notice: %s goes to the copy that holds the relay", needID))
-				case s.mesh != nil:
-					s.log(fmt.Sprintf("notice: %s goes to the other copies: no relay here, and this copy does not push", needID))
-				default:
-					s.log(fmt.Sprintf("notice: %s goes to no device: no relay is online, and this copy does not push", needID))
-				}
-			}
-			return
-		}
+		return
 	}
 	flags := s.router.NotifyFlags()
 	var devices []notices.Device
@@ -937,8 +874,8 @@ func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool, owner, host
 		if owner != "" && s.PersonOf(c.ID) != owner {
 			continue
 		}
-		// A browser goes by Web Push from here, relay or none (#1486): only one that
-		// subscribed, which says it may be notified.
+		// A browser goes by Web Push (#1486): only one that subscribed, which says it may
+		// be notified.
 		if c.Kind == records.KindBrowser {
 			if s.webPush == nil || c.WebPush == nil {
 				continue
@@ -954,8 +891,8 @@ func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool, owner, host
 		if !c.IsDevice() || len(c.PublicKey) == 0 {
 			continue
 		}
-		// Pushed from here, only a device that gave its token can be chosen.
-		if relay == "" && (s.pushes == nil || c.PushToken == nil) {
+		// Only a device that gave its token can be chosen.
+		if s.pushes == nil || c.PushToken == nil {
 			continue
 		}
 		kind := notices.Unknown
@@ -1004,18 +941,12 @@ func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool, owner, host
 			}
 			continue
 		}
-		// A withdrawal goes the way its post went.
-		if relay == "" && s.pushes == nil {
+		if s.pushes == nil {
 			s.log(fmt.Sprintf("notice: could not withdraw %s from %s: this copy has no APNs key", needID, delivery.Device))
 			continue
 		}
-		if relay == "" || s.pushes != nil && delivery.Headline == nil && s.pushes.pushedHere(delivery) {
-			s.pushes.deliver(delivery)
-			s.log(fmt.Sprintf("notice: %s %s for %s through APNs", did, needID, delivery.Device))
-			continue
-		}
-		s.router.Tell(relay, "relay/deliver", delivery)
-		s.log(fmt.Sprintf("notice: %s %s for %s to relay %s", did, needID, delivery.Device, relay))
+		s.pushes.deliver(delivery)
+		s.log(fmt.Sprintf("notice: %s %s for %s through APNs", did, needID, delivery.Device))
 	}
 }
 
@@ -1360,7 +1291,7 @@ func (s *Service) acceptVia(conn *Conn, webOrigin string, proved func(failed boo
 		case auth.Page == nil || *auth.Page < 1 || *auth.Page > 65535:
 			refuse(controllink.Refuse(controllink.BadMessage))
 			return
-		case h == nil || (h.Relay != nil && *h.Relay):
+		case h == nil:
 			refuse(controllink.Refuse(controllink.Unknown))
 			return
 		case !s.router.Reaches(host):
@@ -1377,19 +1308,9 @@ func (s *Service) acceptVia(conn *Conn, webOrigin string, proved func(failed boo
 		refuse(controllink.Refuse(controllink.BadMessage))
 		return
 	}
-	// A device through agents-relay (T096): the exchange is its own, end to end, and it
-	// says it came that way, for itself only.
-	relayed := auth.Kind == "relay"
-	if relayed && (id.Kind != 'c' || deref(auth.For) != id.ID || client == nil || !client.IsDevice()) {
-		refuse(controllink.Refuse(controllink.BadMessage))
-		return
-	}
 	// Once a list has been announced, every member is given it (R16).
 	settings := s.records.Settings()
 	ok2 := controllink.OK{Mac: controllink.B64URL(mac), Host: optional(wire.MachineRef(host)), NewKey: offer}
-	if relayed {
-		ok2.Relayed = &relayed
-	}
 	if settings != nil && settings.Epoch != nil {
 		ok2.Endpoints = currentEndpoints(settings)
 		ok2.Epoch = int64Of(settings.Epoch)
@@ -1433,7 +1354,7 @@ func (s *Service) acceptVia(conn *Conn, webOrigin string, proved func(failed boo
 				return
 			}
 		}
-		session := s.router.AttachClient(client, conn, relayed, auth.Capabilities)
+		session := s.router.AttachClient(client, conn, auth.Capabilities)
 		if carried != nil {
 			s.router.NoteCarried(session, via)
 		}
@@ -1449,9 +1370,6 @@ func (s *Service) acceptVia(conn *Conn, webOrigin string, proved func(failed boo
 		}
 		s.renewClient(context.Background(), client.ID)
 		through := ""
-		if relayed {
-			through = " through the relay"
-		}
 		if via != "" {
 			through = " through " + via + "'s loopback listener"
 		}
@@ -1843,7 +1761,7 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, webOrigin
 			return nil, err
 		}
 		s.log(name + " paired (" + a.Kind + ")")
-		// Known at every copy at once: the relay host may be held at another.
+		// Known at every copy at once.
 		s.announce("clientPaired", client, "code")
 		return result, nil
 	case stored.Purpose == "host" && method == "hosts/announce":
@@ -1853,8 +1771,7 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, webOrigin
 		}
 		// The host on the control plane's own machine is its home host, mac, as a moved
 		// set-up's is (data-model.md).
-		relay := a.Relay != nil && *a.Relay
-		home := s.cfg.MachineID != "" && a.MachineID == s.cfg.MachineID && s.records.Host("mac") == nil && !relay
+		home := s.cfg.MachineID != "" && a.MachineID == s.cfg.MachineID && s.records.Host("mac") == nil
 		want := records.NewHostID()
 		if home {
 			want = "mac"
@@ -1877,9 +1794,6 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, webOrigin
 		// The machine is the person's who made the code (FR-017).
 		record := records.MachineRecord{ID: host, Name: a.Name, PublicKey: a.PublicKey, Platform: a.Platform,
 			Version: a.Version, MachineID: &mid, Owner: stored.Owner, Expires: s.newExpiry()}
-		if relay {
-			record.Relay = &relay
-		}
 		if deref(a.Implementation) != "" {
 			impl, _ := json.Marshal(*a.Implementation)
 			record.Extra = records.Extra{"implementation": impl}
@@ -1904,9 +1818,6 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, webOrigin
 		}
 		if err != nil {
 			return nil, err
-		}
-		if relay {
-			s.router.SetRelay(host, &relay)
 		}
 		// Every other copy knows it at once.
 		s.announce("hostEnrolled", host, "code")

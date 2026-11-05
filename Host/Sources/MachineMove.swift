@@ -370,7 +370,7 @@ struct MachineMoveSheet: View {
             Self.stage(move.stages[0], "Holding records still", note: "Pairing and changes wait. Agents keep working.")
             Self.stage(move.stages[1], move.copied ?? "Copying records")
             Self.stage(move.stages[2], "\(URL(string: move.address)?.host ?? "It") takes over")
-            Self.stage(move.stages[3], "The machine and relay on this Mac go there")
+            Self.stage(move.stages[3], "The machine on this Mac goes there")
             Self.stage(move.stages[4], "This Mac sends anyone still coming here on to it")
             Self.problemLine(move.problem)
             Self.buttons {
@@ -501,7 +501,6 @@ struct MachineMoveSheet: View {
         case "mac": ["window"]
         case "iPhone": ["phone"]
         case "iPad": ["iPad"]
-        case "relay": ["relay"]
         default: [member.id == MachineRef.mac.rawValue ? "host" : "server"]
         }
         if member.online != true, let seen = member.lastSeen {

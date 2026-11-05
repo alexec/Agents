@@ -143,60 +143,6 @@ struct ReconnectScheduleTests {
         #expect(tries >= 2 && tries <= 9, "\(tries) tries in 3 s")
     }
 
-    // MARK: The relay's notices
-
-    func item(_ device: UUID, _ need: NeedID, envelope: Bool, at seconds: TimeInterval) -> MailboxItem {
-        MailboxItem(needID: need, device: device, envelope: nil, alert: envelope,
-                    postedAt: Date(timeIntervalSince1970: seconds))
-    }
-
-    @Test func aNoticeThatDidNotPostIsKeptOncePerNeed() {
-        var pending = PendingPosts()
-        let phone = UUID(), need = NeedID.permission(UUID())
-        pending.keep(item(phone, need, envelope: true, at: 1))
-        pending.keep(item(phone, need, envelope: false, at: 2))
-        #expect(pending.count == 1)
-        #expect(pending.waiting.first?.postedAt == Date(timeIntervalSince1970: 2), "the withdrawal replaced the need")
-        // An older word that failed late does not put back what was withdrawn.
-        pending.keep(item(phone, need, envelope: true, at: 1))
-        #expect(pending.waiting.first?.postedAt == Date(timeIntervalSince1970: 2))
-    }
-
-    @Test func aLaterPostThatWorkedClearsWhatWasWaiting() {
-        var pending = PendingPosts()
-        let phone = UUID(), need = NeedID.permission(UUID())
-        pending.keep(item(phone, need, envelope: true, at: 1))
-        pending.posted(item(phone, need, envelope: false, at: 3))
-        #expect(pending.isEmpty)
-        // But a post older than what is waiting leaves it to be posted.
-        pending.keep(item(phone, need, envelope: false, at: 5))
-        pending.posted(item(phone, need, envelope: true, at: 4))
-        #expect(pending.count == 1)
-    }
-
-    @Test func aRetrySnapshotIsReplacedByAWithdrawalBeforeItIsPosted() {
-        var pending = PendingPosts()
-        let phone = UUID(), need = NeedID.permission(UUID())
-        let offered = item(phone, need, envelope: true, at: 1)
-        pending.keep(offered)
-        pending.keep(item(phone, need, envelope: false, at: 2))
-        #expect(pending.current(offered)?.envelope == nil)
-        #expect(pending.current(item(phone, need, envelope: false, at: 2))?.envelope == nil)
-    }
-
-    @Test func whatIsKeptIsBounded() {
-        var pending = PendingPosts(limit: 3)
-        let phone = UUID()
-        let needs = (0..<5).map { _ in NeedID.permission(UUID()) }
-        var dropped: [MailboxItem] = []
-        for (index, need) in needs.enumerated() {
-            if let gone = pending.keep(item(phone, need, envelope: true, at: Double(index))) { dropped.append(gone) }
-        }
-        #expect(pending.count == 3)
-        #expect(dropped.map(\.needID) == Array(needs.prefix(2)), "the oldest go first")
-        #expect(pending.waiting.map(\.needID) == Array(needs.suffix(3)))
-    }
-
     static func seconds(_ duration: Duration) -> TimeInterval {
         TimeInterval(duration.components.seconds) + TimeInterval(duration.components.attoseconds) / 1e18
     }

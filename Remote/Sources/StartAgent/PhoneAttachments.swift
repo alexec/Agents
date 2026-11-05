@@ -8,7 +8,6 @@ import UniformTypeIdentifiers
 /// (029). Everything goes by value — a picture shrunk, text as its contents — because a
 /// file on this phone is a path the Mac cannot open. The rules are `PhoneAttachment`'s.
 struct AttachButton: View {
-    @Environment(RemoteModel.self) private var model
     @Binding var attachments: [Attachment]
     /// Why something picked could not be attached, said where it was picked.
     @Binding var refusal: String?
@@ -35,9 +34,7 @@ struct AttachButton: View {
         .menuStyle(.button)
         .buttonStyle(.paper)
         .buttonBorderShape(.circle)
-        .accessibilityLabel(model.isAway ? "Attach, needs the same network as your Mac" : "Attach")
-        // Away, a picture is too much to carry through iCloud (046, look A).
-        .disabled(model.isAway)
+        .accessibilityLabel("Attach")
         .photosPicker(isPresented: $choosingPhotos, selection: $photos, matching: .images)
         .fileImporter(isPresented: $choosingFiles, allowedContentTypes: [.item],
                       allowsMultipleSelection: true) { result in
@@ -113,13 +110,11 @@ extension PhoneAttachment {
 /// copied. Through the system's paste, so iPadOS asks nothing first. Not on an iPhone:
 /// there, Paste Picture is the way in.
 struct PastesPictures: ViewModifier {
-    @Environment(RemoteModel.self) private var model
     @Binding var attachments: [Attachment]
     @Binding var refusal: String?
 
     func body(content: Content) -> some View {
-        // Away, as the paperclip: a picture is too much to carry through iCloud (046).
-        if UIDevice.current.userInterfaceIdiom == .pad, !model.isAway {
+        if UIDevice.current.userInterfaceIdiom == .pad {
             content.pasteDestination(for: PastedPicture.self) { pictures in
                 for picture in pictures {
                     PhoneAttachment.add(PhoneAttachment.picture(picture.data, name: "Pasted picture"),

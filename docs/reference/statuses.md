@@ -115,16 +115,13 @@ last ending puts it in, usually **Done**, marked read.
 
 ## The phone's connection
 
-The line at the top of the iPhone and iPad screens says how they are reaching the Mac.
+The line at the top of the iPhone and iPad screens says when they cannot reach the control
+plane.
 
 | Line | What it means | What works |
 | --- | --- | --- |
-| No line | On the Mac's network, connected directly. | Everything. |
-| **Away** — slower, through iCloud | On another network, reaching the Mac through your iCloud. | Everything but the terminal, the live page, files and attaching pictures, which say **Needs the same network as your Mac**. |
-| **Away** — slower than usual | As above, while iCloud has asked the app to slow down. | As above, more slowly. |
-| The relay needs iCloud on your iPhone and your Mac | One of them is not signed in to iCloud, or not to the same account. | Only the Mac's own network. |
-| iCloud is full, so the relay can't carry messages | Your iCloud storage is full. | Only the Mac's own network. |
-| Last heard from your Mac … | Neither way reaches the control plane: the Mac it runs on is asleep, or Agents Host is not running. What is shown is dimmed and offers nothing. | Nothing, until it answers. |
+| No line | Connected to the control plane at its address. | Everything. |
+| Last heard from your Mac … | The device cannot reach the control plane: the Mac it runs on is asleep, or Agents Host is not running. What is shown is dimmed and offers nothing. | Nothing, until it answers. |
 | Not connected to your Mac yet | The app has not reached the control plane since it opened. If it has not paired, the page says **Connect to your agents**, with a button to scan the code the Mac shows in **Settings ▸ Control plane ▸ Clients ▸ Pair a Device…**. | Nothing, until it answers. |
 
 ## See also

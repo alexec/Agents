@@ -30,9 +30,8 @@ const Version = 1
 // base64url.
 type Hello = wire.ControlHello
 
-// Auth is the peer's answer. Kind is mac, iphone, ipad, browser, host, relay or copy. For
-// is a relayed device's id: agents-relay opens the socket for it (R10). Epoch is the epoch
-// of the endpoints this peer holds (R16); nil from a build that keeps none.
+// Auth is the peer's answer. Kind is mac, iphone, ipad, browser, host, copy or page. Epoch
+// is the epoch of the endpoints this peer holds (R16); nil from a build that keeps none.
 type Auth = wire.ControlAuth
 
 // OK is the server's proof back. Endpoints and Epoch say where the control plane answers
@@ -261,7 +260,7 @@ func Nonce() []byte {
 // Answer is the peer's side: what a client, a host or a copy says to hello, and the MAC
 // it then expects in ok. controlKey is the key it already trusts (nil for none yet); a
 // hello with any other is not its control plane.
-func Answer(h *Hello, id Identity, key []byte, origin, kind string, controlKey []byte, device string, epoch *int) (*Auth, []byte, error) {
+func Answer(h *Hello, id Identity, key []byte, origin, kind string, controlKey []byte, epoch *int) (*Auth, []byte, error) {
 	serverNonce, err := FromB64URL(h.Nonce)
 	if h.V != int64(Version) || err != nil || len(serverNonce) != 32 {
 		return nil, nil, Refuse(BadMessage)
@@ -274,9 +273,6 @@ func Answer(h *Hello, id Identity, key []byte, origin, kind string, controlKey [
 	mac := PeerMAC(key, serverNonce, peerNonce, text, origin)
 	expect := ServerMAC(key, serverNonce, peerNonce, text, origin)
 	auth := &Auth{ID: text, Nonce: B64URL(peerNonce), Mac: B64URL(mac), Kind: kind}
-	if device != "" {
-		auth.For = &device
-	}
 	if epoch != nil {
 		auth.Epoch = new(int64(*epoch))
 	}

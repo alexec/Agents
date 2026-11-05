@@ -14,8 +14,8 @@ public enum ConnectionRole: String, Sendable, Hashable {
     /// An agent's call to the app's own tools, through the daemon's MCP endpoint (#185):
     /// that agent's tools, each call carrying the agent's token.
     case agent
-    /// A phone, an iPad or a browser, carried by the bridge on the LAN link or the relay,
-    /// or opened for one by the control plane: everything a window may (#111). What sets
+    /// A phone, an iPad or a browser, carried by the bridge on the LAN link, or opened for
+    /// one by the control plane: everything a window may (#111). What sets
     /// it apart is whose it is: it is bound to one device, reports presence as that
     /// device, and may not name another. A connection becomes one only by the bridge or
     /// the uplink saying so, and never stops being one.

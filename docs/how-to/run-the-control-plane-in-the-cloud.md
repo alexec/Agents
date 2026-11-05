@@ -273,7 +273,7 @@ joins, and the runtimes' toolsets, so that the server installs Claude by itself.
    account, leave out `--service-account`. Then delete `sa.json`: anyone who has it and a
    copy of the store can open the control plane's key. Never commit either.
 
-   For notices on your iPhone and iPad when no Mac host relays them, give the APNs key
+   For notices on your iPhone and iPad, give the APNs key
    from your Apple developer account (Certificates, Identifiers & Profiles ▸ Keys, with
    Apple Push Notification service on). Do it now or later, with or without the rest:
 
@@ -480,7 +480,7 @@ first.
    address. The sheet counts who knows. You can move when some have not heard yet: this
    Mac sends them on later.
 8. Click **Move Now**. The sheet shows each stage: records held still, records copied, the
-   machine takes over, this Mac's host and relay go there, and this Mac forwards anyone
+   machine takes over, this Mac's host goes there, and this Mac forwards anyone
    who still comes to it.
 
 When the move is done, Agents Host says **Joined** and the machine's address. Windows,
@@ -511,17 +511,15 @@ with this setting waits for a move and does not start a store of its own.
    Mac, the machine holds this Mac's key, and you do not do this step.
 3. Click **Tell Everyone**, and then **Move Now**.
 
-Every window, phone and host comes back to the Mac, with nothing paired again. Away from
-home, the iPhone and iPad then reach the Mac only through your iCloud, and only while
-**Relay for my devices** is on.
+Every window, phone and host comes back to the Mac, with nothing paired again. The Mac has
+no address on the internet, so the iPhone and iPad then reach it only on the Mac's own
+network.
 
 ### Notifications
 
-With the APNs key (`--apns`), the control plane sends notifications to the iPhone and iPad
-through Apple, so that a phone can get them with no Mac host. In v0.5.0 this does not work
-yet: with **Relay for my devices** off, a need from a host does not get to the locked phone
-(#1509, to be fixed in v0.5.1). Until then, keep **Relay for my devices** on, on a Mac host.
-With only Linux hosts, devices reach the control plane at its address and get no
+The control plane sends notifications to the iPhone and iPad itself, through Apple's push
+service (APNs), with the APNs key (`--apns`). A need from any host, on a Mac or a Linux
+server, gets to the locked phone. Without the key, the iPhone and iPad get no
 notifications.
 
 The web page gets notifications by Web Push (#1486). `make-secrets.sh` makes the VAPID key
@@ -578,7 +576,7 @@ can still reach the control plane:
 | The Agents window on a Mac | The Mac's: System Settings ▸ Network ▸ Proxies, a PAC file too | The Mac's keychain |
 | Agents on iPhone and iPad | The device's | The device's trusted certificates |
 | A browser | The browser's | The browser's |
-| The Mac's host (agentsd) and relay (Agents Host) | `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` when set; otherwise the Mac's web proxies and their exceptions. A PAC file is not read | The Mac's keychain |
+| The Mac's host (agentsd) | `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` when set; otherwise the Mac's web proxies and their exceptions. A PAC file is not read | The Mac's keychain |
 | A Linux server's host | `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` | The system's roots, and the PEM file in `AGENTS_CA_FILE`, or else `/etc/agents/ca.pem` |
 
 The tunnel through a proxy is HTTP `CONNECT`, so TLS goes from end to end. A proxy that
@@ -592,7 +590,7 @@ On a Mac:
 
 1. If the network uses a PAC file and no fixed proxy, also set the **Secure web proxy
    (HTTPS)** in System Settings ▸ Network ▸ Details ▸ Proxies. The window follows the PAC
-   file. The host and the relay follow the fixed proxy.
+   file. The host follows the fixed proxy.
 2. To trust the organisation's CA, open its certificate in Keychain Access, add it to the
    **System** keychain, and set **When using this certificate** to **Always Trust**. Most
    organisations do this for you with a configuration profile.
@@ -670,7 +668,6 @@ The metrics are:
 | `agents_control_store_operations_total{op}`, `agents_control_store_errors_total{op}`, `agents_control_store_seconds{op}` | Store reads, writes, deletes and lists, the ones that failed, and their times |
 | `agents_control_hosts_connected`, `agents_control_hosts_known` | Machines connected to this copy, and machines in the store |
 | `agents_control_clients_connected`, `agents_control_client_sessions` | Windows, phones and browsers connected, and their sessions |
-| `agents_control_relay_sessions` | Mac relays connected |
 | `agents_control_leases_held`, `agents_control_copies` | With several copies: machine leases that this copy holds, and the copies it knows |
 | `agents_control_phase{phase}` | 1 for this copy's phase: `serving`, `receiving`, `frozen` or `forwarding` |
 | `agents_control_up_seconds`, `agents_control_build_info{version}` | How long it has run, and its version |

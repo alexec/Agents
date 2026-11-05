@@ -182,8 +182,8 @@ func ownCopy() (string, string) {
 }
 
 // handover is a handover of the running control plane to a copy elsewhere (058, R16), one
-// step at a time, with the control plane's key: Agents Host's Move to Another Machine…,
-// Run It Here Again… and Relay for my devices, or by hand. --at is the copy the step is for.
+// step at a time, with the control plane's key: Agents Host's Move to Another Machine… and
+// Run It Here Again…, or by hand. --at is the copy the step is for.
 func handover() {
 	step := ""
 	if len(args) > 1 {
@@ -298,22 +298,6 @@ func handover() {
 			fail("not the same store: %s doesn't see what %s wrote", value("--with"), value("--at"))
 		}
 		fmt.Println("the same store")
-	case "relay":
-		// Relay for my devices (#809): the relay host switched on or off, keeping its
-		// enrolment, over the session the control plane's key proves.
-		host := value("--host")
-		if host == "" || has("--on") == has("--off") {
-			fail("say --host ID and --on or --off")
-		}
-		request := wire.MachineRelayRequest{Host: wire.MachineRef(host), Relay: has("--on")}
-		if _, err := link("--at", "--pin").call("relay/set", request); err != nil {
-			fail("%v", err)
-		}
-		if request.Relay {
-			fmt.Println(host + " relays")
-		} else {
-			fmt.Println(host + " is switched off")
-		}
 	case "copy":
 		// Either end a copy (https://… or self, over its handover session) or a store this
 		// machine opens (file://…, s3://…).
@@ -356,5 +340,4 @@ const handoverUsage = `usage: agents-control handover status|freeze|unfreeze|wit
        agents-control handover shares --at URL [--pin PIN] --with URL [--with-pin PIN]
        agents-control handover announce|forward --at URL [--pin PIN] --endpoint URL [--endpoint-pin PIN] [--days N] [--force]
        agents-control handover copy --from URL|STORE [--from-pin PIN] --to URL|STORE [--to-pin PIN]
-       agents-control handover relay --at URL [--pin PIN] --host ID --on|--off
 (URL may be self: this copy, at the address and pin serve --home gives itself, or its settings say)`

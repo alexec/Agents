@@ -4,13 +4,12 @@ import Foundation
 /// and keeps its tokens, so the control plane keeps none. Add Provider and Edit… choose it,
 /// and the card says which, as the web page's `machineProviders.ts` does.
 public enum ProviderCarrier {
-    /// The machines that may carry a provider: the person's own, online, able to, and running
-    /// agents; `own` (the client's own machine) first, then by name.
+    /// The machines that may carry a provider: the person's own, online and able to; `own` (the client's own machine) first, then by name.
     public static func choices(_ hosts: [DaemonAPI.ControlMachine], person: String?,
                                own: MachineRef?) -> [DaemonAPI.ControlMachine] {
         hosts
             .filter { host in
-                host.runsAgents && host.answers && host.has(Capability.providersCarry1)
+                host.answers && host.has(Capability.providersCarry1)
                     && (person == nil || host.owner == nil || host.owner == person)
             }
             .sorted { a, b in

@@ -42,8 +42,7 @@ type ClientRecord struct {
 	// The newest list of endpoints it has said it holds (R16).
 	KnownEpoch *int
 	// A device's own APNs token (#1460), set only by that device over its own session,
-	// for the control plane to push to when no Mac host relays its notices. Never on the
-	// wire to another client.
+	// for the control plane to push its notices to. Never on the wire to another client.
 	PushToken *PushToken
 	// The push tokens of its Live Activity (#1744), one for each session it speaks for
 	// (#2991), newest last, held to MostActivityTokens. Set only by the device, as PushToken is.
@@ -152,8 +151,6 @@ type MachineRecord struct {
 	Installed bool
 	// The machine it runs on, so a window can tell a host on its own Mac (R11).
 	MachineID *string
-	// A macOS host that runs the relay and mailbox for its person's devices (R10).
-	Relay *bool
 	// The hosts whose sign-in this host may use, by runtime (058, T091).
 	SignInFrom map[string]string
 	// The hosts whose git access this host may use, by git server (#1122).
@@ -181,7 +178,6 @@ type hostJSON struct {
 	Version       string            `json:"version"`
 	Installed     bool              `json:"installed"`
 	MachineID     *string           `json:"machineID,omitempty"`
-	Relay         *bool             `json:"relay,omitempty"`
 	SignInFrom    map[string]string `json:"signInFrom,omitempty"`
 	GitFrom       map[string]string `json:"gitFrom,omitempty"`
 	Owner         *string           `json:"owner,omitempty"`
@@ -200,7 +196,7 @@ var dialOut = json.RawMessage(`{"dialOut":{}}`)
 
 func (h MachineRecord) MarshalJSON() ([]byte, error) {
 	return encodeKeeping(hostJSON{h.ID, h.Name, h.PublicKey, dialOut, h.Platform, h.Version, h.Installed, h.MachineID,
-		h.Relay, h.SignInFrom, h.GitFrom, h.Owner, h.Rev, h.Forgotten, h.ForgottenAt, h.KnownEpoch, h.DetectFolders,
+		h.SignInFrom, h.GitFrom, h.Owner, h.Rev, h.Forgotten, h.ForgottenAt, h.KnownEpoch, h.DetectFolders,
 		h.Workspace, h.Expires}, h.Extra)
 }
 
@@ -210,7 +206,7 @@ func (h *MachineRecord) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	*h = MachineRecord{j.ID, j.Name, j.PublicKey, j.Platform, j.Version, j.Installed, j.MachineID, j.Relay, j.SignInFrom,
+	*h = MachineRecord{j.ID, j.Name, j.PublicKey, j.Platform, j.Version, j.Installed, j.MachineID, j.SignInFrom,
 		j.GitFrom, j.Owner, j.Rev, j.Forgotten, j.ForgottenAt, j.KnownEpoch, j.DetectFolders, j.Workspace, j.Expires, extra}
 	return nil
 }

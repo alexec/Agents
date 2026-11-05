@@ -45,7 +45,6 @@ gateway that the organisation sets (#999) sends the data to that provider or gat
 
 | Company | Service | What it gets | Can a self-hosted set-up leave it out? |
 | --- | --- | --- | --- |
-| Apple | iCloud (CloudKit), when **Relay for my devices** is on | Requests and updates between the control plane and a phone away from home, each sealed so that only your control plane and that device can read it | Yes. The relay is off until you turn it on. With it off, nothing goes through iCloud. |
 | Apple | Apple Push Notification service | A notification's words, sealed with the device's own key; a Live Activity's phase and times, never a title or a line of the chat | Yes. No notifications reach a phone or iPad then. |
 | Your store's host | The bucket that holds the control plane's store (S3, MinIO or another S3-compatible service) | The control plane's records (see [Data and retention](data-and-retention.md)); a server's backups, sealed | Yes. The store can be a folder on the control plane's own disk. |
 | Google | Cloud KMS, when the control plane uses it | Calls to seal and open the control plane's key. The key in KMS never leaves Google Cloud. | Yes. A control plane can keep its key in a file, or use HashiCorp Vault. |

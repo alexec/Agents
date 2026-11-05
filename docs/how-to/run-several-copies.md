@@ -136,9 +136,9 @@ trying it out only.
   holds.
 - To move a control plane from one store to another, `/agents-control store copy --from
   <store> --to <store>` copies every record.
-- The relay that lets devices reach you through iCloud, and notifications, need a Mac host.
-  Without one, your devices reach the control plane only at its address, and get no
-  notifications.
+- Your devices reach the control plane only at its address. For notifications on the iPhone
+  and iPad, give each copy the APNs key; without it, they get no notifications. See
+  [Notifications](run-the-control-plane-in-the-cloud.md#notifications).
 
 ## Related
 

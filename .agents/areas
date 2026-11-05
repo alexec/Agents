@@ -407,8 +407,8 @@ docs/explanation/window-and-daemon.md                  machines
 specs/037-*/                                           machines
 specs/043-*/                                           machines
 
-# devices: how phones, iPads and browsers reach the Mac: pairing, the relay, links,
-# notifications, the widget and the web page's wire.
+# devices: how phones, iPads and browsers reach the Mac: pairing, links, notifications,
+# the widget and the web page's wire.
 Remote/Sources/RemoteApp.swift                         devices
 Remote/Sources/RemoteModel.swift                       devices
 Remote/Sources/Link/                                   devices

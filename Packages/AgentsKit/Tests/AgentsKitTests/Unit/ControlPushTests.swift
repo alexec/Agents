@@ -57,7 +57,7 @@ struct ControlPushTests {
         #expect(ControlPush.pushed(from: userInfo, key: nil) == nil)
     }
 
-    /// A mailbox push from a Mac host's relay is not the control plane's.
+    /// A CloudKit mailbox push is not the control plane's.
     @Test func aMailboxPushIsNotOne() {
         let userInfo: [AnyHashable: Any] = ["aps": ["content-available": 1], "ck": ["qry": [:]]]
         #expect(!ControlPush.isControlPush(userInfo))

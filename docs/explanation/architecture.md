@@ -21,9 +21,8 @@ over ACP, and the runtime prompts its own provider. A runtime calls back into Ag
 app's own tools (`mcp__agents__*`) over MCP.
 
 Agents also polls **MCP servers** for the events that trigger workflows, clones and pushes
-to **GitHub** with git, and installs runtimes from **package registries**. A relay through
-**iCloud** carries phones away from home, and their notifications, when **Relay for my
-devices** is on.
+to **GitHub** with git, and installs runtimes from **package registries**. The control
+plane sends notifications to phones itself, through **APNs**.
 
 ## Containers
 
@@ -39,7 +38,6 @@ devices** is on.
 | Control plane store | | A folder or an S3 bucket | Who is paired, which hosts there are, unused codes, settings. Nothing about agents. |
 | Host daemon | `Go/cmd/agentsd`, `Go/internal/agentsd` | Go daemon, `agentsd`, macOS and Linux | Owns agents, terminals, files, git and workflows on its host. Serves the agents MCP tools. |
 | Host data | | Files on the host | Agent records and transcripts in `~/Library/Application Support/Agents`; the person's settings in `~/.agents/settings`, and shared skills and instructions in `~/.agents` ([the `~/.agents` folder](../reference/agents-folder.md)); a folder's own `.agents/`. |
-| agents-relay | `Host/Relay` | macOS helper | Planned: an iCloud mailbox for phones away from home. |
 
 Every connection to the control plane is made **outwards**: from a client, and from each
 host. A client never reaches a host directly, and a host never needs to be reachable. A

@@ -4,9 +4,9 @@
 Reads, and never changes:
 
   ~/Library/Logs/DiagnosticReports/, ~/Library/DiagnosticReports/
-      macOS crash reports (.ips) of Agents, Agents Host, agentsd, agents-control and
-      agents-relay, and of swiftpm-testing-helper and xctest, which only count when the
-      same stack also hits an app
+      macOS crash reports (.ips) of Agents, Agents Host, agentsd and agents-control,
+      and of swiftpm-testing-helper and xctest, which only count when the same stack also
+      hits an app
   ~/Library/Logs/CrashReporter/MobileDevice/
       the Remote's reports, when a sync or devicectl has already put them on this Mac
   Library/Logs/Agents/crashes/crash-*.txt
@@ -61,7 +61,6 @@ APPS = {
     "Agents Host": "Agents Host",
     "agentsd": "agentsd",
     "agents-control": "agents-control",
-    "agents-relay": "agents-relay",
     "AgentsWidget": "the Remote's widget",
     "RemoteNotify": "the Remote's notification extension",
 }

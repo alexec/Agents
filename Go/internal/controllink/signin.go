@@ -191,7 +191,7 @@ func openSignIn(ctx context.Context, base, pin, page string, controlKey []byte, 
 	if err != nil {
 		return fail(err)
 	}
-	auth, expect, err := Answer(h.Hello, Identity{'s', id}, key, origin, kind, controlKey, "", nil)
+	auth, expect, err := Answer(h.Hello, Identity{'s', id}, key, origin, kind, controlKey, nil)
 	if err != nil {
 		return fail(err)
 	}

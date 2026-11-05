@@ -8,8 +8,7 @@ public extension DaemonAPI {
     struct CatchUpRequest: Codable, Sendable {
         /// The first page of live agents, lean, unless said otherwise.
         public var agents: ListRequest
-        /// Parts to send in the same answer (#884): through the relay each call is a round
-        /// trip of two or three seconds, so one answer, not one call per part. A host that
+        /// Parts to send in the same answer (#884): one answer, not one round trip per part. A host that
         /// predates this sends none, and the client asks for each.
         public var parts: [CatchUpPart]
 

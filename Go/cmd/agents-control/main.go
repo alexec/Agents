@@ -767,7 +767,7 @@ const usage = `usage: agents-control serve [--port N] [--bind ADDR] [--self-sign
        agents-control serve … [--public-web DIR] [--views-url URL]
        agents-control hosts | clients
        agents-control key seal (--key-fd N | AGENTS_CONTROL_KEY)
-       agents-control handover status|announce|freeze|unfreeze|withdraw|copy|take|forward|stop|shares|relay …
+       agents-control handover status|announce|freeze|unfreeze|withdraw|copy|take|forward|stop|shares …
        agents-control key export --key-fd N
        agents-control install-script
        agents-control store check [--store URL]

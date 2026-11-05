@@ -33,12 +33,6 @@ final class RemoteModel {
     /// When the Needs you count was last true, for the "Updated" line beside it: nil while
     /// live, when it is true now (#1163).
     var needsYouUpdatedAt: Date? { isConnected ? nil : liveUntil }
-    /// Which way the Mac is being reached (046): on its own network, or through iCloud.
-    /// Set from the route each connection took (#883); a link that cannot be relayed,
-    /// such as the fake, is always direct.
-    private(set) var link: RemoteLink = .direct
-    /// What is getting in the relay's way, when anything is (046, FR-014).
-    private(set) var relayTrouble: RelayTrouble?
     private(set) var lastHeardFrom: Date?
     private(set) var problem: String?
     /// Words for one chat's prompt bar, from elsewhere in the chat: an edit to a queued
@@ -378,10 +372,6 @@ final class RemoteModel {
             Task { await self.sendActivityToken(agentID, token, startedAt) }
         }
     }
-
-    /// Away, and slower (046): what the screens read to show the Away line and to put
-    /// the terminal, the live page and files behind "needs the same network".
-    var isAway: Bool { link == .relayed }
 
     /// Nothing to reach the control plane with: never paired, or forgotten (FR-009).
     var needsPairing: Bool { baseLink is NotPairedLink || forgottenByControlPlane }
@@ -2055,13 +2045,6 @@ final class RemoteModel {
         }
     }
 
-    /// Which way `link` last connected: its control plane connection's route, and
-    /// direct for a link that has no relay (#883).
-    nonisolated static func route(of link: any DaemonLink) -> RemoteLink {
-        guard let control = link as? ControlPlaneLink, control.route.current != .none else { return .direct }
-        return control.route.current
-    }
-
     /// Whether a refusal is believed yet (#81).
     @ObservationIgnored private var refusals = RefusalPatience()
 
@@ -2077,8 +2060,7 @@ final class RemoteModel {
                 await client.disconnect()
                 return false
             }
-            link = Self.route(of: baseLink)
-            note("link: connected \(link) after \(ContinuousClock.now - began)")
+            note("link: connected after \(ContinuousClock.now - began)")
             refusals.connected()
             // A home host that is a server asks for a key as any other server does (#344).
             await client.setCredentialLender { [weak self] wanted in
@@ -2098,7 +2080,6 @@ final class RemoteModel {
             }
             startPresence()
             presence?.connected()
-            if link == .relayed { relayTrouble = nil }
             await DaemonClient.$patience.withValue(Self.catchUpPatience) {
                 await files.reconnected()
                 await catchUp()
@@ -2422,9 +2403,7 @@ final class RemoteModel {
     private func watchOtherHosts() {
         guard hostWatch == nil, !reconnect.isStopped else { return }
         let client = client
-        // Through the relay a device has one session at a time (046), and it is the
-        // home host's: the other hosts wait until the control plane's address answers.
-        let base: any DaemonLink = (baseLink as? ControlPlaneLink)?.addressOnly ?? baseLink
+        let base: any DaemonLink = baseLink
         let backoff = otherHostsBackoff
         hostWatch = Task { [weak self] in
             guard (try? await client.call(DaemonAPI.Method.controlStatus)) != nil else {
@@ -2498,7 +2477,6 @@ final class RemoteModel {
         note("link: stopping this pairing's connections")
         reconnect.stop()
         networkChanges.stop()
-        (baseLink as? ControlPlaneLink)?.watching.stop()
         hostWatch?.cancel()
         hostWatch = nil
         controlPlane = nil
@@ -2517,14 +2495,11 @@ final class RemoteModel {
         guard let status = try? await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self),
               let listed = try? await control.call(DaemonAPI.Method.hostsList, returning: [DaemonAPI.ControlMachine].self)
         else { return }
-        controlHosts = listed.filter(\.runsAgents)
+        controlHosts = listed
         gitAsksAnswered.formIntersection(GitLendAsk.waiting(in: listed))
         controlHome = status.homeHost
         controlStatus = status
-        // The relay's key, from the control plane itself (T077): kept for when its address
-        // cannot be reached.
-        RemoteControl.keepRelayKey(status.relayKey)
-        let others = listed.filter { $0.id != status.homeHost && $0.answers && $0.runsAgents }
+        let others = listed.filter { $0.id != status.homeHost && $0.answers }
         for host in others {
             let lock = lock
             let other = otherHosts[host.id] ?? DaemonClient(link: LockedLink(link.link(for: host.id), host: host.id) { await lock.channelSigner() })
@@ -3109,16 +3084,6 @@ final class RemoteModel {
                 note("mailbox: subscribe failed: \(error)")
                 subscribed = false
             }
-            // The relay's wake-up (046): a push when the Mac writes to this device's
-            // zone, so a relayed session looks at once. Polling still works without it.
-            if RemoteControl.relayKey != nil {
-                do {
-                    try await CloudKitRelayChannel().subscribe(device: deviceID)
-                    note("relay: subscribed")
-                } catch {
-                    note("relay: subscribe failed: \(error)")
-                }
-            }
         }
     }
 
@@ -3137,10 +3102,8 @@ final class RemoteModel {
         }
         // What kind of push, never its payload: that is the person's work (#175).
         let fromControl = ControlPush.isControlPush(userInfo)
-        note("push: \(CloudKitRelayChannel.isRelayPush(userInfo) ? "relay wake-up" : fromControl ? "control plane" : "mailbox")")
-        // The relay's wake-up: a relayed session polls, so there is nothing to poke.
-        if CloudKitRelayChannel.isRelayPush(userInfo) { return }
-        // The mailbox's, or the control plane's own when no Mac relays (#1460).
+        note("push: \(fromControl ? "control plane" : "mailbox")")
+        // The mailbox's, or the control plane's own (#1460).
         guard let pushed = fromControl ? ControlPush.pushed(from: userInfo, key: key) : CloudKitMailbox.pushed(from: userInfo)
         else { return }
         let headline = pushed.headline

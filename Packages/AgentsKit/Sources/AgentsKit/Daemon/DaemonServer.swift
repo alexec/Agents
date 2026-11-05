@@ -397,8 +397,8 @@ public final class DaemonServer: @unchecked Sendable {
         broadcast(method, params, to: { _ in true })
     }
 
-    /// After a move (058, T085): a device that connects the old way, through the bridge or
-    /// the relay, is told where the control plane is now, once it has said which it is.
+    /// After a move (058, T085): a device that connects the old way, through the bridge, is
+    /// told where the control plane is now, once it has said which it is.
     /// A moment later, so the answer to what it asked goes first.
     private func tellMoved(_ connection: UUID) {
         let file = url.deletingLastPathComponent().appendingPathComponent("control-moved.json")

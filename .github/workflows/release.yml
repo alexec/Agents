@@ -21,7 +21,6 @@
 # The signing material is in the `release` environment's secrets, which only a tag on main
 # can reach (its deployment rule). How to make each is in docs/how-to/release-agents-host.md:
 #   DEVELOPER_ID_P12, DEVELOPER_ID_P12_PASSWORD   the Developer ID Application identity
-#   RELAY_PROFILE                                 the "Agents Relay Developer ID" profile
 #   ASC_KEY_P8, ASC_KEY_ID, ASC_ISSUER_ID         the App Store Connect key, for notarytool
 #                                                 and altool
 # and for the testflight job (scripts/release-secrets.sh --store sets them):
@@ -193,13 +192,11 @@ jobs:
           xcodebuild -downloadComponent MetalToolchain
           wait "$xcodegen_pid"
 
-      # A keychain of the run's own, gone with the runner, and the relay's profile where
-      # Xcode looks for it.
+      # A keychain of the run's own, gone with the runner.
       - name: Signing
         env:
           DEVELOPER_ID_P12: ${{ secrets.DEVELOPER_ID_P12 }}
           DEVELOPER_ID_P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
-          RELAY_PROFILE: ${{ secrets.RELAY_PROFILE }}
           ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
         run: |
           keychain="$RUNNER_TEMP/release.keychain-db"
@@ -213,9 +210,6 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain" >/dev/null
           security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
           rm "$RUNNER_TEMP/devid.p12"
-          profiles="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
-          mkdir -p "$profiles"
-          echo "$RELAY_PROFILE" | base64 --decode > "$profiles/agents-relay-developer-id.provisionprofile"
           echo "$ASC_KEY_P8" > "$RUNNER_TEMP/asc.p8"
           security find-identity -v -p codesigning | grep "Developer ID Application"
 

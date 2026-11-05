@@ -217,7 +217,7 @@ public enum MachineProviderWords {
     /// and are linked to none, the ones that may be it by name first.
     public static func linkableHosts(_ workspace: DaemonAPI.MachineInfo, hosts: [DaemonAPI.ControlMachine]) -> [DaemonAPI.ControlMachine] {
         if workspace.host != nil { return [] }
-        let free = hosts.filter { $0.relay == nil && $0.workspace == nil }
+        let free = hosts.filter { $0.workspace == nil }
         return free.filter { mayBe(workspace, hostName: $0.name) } + free.filter { !mayBe(workspace, hostName: $0.name) }
     }
 

@@ -22,7 +22,7 @@ import (
 func TestAPageAHostCarries(t *testing.T) {
 	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
-	host, _, hostKey := p.rawHostKey("Mac", false)
+	host, _, hostKey := p.rawHostKey("Mac")
 	p.waitFor(func() bool { return p.s.router.Reaches(host) }, "the host online")
 	const port = 8792
 	origin := web.OriginFor(port)
@@ -42,7 +42,7 @@ func TestAPageAHostCarries(t *testing.T) {
 		m, _ := controllink.ParseMessage(line)
 		at, _ := controllink.Origin(p.url)
 		ident, _ := controllink.ParseIdentity(id)
-		auth, expect, err := controllink.Answer(m.Hello, ident, key, at, "page", nil, "", nil)
+		auth, expect, err := controllink.Answer(m.Hello, ident, key, at, "page", nil, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -120,12 +120,5 @@ func TestAPageAHostCarries(t *testing.T) {
 	}
 	if _, err := carry("h:"+host, hostKey, page); err == nil || !strings.Contains(err.Error(), controllink.BadMessage) {
 		t.Fatal("a host's own uplink said a page:", err)
-	}
-
-	// A relay host runs no agents, so it carries no page.
-	relayHost, _, relayKey := p.rawHostKey("Relay", true)
-	p.waitFor(func() bool { return p.s.router.Reaches(relayHost) }, "the relay host online")
-	if _, err := carry("w:"+relayHost, relayKey, page); err == nil || !strings.Contains(err.Error(), controllink.Unknown) {
-		t.Fatal(err)
 	}
 }

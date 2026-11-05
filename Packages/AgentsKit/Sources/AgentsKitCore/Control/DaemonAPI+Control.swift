@@ -4,7 +4,7 @@ import Foundation
 // releases (#2653): this tree's documents, and so every `DaemonAPI.Method` constant below,
 // keep the old names until the last one, but a sender sends the new name. newMethodName is
 // applied once, at each physical place a method is put on the wire (JSONRPCConnection.call,
-// ControlUplink, ControlRelay, ControlCodeUse.announce), so the typed (old) names stay put
+// ControlUplink, ControlCodeUse.announce), so the typed (old) names stay put
 // everywhere else, including the schema-consistency tests.
 public extension DaemonAPI {
     private static let renamed: [(new: String, old: String)] = [("machine/", "host/"), ("machines/", "hosts/")]
@@ -27,8 +27,6 @@ public extension DaemonAPI.Method {
     static let hostsCheckAgain = "hosts/checkAgain"
     static let hostsUpdate = "hosts/update"
     static let hostsRemove = "hosts/remove"
-    /// `{host, relay}`: whether a host carries the person's devices through iCloud (T097).
-    static let hostsSetRelay = "hosts/setRelay"
     /// `{host, from, runtime, allowed}`: whether `host` may use `from`'s sign-in for a
     /// runtime, relayed through the control plane (058, T091). An operator's, after the
     /// window asked the person.
@@ -95,18 +93,6 @@ public extension DaemonAPI.Method {
     static let foldersDetect = "folders/detect"
     /// A host, on its channel 0 (#429): its answer to `folders/detect`. `{added}`.
     static let foldersDetected = "folders/detected"
-
-    // To a relay host, on its channel 0 (058, T096–T097): notifications, never answered.
-    /// `RelayDevices`: the devices it may carry for, with their keys.
-    static let relayDevices = "relay/devices"
-    /// `RelayDelivery`: one mailbox item to seal and post.
-    static let relayDeliver = "relay/deliver"
-    /// `RelayCount` (#1163): one device's Needs you count, to post as a silent push.
-    static let relayCount = "relay/count"
-    /// A relay host, on its channel 0 (#824): `RelaySwitch`, itself switched on or off,
-    /// as `hosts/setRelay` would. What Agents Host has it say where it has no control
-    /// plane's key (Join one elsewhere). Refused from a host that runs agents.
-    static let relaySwitch = "relay/switch"
 }
 
 public extension DaemonAPI.Notification {
@@ -180,9 +166,6 @@ public extension DaemonAPI {
         public var awayFromHome: Bool?
         /// The asking client's own record, so a window can mark itself "you".
         public var you: UUID?
-        /// The public key of the host that relays through iCloud, if one does (T077): what a
-        /// device keeps so it can reach the control plane through the relay when away.
-        public var relayKey: Data?
         /// The web remote's loopback listener (071 R3): whether the page is served, and why
         /// not. Nil when this copy was not asked to serve it.
         public var web: WebRemoteStatus?
@@ -280,12 +263,6 @@ public extension DaemonAPI {
         public var state: String
         public var reach: String
         public var machineID: String?
-        /// A relay host (`agents-relay`): it carries devices through iCloud and runs no agents.
-        /// True while it relays, false while it is switched off, nil on a host that runs agents.
-        public var relay: Bool?
-        /// Not a relay host. A relay switched off is still a relay (`relay` false), and still
-        /// runs no agents (#1507).
-        public var runsAgents: Bool { relay == nil }
         /// The hosts whose sign-in this one may use, by runtime (T091).
         public var signInFrom: [String: MachineRef]?
         /// The hosts whose git access this one may use, by git server (#1122).
@@ -323,8 +300,7 @@ public extension DaemonAPI {
         public var owner: String?
 
         public init(id: MachineRef, name: String, platform: String, version: String, state: String,
-                    reach: String, machineID: String?, relay: Bool? = nil) {
-            self.relay = relay
+                    reach: String, machineID: String?) {
             self.id = id
             self.name = name
             self.platform = platform
@@ -438,15 +414,12 @@ public extension DaemonAPI {
         public var platform: String
         public var machineID: String
         public var name: String?
-        /// Said by `agents-relay` (T096): this host only relays, and gets no client channels.
-        public var relay: Bool?
         /// The language the host is written in, `swift` or `go` (#1134), shown beside its
         /// version in Hosts. Nil from a host built before it was said.
         public var implementation: String?
 
         public init(host: MachineRef? = nil, version: String, platform: String, machineID: String, name: String? = nil,
-                    relay: Bool? = nil, implementation: String? = nil) {
-            self.relay = relay
+                    implementation: String? = nil) {
             self.implementation = implementation
             self.host = host
             self.version = version
@@ -510,22 +483,16 @@ public extension DaemonAPI {
         }
     }
 
-    /// One row of `clients/connections`: a client connected now, and how.
+    /// One row of `clients/connections`: a client connected now.
     struct ClientConnection: Codable, Sendable, Hashable {
         public var client: UUID
-        /// Only through the iCloud relay.
-        public var relayed: Bool
-        /// The relaying host's name, when relayed.
-        public var through: String?
-        public init(client: UUID, relayed: Bool, through: String? = nil) {
+        public init(client: UUID) {
             self.client = client
-            self.relayed = relayed
-            self.through = through
         }
     }
 
     /// `control/moved`: where the control plane is now, told to a device over the old
-    /// bridge link or relay it already trusts. It dials there as itself, with the key it
+    /// bridge link it already trusts. It dials there as itself, with the key it
     /// paired with, which the move gave the control plane (T084–T085).
     struct ControlMoved: Codable, Sendable, Hashable {
         public var url: String
@@ -582,39 +549,9 @@ public extension DaemonAPI {
         }
     }
 
-    /// `relay/switch` (#824): the relay host that says it, on or off.
-    struct RelaySwitch: Codable, Sendable, Hashable {
-        public var relay: Bool
-        public init(relay: Bool) { self.relay = relay }
-    }
-
-    /// `hosts/setRelay`.
-    struct MachineRelayRequest: Codable, Sendable, Hashable {
-        public var host: MachineRef
-        public var relay: Bool
-        public init(host: MachineRef, relay: Bool) {
-            self.host = host
-            self.relay = relay
-        }
-    }
-
-    /// `relay/devices`: every device client, with the key its frames are sealed to.
-    struct RelayDevices: Codable, Sendable, Hashable {
-        public struct Device: Codable, Sendable, Hashable {
-            public var id: UUID
-            public var publicKey: Data
-            public init(id: UUID, publicKey: Data) {
-                self.id = id
-                self.publicKey = publicKey
-            }
-        }
-        public var devices: [Device]
-        public init(devices: [Device]) { self.devices = devices }
-    }
-
-    /// `relay/deliver`: what the control plane chose (T097). The relay host seals the
-    /// headline to `publicKey` and posts it for `device`; no headline is a withdrawal.
-    /// `waiting` is the count across the hosts at that moment, as `RelayCount` says it (#1163).
+    /// A notice for one device, as the control plane chose it (T097), which it sends through
+    /// APNs or Web Push: the headline sealed to `publicKey` for `device`; no headline is a
+    /// withdrawal. `waiting` is the count across the hosts at that moment (#1163).
     struct RelayDelivery: Codable, Sendable, Hashable {
         public var needID: NeedID
         public var device: UUID
@@ -630,19 +567,6 @@ public extension DaemonAPI {
             self.headline = headline
             self.alert = alert
             self.waiting = waiting
-        }
-    }
-
-    /// `relay/count` (#1163): how many sessions need the person across the hosts, for one
-    /// device's widget and badge, posted as a silent push. Only a number: nothing to seal.
-    struct RelayCount: Codable, Sendable, Hashable {
-        public var device: UUID
-        public var waiting: Int
-        public var countedAt: Date
-        public init(device: UUID, waiting: Int, countedAt: Date) {
-            self.device = device
-            self.waiting = waiting
-            self.countedAt = countedAt
         }
     }
 }

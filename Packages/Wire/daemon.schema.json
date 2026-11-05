@@ -4365,9 +4365,6 @@
         "device": {
           "$ref": "#/definitions/UUID"
         },
-        "relayed": {
-          "type": "boolean"
-        },
         "tunnel": {
           "type": "string"
         },
@@ -4515,21 +4512,14 @@
     },
     "ClientConnection": {
       "type": "object",
-      "description": "One row of clients/connections: a client connected now, and how.",
+      "description": "One row of clients/connections: a client connected now.",
       "properties": {
         "client": {
           "$ref": "#/definitions/UUID"
-        },
-        "relayed": {
-          "type": "boolean"
-        },
-        "through": {
-          "type": "string"
         }
       },
       "required": [
-        "client",
-        "relayed"
+        "client"
       ],
       "additionalProperties": false
     },
@@ -5793,7 +5783,7 @@
     },
     "ControlAuth": {
       "type": "object",
-      "description": "The peer's answer: {\"auth\":…} (ControlAuth.Auth). `kind` is mac, iphone, ipad, browser, host, relay, copy or page.",
+      "description": "The peer's answer: {\"auth\":…} (ControlAuth.Auth). `kind` is mac, iphone, ipad, browser, host, copy or page.",
       "properties": {
         "id": {
           "type": "string"
@@ -5805,9 +5795,6 @@
           "type": "string"
         },
         "kind": {
-          "type": "string"
-        },
-        "for": {
           "type": "string"
         },
         "epoch": {
@@ -5979,9 +5966,6 @@
         "machineID": {
           "type": "string"
         },
-        "relay": {
-          "type": "boolean"
-        },
         "signInFrom": {
           "type": "object",
           "additionalProperties": {
@@ -6117,9 +6101,6 @@
         "host": {
           "$ref": "#/definitions/MachineRef"
         },
-        "relayed": {
-          "type": "boolean"
-        },
         "endpoints": {
           "type": "array",
           "items": {
@@ -6221,9 +6202,6 @@
         },
         "you": {
           "$ref": "#/definitions/UUID"
-        },
-        "relayKey": {
-          "$ref": "#/definitions/Base64"
         },
         "web": {
           "$ref": "#/definitions/WebRemoteStatus"
@@ -14340,9 +14318,6 @@
         "machineID": {
           "type": "string"
         },
-        "relay": {
-          "type": "boolean"
-        },
         "implementation": {
           "type": "string"
         }
@@ -14499,9 +14474,6 @@
         },
         "name": {
           "type": "string"
-        },
-        "relay": {
-          "type": "boolean"
         },
         "implementation": {
           "type": "string"
@@ -14831,23 +14803,6 @@
     "MachineRef": {
       "type": "string",
       "x-ts-type": "string & { readonly __brand: \"MachineRef\" }"
-    },
-    "MachineRelayRequest": {
-      "type": "object",
-      "description": "hosts/setRelay.",
-      "properties": {
-        "host": {
-          "$ref": "#/definitions/MachineRef"
-        },
-        "relay": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "host",
-        "relay"
-      ],
-      "additionalProperties": false
     },
     "MachineRelease": {
       "type": "object",
@@ -20007,7 +19962,7 @@
     },
     "PushToken": {
       "type": "object",
-      "description": "clients/setPushToken (#1460): a device's own APNs token, in hex, for the control plane to push to when no Mac host relays its notices. No token takes it away.",
+      "description": "clients/setPushToken (#1460): a device's own APNs token, in hex, for the control plane to push its notices to. No token takes it away.",
       "properties": {
         "token": {
           "type": "string"
@@ -20360,30 +20315,9 @@
       ],
       "additionalProperties": false
     },
-    "RelayCount": {
-      "type": "object",
-      "description": "relay/count (#1163): one device's Needs you count, posted as a silent push.",
-      "properties": {
-        "device": {
-          "$ref": "#/definitions/UUID"
-        },
-        "waiting": {
-          "type": "integer"
-        },
-        "countedAt": {
-          "$ref": "#/definitions/WireDate"
-        }
-      },
-      "required": [
-        "device",
-        "waiting",
-        "countedAt"
-      ],
-      "additionalProperties": false
-    },
     "RelayDelivery": {
       "type": "object",
-      "description": "relay/deliver (T097): seal the headline to `publicKey` and post it for `device`; no headline is a withdrawal.",
+      "description": "A notice for one device (T097), which the control plane sends through APNs or Web Push: seal the headline to `publicKey` and post it for `device`; no headline is a withdrawal.",
       "properties": {
         "needID": {
           "$ref": "#/definitions/NeedID"
@@ -20408,39 +20342,6 @@
         "needID",
         "device",
         "alert"
-      ],
-      "additionalProperties": false
-    },
-    "RelayDevice": {
-      "type": "object",
-      "description": "A device a relay host may carry for, with the key its frames are sealed to.",
-      "properties": {
-        "id": {
-          "$ref": "#/definitions/UUID"
-        },
-        "publicKey": {
-          "$ref": "#/definitions/Base64"
-        }
-      },
-      "required": [
-        "id",
-        "publicKey"
-      ],
-      "additionalProperties": false
-    },
-    "RelayDevices": {
-      "type": "object",
-      "description": "relay/devices: every device client.",
-      "properties": {
-        "devices": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/RelayDevice"
-          }
-        }
-      },
-      "required": [
-        "devices"
       ],
       "additionalProperties": false
     },
@@ -20510,19 +20411,6 @@
       },
       "required": [
         "publicKey"
-      ],
-      "additionalProperties": false
-    },
-    "RelaySwitch": {
-      "type": "object",
-      "description": "relay/switch (#824): the relay host that says it, on or off.",
-      "properties": {
-        "relay": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "relay"
       ],
       "additionalProperties": false
     },

@@ -28,7 +28,7 @@ extension RemoteModel {
     /// the Mac.
     private func workMachines(_ can: (DaemonAPI.ControlMachine) -> Bool) -> [(id: MachineRef, name: String)] {
         controlHosts
-            .filter { $0.runsAgents && can($0) }
+            .filter { can($0) }
             .compactMap { row -> (id: MachineRef, name: String)? in
                 let id: MachineRef = row.id == controlHome ? .mac : row.id
                 return hostClient(id) == nil ? nil : (id: id, name: row.name)

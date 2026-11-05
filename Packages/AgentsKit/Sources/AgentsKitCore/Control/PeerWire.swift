@@ -15,10 +15,8 @@ public enum PeerWire {
         case event(ControlEvent)
         /// A client here said where the person is, and whether it is a device's say.
         case presence(client: UUID, device: Bool, report: DaemonAPI.PresenceReport)
-        /// A host's `attention/need`, for the copy that holds a relay host (T097).
-        case need(DaemonAPI.AttentionNeed)
-        /// How a client reaches the sender now: relayed or not, or no longer (T080).
-        case link(client: UUID, relayed: Bool?)
+        /// Whether a client is connected to the sender now (T080).
+        case link(client: UUID, connected: Bool)
     }
 
     /// `{"p":"H","c":…}` from a host frame's line.
@@ -45,13 +43,9 @@ public enum PeerWire {
                                      "report": (try? JSONValue.encoding(report)) ?? .null])])
     }
 
-    public static func need(_ need: DaemonAPI.AttentionNeed) -> String {
-        encode(["need": (try? JSONValue.encoding(need)) ?? .null])
-    }
-
-    public static func link(client: UUID, relayed: Bool?) -> String {
+    public static func link(client: UUID, connected: Bool) -> String {
         var body: [String: JSONValue] = ["client": .string(client.uuidString)]
-        if let relayed { body["relayed"] = .bool(relayed) } else { body["gone"] = true }
+        if !connected { body["gone"] = true }
         return encode(["link": .object(body)])
     }
 
@@ -82,10 +76,7 @@ public enum PeerWire {
             return .presence(client: client, device: presence["device"]?.boolValue ?? false, report: report)
         }
         if let link = object["link"], let client = link["client"]?.stringValue.flatMap(UUID.init(uuidString:)) {
-            return .link(client: client, relayed: link["gone"] != nil ? nil : (link["relayed"]?.boolValue ?? false))
-        }
-        if let need = object["need"], let decoded = try? need.decode(DaemonAPI.AttentionNeed.self) {
-            return .need(decoded)
+            return .link(client: client, connected: link["gone"] == nil)
         }
         return nil
     }

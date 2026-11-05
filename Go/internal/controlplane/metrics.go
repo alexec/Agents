@@ -165,7 +165,6 @@ var help = map[string][2]string{
 	"agents_control_hosts_known":            {"gauge", "Machines in the store."},
 	"agents_control_clients_connected":      {"gauge", "Clients (windows, phones, browsers) with a session here."},
 	"agents_control_client_sessions":        {"gauge", "Client sessions here; a client can have more than one."},
-	"agents_control_relay_sessions":         {"gauge", "Relays (agents-relay on a Mac) connected and relaying here."},
 	"agents_control_leases_held":            {"gauge", "Machine leases this copy holds, with several copies over one store."},
 	"agents_control_copies":                 {"gauge", "Copies of the control plane this copy knows of, itself too."},
 	"agents_control_phase":                  {"gauge", "1 for this copy's phase: serving, receiving, frozen or forwarding."},
@@ -175,7 +174,7 @@ var help = map[string][2]string{
 
 // gauges is what is read when scraped, rather than counted.
 type gauges struct {
-	hostsConnected, hostsKnown, clients, sessions, relays, leases, copies int
+	hostsConnected, hostsKnown, clients, sessions, leases, copies int
 	phase, version                                                        string
 	up                                                                    time.Duration
 }
@@ -212,7 +211,6 @@ func (m *Metrics) text(w *bytes.Buffer, g gauges) {
 	gauge("agents_control_hosts_known", "", float64(g.hostsKnown))
 	gauge("agents_control_clients_connected", "", float64(g.clients))
 	gauge("agents_control_client_sessions", "", float64(g.sessions))
-	gauge("agents_control_relay_sessions", "", float64(g.relays))
 	gauge("agents_control_leases_held", "", float64(g.leases))
 	gauge("agents_control_copies", "", float64(g.copies))
 	for _, p := range []string{phaseServing, phaseReceiving, phaseFrozen, phaseForwarding} {
@@ -321,7 +319,7 @@ func (s *Service) Metrics() *Metrics { return s.metrics }
 // gauges reads what is scraped now.
 func (s *Service) gauges() gauges {
 	g := gauges{hostsConnected: len(s.router.HostsHeldHere()), hostsKnown: len(s.records.Hosts()),
-		clients: len(s.router.ConnectedClients()), sessions: s.router.Sessions(), relays: len(s.router.RelaysHeldHere()),
+		clients: len(s.router.ConnectedClients()), sessions: s.router.Sessions(),
 		copies: 1, phase: s.phase.now(), version: s.cfg.Version, up: time.Since(s.started)}
 	if s.mesh != nil {
 		g.leases, g.copies = s.mesh.counts()

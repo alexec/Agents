@@ -35,9 +35,9 @@ func (p *Providers) summaryFacts(host string, params json.RawMessage, caller Cal
 	}
 	var machines []wire.MachineSummaryFacts
 	for _, h := range p.records.Hosts() {
-		// Another user's machine is not this person's summary (FR-038); a relay has no folders.
+		// Another user's machine is not this person's summary (FR-038).
 		if strings.EqualFold(h.ID, host) || p.hooks.OwnerOf(h.ID) != caller.Person ||
-			h.Forgotten != nil && *h.Forgotten || h.Relay != nil && *h.Relay {
+			h.Forgotten != nil && *h.Forgotten {
 			continue
 		}
 		machines = append(machines, wire.MachineSummaryFacts{Machine: wire.MachineRef(h.ID), MachineName: h.Name})

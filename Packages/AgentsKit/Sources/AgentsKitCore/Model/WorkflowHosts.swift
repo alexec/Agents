@@ -17,15 +17,14 @@ public struct WorkflowHostChoice: Hashable, Sendable, Identifiable {
 
 /// The hosts a workflow's `hosts:` list is chosen from.
 public enum WorkflowHosts {
-    /// Enrolled hosts that run agents, in the window's order: This Mac, then the rest
-    /// by name. A relay is left out, because it runs no agents. A host with no machine
-    /// id cannot be written, so it is left out too.
+    /// Enrolled hosts, in the window's order: This Mac, then the rest by name. A host with
+    /// no machine id cannot be written, so it is left out.
     ///
     /// "This Mac" is the host whose machine id is `thisMachine` when this device is
     /// that computer. Otherwise it is the host with id `.mac` — the phone and the page
     /// are not that computer, and they still use the window's name for it.
     public static func choices(from hosts: [DaemonAPI.ControlMachine], thisMachine: String?) -> [WorkflowHostChoice] {
-        let usable = hosts.filter { $0.runsAgents && !trimmed($0.machineID).isEmpty }
+        let usable = hosts.filter { !trimmed($0.machineID).isEmpty }
         let mac = thisMachine.flatMap { machine in
             let wanted = machine.trimmingCharacters(in: .whitespacesAndNewlines)
             return usable.first { trimmed($0.machineID) == wanted }

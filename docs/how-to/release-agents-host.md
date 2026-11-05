@@ -10,7 +10,7 @@ Agents Host is downloaded from the folder's GitHub releases, outside the App Sto
 is the page the Agents window's **Get Agents Host…** opens. Pushing a version tag on main
 publishes a release. The tag starts the `release` workflow, which:
 
-- builds Agents Host with agentsd, agents-control and agents-relay inside;
+- builds Agents Host with agentsd and agents-control inside;
 - signs it with Developer ID, notarizes and staples it, as `Agents-Host-<version>.dmg`;
 - staples the same app and zips it as `Agents-Host-<version>.zip`, for Macs that may not
   mount a disk image;
@@ -41,11 +41,7 @@ You set this up once, as the Apple Developer account's Account Holder.
 1. **A Developer ID Application certificate.** In Xcode ▸ Settings ▸ Accounts ▸ Manage
    Certificates, click **+** ▸ **Developer ID Application**. Then right-click it and choose
    **Export Certificate…** to save it as a `.p12` with a password.
-2. **The relay's profile.** agents-relay reaches CloudKit, which needs a profile outside the
-   App Store too. In the developer site's Profiles, make a **Developer ID** profile for the
-   App ID `com.alexecollins.agents.bridge`, with the certificate from step 1. Name it exactly
-   **Agents Relay Developer ID** and download it.
-3. **The `release` environment.** In Keychain Access, under My Certificates, export
+2. **The `release` environment.** In Keychain Access, under My Certificates, export
    **Developer ID Application: …** as a `.p12`. Then run
    `scripts/release-secrets.sh path/to/DeveloperID.p12` and delete the `.p12`. The script
    creates `release`, allows only tags matching `v*` to deploy to it, and sets these
@@ -55,11 +51,10 @@ You set this up once, as the Apple Developer account's Account Holder.
    |---|---|
    | `DEVELOPER_ID_P12` | `base64 -i DeveloperID.p12` |
    | `DEVELOPER_ID_P12_PASSWORD` | the password from step 1 |
-   | `RELAY_PROFILE` | `base64 -i Agents_Relay_Developer_ID.provisionprofile` |
    | `ASC_KEY_P8` | the App Store Connect API key's `.p8`, as text |
    | `ASC_KEY_ID`, `ASC_ISSUER_ID` | that key's ID and its issuer ID |
 
-4. **The TestFlight secrets.** Export **Apple Distribution: …** and **3rd Party Mac
+3. **The TestFlight secrets.** Export **Apple Distribution: …** and **3rd Party Mac
    Developer Installer: …** from Keychain Access as two `.p12` files. Install the four App
    Store profiles: **Agents Universal Mac App Store**, **Agents Remote App Store**,
    **Agents Remote Notify App Store** and **Agents Remote Widget App Store**. Then run
@@ -117,7 +112,7 @@ the **release** workflow by hand and give it the tag. It replaces the release's 
 ## Build one on this Mac
 
 `scripts/release-host.sh 0.2.0` does what the workflow's Mac job does. It needs the
-Developer ID identity in your keychain, the relay's profile installed, and `ASC_KEY_ID`,
+Developer ID identity in your keychain, and `ASC_KEY_ID`,
 `ASC_ISSUER_ID` and `ASC_KEY_PATH` set. It needs the Linux agentsd in `App/Resources/servers`,
 from `scripts/build-linux-agentsd.sh`, and Docker running (or Go installed) for the Go
 programs Agents Host carries.

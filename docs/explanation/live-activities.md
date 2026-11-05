@@ -105,18 +105,6 @@ Without a key, the Live Activity still starts, still counts the time, and still 
 while the app runs. While iOS has the app suspended, it does not change. After 10 minutes
 it says **Open Agents to see where it is**, and it catches up when you open the app.
 
-## With the relay off
-
-**Relay for my devices** carries notifications through your iCloud account (see
-[How the phone and iPad reach your agents](phone-and-ipad.md)). A Live Activity does not
-use it, because CloudKit cannot update a Live Activity. A pushed update always goes from
-the control plane through APNs, with the relay on or off.
-
-So the relay changes nothing for a Live Activity. With the relay off, the app's own
-updates still come while it runs and can reach the control plane, and pushed updates still
-come while it does not. What you lose with the relay off is the notifications that a Mac
-host sends through iCloud.
-
 ## Only on the iPhone and iPad
 
 The Mac window and the web page have no Live Activities, by design. A Live Activity is a

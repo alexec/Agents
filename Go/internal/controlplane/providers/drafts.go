@@ -1523,7 +1523,7 @@ func NewDraftsFor(p *Providers, w DraftWiring) *Drafts {
 		LocalHost: func() *LocalHost {
 			machine := w.MachineID()
 			for _, h := range w.Records.Hosts() {
-				if h.Relay == nil && h.MachineID != nil && *h.MachineID == machine &&
+				if h.MachineID != nil && *h.MachineID == machine &&
 					router.Online(h.ID) && router.Holds(h.ID) {
 					return &LocalHost{ID: h.ID, Name: h.Name}
 				}

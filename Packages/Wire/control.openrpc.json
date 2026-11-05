@@ -2738,26 +2738,6 @@
       }
     },
     {
-      "name": "hosts/setRelay",
-      "x-capability": "hosts/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/MachineRelayRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
       "name": "hosts/sshHosts",
       "x-capability": "hosts/1",
       "paramStructure": "by-name",
@@ -4631,75 +4611,6 @@
           "name": "web"
         }
       ]
-    },
-    {
-      "name": "relay/count",
-      "x-capability": "relay/1",
-      "description": "To a relay host, on its channel 0 (#1163).",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/RelayCount"
-          }
-        }
-      ]
-    },
-    {
-      "name": "relay/deliver",
-      "x-capability": "relay/1",
-      "description": "To a relay host, on its channel 0 (T097).",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/RelayDelivery"
-          }
-        }
-      ]
-    },
-    {
-      "name": "relay/devices",
-      "x-capability": "relay/1",
-      "description": "To a relay host, on its channel 0 (T096).",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/RelayDevices"
-          }
-        }
-      ]
-    },
-    {
-      "name": "relay/switch",
-      "x-capability": "relay/1",
-      "description": "A relay host, on its channel 0 (#824).",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/RelaySwitch"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
     },
     {
       "name": "reports/deleteView",

@@ -1761,7 +1761,6 @@ export interface ChannelLinkRequest {
 export interface ChannelOpen {
   client: string;
   device?: UUID;
-  relayed?: boolean;
   tunnel?: string;
   tunnelRef?: string;
   fanOut?: boolean;
@@ -1826,11 +1825,9 @@ export interface ClientAnnounce {
   kind: ClientKind;
 }
 
-/** One row of clients/connections: a client connected now, and how. */
+/** One row of clients/connections: a client connected now. */
 export interface ClientConnection {
   client: UUID;
-  relayed: boolean;
-  through?: string;
 }
 
 /** ClientRecord.Kind: a kind a later build added reads as `unknown`. */
@@ -2404,14 +2401,13 @@ export interface ContinueWhenBack {
 
 /**
  * The peer's answer: {"auth":…} (ControlAuth.Auth). `kind` is mac, iphone, ipad, browser, host,
- * relay, copy or page.
+ * copy or page.
  */
 export interface ControlAuth {
   id: string;
   nonce: string;
   mac: string;
   kind: string;
-  for?: string;
   epoch?: number;
   /**
    * The capabilities this client has (#1748). None from a client older than #1748, or from a host,
@@ -2493,7 +2489,6 @@ export interface ControlMachine {
   state: string;
   reach: string;
   machineID?: string;
-  relay?: boolean;
   signInFrom?: Record<string, MachineRef>;
   gitFrom?: Record<string, MachineRef>;
   gitAsks?: GitAsk[];
@@ -2548,7 +2543,6 @@ export interface ControlNotice {
 export interface ControlOK {
   mac: string;
   host?: MachineRef;
-  relayed?: boolean;
   endpoints?: ControlEndpoint[];
   epoch?: number;
   newKey?: ControlNewKey;
@@ -2589,7 +2583,6 @@ export interface ControlStatus {
   port?: number;
   awayFromHome?: boolean;
   you?: UUID;
-  relayKey?: Base64;
   web?: WebRemoteStatus;
   /**
    * Where a browser anywhere opens the page, on the control plane's own domain (#1459): its https
@@ -5409,7 +5402,6 @@ export interface MachineAnnounce {
   platform: string;
   version: string;
   machineID: string;
-  relay?: boolean;
   implementation?: string;
 }
 
@@ -5493,7 +5485,6 @@ export interface MachineHello {
   platform: string;
   machineID: string;
   name?: string;
-  relay?: boolean;
   implementation?: string;
   /**
    * The capabilities this host has (#1748): each one whose methods it all serves, and the ones it
@@ -5629,12 +5620,6 @@ export interface MachineProviderDraftCall {
   draft: UUID;
   tool: string;
   arguments?: JSONValue;
-}
-
-/** hosts/setRelay. */
-export interface MachineRelayRequest {
-  host: MachineRef;
-  relay: boolean;
 }
 
 /** host/release (#2178): the release the control plane names, as X.Y.Z. */
@@ -7790,8 +7775,8 @@ export type PushEnvironment =
   | "production";
 
 /**
- * clients/setPushToken (#1460): a device's own APNs token, in hex, for the control plane to push to
- * when no Mac host relays its notices. No token takes it away.
+ * clients/setPushToken (#1460): a device's own APNs token, in hex, for the control plane to push
+ * its notices to. No token takes it away.
  */
 export interface PushToken {
   token?: string;
@@ -7929,16 +7914,9 @@ export interface ReceiveUploadRequest {
   data: Base64;
 }
 
-/** relay/count (#1163): one device's Needs you count, posted as a silent push. */
-export interface RelayCount {
-  device: UUID;
-  waiting: number;
-  countedAt: WireDate;
-}
-
 /**
- * relay/deliver (T097): seal the headline to `publicKey` and post it for `device`; no headline is a
- * withdrawal.
+ * A notice for one device (T097), which the control plane sends through APNs or Web Push: seal the
+ * headline to `publicKey` and post it for `device`; no headline is a withdrawal.
  */
 export interface RelayDelivery {
   needID: NeedID;
@@ -7947,17 +7925,6 @@ export interface RelayDelivery {
   headline?: Headline;
   alert: boolean;
   waiting?: number;
-}
-
-/** A device a relay host may carry for, with the key its frames are sealed to. */
-export interface RelayDevice {
-  id: UUID;
-  publicKey: Base64;
-}
-
-/** relay/devices: every device client. */
-export interface RelayDevices {
-  devices: RelayDevice[];
 }
 
 export interface RelayGrantReply {
@@ -7980,11 +7947,6 @@ export interface RelayOffer {
 /** relay/register: the public half of the Mac's relay key, X9.63. */
 export interface RelayRegistration {
   publicKey: Base64;
-}
-
-/** relay/switch (#824): the relay host that says it, on or off. */
-export interface RelaySwitch {
-  relay: boolean;
 }
 
 /**
@@ -12150,12 +12112,12 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ChannelLinkDecided: { required: ["request", "result"], optional: [] },
   ChannelLinkRemove: { required: ["channel", "identity"], optional: [] },
   ChannelLinkRequest: { required: ["request", "channel", "identity", "expires"], optional: ["name", "email", "for", "forName"] },
-  ChannelOpen: { required: ["client"], optional: ["device", "relayed", "tunnel", "tunnelRef", "fanOut", "fanOutLock", "actor"] },
+  ChannelOpen: { required: ["client"], optional: ["device", "tunnel", "tunnelRef", "fanOut", "fanOutLock", "actor"] },
   ChannelSender: { required: ["channel", "identity"], optional: ["name", "email", "dkim"] },
   ChartHint: { required: ["mark", "x", "y"], optional: ["color", "title"] },
   CheckSuggestion: { required: ["id", "title", "prompt", "at"], optional: ["link", "urgent"] },
   ClientAnnounce: { required: ["id", "publicKey", "name", "kind"], optional: [] },
-  ClientConnection: { required: ["client", "relayed"], optional: ["through"] },
+  ClientConnection: { required: ["client"], optional: [] },
   ClientPairingRequest: { required: [], optional: ["kind", "grant"] },
   ClientPermissionSettings: { required: ["cursor", "grok", "opencode"], optional: ["setBy"] },
   ClientRecord: { required: ["id", "name", "kind", "publicKey", "paired", "rev"], optional: ["lastSeen", "mayNotify", "owner", "forgotten", "forgottenAt", "knownEpoch"] },
@@ -12191,22 +12153,22 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ContinueInFolderRequest: { required: ["agentID", "text", "attachments"], optional: ["requestID"] },
   ContinueInNewRequest: { required: ["agentID"], optional: ["accountID", "requestID", "auto"] },
   ContinueWhenBack: { required: ["at", "resetKnown"], optional: [] },
-  ControlAuth: { required: ["id", "nonce", "mac", "kind"], optional: ["for", "epoch", "capabilities", "page", "publicKey"] },
+  ControlAuth: { required: ["id", "nonce", "mac", "kind"], optional: ["epoch", "capabilities", "page", "publicKey"] },
   ControlClientChanged: { required: [], optional: ["client", "removed"] },
   ControlCodeShown: { required: ["text", "expires"], optional: ["command"] },
   ControlCutOff: { required: ["why"], optional: ["provider"] },
   ControlEndpoint: { required: ["url"], optional: ["pin"] },
   ControlHello: { required: ["v", "name", "control", "nonce", "copy"], optional: ["previous"] },
   ControlInstallProgress: { required: ["name", "step"], optional: [] },
-  ControlMachine: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom", "gitFrom", "gitAsks", "tunnel", "workspace", "implementation", "capabilities", "missing", "owner"] },
+  ControlMachine: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "signInFrom", "gitFrom", "gitAsks", "tunnel", "workspace", "implementation", "capabilities", "missing", "owner"] },
   ControlMoved: { required: ["url", "controlKey", "name"], optional: ["pin"] },
   ControlNewKey: { required: ["key", "proof"], optional: [] },
   ControlNotice: { required: ["kind", "words"], optional: ["user", "group"] },
-  ControlOK: { required: ["mac"], optional: ["host", "relayed", "endpoints", "epoch", "newKey"] },
+  ControlOK: { required: ["mac"], optional: ["host", "endpoints", "epoch", "newKey"] },
   ControlPerson: { required: ["id", "name", "role"], optional: ["localOwner"] },
   ControlPush: { required: ["sealed"], optional: [] },
   ControlPushItem: { required: ["needID", "alert"], optional: ["headline"] },
-  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "publicWeb", "publicViews", "thisMacHost", "folderDetection", "unjoinedTunnels", "capabilities", "required", "person", "joinCommand"] },
+  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "web", "publicWeb", "publicViews", "thisMacHost", "folderDetection", "unjoinedTunnels", "capabilities", "required", "person", "joinCommand"] },
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },
   CostState: { required: ["limits", "today", "day", "tokensToday"], optional: ["note", "organisation", "setBy"] },
@@ -12476,14 +12438,14 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MCPViewsForgetRequest: { required: ["destination", "name"], optional: [] },
   MacPathRequest: { required: ["path"], optional: ["app"] },
   MacTerminalRequest: { required: [], optional: ["path"] },
-  MachineAnnounce: { required: ["publicKey", "name", "platform", "version", "machineID"], optional: ["relay", "implementation"] },
+  MachineAnnounce: { required: ["publicKey", "name", "platform", "version", "machineID"], optional: ["implementation"] },
   MachineCatalog: { required: ["items"], optional: [] },
   MachineClient: { required: ["id", "kind", "publicKey"], optional: ["person"] },
   MachineClients: { required: ["clients"], optional: ["user"] },
   MachineEnroll: { required: [], optional: ["as"] },
   MachineFolderSend: { required: ["host"], optional: ["state", "upload", "receive", "facts", "pack", "read"] },
   MachineFolderSent: { required: [], optional: ["state", "folder", "facts", "pack", "read"] },
-  MachineHello: { required: ["version", "platform", "machineID"], optional: ["host", "name", "relay", "implementation", "capabilities"] },
+  MachineHello: { required: ["version", "platform", "machineID"], optional: ["host", "name", "implementation", "capabilities"] },
   MachineInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "hostKeyRenews", "cost", "host"] },
   MachineInstall: { required: ["destination"], optional: ["name", "key", "trust", "tunnel", "provider", "workspace"] },
   MachineJoinAsk: { required: ["name", "platform", "publicKey"], optional: ["version", "machineID", "person"] },
@@ -12496,7 +12458,6 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachinePolicy: { required: [], optional: ["policy", "signature", "none"] },
   MachineProjects: { required: ["projects"], optional: [] },
   MachineProviderDraftCall: { required: ["agentID", "draft", "tool"], optional: ["arguments"] },
-  MachineRelayRequest: { required: ["host", "relay"], optional: [] },
   MachineRelease: { required: ["version"], optional: [] },
   MachineRequest: { required: ["host"], optional: ["purge"] },
   MachineSchedule: { required: [], optional: ["at", "workflow"] },
@@ -12708,15 +12669,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ReceiveState: { required: ["folder", "exists", "repository", "ownChanges", "heads"], optional: [] },
   ReceiveStateRequest: { required: ["folder"], optional: [] },
   ReceiveUploadRequest: { required: ["upload", "offset", "data"], optional: [] },
-  RelayCount: { required: ["device", "waiting", "countedAt"], optional: [] },
   RelayDelivery: { required: ["needID", "device", "alert"], optional: ["publicKey", "headline", "waiting"] },
-  RelayDevice: { required: ["id", "publicKey"], optional: [] },
-  RelayDevices: { required: ["devices"], optional: [] },
   RelayGrantReply: { required: ["runtime", "caCertificate", "standIn"], optional: [] },
   RelayGrantRequest: { required: ["runtime"], optional: [] },
   RelayOffer: { required: ["runtime", "socketPath", "caCertificate", "standIn"], optional: [] },
   RelayRegistration: { required: ["publicKey"], optional: [] },
-  RelaySwitch: { required: ["relay"], optional: [] },
   RelayTokens: { required: ["input", "output", "cacheRead", "cacheWrite"], optional: [] },
   RememberedOptionsRequest: { required: ["runtimeID", "cwd"], optional: [] },
   RemovalCheck: { required: ["blockedBy", "uncommitted", "unmerged"], optional: [] },

@@ -6,8 +6,8 @@ import UniformTypeIdentifiers
 @testable import AgentsKitCore
 
 /// What a phone may attach to the first prompt, and how (029). A file on a phone is a
-/// path the Mac cannot open, so everything goes by value, small enough to cross the
-/// relayed link in one record.
+/// path the Mac cannot open, so everything goes by value, small enough to go in one
+/// message.
 @Suite("Attaching from a phone")
 struct PhoneAttachmentTests {
     /// A picture the size a phone's camera takes, drawn here rather than kept as a

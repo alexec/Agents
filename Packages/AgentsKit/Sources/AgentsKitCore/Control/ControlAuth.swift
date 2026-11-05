@@ -14,7 +14,7 @@ import Foundation
 /// - another copy (`x:<copy>`): HKDF of the control plane's private key alone.
 ///
 /// Pure Swift, on `ControlAgreement`, so a Linux host and the service need no second
-/// BoringSSL. It runs inside TLS, which is what stops a relay in the middle: the MACs
+/// BoringSSL. It runs inside TLS, which is what stops anyone in the middle: the MACs
 /// are not bound to the TLS session, so the peer must check the certificate or its pin.
 public enum ControlAuth {
     public static let version = 1
@@ -57,10 +57,8 @@ public enum ControlAuth {
         public var id: String
         public var nonce: String
         public var mac: String
-        /// `mac`, `iphone`, `ipad`, `host`, `relay`, `copy`.
+        /// `mac`, `iphone`, `ipad`, `host`, `copy`.
         public var kind: String
-        /// A relayed device's id: `agents-relay` opens the socket for it (R10).
-        public var `for`: String?
         /// The epoch of the endpoints this peer holds (R16), so the control plane knows
         /// who has heard of a move. Nil from a build that keeps none.
         public var epoch: Int?
@@ -69,13 +67,12 @@ public enum ControlAuth {
         public var capabilities: [String]?
         /// With an `s:` identity (#995): the key of the client that signs in, X9.63.
         public var publicKey: Data?
-        public init(id: String, nonce: String, mac: String, kind: String, for device: String? = nil, epoch: Int? = nil,
+        public init(id: String, nonce: String, mac: String, kind: String, epoch: Int? = nil,
                     capabilities: [String]? = nil, publicKey: Data? = nil) {
             self.id = id
             self.nonce = nonce
             self.mac = mac
             self.kind = kind
-            self.for = device
             self.epoch = epoch
             self.capabilities = capabilities
             self.publicKey = publicKey
@@ -85,7 +82,6 @@ public enum ControlAuth {
     public struct OK: Codable, Sendable, Equatable {
         public var mac: String
         public var host: MachineRef?
-        public var relayed: Bool?
         /// Where the control plane answers now, and from when (R16): a member with an older
         /// epoch keeps this list in place of its own. Sent once one has been announced.
         public var endpoints: [ControlEndpoint]?
@@ -93,11 +89,10 @@ public enum ControlAuth {
         /// The control plane's new key, to a member that proved itself with the previous
         /// one (#997).
         public var newKey: NewKey?
-        public init(mac: String, host: MachineRef? = nil, relayed: Bool? = nil,
+        public init(mac: String, host: MachineRef? = nil,
                     endpoints: [ControlEndpoint]? = nil, epoch: Int? = nil, newKey: NewKey? = nil) {
             self.mac = mac
             self.host = host
-            self.relayed = relayed
             self.endpoints = endpoints
             self.epoch = epoch
             self.newKey = newKey
@@ -293,7 +288,7 @@ public enum ControlAuth {
     /// expects in `ok`. `controlKey` is the key it already trusts; a hello with any other
     /// is not its control plane.
     public static func answer(_ hello: Hello, identity: Identity, key: Data, origin: String, kind: String,
-                              expecting controlKey: Data?, for device: UUID? = nil, epoch: Int? = nil)
+                              expecting controlKey: Data?, epoch: Int? = nil)
         throws -> (auth: Auth, expect: Data) {
         guard hello.v == version, let serverNonce = ControlCode.data(base64url: hello.nonce), serverNonce.count == 32 else {
             throw Refusal(.badMessage)
@@ -308,7 +303,7 @@ public enum ControlAuth {
         var capabilities: [String]?
         if case .client = identity { capabilities = Capability.declared["client"] }
         return (Auth(id: text, nonce: ControlCode.base64url(peerNonce), mac: ControlCode.base64url(mac), kind: kind,
-                     for: device?.uuidString, epoch: epoch, capabilities: capabilities), expect)
+                     epoch: epoch, capabilities: capabilities), expect)
     }
 
     /// Whether a hello is from the control plane a member trusts: its key now, or the one

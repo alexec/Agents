@@ -51,13 +51,6 @@ struct StaleBanner: View {
             }
         } else if model.isStale {
             row(icon: "wifi.slash", lead: nil, line: staleLine)
-        } else if let trouble = troubleLine {
-            row(icon: "icloud.slash", lead: nil, line: trouble)
-        } else if model.isAway {
-            // Away (046, look A): not a fault, and said as the reason things are slower.
-            row(icon: "icloud", lead: "Away",
-                line: model.relayTrouble.map { if case .slowedDown = $0 { true } else { false } } == true
-                    ? "slower than usual" : "slower, through iCloud")
         }
     }
 
@@ -90,16 +83,6 @@ struct StaleBanner: View {
         guard let last = model.lastHeard else { return "Not connected to your Mac yet" }
         return "Last heard from your Mac \(last)"
     }
-
-    private var troubleLine: String? {
-        switch model.relayTrouble {
-        case .noICloud?: "The relay needs iCloud on your \(device) and your Mac"
-        case .iCloudFull?: "iCloud is full, so the relay can't carry messages"
-        default: nil
-        }
-    }
-
-    private var device: String { UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone" }
 }
 
 /// What a screen looks like while it cannot be trusted: still readable, plainly not

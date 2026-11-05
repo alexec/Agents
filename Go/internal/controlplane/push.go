@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controlplane/apns"
@@ -19,58 +18,26 @@ type Pusher interface {
 	Send(ctx context.Context, p apns.Push) error
 }
 
-// pushes is the control plane's own way to a device when no Mac host relays notices
-// (public-security.md §5). One queue, sent in order by one worker, so a withdrawal never
-// passes the post it takes back; held to pushQueue, and what does not fit is dropped and
-// said.
+// pushes is the control plane's way to a phone or an iPad (public-security.md §5). One
+// queue, sent in order by one worker, so a withdrawal never passes the post it takes
+// back; held to pushQueue, and what does not fit is dropped and said.
 type pushes struct {
 	s      *Service
 	sender Pusher
 	queue  chan apns.Push
-	// The needs this copy pushed itself, by need and device: a withdrawal goes the way its
-	// post went, even if a relay host is online by then. Held to pushKept.
-	mu   sync.Mutex
-	sent map[string]time.Time
 }
 
-const (
-	pushQueue = 256
-	pushKept  = 1024
-)
+const pushQueue = 256
 
 func newPushes(s *Service, sender Pusher) *pushes {
-	p := &pushes{s: s, sender: sender, queue: make(chan apns.Push, pushQueue), sent: map[string]time.Time{}}
+	p := &pushes{s: s, sender: sender, queue: make(chan apns.Push, pushQueue)}
 	go p.run()
 	return p
-}
-
-func pushKey(need wire.NeedID, device wire.UUID) string {
-	b, _ := json.Marshal(need)
-	return string(b) + "/" + string(device)
-}
-
-// pushedHere says whether this copy pushed this need to this device itself.
-func (p *pushes) pushedHere(d notices.RelayDelivery) bool {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	_, ok := p.sent[pushKey(d.NeedID, d.Device)]
-	return ok
 }
 
 // deliver seals one delivery to its device and queues it. A device with no token, or
 // whose push cannot be sealed, gets nothing, and the log says so without the words.
 func (p *pushes) deliver(d notices.RelayDelivery) {
-	key := pushKey(d.NeedID, d.Device)
-	p.mu.Lock()
-	if d.Headline == nil {
-		delete(p.sent, key)
-	} else {
-		if len(p.sent) >= pushKept {
-			p.dropOldest()
-		}
-		p.sent[key] = time.Now()
-	}
-	p.mu.Unlock()
 	client := p.s.records.Client(string(d.Device))
 	if client == nil || client.PushToken == nil {
 		p.s.log(fmt.Sprintf("notice: no push token for %s", d.Device))
@@ -96,16 +63,6 @@ func (p *pushes) queueActivity(push apns.Push, device string) {
 	default:
 		p.s.log(fmt.Sprintf("live activity: the push queue is full; dropped one for %s", device))
 	}
-}
-
-func (p *pushes) dropOldest() {
-	oldest, at := "", time.Time{}
-	for k, t := range p.sent {
-		if oldest == "" || t.Before(at) {
-			oldest, at = k, t
-		}
-	}
-	delete(p.sent, oldest)
 }
 
 // sealPush is a delivery as APNs carries it: the item sealed whole, so the need's id and
