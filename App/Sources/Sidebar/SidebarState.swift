@@ -127,15 +127,14 @@ final class SidebarFrame {
         total >= minimumConversationWidth + minimumWidth
     }
 
-    /// Open the column across what the chat does not need.
+    /// Open the column across half the pane, the chat taking the other half (Alex).
     ///
-    /// The chat's text stops at `ChatMetrics.measureCap` however wide its pane, so
-    /// anything past its comfortable width is margin. Opening gives that margin to the
-    /// sidebar, and never less than the document pane needs to be read. A width dragged
-    /// to afterwards is kept until the column is next opened.
+    /// What opens it is most often an artifact, a page or a diff, which needs the room
+    /// as much as the chat does. It is never less than the document pane needs to be
+    /// read, and never so much that the conversation drops below its minimum. A width
+    /// dragged to afterwards is kept until the column is next opened.
     func open() {
-        let remaining = paneWidth - ChatMetrics.comfortablePane
-        setWidth(max(Self.readableWidth, remaining), inWindowOf: windowWidth)
+        setWidth(max(Self.readableWidth, paneWidth / 2), inWindowOf: windowWidth)
         isOpen = true
     }
 
