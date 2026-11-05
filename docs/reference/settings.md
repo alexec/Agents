@@ -110,7 +110,9 @@ is on this Mac, and where its allowance is, as **Available**, **Rate limited · 
 again at** a time, **Out · reset** a time **· checking after** a time, **Out since** a
 time **· checking after** a time, or **Credit used up · checking after** a time. Under
 it, where the runtime says so, what is left of its plan, such as **28% left this week ·
-resets Sun 20:39 · as of 14:02**. **Mark available** says it is back before a check does,
+resets Sun 20:39 · as of 14:02**. For a weekly plan, a line under it compares the week with
+an even pace: **3 days to go · used faster than an even pace (43% left)**. **Past weeks**
+then shows how much of each of the last few weeks was used, as short bars. **Mark available** says it is back before a check does,
 and asks nothing first, because a wrong mark costs one refused turn. It is shown only: a
 chat on an out runtime can still be sent a message. The row in the sidebar says how many
 are out, with a red dot, and says nothing when none are. See

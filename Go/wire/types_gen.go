@@ -534,6 +534,9 @@ type AllowanceState struct {
 
 	Reading *AllowanceReading `json:"reading,omitzero"`
 
+	// The last reading of each weekly plan window (#3438): one per window and reset time, at most six per window, oldest first. The Runtimes page shows the past ones' final share.
+	Weeks []AllowanceReading `json:"weeks,omitzero"`
+
 	Spent AllowanceStateSpent `json:"spent"`
 
 	RateLimitStreak []Date `json:"rateLimitStreak"`

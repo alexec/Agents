@@ -1,7 +1,7 @@
 // The order runtimes are listed in, as RuntimeCatalog.sortedByName (AgentsKitCore) has it (#154):
 // alphabetical by the name shown, case-insensitive and as the person's language would, the id
 // breaking a tie. A host on an older build still answers in its catalog's order.
-import type { AccountProfile, Agent, AllowanceState, OrgPolicy, PolicySetBy, RuntimeAllowancesRow, RuntimeStatus } from "../protocol/generated";
+import type { AccountProfile, Agent, AllowanceReading, AllowanceState, OrgPolicy, PolicySetBy, RuntimeAllowancesRow, RuntimeStatus } from "../protocol/generated";
 import { line, runtimeName, tokens } from "./orgPolicy";
 import { fromWireDate } from "../protocol/dates";
 import { fromOrganisation, noPlanLimit, requires, routeMissing, routeRemoved } from "./orgAccounts";
@@ -317,4 +317,68 @@ export function accountChoices(runtimeID: string, profiles: readonly AccountProf
       return accountID.startsWith("org:") ? routeRemoved("this way to the model") : undefined;
     },
   };
+}
+
+const week = 7 * 86400;
+
+/**
+ * A plan's week against an even pace, and its past weeks (#3438), as AllowancePace
+ * (AgentsKitCore) reads them from the weekly readings the daemon keeps: Claude's `seven_day` or
+ * Grok's `weekly` window first, then the newest window kept. Null when it kept no week.
+ */
+export function allowancePace(state: AllowanceState | undefined, now: Date):
+  { current?: AllowanceReading; past: AllowanceReading[]; evenLeft?: number; verdict?: "faster" | "even" | "slower" } | null {
+  const weeks = state?.weeks ?? [];
+  const windows = weeks.map((w) => w.window).filter((w): w is string => !!w);
+  const window = ["seven_day", "weekly"].find((w) => windows.includes(w)) ?? windows[windows.length - 1];
+  if (!window) return null;
+  const isCurrent = (r: AllowanceReading) => fromWireDate(r.resetsAt!).getTime() > now.getTime();
+  const mine = weeks.filter((w) => w.window === window && w.resetsAt != null && (w.spent || w.used != null));
+  const current = mine.filter(isCurrent).pop();
+  const past = mine.filter((w) => !isCurrent(w));
+  if (!current && !past.length) return null;
+  if (!current) return { past };
+  const evenLeft = Math.min(Math.max((current.resetsAt! - current.at) / week, 0), 1);
+  const left = current.spent ? 0 : 1 - current.used!;
+  const verdict = left < evenLeft - 0.05 ? "faster" : left > evenLeft + 0.05 ? "slower" : "even";
+  return { current, past, evenLeft, verdict };
+}
+
+const percent = (fraction: number) => `${Math.round(fraction * 100)}%`;
+
+/** "3 days to go", "1 day to go", "5 hours to go", "Under an hour to go", to the nearest day or hour, as PoolWords.toGo. */
+function toGo(seconds: number): string {
+  const days = Math.round(seconds / 86400);
+  if (days > 1) return `${days} days to go`;
+  if (seconds >= 86400) return "1 day to go";
+  const hours = Math.round(seconds / 3600);
+  if (hours > 1) return `${hours} hours to go`;
+  if (hours === 1) return "1 hour to go";
+  return "Under an hour to go";
+}
+
+/**
+ * The pace line under the reading, PoolWords.pace: "3 days to go · used faster than an even pace
+ * (43% left)", with "28% left this week · " first when the reading line says another window.
+ */
+export function allowancePaceLine(state: AllowanceState | undefined, now: Date): string | null {
+  const pace = allowancePace(state, now);
+  const current = pace?.current;
+  if (!pace || !current || pace.evenLeft == null) return null;
+  const parts: string[] = [];
+  const reading = state?.reading;
+  const sameWeek = reading && reading.window === current.window && reading.resetsAt === current.resetsAt
+    && fromWireDate(reading.resetsAt!).getTime() > now.getTime();
+  const left = current.spent ? 0 : 1 - current.used!;
+  if (!sameWeek) parts.push(left <= 0 ? "None left this week" : `${percent(left)} left this week`);
+  parts.push(toGo((fromWireDate(current.resetsAt!).getTime() - now.getTime()) / 1000));
+  parts.push(pace.verdict === "even" ? "on an even pace" : `used ${pace.verdict} than an even pace (${percent(pace.evenLeft)} left)`);
+  return parts.join(" · ");
+}
+
+/** The past weeks in words, PoolWords.pastWeeks: "Past weeks: 62%, 71%, 90% used". */
+export function pastWeeksLine(state: AllowanceState | undefined, now: Date): string | null {
+  const past = allowancePace(state, now)?.past ?? [];
+  if (!past.length) return null;
+  return `Past weeks: ${past.map((w) => percent(w.spent ? 1 : w.used!)).join(", ")} used`;
 }

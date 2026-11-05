@@ -518,6 +518,11 @@ export interface AllowanceState {
   learnedFrom: AllowanceStateSource;
   lastRateLimit?: RateLimitInfo;
   reading?: AllowanceReading;
+  /**
+   * The last reading of each weekly plan window (#3438): one per window and reset time, at most six
+   * per window, oldest first. The Runtimes page shows the past ones' final share.
+   */
+  weeks?: AllowanceReading[];
   spent: AllowanceStateSpent;
   rateLimitStreak: WireDate[];
   modelsOut?: AllowanceStateModelOut[];
@@ -11298,7 +11303,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AgentsExportRequest: { required: [], optional: ["agentID", "folder"] },
   AgentsImportRequest: { required: ["upload"], optional: ["folder"] },
   AllowanceReading: { required: ["spent", "nearlySpent", "at"], optional: ["window", "used", "resetsAt"] },
-  AllowanceState: { required: ["credentialKey", "entryID", "status", "since", "changedAt", "learnedFrom", "spent", "rateLimitStreak"], optional: ["lastRateLimit", "reading", "modelsOut"] },
+  AllowanceState: { required: ["credentialKey", "entryID", "status", "since", "changedAt", "learnedFrom", "spent", "rateLimitStreak"], optional: ["lastRateLimit", "reading", "weeks", "modelsOut"] },
   AllowanceStateModelOut: { required: ["model", "since", "retryAfter"], optional: ["name"] },
   AnnounceReply: { required: ["device"], optional: ["macKey"] },
   AnswerElicitationRequest: { required: ["requestID", "action", "content"], optional: ["sendID"] },

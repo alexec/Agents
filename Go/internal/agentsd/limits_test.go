@@ -2,6 +2,7 @@ package agentsd
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -156,5 +157,49 @@ func TestPaidOverageTakesTheRuntimeOutAndTheTurnStands(t *testing.T) {
 	}
 	if n := names(d); !strings.Contains(strings.Join(n, " "), "cost.allowance_out") {
 		t.Fatal(n)
+	}
+}
+
+// A weekly reading is the last of its week (#3438): a later one of the same week replaces it,
+// the next week adds one, at most six weeks of a window stay, and other windows are not kept.
+func TestWithWeekKeepsTheLastReadingOfEachWeek(t *testing.T) {
+	week := func(window string, n int, used float64, at float64) wire.AllowanceReading {
+		resets := wire.Date(float64(n) * 7 * 86400)
+		return wire.AllowanceReading{Window: &window, Used: &used, ResetsAt: &resets, At: wire.Date(at)}
+	}
+	var weeks []wire.AllowanceReading
+	var ok bool
+	weeks, ok = withWeek(weeks, week("seven_day", 1, 0.2, 10))
+	if !ok || len(weeks) != 1 {
+		t.Fatalf("first week: %v %v", weeks, ok)
+	}
+	if weeks, ok = withWeek(weeks, week("seven_day", 1, 0.5, 20)); !ok || len(weeks) != 1 || *weeks[0].Used != 0.5 {
+		t.Fatalf("a later reading of the same week replaces it: %v %v", weeks, ok)
+	}
+	if _, ok = withWeek(weeks, week("seven_day", 1, 0.3, 15)); ok {
+		t.Fatal("an older reading of the same week is not news")
+	}
+	if _, ok = withWeek(weeks, week("five_hour", 1, 0.3, 30)); ok {
+		t.Fatal("a five-hour window is not a week")
+	}
+	weeks, _ = withWeek(weeks, week("seven_day_opus", 1, 0.1, 30))
+	for n := 2; n <= 8; n++ {
+		weeks, _ = withWeek(weeks, week("seven_day", n, 0.9, float64(n*100)))
+	}
+	var seven []float64
+	for _, w := range weeks {
+		if *w.Window == "seven_day" {
+			seven = append(seven, float64(*w.ResetsAt)/(7*86400))
+		}
+	}
+	if len(weeks) != 7 || !slices.Equal(seven, []float64{3, 4, 5, 6, 7, 8}) {
+		t.Fatalf("six weeks of seven_day kept, the Opus one too, oldest first: %v", seven)
+	}
+	merged, more := withWeeks(nil, weeks)
+	if !more || len(merged) != len(weeks) {
+		t.Fatalf("another machine's weeks are taken in: %v", merged)
+	}
+	if _, more = withWeeks(merged, weeks); more {
+		t.Fatal("the same weeks again are no news")
 	}
 }
