@@ -26,7 +26,9 @@ import (
 //     away (LockSignature, to this machine, at most a day old, once);
 //   - signed by another machine of the lock, for the steps of start_session, its calls to
 //     the session it started, and send and bring_back (D7);
-//   - or one of the few the control plane asks for itself, which start nothing.
+//   - or one of the few the control plane asks for itself, which start nothing, and the
+//     stop of a provider draft's writer, which a client of the lock signed the start of
+//     for the control plane's own draft (#3542).
 //
 // Everything else is refused with notInLock, the control plane's own word for who sent it
 // notwithstanding. A machine with no lock yet takes what it took before the lock, so a
@@ -143,10 +145,24 @@ func (d *Daemon) readChecked(c *Client, line string) (message, bool) {
 	if s, ok := machinelock.SignatureOf(m.Lock); ok {
 		return m, d.takeSigned(c, state, m, s)
 	}
-	if controlAsks[m.Method] {
+	if controlAsks[m.Method] || d.draftWriterStop(m) {
 		return m, true
 	}
 	return m, d.refuse(c, m, "the request is not signed by one of them")
+}
+
+// draftWriterStop says m stops a provider draft's writer (#3542): the control plane ends
+// the draft it holds. Such an agent has only the draft's tools and is in no list.
+func (d *Daemon) draftWriterStop(m message) bool {
+	if m.Method != wire.CallAgentsStop.Name {
+		return false
+	}
+	var stop wire.AgentStopRequest
+	if json.Unmarshal(m.Params, &stop) != nil || stop.ByAdmin != nil && *stop.ByAdmin {
+		return false
+	}
+	a := d.Store.Agent(stop.AgentID)
+	return a != nil && a.Purpose != nil && a.Purpose.ProviderDraft != nil
 }
 
 // refuse answers a request with notInLock, and says false.

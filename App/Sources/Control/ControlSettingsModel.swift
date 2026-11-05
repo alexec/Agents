@@ -73,6 +73,10 @@ final class ControlSettingsModel {
 
     /// The host on this Mac: shown first and without buttons (the look gate's decision).
     var thisMacHost: DaemonAPI.ControlMachine? { hosts.first { $0.machineID == MachineID.current && $0.runsAgents } }
+    /// The machines that may carry a provider (#3496): the person's online ones, this Mac first.
+    var carriers: [DaemonAPI.ControlMachine] {
+        ProviderCarrier.choices(hosts, person: status?.person?.id, own: thisMacHost?.id)
+    }
     /// Every other host, and this Mac's relay: it shares the Mac's machine but is not its host.
     var otherHosts: [DaemonAPI.ControlMachine] { hosts.filter { $0.machineID != MachineID.current || $0.relay != nil } }
 
@@ -199,12 +203,27 @@ final class ControlSettingsModel {
         try? await client.call(DaemonAPI.Method.providersRuntimes, DaemonAPI.Empty(), returning: DaemonAPI.ProviderRuntimes.self)
     }
 
-    /// Starts a draft: answered at once when no agent is needed, or why it can't start.
-    func startDraft(_ request: DaemonAPI.ProviderDraftStart) async -> Result<DaemonAPI.ProviderDraftStarted, DraftRefusal> {
+    /// Starts a draft: answered at once when no agent is needed, or why it can't start. When
+    /// the host holds the person's lock, this Mac signs the writer's start (#3542).
+    func startDraft(_ request: DaemonAPI.ProviderDraftStart,
+                    signer: () async -> LockChannel.Signer?) async -> Result<DaemonAPI.ProviderDraftStarted, DraftRefusal> {
         do {
             let started = try await client.call(DaemonAPI.Method.providersDraftStart, request,
                                                 returning: DaemonAPI.ProviderDraftStarted.self)
-            return .success(started)
+            guard let sign = started.sign else { return .success(started) }
+            guard let signer = await signer() else {
+                await cancelDraft(started.draft)
+                return .failure(DraftRefusal(message: "The host takes only a start this Mac signs, and this Mac isn’t in your lock."))
+            }
+            let lock: DaemonAPI.LockSignature
+            do {
+                lock = try sign.signed(for: started.draft, runtimeID: request.runtimeID, by: signer.key)
+            } catch let refused as DaemonAPI.ProviderDraftSign.NotAWritersStart {
+                await cancelDraft(started.draft)
+                return .failure(DraftRefusal(message: "This Mac didn’t sign the writer’s start: \(refused.why)."))
+            }
+            _ = try await client.call(DaemonAPI.Method.providersDraftSigned, DaemonAPI.ProviderDraftSigned(draft: started.draft, lock: lock))
+            return .success(DaemonAPI.ProviderDraftStarted(draft: started.draft))
         } catch let error as JSONRPCError {
             return .failure(DraftRefusal(message: HostProblem.controlRefusal(error)))
         } catch {

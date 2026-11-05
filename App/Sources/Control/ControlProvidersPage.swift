@@ -2,8 +2,8 @@ import AgentsKitCore
 import SwiftUI
 
 /// Settings ▸ Machine Providers (#691, layouts.md L3): each machine provider as a
-/// card of its workspaces, which are hosts already or can be added as one. A provider runs on
-/// the control plane, so it can start a machine that is down.
+/// card of its workspaces, which are hosts already or can be added as one. A machine of the
+/// person's carries each provider: it runs its server and keeps its secrets (#3398, #3496).
 struct ControlProvidersPage: View {
     let control: ControlSettingsModel
     @State private var adding = false
@@ -40,7 +40,7 @@ struct ControlProvidersPage: View {
                         .buttonStyle(.paper)
                         .disabled(!control.providers.contains { $0.capabilities.contains("create") && $0.usable })
                 }
-                Text("A provider starts and stops your machines: Docker containers, DigitalOcean Droplets, GitHub Codespaces, Coder workspaces, Google Cloud Workstations and Compute Engine VMs, AWS EC2 instances, or anything with a command. It runs here, on the control plane, so it can start a machine that is down.")
+                Text("A provider starts and stops your machines: Docker containers, DigitalOcean Droplets, GitHub Codespaces, Coder workspaces, Google Cloud Workstations and Compute Engine VMs, AWS EC2 instances, or anything with a command. One of your machines carries it: it runs there and keeps its tokens, and the control plane keeps none.")
                     .appText(.supporting).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -215,6 +215,14 @@ struct ControlProvidersPage: View {
         if provider.workspaces.isEmpty, provider.listedAt != nil { parts.append("No machines") }
         if let group = GroupWords.providerLine(provider, groups: control.groups) { parts.append(group) }
         if let tool = provider.sshToolMissing { parts.append("needs \(tool) for ssh") }
+        // The machine that carries it (#3496), and when it is offline.
+        if let offline = ProviderCarrier.offline(provider) {
+            parts.append(offline)
+        } else if let carried = ProviderCarrier.carriedBy(provider) {
+            parts.append(carried)
+        } else if control.isAdmin, provider.preset != nil {
+            parts.append(ProviderCarrier.notCarried)
+        }
         // A map or commands written for it that give no ssh (#975); a preset's own way in is its own.
         let written = provider.kind == "commands" ? provider.preset == nil : provider.mapped
         if written, !provider.workspaces.isEmpty, provider.workspaces.allSatisfy({ $0.ssh == nil }) {
@@ -244,7 +252,8 @@ struct ControlProvidersPage: View {
 }
 
 /// Add a Provider (#691, layouts.md L4, as Alex chose it): pick what kind first, then a short
-/// form for just that kind. A preset needs its CLI signed in where the control plane runs.
+/// form for just that kind, and the machine that carries it (#3496). A preset needs its CLI
+/// signed in there.
 ///
 /// The MCP server and Your commands forms have Write It for Me (#858, L10): an agent on the
 /// control plane's host reads the server's tools or the CLI's help and writes the tool map or
@@ -252,6 +261,7 @@ struct ControlProvidersPage: View {
 /// provider card's Write Again… (US4): the same, from the map or commands it has, and Save.
 struct AddProviderSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppModel.self) private var model
     let control: ControlSettingsModel
     var editing: DaemonAPI.ProviderSummary?
     /// Inside Add a Machine (#2131): the provider added, to go on with, in place of closing.
@@ -289,19 +299,19 @@ struct AddProviderSheet: View {
             }
         }
 
-        /// What it needs where the control plane runs.
+        /// What it needs on the machine that carries it.
         var needs: String? {
             switch self {
-            case .docker: "Needs docker on the Mac that runs the control plane."
-            case .digitalOcean: "Needs doctl, signed in, on the Mac that runs the control plane."
-            case .codespaces: "Needs gh, signed in, on the Mac that runs the control plane."
-            case .coder: "Needs coder, signed in, and `coder config-ssh` run, on the Mac that runs the control plane."
-            case .workstations: "Needs gcloud, signed in, on the Mac that runs the control plane, and a host in its ssh config that reaches the workstation’s port 22 through `gcloud workstations start-tcp-tunnel`."
+            case .docker: "Needs docker on the machine that carries it."
+            case .digitalOcean: "Needs doctl, signed in, on the machine that carries it."
+            case .codespaces: "Needs gh, signed in, on the machine that carries it."
+            case .coder: "Needs coder, signed in, and `coder config-ssh` run, on the machine that carries it."
+            case .workstations: "Needs gcloud, signed in, on the machine that carries it, and a host in its ssh config that reaches the workstation’s port 22 through `gcloud workstations start-tcp-tunnel`."
             case .compute:
                 "Needs a service account’s JSON key, with the smallest role: compute.instances.list, start and stop, and for New Machine… compute.instances.create, delete, setMetadata and setLabels, compute.disks.create, and compute.subnetworks.use and useExternalIp. ssh goes to each VM’s external address, so the network must let in port 22, and a static address keeps it the same after a stop (#1691). Nothing to install."
             case .aws:
                 "Needs an IAM user’s access key, with the smallest policy: ec2:DescribeInstances on all resources, and ec2:StartInstances and ec2:StopInstances only on instances that have the tag (the condition aws:ResourceTag/‹tag› not Null). Nothing to install."
-            case .commands: "The commands run on the Mac that runs the control plane, as you."
+            case .commands: "The commands run on the machine that carries it, as you."
             case .mcp: "An MCP server that offers workspaces_list, workspace_start and workspace_stop, or a tool map onto its own tools."
             }
         }
@@ -342,9 +352,9 @@ struct AddProviderSheet: View {
             case .digitalOcean:
                 "Needs a DigitalOcean API token with custom scopes: droplet read and update, and droplet create and delete to make and delete droplets. Nothing to install."
             case .codespaces:
-                "Needs a GitHub token: fine-grained, with Codespaces lifecycle admin (read and write), or classic, with the codespace scope. ssh still goes through gh: run `gh codespace ssh --config >> ~/.ssh/config` on the Mac that runs the control plane."
+                "Needs a GitHub token: fine-grained, with Codespaces lifecycle admin (read and write), or classic, with the codespace scope. ssh still goes through gh: run `gh codespace ssh --config >> ~/.ssh/config` on the machine that carries it."
             case .coder:
-                "Needs your deployment’s address and a session token (`coder tokens create`). ssh still goes through coder: run `coder config-ssh` on the Mac that runs the control plane."
+                "Needs your deployment’s address and a session token (`coder tokens create`). ssh still goes through coder: run `coder config-ssh` on the machine that carries it."
             default: nil
             }
         }
@@ -391,6 +401,8 @@ struct AddProviderSheet: View {
     @State private var secrets: [Secret] = []
     @State private var working = false
     @State private var problem: String?
+    /// The machine that carries it (#3496).
+    @State private var carrier: MachineRef?
     // Write It for Me (#858)
     @State private var runtimes: DaemonAPI.ProviderRuntimes?
     @State private var runtime: String?
@@ -421,6 +433,7 @@ struct AddProviderSheet: View {
         .frame(width: 560)
         .task {
             if let editing { prepareEdit(editing) }
+            carrier = ProviderCarrier.start(editing, choices: control.carriers)
             runtimes = await control.writerRuntimes()
             runtime = runtimes?.runtimes.first { $0.isDefault }?.id ?? runtimes?.runtimes.first?.id
         }
@@ -550,6 +563,7 @@ struct AddProviderSheet: View {
                 mcpForm
             }
             if editing == nil, !(kind.hasAPI && !byCLI), kind != .aws, kind != .compute { secretsSection }
+            if editing == nil { CarrierPicker(control: control, carrier: $carrier) }
         }
         .formStyle(.grouped)
         .fileImporter(isPresented: $choosingKey, allowedContentTypes: [.json]) { result in
@@ -558,6 +572,10 @@ struct AddProviderSheet: View {
         }
         if let needs = (kind.hasAPI && !byCLI ? kind.apiNeeds : kind.needs), editing == nil {
             Text(needs).appText(.supporting).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
+        if editing == nil {
+            Text(ProviderCarrier.secretsFoot(control.carriers.first { $0.id == carrier }?.name))
+                .appText(.supporting).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
         if let problem {
             VStack(alignment: .leading, spacing: 6) {
@@ -591,6 +609,7 @@ struct AddProviderSheet: View {
             Button(editing == nil ? "Add" : "Save") { add(kind) }
                 .keyboardShortcut(.defaultAction)
                 .disabled(working || writing || name.trimmingCharacters(in: .whitespaces).isEmpty
+                          || (editing == nil && carrier == nil)
                           || (editing != nil && written == nil) || (kind.hasAPI && !byCLI && token.isEmpty)
                           || (kind == .aws && (trimmed(accessKey).isEmpty || secretKey.isEmpty || trimmed(region).isEmpty))
                           || (kind == .compute && (serviceKey.isEmpty || trimmed(folder).isEmpty || trimmed(region).isEmpty)))
@@ -754,7 +773,7 @@ struct AddProviderSheet: View {
         } header: {
             Text("Secrets")
         } footer: {
-            Text("Given to the provider as environment, or as ${NAME} in its headers. Kept on the control plane, never shown again. A writing agent sees their names, never their values.")
+            Text("Given to the provider as environment, or as ${NAME} in its headers. Kept on the machine that carries it, never shown again. A writing agent sees their names, never their values.")
                 .appText(.fine).foregroundStyle(.secondary)
         }
     }
@@ -790,7 +809,9 @@ struct AddProviderSheet: View {
         }
         startingDraft = true
         Task {
-            let result = await control.startDraft(.init(form: form, secrets: givenSecrets, provider: editing?.id, runtimeID: runtime))
+            let lock = model.lock
+            let result = await control.startDraft(.init(form: form, secrets: givenSecrets, provider: editing?.id, runtimeID: runtime),
+                                                   signer: { await lock.channelSigner() })
             startingDraft = false
             switch result {
             case .success(let started):
@@ -942,6 +963,7 @@ struct AddProviderSheet: View {
         var request = try self.request(kind, map: mapped)
         request.id = editing?.id
         request.draft = draftID
+        if editing == nil { request.machine = carrier }
         return request
     }
 
@@ -1036,6 +1058,8 @@ struct EditProviderSheet: View {
     @State private var choosingKey = false
     @State private var working = false
     @State private var problem: String?
+    /// The machine that carries it (#3496): another one asks for its secrets again.
+    @State private var carrier: MachineRef?
 
     /// A secret the form asks for again: its label, the secret's name, and whether it is hidden.
     struct Field: Hashable {
@@ -1057,9 +1081,10 @@ struct EditProviderSheet: View {
         }
     }
 
-    /// What Save sends: the name, and only the secrets given, so an empty one is kept.
+    /// What Save sends: the name, only the secrets given, so an empty one is kept, and the
+    /// machine to carry it when that is another one.
     static func request(_ provider: DaemonAPI.ProviderSummary, name: String,
-                        values: [String: String]) -> DaemonAPI.ProviderAdd {
+                        values: [String: String], carrier: MachineRef? = nil) -> DaemonAPI.ProviderAdd {
         var secrets: [String: String] = [:]
         for field in fields(provider.preset) {
             let value = values[field.secret] ?? ""
@@ -1069,11 +1094,15 @@ struct EditProviderSheet: View {
         }
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         return DaemonAPI.ProviderAdd(id: provider.id, name: trimmed.isEmpty ? provider.name : trimmed,
-                                     kind: .commands, secrets: secrets)
+                                     kind: .commands,
+                                     machine: ProviderCarrier.moves(provider, to: carrier) ? carrier : nil,
+                                     secrets: secrets)
     }
 
     var body: some View {
         let fields = Self.fields(provider.preset)
+        let moving = ProviderCarrier.moves(provider, to: carrier)
+        let keep = moving ? "Give it again" : "Keep the one it has"
         VStack(alignment: .leading, spacing: 16) {
             Text("Edit \(provider.name)").appText(.title).fontWeight(.semibold)
             Form {
@@ -1082,24 +1111,27 @@ struct EditProviderSheet: View {
                     if field.secret == "GOOGLE_SERVICE_ACCOUNT_KEY" {
                         LabeledContent(field.label) {
                             HStack {
-                                Text(serviceAccount.isEmpty ? "Keep the one it has" : serviceAccount).foregroundStyle(.secondary)
+                                Text(serviceAccount.isEmpty ? keep : serviceAccount).foregroundStyle(.secondary)
                                 Button("Choose Key File…") { choosingKey = true }
                             }
                         }
                     } else if field.hidden {
-                        SecureField(field.label, text: binding(field.secret), prompt: Text("Keep the one it has"))
+                        SecureField(field.label, text: binding(field.secret), prompt: Text(keep))
                     } else {
-                        TextField(field.label, text: binding(field.secret), prompt: Text("Keep the one it has"))
+                        TextField(field.label, text: binding(field.secret), prompt: Text(keep))
                     }
                 }
+                CarrierPicker(control: control, carrier: $carrier, current: provider)
             }
             .formStyle(.grouped)
             .fileImporter(isPresented: $choosingKey, allowedContentTypes: [.json]) { result in
                 guard case .success(let file) = result else { return }
                 readServiceKey(file)
             }
-            Text(fields.isEmpty ? "Its CLI signs in where the control plane runs: only its name is kept here."
-                 : "Leave a field empty to keep the one it has. A new one goes to the control plane and is never shown again. Its machines stay linked.")
+            let to = control.carriers.first { $0.id == carrier }?.name ?? provider.machineName
+            Text(fields.isEmpty ? "Its CLI signs in on the machine that carries it."
+                 : moving ? "\(ProviderCarrier.movedNote) \(ProviderCarrier.secretsFoot(to)) Its machines stay linked."
+                 : "Leave a field empty to keep the one it has. \(ProviderCarrier.secretsFoot(to)) Its machines stay linked.")
                 .appText(.supporting).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             if let problem {
                 Text(problem).appText(.supporting).tinted(.failure).fixedSize(horizontal: false, vertical: true)
@@ -1115,7 +1147,10 @@ struct EditProviderSheet: View {
         }
         .padding(28)
         .frame(width: 480)
-        .onAppear { name = provider.name }
+        .onAppear {
+            name = provider.name
+            carrier = ProviderCarrier.start(provider, choices: control.carriers)
+        }
     }
 
     private func binding(_ secret: String) -> Binding<String> {
@@ -1140,9 +1175,35 @@ struct EditProviderSheet: View {
         working = true
         problem = nil
         Task {
-            let refused = await control.addProvider(Self.request(provider, name: name, values: values))
+            let refused = await control.addProvider(Self.request(provider, name: name, values: values, carrier: carrier))
             working = false
             if let refused { problem = refused } else { dismiss() }
+        }
+    }
+}
+
+/// Carried by (#3496): the person's online machines that can carry a provider, this Mac first.
+/// With `current`, Edit…'s: the one that carries it now shows, offline or not.
+struct CarrierPicker: View {
+    let control: ControlSettingsModel
+    @Binding var carrier: MachineRef?
+    var current: DaemonAPI.ProviderSummary?
+
+    var body: some View {
+        let choices = control.carriers
+        if choices.isEmpty, current?.machine == nil {
+            LabeledContent("Carried by") {
+                Text(ProviderCarrier.noneOnline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+        } else {
+            Picker("Carried by", selection: $carrier) {
+                if let current, let machine = current.machine, !choices.contains(where: { $0.id == machine }) {
+                    Text("\(current.machineName ?? "Its machine") (offline)").tag(Optional(machine))
+                }
+                ForEach(choices) { host in
+                    Text(host.id == control.thisMacHost?.id ? "\(host.name) (this Mac)" : host.name).tag(Optional(host.id))
+                }
+            }
         }
     }
 }

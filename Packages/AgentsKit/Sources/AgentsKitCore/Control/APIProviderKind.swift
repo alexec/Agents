@@ -157,10 +157,10 @@ public enum APIProviderKind: String, CaseIterable, Identifiable, Sendable {
 public enum MachineProviderWords {
     public static let heading = "Machine providers"
     public static let footer = "A provider starts and stops your machines: DigitalOcean Droplets, GitHub Codespaces, Coder workspaces, "
-        + "Google Compute Engine VMs or AWS EC2 instances, through their API. It runs on the control plane, so it can start a machine that is down. "
+        + "Google Compute Engine VMs or AWS EC2 instances, through their API. One of your machines carries it: it runs there and keeps its tokens, and the control plane keeps none. "
         + "Docker, Cloud Workstations, your own commands and MCP servers are added in the Mac app."
     public static let add = "Add Provider…"
-    public static let secretsFoot = "Tokens and keys go to the control plane and are never shown again. This device does not keep them."
+    public static let secretsFoot = ProviderCarrier.secretsFoot(nil)
     public static let editSecret = "Leave empty to keep the one it has."
     public static func removeTitle(_ name: String) -> String { "Remove \(name)?" }
     public static let removeNote = "Its machines stay as they are, unlinked: nothing here can start or stop them any more."

@@ -7575,6 +7575,28 @@ export interface ProviderDraftRequest {
   draft: UUID;
 }
 
+/**
+ * The writing agent's start, for the client that asked for the draft to sign (#3542): the machine
+ * that holds its person's lock takes no start the control plane sends in its own words. The client
+ * checks that it starts only a draft's writer (agents/start, the draft's purpose, sandboxed, no MCP
+ * servers or other folders), signs method and params as they are (a LockSignature to machine), and
+ * sends the signature with providers/draftSigned.
+ */
+export interface ProviderDraftSign {
+  machine: MachineRef;
+  method: string;
+  params: string;
+}
+
+/**
+ * providers/draftSigned (#3542): the signature of a draft's sign, which the control plane delivers
+ * with the start as it came.
+ */
+export interface ProviderDraftSigned {
+  draft: UUID;
+  lock: LockSignature;
+}
+
 /** providers/draftStart (#858). */
 export interface ProviderDraftStart {
   form: ProviderAdd;
@@ -7586,6 +7608,7 @@ export interface ProviderDraftStart {
 export interface ProviderDraftStarted {
   draft: UUID;
   answered?: ProviderDraftAnswered;
+  sign?: ProviderDraftSign;
 }
 
 /** control/providerDraft: how a draft stands, to the client that started it. */
@@ -12557,8 +12580,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProviderDraftAnswer: { required: ["draft", "question", "yes"], optional: [] },
   ProviderDraftAnswered: { required: ["note"], optional: ["map", "preset"] },
   ProviderDraftRequest: { required: ["draft"], optional: [] },
+  ProviderDraftSign: { required: ["machine", "method", "params"], optional: [] },
+  ProviderDraftSigned: { required: ["draft", "lock"], optional: [] },
   ProviderDraftStart: { required: ["form", "runtimeID"], optional: ["secrets", "provider"] },
-  ProviderDraftStarted: { required: ["draft"], optional: ["answered"] },
+  ProviderDraftStarted: { required: ["draft"], optional: ["answered", "sign"] },
   ProviderDraftUpdate: { required: ["draft", "state", "runtimeName", "steps"], optional: ["cost", "draftJSON", "check", "question", "note"] },
   ProviderForget: { required: ["provider"], optional: [] },
   ProviderGroup: { required: ["provider"], optional: ["group"] },

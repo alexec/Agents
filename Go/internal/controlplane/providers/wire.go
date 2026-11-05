@@ -120,6 +120,7 @@ const (
 	MethodDraftStart        = "providers/draftStart"
 	MethodDraftCancel       = "providers/draftCancel"
 	MethodDraftAnswer       = "providers/draftAnswer"
+	MethodDraftSigned       = "providers/draftSigned"
 	MethodHostsLink         = "hosts/link"
 	MethodHostsUnlink       = "hosts/unlink"
 	MethodHostsSetOptions   = "hosts/setMachineOptions"
@@ -170,7 +171,7 @@ var WorkspaceMethods = map[string]bool{
 	MethodHostsStart: true, MethodHostsStop: true, MethodHostsKeep: true, MethodHostsListKept: true,
 	MethodHostsDropKept: true, MethodHostsRetryKept: true, MethodProvidersOptions: true, MethodProvidersCreate: true,
 	MethodHostsDelete: true, MethodDraftStart: true, MethodDraftCancel: true, MethodDraftAnswer: true,
-	MethodProvidersRuntimes: true,
+	MethodDraftSigned: true, MethodProvidersRuntimes: true,
 }
 
 // AgentWorkspaceMethods is DaemonAPI.Method.agentWorkspaceMethods: what an agent may ask

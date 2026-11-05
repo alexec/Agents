@@ -1,12 +1,13 @@
 // Settings ▸ Machine providers (#1808), the window's Settings ▸ Machine Providers: each
 // provider as a card of its workspaces, Add Provider… (kind first, then its short form), Edit…,
 // List Again and Remove…, and on a workspace Add as Machine…, Link to Host…, Start, Stop and Unlink.
+// Add and Edit… choose the machine that carries it, and its card says which (#3496).
 import { useEffect, useState } from "preact/hooks";
 import type { ControlMachine, ProviderSummary, MachineInfo } from "../protocol/generated";
 import type { Store } from "../model/store";
 import {
-  addAsMachine, defaultIdleMinutes, idleChoices, kindChip, kindFields, kindNeeds, kindOfPreset, kindTitle, linkableHosts, mayBe, noHostLine,
-  providerKinds, providerLine, providerRequest, providerWords as words, sshDestination, workspaceLine, type ProviderKind,
+  addAsMachine, carrierChoices, carrierLine, carrierStart, defaultIdleMinutes, idleChoices, kindChip, kindFields, kindNeeds,
+  kindOfPreset, kindTitle, linkableHosts, mayBe, movesTo, noHostLine, providerKinds, providerLine, providerRequest, providerWords as words, sshDestination, workspaceLine, type ProviderKind,
 } from "../model/machineProviders";
 import { Modal } from "./Modal";
 import { MachineDialog } from "./MachineDialog";
@@ -65,7 +66,8 @@ function ProviderCard({ store, provider, say, edit, link, install }: {
   const hosts = store.hosts.value;
   const groups = store.providers.groups.value;
   const admin = store.person.value?.role !== "member";
-  const line = [providerLine(provider, time), groupLine(provider, groups)].filter(Boolean).join(" · ");
+  const line = [providerLine(provider, time), groupLine(provider, groups),
+    carrierLine(provider, admin && !!kindOfPreset(provider.preset))].filter(Boolean).join(" · ");
   const [making, setMaking] = useState(false);
   const setGroup = async (group: string) => say(await store.providers.setGroup(provider.id, group || null));
   const remove = async () => {
@@ -161,6 +163,12 @@ export function AddProviderDialog({ store, editing, close, added }: {
   const [values, setValues] = useState<Record<string, string>>({});
   const [problem, setProblem] = useState<string>();
   const [working, setWorking] = useState(false);
+  // The machine that carries it (#3496): the person's online ones, their Mac first.
+  const mac = store.hosts.value.find((h) => store.isMac(h.id))?.id;
+  const carriers = carrierChoices(store.hosts.value, store.person.value?.id, mac);
+  const [carrier, setCarrier] = useState(carrierStart(editing, carriers));
+  const moving = !!editing && movesTo(editing, carrier);
+  const offlineCarrier = editing?.machine && !carriers.some((h) => h.id === editing.machine) ? editing : undefined;
   const fields = kind ? kindFields(kind).filter((f) => !editing || f.secret) : [];
   const shown = (id: string) => values[id] ?? fields.find((f) => f.id === id)?.value ?? "";
   const choose = (k: ProviderKind) => {
@@ -170,7 +178,7 @@ export function AddProviderDialog({ store, editing, close, added }: {
   };
   const save = async () => {
     if (!kind) return;
-    const request = providerRequest(kind, name, values, editing);
+    const request = providerRequest(kind, name, values, editing, carrier);
     if (typeof request === "string") return setProblem(request);
     setWorking(true);
     setProblem(undefined);
@@ -200,14 +208,23 @@ export function AddProviderDialog({ store, editing, close, added }: {
               <input type="text" value={name} placeholder={kindTitle(kind)} disabled={working} autocomplete="off"
                 onInput={(e) => setName((e.target as HTMLInputElement).value)} />
             </label>
+            {carriers.length === 0 && !offlineCarrier ? <p class="small">{words.noneOnline}</p> : (
+              <label>{words.carriedBy}
+                <select value={carrier ?? ""} disabled={working} onChange={(e) => setCarrier((e.target as HTMLSelectElement).value)}>
+                  {offlineCarrier && <option value={offlineCarrier.machine}>{offlineCarrier.machineName ?? "Its machine"} (offline)</option>}
+                  {carriers.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
+                </select>
+              </label>
+            )}
+            {moving && <p class="small quiet">{words.movedNote}</p>}
             {fields.map((f) => (
               <label key={f.id}>{f.label}{f.optional ? " (optional)" : ""}
                 {f.id === "serviceKey"
                   ? <textarea rows={4} value={shown(f.id)} disabled={working} autocomplete="off" spellcheck={false}
-                      placeholder={editing ? words.editSecret : undefined}
+                      placeholder={moving ? words.giveAgain : editing ? words.editSecret : undefined}
                       onInput={(e) => setValues({ ...values, [f.id]: (e.target as HTMLTextAreaElement).value })} />
                   : f.secret
-                  ? <input type="password" value={shown(f.id)} disabled={working} placeholder={editing ? words.editSecret : f.prompt}
+                  ? <input type="password" value={shown(f.id)} disabled={working} placeholder={moving ? words.giveAgain : editing ? words.editSecret : f.prompt}
                       autocomplete="new-password" onInput={(e) => setValues({ ...values, [f.id]: (e.target as HTMLInputElement).value })} />
                   : <input type="text" value={shown(f.id)} disabled={working} placeholder={f.prompt} autocomplete="off"
                       autocapitalize="off" spellcheck={false}
@@ -219,9 +236,9 @@ export function AddProviderDialog({ store, editing, close, added }: {
         {working && <p class="quiet small">Checking it lists its machines…</p>}
         {problem && <p class="small failure">{problem}</p>}
         <div class="sheet-actions">
-          <span class="quiet small grow">{words.secretsFoot}</span>
+          <span class="quiet small grow">{words.secretsFoot(carriers.find((h) => h.id === carrier)?.name ?? editing?.machineName)}</span>
           <button type="button" onClick={close}>Cancel</button>
-          <button type="button" class="prominent" disabled={!kind || working} onClick={() => void save()}>{editing ? "Save" : "Add"}</button>
+          <button type="button" class="prominent" disabled={!kind || working || !carrier} onClick={() => void save()}>{editing ? "Save" : "Add"}</button>
         </div>
       </div>
     </Modal>
