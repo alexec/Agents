@@ -396,9 +396,10 @@ opens it in headless Chrome. Run it once per press, on the same profile.
 
 ## Screenshots for Alex (#2811)
 
-A UI enhancement merges only after Alex approves its screenshots on the PR (AGENTS.md,
-"A UI enhancement waits for Alex"). Alex reviews the pictures, not the walk, so take a set
-that shows the change as a person meets it:
+Every UI enhancement puts screenshots on its PR. One that adds a new screen, control or
+layout merges only after Alex approves them; every other one merges at once, and Alex can
+look later and comment (AGENTS.md, "A UI enhancement waits for Alex", #3474). Alex reviews
+the pictures, not the walk, so take a set that shows the change as a person meets it:
 
 - **One shot per state and per client.** The states are the ones the change draws: for
   example empty, filled, while it works, an error, and a sheet or a card open. Take each
