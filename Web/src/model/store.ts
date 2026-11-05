@@ -21,6 +21,7 @@ import type {
 import { endedConnections, endedLine, hasEnded } from "./connectorSetup";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
+import { sealWork } from "../wire/sealing";
 import type { FolderGoneAsk } from "./missingFolder";
 import { describe, methodNotFound } from "./errors";
 import { freeProjectName } from "./projectSettings";
@@ -1370,6 +1371,10 @@ export class Store extends Work {
         this.orgRoutesChanges.value += 1;
         return;
       }
+      if (method === "control/sealingWanted") {
+        void this.sealWaiting();
+        return;
+      }
       if (method === "control/policyChanged" || method === "control/stopAll") {
         this.orgPolicy.value = (params as PolicyView | null) ?? {};
         return;
@@ -1409,8 +1414,22 @@ export class Store extends Work {
       }
     });
     link.onState((state) => {
-      if (state.kind === "open") void this.load();
+      if (state.kind === "open") void this.load().then(() => this.sealWaiting());
     });
+  }
+
+  /**
+   * Seals what waits for a copy that this page can make (#3397): a machine that joined, or a
+   * client paired, after a route or a secret was sealed. At each connection and on
+   * control/sealingWanted. The values are opened here, in memory, and never kept.
+   */
+  async sealWaiting(): Promise<void> {
+    if (!this.planeHas(Capability.sealing1)) return;
+    const record = await this.link.keyRecord();
+    const work = record ? await this.link.call("sealing/work", {}).catch(() => null) : null;
+    if (!record || !work || work.items.length === 0) return;
+    const items = await sealWork(record, work);
+    if (items.length > 0) await this.link.call("sealing/add", { items }).catch(() => undefined);
   }
 
   /** A workflow's newest runs, including archived sessions, in a growing page. */

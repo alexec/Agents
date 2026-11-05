@@ -714,6 +714,9 @@ func (s *Service) apply(e controlEvent) {
 	case "userSettingsChanged":
 		// A person's settings or secrets changed at another copy (#1760).
 		s.userChangedHere(e.Subject, nil, true)
+	case "lockChanged":
+		// An entry put on a person's lock at another copy (#3399).
+		s.lockChangedHere(e.Subject)
 	case "orgRoutesChanged":
 		// An org route changed at another copy (#999): its machines and clients here.
 		s.orgRoutesChangedHere()

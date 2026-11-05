@@ -1,7 +1,8 @@
 // Console ▸ Model Access (#999, spec 999 FR-027): the organisation's ways to the model. Each route (an org key,
 // or a gateway: Bedrock, Vertex, Azure, a base URL), who may use it, the runtimes it is the default for, the
-// fingerprint of each key and how many machines hold it; Add Route, Edit, Check, Replace Key and Remove. A key is
-// written and never read back, also by an admin (spec D14).
+// fingerprint of each key and how many machines hold it, or wait for it; Add Route, Edit, Check, Replace Key and
+// Remove. A key is sealed here, in the browser, to each machine and each admin's app (#3397): the control plane
+// never has it, and no client reads it back, an admin included (spec D14).
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
@@ -9,8 +10,9 @@ import type { Group, OrgRouteKept, OrgRouteKind, OrgRouteList, OrgRouteVendor } 
 import { fromWireDate } from "../protocol/dates";
 import { failedWords } from "../model/console";
 import { actorName, runtimeName, when } from "../model/orgPolicy";
-import { fingerprintWords, heldWords, kindName, kinds, modelAccessFoot, needsVendor, newRouteForm, noSealing, routeFormOf, routeOf,
-  runtimesFor, secretFields, settingFields, vendorNames, vendorsFor, whoWords } from "../model/orgAccounts";
+import { fingerprintWords, heldWords, kindName, kinds, modelAccessFoot, needsVendor, newRouteForm, routeFormOf, routeOf,
+  runtimesFor, secretFields, settingFields, vendorNames, vendorsFor, waitingWords, whoWords } from "../model/orgAccounts";
+import { routeIDFrom, sealedFor } from "../model/orgSealing";
 import type { RouteForm } from "../model/orgAccounts";
 
 /** What the page is doing: the list, adding or editing a route, or replacing one's key. */
@@ -51,7 +53,11 @@ export function ModelAccessPage({ store, down }: { store: Store; down: boolean }
   const save = (form: RouteForm, kept: OrgRouteKept | null) => run(async () => {
     const made = routeOf(form, kept?.route);
     if ("problem" in made) { problem.value = made.problem; return null; }
-    const params = { route: made.route, ...(Object.keys(made.secrets).length > 0 && { secrets: made.secrets }), ...(kept && { rev: kept.rev }) };
+    // The id is in each secret's associated data, so a new route's is made here.
+    if (!kept) made.route.id = routeIDFrom(made.route.name);
+    const sealed = await sealedFor(store.link, made.route, kept, made.secrets, secretFields[made.route.kind].map((f) => f.key));
+    if (sealed && "problem" in sealed) { problem.value = sealed.problem; return null; }
+    const params = { route: made.route, ...(sealed && { sealed }), ...(kept && { rev: kept.rev }) };
     const result = await store.link.call("orgRoutes/set", params);
     open.value = { kind: "list" };
     await load();
@@ -60,7 +66,9 @@ export function ModelAccessPage({ store, down }: { store: Store; down: boolean }
   const replace = (kept: OrgRouteKept, secrets: Record<string, string>) => run(async () => {
     const typed = Object.fromEntries(Object.entries(secrets).map(([k, v]) => [k, v.trim()]).filter(([, v]) => v !== ""));
     if (Object.keys(typed).length === 0) { problem.value = "Type the new key."; return null; }
-    await store.link.call("orgRoutes/replaceKey", { id: kept.route.id, secrets: typed, rev: kept.rev });
+    const sealed = await sealedFor(store.link, kept.route, kept, typed, secretFields[kept.route.kind].map((f) => f.key));
+    if (!sealed || "problem" in sealed) { problem.value = sealed?.problem ?? "Type the new key."; return null; }
+    await store.link.call("orgRoutes/replaceKey", { id: kept.route.id, sealed, rev: kept.rev });
     open.value = { kind: "list" };
     await load();
     return `Replaced the key of ${kept.route.name}.`;
@@ -84,7 +92,6 @@ export function ModelAccessPage({ store, down }: { store: Store; down: boolean }
     <div class="model-access">
       {problem.value && <p class="hint" role="alert">{problem.value}</p>}
       {said.value && <p class="quiet small" role="status">{said.value}</p>}
-      {!shown.sealing && <p class="hint attention">{noSealing}</p>}
       {now.kind === "edit" && (
         <RouteEditor form={now.form} kept={now.kept} groups={groups.value} busy={busy.value || down}
           change={(form) => { open.value = { ...now, form }; }} save={() => void save(now.form, now.kept)}
@@ -97,7 +104,7 @@ export function ModelAccessPage({ store, down }: { store: Store; down: boolean }
             <SecretField key={f.key} label={f.label} long={f.long} value={now.secrets[f.key] ?? ""}
               change={(v) => { open.value = { ...now, secrets: { ...now.secrets, [f.key]: v } }; }} />
           ))}
-          <p class="hint">The old key is not shown, and stops being used as each machine gets the new one.</p>
+          <p class="hint">The old key is not shown, and stops being used as each machine gets the new one. A field left empty keeps its value.</p>
           <div class="sheet-actions">
             <button type="button" disabled={busy.value} onClick={() => { open.value = { kind: "list" }; }}>Cancel</button>
             <button type="submit" class="prominent" disabled={busy.value || down}>Replace Key</button>
@@ -129,7 +136,10 @@ export function ModelAccessPage({ store, down }: { store: Store; down: boolean }
                         <span class="small">{fingerprintWords(r)}</span>
                         {r.changed && <><br /><span class="quiet small">By {actorName(r.changed.by)} {when(fromWireDate(r.changed.at), new Date())}</span></>}
                       </td>
-                      <td class="num" title={heldWords(r)}>{r.machines ?? 0}</td>
+                      <td class="num" title={heldWords(r)}>
+                        {r.machines ?? 0}
+                        {(r.waiting ?? 0) > 0 && <><br /><span class="quiet small attention" title={waitingWords(r)}>{r.waiting} waiting</span></>}
+                      </td>
                       <td class="route-actions">
                         <button type="button" class="link" disabled={busy.value || down} onClick={() => void check(kept)}>Check</button>
                         <button type="button" class="link" disabled={busy.value || down} onClick={() => { said.value = null; open.value = { kind: "edit", kept, form: routeFormOf(r) }; }}>Edit…</button>

@@ -5,10 +5,9 @@ import type { SecretsLeft, UserSecretRow } from "../protocol/generated";
 
 export const secretsTitle = "Secrets";
 export const addSecret = "Add a Secret…";
-export const secretsFoot = "A secret goes only to your own machines, into ~/.agents-secrets/secrets.env. "
-  + "Write ${NAME} for it in an MCP server's env or headers. Nobody can read it back, you included: to change it, replace it.";
-export const noSealing = "This control plane has no key to seal secrets with, so it keeps none. "
-  + "Its operator starts it with a key file or AGENTS_CONTROL_KMS.";
+export const secretsFoot = "A secret is sealed in this app to each of your own machines, and goes into ~/.agents-secrets/secrets.env "
+  + "there; the control plane cannot open it. Write ${NAME} for it in an MCP server's env or headers. Nobody can read it back, "
+  + "you included: to change it, replace it.";
 export const thisMacOnly = "This Mac's";
 
 /** Under thisMacOnly at the top of the ~/.agents editors (#2766, #2704): what goes to the other machines. A
@@ -22,6 +21,18 @@ export const nameHint = "Capital letters, digits and _, such as GITHUB_TOKEN.";
 export function machines(row: Pick<UserSecretRow, "machines">): string {
   const n = row.machines.length;
   return n === 0 ? "On no machine yet" : n === 1 ? "On 1 machine" : `On ${n} machines`;
+}
+
+/** Under a secret that one of the person's machines has no copy of yet (#3397). */
+export function waitingOn(row: Pick<UserSecretRow, "waiting">): string | null {
+  const n = row.waiting?.length ?? 0;
+  if (n === 0) return null;
+  return `${n === 1 ? "1 machine waits" : `${n} machines wait`} for one of your apps to seal it there. This happens when you open Agents.`;
+}
+
+/** The version a secret is set at (#3397): the kept one plus one; for a new name, the time in ms, above a removed one's. */
+export function nextVersion(row: Pick<UserSecretRow, "version"> | null, now: number): number {
+  return row?.version !== undefined ? row.version + 1 : now;
 }
 
 /** Under a secret that was on a machine since removed (FR-026). */

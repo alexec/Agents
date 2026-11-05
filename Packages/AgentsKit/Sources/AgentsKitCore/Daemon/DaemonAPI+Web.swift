@@ -486,10 +486,16 @@ public extension DaemonAPI {
                 Row(Method.orgRoutesReplaceKey, params: OrgRouteReplaceKey.self, result: OrgRouteKept.self, kind: .controlRequest),
                 Row(Method.orgRoutesCheck, params: OrgRouteRequest.self, result: OrgRouteCheck.self, kind: .controlRequest),
                 Row(Method.orgRoutesRemove, params: OrgRouteRequest.self, result: Empty.self, kind: .controlRequest),
+                // Client sealing (#3397): who a route or a secret is sealed to, a client's own copy, and what waits.
+                Row(Method.orgRoutesRecipients, params: OrgRouteRecipientsRequest.self, result: SealRecipients.self, kind: .controlRequest),
+                Row(Method.orgRoutesSealed, params: OrgRouteRequest.self, result: SealingItem.self, kind: .controlRequest),
+                Row(Method.sealingWork, params: Empty.self, result: SealingWork.self, kind: .controlRequest),
+                Row(Method.sealingAdd, params: SealingAdd.self, result: Empty.self, kind: .controlRequest),
+                Row(Method.userSecretRecipients, params: Empty.self, result: SealRecipients.self, kind: .controlRequest),
                 // The user scope (#1760): what follows the person to their machines, under You.
                 Row(Method.userSettings, params: Empty.self, result: UserSettings.self, kind: .controlRequest),
                 Row(Method.userSetSettings, params: UserSettingsPart.self, result: Empty.self, kind: .controlRequest),
-                Row(Method.userSetSecret, params: UserSecret.self, result: Empty.self, kind: .controlRequest),
+                Row(Method.userSetSecret, params: UserSecretSet.self, result: Empty.self, kind: .controlRequest),
                 Row(Method.userRemoveSecret, params: UserSecretRequest.self, result: Empty.self, kind: .controlRequest),
                 Row(Method.userSecretNames, params: Empty.self, result: UserSecretNames.self, kind: .controlRequest),
                 // People and the machines that belong to them (#994): Settings ▸ People.
@@ -635,6 +641,8 @@ public extension DaemonAPI {
                 Row(Notification.controlStopAll, params: PolicyView.self, result: Empty.self,
                     kind: .controlNotification),
                 Row(Notification.controlOrgRoutesChanged, params: Empty.self, result: Empty.self,
+                    kind: .controlNotification),
+                Row(Notification.controlSealingWanted, params: Empty.self, result: Empty.self,
                     kind: .controlNotification),
                 Row(Notification.controlGovernanceRequested, params: CatalogRequest.self, result: Empty.self,
                     kind: .controlNotification),

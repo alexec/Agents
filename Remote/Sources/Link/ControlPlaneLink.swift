@@ -139,6 +139,17 @@ enum RemoteControl {
 }
 
 extension RemoteControl {
+    /// This device's key and client id as the control plane knows them, to open what was
+    /// sealed to it and seal it again (#3397); nil when not paired.
+    static func sealing() -> (key: DeviceKey, client: UUID)? {
+        guard let membership, let client = membership.client else { return nil }
+        if FileManager.default.fileExists(atPath: movedFile.path) {
+            return (try? DeviceKey.load(accessGroup: DeviceKey.sharedAccessGroup)).map { ($0, client) }
+        }
+        guard let raw = try? ControlClientKey.loadOrMake(), let key = try? DeviceKey.software(privateKey: raw) else { return nil }
+        return (key, client)
+    }
+
     /// A moved device's link: the same, with the key it paired with the Mac under.
     static func movedLink(_ membership: ControlMembership) -> (any DaemonLink)? {
         guard let client = membership.client,

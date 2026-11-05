@@ -2424,8 +2424,13 @@ final class RemoteModel {
                     await self?.loadKept(control)
                     await self?.people.connected(control)
                     await self?.signIn.connected(control)
+                    await Self.sealWaiting(on: control)
                     for await change in control.notifications() {
                         guard let self, !Task.isCancelled else { return }
+                        if change.method == DaemonAPI.Notification.controlSealingWanted {
+                            await Self.sealWaiting(on: control)
+                            continue
+                        }
                         if await self.people.heard(change.method, change.params, on: control) { continue }
                         if self.signIn.heard(change.method, change.params) { continue }
                         if change.method == DaemonAPI.Notification.controlKeptChanged
@@ -2449,6 +2454,13 @@ final class RemoteModel {
                 await backoff.wait()
             }
         }
+    }
+
+    /// Seals what waits for a copy this device can make (#3397): a machine that joined, or a
+    /// client paired, after an org route or one of the person's secrets was sealed.
+    private static func sealWaiting(on control: DaemonClient) async {
+        guard let (key, client) = RemoteControl.sealing() else { return }
+        await ClientSealing.sealWaiting(on: control, key: key, client: client)
     }
 
     /// Everything this model dials, ended for good: a new pairing has made a new model

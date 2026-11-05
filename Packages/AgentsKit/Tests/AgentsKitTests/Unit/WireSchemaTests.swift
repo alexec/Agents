@@ -261,11 +261,16 @@ struct WireSchemaTests {
             "UserSettings": Self.through(DaemonAPI.UserSettings.self),
             "UserSettingsPart": Self.through(DaemonAPI.UserSettingsPart.self),
             "UserAgentConfig": Self.through(DaemonAPI.UserAgentConfig.self),
-            "UserSecret": Self.through(DaemonAPI.UserSecret.self),
+            "UserSecretSet": Self.through(DaemonAPI.UserSecretSet.self),
             "UserSecretRequest": Self.through(DaemonAPI.UserSecretRequest.self),
             "UserSecretNames": Self.through(DaemonAPI.UserSecretNames.self),
             "UserSettingsChanged": Self.through(DaemonAPI.UserSettingsChanged.self),
             "SecretsLeft": Self.through(DaemonAPI.SecretsLeft.self),
+            // Client sealing (#3397).
+            "SealRecipients": Self.through(DaemonAPI.SealRecipients.self),
+            "SealingWork": Self.through(DaemonAPI.SealingWork.self),
+            "SealingAdd": Self.through(DaemonAPI.SealingAdd.self),
+            "OrgRouteSealed": Self.through(DaemonAPI.OrgRouteSealed.self),
         ]
         let all = samples.objectValue ?? [:]
         #expect(Set(all.keys) == Set(types.keys), "a sample with no Swift type, or a type with no sample")

@@ -11,6 +11,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -151,9 +152,14 @@ func (p *plane) hostSaying(hello controllink.MachineHello, opened func(controlli
 }
 
 // fakeHello is a host of this build: it says the capabilities a host declares.
+// fakeHello is a machine's hello with the capabilities a host declares, but for those a
+// test says it has (routesHello, takingHello): org routes and the secrets sealed to it.
 func fakeHello(machine string) controllink.MachineHello {
+	capabilities := slices.DeleteFunc(slices.Clone(wire.DeclaredCapabilities["host"]), func(c string) bool {
+		return c == CapHostOrgRoutes || c == wire.CapHostUserSettings2
+	})
 	return controllink.MachineHello{Version: "0.1", Platform: "linux aarch64", MachineID: machine, Name: new("box " + machine),
-		Implementation: new("go"), Capabilities: wire.DeclaredCapabilities["host"]}
+		Implementation: new("go"), Capabilities: capabilities}
 }
 
 // serveHost connects a host that has joined, and answers its channels as host does.

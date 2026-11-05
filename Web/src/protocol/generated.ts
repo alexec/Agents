@@ -2582,12 +2582,10 @@ export interface DeleteSessionRequest {
 }
 
 /**
- * One org route as a machine gets it (#999, FR-005): the route without its groups, fingerprint and
- * stamps, and each secret sealed with HPKE to the machine's key (SealedEnvelope), info
- * com.alexecollins.agents.orgroute.v2, associated data <route id>|<host id>|<version>|<hex SHA-256
- * of the route as JSON without sealed>, so a route whose settings changed after delivery does not
- * open. A cloud credential is sent only as a token that ends at expires (Q1 A): awsSession,
- * googleToken or entraToken.
+ * One org route as a machine gets it (#999, FR-005, #3397): the route without its groups,
+ * fingerprint and stamps, and each secret as an admin's client sealed it to this machine
+ * (OrgRouteSealed's envelope). A cloud credential comes as it is, and the machine makes its own
+ * token. waiting: the machine may use the route but has no copy yet, and sealed is empty.
  */
 export interface DeliveredRoute {
   id: string;
@@ -2600,9 +2598,10 @@ export interface DeliveredRoute {
   defaultFor: string[];
   secretFields: string[];
   version: number;
-  /** Each secret value, or token, by field. */
+  /** Each secret value, by field. */
   sealed: Record<string, SealedEnvelope>;
-  expires?: WireDate;
+  sealVersion: number;
+  waiting?: boolean;
 }
 
 /**
@@ -4643,6 +4642,81 @@ export interface LiveBoard {
   agents: LiveAgent[];
 }
 
+/**
+ * A person's machine lock (#3399, specs/3399-machine-lock): its chain of entries, the root first.
+ * lock/get, and host/lock to a machine.
+ */
+export interface Lock {
+  person: string;
+  entries: LockEntry[];
+}
+
+/**
+ * lock/add (#3399): entries to put on the end of the caller's lock, in order. The first names the
+ * head as its previous; the control plane writes each with a conditional write on the head, so two
+ * entries cannot both follow one head.
+ */
+export interface LockAdd {
+  entries: LockEntry[];
+}
+
+/**
+ * What a lock entry says (#3399), as its signer wrote it: the JSON that LockEntry.body carries,
+ * byte for byte. v is 1. Every entry names its person and, except the root, previous: the SHA-256
+ * of the entry before's body. signer is the P-256 signing key that signed it, X9.63. key is the
+ * root's first signing key, the client, machine or invite added, the key removed, or the recovery
+ * key's public half. sealingKey and id are a machine's (addMachine); clientKind is a client's
+ * (addClient: mac, remote or web); expires is an invite's.
+ */
+export interface LockBody {
+  v: number;
+  kind: LockEntryKind;
+  person: string;
+  previous?: Base64;
+  signer: Base64;
+  at: WireDate;
+  key: Base64;
+  sealingKey?: Base64;
+  id?: string;
+  name?: string;
+  clientKind?: string;
+  expires?: WireDate;
+}
+
+/**
+ * One entry of a machine lock (#3399): body is a LockBody's JSON, kept as the signer wrote it, so
+ * no language has to write it again the same way. sig is ECDSA P-256 with SHA-256 over
+ * "agents-lock/1\n" then body, the 64 bytes r then s (as WebCrypto and CryptoKit's
+ * rawRepresentation write it). The entry's hash is the SHA-256 of body.
+ */
+export interface LockEntry {
+  body: Base64;
+  sig: Base64;
+}
+
+/**
+ * What a lock entry changes (#3399): root names the first signing key; addClient a client's signing
+ * key; addMachine a machine's key and sealing key, signed by a signer or an invite; invite a
+ * one-use key that may add one machine; remove a client, machine or invite no longer trusted;
+ * recovery the recovery key, or a new one.
+ */
+export type LockEntryKind =
+  | "root"
+  | "addClient"
+  | "addMachine"
+  | "invite"
+  | "remove"
+  | "recovery";
+
+/**
+ * Where a machine lock stands (#3399): how many entries it has, and head, the SHA-256 of the newest
+ * one's body. lock/add's answer, and control/lockChanged.
+ */
+export interface LockHead {
+  count: number;
+  head: Base64;
+}
+
 export interface MCPAddAnswer {
   server?: ManagedMCPServer;
   error?: MCPCatalogError;
@@ -5351,12 +5425,13 @@ export interface MachineUser {
 /**
  * host/userSettings (#1760, FR-024, FR-025): to a machine, on its channel 0, when it joins and when
  * its user's settings or secrets change. Sent only on the links of that user's own machines.
- * secrets is every secret the user has: a name missing from it was removed.
+ * secrets is every secret the user has that is sealed to this machine (#3397): a name missing from
+ * it was removed, or waits for the person's client to seal it.
  */
 export interface MachineUserSettings {
   user: string;
   settings: UserSettings;
-  secrets: UserSecret[];
+  secrets: SealedUserSecret[];
 }
 
 export interface MachineWorkspace {
@@ -5871,9 +5946,11 @@ export interface OrgProviderSet {
 
 /**
  * An organisation's way to the model for one or more runtimes (#999, spec FR-001): an org key or a
- * gateway. The control plane keeps it at v1/org/routes/<id>.json; its secrets are in an envelope
- * beside it, never in this record. The control plane sets version, secretFields, fingerprint,
- * created and changed; machines is how many machines hold its version, for an admin.
+ * gateway. The control plane keeps it at v1/org/routes/<id>.json; its secrets are sealed by an
+ * admin's client to each machine and client that may hold them (#3397), in a record beside it,
+ * never in this one. The control plane sets version, secretFields, created and changed; the admin's
+ * client says fingerprint and sealVersion. machines is how many machines hold its version, and
+ * waiting how many may use it and have no copy yet, for an admin.
  */
 export interface OrgRoute {
   /** [a-z0-9-]{1,40}, made from the name when absent at add, never changed. */
@@ -5896,9 +5973,12 @@ export interface OrgRoute {
    * entraClientSecret, …), never a value.
    */
   secretFields?: string[];
-  /** The first 8 hex of SHA-256 of each secret value (spec D14), by field. */
+  /**
+   * The first 8 hex of SHA-256 of each secret value (spec D14), by field, as the admin's client
+   * worked it out.
+   */
   fingerprint?: Record<string, string>;
-  /** One more at each change, a replaced key included. */
+  /** One more at each change. */
   version?: number;
   created?: OrgRouteStamp;
   changed?: OrgRouteStamp;
@@ -5906,9 +5986,22 @@ export interface OrgRoute {
    * How many machines said they keep this version (host/orgRoutesApplied). Only in orgRoutes/list.
    */
   machines?: number;
+  /**
+   * One more each time the secrets, the kind, the vendor or the settings change: what each secret's
+   * associated data binds (#3397). 0 with no secret.
+   */
+  sealVersion?: number;
+  /**
+   * How many machines may use the route and have no copy of its secrets yet: they wait for an
+   * admin's client to seal it for them (#3397). Only in orgRoutes/list.
+   */
+  waiting?: number;
 }
 
-/** orgRoutes/check (#999): what one small request from the control plane found, in words. */
+/**
+ * orgRoutes/check (#999, #3397): what one small request from a machine that holds the route found,
+ * in words.
+ */
 export interface OrgRouteCheck {
   ok: boolean;
   words: string;
@@ -5940,12 +6033,9 @@ export type OrgRouteKind =
   | "azure"
   | "baseURL";
 
-/**
- * orgRoutes/list (#999), an admin's: every route, and whether this control plane can seal a secret.
- */
+/** orgRoutes/list (#999), an admin's: every route. */
 export interface OrgRouteList {
   routes: OrgRouteKept[];
-  sealing: boolean;
 }
 
 /** A route the caller may use (#999): no settings, no fingerprint. */
@@ -5955,12 +6045,22 @@ export interface OrgRouteMine {
   kind: OrgRouteKind;
   runtimes: string[];
   defaultFor: string[];
+  /** One of the caller's machines may use it and waits for an admin's client to seal it (#3397). */
+  waiting?: boolean;
 }
 
-/** orgRoutes/replaceKey (#999): new values for a route's secret fields. */
+/** orgRoutes/recipients (#3397): the groups the route is for; none for everyone. */
+export interface OrgRouteRecipientsRequest {
+  groups?: string[];
+}
+
+/**
+ * orgRoutes/replaceKey (#999, #3397): new values for every one of a route's secret fields, sealed
+ * by the client.
+ */
 export interface OrgRouteReplaceKey {
   id: string;
-  secrets: Record<string, string>;
+  sealed: OrgRouteSealed;
   rev: string;
 }
 
@@ -5971,12 +6071,29 @@ export interface OrgRouteRequest {
 }
 
 /**
- * orgRoutes/set (#999): add a route, or change one. secrets are written only, never read back; an
- * absent field keeps its value. rev is the tag the admin read; none to add.
+ * An org route's secrets as an admin's client sealed them (#3397, specs/3397-client-sealing): every
+ * field, to every recipient of orgRoutes/recipients. Each envelope is HPKE to the recipient's key,
+ * info com.alexecollins.agents.orgroute.v3, associated data orgroute.v3|<route
+ * id>|<recipient>|<field>|<sealVersion>|<kind>|<vendor or empty>|<hex SHA-256 of the settings, one
+ * name=value line each>.
+ */
+export interface OrgRouteSealed {
+  /** The kept sealVersion plus one; 1 for a route with no secret yet. */
+  sealVersion: number;
+  /** The first 8 hex of SHA-256 of each value, by field. */
+  fingerprint: Record<string, string>;
+  /** By recipient (m:<machine id> or c:<client id>), then by field. */
+  values: Record<string, Record<string, SealedEnvelope>>;
+}
+
+/**
+ * orgRoutes/set (#999, #3397): add a route, or change one. sealed carries every secret, sealed by
+ * the client; it is needed when the secrets, the kind, the vendor or the settings change, and
+ * absent keeps the secrets as they are. rev is the tag the admin read; none to add.
  */
 export interface OrgRouteSet {
   route: OrgRoute;
-  secrets?: Record<string, string>;
+  sealed?: OrgRouteSealed;
   rev?: string;
 }
 
@@ -8308,12 +8425,83 @@ export type SandboxState =
   | "none";
 
 /**
+ * A machine or a client to seal a secret to (#3397): its id as the associated data names it
+ * (m:<machine id> or c:<client id>), its name, and its P-256 key, X9.63. The control plane gives
+ * the key: until the machine lock (#3400) signs it, a control plane could give one of its own.
+ */
+export interface SealRecipient {
+  id: string;
+  name: string;
+  publicKey: Base64;
+}
+
+/**
+ * orgRoutes/recipients and user/secretRecipients (#3397). user is, for user/secretRecipients, the
+ * person whose secret it is, as its associated data names them.
+ */
+export interface SealRecipients {
+  recipients: SealRecipient[];
+  user?: string;
+}
+
+/**
  * Envelope: HPKE (P-256, HKDF-SHA256, AES-256-GCM) to one device's key. Nothing in it is legible
  * but to that device.
  */
 export interface SealedEnvelope {
   encapsulated: Base64;
   ciphertext: Base64;
+}
+
+/** One secret in host/userSettings (#3397): sealed to this machine by its person's client. */
+export interface SealedUserSecret {
+  name: UserSecretName;
+  version: number;
+  sealed: SealedEnvelope;
+}
+
+/** sealing/add (#3397). */
+export interface SealingAdd {
+  items: SealingAddItem[];
+}
+
+/**
+ * One item of sealing/add (#3397): new copies at the item's version, by recipient, then by field.
+ */
+export interface SealingAddItem {
+  item: SealingItemKind;
+  id: string;
+  version: number;
+  values: Record<string, Record<string, SealedEnvelope>>;
+}
+
+/**
+ * sealing/work and orgRoutes/sealed (#3397): a secret the calling client holds a copy of, and the
+ * recipients that have none. id is the route's id or the secret's name; user is the person whose
+ * secret it is. kind, vendor and settings are the route's, to make the associated data; a copy
+ * opens only if they are what the admin sealed. mine is the client's copy by field (a person's
+ * secret has the one field value).
+ */
+export interface SealingItem {
+  item: SealingItemKind;
+  id: string;
+  user?: string;
+  version: number;
+  kind?: OrgRouteKind;
+  vendor?: OrgRouteVendor;
+  settings?: OrgRouteSettings;
+  mine: Record<string, SealedEnvelope>;
+  missing: SealRecipient[];
+}
+
+/** What a sealing item is (#3397). */
+export type SealingItemKind =
+  | "orgRoute"
+  | "userSecret";
+
+/** sealing/work (#3397). */
+export interface SealingWork {
+  items: SealingItem[];
 }
 
 /**
@@ -9900,10 +10088,6 @@ export type UserSecretName = string;
 /** user/secretNames (#1760). */
 export interface UserSecretNames {
   secrets: UserSecretRow[];
-  /**
-   * False when this control plane has no key to seal secrets with, and user/setSecret is refused.
-   */
-  sealing: boolean;
 }
 
 /** user/removeSecret (#1760). */
@@ -9919,6 +10103,26 @@ export interface UserSecretRow {
   machines: MachineRef[];
   /** Machines removed with it on them, since it was last set. */
   leftOn?: SecretLeftOn[];
+  version?: number;
+  /**
+   * The person's machines that have no copy yet: they wait for one of the person's clients to seal
+   * it (#3397).
+   */
+  waiting?: MachineRef[];
+}
+
+/**
+ * user/setSecret (#1760, FR-025, #3397): a secret as the person's client sealed it to each
+ * recipient of user/secretRecipients, info com.alexecollins.agents.usersecret.v1, associated data
+ * usersecret.v1|<person id>|<recipient>|<name>|<version>. version is above the kept one: the kept
+ * one plus one, or for a name the client has none of, the time in milliseconds, above a removed
+ * one's. The control plane never has the value.
+ */
+export interface UserSecretSet {
+  name: UserSecretName;
+  version: number;
+  /** By recipient. */
+  values: Record<string, SealedEnvelope>;
 }
 
 /**
@@ -10714,8 +10918,10 @@ export interface Methods {
   "orgRoutes/check": { params: OrgRouteRequest; result: OrgRouteCheck };
   "orgRoutes/list": { params: Empty; result: OrgRouteList };
   "orgRoutes/mine": { params: Empty; result: OrgRoutesMine };
+  "orgRoutes/recipients": { params: OrgRouteRecipientsRequest; result: SealRecipients };
   "orgRoutes/remove": { params: OrgRouteRequest; result: Empty };
   "orgRoutes/replaceKey": { params: OrgRouteReplaceKey; result: OrgRouteKept };
+  "orgRoutes/sealed": { params: OrgRouteRequest; result: SealingItem };
   "orgRoutes/set": { params: OrgRouteSet; result: OrgRouteKept };
   "people/forViews": { params: Empty; result: PeopleForViews };
   "people/invite": { params: PersonInvite; result: PersonInvited };
@@ -10806,6 +11012,8 @@ export interface Methods {
   "scim/tokens/list": { params: SCIMTokensRequest; result: SCIMTokenList };
   "scim/tokens/make": { params: SCIMTokenMake; result: SCIMTokenMade };
   "scim/tokens/revoke": { params: SCIMTokenRequest; result: Empty };
+  "sealing/add": { params: SealingAdd; result: Empty };
+  "sealing/work": { params: Empty; result: SealingWork };
   "settings/passThrough": { params: Empty; result: PassThroughState };
   "signIn/approve": { params: SignInDecide; result: Empty };
   "signIn/configure": { params: SignInConfigure; result: SignInProviders };
@@ -10837,7 +11045,8 @@ export interface Methods {
   "usage/history": { params: Empty; result: UsageHistory };
   "user/removeSecret": { params: UserSecretRequest; result: Empty };
   "user/secretNames": { params: Empty; result: UserSecretNames };
-  "user/setSecret": { params: UserSecret; result: Empty };
+  "user/secretRecipients": { params: Empty; result: SealRecipients };
+  "user/setSecret": { params: UserSecretSet; result: Empty };
   "user/setSettings": { params: UserSettingsPart; result: Empty };
   "user/settings": { params: Empty; result: UserSettings };
   "views/call": { params: ViewCallRequest; result: JSONValue };
@@ -11057,8 +11266,10 @@ export const MethodTarget = {
   "orgRoutes/check": "control",
   "orgRoutes/list": "control",
   "orgRoutes/mine": "control",
+  "orgRoutes/recipients": "control",
   "orgRoutes/remove": "control",
   "orgRoutes/replaceKey": "control",
+  "orgRoutes/sealed": "control",
   "orgRoutes/set": "control",
   "people/forViews": "control",
   "people/invite": "control",
@@ -11149,6 +11360,8 @@ export const MethodTarget = {
   "scim/tokens/list": "control",
   "scim/tokens/make": "control",
   "scim/tokens/revoke": "control",
+  "sealing/add": "control",
+  "sealing/work": "control",
   "settings/passThrough": "host",
   "signIn/approve": "control",
   "signIn/configure": "control",
@@ -11180,6 +11393,7 @@ export const MethodTarget = {
   "usage/history": "host",
   "user/removeSecret": "control",
   "user/secretNames": "control",
+  "user/secretRecipients": "control",
   "user/setSecret": "control",
   "user/setSettings": "control",
   "user/settings": "control",
@@ -11238,6 +11452,7 @@ export interface Notifications {
   "control/policyChanged": PolicyView;
   "control/projectsChanged": ProjectsChanged;
   "control/providersChanged": ProviderList;
+  "control/sealingWanted": Empty;
   "control/secretsLeft": SecretsLeft;
   "control/signInDecided": SignInDecided;
   "control/signInRequested": SignInRequest;
@@ -11469,7 +11684,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DefaultAccountRequest: { required: ["runtimeID"], optional: ["accountID"] },
   DeletePreview: { required: ["count", "bytes"], optional: [] },
   DeleteSessionRequest: { required: ["runtimeID", "sessionID"], optional: ["confirmed"] },
-  DeliveredRoute: { required: ["id", "name", "kind", "runtimes", "defaultFor", "secretFields", "version", "sealed"], optional: ["vendor", "settings", "models", "expires"] },
+  DeliveredRoute: { required: ["id", "name", "kind", "runtimes", "defaultFor", "secretFields", "version", "sealed", "sealVersion"], optional: ["vendor", "settings", "models", "waiting"] },
   DesktopControlLiveFrame: { required: ["agentID", "capturedAt"], optional: ["image", "locked", "narration"] },
   DesktopControlPause: { required: ["app", "pausedAt"], optional: [] },
   DesktopControlSettings: { required: ["enabled"], optional: [] },
@@ -11669,6 +11884,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ListedSkill: { required: ["name", "folder"], optional: ["description", "managed"] },
   LiveAgent: { required: ["host", "hostName", "owner", "ownerName", "bot", "agent", "runtime", "state"], optional: ["waitsOnOthers", "workflow", "since", "costToDate", "heardAt"] },
   LiveBoard: { required: ["agents"], optional: [] },
+  Lock: { required: ["person", "entries"], optional: [] },
+  LockAdd: { required: ["entries"], optional: [] },
+  LockBody: { required: ["v", "kind", "person", "signer", "at", "key"], optional: ["previous", "sealingKey", "id", "name", "clientKind", "expires"] },
+  LockEntry: { required: ["body", "sig"], optional: [] },
+  LockHead: { required: ["count", "head"], optional: [] },
   MCPAddAnswer: { required: [], optional: ["server", "error"] },
   MCPAddByHandRequest: { required: ["verifyID", "destination"], optional: [] },
   MCPAddRequest: { required: ["previewID", "destination", "secrets", "plain", "replace"], optional: [] },
@@ -11780,15 +12000,17 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   OrgProviderSCIM: { required: ["on", "match"], optional: [] },
   OrgProviderSecret: { required: ["fingerprint", "setAt"], optional: ["setBy"] },
   OrgProviderSet: { required: ["provider"], optional: ["secret", "rev"] },
-  OrgRoute: { required: ["id", "name", "kind", "runtimes"], optional: ["vendor", "settings", "models", "groups", "defaultFor", "secretFields", "fingerprint", "version", "created", "changed", "machines"] },
+  OrgRoute: { required: ["id", "name", "kind", "runtimes"], optional: ["vendor", "settings", "models", "groups", "defaultFor", "secretFields", "fingerprint", "version", "created", "changed", "machines", "sealVersion", "waiting"] },
   OrgRouteCheck: { required: ["ok", "words"], optional: [] },
   OrgRouteDelivery: { required: ["routes", "at"], optional: [] },
   OrgRouteKept: { required: ["route", "rev"], optional: [] },
-  OrgRouteList: { required: ["routes", "sealing"], optional: [] },
-  OrgRouteMine: { required: ["id", "name", "kind", "runtimes", "defaultFor"], optional: [] },
-  OrgRouteReplaceKey: { required: ["id", "secrets", "rev"], optional: [] },
+  OrgRouteList: { required: ["routes"], optional: [] },
+  OrgRouteMine: { required: ["id", "name", "kind", "runtimes", "defaultFor"], optional: ["waiting"] },
+  OrgRouteRecipientsRequest: { required: [], optional: ["groups"] },
+  OrgRouteReplaceKey: { required: ["id", "sealed", "rev"], optional: [] },
   OrgRouteRequest: { required: ["id"], optional: ["rev"] },
-  OrgRouteSet: { required: ["route"], optional: ["secrets", "rev"] },
+  OrgRouteSealed: { required: ["sealVersion", "fingerprint", "values"], optional: [] },
+  OrgRouteSet: { required: ["route"], optional: ["sealed", "rev"] },
   OrgRouteSettings: { required: [], optional: ["address", "apiVersion", "clientID", "header", "location", "region", "resource", "tenant", "project"] },
   OrgRouteStamp: { required: ["by", "at"], optional: [] },
   OrgRouteVersion: { required: ["id", "version"], optional: [] },
@@ -12012,7 +12234,14 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SaidSearchResult: { required: ["matches"], optional: [] },
   SandboxFailureRecord: { required: ["runtimeID", "detail", "hang", "recoveryOffered", "completedToolCalls"], optional: [] },
   SandboxSettings: { required: ["defaults"], optional: ["setBy"] },
+  SealRecipient: { required: ["id", "name", "publicKey"], optional: [] },
+  SealRecipients: { required: ["recipients"], optional: ["user"] },
   SealedEnvelope: { required: ["encapsulated", "ciphertext"], optional: [] },
+  SealedUserSecret: { required: ["name", "version", "sealed"], optional: [] },
+  SealingAdd: { required: ["items"], optional: [] },
+  SealingAddItem: { required: ["item", "id", "version", "values"], optional: [] },
+  SealingItem: { required: ["item", "id", "version", "mine", "missing"], optional: ["user", "kind", "vendor", "settings"] },
+  SealingWork: { required: ["items"], optional: [] },
   SecretLeftOn: { required: ["host", "name", "at"], optional: [] },
   SecretsLeft: { required: ["host", "name", "secrets"], optional: [] },
   SelfUpdate: { required: ["autoUpdate", "state", "running"], optional: ["release", "message"] },
@@ -12171,9 +12400,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   UserPartHere: { required: ["part", "value"], optional: ["leftOut"] },
   UserPartRequest: { required: ["part"], optional: [] },
   UserSecret: { required: ["name", "value"], optional: [] },
-  UserSecretNames: { required: ["secrets", "sealing"], optional: [] },
+  UserSecretNames: { required: ["secrets"], optional: [] },
   UserSecretRequest: { required: ["name"], optional: [] },
-  UserSecretRow: { required: ["name", "updated", "machines"], optional: ["leftOn"] },
+  UserSecretRow: { required: ["name", "updated", "machines"], optional: ["leftOn", "version", "waiting"] },
+  UserSecretSet: { required: ["name", "version", "values"], optional: [] },
   UserSettings: { required: [], optional: ["mcpServers", "agentConfig", "agentConfigFiles", "runtimes", "costLimits", "notifications", "policy", "updated"] },
   UserSettingsChanged: { required: [], optional: ["parts", "agentConfigFiles", "secrets"] },
   UserSettingsPart: { required: ["part", "value"], optional: [] },

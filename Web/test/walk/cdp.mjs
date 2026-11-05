@@ -17,13 +17,14 @@ export const chromePath = "/Applications/Google Chrome.app/Contents/MacOS/Google
 
 /** Starts Chrome on `profile` (made if missing) and connects to it. */
 /** `args` are Chrome's own flags beside these, such as a test certificate's
- *  `--ignore-certificate-errors-spki-list=<pin>` for the public page on Pebble (#1459). */
-export async function launch({ profile, headed = false, path = chromePath, args: extra = [] } = {}) {
+ *  `--ignore-certificate-errors-spki-list=<pin>` for the public page on Pebble (#1459).
+ *  `push` keeps Chrome's background networking on: Web Push subscribes through it (#3418). */
+export async function launch({ profile, headed = false, push = false, path = chromePath, args: extra = [] } = {}) {
   if (!profile) throw new Error("say which throwaway profile folder to use");
   mkdirSync(profile, { recursive: true });
   rmSync(`${profile}/DevToolsActivePort`, { force: true });
   const args = [`--user-data-dir=${profile}`, "--remote-debugging-port=0", "--no-first-run", "--no-default-browser-check",
-    "--disable-background-networking", "--disable-sync", "--hide-scrollbars", ...extra, "about:blank"];
+    ...(push ? [] : ["--disable-background-networking"]), "--disable-sync", "--hide-scrollbars", ...extra, "about:blank"];
   if (!headed) args.unshift("--headless=new");
   const child = spawn(path, args, { stdio: "ignore" });
   // A walk that throws, calls process.exit or is stopped ends its Chrome too: a Chrome left

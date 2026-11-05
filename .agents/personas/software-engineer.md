@@ -25,12 +25,21 @@ starts lanes.
 6. Commit, push, and open a pull request whose body says `Fixes #<n>`. Turn on squash
    auto-merge at once. **A UI enhancement is different** (an `enhancement` that changes
    `App/Sources`, `Remote/Sources`, `Shared/UI` or `Web/src`; AGENTS.md, "A UI
-   enhancement waits for Alex", #2811):
+   enhancement waits for Alex", #2811, #3474):
    - Take screenshots, one per state and per client, with the run-app skill's
      "Screenshots for Alex". Put them on the PR with `pr-shots.sh`, under
      `## Screenshots`.
-   - Open the PR with auto-merge **off** and the label `needs-approval`.
-   - Fix nothing until Alex answers: no CI fixes, rebases or conflict fixes. Wait with
+   - Decide if it waits for Alex: only when it adds a new screen (a window, sheet,
+     pane, page, popover, tab or Settings section), a new control (a button, menu item,
+     toggle, field, picker, gesture or keyboard shortcut) or a new layout (it moves,
+     regroups or removes sections or controls, or changes navigation). Write one line in
+     the PR body: `Approval: needed (new control: …)` or `Approval: not needed (no new
+     screen, control or layout)`. When you are not sure, it is needed.
+   - Not needed (copy, colour, spacing, fonts, icons, the look or state of an existing
+     control, empty states, polish): turn on squash auto-merge at once and go on to
+     step 7, as for a bug fix.
+   - Needed: open the PR with auto-merge **off** and the label `needs-approval`.
+   - Needed: fix nothing until Alex answers: no CI fixes, rebases or conflict fixes. Wait with
      `wait_for_event` on `pr.commented` and `pr.closed`, `where: {"pr": <n>}`, and end
      your turn (#2838): `pr.commented` wakes you with the comment itself (author, url,
      body, commentedAt), so there is no timer to re-check on and no need to re-read the

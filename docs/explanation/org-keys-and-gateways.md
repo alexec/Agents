@@ -16,45 +16,77 @@ Each member's machines show the route as an account of the runtimes it serves (s
 The control plane keeps two objects for each route in its store:
 
 - `v1/org/routes/<id>.json`: the route. It has its name, kind, runtimes, settings, model
-  map, groups and version. It has no secret. For each secret it has only the field's name
-  and a fingerprint, the first 8 hex digits of its SHA-256, so that two admins can compare.
-- `v1/org/routes/<id>.secret.json`: the secrets, in one envelope. The control plane seals
-  it with its keeper for secrets (Cloud KMS, Vault or the local key file), as it seals a
-  person's own secrets, and binds it to this store key. The store holds only ciphertext.
+  map, groups, version and seal version. It has no secret. For each secret it has only the
+  field's name and a fingerprint, the first 8 hex digits of its SHA-256, which the admin's
+  app works out, so that two admins can compare.
+- `v1/org/routes/<id>.secret.json`: the secrets, as the admin's app sealed them: one
+  envelope for each field and each recipient. Nothing in it opens with a key the control
+  plane holds.
 
-A control plane with no keeper for secrets refuses a route that has a secret. Nobody can
-read a value back after it is saved, also not an admin. **Replace Key** writes a new
-value.
+Nobody can read a value back after it is saved, also not an admin. **Replace Key** writes a
+new value. The control plane needs no keeper for these secrets (#3397,
+`specs/3397-client-sealing`).
 
 ## How a route gets to a machine
 
-Each machine has its own P-256 key; the control plane has its public half. When a route
-changes, the control plane opens the envelope and seals each value again, with HPKE
-(P-256, HKDF-SHA256, AES-256-GCM), to the key of each machine that may use the route. The
-associated data is the machine and the whole route as sent (its version, kind, settings
-such as the address and header, models and expiry). It sends the result on
-the machine's channel 0 (`host/orgRoutes`) within 5 seconds, from every copy.
+Each machine has its own P-256 key, and so has each app (the web page, the Mac window, the
+Remote); the control plane has their public halves. When an admin saves a route, the
+admin's app asks the control plane for the **recipients**: each machine whose person may use
+the route, and each admin's app. It seals each value to each of them with HPKE (P-256,
+HKDF-SHA256, AES-256-GCM), and sends only the envelopes. The associated data is the route,
+the recipient, the field, the seal version, and where the key goes: its kind, its API and a
+digest of its settings (the address, the header, the region and the rest).
 
+The control plane sends each machine its own envelopes on the machine's channel 0
+(`host/orgRoutes`) within 5 seconds, from every copy.
+
+- The control plane cannot open an envelope: it has no recipient's private key.
 - A relay, a log or another copy that sees the message cannot open it.
 - A file copied to another machine does not open there.
-- An older version cannot take the place of a newer one.
-- A route file changed on the machine (another address, header or kind) does not open.
+- A control plane that changes a route's address, header, region or kind, to send the key
+  to a server of its own, makes every envelope fail to open.
+- An older seal cannot take the place of a newer one: each machine keeps the highest it has
+  opened.
 - Only the machines of the people the route is for get it: everyone, or the groups the
-  admin names. A machine that does not say `host.org-routes/1` gets nothing.
+  admin names. A machine that does not say `host.org-routes/2` gets nothing.
 
-## Cloud credentials stay on the control plane
+### A machine that joins later
+
+A machine that joins after the route was saved, or whose person joins one of the route's
+groups, has no envelope yet. It gets the route as **waiting**, and it is no account on that
+machine. The control plane says `control/sealingWanted` to the admins' apps. The next one
+that is open opens its own copy, seals the values to the machine, and sends the new
+envelopes (`sealing/work`, `sealing/add`). Console ▸ Model Access says how many machines
+wait, and a person's Organisation Policy says that a route waits for one of their machines.
+An app paired later gets its copy the same way.
+
+A person's own secrets (Machines ▸ Secrets) are sealed the same way, by the person's app, to
+the person's machines and apps.
+
+## Cloud credentials go to the machine, sealed
 
 An AWS access key (and a role to assume), a Google service account and an Entra app's
-secret last until somebody revokes them. The control plane keeps these and never sends
-them. It makes a token from each one (AWS STS, Google OAuth, Entra) and sends that token,
-sealed, to each machine. The token ends within an hour. A new token goes out about 10
-minutes before the old one ends. An offline machine loses that gateway within an hour.
+secret last until somebody revokes them. The admin's app seals them to each machine like a
+key. The machine makes a token from each one (AWS STS, Google OAuth, Entra) that ends within
+an hour, keeps it in memory only, and makes a new one about 10 minutes before the old one
+ends. An offline machine loses that gateway within an hour.
+
+So a member's machine now holds the long-lived credential, sealed, and opens it in memory to
+make a token. Give the access key a role with the least rights it needs, and prefer a Bedrock
+API key, an Azure key or a gateway's key, which a provider can scope and revoke on its own.
 
 A plain key (an Anthropic, OpenAI or xAI key, a Bedrock API key, an Azure key, or a
 gateway's key) goes to the machine as it is, sealed. It works offline.
 
+**Check** asks an online machine that holds the route to send one small request with it,
+because the control plane cannot open the key.
+
 ## What this does not protect against
 
+- **The control plane gives out the public keys.** The admin's app gets each machine's and
+  each app's public key from the control plane. Until the machine lock (#3400) signs these
+  keys with the person's own devices, a control plane that is compromised or misused could
+  give out a key of its own, and get a copy sealed to it. The machine lock closes this.
 - **Agents Host runs as the member.** Hosts never escalate. A member who reads the
   machine's memory with a debugger while a request is sent can find a key that is open
   there. Sealing keeps keys out of files, logs, messages and the runtime's environment. It
@@ -66,15 +98,19 @@ gateway's key) goes to the machine as it is, sealed. It works offline.
   its own on a Linux machine where that matters.
 - **A leaked key stays valid until the provider revokes it.** Revoke it at the provider
   first. Then replace it here, or turn on the policy's kill switch.
-- **The control plane opens every route.** Whoever can run the control plane with its
-  keeper can read the routes. Keep the keeper's access as tight as the store's.
+
+## No migration
+
+The routes and the secrets that an older control plane sealed with its keeper do not open
+with this one. Enter each route's key again in Console ▸ Model Access, and each of your
+secrets again in Machines ▸ Secrets.
 
 ## The policy
 
 The organisation's policy can require the org path for a runtime: `runtimes.<id>.reach`
 lists the ways allowed (`signIn`, `orgKey`, `gateway`). Its `notices.antigravityTerms`
 says whether members see Google's terms notice for Antigravity (`show`), not see it
-(`accepted`), or cannot use Antigravity (`refuse`). A machine needs `host.org-routes/1` to
+(`accepted`), or cannot use Antigravity (`refuse`). A machine needs `host.org-routes/2` to
 follow either rule.
 
 ## See also

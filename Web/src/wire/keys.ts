@@ -101,7 +101,9 @@ export class IndexedKeyStore implements KeyStore {
   }
 
   async save(record: KeyRecord): Promise<void> {
-    await navigator.storage?.persist?.().catch(() => false);
+    // Asked, not waited for: Firefox asks the person, and a pairing that waited for the
+    // answer would outlast the control plane's wait for the key (#3418).
+    void navigator.storage?.persist?.().catch(() => false);
     await this.run("readwrite", (store) => store.put(record, "self"));
     const back = await this.load();
     if (!back || back.client !== record.client) throw new UnsupportedBrowser();

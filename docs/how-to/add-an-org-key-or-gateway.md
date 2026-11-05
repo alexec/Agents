@@ -8,8 +8,9 @@ description: Give your organisation's people one key or one model gateway (Amazo
 
 An **org route** is your organisation's way to the model (#999): an API key that the
 organisation pays for, or a gateway. Each member's machines use it as one more account of
-the runtimes that it serves. No member sees the key, and the runtime never has it. See
-[Org keys and gateways](../explanation/org-keys-and-gateways.md) for why.
+the runtimes that it serves. No member sees the key, and the runtime never has it. Your
+browser seals the key to each machine (#3397): the control plane keeps only what it cannot
+open. See [Org keys and gateways](../explanation/org-keys-and-gateways.md) for why.
 
 **Not on machines yet.** The Console keeps routes, sends them to machines and keeps the two
 policy rules below. Agents Host uses a route, and refuses a person's own sign-in under
@@ -20,8 +21,6 @@ uses each person's own sign-in.
 
 - You are an admin of the control plane, and you use the web page. Console ▸ Model Access
   is on the web page only.
-- The control plane has a keeper for secrets: a key file, or `AGENTS_CONTROL_KMS`. Without
-  one, Model Access says so, and keeps no route that has a key.
 - You have the key or the credentials from the provider. Each kind below says what to get.
 
 ## Which runtimes can use which kind
@@ -50,11 +49,12 @@ through the machine's relay. They use each person's own sign-in.
      Platform or Google AI Studio).
    - **Amazon Bedrock**: the **AWS region**, and a **Bedrock API key**, or an **AWS access
      key id** and **its secret**. With an access key you can also give a **Role to assume**
-     and its **External id**. The control plane makes a token from them that lasts up to one
-     hour, and sends only the token to machines.
+     and its **External id**. Each machine makes a token from them that lasts up to one
+     hour. The machine keeps the access key, sealed: give it a role with the least rights it
+     needs.
    - **Google Vertex AI**: the **Google Cloud project**, the **Location**, and the **Service
-     account key (JSON)** of a service account that may call Vertex AI. The control plane
-     sends machines a token that lasts up to one hour.
+     account key (JSON)** of a service account that may call Vertex AI. Each machine makes a
+     token from it that lasts up to one hour.
    - **Microsoft Azure**: the **Resource** name or its address, and an **Azure key**, or an
      Entra app's **tenant**, **client id** and **secret**.
    - **Gateway**: the gateway's **Address** (https), the **Header for the key** if it is not
@@ -65,22 +65,30 @@ through the machine's relay. They use each person's own sign-in.
 8. Choose **Who may use it**: no group for everyone, or the groups that may.
 9. Choose **Add Route**.
 
-Each online machine of each person who may use it gets the route within seconds. The key
-field is empty after you save. The list shows the first 8 hex digits of each key's SHA-256,
-so that two admins can compare keys without seeing them.
+Your browser seals each key to each machine that may use the route, and to each admin's
+app (#3397). Each online machine of each person who may use it gets the route within
+seconds. The key field is empty after you save. The list shows the first 8 hex digits of
+each key's SHA-256, so that two admins can compare keys without seeing them.
+
+A machine that joins later, or that a person gets when you add them to a group, **waits**
+for the key: the **Machines** column says how many wait. The next admin's app that is open
+(the web page, the Mac window or the Remote) seals the key for it, with no step from you.
 
 ## Check, edit, replace the key, remove
 
-- **Check** sends one small request to the provider from the control plane, where it can
-  (keys and gateways), and says the answer.
+- **Check** asks a machine that holds the route to send one small request to the provider,
+  and says the answer. With no such machine online, it says so.
 - **Edit…** changes the name, runtimes, settings, model map and who may use it. A key field
-  that you leave empty keeps its key.
+  that you leave empty keeps its key. A change to the kind, the API or a setting (where the
+  key goes) seals each key again in your browser, from your app's own copy: an app with no
+  copy yet asks you to type each key.
 - **Replace Key…** writes a new key. The route's version goes up, and each machine uses the
   new key from its next request.
 - **Remove…** asks first. Each machine deletes its copy, and the sessions on the route stop
   at their next turn.
 
-The **Machines** column says how many machines hold the route's newest version.
+The **Machines** column says how many machines hold the route's newest version, and how
+many wait for the key.
 
 ## Require the org path
 
@@ -104,7 +112,8 @@ member: **Show the notice**, **Reviewed by your organisation** (members do not s
 
 Every person sees the routes that they may use in Settings ▸ Organisation Policy, on the Mac, the iPhone,
 the iPad and the web page: each route's name, its kind, its runtimes and **From your
-organisation**. They never see a key, a fingerprint, a region or an address.
+organisation**. A route that one of their machines waits for says so. They never see a
+key, a fingerprint, a region or an address.
 
 ## See also
 

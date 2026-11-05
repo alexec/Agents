@@ -51,7 +51,9 @@ Rules from Alex (2026-10-12/13) that are not in AGENTS.md:
   land first. A PR labelled `needs-approval` (a UI enhancement waiting for Alex, #2811)
   does not count: it waits for Alex, not for landing. Its lane has ended its turn, so
   it holds no running place, but it still holds its `area:`.
-- **A UI enhancement waits for Alex (#2811).** Never turn on auto-merge, fix checks or
+- **A UI enhancement that adds a screen, control or layout waits for Alex (#2811,
+  #3474).** Other UI enhancements auto-merge at once, with `Approval: not needed` in
+  their body. Never turn on auto-merge, fix checks or
   rebase a PR labelled `needs-approval`, and never message its lane about one: it fixes
   nothing until Alex comments on the PR. Its stuck checks are not
   stuck. Report the waiting ones to Alex in your table, with the list
@@ -111,7 +113,8 @@ Rules from Alex (2026-10-12/13) that are not in AGENTS.md:
   `Remote/Sources`, `Shared/UI`, `Web/src`), bugs first, from the milestone, the bug lane and the
   backlog alike, then the rest. When places run short, pause a non-UI lane, never a UI one: a person
   must review each UI change, so it must get to `main` and TestFlight early. A UI
-  enhancement gets its place early too, and merges after Alex approves it (#2811).
+  enhancement gets its place early too; one that adds a screen, control or layout merges
+  after Alex approves it (#2811, #3474).
 - **A milestone ships when its items are closed** (#3465): the release tags only when
   every issue in the open milestone is closed. Check its report; land anything it could not
   release.

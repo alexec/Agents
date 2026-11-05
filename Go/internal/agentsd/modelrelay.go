@@ -2,6 +2,7 @@ package agentsd
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/hmac"
@@ -61,7 +62,7 @@ const (
 	// relayOutWithoutATime is how long an account is out after a rate limit with no time.
 	relayOutWithoutATime = 5 * time.Minute
 	relayCAFile          = "model-relay-ca.pem"
-	orgExpiredWords      = "Your organisation's %s access ended while this machine is offline. Connect to the network."
+	orgExpiredWords      = "Your organisation's %s access could not be renewed on this machine. Connect to the network."
 )
 
 // relayUpstreamClient sends what the relay sends on. A test points it at a fake provider.
@@ -336,13 +337,6 @@ func (d *Daemon) relayServe(r *modelRelay, w http.ResponseWriter, req *http.Requ
 		return
 	}
 	key := accountKey(s.runtime, &s.account)
-	if route.Expires != nil && !relayNow().Before(route.Expires.Time()) {
-		words := fmt.Sprintf(orgExpiredWords, kindName(route.Kind))
-		d.markOut(key, wire.AllowanceStateOutReasonRuntimeFailed, nil, wire.AllowanceStateSourceExpiry, nil)
-		d.tellAllowances()
-		relayError(w, http.StatusUnauthorized, "authentication_error", words)
-		return
-	}
 	if req.ContentLength > relayMostBody {
 		relayError(w, http.StatusRequestEntityTooLarge, "request_too_large", "The request is over 32 MiB.")
 		return
@@ -380,7 +374,14 @@ func (d *Daemon) relayServe(r *modelRelay, w http.ResponseWriter, req *http.Requ
 		out.Header[name] = values
 	}
 	out.ContentLength = int64(len(body))
-	if err := d.addCredential(out, route, body); err != nil {
+	if err := d.addCredential(req.Context(), out, route, body); err != nil {
+		var expired tokenFailure
+		if errors.As(err, &expired) {
+			d.markOut(key, wire.AllowanceStateOutReasonRuntimeFailed, nil, wire.AllowanceStateSourceExpiry, nil)
+			d.tellAllowances()
+			relayError(w, http.StatusUnauthorized, "authentication_error", err.Error())
+			return
+		}
 		relayError(w, http.StatusBadGateway, "api_error", err.Error())
 		return
 	}
@@ -770,9 +771,14 @@ func askForUsage(path string, body []byte) []byte {
 
 // MARK: the credential
 
+// tokenFailure is a cloud credential's token that could not be made here (#3397).
+type tokenFailure struct{ words string }
+
+func (t tokenFailure) Error() string { return t.words }
+
 // addCredential puts in the route's credential for its kind (research R3), opened for this
-// request only.
-func (d *Daemon) addCredential(req *http.Request, r wire.DeliveredRoute, body []byte) error {
+// request only. A cloud credential is made into a token here first (orgtokens.go).
+func (d *Daemon) addCredential(ctx context.Context, req *http.Request, r wire.DeliveredRoute, body []byte) error {
 	secret := func(field string) string {
 		v, ok := d.orgSecret(r, field)
 		if !ok {
@@ -787,6 +793,16 @@ func (d *Daemon) addCredential(req *http.Request, r wire.DeliveredRoute, body []
 		vendor = *r.Vendor
 	}
 	missing := errors.New("The organisation's route has no key on this machine yet.")
+	// token is the route's token for its cloud credential, made here.
+	token := func() (string, error) {
+		values := d.routeValues(r)
+		value, err := d.routeToken(ctx, r, values)
+		clear(values)
+		if err != nil {
+			return "", tokenFailure{fmt.Sprintf(orgExpiredWords, kindName(r.Kind)) + " (" + err.Error() + ")"}
+		}
+		return value, nil
+	}
 	switch r.Kind {
 	case wire.OrgRouteKindKey:
 		key := secret("apiKey")
@@ -818,7 +834,11 @@ func (d *Daemon) addCredential(req *http.Request, r wire.DeliveredRoute, body []
 			SecretAccessKey string `json:"secretAccessKey"`
 			SessionToken    string `json:"sessionToken"`
 		}
-		if json.Unmarshal([]byte(secret("awsSession")), &session) != nil || session.AccessKeyID == "" {
+		value, err := token()
+		if err != nil {
+			return err
+		}
+		if json.Unmarshal([]byte(value), &session) != nil || session.AccessKeyID == "" {
 			return missing
 		}
 		region := ""
@@ -827,14 +847,18 @@ func (d *Daemon) addCredential(req *http.Request, r wire.DeliveredRoute, body []
 		}
 		signAWS(req, body, session.AccessKeyID, session.SecretAccessKey, session.SessionToken, region, "bedrock", relayNow())
 	case wire.OrgRouteKindVertex:
-		token := secret("googleToken")
-		if token == "" {
-			return missing
+		value, err := token()
+		if err != nil {
+			return err
 		}
-		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Authorization", "Bearer "+value)
 	case wire.OrgRouteKindAzure:
-		if token := secret("entraToken"); token != "" {
-			req.Header.Set("Authorization", "Bearer "+token)
+		if _, ok := r.Sealed["entraClientSecret"]; ok {
+			value, err := token()
+			if err != nil {
+				return err
+			}
+			req.Header.Set("Authorization", "Bearer "+value)
 			return nil
 		}
 		key := secret("apiKey")

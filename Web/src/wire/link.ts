@@ -221,6 +221,11 @@ export class Link {
     };
   }
 
+  /** This page's key, to open what was sealed to it (#3397); null before the page is paired. */
+  keyRecord(): Promise<KeyRecord | null> {
+    return this.options.keys.load().catch(() => null);
+  }
+
   onState(listener: (state: LinkState) => void): () => void {
     this.stateListeners.add(listener);
     return () => this.stateListeners.delete(listener);

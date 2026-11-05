@@ -30,6 +30,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controlplane/audit"
 	"github.com/alexec/agents/Go/internal/controlplane/hostinstall"
 	"github.com/alexec/agents/Go/internal/controlplane/hosttunnels"
+	"github.com/alexec/agents/Go/internal/controlplane/locks"
 	"github.com/alexec/agents/Go/internal/controlplane/notices"
 	"github.com/alexec/agents/Go/internal/controlplane/providers"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
@@ -132,9 +133,6 @@ type Config struct {
 	// The sign-in providers this copy can check, and where it asks them (#995); nil is the
 	// app's own client ids, or AGENTS_SIGNIN_* over them.
 	SignIn *signin.Config
-	// Where the org routes' token and check calls go (#999); nil is the providers' own.
-	// Tests point them at fakes.
-	orgEndpoints *orgEndpoints
 }
 
 // WebConfig is ControlService.Configuration.Web.
@@ -213,6 +211,9 @@ type Service struct {
 	// Each person's settings and secrets (#1760), and what each machine here was sent.
 	users     *usersettings.Book
 	toldUsers toldUsers
+	// Each person's machine lock (#3399), and the head each machine here was sent.
+	locks     *locks.Book
+	toldLocks toldLocks
 	// Which bots are at a spend cap today (#1761).
 	caps botCaps
 	// The organisation's policy as this copy knows it, and what each machine was sent (#998).
@@ -220,6 +221,8 @@ type Service struct {
 	// The organisation's routes to the model (#999): opened secrets, tokens, and what each
 	// machine here was sent.
 	orgRoutes orgRouteBook
+	// sealingWants is who is told control/sealingWanted next (#3397).
+	sealingWants sealingWants
 	// A bot's machine started for its triggers (#2011, FR-034).
 	starts botStarts
 	// What Reports and the Console read from the store, by entity tag (#2054, #2056).
@@ -302,6 +305,7 @@ func New(cfg Config) (*Service, error) {
 	if s.users, err = openUserBook(cfg); err != nil {
 		return nil, err
 	}
+	s.locks = locks.New(cfg.Store)
 	s.backups = newBackupStore(cfg.Store, s.records, s.currentKeys)
 	if cfg.PeerURL != "" {
 		if s.peerOrigin, err = controllink.Origin(cfg.PeerURL); err != nil {
@@ -456,7 +460,6 @@ func (s *Service) Start(ctx context.Context) (int, error) {
 	}
 	go s.refreshEvery(15 * time.Second)
 	go s.sweepEveryHour()
-	go s.renewTokensEvery(time.Minute)
 	go s.signIns.checkEvery(time.Hour, s.stop)
 	if s.tunnels != nil {
 		s.tunnels.Start(0)

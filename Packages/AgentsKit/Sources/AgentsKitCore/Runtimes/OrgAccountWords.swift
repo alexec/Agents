@@ -11,7 +11,9 @@ public enum OrgAccountWords {
     public static let noPlanLimit = "Organisation · No plan limit"
     public static let routesTitle = "Your Organisation’s Ways to the Model"
     public static let noRoutes = "Your organisation gives you no key or gateway. Each runtime uses your own sign-in."
-    public static let routesFoot = "Your organisation keeps the keys. No client shows them, and the runtime never has them: it reaches the model through a relay on your machine."
+    public static let routesFoot = "Your organisation’s admins seal the keys to your machines. No client shows them, and the runtime never has them: it reaches the model through a relay on your machine."
+    /// A route one of the person's machines waits for (#3397).
+    public static let routeWaiting = "Waiting for an admin’s app to seal it for one of your machines."
 
     /// What a kind is called.
     public static func kindName(_ kind: String) -> String {

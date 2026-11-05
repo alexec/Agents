@@ -46,10 +46,20 @@ public struct Envelope: Hashable, Sendable, Codable {
     }
 
     static func open<Key: HPKEDiffieHellmanPrivateKey>(_ envelope: Envelope, with key: Key,
-                                                       info: Data = purpose) throws -> Data {
+                                                       info: Data = purpose, authenticating ad: Data? = nil) throws -> Data {
         var recipient = try HPKE.Recipient(privateKey: key, ciphersuite: suite, info: info,
                                            encapsulatedKey: envelope.encapsulated)
+        if let ad { return try recipient.open(envelope.ciphertext, authenticating: ad) }
         return try recipient.open(envelope.ciphertext)
+    }
+
+    /// Seal `value` to a device's or a machine's P256 key (X9.63) under `info`, bound to `ad`
+    /// (#3397, `ClientSealing`).
+    public static func seal(_ value: Data, to publicKey: Data, info: String, authenticating ad: Data) throws -> Envelope {
+        let recipient = try P256.KeyAgreement.PublicKey(x963Representation: publicKey)
+        var sender = try HPKE.Sender(recipientKey: recipient, ciphersuite: suite, info: Data(info.utf8))
+        let ciphertext = try sender.seal(value, authenticating: ad)
+        return Envelope(encapsulated: sender.encapsulatedKey, ciphertext: ciphertext)
     }
     #else
     public struct Unavailable: Error {}

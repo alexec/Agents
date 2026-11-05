@@ -1,7 +1,12 @@
-package controlplane
+// Package orgtoken makes short-lived tokens from an org route's cloud credentials, and
+// checks a route, on the machine that holds it (#999, #3397). An AWS access key (and a
+// role), a Google service account and an Entra app's secret are sealed by an admin's
+// client to each machine, which makes a token from it that ends within an hour, and a new
+// one about 10 minutes before the last one ends. The calls are small and by hand: AWS STS
+// (SigV4), Google's OAuth JWT grant and Entra's client credentials.
+package orgtoken
 
 import (
-	"cmp"
 	"context"
 	"crypto"
 	"crypto/hmac"
@@ -25,33 +30,26 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Short-lived tokens for cloud credentials (#999, spec Q1 answer A, FR-007): an AWS access
-// key (and a role), a Google service account and an Entra app stay here, sealed. Each
-// machine gets a token made from it that ends within an hour, sealed to its key, and a new
-// one about 10 minutes before the last one ends. A machine never holds a credential that
-// lasts. The calls are small and by hand: AWS STS (SigV4), Google's OAuth JWT grant and
-// Entra's client credentials.
-
 const (
-	// mostTokenLife is the longest a token sent to a machine lasts.
-	mostTokenLife = time.Hour
-	// renewTokenBefore is how long before a token ends that a new one is sent.
-	renewTokenBefore = 10 * time.Minute
-	tokenCallTimeout = 20 * time.Second
-	mostTokenAnswer  = 1 << 20
-	googleScope      = "https://www.googleapis.com/auth/cloud-platform"
-	entraScope       = "https://cognitiveservices.azure.com/.default"
+	// MostLife is the longest a token lasts.
+	MostLife = time.Hour
+	// RenewBefore is how long before a token ends that a new one is made.
+	RenewBefore = 10 * time.Minute
+	callTimeout = 20 * time.Second
+	mostAnswer  = 1 << 20
+	googleScope = "https://www.googleapis.com/auth/cloud-platform"
+	entraScope  = "https://cognitiveservices.azure.com/.default"
 )
 
-// firstTokenRetry and lastTokenRetry bound the wait after a token that was not made:
-// 1, 2, 4 … 30 minutes, for every machine together (#2250).
+// FirstRetry and LastRetry bound the wait after a token that was not made: 1, 2, 4 … 30
+// minutes (#2250).
 const (
-	firstTokenRetry = time.Minute
-	lastTokenRetry  = 30 * time.Minute
+	FirstRetry = time.Minute
+	LastRetry  = 30 * time.Minute
 )
 
-// orgEndpoints are where the token and check calls go. Tests point them at fakes.
-type orgEndpoints struct {
+// Endpoints are where the token and check calls go. Tests point them at fakes.
+type Endpoints struct {
 	// STS is AWS STS's address for a region.
 	STS func(region string) string
 	// GoogleToken is Google's OAuth token address.
@@ -64,7 +62,8 @@ type orgEndpoints struct {
 	Now    func() time.Time
 }
 
-var defaultOrgEndpoints = orgEndpoints{
+// Default is the providers' own addresses.
+var Default = Endpoints{
 	STS:         func(region string) string { return "https://sts." + region + ".amazonaws.com/" },
 	GoogleToken: "https://oauth2.googleapis.com/token",
 	Entra: func(tenant string) string {
@@ -75,112 +74,63 @@ var defaultOrgEndpoints = orgEndpoints{
 		wire.OrgRouteVendorOpenai:    "https://api.openai.com",
 		wire.OrgRouteVendorXai:       "https://api.x.ai",
 	},
-	Client: &http.Client{Timeout: tokenCallTimeout},
+	Client: &http.Client{Timeout: callTimeout},
 	Now:    time.Now,
 }
 
-func (s *Service) endpoints() *orgEndpoints {
-	if s.cfg.orgEndpoints != nil {
-		return s.cfg.orgEndpoints
-	}
-	return &defaultOrgEndpoints
-}
-
-// orgToken is a token made for a route's version, its field and when it ends; and, after
-// a renewal that failed, how many failed and when the next is tried; and when a machine's
-// delivery last asked for it.
-type orgToken struct {
-	asked    time.Time
-	version  int64
-	field    string
-	value    string
-	expires  time.Time
-	failures int
-	retryAt  time.Time
-	err      error
-}
-
-// tokenRetry is how long to wait after the nth renewal in a row that failed.
-func tokenRetry(failures int) time.Duration {
-	wait := firstTokenRetry
-	for i := 1; i < failures && wait < lastTokenRetry; i++ {
+// Retry is how long to wait after the nth renewal in a row that failed.
+func Retry(failures int) time.Duration {
+	wait := FirstRetry
+	for i := 1; i < failures && wait < LastRetry; i++ {
 		wait *= 2
 	}
-	return min(wait, lastTokenRetry)
+	return min(wait, LastRetry)
 }
 
-// tokenField is the field a route's token goes in, or "" for a route sent as it is.
-func tokenField(r wire.OrgRoute, values map[string]string) string {
+// Route is what a token and a check need of a route.
+type Route struct {
+	ID       string
+	Kind     wire.OrgRouteKind
+	Vendor   *wire.OrgRouteVendor
+	Settings *wire.OrgRouteSettings
+}
+
+func deref[T any](p *T) T {
+	var zero T
+	if p == nil {
+		return zero
+	}
+	return *p
+}
+
+// Field is the token a route's credential is made into, or "" for a route used as it is:
+// awsSession, googleToken or entraToken.
+func Field(kind wire.OrgRouteKind, values map[string]string) string {
 	switch {
-	case r.Kind == wire.OrgRouteKindBedrock && values["awsAccessKeyId"] != "":
+	case kind == wire.OrgRouteKindBedrock && values["awsAccessKeyId"] != "":
 		return "awsSession"
-	case r.Kind == wire.OrgRouteKindVertex:
+	case kind == wire.OrgRouteKindVertex:
 		return "googleToken"
-	case r.Kind == wire.OrgRouteKindAzure && values["entraClientSecret"] != "":
+	case kind == wire.OrgRouteKindAzure && values["entraClientSecret"] != "":
 		return "entraToken"
 	}
 	return ""
 }
 
-// routeValuesToSend is what a machine may hold of a route: its plain keys as they are, or
-// a cloud credential's token in its place, and when that ends (FR-007).
-func (s *Service) routeValuesToSend(ctx context.Context, r wire.OrgRoute, values map[string]string) (map[string]string, time.Time, error) {
-	field := tokenField(r, values)
-	if field == "" {
-		return values, time.Time{}, nil
-	}
-	s.orgRoutes.making.Lock()
-	defer s.orgRoutes.making.Unlock()
-	now := s.endpoints().Now()
-	s.orgRoutes.mu.Lock()
-	t, ok := s.orgRoutes.tokens[r.ID]
-	s.orgRoutes.mu.Unlock()
-	if ok && (t.version != deref(r.Version) || t.field != field) {
-		t = orgToken{}
-	}
-	t.asked = now
-	// After a renewal that failed, nothing is tried until retryAt, whichever machine asks.
-	if t.expires.Sub(now) <= renewTokenBefore && !now.Before(t.retryAt) {
-		value, expires, err := s.makeToken(ctx, r, values)
-		if err == nil {
-			t = orgToken{version: deref(r.Version), field: field, value: value, expires: expires}
-			s.log(fmt.Sprintf("org route %s: a token made, until %s", r.ID, expires.UTC().Format(time.TimeOnly)))
-		} else {
-			t.version, t.field, t.err = deref(r.Version), field, err
-			t.failures++
-			t.retryAt = now.Add(tokenRetry(t.failures))
-			s.log(fmt.Sprintf("org route %s: no token made (%v); tried again at %s", r.ID, err, t.retryAt.UTC().Format(time.TimeOnly)))
-		}
-	}
-	s.orgRoutes.mu.Lock()
-	if s.orgRoutes.tokens == nil {
-		s.orgRoutes.tokens = map[string]orgToken{}
-	}
-	s.orgRoutes.tokens[r.ID] = t
-	s.orgRoutes.mu.Unlock()
-	// The last token goes on until it ends, through a renewal that failed.
-	if t.value == "" || !t.expires.After(now) {
-		return nil, time.Time{}, cmp.Or(t.err, errors.New("no token was made"))
-	}
-	return map[string]string{t.field: t.value}, t.expires, nil
-}
-
-// makeToken makes a route's token with its long-lived credential: never longer than
-// mostTokenLife.
-func (s *Service) makeToken(ctx context.Context, r wire.OrgRoute, values map[string]string) (string, time.Time, error) {
-	ctx, cancel := context.WithTimeout(ctx, tokenCallTimeout)
+// Make makes a route's token with its long-lived credential: never longer than MostLife.
+func Make(ctx context.Context, e *Endpoints, r Route, values map[string]string) (string, time.Time, error) {
+	ctx, cancel := context.WithTimeout(ctx, callTimeout)
 	defer cancel()
-	e := s.endpoints()
 	var value string
 	var expires time.Time
 	var err error
-	switch tokenField(r, values) {
+	settings := deref(r.Settings)
+	switch Field(r.Kind, values) {
 	case "awsSession":
-		value, expires, err = awsSession(ctx, e, deref(deref(r.Settings).Region), r.ID, values)
+		value, expires, err = awsSession(ctx, e, deref(settings.Region), r.ID, values)
 	case "googleToken":
 		value, expires, err = googleToken(ctx, e, values["serviceAccount"])
 	case "entraToken":
-		settings := deref(r.Settings)
 		value, expires, err = entraToken(ctx, e, deref(settings.Tenant), deref(settings.ClientID), values["entraClientSecret"])
 	default:
 		return "", time.Time{}, errors.New("this route needs no token")
@@ -188,47 +138,10 @@ func (s *Service) makeToken(ctx context.Context, r wire.OrgRoute, values map[str
 	if err != nil {
 		return "", time.Time{}, err
 	}
-	if most := e.Now().Add(mostTokenLife); expires.IsZero() || expires.After(most) {
+	if most := e.Now().Add(MostLife); expires.IsZero() || expires.After(most) {
 		expires = most
 	}
 	return value, expires, nil
-}
-
-// renewTokensEvery sends a new token to every machine here before its last one ends.
-func (s *Service) renewTokensEvery(every time.Duration) {
-	t := time.NewTicker(every)
-	defer t.Stop()
-	for {
-		select {
-		case <-s.stop:
-			return
-		case <-t.C:
-			if s.tokensEndingSoon() {
-				s.resendOrgRoutes()
-			}
-		}
-	}
-}
-
-// tokensEndingSoon says a token this copy made ends within renewTokenBefore, and is due a
-// renewal: not one that failed until its retryAt. A token that ended and that a resend
-// since did not ask for is dropped: no machine here uses its route any more, and it would
-// bring a resend every minute for ever (#2431).
-func (s *Service) tokensEndingSoon() bool {
-	now := s.endpoints().Now()
-	s.orgRoutes.mu.Lock()
-	defer s.orgRoutes.mu.Unlock()
-	resent := s.orgRoutes.resent
-	for id, t := range s.orgRoutes.tokens {
-		if !t.expires.After(resent) && t.asked.Before(resent) {
-			delete(s.orgRoutes.tokens, id)
-			continue
-		}
-		if t.expires.Sub(now) <= renewTokenBefore && !now.Before(t.retryAt) {
-			return true
-		}
-	}
-	return false
 }
 
 // MARK: AWS STS
@@ -248,7 +161,7 @@ type stsCredentials struct {
 
 // awsSession is a session credential from STS: AssumeRole when the route names a role,
 // GetSessionToken otherwise. It goes to the machine as JSON.
-func awsSession(ctx context.Context, e *orgEndpoints, region, route string, values map[string]string) (string, time.Time, error) {
+func awsSession(ctx context.Context, e *Endpoints, region, route string, values map[string]string) (string, time.Time, error) {
 	form := url.Values{"Version": {"2011-06-15"}, "DurationSeconds": {"3600"}}
 	if role := values["awsRoleArn"]; role != "" {
 		form.Set("Action", "AssumeRole")
@@ -329,8 +242,8 @@ type serviceAccount struct {
 	key          *rsa.PrivateKey
 }
 
-// parseServiceAccount reads a service account's key, as Google gives it in JSON.
-func parseServiceAccount(raw string) (serviceAccount, error) {
+// ParseServiceAccount reads a service account's key, as Google gives it in JSON.
+func ParseServiceAccount(raw string) (serviceAccount, error) {
 	var sa serviceAccount
 	if err := json.Unmarshal([]byte(raw), &sa); err != nil {
 		return sa, errors.New("it is not JSON")
@@ -359,8 +272,8 @@ func parseServiceAccount(raw string) (serviceAccount, error) {
 }
 
 // googleToken is an OAuth access token for a service account, by the JWT bearer grant.
-func googleToken(ctx context.Context, e *orgEndpoints, raw string) (string, time.Time, error) {
-	sa, err := parseServiceAccount(raw)
+func googleToken(ctx context.Context, e *Endpoints, raw string) (string, time.Time, error) {
+	sa, err := ParseServiceAccount(raw)
 	if err != nil {
 		return "", time.Time{}, err
 	}
@@ -370,7 +283,7 @@ func googleToken(ctx context.Context, e *orgEndpoints, raw string) (string, time
 		header["kid"] = sa.PrivateKeyID
 	}
 	claims := map[string]any{"iss": sa.ClientEmail, "scope": googleScope, "aud": e.GoogleToken,
-		"iat": now.Unix(), "exp": now.Add(mostTokenLife).Unix()}
+		"iat": now.Unix(), "exp": now.Add(MostLife).Unix()}
 	h, _ := json.Marshal(header)
 	c, _ := json.Marshal(claims)
 	unsigned := base64.RawURLEncoding.EncodeToString(h) + "." + base64.RawURLEncoding.EncodeToString(c)
@@ -387,14 +300,14 @@ func googleToken(ctx context.Context, e *orgEndpoints, raw string) (string, time
 // MARK: Entra
 
 // entraToken is an access token for an Entra app, by client credentials.
-func entraToken(ctx context.Context, e *orgEndpoints, tenant, client, secret string) (string, time.Time, error) {
+func entraToken(ctx context.Context, e *Endpoints, tenant, client, secret string) (string, time.Time, error) {
 	form := url.Values{"grant_type": {"client_credentials"}, "client_id": {client}, "client_secret": {secret},
 		"scope": {entraScope}}
 	return oauthToken(ctx, e, e.Entra(tenant), form, "Microsoft Entra")
 }
 
 // oauthToken posts a form to a token address and reads access_token and expires_in.
-func oauthToken(ctx context.Context, e *orgEndpoints, address string, form url.Values, who string) (string, time.Time, error) {
+func oauthToken(ctx context.Context, e *Endpoints, address string, form url.Values, who string) (string, time.Time, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, address, strings.NewReader(form.Encode()))
 	if err != nil {
 		return "", time.Time{}, err
@@ -416,13 +329,13 @@ func oauthToken(ctx context.Context, e *orgEndpoints, address string, form url.V
 
 // tokenCall sends a token request and reads a bounded answer. Its error says the status,
 // never the answer's body, which can echo what was sent.
-func tokenCall(e *orgEndpoints, req *http.Request, who string) ([]byte, error) {
+func tokenCall(e *Endpoints, req *http.Request, who string) ([]byte, error) {
 	resp, err := e.Client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("%s could not be reached", who)
 	}
 	defer resp.Body.Close()
-	raw, err := io.ReadAll(io.LimitReader(resp.Body, mostTokenAnswer))
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, mostAnswer))
 	if err != nil {
 		return nil, err
 	}
@@ -432,21 +345,19 @@ func tokenCall(e *orgEndpoints, req *http.Request, who string) ([]byte, error) {
 	return raw, nil
 }
 
-// MARK: orgRoutes/check
+// MARK: The check
 
-// checkOrgRoute is orgRoutes/check: one small request from the control plane where it
-// can make one (a key, a base URL, a cloud credential's token), in words. A route only a
-// machine can check says so.
-func (s *Service) checkOrgRoute(ctx context.Context, r wire.OrgRoute, values map[string]string) wire.OrgRouteCheck {
-	if tokenField(r, values) != "" {
-		_, expires, err := s.makeToken(ctx, r, values)
+// Check is orgRoutes/check on the machine that holds the route (#3397): one small request
+// with its credential (a key, a base URL, a cloud credential's token), in words.
+func Check(ctx context.Context, e *Endpoints, r Route, values map[string]string) wire.OrgRouteCheck {
+	if Field(r.Kind, values) != "" {
+		_, expires, err := Make(ctx, e, r, values)
 		if err != nil {
 			return wire.OrgRouteCheck{Words: err.Error() + "."}
 		}
 		return wire.OrgRouteCheck{Ok: true, Words: fmt.Sprintf("A token was made with this credential, until %s UTC.",
 			expires.UTC().Format("15:04"))}
 	}
-	e := s.endpoints()
 	var address string
 	switch r.Kind {
 	case wire.OrgRouteKindKey:
@@ -454,17 +365,17 @@ func (s *Service) checkOrgRoute(ctx context.Context, r wire.OrgRoute, values map
 	case wire.OrgRouteKindBaseURL:
 		address = deref(deref(r.Settings).Address)
 	default:
-		return wire.OrgRouteCheck{Words: "This route can be checked only from a machine: start a session on it."}
+		return wire.OrgRouteCheck{Words: "This route can be checked only by starting a session on it."}
 	}
 	models := "/v1/models"
-	ctx, cancel := context.WithTimeout(ctx, tokenCallTimeout)
+	ctx, cancel := context.WithTimeout(ctx, callTimeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(address, "/")+models, nil)
 	if err != nil {
 		return wire.OrgRouteCheck{Words: "The route's address is not one to call."}
 	}
 	if key := values["apiKey"]; key != "" {
-		header, value := vendorKeyHeader(deref(r.Vendor), key)
+		header, value := VendorKeyHeader(deref(r.Vendor), key)
 		if h := deref(r.Settings).Header; h != nil {
 			header, value = *h, key
 		}
@@ -475,9 +386,9 @@ func (s *Service) checkOrgRoute(ctx context.Context, r wire.OrgRoute, values map
 	}
 	resp, err := e.Client.Do(req)
 	if err != nil {
-		return wire.OrgRouteCheck{Words: "The route's address could not be reached from the control plane."}
+		return wire.OrgRouteCheck{Words: "The route's address could not be reached from the machine."}
 	}
-	io.Copy(io.Discard, io.LimitReader(resp.Body, mostTokenAnswer))
+	io.Copy(io.Discard, io.LimitReader(resp.Body, mostAnswer))
 	resp.Body.Close()
 	switch {
 	case resp.StatusCode/100 == 2:
@@ -488,8 +399,8 @@ func (s *Service) checkOrgRoute(ctx context.Context, r wire.OrgRoute, values map
 	return wire.OrgRouteCheck{Words: fmt.Sprintf("The provider answered %d.", resp.StatusCode)}
 }
 
-// vendorKeyHeader is the header each vendor takes its key in (research R3).
-func vendorKeyHeader(vendor wire.OrgRouteVendor, key string) (string, string) {
+// VendorKeyHeader is the header each vendor takes its key in (research R3).
+func VendorKeyHeader(vendor wire.OrgRouteVendor, key string) (string, string) {
 	switch vendor {
 	case wire.OrgRouteVendorAnthropic:
 		return "x-api-key", key

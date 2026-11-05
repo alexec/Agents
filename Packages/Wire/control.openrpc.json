@@ -985,6 +985,22 @@
       ]
     },
     {
+      "name": "control/lockChanged",
+      "x-capability": "lock/1",
+      "description": "To a person's clients when an entry is put on their machine lock (#3399): read it again with lock/get.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LockHead"
+          }
+        }
+      ]
+    },
+    {
       "name": "control/moved",
       "x-capability": "control/1",
       "x-notification": true,
@@ -1017,7 +1033,7 @@
     },
     {
       "name": "control/orgRoutesChanged",
-      "x-capability": "org-routes/1",
+      "x-capability": "org-routes/2",
       "description": "To every person's clients when an org route is added, changed or removed (#999).",
       "tags": [
         {
@@ -1038,7 +1054,7 @@
     },
     {
       "name": "control/orgRoutesLeft",
-      "x-capability": "org-routes/1",
+      "x-capability": "org-routes/2",
       "description": "To a removed machine's person and to every admin: the org routes it held (#999).",
       "x-notification": true,
       "paramStructure": "by-name",
@@ -1196,8 +1212,29 @@
       }
     },
     {
+      "name": "control/sealingWanted",
+      "x-capability": "sealing/1",
+      "description": "To an admin's clients when a machine or a client that may hold an org route has no copy of it, and to a person's clients when one of theirs has no copy of a secret (#3397): call sealing/work.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ]
+    },
+    {
       "name": "control/secretsLeft",
-      "x-capability": "user/1",
+      "x-capability": "user/2",
       "tags": [
         {
           "name": "web"
@@ -1824,6 +1861,22 @@
       }
     },
     {
+      "name": "host/lock",
+      "x-capability": "host.lock/1",
+      "description": "To a machine that says host.lock/1, on its channel 0, at each join and when an entry is put on its person's lock (#3399): the whole lock. The machine checks it and takes it only when it grows from the head it pinned last; until #3400's later steps it only logs what it would refuse.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Lock"
+          }
+        }
+      ]
+    },
+    {
       "name": "host/machines",
       "x-capability": "host/1",
       "description": "A host, on its channel 0, for an agent there (#691 US6).",
@@ -1845,9 +1898,30 @@
       }
     },
     {
+      "name": "host/orgRouteCheck",
+      "x-capability": "host.org-routes/2",
+      "description": "To a machine that holds the route, on its channel 0: orgRoutes/check with the machine's own copy (#3397).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/OrgRouteRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/OrgRouteCheck"
+        }
+      }
+    },
+    {
       "name": "host/orgRoutes",
-      "x-capability": "host.org-routes/1",
-      "description": "To a machine that says host.org-routes/1, on its channel 0, at each join and within 5 seconds of a change to what it may use (#999, FR-005): every route its person may use, each secret sealed to the machine's key. A machine without it is sent nothing.",
+      "x-capability": "host.org-routes/2",
+      "description": "To a machine that says host.org-routes/2, on its channel 0, at each join and within 5 seconds of a change to what it may use (#999, FR-005, #3397): every route its person may use, each secret as an admin's client sealed it to the machine's key, or waiting when none has yet. A machine without it is sent nothing.",
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
@@ -1862,7 +1936,7 @@
     },
     {
       "name": "host/orgRoutesAgain",
-      "x-capability": "host.org-routes/1",
+      "x-capability": "host.org-routes/2",
       "description": "A machine, on its channel 0: a sealed route did not open; send its delivery again (#999).",
       "paramStructure": "by-name",
       "params": [
@@ -1883,7 +1957,7 @@
     },
     {
       "name": "host/orgRoutesApplied",
-      "x-capability": "host.org-routes/1",
+      "x-capability": "host.org-routes/2",
       "description": "A machine, on its channel 0, after it keeps a delivery of org routes (#999).",
       "paramStructure": "by-name",
       "params": [
@@ -2031,8 +2105,8 @@
     },
     {
       "name": "host/userSettings",
-      "x-capability": "user/1",
-      "description": "To a machine that says host.user-settings/1, on its channel 0, at join and on each change (#1760): its user's settings and secrets.",
+      "x-capability": "host.user-settings/2",
+      "description": "To a machine that says host.user-settings/1, on its channel 0, at join and on each change (#1760): its user's settings. Only a machine that also says host.user-settings/2 gets its secrets, each as the person's client sealed it to the machine (#3397).",
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
@@ -2817,6 +2891,48 @@
       }
     },
     {
+      "name": "lock/add",
+      "x-capability": "lock/1",
+      "description": "A client's: put entries on the end of the caller's machine lock (#3399). Each must be signed, follow the head, and pass the checks; the first is the root when there is no lock yet. Refused with changedElsewhere when another entry took the head first.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LockAdd"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LockHead"
+        }
+      }
+    },
+    {
+      "name": "lock/get",
+      "x-capability": "lock/1",
+      "description": "A client's: the caller's machine lock, with no entries when there is none yet (#3399).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Lock"
+        }
+      }
+    },
+    {
       "name": "machines/forAgent",
       "x-capability": "machines/1",
       "description": "Through host/machines only.",
@@ -3023,8 +3139,8 @@
     },
     {
       "name": "orgRoutes/check",
-      "x-capability": "org-routes/1",
-      "description": "An admin's: one small request from the control plane with the route's credential, where it can make one (#999).",
+      "x-capability": "org-routes/2",
+      "description": "An admin's: one small request with the route's credential, from an online machine that holds the route's version (#999, #3397).",
       "tags": [
         {
           "name": "web"
@@ -3049,7 +3165,7 @@
     },
     {
       "name": "orgRoutes/list",
-      "x-capability": "org-routes/1",
+      "x-capability": "org-routes/2",
       "description": "An admin's: every org route with its rev and how many machines hold it; no secret value (#999).",
       "tags": [
         {
@@ -3075,7 +3191,7 @@
     },
     {
       "name": "orgRoutes/mine",
-      "x-capability": "org-routes/1",
+      "x-capability": "org-routes/2",
       "description": "Any person's: the org routes they may use (#999).",
       "tags": [
         {
@@ -3100,8 +3216,34 @@
       }
     },
     {
+      "name": "orgRoutes/recipients",
+      "x-capability": "org-routes/2",
+      "description": "An admin's: the machines that may use a route for these groups, and every admin's clients, with each one's key, to seal its secrets to (#3397).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/OrgRouteRecipientsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SealRecipients"
+        }
+      }
+    },
+    {
       "name": "orgRoutes/remove",
-      "x-capability": "org-routes/1",
+      "x-capability": "org-routes/2",
       "description": "An admin's: delete a route and its secrets, conditional on its rev; every machine that held it is sent its routes without it (#999).",
       "tags": [
         {
@@ -3127,8 +3269,8 @@
     },
     {
       "name": "orgRoutes/replaceKey",
-      "x-capability": "org-routes/1",
-      "description": "An admin's: new values for a route's secret fields, one version higher (#999).",
+      "x-capability": "org-routes/2",
+      "description": "An admin's: new values for every one of a route's secret fields, sealed by the client, one version higher (#999, #3397).",
       "tags": [
         {
           "name": "web"
@@ -3152,9 +3294,35 @@
       }
     },
     {
+      "name": "orgRoutes/sealed",
+      "x-capability": "org-routes/2",
+      "description": "An admin's: this client's own copy of a route's secrets, to open before a change; missing is empty (#3397).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/OrgRouteRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SealingItem"
+        }
+      }
+    },
+    {
       "name": "orgRoutes/set",
-      "x-capability": "org-routes/1",
-      "description": "An admin's: add or change an org route, conditional on its rev; its secrets sealed with the keeper; audited and sent to the machines that may use it (#999).",
+      "x-capability": "org-routes/2",
+      "description": "An admin's: add or change an org route, conditional on its rev; its secrets sealed by the client to each recipient of orgRoutes/recipients, never opened here; audited and sent to the machines that may use it (#999, #3397).",
       "tags": [
         {
           "name": "web"
@@ -4544,6 +4712,58 @@
       ]
     },
     {
+      "name": "sealing/add",
+      "x-capability": "sealing/1",
+      "description": "A client's: copies it sealed for sealing/work's missing recipients. Each is kept only at the item's current version, for a current recipient (#3397).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SealingAdd"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "sealing/work",
+      "x-capability": "sealing/1",
+      "description": "A client's: each secret it holds a copy of whose recipients do not all have one, with the recipients missing (#3397).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SealingWork"
+        }
+      }
+    },
+    {
       "name": "signIn/addToMe",
       "x-capability": "signin/1",
       "paramStructure": "by-name",
@@ -5132,7 +5352,7 @@
     },
     {
       "name": "user/removeSecret",
-      "x-capability": "user/1",
+      "x-capability": "user/2",
       "tags": [
         {
           "name": "web"
@@ -5157,7 +5377,7 @@
     },
     {
       "name": "user/secretNames",
-      "x-capability": "user/1",
+      "x-capability": "user/2",
       "tags": [
         {
           "name": "web"
@@ -5177,6 +5397,32 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/UserSecretNames"
+        }
+      }
+    },
+    {
+      "name": "user/secretRecipients",
+      "x-capability": "user/2",
+      "description": "A person's: their machines that take secrets and their clients, with each one's key, to seal a secret to (#3397).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SealRecipients"
         }
       }
     },
@@ -5224,7 +5470,7 @@
     },
     {
       "name": "user/setSecret",
-      "x-capability": "user/1",
+      "x-capability": "user/2",
       "tags": [
         {
           "name": "web"
@@ -5236,7 +5482,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/UserSecret"
+            "$ref": "daemon.schema.json#/definitions/UserSecretSet"
           }
         }
       ],
@@ -5245,7 +5491,8 @@
         "schema": {
           "$ref": "daemon.schema.json#/definitions/Empty"
         }
-      }
+      },
+      "description": "A person's secret, sealed by their client to each recipient of user/secretRecipients; the control plane keeps the envelopes and never opens them (#1760, #3397)."
     },
     {
       "name": "user/setSettings",
