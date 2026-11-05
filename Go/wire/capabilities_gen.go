@@ -65,12 +65,14 @@ const CapGroups1 = "groups/1"
 const CapHandover1 = "handover/1"
 const CapHostDesktopControl1 = "host.desktop-control/1"
 const CapHostOrgRoutes1 = "host.org-routes/1"
+const CapHostOrgRoutes2 = "host.org-routes/2"
 const CapHostPolicyLayers1 = "host.policy-layers/1"
 const CapHostPolicy1 = "host.policy/1"
 const CapHostSuspend1 = "host.suspend/1"
 const CapHostTeam1 = "host.team/1"
 const CapHostUpdate1 = "host.update/1"
 const CapHostUserSettings1 = "host.user-settings/1"
+const CapHostUserSettings2 = "host.user-settings/2"
 const CapHostWire1 = "host.wire/1"
 const CapHost1 = "host/1"
 const CapHostsJoin1 = "hosts.join/1"
@@ -91,7 +93,7 @@ const CapMute1 = "mute/1"
 const CapNotices1 = "notices/1"
 const CapOptions1 = "options/1"
 const CapOrgIdentity1 = "org-identity/1"
-const CapOrgRoutes1 = "org-routes/1"
+const CapOrgRoutes2 = "org-routes/2"
 const CapPages1 = "pages/1"
 const CapPairing1 = "pairing/1"
 const CapPeople1 = "people/1"
@@ -129,6 +131,7 @@ const CapRuntimesAccounts1 = "runtimes.accounts/1"
 const CapRuntimesSignIn1 = "runtimes.sign-in/1"
 const CapRuntimes1 = "runtimes/1"
 const CapSandbox1 = "sandbox/1"
+const CapSealing1 = "sealing/1"
 const CapSessionsElsewhere1 = "sessions.elsewhere/1"
 const CapSessionsOnMachine1 = "sessions.on-machine/1"
 const CapSessionsProject1 = "sessions.project/1"
@@ -147,6 +150,7 @@ const CapTime1 = "time/1"
 const CapTunnel1 = "tunnel/1"
 const CapUsage1 = "usage/1"
 const CapUser1 = "user/1"
+const CapUser2 = "user/2"
 const CapViews1 = "views/1"
 const CapWake1 = "wake/1"
 const CapWorkflow1 = "workflow/1"
@@ -643,8 +647,9 @@ var ControlCapabilities = pairs([][2]string{
 	{"handover/status", "handover/1"},
 	{"host/hello", "host/1"},
 	{"host/machines", "host/1"},
-	{"host/orgRoutesAgain", "host.org-routes/1"},
-	{"host/orgRoutesApplied", "host.org-routes/1"},
+	{"host/orgRouteCheck", "host.org-routes/2"},
+	{"host/orgRoutesAgain", "host.org-routes/2"},
+	{"host/orgRoutesApplied", "host.org-routes/2"},
 	{"host/policyApplied", "host.policy/1"},
 	{"host/providerDraft", "host/1"},
 	{"host/status", "host/1"},
@@ -689,12 +694,14 @@ var ControlCapabilities = pairs([][2]string{
 	{"machines/startSession", "sessions.on-machine/1"},
 	{"machines/summaryFacts", "summary.machines/1"},
 	{"notices/take", "notices/1"},
-	{"orgRoutes/check", "org-routes/1"},
-	{"orgRoutes/list", "org-routes/1"},
-	{"orgRoutes/mine", "org-routes/1"},
-	{"orgRoutes/remove", "org-routes/1"},
-	{"orgRoutes/replaceKey", "org-routes/1"},
-	{"orgRoutes/set", "org-routes/1"},
+	{"orgRoutes/check", "org-routes/2"},
+	{"orgRoutes/list", "org-routes/2"},
+	{"orgRoutes/mine", "org-routes/2"},
+	{"orgRoutes/recipients", "org-routes/2"},
+	{"orgRoutes/remove", "org-routes/2"},
+	{"orgRoutes/replaceKey", "org-routes/2"},
+	{"orgRoutes/sealed", "org-routes/2"},
+	{"orgRoutes/set", "org-routes/2"},
 	{"people/forViews", "people/1"},
 	{"people/invite", "people/1"},
 	{"people/list", "people/1"},
@@ -748,6 +755,8 @@ var ControlCapabilities = pairs([][2]string{
 	{"scim/tokens/list", "org-identity/1"},
 	{"scim/tokens/make", "org-identity/1"},
 	{"scim/tokens/revoke", "org-identity/1"},
+	{"sealing/add", "sealing/1"},
+	{"sealing/work", "sealing/1"},
 	{"signIn/addToMe", "signin/1"},
 	{"signIn/approve", "signin/1"},
 	{"signIn/ask", "signin.ask/1"},
@@ -772,11 +781,12 @@ var ControlCapabilities = pairs([][2]string{
 	{"signIn/ticket", "org-identity/1"},
 	{"tunnel/open", "tunnel/1"},
 	{"usage/rollup", "reports/1"},
-	{"user/removeSecret", "user/1"},
-	{"user/secretNames", "user/1"},
+	{"user/removeSecret", "user/2"},
+	{"user/secretNames", "user/2"},
+	{"user/secretRecipients", "user/2"},
 	{"user/setAgentConfigFile", "user/1"},
 	{"user/setPolicy", "host.policy-layers/1"},
-	{"user/setSecret", "user/1"},
+	{"user/setSecret", "user/2"},
 	{"user/setSettings", "user/1"},
 	{"user/settings", "user/1"},
 	{"workflows/claimRun", "bots/1"},
@@ -799,14 +809,15 @@ var ControlCapabilities = pairs([][2]string{
 	{"control/linksChanged", "links/1"},
 	{"control/moved", "control/1"},
 	{"control/notice", "org-identity/1"},
-	{"control/orgRoutesChanged", "org-routes/1"},
-	{"control/orgRoutesLeft", "org-routes/1"},
+	{"control/orgRoutesChanged", "org-routes/2"},
+	{"control/orgRoutesLeft", "org-routes/2"},
 	{"control/peopleChanged", "people/1"},
 	{"control/policyChanged", "policy/1"},
 	{"control/projectsChanged", "projects/1"},
 	{"control/providerDraft", "control/1"},
 	{"control/providersChanged", "control/1"},
-	{"control/secretsLeft", "user/1"},
+	{"control/sealingWanted", "sealing/1"},
+	{"control/secretsLeft", "user/2"},
 	{"control/signInDecided", "signin/1"},
 	{"control/signInRequested", "signin/1"},
 	{"control/signInWaiting", "signin/1"},
@@ -817,12 +828,12 @@ var ControlCapabilities = pairs([][2]string{
 	{"control/webChanged", "control/1"},
 	{"folders/detect", "folders/1"},
 	{"host/clients", "host/1"},
-	{"host/orgRoutes", "host.org-routes/1"},
+	{"host/orgRoutes", "host.org-routes/2"},
 	{"host/policy", "host.policy/1"},
 	{"host/projects", "projects/1"},
 	{"host/release", "host.update/1"},
 	{"host/user", "bots/1"},
-	{"host/userSettings", "user/1"},
+	{"host/userSettings", "host.user-settings/2"},
 	{"notices/delivered", "notices/1"},
 	{"relay/count", "relay/1"},
 	{"relay/deliver", "relay/1"},
@@ -856,6 +867,7 @@ var ControlNotifications = set([]string{
 	"control/projectsChanged",
 	"control/providerDraft",
 	"control/providersChanged",
+	"control/sealingWanted",
 	"control/secretsLeft",
 	"control/signInDecided",
 	"control/signInRequested",
@@ -897,5 +909,7 @@ var DeclaredCapabilities = map[string][]string{
 		"host.suspend/1",
 		"host.policy-layers/1",
 		"host.desktop-control/1",
+		"host.org-routes/2",
+		"host.user-settings/2",
 	},
 }

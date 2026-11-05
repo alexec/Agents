@@ -12,7 +12,9 @@ export const fromOrganisation = "From your organisation";
 export const noPlanLimit = "Organisation · No plan limit";
 export const routesTitle = "Your Organisation’s Ways to the Model";
 export const noRoutes = "Your organisation gives you no key or gateway. Each runtime uses your own sign-in.";
-export const routesFoot = "Your organisation keeps the keys. No client shows them, and the runtime never has them: it reaches the model through a relay on your machine.";
+export const routesFoot = "Your organisation’s admins seal the keys to your machines. No client shows them, and the runtime never has them: it reaches the model through a relay on your machine.";
+/** A route one of the person's machines waits for (#3397). */
+export const routeWaiting = "Waiting for an admin’s app to seal it for one of your machines.";
 
 export const kinds: readonly OrgRouteKind[] = ["key", "bedrock", "vertex", "azure", "baseURL"];
 export const kindNames: Record<OrgRouteKind, string> = {
@@ -182,8 +184,9 @@ export function routeOf(form: RouteForm, base: OrgRoute | undefined): { route: O
   else delete route.models;
   route.groups = [...form.groups];
   route.defaultFor = form.defaultFor.filter((id) => runtimes.includes(id));
-  // The count the control plane adds for an admin; it sets the rest itself.
+  // The counts the control plane adds for an admin; it sets the rest itself.
   delete route.machines;
+  delete route.waiting;
   return { route, secrets };
 }
 
@@ -212,5 +215,11 @@ export function heldWords(r: OrgRoute): string {
   return n === 0 ? "Held by no machine" : n === 1 ? "Held by 1 machine" : `Held by ${n} machines`;
 }
 
-export const noSealing = "This control plane has no key to seal secrets with, so it keeps no route with a key. Start it with a key file or AGENTS_CONTROL_KMS. A gateway with no key can still be added.";
-export const modelAccessFoot = "A key is sealed on the control plane and sent to each machine that may use it, sealed to that machine. No client shows it again, admins included: compare the fingerprint. The runtime gets a stand-in and reaches the model through a relay on its machine.";
+/** "1 machine waits for an admin’s app to seal the key for it." (#3397) */
+export function waitingWords(r: OrgRoute): string {
+  const n = r.waiting ?? 0;
+  const who = n === 1 ? "1 machine waits" : `${n} machines wait`;
+  return `${who} for an admin’s app to seal the key for it. This happens when an admin opens Agents.`;
+}
+
+export const modelAccessFoot = "A key is sealed in this browser to each machine that may use it, and to each admin’s app: the control plane keeps only what it cannot open. A machine that joins later waits until an admin’s app is open to seal the key for it. No client shows a key again, admins included: compare the fingerprint. The runtime gets a stand-in and reaches the model through a relay on its machine.";

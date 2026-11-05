@@ -10,7 +10,7 @@ import { go } from "../../route";
 import { describe } from "../../model/errors";
 import { changed, editPolicy, foot, none, resumeAll, resumeMessage, resumeTitle, rules, runningAgents, stopAll, stopFoot,
   stopMessage, stopTitle, stoppedBy, stoppedStrip, title, viewOf } from "../../model/orgPolicy";
-import { fromOrganisation, mineLine, noRoutes, routesFoot, routesTitle } from "../../model/orgAccounts";
+import { fromOrganisation, mineLine, noRoutes, routesFoot, routeWaiting, routesTitle } from "../../model/orgAccounts";
 import { GovernanceAsk } from "../Governance";
 
 /** The red strip while the kill switch is on, and the time it went on. */
@@ -108,6 +108,7 @@ export function PolicySection({ store, down }: { store: Store; down: boolean }) 
                     <li key={r.id}>
                       <span class="strong">{r.name}</span> <span class="quiet small">{fromOrganisation}</span><br />
                       <span class="small">{mineLine(r)}</span>
+                      {r.waiting && <><br /><span class="small attention">{routeWaiting}</span></>}
                     </li>
                   ))}
                 </ul>

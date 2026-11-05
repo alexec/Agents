@@ -980,10 +980,6 @@
       "release": "---\nname: release\n---\n"
     }
   },
-  "UserSecret": {
-    "name": "GITHUB_TOKEN",
-    "value": "ghp_example"
-  },
   "UserSecretRequest": {
     "name": "GITHUB_TOKEN"
   },
@@ -1001,10 +997,13 @@
             "name": "Sam's box",
             "at": "2026-10-21T15:00:00Z"
           }
+        ],
+        "version": 2,
+        "waiting": [
+          "box-2"
         ]
       }
-    ],
-    "sealing": true
+    ]
   },
   "UserSettingsChanged": {
     "parts": [
@@ -1142,5 +1141,84 @@
         "lastUsed": "2026-10-30"
       }
     ]
+  },
+  "UserSecretSet": {
+    "name": "GITHUB_TOKEN",
+    "version": 2,
+    "values": {
+      "m:box": {
+        "encapsulated": "BKzbiazQR4LGtRgQPSlIVEoCcE1zvM05lm29rjZefnVpuo68H773EO5R7jmXVga9BvIRe/w1Lo2D/Wckk23ZZh4=",
+        "ciphertext": "c2VhbGVk"
+      }
+    }
+  },
+  "SealRecipients": {
+    "recipients": [
+      {
+        "id": "m:box",
+        "name": "Sam's box",
+        "publicKey": "BKzbiazQR4LGtRgQPSlIVEoCcE1zvM05lm29rjZefnVpuo68H773EO5R7jmXVga9BvIRe/w1Lo2D/Wckk23ZZh4="
+      }
+    ],
+    "user": "sam"
+  },
+  "SealingWork": {
+    "items": [
+      {
+        "item": "orgRoute",
+        "id": "acme",
+        "user": "sam",
+        "version": 3,
+        "kind": "baseURL",
+        "vendor": "openai",
+        "settings": {
+          "address": "https://llm.acme.example"
+        },
+        "mine": {
+          "apiKey": {
+            "encapsulated": "BKzbiazQR4LGtRgQPSlIVEoCcE1zvM05lm29rjZefnVpuo68H773EO5R7jmXVga9BvIRe/w1Lo2D/Wckk23ZZh4=",
+            "ciphertext": "c2VhbGVk"
+          }
+        },
+        "missing": [
+          {
+            "id": "m:box",
+            "name": "Sam's box",
+            "publicKey": "BKzbiazQR4LGtRgQPSlIVEoCcE1zvM05lm29rjZefnVpuo68H773EO5R7jmXVga9BvIRe/w1Lo2D/Wckk23ZZh4="
+          }
+        ]
+      }
+    ]
+  },
+  "SealingAdd": {
+    "items": [
+      {
+        "item": "userSecret",
+        "id": "GITHUB_TOKEN",
+        "version": 2,
+        "values": {
+          "m:box": {
+            "value": {
+              "encapsulated": "BKzbiazQR4LGtRgQPSlIVEoCcE1zvM05lm29rjZefnVpuo68H773EO5R7jmXVga9BvIRe/w1Lo2D/Wckk23ZZh4=",
+              "ciphertext": "c2VhbGVk"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "OrgRouteSealed": {
+    "sealVersion": 3,
+    "fingerprint": {
+      "apiKey": "01ce2783"
+    },
+    "values": {
+      "m:box": {
+        "apiKey": {
+          "encapsulated": "BKzbiazQR4LGtRgQPSlIVEoCcE1zvM05lm29rjZefnVpuo68H773EO5R7jmXVga9BvIRe/w1Lo2D/Wckk23ZZh4=",
+          "ciphertext": "c2VhbGVk"
+        }
+      }
+    }
   }
 }

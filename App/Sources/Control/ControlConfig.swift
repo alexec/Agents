@@ -79,6 +79,15 @@ enum ControlConfig {
         }
     }
 
+    /// This window's key and client id as the control plane knows them, to open what was
+    /// sealed to it and seal it again (#3397); nil with no pairing.
+    static func sealing() -> (key: DeviceKey, client: UUID)? {
+        guard case .remote(let membership)? = endpoint, let client = membership.client,
+              let raw = try? ControlClientKey.loadOrMake(account: keyAccount), let key = try? DeviceKey.software(privateKey: raw)
+        else { return nil }
+        return (key, client)
+    }
+
     /// This Mac's host directly (#1118): agentsd's socket in the app group, named by the
     /// control plane's key, proved with this window's own key. Nil with no pairing, or no
     /// group container for this build.

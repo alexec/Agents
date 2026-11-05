@@ -4,18 +4,14 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"encoding/pem"
-	"net/http"
-	"net/http/httptest"
+	"maps"
 	"slices"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -70,14 +66,28 @@ func (d *routesTold) route(host, id string) *wire.DeliveredRoute {
 	return nil
 }
 
+// sealed is a delivered route that came with its secrets, not waiting.
+func (d *routesTold) sealed(host, id string) *wire.DeliveredRoute {
+	r := d.route(host, id)
+	if r == nil || r.Waiting != nil && *r.Waiting {
+		return nil
+	}
+	return r
+}
+
 // opened is what a delivered route's field opens to with the machine's own key.
 func opened(t *testing.T, box *fakeHost, r *wire.DeliveredRoute, field string) string {
 	t.Helper()
-	plain, err := OpenOrgRoute(box.private, *r, box.member.Host, r.Sealed[field])
+	plain, err := openRoute(box.private, *r, box.member.Host, field)
 	if err != nil {
 		t.Fatalf("%s's %s does not open: %v", r.ID, field, err)
 	}
 	return string(plain)
+}
+
+func openRoute(private []byte, r wire.DeliveredRoute, host, field string) ([]byte, error) {
+	return controllink.Open(private, controllink.OrgRoutePurpose, controllink.DeliveredRouteAD(r, controllink.MachineRecipient(host), field),
+		r.Sealed[field])
 }
 
 // routesHello is a machine that keeps org routes.
@@ -98,10 +108,55 @@ func newKeeperKey() []byte {
 	return key
 }
 
-func setRoute(t *testing.T, s *controllink.Session, route wire.OrgRoute, secrets map[string]string, rev *string) wire.OrgRouteKept {
+// valueFingerprint is the first 8 hex of a value's SHA-256, as a client works it out.
+func valueFingerprint(value string) string {
+	sum := sha256.Sum256([]byte(value))
+	return hex.EncodeToString(sum[:])[:8]
+}
+
+// sealRoute is what an admin's client does (#3397): ask who the route is sealed to, and
+// seal each value to each of them, at sealVersion.
+func sealRoute(t *testing.T, s *controllink.Session, route wire.OrgRoute, values map[string]string, sealVersion int64) *wire.OrgRouteSealed {
 	t.Helper()
+	var recipients wire.SealRecipients
+	json.Unmarshal(call(t, s, "", "orgRoutes/recipients", wire.OrgRouteRecipientsRequest{Groups: route.Groups}), &recipients)
+	return sealTo(t, recipients.Recipients, route, values, sealVersion)
+}
+
+func sealTo(t *testing.T, recipients []wire.SealRecipient, route wire.OrgRoute, values map[string]string, sealVersion int64) *wire.OrgRouteSealed {
+	t.Helper()
+	id := route.ID
+	if id == "" {
+		id = routeIDFrom(route.Name)
+	}
+	out := &wire.OrgRouteSealed{SealVersion: sealVersion, Fingerprint: map[string]string{}, Values: map[string]map[string]wire.SealedEnvelope{}}
+	for field, value := range values {
+		out.Fingerprint[field] = valueFingerprint(value)
+	}
+	for _, r := range recipients {
+		out.Values[r.ID] = map[string]wire.SealedEnvelope{}
+		for field, value := range values {
+			ad := controllink.OrgRouteAD(id, r.ID, field, sealVersion, route.Kind, route.Vendor, route.Settings)
+			e, err := controllink.Seal(r.PublicKey, controllink.OrgRoutePurpose, ad, []byte(value))
+			if err != nil {
+				t.Fatal(err)
+			}
+			out.Values[r.ID][field] = e
+		}
+	}
+	return out
+}
+
+// setRoute adds or changes a route as an admin's client does: with its values sealed, one
+// seal version on from was, when there are values.
+func setRoute(t *testing.T, s *controllink.Session, route wire.OrgRoute, values map[string]string, rev *string, was int64) wire.OrgRouteKept {
+	t.Helper()
+	request := wire.OrgRouteSet{Route: route, Rev: rev}
+	if len(values) > 0 {
+		request.Sealed = sealRoute(t, s, route, values, was+1)
+	}
 	var kept wire.OrgRouteKept
-	json.Unmarshal(call(t, s, "", "orgRoutes/set", wire.OrgRouteSet{Route: route, Secrets: secrets, Rev: rev}), &kept)
+	json.Unmarshal(call(t, s, "", "orgRoutes/set", request), &kept)
 	return kept
 }
 
@@ -142,7 +197,7 @@ func storeHolds(t *testing.T, st store.Store, value string) bool {
 // routes, nothing to one that does not, and writes nothing.
 func TestNoRouteSendsAnEmptyListAndChangesNothing(t *testing.T) {
 	t.Parallel()
-	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), withKeeper(newKeeperKey()))
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	told := newRoutesTold()
 	p.told = told.heard
 	_, window := p.client("Alex's Mac")
@@ -161,7 +216,7 @@ func TestNoRouteSendsAnEmptyListAndChangesNothing(t *testing.T) {
 	if len(mine.Routes) != 0 {
 		t.Fatalf("%+v", mine)
 	}
-	if list := listRoutes(t, window); len(list.Routes) != 0 || !list.Sealing {
+	if list := listRoutes(t, window); len(list.Routes) != 0 {
 		t.Fatalf("%+v", list)
 	}
 	call(t, window, box.member.Host, "daemon/ping", nil)
@@ -170,12 +225,13 @@ func TestNoRouteSendsAnEmptyListAndChangesNothing(t *testing.T) {
 	}
 }
 
-// FR-001 to FR-004, US2: an admin's save is bounded by the spec's table, conditional on its
-// rev and one version higher; no method gives a value back; the store holds none; a member
-// sees only names; a control plane with no keeper keeps no secret.
+// FR-001 to FR-004, US2, #3397: an admin's save is bounded by the spec's table,
+// conditional on its rev and one version higher; it carries envelopes only, and no method
+// gives a value back; the store holds none; a member sees only names. A control plane with
+// no keeper keeps a key: it never needed to open one.
 func TestAnAdminKeepsARouteAndNoValueComesBack(t *testing.T) {
 	t.Parallel()
-	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), withKeeper(newKeeperKey()))
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	_, window := p.client("Alex's Mac")
 	sam := p.invite(window, "Sam", wire.UserRoleMember)
 	priya := p.invite(window, "Priya", wire.UserRoleAdmin)
@@ -204,39 +260,60 @@ func TestAnAdminKeepsARouteAndNoValueComesBack(t *testing.T) {
 			map[string]string{"apiKey": key, "awsAccessKeyId": "AKIA", "awsSecretAccessKey": "s"}},
 		{wire.OrgRoute{Name: "Plain http", Kind: wire.OrgRouteKindBaseURL, Vendor: anthropic, Runtimes: []string{"claude"},
 			Settings: &wire.OrgRouteSettings{Address: optional("http://gateway.example.com")}}, nil},
-		{wire.OrgRoute{Name: "Vertex", Kind: wire.OrgRouteKindVertex, Runtimes: []string{"claude"},
-			Settings: &wire.OrgRouteSettings{Project: optional("p"), Location: optional("us-east5")}}, map[string]string{"serviceAccount": "{}"}},
-		{wire.OrgRoute{Name: "No group", Kind: wire.OrgRouteKindKey, Vendor: anthropic, Runtimes: []string{"claude"}, Groups: []string{"nobody"}}, map[string]string{"apiKey": key}},
+		{wire.OrgRoute{Name: "Two lines", Kind: wire.OrgRouteKindBaseURL, Vendor: anthropic, Runtimes: []string{"claude"},
+			Settings: &wire.OrgRouteSettings{Address: optional("https://gateway.example.com"), ApiVersion: optional("v1\nregion=elsewhere")}}, nil},
+		{wire.OrgRoute{Name: "No group", Kind: wire.OrgRouteKindKey, Vendor: anthropic, Runtimes: []string{"claude"}, Groups: []string{"nobody"}}, nil},
 	} {
-		if e := callError(t, window, "", "orgRoutes/set", wire.OrgRouteSet{Route: bad.route, Secrets: bad.secrets}); !strings.Contains(e, "-32602") {
+		request := wire.OrgRouteSet{Route: bad.route}
+		if len(bad.secrets) > 0 {
+			request.Sealed = sealRoute(t, window, wire.OrgRoute{Name: bad.route.Name, Kind: bad.route.Kind, Vendor: bad.route.Vendor,
+				Settings: bad.route.Settings}, bad.secrets, 1)
+		}
+		if e := callError(t, window, "", "orgRoutes/set", request); !strings.Contains(e, "-32602") {
 			t.Errorf("%+v: %s", bad.route.Name, e)
 		}
 	}
+	// Sealed one version on from none, or for no recipient, is refused.
+	if e := callError(t, window, "", "orgRoutes/set", wire.OrgRouteSet{Route: good, Sealed: sealRoute(t, window, good, map[string]string{"apiKey": key}, 2)}); !strings.Contains(e, "-32093") {
+		t.Fatal(e)
+	}
+	if e := callError(t, window, "", "orgRoutes/set", wire.OrgRouteSet{Route: good, Sealed: sealTo(t, nil, good, map[string]string{"apiKey": key}, 1)}); !strings.Contains(e, "-32602") {
+		t.Fatal(e)
+	}
 	// A member changes nothing, and reads only the routes they may use, by name.
-	for _, method := range []string{"orgRoutes/list", "orgRoutes/set", "orgRoutes/replaceKey", "orgRoutes/check", "orgRoutes/remove"} {
-		if e := callError(t, sam.window, "", method, map[string]any{"route": good, "id": "x", "rev": "x", "secrets": map[string]string{"apiKey": key}}); !strings.Contains(e, "-32045") {
+	for _, method := range []string{"orgRoutes/list", "orgRoutes/set", "orgRoutes/replaceKey", "orgRoutes/check", "orgRoutes/remove",
+		"orgRoutes/recipients", "orgRoutes/sealed"} {
+		if e := callError(t, sam.window, "", method, map[string]any{"route": good, "id": "x", "rev": "x"}); !strings.Contains(e, "-32045") {
 			t.Errorf("%s: %s", method, e)
 		}
 	}
 
-	first := setRoute(t, window, good, map[string]string{"apiKey": key}, nil)
+	first := setRoute(t, window, good, map[string]string{"apiKey": key}, nil, 0)
 	r := first.Route
-	if r.ID != "acme-anthropic" || deref(r.Version) != 1 || first.Rev == "" || !slices.Equal(r.SecretFields, []string{"apiKey"}) ||
-		len(r.Fingerprint["apiKey"]) != 8 || r.Created == nil || r.Created.By.User != p.s.localOwner() {
+	if r.ID != "acme-anthropic" || deref(r.Version) != 1 || deref(r.SealVersion) != 1 || first.Rev == "" ||
+		!slices.Equal(r.SecretFields, []string{"apiKey"}) || r.Fingerprint["apiKey"] != valueFingerprint(key) || r.Created == nil ||
+		r.Created.By.User != p.s.localOwner() {
 		t.Fatalf("%+v", first)
 	}
 	// The same id again, with no rev, is told to load it.
-	if e := callError(t, priya.window, "", "orgRoutes/set", wire.OrgRouteSet{Route: good, Secrets: map[string]string{"apiKey": key}}); !strings.Contains(e, "-32093") {
+	if e := callError(t, priya.window, "", "orgRoutes/set", wire.OrgRouteSet{Route: good, Sealed: sealRoute(t, priya.window, good, map[string]string{"apiKey": key}, 1)}); !strings.Contains(e, "-32093") {
 		t.Fatal(e)
 	}
-	// Two admins read the same rev; the second to save is told to load it again.
+	// Two admins read the same rev; the second to save is told to load it again. A rename
+	// keeps the key, sealed as it was.
 	renamed := r
 	renamed.Name = "Acme"
-	second := setRoute(t, window, renamed, nil, &first.Rev)
-	if deref(second.Route.Version) != 2 || second.Route.Fingerprint["apiKey"] != r.Fingerprint["apiKey"] {
+	second := setRoute(t, window, renamed, nil, &first.Rev, 0)
+	if deref(second.Route.Version) != 2 || deref(second.Route.SealVersion) != 1 || second.Route.Fingerprint["apiKey"] != r.Fingerprint["apiKey"] {
 		t.Fatalf("%+v", second.Route)
 	}
 	if e := callError(t, priya.window, "", "orgRoutes/set", wire.OrgRouteSet{Route: renamed, Rev: &first.Rev}); !strings.Contains(e, "-32093") {
+		t.Fatal(e)
+	}
+	// A change to where the key goes is not taken without the key sealed again.
+	moved := second.Route
+	moved.Kind, moved.Settings = wire.OrgRouteKindBaseURL, &wire.OrgRouteSettings{Address: optional("https://elsewhere.example")}
+	if e := callError(t, window, "", "orgRoutes/set", wire.OrgRouteSet{Route: moved, Rev: &second.Rev}); !strings.Contains(e, "seals the key again") {
 		t.Fatal(e)
 	}
 
@@ -256,41 +333,34 @@ func TestAnAdminKeepsARouteAndNoValueComesBack(t *testing.T) {
 	if bytes.Contains(answers[1], []byte("fingerprint")) || bytes.Contains(answers[1], []byte("settings")) {
 		t.Fatalf("a member was told more than names: %s", answers[1])
 	}
-	// The store holds the envelope, never the value.
+	// The store holds envelopes, never the value.
 	if storeHolds(t, p.store, key) {
 		t.Fatal("the store holds the key")
 	}
 	if object, _ := p.store.Get(t.Context(), orgSecretKey("acme-anthropic")); object == nil {
-		t.Fatal("no envelope")
+		t.Fatal("no envelopes")
 	}
-
-	// A control plane with no keeper keeps no secret; a base URL with no key it may keep.
-	bare := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
-	_, bareWindow := bare.client("Alex's Mac")
-	if e := callError(t, bareWindow, "", "orgRoutes/set", wire.OrgRouteSet{Route: good, Secrets: map[string]string{"apiKey": key}}); !strings.Contains(e, "-32009") || !strings.Contains(e, "no key to seal") {
-		t.Fatal(e)
-	}
-	gateway := setRoute(t, bareWindow, wire.OrgRoute{Name: "Local LiteLLM", Kind: wire.OrgRouteKindBaseURL, Vendor: vendor(wire.OrgRouteVendorOpenai),
-		Runtimes: []string{"codex"}, Settings: &wire.OrgRouteSettings{Address: optional("http://127.0.0.1:4000")}}, nil, nil)
-	if deref(gateway.Route.Version) != 1 || len(gateway.Route.SecretFields) != 0 {
-		t.Fatalf("%+v", gateway)
-	}
-	if list := listRoutes(t, bareWindow); list.Sealing || len(list.Routes) != 1 {
-		t.Fatalf("%+v", list)
+	// Each admin's client has a copy that it alone opens, and orgRoutes/sealed gives it.
+	var item wire.SealingItem
+	json.Unmarshal(call(t, priya.window, "", "orgRoutes/sealed", wire.OrgRouteRequest{ID: "acme-anthropic"}), &item)
+	ad := controllink.OrgRouteAD("acme-anthropic", controllink.ClientRecipient(priya.member.Client), "apiKey", 1, wire.OrgRouteKindKey, anthropic, nil)
+	if plain, err := controllink.Open(priya.member.Private, controllink.OrgRoutePurpose, ad, item.Mine["apiKey"]); err != nil || string(plain) != key {
+		t.Fatalf("%q %v", plain, err)
 	}
 }
 
-// FR-005, SC-002: two copies, three machines of two people across them, and a route for a
-// group: only the group's machines get it, within 5 seconds, and each envelope opens with
-// that machine's key only, and not as another route, machine or version.
+// FR-005, SC-002, #3397: two copies, three machines of two people across them, and a route
+// for a group: only the group's machines get it, within 5 seconds, each copy opens with
+// that machine's key only, and not as another route, machine, field, version or address.
+// A machine that joins later waits, and an admin's client seals it for that machine.
 func TestARouteReachesOnlyTheMachinesAllowed(t *testing.T) {
 	// Not parallel (#2512): it holds a wall-clock limit, which other tests running beside it would make flaky.
-	st, private, keeper := store.NewMemory(), controllink.NewPrivateKey(), newKeeperKey()
-	a, b := startCopyWith(t, st, private, withKeeper(keeper)), startCopyWith(t, st, private, withKeeper(keeper))
+	st, private := store.NewMemory(), controllink.NewPrivateKey()
+	a, b := startCopy(t, st, private), startCopy(t, st, private)
 	a.waitFor(func() bool { return len(a.s.mesh.peers()) == 1 && len(b.s.mesh.peers()) == 1 }, "the copies linked")
 	told := newRoutesTold()
 	a.told, b.told = told.heard, told.heard
-	_, window := a.client("Admin's Mac")
+	member, window := a.client("Admin's Mac")
 	alex := &person{id: a.s.localOwner(), window: window}
 	sam := a.invite(window, "Sam", wire.UserRoleMember)
 	alexBox := a.machineSaying(alex, routesHello("MACHINE-2"))
@@ -302,12 +372,26 @@ func TestARouteReachesOnlyTheMachinesAllowed(t *testing.T) {
 	var platform wire.Group
 	json.Unmarshal(call(t, window, "", "groups/set", wire.GroupSet{Name: "Platform", Members: []string{sam.id}}), &platform)
 
+	// The admin's client is told whom to seal to: Sam's two machines and its own self.
+	var recipients wire.SealRecipients
+	json.Unmarshal(call(t, window, "", "orgRoutes/recipients", wire.OrgRouteRecipientsRequest{Groups: []string{platform.ID}}), &recipients)
+	var ids []string
+	for _, r := range recipients.Recipients {
+		ids = append(ids, r.ID)
+	}
+	want := []string{controllink.ClientRecipient(member.Client), controllink.MachineRecipient(samAtA.member.Host), controllink.MachineRecipient(samAtB.member.Host)}
+	slices.Sort(want)
+	if !slices.Equal(ids, want) {
+		t.Fatalf("%v, not %v", ids, want)
+	}
+
 	const key = "sk-proj-org-key-for-platform"
 	saved := time.Now()
-	kept := setRoute(t, window, wire.OrgRoute{ID: "platform-openai", Name: "Platform OpenAI", Kind: wire.OrgRouteKindKey,
-		Vendor: vendor(wire.OrgRouteVendorOpenai), Runtimes: []string{"codex"}, Groups: []string{platform.ID}}, map[string]string{"apiKey": key}, nil)
+	route := wire.OrgRoute{ID: "platform-openai", Name: "Platform OpenAI", Kind: wire.OrgRouteKindKey,
+		Vendor: vendor(wire.OrgRouteVendorOpenai), Runtimes: []string{"codex"}, Groups: []string{platform.ID}}
+	setRoute(t, window, route, map[string]string{"apiKey": key}, nil, 0)
 	for _, m := range []*fakeHost{samAtA, samAtB} {
-		a.waitFor(func() bool { return told.route(m.member.Host, "platform-openai") != nil }, "Sam's machines told the route")
+		a.waitFor(func() bool { return told.sealed(m.member.Host, "platform-openai") != nil }, "Sam's machines told the route")
 	}
 	if took := time.Since(saved); took > 5*time.Second {
 		t.Fatalf("took %v", took)
@@ -317,48 +401,49 @@ func TestARouteReachesOnlyTheMachinesAllowed(t *testing.T) {
 		t.Fatal("a machine of a person outside the group was told the route")
 	}
 	r := told.route(samAtB.member.Host, "platform-openai")
-	if r.Version != 1 || r.Name != "Platform OpenAI" || !slices.Equal(r.SecretFields, []string{"apiKey"}) || r.Expires != nil {
+	if r.Version != 1 || r.SealVersion != 1 || r.Name != "Platform OpenAI" || !slices.Equal(r.SecretFields, []string{"apiKey"}) || len(r.Sealed) != 1 {
 		t.Fatalf("%+v", r)
 	}
 	if got := opened(t, samAtB, r, "apiKey"); got != key {
 		t.Fatalf("opened %q", got)
 	}
-	sealed := r.Sealed["apiKey"]
-	if bytes.Contains(sealed.Ciphertext, []byte(key)) {
+	if bytes.Contains(r.Sealed["apiKey"].Ciphertext, []byte(key)) {
 		t.Fatal("the key is in the clear")
 	}
-	// Another machine's key, another machine's id, another route's id or an older version
-	// does not open it; nor does the route with its address, header or kind changed.
-	if _, err := OpenOrgRoute(samAtA.private, *r, samAtB.member.Host, sealed); err == nil {
+	// Another machine's key, another machine's id, another route's id, field or seal does
+	// not open it; nor does the route with its address, header or kind changed.
+	if _, err := openRoute(samAtA.private, *r, samAtB.member.Host, "apiKey"); err == nil {
 		t.Fatal("another machine's key opens it")
 	}
-	if _, err := OpenOrgRoute(samAtB.private, *r, samAtA.member.Host, sealed); err == nil {
+	if _, err := openRoute(samAtB.private, *r, samAtA.member.Host, "apiKey"); err == nil {
 		t.Fatal("it opens as another machine's")
 	}
 	for what, edit := range map[string]func(r *wire.DeliveredRoute){
-		"another route":   func(r *wire.DeliveredRoute) { r.ID = "another" },
-		"another version": func(r *wire.DeliveredRoute) { r.Version++ },
+		"another route": func(r *wire.DeliveredRoute) { r.ID = "another" },
+		"another seal":  func(r *wire.DeliveredRoute) { r.SealVersion++ },
+		"another field": func(r *wire.DeliveredRoute) {
+			r.Sealed = map[string]wire.SealedEnvelope{"azureKey": r.Sealed["apiKey"]}
+		},
 		"another address": func(r *wire.DeliveredRoute) {
 			r.Settings = &wire.OrgRouteSettings{Address: new("https://elsewhere.example")}
 		},
-		"another header": func(r *wire.DeliveredRoute) {
-			settings := wire.OrgRouteSettings{}
-			if r.Settings != nil {
-				settings = *r.Settings
-			}
-			settings.Header = new("X-Elsewhere")
-			r.Settings = &settings
-		},
-		"another kind": func(r *wire.DeliveredRoute) { r.Kind = wire.OrgRouteKindBaseURL },
+		"another header": func(r *wire.DeliveredRoute) { r.Settings = &wire.OrgRouteSettings{Header: new("X-Elsewhere")} },
+		"another kind":   func(r *wire.DeliveredRoute) { r.Kind = wire.OrgRouteKindBaseURL },
+		"another vendor": func(r *wire.DeliveredRoute) { r.Vendor = vendor(wire.OrgRouteVendorXai) },
 	} {
 		changed := *r
+		changed.Sealed = maps.Clone(r.Sealed)
 		edit(&changed)
-		if _, err := OpenOrgRoute(samAtB.private, changed, samAtB.member.Host, sealed); err == nil {
+		field := "apiKey"
+		if what == "another field" {
+			field = "azureKey"
+		}
+		if _, err := openRoute(samAtB.private, changed, samAtB.member.Host, field); err == nil {
 			t.Fatalf("it opens as %s", what)
 		}
 	}
 
-	// Each machine says it keeps it; the list counts them.
+	// Each machine says it keeps it; the list counts them, and none waits.
 	for _, m := range []*fakeHost{samAtA, samAtB} {
 		if _, err := m.uplink.Ask(t.Context(), wire.CallHostOrgRoutesApplied.Name,
 			wire.OrgRoutesApplied{Routes: []wire.OrgRouteVersion{{ID: "platform-openai", Version: 1}}}); err != nil {
@@ -367,26 +452,88 @@ func TestARouteReachesOnlyTheMachinesAllowed(t *testing.T) {
 	}
 	a.waitFor(func() bool {
 		list := listRoutes(t, window)
-		return len(list.Routes) == 1 && deref(list.Routes[0].Route.Machines) == 2
+		return len(list.Routes) == 1 && deref(list.Routes[0].Route.Machines) == 2 && deref(list.Routes[0].Route.Waiting) == 0
 	}, "two machines hold the route")
 
-	// A machine that joins later gets it at its join; one that asks again gets it again.
+	// A machine that joins later waits: no copy is sealed to it. The list says so, and so
+	// does Sam's orgRoutes/mine. The admin's clients are asked to seal it.
 	later := b.machineSaying(sam, routesHello("MACHINE-5"))
 	a.waitFor(func() bool { return told.route(later.member.Host, "platform-openai") != nil }, "a later machine told the route")
+	waiting := told.route(later.member.Host, "platform-openai")
+	if waiting.Waiting == nil || !*waiting.Waiting || len(waiting.Sealed) != 0 {
+		t.Fatalf("%+v", waiting)
+	}
+	if list := listRoutes(t, window); deref(list.Routes[0].Route.Waiting) != 1 {
+		t.Fatalf("%+v", list.Routes[0].Route)
+	}
+	var mine wire.OrgRoutesMine
+	json.Unmarshal(call(t, sam.window, "", "orgRoutes/mine", nil), &mine)
+	if len(mine.Routes) != 1 || !deref(mine.Routes[0].Waiting) {
+		t.Fatalf("%+v", mine)
+	}
+	waitNote(t, window, wire.NotifyControlSealingWanted.Name)
+	sealForMissing(t, window, member)
+	a.waitFor(func() bool { return told.sealed(later.member.Host, "platform-openai") != nil }, "the later machine told its copy")
+	if got := opened(t, later, told.route(later.member.Host, "platform-openai"), "apiKey"); got != key {
+		t.Fatalf("opened %q", got)
+	}
+	if list := listRoutes(t, window); deref(list.Routes[0].Route.Waiting) != 0 {
+		t.Fatalf("%+v", list.Routes[0].Route)
+	}
+	// One that asks again gets it again.
 	n := told.count(later.member.Host)
 	if _, err := later.uplink.Ask(t.Context(), wire.CallHostOrgRoutesAgain.Name, wire.Empty{}); err != nil {
 		t.Fatal(err)
 	}
 	a.waitFor(func() bool { return told.count(later.member.Host) > n }, "the machine told again")
-	_ = kept
 }
 
-// FR-004, US4: a replaced key reaches the machines as a new version; a person taken out of
+// sealForMissing is what a client does on control/sealingWanted: sealing/work, open its
+// own copy of each item, seal it to each recipient missing, sealing/add.
+func sealForMissing(t *testing.T, s *controllink.Session, member *controllink.ClientMembership) int {
+	t.Helper()
+	var work wire.SealingWork
+	json.Unmarshal(call(t, s, "", "sealing/work", nil), &work)
+	me := controllink.ClientRecipient(member.Client)
+	add := wire.SealingAdd{Items: []wire.SealingAddItem{}}
+	for _, item := range work.Items {
+		next := wire.SealingAddItem{Item: item.Item, ID: item.ID, Version: item.Version, Values: map[string]map[string]wire.SealedEnvelope{}}
+		for field, e := range item.Mine {
+			info, ad := controllink.OrgRoutePurpose, controllink.OrgRouteAD(item.ID, me, field, item.Version, deref(item.Kind), item.Vendor, item.Settings)
+			if item.Item == wire.SealingItemKindUserSecret {
+				info, ad = controllink.UserSecretPurpose, controllink.UserSecretAD(deref(item.User), me, item.ID, item.Version)
+			}
+			plain, err := controllink.Open(member.Private, info, ad, e)
+			if err != nil {
+				t.Fatalf("%s's own copy does not open: %v", item.ID, err)
+			}
+			for _, r := range item.Missing {
+				ad := controllink.OrgRouteAD(item.ID, r.ID, field, item.Version, deref(item.Kind), item.Vendor, item.Settings)
+				if item.Item == wire.SealingItemKindUserSecret {
+					ad = controllink.UserSecretAD(deref(item.User), r.ID, item.ID, item.Version)
+				}
+				sealed, err := controllink.Seal(r.PublicKey, info, ad, plain)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if next.Values[r.ID] == nil {
+					next.Values[r.ID] = map[string]wire.SealedEnvelope{}
+				}
+				next.Values[r.ID][field] = sealed
+			}
+		}
+		add.Items = append(add.Items, next)
+	}
+	call(t, s, "", "sealing/add", add)
+	return len(work.Items)
+}
+
+// FR-004, US4: a replaced key reaches the machines as a new seal; a person taken out of
 // the group and a removed route give an empty list; the audit says "key replaced" and holds
 // no value; a removed machine's person and the admins hear which routes it held.
 func TestReplaceAndRemoveARoute(t *testing.T) {
 	t.Parallel()
-	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), withKeeper(newKeeperKey()))
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	told := newRoutesTold()
 	p.told = told.heard
 	_, window := p.client("Alex's Mac")
@@ -397,21 +544,25 @@ func TestReplaceAndRemoveARoute(t *testing.T) {
 	json.Unmarshal(call(t, window, "", "groups/set", wire.GroupSet{Name: "Platform", Members: []string{sam.id}}), &platform)
 
 	const oldKey, newKey = "sk-ant-old-key-111111", "sk-ant-new-key-222222"
-	kept := setRoute(t, window, wire.OrgRoute{Name: "Acme", Kind: wire.OrgRouteKindKey, Vendor: vendor(wire.OrgRouteVendorAnthropic),
-		Runtimes: []string{"claude"}, Groups: []string{platform.ID}}, map[string]string{"apiKey": oldKey}, nil)
-	p.waitFor(func() bool { return told.route(box.member.Host, "acme") != nil }, "the machine told the route")
+	route := wire.OrgRoute{Name: "Acme", Kind: wire.OrgRouteKindKey, Vendor: vendor(wire.OrgRouteVendorAnthropic),
+		Runtimes: []string{"claude"}, Groups: []string{platform.ID}}
+	kept := setRoute(t, window, route, map[string]string{"apiKey": oldKey}, nil, 0)
+	p.waitFor(func() bool { return told.sealed(box.member.Host, "acme") != nil }, "the machine told the route")
 
 	var replaced wire.OrgRouteKept
-	json.Unmarshal(call(t, window, "", "orgRoutes/replaceKey", wire.OrgRouteReplaceKey{ID: "acme", Secrets: map[string]string{"apiKey": newKey}, Rev: kept.Rev}), &replaced)
-	if deref(replaced.Route.Version) != 2 || replaced.Route.Fingerprint["apiKey"] == kept.Route.Fingerprint["apiKey"] || replaced.Route.Name != "Acme" {
+	json.Unmarshal(call(t, window, "", "orgRoutes/replaceKey", wire.OrgRouteReplaceKey{ID: "acme",
+		Sealed: *sealRoute(t, window, kept.Route, map[string]string{"apiKey": newKey}, 2), Rev: kept.Rev}), &replaced)
+	if deref(replaced.Route.Version) != 2 || deref(replaced.Route.SealVersion) != 2 || replaced.Route.Fingerprint["apiKey"] != valueFingerprint(newKey) ||
+		replaced.Route.Name != "Acme" {
 		t.Fatalf("%+v", replaced.Route)
 	}
-	p.waitFor(func() bool { r := told.route(box.member.Host, "acme"); return r != nil && r.Version == 2 }, "the machine told version 2")
+	p.waitFor(func() bool { r := told.sealed(box.member.Host, "acme"); return r != nil && r.SealVersion == 2 }, "the machine told seal 2")
 	if got := opened(t, box, told.route(box.member.Host, "acme"), "apiKey"); got != newKey {
 		t.Fatalf("opened %q", got)
 	}
 	// The old rev is spent.
-	if e := callError(t, window, "", "orgRoutes/replaceKey", wire.OrgRouteReplaceKey{ID: "acme", Secrets: map[string]string{"apiKey": oldKey}, Rev: kept.Rev}); !strings.Contains(e, "-32093") {
+	if e := callError(t, window, "", "orgRoutes/replaceKey", wire.OrgRouteReplaceKey{ID: "acme",
+		Sealed: *sealRoute(t, window, kept.Route, map[string]string{"apiKey": oldKey}, 3), Rev: kept.Rev}); !strings.Contains(e, "-32093") {
 		t.Fatal(e)
 	}
 
@@ -449,11 +600,12 @@ func TestReplaceAndRemoveARoute(t *testing.T) {
 		}
 	}
 
-	// Sam leaves the group: their machine's list is empty.
+	// Sam leaves the group: their machine's list is empty. Back in it, the copy sealed
+	// before is still there.
 	call(t, window, "", "groups/set", wire.GroupSet{ID: &platform.ID, Name: "Platform", Members: []string{}})
 	p.waitFor(func() bool { d, _ := told.last(box.member.Host); return len(d.Routes) == 0 }, "the route gone from Sam's machine")
 	call(t, window, "", "groups/set", wire.GroupSet{ID: &platform.ID, Name: "Platform", Members: []string{sam.id}})
-	p.waitFor(func() bool { return told.route(box.member.Host, "acme") != nil }, "the route back on Sam's machine")
+	p.waitFor(func() bool { return told.sealed(box.member.Host, "acme") != nil }, "the route back on Sam's machine")
 
 	// The route is removed: both records go, and the machine's list is empty.
 	if e := callError(t, window, "", "orgRoutes/remove", wire.OrgRouteRequest{ID: "acme", Rev: &kept.Rev}); !strings.Contains(e, "-32093") {
@@ -467,296 +619,73 @@ func TestReplaceAndRemoveARoute(t *testing.T) {
 	waitNote(t, sam.window, wire.NotifyControlOrgRoutesChanged.Name)
 }
 
-// fakeClouds is AWS STS, Google's OAuth and Entra, each counting the tokens it made.
-type fakeClouds struct {
-	server              *httptest.Server
-	sts, google, entra  atomic.Int32
-	refuseSTS           atomic.Bool
-	stsAuth, stsActions []string
-	mu                  sync.Mutex
-}
-
-func newFakeClouds(t *testing.T) *fakeClouds {
-	f := &fakeClouds{}
-	f.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		r.ParseForm()
-		switch {
-		case strings.HasPrefix(r.URL.Path, "/sts/"):
-			n := f.sts.Add(1)
-			if f.refuseSTS.Load() {
-				w.WriteHeader(http.StatusForbidden)
-				return
-			}
-			f.mu.Lock()
-			f.stsAuth = append(f.stsAuth, r.Header.Get("Authorization"))
-			f.stsActions = append(f.stsActions, r.PostForm.Get("Action")+" "+r.PostForm.Get("RoleArn")+" "+r.PostForm.Get("ExternalId"))
-			f.mu.Unlock()
-			w.Write([]byte(`<AssumeRoleResponse><AssumeRoleResult><Credentials><AccessKeyId>ASIA-SESSION</AccessKeyId>` +
-				`<SecretAccessKey>session-secret</SecretAccessKey><SessionToken>aws-session-` + itoa(int(n)) + `</SessionToken>` +
-				`<Expiration>` + time.Now().Add(2*time.Hour).UTC().Format(time.RFC3339) + `</Expiration></Credentials></AssumeRoleResult></AssumeRoleResponse>`))
-		case r.URL.Path == "/google":
-			if r.PostForm.Get("grant_type") != "urn:ietf:params:oauth:grant-type:jwt-bearer" || strings.Count(r.PostForm.Get("assertion"), ".") != 2 {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-			n := f.google.Add(1)
-			json.NewEncoder(w).Encode(map[string]any{"access_token": "ya29.google-" + itoa(int(n)), "expires_in": 3599})
-		case strings.HasPrefix(r.URL.Path, "/entra/"):
-			if r.PostForm.Get("client_secret") != "entra-app-secret" {
-				w.WriteHeader(http.StatusUnauthorized)
-				return
-			}
-			n := f.entra.Add(1)
-			json.NewEncoder(w).Encode(map[string]any{"access_token": "entra-" + itoa(int(n)), "expires_in": 86400})
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	t.Cleanup(f.server.Close)
-	return f
-}
-
-// fakeServiceAccount is a service account's JSON key with a fresh RSA key.
-func fakeServiceAccount(t *testing.T) string {
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatal(err)
-	}
-	der, _ := x509.MarshalPKCS8PrivateKey(key)
-	raw, _ := json.Marshal(map[string]string{"type": "service_account", "client_email": "agents@acme.iam.gserviceaccount.com",
-		"private_key_id": "kid1", "private_key": string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}))})
-	return string(raw)
-}
-
-// FR-007, US7 (Q1 A): a cloud credential stays here; a machine gets only a token that ends
-// within an hour, and a new one about 10 minutes before it ends.
-func TestCloudCredentialsGoAsShortLivedTokens(t *testing.T) {
+// #3397 (done when): the control plane never holds a route's value. This one has no keeper
+// at all, so it could open nothing, and a store that holds only what it was given: the
+// route still reaches the machine, which opens it, and the store holds no value.
+func TestAControlPlaneWithNoKeyStillDeliversARoute(t *testing.T) {
 	t.Parallel()
-	clouds := newFakeClouds(t)
-	var clock atomic.Int64
-	clock.Store(time.Now().UnixNano())
-	endpoints := &orgEndpoints{
-		STS:         func(region string) string { return clouds.server.URL + "/sts/" + region },
-		GoogleToken: clouds.server.URL + "/google",
-		Entra:       func(tenant string) string { return clouds.server.URL + "/entra/" + tenant },
-		Client:      clouds.server.Client(),
-		Now:         func() time.Time { return time.Unix(0, clock.Load()) },
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	if p.s.users.Sealing() {
+		t.Fatal("this control plane has a keeper")
 	}
-	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) {
-		withKeeper(newKeeperKey())(c)
-		c.orgEndpoints = endpoints
-	})
 	told := newRoutesTold()
 	p.told = told.heard
 	_, window := p.client("Alex's Mac")
 	alex := &person{id: p.s.localOwner(), window: window}
 	box := p.machineSaying(alex, routesHello("MACHINE-2"))
-
-	const awsSecret, entraSecret = "aws-long-lived-secret-key", "entra-app-secret"
-	account := fakeServiceAccount(t)
+	const awsSecret = "aws-long-lived-secret-key"
 	setRoute(t, window, wire.OrgRoute{ID: "bedrock", Name: "Acme Bedrock", Kind: wire.OrgRouteKindBedrock, Runtimes: []string{"claude"},
-		Settings: &wire.OrgRouteSettings{Region: optional("us-east-1")}, Models: map[string]string{"claude-sonnet-4-5": "us.anthropic.claude-sonnet-4-5-v1:0"}},
-		map[string]string{"awsAccessKeyId": "AKIAEXAMPLE", "awsSecretAccessKey": awsSecret, "awsRoleArn": "arn:aws:iam::1:role/agents", "externalId": "ext-1"}, nil)
-	setRoute(t, window, wire.OrgRoute{ID: "vertex", Name: "Acme Vertex", Kind: wire.OrgRouteKindVertex, Runtimes: []string{"claude"},
-		Settings: &wire.OrgRouteSettings{Project: optional("acme-ai"), Location: optional("us-east5")}}, map[string]string{"serviceAccount": account}, nil)
-	setRoute(t, window, wire.OrgRoute{ID: "azure", Name: "Acme Azure", Kind: wire.OrgRouteKindAzure, Vendor: vendor(wire.OrgRouteVendorOpenai),
-		Runtimes: []string{"codex"}, Settings: &wire.OrgRouteSettings{Resource: optional("acme-openai"), Tenant: optional("acme.onmicrosoft.com"),
-			ClientID: optional("00000000-0000-0000-0000-000000000001")}}, map[string]string{"entraClientSecret": entraSecret}, nil)
-
-	p.waitFor(func() bool { d, _ := told.last(box.member.Host); return len(d.Routes) == 3 }, "the machine told three routes")
-	now := endpoints.Now()
-	tokens := map[string]string{"bedrock": "awsSession", "vertex": "googleToken", "azure": "entraToken"}
-	for id, field := range tokens {
-		r := told.route(box.member.Host, id)
-		if !slices.Equal(r.SecretFields, []string{field}) || len(r.Sealed) != 1 {
-			t.Fatalf("%s: %+v", id, r.SecretFields)
-		}
-		if r.Expires == nil || r.Expires.Time().After(now.Add(time.Hour+time.Second)) || r.Expires.Time().Before(now.Add(50*time.Minute)) {
-			t.Fatalf("%s ends at %v", id, r.Expires)
-		}
-		value := opened(t, box, r, field)
-		for _, long := range []string{awsSecret, entraSecret, "PRIVATE KEY", "AKIAEXAMPLE"} {
-			if strings.Contains(value, long) {
-				t.Fatalf("%s sent a long-lived credential", id)
-			}
-		}
+		Settings: &wire.OrgRouteSettings{Region: optional("us-east-1")}},
+		map[string]string{"awsAccessKeyId": "AKIAEXAMPLE", "awsSecretAccessKey": awsSecret}, nil, 0)
+	p.waitFor(func() bool { return told.sealed(box.member.Host, "bedrock") != nil }, "the machine told the route")
+	r := told.route(box.member.Host, "bedrock")
+	if !slices.Equal(r.SecretFields, []string{"awsAccessKeyId", "awsSecretAccessKey"}) {
+		t.Fatalf("%+v", r.SecretFields)
 	}
-	var session map[string]string
-	json.Unmarshal([]byte(opened(t, box, told.route(box.member.Host, "bedrock"), "awsSession")), &session)
-	if session["sessionToken"] != "aws-session-1" || session["accessKeyId"] != "ASIA-SESSION" {
-		t.Fatalf("%+v", session)
+	if got := opened(t, box, r, "awsSecretAccessKey"); got != awsSecret {
+		t.Fatalf("opened %q", got)
 	}
-	if got := opened(t, box, told.route(box.member.Host, "vertex"), "googleToken"); got != "ya29.google-1" {
-		t.Fatal(got)
-	}
-	if got := opened(t, box, told.route(box.member.Host, "azure"), "entraToken"); got != "entra-1" {
-		t.Fatal(got)
-	}
-	clouds.mu.Lock()
-	auth, actions := slices.Clone(clouds.stsAuth), slices.Clone(clouds.stsActions)
-	clouds.mu.Unlock()
-	if !strings.HasPrefix(auth[0], "AWS4-HMAC-SHA256 Credential=AKIAEXAMPLE/") || !strings.Contains(auth[0], "/us-east-1/sts/aws4_request") ||
-		strings.Contains(auth[0], awsSecret) || actions[0] != "AssumeRole arn:aws:iam::1:role/agents ext-1" {
-		t.Fatalf("%v %v", auth, actions)
-	}
-	// One token per route, however many machines join.
-	other := p.machineSaying(alex, routesHello("MACHINE-3"))
-	p.waitFor(func() bool { d, _ := told.last(other.member.Host); return len(d.Routes) == 3 }, "a second machine told three routes")
-	if clouds.sts.Load() != 1 || clouds.google.Load() != 1 || clouds.entra.Load() != 1 {
-		t.Fatalf("%d %d %d", clouds.sts.Load(), clouds.google.Load(), clouds.entra.Load())
-	}
-
-	// 52 minutes on, every token is within 10 minutes of its end: each machine gets new ones.
-	clock.Add(int64(52 * time.Minute))
-	if !p.s.tokensEndingSoon() {
-		t.Fatal("no token is ending")
-	}
-	p.s.resendOrgRoutes()
-	p.waitFor(func() bool {
-		return opened(t, box, told.route(box.member.Host, "vertex"), "googleToken") == "ya29.google-2"
-	},
-		"the machine told a new token")
-	p.waitFor(func() bool { return opened(t, box, told.route(box.member.Host, "azure"), "entraToken") == "entra-2" }, "a new Entra token")
-	if p.s.tokensEndingSoon() {
-		t.Fatal("a new token ends soon")
-	}
-
-	// The store holds none of the credentials, nor a token.
-	for _, value := range []string{awsSecret, entraSecret, "ya29.google", "aws-session-", "PRIVATE KEY"} {
+	for _, value := range []string{awsSecret, "AKIAEXAMPLE"} {
 		if storeHolds(t, p.store, value) {
 			t.Fatalf("the store holds %q", value)
 		}
 	}
-
-	// orgRoutes/check makes a token; a refused credential says so, with no value.
-	var check wire.OrgRouteCheck
-	json.Unmarshal(call(t, window, "", "orgRoutes/check", wire.OrgRouteRequest{ID: "vertex"}), &check)
-	if !check.Ok || !strings.Contains(check.Words, "A token was made") {
-		t.Fatalf("%+v", check)
-	}
 }
 
-// A cloud credential that is refused is tried again once per backoff step for every
-// machine, not once a minute for each one; and a machine keeps the last token until it
-// ends (#2250).
-func TestARefusedCredentialBacksOff(t *testing.T) {
+// #3397: orgRoutes/check asks a machine that holds the route's version, and gives its
+// words; with none online, it says so.
+func TestCheckARouteOnAMachine(t *testing.T) {
 	t.Parallel()
-	clouds := newFakeClouds(t)
-	var clock atomic.Int64
-	clock.Store(time.Now().UnixNano())
-	endpoints := &orgEndpoints{
-		STS:    func(region string) string { return clouds.server.URL + "/sts/" + region },
-		Client: clouds.server.Client(),
-		Now:    func() time.Time { return time.Unix(0, clock.Load()) },
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	var asked sync.Map
+	p.asked = func(host, method string, params json.RawMessage) (any, bool) {
+		if wire.OldMethodName(method) != wire.CallHostOrgRouteCheck.Name {
+			return nil, false
+		}
+		asked.Store(host, string(params))
+		return wire.OrgRouteCheck{Ok: true, Words: "The provider took the key."}, true
 	}
-	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) {
-		withKeeper(newKeeperKey())(c)
-		c.orgEndpoints = endpoints
-	})
-	told := newRoutesTold()
-	p.told = told.heard
 	_, window := p.client("Alex's Mac")
 	alex := &person{id: p.s.localOwner(), window: window}
-	const machines = 10
-	boxes := []*fakeHost{}
-	for i := range machines {
-		boxes = append(boxes, p.machineSaying(alex, routesHello("MACHINE-"+itoa(i+2))))
-	}
-	setRoute(t, window, wire.OrgRoute{ID: "bedrock", Name: "Acme Bedrock", Kind: wire.OrgRouteKindBedrock, Runtimes: []string{"claude"},
-		Settings: &wire.OrgRouteSettings{Region: optional("us-east-1")}},
-		map[string]string{"awsAccessKeyId": "AKIAEXAMPLE", "awsSecretAccessKey": "aws-long-lived-secret-key"}, nil)
-	holds := func(box *fakeHost) bool { return told.route(box.member.Host, "bedrock") != nil }
-	for _, box := range boxes {
-		p.waitFor(func() bool { return holds(box) }, "each machine told the route")
-	}
-	if clouds.sts.Load() != 1 {
-		t.Fatal(clouds.sts.Load())
-	}
-	// tick is renewTokensEvery's tick, each machine's delivery made before it returns.
-	tick := func(by time.Duration) {
-		clock.Add(int64(by))
-		if p.s.tokensEndingSoon() {
-			for _, box := range boxes {
-				p.s.sendOrgRoutes(box.member.Host, false)
-			}
-		}
-	}
-
-	// The key is revoked. 52 minutes on, one renewal is tried for all ten machines, and
-	// each keeps the token it holds, which has 8 minutes left.
-	clouds.refuseSTS.Store(true)
-	tick(52 * time.Minute)
-	if clouds.sts.Load() != 2 {
-		t.Fatal(clouds.sts.Load())
-	}
-	for _, box := range boxes {
-		if !holds(box) {
-			t.Fatal("a machine lost a token that has not ended")
-		}
-	}
-	// Ticks a minute apart: tries at 1, 2, 4 and 8 minutes, not ten for each tick.
-	for range 20 {
-		tick(time.Minute)
-	}
-	if got := clouds.sts.Load(); got != 2+4 {
-		t.Fatalf("%d calls to STS in 20 minutes", got)
-	}
-	// The token has ended: the route leaves the machines.
-	for _, box := range boxes {
-		p.waitFor(func() bool { return !holds(box) }, "the ended token taken from each machine")
-	}
-
-	// The key works again: the next try sends a new token to every machine.
-	clouds.refuseSTS.Store(false)
-	for range 16 {
-		tick(time.Minute)
-	}
-	if got := clouds.sts.Load(); got != 2+4+1 {
-		t.Fatalf("%d calls to STS", got)
-	}
-	for _, box := range boxes {
-		p.waitFor(func() bool { return holds(box) }, "a new token sent to each machine")
-	}
-}
-
-// orgRoutes/check sends one small request with a key, to the vendor or a gateway.
-func TestCheckARoute(t *testing.T) {
-	t.Parallel()
-	const key = "sk-ant-checked-key"
-	vendorAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/models" || r.Header.Get("x-api-key") != key || r.Header.Get("anthropic-version") == "" {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-		w.Write([]byte(`{"data":[]}`))
-	}))
-	t.Cleanup(vendorAPI.Close)
-	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) {
-		withKeeper(newKeeperKey())(c)
-		c.orgEndpoints = &orgEndpoints{Vendor: map[wire.OrgRouteVendor]string{wire.OrgRouteVendorAnthropic: vendorAPI.URL},
-			Client: vendorAPI.Client(), Now: time.Now}
-	})
-	_, window := p.client("Alex's Mac")
-	kept := setRoute(t, window, wire.OrgRoute{Name: "Acme", Kind: wire.OrgRouteKindKey, Vendor: vendor(wire.OrgRouteVendorAnthropic),
-		Runtimes: []string{"claude"}}, map[string]string{"apiKey": key}, nil)
+	setRoute(t, window, wire.OrgRoute{Name: "Acme", Kind: wire.OrgRouteKindKey, Vendor: vendor(wire.OrgRouteVendorAnthropic),
+		Runtimes: []string{"claude"}}, map[string]string{"apiKey": "sk-ant-checked"}, nil, 0)
 	var check wire.OrgRouteCheck
 	json.Unmarshal(call(t, window, "", "orgRoutes/check", wire.OrgRouteRequest{ID: "acme"}), &check)
-	if !check.Ok {
+	if check.Ok || !strings.Contains(check.Words, "No machine that holds this route") {
 		t.Fatalf("%+v", check)
 	}
-	json.Unmarshal(call(t, window, "", "orgRoutes/replaceKey", wire.OrgRouteReplaceKey{ID: "acme", Secrets: map[string]string{"apiKey": "sk-ant-wrong"}, Rev: kept.Rev}), &kept)
-	check = wire.OrgRouteCheck{}
-	raw := call(t, window, "", "orgRoutes/check", wire.OrgRouteRequest{ID: "acme"})
-	json.Unmarshal(raw, &check)
-	if check.Ok || !strings.Contains(check.Words, "refused the key (401)") || bytes.Contains(raw, []byte("sk-ant")) {
-		t.Fatalf("%s", raw)
+	box := p.machineSaying(alex, routesHello("MACHINE-2"))
+	if _, err := box.uplink.Ask(t.Context(), wire.CallHostOrgRoutesApplied.Name,
+		wire.OrgRoutesApplied{Routes: []wire.OrgRouteVersion{{ID: "acme", Version: 1}}}); err != nil {
+		t.Fatal(err)
 	}
-	// A Bedrock API key is checked from a machine.
-	setRoute(t, window, wire.OrgRoute{ID: "bedrock", Name: "Bedrock", Kind: wire.OrgRouteKindBedrock, Runtimes: []string{"claude"},
-		Settings: &wire.OrgRouteSettings{Region: optional("eu-west-1")}}, map[string]string{"apiKey": "bedrock-api-key"}, nil)
-	json.Unmarshal(call(t, window, "", "orgRoutes/check", wire.OrgRouteRequest{ID: "bedrock"}), &check)
-	if check.Ok || !strings.Contains(check.Words, "only from a machine") {
+	p.waitFor(func() bool { h := p.s.records.Host(box.member.Host); return h != nil && len(appliedOrgRoutes(*h)) == 1 }, "the route noted")
+	json.Unmarshal(call(t, window, "", "orgRoutes/check", wire.OrgRouteRequest{ID: "acme"}), &check)
+	if !check.Ok || !strings.Contains(check.Words, "The provider took the key, checked on box MACHINE-2.") {
 		t.Fatalf("%+v", check)
+	}
+	if got, ok := asked.Load(box.member.Host); !ok || !strings.Contains(got.(string), `"acme"`) {
+		t.Fatalf("%v", got)
 	}
 }
 
@@ -789,64 +718,4 @@ func TestThePolicyReachAndAntigravityTerms(t *testing.T) {
 		t.Fatalf("%+v", kept.Policy)
 	}
 	_ = context.Background
-}
-
-// A token whose route no machine here uses any more is dropped once it ends, and brings no
-// resend each minute after (#2431); a machine that asks again gets a new one.
-func TestAnEndedTokenNobodyUsesStopsTheResends(t *testing.T) {
-	t.Parallel()
-	clouds := newFakeClouds(t)
-	var clock atomic.Int64
-	clock.Store(time.Now().UnixNano())
-	endpoints := &orgEndpoints{
-		GoogleToken: clouds.server.URL + "/google",
-		Client:      clouds.server.Client(),
-		Now:         func() time.Time { return time.Unix(0, clock.Load()) },
-	}
-	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) {
-		withKeeper(newKeeperKey())(c)
-		c.orgEndpoints = endpoints
-	})
-	told := newRoutesTold()
-	p.told = told.heard
-	_, window := p.client("Alex's Mac")
-	alex := &person{id: p.s.localOwner(), window: window}
-	box := p.machineSaying(alex, routesHello("MACHINE-2"))
-	setRoute(t, window, wire.OrgRoute{ID: "vertex", Name: "Acme Vertex", Kind: wire.OrgRouteKindVertex, Runtimes: []string{"claude"},
-		Settings: &wire.OrgRouteSettings{Project: optional("acme-ai"), Location: optional("us-east5")}},
-		map[string]string{"serviceAccount": fakeServiceAccount(t)}, nil)
-	p.waitFor(func() bool { return told.route(box.member.Host, "vertex") != nil }, "the machine told the route")
-	p.waitFor(func() bool {
-		p.s.orgRoutes.mu.Lock()
-		defer p.s.orgRoutes.mu.Unlock()
-		return !p.s.orgRoutes.resent.IsZero() && !p.s.orgRoutes.resending
-	}, "the resend done")
-
-	// The machine stops using the route (none of the machines here asks for it), and the
-	// token ends: ten ticks of renewTokensEvery bring one resend, not ten.
-	clock.Add(int64(2 * time.Hour))
-	resends := 0
-	for range 10 {
-		clock.Add(int64(time.Minute))
-		if p.s.tokensEndingSoon() {
-			resends++
-			p.s.resendTo(nil)
-		}
-	}
-	t.Logf("10 ticks after the token ended: %d resends", resends)
-	if resends > 1 {
-		t.Fatalf("%d resends for a token nobody uses", resends)
-	}
-	p.s.orgRoutes.mu.Lock()
-	left := len(p.s.orgRoutes.tokens)
-	p.s.orgRoutes.mu.Unlock()
-	if left != 0 {
-		t.Fatalf("%d tokens kept", left)
-	}
-	// A machine that uses it again is sent a new token.
-	made := clouds.google.Load()
-	p.s.resendTo([]string{box.member.Host})
-	if clouds.google.Load() != made+1 {
-		t.Fatal("no new token made")
-	}
 }

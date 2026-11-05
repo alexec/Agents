@@ -148,16 +148,21 @@ An organisation will be able to require a sandbox by policy (T5, below).
 An iPhone or iPad keeps its own key in the Secure Enclave where it has one, else in the
 Keychain, on this device only.
 
-On the control plane, a person's secrets are sealed in the store (AES-256-GCM, with a data
-key wrapped by KMS or a local `secrets-key`). A control plane with neither refuses to keep
-them. The control plane holds no machine provider's secret (#3398): a provider runs on
-one of its person's machines, which keeps its tokens and keys and runs its server, and the
-control plane sends it each list, start and stop. The tokens go through the control plane
-once, on their way to that machine, over TLS. Until clients seal secrets to machines
-(#3397), a control plane could read them as they pass.
+A person's own secrets and the organisation's **org keys** (#999) are sealed by a client
+(the web page, the Mac window or the Remote) with HPKE (P-256, HKDF-SHA256, AES-256-GCM)
+straight to each machine that may use them, and to each app that may seal them again
+(#3397). The control plane keeps and forwards only that ciphertext: it holds no key that
+opens it, in its store or in its memory. Each envelope is bound to its machine, its field,
+its version and, for an org key, to where the key goes, so a control plane that changes a
+gateway's address cannot get the key sent elsewhere. Until the machine lock (#3400), the
+client takes each machine's public key from the control plane, so a misused control plane
+could hand out a key of its own; see [Org keys and gateways](../org-keys-and-gateways.md).
 
-**Org keys** for runtimes, kept by the control plane and sealed to each machine, are
-planned (T6, #999).
+The control plane holds no machine provider's secret (#3398): a provider runs on one of
+its person's machines, which keeps its tokens and keys and runs its server, and the
+control plane sends it each list, start and stop. The tokens go through the control plane
+once, on their way to that machine, over TLS, not sealed to it: a control plane could read
+them as they pass.
 
 ## Logs
 

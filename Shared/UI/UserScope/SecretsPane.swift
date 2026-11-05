@@ -41,7 +41,7 @@ struct SecretsPane: View {
                 .paperSheet()
         }
         .sheet(item: $replacing) { row in
-            SecretSheet(name: row.name) { name, value in await state.setSecret(name, value: value, on: control) }
+            SecretSheet(name: row.name) { name, value in await state.setSecret(name, value: value, replacing: row, on: control) }
                 .paperSheet()
         }
         .confirmationDialog(removing.map { "Remove \($0.name)?" } ?? "",
@@ -74,19 +74,18 @@ struct SecretsPane: View {
                         .accessibilityLabel("\(row.name) actions")
                     }
                     Text(UserScopeWords.machines(row)).appText(.fine).foregroundStyle(.secondary)
+                    if let waiting = UserScopeWords.waiting(row) {
+                        Text(waiting).appText(.fine).tinted(.attention)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     if let left = UserScopeWords.leftOn(row) {
                         Text(left).appText(.fine).tinted(.attention)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }
-            if state.secrets?.sealing == false {
-                Text(UserScopeWords.noSealing).appText(.supporting).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else {
-                Button(UserScopeWords.addSecret) { isAdding = true }
-                    .disabled(control == nil)
-            }
+            Button(UserScopeWords.addSecret) { isAdding = true }
+                .disabled(control == nil)
         } footer: {
             Text(UserScopeWords.secretsFoot).appText(.fine).foregroundStyle(.secondary)
         }

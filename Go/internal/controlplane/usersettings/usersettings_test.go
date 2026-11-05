@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -47,23 +46,76 @@ func everyObject(t *testing.T, s store.Store) map[string][]byte {
 	return out
 }
 
-func TestASecretGoesInAnEnvelopeAndComesBack(t *testing.T) {
+// recipient is a machine or a client a test seals a secret to, with its own key.
+type recipient struct {
+	id      string
+	private []byte
+	public  []byte
+}
+
+func newRecipient(t *testing.T, id string) recipient {
+	t.Helper()
+	private := controllink.NewPrivateKey()
+	public, err := controllink.PublicKey(private)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return recipient{id: id, private: private, public: public}
+}
+
+// sealed is what a person's client sends (#3397): a secret sealed to each recipient.
+func sealed(t *testing.T, user, name string, version int64, value string, to ...recipient) wire.UserSecretSet {
+	t.Helper()
+	out := wire.UserSecretSet{Name: wire.UserSecretName(name), Version: version, Values: map[string]wire.SealedEnvelope{}}
+	for _, r := range to {
+		e, err := controllink.Seal(r.public, controllink.UserSecretPurpose, controllink.UserSecretAD(user, r.id, name, version), []byte(value))
+		if err != nil {
+			t.Fatal(err)
+		}
+		out.Values[r.id] = e
+	}
+	return out
+}
+
+func allowing(to ...recipient) map[string]bool {
+	out := map[string]bool{}
+	for _, r := range to {
+		out[r.id] = true
+	}
+	return out
+}
+
+// opens is what a machine does with its copy.
+func opens(t *testing.T, r recipient, user string, s wire.SealedUserSecret) (string, error) {
+	t.Helper()
+	plain, err := controllink.Open(r.private, controllink.UserSecretPurpose, controllink.UserSecretAD(user, r.id, string(s.Name), s.Version), s.Sealed)
+	return string(plain), err
+}
+
+// #3397: a book with no keeper keeps a person's secrets as their client sealed them; each
+// machine gets its own copy, which opens only with its key; one with no copy waits; the
+// store holds no value.
+func TestASecretIsKeptAsEnvelopesNothingHereOpens(t *testing.T) {
 	ctx := context.Background()
 	s := store.NewMemory()
-	b := localBook(t, s)
+	b := New(s, nil, "")
+	box, mac, other := newRecipient(t, "m:box"), newRecipient(t, "c:MAC"), newRecipient(t, "m:other")
 	secrets := map[string]string{"GITHUB_TOKEN": "ghp_" + strings.Repeat("a1", 18), "LINEAR_KEY": "lin_api_s3cret-value"}
 	for name, value := range secrets {
-		if err := b.SetSecret(ctx, "sam", name, value); err != nil {
+		if err := b.SetSecret(ctx, "sam", sealed(t, "sam", name, 1, value, box, mac), allowing(box, mac, other)); err != nil {
 			t.Fatal(err)
 		}
 	}
-	got, skipped, err := b.Delivery(ctx, "sam")
-	if err != nil || len(skipped) != 0 || len(got.Secrets) != 2 {
-		t.Fatalf("%+v %v %v", got, skipped, err)
+	got, waiting, err := b.Delivery(ctx, "sam", box.id)
+	if err != nil || len(waiting) != 0 || len(got.Secrets) != 2 {
+		t.Fatalf("%+v %v %v", got, waiting, err)
 	}
 	for _, secret := range got.Secrets {
-		if secrets[string(secret.Name)] != secret.Value {
-			t.Fatalf("%s came back as something else", secret.Name)
+		if value, err := opens(t, box, "sam", secret); err != nil || secrets[string(secret.Name)] != value {
+			t.Fatalf("%s came back as something else: %v", secret.Name, err)
+		}
+		if _, err := opens(t, other, "sam", secret); err == nil {
+			t.Fatal("another machine's key opens it")
 		}
 	}
 	// SC-007: no file under the prefix holds a secret, nor its base64, nor any part of it.
@@ -76,65 +128,118 @@ func TestASecretGoesInAnEnvelopeAndComesBack(t *testing.T) {
 			}
 		}
 	}
-	// Another person has none of them.
-	if other, _, _ := b.Delivery(ctx, "kim"); len(other.Secrets) != 0 {
-		t.Fatalf("%+v", other)
+	// A machine with no copy waits for both; another person has none of them.
+	if got, waiting, _ := b.Delivery(ctx, "sam", other.id); len(got.Secrets) != 0 || strings.Join(waiting, ",") != "GITHUB_TOKEN|1,LINEAR_KEY|1" {
+		t.Fatalf("%+v %v", got, waiting)
+	}
+	if got, _, _ := b.Delivery(ctx, "kim", box.id); len(got.Secrets) != 0 {
+		t.Fatalf("%+v", got)
+	}
+	// The person's client seals it for the machine that waits: sealing/work names it.
+	items, lacks, err := b.Work(ctx, "sam", mac.id, []wire.SealRecipient{{ID: box.id}, {ID: other.id}, {ID: mac.id}})
+	if err != nil || len(items) != 2 || len(lacks) != 0 || len(items[0].Missing) != 1 || items[0].Missing[0].ID != other.id {
+		t.Fatalf("%+v %v %v", items, lacks, err)
+	}
+	for _, item := range items {
+		value, err := opens(t, mac, "sam", wire.SealedUserSecret{Name: wire.UserSecretName(item.ID), Version: item.Version, Sealed: item.Mine["value"]})
+		if err != nil {
+			t.Fatal(err)
+		}
+		again := sealed(t, "sam", item.ID, item.Version, value, other)
+		if added, err := b.AddSealed(ctx, "sam", item.ID, item.Version, again.Values, allowing(box, mac, other)); err != nil || !added {
+			t.Fatal(added, err)
+		}
+		// At an older version, or for one that is not a recipient now, nothing is added.
+		if added, _ := b.AddSealed(ctx, "sam", item.ID, item.Version+1, again.Values, allowing(box, mac, other)); added {
+			t.Fatal("added at another version")
+		}
+	}
+	if got, waiting, _ := b.Delivery(ctx, "sam", other.id); len(got.Secrets) != 2 || len(waiting) != 0 {
+		t.Fatalf("%+v %v", got, waiting)
+	}
+	// A client with no copy says so, for the person's other clients to seal it.
+	if _, lacks, _ := b.Work(ctx, "sam", "c:PHONE", nil); len(lacks) != 2 {
+		t.Fatal(lacks)
 	}
 }
 
+// A record copied to another person's secrets does not open on that person's machine:
+// the associated data names the person.
 func TestAnEnvelopeMovedToAnotherPersonDoesNotOpen(t *testing.T) {
 	ctx := context.Background()
 	s := store.NewMemory()
-	b := localBook(t, s)
-	b.SetSecret(ctx, "sam", "TOKEN", "sams-token")
+	b := New(s, nil, "")
+	box := newRecipient(t, "m:box")
+	b.SetSecret(ctx, "sam", sealed(t, "sam", "TOKEN", 1, "sams-token", box), allowing(box))
 	o, _ := s.Get(ctx, secretKey("sam", "TOKEN"))
 	s.Put(ctx, secretKey("kim", "TOKEN"), o.Data, store.Absent)
-	got, skipped, err := b.Delivery(ctx, "kim")
-	if err != nil || len(got.Secrets) != 0 || len(skipped) != 1 {
-		t.Fatalf("%+v %v %v", got, skipped, err)
+	got, _, err := b.Delivery(ctx, "kim", box.id)
+	if err != nil || len(got.Secrets) != 1 {
+		t.Fatalf("%+v %v", got, err)
 	}
-	// And with another keeper's key, nothing opens.
-	other := localBook(t, s)
-	if got, skipped, _ := other.Delivery(ctx, "sam"); len(got.Secrets) != 0 || len(skipped) != 1 {
-		t.Fatalf("%+v %v", got, skipped)
+	if _, err := opens(t, box, "kim", got.Secrets[0]); err == nil {
+		t.Fatal("sam's secret opens as kim's")
 	}
 }
 
 func TestNamesNeverHoldValues(t *testing.T) {
 	ctx := context.Background()
-	b := localBook(t, store.NewMemory())
-	b.SetSecret(ctx, "sam", "TOKEN", "the-value")
-	rows, _ := b.Names(ctx, "sam")
+	b := New(store.NewMemory(), nil, "")
+	box, spare := newRecipient(t, "m:box"), newRecipient(t, "m:spare")
+	b.SetSecret(ctx, "sam", sealed(t, "sam", "TOKEN", 1, "the-value", box), allowing(box, spare))
+	rows, _ := b.Names(ctx, "sam", []string{box.id, spare.id})
 	raw, _ := json.Marshal(rows)
-	if len(rows) != 1 || rows[0].Name != "TOKEN" || strings.Contains(string(raw), "the-value") {
+	if len(rows) != 1 || rows[0].Name != "TOKEN" || deref(rows[0].Version) != 1 || len(rows[0].Waiting) != 1 || rows[0].Waiting[0] != "spare" ||
+		strings.Contains(string(raw), "the-value") {
 		t.Fatalf("%s", raw)
 	}
 	if had, _ := b.RemoveSecret(ctx, "sam", "TOKEN"); !had {
 		t.Fatal("not removed")
 	}
-	if rows, _ := b.Names(ctx, "sam"); len(rows) != 0 {
+	if rows, _ := b.Names(ctx, "sam", nil); len(rows) != 0 {
 		t.Fatalf("%+v", rows)
 	}
-	if got, _, _ := b.Delivery(ctx, "sam"); len(got.Secrets) != 0 {
+	if got, _, _ := b.Delivery(ctx, "sam", box.id); len(got.Secrets) != 0 {
 		t.Fatalf("%+v", got)
 	}
+	// Set again after its removal, it takes the next version.
+	if err := b.SetSecret(ctx, "sam", sealed(t, "sam", "TOKEN", 1, "again", box), allowing(box)); !errors.Is(err, ErrInvalid) {
+		t.Fatal(err)
+	}
+	if err := b.SetSecret(ctx, "sam", sealed(t, "sam", "TOKEN", 2, "again", box), allowing(box)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func deref[T any](p *T) T {
+	var zero T
+	if p == nil {
+		return zero
+	}
+	return *p
 }
 
 func TestSecretsAreChecked(t *testing.T) {
 	ctx := context.Background()
-	b := localBook(t, store.NewMemory())
-	for _, c := range []struct{ name, value string }{
-		{"lower", "s3kr1t"}, {"../X", "s3kr1t"}, {"X", ""}, {"X", "two\nlines"}, {"X", strings.Repeat("s3kr1t", MaxSecret)},
+	b := New(store.NewMemory(), nil, "")
+	box := newRecipient(t, "m:box")
+	for _, c := range []struct {
+		name string
+		set  wire.UserSecretSet
+	}{
+		{"lower", sealed(t, "sam", "lower", 1, "s3kr1t", box)},
+		{"../X", sealed(t, "sam", "../X", 1, "s3kr1t", box)},
+		{"no envelope", sealed(t, "sam", "X", 1, "s3kr1t")},
+		{"too long", sealed(t, "sam", "X", 1, strings.Repeat("s3kr1t", MaxSecret), box)},
+		{"no version", sealed(t, "sam", "X", 0, "s3kr1t", box)},
+		{"to nobody of theirs", sealed(t, "sam", "X", 1, "s3kr1t", newRecipient(t, "m:kims"))},
 	} {
-		err := b.SetSecret(ctx, "sam", c.name, c.value)
-		if !errors.Is(err, ErrInvalid) || (c.value != "" && strings.Contains(err.Error(), c.value)) {
-			t.Fatalf("%q: %v", c.name, err)
+		err := b.SetSecret(ctx, "sam", c.set, allowing(box))
+		if !errors.Is(err, ErrInvalid) || strings.Contains(err.Error(), "s3kr1t") {
+			t.Fatalf("%s: %v", c.name, err)
 		}
 	}
-	if err := b.SetSecret(ctx, "../kim", "X", "v"); !errors.Is(err, ErrInvalid) {
-		t.Fatal(err)
-	}
-	if err := New(store.NewMemory(), nil, "").SetSecret(ctx, "sam", "X", "v"); !errors.Is(err, ErrNoSealing) {
+	if err := b.SetSecret(ctx, "../kim", sealed(t, "../kim", "X", 1, "v", box), allowing(box)); !errors.Is(err, ErrInvalid) {
 		t.Fatal(err)
 	}
 }
@@ -171,6 +276,7 @@ func TestPartsAreKeptWithoutBeingRead(t *testing.T) {
 func TestTheLargestDeliveryFitsAMachinesLink(t *testing.T) {
 	ctx := context.Background()
 	b := localBook(t, store.NewMemory())
+	box := newRecipient(t, "m:box")
 	long := func(n int) string { return strings.Repeat("<", n) }
 	for _, part := range []wire.UserSettingsPartName{wire.UserSettingsPartNameMcpServers, wire.UserSettingsPartNameAgentConfig,
 		wire.UserSettingsPartNameRuntimes, wire.UserSettingsPartNameCostLimits} {
@@ -180,13 +286,14 @@ func TestTheLargestDeliveryFitsAMachinesLink(t *testing.T) {
 		}
 	}
 	for i := range MaxSecrets {
-		if err := b.SetSecret(ctx, "sam", fmt.Sprintf("SECRET_%d", i), long(MaxSecret)); err != nil {
+		name := fmt.Sprintf("SECRET_%d", i)
+		if err := b.SetSecret(ctx, "sam", sealed(t, "sam", name, 1, long(MaxSecret), box), allowing(box)); err != nil {
 			t.Fatal(err)
 		}
 	}
-	delivery, skipped, err := b.Delivery(ctx, "sam")
-	if err != nil || len(skipped) > 0 || len(delivery.Secrets) != MaxSecrets {
-		t.Fatal(len(delivery.Secrets), skipped, err)
+	delivery, waiting, err := b.Delivery(ctx, "sam", box.id)
+	if err != nil || len(waiting) > 0 || len(delivery.Secrets) != MaxSecrets {
+		t.Fatal(len(delivery.Secrets), waiting, err)
 	}
 	encoded, _ := json.Marshal(delivery)
 	if len(encoded) > controllink.MaxMessage/2 {
@@ -196,67 +303,24 @@ func TestTheLargestDeliveryFitsAMachinesLink(t *testing.T) {
 
 func TestAMachineLeftIsNamedOnTheSecretsItHad(t *testing.T) {
 	ctx := context.Background()
-	b := localBook(t, store.NewMemory())
-	b.SetSecret(ctx, "sam", "A", "1")
-	b.SetSecret(ctx, "sam", "B", "2")
+	b := New(store.NewMemory(), nil, "")
+	box := newRecipient(t, "m:box")
+	b.SetSecret(ctx, "sam", sealed(t, "sam", "A", 1, "1", box), allowing(box))
+	b.SetSecret(ctx, "sam", sealed(t, "sam", "B", 1, "2", box), allowing(box))
 	b.Sent(ctx, "sam", "box", []string{"A", "B"})
 	b.Sent(ctx, "sam", "mac", []string{"A"})
 	had, err := b.Left(ctx, "sam", "box", "Sam's box")
 	if err != nil || strings.Join(had, ",") != "A,B" {
 		t.Fatal(had, err)
 	}
-	rows, _ := b.Names(ctx, "sam")
+	rows, _ := b.Names(ctx, "sam", nil)
 	if len(rows) != 2 || len(rows[0].Machines) != 1 || rows[0].Machines[0] != "mac" || len(rows[0].LeftOn) != 1 || rows[0].LeftOn[0].Name != "Sam's box" {
 		t.Fatalf("%+v", rows)
 	}
 	// Set again, the secret is a new one: the machine it was on no longer matters.
-	b.SetSecret(ctx, "sam", "A", "3")
-	if rows, _ := b.Names(ctx, "sam"); len(rows[0].LeftOn) != 0 || len(rows[0].Machines) != 1 {
+	b.SetSecret(ctx, "sam", sealed(t, "sam", "A", 2, "3", box), allowing(box))
+	if rows, _ := b.Names(ctx, "sam", nil); len(rows[0].LeftOn) != 0 || len(rows[0].Machines) != 1 {
 		t.Fatalf("%+v", rows)
-	}
-}
-
-// Copies over one store (#2163): each given the same secrets-key file, as compose.yaml
-// mounts it, opens what another sealed; a copy with a key of its own opens nothing.
-func TestCopiesWithOneSecretsKeyOpenEachOthersSecrets(t *testing.T) {
-	ctx := context.Background()
-	s := store.NewMemory()
-	made := t.TempDir() + "/secrets-key"
-	if _, err := kms.LocalKeeper(made); err != nil {
-		t.Fatal(err)
-	}
-	book := func(path string) *Book {
-		url, err := kms.LocalKeeper(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		k, err := kms.Keeper(ctx, url)
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() { k.Close() })
-		return New(s, k, url)
-	}
-	given := func() string {
-		data, err := os.ReadFile(made)
-		if err != nil {
-			t.Fatal(err)
-		}
-		path := t.TempDir() + "/secrets-key"
-		if err := os.WriteFile(path, data, 0o444); err != nil {
-			t.Fatal(err)
-		}
-		return path
-	}
-	if err := book(given()).SetSecret(ctx, "sam", "LINEAR_KEY", "lin_api_s3cret"); err != nil {
-		t.Fatal(err)
-	}
-	got, skipped, err := book(given()).Delivery(ctx, "sam")
-	if err != nil || len(skipped) != 0 || len(got.Secrets) != 1 || got.Secrets[0].Value != "lin_api_s3cret" {
-		t.Fatalf("another copy got %+v, skipped %v, %v", got.Secrets, skipped, err)
-	}
-	if _, skipped, _ := book(t.TempDir()+"/secrets-key").Delivery(ctx, "sam"); len(skipped) != 1 {
-		t.Fatalf("a copy with its own key skipped %v", skipped)
 	}
 }
 

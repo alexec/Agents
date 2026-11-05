@@ -1,0 +1,56 @@
+{
+  "privateKey": "8ad324db56473ee859e3f7b5522ac23f0f9cdda1dfc6e32bb900897a96b486e5",
+  "publicKey": "BKzbiazQR4LGtRgQPSlIVEoCcE1zvM05lm29rjZefnVpuo68H773EO5R7jmXVga9BvIRe/w1Lo2D/Wckk23ZZh4=",
+  "vectors": [
+    {
+      "item": "orgRoute",
+      "id": "acme",
+      "recipient": "m:host-1",
+      "field": "apiKey",
+      "version": 2,
+      "kind": "baseURL",
+      "vendor": "anthropic",
+      "settings": {
+        "address": "https://llm.acme.example",
+        "header": "X-Key"
+      },
+      "ad": "orgroute.v3|acme|m:host-1|apiKey|2|baseURL|anthropic|944e36afb363daaf3ed4e5d5f15f09b6239d46a11edbfa500cb1c1eea8583220",
+      "value": "sk-ant-fixture-0123",
+      "sealed": {
+        "encapsulated": "BE5bnzsReO105imrb3uklb84uoG+7YTIc1E12z4B6gF1G26d0/C9vkKHONWOPHyQd+wed/IvAV5wIO0/iy02++4=",
+        "ciphertext": "1jKKVpgy3QOIbe4VrMrXVdbStbWBqJ+sMyfDEoN394aLvQg="
+      }
+    },
+    {
+      "item": "orgRoute",
+      "id": "vertex",
+      "recipient": "c:5B0C9A2E-1111-4C2D-9E8F-0A1B2C3D4E5F",
+      "field": "serviceAccount",
+      "version": 1,
+      "kind": "vertex",
+      "settings": {
+        "location": "us-east5",
+        "project": "acme-ai"
+      },
+      "ad": "orgroute.v3|vertex|c:5B0C9A2E-1111-4C2D-9E8F-0A1B2C3D4E5F|serviceAccount|1|vertex||d2b98ead66f7357f547b9c3ef8ca421ffe9443ddc8e778084add2ed6e5b0308f",
+      "value": "{\"client_email\":\"a@b\"}",
+      "sealed": {
+        "encapsulated": "BGeeW2fUUi9rvo8JiSJVfZERThYaBDWKe2/eB01o67Dh16tBZX8RcTvV/mO/9TIUKk+6KT7rB4ZFPeL5EEUX98I=",
+        "ciphertext": "FpgPAgk86+kriAaATCR5nNMkr0EXrko9vRuONJhWWsBioTZLLSQ="
+      }
+    },
+    {
+      "item": "userSecret",
+      "user": "sam",
+      "recipient": "m:host-1",
+      "field": "GITHUB_TOKEN",
+      "version": 1762300000000,
+      "ad": "usersecret.v1|sam|m:host-1|GITHUB_TOKEN|1762300000000",
+      "value": "ghp_fixture",
+      "sealed": {
+        "encapsulated": "BHVS4RLKGJIgxThsTB6A7ZJK3Lr/TO+x3I8fCWbav/lTZbTDUJSWCeN86tFLX5kFP5RB/PEWt/ryrEz0CBCr/SE=",
+        "ciphertext": "vmJF40ikMkO6YFhPG59wS3PBZaOdNwJ+yvLA"
+      }
+    }
+  ]
+}

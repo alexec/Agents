@@ -119,8 +119,10 @@ var own = methodSet(
 	"orgRoutes/check",
 	"orgRoutes/list",
 	"orgRoutes/mine",
+	"orgRoutes/recipients",
 	"orgRoutes/remove",
 	"orgRoutes/replaceKey",
+	"orgRoutes/sealed",
 	"orgRoutes/set",
 	"people/forViews",
 	"people/invite",
@@ -156,6 +158,8 @@ var own = methodSet(
 	"scim/tokens/list",
 	"scim/tokens/make",
 	"scim/tokens/revoke",
+	"sealing/add",
+	"sealing/work",
 	"signIn/addToMe",
 	"signIn/approve",
 	"signIn/configure",
@@ -179,6 +183,7 @@ var own = methodSet(
 	"signIn/ticket",
 	"user/removeSecret",
 	"user/secretNames",
+	"user/secretRecipients",
 	"user/setAgentConfigFile",
 	"user/setSecret",
 	"user/setSettings",
@@ -266,6 +271,7 @@ var writes = methodSet(
 	"scim/set",
 	"scim/tokens/make",
 	"scim/tokens/revoke",
+	"sealing/add",
 	"signIn/addToMe",
 	"signIn/approve",
 	"signIn/configure",
@@ -346,8 +352,11 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return m.policyMethod(ctx, method, params, from)
 	case "policy/askForMore", "policy/requests", "policy/refuseMore":
 		return m.policyAskMethod(ctx, method, params, from)
-	case "orgRoutes/mine", "orgRoutes/list", "orgRoutes/set", "orgRoutes/replaceKey", "orgRoutes/check", "orgRoutes/remove":
+	case "orgRoutes/mine", "orgRoutes/list", "orgRoutes/set", "orgRoutes/replaceKey", "orgRoutes/check", "orgRoutes/remove",
+		"orgRoutes/recipients", "orgRoutes/sealed":
 		return m.orgRoutesMethod(ctx, method, params, from)
+	case "sealing/work", "sealing/add":
+		return m.sealingMethod(ctx, method, params, from)
 	case "links/list", "links/requests", "links/approve", "links/deny", "links/remove":
 		return m.linksMethod(ctx, method, params, from)
 	case "signIn/providers", "signIn/pair", "signIn/addToMe", "signIn/removeFromMe", "signIn/configure",
@@ -358,7 +367,8 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return m.signInMethod(ctx, method, params, from)
 	case "reports/usage", "reports/export", "reports/value", "reports/nodes":
 		return m.reportMethod(ctx, method, params, from)
-	case "user/settings", "user/setAgentConfigFile", "user/setSettings", "user/setSecret", "user/removeSecret", "user/secretNames":
+	case "user/settings", "user/setAgentConfigFile", "user/setSettings", "user/setSecret", "user/removeSecret", "user/secretNames",
+		"user/secretRecipients":
 		return m.userMethod(ctx, method, params, from)
 	case "hosts/joinRequests":
 		return m.s.joins.list(ctx, m.callerPerson(from))
