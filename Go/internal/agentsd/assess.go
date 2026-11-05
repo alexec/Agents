@@ -103,6 +103,10 @@ func appToolMethod(tool string) string {
 	if m, ok := appToolMethods[tool]; ok {
 		return m
 	}
+	// fill_secret (#3530) is served with the browser tools, not as an app tool.
+	if tool == fillSecretName {
+		return "secrets/fill"
+	}
 	// A browser tool (#3534) is browser/<the rest, in camelCase>: browser/takeScreenshot.
 	if rest, ok := strings.CutPrefix(tool, "browser_"); ok && rest != "" {
 		words := strings.Split(rest, "_")

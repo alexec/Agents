@@ -11,8 +11,8 @@ import (
 
 // Filter is what every browser tool's result goes through before an agent gets it (#3534,
 // spike #3527): each value filled into this browser comes out of the text as
-// <secret NAME>, and each image goes through its mask. The fill (#3530) adds the values and
-// the mask; until then a Filter hides nothing and lets images through.
+// <secret NAME>, and each image goes through its mask. The fill (#3530) adds the values;
+// it draws each filled field as dots in the page, so images need no mask of their own yet.
 type Filter struct {
 	mu     sync.Mutex
 	hidden map[string]string // value → its secret's name

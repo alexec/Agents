@@ -311,8 +311,9 @@ func TestTheBrowserToolsMatchThePin(t *testing.T) {
 	if list.Package != manifest.Package || list.Version != manifest.PackageVersion {
 		t.Fatalf("browsertools.json is %s %s, the pin %s %s: run scripts/browser-tools.sh", list.Package, list.Version, manifest.Package, manifest.PackageVersion)
 	}
+	// Playwright's, and the app's own fill_secret (#3530).
 	tools, names := browserTools()
-	if len(tools) != len(list.Tools) || len(names) != len(tools) || len(tools) < 20 {
+	if len(tools) != len(list.Tools)+1 || len(names) != len(tools) || len(tools) < 20 {
 		t.Fatalf("%d tools, %d names", len(tools), len(names))
 	}
 }
