@@ -107,6 +107,8 @@ goroutine writes them in order, away from the agent lock.
 | A session is archived | the links from it end | |
 | The host knows a forge issue (a session's `#n`, a PR's fixes) and the forge says its milestone (#2935) | issue `part-of` the milestone, `github:<owner>/<repo>/milestone/<number>` or `gitlab:<group>/<project>/milestone/<iid>` | `forge` |
 | The issue is named again, an hour or more after the host last asked, and its milestone is another one or none | the old `part-of` link ends; a new one starts | |
+| The same answer says the issue's parent, a GitHub sub-issue's epic (#3582) | issue `part-of` its parent issue; a parent's sub-issues (at most 100) each `part-of` it; a move or a removal ends the old link | `forge` |
+| A session's tool call files a forge issue (`gh issue create`, `glab issue create`, or a forge server's create-issue tool) and its output names the issue's address (#3582) | session `opens` the issue; the forge is asked for it at once and again 5 minutes later, so the children filed just after an epic reach it | `agent` |
 
 - **Refs.** The folder's `origin` remote names the repo for `#n` and `P#n`:
   `github:<owner>/<repo>#n`, or on GitLab `gitlab:<group>/<project>#n` for an issue and
