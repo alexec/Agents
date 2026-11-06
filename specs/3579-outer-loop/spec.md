@@ -41,8 +41,8 @@ new stage needs no wire change: only a new linker in the host.
 | Stage | Node (`kind`, `ref`) | Link into the chain | Today |
 | --- | --- | --- | --- |
 | Idea (dictated, voice mode) | `session`, `session:<id>` | — | there |
-| Epic and its children | `issue` | child `part-of` epic | **missing**: sub-issues make no link |
-| Issue filed by an agent | `issue` | session `opens` issue | **missing**: only `works-on` from a `#n` label |
+| Epic and its children | `issue` | child `part-of` epic | there (#3582) |
+| Issue filed by an agent | `issue` | session `opens` issue | there (#3582) |
 | Work on the issue | `session` | session `works-on` issue | there (#2349) |
 | PR | `pr`, `github:<o>/<r>#n` | session `opens` PR; PR `fixes` issue | there (#2349) |
 | Build (CI run) | `ci-run`, `github:<o>/<r>/actions/run/<id>` | `ci-run` `builds` PR, or `builds` release | **missing**: failed rounds are only a count on the PR (#2350) |

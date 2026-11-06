@@ -12,23 +12,42 @@ import (
 
 var errNoForgeInTests = errors.New("no forge in tests")
 
-// fakeMilestones is the forge's milestones, by issue ref, and how often each was asked.
+// fakeMilestones is the forge's milestones, parents and sub-issues, by issue ref, and how
+// often each was asked.
 type fakeMilestones struct {
-	mu    sync.Mutex
-	of    map[string]int
-	asked map[string]int
+	mu       sync.Mutex
+	of       map[string]int
+	parents  map[string]string
+	children map[string][]string
+	asked    map[string]int
 }
 
-func (f *fakeMilestones) lookup(_ context.Context, _ string, repo forgeRepo, n int) (int, error) {
+func (f *fakeMilestones) lookup(_ context.Context, _ string, repo forgeRepo, n int) (issueOnForge, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	ref := repo.issue(n).Ref
 	f.asked[ref]++
 	m, ok := f.of[ref]
 	if !ok {
-		return 0, errNoForgeInTests
+		return issueOnForge{}, errNoForgeInTests
 	}
-	return m, nil
+	got := issueOnForge{milestone: m}
+	if p := f.parents[ref]; p != "" {
+		got.parent = wire.LineageNode{Kind: "issue", Ref: p}
+	}
+	for _, c := range f.children[ref] {
+		got.children = append(got.children, wire.LineageNode{Kind: "issue", Ref: c})
+	}
+	return got, nil
+}
+
+func (f *fakeMilestones) setParent(ref, parent string) {
+	f.mu.Lock()
+	if f.parents == nil {
+		f.parents = map[string]string{}
+	}
+	f.parents[ref] = parent
+	f.mu.Unlock()
 }
 
 func (f *fakeMilestones) set(ref string, m int) {
@@ -118,6 +137,79 @@ func TestLineageLinksEachIssueToItsMilestone(t *testing.T) {
 	wantLinks(t, active(d, issue),
 		s.Ref+" works-on "+issue.Ref+" (start)",
 		"github:alexec/agents#9 fixes "+issue.Ref+" (pr-body)")
+}
+
+// #3582: an issue is part of its parent on the forge, and a parent's sub-issues each part of
+// it; a move ends the old link, as for a milestone.
+func TestLineageLinksEachIssueToItsParent(t *testing.T) {
+	clock := atTime(t, time.Date(2026, 11, 5, 9, 0, 0, 0, time.UTC))
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	folder := t.TempDir()
+	repo := forgeRepo{"github", "alexec/agents"}
+	d.repos = map[string]forgeRepo{folder: repo}
+	forge := &fakeMilestones{
+		of:       map[string]int{"github:alexec/agents#12": 0, "github:alexec/agents#1": 0},
+		parents:  map[string]string{"github:alexec/agents#12": "github:alexec/agents#1"},
+		children: map[string][]string{"github:alexec/agents#1": {"github:alexec/agents#12", "github:alexec/agents#13"}},
+		asked:    map[string]int{},
+	}
+	d.issueLookup = forge.lookup
+	child, epic := repo.issue(12), repo.issue(1)
+
+	d.noteIssueMilestone(folder, repo, 12)
+	d.noteIssueMilestone(folder, repo, 1)
+	settleMilestones(t, d)
+	wantLinks(t, active(d, epic),
+		child.Ref+" part-of "+epic.Ref+" (forge)",
+		"github:alexec/agents#13 part-of "+epic.Ref+" (forge)")
+
+	// Moved under #2: after the hour, the next lookup moves the link.
+	forge.setParent(child.Ref, "github:alexec/agents#2")
+	clock.add(milestoneRecheck + time.Minute)
+	d.noteIssueMilestone(folder, repo, 12)
+	settleMilestones(t, d)
+	wantLinks(t, active(d, child), child.Ref+" part-of github:alexec/agents#2 (forge)")
+
+	// No parent now: the link ends.
+	forge.setParent(child.Ref, "")
+	clock.add(milestoneRecheck + time.Minute)
+	d.noteIssueMilestone(folder, repo, 12)
+	settleMilestones(t, d)
+	wantLinks(t, active(d, child))
+}
+
+func TestIssueOnForgeOf(t *testing.T) {
+	got, subs, err := issueOnForgeOf([]byte(`{"number":3582,"milestone":null,` +
+		`"parent_issue_url":"https://api.github.com/repos/alexec/Agents/issues/3579","sub_issues_summary":{"total":0}}`))
+	if err != nil || got.parent.Ref != "github:alexec/agents#3579" || subs != 0 || got.milestone != 0 {
+		t.Errorf("a sub-issue: %+v, %d, %v", got, subs, err)
+	}
+	got, subs, err = issueOnForgeOf([]byte(`{"number":3579,"milestone":{"number":9},"parent_issue_url":null,"sub_issues_summary":{"total":8}}`))
+	if err != nil || got.parent != (wire.LineageNode{}) || subs != 8 || got.milestone != 9 {
+		t.Errorf("an epic: %+v, %d, %v", got, subs, err)
+	}
+	children, err := subIssuesOf([]byte(`[{"html_url":"https://github.com/alexec/Agents/issues/3581"},{"html_url":"https://github.com/Other/Repo/issues/7"}]`))
+	if err != nil || len(children) != 2 || children[0].Ref != "github:alexec/agents#3581" || children[1].Ref != "github:other/repo#7" {
+		t.Errorf("sub-issues: %v, %v", children, err)
+	}
+	for raw, want := range map[string]string{
+		"https://github.com/alexec/Agents/issues/12":                "github:alexec/agents#12",
+		"https://gitlab.com/group/sub/project/-/issues/4":           "gitlab:group/sub/project#4",
+		"https://github.com/alexec/Agents/issues/12#issuecomment-1": "github:alexec/agents#12",
+		"https://github.com/alexec/Agents/pull/12":                  "",
+		"https://gitlab.com/group/project/issues/4":                 "",
+		"https://api.github.com/repos/alexec/Agents/issues/12":      "",
+		"https://github.com/alexec/Agents/issues/new":               "",
+	} {
+		got := ""
+		if repo, n, ok := issueOfURL(raw); ok {
+			got = repo.issue(n).Ref
+		}
+		if got != want {
+			t.Errorf("%s: got %q, want %q", raw, got, want)
+		}
+	}
 }
 
 func TestIssueMilestoneOf(t *testing.T) {

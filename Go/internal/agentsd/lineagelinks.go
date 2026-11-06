@@ -26,7 +26,9 @@ import (
 //   - pr.opened links the PR to every session that worked on its branch (opens), and the
 //     PR to the issues its body closes (fixes). pr.merged and pr.closed link what its body
 //     closes too, so a closed PR's cost stays against its issues (#2350).
-//   - Each forge issue named here is part of its milestone (lineagemilestone.go, #2935).
+//   - Each forge issue named here is part of its milestone (lineagemilestone.go, #2935),
+//     and of its parent issue (#3582).
+//   - A session opens each forge issue it files (lineagefiled.go, #3582).
 //   - pr.merged and pr.closed end the sessions' links to the PR; pr.closed also ends its
 //     fixes links, as a PR closed without a merge fixed nothing. An archived session's
 //     links end.
