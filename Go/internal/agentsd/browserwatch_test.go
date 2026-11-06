@@ -123,14 +123,37 @@ func TestAWatcherWhoJoinsSeesTheLastFrame(t *testing.T) {
 	gen := d.bw.gen
 	d.bw.mu.Unlock()
 	d.browserFrame(gen, browser.Frame{JPEG: []byte("still"), Ack: 3, Width: 800, Height: 600})
-	if f := nextBrowserFrame(first, 2*time.Second); f == nil {
-		t.Fatal("no frame")
+	if f := nextBrowserFrame(first, 10*time.Second); f == nil {
+		t.Fatal("the first watcher saw no frame in 10 s")
 	}
 	late := newConn()
 	go d.Accept(late)
-	late.call(t, 1, "browser/watch", wire.BrowserWatchRequest{Width: 400, Height: 300})
-	if f := nextBrowserFrame(late, 2*time.Second); f == nil || string(f.Image) != "still" {
-		t.Fatalf("%+v", f)
+	// The last frame goes out beside the answer, often before it, so read both here:
+	// call drops a notification that comes before its answer (#3637).
+	p, _ := json.Marshal(wire.BrowserWatchRequest{Width: 400, Height: 300})
+	b, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": "browser/watch", "params": json.RawMessage(p)})
+	late.in <- string(b)
+	var f *wire.BrowserFrame
+	answered := false
+	deadline := time.After(10 * time.Second)
+	for f == nil || !answered {
+		select {
+		case line := <-late.out:
+			var m message
+			json.Unmarshal([]byte(line), &m)
+			switch {
+			case string(m.ID) == "1":
+				answered = true
+			case m.Method == wire.NotifyBrowserFrame.Name:
+				f = &wire.BrowserFrame{}
+				json.Unmarshal(m.Params, f)
+			}
+		case <-deadline:
+			t.Fatalf("after 10 s: answered %v, frame %+v", answered, f)
+		}
+	}
+	if string(f.Image) != "still" || f.Ack != 3 {
+		t.Fatalf("the late watcher saw %+v, not the last frame", f)
 	}
 	close(late.in)
 }
