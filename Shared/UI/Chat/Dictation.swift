@@ -23,6 +23,11 @@ private final class BufferSink: @unchecked Sendable {
     private var target: AVAudioFormat?
     /// For the log: the tap's format, and buffers given and passed on, since `point`.
     private var given: (format: String, count: Int, passed: Int) = ("none", 0, 0)
+    /// What the microphone hears while no analyser takes it, for the next one (#3563).
+    /// Nil when nothing is held: the audio then goes nowhere.
+    private var held: HeldAudio?
+    /// The most held: a run starts in a second or two, the first one in a few more.
+    static let holdLimit = 5.0
 
     var counts: String {
         lock.lock()
@@ -30,6 +35,14 @@ private final class BufferSink: @unchecked Sendable {
         return "tap \(given.format), \(given.count) buffers, \(given.passed) passed on"
     }
 
+    var isHolding: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return held != nil
+    }
+
+    /// The analyser the audio goes to now, or none. A new one gets what was held first;
+    /// none (`nil`) lets go of what was held.
     func point(at continuation: AsyncStream<AnalyzerInput>.Continuation?, in target: AVAudioFormat? = nil) {
         lock.lock()
         defer { lock.unlock() }
@@ -38,11 +51,34 @@ private final class BufferSink: @unchecked Sendable {
         self.target = target
         converter = nil
         given = ("none", 0, 0)
+        let kept = held?.take() ?? []
+        held = nil
+        guard continuation != nil else { return }
+        kept.forEach(pass)
+    }
+
+    /// Ends the analyser's input, and keeps what the microphone hears from now on for the
+    /// next one (#3563). What is held already stays.
+    func hold() {
+        lock.lock()
+        defer { lock.unlock() }
+        continuation?.finish()
+        continuation = nil
+        if held == nil { held = HeldAudio(limit: Self.holdLimit) }
     }
 
     func append(_ buffer: AVAudioPCMBuffer) {
         lock.lock()
         defer { lock.unlock() }
+        guard continuation != nil else {
+            held?.append(buffer)
+            return
+        }
+        pass(buffer)
+    }
+
+    /// Gives `buffer` to the analyser, converted. Called with the lock held.
+    private func pass(_ buffer: AVAudioPCMBuffer) {
         guard let continuation else { return }
         if given.count == 0 {
             let format = buffer.format
@@ -128,6 +164,11 @@ final class Dictation {
     #endif
 
     private(set) var isListening = false
+    /// Whether voice mode's microphone hears now: listening, or holding what it hears for
+    /// the analyser that is starting (#3563). Words said meanwhile reach the prompt.
+    var isHearing: Bool { isListening || (tapIsOn && sink.isHolding) }
+    /// Whether voice mode's tap is on its running engine (`shared` only).
+    private var tapIsOn = false
     /// The first volatile words of this run trailed the audio. The underline stays off
     /// and the button's pulse is the listening mark (#2515).
     private(set) var volatileIsLate = false
@@ -254,6 +295,17 @@ final class Dictation {
                               permission: .microphone)
             return
         }
+        // Voice mode's microphone hears at once, while the analyser starts, which on a
+        // phone can take more than a second: what it hears is held for it (#3563). A
+        // failure here is the one `listen` meets and says.
+        if shared != nil, !tapIsOn {
+            sink.hold()
+            try? await openMicrophone()
+            guard thisRun == run else {
+                retireMicrophone()
+                return
+            }
+        }
         await listen(as: model, for: thisRun, vocabulary: vocabulary)
     }
 
@@ -346,7 +398,7 @@ final class Dictation {
         // `stop()` may have been called while all that was being set up. None of it can
         // be cancelled midway, so retire this start before it can listen.
         guard thisRun == run else {
-            closeMicrophone()
+            retireMicrophone()
             await finish(analyzer)
             return
         }
@@ -424,6 +476,7 @@ final class Dictation {
         try input.__installTap(onBus: 0, bufferSize: 1_024, format: format, error: (), block: tap)
         if let shared {
             try shared.start()
+            tapIsOn = true
             return
         }
         engine.prepare()
@@ -447,10 +500,24 @@ final class Dictation {
         return nil
     }
 
-    private func closeMicrophone() {
+    /// The microphone, for a run that was stopped while it opened. Voice mode's tap is left
+    /// to a newer run that listens or holds on it (#3563).
+    private func retireMicrophone() {
+        guard shared == nil || !(isListening || sink.isHolding) else { return }
+        closeMicrophone()
+    }
+
+    /// `holding`: voice mode's tap stays on, and what it hears is kept for the next run
+    /// (#3563). Not for Dictate, whose microphone closes.
+    private func closeMicrophone(holding: Bool = false) {
         // Voice mode's engine goes on playing the voice: only the tap comes off.
         if shared != nil {
+            if holding, tapIsOn {
+                sink.hold()
+                return
+            }
             engine.inputNode.removeTap(onBus: 0)
+            tapIsOn = false
             sink.point(at: nil)
             return
         }
@@ -485,27 +552,34 @@ final class Dictation {
     /// Stops listening once the last words said are in the field, so a prompt sent next
     /// holds all of them (#2753). The microphone closes at once; the analyser then turns
     /// the audio it still has into final words, for up to `lastWordsWait`.
-    func finish() async {
+    /// `holdingAudio`: as `stop(holdingAudio:)`.
+    func finish() async { await finish(holdingAudio: false) }
+
+    func finish(holdingAudio: Bool) async {
         guard isListening, !isFinishing, let analyzer, let results else {
-            stop()
+            stop(holdingAudio: holdingAudio)
             return
         }
         isFinishing = true
         defer { isFinishing = false }
         note("dictation: finish, \(sink.counts)")
-        // Closing the microphone ends the analyser's input.
-        closeMicrophone()
+        // Closing the microphone, or holding what it hears, ends the analyser's input.
+        closeMicrophone(holding: holdingAudio)
         let inTime = await waitAtMost(Self.lastWordsWait) {
             try? await analyzer.finalizeAndFinishThroughEndOfInput()
             await results.value
         }
         if !inTime { note("dictation: last words not in after \(Self.lastWordsWait)") }
-        stop()
+        stop(holdingAudio: holdingAudio)
     }
 
     /// Stops listening. What is in the field stays as it is, words still being heard
     /// and all: they were shown, so they are kept (#69).
-    func stop() {
+    /// `holdingAudio`: voice mode's microphone goes on hearing, and the next `start` gets
+    /// what it heard meanwhile first, so no word is lost while its analyser starts (#3563).
+    func stop() { stop(holdingAudio: false) }
+
+    func stop(holdingAudio: Bool) {
         // Retire pending permission and set-up work as well as results still on their
         // way. Results already queued carry the old run number.
         if isListening { note("dictation: stop, \(sink.counts)") }
@@ -515,7 +589,7 @@ final class Dictation {
         volatileIsLate = false
         listeningSince = nil
         judgedVolatile = false
-        closeMicrophone()
+        closeMicrophone(holding: holdingAudio)
         results?.cancel()
         results = nil
         if let analyzer {
