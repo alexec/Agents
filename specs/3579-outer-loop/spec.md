@@ -49,7 +49,7 @@ new stage needs no wire change: only a new linker in the host.
 | Release | `release`, `github:<o>/<r>/release/<tag>` | PR `part-of` release; milestone `shipped-in` release | there (#3023) |
 | Deploy | `deploy`, `<target>:<id>/<version>`, as `testflight:<bundle id>/<build>` | release `deployed-as` deploy; deploy `part-of` its target | there (#3584): a job's `::notice title=deploy::testflight:<bundle id>/<build>`, read from `run.completed` on a `v*` tag |
 | Health signal | `health`, `<source>:<id>`, as `sentry:<org>/<issue id>` | health `seen-in` release or deploy | there (#3585): `health.issue_new` and `health.issue_regressed`, matched to the release by version |
-| New issue | `issue` | issue `reports` health | **missing** |
+| New issue | `issue` | issue `reports` health | there (#3586): the ready-made **File a bug from Sentry**; the bug its session labels itself with |
 
 - The `ci-run` kind is new, not `workflow-run`: `workflow-run` is an Agents workflow's run
   (`run:<id>`), not a forge's CI.

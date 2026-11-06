@@ -316,6 +316,7 @@ func (d *Daemon) noteLineage(before *wire.Agent, a wire.Agent) {
 				}
 			}
 			d.link(s, to, lineage.RelWorksOn, source)
+			d.lineageReportsHealth(s, to)
 			if repo, n, ok := issueOfNode(to); ok {
 				d.noteIssueMilestone(folder, repo, n)
 			}

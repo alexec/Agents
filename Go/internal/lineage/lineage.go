@@ -67,6 +67,8 @@ const (
 	RelSeenIn = "seen-in"
 	// RelDeployedAs is a release deployed as a deploy (#3584); the deploy is part-of its target.
 	RelDeployedAs = "deployed-as"
+	// RelReports is an issue filed for a health signal, or commented on for it (#3586).
+	RelReports = "reports"
 
 	SourceStart  = "start"
 	SourceBranch = "branch"

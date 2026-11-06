@@ -144,3 +144,44 @@ func TestSentryVersion(t *testing.T) {
 		}
 	}
 }
+
+// #3586: health back into work. The session that a health.* event's run started is started
+// by the health signal, and the bug it labels itself with reports it, so a walk from the bug
+// reaches the release and its PRs.
+func TestLineageABugReportsTheHealthThatStartedIt(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	folder := realTempDir(t)
+	d.repos = map[string]forgeRepo{folder: {"github", "alexec/agents"}}
+	repo := d.repos[folder]
+	release, pr, bug := repo.release("v1.2.0"), repo.pr(40), repo.issue(77)
+	d.lineageDo(func() { d.link(pr, release, lineage.RelPartOf, lineage.SourceForge) })
+	e := healthEvent("health.issue_new", folder, "agents@1.2.0")
+	d.lineageEvent(e)
+	a := seeded(t, d, folder, nil)
+	other := seeded(t, d, folder, nil)
+	d.lineageHealthStarted(e, a.ID)
+	d.lineageHealthStarted(wire.Event{Name: "checks.failed", Details: e.Details}, other.ID)
+	for _, id := range []wire.UUID{a.ID, other.ID} {
+		d.change(id, func(a *wire.Agent) {
+			a.Labels = []wire.SessionLabel{{Value: "#77", Owner: wire.SessionLabelOwnerAgent}}
+		})
+	}
+	health := wire.LineageNode{Kind: "health", Ref: "sentry:scratch/42"}
+	s := sessionNode(a.ID)
+	wantLinks(t, active(d, bug),
+		bug.Ref+" reports "+health.Ref+" (agent)",
+		s.Ref+" works-on "+bug.Ref+" (agent)",
+		sessionNode(other.ID).Ref+" works-on "+bug.Ref+" (agent)")
+	wantLinks(t, active(d, health),
+		health.Ref+" seen-in "+release.Ref+" (health)",
+		health.Ref+" started "+s.Ref+" (helper)",
+		bug.Ref+" reports "+health.Ref+" (agent)")
+	got := map[string]bool{}
+	for _, l := range d.lineage().Walk(bug, 3).Links {
+		got[l.From.Ref+" "+l.Rel+" "+l.To.Ref] = true
+	}
+	if !got[pr.Ref+" part-of "+release.Ref] {
+		t.Fatalf("walk from %s: got %v, want its release's PR", bug.Ref, got)
+	}
+}
