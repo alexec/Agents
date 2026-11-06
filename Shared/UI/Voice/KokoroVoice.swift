@@ -1,3 +1,4 @@
+import AgentsKitCore
 import FluidAudio
 import Foundation
 
@@ -15,6 +16,9 @@ actor KokoroVoice {
     static let sampleRate = Double(KokoroAneConstants.sampleRate)
 
     private var manager: KokoroAneManager?
+    /// "Let me think." in the voice and speed it was made in (#3565): made once, so it plays
+    /// as the prompt goes with no wait.
+    private var thinking: (voice: String, speed: Double, samples: [Float])?
     /// One Core ML run at a time. The actor lets a second call in while the first awaits,
     /// and two runs of the same model at once trap in Core ML (the crash Alex hit when a
     /// sentence was stopped and the next begun, 2026-10-29).
@@ -47,6 +51,29 @@ actor KokoroVoice {
         // A word said in silence, so the first-call set-up is not in the first reply.
         _ = try? await manager.synthesizeDetailed(text: "Hi.")
         self.manager = manager
+        // Just after the "Hi.", so it is ready at the first prompt (about 200 ms, #3564).
+        _ = try? await makeLetMeThink(manager)
+    }
+
+    /// "Let me think." in the voice and speed Settings has now (#3565). Made again only
+    /// when the voice or the speed has changed since it was made.
+    func letMeThink() async throws -> [Float] {
+        if manager == nil { try await load() }
+        await take()
+        defer { giveBack() }
+        guard let manager else { return [] }
+        return try await makeLetMeThink(manager)
+    }
+
+    /// Call only while this holds the model (`take`).
+    private func makeLetMeThink(_ manager: KokoroAneManager) async throws -> [Float] {
+        let voice = VoiceSettings.voice, speed = VoiceSettings.speed
+        if let thinking, thinking.voice == voice, thinking.speed == speed { return thinking.samples }
+        let samples = try await manager.synthesizeDetailed(text: VoiceModeWords.letMeThink, voice: voice,
+                                                           speed: Float(speed)).samples
+        let made = Self.trimmed(samples, gap: 0)
+        thinking = (voice, speed, made)
+        return made
     }
 
     /// One sentence, as samples at `sampleRate`.
@@ -78,6 +105,7 @@ actor KokoroVoice {
         defer { giveBack() }
         await manager?.cleanup()
         manager = nil
+        thinking = nil
     }
 
     /// The bundle's Voice folder, linked into FluidAudio's cache folder (in the app's

@@ -84,4 +84,14 @@ struct VoiceModeWordsTests {
         #expect(!VoiceModeWords.isNear("come", "go"))
         #expect(!VoiceModeWords.isNear("a", "i"))
     }
+
+    /// #3565: the voice's own "Let me think." heard back is not a prompt; more words are.
+    @Test func letMeThinkHeardBackIsNotAPrompt() {
+        #expect(VoiceModeWords.isLetMeThink("let me think"))
+        #expect(VoiceModeWords.isLetMeThink("Let me think."))
+        #expect(VoiceModeWords.isLetMeThink("think"))
+        #expect(!VoiceModeWords.isLetMeThink(""))
+        #expect(!VoiceModeWords.isLetMeThink("let me think about the tests"))
+        #expect(!VoiceModeWords.isLetMeThink("stop"))
+    }
 }

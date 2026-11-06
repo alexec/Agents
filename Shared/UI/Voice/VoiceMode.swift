@@ -67,6 +67,11 @@ final class VoiceMode {
     private var announced: (text: String, at: Date)?
     /// What was told to VoiceOver lately, newest last: what a walk reads back.
     private(set) var announcements: [String] = []
+    /// Until when "Let me think." heard back through the microphone is not a prompt (#3565).
+    private var letMeThinkUntil: ContinuousClock.Instant?
+    /// The words heard came over the voice (a barge-in): the prompt they make goes with the
+    /// sound, not "Let me think." (#3565).
+    private var bargedIn = false
 
     /// Tells VoiceOver what the strip says: only the strip says it, as the voice and the
     /// sounds say the rest (#2446).
@@ -222,6 +227,8 @@ final class VoiceMode {
         turnedOnAt = Date()
         isHangingUp = false
         talkedOver = nil
+        letMeThinkUntil = nil
+        bargedIn = false
         clearJoin()
         phase = .loading
         note("voice: on")
@@ -800,12 +807,18 @@ final class VoiceMode {
             if !isWalked, phase == .listening { startDictation() }
             return
         }
+        // The voice's own "Let me think.", heard back (#3565).
+        if let letMeThinkUntil, ContinuousClock.now < letMeThinkUntil, VoiceModeWords.isLetMeThink(text) {
+            if !isWalked, phase == .listening { startDictation() }
+            return
+        }
         defer { armTick() }
         // Over the voice: words that mean something stop it, and are the next prompt.
         if phase == .speaking {
             guard isBargeIn(text) else { return }
             quiet()
             phase = .listening
+            bargedIn = true
         }
         if !text.isEmpty {
             questionReplay?.cancel()
@@ -877,6 +890,8 @@ final class VoiceMode {
         let joined = joinTarget != nil && joinText != nil && joinStarted
         let outgoing = joined ? [joinFirstText, joinText].compactMap { $0 }.joined(separator: " ") : words
         let stop = joined ? joinTarget : nil
+        let overTheVoice = bargedIn
+        bargedIn = false
         clearJoin()
         let target = walkSendFails ? nil : await send(outgoing, stop)
         guard agentID == agent, phase == .sending else { return }
@@ -893,7 +908,7 @@ final class VoiceMode {
         // (#3163).
         let leftover = VoiceModeWords.heard(after: words, in: continued)
         if let target {
-            sound(.sent)
+            sent(overTheVoice: overTheVoice)
             // A new session's first words started it: voice mode goes on in its chat.
             if agentID == nil {
                 agentID = target
@@ -986,6 +1001,8 @@ final class VoiceMode {
         stillWorking?.cancel()
         phase = .speaking
         heard = ""
+        // Only words said over this speech are a barge-in.
+        bargedIn = false
         armTick()
         if !listensWhileSpeaking {
             dictation.stop()
@@ -1051,6 +1068,32 @@ final class VoiceMode {
             self.armTick()
         }
     }
+
+    /// The sent sound, or "Let me think." in the voice when Settings chose it (#3565): on the
+    /// voice's player, so the echo cancellation leaves it out of the microphone. Not for words
+    /// said over the voice: the voice stopped for them at once, so it does not speak again.
+    private func sent(overTheVoice: Bool) {
+        guard !isWalked else { return }
+        guard VoiceSound.sent.saysLetMeThink, !overTheVoice else {
+            VoiceSound.sent.play()
+            return
+        }
+        Task { [weak self, voice, speaker] in
+            do {
+                let samples = try await voice.letMeThink()
+                guard let self, self.phase != .off else { return }
+                let length = Duration.milliseconds(Int(Double(samples.count) / KokoroVoice.sampleRate * 1000))
+                self.letMeThinkUntil = ContinuousClock.now + length + Self.letMeThinkHeardFor
+                try await speaker.play(samples)
+            } catch {
+                note("voice: let me think would not play: \(error)")
+                VoiceSound.sent.play()
+            }
+        }
+    }
+
+    /// How long after "Let me think." its words heard back are dropped (#3565).
+    private static let letMeThinkHeardFor: Duration = .seconds(2)
 
     /// A sound, but none in a walk.
     private func sound(_ sound: VoiceSound) {

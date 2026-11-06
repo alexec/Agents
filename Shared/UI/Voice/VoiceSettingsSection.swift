@@ -39,6 +39,8 @@ enum VoiceSettings {
                          "Ping", "Pop", "Purr", "Sosumi", "Submarine", "Tink"]
     /// The name kept for a sound that plays nothing.
     static let noSound = ""
+    /// The name kept when the voice says "Let me think." in place of the sent sound (#3565).
+    static let letMeThink = "letMeThink"
 
     @MainActor static func soundKey(_ sound: VoiceSound) -> String { "voiceMode.sound.\(sound)" }
 
@@ -154,6 +156,17 @@ private struct VoiceTuningSections: View {
                 .foregroundStyle(.secondary)
         }
         .paperListRow()
+        #else
+        Section {
+            SentSoundPicker()
+        } header: {
+            Text("Voice mode sounds")
+        } footer: {
+            Text("Let me think is said in the voice as your words go.")
+                .appText(.fine)
+                .foregroundStyle(.secondary)
+        }
+        .paperListRow()
         #endif
     }
 
@@ -229,10 +242,12 @@ private struct SoundPicker: View {
         HStack {
             Picker(sound.title, selection: $name) {
                 Text("None").tag(VoiceSettings.noSound)
+                // Above the system sounds (#3565).
+                if sound == .sent { Text("Let me think").tag(VoiceSettings.letMeThink) }
                 ForEach(VoiceSettings.sounds, id: \.self) { Text($0).tag($0) }
             }
             Button {
-                sound.play()
+                sound.preview()
             } label: {
                 Image(systemName: "play.circle")
             }
@@ -241,7 +256,25 @@ private struct SoundPicker: View {
             .help("Play this sound")
             .accessibilityLabel("Play \(sound.title)")
         }
-        .onChange(of: name) { sound.play() }
+        .onChange(of: name) { sound.preview() }
+    }
+}
+#else
+/// The Remote plays the system's own sounds, with no choice of them, but the sent one can
+/// be "Let me think." in the voice, as on the Mac (#3565).
+private struct SentSoundPicker: View {
+    @AppStorage private var name: String
+
+    init() {
+        _name = AppStorage(wrappedValue: VoiceSound.sent.soundAtFirst, VoiceSettings.soundKey(.sent), store: WindowDefaults.store)
+    }
+
+    var body: some View {
+        Picker(VoiceSound.sent.title, selection: $name) {
+            Text("Sound").tag(VoiceSound.sent.soundAtFirst)
+            Text("Let me think").tag(VoiceSettings.letMeThink)
+        }
+        .onChange(of: name) { VoiceSound.sent.preview() }
     }
 }
 #endif
@@ -270,7 +303,7 @@ final class VoiceSample {
         if let format { try? engine.connectNode(player, to: engine.mainMixerNode, format: format) }
     }
 
-    func play() {
+    func play(_ sentences: [String] = VoiceSample.sentences) {
         guard !isMaking, let format else { return }
         isMaking = true
         problem = nil
@@ -279,7 +312,7 @@ final class VoiceSample {
             defer { isMaking = false }
             do {
                 var samples: [Float] = []
-                for sentence in Self.sentences { samples += try await VoiceMode.shared.sample(sentence) }
+                for sentence in sentences { samples += try await VoiceMode.shared.sample(sentence) }
                 guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count)),
                       let channel = buffer.floatChannelData?[0] else { return }
                 buffer.frameLength = AVAudioFrameCount(samples.count)
