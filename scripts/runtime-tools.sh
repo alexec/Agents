@@ -156,7 +156,7 @@ POLICIES = {
     # Feature switches in CODEX_CONFIG, JSON inline rather than a file (047, R5).
     "codex": {
         "lever": "feature switches in CODEX_CONFIG, JSON inline rather than a file",
-        "removed": ["clock.sleep", "automations", "memories", "apps"],
+        "removed": ["clock.sleep", "automations", "memories", "apps", "computer_use"],
         "kept": ["request_user_input", "goals"],
         "residue": [],
         "meta": None,
@@ -164,7 +164,8 @@ POLICIES = {
         "env": {},
         "inline_env": {"CODEX_CONFIG": json.dumps({"features": {
             "sleep_tool": False, "goals": True, "in_app_local_automation": False,
-            "memories": False, "apps": False, "multi_agent": True,
+            "memories": False, "apps": False, "computer_use": False,
+            "multi_agent": True,
             "default_mode_request_user_input": True}}, sort_keys=True, separators=(",", ":"))},
     },
 }
