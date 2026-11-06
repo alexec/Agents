@@ -273,6 +273,20 @@ These stay behind:
 - the backups that hold it, on the machine and on the control plane, until they age out (a
   restore skips it).
 
+**Forget** removes a client's pairing: **Forget This Mac**, **Forget This iPhone**,
+**Forget This Browser**, or the control plane when it forgets the client. The client then
+also deletes what it kept of that control plane (#3670):
+
+- **The Mac window:** its drafts and the start form, and its machine-lock pins.
+- **The Remote:** its drafts, its machine-lock pins, the widget's file
+  (`attention-snapshot.json`, with its headlines) and the badge, the Live Activity and its
+  turns, and every banner it showed.
+- **The web page:** its drafts and machine-lock pins in `localStorage`, and its Web Push
+  subscription.
+
+The Mac and the Remote keep their own key in the keychain, so that a new pairing can use
+it. The web page deletes its key.
+
 ## Export and import
 
 **Export…** in an agent's menu, and **Export Agents…** in a folder's, on the Mac, the
