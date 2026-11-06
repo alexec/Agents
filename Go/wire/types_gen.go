@@ -727,6 +727,7 @@ const ApprovalKindPlugin ApprovalKind = "plugin"
 const ApprovalKindFile ApprovalKind = "file"
 const ApprovalKindArchive ApprovalKind = "archive"
 const ApprovalKindWorkflowFailed ApprovalKind = "workflowFailed"
+const ApprovalKindDeploy ApprovalKind = "deploy"
 
 type ApprovalReadRequest struct {
 	Folder URL `json:"folder"`

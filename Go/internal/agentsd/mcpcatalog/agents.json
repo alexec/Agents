@@ -16,6 +16,7 @@
               "checks.failed",
               "checks.passed",
               "run.completed",
+              "deploy.waiting",
               "pr.opened",
               "pr.merged",
               "pr.closed",

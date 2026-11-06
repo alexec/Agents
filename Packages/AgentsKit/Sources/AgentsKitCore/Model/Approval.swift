@@ -2,8 +2,9 @@ import Foundation
 
 /// One thing in a folder waiting for the person's approval (#773), as its host lists it on
 /// the folder's summary: a folder MCP server, a workflow, a plugin, a guarded `.agents`
-/// file, or a session asking to be archived; and a workflow that failed (#989), waiting for
-/// the person to fix it or dismiss it. Every client draws the one list in Needs You, the
+/// file, a session asking to be archived, or a deploy held by a GitHub environment's
+/// reviewers (#3587); and a workflow that failed (#989), waiting for the person to fix it or
+/// dismiss it. Every client draws the one list in Needs You, the
 /// same way for every kind, rather than each gathering it from six places.
 ///
 /// The host says which answers each takes (`actions`), so a client offers what the host
@@ -14,6 +15,10 @@ public struct Approval: Codable, Hashable, Sendable, Identifiable {
         /// A workflow that has stopped working (#989): `WorkflowFailure`. Its key is the
         /// workflow's id and its digest the failure's key.
         case workflowFailed
+        /// A GitHub Actions run waiting for a reviewer of an environment (#3587): its key is
+        /// owner/name/<run id>, its digest the attempt and environments it waits on. Approve and
+        /// Reject answer GitHub, as the person.
+        case deploy
     }
 
     public enum Action: String, Codable, Sendable, CaseIterable {
@@ -68,6 +73,7 @@ public struct Approval: Codable, Hashable, Sendable, Identifiable {
         case .file: "File"
         case .archive: "Archive"
         case .workflowFailed: "Workflow"
+        case .deploy: "Deploy"
         }
     }
 
@@ -79,6 +85,7 @@ public struct Approval: Codable, Hashable, Sendable, Identifiable {
         case (.approve, _): "Approve"
         case (.deny, .file): "Undo"
         case (.deny, .archive): "Keep Session"
+        case (.deny, .deploy): "Reject"
         case (.deny, _): "Deny"
         case (.requestChanges, _): "Request Changes"
         case (.dismiss, _): "Dismiss"
@@ -105,14 +112,18 @@ public struct Approval: Codable, Hashable, Sendable, Identifiable {
         case .workflowFailed:
             "The workflow has stopped working. It leaves Needs You when the cause is gone; Dismiss takes it out "
                 + "until it fails again."
+        case .deploy:
+            "The run waits on GitHub for a reviewer of its environment. Approve lets it go on; Reject stops it. "
+                + "GitHub keeps your answer, as you."
         }
     }
 
     /// Whether it has lines to read before an answer, which its Review page shows (#1472):
-    /// a file's diff, a workflow's, a connector's entry or a plugin's files.
+    /// a file's diff, a workflow's, a connector's entry or a plugin's files; a deploy's run and
+    /// what it ships (#3587).
     public var hasReview: Bool {
         switch kind {
-        case .mcpServer, .workflow, .plugin, .file: true
+        case .mcpServer, .workflow, .plugin, .file, .deploy: true
         case .archive, .workflowFailed: false
         }
     }

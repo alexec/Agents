@@ -494,17 +494,20 @@ func (d *Daemon) registerGuarded() {
 			return wire.GuardedChangeReading{}, Invalid("An archive request has nothing to read: open the session.")
 		case wire.ApprovalKindWorkflowFailed:
 			return wire.GuardedChangeReading{}, Invalid("A failed workflow has nothing to read: open the workflow.")
+		case wire.ApprovalKindDeploy:
+			return d.readDeploy(ctx, store.FolderPath(r.Folder), r.Key)
 		}
 		return wire.GuardedChangeReading{}, Invalid("There is no such approval here.")
 	})
 	On(d, wire.CallApprovalsAnswer, func(ctx context.Context, c *Client, r wire.ApprovalAnswer) (wire.FolderSummary, error) {
-		return d.answerApproval(r)
+		return d.answerApproval(ctx, r)
 	})
 }
 
 // answerApproval is approvals/answer for what this host asks: a file's change, a workflow
-// waiting for an OK, a session asking to be archived, and a workflow that failed (#989).
-func (d *Daemon) answerApproval(r wire.ApprovalAnswer) (wire.FolderSummary, error) {
+// waiting for an OK, a session asking to be archived, a workflow that failed (#989), and a
+// deploy waiting for an environment's reviewers (#3587).
+func (d *Daemon) answerApproval(ctx context.Context, r wire.ApprovalAnswer) (wire.FolderSummary, error) {
 	folder := store.FolderPath(r.Folder)
 	// A failed workflow takes Dismiss and nothing else; nothing else takes Dismiss.
 	if failed := r.Kind == wire.ApprovalKindWorkflowFailed; failed != (r.Action == wire.ApprovalActionDismiss) {
@@ -516,6 +519,11 @@ func (d *Daemon) answerApproval(r wire.ApprovalAnswer) (wire.FolderSummary, erro
 	switch r.Kind {
 	case wire.ApprovalKindWorkflowFailed:
 		return d.dismissWorkflowFailure(folder, r.Key, r.Digest)
+	case wire.ApprovalKindDeploy:
+		if r.Action == wire.ApprovalActionRequestChanges {
+			return wire.FolderSummary{}, Invalid("A deploy is approved or rejected.")
+		}
+		return d.answerDeploy(ctx, folder, r.Key, r.Digest, r.Action == wire.ApprovalActionApprove)
 	case wire.ApprovalKindFile:
 		if r.Action == wire.ApprovalActionRequestChanges {
 			if r.Note == nil || strings.TrimSpace(*r.Note) == "" {

@@ -58,6 +58,11 @@ type forgeGitHub interface {
 	Search(ctx context.Context, repos []string, f githubmcp.SearchFilter, after string, first int) (githubmcp.SearchPage, error)
 	ItemPage(ctx context.Context, repo string, number int, before string) (githubmcp.ItemDetail, error)
 	Plan(ctx context.Context, repo string, number int) (githubmcp.Plan, error)
+	// WaitingDeploys are the runs waiting for an environment's reviewers (#3587).
+	WaitingDeploys(ctx context.Context, repo, workflow, branch string) ([]githubmcp.WaitingDeploy, error)
+	// Tags and Compare say what a waiting deploy of a tag ships (#3587).
+	Tags(ctx context.Context, repo string) ([]string, error)
+	Compare(ctx context.Context, repo, base, head string) ([]githubmcp.Commit, error)
 	forgeGitHubWrites
 }
 

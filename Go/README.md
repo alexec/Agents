@@ -103,6 +103,10 @@ whatever its conclusion, for the runs no pull request owns (a tag's `release.yml
 Its `deploys` are what the run's jobs say they deployed (#3584), each a notice
 `::notice title=deploy::<target>:<id>/<version>`, as `testflight:<bundle id>/<build>`: one
 request for the run's check suite, and one for each job that has annotations.
+`deploy.waiting` (#3587) is a run held by an environment with required reviewers (a job's
+`environment: production`), once per run, attempt and set of environments, with the
+reviewers and `canApprove` (whether the connected account is one of them); `workflow` and
+`branch` filter it. Agents Host reads the same waits for Needs You (`agentsd/deploys.go`).
 CodeRabbit's events are new here (#1344): `review.posted` (once per review of the head
 commit: each time its `CodeRabbit` status on it goes to success, or its review with no status) and `review.comment` (each
 review comment by it). Its tools `coderabbit_review`, `coderabbit_reply` and

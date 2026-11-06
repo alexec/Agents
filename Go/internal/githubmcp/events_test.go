@@ -27,6 +27,7 @@ type fakeGitHub struct {
 	prComments []PRComment
 	completed  []CompletedRun
 	deploys    map[int][]string
+	waiting    []WaitingDeploy
 	err        error
 	noRepo     bool
 	// reviews and assigned are what ask the connection's owner, alexec (#2034).
@@ -171,6 +172,18 @@ func (f *fakeGitHub) RunDeploys(_ context.Context, _ string, run CompletedRun) (
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.deploys[run.Run.ID], nil
+}
+
+func (f *fakeGitHub) WaitingDeploys(_ context.Context, _, workflow, branch string) ([]WaitingDeploy, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []WaitingDeploy
+	for _, w := range f.waiting {
+		if (workflow == "" || w.Run.Workflow == workflow) && (branch == "" || w.Run.Run.Branch == branch) {
+			out = append(out, w)
+		}
+	}
+	return out, nil
 }
 
 func (f *fakeGitHub) addCompleted(id, attempt int, workflow, branch, at, conclusion string, trusted bool) {
@@ -402,12 +415,14 @@ func TestEventsListGivesEveryEventPollOnlyWithTheirSchemas(t *testing.T) {
 			equal(t, hasIssue, name != "issue.opened", name+" issue")
 		} else if name == "run.completed" {
 			equal(t, props["run"].(map[string]any)["type"], "integer", name+" run")
+		} else if name == "deploy.waiting" {
+			equal(t, props["workflow"].(map[string]any)["type"], "string", name+" workflow")
 		} else {
 			equal(t, props["pr"].(map[string]any)["type"], "integer", name+" pr")
 		}
 	}
 	sort.Strings(names)
-	equal(t, names, []string{"checks.failed", "checks.passed", "issue.assigned", "issue.closed", "issue.commented", "issue.labelled", "issue.opened",
+	equal(t, names, []string{"checks.failed", "checks.passed", "deploy.waiting", "issue.assigned", "issue.closed", "issue.commented", "issue.labelled", "issue.opened",
 		"pr.closed", "pr.commented", "pr.conflicted", "pr.labelled", "pr.merged", "pr.opened", "pr.unlabelled", "review.comment", "review.posted",
 		"review.requested", "run.completed"}, "names")
 }
@@ -502,6 +517,38 @@ func TestRunCompletedRaisesAnyConclusionOncePerAttempt(t *testing.T) {
 	h.fake.addCompleted(9203, 1, "release-dry-run.yml", "main", h.at(12), "cancelled", true)
 	h.fake.addCompleted(9204, 1, "release-dry-run.yml", "main", h.at(12), "success", true)
 	equal(t, ids(h.poll("run.completed", byID, firstByID["cursor"])), []string{"run.completed:" + repo + ":9203:1"}, "by run id")
+}
+
+// #3587: a run waiting for an environment's reviewers is raised once per run, attempt and set
+// of environments, so the next environment it waits on is a new event; not a fork's or a bot's
+// unless anyone is true.
+func TestDeployWaitingOncePerWait(t *testing.T) {
+	h := newHarness(t)
+	args := map[string]any{"repo": repo, "workflow": "release.yml"}
+	first := h.poll("deploy.waiting", args, nil)
+	wait := func(id, attempt int, at string, env Environment, trusted bool) WaitingDeploy {
+		return WaitingDeploy{Run: CompletedRun{Run: RunRef{ID: id, Attempt: attempt, Name: "Release",
+			URL: fmt.Sprintf("https://github.com/%s/actions/runs/%d", repo, id), HeadSHA: "abc", Branch: "v0.17.0", UpdatedAt: at},
+			Workflow: "release.yml", Event: "push", Actor: "alexec", Trusted: trusted},
+			Environments: []Environment{env}, Reviewers: []string{"alexec"}, CanApprove: true}
+	}
+	production := Environment{ID: 11, Name: "production", URL: "https://github.com/o/r/deployments"}
+	h.fake.mu.Lock()
+	h.fake.waiting = []WaitingDeploy{wait(9400, 1, h.at(5), production, true), wait(9401, 1, h.at(5), production, false)}
+	h.fake.mu.Unlock()
+	raised := h.poll("deploy.waiting", args, first["cursor"])
+	equal(t, ids(raised), []string{"deploy.waiting:" + repo + ":9400:1:11"}, "the repo's own")
+	equal(t, eventsOf(raised)[0]["data"], map[string]any{
+		"run": map[string]any{"id": float64(9400), "attempt": float64(1), "name": "Release", "workflow": "release.yml", "event": "push",
+			"branch": "v0.17.0", "headSha": "abc", "url": "https://github.com/" + repo + "/actions/runs/9400", "actor": "alexec"},
+		"environments": []any{map[string]any{"id": float64(11), "name": "production", "url": "https://github.com/o/r/deployments"}},
+		"reviewers":    []any{"alexec"}, "canApprove": true, "waitingSince": h.at(5),
+	}, "data")
+	equal(t, ids(h.poll("deploy.waiting", args, raised["cursor"])), []string{}, "raised once")
+	h.fake.mu.Lock()
+	h.fake.waiting = []WaitingDeploy{wait(9400, 1, h.at(9), Environment{ID: 12, Name: "store"}, true)}
+	h.fake.mu.Unlock()
+	equal(t, ids(h.poll("deploy.waiting", args, raised["cursor"])), []string{"deploy.waiting:" + repo + ":9400:1:12"}, "the next environment")
 }
 
 func TestRunCompletedLeavesOutForksAndBotsUnlessAnyone(t *testing.T) {

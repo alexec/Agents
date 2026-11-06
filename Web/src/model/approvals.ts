@@ -1,6 +1,7 @@
 // What waits for the person's OK in a folder (#773), as its host lists it on the folder's summary:
-// a folder MCP server, a workflow, a plugin, a guarded `.agents` file, or a session asking to be
-// archived; and a workflow that failed (#989), to fix or dismiss. The words are the window's and the Remote's, Approval (AgentsKitCore/Model/Approval.swift).
+// a folder MCP server, a workflow, a plugin, a guarded `.agents` file, a session asking to be
+// archived, or a deploy held by a GitHub environment's reviewers (#3587); and a workflow that
+// failed (#989), to fix or dismiss. The words are the window's and the Remote's, Approval (AgentsKitCore/Model/Approval.swift).
 import type { Approval, ApprovalAction, ApprovalKind } from "../protocol/generated";
 
 /** Approval.id: one item within its folder. */
@@ -11,14 +12,14 @@ export function approvalID(approval: Approval): string {
 /** Approval.kindWord: the kind in a person's words, as a row's grey line leads with it. */
 export const kindWords: Record<ApprovalKind, string> = {
   mcpServer: "Connector", workflow: "Workflow", plugin: "Plugin", file: "File", archive: "Archive",
-  workflowFailed: "Workflow",
+  workflowFailed: "Workflow", deploy: "Deploy",
 };
 
 /** Approval.word(for:): each action's button, for this kind. */
 export function actionWord(kind: ApprovalKind, action: ApprovalAction): string {
   switch (action) {
     case "approve": return kind === "file" ? "Keep" : kind === "archive" ? "Archive" : "Approve";
-    case "deny": return kind === "file" ? "Undo" : kind === "archive" ? "Keep Session" : "Deny";
+    case "deny": return kind === "file" ? "Undo" : kind === "archive" ? "Keep Session" : kind === "deploy" ? "Reject" : "Deny";
     case "requestChanges": return "Request Changes";
     case "dismiss": return "Dismiss";
   }
@@ -37,6 +38,8 @@ export const explanations: Record<ApprovalKind, string> = {
   archive: "The session asked to be archived. Keep Session takes the request away and leaves it where it is.",
   workflowFailed: "The workflow has stopped working. It leaves Needs You when the cause is gone; Dismiss takes it out "
     + "until it fails again.",
+  deploy: "The run waits on GitHub for a reviewer of its environment. Approve lets it go on; Reject stops it. "
+    + "GitHub keeps your answer, as you.",
 };
 
 /** The row's one grey line: "Connector · New with the last pull". */

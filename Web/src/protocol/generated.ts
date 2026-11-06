@@ -651,7 +651,8 @@ export type ApprovalKind =
   | "plugin"
   | "file"
   | "archive"
-  | "workflowFailed";
+  | "workflowFailed"
+  | "deploy";
 
 export interface ApprovalReadRequest {
   folder: URLString;

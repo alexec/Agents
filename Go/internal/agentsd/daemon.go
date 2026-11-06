@@ -52,6 +52,7 @@ type Daemon struct {
 	pinState
 	viewCountBook
 	reviewBook
+	deployBook
 	attachmentBook
 	settingsState
 	userScopeState
@@ -187,6 +188,8 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	d.startViewCounts()
 	// The pull requests waiting for the person, in For Review (#3330).
 	d.startReviews()
+	// The deploys waiting for the person, in Needs You (#3587).
+	d.startDeploys()
 	d.installDefaultToolsets()
 	return d, nil
 }

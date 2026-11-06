@@ -1482,7 +1482,8 @@
         "plugin",
         "file",
         "archive",
-        "workflowFailed"
+        "workflowFailed",
+        "deploy"
       ]
     },
     "ApprovalReadRequest": {
