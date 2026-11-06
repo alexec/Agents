@@ -40,3 +40,10 @@ test("a GitHub issue's, milestone's or release's address, as ReportValueWords.ur
   assert.equal(v.nodeUrl({ kind: "issue", ref: "linear:ENG-4" }), undefined);
   assert.equal(v.nodeUrl({ kind: "issue", ref: "github:alexec/agents#x" }), undefined);
 });
+
+test("how far the estimates were from the actual figures (#3561)", () => {
+  assert.equal(v.estimateErrorLine({}), undefined);
+  assert.equal(v.estimateErrorLine({ estimateError: { issues: 12, cost: 1.54, workingSeconds: 1.45 } }),
+    "Estimates were off by ×1.5 in dollars and ×1.4 in hours of work (the median of 12 closed issues)");
+  assert.equal(v.estimateErrorLine({ estimateError: { issues: 1 } }), "No estimate had a figure to set against the actual (1 closed issue)");
+});

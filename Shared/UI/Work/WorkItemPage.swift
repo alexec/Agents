@@ -84,12 +84,14 @@ struct WorkItemPage: View {
         var asked: Int
     }
 
-    /// An open issue's estimate (#3560), from the machine that keeps its links. A closed one has
-    /// what it cost.
+    /// An issue's estimate (#3560), from the machine that keeps its links: an open one's, and a
+    /// closed one's as it was when its work started, against what it took (#3561).
     private var estimateAsk: LineageAsk? {
-        guard let item = detail?.got.item, item.node.kind == "issue", item.state == "open" else { return nil }
+        guard let item = detail?.got.item, item.node.kind == "issue" else { return nil }
         return LineageAsk(host: lineageHost, asked: asked)
     }
+
+    private var isOpen: Bool { detail?.got.item.state == "open" }
 
     // MARK: Header
 
@@ -133,8 +135,13 @@ struct WorkItemPage: View {
                     Button(WorkList.openOnWords(node.ref)) { openURL(url) }.linkStyle()
                 }
             }
-            if let estimate, EstimateWords.shows(estimate) {
+            if let estimate, isOpen, EstimateWords.shows(estimate) {
                 estimateLine(estimate)
+            } else if let estimate, !isOpen, let words = EstimateWords.actualWords(estimate) {
+                Text(words).appText(.supporting).foregroundStyle(.secondary).monospacedDigit()
+                #if os(macOS)
+                    .textSelection(.enabled)
+                #endif
             }
             if let item, item.node.kind == "pr" {
                 let words = [WorkList.checksWords(detail?.got.checks, summary: item.checks), WorkList.reviewWords(item.review)]

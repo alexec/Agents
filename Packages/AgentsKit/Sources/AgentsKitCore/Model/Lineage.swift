@@ -174,6 +174,28 @@ public extension DaemonAPI {
         }
     }
 
+    /// An estimate as it was when work started (#3561): the medians, from the issues merged
+    /// before then.
+    struct LineageEstimateKept: Codable, Sendable, Hashable {
+        public var at: Date
+        public var matchedBy: String?
+        public var matches: Int
+        /// Dollars, by currency.
+        public var cost: [String: Double]?
+        public var outputTokens: Double?
+        public var workingSeconds: Double?
+
+        public init(at: Date, matchedBy: String? = nil, matches: Int = 0, cost: [String: Double]? = nil,
+                    outputTokens: Double? = nil, workingSeconds: Double? = nil) {
+            self.at = at
+            self.matchedBy = matchedBy
+            self.matches = matches
+            self.cost = cost
+            self.outputTokens = outputTokens
+            self.workingSeconds = workingSeconds
+        }
+    }
+
     /// `lineage/estimate`'s answer (#3559): what an issue or an epic will probably cost and take,
     /// from the closed issues like it. A figure is nil when fewer than 5 matches have it. An epic
     /// has its open children's estimates, and what its closed children spent.
@@ -198,6 +220,9 @@ public extension DaemonAPI {
         public var closedChildren: Int?
         public var spent: LineageCost?
         public var children: [LineageEstimate]?
+        /// The estimate when work on it started, and what a closed one took (#3561).
+        public var kept: LineageEstimateKept?
+        public var actual: LineageCost?
 
         public init(node: LineageNode, type: String? = nil, level: String? = nil, step: Int? = nil, closedIssues: Int = 0,
                     matchedBy: String? = nil, matches: Int = 0, cost: [String: LineageEstimateRange]? = nil,
@@ -205,7 +230,7 @@ public extension DaemonAPI {
                     workingSeconds: LineageEstimateRange? = nil, leadTimeSeconds: LineageEstimateRange? = nil,
                     cycleTimeSeconds: LineageEstimateRange? = nil, landsAt: LineageEstimateDates? = nil,
                     openChildren: Int? = nil, closedChildren: Int? = nil, spent: LineageCost? = nil,
-                    children: [LineageEstimate]? = nil) {
+                    children: [LineageEstimate]? = nil, kept: LineageEstimateKept? = nil, actual: LineageCost? = nil) {
             self.node = node
             self.type = type
             self.level = level
@@ -224,6 +249,8 @@ public extension DaemonAPI {
             self.closedChildren = closedChildren
             self.spent = spent
             self.children = children
+            self.kept = kept
+            self.actual = actual
         }
     }
 }

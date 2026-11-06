@@ -44,6 +44,9 @@ type Past struct {
 	// Lead is from its first work to its last PR merged; Cycle from its start (#3562). Nil
 	// when not known.
 	Lead, Cycle *float64
+	// Merged is when its last PR merged: an estimate kept at a start (#3561) uses only the
+	// issues merged before it.
+	Merged wire.Date
 }
 
 // TypeOf is an issue's type from its labels: bug or enhancement, else none.
@@ -101,6 +104,7 @@ func History(nodes []wire.LineageCostNode) []Past {
 			continue
 		}
 		p.Lead, p.Cycle = since(first, *merged), since(start, *merged)
+		p.Merged = *merged
 		out = append(out, p)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Ref < out[j].Ref })
@@ -331,4 +335,67 @@ func EstimateEpic(history []Past, nodes []wire.LineageCostNode, of wire.LineageN
 	put(&e, sums)
 	landsAt(&e, start)
 	return e
+}
+
+// Before is the past issues that merged before at: the history an estimate made then had.
+func Before(history []Past, at wire.Date) []Past {
+	var out []Past
+	for _, p := range history {
+		if p.Merged < at {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// StartOf is when work on an issue started (#3562), else when it was first banked.
+func StartOf(n wire.LineageCostNode) *wire.Date {
+	if n.StartedAt != nil {
+		return n.StartedAt
+	}
+	return n.FirstAt
+}
+
+// Keep is e's medians, as an estimate kept for the start at (#3561).
+func Keep(e wire.LineageEstimate, at wire.Date) wire.LineageEstimateKept {
+	k := wire.LineageEstimateKept{At: at, MatchedBy: e.MatchedBy, Matches: e.Matches}
+	for currency, r := range e.Cost {
+		if k.Cost == nil {
+			k.Cost = map[string]float64{}
+		}
+		k.Cost[currency] = r.Median
+	}
+	if e.OutputTokens != nil {
+		k.OutputTokens = &e.OutputTokens.Median
+	}
+	if e.WorkingSeconds != nil {
+		k.WorkingSeconds = &e.WorkingSeconds.Median
+	}
+	return k
+}
+
+// KeepIssue is the estimate an issue with labels had when its work started at: from the issues
+// merged before then (#3561).
+func KeepIssue(history []Past, of wire.LineageNode, labels []string, at wire.Date) wire.LineageEstimateKept {
+	return Keep(EstimateIssue(Before(history, at), of, labels, at), at)
+}
+
+// KeepEpic is the estimate an epic had when its work started at: every child of its plan
+// estimated as open, from the issues merged before then (#3561).
+func KeepEpic(history []Past, of wire.LineageNode, labels []string, children []EpicChild, at wire.Date) wire.LineageEstimateKept {
+	all := make([]EpicChild, len(children))
+	for i, c := range children {
+		c.Open = true
+		all[i] = c
+	}
+	return Keep(EstimateEpic(Before(history, at), nil, of, labels, all, at), at)
+}
+
+// ErrorOf is how far an estimate was from the actual figure (#3561): max(estimate/actual,
+// actual/estimate), as the backtest measured it; false when either is not above zero.
+func ErrorOf(estimate, actual float64) (float64, bool) {
+	if estimate <= 0 || actual <= 0 {
+		return 0, false
+	}
+	return max(estimate/actual, actual/estimate), true
 }

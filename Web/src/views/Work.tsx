@@ -19,7 +19,7 @@ import { newSessionProjects } from "../model/projects";
 import { orderedFolders } from "./Sidebar";
 import { kindWord, lineageUrl, readingTitles, sessionHost } from "../model/lineage";
 import { nodeName } from "../model/value";
-import { estimateLine, estimateRangeWords, estimateSpentWords, showsEstimate } from "../model/estimate";
+import { actualWords, estimateLine, estimateRangeWords, estimateSpentWords, showsEstimate } from "../model/estimate";
 import { ago } from "../model/connectorSetup";
 import { fromWireDate } from "../protocol/dates";
 import { Markdown } from "../render/markdown";
@@ -211,15 +211,18 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
     void store.link.call("lineage/cost", { node }, lineageHost).then((r) => { if (current) cost.value = r; }, () => {});
     return () => { current = false; };
   }, [kind, ref, lineageHost, asked.value]);
-  // An open issue's estimate (#3560), from the machine that keeps its links. A closed one has what it cost.
-  const openIssue = detail.value?.got.item.node.kind === "issue" && detail.value.got.item.state === "open";
+  // An issue's estimate (#3560), from the machine that keeps its links: an open one's, and a closed one's as it
+  // was when its work started, against what it took (#3561).
+  const isIssue = detail.value?.got.item.node.kind === "issue";
+  const isOpen = detail.value?.got.item.state === "open";
   useEffect(() => {
     let current = true;
     estimate.value = null;
-    if (!lineageHost || !openIssue) return;
+    if (!lineageHost || !isIssue) return;
     void store.link.call("lineage/estimate", { node }, lineageHost).then((r) => { if (current) estimate.value = r; }, () => {});
     return () => { current = false; };
-  }, [kind, ref, lineageHost, openIssue, asked.value]);
+  }, [kind, ref, lineageHost, isIssue, isOpen, asked.value]);
+  const actual = estimate.value && !isOpen ? actualWords(estimate.value) : undefined;
   // The walk holds the node's own links, and the titles of the nodes at their other ends.
   const { graph, costs, failed, reading } = useWalk(store, lineageHost, node, asked.value);
   const links: readonly LineageLink[] | null = failed.value ? [] : graph.value?.links ?? null;
@@ -299,10 +302,11 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
           {[ref, ...item ? [peopleWords(item)] : [], ...project ? [projectWords(project.name)] : []].filter(Boolean).join(" · ")}
           {url && <> · <a href={url} target="_blank" rel="noopener noreferrer">{openOnWords(ref)}</a></>}
         </p>
-        {estimate.value && showsEstimate(estimate.value) && (
+        {estimate.value && isOpen && showsEstimate(estimate.value) && (
           <p class="quiet small work-estimate" title={estimateRangeWords(estimate.value)}>
             {[estimateLine(estimate.value), estimateSpentWords(estimate.value)].filter(Boolean).join(" · ")}</p>
         )}
+        {actual && <p class="quiet small work-estimate">{actual}</p>}
         {(checks || review) && <p class="small">{[checks, review].filter(Boolean).join(" · ")}</p>}
         {writes && detail.value && <WorkActions store={store} host={detail.value.host} detail={detail.value.got} wrote={() => void reread()} />}
       </header>
