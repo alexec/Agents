@@ -158,8 +158,21 @@ func TestSigningCodexInOnAServer(t *testing.T) {
 		t.Fatalf("too soon: %+v", e)
 	}
 	os.WriteFile(filepath.Join(home, "entered"), nil, 0o600)
+	// Done again until Codex has seen the code: a loaded runner can take longer than one
+	// short wait (#3634).
 	var s wire.RuntimeStatus
-	json.Unmarshal(c.call(t, 3, "runtimes/signInFinish", map[string]any{"signInID": step.SignInID}), &s)
+	for id, deadline := 100, time.Now().Add(15*time.Second); ; id++ {
+		c.send(requestLine(id, "runtimes/signInFinish", map[string]any{"signInID": step.SignInID}))
+		var m message
+		json.Unmarshal([]byte(c.answer(t, id)), &m)
+		if m.Error == nil {
+			json.Unmarshal(m.Result, &s)
+			break
+		}
+		if !strings.Contains(m.Error.Message, "still waiting") || time.Now().After(deadline) {
+			t.Fatalf("after entering the code: %+v", m.Error)
+		}
+	}
 	if s.SignIn == nil || !s.SignIn.SignedIn {
 		t.Fatalf("after: %+v", s.SignIn)
 	}
