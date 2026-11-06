@@ -119,6 +119,20 @@ async function subscribeWebPush(to: Link): Promise<void> {
   }
 }
 
+/** The control plane forgot this browser (#3670): its push subscription goes, and what it showed. */
+export async function dropWebPush(): Promise<void> {
+  if (!("serviceWorker" in navigator)) return;
+  try {
+    const worker = await (registration ?? navigator.serviceWorker.getRegistration("/"));
+    if (!worker) return;
+    await (await worker.pushManager?.getSubscription())?.unsubscribe();
+    for (const notification of await worker.getNotifications()) notification.close();
+  } catch {
+    // A worker that can't be reached holds a subscription no control plane knows now.
+  }
+  webPush.value = "off";
+}
+
 /** Closes what Web Push showed: the person is at the page now, which shows what needs them. */
 function closePushed(): void {
   if (!registration) return;

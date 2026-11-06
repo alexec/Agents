@@ -439,8 +439,22 @@ final class RemoteModel {
         }
         note("pairing: forgot itself")
         RemoteControl.forget()
+        forgetKept()
         forgotItself = true
         return nil
+    }
+
+    /// The pairing is gone (#3670): what this device kept of that control plane goes with
+    /// it. The widget's headlines and the badge, the drafts, the Live Activity's turns, and
+    /// every banner delivered from it.
+    private func forgetKept() {
+        StartDraftKeeper.shared.forgetAll()
+        liveActivities.endAll()
+        notifier.forgetAll()
+        AttentionSnapshotStore.clear()
+        lastPublished = nil
+        notifier.setBadgeCount(0)
+        WidgetCenter.shared.reloadTimelines(ofKind: AttentionSnapshot.widgetKind)
     }
 
     // MARK: A server's key (#344)
@@ -2110,6 +2124,7 @@ final class RemoteModel {
                 // for a new code, and stops dialling. One "unknown" alone is a control plane
                 // that could not tell yet, and is dialled again (#81).
                 RemoteControl.forget()
+                forgetKept()
                 forgottenByControlPlane = true
                 isConnected = false
                 return false
