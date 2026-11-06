@@ -323,12 +323,12 @@ placeholder never carries pixels, and no screenshot is ever written to disk or s
 tool. No spec user story names this directly (it is Decisions/FR-010), and it shares no area with
 Phases 3–6, so per plan.md's Slice 4 it "may run at any point alongside them."
 
-- [ ] T040 [P] Go: `toolPolicyEnv["codex"]["CODEX_CONFIG"]["features"]` gains `"computer_use": false`
+- [x] T040 [P] Go: `toolPolicyEnv["codex"]["CODEX_CONFIG"]["features"]` gains `"computer_use": false`
       beside the existing `sleep_tool`/`apps` entries, applied by `withToolPolicy` on every launch — in
       `Go/internal/agentsd/runtimes.go` (research R10). `[runtimes]`
-- [ ] T041 [P] Go test: a scratch Codex launch's effective `features` map includes `computer_use: false`
+- [x] T041 [P] Go test: a scratch Codex launch's effective `features` map includes `computer_use: false`
       in `Go/internal/agentsd/runtimes_test.go`.
-- [ ] T042 docs: split `docs/reference/runtimes.md`'s `computer_use` row (`:334`) into its own row,
+- [x] T042 docs: split `docs/reference/runtimes.md`'s `computer_use` row (`:334`) into its own row,
       "Superseded by the app's own desktop-control tool," naming this feature; `browser_use` and
       `image_generation` keep today's "Measure" row. `[docs]`
 
