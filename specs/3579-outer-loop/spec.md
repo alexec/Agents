@@ -48,7 +48,7 @@ new stage needs no wire change: only a new linker in the host.
 | Build (CI run) | `ci-run`, `github:<o>/<r>/actions/run/<id>` | `ci-run` `builds` PR, or `builds` release | there (#3581): `checks.*` and `run.completed` on a `v*` tag; a PR keeps its last 20 runs |
 | Release | `release`, `github:<o>/<r>/release/<tag>` | PR `part-of` release; milestone `shipped-in` release | there (#3023) |
 | Deploy | `deploy`, `<target>:<id>/<version>`, as `testflight:<bundle id>/<build>` | release `deployed-as` deploy; deploy `part-of` its target | **missing**; #3023 named it as a follow-up |
-| Health signal | `health`, `<source>:<id>`, as `sentry:<org>/<issue id>` | health `seen-in` release or deploy | **missing** |
+| Health signal | `health`, `<source>:<id>`, as `sentry:<org>/<issue id>` | health `seen-in` release or deploy | there (#3585): `health.issue_new` and `health.issue_regressed`, matched to the release by version |
 | New issue | `issue` | issue `reports` health | **missing** |
 
 - The `ci-run` kind is new, not `workflow-run`: `workflow-run` is an Agents workflow's run
