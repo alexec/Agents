@@ -160,7 +160,18 @@ func TestOktaAndEntraRequestSetsPlay(t *testing.T) {
 	if kim == nil || kim.SCIM == nil || string(kim.SCIM.Extra["urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"]) == "" {
 		t.Fatalf("%+v", kim)
 	}
-	if storeHolds(t, p.store, "never-kept-1") {
+	// Okta deactivates both ways, by a PATCH with no path: both are suspended.
+	if lee := p.s.records.Person(ids["lee"]); !kim.IsSuspended() || lee == nil || !lee.IsSuspended() || lee.Name != "Lee Park-Smith" {
+		t.Fatalf("%+v %+v", kim, lee)
+	}
+	if storeHolds(t, p.store, "never-kept-1") || storeHolds(t, p.store, "never-kept-2") {
+		t.Fatal("the store holds a SCIM password")
+	}
+	// The steps from Okta's reference that the walk did not send, on a plane of their own:
+	// they count the groups.
+	docs, _, _, docsToken, docsBase := scimPlane(t, wire.OrgProviderJoinScim)
+	play(t, docsBase, docsToken, "scim/testdata/okta-docs.json")
+	if storeHolds(t, docs.store, "never-kept-1") {
 		t.Fatal("the store holds a SCIM password")
 	}
 	ids = play(t, base, token, "scim/testdata/entra.json")
