@@ -62,6 +62,22 @@ The path a new person takes must be short, and must need only a browser. These a
 Milestone 0.8 "Start on the web" builds this path. Each step that needs a CLI, a Mac or a
 second screen today is a gap.
 
+## From idea to production
+
+Alex set this north star on 2026-11-05 (#3579). A person dictates the features they want.
+Agents takes them all the way to production: it organises the work, ships it (a TestFlight
+build on a person's iPhone, an update rolled out, a service behind a status page) and
+watches the system's health. What health finds comes back as new work.
+
+- **The pipeline is in the background.** Idea, issue, pull request, build, release, deploy,
+  health and the next issue are each a node in Lineage. A person asks "where is my
+  feature?" or "what did this outage come from?" in Lineage, not on a pipeline screen.
+- **A deploy runs in the customer's own CI**, or on one of their machines, never on the
+  control plane (principles 5 and 6). Agents watches it and shows the approval step.
+- **Health comes from an outside service**, as an MCP server, Sentry first.
+
+The spec is `specs/3579-outer-loop/spec.md`.
+
 ## Three ways to run it
 
 The same programs make all three. Only who runs the control plane, and how many
