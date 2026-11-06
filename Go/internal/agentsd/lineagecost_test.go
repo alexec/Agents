@@ -311,3 +311,46 @@ func TestCostNodeKeepsStartAndLevel(t *testing.T) {
 		t.Fatalf("%+v", n)
 	}
 }
+
+// #3559: lineage/estimate reads the epic's plan from the forge and its history from the totals:
+// the closed child's cost is spent, and the open child is estimated from the closed issues.
+func TestLineageEstimateOfAnEpic(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	issue := func(n int) wire.LineageNode {
+		return wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#" + strconv.Itoa(n)}
+	}
+	state, merged, level, ended := "closed", lineage.OutcomeMerged, "task", wire.DateOf(time.Now())
+	var prs []wire.LineageCostNode
+	d.workMu.Lock()
+	f := d.costLedgerLocked()
+	for n := 1; n <= 6; n++ {
+		c := wire.LineageCostNode{Node: issue(n), Banked: wire.LineageCost{Cost: map[string]float64{"USD": float64(n)}}, Level: &level,
+			Resolved: &wire.LineageResolved{Title: "Done", State: &state, Labels: []string{"enhancement", "task"}}}
+		f.Nodes[costKey(c.Node)] = c
+		pr := wire.LineageCostNode{Node: wire.LineageNode{Kind: "pr", Ref: "github:alexec/agents#" + strconv.Itoa(100+n)},
+			Banked: wire.LineageCost{Cost: map[string]float64{}}, Fixes: []string{c.Node.Ref}, Outcome: &merged, EndedAt: &ended}
+		f.Nodes[costKey(pr.Node)] = pr
+		prs = append(prs, pr)
+	}
+	d.workMu.Unlock()
+	// The totals take a PR's fixes from the graph.
+	for _, pr := range prs {
+		d.linkAt(pr.Node, wire.LineageNode{Kind: "issue", Ref: pr.Fixes[0]}, lineage.RelFixes, lineage.SourceStart, time.Now())
+	}
+	key, _ := json.Marshal([]any{"forge/plan", issue(10).Ref})
+	d.forgeRemember(string(key), forgeAnswer{plan: &forgePlanAnswer{
+		epic: wire.ForgeItem{Node: issue(10), State: "open", Labels: []wire.ForgeLabel{{Name: "epic"}}},
+		children: []planChild{
+			{item: wire.ForgeItem{Node: issue(1), State: "closed"}},
+			{item: wire.ForgeItem{Node: issue(11), State: "open", Labels: []wire.ForgeLabel{{Name: "enhancement"}, {Name: "task"}}}},
+		}}})
+	e, err := d.lineageEstimate(context.Background(), wire.LineageEstimateRequest{Node: issue(10)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if *e.OpenChildren != 1 || *e.ClosedChildren != 1 || usd(*e.Spent) != 1 || e.ClosedIssues != 6 || len(e.Children) != 1 ||
+		*e.Children[0].MatchedBy != lineage.MatchedByLevel || e.Children[0].Cost["USD"].Median != 3.5 {
+		t.Fatalf("%+v", e)
+	}
+}

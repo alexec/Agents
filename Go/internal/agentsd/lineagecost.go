@@ -435,8 +435,54 @@ func (d *Daemon) lineageCost(of wire.LineageNode) wire.LineageCostRollup {
 	return lineage.Rollup(nodes, of)
 }
 
+// lineageEstimate is lineage/estimate (#3559): an issue or an epic estimated from the closed
+// issues in this machine's totals. Its labels, children, their state and steps come from the
+// forge's plan (forge/plan, cached); an issue with children, or labelled epic, is an epic.
+func (d *Daemon) lineageEstimate(ctx context.Context, r wire.LineageEstimateRequest) (wire.LineageEstimate, error) {
+	plan, err := d.forgePlan(ctx, wire.ForgePlanRequest{Node: r.Node})
+	if err != nil {
+		return wire.LineageEstimate{}, err
+	}
+	start := wire.DateOf(nowFunc())
+	if r.StartAt != nil {
+		start = *r.StartAt
+	}
+	d.lineageSettle(2 * time.Second)
+	d.workMu.Lock()
+	d.refreshCostLinksLocked()
+	d.refreshCostResolvedLocked()
+	f := d.costLedgerLocked()
+	nodes := make([]wire.LineageCostNode, 0, len(f.Nodes))
+	for _, c := range f.Nodes {
+		nodes = append(nodes, c)
+	}
+	d.workMu.Unlock()
+	history := lineage.History(nodes)
+	labels := forgeLabelNames(plan.Item.Labels)
+	if len(plan.Children) == 0 && lineage.LevelOf(labels) != "epic" {
+		return lineage.EstimateIssue(history, r.Node, labels, start), nil
+	}
+	children := make([]lineage.EpicChild, 0, len(plan.Children))
+	for _, c := range plan.Children {
+		children = append(children, lineage.EpicChild{Node: c.Item.Node, Labels: forgeLabelNames(c.Item.Labels), Step: c.Step,
+			Open: c.Item.State != "closed" && c.Item.State != "merged"})
+	}
+	return lineage.EstimateEpic(history, nodes, r.Node, labels, children, start), nil
+}
+
+func forgeLabelNames(labels []wire.ForgeLabel) []string {
+	out := make([]string, 0, len(labels))
+	for _, l := range labels {
+		out = append(out, l.Name)
+	}
+	return out
+}
+
 func (d *Daemon) registerLineageCost() {
 	On(d, wire.CallLineageCost, func(_ context.Context, _ *Client, r wire.LineageNodeRequest) (wire.LineageCostRollup, error) {
 		return d.lineageCost(r.Node), nil
+	})
+	On(d, wire.CallLineageEstimate, func(ctx context.Context, _ *Client, r wire.LineageEstimateRequest) (wire.LineageEstimate, error) {
+		return d.lineageEstimate(ctx, r)
 	})
 }

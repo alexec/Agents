@@ -85,6 +85,17 @@ For each of the 12 closed epics with 2 or more children in the store, the backte
 
 Decided: type + level with the fallback chain, P10–P90, minimum 5, and a simulation for epics, because the backtest gave them the smallest error with a range that holds what it says. Alex can overrule.
 
+## The daemon method (#3559)
+
+`lineage/estimate` (capability `lineage.estimate/1`) answers `LineageEstimate` for an issue or an epic, with the rule above, from the totals in `lineage-cost.json` and the plan from `forge/plan`. Its code is `Go/internal/lineage/estimate.go`.
+
+- **Figures:** dollars by currency, input and output tokens, working time, lead time and cycle time, each as the median and P10–P90. A figure fewer than 5 matches have is absent.
+- **Landing date** (Alex, 2026-11-05): `landsAt` is the start plus the cycle time. The start is the request's `startAt`, or now. An epic's time follows its steps: in each draw, the longest child of each step, added up over the steps.
+- **An epic** is an issue with children in its plan, or labelled `epic`. Its open children are estimated and added up by the simulation; `spent` is what its closed children cost.
+
+Decided: the method is not tagged `web` yet, because a `web` method needs its Swift `WebSignatures` and story 3 (#3560) adds it with the first client that shows it. Alex can overrule.
+Decided: with no `startAt`, the remaining work starts now, because the closed children are already out of the estimate. Alex can overrule.
+
 ## What the backtest does not cover
 
 - **6 days of history.** The store starts on 2026-10-30. These numbers will change as history grows. Story 4 (estimate against actual) keeps track of them.

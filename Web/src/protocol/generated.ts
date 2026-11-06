@@ -4681,6 +4681,83 @@ export interface LineageEndRequest {
 }
 
 /**
+ * lineage/estimate (#3559): what an issue or an epic will probably cost and take, from the closed
+ * issues like it on this machine (specs/3557-estimates/spec.md). An issue matches the closed issues
+ * with its type (bug or enhancement) and level (story, task, spike or bug); when fewer than 5
+ * match, those with its type; then all of them (matchedBy says level, type or all). Only issues
+ * that closed with a merged PR that fixes them count, and no epic. Each figure is the median and
+ * the P10 to P90 range of the matches (8 in 10 like it land there), absent when fewer than 5 of
+ * them have it; with fewer than 5 closed issues in all there are no figures (closedIssues says how
+ * many there are). An epic adds up its open children by a simulation with a fixed seed: one match
+ * per child, 1,000 times. Its times follow its steps: the children of one step run at the same
+ * time, so a draw's time is the sum over the steps of its longest child. spent is what its closed
+ * children cost. landsAt is startAt (now when the request has none) plus the cycle time.
+ */
+export interface LineageEstimate {
+  node: LineageNode;
+  /** bug or enhancement, from its labels; absent with neither. */
+  type?: string;
+  /** epic, story, task, spike or bug, from its labels; absent with none. */
+  level?: string;
+  /** An epic's child's step in its plan (forge/plan). */
+  step?: number;
+  /** The closed issues there are to match, on this machine. */
+  closedIssues: number;
+  /**
+   * An issue's rule: level (the same type and level), type or all. Absent for an epic, and with too
+   * few closed issues.
+   */
+  matchedBy?: string;
+  /** The closed issues the estimate used; for an epic, those its open children used, each once. */
+  matches: number;
+  /** Dollars, by currency, as LineageCost.cost. */
+  cost?: Record<string, LineageEstimateRange>;
+  inputTokens?: LineageEstimateRange;
+  outputTokens?: LineageEstimateRange;
+  /** The agents' time at work. */
+  workingSeconds?: LineageEstimateRange;
+  /**
+   * From the first work to the last PR merged. It varies with the queue (lanes, CI, approvals), not
+   * with the work: the backtest's error was x2.4.
+   */
+  leadTimeSeconds?: LineageEstimateRange;
+  /** From the start of work (#3562) to the last PR merged. */
+  cycleTimeSeconds?: LineageEstimateRange;
+  landsAt?: LineageEstimateDates;
+  /** An epic's children that are open. */
+  openChildren?: number;
+  /** An epic's children that are closed. */
+  closedChildren?: number;
+  /** What an epic's closed children cost, each with the PRs that fix it. */
+  spent?: LineageCost;
+  /** An epic's open children, each estimated as an issue, in step order. */
+  children?: LineageEstimate[];
+}
+
+/** When work lands (#3559): the median and the P10 to P90 range. */
+export interface LineageEstimateDates {
+  median: WireDate;
+  p10: WireDate;
+  p90: WireDate;
+}
+
+/** A figure's estimate (#3559): the median and the P10 to P90 range. */
+export interface LineageEstimateRange {
+  median: number;
+  p10: number;
+  p90: number;
+}
+
+/**
+ * lineage/estimate (#3559): an issue or an epic, and when work on it starts, for landsAt (now when
+ * absent).
+ */
+export interface LineageEstimateRequest {
+  node: LineageNode;
+  startAt?: WireDate;
+}
+
+/**
  * lineage/walk (#2348): the nodes the walk reached and the links it went along. limited says the
  * walk stopped at its limit on nodes, so there is more. resolved is each node's title, state and
  * labels from its connector, by ref, for the nodes a connector could resolve (#3089). resolving
@@ -12410,6 +12487,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["repo", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "startedAt", "level", "feature", "area", "parent", "endedAt", "resolved", "sessions"] },
   LineageCostRollup: { required: ["node", "own", "total", "waste", "unlinked", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "parts"], optional: ["limited"] },
   LineageEndRequest: { required: ["from", "to", "rel"], optional: [] },
+  LineageEstimate: { required: ["node", "closedIssues", "matches"], optional: ["type", "level", "step", "matchedBy", "cost", "inputTokens", "outputTokens", "workingSeconds", "leadTimeSeconds", "cycleTimeSeconds", "landsAt", "openChildren", "closedChildren", "spent", "children"] },
+  LineageEstimateDates: { required: ["median", "p10", "p90"], optional: [] },
+  LineageEstimateRange: { required: ["median", "p10", "p90"], optional: [] },
+  LineageEstimateRequest: { required: ["node"], optional: ["startAt"] },
   LineageGraph: { required: ["nodes", "links"], optional: ["limited", "resolving", "resolved"] },
   LineageLink: { required: ["from", "to", "rel", "source", "at"], optional: ["endedAt"] },
   LineageLinkRequest: { required: ["from", "to", "rel", "source"], optional: [] },

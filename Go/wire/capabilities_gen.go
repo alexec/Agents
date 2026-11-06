@@ -86,6 +86,7 @@ const CapHost1 = "host/1"
 const CapHostsJoin1 = "hosts.join/1"
 const CapHosts1 = "hosts/1"
 const CapLineageComment1 = "lineage.comment/1"
+const CapLineageEstimate1 = "lineage.estimate/1"
 const CapLineage1 = "lineage/1"
 const CapLinks1 = "links/1"
 const CapLiveactivity1 = "liveactivity/1"
@@ -344,6 +345,7 @@ var HostCapabilities = pairs([][2]string{
 	{"git/fill", "git/1"},
 	{"lineage/cost", "lineage/1"},
 	{"lineage/end", "lineage/1"},
+	{"lineage/estimate", "lineage.estimate/1"},
 	{"lineage/link", "lineage/1"},
 	{"lineage/links", "lineage/1"},
 	{"lineage/walk", "lineage/1"},

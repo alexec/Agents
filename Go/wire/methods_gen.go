@@ -177,6 +177,7 @@ var CallForgeRerun = Method[ForgeNodeRequest, ForgeDone]{"forge/rerun"}
 var CallGitFill = Method[GitCredentialRequest, GitCredential]{"git/fill"}
 var CallLineageCost = Method[LineageNodeRequest, LineageCostRollup]{"lineage/cost"}
 var CallLineageEnd = Method[LineageEndRequest, LineageLinks]{"lineage/end"}
+var CallLineageEstimate = Method[LineageEstimateRequest, LineageEstimate]{"lineage/estimate"}
 var CallLineageLink = Method[LineageLinkRequest, LineageLink]{"lineage/link"}
 var CallLineageLinks = Method[LineageNodeRequest, LineageLinks]{"lineage/links"}
 var CallLineageWalk = Method[LineageNodeRequest, LineageGraph]{"lineage/walk"}
