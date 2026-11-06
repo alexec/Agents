@@ -21,6 +21,7 @@ stay as they are.
 | `cmd/email-mcp/`, `internal/emailmcp/` | The `email` MCP server (#1780): one IMAP mailbox's new mail as `email.received`, and tools that read it; it never sends | email |
 | `cmd/slack-mcp/`, `internal/slackmcp/` | The `slack` MCP server (#1351): a Slack app's bot over Socket Mode, `message.received` and `question.answered`, and tools that read, send and ask | channels |
 | `cmd/googlechat-mcp/`, `internal/googlechatmcp/` | The `googlechat` MCP server (#1016): a Google Chat app's messages and answers as `message.received` and `question.answered`, pulled from Pub/Sub, and tools that post as the app | googlechat |
+| `cmd/sentry-mcp/`, `internal/sentrymcp/` | The `sentry` events MCP server (#3583): an organization's new and regressed issues as `health.issue_new` and `health.issue_regressed`, polled on Sentry's REST API; no tools (Sentry's own server has them) | sentry |
 | `cmd/whatsapp-mcp/`, `internal/whatsappmcp/` | The `whatsapp` MCP server (#1352): a WhatsApp Business number's messages and answers as `message.received` and `question.answered`, by Meta's signed webhook, and tools that send as the number | whatsapp |
 | `cmd/gitlab-mcp/`, `internal/gitlabmcp/` | The `gitlab` MCP server (#1629): merge requests, pipelines and issues on GitLab, tools and events on REST v4 | gitlab |
 | `cmd/workspace-commands/`, `internal/workspacecommands/` | The command machine provider (#691, in Go since #1364): workspaces as shell commands and presets, an MCP server the control plane runs | workspaces |
@@ -300,6 +301,29 @@ The tests run it against a fake Cloud API over HTTP and signed webhook calls (`f
 (`scripts/go-github-mcp.sh whatsapp-mcp`) and every Linux host installs
 `whatsapp-mcp-linux-<arch>`; the catalogue lists it as `agents/whatsapp`, which asks for the
 four values as secrets. See `docs/how-to/use-whatsapp.md`.
+
+## The Sentry events MCP server (`sentry-mcp`, #3583)
+
+Sentry's official MCP server (`getsentry/sentry-mcp`) is TypeScript and has tools but no
+events, so the catalogue offers it as a remote (`https://mcp.sentry.dev/mcp`, signed in by
+the app's MCP OAuth) and `sentry-mcp` adds the events, as `github-mcp` adds them to GitHub's.
+It is the slack server's front with no tools, on Go's own `net/http` (the sentry-go SDK sends
+errors and has no API client). `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` and `SENTRY_URL` are read at
+its start.
+
+- **Events** `health.issue_new` (an issue whose first event is after the cursor) and
+  `health.issue_regressed` (an issue's last `set_regression` activity after it, once per
+  regression), filters `project`, `environment` and `level`, polled every 30 seconds. The
+  cursor is a time and the issues raised from 30 minutes before it, as the github server's,
+  so the server keeps nothing; each poll looks back 30 minutes for an issue whose first
+  event came in late. The data is the organization, the project, the issue and the release
+  that saw it (the issue's `firstRelease`, or the regression's own release).
+
+The tests run it against a fake Sentry API (`sentry_test.go`), and agentsd's
+`sentryevents_test.go` wakes a wait through it. Agents Host carries it
+(`scripts/go-github-mcp.sh sentry-mcp`) and every Linux host installs
+`sentry-mcp-linux-<arch>`; the catalogue lists it as `agents/sentry`. See
+`docs/how-to/use-sentry.md`.
 
 ## The command machine provider (`workspace-commands`, #691, #1364)
 

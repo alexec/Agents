@@ -341,6 +341,11 @@ Go/cmd/whatsapp-mcp/                                   whatsapp
 Go/internal/whatsappmcp/                               whatsapp
 docs/how-to/use-whatsapp.md                            whatsapp
 
+# sentry: the Sentry events MCP server (#3583): an organization's new and regressed issues, polled.
+Go/cmd/sentry-mcp/                                     sentry
+Go/internal/sentrymcp/                                 sentry
+docs/how-to/use-sentry.md                              sentry
+
 # control-plane: the control plane's core: joining, membership, grants, copies and
 # handover, routing, its store, keys, its server and its deploy. Team, reports, channels
 # and sign-in are areas of their own below (#2017), so that more lanes can work on the

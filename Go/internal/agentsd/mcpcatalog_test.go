@@ -255,10 +255,19 @@ func TestOursAreListedAndAddedLikeAnyConnector(t *testing.T) {
 
 	var ours wire.MCPSearchAnswer
 	json.Unmarshal(c.call(t, 2, "catalog/search", map[string]any{"query": "", "kind": "mcp", "marketplace": "provided:agents"}), &ours)
-	if len(ours.Results) != 8 || ours.Results[0].Title != "GitHub" || ours.Results[1].Title != "Linear" || ours.Results[2].Title != "Jira" ||
+	if len(ours.Results) != 10 || ours.Results[0].Title != "GitHub" || ours.Results[1].Title != "Linear" || ours.Results[2].Title != "Jira" ||
 		ours.Results[3].Title != "GitLab" || ours.Results[4].Title != "Email" || ours.Results[5].Title != "Slack" ||
-		ours.Results[6].Title != "Google Chat" || ours.Results[7].Title != "WhatsApp" {
+		ours.Results[6].Title != "Google Chat" || ours.Results[7].Title != "WhatsApp" || ours.Results[8].Title != "Sentry" ||
+		ours.Results[9].Title != "Sentry events" {
 		t.Fatalf("%+v", ours)
+	}
+	// Sentry's own server is a remote one on Sentry's host, signed in by OAuth (#3583); its events are ours.
+	if sentry := ours.Results[8]; sentry.ID != "io.github.getsentry/sentry-mcp" || sentry.Publisher.Label != "getsentry on GitHub" ||
+		len(sentry.Runs) != 1 || sentry.Runs[0] != wire.MCPRunKindRemote || deref(sentry.RemoteHost) != "mcp.sentry.dev" {
+		t.Fatalf("sentry: %+v", sentry)
+	}
+	if events := ours.Results[9]; *events.Levels != (wire.MCPLevels{Events: true}) {
+		t.Fatalf("sentry events: %+v", events.Levels)
 	}
 	github, linear := ours.Results[0], ours.Results[1]
 	if github.Publisher.Label != "Agents" || deref(github.Marketplace) != "provided:agents" || *github.Levels != (wire.MCPLevels{Tools: true, Events: true, Views: true, Workflows: true, Tested: true}) {

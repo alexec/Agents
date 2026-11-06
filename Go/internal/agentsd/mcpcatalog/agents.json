@@ -249,6 +249,59 @@
           ]
         }
       }
+    },
+    {
+      "server": {
+        "name": "io.github.getsentry/sentry-mcp",
+        "title": "Sentry",
+        "description": "Sentry's official MCP server (getsentry/sentry-mcp): search issues and events, read stack traces, releases and traces, and ask Seer for a fix; sign in to Sentry",
+        "repository": {
+          "url": "https://github.com/getsentry/sentry-mcp"
+        },
+        "remotes": [
+          {
+            "type": "streamable-http",
+            "url": "https://mcp.sentry.dev/mcp"
+          }
+        ]
+      }
+    },
+    {
+      "server": {
+        "name": "agents/sentry",
+        "title": "Sentry events",
+        "description": "One Sentry organization's issues as events: a new issue, and a resolved issue that came back, each with its project, level and release. Add Sentry for the tools"
+      },
+      "_meta": {
+        "dev.agentloops/connector": {
+          "command": "sentry-mcp",
+          "hosted": true,
+          "declares": {
+            "tools": false,
+            "events": [
+              "health.issue_new",
+              "health.issue_regressed"
+            ]
+          },
+          "secrets": [
+            {
+              "name": "SENTRY_AUTH_TOKEN",
+              "description": "A personal auth token with event:read, org:read and project:read, sntryu_…",
+              "required": true
+            },
+            {
+              "name": "SENTRY_ORG",
+              "description": "The organization's slug, as in acme.sentry.io",
+              "required": true
+            },
+            {
+              "name": "SENTRY_URL",
+              "description": "Sentry's address: https://sentry.io when left out, https://de.sentry.io for the EU, or your own Sentry",
+              "required": false
+            }
+          ]
+        }
+      }
     }
   ]
 }
