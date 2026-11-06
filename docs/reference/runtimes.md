@@ -332,7 +332,8 @@ every turn, so those in your config file only choose the first value, or nothing
 | Web search | `web_search` | cached; live under **Full access** | Yes | Only through `CODEX_CONFIG` | Show, planned: the web access switch |
 | Usage data | `analytics.enabled`, `feedback.enabled` | on | Yes | Only through `CODEX_CONFIG` | Show, planned: the usage data switch |
 | Memories | `features.memories` | off | Yes | Yes | Leave alone: Codex's own setting decides |
-| Browser, computer use, image generation | `features.browser_use`, `computer_use`, `image_generation` | on | Not yet measured | — | Measure: they may be tools that duplicate the app's |
+| Browser, image generation | `features.browser_use`, `image_generation` | on | Not yet measured | — | Measure: they may be tools that duplicate the app's |
+| Computer use | `features.computer_use` | off | Yes: `CODEX_CONFIG` on every launch | Through `CODEX_CONFIG` | Superseded by the app's own desktop control, `drive_screen` ([Let an agent drive desktop apps](../how-to/let-an-agent-drive-desktop-apps.md), #3004) |
 | Reasoning summaries | `model_reasoning_summary` | auto | No: the adapter chooses | — | Leave alone |
 | Folder trust | `folders.<path>.trust_level` | asks | The adapter trusts every agent's folder, so a folder's own Codex config and hooks load | Yes | Leave alone |
 | Compaction | `model_auto_compact_token_limit`, `compact_prompt` | on, 90% of the window, no off switch | Yes: `compaction_update`, no summary; `/compact` offered | Through `CODEX_CONFIG` | Leave alone: on with nothing set; see [Compaction in each runtime](../explanation/compaction-by-runtime.md) |

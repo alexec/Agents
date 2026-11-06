@@ -11,6 +11,8 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -440,6 +442,7 @@ type runJSON struct {
 	HTMLURL      string `json:"html_url"`
 	HeadSHA      string `json:"head_sha"`
 	HeadBranch   string `json:"head_branch"`
+	CheckSuiteID int    `json:"check_suite_id"`
 	Status       string `json:"status"`
 	Conclusion   string `json:"conclusion"`
 	UpdatedAt    string `json:"updated_at"`
@@ -478,7 +481,7 @@ func (r runJSON) completed(repo string) CompletedRun {
 	}
 	own := r.HeadRepository == nil || strings.EqualFold(r.HeadRepository.FullName, repo)
 	bot := actor.Type == "Bot" || strings.HasSuffix(actor.Login, "[bot]")
-	return CompletedRun{Run: r.ref(), Workflow: path.Base(r.Path), Event: r.Event, Conclusion: r.Conclusion,
+	return CompletedRun{Run: r.ref(), CheckSuite: r.CheckSuiteID, Workflow: path.Base(r.Path), Event: r.Event, Conclusion: r.Conclusion,
 		Actor: actor.Login, Trusted: own && actor.Login != "" && !bot}
 }
 
@@ -518,6 +521,60 @@ func (g *RealGitHub) CompletedRuns(ctx context.Context, repo, workflow, branch s
 	}
 	truncated, err := g.listRuns(ctx, list, branch, since, keep)
 	return runs, truncated, err
+}
+
+// deployTitle is the title of the notice a job writes to say what it deployed (#3584), and
+// mostDeploys and mostAnnotated bound what one run may say and how many jobs are read.
+const (
+	deployTitle   = "deploy"
+	mostDeploys   = 10
+	mostAnnotated = 20
+)
+
+// deployPattern is a deploy's ref, <target>:<id>/<version>, as testflight:com.example.app/42.
+var deployPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,19}:[^\s/]+(/[^\s/]+)*/[^\s/]+$`)
+
+// RunDeploys reads the run's check suite: only its check runs (jobs) that have annotations are
+// read, so a run that deployed nothing costs one request.
+func (g *RealGitHub) RunDeploys(ctx context.Context, repo string, run CompletedRun) ([]string, error) {
+	if run.CheckSuite == 0 {
+		return nil, nil
+	}
+	var suite struct {
+		CheckRuns []struct {
+			ID     int `json:"id"`
+			Output struct {
+				Annotations int `json:"annotations_count"`
+			} `json:"output"`
+		} `json:"check_runs"`
+	}
+	if err := g.get(ctx, fmt.Sprintf("repos/%s/check-suites/%d/check-runs?filter=latest&per_page=100", repo, run.CheckSuite), false, &suite); err != nil {
+		return nil, err
+	}
+	var deploys []string
+	read := 0
+	for _, c := range suite.CheckRuns {
+		if c.Output.Annotations == 0 || read == mostAnnotated {
+			continue
+		}
+		read++
+		var notes []struct {
+			Level   string `json:"annotation_level"`
+			Title   string `json:"title"`
+			Message string `json:"message"`
+		}
+		if err := g.get(ctx, fmt.Sprintf("repos/%s/check-runs/%d/annotations?per_page=100", repo, c.ID), false, &notes); err != nil {
+			return nil, err
+		}
+		for _, n := range notes {
+			ref := strings.TrimSpace(n.Message)
+			if n.Level == "notice" && n.Title == deployTitle && deployPattern.MatchString(ref) &&
+				!slices.Contains(deploys, ref) && len(deploys) < mostDeploys {
+				deploys = append(deploys, ref)
+			}
+		}
+	}
+	return deploys, nil
 }
 
 // listRuns hands each run of list (a branch's only, when branch is set) updated at or after

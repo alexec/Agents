@@ -39,7 +39,7 @@ func TestMain(m *testing.M) {
 	// No test asks the person's gh about merged pull requests unless it says so.
 	findGH = func() string { return "" }
 	// Nor asks the forge for an issue's milestone (#2935): a test sets issueLookup.
-	milestoneLookup = func(context.Context, string, forgeRepo, int) (int, error) { return 0, errNoForgeInTests }
+	milestoneLookup = func(context.Context, string, forgeRepo, int) (issueOnForge, error) { return issueOnForge{}, errNoForgeInTests }
 	// Nor erases a deleted agent's runtime copy (#1001): that starts the runtime.
 	erasing = false
 	os.Exit(m.Run())
@@ -456,7 +456,9 @@ func TestStopEndsTheTurnCancelled(t *testing.T) {
 	c.until(t, "running", ended(id, wire.AgentStateRunning))
 	time.Sleep(200 * time.Millisecond)
 	c.call(t, 2, "agents/stop", map[string]any{"agentID": id})
-	c.until(t, "stopped", ended(id, wire.AgentStateStopped))
+	// The record, not the notification: call drops a notification that comes before
+	// its answer, and under load the stop's agent/changed can (#3623).
+	waitFor(t, "stopped", func() bool { return d.Store.Agent(id).State == wire.AgentStateStopped })
 	if a := d.Store.Agent(id); *a.EndedReason != wire.EndedReasonCancelled {
 		t.Fatalf("ended %s", *a.EndedReason)
 	}
@@ -478,7 +480,9 @@ func TestAnAdminsStopSaysSo(t *testing.T) {
 	c.until(t, "running", ended(id, wire.AgentStateRunning))
 	time.Sleep(200 * time.Millisecond)
 	c.call(t, 2, "agents/stop", map[string]any{"agentID": id, "byAdmin": true})
-	c.until(t, "stopped", ended(id, wire.AgentStateStopped))
+	// The record, not the notification: call drops a notification that comes before
+	// its answer, and under load the stop's agent/changed can (#3623).
+	waitFor(t, "stopped", func() bool { return d.Store.Agent(id).State == wire.AgentStateStopped })
 	if a := d.Store.Agent(id); *a.EndedReason != wire.EndedReasonStoppedByAdmin {
 		t.Fatalf("ended %s", *a.EndedReason)
 	}

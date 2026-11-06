@@ -37,6 +37,7 @@ func (d *Daemon) lineage() lineage.Store {
 // closeLineage lets the file go at shutdown.
 func (d *Daemon) closeLineage() {
 	d.lineageSettle(2 * time.Second)
+	d.stopLinker()
 	d.resolveSettle(2 * time.Second)
 	d.closeCost()
 	d.lineage().Close()

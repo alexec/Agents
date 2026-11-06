@@ -20,6 +20,16 @@ type fixedPolicy struct {
 func (p fixedPolicy) Role(net.Conn) (Role, bool) { return p.role, p.ok }
 func (fixedPolicy) Summary() string              { return "a test's" }
 
+// usePolicy decides d's socket policy as p before anything serves (#3623).
+func usePolicy(t testing.TB, d *Daemon, p SocketPolicy) {
+	t.Helper()
+	set := false
+	d.policyOnce.Do(func() { d.policy, set = p, true })
+	if !set {
+		t.Fatal("the socket policy was decided already")
+	}
+}
+
 func TestRoleAllows(t *testing.T) {
 	for _, c := range []struct {
 		role   Role
@@ -54,10 +64,7 @@ func TestRoleAllows(t *testing.T) {
 // socketCall sends one call on daemon.sock and reads the answer.
 func socketCall(t *testing.T, path, method string) *message {
 	t.Helper()
-	c, err := net.Dial("unix", path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	c := dialUnix(t, path)
 	defer c.Close()
 	b, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": method})
 	c.Write(append(b, '\n'))
@@ -73,13 +80,11 @@ func socketCall(t *testing.T, path, method string) *message {
 
 func serveWith(t *testing.T, p SocketPolicy) (*Daemon, string) {
 	t.Helper()
-	if p != nil {
-		old := socketPolicyFor
-		socketPolicyFor = func(*Daemon) SocketPolicy { return p }
-		t.Cleanup(func() { socketPolicyFor = old })
-	}
 	root := t.TempDir()
 	d, _ := start(t, root)
+	if p != nil {
+		usePolicy(t, d, p)
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	// A short path: a Unix socket's is at most 104 bytes on a Mac.
@@ -89,12 +94,7 @@ func serveWith(t *testing.T, p SocketPolicy) (*Daemon, string) {
 	}
 	t.Cleanup(func() { os.RemoveAll(dir) })
 	path := filepath.Join(dir, "d.sock")
-	go d.ServeSocket(ctx, path)
-	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
-		if _, err := os.Stat(path); err == nil {
-			break
-		}
-	}
+	go d.ServeSocket(ctx, path) // socketCall dials until it listens
 	return d, path
 }
 

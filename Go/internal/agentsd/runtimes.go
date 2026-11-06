@@ -448,16 +448,16 @@ func (d *Daemon) needsSignIn(runtimeID string) error {
 // toolPolicyEnv is the environmentJSON lever: JSON in a variable the runtime reads at
 // start, compact with sorted keys, the person's own replaced.
 //   - Codex's feature switches in CODEX_CONFIG, which its adapter merges into every
-//     thread's config (047). They take sleep, automations and apps away, and let
-//     request_user_input ask outside plan mode, so Codex's own question reaches the app as
-//     a form (#1432).
+//     thread's config (047). They take sleep, automations and apps away, and computer use,
+//     which the app's own drive_screen does (#3004, FR-010). They let request_user_input
+//     ask outside plan mode, so Codex's own question reaches the app as a form (#1432).
 //   - OpenCode's own configuration in OPENCODE_CONFIG_CONTENT, merged over the person's
 //     opencode.json for this process (049 D4): it asks before an edit, a command or a fetch
 //     (its own default is to allow all three), and never updates itself or shares (#1445).
 var toolPolicyEnv = map[string]map[string]any{
 	"codex": {"CODEX_CONFIG": map[string]any{"features": map[string]any{
 		"sleep_tool": false, "goals": true, "in_app_local_automation": false, "apps": false,
-		"multi_agent": true, "default_mode_request_user_input": true}}},
+		"computer_use": false, "multi_agent": true, "default_mode_request_user_input": true}}},
 	"opencode": {"OPENCODE_CONFIG_CONTENT": map[string]any{"autoupdate": false,
 		"permission": map[string]any{"bash": "ask", "edit": "ask", "webfetch": "ask"}, "share": "disabled"}},
 }

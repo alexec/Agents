@@ -246,6 +246,8 @@ public enum ToolPolicyCatalog {
     /// `clock.sleep`, and `goals`, `apps` and `in_app_local_automation` take Codex's own
     /// long-running goals, ChatGPT connectors and automations. Memories are left to
     /// Codex's own configuration.
+    /// `computer_use` is off because the app has its own desktop control, `drive_screen`
+    /// (#3004, FR-010): two tools driving one screen would fight over it.
     /// `multi_agent` is left on (Alex, 2026-09-26, 057): Codex's sub-agents are its own,
     /// and the app shows them as a list rather than refusing them. Off, it never took the
     /// `collaboration.*` tools away anyway (the model's catalog names them), so they were
@@ -268,6 +270,7 @@ public enum ToolPolicyCatalog {
             RemovedTool(name: "sleep", category: .standingArrangements),
             RemovedTool(name: "automations", category: .standingArrangements),
             RemovedTool(name: "apps", category: .artefacts),
+            RemovedTool(name: "computer_use", category: .artefacts),
         ],
         kept: [
             KeptTool(name: "request_user_input",
@@ -281,6 +284,7 @@ public enum ToolPolicyCatalog {
                 "goals": .bool(true),
                 "in_app_local_automation": .bool(false),
                 "apps": .bool(false),
+                "computer_use": .bool(false),
                 "multi_agent": .bool(true),
                 "default_mode_request_user_input": .bool(true),
             ]),

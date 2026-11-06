@@ -100,6 +100,9 @@ trust filter (#728), polled only: `checks.failed`, `pr.opened`, `pr.merged`, `pr
 `run.completed` is new here (#3444): a workflow run that finished, whatever started it and
 whatever its conclusion, for the runs no pull request owns (a tag's `release.yml`, a
 `workflow_dispatch` dry run); `workflow`, `branch` (a branch or a tag) and `run` filter it.
+Its `deploys` are what the run's jobs say they deployed (#3584), each a notice
+`::notice title=deploy::<target>:<id>/<version>`, as `testflight:<bundle id>/<build>`: one
+request for the run's check suite, and one for each job that has annotations.
 CodeRabbit's events are new here (#1344): `review.posted` (once per review of the head
 commit: each time its `CodeRabbit` status on it goes to success, or its review with no status) and `review.comment` (each
 review comment by it). Its tools `coderabbit_review`, `coderabbit_reply` and

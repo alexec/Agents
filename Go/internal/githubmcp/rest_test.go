@@ -139,7 +139,7 @@ func TestCompletedRunsOfAWorkflowAndByID(t *testing.T) {
 	since := "2026-10-16T10:00:00.000Z"
 	api := newFakeAPI(t, map[string]string{
 		"repos/" + repo + "/actions/workflows/release.yml/runs": `{"workflow_runs": [
-			{"id": 5, "run_attempt": 1, "name": "Release", "path": ".github/workflows/release.yml", "event": "push", "html_url": "u5",
+			{"id": 5, "run_attempt": 1, "check_suite_id": 55, "name": "Release", "path": ".github/workflows/release.yml", "event": "push", "html_url": "u5",
 			 "head_sha": "s5", "head_branch": "v0.16.0", "status": "completed", "conclusion": "success",
 			 "updated_at": "2026-10-16T10:30:00Z", "created_at": "2026-10-16T09:00:00Z", "pull_requests": [],
 			 "actor": {"login": "alexec", "type": "User"}, "head_repository": {"full_name": "` + repo + `"}},
@@ -159,7 +159,7 @@ func TestCompletedRunsOfAWorkflowAndByID(t *testing.T) {
 		t.Fatal(err, truncated)
 	}
 	equal(t, runs, []CompletedRun{{Run: RunRef{ID: 5, Attempt: 1, Name: "Release", URL: "u5", HeadSHA: "s5", Branch: "v0.16.0",
-		UpdatedAt: "2026-10-16T10:30:00Z"}, Workflow: "release.yml", Event: "push", Conclusion: "success", Actor: "alexec", Trusted: true}},
+		UpdatedAt: "2026-10-16T10:30:00Z"}, CheckSuite: 55, Workflow: "release.yml", Event: "push", Conclusion: "success", Actor: "alexec", Trusted: true}},
 		"only the finished run since")
 	byID, _, err := g.CompletedRuns(context.Background(), repo, "", "", 8, since)
 	if err != nil {
@@ -168,6 +168,32 @@ func TestCompletedRunsOfAWorkflowAndByID(t *testing.T) {
 	equal(t, len(byID), 1, "the run by its id")
 	equal(t, byID[0].Actor, "dependabot[bot]", "the actor that started this attempt")
 	equal(t, byID[0].Trusted, false, "a bot's run is not the repo's own")
+}
+
+// A run says what it deployed with a notice titled deploy (#3584): only check runs with
+// annotations are read, and other notices, warnings and bad refs are left out.
+func TestRunDeploysAreTheRunsDeployNotices(t *testing.T) {
+	api := newFakeAPI(t, map[string]string{
+		"repos/" + repo + "/check-suites/77/check-runs": `{"check_runs": [
+			{"id": 1, "output": {"annotations_count": 0}},
+			{"id": 2, "output": {"annotations_count": 4}}]}`,
+		"repos/" + repo + "/check-runs/2/annotations": `[
+			{"annotation_level": "notice", "title": "deploy", "message": "testflight:com.example.app/42\n"},
+			{"annotation_level": "notice", "title": "deploy", "message": "testflight:com.example.app/42"},
+			{"annotation_level": "warning", "title": "deploy", "message": "testflight:com.example.other/1"},
+			{"annotation_level": "notice", "title": "deploy", "message": "not a ref"},
+			{"annotation_level": "notice", "title": "Node 20 is deprecated", "message": "testflight:x/1"}]`,
+	})
+	g := api.github()
+	deploys, err := g.RunDeploys(context.Background(), repo, CompletedRun{CheckSuite: 77})
+	if err != nil {
+		t.Fatal(err)
+	}
+	equal(t, deploys, []string{"testflight:com.example.app/42"}, "the deploy notice, once")
+	equal(t, api.hits["repos/"+repo+"/check-runs/1/annotations"] == nil, true, "a job with no annotations is not read")
+	none, err := g.RunDeploys(context.Background(), repo, CompletedRun{})
+	equal(t, none, []string(nil), "no check suite, nothing read")
+	equal(t, err, error(nil), "no error")
 }
 
 // A PR is the repo's own only from a branch of the repo, by one of its own: a collaborator's

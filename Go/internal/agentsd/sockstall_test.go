@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"io"
-	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,10 +18,8 @@ import (
 // read: it is let go, and the others hear everything (#1399).
 func TestAStalledSocketClientIsLetGo(t *testing.T) {
 	// Both callers are windows, which hear notifications, whatever the platform's door.
-	old := socketPolicyFor
-	socketPolicyFor = func(*Daemon) SocketPolicy { return fixedPolicy{role: RoleControl, ok: true} }
-	t.Cleanup(func() { socketPolicyFor = old })
 	d, c := start(t, t.TempDir())
+	usePolicy(t, d, fixedPolicy{role: RoleControl, ok: true})
 	// The test's own connection is read too: only the socket's client stalls.
 	go func() {
 		for range c.out {
@@ -37,20 +34,9 @@ func TestAStalledSocketClientIsLetGo(t *testing.T) {
 	defer os.RemoveAll(dir)
 	path := filepath.Join(dir, "d.sock")
 	go d.ServeSocket(ctx, path)
-	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
-		if _, err := os.Stat(path); err == nil {
-			break
-		}
-	}
-	stalled, err := net.Dial("unix", path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	stalled := dialUnix(t, path)
 	defer stalled.Close()
-	reader, err := net.Dial("unix", path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	reader := dialUnix(t, path)
 	defer reader.Close()
 	clients := func() int {
 		d.mu.Lock()
