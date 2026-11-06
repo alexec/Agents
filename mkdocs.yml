@@ -130,6 +130,7 @@ nav:
       - how-to/use-google-chat.md
       - how-to/use-whatsapp.md
       - how-to/use-sentry.md
+      - how-to/deploy-to-cloud-run.md
       - how-to/hand-files-to-a-workflow.md
       - how-to/pin-a-page-to-a-folder.md
       - how-to/sign-a-runtime-in.md

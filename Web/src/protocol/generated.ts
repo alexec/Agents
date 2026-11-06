@@ -222,6 +222,12 @@ export interface Agent {
   labels?: SessionLabel[];
   state: AgentState;
   runtimeSessionID?: string;
+  /**
+   * Delete leaves the runtime's own copy of the conversation (#3669): its files are not known and
+   * its adapter cannot delete a session (OpenCode without session/delete). Set when the runtime's
+   * session starts; absent when Delete erases it, or nothing is known yet.
+   */
+  runtimeKeepsCopy?: boolean;
   startOptions: StartOptions;
   advertisedOptions: ConfigOption[];
   availableCommands: SlashCommand[];
@@ -12149,7 +12155,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AddFolderRequest: { required: ["folder"], optional: ["project"] },
   Admitted: { required: [], optional: ["client", "host"] },
   AdoptRequest: { required: ["runtimeID", "sessionID", "cwd"], optional: [] },
-  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "desktopControlPause", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID", "auto", "clientPermission", "levels", "voiceHungUpAt", "goal", "project"] },
+  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "runtimeKeepsCopy", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "desktopControlPause", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID", "auto", "clientPermission", "levels", "voiceHungUpAt", "goal", "project"] },
   AgentConfigEditorFile: { required: ["path", "content"], optional: [] },
   AgentConfigEditorRequest: { required: ["kind"], optional: ["folder"] },
   AgentConfigEditorSaveRequest: { required: ["kind", "path", "content"], optional: ["folder", "delete"] },

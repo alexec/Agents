@@ -3181,6 +3181,8 @@ final class AppModel {
         directHost = nil
         keptHost = nil
         KeptThisMacHost.forget(in: WindowDefaults.store)
+        // What was half-typed to that control plane goes too (#3670).
+        DraftKeeper.shared.forgetAll()
         client = DaemonClient(link: UnreachableLink())
         isConnected = false
     }

@@ -386,3 +386,26 @@ func TestASweepStartsTheRuntimeOnce(t *testing.T) {
 		t.Fatalf("%d runtime starts for an adapter that cannot delete", n)
 	}
 }
+
+// Delete says when the runtime keeps its own copy (#3669): only a runtime whose files are
+// not known and whose adapter cannot delete a session keeps one.
+func TestDeleteSaysWhenTheRuntimeKeepsItsCopy(t *testing.T) {
+	for _, c := range []struct {
+		runtime   string
+		canDelete bool
+		keeps     bool
+	}{
+		{"opencode", false, true},
+		{"opencode", true, false},
+		{"claude", false, false},
+		{"codex", false, false},
+		{"grok", false, false},
+		{"copilot", false, false},
+		{"cursor", false, false},
+		{"antigravity", false, false},
+	} {
+		if got := keepsCopy(c.runtime, c.canDelete); got != c.keeps {
+			t.Errorf("keepsCopy(%q, %v) = %v, want %v", c.runtime, c.canDelete, got, c.keeps)
+		}
+	}
+}

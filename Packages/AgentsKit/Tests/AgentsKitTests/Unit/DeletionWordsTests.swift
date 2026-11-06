@@ -12,6 +12,18 @@ struct DeletionWordsTests {
         #expect(DeletionWords.confirmMessage == "Its conversation and record are removed. This cannot be undone.")
     }
 
+    /// A runtime that keeps its own copy says so (#3669); the line is read from the wire.
+    @Test func theConfirmationSaysWhenTheRuntimeKeepsItsCopy() throws {
+        var agent = Agent(id: UUID(), runtimeID: "opencode", cwd: URL(filePath: "/tmp/scratch"), title: "Scratch",
+                          state: .archived, lastActivityAt: Date())
+        #expect(DeletionWords.confirmMessage(agent) == DeletionWords.confirmMessage)
+        agent.runtimeKeepsCopy = true
+        #expect(DeletionWords.confirmMessage(agent) == "Its conversation and record are removed. This cannot be undone. "
+                + "OpenCode keeps its own copy of this conversation.")
+        let read = try JSONDecoder().decode(Agent.self, from: JSONEncoder().encode(agent))
+        #expect(read.runtimeKeepsCopy)
+    }
+
     @Test func settings() {
         #expect(DeletionWords.settingsSummary(archivedCount: 263, archivedBytes: 791_000_000,
                                               settings: RetentionSettings())
