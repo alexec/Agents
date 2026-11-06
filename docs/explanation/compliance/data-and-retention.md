@@ -87,7 +87,7 @@ Mac.
 | `backups/<machine>/` | This machine's backups | The newest **Keep** (1 to 10, 3 by default); a `.tmp` after 24 hours. **Another machine's backups in a shared backup folder are never pruned.** | After each backup |
 | `backups-upload/`, `backups-download/` | A server backup on its way | Removed after use | On use |
 | `.restore-*` | A restore in progress | Removed when it ends; one a crash left goes at the next start (#3649) | At end; at start |
-| `Outgoing/`, `Incoming/` | Exports, sends and imports | 1 hour untouched | On the next transfer, and hourly (#3649) |
+| `Outgoing/`, `Incoming/` | Exports, sends and imports | 1 hour untouched | On the next transfer, at start and hourly (#3649) |
 | `Clones/<id>` | A clone in progress | Removed after the clone | After the clone, and at start |
 
 ### Caches and logs
@@ -301,7 +301,7 @@ An agent that the machine has already, or that it deleted (`erased.json`), is sk
 
 The machine makes an export in its `Outgoing` folder and an import arrives in `Incoming`.
 Each goes once it is read or imported. One left untouched for an hour goes at the next
-export, send or import, or at the hourly sweep.
+export, send or import, at the next start, or at the hourly sweep.
 
 ## Backups
 
