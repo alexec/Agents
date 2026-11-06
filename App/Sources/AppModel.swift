@@ -597,6 +597,9 @@ final class AppModel {
                 showsWork = true
             case .docs:
                 showDocs(docsHistory.current ?? DocsPlace())
+            case .resources:
+                // The Remote's row (#3629): on the Mac, This Mac's page at its Resources.
+                showResources()
             case .events:
                 showEvents()
             case .runtimes:
