@@ -1978,6 +1978,9 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
 .work-plan-level { width: 3.2em; flex: none; }
 .work-plan-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .work-plan-cost { font-variant-numeric: tabular-nums; }
+/* An estimate (#3560): fainter than what was spent. */
+.work-plan-estimate { opacity: 0.75; }
+.work-estimate { font-variant-numeric: tabular-nums; }
 /* Work ▸ Features (#3269): a row per feature: label; opened, its epics and its issues with no epic. */
 .work-feature-head { display: flex; gap: 8px; align-items: baseline; width: 100%; padding: 8px 4px; text-align: left; background: none; border: none;
   border-radius: 0; color: inherit; font: inherit; cursor: pointer; }

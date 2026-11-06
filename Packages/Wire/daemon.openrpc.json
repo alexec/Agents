@@ -4775,6 +4775,11 @@
     {
       "name": "lineage/estimate",
       "x-capability": "lineage.estimate/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {

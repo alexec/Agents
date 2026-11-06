@@ -146,6 +146,8 @@ public enum DaemonAPI {
         /// session's Lineage pane (#2940).
         public static let lineageWalk = "lineage/walk"
         public static let lineageCost = "lineage/cost"
+        /// What an issue or an epic will probably cost and take, from past work (#3559, #3560).
+        public static let lineageEstimate = "lineage/estimate"
         public static let simulatorsList = "simulators/list"
         public static let simulatorsBoot = "simulators/boot"
         public static let simulatorsShutdown = "simulators/shutdown"

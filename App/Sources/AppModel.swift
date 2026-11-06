@@ -6092,6 +6092,11 @@ final class AppModel {
                                           returning: DaemonAPI.LineageCostRollup.self)
     }
 
+    func lineageEstimate(_ node: DaemonAPI.LineageNode, on host: MachineRef) async -> DaemonAPI.LineageEstimate? {
+        try? await client(for: host).call(DaemonAPI.Method.lineageEstimate, DaemonAPI.LineageEstimateRequest(node: node),
+                                          returning: DaemonAPI.LineageEstimate.self)
+    }
+
     /// The machine a Lineage page start is walked on when the person types one: the selected
     /// folder's, as a new session's.
     var lineageHost: MachineRef { selectedFolderHost }

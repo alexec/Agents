@@ -249,6 +249,8 @@ public extension DaemonAPI {
                 Row(Method.lockHello, params: LockHello.self, result: LockHelloReply.self, kind: .hostRequest),
                 Row(Method.lineageCost, params: LineageNodeRequest.self, result: LineageCostRollup.self,
                     kind: .hostRequest),
+                Row(Method.lineageEstimate, params: LineageEstimateRequest.self, result: LineageEstimate.self,
+                    kind: .hostRequest),
                 Row(Method.simulatorsList, params: Empty.self, result: SimulatorList.self, kind: .hostRequest),
                 Row(Method.simulatorsBoot, params: SimulatorRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.simulatorsShutdown, params: SimulatorRequest.self, result: Empty.self, kind: .hostRequest),
