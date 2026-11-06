@@ -192,7 +192,6 @@ final class AppModel {
     var showsSpending = false {
         didSet {
             guard showsSpending, showsSpending != oldValue else { return }
-            showsResources = false
             showsEvents = false
             showsRuntimes = false
             showsMCPServers = false
@@ -213,36 +212,12 @@ final class AppModel {
         }
     }
 
-    /// Whether the window is showing Resources: who holds the Mac's shared things
-    /// and who is waiting (036). A page like Spending, and not persisted for the same
-    /// reason: it is somewhere you go to answer a question.
-    var showsResources = false {
-        didSet {
-            guard showsResources, showsResources != oldValue else { return }
-            showsSpending = false
-            showsEvents = false
-            showsRuntimes = false
-            showsMCPServers = false
-            showsTime = false
-            showsMilestones = false
-            showsTokens = false
-            machinePage = nil
-            showsWork = false
-            showsDocs = false
-            selection = nil
-            openWorkflow = nil
-            folderPage = nil
-            composing = false
-        }
-    }
-
     /// Whether the window is showing Events: what happened, what came of it, and who
     /// is waiting (042). A page like Resources, and not persisted for the same reason.
     var showsEvents = false {
         didSet {
             guard showsEvents, showsEvents != oldValue else { return }
             showsSpending = false
-            showsResources = false
             showsRuntimes = false
             showsMCPServers = false
             showsTime = false
@@ -267,7 +242,6 @@ final class AppModel {
         didSet {
             guard showsRuntimes, showsRuntimes != oldValue else { return }
             showsSpending = false
-            showsResources = false
             showsEvents = false
             showsMCPServers = false
             showsTime = false
@@ -290,7 +264,6 @@ final class AppModel {
         didSet {
             guard showsMCPServers, showsMCPServers != oldValue else { return }
             showsSpending = false
-            showsResources = false
             showsEvents = false
             showsRuntimes = false
             showsTime = false
@@ -312,7 +285,6 @@ final class AppModel {
         didSet {
             guard showsTime, showsTime != oldValue else { return }
             showsSpending = false
-            showsResources = false
             showsEvents = false
             showsRuntimes = false
             showsMCPServers = false
@@ -334,7 +306,6 @@ final class AppModel {
         didSet {
             guard showsMilestones, showsMilestones != oldValue else { return }
             showsSpending = false
-            showsResources = false
             showsEvents = false
             showsRuntimes = false
             showsMCPServers = false
@@ -356,7 +327,6 @@ final class AppModel {
         didSet {
             guard showsTokens, showsTokens != oldValue else { return }
             showsSpending = false
-            showsResources = false
             showsEvents = false
             showsRuntimes = false
             showsMCPServers = false
@@ -380,7 +350,6 @@ final class AppModel {
             showsWork = false
             showsDocs = false
             showsSpending = false
-            showsResources = false
             showsEvents = false
             showsRuntimes = false
             showsMCPServers = false
@@ -402,7 +371,6 @@ final class AppModel {
             guard showsWork, showsWork != oldValue else { return }
             showsDocs = false
             showsSpending = false
-            showsResources = false
             showsEvents = false
             showsRuntimes = false
             showsMCPServers = false
@@ -423,7 +391,6 @@ final class AppModel {
         didSet {
             guard showsDocs, showsDocs != oldValue else { return }
             showsSpending = false
-            showsResources = false
             showsEvents = false
             showsRuntimes = false
             showsMCPServers = false
@@ -484,13 +451,15 @@ final class AppModel {
         openWorkflow = Folder.standardize(folder).path + "/" + workflowID
     }
 
-    /// The resource a capsule in a chat asked to be shown. Scrolled to, once.
-    var resourcesFocus: ResourceName?
+    /// The resources a capsule or the Go menu asked to be shown on This Mac's page (#3629),
+    /// at one resource or the section. Scrolled to, once.
+    var resourcesAsked: ResourcesAsk?
 
-    /// Resources, at one resource if a chat's capsule asked for it.
+    /// This Mac's resources, on its machine page (#3629), at one resource if a chat's capsule
+    /// asked for it. A capsule names a lease on this Mac, where the window's agents hold them.
     func showResources(at name: ResourceName? = nil) {
-        resourcesFocus = name
-        showsResources = true
+        resourcesAsked = ResourcesAsk(name: name)
+        machinePage = .mac
     }
 
     /// Runtimes, from the prompt bar's warning about starting on one that is out.
@@ -498,11 +467,10 @@ final class AppModel {
         showsRuntimes = true
     }
 
-    /// An agent's chat, from the Resources page or a capsule naming its holder: its
+    /// An agent's chat, from a machine's Resources or a capsule naming its holder: its
     /// own folder first, as a banner does, so the sidebar and the page agree.
     func openAgent(_ agentID: UUID) {
         showsSpending = false
-        showsResources = false
         showsEvents = false
         showsRuntimes = false
         showsMCPServers = false
@@ -528,7 +496,6 @@ final class AppModel {
     /// change git brought to its files is asked.
     func openFolder(_ key: FolderKey) {
         showsSpending = false
-        showsResources = false
         showsEvents = false
         showsRuntimes = false
         showsMCPServers = false
@@ -573,7 +540,6 @@ final class AppModel {
     var sidebarItem: SidebarItem? {
         get {
             if showsEvents { return .events }
-            if showsResources { return .resources }
             if showsRuntimes { return .runtimes }
             if showsMCPServers { return .mcpServers }
             if let machinePage { return .machine(machinePage) }
@@ -600,7 +566,6 @@ final class AppModel {
                 openAgent(id)
             case .workflow(let id, let key):
                 showsSpending = false
-                showsResources = false
                 showsEvents = false
                 showsRuntimes = false
                 showsMCPServers = false
@@ -633,6 +598,7 @@ final class AppModel {
             case .docs:
                 showDocs(docsHistory.current ?? DocsPlace())
             case .resources:
+                // The Remote's row (#3629): on the Mac, This Mac's page at its Resources.
                 showResources()
             case .events:
                 showEvents()
@@ -644,7 +610,6 @@ final class AppModel {
                 machinePage = host
             case .folder(let key):
                 showsSpending = false
-                showsResources = false
                 showsEvents = false
                 showsRuntimes = false
                 showsMCPServers = false
@@ -667,7 +632,6 @@ final class AppModel {
     /// A folder's workflows or its archive, from its row in the sidebar (#495).
     func showFolderPage(_ page: FolderPage, of key: FolderKey) {
         showsSpending = false
-        showsResources = false
         showsEvents = false
         showsRuntimes = false
         showsMCPServers = false
@@ -698,7 +662,6 @@ final class AppModel {
         // — a new folder being added, a menu item, its New session row. And from
         // Resources, for the same reason.
         showsSpending = false
-        showsResources = false
         showsEvents = false
         showsRuntimes = false
         showsMCPServers = false
@@ -924,7 +887,6 @@ final class AppModel {
     /// A folder's pinned page, from its row.
     func showPin(_ path: String, in key: FolderKey) {
         showsSpending = false
-        showsResources = false
         showsEvents = false
         showsRuntimes = false
         showsMCPServers = false
@@ -2193,15 +2155,26 @@ final class AppModel {
 
     /// Every resource and who holds it (036). A daemon too old to know the method
     /// leaves `leases` nil, and nothing about leases is drawn.
-    func refreshLeases() async {
-        guard let snapshot = try? await macClient.call(DaemonAPI.Method.resourcesSnapshot,
-                                                    Optional<String>.none,
-                                                    returning: DaemonAPI.LeaseSnapshot.self) else { return }
-        work.replaceLeases(snapshot)
+    func refreshLeases(on host: MachineRef = .mac) async {
+        guard let snapshot = try? await client(for: host).call(DaemonAPI.Method.resourcesSnapshot,
+                                                               Optional<String>.none,
+                                                               returning: DaemonAPI.LeaseSnapshot.self) else { return }
+        takeLeases(snapshot, from: host)
+    }
+
+    /// Each other machine's resources, as its page last read them (#3629). This Mac's are `leases`.
+    private(set) var serverLeases: [MachineRef: DaemonAPI.LeaseSnapshot] = [:]
+
+    func leases(on host: MachineRef) -> DaemonAPI.LeaseSnapshot? {
+        host == .mac ? leases : serverLeases[host]
+    }
+
+    private func takeLeases(_ snapshot: DaemonAPI.LeaseSnapshot, from host: MachineRef) {
+        if host == .mac { work.replaceLeases(snapshot) } else { serverLeases[host] = snapshot }
     }
 
     /// The MCP servers this Mac runs for every agent (#488). A daemon too old to know the
-    /// method leaves `hostedMCP` nil, and the Resources page draws no such group.
+    /// method leaves `hostedMCP` nil, and no such group is drawn.
     func refreshHostedMCP() async {
         guard let snapshot = try? await macClient.call(DaemonAPI.Method.mcpHosted, Optional<String>.none,
                                                     returning: DaemonAPI.HostedMCPSnapshot.self) else { return }
@@ -2316,12 +2289,12 @@ final class AppModel {
 
     /// The person ending a lease (036 US4): one holder's, or with none named, every
     /// one. Never a way to take one.
-    func endLease(_ name: ResourceName, holder: UUID? = nil) async {
-        guard let snapshot = try? await macClient.call(DaemonAPI.Method.resourcesEnd,
-                                                    DaemonAPI.PersonEndRequest(name: name.key,
-                                                                               agentID: holder?.uuidString),
-                                                    returning: DaemonAPI.LeaseSnapshot.self) else { return }
-        work.replaceLeases(snapshot)
+    func endLease(_ name: ResourceName, holder: UUID? = nil, on host: MachineRef = .mac) async {
+        guard let snapshot = try? await client(for: host).call(DaemonAPI.Method.resourcesEnd,
+                                                               DaemonAPI.PersonEndRequest(name: name.key,
+                                                                                          agentID: holder?.uuidString),
+                                                               returning: DaemonAPI.LeaseSnapshot.self) else { return }
+        takeLeases(snapshot, from: host)
     }
 
     /// The person adding or changing a declared resource (#116). The host's refusal,
@@ -2350,12 +2323,12 @@ final class AppModel {
     }
 
     /// The person taking one agent out of one line (036 US4).
-    func removeFromLine(_ name: ResourceName, agentID: UUID) async {
-        guard let snapshot = try? await macClient.call(
+    func removeFromLine(_ name: ResourceName, agentID: UUID, on host: MachineRef = .mac) async {
+        guard let snapshot = try? await client(for: host).call(
             DaemonAPI.Method.resourcesRemoveWaiter,
             DaemonAPI.PersonRemoveRequest(name: name.key, agentID: agentID.uuidString),
             returning: DaemonAPI.LeaseSnapshot.self) else { return }
-        work.replaceLeases(snapshot)
+        takeLeases(snapshot, from: host)
     }
 
     // MARK: The user scope (#1760)

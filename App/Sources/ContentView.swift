@@ -104,8 +104,6 @@ struct ContentView: View {
     private func detail(inPaneOf width: CGFloat) -> some View {
         if model.showsEvents {
             EventsView().paperGround()
-        } else if model.showsResources {
-            ResourcesView().paperGround()
         } else if model.showsRuntimes {
             RuntimesView().paperGround()
         } else if model.showsMCPServers {
@@ -182,7 +180,7 @@ struct ContentView: View {
     /// the selected folder, with an agent chosen or none, but not under the pages
     /// about all the work, which are no folder's.
     private var folderForTerminal: DaemonAPI.FolderSummary? {
-        guard terminal.isOpen, !model.showsEvents, !model.showsResources, !model.showsRuntimes,
+        guard terminal.isOpen, !model.showsEvents, !model.showsRuntimes,
               !model.showsMCPServers, model.machinePage == nil,
               !model.showsSpending, !model.showsTokens, !model.showsTime, !model.showsMilestones,
               !model.showsWork, !model.showsDocs, let folder = model.selectedFolderSummary, folder.exists else { return nil }
@@ -197,7 +195,7 @@ struct ContentView: View {
     /// Whether `detail` shows the chat: a session is selected and nothing above it in
     /// that chain is open.
     private var showsChat: Bool {
-        model.selection != nil && !model.showsEvents && !model.showsResources
+        model.selection != nil && !model.showsEvents
             && !model.showsRuntimes && !model.showsMCPServers && model.machinePage == nil
             && !model.showsSpending && !model.showsTime && !model.showsMilestones && !model.showsWork && !model.showsDocs
             && model.openWorkflow == nil

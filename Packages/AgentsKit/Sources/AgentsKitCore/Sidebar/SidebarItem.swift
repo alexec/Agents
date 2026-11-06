@@ -34,7 +34,8 @@ public enum SidebarItem: Hashable, Sendable {
     /// The folders' docs and the docs connectors', each doc a page (#3321, spec 3319). Mac + web:
     /// the Remote has no row for it (#2796).
     case docs
-    /// Every resource an agent can lease, and who holds and waits for each (036).
+    /// Every resource an agent can lease, and who holds and waits for each (036). The Remote's
+    /// only: the Mac and the web page show a machine's resources on its page (#3629).
     case resources
     /// What happened, and what came of it (042).
     case events

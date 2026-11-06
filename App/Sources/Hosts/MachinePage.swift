@@ -3,7 +3,8 @@ import SwiftUI
 
 /// One machine's page in the main window (#3626): the place to go for its status. Its CPU
 /// and memory now, every disk its agents write to with the level the disk-low strip uses,
-/// its worktrees, a section per folder (#3627), and its processes (#3453). Read with
+/// its worktrees, a section per folder (#3627), its runtimes and resources (#3629), and its
+/// processes (#3453). Read with
 /// `machine/usage` when it opens and every few seconds while it is open, never otherwise.
 /// The machine's settings stay in Settings ▸ Machines; Settings… goes there. The web page draws the same in Web/src/views/MachinePage.tsx.
 struct MachinePage: View {
@@ -38,29 +39,36 @@ struct MachinePage: View {
             .padding(.horizontal, 24)
             .padding(.top, 24)
 
-            Form {
-                if offline {
-                    Section {
-                        Text("\(name) is offline, so it can’t say how it is doing now.")
-                            .foregroundStyle(.secondary)
+            ScrollViewReader { proxy in
+                Form {
+                    if offline {
+                        Section {
+                            Text("\(name) is offline, so it can’t say how it is doing now.")
+                                .foregroundStyle(.secondary)
+                        }
+                    } else if !answersUsage {
+                        Section {
+                            Text("Update Agents on \(name) to see its CPU, memory and disks here.")
+                                .foregroundStyle(.secondary)
+                        }
+                    } else {
+                        usageSection
+                        disksSection
                     }
-                } else if !answersUsage {
-                    Section {
-                        Text("Update Agents on \(name) to see its CPU, memory and disks here.")
-                            .foregroundStyle(.secondary)
+                    if !offline {
+                        MachineWorktreesSections(host: host)
+                        MachineRuntimesSection(host: host)
+                        MachineResourcesSection(host: host)
                     }
-                } else {
-                    usageSection
-                    disksSection
+                    if !offline, model.host(host, has: Capability.processes1) {
+                        MachineProcessesSection(client: model.client(for: host), hostName: name, showsTotals: false)
+                    }
                 }
-                if !offline {
-                    MachineWorktreesSections(host: host)
-                }
-                if !offline, model.host(host, has: Capability.processes1) {
-                    MachineProcessesSection(client: model.client(for: host), hostName: name, showsTotals: false)
-                }
+                .paperForm()
+                .onAppear { scroll(proxy) }
+                .onChange(of: model.resourcesAsked) { scroll(proxy) }
+                .onChange(of: model.leases(on: host)?.resources.count) { scroll(proxy) }
             }
-            .paperForm()
         }
         .navigationTitle(name)
         .task(id: host) {
@@ -125,6 +133,20 @@ struct MachinePage: View {
         }
     }
 
+    /// To the resource a chat's capsule named, or the Resources section, once (#3629). Only
+    /// This Mac's page is asked; the leases may arrive after the page does.
+    private func scroll(_ proxy: ScrollViewProxy) {
+        guard host == .mac, let asked = model.resourcesAsked, model.leases != nil else { return }
+        withAnimation {
+            if let name = asked.name, model.leases?.resources.contains(where: { $0.name == name }) == true {
+                proxy.scrollTo(name, anchor: .top)
+            } else {
+                proxy.scrollTo(MachineResourcesSection.top, anchor: .top)
+            }
+        }
+        model.resourcesAsked = nil
+    }
+
     private func read() async {
         do {
             usage = try await model.client(for: host).call(DaemonAPI.Method.machineUsage, DaemonAPI.Empty(),
@@ -153,8 +175,8 @@ struct MachineRow: View {
                 Text("Offline").appText(.fine).foregroundStyle(.secondary)
             }
         }
-        .help(model.diskWarns(host) ? "\(name): a disk is low. Its CPU, memory, disks and worktrees"
-            : "\(name): its CPU, memory, disks and worktrees")
+        .help(model.diskWarns(host) ? "\(name): a disk is low. Its CPU, memory, disks, worktrees, runtimes and resources"
+            : "\(name): its CPU, memory, disks, worktrees, runtimes and resources")
         .accessibilityValue(offline ? "Offline" : "")
     }
 }
