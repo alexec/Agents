@@ -364,6 +364,11 @@ jobs:
           export ASC_KEY_PATH="$RUNNER_TEMP/asc.p8"
           swift scripts/asc-builds.swift "${TAG#v}" "${{ github.run_number }}" --wait 45
 
+      # What this run deployed, for Lineage (#3584): Agents reads the notice from the run, so App
+      # Store Connect's key stays here. The Universal app's Mac and iOS builds share one bundle id.
+      - name: Say the deploy
+        run: echo "::notice title=deploy::testflight:com.alexecollins.agents.remote/${{ github.run_number }}"
+
       - name: Logs
         if: failure()
         uses: actions/upload-artifact@v5

@@ -42,6 +42,10 @@ const (
 	// KindCIRun is a forge's CI run (#3581): a GitHub Actions run or a GitLab pipeline. Not
 	// KindWorkflowRun, which is an Agents workflow's run.
 	KindCIRun = "ci-run"
+	// KindDeploy is a build or a version put on a deploy target (#3584), as a TestFlight build:
+	// testflight:<bundle id>/<build>. KindTarget is where it went: target:testflight:<bundle id>.
+	KindDeploy = "deploy"
+	KindTarget = "target"
 
 	RelWorksOn = "works-on"
 	RelOpens   = "opens"
@@ -57,6 +61,8 @@ const (
 	RelLinksTo = "links-to"
 	// RelBuilds is a CI run that builds a PR, or the release of the tag it ran on (#3581).
 	RelBuilds = "builds"
+	// RelDeployedAs is a release deployed as a deploy (#3584); the deploy is part-of its target.
+	RelDeployedAs = "deployed-as"
 
 	SourceStart  = "start"
 	SourceBranch = "branch"
