@@ -51,7 +51,7 @@ Mac.
 | `spend.json` | Spend for the cost limits | The newest 7 days that have data (keys) | On write |
 | `report-hours.json` | Hourly totals sent to the control plane | 8 days | On write |
 | `features-history.json` | How often each feature is used | The newest 90 days that have data (keys) | On write |
-| `lineage.jsonl` | Links between issues, PRs, sessions and deploys | Ended links 90 days, 20,000 links | When it opens, and when it grows by 2,000; **no timer** |
+| `lineage.jsonl` | Links between issues, PRs, sessions and deploys | Ended links 90 days, 20,000 links | When it opens, when it grows by 2,000, and hourly (#3649) |
 | `lineage-cost.json` | Cost of each lineage node | 90 days, 5,000 nodes | On write |
 | `lineage-comments.json` | Cost comments on PRs | 500, 30 days | On write |
 | `release-tags.json` | Release tags already linked, for each repo | **None** | Never |
@@ -61,7 +61,7 @@ Mac.
 
 | Store | What it keeps | How long, how large | Applied |
 | --- | --- | --- | --- |
-| `workflows.json`: runs | Workflow runs | 7 days | **At start**, and when a run ends |
+| `workflows.json`: runs | Workflow runs | 7 days, unless its agent still works | At start, when a run ends, and hourly (#3649) |
 | `workflows.json`: states | A state for each folder and workflow ever seen | **None** | Only the app's **Remove** |
 | `workflow-copies/` | The approved text of each workflow and its skills | The copies that the states name; an older version goes when one is saved | On write |
 | `assessments/` | Each runtime assessment's start, score and scope | The newest 50 | When one starts |
@@ -86,8 +86,8 @@ Mac.
 | --- | --- | --- | --- |
 | `backups/<machine>/` | This machine's backups | The newest **Keep** (1 to 10, 3 by default); a `.tmp` after 24 hours. **Another machine's backups in a shared backup folder are never pruned.** | After each backup |
 | `backups-upload/`, `backups-download/` | A server backup on its way | Removed after use | On use |
-| `.restore-*` | A restore in progress | Removed when it ends. **A crash leaves it.** | Never |
-| `Outgoing/`, `Incoming/` | Exports, sends and imports | 1 hour untouched | **On the next transfer, or at start** |
+| `.restore-*` | A restore in progress | Removed when it ends; one a crash left goes at the next start (#3649) | At end; at start |
+| `Outgoing/`, `Incoming/` | Exports, sends and imports | 1 hour untouched | On the next transfer, at start and hourly (#3649) |
 | `Clones/<id>` | A clone in progress | Removed after the clone | After the clone, and at start |
 
 ### Caches and logs
@@ -97,8 +97,8 @@ Mac.
 | `daemon.log`, in the log folder | What the machine did | 4 MB, and one older file. Output from a crash is not checked until the next write. | On write |
 | `mcp-logs/`, in the log folder | What each hosted MCP server wrote to stderr | 1 MB and one older file a server, and the newest 32 servers. A single write over 1 MB is kept whole. | When a server starts |
 | `tools/<runtime>/`, in the cache folder | Pinned runtime toolsets | The current one | At start |
-| `browser/`, in the cache folder | The browser that agents drive, and its output | Old browser versions are left to Playwright. Output goes when the session ends; **a crash leaves it.** | On install; at session end |
-| `catalog-staging/`, in the cache folder | Skill previews | 8 previews, 30 minutes. **Folders left by a restart are never swept.** | On use |
+| `browser/`, in the cache folder | The browser that agents drive, and its output | Old browser versions are left to Playwright. Output goes when the session ends; what a crash left goes at the next start (#3649) | On install; at session end; at start |
+| `catalog-staging/`, in the cache folder | Skill previews | 8 previews, 30 minutes; folders left by a restart go at the next start (#3649) | On use; at start |
 | `option-cache.json`, in the cache folder | Runtime options | 50 | On write |
 | Cache and log folders of each other data folder (`roots/<name>-<hash>`) | As above, for a second copy | **None.** Not removed when that data folder is deleted. | Never |
 | Terminal scrollback | What a terminal showed | In memory only, 4 MiB a terminal | On write |
@@ -119,7 +119,7 @@ These are in `<folder>/.agents/`.
 
 | Store | What it keeps | How long, how large | Applied |
 | --- | --- | --- | --- |
-| `attachments/` | Files attached to prompts | A file that no kept conversation names goes after 7 days. The folder stays under 500 MB, oldest first. **Only in folders that still have an agent.** | At start, hourly and on write |
+| `attachments/` | Files attached to prompts | A file that no kept conversation names goes after 7 days. The folder stays under 500 MB, oldest first. A folder with no agent left is swept too: `attachment-folders.json` lists each folder an attachment was written in, until it holds none (#3649). | At start, hourly and on write |
 | `dropbox/` | Files handed to a workflow | 25 MB a file. **No total, count or age limit.** | Never |
 | `worktrees/<name>`, and branch `agents/<name>` | Git worktrees that agents made | **None.** Archive and delete leave them. | Only when removed |
 | `reviews/runtimes/`, `workflows/assess-<id>.md` | Runtime assessment reports | **None** | Never |
@@ -141,7 +141,7 @@ Agents starts these tools. It does not own what they keep.
 | Docker images and named volumes | What Docker workspaces pulled and kept | **Not removed.** Removing a workspace removes its container. |
 | DigitalOcean, Codespaces, EC2 and GCP machines | Cloud machines | **No limit in count or time, and no stop when idle.** Only **Delete Machine** removes one. |
 | `~/.ssh/config` | A block for each codespace | **Never removed** |
-| `/tmp/agents-tunnels-<uid>-<pid>` | ssh control sockets | Removed at a clean stop. **A crash leaves one.** |
+| `/tmp/agents-tunnels-<uid>-<pid>` | ssh control sockets | Removed at a clean stop; one whose process is gone goes when a control plane's tunnels start (#3649) |
 | `$TMPDIR/agents-output-*` | Output that the Mac window opened in TextEdit | **None**; macOS clears its temporary folder |
 
 ## On the control plane
@@ -152,9 +152,9 @@ and agents (with agent titles), prompts waiting for a stopped workspace (with th
 attachments), and lineage nodes (each issue, PR and session it links, with its cost).
 
 One sweep runs every hour. It removes old audit days, codes, tombstones, records with no
-owner, usage, workflow runs and lineage, and once a day the backups of removed servers.
-**Join, sign-in and link requests, and policy, governance and remove requests, are pruned
-only when they are read.**
+owner, usage, workflow runs and lineage, join, lock-join, sign-in and link requests, and
+policy, governance and remove requests (#3649), and once a day the backups of removed
+servers.
 
 A removed client, machine, group, project or route leaves a **tombstone** for 7 days, so
 the other copies of the control plane learn that it went.
@@ -177,12 +177,12 @@ the other copies of the control plane learn that it went.
 | Records | What they keep | How long, how large | Applied |
 | --- | --- | --- | --- |
 | Codes | A code's purpose, owner and expiry, and an invite's name and role; never its secret | Deleted 24 hours after it expires. No count limit; only a rate limit. | Hourly |
-| Join, lock-join and sign-in requests | The asking key and its address | 10 minutes; 50, 200 and 50 open | **On read only**, 1 hour after expiry |
-| Link requests | A channel link that waits | 24 hours; 50 open | **On read only** |
+| Join, lock-join and sign-in requests | The asking key and its address | 10 minutes; 50, 200 and 50 open | On read and hourly, 1 hour after expiry |
+| Link requests | A channel link that waits | 24 hours; 50 open | On read and hourly, 24 hours after expiry |
 | Sign-in state | PKCE state and sealed refresh tokens while a sign-in runs | 10 and 2 minutes | Hourly, 1 hour after expiry |
 | Sign-in settings | Org OIDC providers, domain claims, one sealed refresh token a person and provider | 5 providers, 20 domains | On remove |
 | SCIM and read tokens | Token hashes, address of last use | 2 live of 20; 10 live of 50 | On write |
-| Policy, governance and remove requests | Asks for a budget, a catalogue item, or removal of a person | 1,000; a decided one 30 days | **On read only** |
+| Policy, governance and remove requests | Asks for a budget, a catalogue item, or removal of a person | 1,000; a decided one 30 days | On read and hourly |
 
 ### Work data
 
@@ -265,8 +265,7 @@ These stay behind:
 
 - the copy of a runtime whose files are not known and that cannot delete a conversation
   (the Delete confirmation says so, #3669);
-- attachments, until the next sweep finds no conversation that names them (only in a
-  folder that still has an agent);
+- attachments, until the next sweep finds no conversation that names them;
 - the agent's events, until they are 7 days old;
 - the agent's title in its machine's host copy on the control plane, until a window next
   lists that machine's agents;
@@ -302,7 +301,7 @@ An agent that the machine has already, or that it deleted (`erased.json`), is sk
 
 The machine makes an export in its `Outgoing` folder and an import arrives in `Incoming`.
 Each goes once it is read or imported. One left untouched for an hour goes at the next
-export, send or import, or at the next start.
+export, send or import, at the next start, or at the hourly sweep.
 
 ## Backups
 
