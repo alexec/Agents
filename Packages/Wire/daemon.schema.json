@@ -335,6 +335,10 @@
         "runtimeSessionID": {
           "type": "string"
         },
+        "runtimeKeepsCopy": {
+          "type": "boolean",
+          "description": "Delete leaves the runtime's own copy of the conversation (#3669): its files are not known and its adapter cannot delete a session (OpenCode without session/delete). Set when the runtime's session starts; absent when Delete erases it, or nothing is known yet."
+        },
         "startOptions": {
           "$ref": "#/definitions/StartOptions"
         },
@@ -15211,6 +15215,27 @@
       ],
       "additionalProperties": false
     },
+    "MachineUsageState": {
+      "type": "object",
+      "description": "machine/usage (#3626): a machine's page. Its CPU and memory now, as processes/list has them, and every disk its agents write to, ok ones too, as the last disk look (every minute) found them.",
+      "properties": {
+        "machine": {
+          "$ref": "#/definitions/MachineUsage"
+        },
+        "disks": {
+          "type": "array",
+          "description": "Each volume once: the most critical first, then the least free.",
+          "items": {
+            "$ref": "#/definitions/DiskAlarm"
+          }
+        }
+      },
+      "required": [
+        "machine",
+        "disks"
+      ],
+      "additionalProperties": false
+    },
     "MachineUser": {
       "type": "object",
       "description": "host/user (#1761): to a machine on its channel 0, at each join and when its user changes. Its user, their kind, and the labels runs-on: matches (FR-034); for a bot at its cap, until when it starts no work (FR-033).",
@@ -15429,6 +15454,43 @@
         "run",
         "addedAt",
         "destination"
+      ],
+      "additionalProperties": false
+    },
+    "ManagedPersona": {
+      "type": "object",
+      "description": "A persona added from a marketplace (#3665): its file in .agents/personas, where it came from, and whether it has an update.",
+      "properties": {
+        "destination": {
+          "$ref": "#/definitions/SkillDestination"
+        },
+        "id": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "commit": {
+          "type": "string"
+        },
+        "edited": {
+          "type": "boolean",
+          "description": "The file no longer has the blob SHA it was added with."
+        },
+        "update": {
+          "$ref": "#/definitions/UpdateState"
+        }
+      },
+      "required": [
+        "destination",
+        "id",
+        "source",
+        "path",
+        "edited",
+        "update"
       ],
       "additionalProperties": false
     },
@@ -17666,6 +17728,18 @@
       ],
       "additionalProperties": false
     },
+    "PersonaAddAnswer": {
+      "type": "object",
+      "properties": {
+        "persona": {
+          "$ref": "#/definitions/ManagedPersona"
+        }
+      },
+      "required": [
+        "persona"
+      ],
+      "additionalProperties": false
+    },
     "PersonaFile": {
       "type": "object",
       "properties": {
@@ -17725,6 +17799,109 @@
         "personal"
       ]
     },
+    "PersonaPreview": {
+      "type": "object",
+      "description": "A persona file fetched at one commit, shown whole before it is added (#3665).",
+      "properties": {
+        "previewID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "result": {
+          "$ref": "#/definitions/CatalogResult"
+        },
+        "path": {
+          "type": "string"
+        },
+        "commit": {
+          "type": "string"
+        },
+        "blobSHA": {
+          "type": "string"
+        },
+        "committedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "markdown": {
+          "type": "string"
+        },
+        "persona": {
+          "$ref": "#/definitions/Persona"
+        },
+        "destinationState": {
+          "$ref": "#/definitions/DestinationState"
+        }
+      },
+      "required": [
+        "previewID",
+        "result",
+        "path",
+        "commit",
+        "blobSHA",
+        "markdown",
+        "persona",
+        "destinationState"
+      ],
+      "additionalProperties": false
+    },
+    "PersonaPreviewAnswer": {
+      "type": "object",
+      "properties": {
+        "preview": {
+          "$ref": "#/definitions/PersonaPreview"
+        },
+        "error": {
+          "$ref": "#/definitions/CatalogError"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PersonaSettingChange": {
+      "type": "object",
+      "description": "A setting an update changes that the person is warned about: runtime or permission-mode.",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "old": {
+          "type": "string"
+        },
+        "new": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "additionalProperties": false
+    },
+    "PersonaUpdatePreviewAnswer": {
+      "type": "object",
+      "properties": {
+        "preview": {
+          "$ref": "#/definitions/PersonaPreview"
+        },
+        "installed": {
+          "type": "string",
+          "description": "The file as it is now, for the diff."
+        },
+        "edited": {
+          "type": "boolean"
+        },
+        "changes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PersonaSettingChange"
+          }
+        }
+      },
+      "required": [
+        "preview",
+        "installed",
+        "edited",
+        "changes"
+      ],
+      "additionalProperties": false
+    },
     "PersonasFilesRequest": {
       "type": "object",
       "properties": {
@@ -17749,6 +17926,21 @@
       },
       "required": [
         "folder"
+      ],
+      "additionalProperties": false
+    },
+    "PersonasManagedAnswer": {
+      "type": "object",
+      "properties": {
+        "personas": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ManagedPersona"
+          }
+        }
+      },
+      "required": [
+        "personas"
       ],
       "additionalProperties": false
     },

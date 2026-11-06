@@ -5,7 +5,7 @@ import type { Attachment } from "../protocol/generated";
 
 export interface Draft { text: string; attachments: Attachment[] }
 
-interface Storage { getItem(key: string): string | null; setItem(key: string, value: string): void }
+interface Storage { getItem(key: string): string | null; setItem(key: string, value: string): void; removeItem(key: string): void }
 
 const storageKey = "agents.drafts";
 /** The most drafts kept. */
@@ -39,6 +39,12 @@ export class Drafts {
 
   delete(key: string): void {
     if (this.held.delete(key)) this.save();
+  }
+
+  /** Every draft goes: the control plane they were typed to forgot this browser (#3670). */
+  clear(): void {
+    this.held.clear();
+    try { this.storage?.removeItem(storageKey); } catch { /* off: nothing kept */ }
   }
 
   private save(): void {

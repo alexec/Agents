@@ -139,6 +139,8 @@ enum ControlConfig {
     }
 
     static func forget() {
+        // Its machine-lock pins go with it (#3670), named by the control plane while it is known.
+        LockPins(defaults: WindowDefaults.store, name: lockPinName).clearAll()
         try? FileManager.default.removeItem(at: membershipFile)  // store-ok: the window's own container
     }
 

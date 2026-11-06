@@ -9,6 +9,7 @@ import { hostNeedsUpdate } from "../model/capabilities";
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { Agent } from "../protocol/generated";
+import { runtimeName } from "../model/orgPolicy";
 import type { Store } from "../model/store";
 import { asksToArchive, isOpenBlock, folderPath } from "../model/groups";
 import { keepLabel } from "../model/archiveWords";
@@ -264,7 +265,7 @@ export function runSessionAction(store: Store, host: string, agent: Agent, actio
   else if (action === "keep") void store.keepSession(host, agent);
   else if (action === "agents/archive") void archiveWithChildren(store, host, agent);
   else if (action === "stopAll") void stopAll(store, host, agent);
-  else if (action === "delete") { if (confirm(`${deleteTitle(agent.title)}\n\n${deleteMessage}`)) void remove(store, host, agent); }
+  else if (action === "delete") { if (confirm(`${deleteTitle(agent.title)}\n\n${deleteMessageFor(agent)}`)) void remove(store, host, agent); }
   else void store.perform(host, agent.id, action);
 }
 
@@ -276,6 +277,11 @@ export function deleteTitle(title: string | null | undefined): string {
 
 /** DeletionWords.confirmMessage. */
 export const deleteMessage = "Its conversation and record are removed. This cannot be undone.";
+
+/** DeletionWords.confirmMessage(agent): with a line when its runtime keeps its own copy (#3669). */
+export function deleteMessageFor(agent: Pick<Agent, "runtimeID" | "runtimeKeepsCopy">): string {
+  return agent.runtimeKeepsCopy ? `${deleteMessage} ${runtimeName(agent.runtimeID)} keeps its own copy of this conversation.` : deleteMessage;
+}
 
 /** Delete, asked first (#398); the host's agent/removed takes it out of every list. */
 async function remove(store: Store, host: string, agent: Agent) {

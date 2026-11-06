@@ -470,3 +470,17 @@ test("a lock with one client offers a recovery key until it is saved or skipped 
   await again.run();
   assert.equal(again.recovery.value.kind, "none");
 });
+
+test("a forget clears every lock pin and recovery mark, and nothing else (#3670)", () => {
+  const items = new Map([
+    ["agents-lock-pin", "{}"], ["agents-lock-pin:ana@example.com", "{}"],
+    ["agents-lock-recovery-done:ana@example.com", "1"], ["agents.drafts", "[]"], ["agents-lock-pinned-elsewhere", "x"],
+  ]);
+  const storage = {
+    get length() { return items.size; },
+    key: (i) => [...items.keys()][i] ?? null,
+    removeItem: (key) => items.delete(key),
+  };
+  model.forgetPins(storage);
+  assert.deepEqual([...items.keys()], ["agents.drafts", "agents-lock-pinned-elsewhere"]);
+});

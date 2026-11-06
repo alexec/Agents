@@ -34,10 +34,12 @@ type sweepReport struct {
 	events, codes, tombstones, leftovers, dated, usage int
 	// Leases of hosts that were removed, and org routes' tombstones (#2293).
 	orphans int
+	// Removed people cut to their tombstone (#3647).
+	cut int
 }
 
 func (r sweepReport) total() int {
-	return r.events + r.codes + r.tombstones + r.leftovers + r.usage + r.orphans
+	return r.events + r.codes + r.tombstones + r.leftovers + r.usage + r.orphans + r.cut
 }
 
 // full says whether a sweep of at most most deletions stopped at that bound, so more may
@@ -48,13 +50,13 @@ func (r sweepReport) add(o sweepReport) sweepReport {
 	return sweepReport{
 		events: r.events + o.events, codes: r.codes + o.codes, tombstones: r.tombstones + o.tombstones,
 		leftovers: r.leftovers + o.leftovers, dated: r.dated + o.dated, usage: r.usage + o.usage,
-		orphans: r.orphans + o.orphans,
+		orphans: r.orphans + o.orphans, cut: r.cut + o.cut,
 	}
 }
 
 func (r sweepReport) String() string {
-	return fmt.Sprintf("removed %d events, %d code files, %d tombstones, %d leftovers, %d usage periods, %d orphans; dated %d tombstones",
-		r.events, r.codes, r.tombstones, r.leftovers, r.usage, r.orphans, r.dated)
+	return fmt.Sprintf("removed %d events, %d code files, %d tombstones, %d leftovers, %d usage periods, %d orphans; dated %d tombstones; cut %d removed people",
+		r.events, r.codes, r.tombstones, r.leftovers, r.usage, r.orphans, r.dated, r.cut)
 }
 
 // sweep is StoreSweep.run: old events, spent and expired codes, old tombstones and a
@@ -196,6 +198,14 @@ func sweep(ctx context.Context, rs *records.Records, now time.Time, most int, ev
 		}
 		report.tombstones++
 		left--
+	}
+
+	// Removed people kept whole from before removal cut them to a tombstone (#3647).
+	n, err = sweepRemovedPeople(ctx, rs, now, left)
+	report.cut = n
+	left -= n
+	if err != nil {
+		return report, err
 	}
 
 	// What outlived what it belonged to (#2293).
@@ -431,6 +441,28 @@ func (e *eventSweep) sweep(ctx context.Context, s store.Store, cutoff string, mo
 	return deleted, nil
 }
 
+// sweepRemovedPeople cuts at most most removed people to their tombstone (#3647): each was
+// removed before removal did it, and still holds their name, emails and logins.
+func sweepRemovedPeople(ctx context.Context, rs *records.Records, now time.Time, most int) (int, error) {
+	ids := rs.RemovedToCut()
+	if len(ids) == 0 || most <= 0 {
+		return 0, nil
+	}
+	ids = ids[:min(len(ids), most)]
+	cut := 0
+	err := rs.ChangePeople(ctx, func(all map[string]records.Person) ([]records.Person, error) {
+		var out []records.Person
+		for _, id := range ids {
+			if p, ok := all[id]; ok && p.IsRemoved() && !p.IsTombstone() {
+				out = append(out, p.Tombstone(records.At(now)))
+			}
+		}
+		cut = len(out)
+		return out, nil
+	})
+	return cut, err
+}
+
 // sweepRounds is one hour's sweep (#2291): a round of at most most deletions, then, while a
 // round stops at that bound, another after pause, until nothing more has expired, the hour
 // is over, or wait says to stop. So when more expires in an hour than one round deletes
@@ -488,6 +520,12 @@ func (s *Service) sweepEveryHour() {
 				}
 			}
 			s.sweepRequests(context.Background(), time.Now())
+			// Kept requests not sent for a week, with their attachments (#3647).
+			if s.providers != nil {
+				if kept := s.providers.Kept(); kept != nil {
+					kept.Expire(time.Now())
+				}
+			}
 			s.renewConnected(context.Background())
 			s.dropPreviousKey(context.Background())
 		}

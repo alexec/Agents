@@ -274,8 +274,8 @@ export function FolderSettingsModal({ store, host, folder, summary, down, close,
     <dt>Critical disk space</dt>
     <dd>
       {line("criticalGB", critical, diskDefaults.criticalGB, diskDefaults.criticalChoices, "Critical disk space")}
-      <p class="sheet-note">When free space on the disk holding this folder or its worktrees falls below these, the page
-        says so and machine.disk_low is raised for agents and workflows. Low is also below {disk?.lowPercent ?? diskDefaults.lowPercent}%
+      <p class="sheet-note">When free space on the disk holding this folder or its worktrees falls below these, the machine's
+        row and page say so and machine.disk_low is raised for agents and workflows. Low is also below {disk?.lowPercent ?? diskDefaults.lowPercent}%
         of the disk. Saved in .agents/folder.json.</p>
     </dd>
   </dl>;

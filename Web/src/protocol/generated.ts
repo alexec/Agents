@@ -222,6 +222,12 @@ export interface Agent {
   labels?: SessionLabel[];
   state: AgentState;
   runtimeSessionID?: string;
+  /**
+   * Delete leaves the runtime's own copy of the conversation (#3669): its files are not known and
+   * its adapter cannot delete a session (OpenCode without session/delete). Set when the runtime's
+   * session starts; absent when Delete erases it, or nothing is known yet.
+   */
+  runtimeKeepsCopy?: boolean;
   startOptions: StartOptions;
   advertisedOptions: ConfigOption[];
   availableCommands: SlashCommand[];
@@ -5835,6 +5841,16 @@ export interface MachineUsage {
 }
 
 /**
+ * machine/usage (#3626): a machine's page. Its CPU and memory now, as processes/list has them, and
+ * every disk its agents write to, ok ones too, as the last disk look (every minute) found them.
+ */
+export interface MachineUsageState {
+  machine: MachineUsage;
+  /** Each volume once: the most critical first, then the least free. */
+  disks: DiskAlarm[];
+}
+
+/**
  * host/user (#1761): to a machine on its channel 0, at each join and when its user changes. Its
  * user, their kind, and the labels runs-on: matches (FR-034); for a bot at its cap, until when it
  * starts no work (FR-033).
@@ -5917,6 +5933,21 @@ export interface ManagedMCPServer {
   addedAt: WireDate;
   destination: SkillDestination;
   byHand?: boolean;
+}
+
+/**
+ * A persona added from a marketplace (#3665): its file in .agents/personas, where it came from, and
+ * whether it has an update.
+ */
+export interface ManagedPersona {
+  destination: SkillDestination;
+  id: string;
+  source: string;
+  path: string;
+  commit?: string;
+  /** The file no longer has the blob SHA it was added with. */
+  edited: boolean;
+  update: UpdateState;
 }
 
 export interface ManagedSkill {
@@ -6849,6 +6880,10 @@ export interface Persona {
   problem?: string;
 }
 
+export interface PersonaAddAnswer {
+  persona: ManagedPersona;
+}
+
 export interface PersonaFile {
   id: string;
   origin: PersonaOrigin;
@@ -6869,6 +6904,39 @@ export type PersonaOrigin =
   | "folder"
   | "personal";
 
+/** A persona file fetched at one commit, shown whole before it is added (#3665). */
+export interface PersonaPreview {
+  previewID: UUID;
+  result: CatalogResult;
+  path: string;
+  commit: string;
+  blobSHA: string;
+  committedAt?: WireDate;
+  markdown: string;
+  persona: Persona;
+  destinationState: DestinationState;
+}
+
+export interface PersonaPreviewAnswer {
+  preview?: PersonaPreview;
+  error?: CatalogError;
+}
+
+/** A setting an update changes that the person is warned about: runtime or permission-mode. */
+export interface PersonaSettingChange {
+  key: string;
+  old?: string;
+  new?: string;
+}
+
+export interface PersonaUpdatePreviewAnswer {
+  preview: PersonaPreview;
+  /** The file as it is now, for the diff. */
+  installed: string;
+  edited: boolean;
+  changes: PersonaSettingChange[];
+}
+
 export interface PersonasFilesRequest {
   folder?: URLString;
   origin: PersonaOrigin;
@@ -6876,6 +6944,10 @@ export interface PersonasFilesRequest {
 
 export interface PersonasListRequest {
   folder: URLString;
+}
+
+export interface PersonasManagedAnswer {
+  personas: ManagedPersona[];
 }
 
 export interface PinArrangeRequest {
@@ -11520,6 +11592,7 @@ export interface Methods {
   "lock/joinRequests": { params: Empty; result: LockJoinRequest[] };
   "lock/joinReveal": { params: LockJoinNonce; result: Empty };
   "lock/reset": { params: Empty; result: Empty };
+  "machine/usage": { params: Empty; result: MachineUsageState };
   "mcp/health": { params: Empty; result: MCPHealthSnapshot };
   "mcp/health/check": { params: MCPHealthCheckRequest; result: MCPHealthSnapshot };
   "mcp/hosted": { params: Empty; result: HostedMCPSnapshot };
@@ -11890,6 +11963,7 @@ export const MethodTarget = {
   "lock/joinRequests": "control",
   "lock/joinReveal": "control",
   "lock/reset": "control",
+  "machine/usage": "host",
   "mcp/health": "host",
   "mcp/health/check": "host",
   "mcp/hosted": "host",
@@ -12137,7 +12211,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AddFolderRequest: { required: ["folder"], optional: ["project"] },
   Admitted: { required: [], optional: ["client", "host"] },
   AdoptRequest: { required: ["runtimeID", "sessionID", "cwd"], optional: [] },
-  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "desktopControlPause", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID", "auto", "clientPermission", "levels", "voiceHungUpAt", "goal", "project"] },
+  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "runtimeKeepsCopy", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "desktopControlPause", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID", "auto", "clientPermission", "levels", "voiceHungUpAt", "goal", "project"] },
   AgentConfigEditorFile: { required: ["path", "content"], optional: [] },
   AgentConfigEditorRequest: { required: ["kind"], optional: ["folder"] },
   AgentConfigEditorSaveRequest: { required: ["kind", "path", "content"], optional: ["folder", "delete"] },
@@ -12630,12 +12704,14 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineTunnelChanged: { required: ["name", "tunnel"], optional: ["host"] },
   MachineUpdate: { required: ["host", "destination"], optional: ["key", "trust"] },
   MachineUsage: { required: ["cpuPercent", "cpuCount", "memoryUsed", "memoryTotal"], optional: [] },
+  MachineUsageState: { required: ["machine", "disks"], optional: [] },
   MachineUser: { required: ["user", "kind", "name", "labels"], optional: ["capReachedUntil", "bots"] },
   MachineUserSettings: { required: ["user", "settings", "secrets"], optional: [] },
   MachineWorkspace: { required: ["provider", "providerName", "workspace", "workspaceName", "workspaceState", "canStart", "canStop", "startWhenUsed", "current"], optional: ["hostState", "phase", "since", "problem", "stoppedBy", "stopWhenIdleMinutes", "cost", "startForSchedules", "tellsSchedule", "nextWorkflow", "nextWorkflowAt", "wakeAt"] },
   MachineWorkspaceCall: { required: ["agent", "method", "params"], optional: ["deliver"] },
   MachinesSummaryFacts: { required: ["machines"], optional: [] },
   ManagedMCPServer: { required: ["name", "registryName", "version", "run", "addedAt", "destination"], optional: ["byHand"] },
+  ManagedPersona: { required: ["destination", "id", "source", "path", "edited", "update"], optional: ["commit"] },
   ManagedSkill: { required: ["destination", "name", "source", "edited", "update"], optional: ["skillPath", "recordedHash", "commit", "committedAt", "catalogue"] },
   MarkRuntimeAvailable: { required: ["credentialKey"], optional: [] },
   Marketplace: { required: ["id", "name", "format", "url", "tokenMissing", "origin", "enabled"], optional: ["token", "about"] },
@@ -12711,10 +12787,16 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PersonSettings: { required: [], optional: ["name", "pronouns"] },
   PersonSuspended: { required: ["by", "provider", "at"], optional: ["why"] },
   Persona: { required: ["id", "name", "origin", "settings"], optional: ["description", "problem"] },
+  PersonaAddAnswer: { required: ["persona"], optional: [] },
   PersonaFile: { required: ["id", "origin", "content"], optional: [] },
   PersonaFileSaveRequest: { required: ["origin", "id", "content"], optional: ["folder", "delete"] },
+  PersonaPreview: { required: ["previewID", "result", "path", "commit", "blobSHA", "markdown", "persona", "destinationState"], optional: ["committedAt"] },
+  PersonaPreviewAnswer: { required: [], optional: ["preview", "error"] },
+  PersonaSettingChange: { required: ["key"], optional: ["old", "new"] },
+  PersonaUpdatePreviewAnswer: { required: ["preview", "installed", "edited", "changes"], optional: [] },
   PersonasFilesRequest: { required: ["origin"], optional: ["folder"] },
   PersonasListRequest: { required: ["folder"], optional: [] },
+  PersonasManagedAnswer: { required: ["personas"], optional: [] },
   PinArrangeRequest: { required: ["folder", "paths"], optional: [] },
   PinArrangeSessionsRequest: { required: ["folder", "agentIDs"], optional: [] },
   PinArrangeWorkflowsRequest: { required: ["folder", "workflowIDs"], optional: [] },

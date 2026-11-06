@@ -40,7 +40,7 @@ public extension DaemonAPI {
         public var elicitations: [ElicitationRequest]
         public var attention: AttentionPending
         public var resuming: [UUID]
-        /// The low-disk strip and what the host could not read, shown on every page (#884).
+        /// The disks' alarms (the machine's row, #3628) and what the host could not read (#884).
         /// Nil from a host that predates them.
         public var disk: DiskState?
         public var storeNotes: StoreNotes?

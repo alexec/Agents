@@ -110,6 +110,17 @@ public struct DraftStore: @unchecked Sendable {
         return kept
     }
 
+    /// Let go of every draft in this scope, the start form too: the pairing they were typed
+    /// under was forgotten (#3670), and what was half-typed to that control plane goes with it.
+    /// The ordinary scope leaves every other root's alone.
+    public func clearAll() {
+        let others = Self.prefix + "root:"
+        for key in defaults.dictionaryRepresentation().keys where key.hasPrefix(scopePrefix) {
+            if scopePrefix == Self.prefix, key.hasPrefix(others) { continue }
+            defaults.removeObject(forKey: key)
+        }
+    }
+
     // MARK: The start form
 
     public func startDraft() -> StartDraft? {

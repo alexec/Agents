@@ -156,6 +156,9 @@ type Agent struct {
 
 	RuntimeSessionID *string `json:"runtimeSessionID,omitzero"`
 
+	// Delete leaves the runtime's own copy of the conversation (#3669): its files are not known and its adapter cannot delete a session (OpenCode without session/delete). Set when the runtime's session starts; absent when Delete erases it, or nothing is known yet.
+	RuntimeKeepsCopy *bool `json:"runtimeKeepsCopy,omitzero"`
+
 	StartOptions StartOptions `json:"startOptions"`
 
 	AdvertisedOptions []ConfigOption `json:"advertisedOptions"`
@@ -6780,6 +6783,14 @@ type MachineUsage struct {
 	MemoryTotal int64 `json:"memoryTotal"`
 }
 
+// machine/usage (#3626): a machine's page. Its CPU and memory now, as processes/list has them, and every disk its agents write to, ok ones too, as the last disk look (every minute) found them.
+type MachineUsageState struct {
+	Machine MachineUsage `json:"machine"`
+
+	// Each volume once: the most critical first, then the least free.
+	Disks []DiskAlarm `json:"disks"`
+}
+
 // host/user (#1761): to a machine on its channel 0, at each join and when its user changes. Its user, their kind, and the labels runs-on: matches (FR-034); for a bot at its cap, until when it starts no work (FR-033).
 type MachineUser struct {
 	User string `json:"user"`
@@ -6879,6 +6890,24 @@ type ManagedMCPServer struct {
 	Destination SkillDestination `json:"destination"`
 
 	ByHand *bool `json:"byHand,omitzero"`
+}
+
+// A persona added from a marketplace (#3665): its file in .agents/personas, where it came from, and whether it has an update.
+type ManagedPersona struct {
+	Destination SkillDestination `json:"destination"`
+
+	ID string `json:"id"`
+
+	Source string `json:"source"`
+
+	Path string `json:"path"`
+
+	Commit *string `json:"commit,omitzero"`
+
+	// The file no longer has the blob SHA it was added with.
+	Edited bool `json:"edited"`
+
+	Update UpdateState `json:"update"`
 }
 
 type ManagedSkill struct {
@@ -7923,6 +7952,10 @@ type Persona struct {
 	Problem *string `json:"problem,omitzero"`
 }
 
+type PersonaAddAnswer struct {
+	Persona ManagedPersona `json:"persona"`
+}
+
 type PersonaFile struct {
 	ID string `json:"id"`
 
@@ -7950,6 +7983,53 @@ type PersonaOrigin string
 const PersonaOriginFolder PersonaOrigin = "folder"
 const PersonaOriginPersonal PersonaOrigin = "personal"
 
+// A persona file fetched at one commit, shown whole before it is added (#3665).
+type PersonaPreview struct {
+	PreviewID UUID `json:"previewID"`
+
+	Result CatalogResult `json:"result"`
+
+	Path string `json:"path"`
+
+	Commit string `json:"commit"`
+
+	BlobSHA string `json:"blobSHA"`
+
+	CommittedAt *Date `json:"committedAt,omitzero"`
+
+	Markdown string `json:"markdown"`
+
+	Persona Persona `json:"persona"`
+
+	DestinationState DestinationState `json:"destinationState"`
+}
+
+type PersonaPreviewAnswer struct {
+	Preview *PersonaPreview `json:"preview,omitzero"`
+
+	Error *CatalogError `json:"error,omitzero"`
+}
+
+// A setting an update changes that the person is warned about: runtime or permission-mode.
+type PersonaSettingChange struct {
+	Key string `json:"key"`
+
+	Old *string `json:"old,omitzero"`
+
+	New *string `json:"new,omitzero"`
+}
+
+type PersonaUpdatePreviewAnswer struct {
+	Preview PersonaPreview `json:"preview"`
+
+	// The file as it is now, for the diff.
+	Installed string `json:"installed"`
+
+	Edited bool `json:"edited"`
+
+	Changes []PersonaSettingChange `json:"changes"`
+}
+
 type PersonasFilesRequest struct {
 	Folder *URL `json:"folder,omitzero"`
 
@@ -7958,6 +8038,10 @@ type PersonasFilesRequest struct {
 
 type PersonasListRequest struct {
 	Folder URL `json:"folder"`
+}
+
+type PersonasManagedAnswer struct {
+	Personas []ManagedPersona `json:"personas"`
 }
 
 type PinArrangeRequest struct {

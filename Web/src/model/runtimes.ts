@@ -169,6 +169,23 @@ export function machineSignInLine(status: RuntimeStatus): string | undefined {
   return signIn.relayed ? "Uses the Mac’s sign-in" : "Not signed in on this machine";
 }
 
+/** A runtime's line on a machine's page (#3629): installed or not, and signed in where the machine says.
+ * RuntimeStatus.machineLine on the Mac. Accounts and allowances are the person's, so they are not said here. */
+export function machineRuntimeLine(status: RuntimeStatus): string {
+  const a = status.availability;
+  const signIn = status.signIn;
+  const line = "available" in a
+    ? !signIn ? "Installed"
+      : signIn.signedIn ? "Installed · signed in"
+      : signIn.relayed ? "Installed · uses the Mac’s sign-in" : "Installed · not signed in"
+    : "needsSignIn" in a ? "Installed · not signed in"
+    : "missing" in a ? "Not installed"
+    : "failed" in a ? `Can’t be used: ${a.failed.reason}`
+    : "installing" in a ? (a.installing.progress ? `Installing: ${a.installing.progress}` : "Installing…")
+    : `Install failed: ${a.installFailed.reason}`;
+  return status.outdated ? `${line} · an update is out` : line;
+}
+
 /** The words of the sheet that signs a runtime in on a machine with no browser. */
 export const machineSignInWords = {
   title: (runtime: string, machine: string) => `Sign In to ${runtime} on ${machine}`,

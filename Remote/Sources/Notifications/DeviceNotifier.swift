@@ -131,6 +131,13 @@ final class DeviceNotifier: NSObject, UNUserNotificationCenterDelegate {
         center.removePendingNotificationRequests(withIdentifiers: [token])
     }
 
+    /// The control plane was forgotten (#3670): every banner it delivered goes, shown or not.
+    func forgetAll() {
+        showing = [:]
+        center.removeAllDeliveredNotifications()
+        center.removeAllPendingNotificationRequests()
+    }
+
     /// Asked when the Mac has taken this device's announce — the moment it has become
     /// a device that can be told things, which is where the "why" is plainest (FR-024).
     /// Not later: the Mac never chooses a device that has not said it can notify

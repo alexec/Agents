@@ -49,6 +49,14 @@ final class StartDraftKeeper {
         store.clear(key)
     }
 
+    /// The control plane was forgotten (#3670): every draft goes, and nothing waiting is
+    /// written back after.
+    func forgetAll() {
+        pause?.cancel()
+        waiting = [:]
+        store.clearAll()
+    }
+
     func flush() {
         pause?.cancel()
         for (key, draft) in waiting { store.save(draft, for: key) }

@@ -332,7 +332,7 @@ public final class AgentsModel {
     /// Every volume that is low on space (#195), as the daemon last said. Replaced whole
     /// by each `disk/changed`. Empty from a daemon too old to say, which draws nothing.
     public private(set) var disk = DiskState()
-    /// Every folder's worktrees on each host (#790), for Activity ▸ Worktrees, as last
+    /// Every folder's worktrees on each host (#790), for each machine's page, as last
     /// asked: a list, not kept up by the host, so asked again when the page is shown.
     public private(set) var worktrees: [MachineRef: [DaemonAPI.FolderWorktrees]] = [:]
     /// Each worktree's size as `worktrees/sized` last said, by host and root, newer than

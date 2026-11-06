@@ -4,8 +4,8 @@ import SwiftUI
 /// What runs on a machine (#3453): its CPU and memory, then the daemon, each session's
 /// runtime and their children, with the CPU and memory each uses now. Read with
 /// `processes/list` when it opens and every few seconds while it is open, never otherwise.
-/// A session's row opens its chat. Settings ▸ Machines ▸ This Mac draws it for this Mac, and
-/// a machine's Processes… for any other; the web page draws the same in
+/// A session's row opens its chat. Settings ▸ Machines ▸ This Mac draws it for this Mac, a
+/// machine's Processes… for any other, and the machine's page (#3626) for every one; the web page draws the same in
 /// Web/src/views/settings/Processes.tsx.
 struct MachineProcessesSection: View {
     @Environment(AppModel.self) private var model
@@ -14,6 +14,9 @@ struct MachineProcessesSection: View {
     let hostName: String
     /// What opening a session does first, as a sheet closing.
     var opened: () -> Void = {}
+    /// The machine's CPU and memory above the processes: not on the machine's page, which
+    /// says them in its own Usage section (#3626).
+    var showsTotals = true
 
     @State private var state: DaemonAPI.ProcessesState?
     @State private var failure: String?
@@ -21,8 +24,10 @@ struct MachineProcessesSection: View {
     var body: some View {
         Section {
             if let state {
-                LabeledContent("CPU", value: ProcessWords.machineCPU(state.machine))
-                LabeledContent("Memory", value: ProcessWords.machineMemory(state.machine))
+                if showsTotals {
+                    LabeledContent("CPU", value: ProcessWords.machineCPU(state.machine))
+                    LabeledContent("Memory", value: ProcessWords.machineMemory(state.machine))
+                }
                 ForEach(state.processes) { process in
                     row(process)
                 }

@@ -217,6 +217,16 @@ struct AttentionSnapshotTests {
                 "the count moved, so the widget is told")
     }
 
+    /// A forgotten pairing takes the widget's headlines with it (#3670).
+    @Test func aForgetClearsTheSnapshot() throws {
+        let directory = try TemporaryDirectory()
+        defer { directory.remove() }
+        #expect(AttentionSnapshotStore.write(AttentionSnapshot(writtenAt: Date(), total: 1, sessions: []), into: directory.url))
+        AttentionSnapshotStore.clear(in: directory.url)
+        #expect(AttentionSnapshotStore.read(from: directory.url) == nil)
+        AttentionSnapshotStore.clear(in: directory.url)
+    }
+
     @Test func aWriteMakesTheCachesFolderItGoesIn() throws {
         let directory = try TemporaryDirectory()
         defer { directory.remove() }

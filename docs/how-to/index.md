@@ -167,6 +167,8 @@ something particular done.
   questions with buttons and takes the answer back.
 - [Use Sentry](use-sentry.md): Sentry's tools, signed in, and a workflow or a wait that starts
   on a new or regressed Sentry issue.
+- [Deploy to Cloud Run](deploy-to-cloud-run.md): a deploy from your own GitHub Actions on a
+  version tag, held for a person's approval, and linked to its release in Lineage.
 - [Pin a page to a folder](pin-a-page-to-a-folder.md): a document or an HTML page
   under its folder in the sidebar, live as it changes.
 - [Hand files to a workflow](hand-files-to-a-workflow.md): drop a file into a folder's
