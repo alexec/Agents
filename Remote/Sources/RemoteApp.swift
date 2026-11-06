@@ -264,8 +264,8 @@ struct RemoteView: View {
                             titleVisibility: .visible, presenting: model.askingToDelete) { agent in
             Button("Delete", role: .destructive) { Task { await model.delete(agent.id) } }
             Button("Cancel", role: .cancel) {}
-        } message: { _ in
-            Text(DeletionWords.confirmMessage)
+        } message: { agent in
+            Text(DeletionWords.confirmMessage(agent))
         }
         // Rename… from a session's menu or the chat's ··· (#751), asked here as Delete… is.
         .alert("Rename Session",

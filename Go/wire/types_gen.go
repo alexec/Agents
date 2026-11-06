@@ -156,6 +156,9 @@ type Agent struct {
 
 	RuntimeSessionID *string `json:"runtimeSessionID,omitzero"`
 
+	// Delete leaves the runtime's own copy of the conversation (#3669): its files are not known and its adapter cannot delete a session (OpenCode without session/delete). Set when the runtime's session starts; absent when Delete erases it, or nothing is known yet.
+	RuntimeKeepsCopy *bool `json:"runtimeKeepsCopy,omitzero"`
+
 	StartOptions StartOptions `json:"startOptions"`
 
 	AdvertisedOptions []ConfigOption `json:"advertisedOptions"`

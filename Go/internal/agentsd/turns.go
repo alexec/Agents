@@ -633,6 +633,10 @@ func (l *live) turn() bool {
 		sessionID := string(s.ID)
 		d.change(l.id, func(a *wire.Agent) {
 			a.RuntimeSessionID = &sessionID
+			a.RuntimeKeepsCopy = nil
+			if keepsCopy(a.RuntimeID, s.CanDelete()) {
+				a.RuntimeKeepsCopy = new(true)
+			}
 			if opts := configOptions(s.NewResult.ConfigOptions); opts != nil {
 				a.AdvertisedOptions = d.markOptions(a.RuntimeID, withAppOptions(a.RuntimeID, a.StartOptions.Values, opts))
 				a.Levels = d.matchLevels(a)
