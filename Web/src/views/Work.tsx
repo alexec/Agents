@@ -3,6 +3,7 @@
 // what lineage knows (reports/nodes: sessions, cost, lead time) under its title; the milestones and
 // releases lineage knows. A row opens its page.
 import { effect, useSignal } from "@preact/signals";
+import { Fragment } from "preact";
 import { useEffect, useMemo } from "preact/hooks";
 import type { ForgeItemDetail, ForgeLabel, LineageEstimate } from "../protocol/generated";
 import type { Store } from "../model/store";
@@ -18,6 +19,7 @@ import {
 import { newSessionProjects } from "../model/projects";
 import { orderedFolders } from "./Sidebar";
 import { lineageUrl } from "../model/lineage";
+import { type PipelineStep, pipelineDepth, pipelineSteps } from "../model/pipeline";
 import { nodeName } from "../model/value";
 import { actualWords, estimateLine, estimateRangeWords, estimateSpentWords, showsEstimate } from "../model/estimate";
 import { ago } from "../model/connectorSetup";
@@ -176,6 +178,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
   const forgeProblem = useSignal<string | null>(null);
   const older = useSignal(false);
   const estimate = useSignal<LineageEstimate | null>(null);
+  const pipeline = useSignal<PipelineStep[]>([]);
   const forgeHosts = store.hosts.value.filter((h) => hostAnswers(h.state) && store.has(h.id, Capability.forge1));
   const lineageHosts = store.hosts.value.filter((h) => hostAnswers(h.state) && store.has(h.id, Capability.lineage1));
   // Lineage from the machine that read the forge, else this Mac, else the first that keeps links.
@@ -213,6 +216,15 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
     return () => { current = false; };
   }, [kind, ref, lineageHost, isIssue, isOpen, asked.value]);
   const actual = estimate.value && !isOpen ? actualWords(estimate.value) : undefined;
+  // The outer loop in reach (#3588): its releases, CI runs, deploys and health, and what it came from.
+  useEffect(() => {
+    let current = true;
+    pipeline.value = [];
+    if (!lineageHost || kind === "milestone") return;
+    void store.link.call("lineage/walk", { node, depth: pipelineDepth }, lineageHost)
+      .then((g) => { if (current) pipeline.value = pipelineSteps(node, g); }, () => {});
+    return () => { current = false; };
+  }, [kind, ref, lineageHost, asked.value]);
 
   // The item again after a write (#3130), from the machine that read it, keeping the page until it comes.
   const reread = async () => {
@@ -279,6 +291,11 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
             {[estimateLine(estimate.value), estimateSpentWords(estimate.value)].filter(Boolean).join(" · ")}</p>
         )}
         {actual && <p class="quiet small work-estimate">{actual}</p>}
+        {pipeline.value.length > 0 && (
+          <p class="small work-pipeline">{pipeline.value.map((s, i) => (
+            <Fragment key={i}>{i > 0 && " · "}{s.url ? <a href={s.url} target="_blank" rel="noopener noreferrer">{s.words}</a> : <span class="quiet">{s.words}</span>}</Fragment>
+          ))}</p>
+        )}
         {(checks || review) && <p class="small">{[checks, review].filter(Boolean).join(" · ")}</p>}
         {writes && detail.value && <WorkActions store={store} host={detail.value.host} detail={detail.value.got} wrote={() => void reread()} />}
       </header>

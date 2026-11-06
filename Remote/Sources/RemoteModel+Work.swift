@@ -64,9 +64,9 @@ extension RemoteModel {
         return try await controlPlane.call(DaemonAPI.Method.reportsNodes, query, returning: DaemonAPI.ReportNodes.self)
     }
 
-    func lineageWalk(_ node: DaemonAPI.LineageNode, on host: MachineRef) async throws -> DaemonAPI.LineageGraph {
+    func lineageWalk(_ node: DaemonAPI.LineageNode, depth: Int, on host: MachineRef) async throws -> DaemonAPI.LineageGraph {
         try await workClient(host).call(DaemonAPI.Method.lineageWalk,
-                                        DaemonAPI.LineageNodeRequest(node: node, depth: LineageList.depth),
+                                        DaemonAPI.LineageNodeRequest(node: node, depth: depth),
                                         returning: DaemonAPI.LineageGraph.self)
     }
 

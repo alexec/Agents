@@ -21,6 +21,7 @@ struct WorkItemPage: View {
     @State private var olderLoading = false
     @State private var estimate: DaemonAPI.LineageEstimate?
     @State private var estimateRange = false
+    @State private var pipeline: [Pipeline.Step] = []
     @State private var asked = 0
 
     private var node: DaemonAPI.LineageNode { place.node ?? .init(kind: place.kind.rawValue, ref: "") }
@@ -68,6 +69,9 @@ struct WorkItemPage: View {
         #endif
         .workTask(id: asked) { await loadForge() }
         .workTask(id: estimateAsk) { await loadEstimate() }
+        #if os(macOS)
+        .workTask(id: pipelineAsk) { await loadPipeline() }
+        #endif
     }
 
     private struct LineageAsk: Equatable {
@@ -79,6 +83,13 @@ struct WorkItemPage: View {
     /// closed one's as it was when its work started, against what it took (#3561).
     private var estimateAsk: LineageAsk? {
         guard let item = detail?.got.item, item.node.kind == "issue" else { return nil }
+        return LineageAsk(host: lineageHost, asked: asked)
+    }
+
+    /// The outer loop in reach of an issue, a PR or a release (#3588), from the machine that keeps
+    /// its links: Mac + web, so not on the Remote (#2796).
+    private var pipelineAsk: LineageAsk? {
+        guard [.issue, .pr, .release].contains(place.kind), !node.ref.isEmpty else { return nil }
         return LineageAsk(host: lineageHost, asked: asked)
     }
 
@@ -133,6 +144,9 @@ struct WorkItemPage: View {
                     .textSelection(.enabled)
                 #endif
             }
+            #if os(macOS)
+            if !pipeline.isEmpty { pipelineLine }
+            #endif
             if let item, item.node.kind == "pr" {
                 let words = [WorkList.checksWords(detail?.got.checks, summary: item.checks), WorkList.reviewWords(item.review)]
                     .compactMap { $0 }
@@ -160,6 +174,18 @@ struct WorkItemPage: View {
         #else
         line.textSelection(.enabled).help(range ?? "")
         #endif
+    }
+
+    /// "Release v1.2.0 · CI run · TestFlight 42 · Sentry issue 4321", each a link out (#3588).
+    private var pipelineLine: some View {
+        var line = AttributedString()
+        for (i, step) in pipeline.enumerated() {
+            if i > 0 { line += AttributedString(" · ") }
+            var words = AttributedString(step.words)
+            words.link = step.url
+            line += words
+        }
+        return Text(line).appText(.supporting).foregroundStyle(.secondary).monospacedDigit()
     }
 
     @ViewBuilder
@@ -298,6 +324,15 @@ struct WorkItemPage: View {
         } catch {
             forgeProblem = error.localizedDescription
         }
+    }
+
+    private func loadPipeline() async {
+        let mine = pipelineAsk
+        pipeline = []
+        guard let mine, let host = mine.host,
+              let graph = try? await model.lineageWalk(node, depth: Pipeline.depth, on: host) else { return }
+        guard pipelineAsk == mine else { return }
+        pipeline = Pipeline.steps(of: node, in: graph)
     }
 
     private func loadEstimate() async {
