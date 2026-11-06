@@ -1,5 +1,8 @@
 # Research: Remote Works Away From Home
 
+> **Replaced (#3390, #3576).** The relay is removed: see the note at the top of
+> [spec.md](spec.md). This page is kept as a record only.
+
 Each finding says what it decides. 005's research §1–§3 is not repeated: there is still no
 first-party way to open a socket between two of a person's devices across the internet, and
 CloudKit's private database is still the channel. What is new is what the tree now has, and what

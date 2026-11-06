@@ -562,13 +562,9 @@ export type AllowanceStateStatus =
   | { rateLimited: { until: WireDate } }
   | { out: { until?: WireDate; retryAfter?: WireDate; why: AllowanceStateOutReason } };
 
-/**
- * What devices/announce answers: the device's record, with the Mac's relay key beside it when a
- * bridge has registered one (046).
- */
+/** What devices/announce answers: the device's record. */
 export interface AnnounceReply {
   device: Device;
-  macKey?: Base64;
 }
 
 export interface AnswerElicitationRequest {
@@ -2581,7 +2577,6 @@ export interface ControlStatus {
   machineID: string;
   startedAt?: WireDate;
   port?: number;
-  awayFromHome?: boolean;
   you?: UUID;
   web?: WebRemoteStatus;
   /**
@@ -6560,11 +6555,9 @@ export interface PagesChangedNotification {
 }
 
 /**
- * devices/startPairing: the Mac's relay key, a one-time secret and this Mac's name, good for five
- * minutes or one device.
+ * devices/startPairing: a one-time secret and this Mac's name, good for five minutes or one device.
  */
 export interface PairingCode {
-  macKey: Base64;
   secret: Base64;
   name: string;
   expires: WireDate;
@@ -8021,11 +8014,6 @@ export interface RelayOffer {
   socketPath: string;
   caCertificate: string;
   standIn: string;
-}
-
-/** relay/register: the public half of the Mac's relay key, X9.63. */
-export interface RelayRegistration {
-  publicKey: Base64;
 }
 
 /**
@@ -12082,7 +12070,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AllowanceReading: { required: ["spent", "nearlySpent", "at"], optional: ["window", "used", "resetsAt"] },
   AllowanceState: { required: ["credentialKey", "entryID", "status", "since", "changedAt", "learnedFrom", "spent", "rateLimitStreak"], optional: ["lastRateLimit", "reading", "weeks", "modelsOut"] },
   AllowanceStateModelOut: { required: ["model", "since", "retryAfter"], optional: ["name"] },
-  AnnounceReply: { required: ["device"], optional: ["macKey"] },
+  AnnounceReply: { required: ["device"], optional: [] },
   AnswerElicitationRequest: { required: ["requestID", "action", "content"], optional: ["sendID"] },
   AnswerRequest: { required: ["permissionID", "optionID"], optional: ["sendID"] },
   AnswerSandboxRequest: { required: ["agentID", "carryOn"], optional: [] },
@@ -12247,7 +12235,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ControlPerson: { required: ["id", "name", "role"], optional: ["localOwner"] },
   ControlPush: { required: ["sealed"], optional: [] },
   ControlPushItem: { required: ["needID", "alert"], optional: ["headline"] },
-  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "web", "publicWeb", "publicViews", "thisMacHost", "folderDetection", "unjoinedTunnels", "capabilities", "required", "person", "joinCommand"] },
+  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "you", "web", "publicWeb", "publicViews", "thisMacHost", "folderDetection", "unjoinedTunnels", "capabilities", "required", "person", "joinCommand"] },
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },
   CostState: { required: ["limits", "today", "day", "tokensToday"], optional: ["note", "organisation", "setBy"] },
@@ -12609,7 +12597,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   OrgRoutesLeft: { required: ["host", "name", "user", "routes"], optional: [] },
   OrgRoutesMine: { required: ["routes"], optional: [] },
   PagesChangedNotification: { required: ["folder", "folders"], optional: [] },
-  PairingCode: { required: ["macKey", "secret", "name", "expires"], optional: [] },
+  PairingCode: { required: ["secret", "name", "expires"], optional: [] },
   PairingSecret: { required: [], optional: ["secret", "expires"] },
   PassThroughName: { required: ["name"], optional: ["runtime", "setBy"] },
   PassThroughState: { required: ["names"], optional: [] },
@@ -12756,7 +12744,6 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RelayGrantReply: { required: ["runtime", "caCertificate", "standIn"], optional: [] },
   RelayGrantRequest: { required: ["runtime"], optional: [] },
   RelayOffer: { required: ["runtime", "socketPath", "caCertificate", "standIn"], optional: [] },
-  RelayRegistration: { required: ["publicKey"], optional: [] },
   RelayTokens: { required: ["input", "output", "cacheRead", "cacheWrite"], optional: [] },
   RememberedOptionsRequest: { required: ["runtimeID", "cwd"], optional: [] },
   RemovalCheck: { required: ["blockedBy", "uncommitted", "unmerged"], optional: [] },

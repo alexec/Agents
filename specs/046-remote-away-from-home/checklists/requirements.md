@@ -1,5 +1,8 @@
 # Specification Quality Checklist: Remote Works Away From Home
 
+> **Replaced (#3390, #3576).** The relay is removed: see the note at the top of
+> [spec.md](../spec.md). This page is kept as a record only.
+
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-09-25
 **Feature**: [spec.md](../spec.md)

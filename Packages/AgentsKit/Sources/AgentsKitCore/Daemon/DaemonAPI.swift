@@ -123,7 +123,6 @@ public enum DaemonAPI {
         /// The bridge handing the daemon the public half of the Mac's relay key, so a device
         /// announcing on the direct link is given it (046, R4). Said once per connection,
         /// right after `mailbox/carry`.
-        public static let relayRegister = "relay/register"
         public static let agentsStart = "agents/start"
         public static let agentsSetLabels = "agents/setLabels"
         public static let agentsLabelVocabulary = "agents/labelVocabulary"
@@ -3841,38 +3840,34 @@ public enum DaemonAPI {
 
     /// What the Mac shows as a QR code, and what the phone reads from it.
     public struct PairingCode: Codable, Sendable, Hashable {
-        /// The Mac's relay key, X9.63. The phone keeps this one and no other.
-        public var macKey: Data
         /// Thirty-two random bytes, good once.
         public var secret: Data
         /// This Mac's name, as the bridge advertises it on Bonjour.
         public var name: String
         public var expires: Date
 
-        public init(macKey: Data, secret: Data, name: String, expires: Date) {
-            self.macKey = macKey
+        public init(secret: Data, name: String, expires: Date) {
             self.secret = secret
             self.name = name
             self.expires = expires
         }
 
-        /// The text in the QR code: `agents-pair:1:<key>:<secret>:<name>`, the key and the
-        /// secret in base64url and the name percent-encoded.
+        /// The text in the QR code: `agents-pair:2:<secret>:<name>`, the secret in base64url
+        /// and the name percent-encoded.
         public var text: String {
             let name = name.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""
-            return "agents-pair:1:\(Self.base64url(macKey)):\(Self.base64url(secret)):\(name)"
+            return "agents-pair:2:\(Self.base64url(secret)):\(name)"
         }
 
         /// A code read back from a QR code's text, without its expiry: the phone does not
         /// know it and does not need to, the Mac refuses a code it has let go.
         public init?(text: String) {
             let parts = text.split(separator: ":", omittingEmptySubsequences: false).map(String.init)
-            guard parts.count == 5, parts[0] == "agents-pair", parts[1] == "1",
-                  let key = Self.data(base64url: parts[2]), key.count == 65, key.first == 0x04,
-                  let secret = Self.data(base64url: parts[3]), secret.count == 32,
-                  let name = parts[4].removingPercentEncoding
+            guard parts.count == 4, parts[0] == "agents-pair", parts[1] == "2",
+                  let secret = Self.data(base64url: parts[2]), secret.count == 32,
+                  let name = parts[3].removingPercentEncoding
             else { return nil }
-            self.init(macKey: key, secret: secret, name: name, expires: .distantFuture)
+            self.init(secret: secret, name: name, expires: .distantFuture)
         }
 
         static func base64url(_ data: Data) -> String {
@@ -3936,39 +3931,22 @@ public enum DaemonAPI {
         public init(id: UUID) { self.id = id }
     }
 
-    /// `relay/register`: the public half of the Mac's relay key, X9.63.
-    public struct RelayRegistration: Codable, Sendable {
-        public var publicKey: Data
-        public init(publicKey: Data) { self.publicKey = publicKey }
-    }
-
-    /// What `devices/announce` answers: the device's record, as it always was, with the
-    /// Mac's relay key beside its fields when a bridge has registered one (046). The one
-    /// object is both, so a phone from before 046 decodes the record and keeps `macKey`
-    /// among the fields it does not know. Kept past the #58 cut-off: the flat shape is
-    /// the protocol now, and the bridge path it travels is 058 T106/T042's to replace.
+    /// What `devices/announce` answers: the device's record, as it always was. The one
+    /// object is the record's own fields, flat. Kept past the #58 cut-off: the flat shape
+    /// is the protocol now.
     public struct AnnounceReply: Codable, Sendable, Hashable {
         public var device: Device
-        public var macKey: Data?
 
-        public init(device: Device, macKey: Data?) {
+        public init(device: Device) {
             self.device = device
-            self.macKey = macKey
         }
 
-        private enum CodingKeys: String, CodingKey { case macKey }
-
         public init(from decoder: any Decoder) throws {
-            var device = try Device(from: decoder)
-            device.unknownFields.removeValue(forKey: CodingKeys.macKey.stringValue)
-            self.device = device
-            macKey = try decoder.container(keyedBy: CodingKeys.self).decodeIfPresent(Data.self, forKey: .macKey)
+            device = try Device(from: decoder)
         }
 
         public func encode(to encoder: any Encoder) throws {
             try device.encode(to: encoder)
-            var c = encoder.container(keyedBy: CodingKeys.self)
-            try c.encodeIfPresent(macKey, forKey: .macKey)
         }
     }
 

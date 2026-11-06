@@ -19,8 +19,8 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Pairing (021 US5, 046), as DaemonCore+Devices: the paired devices in devices.json, the
-// Mac's relay key in relay.json, and the one pairing code the Mac is showing. A device
+// Pairing (021 US5, 046), as DaemonCore+Devices: the paired devices in devices.json and the
+// one pairing code the Mac is showing. A device
 // not yet on record is taken only from a connection the bridge bound to a pairing phone
 // while that code is good, or from a device's channel the control plane opened (it paired
 // the device there, #232). Only a Mac host serves these (devices_darwin.go); the binding is
@@ -91,7 +91,6 @@ func (r deviceRecord) MarshalJSON() ([]byte, error) {
 }
 
 func (d *Daemon) devicesFile() string { return filepath.Join(d.Store.Loc.Root, "devices.json") }
-func (d *Daemon) relayFile() string   { return filepath.Join(d.Store.Loc.Root, "relay.json") }
 
 // loadDevices is DeviceStore.load: no file is no devices, a file that is not a list is
 // set aside, a bad record costs that record only, and one id is one device.
@@ -253,7 +252,7 @@ func (d *Daemon) announce(c *Client, a wire.DeviceAnnouncement) (wire.AnnounceRe
 	if i < 0 {
 		safe.Go("reconsider", d.reconsider)
 	}
-	return wire.AnnounceReply{Device: r.Device, MacKey: d.relayKey()}, nil
+	return wire.AnnounceReply{Device: r.Device}, nil
 }
 
 // forgetDevice is devices/forget: the Mac's window only. Its connections are closed too,
@@ -305,15 +304,11 @@ func (d *Daemon) refuseDevice(c *Client, method string) error {
 func (d *Daemon) startPairing() (wire.PairingCode, error) {
 	d.devMu.Lock()
 	defer d.devMu.Unlock()
-	key := d.relayKey()
-	if key == nil {
-		return wire.PairingCode{}, &Error{Code: wire.FailureNotAllowed, Message: "The phone bridge isn't running, so there is nothing for a phone to pair with."}
-	}
 	secret := make([]byte, 32)
 	if _, err := rand.Read(secret); err != nil {
 		return wire.PairingCode{}, err
 	}
-	code := wire.PairingCode{MacKey: key, Secret: secret, Name: macName(), Expires: wire.DateOf(nowFunc().Add(pairingLifetime))}
+	code := wire.PairingCode{Secret: secret, Name: macName(), Expires: wire.DateOf(nowFunc().Add(pairingLifetime))}
 	d.devPairing = &code
 	Broadcast(d, wire.NotifyPairingChanged, wire.Empty{})
 	return code, nil
@@ -336,36 +331,6 @@ func (d *Daemon) currentPairing() wire.PairingSecret {
 	}
 	e := d.devPairing.Expires
 	return wire.PairingSecret{Secret: d.devPairing.Secret, Expires: &e}
-}
-
-// relayKey is the public half of the Mac's relay key, if a bridge has registered one.
-func (d *Daemon) relayKey() wire.Data {
-	b, err := os.ReadFile(d.relayFile())
-	if err != nil {
-		return nil
-	}
-	var r wire.RelayRegistration
-	if json.Unmarshal(b, &r) != nil || len(r.PublicKey) == 0 {
-		return nil
-	}
-	return r.PublicKey
-}
-
-// registerRelayKey is relay/register: an uncompressed P256 point, or refused.
-func (d *Daemon) registerRelayKey(key wire.Data) error {
-	if len(key) != 65 || key[0] != 0x04 {
-		return Invalid("A relay key is an uncompressed P256 public key, 65 bytes.")
-	}
-	d.devMu.Lock()
-	defer d.devMu.Unlock()
-	if bytes.Equal(d.relayKey(), key) {
-		return nil
-	}
-	b, err := storeJSON(wire.RelayRegistration{PublicKey: key})
-	if err == nil {
-		err = store.WriteAtomically(d.relayFile(), b, 0o644)
-	}
-	return err
 }
 
 // serveDevices registers the methods; devices_darwin.go calls it.
@@ -399,11 +364,5 @@ func (d *Daemon) serveDevices() {
 			return wire.PairingSecret{}, err
 		}
 		return d.currentPairing(), nil
-	})
-	On(d, wire.CallRelayRegister, func(_ context.Context, c *Client, r wire.RelayRegistration) (wire.Empty, error) {
-		if err := d.refuseDevice(c, wire.CallRelayRegister.Name); err != nil {
-			return wire.Empty{}, err
-		}
-		return wire.Empty{}, d.registerRelayKey(r.PublicKey)
 	})
 }

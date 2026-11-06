@@ -250,7 +250,6 @@ var CallProvidersKeepSecrets = Method[ProviderSecretsKeep, ProviderCarried]{"pro
 var CallProvidersSSH = Method[ProviderSSH, ProviderCarried]{"providers/ssh"}
 var CallRelayGrant = Method[RelayGrantRequest, RelayGrantReply]{"relay/grant"}
 var CallRelayOffer = Method[RelayOffer, Empty]{"relay/offer"}
-var CallRelayRegister = Method[RelayRegistration, Empty]{"relay/register"}
 var CallReportsFeatures = Method[Empty, FeatureUsage]{"reports/features"}
 var CallResourcesDeclare = Method[DeclareResourceRequest, LeaseSnapshot]{"resources/declare"}
 var CallResourcesEnd = Method[PersonEndRequest, LeaseSnapshot]{"resources/end"}

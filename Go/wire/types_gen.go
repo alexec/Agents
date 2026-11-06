@@ -603,11 +603,9 @@ type AllowanceStateStatusOut struct {
 	Why AllowanceStateOutReason `json:"why"`
 }
 
-// What devices/announce answers: the device's record, with the Mac's relay key beside it when a bridge has registered one (046).
+// What devices/announce answers: the device's record.
 type AnnounceReply struct {
 	Device Device `json:"device"`
-
-	MacKey Data `json:"macKey,omitzero"`
 }
 
 type AnswerElicitationRequest struct {
@@ -2960,8 +2958,6 @@ type ControlStatus struct {
 	StartedAt *Date `json:"startedAt,omitzero"`
 
 	Port *int64 `json:"port,omitzero"`
-
-	AwayFromHome *bool `json:"awayFromHome,omitzero"`
 
 	You *UUID `json:"you,omitzero"`
 
@@ -7574,10 +7570,8 @@ type PagesChangedNotification struct {
 	Folders []string `json:"folders"`
 }
 
-// devices/startPairing: the Mac's relay key, a one-time secret and this Mac's name, good for five minutes or one device.
+// devices/startPairing: a one-time secret and this Mac's name, good for five minutes or one device.
 type PairingCode struct {
-	MacKey Data `json:"macKey"`
-
 	Secret Data `json:"secret"`
 
 	Name string `json:"name"`
@@ -9178,11 +9172,6 @@ type RelayOffer struct {
 	CaCertificate string `json:"caCertificate"`
 
 	StandIn string `json:"standIn"`
-}
-
-// relay/register: the public half of the Mac's relay key, X9.63.
-type RelayRegistration struct {
-	PublicKey Data `json:"publicKey"`
 }
 
 // The tokens the machine's model relay counted from the provider's own answers (#999, FR-019): fresh input, output, and cache reads and writes.

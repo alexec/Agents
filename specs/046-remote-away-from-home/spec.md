@@ -1,10 +1,16 @@
 # Feature Specification: Remote Works Away From Home
 
+> **Replaced (#3390, #3576).** The relay that this spec describes is removed. Phones now
+> connect directly to a control plane in the cloud, and the control plane sends notices
+> through APNs. This spec is kept as a record only. Its relay contract
+> (`contracts/relay.md`) is removed, and the daemon's relay key, `relay/register` and the
+> `macKey` fields are removed from the wire.
+
 **Feature Branch**: `agents/ios-works-when-not`
 
 **Created**: 2026-09-25
 
-**Status**: Draft
+**Status**: Replaced by #3390
 
 **Input**: User description: "Remote works away from home (CloudKit relayed link). The phone/iPad keeps working on any network. On the same Wi‑Fi it uses the direct link as it does today. Otherwise it switches to a relayed link through the person's iCloud private database, and switches back when the direct link returns, without the person doing anything. Pairing happens once, on the same network. Every message is sealed to its recipient, so iCloud sees only ciphertext. Degraded on purpose: a round trip takes about 1–3 s. Works away: project list, agent list, chat read and send, questions and permissions, start agent, stop/archive, events list. Not away: terminal, live page, typing into shells, large file browsing. An always-visible 'Away — slower' indicator."
 

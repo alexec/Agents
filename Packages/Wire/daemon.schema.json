@@ -1209,13 +1209,10 @@
     },
     "AnnounceReply": {
       "type": "object",
-      "description": "What devices/announce answers: the device's record, with the Mac's relay key beside it when a bridge has registered one (046).",
+      "description": "What devices/announce answers: the device's record.",
       "properties": {
         "device": {
           "$ref": "#/definitions/Device"
-        },
-        "macKey": {
-          "$ref": "#/definitions/Base64"
         }
       },
       "required": [
@@ -6196,9 +6193,6 @@
         },
         "port": {
           "type": "integer"
-        },
-        "awayFromHome": {
-          "type": "boolean"
         },
         "you": {
           "$ref": "#/definitions/UUID"
@@ -16923,11 +16917,8 @@
     },
     "PairingCode": {
       "type": "object",
-      "description": "devices/startPairing: the Mac's relay key, a one-time secret and this Mac's name, good for five minutes or one device.",
+      "description": "devices/startPairing: a one-time secret and this Mac's name, good for five minutes or one device.",
       "properties": {
-        "macKey": {
-          "$ref": "#/definitions/Base64"
-        },
         "secret": {
           "$ref": "#/definitions/Base64"
         },
@@ -16939,7 +16930,6 @@
         }
       },
       "required": [
-        "macKey",
         "secret",
         "name",
         "expires"
@@ -20542,19 +20532,6 @@
         "socketPath",
         "caCertificate",
         "standIn"
-      ],
-      "additionalProperties": false
-    },
-    "RelayRegistration": {
-      "type": "object",
-      "description": "relay/register: the public half of the Mac's relay key, X9.63.",
-      "properties": {
-        "publicKey": {
-          "$ref": "#/definitions/Base64"
-        }
-      },
-      "required": [
-        "publicKey"
       ],
       "additionalProperties": false
     },

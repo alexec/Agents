@@ -1,5 +1,8 @@
 # 046 walk
 
+> **Replaced (#3390, #3576).** The relay is removed: see the note at the top of
+> [spec.md](../spec.md). This page is kept as a record only.
+
 ## Done here, on 2026-09-25
 
 - **Kit suites**: 51 relay tests across 8 suites, all green. They cover sealing, order,

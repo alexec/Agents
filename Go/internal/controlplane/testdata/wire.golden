@@ -6,7 +6,6 @@ control/status
   "machineID": "MACHINE-1",
   "startedAt": <date>,
   "port": <port>,
-  "awayFromHome": false,
   "you": "<UUID>",
   "folderDetection": {
     "enabled": true,
@@ -223,7 +222,6 @@ control/status
   "machineID": "MACHINE-1",
   "startedAt": <date>,
   "port": <port>,
-  "awayFromHome": false,
   "you": "<UUID>",
   "folderDetection": {
     "enabled": true,
