@@ -104,7 +104,7 @@ func TestBrowserStateBeforeTheDownload(t *testing.T) {
 	}
 	// The sites say where the person signed in, and Clear signs agents out: the person's
 	// own clients only.
-	for _, role := range []Role{RoleAgent, RoleHostApp, RoleWindow, RoleStranger, RolePairing} {
+	for _, role := range []Role{RoleAgent, RoleHostApp, RoleWindow, RoleStranger} {
 		for _, m := range []string{"browser/state", "browser/clear"} {
 			if role.Allows(m) {
 				t.Fatalf("the %s role may call %s", role, m)

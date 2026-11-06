@@ -83,7 +83,7 @@ func (d *Daemon) countFeature(method, client string) {
 }
 
 // countCall counts a socket call that was answered, as the client its connection is.
-// A stranger's and a pairing phone's calls are not a feature anyone chose.
+// A stranger's calls are not a feature anyone chose.
 func (d *Daemon) countCall(c *Client, method string) {
 	if _, served := d.handlers[method]; served {
 		d.countFeature(method, d.featureClient(c))

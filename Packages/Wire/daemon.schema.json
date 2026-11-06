@@ -6875,9 +6875,6 @@
       "properties": {
         "id": {
           "$ref": "#/definitions/UUID"
-        },
-        "pairing": {
-          "type": "boolean"
         }
       },
       "required": [],
@@ -16963,40 +16960,6 @@
         "folder",
         "folders"
       ],
-      "additionalProperties": false
-    },
-    "PairingCode": {
-      "type": "object",
-      "description": "devices/startPairing: a one-time secret and this Mac's name, good for five minutes or one device.",
-      "properties": {
-        "secret": {
-          "$ref": "#/definitions/Base64"
-        },
-        "name": {
-          "type": "string"
-        },
-        "expires": {
-          "$ref": "#/definitions/WireDate"
-        }
-      },
-      "required": [
-        "secret",
-        "name",
-        "expires"
-      ],
-      "additionalProperties": false
-    },
-    "PairingSecret": {
-      "type": "object",
-      "description": "pairing/current: the secret the bridge's listener should take, if any.",
-      "properties": {
-        "secret": {
-          "$ref": "#/definitions/Base64"
-        },
-        "expires": {
-          "$ref": "#/definitions/WireDate"
-        }
-      },
       "additionalProperties": false
     },
     "PassThroughName": {

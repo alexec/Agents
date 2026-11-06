@@ -104,10 +104,10 @@ public final class DaemonServer: @unchecked Sendable {
 
         /// A window's connection becomes a device's, for good. Only a window's may: a
         /// helper or a stranger that could say this would be choosing its own rights.
-        func bindDevice(_ device: UUID?, pairing: Bool = false) -> Bool {
+        func bindDevice(_ device: UUID?) -> Bool {
             lock.lock(); defer { lock.unlock() }
             guard _role == .control else { return false }
-            _role = pairing ? .pairing : .device
+            _role = .device
             if let device {
                 _device = device
                 _surface = .device(device)
@@ -120,7 +120,7 @@ public final class DaemonServer: @unchecked Sendable {
         /// it always could.
         func mayClaim(_ claimed: UUID) -> Bool {
             lock.lock(); defer { lock.unlock() }
-            guard _role == .device || _role == .pairing else { return true }
+            guard _role == .device else { return true }
             if let _device { return _device == claimed }
             _device = claimed
             _surface = .device(claimed)
@@ -306,11 +306,6 @@ public final class DaemonServer: @unchecked Sendable {
             // what only a person may, or a shell asking for anything at all.
             let role = identity.role
             guard role.allows(method) else {
-                // A phone refused is a phone that does less than it did, and the phone's
-                // own screen is the only other place that would say so.
-                if role == .pairing {
-                    self.sayOnce("socket: refused \(method) to a \(role.rawValue) connection")
-                }
                 return .failure(JSONRPCError(code: DaemonAPI.Failure.notPermitted,
                                              message: "\(method) is not open to this connection (\(role.rawValue))."))
             }
@@ -318,14 +313,12 @@ public final class DaemonServer: @unchecked Sendable {
             // alone: the daemon never hears it, only the rights that follow from it.
             if method == DaemonAPI.Method.connectionBindDevice {
                 let binding = (try? params?.decode(DaemonAPI.DeviceBinding.self)) ?? DaemonAPI.DeviceBinding(id: nil)
-                guard identity.bindDevice(binding.id, pairing: binding.pairing == true) else {
+                guard identity.bindDevice(binding.id) else {
                     return .failure(JSONRPCError(code: DaemonAPI.Failure.notPermitted,
                                                  message: "Only a window's connection can be given to a device."))
                 }
-                DaemonLog.shared.write(binding.pairing == true
-                    ? "socket: a connection now carries a device that is pairing"
-                    : "socket: a connection now carries device \(binding.id?.uuidString ?? "(not yet named)")")
-                if binding.pairing != true { self.tellMoved(identity.id) }
+                DaemonLog.shared.write("socket: a connection now carries device \(binding.id?.uuidString ?? "(not yet named)")")
+                self.tellMoved(identity.id)
                 return .success([:])
             }
             // A device naming itself, by saying which it is or announcing its key. On a
