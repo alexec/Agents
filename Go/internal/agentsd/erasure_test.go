@@ -52,12 +52,12 @@ func TestDeleteLeavesNoRuntimeSessionFile(t *testing.T) {
 	session := "5b0f6a1e-1c2d-4e3f-8a9b-0c1d2e3f4a5b"
 	a := archivedWithSession(t, d, dir, session)
 	theirs := []string{
-		filepath.Join(claude, "folders", "-w", session+".jsonl"),
-		filepath.Join(claude, "folders", "-w", session, "subagents", "agent-1.jsonl"),
+		filepath.Join(claude, "projects", "-w", session+".jsonl"),
+		filepath.Join(claude, "projects", "-w", session, "subagents", "agent-1.jsonl"),
 		filepath.Join(claude, "todos", session+"-agent-"+session+".json"),
 		filepath.Join(claude, "file-history", session, "a.txt"),
 	}
-	other := filepath.Join(claude, "folders", "-w", "another-session.jsonl")
+	other := filepath.Join(claude, "projects", "-w", "another-session.jsonl")
 	for _, f := range append(theirs, other) {
 		writeFile(t, f, "{}\n")
 	}
@@ -69,7 +69,7 @@ func TestDeleteLeavesNoRuntimeSessionFile(t *testing.T) {
 			t.Errorf("left behind: %s (%v)", f, err)
 		}
 	}
-	if _, err := os.Stat(filepath.Join(claude, "folders", "-w", session)); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(claude, "projects", "-w", session)); !os.IsNotExist(err) {
 		t.Error("the session's folder is left")
 	}
 	if _, err := os.Stat(other); err != nil {
@@ -109,6 +109,31 @@ func TestCodexFilesGoWithoutTheRuntime(t *testing.T) {
 	}
 	if known, _ := eraseRuntimeFiles("grok", session, nil); known {
 		t.Fatal("grok's layout is not known")
+	}
+}
+
+// Claude's transcript is in projects/<slug>/ of the home its launch names, and goes
+// without the runtime (#3625).
+func TestClaudeTranscriptGoesWithoutTheRuntime(t *testing.T) {
+	home := t.TempDir()
+	session := "5b0f6a1e-1c2d-4e3f-8a9b-0c1d2e3f4a5b"
+	transcript := filepath.Join(home, "projects", "-Users-me-work", session+".jsonl")
+	subagent := filepath.Join(home, "projects", "-Users-me-work", session, "subagents", "agent-1.jsonl")
+	other := filepath.Join(home, "projects", "-Users-me-work", "6c1f7b2f-2d3e-4f40-9bac-1d2e3f4a5b6c.jsonl")
+	for _, f := range []string{transcript, subagent, other} {
+		writeFile(t, f, "{}\n")
+	}
+	known, removed := eraseRuntimeFiles("claude", session, []string{"HOME=/nowhere", "CLAUDE_CONFIG_DIR=" + home})
+	if !known || removed != 2 {
+		t.Fatalf("known %v, removed %d", known, removed)
+	}
+	for _, f := range []string{transcript, filepath.Dir(filepath.Dir(subagent))} {
+		if _, err := os.Stat(f); !os.IsNotExist(err) {
+			t.Errorf("left behind: %s (%v)", f, err)
+		}
+	}
+	if _, err := os.Stat(other); err != nil {
+		t.Errorf("another session's transcript went: %v", err)
 	}
 }
 

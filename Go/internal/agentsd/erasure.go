@@ -367,9 +367,11 @@ func eraseRuntimeFiles(runtimeID, sessionID string, env []string) (known bool, r
 	switch runtimeID {
 	case "claude":
 		home := envHome(env, "CLAUDE_CONFIG_DIR", ".claude")
+		// "projects" is Claude's own folder name, not our term: a rename of ours does not
+		// change it (#3625).
 		patterns = []string{
-			filepath.Join(home, "folders", "*", sessionID+".jsonl"),
-			filepath.Join(home, "folders", "*", sessionID),
+			filepath.Join(home, "projects", "*", sessionID+".jsonl"),
+			filepath.Join(home, "projects", "*", sessionID),
 			filepath.Join(home, "todos", sessionID+"-*.json"),
 			filepath.Join(home, "file-history", sessionID),
 			filepath.Join(home, "session-env", sessionID),
