@@ -136,7 +136,7 @@ Agents starts these tools. It does not own what they keep.
 | `~/.claude/todos`, `file-history`, `session-env`, `debug` | Claude's files for each session | Erased when the agent is deleted |
 | `~/.codex/sessions/` (or `CODEX_HOME`) | Codex's copy of each conversation | Erased when the agent is deleted |
 | `~/.grok/sessions/`, `~/.copilot/session-state/`, `~/.cursor/acp-sessions/`, and Antigravity's `conversations/` and `brain/` in its own home | Grok's, Copilot's, Cursor's and Antigravity's copy of each conversation | Erased when the agent is deleted (#3647). Copilot's index, `session-store.db`, keeps the session's row |
-| OpenCode's `opencode.db` | OpenCode's copies, all in one SQLite file | **Not erased**, unless OpenCode can delete a conversation (ACP `session/delete`) |
+| OpenCode's `opencode.db` | OpenCode's copies, all in one SQLite file | **Not erased**, unless OpenCode can delete a conversation (ACP `session/delete`). When it cannot, the Delete confirmation says so on every client (#3669) |
 | `~/.claude/history.jsonl`, Codex's history and indexes | Each runtime's own history | **Not erased** |
 | Docker images and named volumes | What Docker workspaces pulled and kept | **Not removed.** Removing a workspace removes its container. |
 | DigitalOcean, Codespaces, EC2 and GCP machines | Cloud machines | **No limit in count or time, and no stop when idle.** Only **Delete Machine** removes one. |
@@ -263,7 +263,8 @@ summaries. Then (T8, #1001):
 
 These stay behind:
 
-- the copy of a runtime whose files are not known and that cannot delete a conversation;
+- the copy of a runtime whose files are not known and that cannot delete a conversation
+  (the Delete confirmation says so, #3669);
 - attachments, until the next sweep finds no conversation that names them (only in a
   folder that still has an agent);
 - the agent's events, until they are 7 days old;

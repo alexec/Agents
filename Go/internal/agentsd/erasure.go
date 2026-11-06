@@ -363,6 +363,32 @@ func eraseRuntimeFiles(runtimeID, sessionID string, env []string) (known bool, r
 	if !sessionIDShape.MatchString(sessionID) {
 		return false, 0
 	}
+	patterns := runtimeFilePatterns(runtimeID, sessionID, env)
+	if patterns == nil {
+		return false, 0
+	}
+	for _, p := range patterns {
+		matches, _ := filepath.Glob(p)
+		for _, m := range matches {
+			if err := os.RemoveAll(m); err != nil {
+				log.Printf("erasure: %v", err)
+				continue
+			}
+			removed++
+		}
+	}
+	return true, removed
+}
+
+// keepsCopy is whether Delete leaves the runtime's own copy of a conversation (#3669): its
+// files are not known, and its adapter cannot delete a session.
+func keepsCopy(runtimeID string, canDelete bool) bool {
+	return !canDelete && runtimeFilePatterns(runtimeID, "id", nil) == nil
+}
+
+// runtimeFilePatterns is where the runtime keeps a session's files, in the home env names;
+// nil when its layout is not known.
+func runtimeFilePatterns(runtimeID, sessionID string, env []string) []string {
 	var patterns []string
 	switch runtimeID {
 	case "claude":
@@ -402,20 +428,8 @@ func eraseRuntimeFiles(runtimeID, sessionID string, env []string) (known bool, r
 			filepath.Join(home, "conversations", sessionID+".*"),
 			filepath.Join(home, "brain", sessionID),
 		}
-	default:
-		return false, 0
 	}
-	for _, p := range patterns {
-		matches, _ := filepath.Glob(p)
-		for _, m := range matches {
-			if err := os.RemoveAll(m); err != nil {
-				log.Printf("erasure: %v", err)
-				continue
-			}
-			removed++
-		}
-	}
-	return true, removed
+	return patterns
 }
 
 // envHome is the folder a variable of env names, or the folder under HOME; no variable is
