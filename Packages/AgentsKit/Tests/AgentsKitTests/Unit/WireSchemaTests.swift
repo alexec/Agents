@@ -142,6 +142,31 @@ struct WireSchemaTests {
         #expect(!schema.errors(["sometimes": "x"], against: "SharedReach").isEmpty)
     }
 
+    /// Personas from a marketplace (#3665): what the window reads, written with today's
+    /// encoder, fits the schema the Go host is made from.
+    @Test func personaCatalogFitsTheSchema() throws {
+        let schema = try WireSchema(Self.read("daemon.schema.json"))
+        let result = DaemonAPI.CatalogResult(id: "o/r/personas/reviewer.md", name: "reviewer", owner: "o", repo: "r",
+                                             skillID: "reviewer", installs: 0, known: false,
+                                             marketplace: "provided:anthropic-skills", skillPath: "personas/reviewer.md")
+        let preview = DaemonAPI.PersonaPreview(
+            previewID: UUID(), result: result, path: "personas/reviewer.md", commit: "abc", blobSHA: "def",
+            committedAt: Date(timeIntervalSinceReferenceDate: 0), markdown: "---\nruntime: codex\n---\nReview.",
+            persona: Persona(id: "reviewer", name: "Reviewer", origin: .personal,
+                             settings: WorkflowSettings(permissionMode: "read-only", runtimeID: "codex")),
+            destinationState: .sameSkill(update: true))
+        let update = DaemonAPI.PersonaUpdatePreviewAnswer(
+            preview: preview, installed: "Review.", edited: true,
+            changes: [.init(key: "runtime", old: "claude", new: "codex"), .init(key: "permission-mode", old: nil, new: "read-only")])
+        let managed = DaemonAPI.ManagedPersona(destination: .folder(folder: "/p"), id: "reviewer", source: "o/r",
+                                               path: "personas/reviewer.md", commit: "abc", edited: false,
+                                               update: .available(commit: "def"))
+        #expect(schema.errors(try JSONValue.encoding(update), against: "PersonaUpdatePreviewAnswer") == [])
+        #expect(schema.errors(try JSONValue.encoding(DaemonAPI.PersonaPreviewAnswer(preview: preview)), against: "PersonaPreviewAnswer") == [])
+        #expect(schema.errors(try JSONValue.encoding(DaemonAPI.PersonasManagedAnswer(personas: [managed])), against: "PersonasManagedAnswer") == [])
+        #expect(schema.errors(try JSONValue.encoding(DaemonAPI.PersonaAddAnswer(persona: managed)), against: "PersonaAddAnswer") == [])
+    }
+
     /// The control plane's types (#1313), which the Go control plane now takes from the
     /// schema: a sample of each, with every field set, read with today's decoder and written
     /// with today's encoder, fits the schema and comes back whole, so neither has a field

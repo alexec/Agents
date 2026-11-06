@@ -5935,6 +5935,21 @@ export interface ManagedMCPServer {
   byHand?: boolean;
 }
 
+/**
+ * A persona added from a marketplace (#3665): its file in .agents/personas, where it came from, and
+ * whether it has an update.
+ */
+export interface ManagedPersona {
+  destination: SkillDestination;
+  id: string;
+  source: string;
+  path: string;
+  commit?: string;
+  /** The file no longer has the blob SHA it was added with. */
+  edited: boolean;
+  update: UpdateState;
+}
+
 export interface ManagedSkill {
   destination: SkillDestination;
   name: string;
@@ -6865,6 +6880,10 @@ export interface Persona {
   problem?: string;
 }
 
+export interface PersonaAddAnswer {
+  persona: ManagedPersona;
+}
+
 export interface PersonaFile {
   id: string;
   origin: PersonaOrigin;
@@ -6885,6 +6904,39 @@ export type PersonaOrigin =
   | "folder"
   | "personal";
 
+/** A persona file fetched at one commit, shown whole before it is added (#3665). */
+export interface PersonaPreview {
+  previewID: UUID;
+  result: CatalogResult;
+  path: string;
+  commit: string;
+  blobSHA: string;
+  committedAt?: WireDate;
+  markdown: string;
+  persona: Persona;
+  destinationState: DestinationState;
+}
+
+export interface PersonaPreviewAnswer {
+  preview?: PersonaPreview;
+  error?: CatalogError;
+}
+
+/** A setting an update changes that the person is warned about: runtime or permission-mode. */
+export interface PersonaSettingChange {
+  key: string;
+  old?: string;
+  new?: string;
+}
+
+export interface PersonaUpdatePreviewAnswer {
+  preview: PersonaPreview;
+  /** The file as it is now, for the diff. */
+  installed: string;
+  edited: boolean;
+  changes: PersonaSettingChange[];
+}
+
 export interface PersonasFilesRequest {
   folder?: URLString;
   origin: PersonaOrigin;
@@ -6892,6 +6944,10 @@ export interface PersonasFilesRequest {
 
 export interface PersonasListRequest {
   folder: URLString;
+}
+
+export interface PersonasManagedAnswer {
+  personas: ManagedPersona[];
 }
 
 export interface PinArrangeRequest {
@@ -12655,6 +12711,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineWorkspaceCall: { required: ["agent", "method", "params"], optional: ["deliver"] },
   MachinesSummaryFacts: { required: ["machines"], optional: [] },
   ManagedMCPServer: { required: ["name", "registryName", "version", "run", "addedAt", "destination"], optional: ["byHand"] },
+  ManagedPersona: { required: ["destination", "id", "source", "path", "edited", "update"], optional: ["commit"] },
   ManagedSkill: { required: ["destination", "name", "source", "edited", "update"], optional: ["skillPath", "recordedHash", "commit", "committedAt", "catalogue"] },
   MarkRuntimeAvailable: { required: ["credentialKey"], optional: [] },
   Marketplace: { required: ["id", "name", "format", "url", "tokenMissing", "origin", "enabled"], optional: ["token", "about"] },
@@ -12730,10 +12787,16 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PersonSettings: { required: [], optional: ["name", "pronouns"] },
   PersonSuspended: { required: ["by", "provider", "at"], optional: ["why"] },
   Persona: { required: ["id", "name", "origin", "settings"], optional: ["description", "problem"] },
+  PersonaAddAnswer: { required: ["persona"], optional: [] },
   PersonaFile: { required: ["id", "origin", "content"], optional: [] },
   PersonaFileSaveRequest: { required: ["origin", "id", "content"], optional: ["folder", "delete"] },
+  PersonaPreview: { required: ["previewID", "result", "path", "commit", "blobSHA", "markdown", "persona", "destinationState"], optional: ["committedAt"] },
+  PersonaPreviewAnswer: { required: [], optional: ["preview", "error"] },
+  PersonaSettingChange: { required: ["key"], optional: ["old", "new"] },
+  PersonaUpdatePreviewAnswer: { required: ["preview", "installed", "edited", "changes"], optional: [] },
   PersonasFilesRequest: { required: ["origin"], optional: ["folder"] },
   PersonasListRequest: { required: ["folder"], optional: [] },
+  PersonasManagedAnswer: { required: ["personas"], optional: [] },
   PinArrangeRequest: { required: ["folder", "paths"], optional: [] },
   PinArrangeSessionsRequest: { required: ["folder", "agentIDs"], optional: [] },
   PinArrangeWorkflowsRequest: { required: ["folder", "workflowIDs"], optional: [] },

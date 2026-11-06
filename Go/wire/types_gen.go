@@ -6892,6 +6892,24 @@ type ManagedMCPServer struct {
 	ByHand *bool `json:"byHand,omitzero"`
 }
 
+// A persona added from a marketplace (#3665): its file in .agents/personas, where it came from, and whether it has an update.
+type ManagedPersona struct {
+	Destination SkillDestination `json:"destination"`
+
+	ID string `json:"id"`
+
+	Source string `json:"source"`
+
+	Path string `json:"path"`
+
+	Commit *string `json:"commit,omitzero"`
+
+	// The file no longer has the blob SHA it was added with.
+	Edited bool `json:"edited"`
+
+	Update UpdateState `json:"update"`
+}
+
 type ManagedSkill struct {
 	Destination SkillDestination `json:"destination"`
 
@@ -7934,6 +7952,10 @@ type Persona struct {
 	Problem *string `json:"problem,omitzero"`
 }
 
+type PersonaAddAnswer struct {
+	Persona ManagedPersona `json:"persona"`
+}
+
 type PersonaFile struct {
 	ID string `json:"id"`
 
@@ -7961,6 +7983,53 @@ type PersonaOrigin string
 const PersonaOriginFolder PersonaOrigin = "folder"
 const PersonaOriginPersonal PersonaOrigin = "personal"
 
+// A persona file fetched at one commit, shown whole before it is added (#3665).
+type PersonaPreview struct {
+	PreviewID UUID `json:"previewID"`
+
+	Result CatalogResult `json:"result"`
+
+	Path string `json:"path"`
+
+	Commit string `json:"commit"`
+
+	BlobSHA string `json:"blobSHA"`
+
+	CommittedAt *Date `json:"committedAt,omitzero"`
+
+	Markdown string `json:"markdown"`
+
+	Persona Persona `json:"persona"`
+
+	DestinationState DestinationState `json:"destinationState"`
+}
+
+type PersonaPreviewAnswer struct {
+	Preview *PersonaPreview `json:"preview,omitzero"`
+
+	Error *CatalogError `json:"error,omitzero"`
+}
+
+// A setting an update changes that the person is warned about: runtime or permission-mode.
+type PersonaSettingChange struct {
+	Key string `json:"key"`
+
+	Old *string `json:"old,omitzero"`
+
+	New *string `json:"new,omitzero"`
+}
+
+type PersonaUpdatePreviewAnswer struct {
+	Preview PersonaPreview `json:"preview"`
+
+	// The file as it is now, for the diff.
+	Installed string `json:"installed"`
+
+	Edited bool `json:"edited"`
+
+	Changes []PersonaSettingChange `json:"changes"`
+}
+
 type PersonasFilesRequest struct {
 	Folder *URL `json:"folder,omitzero"`
 
@@ -7969,6 +8038,10 @@ type PersonasFilesRequest struct {
 
 type PersonasListRequest struct {
 	Folder URL `json:"folder"`
+}
+
+type PersonasManagedAnswer struct {
+	Personas []ManagedPersona `json:"personas"`
 }
 
 type PinArrangeRequest struct {

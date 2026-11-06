@@ -4277,6 +4277,80 @@ final class AppModel {
         }
     }
 
+    // MARK: Personas from a marketplace (#3665)
+
+    func personaSearch(_ query: String, marketplace: String?,
+                       destination: DaemonAPI.SkillDestination) async -> DaemonAPI.CatalogSearchAnswer {
+        do {
+            return try await macClient.call(DaemonAPI.Method.personasSearch,
+                                         DaemonAPI.CatalogSearchRequest(query: query, marketplace: marketplace,
+                                                                        destination: destination),
+                                         returning: DaemonAPI.CatalogSearchAnswer.self)
+        } catch {
+            return .init(results: [], error: Self.catalogError(error))
+        }
+    }
+
+    func personaPreview(_ result: DaemonAPI.CatalogResult,
+                        for destination: DaemonAPI.SkillDestination) async -> DaemonAPI.PersonaPreviewAnswer {
+        do {
+            return try await macClient.call(DaemonAPI.Method.personasPreview,
+                                         DaemonAPI.CatalogPreviewRequest(result: result, destination: destination),
+                                         returning: DaemonAPI.PersonaPreviewAnswer.self)
+        } catch {
+            return .init(preview: nil, error: Self.catalogError(error))
+        }
+    }
+
+    func addPersona(_ previewID: UUID, to destination: DaemonAPI.SkillDestination,
+                    replace: Bool) async -> Result<DaemonAPI.ManagedPersona, DaemonAPI.CatalogError> {
+        do {
+            let answer = try await macClient.call(DaemonAPI.Method.personasAdd,
+                                               DaemonAPI.SkillAddRequest(previewID: previewID, destination: destination,
+                                                                         replace: replace),
+                                               returning: DaemonAPI.PersonaAddAnswer.self)
+            return .success(answer.persona)
+        } catch {
+            return .failure(Self.catalogError(error))
+        }
+    }
+
+    /// The personas at a destination that were added from a marketplace.
+    func managedPersonas(at destination: DaemonAPI.SkillDestination) async -> [DaemonAPI.ManagedPersona]? {
+        try? await macClient.call(DaemonAPI.Method.personasManaged, DaemonAPI.SkillsListRequest(destination: destination),
+                               returning: DaemonAPI.PersonasManagedAnswer.self).personas
+    }
+
+    /// Whether each persona added from a marketplace has an update. Nil when it could not be
+    /// asked, so no marks rather than wrong ones.
+    func personaUpdates(at destination: DaemonAPI.SkillDestination) async -> [String: DaemonAPI.UpdateState]? {
+        try? await macClient.call(DaemonAPI.Method.personasCheckUpdates, DaemonAPI.SkillsListRequest(destination: destination),
+                               returning: DaemonAPI.SkillUpdatesAnswer.self).updates
+    }
+
+    func personaUpdatePreview(_ id: String, at destination: DaemonAPI.SkillDestination)
+        async -> Result<DaemonAPI.PersonaUpdatePreviewAnswer, DaemonAPI.CatalogError> {
+        do {
+            return .success(try await macClient.call(DaemonAPI.Method.personasUpdatePreview,
+                                                  DaemonAPI.SkillNameRequest(destination: destination, name: id),
+                                                  returning: DaemonAPI.PersonaUpdatePreviewAnswer.self))
+        } catch {
+            return .failure(Self.catalogError(error))
+        }
+    }
+
+    /// Take out a persona added from a marketplace; its file goes to the Trash.
+    func removePersona(_ id: String, at destination: DaemonAPI.SkillDestination) async -> DaemonAPI.CatalogError? {
+        do {
+            _ = try await macClient.call(DaemonAPI.Method.personasRemove,
+                                      DaemonAPI.SkillNameRequest(destination: destination, name: id),
+                                      returning: DaemonAPI.SkillRemoveAnswer.self)
+            return nil
+        } catch {
+            return Self.catalogError(error)
+        }
+    }
+
     /// The daemon's own reason when it gave one, and "can't reach" the daemon otherwise.
     private static func catalogError(_ error: any Error) -> DaemonAPI.CatalogError {
         if let rpc = error as? JSONRPCError, rpc.code == DaemonAPI.Failure.catalogRefused,
