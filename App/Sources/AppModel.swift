@@ -6035,9 +6035,9 @@ final class AppModel {
     // MARK: Lineage
 
     /// What a node is linked to, on a host (#3087): an epic's plan reads its children's links.
-    func lineageWalk(_ node: DaemonAPI.LineageNode, on host: MachineRef) async throws -> DaemonAPI.LineageGraph {
+    func lineageWalk(_ node: DaemonAPI.LineageNode, depth: Int, on host: MachineRef) async throws -> DaemonAPI.LineageGraph {
         try await client(for: host).call(DaemonAPI.Method.lineageWalk,
-                                         DaemonAPI.LineageNodeRequest(node: node, depth: LineageList.depth),
+                                         DaemonAPI.LineageNodeRequest(node: node, depth: depth),
                                          returning: DaemonAPI.LineageGraph.self)
     }
 

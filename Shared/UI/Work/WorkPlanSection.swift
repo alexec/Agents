@@ -276,7 +276,7 @@ struct WorkPlanSection: View {
                 let node = child.item.node
                 group.addTask {
                     async let cost = model.lineageCost(node, on: lineageHost)
-                    async let walk = try? model.lineageWalk(node, on: lineageHost)
+                    async let walk = try? model.lineageWalk(node, depth: LineageList.depth, on: lineageHost)
                     return await (node, cost, walk?.links)
                 }
             }

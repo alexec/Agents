@@ -31,7 +31,8 @@ protocol WorkModel: AnyObject, Sendable {
                                         on host: MachineRef) async throws -> R
     /// A page of the lineage nodes of a kind, from the control plane; nil with none.
     func reportNodes(_ query: DaemonAPI.ReportNodesQuery) async throws -> DaemonAPI.ReportNodes?
-    func lineageWalk(_ node: DaemonAPI.LineageNode, on host: MachineRef) async throws -> DaemonAPI.LineageGraph
+    /// What a node is linked to, `depth` links away (1 to 4).
+    func lineageWalk(_ node: DaemonAPI.LineageNode, depth: Int, on host: MachineRef) async throws -> DaemonAPI.LineageGraph
     func lineageCost(_ node: DaemonAPI.LineageNode, on host: MachineRef) async -> DaemonAPI.LineageCostRollup?
     /// An issue's or an epic's estimate from past work (#3560); nil where the machine cannot make one.
     func lineageEstimate(_ node: DaemonAPI.LineageNode, on host: MachineRef) async -> DaemonAPI.LineageEstimate?

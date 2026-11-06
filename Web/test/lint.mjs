@@ -57,6 +57,10 @@ const allowedURLs = new Set([
   // The wait card's link to the merge request or issue its arguments name (#3077): a link
   // the person opens in a new tab, never fetched.
   "https://gitlab.com/",
+  // A Work page's pipeline line (#3588): a TestFlight build in App Store Connect and a Sentry
+  // issue, links the person opens in a new tab, never fetched.
+  "https://appstoreconnect.apple.com/apps",
+  "https://sentry.io/organizations/",
   // Connect Jira (#3304): Make an API Token's page on Atlassian, a link the person opens in a
   // new tab, never fetched.
   "https://id.atlassian.com/manage-profile/security/api-tokens",

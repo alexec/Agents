@@ -30,8 +30,18 @@ The pipeline is: idea → issue → PR → build → release → deploy → heal
 - **The pipeline is in the background.** There is no pipeline screen. Each stage is a
   lineage node, so "where is my feature?" and "what did this outage come from?" are walks
   of the graph (#2348).
-- **A person sees it in Lineage:** the issue's and the PR's Lineage section, the session's
-  Lineage pane, and Reports ▸ Value.
+- **A person sees it in Lineage's data and one line (#3588):** #3506 removed the Lineage
+  section and pane, and no new one takes their place. Under the title of an issue's, a PR's
+  or a release's Work page, one line names the pipeline in reach, each stage a link out:
+  `Release v1.2.0 · CI run · TestFlight 42 · Sentry issue 4321`. It comes from one
+  `lineage/walk`, 4 links deep, on the machine that keeps the links.
+  - **Back ("what did this come from?"):** a bug that `reports` a health signal says
+    `From Sentry issue 4321 · seen in v1.2.0 · TestFlight 42 · PR #12 · #10`: the release
+    and deploy it was seen in, that release's PRs and the issues they fix. A release's page
+    says its PRs and their issues the same way. Reports ▸ Value's release rows open that
+    page.
+  - At most 3 of a kind are named; the rest are counted ("2 more").
+  - Mac + web (#2796); the Remote's Work page leaves the line out.
 
 ## Each stage as a node and a link
 
