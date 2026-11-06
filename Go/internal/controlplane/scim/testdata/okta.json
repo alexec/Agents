@@ -1,40 +1,20 @@
 {
-  "source": "Written from Okta's SCIM 2.0 protocol reference (request shapes and order of a first push, a profile change, a group push and a deactivation). Alex records the real set on an Okta tenant later (#1782).",
+  "source": "Recorded from Okta's SCIM client (\"Okta SCIM Client 1.0.0\", the SCIM 2.0 Test App (OAuth Bearer Token)) on a real Okta Integrator org on 2026-11-06 by scripts/okta-walk.sh (#3415): connection tests, two users pushed on assignment, a profile change, a group push, and a deactivation both ways (the Okta account deactivated; unassigned from the app). Passwords Okta made are replaced, and the tunnel's address is https://plane.example; the rest is as Okta sent it. okta-docs.json keeps the steps from Okta's protocol reference that the walk did not cover.",
   "steps": [
-    {"name": "Okta checks the connection with a user that is not there", "method": "GET", "path": "/Users?filter=userName%20eq%20%22check-0000%40acme.test%22&startIndex=1&count=100", "status": 200, "expect": {"totalResults": 0}},
-    {"name": "Find Lee before making them", "method": "GET", "path": "/Users?filter=userName%20eq%20%22lee%40acme.test%22&startIndex=1&count=100", "status": 200, "expect": {"totalResults": 0}},
-    {"name": "Make Lee", "method": "POST", "path": "/Users", "status": 201, "save": "lee", "body": {
-      "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"], "userName": "lee@acme.test", "externalId": "00u-lee",
-      "name": {"givenName": "Lee", "familyName": "Park"}, "emails": [{"primary": true, "value": "lee@acme.test", "type": "work"}],
-      "displayName": "Lee Park", "locale": "en-US", "groups": [], "password": "never-kept-1", "active": true}},
-    {"name": "Make Kim", "method": "POST", "path": "/Users", "status": 201, "save": "kim", "body": {
-      "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User", "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"],
-      "userName": "kim@acme.test", "externalId": "00u-kim", "name": {"givenName": "Kim", "familyName": "Lo"},
-      "emails": [{"primary": true, "value": "kim@acme.test", "type": "work"}], "displayName": "Kim Lo", "active": true,
-      "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {"department": "Platform", "manager": {"value": "00u-boss"}}}},
-    {"name": "A second Lee is refused", "method": "POST", "path": "/Users", "status": 409, "body": {
-      "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"], "userName": "LEE@acme.test", "externalId": "00u-lee2", "active": true}},
-    {"name": "Read Lee", "method": "GET", "path": "/Users/${lee}", "status": 200, "expect": {"userName": "lee@acme.test", "externalId": "00u-lee", "active": true}},
-    {"name": "Profile change by PUT", "method": "PUT", "path": "/Users/${lee}", "status": 200, "expect": {"displayName": "Lee Park-Smith"}, "body": {
-      "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"], "id": "${lee}", "userName": "lee@acme.test", "externalId": "00u-lee",
-      "name": {"givenName": "Lee", "familyName": "Park-Smith"}, "emails": [{"primary": true, "value": "lee@acme.test", "type": "work"}],
-      "displayName": "Lee Park-Smith", "active": true}},
-    {"name": "Push the group Engineering", "method": "POST", "path": "/Groups", "status": 201, "save": "engineering", "body": {
-      "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"], "displayName": "Engineering", "members": [{"value": "${lee}", "display": "lee@acme.test"}]}},
-    {"name": "Add Kim to Engineering", "method": "PATCH", "path": "/Groups/${engineering}", "status": 200, "body": {
-      "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{"op": "add", "path": "members", "value": [{"value": "${kim}", "display": "kim@acme.test"}]}]}},
-    {"name": "Read Engineering", "method": "GET", "path": "/Groups/${engineering}", "status": 200, "expectMembers": 2},
-    {"name": "Rename the group by PATCH replace", "method": "PATCH", "path": "/Groups/${engineering}", "status": 200, "expect": {"displayName": "Platform Engineering"}, "body": {
-      "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{"op": "replace", "value": {"id": "${engineering}", "displayName": "Platform Engineering"}}]}},
-    {"name": "Take Lee out of the group", "method": "PATCH", "path": "/Groups/${engineering}", "status": 200, "body": {
-      "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{"op": "remove", "path": "members[value eq \"${lee}\"]"}]}},
-    {"name": "Read the group again", "method": "GET", "path": "/Groups/${engineering}", "status": 200, "expectMembers": 1},
-    {"name": "List groups", "method": "GET", "path": "/Groups?startIndex=1&count=100", "status": 200, "expect": {"totalResults": 1}},
-    {"name": "Deactivate Kim", "method": "PATCH", "path": "/Users/${kim}", "status": 200, "expect": {"active": false}, "body": {
-      "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{"op": "replace", "value": {"active": false}}]}},
-    {"name": "Reactivate Kim", "method": "PATCH", "path": "/Users/${kim}", "status": 200, "expect": {"active": true}, "body": {
-      "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{"op": "replace", "value": {"active": true}}]}},
-    {"name": "Delete the group", "method": "DELETE", "path": "/Groups/${engineering}", "status": 204},
-    {"name": "The group is gone", "method": "GET", "path": "/Groups/${engineering}", "status": 404}
+    {"name": "Okta tests the connection (Test API Credentials)", "method": "GET", "path": "/Users?startIndex=1&count=2", "status": 200, "expect": {"totalResults": 0}},
+    {"name": "Okta tests the connection again on Save", "method": "GET", "path": "/Users?startIndex=1&count=2", "status": 200, "expect": {"totalResults": 0}},
+    {"name": "Okta reads the groups on Save", "method": "GET", "path": "/Groups?startIndex=1&count=100", "status": 200, "expect": {"totalResults": 0}},
+    {"name": "Okta tests the connection when the app is assigned", "method": "GET", "path": "/Users?startIndex=1&count=2", "status": 200, "expect": {"totalResults": 0}},
+    {"name": "Okta reads the groups", "method": "GET", "path": "/Groups?startIndex=1&count=100", "status": 200, "expect": {"totalResults": 0}},
+    {"name": "Find Lee before making them", "method": "GET", "path": "/Users?filter=userName%20eq%20%22lee.park%40agents-walk.test%22&startIndex=1&count=100", "status": 200, "expect": {"totalResults": 0}},
+    {"name": "Find Kim before making them", "method": "GET", "path": "/Users?filter=userName%20eq%20%22kim.lo%40agents-walk.test%22&startIndex=1&count=100", "status": 200, "expect": {"totalResults": 0}},
+    {"name": "Make Lee (assigned to the app; Lee had signed in already)", "method": "POST", "path": "/Users", "status": 201, "body": {"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"], "userName": "lee.park@agents-walk.test", "name": {"givenName": "Lee", "familyName": "Park"}, "emails": [{"primary": true, "value": "lee.park@agents-walk.test", "type": "work"}], "displayName": "Lee Park", "locale": "en-US", "externalId": "00u19l4sme7HxUTwX698", "groups": [], "password": "never-kept-1", "active": true}, "save": "lee", "expect": {"userName": "lee.park@agents-walk.test", "externalId": "00u19l4sme7HxUTwX698", "displayName": "Lee Park", "active": true}},
+    {"name": "Make Kim (with the Enterprise extension)", "method": "POST", "path": "/Users", "status": 201, "body": {"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User", "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"], "userName": "kim.lo@agents-walk.test", "name": {"givenName": "Kim", "familyName": "Lo"}, "emails": [{"primary": true, "value": "kim.lo@agents-walk.test", "type": "work"}], "displayName": "Kim Lo", "locale": "en-US", "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {"department": "Platform"}, "externalId": "00u19l586usXJUgI7698", "groups": [], "password": "never-kept-2", "active": true}, "save": "kim", "expect": {"userName": "kim.lo@agents-walk.test", "externalId": "00u19l586usXJUgI7698", "displayName": "Kim Lo", "active": true}},
+    {"name": "Read Lee before a profile change", "method": "GET", "path": "/Users/${lee}", "status": 200, "expect": {"userName": "lee.park@agents-walk.test", "externalId": "00u19l4sme7HxUTwX698", "displayName": "Lee Park", "active": true}},
+    {"name": "Profile change by PUT (Lee's last name), echoing what the plane answered", "method": "PUT", "path": "/Users/${lee}", "status": 200, "body": {"active": true, "displayName": "Lee Park-Smith", "emails": [{"primary": true, "type": "work", "value": "lee.park@agents-walk.test"}], "externalId": "00u19l4sme7HxUTwX698", "id": "${lee}", "locale": "en-US", "meta": {"created": "2026-11-06T04:51:48Z", "lastModified": "2026-11-06T04:51:48Z", "location": "https://plane.example/scim/v2/Users/${lee}", "resourceType": "User"}, "name": {"familyName": "Park-Smith", "givenName": "Lee"}, "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"], "userName": "lee.park@agents-walk.test", "groups": []}, "expect": {"userName": "lee.park@agents-walk.test", "externalId": "00u19l4sme7HxUTwX698", "displayName": "Lee Park-Smith", "active": true}},
+    {"name": "Group push makes the group with its members", "method": "POST", "path": "/Groups", "status": 201, "body": {"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"], "displayName": "Walk Engineers", "members": [{"value": "${lee}", "display": "lee.park@agents-walk.test"}, {"value": "${kim}", "display": "kim.lo@agents-walk.test"}]}, "save": "engineers", "expectMembers": 2},
+    {"name": "Group push adds the members again", "method": "PATCH", "path": "/Groups/${engineers}", "status": 200, "body": {"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{"op": "add", "path": "members", "value": [{"value": "${lee}", "display": "lee.park@agents-walk.test"}, {"value": "${kim}", "display": "kim.lo@agents-walk.test"}]}]}, "expectMembers": 2},
+    {"name": "Kim's Okta account is deactivated", "method": "PATCH", "path": "/Users/${kim}", "status": 200, "body": {"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{"op": "replace", "value": {"active": false}}]}, "expect": {"userName": "kim.lo@agents-walk.test", "externalId": "00u19l586usXJUgI7698", "displayName": "Kim Lo", "active": false}},
+    {"name": "Lee is unassigned from the app", "method": "PATCH", "path": "/Users/${lee}", "status": 200, "body": {"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{"op": "replace", "value": {"active": false}}]}, "expect": {"userName": "lee.park@agents-walk.test", "externalId": "00u19l4sme7HxUTwX698", "displayName": "Lee Park-Smith", "active": false}}
   ]
 }

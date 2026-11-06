@@ -1,5 +1,8 @@
 # Security review (T102)
 
+> **Replaced (#3390).** #3390 removed the phone relay; phones reach a cloud control plane
+> directly. What this page says about the relay is kept as a record only.
+
 2026-09-29, `security-review` on `agents/control-plane` against `main`, at 2b41febb.
 
 It ran in two steps: one pass found candidates, and a second checked each against the

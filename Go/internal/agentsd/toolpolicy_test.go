@@ -113,6 +113,10 @@ func TestCodexAndCursorsToolPolicy(t *testing.T) {
 	if v, ok := envValue(l.Env, "CODEX_CONFIG"); !ok || !strings.Contains(v, `"default_mode_request_user_input":true`) {
 		t.Fatalf("%q", l.Env)
 	}
+	// Codex's own computer use is off: the app's drive_screen drives the screen (#3004).
+	if v, _ := envValue(l.Env, "CODEX_CONFIG"); !strings.Contains(v, `"computer_use":false`) {
+		t.Fatalf("%q", l.Env)
+	}
 	l, _ = launchOf(t, "cursor")
 	if len(l.Args) != 0 || sessionMeta("cursor") != nil {
 		t.Fatalf("%q", l.Args)

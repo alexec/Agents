@@ -55,6 +55,25 @@ that saw it (#3585).
 
    The values go in your own `~/.agents-secrets/secrets.env`, never in `mcp.json`.
 
+## File a bug from a new issue
+
+**File a bug from Sentry** is a ready-made workflow (#3586). It is on the **Workflows** page
+of each folder that pushes to GitHub or GitLab, off. Turn on its **Enabled** switch. Then a
+new issue (`health.issue_new`) or one that came back (`health.issue_regressed`) starts an
+agent that:
+
+1. reads the issue, and its stack trace with Sentry's tools when the folder has them;
+2. looks for the folder's issue that tracks it, by the line
+   `Sentry issue: sentry:<org>/<issue id>` at the end of the bug;
+3. comments on that issue when it is open, or else files a bug: the label `bug`, no
+   milestone, so the bug lane takes it. Its **Lineage** section names the release and the
+   pull requests that shipped in it. Secrets in a trace or a message are `<redacted>`;
+4. labels its session with the bug, so Lineage links the bug to the Sentry issue
+   (`reports`), and through it to the release and its pull requests.
+
+The agent changes no code. To file only some issues, add the filters below to its triggers
+in `.agents/workflows/file-a-bug-from-sentry.md`.
+
 ## Start work from a new issue
 
 A workflow or a wait names the event. Each takes the filters `project` (a project's slug),

@@ -62,6 +62,7 @@ agent uses the tools of the server that the event came from.
 | --- | --- | --- |
 | **Work an issue** | `issue.labelled` with `label: agent`: someone adds the `agent` label to an issue | does what the issue asks on a branch of its own, and opens a pull request or merge request for it |
 | **Fix failed checks** | `checks.failed`: a pull request's checks or a merge request's pipeline failed | reads the failed jobs, fixes the cause on the branch and pushes, or runs the jobs again when the change did not cause it |
+| **File a bug from Sentry** | `health.issue_new` or `health.issue_regressed` (the **Sentry events** server): Sentry saw a new issue, or one came back | files a bug for it with its release and that release's pull requests, or comments on the issue that tracks it, and links the bug to the Sentry issue in Lineage ([Use Sentry](use-sentry.md)) |
 | **Address review comments** | `review.posted`: CodeRabbit finished a review of a pull request; on GitLab, `review.comment`: a line of a merge request was commented on (GitLab has no event for a whole review, so a 10-minute cooldown gathers a reviewer's comments) | fixes or answers each open review comment, a person's or CodeRabbit's, and pushes |
 
 1. Open the workflow and turn on its **Enabled** switch.

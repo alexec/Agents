@@ -41,9 +41,12 @@ import (
 // lineageJobsHeld bounds the work waiting; past it, a link is dropped and logged.
 const lineageJobsHeld = 1024
 
+// linkerMu guards linkerJobs and linkerDone. stopLinker closes the jobs, so the goroutine
+// ends with the host (#3617); work given after that is dropped.
 type lineageLinker struct {
-	linkerOnce sync.Once
+	linkerMu   sync.Mutex
 	linkerJobs chan func()
+	linkerDone bool
 	repoMu     sync.Mutex
 	// repos is each folder's forge repo, looked up once: a remote seldom changes.
 	repos map[string]forgeRepo
@@ -184,9 +187,15 @@ func (d *Daemon) folderRepo(folder string) forgeRepo {
 	return r
 }
 
-// lineageDo runs f after the work before it, on the linker's goroutine.
-func (d *Daemon) lineageDo(f func()) {
-	d.linkerOnce.Do(func() {
+// lineageDo runs f after the work before it, on the linker's goroutine. It is false when
+// f is dropped: the linker is stopped, or too much work waits.
+func (d *Daemon) lineageDo(f func()) bool {
+	d.linkerMu.Lock()
+	defer d.linkerMu.Unlock()
+	if d.linkerDone {
+		return false
+	}
+	if d.linkerJobs == nil {
 		d.linkerJobs = make(chan func(), lineageJobsHeld)
 		jobs := d.linkerJobs
 		safe.Go("lineage links", func() {
@@ -194,18 +203,32 @@ func (d *Daemon) lineageDo(f func()) {
 				job()
 			}
 		})
-	})
+	}
 	select {
 	case d.linkerJobs <- f:
+		return true
 	default:
 		log.Printf("lineage: %d links wait to be written; one was dropped", lineageJobsHeld)
+		return false
 	}
+}
+
+// stopLinker ends the linker's goroutine once the work given so far is done.
+func (d *Daemon) stopLinker() {
+	d.linkerMu.Lock()
+	defer d.linkerMu.Unlock()
+	if !d.linkerDone && d.linkerJobs != nil {
+		close(d.linkerJobs)
+	}
+	d.linkerDone = true
 }
 
 // lineageSettle waits, at most wait, for the work given so far.
 func (d *Daemon) lineageSettle(wait time.Duration) {
 	done := make(chan struct{})
-	d.lineageDo(func() { close(done) })
+	if !d.lineageDo(func() { close(done) }) {
+		return
+	}
 	select {
 	case <-done:
 	case <-time.After(wait):
@@ -316,6 +339,7 @@ func (d *Daemon) noteLineage(before *wire.Agent, a wire.Agent) {
 				}
 			}
 			d.link(s, to, lineage.RelWorksOn, source)
+			d.lineageReportsHealth(s, to)
 			if repo, n, ok := issueOfNode(to); ok {
 				d.noteIssueMilestone(folder, repo, n)
 			}

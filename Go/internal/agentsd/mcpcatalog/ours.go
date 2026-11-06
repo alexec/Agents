@@ -135,7 +135,7 @@ type Declared struct {
 // workflow names events, never a server, so any server that declares one of them reaches
 // the Workflows level. agentsd's readymade folder holds the workflows; a test there keeps
 // this list the same as their triggers.
-var ReadyMadeEvents = []string{"checks.failed", "email.received", "issue.labelled", "review.comment", "review.posted"}
+var ReadyMadeEvents = []string{"checks.failed", "email.received", "health.issue_new", "health.issue_regressed", "issue.labelled", "review.comment", "review.posted"}
 
 // Levels is the five levels (#1428) from what a server declares, and whether it was tested.
 func Levels(d Declared, tested bool) wire.MCPLevels {
