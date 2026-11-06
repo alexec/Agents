@@ -116,7 +116,7 @@ function ServerBackups({ store, host, name }: { store: Store; host: string; name
 export function ServerBackupsSection({ store }: { store: Store }) {
   const [open, setOpen] = useState<string | null>(null);
   const hosts = store.hosts.value;
-  const servers = hosts.filter((h) => h.relay == null && !store.isMac(h.id) && hostAnswers(h.state)
+  const servers = hosts.filter((h) => !store.isMac(h.id) && hostAnswers(h.state)
     && hostHas(hosts, h.id, Capability.backups1));
   if (servers.length === 0) return null;
   const shown = servers.find((h) => h.id === open);

@@ -49,7 +49,7 @@ export function ConnectorSetupSection({ store, host, folder, folderName, go }: {
   const [adding, setAdding] = useState<"machine" | "provider">();
   useEffect(() => { if (store.providers.list.peek() === null) void store.providers.load(); }, []);
   // Where agents run (#2131): the machine the folder is on, and what else is yours.
-  const hosts = store.hosts.value.filter((h) => h.relay == null);
+  const hosts = store.hosts.value;
   const place = {
     title: whereAgentsRun.title(false, hosts.find((h) => h.id === host)?.name),
     line: whereAgentsRun.line(hosts.filter((h) => h.id !== host).map((h) => h.name),

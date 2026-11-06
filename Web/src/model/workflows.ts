@@ -823,16 +823,16 @@ export interface WorkflowHostChoice {
 }
 
 /**
- * Enrolled hosts that run agents, This Mac first, then the rest by name. A relay runs
- * no agents, and a host with no machine id cannot be written, so both are left out.
+ * Enrolled hosts, This Mac first, then the rest by name. A host with no machine id
+ * cannot be written, so it is left out.
  * On the phone and the page, This Mac is the host whose id is `macID`: `mac`, or the person's
  * Mac by its own id (#1501).
  */
-export function workflowHostChoices(hosts: readonly { id: string; name: string; machineID?: string | undefined; relay?: boolean | undefined }[],
+export function workflowHostChoices(hosts: readonly { id: string; name: string; machineID?: string | undefined }[],
                                     macID = "mac"): WorkflowHostChoice[] {
   const usable = hosts.flatMap((host) => {
     const machineID = (host.machineID ?? "").trim();
-    return host.relay !== undefined || machineID === "" ? [] : [{ ...host, machineID }];
+    return machineID === "" ? [] : [{ ...host, machineID }];
   });
   const ordered = [...usable].sort((a, b) => {
     const aMac = a.id === macID;
