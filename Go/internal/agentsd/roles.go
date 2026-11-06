@@ -93,13 +93,11 @@ type SocketPolicy interface {
 	Summary() string
 }
 
-// socketPolicy is socketPolicyFor(d), decided once: daemon.sock and the local socket
-// ask the same agents-peer.
+// socketPolicy is the policy for d's daemon.sock, decided once: by code signature on a
+// Mac (roles_darwin.go), by ssh session on Linux (roles_linux.go). daemon.sock and the
+// local socket ask the same agents-peer. A test decides it first on its own host
+// (usePolicy), not by a package variable that a serving goroutine reads (#3623).
 func (d *Daemon) socketPolicy() SocketPolicy {
-	d.policyOnce.Do(func() { d.policy = socketPolicyFor(d) })
+	d.policyOnce.Do(func() { d.policy = platformSocketPolicy(d) })
 	return d.policy
 }
-
-// socketPolicyFor is the policy for d's daemon.sock: by code signature on a Mac
-// (roles_darwin.go), by ssh session on Linux (roles_linux.go). Tests replace it.
-var socketPolicyFor = platformSocketPolicy

@@ -2,12 +2,12 @@ package agentsd
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"sort"
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -99,12 +99,12 @@ func (d *Daemon) startHostStatus() {
 	d.statusMu.Unlock()
 	d.reviseHostStatus()
 	d.statusTick.Do(func() {
-		safe.Go("host status", func() {
+		d.goLoop("host status", func(ctx context.Context) {
 			tick := time.NewTicker(hostStatusTick)
 			defer tick.Stop()
 			for {
 				select {
-				case <-d.ctx.Done():
+				case <-ctx.Done():
 					return
 				case <-tick.C:
 					d.reviseHostStatus()

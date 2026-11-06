@@ -417,12 +417,12 @@ func (d *Daemon) startReports() {
 	// What it has from a catalogue (#2019, M5), on the same clock.
 	safe.Go("governance report", d.sendGovernanceReport)
 	d.reportTick.Do(func() {
-		safe.Go("usage rollup clock", func() {
+		d.goLoop("usage rollup clock", func(ctx context.Context) {
 			tick := time.NewTicker(reportEvery)
 			defer tick.Stop()
 			for {
 				select {
-				case <-d.ctx.Done():
+				case <-ctx.Done():
 					return
 				case <-tick.C:
 					d.sendReport()

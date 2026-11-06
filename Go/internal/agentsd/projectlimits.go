@@ -1,13 +1,13 @@
 package agentsd
 
 import (
+	"context"
 	"encoding/json"
 	"slices"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -186,12 +186,12 @@ func (d *Daemon) countedHereWords(folder string) string {
 // checkProjectQueues looks again, every projectQueueEvery, at each queue of a folder in a
 // project, for a place another machine freed: this machine hears of no end there.
 func (d *Daemon) checkProjectQueues() {
-	safe.Go("project queues", func() {
+	d.goLoop("project queues", func(ctx context.Context) {
 		tick := time.NewTicker(projectQueueEvery)
 		defer tick.Stop()
 		for {
 			select {
-			case <-d.ctx.Done():
+			case <-ctx.Done():
 				return
 			case <-tick.C:
 				if d.askControl.Load() == nil {
