@@ -3,6 +3,7 @@ package providers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 	"sync"
@@ -244,6 +245,58 @@ func TestAFailedStartLeavesWhatWasKeptNotSentWithWhyAndTryAgainStartsAgain(t *te
 	h.waitFor("starting", devbox, 5, func(r row) bool { return deref(r.Workspace.Phase) == "connecting" })
 	if starts, _ := h.provider.count(); starts != 2 {
 		t.Errorf("starts %d", starts)
+	}
+}
+
+// What was not sent goes a week on, with its attachments (#3647); what waits stays.
+func TestWhatWasNotSentGoesAWeekOn(t *testing.T) {
+	h := newHarness(t)
+	h.link(h.add(), devbox, "agents-devbox")
+	h.provider.set("", "Error: droplet is locked", 0)
+	kept := h.keeper()
+	kept.Keep(devbox, MethodAgentsPrompt, promptParams("go"), h.caller, nil)
+	eventually(t, func() bool { return len(kept.All()) == 1 && deref(kept.All()[0].Failed) != "" })
+	if n := kept.Expire(time.Now().Add(KeptFailedFor - time.Hour)); n != 0 || len(kept.All()) != 1 {
+		t.Fatalf("dropped %d before its week", n)
+	}
+	if n := kept.Expire(time.Now().Add(KeptFailedFor + time.Hour)); n != 1 || len(kept.All()) != 0 {
+		t.Fatalf("dropped %d, kept %v", n, kept.All())
+	}
+	if keys, _ := h.store.List(context.Background(), KeptPrefix); len(keys) != 0 {
+		t.Fatalf("still stored: %v", keys)
+	}
+}
+
+// A host keeps KeptLimit requests at most, not sent ones too: a new one pushes out the oldest
+// not sent (#3647).
+func TestAHostKeepsAtMostKeptLimitWithWhatWasNotSent(t *testing.T) {
+	h := newHarness(t)
+	h.link(h.add(), devbox, "agents-devbox")
+	h.provider.set("", "Error: droplet is locked", 0)
+	kept := h.keeper()
+	allFailed := func() bool {
+		for _, k := range kept.All() {
+			if deref(k.Failed) == "" {
+				return false
+			}
+		}
+		return true
+	}
+	var first KeptRequest
+	for i := range KeptLimit {
+		s := keptSummary(t, kept.Keep(devbox, MethodAgentsPrompt, promptParams(fmt.Sprint("go ", i)), h.caller, nil))
+		if i == 0 {
+			first = s
+		}
+		eventually(t, allFailed)
+	}
+	kept.Keep(devbox, MethodAgentsPrompt, promptParams("one more"), h.caller, nil)
+	all := kept.All()
+	if len(all) != KeptLimit || all[0].ID == first.ID || all[len(all)-1].Text != "one more" {
+		t.Fatalf("kept %d: %v", len(all), all)
+	}
+	if keys, _ := h.store.List(context.Background(), KeptPrefix+devbox+"/"); len(keys) != KeptLimit {
+		t.Fatalf("stored %d", len(keys))
 	}
 }
 

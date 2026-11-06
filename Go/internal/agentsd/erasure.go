@@ -26,8 +26,8 @@ import (
 //
 //   - erasures.json is the queue of runtime copies still to erase, kept across a restart.
 //     The eraser takes them one at a time: it starts the runtime as the agent ran (its
-//     account), asks it to delete the session (ACP session/delete), and for Claude and
-//     Codex also removes the files it knows in the home that launch names. A copy that
+//     account), asks it to delete the session (ACP session/delete), and also removes the
+//     files it knows (every runtime's but OpenCode's) in the home that launch names. A copy that
 //     could not be erased is tried again at the next start, erasureTries times at most.
 //   - erased.json is every agent this machine deleted, so a restore skips it. Backups carry
 //     it, and a restore adds the backup's to this machine's.
@@ -383,6 +383,25 @@ func eraseRuntimeFiles(runtimeID, sessionID string, env []string) (known bool, r
 			filepath.Join(home, "sessions", "*", "*", "*", "rollout-*-"+sessionID+".jsonl"),
 			filepath.Join(home, "archived_sessions", "rollout-*-"+sessionID+".jsonl"),
 		}
+	// The other runtimes' layouts, as their CLIs wrote them in 2026-11 (#3647). OpenCode keeps
+	// every session in one SQLite file, so only its session/delete erases one.
+	case "grok":
+		// sessions/<the folder, escaped>/<id>/: the chat, its events and rewind points.
+		patterns = []string{filepath.Join(envHome(env, "", ".grok"), "sessions", "*", sessionID)}
+	case "copilot":
+		// session-state/<id>/: the events, checkpoints and files. session-store.db, its
+		// index, keeps the session's row.
+		patterns = []string{filepath.Join(envHome(env, "", ".copilot"), "session-state", sessionID)}
+	case "cursor":
+		patterns = []string{filepath.Join(envHome(env, "", ".cursor"), "acp-sessions", sessionID)}
+	case "antigravity":
+		// The home the daemon gives it (appHomes): conversations/<id>.db, -wal, -shm and
+		// .meta, and brain/<id>/.
+		home := filepath.Join(envHome(env, "GEMINI_HOME", ".gemini"), "antigravity-acp")
+		patterns = []string{
+			filepath.Join(home, "conversations", sessionID+".*"),
+			filepath.Join(home, "brain", sessionID),
+		}
 	default:
 		return false, 0
 	}
@@ -399,7 +418,8 @@ func eraseRuntimeFiles(runtimeID, sessionID string, env []string) (known bool, r
 	return true, removed
 }
 
-// envHome is the folder a variable of env names, or the folder under HOME.
+// envHome is the folder a variable of env names, or the folder under HOME; no variable is
+// always the folder under HOME.
 func envHome(env []string, variable, under string) string {
 	value := func(name string) string {
 		for _, kv := range slices.Backward(env) {
@@ -409,8 +429,10 @@ func envHome(env []string, variable, under string) string {
 		}
 		return ""
 	}
-	if v := value(variable); v != "" {
-		return v
+	if variable != "" {
+		if v := value(variable); v != "" {
+			return v
+		}
 	}
 	home := value("HOME")
 	if home == "" {

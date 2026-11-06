@@ -312,6 +312,21 @@ func (r *Records) TombstoneKeys() []string {
 	return out
 }
 
+// RemovedToCut is each removed person kept for their sign-ins whose record still holds
+// more than its tombstone, from before removal cut it (#3647), for the sweep.
+func (r *Records) RemovedToCut() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var out []string
+	for _, h := range r.people {
+		if h.record.IsRemoved() && !h.record.IsTombstone() {
+			out = append(out, h.record.ID)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
 // Clients is every client, the first paired first.
 func (r *Records) Clients() []ClientRecord {
 	r.mu.Lock()

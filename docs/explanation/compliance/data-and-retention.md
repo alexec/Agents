@@ -135,7 +135,8 @@ Agents starts these tools. It does not own what they keep.
 | `~/.claude/projects/` (or `CLAUDE_CONFIG_DIR`) | Claude's copy of each conversation | **Not erased today:** erasure looks in the wrong folder (#3625) |
 | `~/.claude/todos`, `file-history`, `session-env`, `debug` | Claude's files for each session | Erased when the agent is deleted |
 | `~/.codex/sessions/` (or `CODEX_HOME`) | Codex's copy of each conversation | Erased when the agent is deleted |
-| The session stores of Grok, Copilot, OpenCode, Cursor and Antigravity | Their copies | **Not erased**, unless the runtime can delete a conversation (ACP `session/delete`) |
+| `~/.grok/sessions/`, `~/.copilot/session-state/`, `~/.cursor/acp-sessions/`, and Antigravity's `conversations/` and `brain/` in its own home | Grok's, Copilot's, Cursor's and Antigravity's copy of each conversation | Erased when the agent is deleted (#3647). Copilot's index, `session-store.db`, keeps the session's row |
+| OpenCode's `opencode.db` | OpenCode's copies, all in one SQLite file | **Not erased**, unless OpenCode can delete a conversation (ACP `session/delete`) |
 | `~/.claude/history.jsonl`, Codex's history and indexes | Each runtime's own history | **Not erased** |
 | Docker images and named volumes | What Docker workspaces pulled and kept | **Not removed.** Removing a workspace removes its container. |
 | DigitalOcean, Codespaces, EC2 and GCP machines | Cloud machines | **No limit in count or time, and no stop when idle.** Only **Delete Machine** removes one. |
@@ -164,10 +165,10 @@ the other copies of the control plane learn that it went.
 | --- | --- | --- | --- |
 | Clients | Name, kind, public key, when last seen, push tokens (APNs, up to 16 Live Activity tokens of 12 hours each, Web Push) | Until forgotten, then a tombstone for 7 days. A key lives 90 days; **a client whose key expired is kept.** No count limit on a control plane of your own (hosted: 5 or 50). | Hourly |
 | Machines | Name, key, platform, version, owner, workspace | Until removed, then a tombstone for 7 days. **An expired machine is kept.** No count limit (hosted: 2 or 20). | Hourly |
-| People | Name, role, sign-ins (email, login), SCIM data, old names for 90 days | A removed person goes after 14 days, **or never when they have a sign-in** | Hourly |
+| People | Name, role, sign-ins (email, login), SCIM data, old names for 90 days | A removed person goes after 14 days. One with a sign-in is kept, so that sign-in stays refused, but only as a tombstone: the ID, kind, role and each sign-in's provider and account (#3647) | Hourly |
 | Groups, projects | Name and members; name, owner, slots and boards | 1,000 groups; 500 projects a person | Tombstone, hourly |
 | Projects' folders | Each machine's joined folders | 1,000 | Hourly |
-| Machine locks | Each person's lock chain | 4,096 entries a person. **Kept when the person is removed.** | Only on **Reset** |
+| Machine locks | Each person's lock chain | 4,096 entries a person. Deleted when the person is removed (#3647) | On **Reset** and on remove |
 | A person's settings and secrets | Settings that follow a person; secrets, sealed | 256 KiB of settings, 200 secrets of 16 KiB | When the person is removed |
 | Channel links | Which person a channel identity is | No count limit | On unlink or when the person is removed |
 
@@ -187,7 +188,7 @@ the other copies of the control plane learn that it went.
 
 | Records | What they keep | How long, how large | Applied |
 | --- | --- | --- | --- |
-| Kept requests | Prompts and agent starts for a stopped workspace, **with their attachments** (up to 40 MiB each) | Until the machine starts and takes them, or is removed; 20 waiting a machine. **A request that failed is not counted and never deleted.** | On delivery |
+| Kept requests | Prompts and agent starts for a stopped workspace, **with their attachments** (up to 40 MiB each) | Until the machine starts and takes them, or is removed; 20 a machine, failed ones included (a new one pushes out the oldest that failed). One that failed goes after 7 days (#3647) | On delivery, on keep, hourly |
 | Host copies | Each machine's last folders and agents, up to 500, **with titles** | One a machine | When the machine is forgotten |
 | Usage reports | Usage, cost and time by person, project, folder, machine and runtime | 7 days by the hour, 90 days by the day | Hourly |
 | Lineage | Cost of each issue, PR and session node | 5,000 nodes, 90 days | On write |
