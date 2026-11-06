@@ -724,12 +724,13 @@ final class VoiceMode {
         if chime { chimeWhenListening() }
     }
 
-    /// Plays the listening sound as soon as dictation listens, or after a second at most.
+    /// Plays the listening sound as soon as the microphone hears (held for an analyser
+    /// still starting counts, #3563), or after a second at most.
     private func chimeWhenListening() {
         Task { [weak self] in
             for _ in 0..<20 {
                 guard let self, self.phase == .listening else { return }
-                if self.dictation.isListening { break }
+                if self.dictation.isHearing { break }
                 try? await Task.sleep(for: .milliseconds(50))
             }
             guard let self, self.phase == .listening else { return }
@@ -737,9 +738,11 @@ final class VoiceMode {
         }
     }
 
-    /// Dictation afresh, so what was heard before is not in what comes next.
+    /// Dictation afresh, so what was heard before is not in what comes next. The microphone
+    /// hears on while the new run's analyser starts, and gives it what it heard: words
+    /// said in that time are not lost (#3563).
     private func startDictation(after words: String = "") {
-        dictation.stop()
+        dictation.stop(holdingAudio: true)
         dictation.start(in: words, selection: nil, vocabulary: vocabulary) { [weak self] text, _ in
             self?.heardChanged(text)
         }
@@ -877,6 +880,13 @@ final class VoiceMode {
         clearJoin()
         let target = walkSendFails ? nil : await send(outgoing, stop)
         guard agentID == agent, phase == .sending else { return }
+        // The words said as it went, to their last one: the analyser's last audio is made
+        // into words, not dropped, and what is said from now on is held for the next run
+        // (#3563).
+        if !isWalked {
+            await dictation.finish(holdingAudio: true)
+            guard agentID == agent, phase == .sending else { return }
+        }
         // What was heard while that call was in flight, not sent with it (#3070).
         let continued = heard.trimmingCharacters(in: .whitespacesAndNewlines)
         // The recognizer may have revised the words sent meanwhile: they are not sent twice
@@ -927,7 +937,7 @@ final class VoiceMode {
         Task { [weak self] in
             for _ in 0..<20 {
                 guard let self, self.joinTarget != nil else { return }
-                if self.isWalked || self.dictation.isListening { break }
+                if self.isWalked || self.dictation.isHearing { break }
                 try? await Task.sleep(for: .milliseconds(50))
             }
             guard let self, self.joinTarget != nil else { return }
