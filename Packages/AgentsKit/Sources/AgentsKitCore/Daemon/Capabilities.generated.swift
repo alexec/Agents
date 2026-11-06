@@ -108,7 +108,6 @@ public enum Capability {
     public static let orgIdentity1 = "org-identity/1"
     public static let orgRoutes2 = "org-routes/2"
     public static let pages1 = "pages/1"
-    public static let pairing1 = "pairing/1"
     public static let people1 = "people/1"
     public static let permissions1 = "permissions/1"
     public static let person1 = "person/1"
@@ -277,8 +276,6 @@ public enum Capability {
         "devices/announce": "devices/1",
         "devices/forget": "devices/1",
         "devices/list": "devices/1",
-        "devices/startPairing": "devices/1",
-        "devices/stopPairing": "devices/1",
         "disk/state": "disk/1",
         "docs/list": "docs/1",
         "docs/read": "docs/1",
@@ -378,7 +375,6 @@ public enum Capability {
         "milestones/state": "milestones/1",
         "modes/remembered": "modes/1",
         "options/remembered": "options/1",
-        "pairing/current": "pairing/1",
         "permissions/answer": "permissions/1",
         "permissions/pending": "permissions/1",
         "person/set": "person/1",
@@ -545,7 +541,6 @@ public enum Capability {
         "milestones/changed": "milestones/1",
         "modes/changed": "modes/1",
         "pages/changed": "pages/1",
-        "pairing/changed": "pairing/1",
         "person/changed": "person/1",
         "pins/changed": "pins/1",
         "plugins/changed": "plugins/1",

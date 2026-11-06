@@ -3244,8 +3244,6 @@ type DeviceAnnouncement struct {
 
 type DeviceBinding struct {
 	ID *UUID `json:"id,omitzero"`
-
-	Pairing *bool `json:"pairing,omitzero"`
 }
 
 type DeviceForget struct {
@@ -7568,22 +7566,6 @@ type PagesChangedNotification struct {
 	Folder URL `json:"folder"`
 
 	Folders []string `json:"folders"`
-}
-
-// devices/startPairing: a one-time secret and this Mac's name, good for five minutes or one device.
-type PairingCode struct {
-	Secret Data `json:"secret"`
-
-	Name string `json:"name"`
-
-	Expires Date `json:"expires"`
-}
-
-// pairing/current: the secret the bridge's listener should take, if any.
-type PairingSecret struct {
-	Secret Data `json:"secret,omitzero"`
-
-	Expires *Date `json:"expires,omitzero"`
 }
 
 // One name in the person's own pass-through list (#998, FR-011a), as runtime-environment.json has it.

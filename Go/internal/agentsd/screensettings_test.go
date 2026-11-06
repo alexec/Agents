@@ -93,7 +93,7 @@ func TestDesktopControlSetRefusesTheAgentSocketRole(t *testing.T) {
 	d, _ := start(t, t.TempDir())
 	defer d.Shutdown()
 	d.SettingsDir = t.TempDir()
-	for _, role := range []Role{RoleAgent, RolePairing, RoleHostApp, RoleWindow, RoleStranger} {
+	for _, role := range []Role{RoleAgent, RoleHostApp, RoleWindow, RoleStranger} {
 		_, err := d.setDesktopControl(&Client{Role: role, d: d}, wire.DesktopControlSettings{Enabled: true})
 		if e := asError(err); e == nil || e.Code != CodeNotPermitted {
 			t.Fatalf("%s: %+v, wanted notPermitted", role, err)

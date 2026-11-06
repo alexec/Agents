@@ -2821,7 +2821,6 @@ export interface DeviceAnnouncement {
 
 export interface DeviceBinding {
   id?: UUID;
-  pairing?: boolean;
 }
 
 export interface DeviceForget {
@@ -6552,21 +6551,6 @@ export type PRCostComment =
 export interface PagesChangedNotification {
   folder: URLString;
   folders: string[];
-}
-
-/**
- * devices/startPairing: a one-time secret and this Mac's name, good for five minutes or one device.
- */
-export interface PairingCode {
-  secret: Base64;
-  name: string;
-  expires: WireDate;
-}
-
-/** pairing/current: the secret the bridge's listener should take, if any. */
-export interface PairingSecret {
-  secret?: Base64;
-  expires?: WireDate;
 }
 
 /**
@@ -12259,7 +12243,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DetectedServer: { required: ["alias", "resolved", "outcome"], optional: ["detail"] },
   Device: { required: ["id", "publicKey", "name", "kind", "announcedAt"], optional: ["lastSeenAt", "mayNotify"] },
   DeviceAnnouncement: { required: ["id", "publicKey", "name", "kind"], optional: [] },
-  DeviceBinding: { required: [], optional: ["id", "pairing"] },
+  DeviceBinding: { required: [], optional: ["id"] },
   DeviceForget: { required: ["id"], optional: [] },
   DeviceNotification: { required: ["id"], optional: ["device", "removed"] },
   DiffLine: { required: ["kind", "text"], optional: ["newLine"] },
@@ -12599,8 +12583,6 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   OrgRoutesLeft: { required: ["host", "name", "user", "routes"], optional: [] },
   OrgRoutesMine: { required: ["routes"], optional: [] },
   PagesChangedNotification: { required: ["folder", "folders"], optional: [] },
-  PairingCode: { required: ["secret", "name", "expires"], optional: [] },
-  PairingSecret: { required: [], optional: ["secret", "expires"] },
   PassThroughName: { required: ["name"], optional: ["runtime", "setBy"] },
   PassThroughState: { required: ["names"], optional: [] },
   PendingMove: { required: ["target", "removeLeft", "discardChanges", "askedBy", "askedAt"], optional: [] },

@@ -854,7 +854,7 @@ func TestAlwaysApproveIsUnderTheModeCeiling(t *testing.T) {
 func TestSetYoursRefusesTheAgentSocketRole(t *testing.T) {
 	d, _ := start(t, t.TempDir())
 	d.SettingsDir = t.TempDir()
-	for _, role := range []Role{RoleAgent, RolePairing, RoleHostApp, RoleStranger} {
+	for _, role := range []Role{RoleAgent, RoleHostApp, RoleStranger} {
 		agent := &Client{Role: role, d: d}
 		_, err := d.setYourPolicy(agent, wire.SetYourPolicyRequest{Rules: wire.PolicyRules{}, Revision: 0})
 		e := asError(err)

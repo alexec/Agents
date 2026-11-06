@@ -3,7 +3,6 @@ package agentsd
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -19,30 +18,23 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Pairing (021 US5, 046), as DaemonCore+Devices: the paired devices in devices.json and the
-// one pairing code the Mac is showing. A device
-// not yet on record is taken only from a connection the bridge bound to a pairing phone
-// while that code is good, or from a device's channel the control plane opened (it paired
-// the device there, #232). Only a Mac host serves these (devices_darwin.go); the binding is
-// heard everywhere, so a server's host can tell a device's connection from a window's.
-
-// pairingLifetime is five minutes: long enough to find the phone, short enough that a code
-// left on the screen is soon worth nothing.
-const pairingLifetime = 5 * time.Minute
+// Devices (021 US5, 046), as DaemonCore+Devices: the paired devices in devices.json. A
+// device not yet on record is taken only from a device's channel the control plane opened
+// (it paired the device there, #232). Only a Mac host serves these (devices_darwin.go); the
+// binding is heard everywhere, so a server's host can tell a device's connection from a
+// window's.
 
 type deviceBook struct {
 	devMu      sync.Mutex
 	devRecords []deviceRecord
 	devLoaded  bool
-	devPairing *wire.PairingCode
-	// bound is what connection/bindDevice made of a connection: a device's or a pairing
-	// phone's, and the one device it may speak as.
+	// bound is what connection/bindDevice made of a connection: a device's, and the one
+	// device it may speak as.
 	devBound map[*Client]*binding
 }
 
 type binding struct {
-	pairing bool
-	device  wire.UUID
+	device wire.UUID
 }
 
 // deviceRecord is one device and what a later build wrote beside its fields, kept so
@@ -170,8 +162,8 @@ func (d *Daemon) listDevices() []wire.Device {
 	return out
 }
 
-// bindDevice is connection/bindDevice: the bridge saying a window's connection carries a
-// device, or a phone that is pairing. Never undone, and never from a device's own.
+// bindDevice is connection/bindDevice: a window's connection saying it carries a device.
+// Never undone, and never from a device's own.
 func (d *Daemon) bindDevice(c *Client, b wire.DeviceBinding) error {
 	d.devMu.Lock()
 	defer d.devMu.Unlock()
@@ -189,7 +181,7 @@ func (d *Daemon) bindDevice(c *Client, b wire.DeviceBinding) error {
 		}
 	}
 	d.mu.Unlock()
-	n := &binding{pairing: b.Pairing != nil && *b.Pairing}
+	n := &binding{}
 	if b.ID != nil {
 		n.device = wire.UUID(strings.ToUpper(string(*b.ID)))
 	}
@@ -222,16 +214,9 @@ func (d *Daemon) announce(c *Client, a wire.DeviceAnnouncement) (wire.AnnounceRe
 			return wire.AnnounceReply{}, &Error{Code: wire.FailureNotPermitted, Message: "A device's connection speaks only for that device."}
 		}
 	}
-	pairing := b != nil && b.pairing
-	if pairing && (d.devPairing == nil || !nowFunc().Before(d.devPairing.Expires.Time())) {
-		return wire.AnnounceReply{}, &Error{Code: wire.FailureNotAllowed, Message: "That pairing code has run out. Show a new one on the Mac."}
-	}
 	i := d.findDevice(a.ID)
-	if i < 0 && b != nil && !pairing && !vouched {
+	if i < 0 && b != nil && !vouched {
 		return wire.AnnounceReply{}, &Error{Code: wire.FailureNotAllowed, Message: "Pair this device by scanning the code in the Mac's Settings."}
-	}
-	if pairing {
-		defer d.endPairing()
 	}
 	var r deviceRecord
 	if i >= 0 {
@@ -290,49 +275,6 @@ func (d *Daemon) forgetDevice(c *Client, id wire.UUID) error {
 	return nil
 }
 
-// refuseDevice keeps what only the Mac's own window asks for from a device's connection.
-func (d *Daemon) refuseDevice(c *Client, method string) error {
-	d.devMu.Lock()
-	defer d.devMu.Unlock()
-	if b, _ := d.callerDevice(c); b != nil {
-		return &Error{Code: wire.FailureNotPermitted, Message: method + " is not open to a device's connection."}
-	}
-	return nil
-}
-
-// startPairing is devices/startPairing: a fresh code each time, replacing any before it.
-func (d *Daemon) startPairing() (wire.PairingCode, error) {
-	d.devMu.Lock()
-	defer d.devMu.Unlock()
-	secret := make([]byte, 32)
-	if _, err := rand.Read(secret); err != nil {
-		return wire.PairingCode{}, err
-	}
-	code := wire.PairingCode{Secret: secret, Name: macName(), Expires: wire.DateOf(nowFunc().Add(pairingLifetime))}
-	d.devPairing = &code
-	Broadcast(d, wire.NotifyPairingChanged, wire.Empty{})
-	return code, nil
-}
-
-func (d *Daemon) endPairing() {
-	if d.devPairing == nil {
-		return
-	}
-	d.devPairing = nil
-	Broadcast(d, wire.NotifyPairingChanged, wire.Empty{})
-}
-
-// currentPairing is pairing/current, for the bridge: a code run out is not handed out.
-func (d *Daemon) currentPairing() wire.PairingSecret {
-	d.devMu.Lock()
-	defer d.devMu.Unlock()
-	if d.devPairing == nil || !nowFunc().Before(d.devPairing.Expires.Time()) {
-		return wire.PairingSecret{}
-	}
-	e := d.devPairing.Expires
-	return wire.PairingSecret{Secret: d.devPairing.Secret, Expires: &e}
-}
-
 // serveDevices registers the methods; devices_darwin.go calls it.
 func (d *Daemon) serveDevices() {
 	On(d, wire.CallDevicesList, func(context.Context, *Client, wire.Empty) ([]wire.Device, error) {
@@ -343,26 +285,5 @@ func (d *Daemon) serveDevices() {
 	})
 	On(d, wire.CallDevicesForget, func(_ context.Context, c *Client, r wire.DeviceForget) (wire.Empty, error) {
 		return wire.Empty{}, d.forgetDevice(c, r.ID)
-	})
-	On(d, wire.CallDevicesStartPairing, func(_ context.Context, c *Client, _ wire.Empty) (wire.PairingCode, error) {
-		if err := d.refuseDevice(c, wire.CallDevicesStartPairing.Name); err != nil {
-			return wire.PairingCode{}, err
-		}
-		return d.startPairing()
-	})
-	On(d, wire.CallDevicesStopPairing, func(_ context.Context, c *Client, _ wire.Empty) (wire.Empty, error) {
-		if err := d.refuseDevice(c, wire.CallDevicesStopPairing.Name); err != nil {
-			return wire.Empty{}, err
-		}
-		d.devMu.Lock()
-		d.endPairing()
-		d.devMu.Unlock()
-		return wire.Empty{}, nil
-	})
-	On(d, wire.CallPairingCurrent, func(_ context.Context, c *Client, _ wire.Empty) (wire.PairingSecret, error) {
-		if err := d.refuseDevice(c, wire.CallPairingCurrent.Name); err != nil {
-			return wire.PairingSecret{}, err
-		}
-		return d.currentPairing(), nil
 	})
 }
