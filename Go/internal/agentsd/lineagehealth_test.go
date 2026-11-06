@@ -185,3 +185,48 @@ func TestLineageABugReportsTheHealthThatStartedIt(t *testing.T) {
 		t.Fatalf("walk from %s: got %v, want its release's PR", bug.Ref, got)
 	}
 }
+
+func incidentEvent(name, folder, startedAt string) wire.Event {
+	e := wire.Event{Name: name, Details: map[string]string{"payload": fmt.Sprintf(
+		`{"team":"Scratch","startedAt":%q,"incident":{"id":"77","name":"web","cause":"Status 503","url":"https://app.example.com","monitor":"7"}}`,
+		startedAt)}}
+	if folder != "" {
+		e.Scope = folderScope(folder)
+	}
+	return e
+}
+
+// #3655: a Better Stack incident is a health node seen-in the release that was out when it
+// started: not a later one, and nothing with no folder.
+func TestLineageIncidentSeenInTheReleaseOut(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	folder := realTempDir(t)
+	d.repos = map[string]forgeRepo{folder: {"github", "alexec/agents"}}
+	repo := d.repos[folder]
+	day := func(n int) time.Time { return time.Date(2026, 11, n, 9, 0, 0, 0, time.UTC) }
+	for i, tag := range []string{"v1.2.0", "v1.10.0", "v1.11.0"} {
+		d.markReleaseTagDone(repo, tag)
+		pr := repo.pr(40 + i)
+		d.lineageDo(func() { d.linkAt(pr, repo.release(tag), lineage.RelPartOf, lineage.SourceForge, day(1+2*i)) })
+	}
+	health := wire.LineageNode{Kind: "health", Ref: "betterstack:77"}
+
+	d.lineageEvent(incidentEvent("health.incident_started", "", "2026-11-04T10:00:00Z"))
+	d.lineageEvent(incidentEvent("health.incident_resolved", folder, "2026-11-04T10:00:00Z"))
+	if links := d.lineage().Links(health).Links; len(links) != 0 {
+		t.Fatalf("no folder, or resolved, linked %v", links)
+	}
+	// v1.10.0 was out on the 3rd; v1.11.0 only on the 5th.
+	d.lineageEvent(incidentEvent("health.incident_started", folder, "2026-11-04T10:00:00Z"))
+	wantLinks(t, active(d, health), health.Ref+" seen-in "+repo.release("v1.10.0").Ref+" (health)")
+	if l := d.lineage().Links(health).Links[0]; !l.At.Time().Equal(time.Date(2026, 11, 4, 10, 0, 0, 0, time.UTC)) {
+		t.Fatalf("linked at %v, want when the incident started", l.At.Time())
+	}
+
+	// A workflow run it started links health started session, as a Sentry issue's does.
+	e := incidentEvent("health.incident_started", folder, "2026-11-04T10:00:00Z")
+	if n, ok := healthNode(e); !ok || n != health {
+		t.Fatalf("%v %v", n, ok)
+	}
+}

@@ -28,6 +28,12 @@ import (
 //     than one has the tag).
 //   - The health node is also seen-in the deploy that the version's build names, when the
 //     graph knows that deploy (#3584): com.example.app@1.2.0+42 is testflight:com.example.app/42.
+//   - Kind health, ref betterstack:<incident id>, from the betterstack events server's
+//     health.incident_started (#3655): a monitor behind a deployed app's status page that
+//     failed. An incident names no version, so it is seen-in the release that was out when
+//     it started: of the version tags done in the scoped folder's repo, the highest whose
+//     release node's first link is at or before the start. An event with no folder links
+//     nothing: a wrong link is worse than a missing one.
 //   - Health back into work (#3586): a workflow run that a health.* event started links
 //     health started the run's session, and an issue that session works on (the File a bug
 //     from Sentry workflow labels its session with the bug it filed or commented on)
@@ -70,7 +76,34 @@ func (d *Daemon) lineageKnows(n wire.LineageNode) bool {
 	return len(d.lineage().Links(n).Links) > 0
 }
 
-// healthOf is a health.* event's payload and its health node.
+// incidentPayload is what health.incident_started and health.incident_resolved say.
+type incidentPayload struct {
+	Incident struct {
+		ID string `json:"id"`
+	} `json:"incident"`
+	StartedAt string `json:"startedAt"`
+}
+
+// incidentOf is a Better Stack event's payload and its health node.
+func incidentOf(e wire.Event) (incidentPayload, wire.LineageNode, bool) {
+	var p incidentPayload
+	if e.Name != "health.incident_started" && e.Name != "health.incident_resolved" ||
+		json.Unmarshal([]byte(e.Details["payload"]), &p) != nil || p.Incident.ID == "" {
+		return p, wire.LineageNode{}, false
+	}
+	return p, wire.LineageNode{Kind: lineage.KindHealth, Ref: "betterstack:" + p.Incident.ID}, true
+}
+
+// healthNode is the health node a health.* event names, from any health source.
+func healthNode(e wire.Event) (wire.LineageNode, bool) {
+	if _, n, ok := healthOf(e); ok {
+		return n, true
+	}
+	_, n, ok := incidentOf(e)
+	return n, ok
+}
+
+// healthOf is a Sentry health.* event's payload and its health node.
 func healthOf(e wire.Event) (healthPayload, wire.LineageNode, bool) {
 	var p healthPayload
 	if e.Name != "health.issue_new" && e.Name != "health.issue_regressed" ||
@@ -83,7 +116,7 @@ func healthOf(e wire.Event) (healthPayload, wire.LineageNode, bool) {
 // lineageHealthStarted links health started session, for the session a health.* event's
 // workflow run started.
 func (d *Daemon) lineageHealthStarted(e wire.Event, session wire.UUID) {
-	if _, health, ok := healthOf(e); ok {
+	if health, ok := healthNode(e); ok {
 		d.lineageDo(func() { d.link(health, sessionNode(session), lineage.RelStarted, lineage.SourceHelper) })
 	}
 }
@@ -169,4 +202,53 @@ func (d *Daemon) healthRelease(scoped, tag, project string) (wire.LineageNode, b
 		return wire.LineageNode{}, false
 	}
 	return found[0].release(tag), true
+}
+
+// lineageIncidentEvent links the health node health.incident_started names seen-in the
+// release that was out when the incident started.
+func (d *Daemon) lineageIncidentEvent(e wire.Event) {
+	p, health, ok := incidentOf(e)
+	if !ok || e.Name != "health.incident_started" || e.Scope.Folder == nil {
+		return
+	}
+	at, err := time.Parse(time.RFC3339, p.StartedAt)
+	if err != nil {
+		return
+	}
+	repo := d.folderRepo(store.FolderPath(e.Scope.Folder.Value))
+	if repo.forge == "" {
+		return
+	}
+	d.lineageDo(func() {
+		if release, ok := d.releaseOutAt(repo, at); ok {
+			d.linkAt(health, release, lineage.RelSeenIn, lineage.SourceHealth, at)
+		}
+	})
+}
+
+// releaseOutAt is the release of repo that was out at at: the highest version tag done
+// whose release node's first link is at or before it. It runs in lineageDo.
+func (d *Daemon) releaseOutAt(repo forgeRepo, at time.Time) (wire.LineageNode, bool) {
+	var tags []string
+	for tag := range d.doneReleaseTags(repo) {
+		if versionTagPattern.MatchString(tag) {
+			tags = append(tags, tag)
+		}
+	}
+	sortVersionTags(tags)
+	for i := len(tags) - 1; i >= 0; i-- {
+		release := repo.release(tags[i])
+		links := d.lineage().Links(release).Links
+		if len(links) == 0 {
+			continue
+		}
+		first := links[0].At
+		for _, l := range links[1:] {
+			first = min(first, l.At)
+		}
+		if !first.Time().After(at) {
+			return release, true
+		}
+	}
+	return wire.LineageNode{}, false
 }

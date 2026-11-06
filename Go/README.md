@@ -22,6 +22,7 @@ stay as they are.
 | `cmd/slack-mcp/`, `internal/slackmcp/` | The `slack` MCP server (#1351): a Slack app's bot over Socket Mode, `message.received` and `question.answered`, and tools that read, send and ask | channels |
 | `cmd/googlechat-mcp/`, `internal/googlechatmcp/` | The `googlechat` MCP server (#1016): a Google Chat app's messages and answers as `message.received` and `question.answered`, pulled from Pub/Sub, and tools that post as the app | googlechat |
 | `cmd/sentry-mcp/`, `internal/sentrymcp/` | The `sentry` events MCP server (#3583): an organization's new and regressed issues as `health.issue_new` and `health.issue_regressed`, polled on Sentry's REST API; no tools (Sentry's own server has them) | sentry |
+| `cmd/betterstack-mcp/`, `internal/betterstackmcp/` | The `betterstack` events MCP server (#3655): a team's incidents as `health.incident_started` and `health.incident_resolved`, polled on Better Stack's Uptime API; no tools (Better Stack's own server has them) | betterstack |
 | `cmd/whatsapp-mcp/`, `internal/whatsappmcp/` | The `whatsapp` MCP server (#1352): a WhatsApp Business number's messages and answers as `message.received` and `question.answered`, by Meta's signed webhook, and tools that send as the number | whatsapp |
 | `cmd/gitlab-mcp/`, `internal/gitlabmcp/` | The `gitlab` MCP server (#1629): merge requests, pipelines and issues on GitLab, tools and events on REST v4 | gitlab |
 | `cmd/workspace-commands/`, `internal/workspacecommands/` | The command machine provider (#691, in Go since #1364): workspaces as shell commands and presets, an MCP server the control plane runs | workspaces |
@@ -331,6 +332,28 @@ The tests run it against a fake Sentry API (`sentry_test.go`), and agentsd's
 (`scripts/go-github-mcp.sh sentry-mcp`) and every Linux host installs
 `sentry-mcp-linux-<arch>`; the catalogue lists it as `agents/sentry`. See
 `docs/how-to/use-sentry.md`.
+
+## The Better Stack events MCP server (`betterstack-mcp`, #3655)
+
+Better Stack's official MCP server (`https://mcp.betterstack.com`) has tools, status pages
+included, but no events, so the catalogue offers it as a remote (`com.betterstack/mcp`,
+signed in by the app's MCP OAuth) and `betterstack-mcp` adds the events, as `sentry-mcp`
+does for Sentry. It is the sentry server's front with no tools, on Go's own `net/http`
+(Better Stack has no Go SDK). `BETTERSTACK_API_TOKEN`, `BETTERSTACK_TEAM` and
+`BETTERSTACK_URL` are read at its start.
+
+- **Events** `health.incident_started` (an incident that started after the cursor) and
+  `health.incident_resolved` (one resolved after it, that started at most 7 days before),
+  filter `monitor`, polled every 30 seconds. Incidents are read by the day they started, at
+  most 4 pages of 50; a next page on another host is not followed. The cursor is a time and
+  the incidents raised from 30 minutes before it, as the sentry server's. The data is the
+  team, the incident (id, the monitor's name, cause, address, monitor id) and its times.
+
+The tests run it against a fake Better Stack API (`betterstack_test.go`), and agentsd's
+`betterstackevents_test.go` wakes a wait through it. Agents Host carries it
+(`scripts/go-github-mcp.sh betterstack-mcp`) and every Linux host installs
+`betterstack-mcp-linux-<arch>`; the catalogue lists it as `agents/betterstack`. See
+`docs/how-to/use-better-stack.md`.
 
 ## The command machine provider (`workspace-commands`, #691, #1364)
 
