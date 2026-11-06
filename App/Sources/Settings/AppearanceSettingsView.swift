@@ -84,6 +84,9 @@ struct MacSettingsView: View {
                 BackupsSection(state: backups, configure: model.configureBackups, make: model.makeBackup,
                                restore: model.restoreBackup, chooseFolder: { chooseBackupFolder(backups) })
             }
+            if model.hasMacHost, model.host(.mac, has: Capability.processes1) {
+                MachineProcessesSection(client: model.client(for: .mac), hostName: "This Mac")
+            }
         }
         .paperForm()
         .task {

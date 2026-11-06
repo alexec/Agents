@@ -120,6 +120,7 @@ const CapPolicy1 = "policy/1"
 const CapPool1 = "pool/1"
 const CapPreferences1 = "preferences/1"
 const CapPresence1 = "presence/1"
+const CapProcesses1 = "processes/1"
 const CapProjectsBoards1 = "projects.boards/1"
 const CapProjectsSessions1 = "projects.sessions/1"
 const CapProjects1 = "projects/1"
@@ -408,6 +409,7 @@ var HostCapabilities = pairs([][2]string{
 	{"preferences/get", "preferences/1"},
 	{"preferences/set", "preferences/1"},
 	{"presence/report", "presence/1"},
+	{"processes/list", "processes/1"},
 	{"providers/carry", "providers.carry/1"},
 	{"providers/forget", "providers.carry/1"},
 	{"providers/keepSecrets", "providers.carry/1"},

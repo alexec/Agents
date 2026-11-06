@@ -326,6 +326,27 @@ func (s *Session) Stop() {
 
 func (s *Session) Done() <-chan struct{} { return s.done }
 
+// Pids is the runtime's process, then each terminal's it asked for that has not ended
+// (processes/list, #3453): the daemon starts both, so a terminal is not the runtime's child.
+func (s *Session) Pids() []int {
+	if s.cmd.Process == nil {
+		return nil
+	}
+	pids := []int{s.cmd.Process.Pid}
+	s.client.mu.Lock()
+	defer s.client.mu.Unlock()
+	for _, t := range s.client.terminals {
+		select {
+		case <-t.done:
+		default:
+			if t.cmd.Process != nil {
+				pids = append(pids, t.cmd.Process.Pid)
+			}
+		}
+	}
+	return pids
+}
+
 // client answers the runtime's requests.
 type client struct {
 	sink Sink

@@ -1319,5 +1319,14 @@
   "LockJoinDecided": {
     "request": "request",
     "result": "approved"
+  },
+  "ProcessesState": {
+    "machine": { "cpuPercent": 12.5, "cpuCount": 8, "memoryUsed": 7000000000, "memoryTotal": 16000000000 },
+    "processes": [
+      { "pid": 10, "parent": 1, "depth": 0, "name": "agentsd", "cpuPercent": 1.5, "memory": 50000000 },
+      { "pid": 20, "parent": 10, "depth": 1, "name": "node", "cpuPercent": 101.5, "memory": 300000000,
+        "agentId": "6F9619FF-8B86-D011-B42D-00C04FC964FF", "title": "title" }
+    ],
+    "omitted": 7
   }
 }

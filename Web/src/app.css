@@ -2002,3 +2002,6 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
 .work-plan-blocked:hover:not(:disabled) { opacity: 1; text-decoration: underline; }
 .work-plan-add { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
 .work-plan-add input { flex: 1; min-width: 16em; }
+
+/* Settings ▸ Processes (#3453): the numbers line up. */
+.process-usage { white-space: nowrap; font-variant-numeric: tabular-nums; }

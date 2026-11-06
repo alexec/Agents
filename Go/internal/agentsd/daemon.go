@@ -59,6 +59,7 @@ type Daemon struct {
 	lockState
 	selfUpdateState
 	quitState
+	processBook
 	leaseState
 	eventBook
 	actorBook
