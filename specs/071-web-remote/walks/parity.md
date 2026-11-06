@@ -60,7 +60,7 @@ The deltas are tracked by 31 issues:
 - [Pool, runtimes and spending](parity/pool-runtimes-and-spending.md)
 - [Events and resources](parity/events-and-resources.md)
 - [Notifications and badges](parity/notifications-and-badges.md)
-- [Disk strip](parity/disk-strip.md)
+- [Disk space](parity/disk-space.md)
 - [Hosts, connection and pairing](parity/hosts-connection-and-pairing.md)
 - [MCP Apps views](parity/mcp-apps-views.md)
 - [Console and Reports (#1804)](parity/console-and-reports.md)

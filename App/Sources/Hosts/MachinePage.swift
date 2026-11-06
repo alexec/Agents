@@ -2,7 +2,7 @@ import AgentsKitCore
 import SwiftUI
 
 /// One machine's page in the main window (#3626): the place to go for its status. Its CPU
-/// and memory now, every disk its agents write to with the level the disk-low strip uses,
+/// and memory now, every disk its agents write to with its level (low or almost full),
 /// its worktrees, a section per folder (#3627), its runtimes and resources (#3629), and its
 /// processes (#3453). Read with
 /// `machine/usage` when it opens and every few seconds while it is open, never otherwise.
@@ -119,7 +119,7 @@ struct MachinePage: View {
             } header: {
                 Text("Disks")
             } footer: {
-                Text("Each disk its agents write to. Low and almost full are the lines the disk-low warning uses.")
+                Text("Each disk its agents write to. Low and almost full are the lines set in Folder Settings ▸ Disk Space.")
                     .foregroundStyle(.secondary)
             }
         }
@@ -182,7 +182,7 @@ struct MachineRow: View {
 }
 
 extension AppModel {
-    /// Whether a disk on the machine is low or almost full, as its disk-low strip says (#3626).
+    /// Whether a disk on the machine is low or almost full, as its page says (#3626, #3628).
     func diskWarns(_ host: MachineRef) -> Bool {
         let alarms = host == .mac ? work.disk.alarms : serverDisks[host]?.alarms ?? []
         return alarms.contains { $0.level != .ok }

@@ -333,9 +333,6 @@ final class RemoteModel {
     /// What `control/status` last said: its version and capabilities, for Settings (#1748).
     private(set) var controlStatus: DaemonAPI.ControlStatus?
 
-    /// Each other host's disk alarms, kept separate from this Mac's strip (#263).
-    private(set) var serverDisks: [MachineRef: DiskState] = [:]
-
     init(link: any DaemonLink) {
         baseLink = link
         // Each request to the home host checked end to end once this device is in its lock (#3492),
@@ -2545,7 +2542,6 @@ final class RemoteModel {
                 work.replaceAgents(agents, from: id)
             }
             await refreshServerRuntimes(id)
-            await refreshServerDisk(id)
             let notes = other.notifications()
             let shown = work.shown
             // Read off the main actor, once, and applied there (#203).
@@ -2558,12 +2554,10 @@ final class RemoteModel {
                         await self?.received(note.method, note.params, fromOther: id)
                         continue
                     }
-                    if note.method == DaemonAPI.Notification.diskChanged {
-                        await self?.received(note.method, note.params, fromOther: id)
-                        continue
-                    }
-                    // Settings ▸ Backups is the Mac's (#1810).
-                    if note.method == DaemonAPI.Notification.resourcesChanged
+                    // Settings ▸ Backups is the Mac's (#1810); a machine's disks are on its
+                    // page, which the Remote does not have (#3628).
+                    if note.method == DaemonAPI.Notification.diskChanged
+                        || note.method == DaemonAPI.Notification.resourcesChanged
                         || note.method == DaemonAPI.Notification.mcpHostedChanged
                         || note.method == DaemonAPI.Notification.eventsChanged
                         || note.method == DaemonAPI.Notification.backupsChanged { continue }
@@ -2600,7 +2594,6 @@ final class RemoteModel {
                 work.replaceFolders([], from: id)
                 work.replaceAgents([], from: id)
                 serverRuntimes[id] = nil
-                serverDisks[id] = nil
             }
         }
     }
@@ -2611,8 +2604,6 @@ final class RemoteModel {
         switch method {
         case DaemonAPI.Notification.runtimeChanged:
             await refreshServerRuntimes(host)
-        case DaemonAPI.Notification.diskChanged:
-            if let state = try? params?.decode(DiskState.self) { serverDisks[host] = state }
         case DaemonAPI.Notification.draftOptions:
             guard host == startDraftHost,
                   let change = try? params?.decode(DaemonAPI.DraftOptionsNotification.self) else { return }
@@ -2888,9 +2879,6 @@ final class RemoteModel {
         }
         // Sessions in scenes of their own (#888), as the main scene's chat.
         for chat in popouts.values { await loadTranscript(of: chat) }
-        // The low-disk strip is under the banner on every page (#196), so it is read
-        // on every catch-up, not when a page asks for it.
-        if carried?.disk == nil { await refreshDisk() }
         // The person's display choices (#1033): the sidebar and every chat read them.
         await refreshDisplayPreferences()
         // The organisation's strip is on every page (#998), so it is read on every catch-up.
@@ -2934,7 +2922,6 @@ final class RemoteModel {
         work.replaceAttention(snapshot.attention)
         work.setResuming(snapshot.resuming)
         toNotifier { [deviceID = self.deviceID] notifier in await notifier.sweep(keeping: snapshot.attention, me: .device(deviceID)) }
-        if let disk = snapshot.disk { work.replaceDisk(disk) }
         if let notes = snapshot.storeNotes { work.replaceStoreNotes(notes) }
         if let workflows = snapshot.workflows { work.replaceWorkflows(workflows) }
         if let pins = snapshot.pins { work.replacePins(pins) }
@@ -3616,13 +3603,6 @@ final class RemoteModel {
         await refreshEvents()
     }
 
-    private func refreshServerDisk(_ host: MachineRef) async {
-        guard let other = otherHosts[host], reachableHosts.contains(host),
-              let state = try? await other.call(DaemonAPI.Method.diskState,
-                                                Optional<String>.none, returning: DiskState.self) else { return }
-        serverDisks[host] = state
-    }
-
     // MARK: The pool (052)
 
     func agent(_ id: UUID) -> Agent? { work.agent(id) }
@@ -3662,14 +3642,6 @@ final class RemoteModel {
                                                returning: DaemonAPI.MCPHealthSnapshot.self) {
             work.replaceMCPHealth(health)
         }
-    }
-
-    /// Every volume on the Mac low on space (#196), for the strip under the banner. A Mac
-    /// too old to know the method leaves it empty, and no strip is drawn.
-    private func refreshDisk() async {
-        guard let state = try? await client.call(DaemonAPI.Method.diskState, Optional<String>.none,
-                                                 returning: DiskState.self) else { return }
-        work.replaceDisk(state)
     }
 
     /// The files the Mac's host could not read in this run (#205, #223), then heard as

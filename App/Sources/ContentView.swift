@@ -141,7 +141,6 @@ struct ContentView: View {
             // pinned view (#189), fed afresh.
             VStack(spacing: 0) {
                 OfflineStrip(host: summary.host)
-                DiskStrip(host: summary.host)
                 // Or a server's list view (#2032), whose Hide is its Unpin.
                 if let pin = model.work.pinOrView(path, in: key.folder), let view = pin.view {
                     PinnedViewPage(folder: key.folder, pin: pin, view: view,
