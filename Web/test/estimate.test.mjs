@@ -42,3 +42,12 @@ test("an epic adds up its open children and says what its closed ones spent", ()
   assert.equal(e.childEstimateWords(story), "est. $3.20 · 2h 10m");
   assert.equal(e.showsEstimate({ ...epic, openChildren: 0 }), false);
 });
+
+test("a closed issue says the estimate at its start against the actual (#3561)", () => {
+  assert.equal(e.actualWords(story), undefined);
+  const kept = { at: 0, matchedBy: "level", matches: 31, cost: { USD: 3.2 }, workingSeconds: 7800 };
+  assert.equal(e.actualWords({ ...story, kept }), undefined);
+  const actual = { cost: { USD: 4.1 }, inputTokens: 0, outputTokens: 0, turns: 1, workingSeconds: 10800, waitingSeconds: 0 };
+  assert.equal(e.actualWords({ ...story, kept, actual }), "Estimated $3.20, 2h 10m of work; actual $4.10, 3h of work");
+  assert.equal(e.actualWords({ ...story, kept: { at: 0, matches: 0 }, actual }), undefined);
+});

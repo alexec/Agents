@@ -315,6 +315,60 @@ func (d *Daemon) refreshCostResolvedLocked() {
 	}
 }
 
+// keepEstimatesLocked keeps on each issue whose work has started the estimate it had then
+// (#3561): from the issues merged before its start, once its labels are known, marking it
+// unsent. It is made once, so an issue that closes is set against what was said at its start.
+// An epic (labelled epic, or another issue's parent) has none here: lineage/estimate makes an
+// epic's from its plan.
+func (d *Daemon) keepEstimatesLocked() {
+	f := d.costLedgerLocked()
+	var history []lineage.Past
+	var parents map[string]bool
+	for k, c := range f.Nodes {
+		start := lineage.StartOf(c)
+		if c.Node.Kind != lineage.KindIssue || c.Estimate != nil || start == nil || c.Resolved == nil ||
+			(c.Level != nil && *c.Level == "epic") {
+			continue
+		}
+		if parents == nil {
+			nodes := ledgerNodes(f)
+			history = lineage.History(nodes)
+			parents = map[string]bool{}
+			for _, n := range nodes {
+				if n.Parent != nil {
+					parents[*n.Parent] = true
+				}
+			}
+		}
+		if parents[c.Node.Ref] {
+			continue
+		}
+		kept := lineage.KeepIssue(history, c.Node, c.Resolved.Labels, *start)
+		d.keepEstimateLocked(k, kept)
+	}
+}
+
+// keepEstimateLocked puts kept on the node at k and marks it unsent.
+func (d *Daemon) keepEstimateLocked(k string, kept wire.LineageEstimateKept) {
+	f := d.costLedgerLocked()
+	c, ok := f.Nodes[k]
+	if !ok {
+		return
+	}
+	c.Estimate = &kept
+	f.Nodes[k] = c
+	f.Seq++
+	f.Unsent[k] = f.Seq
+}
+
+func ledgerNodes(f *costLedgerFile) []wire.LineageCostNode {
+	nodes := make([]wire.LineageCostNode, 0, len(f.Nodes))
+	for _, c := range f.Nodes {
+		nodes = append(nodes, c)
+	}
+	return nodes
+}
+
 // costChangedLocked saves within reportSaveAfter, or at once after shutdown.
 func (d *Daemon) costChangedLocked() {
 	if d.workClosed {
@@ -387,6 +441,7 @@ func (d *Daemon) unsentCost() ([]wire.LineageCostNode, map[string]int64) {
 	defer d.workMu.Unlock()
 	d.refreshCostLinksLocked()
 	d.refreshCostResolvedLocked()
+	d.keepEstimatesLocked()
 	f := d.costLedgerLocked()
 	keys := make([]string, 0, len(f.Unsent))
 	for k := range f.Unsent {
@@ -438,6 +493,7 @@ func (d *Daemon) lineageCost(of wire.LineageNode) wire.LineageCostRollup {
 // lineageEstimate is lineage/estimate (#3559): an issue or an epic estimated from the closed
 // issues in this machine's totals. Its labels, children, their state and steps come from the
 // forge's plan (forge/plan, cached); an issue with children, or labelled epic, is an epic.
+// With it go the estimate it had when its work started and, once closed, what it took (#3561).
 func (d *Daemon) lineageEstimate(ctx context.Context, r wire.LineageEstimateRequest) (wire.LineageEstimate, error) {
 	plan, err := d.forgePlan(ctx, wire.ForgePlanRequest{Node: r.Node})
 	if err != nil {
@@ -451,23 +507,72 @@ func (d *Daemon) lineageEstimate(ctx context.Context, r wire.LineageEstimateRequ
 	d.workMu.Lock()
 	d.refreshCostLinksLocked()
 	d.refreshCostResolvedLocked()
+	d.keepEstimatesLocked()
 	f := d.costLedgerLocked()
-	nodes := make([]wire.LineageCostNode, 0, len(f.Nodes))
-	for _, c := range f.Nodes {
-		nodes = append(nodes, c)
-	}
+	nodes := ledgerNodes(f)
+	own, haveOwn := f.Nodes[costKey(r.Node)]
 	d.workMu.Unlock()
 	history := lineage.History(nodes)
 	labels := forgeLabelNames(plan.Item.Labels)
+	closed := plan.Item.State == "closed" || plan.Item.State == "merged"
 	if len(plan.Children) == 0 && lineage.LevelOf(labels) != "epic" {
-		return lineage.EstimateIssue(history, r.Node, labels, start), nil
+		e := lineage.EstimateIssue(history, r.Node, labels, start)
+		if haveOwn {
+			e.Kept = own.Estimate
+		}
+		if closed {
+			actual := lineage.Rollup(nodes, r.Node).Total
+			e.Actual = &actual
+		}
+		return e, nil
 	}
 	children := make([]lineage.EpicChild, 0, len(plan.Children))
 	for _, c := range plan.Children {
 		children = append(children, lineage.EpicChild{Node: c.Item.Node, Labels: forgeLabelNames(c.Item.Labels), Step: c.Step,
 			Open: c.Item.State != "closed" && c.Item.State != "merged"})
 	}
-	return lineage.EstimateEpic(history, nodes, r.Node, labels, children, start), nil
+	e := lineage.EstimateEpic(history, nodes, r.Node, labels, children, start)
+	e.Kept = d.keptEpic(history, nodes, own, haveOwn, r.Node, labels, children)
+	if closed {
+		actual := lineage.Rollup(nodes, r.Node).Total
+		for _, c := range children {
+			lineage.AddCost(&actual, lineage.Rollup(nodes, c.Node).Total)
+		}
+		e.Actual = &actual
+	}
+	return e, nil
+}
+
+// keptEpic is the estimate an epic had when its work started (#3561): the one kept on its
+// node, else one made now from its plan, every child open, and the issues merged before the
+// first start on it or any child; kept on its node when the store has one. None before work
+// starts. An estimate kept as an issue's (it had no children yet) is made again.
+func (d *Daemon) keptEpic(history []lineage.Past, nodes []wire.LineageCostNode, own wire.LineageCostNode, haveOwn bool,
+	of wire.LineageNode, labels []string, children []lineage.EpicChild) *wire.LineageEstimateKept {
+	if haveOwn && own.Estimate != nil && own.Estimate.MatchedBy == nil {
+		return own.Estimate
+	}
+	in := map[wire.LineageNode]bool{of: true}
+	for _, c := range children {
+		in[c.Node] = true
+	}
+	var start *wire.Date
+	for _, n := range nodes {
+		if s := lineage.StartOf(n); in[n.Node] && s != nil && (start == nil || *s < *start) {
+			start = s
+		}
+	}
+	if start == nil {
+		return nil
+	}
+	kept := lineage.KeepEpic(history, of, labels, children, *start)
+	if haveOwn {
+		d.workMu.Lock()
+		d.keepEstimateLocked(costKey(of), kept)
+		d.costChangedLocked()
+		d.workMu.Unlock()
+	}
+	return &kept
 }
 
 func forgeLabelNames(labels []wire.ForgeLabel) []string {

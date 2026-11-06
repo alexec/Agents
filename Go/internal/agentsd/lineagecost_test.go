@@ -354,3 +354,60 @@ func TestLineageEstimateOfAnEpic(t *testing.T) {
 		t.Fatalf("%+v", e)
 	}
 }
+
+// #3561: an issue keeps the estimate it had when its work started, from the issues merged
+// before then only, and once closed lineage/estimate says it with what the work took.
+func TestLineageEstimateKeepsTheStartAndSaysTheActual(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	issue := func(n int) wire.LineageNode {
+		return wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#" + strconv.Itoa(n)}
+	}
+	now := time.Now()
+	began := wire.DateOf(now.Add(-5 * time.Hour))
+	state, merged, level := "closed", lineage.OutcomeMerged, "task"
+	labels := []string{"enhancement", "task"}
+	var links []wire.LineageCostNode
+	add := func(n int, usd float64, mergedAt time.Time, startedAt *wire.Date) {
+		c := wire.LineageCostNode{Node: issue(n), Banked: wire.LineageCost{Cost: map[string]float64{"USD": usd}}, Level: &level,
+			StartedAt: startedAt, Resolved: &wire.LineageResolved{Title: "Done", State: &state, Labels: labels}}
+		ended := wire.DateOf(mergedAt)
+		pr := wire.LineageCostNode{Node: wire.LineageNode{Kind: "pr", Ref: "github:alexec/agents#" + strconv.Itoa(100+n)},
+			Banked: wire.LineageCost{Cost: map[string]float64{"USD": 1}}, Fixes: []string{c.Node.Ref}, Outcome: &merged, EndedAt: &ended}
+		d.workMu.Lock()
+		f := d.costLedgerLocked()
+		f.Nodes[costKey(c.Node)], f.Nodes[costKey(pr.Node)] = c, pr
+		d.workMu.Unlock()
+		links = append(links, pr)
+	}
+	for n := 1; n <= 6; n++ {
+		add(n, float64(n)-1, now.Add(-10*time.Hour), nil)
+	}
+	// Merged after #20 started: not in what #20's estimate knew.
+	add(7, 99, now.Add(-time.Hour), nil)
+	add(20, 7, now, &began)
+	for _, pr := range links {
+		d.linkAt(pr.Node, wire.LineageNode{Kind: "issue", Ref: pr.Fixes[0]}, lineage.RelFixes, lineage.SourceStart, now)
+	}
+	key, _ := json.Marshal([]any{"forge/plan", issue(20).Ref})
+	d.forgeRemember(string(key), forgeAnswer{plan: &forgePlanAnswer{
+		epic: wire.ForgeItem{Node: issue(20), State: "closed", Labels: []wire.ForgeLabel{{Name: "enhancement"}, {Name: "task"}}}}})
+	e, err := d.lineageEstimate(context.Background(), wire.LineageEstimateRequest{Node: issue(20)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The six before: $1 to $6 with their PRs' $1, so a median of $3.50.
+	if e.Kept == nil || e.Kept.At != began || e.Kept.Matches != 6 || e.Kept.Cost["USD"] != 3.5 {
+		t.Fatalf("kept %+v", e.Kept)
+	}
+	if e.Actual == nil || usd(*e.Actual) != 8 {
+		t.Fatalf("actual %+v", e.Actual)
+	}
+	// Kept on the node, so it goes to the control plane and is not made again.
+	d.workMu.Lock()
+	kept := d.costLedgerLocked().Nodes[costKey(issue(20))].Estimate
+	d.workMu.Unlock()
+	if kept == nil || kept.Cost["USD"] != 3.5 {
+		t.Fatalf("%+v", kept)
+	}
+}

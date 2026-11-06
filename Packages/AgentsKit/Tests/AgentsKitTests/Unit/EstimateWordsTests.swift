@@ -45,4 +45,16 @@ struct EstimateWordsTests {
         epic.openChildren = 0
         #expect(!EstimateWords.shows(epic))
     }
+
+    @Test func aClosedIssueSaysTheEstimateAtItsStartAgainstTheActual() {
+        var done = story
+        #expect(EstimateWords.actualWords(done) == nil)
+        done.kept = .init(at: Date(timeIntervalSince1970: 0), matchedBy: "level", matches: 31, cost: ["USD": 3.2],
+                          workingSeconds: 7800)
+        #expect(EstimateWords.actualWords(done) == nil)
+        done.actual = .init(cost: ["USD": 4.1], workingSeconds: 10800)
+        #expect(EstimateWords.actualWords(done) == "Estimated $3.20, 2h 10m of work; actual $4.10, 3h of work")
+        done.kept = .init(at: Date(timeIntervalSince1970: 0), matches: 0)
+        #expect(EstimateWords.actualWords(done) == nil)
+    }
 }

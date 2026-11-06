@@ -87,3 +87,18 @@ function money(cost: Record<string, LineageEstimateRange> | undefined, at: "medi
   if (priced.length === 0) return undefined;
   return priced.map(([currency, r]) => moneyWords(r[at], currency)).join(" + ");
 }
+
+/** A closed issue's or epic's estimate against what it took (#3561): "Estimated $3.20, 2h 10m of work; actual
+ * $4.10, 3h of work". Undefined while open, before work started, or when the estimate then had no figures. */
+export function actualWords(e: LineageEstimate): string | undefined {
+  const kept = e.kept;
+  if (!kept || !e.actual) return undefined;
+  const said: string[] = [];
+  const priced = Object.entries(kept.cost ?? {}).sort(([a], [b]) => a.localeCompare(b));
+  if (priced.length > 0) said.push(priced.map(([currency, v]) => moneyWords(v, currency)).join(" + "));
+  if (kept.workingSeconds !== undefined) said.push(`${timeWords(kept.workingSeconds)} of work`);
+  if (said.length === 0) return undefined;
+  const took = [costWords(e.actual)];
+  if (kept.workingSeconds !== undefined) took.push(`${timeWords(e.actual.workingSeconds)} of work`);
+  return `Estimated ${said.join(", ")}; actual ${took.join(", ")}`;
+}

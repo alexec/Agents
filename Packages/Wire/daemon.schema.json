@@ -11775,6 +11775,10 @@
             "type": "string"
           },
           "description": "The sessions linked to the node (works-on, opens, reviews), by ref, at most 20 (#3118)."
+        },
+        "estimate": {
+          "$ref": "#/definitions/LineageEstimateKept",
+          "description": "An issue's estimate when its work started (#3561), kept once made, for the estimate against the actual when it closes."
         }
       },
       "required": [
@@ -11937,6 +11941,14 @@
             "$ref": "#/definitions/LineageEstimate"
           },
           "description": "An epic's open children, each estimated as an issue, in step order."
+        },
+        "kept": {
+          "$ref": "#/definitions/LineageEstimateKept",
+          "description": "The estimate when work on it started (#3561), from the issues merged before then; absent before work starts. An issue's is kept in the cost store; an epic's is made from its plan's children, all open, at the epic's start."
+        },
+        "actual": {
+          "$ref": "#/definitions/LineageCost",
+          "description": "What a closed issue or epic took (#3561): an issue's own cost and its PRs'; an epic's, its own and every child's. Absent while open."
         }
       },
       "required": [
@@ -11964,6 +11976,44 @@
         "median",
         "p10",
         "p90"
+      ],
+      "additionalProperties": false
+    },
+    "LineageEstimateKept": {
+      "type": "object",
+      "description": "An estimate as it was when work started (#3561): the medians of lineage/estimate's figures, made from the closed issues that had merged before the start, so it can be set against what the work took when it closes.",
+      "properties": {
+        "at": {
+          "$ref": "#/definitions/WireDate",
+          "description": "The start of work it was made for: the history is the issues merged before it."
+        },
+        "matchedBy": {
+          "type": "string",
+          "description": "level, type or all, as LineageEstimate.matchedBy; absent for an epic and with too few closed issues."
+        },
+        "matches": {
+          "type": "integer",
+          "description": "The closed issues it was made from."
+        },
+        "cost": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "Dollars, by currency: the median."
+        },
+        "outputTokens": {
+          "type": "number",
+          "description": "The median."
+        },
+        "workingSeconds": {
+          "type": "number",
+          "description": "The agents' time at work: the median."
+        }
+      },
+      "required": [
+        "at",
+        "matches"
       ],
       "additionalProperties": false
     },
@@ -20730,6 +20780,28 @@
       ],
       "additionalProperties": false
     },
+    "ReportEstimateError": {
+      "type": "object",
+      "description": "How far the estimates were from the actual figures (#3561), over the issues closed in the range that had an estimate when their work started: the median of max(estimate/actual, actual/estimate), so 1.5 means 1.5 times too high or too low. A figure is absent when no issue had it.",
+      "properties": {
+        "issues": {
+          "type": "integer",
+          "description": "The closed issues with an estimate."
+        },
+        "cost": {
+          "type": "number",
+          "description": "In US dollars."
+        },
+        "workingSeconds": {
+          "type": "number",
+          "description": "In the agents' time at work."
+        }
+      },
+      "required": [
+        "issues"
+      ],
+      "additionalProperties": false
+    },
     "ReportExport": {
       "type": "object",
       "description": "reports/export's answer (#1811): the rows as CSV or JSON lines.",
@@ -21204,6 +21276,9 @@
         "cycleTimeSeconds": {
           "type": "number",
           "description": "The median of the issues' cycle times (#3562)."
+        },
+        "estimateError": {
+          "$ref": "#/definitions/ReportEstimateError"
         },
         "issues": {
           "type": "array",
