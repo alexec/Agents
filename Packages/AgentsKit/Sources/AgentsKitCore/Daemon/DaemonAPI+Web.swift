@@ -113,7 +113,7 @@ public extension DaemonAPI {
                 Row(Method.agentsResuming, params: Empty.self, result: ResumingResponse.self, kind: .hostRequest),
                 Row(Method.worktreesList, params: WorktreesListRequest.self, result: WorktreesListResponse.self,
                     kind: .hostRequest),
-                // Activity ▸ Worktrees (#790): every folder's, with sizes; Remove build output and Remove….
+                // A machine's page ▸ Worktrees (#790, #3627): every folder's, with sizes; Remove build output and Remove….
                 Row(Method.worktreesAll, params: Empty.self, result: [FolderWorktrees].self, kind: .hostRequest),
                 Row(Method.worktreesRemoveBuildOutput, params: WorktreeRemovalRequest.self, result: BuildOutputRemoved.self,
                     kind: .hostRequest),

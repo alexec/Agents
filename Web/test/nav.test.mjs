@@ -105,3 +105,8 @@ test("Agents' state filter keeps the sessions in that state", async () => {
   assert.equal(f.keptByState(agent("finished"), "done"), true);
   assert.equal(f.keptByState(agent("finished"), "working"), false);
 });
+
+test("worktrees are on each machine's page, and the old address goes to Machines (#3627)", () => {
+  assert.ok(n.navPages.machines.every((p) => p.id !== "worktrees"));
+  assert.deepEqual(n.movedPage("a", "worktrees"), { nav: "machines", section: "machines" });
+});

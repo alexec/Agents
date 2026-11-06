@@ -199,7 +199,6 @@ final class AppModel {
             showsTime = false
             showsMilestones = false
             showsTokens = false
-            showsWorktrees = false
             machinePage = nil
             showsWork = false
             showsDocs = false
@@ -227,7 +226,6 @@ final class AppModel {
             showsTime = false
             showsMilestones = false
             showsTokens = false
-            showsWorktrees = false
             machinePage = nil
             showsWork = false
             showsDocs = false
@@ -250,7 +248,6 @@ final class AppModel {
             showsTime = false
             showsMilestones = false
             showsTokens = false
-            showsWorktrees = false
             machinePage = nil
             showsWork = false
             showsDocs = false
@@ -276,7 +273,6 @@ final class AppModel {
             showsTime = false
             showsMilestones = false
             showsTokens = false
-            showsWorktrees = false
             machinePage = nil
             showsWork = false
             showsDocs = false
@@ -300,7 +296,6 @@ final class AppModel {
             showsTime = false
             showsMilestones = false
             showsTokens = false
-            showsWorktrees = false
             machinePage = nil
             showsWork = false
             showsDocs = false
@@ -323,7 +318,6 @@ final class AppModel {
             showsMCPServers = false
             showsMilestones = false
             showsTokens = false
-            showsWorktrees = false
             machinePage = nil
             showsWork = false
             showsDocs = false
@@ -346,7 +340,6 @@ final class AppModel {
             showsMCPServers = false
             showsTime = false
             showsTokens = false
-            showsWorktrees = false
             machinePage = nil
             showsWork = false
             showsDocs = false
@@ -369,7 +362,6 @@ final class AppModel {
             showsMCPServers = false
             showsTime = false
             showsMilestones = false
-            showsWorktrees = false
             machinePage = nil
             showsWork = false
             showsDocs = false
@@ -385,31 +377,6 @@ final class AppModel {
     var machinePage: MachineRef? {
         didSet {
             guard machinePage != nil, machinePage != oldValue else { return }
-            showsWork = false
-            showsDocs = false
-            showsSpending = false
-            showsResources = false
-            showsEvents = false
-            showsRuntimes = false
-            showsMCPServers = false
-            showsTime = false
-            showsMilestones = false
-            showsTokens = false
-            showsWorktrees = false
-            selection = nil
-            openWorkflow = nil
-            folderPage = nil
-            composing = false
-        }
-    }
-
-    /// Whether the window is showing Worktrees: every folder's, and how much each holds
-    /// on disk (#790). A page like MCP Servers, and not persisted for the same reason; it
-    /// was in Folder Settings, which are for what a person sets, not what changes.
-    var showsWorktrees = false {
-        didSet {
-            guard showsWorktrees, showsWorktrees != oldValue else { return }
-            machinePage = nil
             showsWork = false
             showsDocs = false
             showsSpending = false
@@ -442,7 +409,6 @@ final class AppModel {
             showsTime = false
             showsMilestones = false
             showsTokens = false
-            showsWorktrees = false
             machinePage = nil
             selection = nil
             openWorkflow = nil
@@ -464,7 +430,6 @@ final class AppModel {
             showsTime = false
             showsMilestones = false
             showsTokens = false
-            showsWorktrees = false
             machinePage = nil
             showsWork = false
             selection = nil
@@ -544,7 +509,6 @@ final class AppModel {
         showsTime = false
         showsMilestones = false
         showsTokens = false
-        showsWorktrees = false
         machinePage = nil
         showsWork = false
         showsDocs = false
@@ -571,7 +535,6 @@ final class AppModel {
         showsTime = false
         showsMilestones = false
         showsTokens = false
-        showsWorktrees = false
         machinePage = nil
         showsWork = false
         showsDocs = false
@@ -613,7 +576,6 @@ final class AppModel {
             if showsResources { return .resources }
             if showsRuntimes { return .runtimes }
             if showsMCPServers { return .mcpServers }
-            if showsWorktrees { return .worktrees }
             if let machinePage { return .machine(machinePage) }
             if showsSpending { return .spending }
             if showsTokens { return .tokens }
@@ -645,7 +607,6 @@ final class AppModel {
                 showsTime = false
                 showsMilestones = false
                 showsTokens = false
-                showsWorktrees = false
                 machinePage = nil
                 showsWork = false
                 showsDocs = false
@@ -679,8 +640,6 @@ final class AppModel {
                 showRuntimes()
             case .mcpServers:
                 showsMCPServers = true
-            case .worktrees:
-                showsWorktrees = true
             case .machine(let host):
                 machinePage = host
             case .folder(let key):
@@ -692,7 +651,6 @@ final class AppModel {
                 showsTime = false
                 showsMilestones = false
                 showsTokens = false
-                showsWorktrees = false
                 machinePage = nil
                 showsWork = false
                 showsDocs = false
@@ -716,7 +674,6 @@ final class AppModel {
         showsTime = false
         showsMilestones = false
         showsTokens = false
-        showsWorktrees = false
         machinePage = nil
         showsWork = false
         showsDocs = false
@@ -748,7 +705,6 @@ final class AppModel {
         showsTime = false
         showsMilestones = false
         showsTokens = false
-        showsWorktrees = false
         machinePage = nil
         showsWork = false
         showsDocs = false
@@ -975,7 +931,6 @@ final class AppModel {
         showsTime = false
         showsMilestones = false
         showsTokens = false
-        showsWorktrees = false
         machinePage = nil
         showsWork = false
         showsDocs = false
@@ -4938,19 +4893,24 @@ final class AppModel {
         }
     }
 
-    /// Every folder's worktrees on this Mac, for Activity ▸ Worktrees (#790). Sizes the
+    /// Every folder's worktrees on a machine, for its page (#790, #3627). Sizes the
     /// daemon has not measured yet come later, on `worktrees/sized`.
-    func loadWorktrees() async {
-        guard let listed = try? await macClient.call(DaemonAPI.Method.worktreesAll, DaemonAPI.Empty(),
-                                                  returning: [DaemonAPI.FolderWorktrees].self) else { return }
-        work.replaceWorktrees(listed)
+    func loadWorktrees(on host: MachineRef = .mac) async {
+        guard let listed = try? await worktreeClient(host).call(DaemonAPI.Method.worktreesAll, DaemonAPI.Empty(),
+                                                             returning: [DaemonAPI.FolderWorktrees].self) else { return }
+        work.replaceWorktrees(listed, from: host)
+    }
+
+    /// The machine a worktree is on: this Mac's own host for This Mac (#1496), else the machine's.
+    private func worktreeClient(_ host: MachineRef) -> DaemonClient {
+        host == .mac ? macClient : client(for: host)
     }
 
     /// What removing one of a folder's worktrees would lose, or nil when it could
     /// not be asked (and `problem` says why).
-    func checkWorktreeRemoval(_ root: URL, in folder: URL) async -> DaemonAPI.RemovalCheck? {
+    func checkWorktreeRemoval(_ root: URL, in folder: URL, on host: MachineRef = .mac) async -> DaemonAPI.RemovalCheck? {
         do {
-            return try await macClient.call(DaemonAPI.Method.worktreesCheck,
+            return try await worktreeClient(host).call(DaemonAPI.Method.worktreesCheck,
                                          DaemonAPI.WorktreeRemovalRequest(folder: folder, root: root),
                                          returning: DaemonAPI.RemovalCheck.self)
         } catch {
@@ -4961,25 +4921,25 @@ final class AppModel {
 
     /// Remove one of a folder's worktrees. `confirmed` is the person having seen
     /// what would be lost; the daemon checks again either way.
-    func removeWorktree(_ root: URL, in folder: URL, confirmed: Bool) async {
+    func removeWorktree(_ root: URL, in folder: URL, on host: MachineRef = .mac, confirmed: Bool) async {
         do {
-            _ = try await macClient.call(DaemonAPI.Method.worktreesRemove,
+            _ = try await worktreeClient(host).call(DaemonAPI.Method.worktreesRemove,
                                       DaemonAPI.WorktreeRemovalRequest(folder: folder, root: root,
                                                                        confirmed: confirmed),
                                       returning: DaemonAPI.WorktreeRemoved.self)
         } catch {
             problem = describe(error)
         }
-        await loadWorktrees()
+        await loadWorktrees(on: host)
         if draftCwd != nil { await loadDraftWorktrees() }
     }
 
     /// Delete an idle worktree's build output (#790), and say what it freed; nil when it
     /// could not (and `problem` says why).
-    func removeBuildOutput(_ root: URL, in folder: URL) async -> String? {
-        defer { Task { await loadWorktrees() } }
+    func removeBuildOutput(_ root: URL, in folder: URL, on host: MachineRef = .mac) async -> String? {
+        defer { Task { await loadWorktrees(on: host) } }
         do {
-            let removed = try await macClient.call(DaemonAPI.Method.worktreesRemoveBuildOutput,
+            let removed = try await worktreeClient(host).call(DaemonAPI.Method.worktreesRemoveBuildOutput,
                                                 DaemonAPI.WorktreeRemovalRequest(folder: folder, root: root),
                                                 returning: DaemonAPI.BuildOutputRemoved.self)
             return WorktreeTally.freedWords(removed)
@@ -4990,8 +4950,8 @@ final class AppModel {
     }
 
     /// Clean up worktrees (030): a new session in the folder, offered the words.
-    func offerCleanUp(in folder: URL) {
-        showFolder(FolderKey(folder: folder))
+    func offerCleanUp(in folder: URL, on host: MachineRef = .mac) {
+        showFolder(FolderKey(host: host, folder: folder))
         offeredPrompt = PromptOffer(agentID: nil, words: WorktreeTally.cleanUpPrompt)
     }
 

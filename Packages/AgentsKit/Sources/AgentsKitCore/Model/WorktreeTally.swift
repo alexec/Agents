@@ -1,8 +1,8 @@
 import Foundation
 
-/// What Activity ▸ Worktrees says about a host's worktrees together (#790): how many,
-/// how many idle, and how much they hold. The window and the Remote say it with these
-/// words, and the web page with its port of them (`Web/src/model/worktrees.ts`).
+/// What a machine's page says about its worktrees together (#790, #3627): how many,
+/// how many idle, and how much they hold. The window says it with these words, and the
+/// web page with its port of them (`Web/src/model/worktrees.ts`).
 public struct WorktreeTally: Hashable, Sendable {
     public var count = 0
     public var idle = 0
@@ -31,12 +31,6 @@ public struct WorktreeTally: Hashable, Sendable {
         self.init(groups.flatMap(\.worktrees))
     }
 
-    /// The Activity row's tooltip, and VoiceOver's value: "12 worktrees, 5 idle".
-    public var rowWords: String? {
-        guard count > 0 else { return nil }
-        return "\(count) \(count == 1 ? "worktree" : "worktrees"), \(idle) idle"
-    }
-
     /// The line at the top of the page: "Worktrees hold 38.2 GB, 30.1 GB of it idle."
     public var pageLine: String {
         guard count > 0 else { return Self.empty }
@@ -46,8 +40,8 @@ public struct WorktreeTally: Hashable, Sendable {
     }
 
     public static let empty = "No worktrees. A session started in a new worktree makes one."
-    /// The page's intro, under its title.
-    public static let intro = "Every folder's worktrees and how much each holds on disk. Idle ones, with no session in them, come first, largest first."
+    /// The section's intro, under its title.
+    public static let intro = "Each folder's worktrees on this machine and how much each holds on disk. Idle ones, with no session in them, come first, largest first."
     /// A row's size before its walk is done.
     public static let measuring = "Measuring…"
 
