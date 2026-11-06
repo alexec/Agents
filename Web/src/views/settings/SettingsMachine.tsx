@@ -7,6 +7,11 @@ import { machineLabel, noMachineYet, settingsMachine, settingsMachines } from ".
 
 const chosen = signal<string | null>(null);
 
+/** Settings' per-machine panes speak to this machine, as a machine's page's Settings… asks (#3626). */
+export function chooseSettingsMachine(id: string) {
+  chosen.value = id;
+}
+
 export function useSettingsMachine(store: Store) {
   const macID = store.macHostID.value;
   const machines = settingsMachines(store.hosts.value, macID);

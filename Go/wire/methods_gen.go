@@ -183,6 +183,7 @@ var CallLockHello = Method[LockHello, LockHelloReply]{"lock/hello"}
 var CallMacOpen = Method[MacPathRequest, Empty]{"mac/open"}
 var CallMacReveal = Method[MacPathRequest, Empty]{"mac/reveal"}
 var CallMacTerminal = Method[MacTerminalRequest, Empty]{"mac/terminal"}
+var CallMachineUsage = Method[Empty, MachineUsageState]{"machine/usage"}
 var CallMailboxCarry = Method[Empty, Empty]{"mailbox/carry"}
 var CallMarketplacesAdd = Method[MarketplaceAddRequest, MarketplacesListAnswer]{"marketplaces/add"}
 var CallMarketplacesList = Method[MarketplacesListRequest, MarketplacesListAnswer]{"marketplaces/list"}

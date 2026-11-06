@@ -95,3 +95,28 @@ func TestProcessesListsTheDaemonAndItsChildren(t *testing.T) {
 		t.Fatalf("the machine: %+v", s.Machine)
 	}
 }
+
+// machine/usage (#3626): the machine's totals, and every disk the daemon looked at, ok
+// ones too, so the page lists the root's volume when nothing is low.
+func TestMachineUsageHasTheTotalsAndEveryDisk(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	d.checkDisk()
+	var s wire.MachineUsageState
+	if err := json.Unmarshal(c.call(t, 1, wire.CallMachineUsage.Name, map[string]any{}), &s); err != nil {
+		t.Fatal(err)
+	}
+	if s.Machine.CpuCount <= 0 || s.Machine.MemoryTotal <= 0 || s.Machine.MemoryUsed <= 0 || s.Machine.MemoryUsed > s.Machine.MemoryTotal {
+		t.Fatalf("the machine: %+v", s.Machine)
+	}
+	if s.Machine.CpuPercent < 0 || s.Machine.CpuPercent > 100 {
+		t.Fatalf("the CPU %v", s.Machine.CpuPercent)
+	}
+	if len(s.Disks) == 0 {
+		t.Fatal("no disk: the root's volume is always looked at")
+	}
+	for _, disk := range s.Disks {
+		if disk.Reading.TotalBytes <= 0 || disk.Reading.FreeBytes > disk.Reading.TotalBytes || disk.Level == "" {
+			t.Fatalf("a disk: %+v", disk)
+		}
+	}
+}

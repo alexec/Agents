@@ -5835,6 +5835,16 @@ export interface MachineUsage {
 }
 
 /**
+ * machine/usage (#3626): a machine's page. Its CPU and memory now, as processes/list has them, and
+ * every disk its agents write to, ok ones too, as the last disk look (every minute) found them.
+ */
+export interface MachineUsageState {
+  machine: MachineUsage;
+  /** Each volume once: the most critical first, then the least free. */
+  disks: DiskAlarm[];
+}
+
+/**
  * host/user (#1761): to a machine on its channel 0, at each join and when its user changes. Its
  * user, their kind, and the labels runs-on: matches (FR-034); for a bot at its cap, until when it
  * starts no work (FR-033).
@@ -11520,6 +11530,7 @@ export interface Methods {
   "lock/joinRequests": { params: Empty; result: LockJoinRequest[] };
   "lock/joinReveal": { params: LockJoinNonce; result: Empty };
   "lock/reset": { params: Empty; result: Empty };
+  "machine/usage": { params: Empty; result: MachineUsageState };
   "mcp/health": { params: Empty; result: MCPHealthSnapshot };
   "mcp/health/check": { params: MCPHealthCheckRequest; result: MCPHealthSnapshot };
   "mcp/hosted": { params: Empty; result: HostedMCPSnapshot };
@@ -11890,6 +11901,7 @@ export const MethodTarget = {
   "lock/joinRequests": "control",
   "lock/joinReveal": "control",
   "lock/reset": "control",
+  "machine/usage": "host",
   "mcp/health": "host",
   "mcp/health/check": "host",
   "mcp/hosted": "host",
@@ -12630,6 +12642,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineTunnelChanged: { required: ["name", "tunnel"], optional: ["host"] },
   MachineUpdate: { required: ["host", "destination"], optional: ["key", "trust"] },
   MachineUsage: { required: ["cpuPercent", "cpuCount", "memoryUsed", "memoryTotal"], optional: [] },
+  MachineUsageState: { required: ["machine", "disks"], optional: [] },
   MachineUser: { required: ["user", "kind", "name", "labels"], optional: ["capReachedUntil", "bots"] },
   MachineUserSettings: { required: ["user", "settings", "secrets"], optional: [] },
   MachineWorkspace: { required: ["provider", "providerName", "workspace", "workspaceName", "workspaceState", "canStart", "canStop", "startWhenUsed", "current"], optional: ["hostState", "phase", "since", "problem", "stoppedBy", "stopWhenIdleMinutes", "cost", "startForSchedules", "tellsSchedule", "nextWorkflow", "nextWorkflowAt", "wakeAt"] },

@@ -6780,6 +6780,14 @@ type MachineUsage struct {
 	MemoryTotal int64 `json:"memoryTotal"`
 }
 
+// machine/usage (#3626): a machine's page. Its CPU and memory now, as processes/list has them, and every disk its agents write to, ok ones too, as the last disk look (every minute) found them.
+type MachineUsageState struct {
+	Machine MachineUsage `json:"machine"`
+
+	// Each volume once: the most critical first, then the least free.
+	Disks []DiskAlarm `json:"disks"`
+}
+
 // host/user (#1761): to a machine on its channel 0, at each join and when its user changes. Its user, their kind, and the labels runs-on: matches (FR-034); for a bot at its cap, until when it starts no work (FR-033).
 type MachineUser struct {
 	User string `json:"user"`
