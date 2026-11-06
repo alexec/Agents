@@ -1,5 +1,8 @@
 # Walk 5: phone paths (US5, T079)
 
+> **Replaced (#3390).** #3390 removed the phone relay; phones reach a cloud control plane
+> directly. What this page says about the relay is kept as a record only.
+
 2026-09-29, on a scratch control plane:
 - `agents-control serve --home /tmp/w5/control` at `https://127.0.0.1:18831`, self-signed;
 - two scratch hosts: `walk5 mac` (the home host, `mac`) and `walk5 other`, with a project each

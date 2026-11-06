@@ -33,9 +33,7 @@ func newWindow(t *testing.T) (window, wire.MachineClient) {
 // serveLocal serves d's local socket as host "mac" with a test's door, and says where.
 func serveLocal(t *testing.T, d *Daemon, role Role) string {
 	t.Helper()
-	old := socketPolicyFor
-	socketPolicyFor = func(*Daemon) SocketPolicy { return fixedPolicy{role: role, ok: true} }
-	t.Cleanup(func() { socketPolicyFor = old })
+	usePolicy(t, d, fixedPolicy{role: role, ok: true})
 	dir, err := os.MkdirTemp("", "local") // short: a Unix socket's path is at most 104 bytes
 	if err != nil {
 		t.Fatal(err)
@@ -45,23 +43,31 @@ func serveLocal(t *testing.T, d *Daemon, role Role) string {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	go d.ServeLocal(ctx, path, "mac", controllink.NewPrivateKey())
-	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
-		if _, err := os.Stat(path); err == nil {
-			return path
+	return path
+}
+
+// dialUnix dials the socket at path, again until it listens: the file is there at
+// bind, a moment before listen, so a stat said "ready" too soon (#3623).
+func dialUnix(t testing.TB, path string) net.Conn {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		c, err := net.Dial("unix", path)
+		if err == nil {
+			return c
 		}
+		if time.Now().After(deadline) {
+			t.Fatal(err)
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
-	t.Fatal("the local socket never came")
-	return ""
 }
 
 // prove dials the local socket as w and runs the exchange, as the window does
 // (LocalHostLink.swift): the reader after it, and the host's ok, or its refusal.
 func prove(t *testing.T, path string, w window) (net.Conn, *bufio.Reader, controllink.Message) {
 	t.Helper()
-	c, err := net.Dial("unix", path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	c := dialUnix(t, path)
 	t.Cleanup(func() { c.Close() })
 	c.SetDeadline(time.Now().Add(5 * time.Second))
 	r := bufio.NewReader(c)
@@ -146,10 +152,7 @@ func TestAnUnknownWindowIsRefused(t *testing.T) {
 func TestAStrangerGetsNoHello(t *testing.T) {
 	d, _ := start(t, t.TempDir())
 	path := serveLocal(t, d, RoleStranger)
-	c, err := net.Dial("unix", path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	c := dialUnix(t, path)
 	defer c.Close()
 	c.SetDeadline(time.Now().Add(5 * time.Second))
 	if line, err := bufio.NewReader(c).ReadString('\n'); err == nil {

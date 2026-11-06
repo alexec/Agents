@@ -14,8 +14,8 @@ import (
 
 	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
 	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/internal/browser"
+	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -682,12 +682,12 @@ func (d *Daemon) registerLeases() {
 		})
 	})
 	// While anything is held, the person's view is kept current every minute.
-	safe.Go("lease ticker", func() {
+	d.goLoop("lease ticker", func(ctx context.Context) {
 		t := time.NewTicker(time.Minute)
 		defer t.Stop()
 		for {
 			select {
-			case <-d.ctx.Done():
+			case <-ctx.Done():
 				return
 			case <-t.C:
 				d.leaseMu.Lock()
