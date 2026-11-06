@@ -51,7 +51,7 @@ export function stageUrl(n: LineageNode): string | undefined {
   if (n.kind === "deploy" && scheme === "cloudrun") {
     // cloudrun:<project>/<region>/<service>/<revision>
     const m = /^([^/]+)\/([^/]+)\/([^/]+)\/[^/]+$/.exec(id);
-    return m ? `https://console.cloud.google.com/run/detail/${m[2]}/${m[3]}/revisions?project=${m[1]}` : undefined;
+    return m ? "https://console.cloud.google.com/run/detail/" + m[2] + "/" + m[3] + "/revisions?project=" + m[1] : undefined;
   }
   if (n.kind === "health" && scheme === "sentry") {
     const m = /^([^/]+)\/(.+)$/.exec(id);
