@@ -92,13 +92,15 @@ ctl() {
 	AGENTSCTL="$dir/ctl.json" "$work/new/agentsctl" "$@"
 }
 
-# hosts/list's row for the skew host, waiting for it to join.
+# hosts/list's row for the skew host, waiting for it to join and come online.
 host_row() {
 	dir=$1
 	i=0
 	while :; do
 		row=$(ctl "$dir" hosts 2>/dev/null | tr -d '\n' | grep -o '{[^{}]*"name": *"skew host"[^}]*' || true)
-		[ -n "$row" ] && case "$row" in *'"state": "joining"'* | *'"state":"joining"'*) ;; *) echo "$row" && return 0 ;; esac
+		# Joining, or offline until its first hello lands (a slow runner reads it between,
+		# with no capabilities yet): not its row yet.
+		[ -n "$row" ] && case "$row" in *'"state": "joining"'* | *'"state":"joining"'* | *'"state": "offline"'* | *'"state":"offline"'*) ;; *) echo "$row" && return 0 ;; esac
 		i=$((i + 1))
 		if [ "$i" -gt 60 ]; then
 			echo "skew-test: the host did not join" >&2

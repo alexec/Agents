@@ -176,6 +176,8 @@ public extension DaemonAPI {
                 Row(Method.diskState, params: Empty.self, result: DiskState.self, kind: .hostRequest),
                 // What runs on a machine, on its page (#3453).
                 Row(Method.processesList, params: Empty.self, result: ProcessesState.self, kind: .hostRequest),
+                // A machine's page: its CPU, memory and disks (#3626).
+                Row(Method.machineUsage, params: Empty.self, result: MachineUsageState.self, kind: .hostRequest),
                 // Backups of the machine, in Settings (#1810).
                 Row(Method.backupsState, params: Empty.self, result: BackupState.self, kind: .hostRequest),
                 Row(Method.backupsConfigure, params: BackupSettings.self, result: BackupState.self, kind: .hostRequest),

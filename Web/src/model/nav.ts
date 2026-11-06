@@ -26,6 +26,7 @@ export type PageDraw =
   | { kind: "work"; work: WorkKind }
   | { kind: "features" }
   | { kind: "docs" }
+  | { kind: "machine"; host: string }
   | { kind: "usage" | "machines" | "workflows" | "settings" };
 
 export interface NavPage {
@@ -87,19 +88,34 @@ export const navPages: Record<NavSection, readonly NavPage[]> = {
   ],
 };
 
+/** A page per machine (#3626), after Machines ▸ Machines: its CPU, memory and disks. The Mac first, then the
+ * others by name. */
+export function machinePages(hosts: readonly { id: string; name: string }[], macID: string): NavPage[] {
+  const sorted = [...hosts].sort((a, b) => Number(b.id === macID) - Number(a.id === macID) || a.name.localeCompare(b.name));
+  return sorted.map((h) => ({ id: `machine-${h.id}`, title: h.name, group: "Machines", draw: { kind: "machine", host: h.id } }));
+}
+
+/** A section's pages with the ones made from data put in: the machines' after Machines ▸ Machines. */
+export function withPages(section: NavSection, more: readonly NavPage[]): readonly NavPage[] {
+  if (section !== "machines" || more.length === 0) return navPages[section];
+  const list = navPages[section];
+  return [...list.slice(0, 1), ...more, ...list.slice(1)];
+}
+
 /** The sections in the bar: every one for an admin; for a member (or while the role is not known), not Requests or People. */
 export function sectionsShown(admin: boolean | null, current: NavSection): NavSection[] {
   return navSections.filter((s) => admin === true || !adminSections.has(s) || s === current);
 }
 
 /** The pages in a section's list: every one for an admin; a member's, and the one open. */
-export function pagesShown(section: NavSection, admin: boolean | null, open?: string): NavPage[] {
-  return navPages[section].filter((p) => admin === true || !p.admin || p.id === open);
+export function pagesShown(section: NavSection, admin: boolean | null, open?: string, more: readonly NavPage[] = []): NavPage[] {
+  return withPages(section, more).filter((p) => admin === true || !p.admin || p.id === open);
 }
 
 /** The page a route opens: the one named, or the section's first that this person may use. */
-export function openPage(section: NavSection, id: string | undefined, admin: boolean | null): NavPage | undefined {
-  const list = navPages[section];
+export function openPage(section: NavSection, id: string | undefined, admin: boolean | null,
+                         more: readonly NavPage[] = []): NavPage | undefined {
+  const list = withPages(section, more);
   return list.find((p) => p.id === id) ?? list.find((p) => admin === true || !p.admin) ?? list[0];
 }
 

@@ -4909,6 +4909,32 @@
       }
     },
     {
+      "name": "machine/usage",
+      "x-capability": "machine.usage/1",
+      "description": "A machine's page (#3626): its CPU and memory now, and every disk its agents write to with its level. Asked while the page is open; nothing is kept between asks but the machine's last CPU time.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MachineUsageState"
+        }
+      }
+    },
+    {
       "name": "mailbox/carry",
       "x-capability": "mailbox/1",
       "paramStructure": "by-name",

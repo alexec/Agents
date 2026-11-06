@@ -188,6 +188,7 @@ struct WireSchemaTests {
             "MachineSchedule": Self.through(DaemonAPI.MachineSchedule.self),
             "MachineStatus": Self.through(DaemonAPI.MachineStatus.self),
             "ProcessesState": Self.through(DaemonAPI.ProcessesState.self),
+            "MachineUsageState": Self.through(DaemonAPI.MachineUsageState.self),
             "KeepRequest": Self.through(DaemonAPI.KeepRequest.self),
             "ProviderDraftStart": Self.through(DaemonAPI.ProviderDraftStart.self),
             "ProviderDraftStarted": Self.through(DaemonAPI.ProviderDraftStarted.self),

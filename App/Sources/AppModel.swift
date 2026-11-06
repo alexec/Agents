@@ -200,6 +200,7 @@ final class AppModel {
             showsMilestones = false
             showsTokens = false
             showsWorktrees = false
+            machinePage = nil
             showsWork = false
             showsDocs = false
             // The same rule as picking a folder: what you picked is what you see,
@@ -227,6 +228,7 @@ final class AppModel {
             showsMilestones = false
             showsTokens = false
             showsWorktrees = false
+            machinePage = nil
             showsWork = false
             showsDocs = false
             selection = nil
@@ -249,6 +251,7 @@ final class AppModel {
             showsMilestones = false
             showsTokens = false
             showsWorktrees = false
+            machinePage = nil
             showsWork = false
             showsDocs = false
             selection = nil
@@ -274,6 +277,7 @@ final class AppModel {
             showsMilestones = false
             showsTokens = false
             showsWorktrees = false
+            machinePage = nil
             showsWork = false
             showsDocs = false
             selection = nil
@@ -297,6 +301,7 @@ final class AppModel {
             showsMilestones = false
             showsTokens = false
             showsWorktrees = false
+            machinePage = nil
             showsWork = false
             showsDocs = false
             selection = nil
@@ -319,6 +324,7 @@ final class AppModel {
             showsMilestones = false
             showsTokens = false
             showsWorktrees = false
+            machinePage = nil
             showsWork = false
             showsDocs = false
             selection = nil
@@ -341,6 +347,7 @@ final class AppModel {
             showsTime = false
             showsTokens = false
             showsWorktrees = false
+            machinePage = nil
             showsWork = false
             showsDocs = false
             selection = nil
@@ -363,8 +370,32 @@ final class AppModel {
             showsTime = false
             showsMilestones = false
             showsWorktrees = false
+            machinePage = nil
             showsWork = false
             showsDocs = false
+            selection = nil
+            openWorkflow = nil
+            folderPage = nil
+            composing = false
+        }
+    }
+
+    /// The machine whose page the window shows (#3626): its CPU, memory and disks, from its
+    /// row under Machines. Status, not a setting, so it is here rather than in Settings.
+    var machinePage: MachineRef? {
+        didSet {
+            guard machinePage != nil, machinePage != oldValue else { return }
+            showsWork = false
+            showsDocs = false
+            showsSpending = false
+            showsResources = false
+            showsEvents = false
+            showsRuntimes = false
+            showsMCPServers = false
+            showsTime = false
+            showsMilestones = false
+            showsTokens = false
+            showsWorktrees = false
             selection = nil
             openWorkflow = nil
             folderPage = nil
@@ -378,6 +409,7 @@ final class AppModel {
     var showsWorktrees = false {
         didSet {
             guard showsWorktrees, showsWorktrees != oldValue else { return }
+            machinePage = nil
             showsWork = false
             showsDocs = false
             showsSpending = false
@@ -411,6 +443,7 @@ final class AppModel {
             showsMilestones = false
             showsTokens = false
             showsWorktrees = false
+            machinePage = nil
             selection = nil
             openWorkflow = nil
             folderPage = nil
@@ -432,6 +465,7 @@ final class AppModel {
             showsMilestones = false
             showsTokens = false
             showsWorktrees = false
+            machinePage = nil
             showsWork = false
             selection = nil
             openWorkflow = nil
@@ -511,6 +545,7 @@ final class AppModel {
         showsMilestones = false
         showsTokens = false
         showsWorktrees = false
+        machinePage = nil
         showsWork = false
         showsDocs = false
         if let agent = agents.first(where: { $0.id == agentID }) {
@@ -537,6 +572,7 @@ final class AppModel {
         showsMilestones = false
         showsTokens = false
         showsWorktrees = false
+        machinePage = nil
         showsWork = false
         showsDocs = false
         // Not listed yet: settling the selection would pick another, so it waits (#1055).
@@ -578,6 +614,7 @@ final class AppModel {
             if showsRuntimes { return .runtimes }
             if showsMCPServers { return .mcpServers }
             if showsWorktrees { return .worktrees }
+            if let machinePage { return .machine(machinePage) }
             if showsSpending { return .spending }
             if showsTokens { return .tokens }
             if showsTime { return .time }
@@ -609,6 +646,7 @@ final class AppModel {
                 showsMilestones = false
                 showsTokens = false
                 showsWorktrees = false
+                machinePage = nil
                 showsWork = false
                 showsDocs = false
                 select(key)
@@ -643,6 +681,8 @@ final class AppModel {
                 showsMCPServers = true
             case .worktrees:
                 showsWorktrees = true
+            case .machine(let host):
+                machinePage = host
             case .folder(let key):
                 showsSpending = false
                 showsResources = false
@@ -653,6 +693,7 @@ final class AppModel {
                 showsMilestones = false
                 showsTokens = false
                 showsWorktrees = false
+                machinePage = nil
                 showsWork = false
                 showsDocs = false
                 showFolder(key)
@@ -676,6 +717,7 @@ final class AppModel {
         showsMilestones = false
         showsTokens = false
         showsWorktrees = false
+        machinePage = nil
         showsWork = false
         showsDocs = false
         select(key)
@@ -707,6 +749,7 @@ final class AppModel {
         showsMilestones = false
         showsTokens = false
         showsWorktrees = false
+        machinePage = nil
         showsWork = false
         showsDocs = false
         select(key)
@@ -933,6 +976,7 @@ final class AppModel {
         showsMilestones = false
         showsTokens = false
         showsWorktrees = false
+        machinePage = nil
         showsWork = false
         showsDocs = false
         select(key)
@@ -2392,6 +2436,9 @@ final class AppModel {
     /// A Settings pane to open on, asked for by a link elsewhere (052): read and cleared
     /// by the Settings window.
     var settingsPaneAsked: SettingsPane?
+    /// The machine Settings ▸ Machines opens on, asked for by its page's Settings… (#3626):
+    /// read and cleared with `settingsPaneAsked`.
+    var settingsMachineAsked: MachineRef?
 
     /// A file for Agent Configuration's editor to open, asked for by a workflow page's Edit
     /// File… (#2803): read and cleared by the editor's page for that kind and folder.
