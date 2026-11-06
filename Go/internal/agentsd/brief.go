@@ -71,7 +71,8 @@ var compatibilitySystemPromptDelivery = map[string]string{"claude": "append", "g
 func (d *Daemon) brief(a *wire.Agent) string {
 	parts := []string{d.namingBrief(a), leasesWithDeclared(d.declaredResources()), eventsBrief,
 		endingBrief(a.RuntimeID), liveDocumentBrief, escalationBrief(a.RuntimeID),
-		workflowsBrief(a.RuntimeID), helpersBrief, sessionsBrief}
+		workflowsBrief(a.RuntimeID), helpersBrief, sessionsBrief,
+		toolsBrief(d.offersBrowser(), d.offersDriveScreen(), d.isBot())}
 	if appToolServed("move_worktree") && runtimeCanMove(a.RuntimeID) {
 		parts = append(parts, worktreesBrief)
 	}
@@ -192,14 +193,44 @@ func workflowsBrief(runtimeID string) string {
 // helpersBrief is Briefing.helpers (028, #940): every agent is told, a helper too, with the
 // limits said before the first call rather than learnt from a refusal.
 const helpersBrief = "For work that can run alongside yours, use start_session within my limits " +
-	"on how many may run and be kept. Stop the sessions you started when they are done, and " +
+	"on how many may run and be kept. Stop the sessions you started with stop_session when they are done, and " +
 	"archive them once their work is merged or abandoned. Do not start one for work you could " +
 	"simply do yourself."
 
 // sessionsBrief is Briefing.sessions (065): the person says "continue Login redirect" to
 // whichever chat they opened. Archiving this session is in endingBrief now.
 const sessionsBrief = "To continue another session in this folder, read it with read_session " +
-	"(by id or exact title; reading changes nothing). list_sessions lists them."
+	"(by id or exact title; reading changes nothing). list_sessions lists them. Send words " +
+	"to one with message_session."
+
+// toolsBrief names the rest of the app's tools, each with when to use it (#3608). Claude
+// defers MCP tools, so a tool no paragraph names is one it does not know it has; and a
+// folder's AGENTS.md and skills reach only that folder. The browser and drive_screen are
+// named only where this host lists them, as tools/list does; hand_to_person not on a bot's
+// machine, where nobody answers it.
+func toolsBrief(browser, screen, bot bool) string {
+	lines := []string{
+		"- notify: tell me that something happened, when you have no question for me.",
+		"- set_session_labels: label this session #<n> for an issue or P#<n> for a pull request. This links them to it.",
+		"- docs_search, then docs_read: find the docs for your work, in this folder and its docs connectors.",
+		"- estimate_issue: say what an issue or an epic will cost and take.",
+		"- list_machines, then start_session with machine: work on another of my machines. bring_back " +
+			"brings its branch back here. start_machine, stop_machine, make_machine and delete_machine control the machines.",
+	}
+	if browser {
+		lines = append(lines,
+			"- browser_navigate, browser_snapshot, browser_click and the other browser_* tools: use a web "+
+				"page in this machine's browser. They take the browser lease themselves.",
+			"- fill_secret: type one of my secrets into a field on the page. Never type a secret with browser_type.")
+		if !bot {
+			lines = append(lines, "- "+handToPersonName+": give me one step on the page that only I can do, such as a CAPTCHA or a sign-in.")
+		}
+	}
+	if screen {
+		lines = append(lines, "- drive_screen: use an app on this Mac that no other tool reaches. It takes the screen lease itself.")
+	}
+	return "Use the app's other tools when you need them:\n" + strings.Join(lines, "\n")
+}
 
 // worktreesBrief is Briefing.worktrees (#615): with move_worktree only described, agents
 // ran git worktree add and the app showed them in the wrong folder. Said only where the
