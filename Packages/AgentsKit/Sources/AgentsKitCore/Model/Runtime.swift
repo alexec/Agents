@@ -190,6 +190,9 @@ public struct RuntimeStatus: Codable, Hashable, Sendable, Identifiable {
     /// Whether it is signed in on the machine itself (#3349): Claude and Codex on a server,
     /// which a client signs in there with no browser on the machine. Nil on a Mac.
     public var signIn: SignIn?
+    /// The installed copy's version (#3674): the toolset's pin for the app's own copy, else
+    /// what the runtime's `--version` says. Nil when it is not installed or does not say.
+    public var version: String?
 
     public struct SignIn: Codable, Hashable, Sendable {
         public var signedIn: Bool
@@ -235,21 +238,22 @@ public struct RuntimeStatus: Codable, Hashable, Sendable, Identifiable {
     }
 }
 
-/// A runtime's line on a machine's page (#3629): whether it is installed there and, where the
-/// machine says, whether it is signed in. Accounts and allowances are the person's, so they
+/// A runtime's line on a machine's page (#3629): whether it is installed there, its version
+/// (#3674) and, where the machine says, whether it is signed in. Accounts and allowances are the person's, so they
 /// are not said here. The web page's `machineRuntimeLine` says the same.
 extension RuntimeStatus {
     public var machineLine: String {
         var line: String
+        let installed = version.map { "Installed \($0)" } ?? "Installed"
         switch availability {
         case .available:
             switch signIn {
-            case nil: line = "Installed"
-            case let signIn? where signIn.signedIn: line = "Installed · signed in"
-            case let signIn? where signIn.relayed == true: line = "Installed · uses the Mac’s sign-in"
-            case _?: line = "Installed · not signed in"
+            case nil: line = installed
+            case let signIn? where signIn.signedIn: line = installed + " · signed in"
+            case let signIn? where signIn.relayed == true: line = installed + " · uses the Mac’s sign-in"
+            case _?: line = installed + " · not signed in"
             }
-        case .needsSignIn: line = "Installed · not signed in"
+        case .needsSignIn: line = installed + " · not signed in"
         case .missing: line = "Not installed"
         case .failed(let reason): line = "Can’t be used: \(reason)"
         case .installing(let progress): line = progress.map { "Installing: \($0)" } ?? "Installing…"

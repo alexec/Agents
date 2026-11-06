@@ -37,6 +37,19 @@ struct MachineRuntimeLineTests {
                 == "Installed · an update is out")
     }
 
+    @Test func itSaysTheVersionWhereTheMachineReadOne() {
+        let path = RuntimeAvailability.available(path: "/p", supportsResume: true)
+        var mac = status(path)
+        mac.version = "2.1.4"
+        #expect(mac.machineLine == "Installed 2.1.4")
+        var server = status(path, signIn: .init(signedIn: true))
+        server.version = "2.1.4"
+        #expect(server.machineLine == "Installed 2.1.4 · signed in")
+        var old = status(path, outdated: true)
+        old.version = "2.5.0"
+        #expect(old.machineLine == "Installed 2.5.0 · an update is out")
+    }
+
     @Test func installIsOfferedOnlyForAMissingOneWithARecipe() {
         #expect(status(.missing(lookedIn: [])).offersInstall)
         #expect(status(.installFailed(reason: "x")).offersInstall)
