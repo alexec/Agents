@@ -1,10 +1,12 @@
-// A host's resources, read-only (#116): what the person declared there, each with its
-// description and "2 of 3 held", then whatever else is held or awaited. Declaring and ending
-// leases are the Mac's (Settings ▸ Resources, the Resources page), as on the Remote.
+// A machine's resources, read-only (#116), as a section of its page (#3629; MachineResourcesSection.swift):
+// what the person declared there, each with its description and "2 of 3 held", then whatever else is held
+// or awaited. Declaring and ending leases are the Mac's (Settings ▸ Resources, the machine's page).
+import { useEffect, useRef } from "preact/hooks";
+import { signal } from "@preact/signals";
 import type { Store } from "../model/store";
 import type { Lease, ResourceState } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
-import { resourcesHint } from "../model/onTheMac";
+import { noResourcesHint, resourcesHint } from "../model/onTheMac";
 
 /** "14:05", twenty-four hours, as LeaseWords.clock says it to agents and the Mac. */
 function clock(at: number): string {
@@ -25,12 +27,20 @@ export function heldWords(state: ResourceState): string {
   return holds.length > 0 ? "Held" : "Free";
 }
 
-export function Resources({ store, host, open }: { store: Store; host: string; open?: boolean }) {
+/** Set by a chat's lease line: the machine's page it opens scrolls to its Resources, once. */
+export const resourcesAsked = signal(false);
+
+export function Resources({ store, host }: { store: Store; host: string }) {
   const snapshot = store.leases.value[host];
-  if (!snapshot) return null;
-  const declared = snapshot.resources.filter((r) => r.declared);
-  const busy = snapshot.resources.filter((r) => !r.declared && ((r.holds ?? []).length > 0 || r.line.length > 0));
-  if (declared.length === 0 && busy.length === 0) return null;
+  const ref = useRef<HTMLElement>(null);
+  const asked = resourcesAsked.value;
+  useEffect(() => {
+    if (!asked || !snapshot) return;
+    ref.current?.scrollIntoView({ block: "start" });
+    resourcesAsked.value = false;
+  }, [asked, snapshot !== undefined]);
+  const declared = snapshot?.resources.filter((r) => r.declared) ?? [];
+  const busy = snapshot?.resources.filter((r) => !r.declared && ((r.holds ?? []).length > 0 || r.line.length > 0)) ?? [];
   const row = (state: ResourceState) => {
     const holds: Lease[] = state.holds ?? (state.lease ? [state.lease] : []);
     return (
@@ -47,10 +57,14 @@ export function Resources({ store, host, open }: { store: Store; host: string; o
     );
   };
   return (
-    <details class="resources" open={open}>
-      <summary class="subhead">Resources <span class="count">{declared.length + busy.length}</span></summary>
-      <ul>{declared.map(row)}{busy.map(row)}</ul>
-      <p class="hint">{resourcesHint(store.hasMac.value)}</p>
-    </details>
+    <section class="resources" aria-labelledby="machine-resources" ref={ref}>
+      <h3 class="section-head" id="machine-resources">Resources</h3>
+      {!snapshot ? <p class="hint">Loading…</p>
+        : declared.length === 0 && busy.length === 0 ? <p class="hint">{noResourcesHint(store.hasMac.value)}</p>
+        : <>
+          <ul>{declared.map(row)}{busy.map(row)}</ul>
+          <p class="hint">{resourcesHint(store.hasMac.value)}</p>
+        </>}
+    </section>
   );
 }

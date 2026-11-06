@@ -1,89 +1,93 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Who holds the Mac's shared things, and who is waiting (036 US3, US4).
+/// What agents take turns with on a machine, who holds each and who is waiting (036 US3,
+/// US4), as a section of the machine's page (#3629). It was Status ▸ Resources, which was
+/// this Mac's only.
 ///
-/// A page like Spending, reached from the foot of the sidebar. What the person can do
-/// here is two things: end a lease, and take an agent out of a line. There is no way
-/// to take one. Only agents hold leases, and they take them themselves when they need
-/// them (spec, Clarifications). A free resource therefore has no button at all.
+/// What the person can do here is two things: end a lease, and take an agent out of a
+/// line. There is no way to take one. Only agents hold leases, and they take them
+/// themselves when they need them (spec, Clarifications). A free resource therefore has
+/// no button at all.
 ///
 /// Nothing is tinted. Holding an agreement is not a person being needed, a failure,
-/// or a vouched completion, which are the only things colour means here.
-struct ResourcesView: View {
+/// or a vouched completion, which are the only things colour means here. The web page
+/// draws the same in Web/src/views/Resources.tsx.
+struct MachineResourcesSection: View {
     @Environment(AppModel.self) private var model
+    let host: MachineRef
 
-    private var snapshot: DaemonAPI.LeaseSnapshot { model.leases ?? .empty }
     /// Groups whose free rows are all showing. A Mac with Xcode has twenty-odd
-    /// simulators, and a page that lists every free one pushes the browsers below the
+    /// simulators, and a section that lists every free one pushes the rest below the
     /// fold for no reason: what anyone comes here to see is what is held.
     @State private var unfolded: Set<String> = []
     private static let freeShown = 4
 
-    /// The page's groups, always in this order. A group with nothing in it is not
+    /// The id of the section's first row, for the Go menu's Resources to scroll to.
+    static let top = "machine-resources"
+
+    private var snapshot: DaemonAPI.LeaseSnapshot? { model.leases(on: host) }
+
+    /// The section's groups, always in this order. A group with nothing in it is not
     /// drawn: a Mac without Xcode has no simulators, and names only exist while leased.
     /// Declared ones come first, free or held, with what each is for (#116).
     private var groups: [(title: String, rows: [DaemonAPI.ResourceState])] {
-        [("Declared", snapshot.resources.filter { $0.declared != nil })]
+        let resources = snapshot?.resources ?? []
+        return ([("Declared", resources.filter { $0.declared != nil })]
             + [("Screen", ResourceKind.screen), ("Simulators", .simulator), ("Browsers", .browser),
                ("Named by agents", .named)]
-            .map { title, kind in (title, snapshot.resources.filter { $0.kind == kind && $0.declared == nil }) }
+            .map { title, kind in (title, resources.filter { $0.kind == kind && $0.declared == nil }) })
             .filter { !$0.rows.isEmpty }
     }
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text("Things on this Mac that agents take turns with. A lease is an agreement "
-                             + "between agents, not a lock.")
-                            .appText(.supporting)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        SettingsLink { Text("Declare in Settings\u{2026}") }
-                            .simultaneousGesture(TapGesture().onEnded { model.settingsPaneAsked = .resources })
-                            .appText(.fine)
-                    }
-                    ForEach(groups, id: \.title) { group in
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(group.title.uppercased())
-                                .appText(.fine).fontWeight(.semibold)
-                                .foregroundStyle(.secondary)
-                            let (shown, folded) = fold(group.rows, group: group.title)
-                            VStack(spacing: 0) {
-                                ForEach(Array(shown.enumerated()), id: \.element.id) { index, state in
-                                    if index > 0 { Divider().padding(.leading, 32) }
-                                    ResourceRow(state: state, at: snapshot.at)
-                                        .id(state.name)
-                                }
-                                if folded > 0 {
-                                    Divider().padding(.leading, 32)
-                                    Button("Show \(folded) more free") { unfolded.insert(group.title) }
-                                        .buttonStyle(.plain)
-                                        .appText(.fine)
-                                        .foregroundStyle(.secondary)
-                                        .padding(.horizontal, 14)
-                                        .padding(.vertical, 10)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                }
-                            }
-                            .padding(.vertical, 4)
-                            .paperRaised(in: RoundedRectangle(cornerRadius: 10))
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(24)
+        Section {
+            if snapshot == nil {
+                ProgressView().id(Self.top)
+            } else if groups.isEmpty {
+                Text("Nothing to take turns with here yet. An agent names one when it leases it.")
+                    .foregroundStyle(.secondary)
+                    .id(Self.top)
             }
-            .onAppear { scroll(proxy) }
-            .onChange(of: model.resourcesFocus) { scroll(proxy) }
+            ForEach(Array(groups.enumerated()), id: \.element.title) { index, group in
+                Text(group.title.uppercased())
+                    .appText(.fine).fontWeight(.semibold)
+                    .foregroundStyle(.secondary)
+                    .id(index == 0 ? Self.top : group.title)
+                let (shown, folded) = fold(group.rows, group: group.title)
+                ForEach(shown) { state in
+                    ResourceRow(host: host, state: state, at: snapshot?.at ?? Date())
+                        .id(state.name)
+                }
+                if folded > 0 {
+                    Button("Show \(folded) more free") { unfolded.insert(group.title) }
+                        .buttonStyle(.plain)
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Resources")
+                Spacer()
+                if host == .mac {
+                    SettingsLink { Text("Declare in Settings\u{2026}") }
+                        .simultaneousGesture(TapGesture().onEnded { model.settingsPaneAsked = .resources })
+                        .appText(.fine)
+                }
+            }
+        } footer: {
+            Text("Things on this machine that agents take turns with. A lease is an agreement between agents, not a lock.")
+                .foregroundStyle(.secondary)
         }
-        .navigationTitle("Resources")
-        .task {
-            async let leases: Void = model.refreshLeases()
-            async let hosted: Void = model.refreshHostedMCP()
-            _ = await (leases, hosted)
+        .task(id: host) {
+            // This Mac's arrive as they change; another machine's are read while its page is open.
+            await model.refreshLeases(on: host)
+            guard host != .mac else { return }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(5))
+                await model.refreshLeases(on: host)
+            }
         }
     }
 
@@ -93,25 +97,27 @@ struct ResourcesView: View {
         // Declared ones are few, and the person put each there: never folded.
         guard group != "Declared", !unfolded.contains(group) else { return (rows, 0) }
         var freeSoFar = 0
+        let asked = model.resourcesAsked?.name
         let shown = rows.filter { state in
-            if !state.holds.isEmpty || !state.line.isEmpty || state.name == model.resourcesFocus { return true }
+            if !state.holds.isEmpty || !state.line.isEmpty || state.name == asked { return true }
             freeSoFar += 1
             return freeSoFar <= Self.freeShown
         }
         return (shown, rows.count - shown.count)
     }
+}
 
-    /// To the resource a chat's capsule named, once.
-    private func scroll(_ proxy: ScrollViewProxy) {
-        guard let focus = model.resourcesFocus else { return }
-        withAnimation { proxy.scrollTo(focus, anchor: .top) }
-        model.resourcesFocus = nil
-    }
+/// What a chat's capsule or the Go menu asked This Mac's page to show (#3629): one resource,
+/// or with none, the Resources section. Each ask is new, so the same one twice scrolls twice.
+struct ResourcesAsk: Equatable {
+    let name: ResourceName?
+    let id = UUID()
 }
 
 /// One resource: free, or held by an agent, with its line beneath.
 private struct ResourceRow: View {
     @Environment(AppModel.self) private var model
+    let host: MachineRef
     let state: DaemonAPI.ResourceState
     /// The daemon's time when the snapshot was taken: minutes left are counted from
     /// the same clock the lease runs by.
@@ -150,15 +156,14 @@ private struct ResourceRow: View {
                 endButton(lease)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.vertical, 2)
     }
 
     /// No confirmation: ending is recoverable, since the agent is told at its next
     /// lease call and can ask again; and one click matters most when an agent is
     /// holding the screen.
     private func endButton(_ lease: Lease) -> some View {
-        Button("End") { Task { await model.endLease(state.name, holder: lease.holder) } }
+        Button("End") { Task { await model.endLease(state.name, holder: lease.holder, on: host) } }
             .buttonStyle(.paper)
             .appText(.fine)
             .accessibilityLabel("End \(name(lease.holder))'s lease on \(state.displayName)")
@@ -183,7 +188,7 @@ private struct ResourceRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(state.holds, id: \.holder) { lease in
                     HStack(spacing: 0) {
-                        if state.isGone { Text("Gone from this Mac \u{00B7} still held by ") } else { Text("Held by ") }
+                        if state.isGone { Text("Gone from this machine \u{00B7} still held by ") } else { Text("Held by ") }
                         agentLink(lease.holder)
                         Text(" since \(LeaseWords.clock(lease.grantedAt)) \u{00B7} until \(LeaseWords.clock(lease.expiresAt))"
                              + " \u{00B7} \(minutesLeft(lease)) left")
@@ -212,7 +217,7 @@ private struct ResourceRow: View {
                         .foregroundStyle(.secondary)
                     Spacer(minLength: 8)
                     Button {
-                        Task { await model.removeFromLine(state.name, agentID: member.agentID) }
+                        Task { await model.removeFromLine(state.name, agentID: member.agentID, on: host) }
                     } label: {
                         Image(systemName: "xmark")
                     }
@@ -243,31 +248,5 @@ private struct ResourceRow: View {
     private func minutesLeft(_ lease: Lease) -> String {
         let minutes = LeaseWords.minutesLeft(until: lease.expiresAt, now: at)
         return minutes >= 60 ? "\(minutes / 60) h \(minutes % 60) min" : "\(minutes) min"
-    }
-}
-
-/// The way into Resources, above Spending, with how much is held on the way past.
-///
-/// Always there, so the page can be found before anything is leased. The count line
-/// comes and goes: absent when nothing is held or waited for.
-struct ResourcesRow: View {
-    @Environment(AppModel.self) private var model
-
-    private var counts: String? {
-        guard let resources = model.leases?.resources else { return nil }
-        let held = resources.reduce(0) { $0 + $1.holds.count }
-        let waiting = resources.reduce(0) { $0 + $1.line.count }
-        guard held + waiting > 0 else { return nil }
-        return "\(held) held \u{00B7} \(waiting) waiting"
-    }
-
-    var body: some View {
-        // The title alone (#587): what is held and waited for is the tooltip's.
-        HStack(alignment: .firstTextBaseline) {
-            Text("Resources").foregroundStyle(.primary)
-            Spacer()
-        }
-        .help(counts.map { "\($0). Who holds the simulators, browsers and screen, and who is waiting" }
-              ?? "Who holds the simulators, browsers and screen, and who is waiting")
     }
 }

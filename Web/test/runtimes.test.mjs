@@ -208,3 +208,18 @@ test("runtimes: past weeks are their final shares, of one window", () => {
   assert.equal(r.pastWeeksLine({ weeks: [] }, paceNow), null);
   assert.equal(r.allowancePaceLine({ weeks: [week(0.6, -1)] }, paceNow), null);
 });
+
+test("a runtime's line on a machine's page: installed, and signed in where the machine says (#3629)", () => {
+  const s = (availability, more = {}) => ({ runtime: { id: "codex", name: "Codex" }, availability, outdated: false, ...more });
+  const path = { available: { path: "/p", supportsResume: true } };
+  assert.equal(r.machineRuntimeLine(s(path)), "Installed");
+  assert.equal(r.machineRuntimeLine(s(path, { signIn: { signedIn: true } })), "Installed · signed in");
+  assert.equal(r.machineRuntimeLine(s(path, { signIn: { signedIn: false } })), "Installed · not signed in");
+  assert.equal(r.machineRuntimeLine(s(path, { signIn: { signedIn: false, relayed: true } })), "Installed · uses the Mac’s sign-in");
+  assert.equal(r.machineRuntimeLine(s({ needsSignIn: { authMethods: [] } })), "Installed · not signed in");
+  assert.equal(r.machineRuntimeLine(s({ missing: { lookedIn: [] } })), "Not installed");
+  assert.equal(r.machineRuntimeLine(s({ installing: {} })), "Installing…");
+  assert.equal(r.machineRuntimeLine(s({ installing: { progress: "Downloading" } })), "Installing: Downloading");
+  assert.equal(r.machineRuntimeLine(s({ installFailed: { reason: "No network." } })), "Install failed: No network.");
+  assert.equal(r.machineRuntimeLine(s(path, { outdated: true })), "Installed · an update is out");
+});

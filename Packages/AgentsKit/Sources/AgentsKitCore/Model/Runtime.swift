@@ -234,3 +234,37 @@ public struct RuntimeStatus: Codable, Hashable, Sendable, Identifiable {
         self.outdated = outdated
     }
 }
+
+/// A runtime's line on a machine's page (#3629): whether it is installed there and, where the
+/// machine says, whether it is signed in. Accounts and allowances are the person's, so they
+/// are not said here. The web page's `machineRuntimeLine` says the same.
+extension RuntimeStatus {
+    public var machineLine: String {
+        var line: String
+        switch availability {
+        case .available:
+            switch signIn {
+            case nil: line = "Installed"
+            case let signIn? where signIn.signedIn: line = "Installed · signed in"
+            case let signIn? where signIn.relayed == true: line = "Installed · uses the Mac’s sign-in"
+            case _?: line = "Installed · not signed in"
+            }
+        case .needsSignIn: line = "Installed · not signed in"
+        case .missing: line = "Not installed"
+        case .failed(let reason): line = "Can’t be used: \(reason)"
+        case .installing(let progress): line = progress.map { "Installing: \($0)" } ?? "Installing…"
+        case .installFailed(let reason): line = "Install failed: \(reason)"
+        }
+        return outdated ? line + " · an update is out" : line
+    }
+
+    /// Whether this Mac can install it, or install it again, from its page: not there, or
+    /// a failed install, with a recipe the daemon carries out.
+    public var offersInstall: Bool {
+        guard runtime.install != nil else { return false }
+        switch availability {
+        case .missing, .installFailed: return true
+        default: return false
+        }
+    }
+}

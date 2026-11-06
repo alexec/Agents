@@ -16,6 +16,7 @@ import { replace, route } from "../route";
 import { useWaitingCards, type WaitingCard } from "./Cards";
 import { OfflineStrip } from "./OfflineStrip";
 import { DiskStrip } from "./DiskStrip";
+import { resourcesAsked } from "./Resources";
 import { KeptBubbles } from "./Kept";
 import { FolderGoneNotice, MissingFolderStrip } from "./MissingFolder";
 import { AccountMoveStrip } from "./AccountMove";
@@ -866,7 +867,7 @@ function Queued({ store, host, agent, disabled, draftKey }: { store: Store; host
 
 /**
  * What the open agent holds and waits for in line, with the working line (036; LeaseLine.swift,
- * #2344): one line each, a way to the Resources page, with a chevron and a row's hit area (#2448). What it waits for on events is a card (#1995).
+ * #2344): one line each, a way to the Resources on its machine's page (#3629), with a chevron and a row's hit area (#2448). What it waits for on events is a card (#1995).
  */
 function LeaseLine({ store, host, agent }: { store: Store; host: string; agent: Agent }) {
   // A place in line that the wait card says is left to the card (#2361).
@@ -876,7 +877,7 @@ function LeaseLine({ store, host, agent }: { store: Store; host: string; agent: 
     <div class="lease-line" role="status" aria-label={leases.full}>
       {leases.lines.map((text) => (
         <button key={text} class="link" title={leases.full}
-          onClick={() => { location.hash = routeHash({ nav: "machines", section: "resources" }); }}>
+          onClick={() => { resourcesAsked.value = true; location.hash = routeHash({ nav: "machines", section: `machine-${host}` }); }}>
           <span class="words">{text}</span><span class="chevron" aria-hidden="true">›</span>
         </button>
       ))}

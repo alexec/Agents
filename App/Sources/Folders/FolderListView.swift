@@ -214,8 +214,6 @@ struct FolderListView: View {
             Section(isExpanded: $showsStatus) {
                 EventsRow().activityIcon("list.bullet.rectangle")
                     .appText(.supporting).sidebarInk(.events).tag(SidebarItem.events)
-                ResourcesRow().activityIcon("square.stack.3d.up")
-                    .appText(.supporting).sidebarInk(.resources).tag(SidebarItem.resources)
                 RuntimesRow().activityIcon("cpu", warns: runtimesFailing)
                     .appText(.supporting).sidebarInk(.runtimes).tag(SidebarItem.runtimes)
                 MCPServersRow().activityIcon("server.rack", warns: connectorsWarn)

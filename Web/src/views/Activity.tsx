@@ -1,4 +1,4 @@
-// Activity at the top of the sidebar (#151), as the window's (#145): Events, Resources, Runtimes,
+// Activity at the top of the sidebar (#151), as the window's (#145): Events, Runtimes,
 // MCP Servers (#589) and Spending, each a row whose tooltip says what it has at a glance (#587)
 // and that opens its page in the chat's place. What each page lets you change is the Mac's, but
 // for marking a runtime available and stopping a wait (#541).
@@ -10,7 +10,6 @@ import type { AccountProfile, AllowanceReading, AllowanceState, Consequence, Con
 import { fromWireDate } from "../protocol/dates";
 import { who } from "../model/audit";
 import type { ActivityPage } from "../route";
-import { Resources } from "./Resources";
 import { MCPServersList } from "./MCPServers";
 import { YourConnections } from "./ConnectorSetup";
 import { AuditPane } from "./Audit";
@@ -20,7 +19,7 @@ import { Modal } from "./Modal";
 import { folderKey, folderPath } from "../model/groups";
 import { accountChoices, accountRows, accountState, agentsHolding, allowanceLine, allowancePace, allowancePaceLine, pastWeeksLine, defaultAccountName, isOrgRow, orgAllowanceLine, ownRow, ownSignInID, reachesFoot, reachesTheModelBy, machineSignInLine, offersMachineSignIn, removeMessage, rowTitle, runtimeTime, runtimesHint, signInOnTheMac } from "../model/runtimes";
 import { RuntimeSignInDialog } from "./RuntimeSignInDialog";
-import { limitsHint, noResourcesHint } from "../model/onTheMac";
+import { limitsHint } from "../model/onTheMac";
 import { fromOrganisation } from "../model/orgAccounts";
 import { setBy as setByWords } from "../model/orgPolicy";
 import { personalEmpty, personalIntro, personalServers } from "../model/hostedMCP";
@@ -233,7 +232,7 @@ export function availabilityWords(availability: RuntimeAvailability): string {
 
 const onlineHosts = (store: Store): ControlMachine[] => store.hosts.value.filter((h) => hostAnswers(h.state));
 
-const pageTitles: Record<ActivityPage, string> = { events: "Events", resources: "Resources", runtimes: "Runtimes", mcp: "Connectors", spending: "Cost", tokens: "Tokens", time: "Time", milestones: "Milestones" };
+const pageTitles: Record<ActivityPage, string> = { events: "Events", runtimes: "Runtimes", mcp: "Connectors", spending: "Cost", tokens: "Tokens", time: "Time", milestones: "Milestones" };
 
 /** An Activity page in the chat's place. */
 export function ActivityPageView({ store, page }: { store: Store; page: ActivityPage }) {
@@ -273,19 +272,6 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
           )}
           {page === "events" && pane.value === "events" && <EventsList store={store} hostName={hostName} />}
           {page === "events" && pane.value === "audit" && <AuditPane store={store} hostName={hostName} />}
-          {page === "resources" && (
-            <>
-              {store.hosts.value.map((host) => (
-                <section key={host.id}>
-                  {several && <h2 class="section-head">{hostName(host.id)}</h2>}
-                  <Resources store={store} host={host.id} open />
-                </section>
-              ))}
-              {Object.values(store.leases.value).every((s) => s.resources.length === 0) && (
-                <p class="hint">{noResourcesHint(store.hasMac.value)}</p>
-              )}
-            </>
-          )}
           {page === "runtimes" && store.hosts.value.map((host) => (
             <section key={host.id}>
               {several && <h2 class="section-head">{hostName(host.id)}</h2>}
