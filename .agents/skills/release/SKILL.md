@@ -239,12 +239,10 @@ open for item 2 and for the notes' known issues (`git merge-base --is-ancestor <
 2. **No open high, and the milestone is done:** none of step 3's high issues is open, and
    none of the milestone's issues is open at the pin (step 1, item 3; #3465). When one
    closed by a PR that merged after the pin, start over on the newest main from item 1.
-3. **Walks:** `gh issue list --label needs-walk --state open` holds at most five.
-   More than five: end with `partly_done`, naming them; walks are the Scrum Master's to start.
-4. **No tag today** (#2462): look again as in step 0. The release can run past midnight, so a
+3. **No tag today** (#2462): look again as in step 0. The release can run past midnight, so a
    tag pushed today by another run ends this one with `nothing_to_do` and "released today
    (vX.Y.Z at HH:MM); next release tomorrow", unless Alex's prompt says to release again today.
-5. **The archives build on a cold cache** (#2780): `gh workflow run release-dry-run.yml -f
+4. **The archives build on a cold cache** (#2780): `gh workflow run release-dry-run.yml -f
    ref=<sha>`, then find its run (`gh run list --workflow release-dry-run.yml --json
    databaseId,displayTitle,status --jq '.[] | select(.displayTitle == "release dry run <sha>")'`)
    and wait until it is `completed` (it takes up to an hour). It runs by
@@ -325,7 +323,7 @@ A tag that already exists for this version means another release ran: end with
    with `gh run view <id> --json status,conclusion,jobs`. Never wait on a background
    `gh run watch`: it ends with the session's process, and nothing wakes the release.
    A job that no runner took is not a failure: look and run it again once, as in step 5,
-   item 5 (#3445). Only a job that ran and failed goes to items 2–4.
+   item 4 (#3445). Only a job that ran and failed goes to items 2–4.
 2. **GitHub:** `gh release view v<version> --json assets` has the `.dmg`, the `.zip`,
    both `agentsd-linux-*.tar.gz` and `SHA256SUMS`. Macs update Agents Host from the `.zip`
    and `SHA256SUMS` by these names (#2178): a release without them updates no Mac.

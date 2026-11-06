@@ -27,24 +27,6 @@ answer". The order of work is in AGENTS.md, "Work by epic, release by milestone"
 4. If start_session refuses, unassign the issue
    (`gh issue edit <n> --remove-assignee alexec`) and start no more.
 
-**Walk lanes (#611).** While more than 5 issues are labelled `needs-walk` (merged UI
-changes nobody has run: `gh issue list --state all --label needs-walk`), start no
-enhancements: after the bugs, start walk lanes on the unassigned `needs-walk` issues,
-oldest first. A walk lane's worktree is `walk-github-issue-<n>`, its title
-`Walk #<n>: <issue title>`, and its prompt is this one:
-
-> #<n>: <issue title>
->
-> This issue's UI change has merged but nobody has run it (`gh issue view <n>`; its
-> pull request says what changed). Walk it on main with the run-app skill (the web page
-> in headless Chrome; Remote screens only by building, never a simulator), on a scratch
-> root, never the real app. Follow AGENTS.md for the "build" lease. If the Mac is
-> locked, leave everything as it is and end your turn. If it works, comment on the issue
-> what you ran and saw, and remove the `needs-walk` label. If not, file a bug for each
-> problem, linked to #<n>, then remove the label. Then close the scratch app (run-app's
-> "When you are done", which deletes the worktree's build output), call move_worktree
-> with leave_worktree: remove, and archive_session with no id.
-
 Rules from Alex (2026-10-12/13) that are not in AGENTS.md:
 
 - **Up to three lanes.** Start no new agent while more than 2 pull requests are open:
