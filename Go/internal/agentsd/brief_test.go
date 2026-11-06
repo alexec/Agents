@@ -217,6 +217,71 @@ func TestTheBriefSaysTheRestWhereItApplies(t *testing.T) {
 	}
 }
 
+// toolsBriefSkips are the app's tools no brief line names, each with where an agent is told
+// of it instead (#3608).
+var toolsBriefSkips = map[string]string{
+	"hang_up":             "voice mode's own words (agents.go)",
+	"write_daily_summary": "the Daily summary workflow's prompt",
+	"check_folders":       "the Daily checks workflow's prompt",
+	"cancel_wait":         "every wait's answer",
+	"cancel_message":      "message_session's refusal of a second message",
+	"list_resources":      "lease_resource's description; the declared resources are in the brief",
+}
+
+// Every tool this host can list is named in the brief, or skipped above with a reason, so a
+// new tool cannot be one an agent never hears of (#3608). The browser's own tools are named
+// together as browser_*; the browser and drive_screen only where they are offered, and
+// hand_to_person not on a bot's machine.
+func TestTheBriefNamesEveryAppTool(t *testing.T) {
+	var all []struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(wire.AppTools, &all); err != nil {
+		t.Fatal(err)
+	}
+	_, browserNames := browserTools()
+	if len(browserNames) == 0 {
+		t.Fatal("no browser tools")
+	}
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	full := d.brief(&wire.Agent{RuntimeID: "claude"}) + "\n" + toolsBrief(true, true, false)
+	for _, tool := range all {
+		if toolsBriefSkips[tool.Name] == "" && !strings.Contains(full, tool.Name) {
+			t.Errorf("the brief does not name %s: add a line to toolsBrief, or a reason to toolsBriefSkips", tool.Name)
+		}
+	}
+	for name := range browserNames {
+		if !strings.HasPrefix(name, "browser_") && !strings.Contains(full, name) {
+			t.Errorf("the brief does not name %s", name)
+		}
+	}
+	if !strings.Contains(full, "browser_* tools") {
+		t.Error("the brief does not name the browser tools")
+	}
+	for _, c := range []struct {
+		browser, screen, bot bool
+		named, unnamed       []string
+	}{
+		{false, false, false, nil, []string{"browser_", "fill_secret", "hand_to_person", "drive_screen"}},
+		{true, false, false, []string{"browser_* tools", "fill_secret", "hand_to_person", "take the browser lease themselves"}, []string{"drive_screen"}},
+		{true, false, true, []string{"browser_* tools", "fill_secret"}, []string{"hand_to_person"}},
+		{false, true, false, []string{"drive_screen", "takes the screen lease itself"}, []string{"browser_"}},
+	} {
+		got := toolsBrief(c.browser, c.screen, c.bot)
+		for _, w := range c.named {
+			if !strings.Contains(got, w) {
+				t.Errorf("%+v: no %q in %q", c, w, got)
+			}
+		}
+		for _, w := range c.unnamed {
+			if strings.Contains(got, w) {
+				t.Errorf("%+v: %q in %q", c, w, got)
+			}
+		}
+	}
+}
+
 // The persona's prompt follows the brief: the folder's before the person's, its front
 // matter left out, none for a persona that is not there or an id that is a path (#760).
 func TestThePersonasPromptFollowsTheBrief(t *testing.T) {
