@@ -96,6 +96,18 @@ Decided: type + level with the fallback chain, P10–P90, minimum 5, and a simul
 Decided: the method is not tagged `web` yet, because a `web` method needs its Swift `WebSignatures` and story 3 (#3560) adds it with the first client that shows it. Alex can overrule.
 Decided: with no `startAt`, the remaining work starts now, because the closed children are already out of the estimate. Alex can overrule.
 
+## The Work pages (#3560)
+
+`lineage/estimate` is tagged `web` now, with its `WebSignatures` row. An open issue's page asks the machine that keeps its links, and shows one line under the title (`EstimateWords`, `Web/src/model/estimate.ts`):
+
+- **An issue:** "Estimate: about $5.87, 85.5K output tokens, 2h 58m of work (from 8 closed stories)". The P10–P90 range and the lead time ("it varies with the queue") are in its help on the Mac and the web page; on the Remote a tap shows them under the line.
+- **An epic:** "Estimate for 3 open children: about …", and "Spent $14.21 on 2 closed children". In the Plan, each open child has "est. $5.87 · 2h 58m" after its cost (Mac + web, as the Plan).
+- **Too little history:** "Not enough past work to estimate", and nothing else.
+
+Decided: the hours are the agents' working time, not the cycle or lead time, because the backtest found working time the most accurate (×1.45) and lead time poor (×2.44). Alex can overrule.
+Decided: no landing date on the pages yet, because the cycle time needs the start of work (#3562), which has only just begun to be recorded. Alex can overrule.
+Decided: a closed issue shows no estimate, because story 4 (#3561) shows the estimate against the actual there. Alex can overrule.
+
 ## What the backtest does not cover
 
 - **6 days of history.** The store starts on 2026-10-30. These numbers will change as history grows. Story 4 (estimate against actual) keeps track of them.

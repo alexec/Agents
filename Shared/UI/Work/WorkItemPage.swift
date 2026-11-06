@@ -25,6 +25,8 @@ struct WorkItemPage: View {
     @State private var costs: [DaemonAPI.LineageNode: DaemonAPI.LineageCostRollup] = [:]
     @State private var layout: LineageLayout.Graph?
     @State private var linksFailed = false
+    @State private var estimate: DaemonAPI.LineageEstimate?
+    @State private var estimateRange = false
     @State private var reading = false
     @State private var asked = 0
 
@@ -53,6 +55,7 @@ struct WorkItemPage: View {
                 // An epic's plan (#3268): Mac + web, so not on the Remote (#2796).
                 if let detail, WorkPlan.hasPlan(detail.got.item) {
                     WorkPlanSection(model: model, host: detail.host, lineageHost: lineageHost, detail: detail.got, asked: asked,
+                                    estimates: estimate?.children ?? [],
                                     writes: model.forgeWrites(on: detail.host), wrote: { Task { await reread() } })
                 }
                 #endif
@@ -73,11 +76,19 @@ struct WorkItemPage: View {
         #endif
         .workTask(id: asked) { await loadForge() }
         .workTask(id: LineageAsk(host: lineageHost, asked: asked)) { await loadLineage() }
+        .workTask(id: estimateAsk) { await loadEstimate() }
     }
 
     private struct LineageAsk: Equatable {
         var host: MachineRef?
         var asked: Int
+    }
+
+    /// An open issue's estimate (#3560), from the machine that keeps its links. A closed one has
+    /// what it cost.
+    private var estimateAsk: LineageAsk? {
+        guard let item = detail?.got.item, item.node.kind == "issue", item.state == "open" else { return nil }
+        return LineageAsk(host: lineageHost, asked: asked)
     }
 
     // MARK: Header
@@ -122,6 +133,9 @@ struct WorkItemPage: View {
                     Button(WorkList.openOnWords(node.ref)) { openURL(url) }.linkStyle()
                 }
             }
+            if let estimate, EstimateWords.shows(estimate) {
+                estimateLine(estimate)
+            }
             if let item, item.node.kind == "pr" {
                 let words = [WorkList.checksWords(detail?.got.checks, summary: item.checks), WorkList.reviewWords(item.review)]
                     .compactMap { $0 }
@@ -130,6 +144,25 @@ struct WorkItemPage: View {
                 }
             }
         }
+    }
+
+    /// "Estimate: about $3.20, 45K output tokens, 2h 10m of work (from 31 closed stories)", and for
+    /// an epic what its closed children spent. The range is its help on the Mac; on the Remote a
+    /// tap shows it under the line.
+    @ViewBuilder
+    private func estimateLine(_ e: DaemonAPI.LineageEstimate) -> some View {
+        let range = EstimateWords.rangeWords(e)
+        let line = Text(([EstimateWords.line(e)] + [EstimateWords.spentWords(e)].compactMap { $0 }).joined(separator: " · "))
+            .appText(.supporting).foregroundStyle(.secondary).monospacedDigit()
+            .accessibilityHint(range ?? "")
+        #if os(iOS)
+        line.onTapGesture { if range != nil { estimateRange.toggle() } }
+        if estimateRange, let range {
+            Text(range).appText(.fine).foregroundStyle(.secondary).monospacedDigit()
+        }
+        #else
+        line.textSelection(.enabled).help(range ?? "")
+        #endif
     }
 
     @ViewBuilder
@@ -339,6 +372,15 @@ struct WorkItemPage: View {
         } catch {
             forgeProblem = error.localizedDescription
         }
+    }
+
+    private func loadEstimate() async {
+        let mine = estimateAsk
+        estimate = nil
+        guard let mine, let host = mine.host else { return }
+        let got = await model.lineageEstimate(node, on: host)
+        guard estimateAsk == mine else { return }
+        estimate = got
     }
 
     private func loadLineage() async {

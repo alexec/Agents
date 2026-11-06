@@ -7,6 +7,7 @@ import SwiftUI
 /// `lineage/cost`); a
 /// header with the lead, the children done and running, and the total cost; and **Start lead**
 /// (the `lead` skill's form, in the epic's folder) or **Open lead**. A row opens its issue's page.
+/// An open child also shows its estimate (#3560), from the page's `lineage/estimate`.
 /// Where the machine writes to the forge, the plan changes here too (#3271): **Add child** (a new
 /// issue, or one that is there) under the steps, and each row's **Blocked by** menu of the other
 /// children; `wrote` reads the page again.
@@ -16,6 +17,8 @@ struct WorkPlanSection: View {
     let lineageHost: MachineRef?
     let detail: DaemonAPI.ForgeItemDetail
     let asked: Int
+    /// The epic's open children's estimates (#3560).
+    var estimates: [DaemonAPI.LineageEstimate] = []
     let writes: Bool
     let wrote: () -> Void
 
@@ -152,6 +155,11 @@ struct WorkPlanSection: View {
                 }
                 if let cost = WorkPlan.costWords(rollup) {
                     Text(cost).monospacedDigit().foregroundStyle(.secondary)
+                }
+                if let estimate = estimates.first(where: { $0.node == child.item.node }),
+                   let words = EstimateWords.childWords(estimate) {
+                    Text(words).monospacedDigit().foregroundStyle(.tertiary)
+                        .help(EstimateWords.rangeWords(estimate) ?? "")
                 }
             }
             .padding(.horizontal, 10).padding(.vertical, 5)

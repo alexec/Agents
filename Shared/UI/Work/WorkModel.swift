@@ -33,6 +33,8 @@ protocol WorkModel: AnyObject, Sendable {
     func reportNodes(_ query: DaemonAPI.ReportNodesQuery) async throws -> DaemonAPI.ReportNodes?
     func lineageWalk(_ node: DaemonAPI.LineageNode, on host: MachineRef) async throws -> DaemonAPI.LineageGraph
     func lineageCost(_ node: DaemonAPI.LineageNode, on host: MachineRef) async -> DaemonAPI.LineageCostRollup?
+    /// An issue's or an epic's estimate from past work (#3560); nil where the machine cannot make one.
+    func lineageEstimate(_ node: DaemonAPI.LineageNode, on host: MachineRef) async -> DaemonAPI.LineageEstimate?
     /// A session's title, or nil when this app does not know the session.
     func workSessionTitle(_ id: UUID) -> String?
     /// A session's state, or nil when this app does not know the session (#3268, a plan's marks).

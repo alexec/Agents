@@ -11432,6 +11432,7 @@ export interface Methods {
   "hosts/stop": { params: MachineStop; result: ControlMachine };
   "hosts/unlink": { params: MachineRequest; result: ControlMachine };
   "lineage/cost": { params: LineageNodeRequest; result: LineageCostRollup };
+  "lineage/estimate": { params: LineageEstimateRequest; result: LineageEstimate };
   "lineage/walk": { params: LineageNodeRequest; result: LineageGraph };
   "links/approve": { params: ChannelLinkDecide; result: Empty };
   "links/deny": { params: ChannelLinkDecide; result: Empty };
@@ -11800,6 +11801,7 @@ export const MethodTarget = {
   "hosts/stop": "control",
   "hosts/unlink": "control",
   "lineage/cost": "host",
+  "lineage/estimate": "host",
   "lineage/walk": "host",
   "links/approve": "control",
   "links/deny": "control",

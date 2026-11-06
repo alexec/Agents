@@ -4,14 +4,16 @@
 // lead, the children done and running, and the total cost; and Start lead (the lead skill's form, in
 // the epic's folder) or Open lead. A row opens its issue's page. Where the machine writes to the
 // forge, the plan changes here too (#3271): Add child (a new issue, or one that is there) under the
-// steps, and each row's Blocked by menu of the other children; `wrote` reads the page again.
+// steps, and each row's Blocked by menu of the other children; `wrote` reads the page again. An open
+// child also shows its estimate (#3560), from the page's lineage/estimate.
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import type { AgentState, ForgeDone, ForgeItemDetail, ForgePlan, ForgePlanChild, LineageCostRollup, LineageLink } from "../protocol/generated";
+import type { AgentState, ForgeDone, ForgeItemDetail, ForgePlan, ForgePlanChild, LineageCostRollup, LineageEstimate, LineageLink } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { describe } from "../model/errors";
 import { sessionHost } from "../model/lineage";
 import { doneWords, shortRef } from "../model/work";
+import { childEstimateWords, estimateRangeWords } from "../model/estimate";
 import {
   addChildRequest, blockedByRequest, blockedWords, blockerChoices, childLevels, leadStart, leadWords, markWords, namesIssue, planCostWords,
   planMark, planPR, planSessions, planWorkWords, progressWords, stepTitle, type PlanMark,
@@ -24,8 +26,9 @@ import { ForgeTitle } from "../render/ForgeTitle";
 const markClass: Record<PlanMark, string> = { "✓": "done", "◐": "working", "⚠": "attention", "○": "waiting", "⊘": "blocked" };
 const holdsRuntime = (s: AgentState) => s === "starting" || s === "running" || s === "waitingOnUser";
 
-export function WorkPlan({ store, host, lineageHost, detail, asked, writes, wrote }: {
-  store: Store; host: string; lineageHost: string | undefined; detail: ForgeItemDetail; asked: number; writes: boolean; wrote: () => void;
+export function WorkPlan({ store, host, lineageHost, detail, asked, estimates = [], writes, wrote }: {
+  store: Store; host: string; lineageHost: string | undefined; detail: ForgeItemDetail; asked: number;
+  estimates?: readonly LineageEstimate[]; writes: boolean; wrote: () => void;
 }) {
   const plan = useSignal<ForgePlan | null>(null);
   const problem = useSignal<string | null>(null);
@@ -152,6 +155,8 @@ export function WorkPlan({ store, host, lineageHost, detail, asked, writes, wrot
                         const mark = planMark(c, pr, st);
                         const work = planWorkWords(pr, st) ?? blockedWords(c);
                         const cost = planCostWords(rollup);
+                        const est = estimates.find((e) => e.node.ref === c.item.node.ref);
+                        const estWords = est ? childEstimateWords(est) : undefined;
                         return (
                           <li key={c.item.node.ref} class="work-plan-item">
                             <button type="button" class="work-plan-row" title={`Open ${shortRef(c.item.node.ref)}'s page`}
@@ -162,6 +167,7 @@ export function WorkPlan({ store, host, lineageHost, detail, asked, writes, wrot
                               <span class="work-plan-title"><ForgeTitle text={c.item.title} /></span>
                               {work && <span class="quiet small">{work}</span>}
                               {cost && <span class="quiet small work-plan-cost">{cost}</span>}
+                              {est && estWords && <span class="quiet small work-plan-cost work-plan-estimate" title={estimateRangeWords(est)}>{estWords}</span>}
                             </button>
                             {writes && p.children.length > 1 && (
                               <button type="button" class="work-plan-blocked" disabled={busy.value} aria-label="Blocked by"

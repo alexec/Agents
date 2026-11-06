@@ -136,6 +136,96 @@ public extension DaemonAPI {
             self.limited = limited
         }
     }
+
+    /// `lineage/estimate`: an issue or an epic, and when work on it starts (now when nil).
+    struct LineageEstimateRequest: Codable, Sendable, Hashable {
+        public var node: LineageNode
+        public var startAt: Date?
+
+        public init(node: LineageNode, startAt: Date? = nil) {
+            self.node = node
+            self.startAt = startAt
+        }
+    }
+
+    /// A figure's estimate: the median and the P10 to P90 range.
+    struct LineageEstimateRange: Codable, Sendable, Hashable {
+        public var median: Double
+        public var p10: Double
+        public var p90: Double
+
+        public init(median: Double, p10: Double, p90: Double) {
+            self.median = median
+            self.p10 = p10
+            self.p90 = p90
+        }
+    }
+
+    /// When work lands: the median and the P10 to P90 range.
+    struct LineageEstimateDates: Codable, Sendable, Hashable {
+        public var median: Date
+        public var p10: Date
+        public var p90: Date
+
+        public init(median: Date, p10: Date, p90: Date) {
+            self.median = median
+            self.p10 = p10
+            self.p90 = p90
+        }
+    }
+
+    /// `lineage/estimate`'s answer (#3559): what an issue or an epic will probably cost and take,
+    /// from the closed issues like it. A figure is nil when fewer than 5 matches have it. An epic
+    /// has its open children's estimates, and what its closed children spent.
+    struct LineageEstimate: Codable, Sendable, Hashable {
+        public var node: LineageNode
+        public var type: String?
+        public var level: String?
+        public var step: Int?
+        public var closedIssues: Int
+        /// level, type or all; nil for an epic, and with too few closed issues.
+        public var matchedBy: String?
+        public var matches: Int
+        /// Dollars, by currency.
+        public var cost: [String: LineageEstimateRange]?
+        public var inputTokens: LineageEstimateRange?
+        public var outputTokens: LineageEstimateRange?
+        public var workingSeconds: LineageEstimateRange?
+        public var leadTimeSeconds: LineageEstimateRange?
+        public var cycleTimeSeconds: LineageEstimateRange?
+        public var landsAt: LineageEstimateDates?
+        public var openChildren: Int?
+        public var closedChildren: Int?
+        public var spent: LineageCost?
+        public var children: [LineageEstimate]?
+
+        public init(node: LineageNode, type: String? = nil, level: String? = nil, step: Int? = nil, closedIssues: Int = 0,
+                    matchedBy: String? = nil, matches: Int = 0, cost: [String: LineageEstimateRange]? = nil,
+                    inputTokens: LineageEstimateRange? = nil, outputTokens: LineageEstimateRange? = nil,
+                    workingSeconds: LineageEstimateRange? = nil, leadTimeSeconds: LineageEstimateRange? = nil,
+                    cycleTimeSeconds: LineageEstimateRange? = nil, landsAt: LineageEstimateDates? = nil,
+                    openChildren: Int? = nil, closedChildren: Int? = nil, spent: LineageCost? = nil,
+                    children: [LineageEstimate]? = nil) {
+            self.node = node
+            self.type = type
+            self.level = level
+            self.step = step
+            self.closedIssues = closedIssues
+            self.matchedBy = matchedBy
+            self.matches = matches
+            self.cost = cost
+            self.inputTokens = inputTokens
+            self.outputTokens = outputTokens
+            self.workingSeconds = workingSeconds
+            self.leadTimeSeconds = leadTimeSeconds
+            self.cycleTimeSeconds = cycleTimeSeconds
+            self.landsAt = landsAt
+            self.openChildren = openChildren
+            self.closedChildren = closedChildren
+            self.spent = spent
+            self.children = children
+        }
+    }
 }
 
 /// A session's Lineage pane (#2940), as `Web/src/model/lineage.ts` has it on the web page: the
