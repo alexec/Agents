@@ -27,6 +27,11 @@ import (
 //   - The answer is kept milestoneRecheck: an issue named again after that is asked again.
 //     When its milestone is another one now, the old link ends and a new one starts; with
 //     none, the link ends.
+//   - The same answer says the issue's parent (a GitHub sub-issue's epic, #3582): the issue
+//     is part-of its parent, source forge, and a parent's sub-issues (at most
+//     subIssuesMax) are each part-of it, so a walk from an epic reaches its children. A
+//     move or a removal ends the old link as for a milestone. GitLab's REST API says no
+//     parent, so a GitLab issue gets none.
 //   - Bounded: one lookup at a time, on its own goroutine so the linker never waits on the
 //     forge; at most milestoneLookupsHeld wait, each issue once, and milestonesCached
 //     answers are kept.
@@ -39,13 +44,24 @@ const (
 	milestoneRecheck     = time.Hour
 	milestoneLookupsHeld = 256
 	milestonesCached     = 2_000
+	// subIssuesMax bounds the sub-issues of one parent that are linked: one page of the forge's.
+	subIssuesMax = 100
 )
 
-// milestoneLookup asks the forge for an issue's milestone: its number (GitLab: its iid),
-// or 0 for none. Tests set it, or a daemon's issueLookup.
-var milestoneLookup = forgeIssueMilestone
+// issueOnForge is what the forge says of an issue: its milestone's number (GitLab: its
+// iid), 0 for none; the issue it is a sub-issue of, the zero node for none; and its own
+// sub-issues.
+type issueOnForge struct {
+	milestone int
+	parent    wire.LineageNode
+	children  []wire.LineageNode
+}
 
-type issueLookup func(ctx context.Context, folder string, repo forgeRepo, n int) (int, error)
+// milestoneLookup asks the forge for an issue's milestone, parent and sub-issues. Tests set
+// it, or a daemon's issueLookup.
+var milestoneLookup = forgeIssue
+
+type issueLookup func(ctx context.Context, folder string, repo forgeRepo, n int) (issueOnForge, error)
 
 type issueMilestoneBook struct {
 	issueMu      sync.Mutex
@@ -106,7 +122,8 @@ func (d *Daemon) askIssueMilestone(j milestoneJob) {
 	if d.issueLookup != nil {
 		ask = d.issueLookup
 	}
-	m, err := ask(context.Background(), j.folder, j.repo, j.n)
+	got, err := ask(context.Background(), j.folder, j.repo, j.n)
+	m := got.milestone
 	if err != nil {
 		log.Printf("lineage: the milestone of %s: %v", issue.Ref, err)
 	} else {
@@ -121,6 +138,16 @@ func (d *Daemon) askIssueMilestone(j milestoneJob) {
 			})
 			if m > 0 {
 				d.link(issue, to, lineage.RelPartOf, lineage.SourceForge)
+			}
+			d.endLinks(issue, func(l wire.LineageLink) bool {
+				return l.From == issue && l.Rel == lineage.RelPartOf && l.To.Kind == lineage.KindIssue &&
+					l.Source == lineage.SourceForge && l.To != got.parent
+			})
+			if got.parent != (wire.LineageNode{}) {
+				d.link(issue, got.parent, lineage.RelPartOf, lineage.SourceForge)
+			}
+			for _, child := range got.children {
+				d.link(child, issue, lineage.RelPartOf, lineage.SourceForge)
 			}
 		})
 		if m > 0 {
@@ -163,8 +190,9 @@ func (d *Daemon) repoFolder(repo forgeRepo) string {
 	return ""
 }
 
-// forgeIssueMilestone asks gh or glab, in folder, for an issue's milestone.
-func forgeIssueMilestone(ctx context.Context, folder string, repo forgeRepo, n int) (int, error) {
+// forgeIssue asks gh or glab, in folder, for an issue's milestone and parent, and, when it
+// has sub-issues, for them.
+func forgeIssue(ctx context.Context, folder string, repo forgeRepo, n int) (issueOnForge, error) {
 	var exe, path string
 	switch repo.forge {
 	case "github":
@@ -172,16 +200,102 @@ func forgeIssueMilestone(ctx context.Context, folder string, repo forgeRepo, n i
 	case "gitlab":
 		exe, path = forgeCLI("glab"), fmt.Sprintf("projects/%s/issues/%d", url.PathEscape(repo.path), n)
 	default:
-		return 0, fmt.Errorf("no issues on %s", repo.forge)
+		return issueOnForge{}, fmt.Errorf("no issues on %s", repo.forge)
 	}
 	if exe == "" {
-		return 0, errors.New("gh or glab is not installed")
+		return issueOnForge{}, errors.New("gh or glab is not installed")
 	}
 	out, err := runForgeCLI(ctx, exe, folder, nil, "api", path)
 	if err != nil {
-		return 0, err
+		return issueOnForge{}, err
 	}
-	return issueMilestoneOf(out)
+	got, subIssues, err := issueOnForgeOf(out)
+	if err != nil || subIssues == 0 || repo.forge != "github" {
+		return got, err
+	}
+	out, err = runForgeCLI(ctx, exe, folder, nil, "api", fmt.Sprintf("repos/%s/issues/%d/sub_issues?per_page=%d", repo.path, n, subIssuesMax))
+	if err != nil {
+		// The milestone and parent stand; the sub-issues are asked the next time.
+		log.Printf("lineage: the sub-issues of %s: %v", repo.issue(n).Ref, err)
+		return got, nil
+	}
+	got.children, err = subIssuesOf(out)
+	return got, err
+}
+
+// issueOnForgeOf is an issue as the forge's API says it: its milestone and parent, and how
+// many sub-issues it has.
+func issueOnForgeOf(out []byte) (issueOnForge, int, error) {
+	m, err := issueMilestoneOf(out)
+	if err != nil {
+		return issueOnForge{}, 0, err
+	}
+	var issue struct {
+		ParentIssueURL string `json:"parent_issue_url"`
+		SubIssues      struct {
+			Total int `json:"total"`
+		} `json:"sub_issues_summary"`
+	}
+	if err := json.Unmarshal(out, &issue); err != nil {
+		return issueOnForge{}, 0, fmt.Errorf("the forge did not say the issue: %v", err)
+	}
+	got := issueOnForge{milestone: m}
+	if repo, n, ok := issueOfAPIURL(issue.ParentIssueURL); ok {
+		got.parent = repo.issue(n)
+	}
+	return got, issue.SubIssues.Total, nil
+}
+
+// subIssuesOf is the issues a GitHub sub_issues list names, at most subIssuesMax.
+func subIssuesOf(out []byte) ([]wire.LineageNode, error) {
+	var list []struct {
+		HTMLURL string `json:"html_url"`
+	}
+	if err := json.Unmarshal(out, &list); err != nil {
+		return nil, fmt.Errorf("the forge did not say the sub-issues: %v", err)
+	}
+	var children []wire.LineageNode
+	for _, c := range list {
+		if repo, n, ok := issueOfURL(c.HTMLURL); ok && len(children) < subIssuesMax {
+			children = append(children, repo.issue(n))
+		}
+	}
+	return children, nil
+}
+
+// issueOfAPIURL is the repo and number of a GitHub API issue address:
+// https://api.github.com/repos/o/r/issues/12.
+func issueOfAPIURL(raw string) (forgeRepo, int, bool) {
+	u, err := url.Parse(raw)
+	if err != nil || !strings.EqualFold(u.Host, "api.github.com") {
+		return forgeRepo{}, 0, false
+	}
+	rest, ok := strings.CutPrefix(u.Path, "/repos/")
+	if !ok {
+		return forgeRepo{}, 0, false
+	}
+	return issueOfURL("https://github.com/" + rest)
+}
+
+// issueOfURL is the repo and number of an issue's web address: github.com/o/r/issues/5, or
+// <gitlab>/group/project/-/issues/5.
+func issueOfURL(raw string) (forgeRepo, int, bool) {
+	u, err := url.Parse(raw)
+	if err != nil || (u.Scheme != "https" && u.Scheme != "http") {
+		return forgeRepo{}, 0, false
+	}
+	path := strings.Trim(u.Path, "/")
+	for _, sep := range []string{"/-/issues/", "/issues/"} {
+		if repo, num, ok := strings.Cut(path, sep); ok {
+			n, err := strconv.Atoi(strings.SplitN(num, "/", 2)[0])
+			r := forgeOf(u.Host, repo)
+			if err != nil || n <= 0 || r.forge == "" || (sep == "/issues/") != (r.forge == "github") {
+				return forgeRepo{}, 0, false
+			}
+			return r, n, true
+		}
+	}
+	return forgeRepo{}, 0, false
 }
 
 // issueMilestoneOf is the milestone of an issue as the forge's API says it: number on

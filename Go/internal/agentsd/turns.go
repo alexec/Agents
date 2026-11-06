@@ -63,6 +63,9 @@ type live struct {
 	// that came before it on the wire.
 	toolCalls map[string]bool
 	seen      *sync.Cond
+	// filing is the open tool calls that file a forge issue, by id (lineagefiled.go): the
+	// issue's address comes in a later update than the command.
+	filing map[string]bool
 	// evidence is what this turn's commands printed and what it replied, for a sandbox
 	// that could not start (sandboxfailure.go).
 	evidence turnEvidence
@@ -1333,6 +1336,7 @@ func (l *live) Update(n sdk.SessionNotification) {
 		d.record(l.id, wire.TranscriptEntryKind{ToolCall: &wire.TranscriptEntryKindToolCall{Value: call}})
 		d.noteAgentViewCall(l.id, call)
 		d.noteDocRead(l.id, call)
+		d.noteIssueFiled(l, call)
 		l.mu.Lock()
 		l.evidence.takeCall(call)
 		said := l.lastMessage.String()
@@ -1347,6 +1351,7 @@ func (l *live) Update(n sdk.SessionNotification) {
 		d.record(l.id, wire.TranscriptEntryKind{ToolCallUpdate: &wire.TranscriptEntryKindToolCallUpdate{Value: call}})
 		d.noteAgentViewCall(l.id, call)
 		d.noteDocRead(l.id, call)
+		d.noteIssueFiled(l, call)
 		l.mu.Lock()
 		l.evidence.takeCall(call)
 		l.mu.Unlock()
