@@ -4,8 +4,11 @@ description: "Tasks for 046 Remote Works Away From Home"
 
 # Tasks: Remote Works Away From Home
 
+> **Replaced (#3390, #3576).** The relay is removed: see the note at the top of
+> [spec.md](spec.md). This page is kept as a record only.
+
 **Input**: `specs/046-remote-away-from-home/` — plan.md, spec.md, research.md (R1–R13), data-model.md,
-contracts/relay.md, contracts/daemon.md, contracts/ui.md, quickstart.md
+contracts/relay.md (removed in #3576), contracts/daemon.md, contracts/ui.md, quickstart.md
 
 **Tests**: Yes. The plan asks for them, and every lane in this repo writes them. The suites go in
 `Packages/AgentsKit/Tests/AgentsKitTests/{Unit,Integration}/`. Assert properties directly, and

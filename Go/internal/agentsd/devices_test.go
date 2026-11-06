@@ -17,8 +17,6 @@ func startDevices(t *testing.T) (*Daemon, *conn) {
 	return d, c
 }
 
-func relayPoint() []byte { return append([]byte{0x04}, bytes.Repeat([]byte{7}, 64)...) }
-
 func announcement(id string, key byte) map[string]any {
 	return map[string]any{"id": id, "publicKey": []byte{key, key}, "name": "Phone", "kind": "iPhone"}
 }
@@ -27,16 +25,9 @@ const phone = "11111111-2222-3333-4444-555555555555"
 
 func TestPairingTakesOneDeviceWithTheCode(t *testing.T) {
 	d, mac := startDevices(t)
-	if e := mac.callError(t, 1, "devices/startPairing", nil); e.Code != wire.FailureNotAllowed {
-		t.Fatalf("no bridge: %+v", e)
-	}
-	if e := mac.callError(t, 2, "relay/register", map[string]any{"publicKey": []byte{1, 2}}); e.Code != CodeInvalidParams {
-		t.Fatalf("short key: %+v", e)
-	}
-	mac.call(t, 3, "relay/register", map[string]any{"publicKey": relayPoint()})
 	var code wire.PairingCode
 	json.Unmarshal(mac.call(t, 4, "devices/startPairing", nil), &code)
-	if len(code.Secret) != 32 || !bytes.Equal(code.MacKey, relayPoint()) || code.Name == "" {
+	if len(code.Secret) != 32 || code.Name == "" {
 		t.Fatalf("code: %+v", code)
 	}
 	var current wire.PairingSecret
@@ -55,7 +46,7 @@ func TestPairingTakesOneDeviceWithTheCode(t *testing.T) {
 	}
 	var reply wire.AnnounceReply
 	json.Unmarshal(p.call(t, 3, "devices/announce", announcement(phone, 1)), &reply)
-	if string(reply.Device.ID) != phone || !bytes.Equal(reply.MacKey, relayPoint()) {
+	if string(reply.Device.ID) != phone {
 		t.Fatalf("reply: %+v", reply)
 	}
 	// The code is spent.

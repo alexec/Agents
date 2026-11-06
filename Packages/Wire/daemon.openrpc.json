@@ -6664,26 +6664,6 @@
       }
     },
     {
-      "name": "relay/register",
-      "x-capability": "relay/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/RelayRegistration"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
       "name": "reports/features",
       "x-capability": "features/1",
       "tags": [

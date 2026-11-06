@@ -1,5 +1,8 @@
 # Baseline (T002)
 
+> **Replaced (#3390, #3576).** The relay is removed: see the note at the top of
+> [spec.md](../spec.md). This page is kept as a record only.
+
 Three full `swift test --package-path Packages/AgentsKit` runs on a frozen copy of this branch
 right after merging main (`Merge main into agents/ios-works-when-not`, 2026-09-25), before any
 046 code. 1989 tests in 228 suites each time.

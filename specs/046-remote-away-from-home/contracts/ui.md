@@ -1,5 +1,8 @@
 # Contract: Screens
 
+> **Replaced (#3390, #3576).** The relay is removed: see the note at the top of
+> [spec.md](../spec.md). This page is kept as a record only.
+
 The look was approved on [look/away-mock.png](../look/away-mock.png). Words are exact.
 
 ## The line under the title (the `StaleBanner` slot)

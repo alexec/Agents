@@ -418,17 +418,13 @@ RemoteWidget/                                          devices
 App/Sources/Notifications/                             devices
 App/Sources/Settings/PairDeviceSheet.swift             devices
 App/Sources/Settings/QRCode.swift                      devices
-Host/Relay/                                            devices
-Packages/AgentsKit/Sources/AgentsKit/Relay/            devices
 Packages/AgentsKit/Sources/AgentsKitCore/Remote/       devices
 Packages/AgentsKit/Sources/AgentsKitCore/Widget/       devices
 Packages/AgentsKit/Sources/AgentsKitCore/Attention/    devices
 Packages/AgentsKit/Sources/AgentsKitCore/Client/       devices
 Packages/AgentsKit/Sources/AgentsKitCore/Control/Pairing*.swift  devices
-Packages/AgentsKit/Sources/AgentsKitCore/Control/ControlRelayDial.swift  devices
 Packages/AgentsKit/Sources/AgentsKitCore/Control/WebRemoteFile.swift  devices
 Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI+Web.swift  devices
-Packages/AgentsKit/Tests/AgentsKitTests/**/*Relay*     devices
 Packages/AgentsKit/Tests/AgentsKitTests/**/*Device*    devices
 Packages/AgentsKit/Tests/AgentsKitTests/**/*Attention*  devices
 Web/src/wire/                                          devices

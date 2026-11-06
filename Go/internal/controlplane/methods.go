@@ -687,8 +687,6 @@ func (m *Methods) status(from Caller) wire.ControlStatus {
 	status.FolderDetection = &detection
 	needed := requiredNow(m.router.Team())
 	status.Capabilities, status.Required = capabilities(), &needed
-	away := false
-	status.AwayFromHome = &away
 	return status
 }
 

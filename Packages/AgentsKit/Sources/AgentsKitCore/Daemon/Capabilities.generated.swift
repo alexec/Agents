@@ -419,7 +419,6 @@ public enum Capability {
         "providers/ssh": "providers.carry/1",
         "relay/grant": "relay/1",
         "relay/offer": "relay/1",
-        "relay/register": "relay/1",
         "reports/features": "features/1",
         "resources/declare": "resources/1",
         "resources/end": "resources.leases/1",

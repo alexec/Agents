@@ -1,5 +1,8 @@
 # Contract: Daemon Methods
 
+> **Replaced (#3390, #3576).** The relay is removed: see the note at the top of
+> [spec.md](../spec.md). This page is kept as a record only.
+
 Three changes to `DaemonAPI`. None of them gives the daemon network code or CryptoKit: it stores
 and hands out bytes.
 
