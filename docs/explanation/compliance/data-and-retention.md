@@ -24,18 +24,23 @@ command). Only its user can read it (mode 0700).
 | `events.jsonl` | The machine's events | 7 days, and 10,000 events at most |
 | `usage-history.json`, `time-history.json` | Usage, cost and time | 168 hours by the hour, 90 days by the day |
 | `spend.json` | Spend for the cost limits | 7 days |
-| `workflows.json` | Workflows and their runs | A run is kept 7 days, or until its agent is archived or gone |
+| `workflows.json` | Workflows and their runs | A run is kept until its agent is archived, gone or ended; one 7 days old goes at the hourly sweep unless its agent still works |
 | `workflow-copies/` | The approved text of each workflow and its skills | The copies that `workflows.json` names; an older version goes when it is saved |
 | `assessments/` | Each runtime assessment's start, score and scope | The newest 50 |
 | `mcp-logs/`, in the log folder | What each hosted MCP server wrote to stderr | 1 MB and one older file a server, and the newest 32 servers |
 | `events-state.json` | The branch tips that `branch.moved` compares | The live folders only |
 | `<file>.unreadable-<time>`, `<file>.corrupt-<time>` | A store that could not be read, set aside | The newest 3 of each kind for each file |
-| `<folder>/.agents/attachments` | Files attached to prompts | A file that no kept conversation names goes after 7 days. The folder stays under 500 MB, oldest first. |
+| `<folder>/.agents/attachments` | Files attached to prompts | A file that no kept conversation names goes after 7 days, swept every hour, also in a folder with no agent left (`attachment-folders.json` lists the folders). The folder stays under 500 MB, oldest first. |
+| `lineage.jsonl` | Links between issues, sessions, PRs and the rest | An ended link goes 90 days after its end, at the hourly sweep; 20,000 links at most |
 | `<folder>/.agents/dropbox` | Files handed to a workflow | 25 MB a file. Not swept. |
 | Terminal scrollback | What a terminal showed | In memory only, 4 MiB a terminal |
 | `daemon.log` | What the machine did | 4 MB, and one older file |
 | `erasures.json`, `erased.json` | Runtime copies of deleted agents still to erase; every agent deleted here | 1,000 entries for 7 days; 10,000 IDs for 400 days |
 | `~/.agents-secrets` | Secrets (see [Security overview](security-overview.md#where-secrets-live)) | Until you remove them |
+
+What a crash leaves is removed when the machine starts again: a restore's `.restore-*`
+folder, the skill catalog's previews and the browser's output in the cache folder, and a
+control plane's `/tmp/agents-tunnels-<uid>-<pid>` folder whose process is gone.
 
 ## On the control plane
 
@@ -49,6 +54,9 @@ that machine starts.
 | Codes | A code's purpose, owner and expiry, never its secret | Deleted 24 hours after it expires |
 | Audit events | Who did what (see [Security overview](security-overview.md#who-did-what)) | 90 days by default; an admin sets 1 to 3,650 days |
 | Usage reports | Usage, cost and time by person, project, folder, machine and runtime, sent by each machine | 7 days by the hour, 90 days by the day |
+| Join, lock-join and sign-in requests | A machine's or client's request, and how it ended | An hour after it ends, at the hourly sweep |
+| Link requests | A channel sender's request to link to a person | A day after it ends, at the hourly sweep |
+| Budget, governance and remove requests | A person's ask for more budget, for a server or skill, or an identity provider's removal | Budget: the next day. Governance: 30 days after it is decided. A removed person's, or a removed machine's report, at the hourly sweep. |
 | Kept requests | Prompts and agent starts for a stopped workspace | Until the machine starts and takes them; 20 a machine at most |
 | A person's settings and secrets | Settings that follow a person; secrets, sealed | Until changed |
 | Server backups | See below | The newest **Keep** of each server; a removed server's for 90 days after its newest |
@@ -92,7 +100,7 @@ come back archived, to read and search. They are never run there, and bring no M
 An agent that the machine has already, or that it deleted (`erased.json`), is skipped.
 
 The machine makes an export in its `Outgoing` folder and an import arrives in `Incoming`.
-Each goes once it is read or imported, or after an hour untouched.
+Each goes once it is read or imported, or after an hour untouched, at the next send or the hourly sweep.
 
 ## Backups
 

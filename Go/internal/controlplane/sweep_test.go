@@ -402,3 +402,54 @@ func TestWhatAHostLastListedIsKept(t *testing.T) {
 		t.Fatal(e)
 	}
 }
+
+// The hour's sweep deletes the ended requests, not only a list someone asks for (#3649).
+func TestTheSweepDeletesEndedRequests(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	st := store.NewMemory()
+	p := startPlane(t, st, controllink.NewPrivateKey())
+	now := time.Now()
+	put := func(key string, v any) {
+		data, err := records.Encode(v)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := st.Put(ctx, key, data, store.Absent); err != nil {
+			t.Fatal(err)
+		}
+	}
+	old, live := records.At(now.Add(-2*linkKept)), records.At(now.Add(time.Minute))
+	oldJoin, liveJoin := newJoinID(), newJoinID()
+	put(joinKey(oldJoin), joinRecord{ID: oldJoin, Expires: old})
+	put(joinKey(liveJoin), joinRecord{ID: liveJoin, Expires: live})
+	oldLock, liveLock := newJoinID(), newJoinID()
+	put(lockJoinKey(oldLock), lockJoinRecord{ID: oldLock, Expires: old})
+	put(lockJoinKey(liveLock), lockJoinRecord{ID: liveLock, Expires: live})
+	oldSignIn, liveSignIn := newJoinID(), newJoinID()
+	put(signInRequestKey(oldSignIn), signInRequest{ID: oldSignIn, Expires: old})
+	put(signInRequestKey(liveSignIn), signInRequest{ID: liveSignIn, Expires: live})
+	oldLink, liveLink := newJoinID(), newJoinID()
+	put(linkRequestKey(oldLink), linkRequestRecord{ID: oldLink, Expires: old})
+	put(linkRequestKey(liveLink), linkRequestRecord{ID: liveLink, Expires: live})
+	yesterday, today := now.Add(-24*time.Hour).UTC().Format(time.DateOnly), now.UTC().Format(time.DateOnly)
+	put(budgetRequestKey("old"), map[string]string{"id": "old", "user": "U", "day": yesterday})
+	put(budgetRequestKey("live"), map[string]string{"id": "live", "user": "U", "day": today})
+	// Nobody lists any of them: the sweep alone deletes the ended ones.
+	p.s.sweepRequests(ctx, now)
+	for key, want := range map[string]bool{
+		joinKey(oldJoin): false, joinKey(liveJoin): true,
+		lockJoinKey(oldLock): false, lockJoinKey(liveLock): true,
+		signInRequestKey(oldSignIn): false, signInRequestKey(liveSignIn): true,
+		linkRequestKey(oldLink): false, linkRequestKey(liveLink): true,
+		budgetRequestKey("old"): false, budgetRequestKey("live"): true,
+	} {
+		object, err := st.Get(ctx, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if (object != nil) != want {
+			t.Errorf("%s: kept %v, want %v", key, object != nil, want)
+		}
+	}
+}

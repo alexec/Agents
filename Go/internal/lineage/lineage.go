@@ -109,6 +109,9 @@ type Store interface {
 	Links(n wire.LineageNode) wire.LineageLinks
 	// Walk is the graph within depth links of a node, either way.
 	Walk(n wire.LineageNode, depth int) wire.LineageGraph
+	// Prune drops what is past the bounds now, not only at open or on a long append
+	// (#3649), and says how many links it dropped.
+	Prune() int
 	// Close writes what is left and lets the file go.
 	Close() error
 }
@@ -334,6 +337,17 @@ func (f *Files) append(l line) error {
 		f.rewrite()
 	}
 	return nil
+}
+
+func (f *Files) Prune() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	before := len(f.links)
+	if !f.prune() {
+		return 0
+	}
+	f.rewrite()
+	return before - len(f.links)
 }
 
 func endsTorn(path string) bool {
