@@ -39,6 +39,9 @@ const (
 	KindRelease     = "release"
 	// KindDoc is a doc behind the work (#3308): a file under specs/ or docs/, or a docs page.
 	KindDoc = "doc"
+	// KindCIRun is a forge's CI run (#3581): a GitHub Actions run or a GitLab pipeline. Not
+	// KindWorkflowRun, which is an Agents workflow's run.
+	KindCIRun = "ci-run"
 
 	RelWorksOn = "works-on"
 	RelOpens   = "opens"
@@ -52,6 +55,8 @@ const (
 	// RelReads and RelLinksTo are a session that read a doc, or named it in what it said (#3308).
 	RelReads   = "reads"
 	RelLinksTo = "links-to"
+	// RelBuilds is a CI run that builds a PR, or the release of the tag it ran on (#3581).
+	RelBuilds = "builds"
 
 	SourceStart  = "start"
 	SourceBranch = "branch"
