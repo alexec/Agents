@@ -19,6 +19,8 @@ import {
   callLine, compactionLine, copiedText, drawnInTurn, fields, isSummaryOnly, kindOf, thoughtLine, turnLine, turnParts, type ChatTurn, type Item,
 } from "../../model/turns";
 import { fileLinkPath, Markdown } from "../../render/markdown";
+import { highlightCode } from "../../render/codeHighlight";
+import { readable } from "../../render/structured";
 import { AppView } from "./AppView";
 import { FileCard } from "./FileCard";
 import { noticeClock, noticeOutcome } from "../../model/notified";
@@ -90,15 +92,10 @@ function stateWords(state: AgentState, reason: EndedReason | undefined): string 
   }
 }
 
-function pretty(value: JSONValue): string {
-  // A list of bytes, the way some runtimes send a tool's output, read as text.
-  if (Array.isArray(value) && value.length && value.every((v) => typeof v === "number" && v >= 0 && v <= 255 && Number.isInteger(v))) {
-    try {
-      return new TextDecoder("utf-8", { fatal: true }).decode(new Uint8Array(value as number[]));
-    } catch { /* not text: drawn as it came */ }
-  }
-  if (typeof value === "string") return value;
-  return JSON.stringify(value, null, 2);
+/** A tool's argument or return: structured values as coloured YAML (#3569), text as it came. */
+function Exchanged({ title, value }: { title: string; value: JSONValue }) {
+  const { text, structured } = readable(value);
+  return <div><p class="faint">{title}</p>{structured ? <pre class="code">{highlightCode(text, "yaml")}</pre> : <pre>{text}</pre>}</div>;
 }
 
 /** ChatBlocks' PlanView: a withdrawn plan is struck through, and says the agent dropped it (#252). */
@@ -222,7 +219,7 @@ export function ToolCallLine({ call, text, focused = false, background, onClick 
             if (piece.type === "content") return <div key={index} class="quiet"><Blocks blocks={[piece.content]} text="" /></div>;
             if (piece.type === "terminal") return <p key={index} class="quiet">{terminalOutput(actions?.hasMac ?? true)}</p>;
             // Kept rather than dropped: what the runtime sent, as the window shows it.
-            return <pre key={index} class="raw faint">{pretty(piece as unknown as JSONValue).split("\n").slice(0, 6).join("\n")}</pre>;
+            return <pre key={index} class="raw faint">{readable(piece as unknown as JSONValue).text.split("\n").slice(0, 6).join("\n")}</pre>;
           })}
           {/* Where it did its work, each a way in, wrapped: file names are long. */}
           {(call.locations ?? []).length > 0 && (
@@ -236,8 +233,8 @@ export function ToolCallLine({ call, text, focused = false, background, onClick 
               })}
             </p>
           )}
-          {call.rawInput !== undefined && <div><p class="faint">Argument</p><pre>{pretty(call.rawInput)}</pre></div>}
-          {call.rawOutput !== undefined && <div><p class="faint">Return</p><pre>{pretty(call.rawOutput)}</pre></div>}
+          {call.rawInput !== undefined && <Exchanged title="Argument" value={call.rawInput} />}
+          {call.rawOutput !== undefined && <Exchanged title="Return" value={call.rawOutput} />}
         </div>
       )}
     </div>

@@ -72,6 +72,11 @@ packages:
   # the grammars are seventeen megabytes it has no use for.
   CodeText:
     path: Packages/CodeText
+  # A tool's structured input and output drawn as YAML in the chat (#3569). The two apps
+  # link this; agentsd does not.
+  Yams:
+    url: https://github.com/jpsim/Yams
+    exactVersion: 6.2.2
   # The voice of voice mode (#2322): Kokoro-82M through Core ML (was Paradee-8M). The two
   # apps link this; AgentsKitCore does not, so `swift test` never resolves it. Exact,
   # because FluidAudio's Kokoro build is a beta conversion and its API may change in any release.
@@ -124,6 +129,7 @@ targets:
         product: AgentsKitCore
       - package: SwiftTerm
       - package: CodeText
+      - package: Yams
       - package: FluidAudio
     # The voice's models, copied into Resources/Voice (#2322).
     postBuildScripts:
@@ -209,6 +215,7 @@ targets:
       # the shell it draws is the one the Mac's daemon holds.
       - package: SwiftTerm
       - package: CodeText
+      - package: Yams
       # Voice mode's voice (#2322). See the note on the package.
       - package: FluidAudio
       # The notification service extension: the banner's words are assembled on the

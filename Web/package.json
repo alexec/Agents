@@ -13,7 +13,8 @@
     "@hpke/core": "1.10.0",
     "@preact/signals": "2.11.3",
     "markdown-it": "15.0.3",
-    "preact": "11.0.0"
+    "preact": "11.0.0",
+    "yaml": "2.9.1"
   },
   "devDependencies": {
     "@types/markdown-it": "14.2.0",
