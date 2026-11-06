@@ -61,6 +61,8 @@ const (
 	RelBuilds = "builds"
 	// RelSeenIn is a health signal seen in a release or a deploy (#3585).
 	RelSeenIn = "seen-in"
+	// RelReports is an issue filed for a health signal, or commented on for it (#3586).
+	RelReports = "reports"
 
 	SourceStart  = "start"
 	SourceBranch = "branch"

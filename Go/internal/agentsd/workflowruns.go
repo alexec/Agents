@@ -593,6 +593,13 @@ func (d *Daemon) runAgent(w wire.Workflow, run workflowRun, fr fireRequest) (wir
 			a.IsMuted = &muted // a muted workflow's runs start muted (#2003)
 		}
 	})
+	if e := fr.event; e != nil {
+		d.lineageHealthStarted(*e, id)
+	} else if fr.causingEvent != nil {
+		if e := d.event(*fr.causingEvent); e != nil {
+			d.lineageHealthStarted(*e, id)
+		}
+	}
 	if w.Mode == wire.WorkflowModeStanding {
 		d.workflowMu.Lock()
 		d.stateLocked(fr.folder, fr.id, true).StandingAgentID = &id

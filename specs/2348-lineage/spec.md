@@ -17,7 +17,7 @@ A graph that links the parts of the SDLC. The host keeps it. The other slices fi
 - **A link** has `from`, `to`, `rel`, `source`, `at`, and `endedAt` when it stops being
   active.
   - `rel`: `works-on`, `opens`, `fixes`, `started`, `reviews`, `closes`, `part-of`,
-    `shipped-in`, `builds` (#3581), `seen-in` (#3585). The list is open.
+    `shipped-in`, `builds` (#3581), `seen-in` (#3585), `reports` (#3586). The list is open.
   - `source` (how the host knows it): `start`, `branch`, `pr-body`, `helper`, `agent`,
     `person`, `forge`, `health` (#3585). The list is open.
   - At most one link from, to, rel is active at a time. To link it again while it is active
@@ -378,6 +378,11 @@ The health stage of the outer loop (spec `3579-outer-loop`), in
   `com.example.app@1.2.0+42` names the build `testflight:com.example.app/42`.
 - A walk from a health node reaches the release (1 link), its PRs (2) and the issues they
   fix (3).
+- **Health back into work (#3586).** A workflow run that a `health.*` event starts links
+  health `started` its session, source `helper`. An issue that session works on (its `#n`
+  label: the ready-made **File a bug from Sentry** labels its session with the bug it filed
+  or commented on) `reports` the health signal, source `agent`. A walk from the bug
+  reaches the health signal (1), its release (2) and the release's PRs (3).
 
 ## Clients
 
