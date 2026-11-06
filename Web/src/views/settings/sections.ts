@@ -20,6 +20,7 @@ import { GitAccessSection } from "./GitAccess";
 import { VersionsSection } from "./Machines";
 import { NotificationsSection } from "./Notifications";
 import { PolicySection } from "./Policy";
+import { ProcessesSection } from "./Processes";
 import { SidebarGroupsSection } from "./SidebarGroups";
 import { PersonasConfigSection, SkillsConfigSection, WorkflowsConfigSection } from "../AgentConfigEditor";
 
@@ -64,6 +65,8 @@ export const settingsSections: readonly SettingsSection[] = [
   { name: "personas", scope: "agentConfiguration", order: 20, Section: PersonasConfigSection },
   // Organisation Policy (#2957, was Policy): the organisation's rules, read only, and the kill switch for an admin (#998).
   { name: "policy", scope: "controlPlane", order: 45, Section: PolicySection },
+  // What runs on each machine, with its CPU and memory (#3453).
+  { name: "processes", scope: "machines", order: 45, Section: ProcessesSection },
   { name: "providers", scope: "controlPlane", order: 50, Section: ProvidersSection },
   // The secrets the control plane keeps for you and sends to each machine of yours (#1760, #2157).
   { name: "secrets", scope: "machines", order: 60, Section: SecretsSection },

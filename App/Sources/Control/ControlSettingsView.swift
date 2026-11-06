@@ -260,6 +260,8 @@ struct ControlHostsPage: View {
     @State private var deleting: DaemonAPI.ControlMachine?
     /// Backups… (#1815): the host's own backups page.
     @State private var backingUp: DaemonAPI.ControlMachine?
+    /// Processes… (#3453): what runs on the machine.
+    @State private var watching: DaemonAPI.ControlMachine?
     /// Update… (#1766): a host that needs an update, updated over ssh.
     @State private var updating: DaemonAPI.ControlMachine?
 
@@ -324,6 +326,9 @@ struct ControlHostsPage: View {
         }
         .sheet(item: $backingUp) { host in
             HostBackupsSheet(host: host).paperSheet()
+        }
+        .sheet(item: $watching) { host in
+            MachineProcessesSheet(host: host).paperSheet()
         }
         .sheet(item: $choosing) { host in
             ChooseFoldersSheet(host: host.id, hostName: host.id == control.thisMacHost?.id ? "This Mac" : host.name,
@@ -418,6 +423,9 @@ struct ControlHostsPage: View {
             Button("Choose Folders…") { choosing = host }.disabled(!host.answers)
             if model.host(host.id, has: Capability.backups1) {
                 Button("Backups…") { backingUp = host }.disabled(!host.answers)
+            }
+            if model.host(host.id, has: Capability.processes1) {
+                Button("Processes…") { watching = host }.disabled(!host.answers)
             }
             if host.workspace != nil {
                 Button("Check again") { Task { await control.checkAgain(host.id) } }

@@ -6765,6 +6765,20 @@ type MachineUpdate struct {
 	Trust *string `json:"trust,omitzero"`
 }
 
+// processes/list (#3453): the whole machine's CPU and memory now.
+type MachineUsage struct {
+	// Every core together, 0 to 100, since the last ask, or over half a second when there was none in the last minute.
+	CpuPercent float64 `json:"cpuPercent"`
+
+	CpuCount int64 `json:"cpuCount"`
+
+	// Bytes in use.
+	MemoryUsed int64 `json:"memoryUsed"`
+
+	// Bytes the machine has.
+	MemoryTotal int64 `json:"memoryTotal"`
+}
+
 // host/user (#1761): to a machine on its channel 0, at each join and when its user changes. Its user, their kind, and the labels runs-on: matches (FR-034); for a bot at its cap, until when it starts no work (FR-033).
 type MachineUser struct {
 	User string `json:"user"`
@@ -8513,6 +8527,39 @@ type PrewarmRequestWhy string
 
 const PrewarmRequestWhyOpened PrewarmRequestWhy = "opened"
 const PrewarmRequestWhyTyping PrewarmRequestWhy = "typing"
+
+// One process of processes/list (#3453): the daemon, a session's runtime, or a child of either.
+type ProcessUsage struct {
+	Pid int64 `json:"pid"`
+
+	Parent int64 `json:"parent"`
+
+	// 0 for the daemon; a child is one deeper than its parent.
+	Depth int64 `json:"depth"`
+
+	Name string `json:"name"`
+
+	// Of one core, so more than 100 on several, over the same time as the machine's; 0 for a process the last ask did not list.
+	CpuPercent float64 `json:"cpuPercent"`
+
+	// Resident bytes.
+	Memory int64 `json:"memory"`
+
+	// The session whose runtime this is, or whose runtime started it.
+	AgentId *UUID `json:"agentId,omitzero"`
+
+	// That session's title, when it has one.
+	Title *string `json:"title,omitzero"`
+}
+
+// processes/list (#3453): the machine's totals and the daemon's process tree, in tree order, the daemon first. At most 200 processes; omitted counts the rest.
+type ProcessesState struct {
+	Machine MachineUsage `json:"machine"`
+
+	Processes []ProcessUsage `json:"processes"`
+
+	Omitted int64 `json:"omitted"`
+}
 
 // A project (#2317): what people work on, the record that folders join. folders is what the machines last reported.
 type Project struct {

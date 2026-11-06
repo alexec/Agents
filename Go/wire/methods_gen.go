@@ -241,6 +241,7 @@ var CallPoolApplyAllowances = Method[ApplyAllowancesRequest, Changed]{"pool/appl
 var CallPreferencesGet = Method[Empty, map[string]JSONValue]{"preferences/get"}
 var CallPreferencesSet = Method[map[string]JSONValue, map[string]JSONValue]{"preferences/set"}
 var CallPresenceReport = Method[PresenceReport, Empty]{"presence/report"}
+var CallProcessesList = Method[Empty, ProcessesState]{"processes/list"}
 var CallProvidersCarry = Method[ProviderCarry, ProviderCarried]{"providers/carry"}
 var CallProvidersForget = Method[ProviderForget, ProviderCarried]{"providers/forget"}
 var CallProvidersKeepSecrets = Method[ProviderSecretsKeep, ProviderCarried]{"providers/keepSecrets"}

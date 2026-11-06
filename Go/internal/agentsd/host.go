@@ -59,6 +59,9 @@ func (d *Daemon) registerHost() {
 	On(d, wire.CallDiskState, func(ctx context.Context, c *Client, _ wire.Empty) (wire.DiskState, error) {
 		return d.diskState(), nil
 	})
+	On(d, wire.CallProcessesList, func(ctx context.Context, c *Client, _ wire.Empty) (wire.ProcessesState, error) {
+		return d.processesState(ctx), nil
+	})
 	On(d, wire.CallSandboxState, func(ctx context.Context, c *Client, _ wire.Empty) (wire.SandboxSettings, error) {
 		return d.sandboxState(), nil
 	})

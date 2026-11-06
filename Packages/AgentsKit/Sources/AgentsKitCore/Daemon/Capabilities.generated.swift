@@ -121,6 +121,7 @@ public enum Capability {
     public static let pool1 = "pool/1"
     public static let preferences1 = "preferences/1"
     public static let presence1 = "presence/1"
+    public static let processes1 = "processes/1"
     public static let projectsBoards1 = "projects.boards/1"
     public static let projectsSessions1 = "projects.sessions/1"
     public static let projects1 = "projects/1"
@@ -409,6 +410,7 @@ public enum Capability {
         "preferences/get": "preferences/1",
         "preferences/set": "preferences/1",
         "presence/report": "presence/1",
+        "processes/list": "processes/1",
         "providers/carry": "providers.carry/1",
         "providers/forget": "providers.carry/1",
         "providers/keepSecrets": "providers.carry/1",

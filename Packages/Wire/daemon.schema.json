@@ -15182,6 +15182,34 @@
       ],
       "additionalProperties": false
     },
+    "MachineUsage": {
+      "type": "object",
+      "description": "processes/list (#3453): the whole machine's CPU and memory now.",
+      "properties": {
+        "cpuPercent": {
+          "type": "number",
+          "description": "Every core together, 0 to 100, since the last ask, or over half a second when there was none in the last minute."
+        },
+        "cpuCount": {
+          "type": "integer"
+        },
+        "memoryUsed": {
+          "type": "integer",
+          "description": "Bytes in use."
+        },
+        "memoryTotal": {
+          "type": "integer",
+          "description": "Bytes the machine has."
+        }
+      },
+      "required": [
+        "cpuPercent",
+        "cpuCount",
+        "memoryUsed",
+        "memoryTotal"
+      ],
+      "additionalProperties": false
+    },
     "MachineUser": {
       "type": "object",
       "description": "host/user (#1761): to a machine on its channel 0, at each join and when its user changes. Its user, their kind, and the labels runs-on: matches (FR-034); for a bot at its cap, until when it starts no work (FR-033).",
@@ -19026,6 +19054,74 @@
         "opened",
         "typing"
       ]
+    },
+    "ProcessUsage": {
+      "type": "object",
+      "description": "One process of processes/list (#3453): the daemon, a session's runtime, or a child of either.",
+      "properties": {
+        "pid": {
+          "type": "integer"
+        },
+        "parent": {
+          "type": "integer"
+        },
+        "depth": {
+          "type": "integer",
+          "description": "0 for the daemon; a child is one deeper than its parent."
+        },
+        "name": {
+          "type": "string"
+        },
+        "cpuPercent": {
+          "type": "number",
+          "description": "Of one core, so more than 100 on several, over the same time as the machine's; 0 for a process the last ask did not list."
+        },
+        "memory": {
+          "type": "integer",
+          "description": "Resident bytes."
+        },
+        "agentId": {
+          "$ref": "#/definitions/UUID",
+          "description": "The session whose runtime this is, or whose runtime started it."
+        },
+        "title": {
+          "type": "string",
+          "description": "That session's title, when it has one."
+        }
+      },
+      "required": [
+        "pid",
+        "parent",
+        "depth",
+        "name",
+        "cpuPercent",
+        "memory"
+      ],
+      "additionalProperties": false
+    },
+    "ProcessesState": {
+      "type": "object",
+      "description": "processes/list (#3453): the machine's totals and the daemon's process tree, in tree order, the daemon first. At most 200 processes; omitted counts the rest.",
+      "properties": {
+        "machine": {
+          "$ref": "#/definitions/MachineUsage"
+        },
+        "processes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProcessUsage"
+          }
+        },
+        "omitted": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "machine",
+        "processes",
+        "omitted"
+      ],
+      "additionalProperties": false
     },
       "Project": {
         "type": "object",

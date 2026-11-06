@@ -5819,6 +5819,20 @@ export interface MachineUpdate {
   trust?: string;
 }
 
+/** processes/list (#3453): the whole machine's CPU and memory now. */
+export interface MachineUsage {
+  /**
+   * Every core together, 0 to 100, since the last ask, or over half a second when there was none in
+   * the last minute.
+   */
+  cpuPercent: number;
+  cpuCount: number;
+  /** Bytes in use. */
+  memoryUsed: number;
+  /** Bytes the machine has. */
+  memoryTotal: number;
+}
+
 /**
  * host/user (#1761): to a machine on its channel 0, at each join and when its user changes. Its
  * user, their kind, and the labels runs-on: matches (FR-034); for a bot at its cap, until when it
@@ -7395,6 +7409,36 @@ export interface PrewarmRequest {
 export type PrewarmRequestWhy =
   | "opened"
   | "typing";
+
+/** One process of processes/list (#3453): the daemon, a session's runtime, or a child of either. */
+export interface ProcessUsage {
+  pid: number;
+  parent: number;
+  /** 0 for the daemon; a child is one deeper than its parent. */
+  depth: number;
+  name: string;
+  /**
+   * Of one core, so more than 100 on several, over the same time as the machine's; 0 for a process
+   * the last ask did not list.
+   */
+  cpuPercent: number;
+  /** Resident bytes. */
+  memory: number;
+  /** The session whose runtime this is, or whose runtime started it. */
+  agentId?: UUID;
+  /** That session's title, when it has one. */
+  title?: string;
+}
+
+/**
+ * processes/list (#3453): the machine's totals and the daemon's process tree, in tree order, the
+ * daemon first. At most 200 processes; omitted counts the rest.
+ */
+export interface ProcessesState {
+  machine: MachineUsage;
+  processes: ProcessUsage[];
+  omitted: number;
+}
 
 /**
  * A project (#2317): what people work on, the record that folders join. folders is what the
@@ -11533,6 +11577,7 @@ export interface Methods {
   "preferences/get": { params: Empty; result: Record<string, JSONValue> };
   "preferences/set": { params: Record<string, JSONValue>; result: Record<string, JSONValue> };
   "presence/report": { params: PresenceReport; result: Empty };
+  "processes/list": { params: Empty; result: ProcessesState };
   "projects/list": { params: Empty; result: ProjectList };
   "projects/remove": { params: ProjectRequest; result: Empty };
   "projects/set": { params: ProjectSet; result: Project };
@@ -11902,6 +11947,7 @@ export const MethodTarget = {
   "preferences/get": "host",
   "preferences/set": "host",
   "presence/report": "host",
+  "processes/list": "host",
   "projects/list": "control",
   "projects/remove": "control",
   "projects/set": "control",
@@ -12582,6 +12628,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineTunnel: { required: ["up"], optional: ["problem"] },
   MachineTunnelChanged: { required: ["name", "tunnel"], optional: ["host"] },
   MachineUpdate: { required: ["host", "destination"], optional: ["key", "trust"] },
+  MachineUsage: { required: ["cpuPercent", "cpuCount", "memoryUsed", "memoryTotal"], optional: [] },
   MachineUser: { required: ["user", "kind", "name", "labels"], optional: ["capReachedUntil", "bots"] },
   MachineUserSettings: { required: ["user", "settings", "secrets"], optional: [] },
   MachineWorkspace: { required: ["provider", "providerName", "workspace", "workspaceName", "workspaceState", "canStart", "canStop", "startWhenUsed", "current"], optional: ["hostState", "phase", "since", "problem", "stoppedBy", "stopWhenIdleMinutes", "cost", "startForSchedules", "tellsSchedule", "nextWorkflow", "nextWorkflowAt", "wakeAt"] },
@@ -12721,6 +12768,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PresenceReport: { required: ["active"], optional: ["watching", "mayNotify", "showing", "alsoShowing"] },
   PreviewFile: { required: ["path", "bytes", "runnable", "via"], optional: [] },
   PrewarmRequest: { required: ["agentID", "why"], optional: [] },
+  ProcessUsage: { required: ["pid", "parent", "depth", "name", "cpuPercent", "memory"], optional: ["agentId", "title"] },
+  ProcessesState: { required: ["machine", "processes", "omitted"], optional: [] },
   Project: { required: ["id", "name", "owner", "folders", "mayChange"], optional: ["slots", "boards"] },
   ProjectBoard: { required: ["name", "url"], optional: ["forge", "key", "site"] },
   ProjectBoardsSet: { required: ["id", "boards"], optional: [] },
