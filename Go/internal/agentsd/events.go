@@ -16,7 +16,6 @@ import (
 
 	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
 	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -157,14 +156,14 @@ func (d *Daemon) loadEvents() {
 	d.pruneEventsLocked()
 	d.eventPruner = time.NewTicker(time.Hour)
 	t := d.eventPruner
-	safe.Go("event pruner", func() {
+	d.goLoop("event pruner", func(ctx context.Context) {
 		for {
 			select {
 			case <-t.C:
 				d.eventMu.Lock()
 				d.pruneEventsLocked()
 				d.eventMu.Unlock()
-			case <-d.ctx.Done():
+			case <-ctx.Done():
 				return
 			}
 		}
