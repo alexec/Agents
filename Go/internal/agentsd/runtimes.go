@@ -269,6 +269,23 @@ func (d *Daemon) runtimeStatuses() []wire.RuntimeStatus {
 		d.noteSignIn(&s)
 		out = append(out, s)
 	}
+	// Each runtime's version, asked of them all at once: a path asked before is not asked
+	// again (#3674).
+	var wg sync.WaitGroup
+	for i := range out {
+		a := out[i].Availability.Available
+		if a == nil {
+			continue
+		}
+		wg.Add(1)
+		go func(s *wire.RuntimeStatus, r *runtimeDef, path string) {
+			defer wg.Done()
+			if v := installedVersion(r, path); v != "" {
+				s.Version = &v
+			}
+		}(&out[i], &catalog[i], a.Path)
+	}
+	wg.Wait()
 	return out
 }
 

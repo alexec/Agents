@@ -222,4 +222,8 @@ test("a runtime's line on a machine's page: installed, and signed in where the m
   assert.equal(r.machineRuntimeLine(s({ installing: { progress: "Downloading" } })), "Installing: Downloading");
   assert.equal(r.machineRuntimeLine(s({ installFailed: { reason: "No network." } })), "Install failed: No network.");
   assert.equal(r.machineRuntimeLine(s(path, { outdated: true })), "Installed · an update is out");
+  // Its version, where the machine read one (#3674).
+  assert.equal(r.machineRuntimeLine(s(path, { version: "2.1.4" })), "Installed 2.1.4");
+  assert.equal(r.machineRuntimeLine(s(path, { version: "2.1.4", signIn: { signedIn: true } })), "Installed 2.1.4 · signed in");
+  assert.equal(r.machineRuntimeLine(s(path, { version: "2.5.0", outdated: true })), "Installed 2.5.0 · an update is out");
 });

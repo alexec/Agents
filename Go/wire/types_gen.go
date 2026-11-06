@@ -10150,6 +10150,9 @@ type RuntimeStatus struct {
 	SetBy *PolicySetBy `json:"setBy,omitzero"`
 
 	SignIn *RuntimeSignIn `json:"signIn,omitzero"`
+
+	// The installed copy's version: the toolset's pinned version for the app's own copy, else what the runtime's --version says (#3674). Absent when it is not installed or does not say.
+	Version *string `json:"version,omitzero"`
 }
 
 // A SCIM user's email (RFC 7643 §4.1.2), to show only: never a sign-in.

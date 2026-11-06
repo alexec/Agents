@@ -8827,6 +8827,11 @@ export interface RuntimeStatus {
   /** Set when the organisation's policy does not allow this runtime here (#998, FR-010). */
   setBy?: PolicySetBy;
   signIn?: RuntimeSignIn;
+  /**
+   * The installed copy's version: the toolset's pinned version for the app's own copy, else what
+   * the runtime's --version says (#3674). Absent when it is not installed or does not say.
+   */
+  version?: string;
 }
 
 /** A SCIM user's email (RFC 7643 §4.1.2), to show only: never a sign-in. */
@@ -12965,7 +12970,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RuntimeSignInFinish: { required: ["signInID"], optional: ["code", "cancel"] },
   RuntimeSignInKey: { required: ["runtimeID", "key"], optional: [] },
   RuntimeSignInStep: { required: ["signInID", "runtimeID", "url", "wantsCode"], optional: ["userCode"] },
-  RuntimeStatus: { required: ["runtime", "availability", "checkedAt", "outdated"], optional: ["poolNote", "isOut", "setBy", "signIn"] },
+  RuntimeStatus: { required: ["runtime", "availability", "checkedAt", "outdated"], optional: ["poolNote", "isOut", "setBy", "signIn", "version"] },
   SCIMEmail: { required: ["value"], optional: ["type", "primary"] },
   SCIMName: { required: [], optional: ["givenName", "familyName", "formatted"] },
   SCIMSet: { required: ["provider", "on"], optional: ["match"] },
