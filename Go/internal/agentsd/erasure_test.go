@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -107,8 +108,54 @@ func TestCodexFilesGoWithoutTheRuntime(t *testing.T) {
 			t.Fatalf("%q: known %v, removed %d", bad, known, removed)
 		}
 	}
-	if known, _ := eraseRuntimeFiles("grok", session, nil); known {
-		t.Fatal("grok's layout is not known")
+	if known, _ := eraseRuntimeFiles("opencode", session, nil); known {
+		t.Fatal("opencode's layout is not known")
+	}
+}
+
+// Grok's, Copilot's, Cursor's and Antigravity's copies go without the runtime too, from the
+// home their launch names, and another session's stay (#3647).
+func TestOtherRuntimesFilesGoWithoutTheRuntime(t *testing.T) {
+	session := "019a2b3c-4d5e-7f60-8a9b-0c1d2e3f4a5b"
+	other := "019a0000-0000-7000-8000-000000000000"
+	for _, tc := range []struct {
+		runtime string
+		env     func(home string) []string
+		mine    []string
+		theirs  string
+	}{
+		{"grok", func(h string) []string { return []string{"HOME=" + h} },
+			[]string{".grok/sessions/%2FUsers%2Fme%2Fwork/" + session + "/chat_history.jsonl"},
+			".grok/sessions/%2FUsers%2Fme%2Fwork/" + other + "/chat_history.jsonl"},
+		{"copilot", func(h string) []string { return []string{"HOME=" + h} },
+			[]string{".copilot/session-state/" + session + "/events.jsonl"},
+			".copilot/session-state/" + other + "/events.jsonl"},
+		{"cursor", func(h string) []string { return []string{"HOME=" + h} },
+			[]string{".cursor/acp-sessions/" + session + "/store.db"},
+			".cursor/acp-sessions/" + other + "/store.db"},
+		{"antigravity", func(h string) []string { return []string{"HOME=/nowhere", "GEMINI_HOME=" + filepath.Join(h, "ag")} },
+			[]string{"ag/antigravity-acp/conversations/" + session + ".db", "ag/antigravity-acp/conversations/" + session + ".db-wal",
+				"ag/antigravity-acp/conversations/" + session + ".meta", "ag/antigravity-acp/brain/" + session + "/plan.md"},
+			"ag/antigravity-acp/conversations/" + other + ".db"},
+	} {
+		t.Run(tc.runtime, func(t *testing.T) {
+			home := t.TempDir()
+			for _, f := range append(slices.Clone(tc.mine), tc.theirs) {
+				writeFile(t, filepath.Join(home, f), "{}\n")
+			}
+			known, removed := eraseRuntimeFiles(tc.runtime, session, tc.env(home))
+			if !known || removed != len(tc.mine) {
+				t.Fatalf("known %v, removed %d", known, removed)
+			}
+			for _, f := range tc.mine {
+				if _, err := os.Stat(filepath.Join(home, f)); !os.IsNotExist(err) {
+					t.Errorf("left behind: %s (%v)", f, err)
+				}
+			}
+			if _, err := os.Stat(filepath.Join(home, tc.theirs)); err != nil {
+				t.Errorf("another session's copy went: %v", err)
+			}
+		})
 	}
 }
 

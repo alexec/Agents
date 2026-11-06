@@ -17,8 +17,12 @@ import (
 // KeptPrefix is KeptRequests.prefix.
 const KeptPrefix = "v1/kept/"
 
-// KeptLimit is KeptRequests.limit: at most this many per host.
+// KeptLimit is KeptRequests.limit: at most this many per host, waiting or not sent.
 const KeptLimit = 20
+
+// KeptFailedFor is how long a request that was not sent is kept, to try again or drop by
+// hand (#3647): its attachments are in it.
+const KeptFailedFor = 7 * 24 * time.Hour
 
 // KeptRequest is DaemonAPI.KeptRequest: a kept request, as clients draw it, never its
 // attachments or options. Kind is prompt (to an agent there, AgentID) or start (a new
@@ -48,6 +52,7 @@ type keptRecord struct {
 	ClientKind string          `json:"clientKind"`
 	At         records.Stamp   `json:"at"`
 	Failed     string          `json:"failed,omitempty"`
+	FailedAt   *records.Stamp  `json:"failedAt,omitempty"`
 	// Signed is the request as its client signed it (#3492): delivered as it is, since a
 	// host that holds its person's lock takes nothing else.
 	Signed *wire.LockDelivery `json:"signed,omitempty"`
@@ -176,6 +181,8 @@ func (k *Kept) Keep(host, method string, params json.RawMessage, caller Caller, 
 	if waiting >= KeptLimit {
 		return fail(CodeHostOffline, "%s is starting; too many prompts are waiting.", name)
 	}
+	// The oldest not sent makes room, so a host keeps KeptLimit at most (#3647).
+	k.dropFailed(host, func(left int, _ keptRecord) bool { return left >= KeptLimit })
 	record := keptRecord{ID: records.NewUUID(), Host: host, Method: method, Params: once(method, params),
 		Client: strings.ToUpper(caller.Client), ClientKind: caller.Kind, At: records.Now(), Signed: signed}
 	if signed != nil {
@@ -349,7 +356,7 @@ func (k *Kept) Answer(method string, params json.RawMessage, person string) (any
 			return nil, invalid("That was sent or dropped already.")
 		}
 		entry := &k.kept[host][index]
-		entry.record.Failed = ""
+		entry.record.Failed, entry.record.FailedAt = "", nil
 		key, record := entry.key, entry.record
 		k.mu.Unlock()
 		if data, err := records.Encode(record); err == nil {
@@ -388,12 +395,13 @@ func (k *Kept) Forget(host string) {
 }
 
 func (k *Kept) fail(host, only, reason string) {
+	now := records.Now()
 	k.mu.Lock()
 	var writes []keptEntry
 	for i := range k.kept[host] {
 		e := &k.kept[host][i]
 		if e.record.Failed == "" && (only == "" || e.record.ID == only) {
-			e.record.Failed = reason
+			e.record.Failed, e.record.FailedAt = reason, &now
 			writes = append(writes, *e)
 		}
 	}
@@ -403,6 +411,61 @@ func (k *Kept) fail(host, only, reason string) {
 			k.store.Put(context.Background(), e.key, data, store.Always)
 		}
 	}
+}
+
+// Expire drops every request not sent for KeptFailedFor (#3647), with its attachments, and
+// says how many went. One written before failedAt was kept goes by when it was kept.
+func (k *Kept) Expire(now time.Time) int {
+	k.Load()
+	before := now.Add(-KeptFailedFor)
+	k.mu.Lock()
+	hosts := make([]string, 0, len(k.kept))
+	for h := range k.kept {
+		hosts = append(hosts, h)
+	}
+	k.mu.Unlock()
+	dropped := 0
+	for _, h := range hosts {
+		dropped += k.dropFailed(h, func(_ int, r keptRecord) bool {
+			at := r.At
+			if r.FailedAt != nil {
+				at = *r.FailedAt
+			}
+			return at.Before(before)
+		})
+	}
+	if dropped > 0 {
+		k.log(fmt.Sprintf("workspace: dropped %d kept requests not sent for %s", dropped, KeptFailedFor))
+		k.changed()
+	}
+	return dropped
+}
+
+// dropFailed deletes the host's requests not sent, oldest first, while drop says so of the
+// next one; drop is called under k.mu with how many the host keeps. It says how many went.
+func (k *Kept) dropFailed(host string, drop func(left int, r keptRecord) bool) int {
+	k.mu.Lock()
+	var keys []string
+	entries := k.kept[host]
+	for i := 0; i < len(entries); {
+		e := entries[i]
+		if e.record.Failed == "" || !drop(len(entries), e.record) {
+			i++
+			continue
+		}
+		keys = append(keys, e.key)
+		entries = append(entries[:i:i], entries[i+1:]...)
+	}
+	if len(entries) == 0 {
+		delete(k.kept, host)
+	} else {
+		k.kept[host] = entries
+	}
+	k.mu.Unlock()
+	for _, key := range keys {
+		k.store.Delete(context.Background(), key)
+	}
+	return len(keys)
 }
 
 func (k *Kept) remove(host, id string) {

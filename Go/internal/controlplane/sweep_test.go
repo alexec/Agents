@@ -201,6 +201,40 @@ func TestTheSweepRemovesRemovedGroupsAndPeople(t *testing.T) {
 	}
 }
 
+// A person removed before removal cut them to a tombstone is cut by the sweep (#3647).
+func TestTheSweepCutsARemovedPersonToTheirTombstone(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	s := store.NewMemory()
+	rs := records.New(s)
+	yes, now := true, records.Now()
+	rs.ChangePeople(ctx, func(map[string]records.Person) ([]records.Person, error) {
+		return []records.Person{
+			{ID: "u-live", Name: "Live", GitHubLogin: "live"},
+			{ID: "u-refused", Name: "Refused", Removed: &yes, RemovedAt: &now, GitHubLogin: "refused",
+				SignIns: []records.SignIn{{Provider: "google", Account: "1", Email: "refused@example.com"}}},
+		}, nil
+	})
+	if report, err := sweep(ctx, rs, time.Now(), mostPerSweep, nil); err != nil || report.cut != 1 {
+		t.Fatalf("%+v %v", report, err)
+	}
+	o, _ := s.Get(ctx, records.PersonKey("u-refused"))
+	if o == nil || strings.Contains(string(o.Data), "@example.com") || strings.Contains(string(o.Data), "Refused") ||
+		strings.Contains(string(o.Data), "gitHubLogin") {
+		t.Fatalf("kept as %s", o.Data)
+	}
+	if p := rs.PersonWithSignIn("google", "1"); p == nil || !p.IsRemoved() || !p.RemovedAt.Equal(now.Time) {
+		t.Fatalf("the sign-in is no longer refused: %+v", p)
+	}
+	if p := rs.Person("u-live"); p == nil || p.GitHubLogin != "live" {
+		t.Fatalf("the live one changed: %+v", p)
+	}
+	// Once cut, the next sweep has nothing to do.
+	if report, err := sweep(ctx, rs, time.Now(), mostPerSweep, nil); err != nil || report.total() != 0 {
+		t.Fatalf("%+v %v", report, err)
+	}
+}
+
 func TestTheSweepStopsAtItsBound(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

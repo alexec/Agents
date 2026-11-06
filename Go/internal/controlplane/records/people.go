@@ -192,6 +192,32 @@ func (p *Person) IsSuspended() bool { return p.Suspended != nil }
 // IsRemoved says the person was removed: kept, so their sign-ins stay refused.
 func (p *Person) IsRemoved() bool { return p.Removed != nil && *p.Removed }
 
+// Tombstone is the person removed at that time, with only what refuses their sign-ins
+// again (#3647): the id the audit names, the kind and role, and each sign-in's provider and
+// account. Their name, emails, logins, SCIM user and anything a newer version wrote go.
+func (p Person) Tombstone(at Stamp) Person {
+	yes := true
+	out := Person{ID: p.ID, Kind: p.Kind, Role: p.Role, Rev: p.Rev, Removed: &yes, RemovedAt: &at}
+	if p.RemovedAt != nil {
+		out.RemovedAt = p.RemovedAt
+	}
+	for _, s := range p.SignIns {
+		out.SignIns = append(out.SignIns, SignIn{Provider: s.Provider, Account: s.Account})
+	}
+	return out
+}
+
+// IsTombstone says the person is removed and holds nothing more than Tombstone keeps.
+func (p *Person) IsTombstone() bool {
+	if !p.IsRemoved() || p.RemovedAt == nil {
+		return false
+	}
+	t := p.Tombstone(*p.RemovedAt)
+	b, _ := json.Marshal(t)
+	a, _ := json.Marshal(*p)
+	return string(a) == string(b)
+}
+
 // HasSignIn says the person signs in with that provider and account.
 func (p *Person) HasSignIn(provider, account string) bool {
 	for _, s := range p.SignIns {
