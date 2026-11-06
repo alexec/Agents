@@ -633,6 +633,9 @@ func TestAControlPlaneWithNoKeyStillDeliversARoute(t *testing.T) {
 	_, window := p.client("Alex's Mac")
 	alex := &person{id: p.s.localOwner(), window: window}
 	box := p.machineSaying(alex, routesHello("MACHINE-2"))
+	// host/hello is told, not asked, so it can land after the machine is online: a route
+	// set before it is noted is sealed to no machine, and with no keeper stays so (#3636).
+	p.waitFor(func() bool { _, ok := told.last(box.member.Host); return ok }, "the machine told at its join")
 	const awsSecret = "aws-long-lived-secret-key"
 	setRoute(t, window, wire.OrgRoute{ID: "bedrock", Name: "Acme Bedrock", Kind: wire.OrgRouteKindBedrock, Runtimes: []string{"claude"},
 		Settings: &wire.OrgRouteSettings{Region: optional("us-east-1")}},
