@@ -16,6 +16,15 @@ public enum VoiceModeWords {
         "\(doing). Say no to stop."
     }
 
+    /// Said as a prompt goes, when it is the "Stops listening" sound (#3565).
+    public static let letMeThink = "Let me think."
+
+    /// Whether words heard are only the voice's own "Let me think." heard back, not a
+    /// prompt (#3565).
+    public static func isLetMeThink(_ heard: String) -> Bool {
+        isEcho(heard, of: letMeThink)
+    }
+
     /// Told to VoiceOver as the strip comes and goes (#2446).
     public static let on = "Voice mode is on."
     public static let off = "Voice mode is off."

@@ -1,3 +1,4 @@
+import AgentsKitCore
 #if os(macOS)
 import AppKit
 #else
@@ -51,9 +52,22 @@ enum VoiceSound: CaseIterable {
         }
     }
 
+    /// Whether the voice says "Let me think." in place of this sound (#3565): only the sent
+    /// sound has that choice.
+    var saysLetMeThink: Bool {
+        self == .sent && VoiceSettings.soundName(self) == VoiceSettings.letMeThink
+    }
+
+    /// Settings' preview: the sound, or "Let me think." in the voice chosen.
+    func preview() {
+        if saysLetMeThink { VoiceSample.shared.play([VoiceModeWords.letMeThink]) } else { play() }
+    }
+
+    /// The sound. Where "Let me think." is the choice and voice mode plays a sound even so
+    /// (a prompt said over the voice, #3565), the sound it has at first.
     func play() {
         #if os(macOS)
-        Self.play(VoiceSettings.soundName(self), volume: volume)
+        Self.play(saysLetMeThink ? soundAtFirst : VoiceSettings.soundName(self), volume: volume)
         #else
         // begin recording, a quiet tock, sent, the key tock, the error, end recording.
         let id: SystemSoundID = switch self {

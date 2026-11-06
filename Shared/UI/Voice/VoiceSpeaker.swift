@@ -56,6 +56,15 @@ final class VoiceSpeaker {
         }
     }
 
+    /// Plays a clip made already, "Let me think." (#3565), on the voice's player, so the
+    /// microphone leaves it out as it does the voice. A reply begun meanwhile is heard after
+    /// it; `stop()` stops it too.
+    func play(_ samples: [Float]) async throws {
+        guard let format, let buffer = Self.buffer(samples, format: format) else { return }
+        try await openOutput()
+        _ = try play(buffer)
+    }
+
     /// Stops at once, mid-word if it must.
     func stop() {
         run += 1
