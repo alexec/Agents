@@ -223,7 +223,7 @@ service keeps these records.
 | Sign-in links | Which account a GitHub, Apple or Google user is | Until **Delete Account** |
 | Account usage | The bytes the account's store holds | Until **Delete Account** |
 | The account's control plane store | All of the section above | Plan limits: 1 or 20 GB, 2 or 20 machines, 5 or 50 clients, audit 7 or 90 days. Until **Delete Account**. |
-| Invites | Expiry, and **who used it** | 14 days to use it. **Kept after use, also after Delete Account.** |
+| Invites | Expiry, and **who used it** | 14 days to use it. Kept after use, until **Delete Account**. |
 | Waitlist | Who asked to join | 10,000; removed on sign-up |
 | Stripe events | Stripe event IDs already seen | 30 days, swept daily |
 | Operator backups | Each account's store, on the operator's disk | **None, unless the operator sets `--keep`** |
@@ -231,8 +231,8 @@ service keeps these records.
 The service keeps nothing for a signed-in browser: a session is a signed cookie for 30 days.
 
 **Delete Account** stops the account's control plane, deletes its store, its usage, the
-account and its sign-in link. It does not delete the account's machines. It leaves the
-invites the account used, the operator's backups of it, and Stripe's own records.
+invites its sign-in used, the account and its sign-in link. It does not delete the
+account's machines. It leaves the operator's backups of it, and Stripe's own records.
 
 ## Agents Host on the Mac
 
