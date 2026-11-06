@@ -148,7 +148,9 @@ Later, filed by the lead when the loop works:
 - A status page.
 - A new app from nothing, by voice: a repo, outside accounts and secrets.
 - The App Store (not only TestFlight) as a deploy target, with Alex's approval for each
-  release to App Review.
+  release to App Review: #3657. `app-store.yml` waits at the `app-store` environment's gate
+  (#3587), then submits; its run says `appstore:<bundle id>/<version>` and the TestFlight
+  build it submitted, which is `deployed-as` that version.
 
 ## Clients
 

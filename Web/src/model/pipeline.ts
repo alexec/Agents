@@ -29,25 +29,27 @@ function split(ref: string): [string, string] {
   return i < 0 ? ["", ref] : [ref.slice(0, i), ref.slice(i + 1)];
 }
 
-/** "TestFlight 42", "Cloud Run web-42", "Sentry issue 4321": a deploy's or a health signal's name. */
+/** "TestFlight 42", "App Store 1.2.0", "Cloud Run web-42", "Sentry issue 4321": a deploy's or a health
+ * signal's name. */
 export function stageWords(n: LineageNode): string {
   const [scheme, id] = split(n.ref);
   const last = id.split("/").pop() ?? id;
   if (n.kind === "deploy" && scheme === "testflight") return `TestFlight ${last}`;
+  if (n.kind === "deploy" && scheme === "appstore") return `App Store ${last}`;
   if (n.kind === "deploy" && scheme === "cloudrun") return `Cloud Run ${last}`;
   if (n.kind === "health" && scheme === "sentry") return `Sentry issue ${last}`;
   return `${scheme} ${last}`;
 }
 
-/** Where a stage is outside Agents: a CI run's page, App Store Connect for a TestFlight build (its
- * address needs the app's Apple ID, which the ref does not say), a Cloud Run service's revisions in
- * the Google Cloud console (#3654), a Sentry issue on sentry.io, else the forge's page for an issue, a
- * PR or a release. */
+/** Where a stage is outside Agents: a CI run's page, App Store Connect for a TestFlight build or an
+ * App Store version (its address needs the app's Apple ID, which the ref does not say), a Cloud Run
+ * service's revisions in the Google Cloud console (#3654), a Sentry issue on sentry.io, else the
+ * forge's page for an issue, a PR or a release. */
 export function stageUrl(n: LineageNode): string | undefined {
   const [scheme, id] = split(n.ref);
   if (n.kind === "ci-run" && scheme === "github") return "https://github.com/" + id.replace("/actions/run/", "/actions/runs/");
   if (n.kind === "ci-run" && scheme === "gitlab") return "https://gitlab.com/" + id.replace("/pipelines/", "/-/pipelines/");
-  if (n.kind === "deploy" && scheme === "testflight") return "https://appstoreconnect.apple.com/apps";
+  if (n.kind === "deploy" && (scheme === "testflight" || scheme === "appstore")) return "https://appstoreconnect.apple.com/apps";
   if (n.kind === "deploy" && scheme === "cloudrun") {
     // cloudrun:<project>/<region>/<service>/<revision>
     const m = /^([^/]+)\/([^/]+)\/([^/]+)\/[^/]+$/.exec(id);

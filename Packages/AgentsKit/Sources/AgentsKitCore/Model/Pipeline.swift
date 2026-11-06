@@ -62,22 +62,24 @@ public enum Pipeline {
             + capped(health, words)
     }
 
-    /// "TestFlight 42", "Cloud Run web-42", "Sentry issue 4321": a deploy's or a health signal's name.
+    /// "TestFlight 42", "App Store 1.2.0", "Cloud Run web-42", "Sentry issue 4321": a deploy's or a
+    /// health signal's name.
     static func words(_ n: Node) -> String {
         let (scheme, id) = split(n.ref)
         let last = id.split(separator: "/").last.map(String.init) ?? id
         switch (n.kind, scheme) {
         case ("deploy", "testflight"): return "TestFlight \(last)"
+        case ("deploy", "appstore"): return "App Store \(last)"
         case ("deploy", "cloudrun"): return "Cloud Run \(last)"
         case ("health", "sentry"): return "Sentry issue \(last)"
         default: return "\(scheme) \(last)"
         }
     }
 
-    /// Where a stage is outside Agents: a CI run's page, App Store Connect for a TestFlight build
-    /// (its address needs the app's Apple ID, which the ref does not say), a Cloud Run service's
-    /// revisions in the Google Cloud console (#3654), a Sentry issue on sentry.io, else the
-    /// forge's page for an issue, a PR or a release.
+    /// Where a stage is outside Agents: a CI run's page, App Store Connect for a TestFlight build or
+    /// an App Store version (its address needs the app's Apple ID, which the ref does not say), a
+    /// Cloud Run service's revisions in the Google Cloud console (#3654), a Sentry issue on
+    /// sentry.io, else the forge's page for an issue, a PR or a release.
     public static func url(_ n: Node) -> URL? {
         let (scheme, id) = split(n.ref)
         switch (n.kind, scheme) {
@@ -85,7 +87,7 @@ public enum Pipeline {
             return URL(string: "https://github.com/" + id.replacingOccurrences(of: "/actions/run/", with: "/actions/runs/"))
         case ("ci-run", "gitlab"):
             return URL(string: "https://gitlab.com/" + id.replacingOccurrences(of: "/pipelines/", with: "/-/pipelines/"))
-        case ("deploy", "testflight"):
+        case ("deploy", "testflight"), ("deploy", "appstore"):
             return URL(string: "https://appstoreconnect.apple.com/apps")
         case ("deploy", "cloudrun"):
             // cloudrun:<project>/<region>/<service>/<revision>

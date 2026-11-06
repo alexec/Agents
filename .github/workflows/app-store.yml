@@ -1,0 +1,95 @@
+# Submits a release to App Review when a person approves it (#3657). On each version tag, the
+# submit job waits at the `app-store` environment's gate for one of its required reviewers. Agents
+# shows the wait as a Deploy row in Needs You (#3587), and Approve or Reject answers GitHub. Only
+# after Approve does the job wait for release.yml's TestFlight builds of the tag to be processed,
+# then submit the iOS and the macOS version for App Review (scripts/asc-submit.swift). Reject
+# ends it, and the release stays on TestFlight.
+#
+# What it submitted is two deploy notices, for Lineage (#3584): the App Store version,
+# appstore:<bundle id>/<version>, and the TestFlight build it submitted. Agents links the release
+# and that build deployed-as the version.
+#
+# The gate job first checks that the `app-store` environment has required reviewers. Without them
+# the submit job does not start: GitHub would make the environment with no gate, and the release
+# would go to App Review with nobody's approval. scripts/release-secrets.sh --app-store makes the
+# environment, its reviewer and its secrets (docs/how-to/release-agents-host.md):
+#   ASC_KEY_P8, ASC_KEY_ID, ASC_ISSUER_ID   the App Store Connect key
+name: app-store
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-store-${{ github.ref_name }}
+
+env:
+  TAG: ${{ github.ref_name }}
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.gate.outputs.ready }}
+    steps:
+      - name: The app-store environment has required reviewers
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          reviewers=$(gh api "repos/$GITHUB_REPOSITORY/environments/app-store" \
+            --jq '[.protection_rules[]? | select(.type == "required_reviewers") | .reviewers[]] | length' 2>/dev/null || echo 0)
+          if [[ $reviewers -gt 0 ]]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No app-store environment with required reviewers, so $TAG is not submitted to App Review. scripts/release-secrets.sh --app-store makes it."
+          fi
+
+  submit:
+    needs: gate
+    if: needs.gate.outputs.ready == 'true'
+    runs-on: xcode-27
+    timeout-minutes: 120
+    environment: app-store
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+      BUNDLE_ID: com.alexecollins.agents.remote
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: The App Store Connect key is there
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          if [[ -z $ASC_KEY_P8 || -z $ASC_KEY_ID || -z $ASC_ISSUER_ID ]]; then
+            echo "::error::The app-store environment has no App Store Connect key. Set it with scripts/release-secrets.sh --app-store. Nothing was submitted to App Review."
+            exit 1
+          fi
+          echo "$ASC_KEY_P8" > "$RUNNER_TEMP/asc.p8"
+
+      # release.yml uploads the builds; its testflight job takes up to 90 minutes, and App Store
+      # Connect then processes them. "What's New" is the tag's message, the release notes.
+      - name: Submit for App Review
+        id: submit
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          export ASC_KEY_PATH="$RUNNER_TEMP/asc.p8"
+          git fetch --quiet --force origin "refs/tags/$TAG:refs/tags/$TAG"
+          export WHATS_NEW="$(git tag -l --format='%(contents)' "$TAG")"
+          swift scripts/asc-submit.swift "${TAG#v}" --wait 110 | tee "$RUNNER_TEMP/submit.log"
+          echo "build=$(tail -n 1 "$RUNNER_TEMP/submit.log")" >> "$GITHUB_OUTPUT"
+
+      # What this run deployed, for Lineage (#3584, #3657): Agents reads the notices from the run,
+      # so App Store Connect's key stays here.
+      - name: Say the deploy
+        run: |
+          echo "::notice title=deploy::testflight:$BUNDLE_ID/${{ steps.submit.outputs.build }}"
+          echo "::notice title=deploy::appstore:$BUNDLE_ID/${TAG#v}"

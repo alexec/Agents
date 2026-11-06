@@ -58,6 +58,14 @@ test("many of a kind name the first three and count the rest", () => {
   assert.equal(steps.at(-1).url, undefined);
 });
 
+test("a release submitted for App Review says its App Store version", () => {
+  const store = { kind: "deploy", ref: "appstore:com.example.app/1.2.0" };
+  const g = { nodes: [...graph.nodes, store], links: [...graph.links, link(release, "deployed-as", store), link(build, "deployed-as", store)] };
+  const steps = p.pipelineSteps(issue, g);
+  assert.deepEqual(words(steps), ["Release v1.2.0", "CI run", "TestFlight 42", "App Store 1.2.0", "Sentry issue 4321"]);
+  assert.equal(steps[3].url, "https://appstoreconnect.apple.com/apps");
+});
+
 test("a GitLab pipeline has its page", () => {
   assert.equal(p.stageUrl({ kind: "ci-run", ref: "gitlab:group/app/pipelines/55" }), "https://gitlab.com/group/app/-/pipelines/55");
 });

@@ -66,6 +66,15 @@ struct PipelineTests {
         #expect(steps.last?.url == nil)
     }
 
+    @Test func aReleaseSubmittedForAppReviewSaysItsAppStoreVersion() throws {
+        let version = Node(kind: "deploy", ref: "appstore:com.example.app/1.2.0")
+        let g = DaemonAPI.LineageGraph(links: graph.links + [link(release, "deployed-as", version), link(build, "deployed-as", version)])
+        let steps = Pipeline.steps(of: issue, in: g)
+        #expect(words(steps) == ["Release v1.2.0", "CI run", "TestFlight 42", "App Store 1.2.0", "Sentry issue 4321"])
+        let store = try #require(steps.first { $0.words == "App Store 1.2.0" })
+        #expect(store.url?.absoluteString == "https://appstoreconnect.apple.com/apps")
+    }
+
     @Test func aGitLabPipelineHasItsPage() {
         #expect(Pipeline.url(Node(kind: "ci-run", ref: "gitlab:group/app/pipelines/55"))?.absoluteString
             == "https://gitlab.com/group/app/-/pipelines/55")
