@@ -23,9 +23,9 @@ type WebPusher interface {
 	PublicKey() string
 }
 
-// webPushes is the control plane's way to a browser: a browser has no relay host and no
-// mailbox, so every notice the ladder sends to one goes from here, relay or none. One
-// queue, sent in order by one worker. It sends no withdrawal (deliver says why).
+// webPushes is the control plane's way to a browser: every notice the ladder sends to one
+// goes from here. One queue, sent in order by one worker. It sends no withdrawal (deliver
+// says why).
 type webPushes struct {
 	s      *Service
 	sender WebPusher

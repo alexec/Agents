@@ -6,7 +6,7 @@ import PackageDescription
 //
 // `AgentsKitCore` is everything both platforms can hold: the record, the JSON-RPC
 // line protocol, the daemon's method names, and the client that speaks them over any
-// transport. `AgentsKit` is what Agents Host and agents-relay need beyond it (the daemon
+// transport. `AgentsKit` is what Agents Host needs beyond it (the daemon
 // itself is Go since #1138, and its Swift sources went in #1314), and re-exports Core.
 //
 // Written as a string rather than `.macOS(.v27)`: this tools version has no `.v27`
@@ -18,12 +18,12 @@ let package = Package(
         .library(name: "AgentsKit", targets: ["AgentsKit"]),
         // The phone links this one. It is the only product that builds for iOS.
         .library(name: "AgentsKitCore", targets: ["AgentsKitCore"]),
-        // The control plane's WebSocket (058): agents-relay dials with it, and the tests
-        // serve with it. Never linked by the apps.
+        // The control plane's WebSocket (058): the tests dial and serve with it. Never
+        // linked by the apps.
         .library(name: "ControlDial", targets: ["ControlDial"]),
     ],
     dependencies: [
-        // The control plane's WebSocket (058): `ControlDial`, linked by agents-relay.
+        // The control plane's WebSocket (058): `ControlDial`, for the tests.
         // `swift-crypto` is not a dependency: its BoringSSL would be a second copy.
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.80.0"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.29.0"),
@@ -40,12 +40,12 @@ let package = Package(
                 .product(name: "NIOWebSocket", package: "swift-nio"),
                 .product(name: "NIOSSL", package: "swift-nio-ssl"),
             ]),
-        // What Agents Host and agents-relay still link (#1314): the relay's dial to the control
-        // plane with `ControlDial`, the move of a set-up, ssh, and the local socket's server.
+        // What Agents Host still links (#1314): the move of a set-up, ssh, and the local
+        // socket's server.
         // The daemon is Go (#1138). SwiftTerm belongs to the app, declared in `project.yml`.
         .target(
             name: "AgentsKit",
-            dependencies: ["AgentsKitCore", "ControlDial"],
+            dependencies: ["AgentsKitCore"],
             swiftSettings: [.treatAllWarnings(as: .error)]),
         .testTarget(
             name: "AgentsKitTests",

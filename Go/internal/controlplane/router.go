@@ -3,6 +3,8 @@ package controlplane
 import (
 	"context"
 	"encoding/json"
+	"maps"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -23,8 +25,6 @@ type Caller struct {
 	Session string
 	Client  string
 	Kind    string
-	// The device came through agents-relay (T096), not straight here.
-	Relayed bool
 	// The person the client belongs to (#994): it reaches only that person's machines.
 	Person string
 }
@@ -77,11 +77,8 @@ type Router struct {
 	clients  map[string]*clientSession
 	hosts    map[string]*hostSession
 	known    map[string]bool
-	// Hosts that only relay (T096), and whether each is relaying now: they carry devices
-	// and are given no client channels, only channel 0.
-	relays map[string]bool
-	states map[string]hostState
-	// How each client reaches this copy, as last said: true when only through the relay.
+	states   map[string]hostState
+	// The clients connected to this copy, as last said to the other copies.
 	toldLinks map[string]bool
 	// Requests of a host on its channel 0 (#1122), by their id, until it answers.
 	asks map[string]*hostAsk
@@ -93,10 +90,10 @@ type Router struct {
 	localEnded func(host string)
 	// How to reach each peer copy on its link, for streams carried for it (T064).
 	peers map[string]func(string)
-	// How each client connected at another copy reaches it: relayed or not (T080).
+	// The clients connected at each other copy (T080).
 	peerLinks map[string]map[string]bool
-	// Told when a client here connects, or its last session ends (nil).
-	linkChanged func(client string, relayed *bool)
+	// Told when a client here connects (true), or its last session ends (false).
+	linkChanged func(client string, connected bool)
 	// Told each presence report a client here makes.
 	presenceHeard func(client string, device bool, report json.RawMessage)
 	// A linked host's workspace (#691), laid over its state: a host whose workspace is
@@ -215,7 +212,7 @@ func NewRouter(h Handler, log func(string)) *Router {
 		log = func(string) {}
 	}
 	return &Router{handler: h, clients: map[string]*clientSession{}, hosts: map[string]*hostSession{},
-		known: map[string]bool{}, relays: map[string]bool{}, states: map[string]hostState{},
+		known: map[string]bool{}, states: map[string]hostState{},
 		toldLinks: map[string]bool{}, asks: map[string]*hostAsk{}, keptWaits: map[string]chan *message{}, presence: map[string]notedPresence{}, log: log,
 		peers: map[string]func(string){}, peerLinks: map[string]map[string]bool{},
 		workspaces: map[string]*providers.MachineWorkspace{}, rates: newClientRates(), refusals: newRefusalLog(log)}
@@ -432,74 +429,17 @@ func (r *Router) CloseMembers() {
 	}
 }
 
-// SetRelay says whether a host only relays (MachineRecord.relay): nil for a host that runs
-// agents, false for a relay switched off, true for one relaying. A host found to be a
-// relay has its client channels closed.
-func (r *Router) SetRelay(host string, relay *bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if relay == nil {
-		if _, was := r.relays[host]; was {
-			delete(r.relays, host)
-			for id := range r.clients {
-				r.openChannelLocked(id, host)
-			}
-		}
-		return
-	}
-	_, was := r.relays[host]
-	r.relays[host] = *relay
-	if was {
-		return
-	}
-	for _, s := range r.clients {
-		if c, ok := s.channels[host]; ok {
-			delete(s.channels, host)
-			if h := r.hosts[host]; h != nil {
-				delete(h.channels, c)
-				h.conn.Send(closeFrame(c))
-			}
-		}
-	}
-}
-
-// HostsHeldHere is every host that runs agents whose uplink ends here.
+// HostsHeldHere is every host whose uplink ends here.
 func (r *Router) HostsHeldHere() []string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	var out []string
 	for host, h := range r.hosts {
-		if h != nil && h.local && !r.relays[host] {
+		if h != nil && h.local {
 			out = append(out, host)
 		}
 	}
 	return out
-}
-
-// RelaysHeldHere is every relaying host whose uplink ends here.
-func (r *Router) RelaysHeldHere() []string {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	var out []string
-	for host, on := range r.relays {
-		if on && r.hosts[host] != nil && r.hosts[host].local {
-			out = append(out, host)
-		}
-	}
-	return out
-}
-
-// RelayOnline says whether a relaying host is online anywhere: held here, or at another
-// copy that this one reaches it through (#1460).
-func (r *Router) RelayOnline() bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	for host, on := range r.relays {
-		if on && r.hosts[host] != nil {
-			return true
-		}
-	}
-	return false
 }
 
 // MARK: Hosts
@@ -648,7 +588,7 @@ func (r *Router) OpenFromPeer(peer, host string, c int, open wire.ChannelOpen) {
 	h := r.hosts[host]
 	// The peer checks its client's person too; a stream for another's machine opens nothing.
 	mine := r.owners == nil || r.owners.OwnerOf(host) == r.owners.PersonOf(open.Client)
-	if _, relay := r.relays[host]; relay || h == nil || !h.local || !mine {
+	if h == nil || !h.local || !mine {
 		r.tellPeerLocked(peer, peerFrame(host, closeFrame(c)))
 		return
 	}
@@ -711,35 +651,31 @@ func (r *Router) HeldHere() []string {
 	return out
 }
 
-// NotePeerLink is a peer copy saying how one of its clients reaches it; nil: it doesn't.
-func (r *Router) NotePeerLink(peer, client string, relayed *bool) {
+// NotePeerLink is a peer copy saying whether one of its clients is connected to it.
+func (r *Router) NotePeerLink(peer, client string, connected bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.peerLinks[peer] == nil {
 		r.peerLinks[peer] = map[string]bool{}
 	}
-	if relayed == nil {
-		delete(r.peerLinks[peer], client)
+	if connected {
+		r.peerLinks[peer][client] = true
 	} else {
-		r.peerLinks[peer][client] = *relayed
+		delete(r.peerLinks[peer], client)
 	}
 	r.broadcastControlLocked("control/clientChanged", map[string]any{"client": client})
 }
 
 // LinksHere is every client connected here, as it was said: for a peer that just linked.
-func (r *Router) LinksHere() map[string]bool {
+func (r *Router) LinksHere() []string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	out := map[string]bool{}
-	for k, v := range r.toldLinks {
-		out[k] = v
-	}
-	return out
+	return slices.Collect(maps.Keys(r.toldLinks))
 }
 
-// OnLinkChanged is told when a client here connects (its relayed), or its last session
-// ends (nil), so other copies know.
-func (r *Router) OnLinkChanged(f func(client string, relayed *bool)) {
+// OnLinkChanged is told when a client here connects (true), or its last session ends
+// (false), so other copies know.
+func (r *Router) OnLinkChanged(f func(client string, connected bool)) {
 	r.mu.Lock()
 	r.linkChanged = f
 	r.mu.Unlock()
@@ -1220,7 +1156,7 @@ func (r *Router) DeliverSigned(d wire.LockDelivery, client, kind, host string, p
 func (r *Router) deliver(line func(id string) string, client, kind, host string, patience time.Duration) *message {
 	r.mu.Lock()
 	h := r.hosts[host]
-	if _, relay := r.relays[host]; relay || h == nil {
+	if h == nil {
 		r.mu.Unlock()
 		return nil
 	}
@@ -1269,14 +1205,14 @@ func (r *Router) endKeptLocked(delivery string, m *message) {
 
 // AttachClient takes a paired client's socket, and returns its session, which ends when
 // the socket does.
-func (r *Router) AttachClient(client *records.ClientRecord, conn *Conn, relayed bool, capabilities []string) string {
+func (r *Router) AttachClient(client *records.ClientRecord, conn *Conn, capabilities []string) string {
 	id := records.NewUUID()
 	r.mu.Lock()
 	person := ""
 	if r.owners != nil {
 		person = r.owners.PersonOf(client.ID)
 	}
-	r.clients[id] = &clientSession{caller: Caller{Session: id, Client: client.ID, Kind: client.Kind, Relayed: relayed, Person: person},
+	r.clients[id] = &clientSession{caller: Caller{Session: id, Client: client.ID, Kind: client.Kind, Person: person},
 		conn: conn, channels: map[string]int{}, inFlight: map[string]map[string]bool{},
 		copying: map[string]map[string]string{}, capabilities: capabilities}
 	for host := range r.hosts {
@@ -1351,54 +1287,40 @@ func (r *Router) ForgetClient(client string) {
 	}
 }
 
-// noteLinkLocked says a client's link changed here: true when it reaches this copy only
-// through the relay, gone when its last session ended.
+// noteLinkLocked says a client's link changed here: it connected, or its last session
+// ended.
 func (r *Router) noteLinkLocked(client string) {
-	present, allRelayed := false, true
+	present := false
 	for _, s := range r.clients {
 		if s.caller.Client == client {
 			present = true
-			allRelayed = allRelayed && s.caller.Relayed
+			break
 		}
 	}
-	was, had := r.toldLinks[client]
-	if present == had && (!present || was == allRelayed) {
+	if present == r.toldLinks[client] {
 		return
 	}
 	if present {
-		r.toldLinks[client] = allRelayed
+		r.toldLinks[client] = true
 	} else {
 		delete(r.toldLinks, client)
 	}
 	if r.linkChanged != nil {
-		var relayed *bool
-		if present {
-			relayed = &allRelayed
-		}
-		go r.linkChanged(client, relayed)
+		go r.linkChanged(client, present)
 	}
 	r.broadcastControlLocked("control/clientChanged", map[string]any{"client": client})
 }
 
-// Connections is how every connected client reaches the control plane: true when only
-// through the relay.
-func (r *Router) Connections() map[string]bool {
+// Connections is every client connected to the control plane: here, or at another copy.
+func (r *Router) Connections() []string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	out := map[string]bool{}
-	note := func(client string, relayed bool) {
-		was, ok := out[client]
-		out[client] = (!ok || was) && relayed
-	}
 	for _, links := range r.peerLinks {
-		for client, relayed := range links {
-			note(client, relayed)
-		}
+		maps.Copy(out, links)
 	}
-	for k, v := range r.toldLinks {
-		note(k, v)
-	}
-	return out
+	maps.Copy(out, r.toldLinks)
+	return slices.Collect(maps.Keys(out))
 }
 
 func (r *Router) openChannelLocked(sessionID, host string) {
@@ -1407,18 +1329,10 @@ func (r *Router) openChannelLocked(sessionID, host string) {
 	if s == nil || h == nil {
 		return
 	}
-	if _, relay := r.relays[host]; relay {
-		return
-	}
 	if !r.mayReachLocked(s.caller, host) {
 		return
 	}
 	r.openReachedLocked(sessionID, host)
-}
-
-func (r *Router) relayLocked(host string) bool {
-	_, relay := r.relays[host]
-	return relay
 }
 
 // openReachedLocked is openChannelLocked for a session already known to reach the host.
@@ -1434,9 +1348,6 @@ func (r *Router) openReachedLocked(sessionID, host string) {
 	open := wire.ChannelOpen{Client: s.caller.Client, FanOut: &yes, FanOutLock: &yes}
 	if s.caller.Kind != records.KindMac {
 		open.Device = new(wire.UUID(s.caller.Client))
-	}
-	if s.caller.Relayed {
-		open.Relayed = &yes
 	}
 	if r.actorOf != nil {
 		open.Actor = r.actorOf(s.caller)
@@ -1736,9 +1647,7 @@ func (r *Router) HoldToOwners() {
 	owners := r.owners
 	hosts := make([]string, 0, len(r.hosts))
 	for host := range r.hosts {
-		if _, relay := r.relays[host]; !relay {
-			hosts = append(hosts, host)
-		}
+		hosts = append(hosts, host)
 	}
 	r.mu.Unlock()
 	ownerOf := make(map[string]string, len(hosts))
@@ -1782,7 +1691,7 @@ func (r *Router) HoldToOwners() {
 			}
 		}
 		for _, host := range byOwner[person] {
-			if _, has := s.channels[host]; !has && r.hosts[host] != nil && !r.relayLocked(host) {
+			if _, has := s.channels[host]; !has && r.hosts[host] != nil {
 				r.openReachedLocked(id, host)
 			}
 		}

@@ -186,7 +186,6 @@ Agents has none of these at all:
 | Pragma | ● | ● | ● | ● | ○ | ● | 83% |
 | Parallel Code | ● | ○ | ● | ● | ◐ | ● | 75% |
 | Ace | ● | ● | ○ | ● | ?⃝ | ● | 67% |
-| **Agents** | ○ | ● | ○ | ● | ● | ● | 67% |
 | Codeg | ● | ◐ | ◐ | ● | ○ | ● | 67% |
 | Cursor | ● | ● | ○ | ● | ○ | ● | 67% |
 | Orca | ● | ◐ | ◐ | ◐ | ◐ | ● | 67% |
@@ -194,6 +193,7 @@ Agents has none of these at all:
 | CodeAgentSwarm | ● | ◐ | ◐ | ◐ | ?⃝ | ● | 58% |
 | Nuphos | ● | ● | ◐ | ?⃝ | ○ | ● | 58% |
 | Warp | ● | ○ | ○ | ● | ◐ | ● | 58% |
+| **Agents** | ○ | ● | ○ | ● | ○ | ● | 50% |
 | Maestro | ● | ○ | ○ | ● | ○ | ● | 50% |
 | Roamgate | ◐ | ○ | ○ | ● | ◐ | ● | 50% |
 | Vibe Kanban | ● | ○ | ○ | ● | ?⃝ | ● | 50% |
@@ -451,7 +451,7 @@ Each app's score in every table, and overall: its points over the 50 scored feat
 
 | Rank | App | Running | Reach | Following | Reviewing | Tools | Tasks | Extensions | Organising | Overall |
 |--:|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|
-| 1 | **Agents** | 100% | 67% | 100% | 100% | 90% | 100% | 80% | 83% | **91%** |
+| 1 | **Agents** | 100% | 50% | 100% | 100% | 90% | 100% | 80% | 83% | **89%** |
 | 2 | GitHub Copilot | 92% | 83% | 100% | 100% | 80% | 61% | 100% | 50% | **82%** |
 | 3 | Paseo | 100% | 100% | 69% | 90% | 60% | 61% | 60% | 100% | **79%** |
 | 4 | Cursor | 83% | 67% | 81% | 100% | 80% | 67% | 80% | 50% | **75%** |

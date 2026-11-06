@@ -100,9 +100,10 @@ To go back, set **Keeps its store** to **On this Mac** and click **Switch Storeâ
   [Add a machine](add-a-machine.md#add-another-mac).
 - If you used the earlier Agents app on this Mac, Agents Host offers to move your agents,
   devices and servers across. See [Move an existing set-up across](move-an-existing-set-up.md).
-- To reach your agents from your iPhone and iPad away from home, and to be notified on
-  them, turn on **Relay for my devices**. It is off until you do. Under **Join one
-  elsewhere**, it asks for a machine code from that control plane the first time. See
+- A control plane on this Mac has no address on the internet. Your iPhone and iPad reach
+  it only on this Mac's network. To reach your agents away from home, and to be notified
+  on your devices, run the control plane in the cloud. See
+  [Run the control plane in the cloud](run-the-control-plane-in-the-cloud.md) and
   [Phone and iPad](../explanation/phone-and-ipad.md).
 
 ## Related

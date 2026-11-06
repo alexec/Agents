@@ -216,7 +216,7 @@ struct ConnectorSetupView: View {
         let hosts = control?.hosts ?? []
         let here = model.isOnThisMac(folder.host)
         let title = WhereAgentsRun.title(onThisMac: here, hostName: hosts.first { $0.id == folder.host }?.name)
-        let others = hosts.filter { $0.id != folder.host && $0.runsAgents }
+        let others = hosts.filter { $0.id != folder.host }
             .map { $0.id == control?.thisMacHost?.id ? "This Mac" : $0.name }
         return Place(title: title, line: WhereAgentsRun.line(others: others, providers: control?.providers.map(\.name) ?? []))
     }

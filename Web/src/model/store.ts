@@ -438,7 +438,7 @@ export class Work {
     if (hosts.some((h) => h.id === "mac")) return "mac";
     const home = this.plane.value?.homeHost;
     const listed = home ? hosts.find((h) => h.id === home) : undefined;
-    return listed && listed.relay === undefined && listed.platform.startsWith("macOS") ? listed.id : "mac";
+    return listed && listed.platform.startsWith("macOS") ? listed.id : "mac";
   });
   /** Whether `host` is the person's Mac (#1501). */
   isMac(host: string | undefined): boolean {
@@ -1510,7 +1510,7 @@ export class Store extends Work {
         await this.loadHost(host.id);
       })));
       // One offline or stopped now lists what it last did, greyed, as the window keeps it (#962).
-      await Promise.all(this.hosts.value.filter((host) => !hostAnswers(host.state) && host.relay === undefined)
+      await Promise.all(this.hosts.value.filter((host) => !hostAnswers(host.state))
         .map((host) => this.onHost(host.id, () => this.loadLastHeard(host.id))));
       const watching = this.watching.value;
       if (watching) await this.loadTranscript(watching.host, watching.session);

@@ -1,6 +1,6 @@
 // Package apns posts the control plane's own pushes to Apple (#1460, public-security.md
-// §5): for a device whose person has no Mac host relaying notices through iCloud. Token
-// auth with the one .p8 key, HTTP/2. What is pushed is a generic alert and a sealed item;
+// §5): every notice for a phone or an iPad goes this way. Token auth with the one .p8 key,
+// HTTP/2. What is pushed is a generic alert and a sealed item;
 // the Remote's Notification Service Extension opens it and shows the real words.
 package apns
 

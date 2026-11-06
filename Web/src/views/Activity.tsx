@@ -561,7 +561,7 @@ function ConsequenceLine({ consequence, host, store, openAgent }: {
  * other online host, each moved into this browser's days.
  */
 function chartHosts(store: Store): string[] {
-  const online = store.hosts.value.filter((h) => hostAnswers(h.state) && h.relay === undefined).map((h) => h.id);
+  const online = store.hosts.value.filter((h) => hostAnswers(h.state)).map((h) => h.id);
   const ids = online.length > 0 ? online : store.hosts.value.map((h) => h.id);
   const macID = store.macHostID.value;
   return [...ids.filter((id) => id === macID), ...ids.filter((id) => id !== macID)];

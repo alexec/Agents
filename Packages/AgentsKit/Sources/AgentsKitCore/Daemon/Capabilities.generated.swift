@@ -651,7 +651,6 @@ public enum Capability {
         "hosts/remove": "hosts/1",
         "hosts/retryKept": "hosts/1",
         "hosts/setMachineOptions": "hosts/1",
-        "hosts/setRelay": "hosts/1",
         "hosts/sshHosts": "hosts/1",
         "hosts/start": "hosts/1",
         "hosts/startEnroll": "hosts/1",
@@ -728,7 +727,6 @@ public enum Capability {
         "readApi/list": "readapi/1",
         "readApi/make": "readapi/1",
         "readApi/revoke": "readapi/1",
-        "relay/switch": "relay/1",
         "reports/deleteView": "reports.views/1",
         "reports/export": "reports/1",
         "reports/nodes": "reports.nodes/1",
@@ -829,9 +827,6 @@ public enum Capability {
         "host/user": "bots/1",
         "host/userSettings": "host.user-settings/2",
         "notices/delivered": "notices/1",
-        "relay/count": "relay/1",
-        "relay/deliver": "relay/1",
-        "relay/devices": "relay/1",
         "user/suspended": "host.suspend/1",
     ]
 

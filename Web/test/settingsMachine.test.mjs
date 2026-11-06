@@ -13,7 +13,7 @@ test("settings machine: with a Mac, the panes are the Mac's alone", () => {
 });
 
 test("settings machine: with no Mac, each machine that answers, the chosen one or the home host first", () => {
-  const hosts = [row("a"), row("b"), row("down", "offline"), row("relay", "online", { relay: true })];
+  const hosts = [row("a"), row("b"), row("down", "offline")];
   const machines = m.settingsMachines(hosts, "mac");
   assert.deepEqual(machines.map((h) => h.id), ["a", "b"]);
   assert.equal(m.settingsMachine(machines, null, "b").id, "b");

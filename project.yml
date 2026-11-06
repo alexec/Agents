@@ -157,8 +157,8 @@ targets:
         NSBonjourServices: [_agents-control._tcp]
         # Where "Set one up on this Mac" sends the person (frame K).
         AgentsHostDownloadURL: https://github.com/alexec/Agents/releases/latest
-        # Exempt (#729): what is encrypted (HPKE for sealed pushes and relay frames, and the
-        # P-256 agreement) is CryptoKit's, and TLS is the system's. The app's own SHA-256,
+        # Exempt (#729): what is encrypted (HPKE for sealed pushes, and the P-256
+        # agreement) is CryptoKit's, and TLS is the system's. The app's own SHA-256,
         # HMAC and HKDF hash and authenticate; its own P-256 arithmetic runs only on Linux.
         ITSAppUsesNonExemptEncryption: false
     settings:
@@ -420,53 +420,6 @@ targets:
           CODE_SIGN_IDENTITY: Apple Distribution
           PROVISIONING_PROFILE_SPECIFIER: Agents Remote Widget App Store
 
-  # agents-relay (058, T096): the bridge's relay and mailbox, cut down to a helper of
-  # Agents Host that carries devices to the control plane through iCloud. Signed as the
-  # bridge was, with its iCloud container (Alex's choice: nothing new in the developer
-  # account).
-  agents-relay:
-    type: application
-    supportedDestinations: [macOS]
-    sources:
-      - path: Host/Relay/Sources
-      - path: Host/Relay/agents-relay.entitlements
-        buildPhase: none
-      - path: Host/Relay/agents-relay-DeveloperID.entitlements
-        buildPhase: none
-    dependencies:
-      - package: AgentsKit
-    info:
-      path: Host/Relay/Info.plist
-      properties:
-        CFBundleName: agents-relay
-        CFBundleDisplayName: Agents Relay
-        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        CFBundleShortVersionString: $(MARKETING_VERSION)
-        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
-        LSUIElement: true
-        LSBackgroundOnly: true
-        ITSAppUsesNonExemptEncryption: false
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.bridge
-        PRODUCT_NAME: agents-relay
-        CODE_SIGN_ENTITLEMENTS: Host/Relay/agents-relay.entitlements
-        GENERATE_INFOPLIST_FILE: NO
-        ENABLE_HARDENED_RUNTIME: YES
-        SDKROOT: macosx
-        SUPPORTED_PLATFORMS: macosx
-        SKIP_INSTALL: YES
-      # The GitHub release (#669): Release signs it with Developer ID, outside the App Store.
-      configs:
-        Release:
-          CODE_SIGN_STYLE: Manual
-          CODE_SIGN_IDENTITY: Developer ID Application
-          OTHER_CODE_SIGN_FLAGS: --timestamp
-          # CloudKit outside the App Store needs a Developer ID profile, and the production
-          # container.
-          PROVISIONING_PROFILE_SPECIFIER: Agents Relay Developer ID
-          CODE_SIGN_ENTITLEMENTS: Host/Relay/agents-relay-DeveloperID.entitlements
-
   # Agents Host (058, US2, T054): the download of its own that runs this Mac's host and,
   # when chosen, the control plane's single copy, as launch agents. Not sandboxed and not
   # in the App Store, because it runs programs for the person's agents; Developer ID for
@@ -599,10 +552,6 @@ targets:
         product: AgentsKit
       - package: AgentsKit
         product: AgentsKitCore
-      - target: agents-relay
-        copy:
-          destination: wrapper
-          subpath: Contents/Helpers
       # agentsd's reader of its callers' code signatures (#1138, slice C), which it
       # looks for beside itself: without it the host's socket is open to every caller.
       - target: agents-peer
@@ -748,12 +697,6 @@ schemes:
     # The Mac App Store archive (058, T089), checked by scripts/check-store-archive.sh.
     archive:
       config: Release
-  agents-relay:
-    build:
-      targets:
-        agents-relay: all
-    run:
-      config: Debug
   agents-peer:
     build:
       targets:

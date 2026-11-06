@@ -164,14 +164,11 @@ public extension DaemonAPI {
         public var platform: String
         public var version: String
         public var machineID: String
-        /// `agents-relay` enrolling (T096): never the home host, and relaying from the start.
-        public var relay: Bool?
         /// `swift` or `go` (#1134), as in `MachineHello.implementation`, so the row says it from
         /// the first listing, before the host's first hello.
         public var implementation: String?
         public init(publicKey: Data, name: String, platform: String, version: String, machineID: String,
-                    relay: Bool? = nil, implementation: String? = nil) {
-            self.relay = relay
+                    implementation: String? = nil) {
             self.implementation = implementation
             self.publicKey = publicKey
             self.name = name

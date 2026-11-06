@@ -80,7 +80,7 @@ same code. Only a browser on that Mac can use it, and a code from **Pair a Devic
 1. Open **Settings ▸ Control plane**, and click **Show** beside **Clients**.
 2. Beside the client, click **Forget…**, then **Forget**.
 
-   It is cut off at once, directly and through the relay, and its next attempt to connect
+   It is cut off at once, and its next attempt to connect
    is refused. To use it again, pair it again with a new code.
 
 Any client may be forgotten, the last one too. If none is left, pair one again from Agents

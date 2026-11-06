@@ -2,8 +2,7 @@
 #if canImport(CloudKit)
 import Foundation
 
-/// A push the control plane sends through APNs itself (#1460), for a person with no Mac
-/// host relaying notices into their iCloud mailbox.
+/// A push the control plane sends through APNs itself (#1460).
 ///
 /// All of it but the `aps` is one `Envelope` under `agents`, sealed to this device: the
 /// need's id, whether to buzz, and the banner's words. Apple sees only "An agent needs

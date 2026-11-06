@@ -25,8 +25,6 @@ flowchart LR
     agentsd["Machine: Agents Host and agentsd, on a Mac or Linux"]
     data[("Host data: records, transcripts, logs")]
     runtime["Runtime: Claude Code, Codex and others"]
-    relay["agents-relay on a Mac"]
-    icloud["iCloud: CloudKit private database"]
     apns["Apple Push Notification service"]
     vendor["Each runtime's vendor"]
     integrations["GitHub, GitLab, Linear, mail, MCP servers"]
@@ -48,9 +46,6 @@ flowchart LR
     runtime -->|"HTTPS: prompts, files, output"| vendor
     agentsd -.->|"HTTPS"| integrations
     runtime -.->|"MCP tools"| integrations
-    remote -.->|"sealed frames"| icloud
-    relay -.->|"sealed frames"| icloud
-    relay -.->|"wss"| control
 ```
 
 The diagram is drawn as text so it can be checked against the code. The same parts are
@@ -70,7 +65,6 @@ drawn as C4 diagrams in [Architecture](../architecture.md).
 | A machine to a mail server | One mailbox, read over IMAP | As the mail server allows. Agents never sends mail. |
 | A server to the control plane, for a backup | The backup, in parts of 8 MiB | Inside the machine's connection (TLS, as above). The control plane seals each part when it arrives. |
 | The control plane to Apple Push Notification service | A notification, and Live Activity updates | HTTPS to Apple. The words of a notification are sealed with the device's own key (HPKE: P-256, HKDF-SHA256, AES-256-GCM), and the visible alert says only "An agent needs you". A Live Activity update is not sealed. It carries only the turn's phase and times. |
-| A phone away from home, through iCloud | Requests and updates, when **Relay for my devices** is on | Each frame is sealed (HPKE, P-256 and AES-256-GCM) between the device's key and the relay's key on your Mac, then posted to your own iCloud private database. Apple sees only sealed frames. The relay on your Mac opens them and passes them on to the control plane over its own connection. |
 | The control plane to a machine provider | Calls that start, stop and make machines | Sent to the machine that carries the provider, which runs its MCP server or CLI with the credentials it keeps (#3398), over HTTPS. |
 | The control plane to KMS | Calls to seal and open the control plane's key | HTTPS to Google Cloud KMS or HashiCorp Vault. |
 
@@ -95,7 +89,6 @@ on to Anthropic (`api.anthropic.com`) or OpenAI (`chatgpt.com`). The Mac's log o
 | | A server's backups | Yes, each part sealed with AES-256-GCM under a key made from the control key. The index beside each backup (machine, date, size, number of agents) is plain. |
 | | The control key, on a control plane in the cloud | Yes, sealed by KMS. On a Mac it is in the Keychain, or in a file of mode 0600. |
 | The hosted service's store | Each account's records | As above, under `accounts/<id>/`, with the account's own control key sealed by Google Cloud KMS. |
-| iCloud | Relay frames and mailbox records | Frames are sealed, as above. A mailbox record holds a sealed headline, ids and flags. |
 
 ## Related
 

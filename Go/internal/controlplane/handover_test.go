@@ -67,8 +67,7 @@ func phaseOf(raw json.RawMessage) string {
 	return s.Phase
 }
 
-// Freezing refuses what changes records, in words, and unfreezing lets it through again;
-// the relay switch goes the same way (#809).
+// Freezing refuses what changes records, in words, and unfreezing lets it through again.
 func TestAFrozenCopyChangesNothing(t *testing.T) {
 	t.Parallel()
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
@@ -87,9 +86,6 @@ func TestAFrozenCopyChangesNothing(t *testing.T) {
 	call(t, window, "", "hosts/list", nil)
 	d.must("handover/unfreeze", nil)
 	call(t, window, "", "clients/startPairing", nil)
-	if _, refused := d.call("relay/set", map[string]any{"host": "nobody", "relay": true}); !strings.Contains(refused, "No machine is called nobody") {
-		t.Fatal(refused)
-	}
 }
 
 // The whole move (R16): a copy started empty to receive is filled from a frozen copy,

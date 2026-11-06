@@ -253,7 +253,7 @@ func exchange(ctx context.Context, l *controllink.Lines, id controllink.Identity
 	if m.Hello == nil {
 		return fmt.Errorf("no hello: %s", line)
 	}
-	auth, expect, err := controllink.Answer(m.Hello, id, key, origin, "browser", nil, "", nil)
+	auth, expect, err := controllink.Answer(m.Hello, id, key, origin, "browser", nil, nil)
 	if err != nil {
 		return err
 	}

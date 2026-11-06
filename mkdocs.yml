@@ -89,7 +89,6 @@ nav:
       - how-to/start-machines-from-agents.md
       - how-to/add-a-machine-provider.md
       - how-to/set-up-a-cloud-machine-provider.md
-      - how-to/turn-the-relay-on-or-off.md
       - how-to/run-the-control-plane-in-the-cloud.md
       - how-to/run-agents-with-no-mac.md
       - how-to/run-the-hosted-service.md

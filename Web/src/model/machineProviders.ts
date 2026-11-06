@@ -194,7 +194,7 @@ export function providerRequest(kind: ProviderKind, name: string, values: Record
  */
 export function carrierChoices(hosts: readonly ControlMachine[], person: string | undefined, own?: string): ControlMachine[] {
   return hosts
-    .filter((h) => h.relay == null && hostAnswers(h.state) && (h.capabilities?.includes(Capability.providersCarry1) ?? true)
+    .filter((h) => hostAnswers(h.state) && (h.capabilities?.includes(Capability.providersCarry1) ?? true)
       && (!person || !h.owner || h.owner === person))
     .sort((a, b) => Number(b.id === own) - Number(a.id === own) || a.name.localeCompare(b.name, undefined, { numeric: true }));
 }
@@ -288,7 +288,7 @@ export function mayBe(workspace: MachineInfo, hostName: string): boolean {
  */
 export function linkableHosts(workspace: MachineInfo, hosts: readonly ControlMachine[]): ControlMachine[] {
   if (workspace.host) return [];
-  const free = hosts.filter((h) => h.relay == null && !h.workspace);
+  const free = hosts.filter((h) => !h.workspace);
   return [...free.filter((h) => mayBe(workspace, h.name)), ...free.filter((h) => !mayBe(workspace, h.name))];
 }
 

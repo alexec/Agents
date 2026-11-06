@@ -59,22 +59,6 @@ enum ControlTool {
         }
     }
 
-    /// `agents-relay --on` or `--off` (#824): the relay says so to its control plane, by
-    /// its own membership, where this Mac has no control plane's key.
-    static func relay(_ arguments: [String], paths: HostPaths) async -> Result {
-        var environment = ["HOME": NSHomeDirectory(), "PATH": "/usr/bin:/bin:/usr/sbin:/sbin"]
-        // `<root>/relay` on a scratch set-up, as its launch agent's.
-        if let root = paths.scratchRoot { environment[StoreLocations.rootVariable] = root.path }
-        #if DEBUG
-        if let root = ProcessInfo.processInfo.environment["AGENTS_TEST_TRUST_ROOT"] { environment["AGENTS_TEST_TRUST_ROOT"] = root }
-        #endif
-        do {
-            return try await spawn(paths.agentsRelay.path, arguments, environment, [:])
-        } catch {
-            return Result(status: -1, output: "", error: "\(error)")
-        }
-    }
-
     private static func spawn(_ tool: String, _ arguments: [String], _ environment: [String: String],
                               _ secrets: [Int32: Data]) async throws -> Result {
         try await withCheckedThrowingContinuation { continuation in

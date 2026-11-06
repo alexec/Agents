@@ -6,9 +6,8 @@ control/status
   "machineID": "MACHINE-1",
   "startedAt": <date>,
   "port": <port>,
-  "awayFromHome": true,
+  "awayFromHome": false,
   "you": "<UUID>",
-  "relayKey": "<secret>",
   "folderDetection": {
     "enabled": true,
     "paths": [
@@ -68,7 +67,6 @@ control/status
     "projects/1",
     "providers/1",
     "readapi/1",
-    "relay/1",
     "reports.nodes/1",
     "reports.scope/1",
     "reports.value/1",
@@ -117,23 +115,12 @@ hosts/list
   },
   {
     "id": "<host b>",
-    "name": "relay mac",
-    "platform": "macOS arm64",
-    "version": "1",
-    "state": "online",
-    "reach": "dialOut",
-    "machineID": "RELAY-MAC",
-    "relay": true,
-    "owner": "<uuid>"
-  },
-  {
-    "id": "<host c>",
     "name": "plain mac",
     "platform": "macOS arm64",
     "version": "1",
     "state": "online",
     "reach": "dialOut",
-    "machineID": "RELAY-MAC",
+    "machineID": "RAW-MAC",
     "owner": "<uuid>"
   },
   {
@@ -161,17 +148,6 @@ clients/list
     "owner": "<uuid>",
     "rev": 2,
     "knownEpoch": 0
-  },
-  {
-    "id": "<UUID>",
-    "name": "phone",
-    "kind": "iPhone",
-    "publicKey": "<secret>",
-    "paired": <date>,
-    "lastSeen": <date>,
-    "mayNotify": true,
-    "owner": "<uuid>",
-    "rev": 2
   }
 ]
 
@@ -187,25 +163,13 @@ devices/list
     "owner": "<uuid>",
     "rev": 2,
     "knownEpoch": 0
-  },
-  {
-    "id": "<UUID>",
-    "name": "phone",
-    "kind": "iPhone",
-    "publicKey": "<secret>",
-    "paired": <date>,
-    "lastSeen": <date>,
-    "mayNotify": true,
-    "owner": "<uuid>",
-    "rev": 2
   }
 ]
 
 clients/connections
 [
   {
-    "client": "<UUID>",
-    "relayed": false
+    "client": "<UUID>"
   }
 ]
 
@@ -251,9 +215,6 @@ hosts/lendSignIn
 hosts/lendGit
 {}
 
-hosts/setRelay
-{}
-
 control/status
 {
   "name": "Test plane",
@@ -262,9 +223,8 @@ control/status
   "machineID": "MACHINE-1",
   "startedAt": <date>,
   "port": <port>,
-  "awayFromHome": true,
+  "awayFromHome": false,
   "you": "<UUID>",
-  "relayKey": "<secret>",
   "folderDetection": {
     "enabled": true,
     "paths": [
@@ -319,7 +279,6 @@ control/status
     "projects/1",
     "providers/1",
     "readapi/1",
-    "relay/1",
     "reports.nodes/1",
     "reports.scope/1",
     "reports.value/1",
@@ -374,23 +333,12 @@ hosts/list
   },
   {
     "id": "<host b>",
-    "name": "relay mac",
-    "platform": "macOS arm64",
-    "version": "1",
-    "state": "online",
-    "reach": "dialOut",
-    "machineID": "RELAY-MAC",
-    "relay": true,
-    "owner": "<uuid>"
-  },
-  {
-    "id": "<host c>",
     "name": "plain mac",
     "platform": "macOS arm64",
     "version": "1",
     "state": "online",
     "reach": "dialOut",
-    "machineID": "RELAY-MAC",
+    "machineID": "RAW-MAC",
     "owner": "<uuid>"
   },
   {
@@ -436,44 +384,6 @@ nothing/here refused
   "message": "Method not found",
   "data": {
     "method": "nothing/here"
-  }
-}
-
-relay reads
-{
-  "c": 0,
-  "m": {
-    "jsonrpc": "2.0",
-    "method": "relay/deliver",
-    "params": {
-      "needID": {
-        "permission": "<UUID>"
-      },
-      "device": "<UUID>",
-      "publicKey": "<secret>",
-      "headline": {
-        "h1": "work",
-        "h2": "Fix",
-        "h3": "may run"
-      },
-      "alert": true
-    }
-  }
-}
-
-relay reads
-{
-  "c": 0,
-  "m": {
-    "jsonrpc": "2.0",
-    "method": "relay/deliver",
-    "params": {
-      "needID": {
-        "permission": "<UUID>"
-      },
-      "device": "<UUID>",
-      "alert": false
-    }
   }
 }
 

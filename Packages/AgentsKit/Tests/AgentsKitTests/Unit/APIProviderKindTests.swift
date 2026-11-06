@@ -55,12 +55,12 @@ struct APIProviderKindTests {
     }
 
     @Test func aWorkspaceNoHostCanBeLinkedToSaysWhereToMakeItOne() {
-        func host(_ id: String, relay: Bool? = nil) -> DaemonAPI.ControlMachine {
+        func host(_ id: String) -> DaemonAPI.ControlMachine {
             DaemonAPI.ControlMachine(id: MachineRef(rawValue: id), name: id, platform: "linux", version: "1",
-                                  state: "online", reach: "local", machineID: id, relay: relay)
+                                  state: "online", reach: "local", machineID: id)
         }
         let workspace = DaemonAPI.MachineInfo(id: "w", name: "dev", state: "stopped")
-        #expect(MachineProviderWords.noHostLine(workspace, hosts: [host("relay", relay: true)]) == MachineProviderWords.notAHostYet)
+        #expect(MachineProviderWords.noHostLine(workspace, hosts: []) == MachineProviderWords.notAHostYet)
         #expect(MachineProviderWords.noHostLine(workspace, hosts: [host("free")]) == nil)
         var linked = workspace
         linked.host = MachineRef(rawValue: "free")

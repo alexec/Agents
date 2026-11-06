@@ -93,36 +93,22 @@ At home, the device connects to the control plane's address, the one its code ca
 over HTTPS. It checks the control plane's certificate against the one named in the code,
 so nothing else on the network can stand in for it.
 
-Away from home, the device connects to that same address if it can reach it, which it can
-when the control plane runs on hosting of your own with a public name. If it cannot, for
-instance because the control plane is on your Mac at home, it can go through the relay
-instead: the same requests and updates pass through your own iCloud account, each one
-sealed so that only your control plane and that one device can read it. Nothing passes
-through a server of ours. A device on the relay says **Away — slower, through iCloud**.
-The relay is slower, about two or three seconds for each answer, so the terminal, the live
-page, files and attaching pictures wait until the device can reach the address again.
-After the address has failed once, the device gives it three seconds, not ten, before it
-tries the relay. When it connects, it catches up in one request, with what the pages on
-screen show in the same answer. Through the relay, a device reaches this Mac's host; your other hosts wait until it can
-reach the control plane's address again.
+Away from home, the device connects to that same address if it can reach it. It can when
+the control plane runs in the cloud, or on hosting of your own with a public name. A
+control plane on your Mac at home has no address on the internet, so a device reaches it
+only on the Mac's own network. Nothing passes through a server of ours.
 
-Notifications take the same path. When an agent on any host needs you, a short notice is
-sealed to your device and posted to your own iCloud account. When the question is
-answered, or goes away, the notice is taken down.
-
-The relay and notifications are run by a Mac host, because they need your iCloud account.
-Turn on **Relay for my devices** in Agents Host on a Mac. On the Mac that runs the control
-plane, that is all. On a Mac that joins one elsewhere (a control plane on a server, for
-example), Agents Host asks for a machine code from that control plane the first time: in
-Agents, **Settings ▸ Machines ▸ Add a Mac**. After that the switch turns the
-relay on and off by itself: the relay tells the control plane (#824). It is off until you
-turn it on. While it is off, a device reaches your agents only where it can reach the
-control plane's address, and gets no notifications; a paired device stays paired.
+The control plane sends notifications itself. When an agent on any host needs you, it
+sends a short notice to your device through Apple's push service (APNs), with the APNs key
+it was given (see [Run the control plane in the cloud](../how-to/run-the-control-plane-in-the-cloud.md#notifications)).
+When the question is answered, or goes away, the notice is taken down. A control plane
+with no APNs key sends no notifications to the iPhone and iPad; a paired device stays
+paired.
 
 ## Forgetting a device
 
 In **Settings ▸ Control plane ▸ Clients** on the Mac, **Forget…** cuts a device off at
-once, directly and through the relay, and on every copy of the control plane. Its next
+once, on every copy of the control plane. Its next
 attempt to connect is refused. To use it again, pair it again with a new code. Any client
 may be forgotten from any other, the last one too; Agents Host can always make a new code.
 

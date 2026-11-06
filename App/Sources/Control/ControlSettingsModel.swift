@@ -72,13 +72,13 @@ final class ControlSettingsModel {
     var isOnThisMac: Bool { status?.machineID == MachineID.current }
 
     /// The host on this Mac: shown first and without buttons (the look gate's decision).
-    var thisMacHost: DaemonAPI.ControlMachine? { hosts.first { $0.machineID == MachineID.current && $0.runsAgents } }
+    var thisMacHost: DaemonAPI.ControlMachine? { hosts.first { $0.machineID == MachineID.current } }
     /// The machines that may carry a provider (#3496): the person's online ones, this Mac first.
     var carriers: [DaemonAPI.ControlMachine] {
         ProviderCarrier.choices(hosts, person: status?.person?.id, own: thisMacHost?.id)
     }
-    /// Every other host, and this Mac's relay: it shares the Mac's machine but is not its host.
-    var otherHosts: [DaemonAPI.ControlMachine] { hosts.filter { $0.machineID != MachineID.current || $0.relay != nil } }
+    /// Every other host.
+    var otherHosts: [DaemonAPI.ControlMachine] { hosts.filter { $0.machineID != MachineID.current } }
 
     var onlineCount: Int { hosts.filter(\.answers).count }
 
@@ -403,7 +403,7 @@ final class ControlSettingsModel {
     /// (#976): Add as Host… offers to link one instead.
     func hostsThatMayBe(_ workspace: DaemonAPI.MachineInfo) -> [DaemonAPI.ControlMachine] {
         guard workspace.host == nil else { return [] }
-        return hosts.filter { $0.workspace == nil && $0.runsAgents && workspace.mayBe(hostNamed: $0.name) }
+        return hosts.filter { $0.workspace == nil && workspace.mayBe(hostNamed: $0.name) }
     }
 
     /// The workspaces no host is linked to yet, by provider, for Link to Machine….

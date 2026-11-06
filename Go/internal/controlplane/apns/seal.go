@@ -117,9 +117,9 @@ func Token(id wire.NeedID) string {
 	return ""
 }
 
-// CollapseID is the apns-collapse-id for a need: the token CloudKit's subscription
-// collapses by (so a banner from the relay and one from here are one banner), unless it
-// names a file or is longer than APNs allows. Then a hash, which names nothing.
+// CollapseID is the apns-collapse-id for a need: its token (so a post and a later one for
+// the same need are one banner), unless it names a file or is longer than APNs allows.
+// Then a hash, which names nothing.
 func CollapseID(id wire.NeedID) string {
 	token := Token(id)
 	if token != "" && !strings.HasPrefix(token, "guarded:") && len(token) <= 64 {

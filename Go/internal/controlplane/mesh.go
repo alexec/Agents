@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controllink"
-	"github.com/alexec/agents/Go/internal/controlplane/notices"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 	"github.com/alexec/agents/Go/wire"
@@ -384,15 +383,6 @@ func encodePeer(tag string, body any) string {
 	return strings.TrimSuffix(b.String(), "\n")
 }
 
-// encodeNeed is a need for the other copies, with whose devices it goes to (#994).
-func encodeNeed(need notices.AttentionNeed, owner string) string {
-	var b bytes.Buffer
-	e := json.NewEncoder(&b)
-	e.SetEscapeHTML(false)
-	e.Encode(map[string]any{"need": need, "owner": owner})
-	return strings.TrimSuffix(b.String(), "\n")
-}
-
 // received is what a peer says (PeerWire.read).
 func (m *mesh) received(line string, link *peerLink) {
 	if strings.HasPrefix(line, `{"p":"`) {
@@ -446,26 +436,11 @@ func (m *mesh) received(line string, link *peerLink) {
 		}
 	case o["link"] != nil:
 		var l struct {
-			Client  string          `json:"client"`
-			Relayed *bool           `json:"relayed"`
-			Gone    json.RawMessage `json:"gone"`
+			Client string          `json:"client"`
+			Gone   json.RawMessage `json:"gone"`
 		}
 		if json.Unmarshal(o["link"], &l) == nil && controllink.IsUUID(l.Client) {
-			relayed := l.Relayed
-			if l.Gone != nil {
-				relayed = nil
-			} else if relayed == nil {
-				no := false
-				relayed = &no
-			}
-			m.s.router.NotePeerLink(link.peer, strings.ToUpper(l.Client), relayed)
-		}
-	case o["need"] != nil:
-		var need notices.AttentionNeed
-		var owner string
-		json.Unmarshal(o["owner"], &owner)
-		if json.Unmarshal(o["need"], &need) == nil {
-			m.s.deliver(need, true, owner, "")
+			m.s.router.NotePeerLink(link.peer, strings.ToUpper(l.Client), l.Gone == nil)
 		}
 	}
 }
@@ -766,26 +741,25 @@ func (s *Service) apply(e controlEvent) {
 			c.Close()
 		}
 	}
-	s.syncRelays()
+	s.tellHostClients()
 	s.log("applied " + e.Kind + " " + e.Subject + " from another copy")
 }
 
 // linked is a copy that just linked: every session here held to the records, and the
-// peer told how each client here reaches this copy (T080).
+// peer told which clients are connected to this copy (T080).
 func (s *Service) linked() {
 	s.reconcile()
-	for client, relayed := range s.router.LinksHere() {
-		r := relayed
-		s.mesh.broadcast(peerLinkLine(client, &r))
+	for _, client := range s.router.LinksHere() {
+		s.mesh.broadcast(peerLinkLine(client, true))
 	}
 }
 
-func peerLinkLine(client string, relayed *bool) string {
+// peerLinkLine tells the other copies that a client connected here, or that its last
+// session here ended ("gone").
+func peerLinkLine(client string, connected bool) string {
 	body := map[string]any{"client": client}
-	if relayed == nil {
+	if !connected {
 		body["gone"] = true
-	} else {
-		body["relayed"] = *relayed
 	}
 	return encodePeer("link", body)
 }

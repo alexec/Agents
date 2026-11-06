@@ -39,7 +39,7 @@ do not sync (#2410).
 | `sandbox.json` | The command sandbox of each runtime | **Settings ▸ Agent Runtimes** |
 | `modes.json` | The mode last chosen for each runtime | The start form |
 | `display.json` | Your display choices, the same on every client: how much of a turn shows, the smart groups that are off, whether Archived folders, Status and Usage are open, the new-session form's runtime and choices, and the marketplace last chosen | Any client |
-| `host.json` | The role of each of your Macs in Agents Host (its store, bucket, web remote and relay), one entry per Mac, by its local host name. The bucket's keys stay in the keychain. | Agents Host |
+| `host.json` | The role of each of your Macs in Agents Host (its store, bucket and web remote), one entry per Mac, by its local host name. The bucket's keys stay in the keychain. | Agents Host |
 
 A file you change by hand counts at once, without a restart. A file that cannot be read is
 set aside as `<name>.corrupt-<time>`, and the setting goes back to its default. For

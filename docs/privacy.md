@@ -50,9 +50,8 @@ Each one sends only what it needs, to that service only:
   the calls that start, stop and make your machines, with the credentials you give.
 - **Downloads:** to install a runtime, the app downloads it from nodejs.org, npm, GitHub or
   the company that makes it.
-- **Apple:** the Remote uses your own iCloud (CloudKit) to relay messages and send
-  notifications to your devices, and Apple Push Notification service for notifications and
-  Live Activities. The words of a notification (the folder, the agent and what it needs)
+- **Apple:** the control plane uses Apple Push Notification service to send notifications
+  and Live Activity updates to your iPhone and iPad. The words of a notification (the folder, the agent and what it needs)
   are sealed with your device's own key, and only your device opens them. A Live Activity
   update carries only the turn's phase and times, never a title or a line of the chat.
 

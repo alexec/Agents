@@ -52,7 +52,7 @@ The schemes:
 | Scheme | What it builds |
 |---|---|
 | `AgentsStore` | the App Store window: sandboxed, no helpers, reaches everything through a control plane |
-| `AgentsHost` | Agents Host, carrying `agentsd` and `agents-control` (Go, built from `Go/`) and `agents-relay` |
+| `AgentsHost` | Agents Host, carrying `agentsd` and `agents-control` (Go, built from `Go/`) |
 | `Remote` | the iPhone and iPad app |
 
 The web page lives in `Web/`: Preact and TypeScript, bundled by esbuild. Its build,
@@ -121,7 +121,7 @@ ls ~/Library/Application\ Support/Agents/
 #   folders.json                   only what a folder cannot tell us: archived, added
 
 # Its logs: daemon.log (what it has been doing), mcp-logs/, Agents Host's
-# control.log, relay.log and host.out, and the window's crashes/
+# control.log and host.out, and the window's crashes/
 ls ~/Library/Logs/Agents/
 
 # Its caches, safe to delete while it is stopped: toolsets (tools/), turns/,

@@ -56,11 +56,6 @@
 <text class="d" x="540.0" y="684">Go/internal/agentsd · owns</text>
 <text class="d" x="540.0" y="699">agents, terminals, files, git, workflows;</text>
 <text class="d" x="540.0" y="714">serves the agents MCP tools</text>
-<rect x="750" y="620" width="260" height="110" rx="8" fill="#438dd5" stroke="#438dd5"/>
-<text class="t" x="880.0" y="646">agents-relay</text>
-<text class="k" x="880.0" y="663">[Container: macOS helper]</text>
-<text class="d" x="880.0" y="684">iCloud mailbox for phones</text>
-<text class="d" x="880.0" y="699">away from home</text>
 <rect x="330" y="880" width="300" height="120" rx="8" fill="#8a8a8a" stroke="#8a8a8a"/>
 <text class="t" x="480.0" y="906">Agent runtimes</text>
 <text class="k" x="480.0" y="923">[External Software System]</text>
@@ -79,10 +74,6 @@
 <text class="t" x="1230.0" y="716">GitHub</text>
 <text class="k" x="1230.0" y="733">[External Software System]</text>
 <text class="d" x="1230.0" y="754">repos, PRs, Actions</text>
-<rect x="1100" y="420" width="260" height="100" rx="8" fill="#8a8a8a" stroke="#8a8a8a"/>
-<text class="t" x="1230.0" y="446">Apple iCloud</text>
-<text class="k" x="1230.0" y="463">[External Software System]</text>
-<text class="d" x="1230.0" y="484">CloudKit mailbox</text>
 <text x="1110" y="96" font-size="12" font-weight="700" fill="#333">Key</text>
 <rect x="1110" y="108" width="26" height="16" rx="3" fill="#08427b"/><text x="1144" y="120" font-size="11.5" fill="#333">Person</text>
 <rect x="1110" y="132" width="26" height="16" rx="3" fill="#1168bd"/><text x="1144" y="144" font-size="11.5" fill="#333">Software system</text>
@@ -120,10 +111,6 @@
 <path class="r" d="M410,690 L330,690"/>
 <text class="rl" x="370" y="675"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Reads, writes</tspan></text>
 <text class="rt" x="370" y="689"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">[files]</tspan></text>
-<path class="r" d="M670,680 L750,680"/>
-<text class="rl" x="710" y="665"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Pushes (planned)</tspan></text>
-<path class="r" d="M1010,640 C1050,600 1060,520 1100,480"/>
-<text class="rl" x="1060" y="560"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Mailbox</tspan></text>
 <path class="r" d="M670,720 C800,760 1000,760 1100,740"/>
 <text class="rl" x="900" y="748"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Clones, pushes</tspan></text>
 <text class="rt" x="900" y="762"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">[git]</tspan></text>

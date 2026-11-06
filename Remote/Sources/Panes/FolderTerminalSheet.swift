@@ -24,26 +24,21 @@ struct FolderTerminalSheet: View {
     var body: some View {
         NavigationStack {
             Group {
-                if model.isAway {
-                    // Away, as the panes: a shell streams too much for iCloud (046).
-                    NeedsSameNetworkView()
-                } else {
-                    VStack(spacing: 0) {
-                        ShellTabs(shells: shells, titles: titles, front: front,
-                                  canOpenMore: canOpenMore && !model.isStale,
-                                  select: { front = $0 }, open: open, close: close)
-                        Divider()
-                        ZStack {
-                            ForEach(shells, id: \.self) { shell in
-                                // Made here, with the folder, before the screen asks the
-                                // model for it by id.
-                                let _ = model.folderShellClient(for: folder, shell: shell)
-                                ShellScreen(id: id, shell: shell, isFront: front == shell,
-                                            isOpen: { shells.contains(shell) })
-                                    .opacity(front == shell ? 1 : 0)
-                                    .allowsHitTesting(front == shell)
-                                    .accessibilityHidden(front != shell)
-                            }
+                VStack(spacing: 0) {
+                    ShellTabs(shells: shells, titles: titles, front: front,
+                              canOpenMore: canOpenMore && !model.isStale,
+                              select: { front = $0 }, open: open, close: close)
+                    Divider()
+                    ZStack {
+                        ForEach(shells, id: \.self) { shell in
+                            // Made here, with the folder, before the screen asks the
+                            // model for it by id.
+                            let _ = model.folderShellClient(for: folder, shell: shell)
+                            ShellScreen(id: id, shell: shell, isFront: front == shell,
+                                        isOpen: { shells.contains(shell) })
+                                .opacity(front == shell ? 1 : 0)
+                                .allowsHitTesting(front == shell)
+                                .accessibilityHidden(front != shell)
                         }
                     }
                 }

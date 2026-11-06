@@ -365,7 +365,7 @@ func carryAs(ctx context.Context, base, pin, host string, key, controlKey []byte
 		l.Close()
 		return nil, fmt.Errorf("expected hello, got %s", line)
 	}
-	auth, expect, err := controllink.Answer(m.Hello, controllink.Identity{Kind: 'w', ID: host}, key, origin, "page", controlKey, "", nil)
+	auth, expect, err := controllink.Answer(m.Hello, controllink.Identity{Kind: 'w', ID: host}, key, origin, "page", controlKey, nil)
 	if err != nil {
 		l.Close()
 		return nil, err

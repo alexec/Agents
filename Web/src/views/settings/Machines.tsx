@@ -9,7 +9,7 @@ import { appMissingWords, missingWords, stateWords, versionWords } from "../../m
  * missing and Remove… (#3381), as the window's Machines pane lists them. The control plane's own version is under the list. */
 export function VersionsSection({ store }: { store: Store }) {
   const plane = store.plane.value;
-  const hosts = store.hosts.value.filter((h) => h.relay == null);
+  const hosts = store.hosts.value;
   const appMissing = plane?.version ? appMissingWords(plane.required, plane.version) : null;
   const [adding, setAdding] = useState(false);
   const remove = (host: { id: string; name: string }) => {

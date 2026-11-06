@@ -9,10 +9,7 @@ import UIKit
 /// What the phone says on this connection goes to the control plane's home host, as it
 /// did to the Mac; `RemoteModel` reaches every other host over a second connection
 /// wrapped by `ControlLink`. The first build's TLS link to a Mac's bridge went in T106.
-///
-/// Away from anywhere that reaches the control plane's address, it goes through
-/// `agents-relay` in the person's iCloud instead (T077), with the same key exchange end
-/// to end inside, and back to the address as soon as it answers again.
+/// The relay through iCloud went in #3390: the control plane's address is the only way.
 enum RemoteControl {
     private static var folder: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -21,34 +18,10 @@ enum RemoteControl {
     /// Not backed up (#1031): a restored device pairs again. Its key is in the keychain,
     /// this device only (`ControlClientKey`).
     private static var membershipFile: URL { folder.appendingPathComponent("control-client.json") }
-    /// A copy of what `control/status` says, so a cache: made again at the next answer.
-    private static var relayKeyFile: URL {
-        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Agents", isDirectory: true).appendingPathComponent("control-relay-key.pub")
-    }
     /// Present when the membership came from a move (T085): the key is this device's own,
     /// the one it paired with the Mac under, not `ControlClientKey`. Kept for a device
     /// moved that way (FR-038); nothing tells a device of a move now the bridge is gone.
     private static var movedFile: URL { folder.appendingPathComponent("control-client-moved") }
-
-    /// The relay's key, as the control plane named it in `control/status`, over a
-    /// connection this device had already proved and checked the pin of. Without it
-    /// nothing is written to iCloud.
-    static var relayKey: Data? {
-        guard let data = try? Data(contentsOf: relayKeyFile), data.count == 65 else { return nil }
-        return data
-    }
-
-    static func keepRelayKey(_ key: Data?) {
-        guard membership != nil, key != relayKey else { return }
-        if let key {
-            try? FileManager.default.createDirectory(at: relayKeyFile.deletingLastPathComponent(),
-                                                     withIntermediateDirectories: true)
-            try? key.write(to: relayKeyFile, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
-        } else {
-            try? FileManager.default.removeItem(at: relayKeyFile)
-        }
-    }
 
     /// This device's pairing with a control plane, if it has one.
     static var membership: ControlMembership? {
@@ -118,7 +91,6 @@ enum RemoteControl {
     /// Forget the pairing: this device goes back to asking for a code.
     static func forget() {
         try? FileManager.default.removeItem(at: membershipFile)
-        try? FileManager.default.removeItem(at: relayKeyFile)
         try? FileManager.default.removeItem(at: movedFile)
     }
 
@@ -136,12 +108,7 @@ enum RemoteControl {
                                                         keep: keepNewer) else {
             return nil
         }
-        let relayed: @Sendable () async throws -> any LineTransport = {
-            guard let relayKey else { throw RelayTrouble.notPaired }
-            return try await ControlCodeUse.relayedDial(membership, privateKey: key, relayKey: relayKey,
-                                                        channel: CloudKitRelayChannel())()
-        }
-        return ControlPlaneLink(dial: dial, relayed: relayed)
+        return ControlPlaneLink(dial: dial)
     }
 }
 
@@ -161,23 +128,18 @@ extension RemoteControl {
     static func movedLink(_ membership: ControlMembership) -> (any DaemonLink)? {
         guard let client = membership.client,
               let key = try? DeviceKey.load(accessGroup: DeviceKey.sharedAccessGroup),
-              let shared = try? key.controlClientKey(controlKey: membership.controlKey, client: client),
               let dial = try? ControlCodeUse.clientDial(membership,
                                                         sharedKey: { try key.controlClientKey(controlKey: $0, client: client) },
                                                         kind: kind.rawValue, dial: dial, keep: keepNewer) else {
             return nil
         }
-        let relayed: @Sendable () async throws -> any LineTransport = {
-            guard let relayKey else { throw RelayTrouble.notPaired }
-            return try await ControlCodeUse.relayedDial(membership, sharedKey: shared, sealing: key, relayKey: relayKey,
-                                                        channel: CloudKitRelayChannel())()
-        }
-        return ControlPlaneLink(dial: dial, relayed: relayed)
+        return ControlPlaneLink(dial: dial)
     }
 }
 
 /// The Remote before it has paired: nothing to dial, so it asks for a code.
 struct NotPairedLink: DaemonLink {
-    func transport() async throws -> any LineTransport { throw RelayTrouble.notPaired }
+    struct NotPaired: Error {}
+    func transport() async throws -> any LineTransport { throw NotPaired() }
     func start() async throws {}
 }

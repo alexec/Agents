@@ -17,9 +17,7 @@
     "client": "6F9619FF-8B86-D011-B42D-00C04FC964FF"
   },
   "ClientConnection": {
-    "client": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
-    "relayed": true,
-    "through": "through"
+    "client": "6F9619FF-8B86-D011-B42D-00C04FC964FF"
   },
   "ClientAnnounce": {
     "id": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
@@ -33,7 +31,6 @@
     "platform": "platform",
     "version": "version",
     "machineID": "machineID",
-    "relay": true,
     "implementation": "implementation"
   },
   "Admitted": {
@@ -51,7 +48,6 @@
     "platform": "platform",
     "machineID": "machineID",
     "name": "name",
-    "relay": true,
     "implementation": "implementation"
   },
   "LendSignIn": {
@@ -59,13 +55,6 @@
     "from": "box",
     "runtime": "runtime",
     "allowed": true
-  },
-  "MachineRelayRequest": {
-    "host": "box",
-    "relay": true
-  },
-  "RelaySwitch": {
-    "relay": true
   },
   "TunnelOpen": {
     "runtime": "runtime",
@@ -93,13 +82,11 @@
     "nonce": "nonce",
     "mac": "mac",
     "kind": "kind",
-    "for": "for",
     "epoch": 7
   },
   "ControlOK": {
     "mac": "mac",
     "host": "box",
-    "relayed": true,
     "endpoints": [
       {
         "url": "url",
@@ -111,7 +98,6 @@
   "ChannelOpen": {
     "client": "client",
     "device": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
-    "relayed": true,
     "tunnel": "tunnel",
     "tunnelRef": "tunnelRef",
     "fanOut": true
@@ -168,14 +154,6 @@
     },
     "waiting": 7
   },
-  "RelayDevices": {
-    "devices": [
-      {
-        "id": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
-        "publicKey": "AQID"
-      }
-    ]
-  },
   "RelayDelivery": {
     "needID": {
       "permission": "6F9619FF-8B86-D011-B42D-00C04FC964FF"
@@ -198,11 +176,6 @@
     },
     "alert": true,
     "waiting": 7
-  },
-  "RelayCount": {
-    "device": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
-    "waiting": 7,
-    "countedAt": 812345678.5
   },
   "DetectedServer": {
     "alias": "alias",

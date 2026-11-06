@@ -1,7 +1,6 @@
 package providers
 
 import (
-	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -309,15 +308,12 @@ func TestAnAgentReachesItsProjectOnOtherMachines(t *testing.T) {
 
 // The daily summary's facts from the person's other machines (#3354): each one online is
 // asked for its agents/summaryFacts; one that is off, or does not answer, is named with why;
-// the asking machine, another person's and a relay are not in it.
+// the asking machine and another person's are not in it.
 func TestTheSummaryAsksThePersonsOtherMachines(t *testing.T) {
 	h := newHarness(t)
-	const laptop, kims, relay, old = "laptop01", "kims0001", "relay001", "old00001"
+	const laptop, kims, old = "laptop01", "kims0001", "old00001"
 	for _, m := range [][2]string{{laptop, "laptop"}, {kims, "kims-mac"}, {old, "old-box"}} {
 		h.enroll(m[0], m[1])
-	}
-	if err := h.records.SaveHost(context.Background(), records.MachineRecord{ID: relay, Name: "relay", Platform: "macOS", Version: "1", Relay: new(true)}); err != nil {
-		t.Fatal(err)
 	}
 	h.providers.hooks.OwnerOf = func(host string) string {
 		if host == kims {
@@ -325,7 +321,7 @@ func TestTheSummaryAsksThePersonsOtherMachines(t *testing.T) {
 		}
 		return "lee"
 	}
-	for _, host := range []string{devbox, kims, relay, old} {
+	for _, host := range []string{devbox, kims, old} {
 		h.router.setOnline(host, true)
 	}
 	h.router.mu.Lock()
@@ -349,7 +345,7 @@ func TestTheSummaryAsksThePersonsOtherMachines(t *testing.T) {
 		t.Fatalf("%+v", got)
 	}
 	for _, d := range h.router.deliveries() {
-		if d.method != wire.CallAgentsSummaryFacts.Name || d.host == other || d.host == kims || d.host == relay {
+		if d.method != wire.CallAgentsSummaryFacts.Name || d.host == other || d.host == kims {
 			t.Fatalf("asked %+v", d)
 		}
 	}

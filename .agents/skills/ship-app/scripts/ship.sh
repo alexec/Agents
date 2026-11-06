@@ -50,10 +50,6 @@ ROOT="$HOME/Library/Application Support/Agents"
 GUI=gui/$(id -u)
 # Agents Host's two jobs.
 HOST_JOBS=(com.alexecollins.agentshost.control com.alexecollins.agentshost.daemon)
-# Its relay, loaded only while Relay for my devices is on. It is started again with the
-# others: its command line names no path, so the clean-up below cannot see that it runs
-# from the old copy, and CloudKit refuses a client whose binary is gone (#1103).
-RELAY_JOB=com.alexecollins.agentshost.relay
 STORE_ID=com.alexecollins.agents.store
 HOST_ID=com.alexecollins.agents.host
 LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
@@ -167,7 +163,7 @@ restart() { # live-folder sha delay
   echo "$(date) Agents Host $SHA at $HOSTAPP_AT"
   only_installed_host
   move_aside_running_copies
-  for j in $HOST_JOBS $RELAY_JOB; do
+  for j in $HOST_JOBS; do
     if loaded $j; then launchctl kickstart -k $GUI/$j && echo "restarted $j"; fi
   done
   wait_host_jobs_installed >/dev/null

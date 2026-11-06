@@ -29,15 +29,10 @@ public struct DeviceKey: Sendable {
     /// The device's key, made on first use and found in the keychain after that.
     /// `accessGroup` is the shared group on a device and `nil` on a Mac or in a test,
     /// where there is no entitlement to name one.
-    ///
-    /// `enclave: false` keeps the key in the keychain as a software key even where there is
-    /// a Secure Enclave: the Mac's relay key (046) belongs to a helper with no window, which
-    /// must not lose its key to a locked screen.
-    public static func load(account: String = "device-key", accessGroup: String? = nil,
-                            enclave: Bool = true) throws -> DeviceKey {
+    public static func load(account: String = "device-key", accessGroup: String? = nil) throws -> DeviceKey {
         let keychain = Keychain(accessGroup: accessGroup)
         if let stored = try keychain.read(account: account) {
-            if enclave, SecureEnclave.isAvailable,
+            if SecureEnclave.isAvailable,
                let key = try? SecureEnclave.P256.KeyAgreement.PrivateKey(dataRepresentation: stored) {
                 return DeviceKey(publicKey: key.publicKey.x963Representation,
                                  holder: .enclave(key))
@@ -47,7 +42,7 @@ public struct DeviceKey: Sendable {
                                  holder: .software(key))
             }
         }
-        let made = enclave ? try make() : ephemeral()
+        let made = try make()
         try keychain.write(made.representation, account: account)
         return made
     }
@@ -194,24 +189,6 @@ public struct DeviceKey: Sendable {
 
     public enum Failure: Error, Sendable {
         case keychain(OSStatus)
-    }
-}
-
-/// The device's key seals and opens relayed frames as itself (046), with whichever half
-/// it holds: the enclave's or the keychain's.
-extension DeviceKey: RelayKey {
-    public func seal(_ plain: Data, to recipient: Data, associatedData: Data) throws -> Data {
-        switch holder {
-        case .enclave(let key): try RelaySealing.seal(plain, to: recipient, associatedData: associatedData, as: key)
-        case .software(let key): try RelaySealing.seal(plain, to: recipient, associatedData: associatedData, as: key)
-        }
-    }
-
-    public func open(_ sealed: Data, from sender: Data, associatedData: Data) throws -> Data {
-        switch holder {
-        case .enclave(let key): try RelaySealing.open(sealed, from: sender, associatedData: associatedData, as: key)
-        case .software(let key): try RelaySealing.open(sealed, from: sender, associatedData: associatedData, as: key)
-        }
     }
 }
 #endif

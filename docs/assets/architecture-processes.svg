@@ -146,12 +146,6 @@
   <path class="conn" d="M1100,340 C1100,290 1000,260 950,260"/>
   <text class="lbl" x="1040" y="300">connects out</text>
 
-  <rect class="box host" x="990" y="480" width="250" height="88" style="stroke-dasharray:5 4"/>
-  <text class="title" x="1006" y="504">agents-relay.app (optional)</text>
-  <text class="small" x="1006" y="524">in Agents Host's Helpers; iCloud</text>
-  <text class="small" x="1006" y="542">mailbox for phones away from home</text>
-  <text class="small" x="1006" y="560">and notifications, when switched on</text>
-
   <!-- Legend -->
   <line x1="40" y1="940" x2="90" y2="940" class="spawn"/>
   <text class="lbls" x="100" y="944">starts (parent → child process)</text>

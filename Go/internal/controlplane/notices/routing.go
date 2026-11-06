@@ -1,6 +1,6 @@
 // Package notices chooses where a need for the person shows, and keeps what was posted
 // where (058, R6, T097): Routing.swift's ladder and NoticeDesk in ControlNotices.swift.
-// The control plane hands each delivery to the relay host, which seals it to the device.
+// The control plane seals each delivery to its device and pushes it (APNs, Web Push).
 package notices
 
 import (

@@ -277,7 +277,7 @@ struct MachineReturnSheet: View {
                 Text("!").font(.body.weight(.semibold)).foregroundStyle(.secondary).frame(width: 16)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Away from home, iPhone and iPad can't reach this Mac directly")
-                    Text("\(back.placeName) had a public address; this Mac doesn't. On your network they connect as before. Away, they go through your iCloud when Relay for my devices is on, and not at all while it's off.")
+                    Text("\(back.placeName) had a public address; this Mac doesn't. On your network they connect as before. Away, they can't reach it.")
                         .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
             }

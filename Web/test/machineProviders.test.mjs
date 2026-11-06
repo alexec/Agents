@@ -68,7 +68,6 @@ test("Carried by offers the person's online machines that can carry it, their Ma
     { id: "o", name: "off", state: "offline", owner: "alex", capabilities: can },
     { id: "s", name: "sam's", state: "online", owner: "sam", capabilities: can },
     { id: "x", name: "old", state: "online", owner: "alex", capabilities: [] },
-    { id: "r", name: "relay", state: "online", owner: "alex", relay: true },
   ];
   assert.deepEqual(w.carrierChoices(hosts, "alex", "m").map((h) => h.name), ["mac", "attic", "box"]);
   assert.deepEqual(w.carrierChoices(hosts, "alex").map((h) => h.name), ["attic", "box", "mac"]);
@@ -97,9 +96,9 @@ test("the card says which machine carries it, and when it is offline (#3496)", (
   assert.ok(!w.providerWords.footer(true).includes("runs on the control plane"));
 });
 
-test("Link to Host offers free hosts that run agents, the likely one first", () => {
+test("Link to Host offers free hosts, the likely one first", () => {
   const hosts = [
-    { id: "1", name: "other" }, { id: "2", name: "cws.devbox" }, { id: "3", name: "relay", relay: true },
+    { id: "1", name: "other" }, { id: "2", name: "cws.devbox" },
     { id: "4", name: "devbox", workspace: { provider: "p" } },
   ];
   assert.deepEqual(w.linkableHosts({ id: "x", name: "devbox", state: "running" }, hosts).map((h) => h.id), ["2", "1"]);
@@ -107,7 +106,7 @@ test("Link to Host offers free hosts that run agents, the likely one first", () 
 });
 
 test("a workspace no host can be linked to says where to make it one (#1931)", () => {
-  const taken = [{ id: "4", name: "devbox", workspace: { provider: "p" } }, { id: "3", name: "relay", relay: true }];
+  const taken = [{ id: "4", name: "devbox", workspace: { provider: "p" } }];
   assert.equal(w.noHostLine({ id: "x", name: "other", state: "stopped" }, taken), w.providerWords.notAHostYet);
   assert.equal(w.noHostLine({ id: "x", name: "other", state: "running" }, [...taken, { id: "1", name: "free" }]), undefined);
   assert.equal(w.noHostLine({ id: "x", name: "devbox", state: "running", host: "4" }, taken), undefined);

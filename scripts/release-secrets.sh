@@ -5,8 +5,8 @@
 #
 # The .p12 is the Developer ID Application identity, exported from Keychain Access (My
 # Certificates ▸ Developer ID Application: … ▸ Export…). The script asks for its password.
-# The relay's profile is the installed "Agents Relay Developer ID". The App Store Connect key
-# is read from ~/.private_keys (asc.env and the AuthKey_*.p8 beside it).
+# The App Store Connect key is read from ~/.private_keys (asc.env and the AuthKey_*.p8
+# beside it).
 # Nothing is written to disk; delete the .p12 afterwards.
 #
 #   scripts/release-secrets.sh --store path/to/Distribution.p12 path/to/Installer.p12
@@ -77,8 +77,6 @@ fi
 
 p12=${1:?usage: release-secrets.sh path/to/DeveloperID.p12 | --store Distribution.p12 Installer.p12}
 
-profile=$(profile_named "Agents Relay Developer ID")
-[[ -n $profile ]] || { print -u2 "No installed \"Agents Relay Developer ID\" profile."; exit 1 }
 p8=( $keys/AuthKey_*.p8(N) )
 (( ${#p8} == 1 )) || { print -u2 "Expected one AuthKey_*.p8 in $keys."; exit 1 }
 asc_key_id=$(sed -n 's/^ASC_KEY_ID=//p' $keys/asc.env)
@@ -98,7 +96,6 @@ gh api repos/$repo/environments/release/deployment-branch-policies --jq '.branch
 print "its secrets…"
 base64 -i $p12 | gh secret set DEVELOPER_ID_P12 --env release -R $repo
 print -rn -- $password | gh secret set DEVELOPER_ID_P12_PASSWORD --env release -R $repo
-base64 -i "$profile" | gh secret set RELAY_PROFILE --env release -R $repo
 gh secret set ASC_KEY_P8 --env release -R $repo < $p8[1]
 print -rn -- $asc_key_id | gh secret set ASC_KEY_ID --env release -R $repo
 print -rn -- $asc_issuer_id | gh secret set ASC_ISSUER_ID --env release -R $repo

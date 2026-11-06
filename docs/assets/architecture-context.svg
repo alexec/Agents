@@ -43,10 +43,6 @@
 <text class="t" x="620.0" y="586">Package registries</text>
 <text class="k" x="620.0" y="603">[External Software System]</text>
 <text class="d" x="620.0" y="624">npm, vendor install scripts</text>
-<rect x="880" y="120" width="300" height="90" rx="8" fill="#8a8a8a" stroke="#8a8a8a"/>
-<text class="t" x="1030.0" y="146">Apple iCloud</text>
-<text class="k" x="1030.0" y="163">[External Software System]</text>
-<text class="d" x="1030.0" y="184">relay mailbox for phones away</text>
 <path class="r" d="M620,230 L620,330"/>
 <text class="rl" x="620" y="272"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">Starts, watches and</tspan></text>
 <text class="rl" x="620" y="286"><tspan style="paint-order:stroke;stroke:#fff;stroke-width:4px">answers agents</tspan></text>

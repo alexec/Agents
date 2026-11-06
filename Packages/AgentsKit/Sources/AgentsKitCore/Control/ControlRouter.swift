@@ -29,10 +29,7 @@ public actor ControlRouter {
         public var session: UUID
         public var client: UUID
         public var kind: ClientRecord.Kind
-        /// The device came through `agents-relay` (T096), not straight here.
-        public var relayed: Bool
-        public init(session: UUID, client: UUID, kind: ClientRecord.Kind, relayed: Bool = false) {
-            self.relayed = relayed
+        public init(session: UUID, client: UUID, kind: ClientRecord.Kind) {
             self.session = session
             self.client = client
             self.kind = kind
@@ -83,9 +80,6 @@ public actor ControlRouter {
     private var clients: [UUID: ClientSession] = [:]
     private var hosts: [MachineRef: HostSession] = [:]
     private var known: Set<MachineRef>
-    /// Hosts that only relay (T096), and whether each is relaying now: they carry
-    /// devices through iCloud and are given no client channels, only channel 0.
-    private var relays: [MachineRef: Bool] = [:]
     private var states: [MachineRef: HostState] = [:]
     /// A linked host's workspace (#691), laid over its state: a host whose workspace is
     /// stopped is shown stopped, not offline.
@@ -107,10 +101,11 @@ public actor ControlRouter {
     private var notedPresence: [UUID: NotedPresence] = [:]
     /// How to reach each peer copy on its link, for streams carried for it (T064).
     private var peers: [String: @Sendable (String) -> Void] = [:]
-    /// How each client connected at another copy reaches it: relayed or not (T080).
-    private var peerLinks: [String: [UUID: Bool]] = [:]
-    /// Told when a client here connects, or its last session ends (nil), so other copies know.
-    private var linkChanged: (@Sendable (UUID, Bool?) -> Void)?
+    /// The clients connected at each other copy (T080).
+    private var peerLinks: [String: Set<UUID>] = [:]
+    /// Told when a client here connects (true), or its last session ends (false), so other
+    /// copies know.
+    private var linkChanged: (@Sendable (UUID, Bool) -> Void)?
     /// Told each presence report a client here makes, so other copies fold it too.
     /// The `Bool` says whether the client is a device (`ClientRecord.Kind.isDevice`).
     private var presenceHeard: (@Sendable (UUID, Bool, DaemonAPI.PresenceReport) -> Void)?
@@ -314,7 +309,7 @@ public actor ControlRouter {
 
     /// A peer opens a stream to a host held here: a fresh channel on the real uplink.
     public func openFromPeer(_ peer: String, host: MachineRef, channel: Int, _ open: ControlWire.ChannelOpen) {
-        guard relays[host] == nil, var session = hosts[host], session.local else {
+        guard var session = hosts[host], session.local else {
             peers[peer]?(PeerWire.frame(host, ControlWire.close(channel)))
             return
         }
@@ -653,10 +648,9 @@ public actor ControlRouter {
     /// A paired client has connected. Returns its session, which ends when the
     /// transport does.
     @discardableResult
-    public func attachClient(_ client: ClientRecord, transport: any LineTransport, relayed: Bool = false) -> UUID {
+    public func attachClient(_ client: ClientRecord, transport: any LineTransport) -> UUID {
         let id = UUID()
-        clients[id] = ClientSession(caller: Caller(session: id, client: client.id, kind: client.kind,
-                                                   relayed: relayed),
+        clients[id] = ClientSession(caller: Caller(session: id, client: client.id, kind: client.kind),
                                     transport: transport)
         for host in hosts.keys { openChannel(for: id, to: host) }
         noteLink(client.id)
@@ -692,45 +686,36 @@ public actor ControlRouter {
 
     // MARK: How clients reach the control plane (T080)
 
-    /// How a client reaches this copy now: nil when it doesn't, true when only through
-    /// the relay. A client with a direct session counts as direct.
-    private func linkHere(_ client: UUID) -> Bool? {
-        let mine = clients.values.filter { $0.caller.client == client }
-        guard !mine.isEmpty else { return nil }
-        return mine.allSatisfy(\.caller.relayed)
+    /// Whether a client has a session at this copy now.
+    private func linkHere(_ client: UUID) -> Bool {
+        clients.values.contains { $0.caller.client == client }
     }
 
-    private var toldLinks: [UUID: Bool] = [:]
+    private var toldLinks: Set<UUID> = []
 
     /// A client's link changed here: other copies are told, and operators' Settings.
     private func noteLink(_ client: UUID) {
         let now = linkHere(client)
-        guard toldLinks[client] != now else { return }
-        toldLinks[client] = now
+        guard toldLinks.contains(client) != now else { return }
+        if now { toldLinks.insert(client) } else { toldLinks.remove(client) }
         linkChanged?(client, now)
         broadcastControl(DaemonAPI.Notification.controlClientChanged, ["client": .string(client.uuidString)])
     }
 
-    public func onLinkChanged(_ changed: @escaping @Sendable (UUID, Bool?) -> Void) { linkChanged = changed }
+    public func onLinkChanged(_ changed: @escaping @Sendable (UUID, Bool) -> Void) { linkChanged = changed }
 
     /// Every client connected here, as `onLinkChanged` said it: for a peer that just linked.
-    public func linksHere() -> [UUID: Bool] { toldLinks }
+    public func linksHere() -> Set<UUID> { toldLinks }
 
-    /// A peer copy said how one of its clients reaches it.
-    public func notePeerLink(_ peer: String, client: UUID, relayed: Bool?) {
-        peerLinks[peer, default: [:]][client] = relayed
+    /// A peer copy said whether one of its clients is connected to it.
+    public func notePeerLink(_ peer: String, client: UUID, connected: Bool) {
+        if connected { peerLinks[peer, default: []].insert(client) } else { peerLinks[peer]?.remove(client) }
         broadcastControl(DaemonAPI.Notification.controlClientChanged, ["client": .string(client.uuidString)])
     }
 
-    /// How every connected client reaches the control plane, at any copy: true when only
-    /// through the relay.
-    public func connections() -> [UUID: Bool] {
-        var all: [UUID: Bool] = [:]
-        for links in peerLinks.values {
-            for (client, relayed) in links { all[client] = (all[client] ?? true) && relayed }
-        }
-        for (client, relayed) in toldLinks { all[client] = (all[client] ?? true) && relayed }
-        return all
+    /// Every client connected to the control plane, at any copy.
+    public func connections() -> Set<UUID> {
+        peerLinks.values.reduce(toldLinks) { $0.union($1) }
     }
 
     /// `clients/forget`: every session of that client, at once (FR-008).
@@ -740,7 +725,7 @@ public actor ControlRouter {
     }
 
     private func openChannel(for sessionID: UUID, to host: MachineRef) {
-        guard relays[host] == nil, var hostSession = hosts[host], let caller = clients[sessionID]?.caller else { return }
+        guard var hostSession = hosts[host], let caller = clients[sessionID]?.caller else { return }
         let channel = hostSession.nextChannel
         hostSession.nextChannel += 1
         hostSession.channels[channel] = .session(sessionID)
@@ -749,8 +734,7 @@ public actor ControlRouter {
         // Bound to the client unless it is a Mac's window, which is the Mac, as a window
         // on the socket is: presence is reported as it, and it names no other device.
         let open = ControlWire.ChannelOpen(client: caller.client.uuidString,
-                                           device: caller.kind == .mac ? nil : caller.client,
-                                           relayed: caller.relayed ? true : nil, fanOut: true)
+                                           device: caller.kind == .mac ? nil : caller.client, fanOut: true)
         try? hostSession.transport.write(line: ControlWire.open(channel, open))
     }
 
@@ -889,7 +873,7 @@ public actor ControlRouter {
     /// or takes longer than `patience`: the request stays kept.
     public func deliverKept(_ method: String, params: JSONValue?, as client: UUID, kind: ClientRecord.Kind,
                             to host: MachineRef, patience: Duration = .seconds(60)) async -> JSONRPCMessage? {
-        guard relays[host] == nil, var session = hosts[host] else { return nil }
+        guard var session = hosts[host] else { return nil }
         let delivery = UUID()
         let channel = session.nextChannel
         session.nextChannel += 1
@@ -985,35 +969,6 @@ public actor ControlRouter {
                 return (host, other)
             }
         }
-    }
-
-    // MARK: Relay hosts (T096–T097)
-
-    /// Whether a host only relays (`MachineRecord.relay`): nil for a host that runs agents,
-    /// false for a relay switched off, true for one relaying. A host found to be a relay
-    /// has its client channels closed.
-    public func setRelay(_ host: MachineRef, _ relay: Bool?) {
-        guard let relay else {
-            guard relays.removeValue(forKey: host) != nil else { return }
-            for sessionID in clients.keys { openChannel(for: sessionID, to: host) }
-            return
-        }
-        let was = relays.updateValue(relay, forKey: host)
-        guard was == nil else { return }
-        for (sessionID, session) in clients {
-            guard let channel = session.channels[host] else { continue }
-            clients[sessionID]?.channels[host] = nil
-            hosts[host]?.channels[channel] = nil
-            try? hosts[host]?.transport.write(line: ControlWire.close(channel))
-        }
-    }
-
-    /// A relaying host whose uplink ends at this copy, if there is one online.
-    public func relayHeldHere() -> MachineRef? { relaysHeldHere().first }
-
-    /// Relaying hosts whose uplinks end here.
-    public func relaysHeldHere() -> [MachineRef] {
-        relays.filter { $0.value && hosts[$0.key]?.local == true }.keys.sorted { $0.rawValue < $1.rawValue }
     }
 
     /// A notification on a host's channel 0, when its uplink ends here.

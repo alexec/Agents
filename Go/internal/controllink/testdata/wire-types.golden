@@ -1,5 +1,5 @@
 ControlAuth full
-{"id":"ID","nonce":"NONCE","mac":"MAC","kind":"KIND","for":"FOR","epoch":7}
+{"id":"ID","nonce":"NONCE","mac":"MAC","kind":"KIND","epoch":7}
 ControlAuth zero
 {"id":"","nonce":"","mac":"","kind":""}
 ControlHello full
@@ -7,7 +7,7 @@ ControlHello full
 ControlHello zero
 {"v":0,"name":"","control":"","nonce":"","copy":""}
 ControlOK full
-{"mac":"MAC","host":"HOST","relayed":true,"endpoints":[{"url":"URL","pin":"PIN"}],"epoch":7}
+{"mac":"MAC","host":"HOST","endpoints":[{"url":"URL","pin":"PIN"}],"epoch":7}
 ControlOK zero
 {"mac":""}
 MachineAnnounce full

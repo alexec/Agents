@@ -19,7 +19,7 @@ import (
 // The handover (058, research R16), the copy's side, as Handover.swift has it: a copy
 // moved to another machine without anyone pairing again. Agents Host drives it with
 // `agents-control handover …` (the Swift tool), which proves itself as a copy named
-// handover-<id> and calls these methods; Relay for my devices (#809) goes the same way.
+// handover-<id> and calls these methods.
 
 // handoverPrefix is Handover.prefix: the copy name a handover's driver proves.
 const handoverPrefix = "handover-"
@@ -311,19 +311,6 @@ func (s *Service) handoverAnswer(method string, params json.RawMessage) (any, er
 		}
 		s.log("took over the control plane at " + s.cfg.URL)
 		return s.handoverStatus(), nil
-	case "relay/set":
-		if phase != phaseServing {
-			return nil, refuseHandover("A relay is switched on or off at a copy that is serving.")
-		}
-		request, err := require[wire.MachineRelayRequest](params, "MachineRelayRequest")
-		if err != nil {
-			return nil, refuseHandover("Say the relay host and whether it relays.")
-		}
-		if err := s.methods.setRelay(ctx, request); err != nil {
-			return nil, err
-		}
-		s.announce("hostEnrolled", string(request.Host), "agents-host")
-		return map[string]any{}, nil
 	}
 	return nil, fail(methodNotFound, "%s is not part of a handover.", method)
 }
@@ -412,14 +399,10 @@ func (s *Service) handoverStatus() wire.HandoverStatus {
 				KnownEpoch: int64Of(c.KnownEpoch), Online: &online, LastSeen: stampDate(c.LastSeen)})
 		}
 		for _, h := range s.records.Hosts() {
-			kind := "host"
-			if h.Relay != nil {
-				kind = "relay"
-			}
 			state, _ := s.router.State(h.ID)
 			online := state.online()
 			version := h.Version
-			status.Members = append(status.Members, wire.HandoverMember{ID: h.ID, Name: h.Name, Kind: kind,
+			status.Members = append(status.Members, wire.HandoverMember{ID: h.ID, Name: h.Name, Kind: "host",
 				KnownEpoch: int64Of(h.KnownEpoch), Version: &version, Online: &online})
 		}
 		if settings := s.records.Settings(); settings != nil {

@@ -3831,8 +3831,7 @@ final class AppModel {
         controlPlaneMachine = status.machineID
         // `.mac` is `client`, already. Every other host, including another machine's
         // home host, gets a client of its own on the same link.
-        // A relay host (`agents-relay`) runs no agents: nothing to reach there.
-        let others = listed.filter { $0.id != .mac && $0.runsAgents }
+        let others = listed.filter { $0.id != .mac }
         hosts.controlled = Dictionary(uniqueKeysWithValues: others.map { ($0.id, (label: $0.name, online: $0.answers)) })
         hosts.controlRows = Dictionary(uniqueKeysWithValues: others.map { ($0.id, $0) })
         for host in others where host.answers {
@@ -6102,7 +6101,7 @@ final class AppModel {
     var lineageMachines: [(id: MachineRef, name: String)] {
         let mine = thisMacHostID
         return (controlPlaneHosts ?? [])
-            .filter { $0.runsAgents && $0.has(Capability.lineage1) }
+            .filter { $0.has(Capability.lineage1) }
             .map { (id: $0.id, name: $0.id == mine ? "This Mac" : $0.name) }
             .sorted { ($0.id == mine ? 0 : 1, $0.name) < ($1.id == mine ? 0 : 1, $1.name) }
     }
@@ -6122,7 +6121,7 @@ final class AppModel {
     var forgeMachines: [(id: MachineRef, name: String)] {
         let mine = thisMacHostID
         return (controlPlaneHosts ?? [])
-            .filter { $0.runsAgents && $0.has(Capability.forge1) && $0.state != "offline" }
+            .filter { $0.has(Capability.forge1) && $0.state != "offline" }
             .map { (id: $0.id, name: $0.id == mine ? "This Mac" : $0.name) }
             .sorted { ($0.id == mine ? 0 : 1, $0.name) < ($1.id == mine ? 0 : 1, $1.name) }
     }
@@ -6137,7 +6136,7 @@ final class AppModel {
     var docsMachines: [(id: MachineRef, name: String)] {
         let mine = thisMacHostID
         return (controlPlaneHosts ?? [])
-            .filter { $0.runsAgents && $0.has(Capability.docs1) && $0.state != "offline" }
+            .filter { $0.has(Capability.docs1) && $0.state != "offline" }
             .map { (id: $0.id, name: $0.id == mine ? "This Mac" : $0.name) }
             .sorted { ($0.id == mine ? 0 : 1, $0.name) < ($1.id == mine ? 0 : 1, $1.name) }
     }

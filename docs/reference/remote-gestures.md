@@ -107,9 +107,6 @@ they stay in the folder whichever session you open.
 - Each shell is a tab. Closing a tab ends its shell. **End Shell** ends the shell in front.
 - **Done**, or Control-\` again, puts the shells away and leaves them running.
 
-Away from home, through the relay, the folder terminal and the panes say they need the
-same network, because a shell sends too much for iCloud.
-
 ### Keys above the keyboard
 
 A shell has a row of keys that a touch keyboard does not have: **^C**, **esc**, **tab**,

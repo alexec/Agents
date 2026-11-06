@@ -14,15 +14,14 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controllink"
-	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 )
 
 var update = flag.Bool("update", false, "write testdata/wire.golden from what the control plane says now")
 
 // What the control plane says, byte for byte, to a window and to a host (#1313): the
-// answers to its own methods, the notifications a window hears, and the lines a relay
-// host and a plain host read on their uplinks. Only what changes from run to run (ids, a
+// answers to its own methods, the notifications a window hears, and the lines a plain
+// host reads on its uplink. Only what changes from run to run (ids, a
 // date's value, codes, keys, the port) is masked; the keys, their order, what is left out,
 // a UUID's case and every other value are as written. testdata/wire.golden was made from
 // the hand-written wire types before they moved to Go/wire, so this is the proof that the
@@ -34,23 +33,8 @@ func TestTheWireIsWhatItWas(t *testing.T) {
 	// Hosts that say no list, as the golden was made before capabilities (#1748).
 	home := p.olderHost("MACHINE-1")
 	box := p.olderHost("MACHINE-2")
-	relayID, relay := p.rawHost("relay mac", true)
-	plainID, plain := p.rawHost("plain mac", false)
+	plainID, plain := p.rawHost("plain mac")
 	member, window := p.client("Golden window")
-	// A phone that may notify, so the relay host hears a device and a delivery.
-	phone, err := controllink.PairClient(ctx, p.code(false), "phone")
-	if err != nil {
-		t.Fatal(err)
-	}
-	yes := true
-	if err := p.s.Records().ChangeClient(ctx, phone.Client, func(c *records.ClientRecord) bool {
-		c.Kind, c.MayNotify = records.KindIPhone, &yes
-		return true
-	}); err != nil {
-		t.Fatal(err)
-	}
-	p.s.tellRelayDevices()
-	readUntil(t, relay, phone.Client)
 
 	var out []string
 	say := func(what, line string) { out = append(out, what+"\n"+pretty(line, "")) }
@@ -67,7 +51,7 @@ func TestTheWireIsWhatItWas(t *testing.T) {
 		if strings.HasPrefix(string(got), "[") && json.Unmarshal(got, &rows) == nil {
 			masked := make([]string, len(rows))
 			for i, r := range rows {
-				masked[i] = "  " + mask(pretty(string(r), "  "), p, box.member.Host, relayID, plainID)
+				masked[i] = "  " + mask(pretty(string(r), "  "), p, box.member.Host, plainID)
 			}
 			sort.Strings(masked)
 			out = append(out, method+"\n[\n"+strings.Join(masked, ",\n")+"\n]")
@@ -89,7 +73,6 @@ func TestTheWireIsWhatItWas(t *testing.T) {
 	answer("control/setFolderDetection", map[string]any{"enabled": true, "paths": []string{" ~/src ", "", "~/work"}})
 	answer("hosts/lendSignIn", map[string]any{"host": box.member.Host, "from": home.member.Host, "runtime": "claude", "allowed": true})
 	answer("hosts/lendGit", map[string]any{"host": box.member.Host, "from": home.member.Host, "server": "github.com", "allowed": true})
-	answer("hosts/setRelay", map[string]any{"host": relayID, "relay": true})
 	answer("control/status", nil)
 	answer("hosts/list", nil)
 	answer("clients/setGrant", map[string]any{"client": member.Client, "grant": "viewer"})
@@ -97,16 +80,6 @@ func TestTheWireIsWhatItWas(t *testing.T) {
 	answer("hosts/update", map[string]any{"nothing": 1})
 	answer("providers/list", nil)
 	answer("nothing/here", nil)
-
-	// A need, offered and taken back, as the relay host reads it.
-	need := `{"need":{"id":{"permission":"E0000000-0000-4000-8000-000000000005"},"agentID":"A0000000-0000-4000-8000-000000000001",` +
-		`"folder":"file:///work","kind":"permission","raisedAt":800000000.25,"headline":{"h1":"work","h2":"Fix","h3":"may run"}},"buzz":true,"waiting":1}`
-	if _, err := p.s.methods.HostSaid(box.member.Host, "attention/need", json.RawMessage(need)); err != nil {
-		t.Fatal(err)
-	}
-	say("relay reads", readUntil(t, relay, "relay/deliver"))
-	_, _ = p.s.methods.HostSaid(box.member.Host, "attention/need", json.RawMessage(`{"withdraw":{"permission":"E0000000-0000-4000-8000-000000000005"},"waiting":0}`))
-	say("relay reads", readUntil(t, relay, "relay/deliver"))
 
 	// A window's call to a plain host opens a channel: the host reads the open frame.
 	go func() { _, _ = window.Call(ctx, plainID, "daemon/ping", nil) }()
@@ -128,11 +101,11 @@ func TestTheWireIsWhatItWas(t *testing.T) {
 	}
 	var notes []string
 	for n := range heard {
-		notes = append(notes, mask(n, p, box.member.Host, relayID, plainID))
+		notes = append(notes, mask(n, p, box.member.Host, plainID))
 	}
 	sort.Strings(notes)
 	for i := range out {
-		out[i] = mask(out[i], p, box.member.Host, relayID, plainID)
+		out[i] = mask(out[i], p, box.member.Host, plainID)
 	}
 	got := strings.Join(out, "\n\n") + "\n\n# notifications\n\n" + strings.Join(notes, "\n\n") + "\n"
 
@@ -175,7 +148,7 @@ var (
 	// A date's value changes; that it is a number, and where, does not.
 	dates = regexp.MustCompile(`"(startedAt|paired|lastSeen|expires|at|heardAt|since|countedAt|forgottenAt)":( ?)-?[0-9][0-9.eE+-]*`)
 	// Base64 keys and codes, which are new each run.
-	secrets = regexp.MustCompile(`"(publicKey|relayKey|text|command)":( ?)"[^"]*"`)
+	secrets = regexp.MustCompile(`"(publicKey|text|command)":( ?)"[^"]*"`)
 	ports   = regexp.MustCompile(`"port":( ?)[0-9]+`)
 )
 

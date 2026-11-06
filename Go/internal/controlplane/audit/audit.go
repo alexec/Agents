@@ -117,7 +117,6 @@ var controlActions = map[string]string{
 	"hosts/startEnroll":       "Made a machine code",
 	"hosts/install":           "Installed a machine over ssh",
 	"hosts/update":            "Updated a machine",
-	"hosts/setRelay":          "Changed a machine's relay",
 	"hosts/lendSignIn":        "Lent a sign-in to a machine",
 	"hosts/lendGit":           "Lent git access to a machine",
 	"hosts/detect":            "Added the machines it found",

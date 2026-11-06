@@ -34,8 +34,6 @@ something particular done.
 - [Set up a cloud machine provider](set-up-a-cloud-machine-provider.md): add AWS EC2,
   Compute Engine, Cloud Workstations, DigitalOcean, Codespaces or Coder, with the credentials
   each one needs.
-- [Turn the relay on or off](turn-the-relay-on-or-off.md): let your iPhone and iPad reach
-  your agents away from home through iCloud, and be notified, or stop it.
 - [Run the control plane in the cloud](run-the-control-plane-in-the-cloud.md): on a
   machine you rent, at your own domain with a public certificate.
 - [Run Agents with no Mac](run-agents-with-no-mac.md): a control plane in the cloud, the

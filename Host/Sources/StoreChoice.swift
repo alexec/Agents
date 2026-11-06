@@ -32,10 +32,6 @@ struct HostSettings: Codable, Sendable, Equatable {
     /// which is on, as it is by default.
     var serveWebRemote: Bool?
     var servesWebRemote: Bool { serveWebRemote ?? true }
-    /// Relay for my devices (#809): `agents-relay` carries the person's iPhone and iPad
-    /// through iCloud when away, and posts their notices. Off until turned on (Alex).
-    var relay: Bool?
-    var relaysForDevices: Bool { relay ?? false }
 
     /// This Mac's entry in `host.json`: its Bonjour name, which the person sees in Sharing.
     private static func key(_ paths: HostPaths) -> String {

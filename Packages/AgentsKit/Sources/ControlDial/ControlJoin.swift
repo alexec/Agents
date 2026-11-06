@@ -28,7 +28,7 @@ public enum ControlJoin {
         guard case .host = code.purpose else { throw Failure("that is not a host code") }
         let announce = DaemonAPI.MachineAnnounce(publicKey: try ControlAgreement.publicKey(privateKey: privateKey),
                                               name: hello.name ?? "A host", platform: hello.platform,
-                                              version: hello.version, machineID: hello.machineID, relay: hello.relay,
+                                              version: hello.version, machineID: hello.machineID,
                                               implementation: hello.implementation)
         let admitted = try await self.announce(code, method: DaemonAPI.Method.hostsAnnounce, params: try JSONValue.encoding(announce))
         guard let host = admitted.host else { throw Failure("the control plane did not say which host this is") }
@@ -44,8 +44,7 @@ public enum ControlJoin {
         try hostDial(EndpointBook(membership, keep: keep), privateKey: privateKey)
     }
 
-    /// As above, over a book the caller also reads (the relay opens devices' sockets at
-    /// the same place).
+    /// As above, over a book the caller also reads.
     public static func hostDial(_ book: EndpointBook, privateKey: Data) throws -> @Sendable () async throws -> any LineTransport {
         let membership = book.current
         guard !membership.endpointsToDial.isEmpty, let host = membership.host else {

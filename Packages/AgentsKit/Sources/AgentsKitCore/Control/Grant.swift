@@ -7,7 +7,7 @@ public struct ClientRecord: Codable, Hashable, Sendable, Identifiable {
     public enum Kind: String, Codable, Hashable, Sendable {
         case mac, iPhone, iPad, unknown
         /// The web remote (071): pairs and connects only through the loopback listener,
-        /// and has no relay mailbox, so it is never a notice's device.
+        /// and has no mailbox, so it is never a notice's device.
         case browser
 
         /// A kind a later build added reads as `unknown`, so an older window can still list
@@ -147,10 +147,6 @@ public struct MachineRecord: Codable, Hashable, Sendable, Identifiable {
     public var installed: Bool
     /// The machine it runs on, so a window can tell a host on its own Mac (R11).
     public var machineID: String?
-    /// A macOS host that runs the iCloud relay and mailbox for its person's devices (R10):
-    /// `agents-relay`, which runs no agents. Nil for any other host; false while switched
-    /// off with `hosts/setRelay`.
-    public var relay: Bool?
     /// The hosts whose sign-in this host may use, by runtime, relayed through the control
     /// plane (058, T091): an operator said yes to each.
     public var signInFrom: [String: MachineRef]?
@@ -177,9 +173,8 @@ public struct MachineRecord: Codable, Hashable, Sendable, Identifiable {
 
     public init(id: MachineRef, name: String, publicKey: Data? = nil, reach: MachineReach = .dialOut,
                 platform: String = "", version: String = "", installed: Bool = false,
-                machineID: String? = nil, relay: Bool? = nil, owner: PersonID? = nil,
+                machineID: String? = nil, owner: PersonID? = nil,
                 rev: Int = 0, forgotten: Bool? = nil) {
-        self.relay = relay
         self.owner = owner
         self.rev = rev
         self.forgotten = forgotten

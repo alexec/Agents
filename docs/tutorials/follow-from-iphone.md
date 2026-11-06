@@ -103,11 +103,10 @@ to say next. On the Mac, the same agent shows the same conversation.
 
 ## 7. Take it with you
 
-Away from home, the phone reaches the control plane at its address when it can. When it
-cannot, because the control plane is on your Mac at home, it can go through the relay
-instead, through your own iCloud account, and says **Away — slower, through iCloud**. In
-this build Agents Host cannot switch the relay on yet; see
-[How the phone and iPad reach your agents](../explanation/phone-and-ipad.md#at-home-and-away).
+Away from home, the phone reaches the control plane at its address. A control plane in the
+cloud has an address on the internet, so the phone reaches it from anywhere. A control
+plane on your Mac at home has none, so the phone reaches it only on the Mac's own network.
+See [How the phone and iPad reach your agents](../explanation/phone-and-ipad.md#at-home-and-away).
 
 ## Where next
 

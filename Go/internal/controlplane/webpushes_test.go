@@ -127,32 +127,6 @@ func TestAnIPhoneComesBeforeABrowser(t *testing.T) {
 	}
 }
 
-// A relay host carries nothing to a browser: with one online, the browser still gets its
-// Web Push from the control plane, and the relay hears of none.
-func TestABrowserGetsWebPushBesideARelay(t *testing.T) {
-	t.Parallel()
-	web := &fakeWebPusher{}
-	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) { c.WebPush = web })
-	_, relay := p.rawHost("relay mac", true)
-	box := p.host("MACHINE-2")
-	p.browserWithWebPush()
-	if _, err := p.s.methods.HostSaid(box.member.Host, "attention/need", json.RawMessage(pushNeed)); err != nil {
-		t.Fatal(err)
-	}
-	p.waitFor(func() bool { return len(web.sent()) == 1 }, "a Web Push")
-	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
-	defer cancel()
-	for {
-		line, err := relay.Read(ctx)
-		if err != nil {
-			break
-		}
-		if strings.Contains(line, "relay/deliver") {
-			t.Fatal("the relay was given a browser's notice:", line)
-		}
-	}
-}
-
 // Only a browser sets a subscription, only its own, only a real one, and only where there
 // is a VAPID key to push with; one its push service says is gone is forgotten.
 func TestOnlyABrowserSetsItsOwnWebPush(t *testing.T) {

@@ -12,13 +12,11 @@ import UniformTypeIdentifiers
 /// the Mac, so everything goes by value: a picture as a picture, shrunk; text as the
 /// file's contents; anything else is refused, in one sentence, before it is sent.
 ///
-/// Small enough, in all, to cross the relayed link in one record (005's mailbox, 1 MB),
-/// and held to the same size on the direct link, so what can be attached does not change
-/// with where the phone is.
+/// Small enough, in all, to go in one message of under 1 MB.
 public enum PhoneAttachment {
     /// A picture's longest side, once shrunk. Enough to read a screenshot by.
     public static let longestEdge = 2048
-    /// Everything attached by value to one prompt, under the relayed link's record.
+    /// Everything attached by value to one prompt, under 1 MB.
     public static let limit = 900_000
 
     public struct Refusal: Error, Equatable, Sendable {

@@ -76,7 +76,7 @@ export function ProjectSettingsModal({ store, host, folder, summary, down, close
       .filter((s) => s.project === summary.project && s.folder.archivedAt === undefined).map((s) => ({ host: h, summary: s })));
   const others = (project.value?.folders ?? []).filter((f) => !mine.some((m) => m.host === f.machine
     && folderPathOf(m.summary.folder.folder) === folderPathOf(f.folder)));
-  const otherMachines = store.hosts.value.filter((h) => store.hostIsOnline(h.id) && h.relay === undefined
+  const otherMachines = store.hosts.value.filter((h) => store.hostIsOnline(h.id)
     && !mine.some((m) => m.host === h.id) && !others.some((f) => f.machine === h.id));
 
   const general = <>

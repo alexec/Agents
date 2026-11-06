@@ -12,8 +12,8 @@ import (
 // offer, or one to withdraw.
 type AttentionNeed = wire.AttentionNeed
 
-// RelayDelivery is DaemonAPI.RelayDelivery, a delivery to a relay host: a need posted to
-// a device, or (with no headline) taken back from it.
+// RelayDelivery is DaemonAPI.RelayDelivery, a delivery to one device, through APNs or Web
+// Push: a need posted to it, or (with no headline) taken back from it.
 type RelayDelivery = wire.RelayDelivery
 
 type posted struct {
@@ -37,7 +37,7 @@ func key(id wire.NeedID) string {
 	return string(b)
 }
 
-// Heard is NoticeDesk.heard: what to tell the relay host of a need a host raised.
+// Heard is NoticeDesk.heard: what to send each device of a need a host raised.
 func (d *Desk) Heard(message AttentionNeed, presences map[Surface]Presence, devices []Device, now time.Time) []RelayDelivery {
 	d.mu.Lock()
 	defer d.mu.Unlock()

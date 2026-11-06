@@ -107,7 +107,6 @@ var own = methodSet(
 	"hosts/lendSignIn",
 	"hosts/list",
 	"hosts/remove",
-	"hosts/setRelay",
 	"hosts/sshHosts",
 	"hosts/startEnroll",
 	"hosts/update",
@@ -250,7 +249,6 @@ var writes = methodSet(
 	"hosts/lendGit",
 	"hosts/lendSignIn",
 	"hosts/remove",
-	"hosts/setRelay",
 	"hosts/startEnroll",
 	"hosts/update",
 	"links/approve",
@@ -423,26 +421,12 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		}
 		return approved, nil
 	case "clients/connections":
-		// The relaying host by name; with more than one, the first, as a relayed session
-		// does not say which carried it.
-		var relay *string
-		for _, h := range m.records.Hosts() {
-			if h.Relay != nil && *h.Relay {
-				name := h.Name
-				relay = &name
-				break
-			}
-		}
 		out := []wire.ClientConnection{}
-		for client, relayed := range m.router.Connections() {
+		for _, client := range m.router.Connections() {
 			if m.s.PersonOf(client) != m.callerPerson(from) {
 				continue
 			}
-			c := wire.ClientConnection{Client: wire.UUID(client), Relayed: relayed}
-			if relayed {
-				c.Through = relay
-			}
-			out = append(out, c)
+			out = append(out, wire.ClientConnection{Client: wire.UUID(client)})
 		}
 		sort.Slice(out, func(i, j int) bool { return out[i].Client < out[j].Client })
 		return out, nil
@@ -624,16 +608,6 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		}
 		m.s.announce("hostEnrolled", string(request.Host), from.Client)
 		return map[string]any{}, nil
-	case "hosts/setRelay":
-		request, err := require[wire.MachineRelayRequest](params, "MachineRelayRequest")
-		if err != nil {
-			return nil, err
-		}
-		if err := m.setRelay(ctx, request); err != nil {
-			return nil, err
-		}
-		m.s.announce("hostEnrolled", string(request.Host), from.Client)
-		return map[string]any{}, nil
 	case "hosts/remove":
 		request, err := require[wire.MachineRequest](params, "MachineRequest")
 		if err != nil {
@@ -715,14 +689,6 @@ func (m *Methods) status(from Caller) wire.ControlStatus {
 	status.Capabilities, status.Required = capabilities(), &needed
 	away := false
 	status.AwayFromHome = &away
-	for _, h := range m.records.Hosts() {
-		// A relay host is what takes devices out of the house (T096): the person's own.
-		if h.Relay != nil && *h.Relay && m.owns(from, h.ID) {
-			status.RelayKey = h.PublicKey
-			status.AwayFromHome = &[]bool{true}[0]
-			break
-		}
-	}
 	return status
 }
 
@@ -804,7 +770,7 @@ func (m *Methods) removeHost(ctx context.Context, host string, from Caller) (boo
 func (m *Methods) hostRow(h records.MachineRecord) wire.ControlMachine {
 	state, _ := m.router.Described(h.ID)["state"].(string)
 	row := wire.ControlMachine{ID: wire.MachineRef(h.ID), Name: h.Name, Platform: h.Platform, Version: h.Version, State: state,
-		Reach: "dialOut", MachineID: h.MachineID, Relay: h.Relay, SignInFrom: hostIDs(m.sameUsers(h.ID, h.SignInFrom)),
+		Reach: "dialOut", MachineID: h.MachineID, SignInFrom: hostIDs(m.sameUsers(h.ID, h.SignInFrom)),
 		GitFrom: hostIDs(m.sameUsers(h.ID, h.GitFrom)),
 		Owner:   optional(m.s.ownerOf(h.ID))}
 	if raw, ok := h.Extra["implementation"]; ok {
@@ -839,7 +805,6 @@ func (m *Methods) forget(ctx context.Context, id string, after time.Duration) er
 		time.Sleep(after)
 		m.router.ForgetClient(id)
 		m.router.BroadcastControl("control/clientChanged", map[string]any{"client": id, "removed": true})
-		m.s.tellRelayDevices()
 		m.s.tellHostClients()
 	}()
 	return nil
@@ -860,7 +825,6 @@ func (m *Methods) Admit(ctx context.Context, client records.ClientRecord) error 
 	}
 	if said {
 		m.router.BroadcastControl("control/clientChanged", map[string]any{"client": client.ID})
-		go m.s.tellRelayDevices()
 		go m.s.tellHostClients()
 	}
 	return nil
@@ -1098,30 +1062,6 @@ func samePushToken(a, b *records.PushToken) bool {
 	return *a == *b
 }
 
-// setRelay is hosts/setRelay or relay/switch (#824): a relay switched on or off, keeping
-// its enrolment.
-func (m *Methods) setRelay(ctx context.Context, request wire.MachineRelayRequest) error {
-	host := string(request.Host)
-	record := m.records.Host(host)
-	if record == nil {
-		return fail(noSuchHost, "No machine is called %s.", host)
-	}
-	// Only agents-relay carries devices; a host that runs agents cannot start to.
-	if record.Relay == nil {
-		return fail(invalidParams, "%s does not relay.", record.Name)
-	}
-	if *record.Relay == request.Relay {
-		return nil
-	}
-	record.Relay = &request.Relay
-	if err := m.records.SaveHost(ctx, *record); err != nil {
-		return err
-	}
-	m.router.SetRelay(host, record.Relay)
-	m.s.tellRelayDevices()
-	return nil
-}
-
 // startsWork is what a machine says that starts work or uses its person's access, refused
 // while its person is suspended (D13). What it says to stop their work still goes. One a
 // line, sorted (#2020).
@@ -1159,17 +1099,6 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 				return nil, err
 			}
 		}
-		return map[string]any{}, nil
-	case "relay/switch":
-		// A relay host on or off by its own word (#824): only its own record.
-		request, err := require[wire.RelaySwitch](params, "RelaySwitch")
-		if err != nil {
-			return nil, err
-		}
-		if err := m.setRelay(ctx, wire.MachineRelayRequest{Host: wire.MachineRef(host), Relay: request.Relay}); err != nil {
-			return nil, err
-		}
-		m.s.announce("hostEnrolled", host, host)
 		return map[string]any{}, nil
 	case "attention/need":
 		m.s.heard(host, params)
@@ -1360,8 +1289,6 @@ func (m *Methods) hello(ctx context.Context, host string, hello wire.MachineHell
 		}
 		*record = withCapabilities(*record, hello.Capabilities)
 	}
-	// Whether a host relays is settled when it enrols and changed only by a person
-	// (hosts/setRelay). A host's own hello never makes it a relay (T102).
 	changed := known == nil
 	if known == nil {
 		record := records.MachineRecord{ID: host, Name: host}
@@ -1385,23 +1312,20 @@ func (m *Methods) hello(ctx context.Context, host string, hello wire.MachineHell
 	// The home host is where a device's plain connection goes: the host on the control
 	// plane's own machine, or, on a control plane with none, the first host to join until
 	// one on its machine does.
-	if hello.Relay == nil || !*hello.Relay {
-		settings := m.records.Settings()
-		if settings != nil {
-			onThisMachine := hello.MachineID == settings.MachineID
-			homeIsHere := false
-			if settings.HomeHost != nil {
-				if h := m.records.Host(*settings.HomeHost); h != nil && h.MachineID != nil && *h.MachineID == settings.MachineID {
-					homeIsHere = true
-				}
+	if settings := m.records.Settings(); settings != nil {
+		onThisMachine := hello.MachineID == settings.MachineID
+		homeIsHere := false
+		if settings.HomeHost != nil {
+			if h := m.records.Host(*settings.HomeHost); h != nil && h.MachineID != nil && *h.MachineID == settings.MachineID {
+				homeIsHere = true
 			}
-			if settings.HomeHost == nil || (onThisMachine && *settings.HomeHost != host && !homeIsHere) {
-				if _, err := m.records.ChangeSettings(ctx, func(s *records.Settings) { s.HomeHost = &host }); err != nil {
-					return err
-				}
-				m.router.SetHomeHost(host)
-				changed = true
+		}
+		if settings.HomeHost == nil || (onThisMachine && *settings.HomeHost != host && !homeIsHere) {
+			if _, err := m.records.ChangeSettings(ctx, func(s *records.Settings) { s.HomeHost = &host }); err != nil {
+				return err
 			}
+			m.router.SetHomeHost(host)
+			changed = true
 		}
 	}
 	// A suspended person's machine that cannot stop their work is refused (#1002, FR-018).
@@ -1412,11 +1336,7 @@ func (m *Methods) hello(ctx context.Context, host string, hello wire.MachineHell
 	if changed {
 		m.router.BroadcastHost(host, "control/hostChanged", m.router.Described(host))
 	}
-	if r := m.records.Host(host); r != nil && r.Relay != nil && *r.Relay {
-		m.s.tellRelayDevices()
-	} else {
-		m.s.tellHostClients(host)
-	}
+	m.s.tellHostClients(host)
 	// Whether its person is suspended, before anything they set (#1002, FR-018).
 	m.s.sendUserSuspended(host)
 	// Its person's settings and secrets, at every join (#1760, FR-024).
@@ -1581,12 +1501,12 @@ func (m *Methods) gitCredential(ctx context.Context, host string, request wire.G
 }
 
 // gitLender is the Mac whose git access a host would use: the home host if it is a Mac,
-// else the first connected Mac. Never the host itself, never a relay, and only a Mac of
-// the host's own user (FR-021).
+// else the first connected Mac. Never the host itself, and only a Mac of the host's own
+// user (FR-021).
 func (m *Methods) gitLender(host string) string {
 	var macs []string
 	for _, r := range m.records.Hosts() {
-		if r.ID == host || r.Relay != nil || !strings.HasPrefix(r.Platform, "macOS") || !m.sameUser(host, r.ID) {
+		if r.ID == host || !strings.HasPrefix(r.Platform, "macOS") || !m.sameUser(host, r.ID) {
 			continue
 		}
 		if s, ok := m.router.State(r.ID); ok && s.online() {

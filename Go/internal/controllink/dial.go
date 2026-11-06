@@ -119,7 +119,7 @@ func Join(ctx context.Context, base, pin string, cr Credentials) (*Lines, *OK, e
 		l.Close()
 		return nil, nil, fmt.Errorf("%q is not an identity", cr.Identity)
 	}
-	auth, expect, err := Answer(h.Hello, id, cr.Key, origin, cr.Kind, cr.ControlKey, "", cr.Epoch)
+	auth, expect, err := Answer(h.Hello, id, cr.Key, origin, cr.Kind, cr.ControlKey, cr.Epoch)
 	if err != nil {
 		l.Close()
 		return nil, nil, err

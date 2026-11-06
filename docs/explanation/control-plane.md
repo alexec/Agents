@@ -62,15 +62,11 @@ plane, and nothing connects in to a machine.
 │ MACHINE: this Mac            │   │ MACHINE: another Mac         │   │ MACHINE: a Linux server       │
 │ Agents Host               │   │ Agents Host,              │   │ agentsd, installed over    │
 │  ├ agentsd                │   │ Join one elsewhere        │   │ ssh or by one command      │
-│  ├ agents-control, if the │   │  ├ agentsd                │   │                            │
-│  │ control plane runs here│   │  └ agents-relay, optional │   │                            │
-│  └ agents-relay, optional │   │                           │   │                            │
+│  └ agents-control, if the │   │  └ agentsd                │   │                            │
+│    control plane runs here│   │                           │   │                            │
 │ folders, agents,         │   │ folders, agents,         │   │ folders, agents,          │
 │ runtimes, files, terminals│   │ runtimes                  │   │ runtimes                   │
-└──────────────┬────────────┘   └───────────────────────────┘   └────────────────────────────┘
-               │ agents-relay, when Relay for my devices is on
-               ▼
-     your iCloud mailbox ──► iPhone and iPad away from home, and notifications
+└───────────────────────────┘   └───────────────────────────┘   └────────────────────────────┘
 ```
 
 Your agents, their conversations, files and terminals, and the runtimes' sign-ins stay on
@@ -280,8 +276,7 @@ page's own exchange then runs on that socket, with the control plane, bound to
 That is a rule of trust: the control plane takes the machine's word that the socket came in on
 the machine's loopback listener. It gives a machine nothing new. A machine can carry only the sessions
 of browsers that paired at its own `localhost` address, because only the browser's key can
-prove itself there, and a machine already reads and answers everything its own agents do. A
-relay machine, which runs no agents, can't carry a page. See `specs/1480-local-page-on-agentsd/`.
+prove itself there, and a machine already reads and answers everything its own agents do.  See `specs/1480-local-page-on-agentsd/`.
 
 Since every client may do everything (#111), the listener's address and origin checks and
 the key that can't be read are what keep a browser's session its own. Serving the page at a

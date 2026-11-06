@@ -11,7 +11,7 @@ export const noMachineYet = "No machine has joined this control plane yet. Add o
 export function settingsMachines(hosts: readonly ControlMachine[], macID: string): ControlMachine[] {
   const mac = hosts.find((h) => h.id === macID);
   if (mac) return [mac];
-  return hosts.filter((h) => h.relay === undefined && hostAnswers(h.state));
+  return hosts.filter((h) => hostAnswers(h.state));
 }
 
 /** The machine in use: the one chosen while it is still listed, else the home host, else the first. */
