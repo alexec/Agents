@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/mac"
-	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -30,7 +29,7 @@ func (d *Daemon) registerWake() {
 	On(d, wire.CallWakeSet, func(_ context.Context, _ *Client, s wire.WakeSettings) (wire.WakeSettings, error) {
 		return w.Set(s), nil
 	})
-	safe.Go("wake", func() {
+	d.goLoop("wake", func(ctx context.Context) {
 		w.Revise(d.agentsInFlight(), true)
 		count := time.NewTicker(2 * time.Second)
 		defer count.Stop()
@@ -38,7 +37,7 @@ func (d *Daemon) registerWake() {
 		defer power.Stop()
 		for {
 			select {
-			case <-d.ctx.Done():
+			case <-ctx.Done():
 				w.Stop()
 				return
 			case <-count.C:
