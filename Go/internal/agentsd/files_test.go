@@ -167,6 +167,33 @@ func TestAWatchSaysWhichFoldersChanged(t *testing.T) {
 	}
 }
 
+// callHearing makes a call and, in the same loop, waits for a notification that ok
+// accepts: one the call sets off can come before its answer, and c.call reads past it.
+func (c *conn) callHearing(t *testing.T, id int, method string, params any, what string, ok func(method string, params json.RawMessage) bool) {
+	t.Helper()
+	b, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": id, "method": method, "params": params})
+	c.send(string(b))
+	answered, heard := false, false
+	for deadline := time.After(20 * time.Second); !answered || !heard; {
+		select {
+		case line := <-c.out:
+			var m message
+			json.Unmarshal([]byte(line), &m)
+			switch {
+			case string(m.ID) == strings.TrimSpace(string(mustJSON(id))):
+				if m.Error != nil {
+					t.Fatalf("%s: %v", method, m.Error)
+				}
+				answered = true
+			case m.Method != "" && !heard:
+				heard = ok(m.Method, m.Params)
+			}
+		case <-deadline:
+			t.Fatalf("%s: answered %v, heard %s %v", method, answered, what, heard)
+		}
+	}
+}
+
 func TestATerminal(t *testing.T) {
 	t.Setenv("SHELL", "/bin/sh")
 	d, c := start(t, t.TempDir())
@@ -174,10 +201,11 @@ func TestATerminal(t *testing.T) {
 	work, _ := store.Resolve(t.TempDir())
 	id := anAgentIn(t, d, work)
 	c.call(t, 1, "shell/attach", map[string]any{"agentID": id, "shell": 0, "rows": 24, "cols": 80})
+	// The shell's output and its "released" come from its pump, maybe before the
+	// call's answer (#3613).
 	in := base64.StdEncoding.EncodeToString([]byte("echo hello-$((40+2)) && pwd\n"))
-	c.call(t, 2, "shell/input", map[string]any{"agentID": id, "shell": 0, "bytes": in})
 	var seen strings.Builder
-	c.until(t, "the shell's output", func(method string, p json.RawMessage) bool {
+	c.callHearing(t, 2, "shell/input", map[string]any{"agentID": id, "shell": 0, "bytes": in}, "the shell's output", func(method string, p json.RawMessage) bool {
 		var o struct {
 			Bytes []byte `json:"bytes"`
 		}
@@ -186,8 +214,7 @@ func TestATerminal(t *testing.T) {
 		}
 		return strings.Contains(seen.String(), "hello-42") && strings.Contains(seen.String(), work)
 	})
-	c.call(t, 3, "shell/close", map[string]any{"agentID": id, "shell": 0})
-	c.until(t, "released", func(method string, p json.RawMessage) bool {
+	c.callHearing(t, 3, "shell/close", map[string]any{"agentID": id, "shell": 0}, "released", func(method string, p json.RawMessage) bool {
 		return method == "shell/stateChanged" && strings.Contains(string(p), "released")
 	})
 }
