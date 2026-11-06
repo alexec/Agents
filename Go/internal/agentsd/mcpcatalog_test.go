@@ -261,12 +261,13 @@ func TestOursAreListedAndAddedLikeAnyConnector(t *testing.T) {
 		ours.Results[9].Title != "Sentry events" {
 		t.Fatalf("%+v", ours)
 	}
-	// Sentry's own server is a remote one on Sentry's host, signed in by OAuth (#3583); its events are ours.
+	// Sentry's own server is a remote one on Sentry's host, signed in by OAuth (#3583); its events are ours,
+	// and File a bug from Sentry starts on them (#3586).
 	if sentry := ours.Results[8]; sentry.ID != "io.github.getsentry/sentry-mcp" || sentry.Publisher.Label != "getsentry on GitHub" ||
 		len(sentry.Runs) != 1 || sentry.Runs[0] != wire.MCPRunKindRemote || deref(sentry.RemoteHost) != "mcp.sentry.dev" {
 		t.Fatalf("sentry: %+v", sentry)
 	}
-	if events := ours.Results[9]; *events.Levels != (wire.MCPLevels{Events: true}) {
+	if events := ours.Results[9]; *events.Levels != (wire.MCPLevels{Events: true, Workflows: true}) {
 		t.Fatalf("sentry events: %+v", events.Levels)
 	}
 	github, linear := ours.Results[0], ours.Results[1]

@@ -28,6 +28,10 @@ import (
 //     than one has the tag).
 //   - The health node is also seen-in the deploy that the version's build names, when the
 //     graph knows that deploy (#3584): com.example.app@1.2.0+42 is testflight:com.example.app/42.
+//   - Health back into work (#3586): a workflow run that a health.* event started links
+//     health started the run's session, and an issue that session works on (the File a bug
+//     from Sentry workflow labels its session with the bug it filed or commented on)
+//     reports the health signal: a walk from the bug reaches the release and its PRs.
 
 // kindDeploy is #3584's deploy node.
 const kindDeploy = "deploy"
@@ -66,10 +70,41 @@ func (d *Daemon) lineageKnows(n wire.LineageNode) bool {
 	return len(d.lineage().Links(n).Links) > 0
 }
 
+// healthOf is a health.* event's payload and its health node.
+func healthOf(e wire.Event) (healthPayload, wire.LineageNode, bool) {
+	var p healthPayload
+	if e.Name != "health.issue_new" && e.Name != "health.issue_regressed" ||
+		json.Unmarshal([]byte(e.Details["payload"]), &p) != nil || p.Org == "" || p.Issue.ID == "" {
+		return p, wire.LineageNode{}, false
+	}
+	return p, wire.LineageNode{Kind: lineage.KindHealth, Ref: "sentry:" + p.Org + "/" + p.Issue.ID}, true
+}
+
+// lineageHealthStarted links health started session, for the session a health.* event's
+// workflow run started.
+func (d *Daemon) lineageHealthStarted(e wire.Event, session wire.UUID) {
+	if _, health, ok := healthOf(e); ok {
+		d.lineageDo(func() { d.link(health, sessionNode(session), lineage.RelStarted, lineage.SourceHelper) })
+	}
+}
+
+// lineageReportsHealth links issue reports health for each health signal that started the
+// session s, which now works on issue. It runs in lineageDo.
+func (d *Daemon) lineageReportsHealth(s, issue wire.LineageNode) {
+	if issue.Kind != lineage.KindIssue {
+		return
+	}
+	for _, l := range d.lineage().Links(s).Links {
+		if l.To == s && l.Rel == lineage.RelStarted && l.From.Kind == lineage.KindHealth {
+			d.link(issue, l.From, lineage.RelReports, lineage.SourceAgent)
+		}
+	}
+}
+
 // lineageHealthEvent links the health node a health.* event names.
 func (d *Daemon) lineageHealthEvent(e wire.Event) {
-	var p healthPayload
-	if json.Unmarshal([]byte(e.Details["payload"]), &p) != nil || p.Org == "" || p.Issue.ID == "" {
+	p, health, ok := healthOf(e)
+	if !ok {
 		return
 	}
 	tag, pkg, build, ok := sentryVersion(p.Release)
@@ -84,7 +119,6 @@ func (d *Daemon) lineageHealthEvent(e wire.Event) {
 	if t, err := time.Parse(time.RFC3339, when); err == nil {
 		at = t
 	}
-	health := wire.LineageNode{Kind: lineage.KindHealth, Ref: "sentry:" + p.Org + "/" + p.Issue.ID}
 	scoped := ""
 	if e.Scope.Folder != nil {
 		scoped = store.FolderPath(e.Scope.Folder.Value)
