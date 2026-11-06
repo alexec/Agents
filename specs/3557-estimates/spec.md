@@ -119,7 +119,9 @@ Decided: a closed issue shows no estimate, because story 4 (#3561) shows the est
 Decided: the error is over the report's range (a month by default), not a fixed 30 days, because every other figure on Reports ▸ Value follows the range. Alex can overrule.
 Decided: the hours are the agents' working time, as on the open page (#3560). Alex can overrule.
 Decided: an epic's estimate at its start counts the children its plan has now, because the plan at its start is not kept; a child added later makes the estimate higher. Alex can overrule.
-Decided: the lead's closing summary does not say the line yet, because an agent has no way to ask `lineage/estimate` (no app tool calls it), and a new tool is a feature of its own: #3590. Alex can overrule.
+- **The lead's closing summary** (#3590): the app tool `estimate_issue`, read-only, says `lineage/estimate` to an agent, with the same line once the issue or epic is closed. The `lead` skill closes the epic, asks it, and puts the line in its summary comment.
+
+Decided: an app tool (`estimate_issue`, method `issues/estimate`), not the daemon posting the line on the epic, because the lead already writes the summary and other agents (the Product Owner, when it files an epic) can ask for an estimate too. Alex can overrule.
 
 ## What the backtest does not cover
 

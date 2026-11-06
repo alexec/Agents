@@ -96,6 +96,7 @@ var appToolMethods = map[string]string{
 	"check_folders":       "folders/check",
 	"docs_search":         "docs/search",
 	"docs_read":           "docs/read",
+	"estimate_issue":      "issues/estimate",
 }
 
 // appToolMethod is the method a tool is, or the tool's own name for one not in the table.

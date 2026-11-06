@@ -102,6 +102,7 @@ func appToolCalls() []appTool {
 		{"check_folders", (*Daemon).dailyChecks},
 		{"docs_search", (*Daemon).docsSearchTool},
 		{"docs_read", (*Daemon).docsReadTool},
+		{"estimate_issue", (*Daemon).estimateIssueTool},
 	}
 }
 
