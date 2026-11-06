@@ -26,6 +26,7 @@ type fakeGitHub struct {
 	rabbit     []CodeRabbitComment
 	prComments []PRComment
 	completed  []CompletedRun
+	deploys    map[int][]string
 	err        error
 	noRepo     bool
 	// reviews and assigned are what ask the connection's owner, alexec (#2034).
@@ -164,6 +165,12 @@ func (f *fakeGitHub) CompletedRuns(_ context.Context, _, workflow, branch string
 		}
 	}
 	return out, false, nil
+}
+
+func (f *fakeGitHub) RunDeploys(_ context.Context, _ string, run CompletedRun) ([]string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.deploys[run.Run.ID], nil
 }
 
 func (f *fakeGitHub) addCompleted(id, attempt int, workflow, branch, at, conclusion string, trusted bool) {
@@ -479,11 +486,15 @@ func TestRunCompletedRaisesAnyConclusionOncePerAttempt(t *testing.T) {
 		"run": map[string]any{"id": float64(9200), "attempt": float64(1), "name": "Release", "workflow": "release.yml", "event": "push",
 			"branch": "v0.16.0", "headSha": "sha9200", "url": "https://github.com/" + repo + "/actions/runs/9200",
 			"conclusion": "failure", "actor": "alexec"},
-		"completedAt": h.at(5),
+		"completedAt": h.at(5), "deploys": []any{},
 	}, "data")
 	h.fake.addCompleted(9200, 2, "release.yml", "v0.16.0", h.at(9), "success", true)
+	h.fake.mu.Lock()
+	h.fake.deploys = map[int][]string{9200: {"testflight:com.example.app/42"}}
+	h.fake.mu.Unlock()
 	again := h.poll("run.completed", args, raised["cursor"])
 	equal(t, ids(again), []string{"run.completed:" + repo + ":9200:2"}, "a rerun is a new event")
+	equal(t, eventsOf(again)[0]["data"].(map[string]any)["deploys"], []any{"testflight:com.example.app/42"}, "what the run deployed (#3584)")
 	equal(t, ids(h.poll("run.completed", args, again["cursor"])), []string{}, "raised once")
 
 	byID := map[string]any{"repo": repo, "run": float64(9203)}

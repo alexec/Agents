@@ -105,6 +105,8 @@ func (d RunData) passedJSON() map[string]any { return d.run() }
 // tag's release.yml or a workflow_dispatch run, which no pull request owns.
 type CompletedRun struct {
 	Run RunRef
+	// CheckSuite is the run's check suite, whose check runs (its jobs) carry its annotations.
+	CheckSuite int
 	// Workflow is the workflow's file name, as release.yml; Event is what started it, as push.
 	Workflow, Event, Conclusion, Actor string
 	// Trusted says whether the run is the repo's own: not from a fork, and started by a person,
@@ -112,11 +114,15 @@ type CompletedRun struct {
 	Trusted bool
 }
 
-func (c CompletedRun) data() map[string]any {
+// data is run.completed's payload; deploys are what the run says it deployed (#3584).
+func (c CompletedRun) data(deploys []string) map[string]any {
+	if deploys == nil {
+		deploys = []string{}
+	}
 	return map[string]any{"run": map[string]any{
 		"id": c.Run.ID, "attempt": c.Run.Attempt, "name": c.Run.Name, "workflow": c.Workflow, "event": c.Event,
 		"branch": c.Run.Branch, "headSha": c.Run.HeadSHA, "url": c.Run.URL, "conclusion": c.Conclusion, "actor": c.Actor,
-	}, "completedAt": c.Run.UpdatedAt}
+	}, "completedAt": c.Run.UpdatedAt, "deploys": deploys}
 }
 
 // OpenPR is an open pull request, drafts too, as pr.opened sees it (#833). Here and in the
@@ -279,6 +285,9 @@ type GitHub interface {
 	// in any order (#3444): only workflow's (a file name) when it is set, only branch's (a branch or a
 	// tag) when it is set, and only run id when it is not 0.
 	CompletedRuns(ctx context.Context, repo, workflow, branch string, run int, since string) (runs []CompletedRun, truncated bool, err error)
+	// RunDeploys are what a finished run says it deployed (#3584): the message of each notice
+	// titled deploy that its jobs wrote (::notice title=deploy::testflight:<bundle id>/<build>).
+	RunDeploys(ctx context.Context, repo string, run CompletedRun) ([]string, error)
 	// PRBranch is the head branch of PR number pr. checks.failed and checks.passed with a pr and
 	// no branch list only that branch's runs, not the whole repo's (#3107).
 	PRBranch(ctx context.Context, repo string, pr int) (string, error)

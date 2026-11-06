@@ -22,6 +22,11 @@ import (
 //     tag's release, whatever its conclusion: a failed release build is part of the story.
 //   - A PR keeps at most ciRunsPerPR active runs: an older run's link ends, and the store's
 //     own bounds (KeepEnded, MostLinks) let it go.
+//   - Deploys (#3584): what run.completed on a version tag says the run deployed (each a
+//     job's ::notice title=deploy::<target>:<id>/<version>, as testflight:<bundle id>/<build>)
+//     is a deploy node. The release is deployed-as it, and it is part-of its target,
+//     target:<target>:<id>. The run says it; App Store Connect's key stays in the customer's CI
+//     (direction.md, principles 6 and 7).
 
 // ciRunsPerPR is how many runs a PR keeps active.
 const ciRunsPerPR = 20
@@ -44,7 +49,8 @@ type ciRunPayload struct {
 		Branch string `json:"branch"`
 		URL    string `json:"url"`
 	} `json:"run"`
-	CompletedAt string `json:"completedAt"`
+	CompletedAt string   `json:"completedAt"`
+	Deploys     []string `json:"deploys"`
 }
 
 // lineageCIEvent links the run a checks.* or run.completed event names.
@@ -63,7 +69,15 @@ func (d *Daemon) lineageCIEvent(e wire.Event) {
 			at = t
 		}
 		run, release := repo.ciRun(p.Run.ID), repo.release(p.Run.Branch)
-		d.lineageDo(func() { d.linkAt(run, release, lineage.RelBuilds, lineage.SourceForge, at) })
+		d.lineageDo(func() {
+			d.linkAt(run, release, lineage.RelBuilds, lineage.SourceForge, at)
+			for _, ref := range p.Deploys[:min(len(p.Deploys), mostDeploys)] {
+				if deploy, target, ok := deployNodes(ref); ok {
+					d.linkAt(release, deploy, lineage.RelDeployedAs, lineage.SourceForge, at)
+					d.linkAt(deploy, target, lineage.RelPartOf, lineage.SourceForge, at)
+				}
+			}
+		})
 		return
 	}
 	repo, n, ok := prOfURL(p.PR.URL)
@@ -87,6 +101,20 @@ func (d *Daemon) boundCIRuns(pr wire.LineageNode) {
 		kept++
 		return kept > ciRunsPerPR
 	})
+}
+
+// mostDeploys bounds the deploys one run may link.
+const mostDeploys = 10
+
+// deployNodes are a deploy's node and its target's, from its ref <target>:<id>/<version>.
+func deployNodes(ref string) (deploy, target wire.LineageNode, ok bool) {
+	where, _, ok := strings.Cut(ref, "/")
+	i := strings.LastIndex(ref, "/")
+	if !ok || i == len(ref)-1 || strings.ContainsAny(ref, " \t\n") || !strings.Contains(where, ":") {
+		return deploy, target, false
+	}
+	return wire.LineageNode{Kind: lineage.KindDeploy, Ref: ref},
+		wire.LineageNode{Kind: lineage.KindTarget, Ref: "target:" + ref[:i]}, true
 }
 
 // repoOfRunURL is the repo of a GitHub Actions run's web address,

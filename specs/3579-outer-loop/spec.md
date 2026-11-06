@@ -47,7 +47,7 @@ new stage needs no wire change: only a new linker in the host.
 | PR | `pr`, `github:<o>/<r>#n` | session `opens` PR; PR `fixes` issue | there (#2349) |
 | Build (CI run) | `ci-run`, `github:<o>/<r>/actions/run/<id>` | `ci-run` `builds` PR, or `builds` release | there (#3581): `checks.*` and `run.completed` on a `v*` tag; a PR keeps its last 20 runs |
 | Release | `release`, `github:<o>/<r>/release/<tag>` | PR `part-of` release; milestone `shipped-in` release | there (#3023) |
-| Deploy | `deploy`, `<target>:<id>/<version>`, as `testflight:<bundle id>/<build>` | release `deployed-as` deploy; deploy `part-of` its target | **missing**; #3023 named it as a follow-up |
+| Deploy | `deploy`, `<target>:<id>/<version>`, as `testflight:<bundle id>/<build>` | release `deployed-as` deploy; deploy `part-of` its target | there (#3584): a job's `::notice title=deploy::testflight:<bundle id>/<build>`, read from `run.completed` on a `v*` tag |
 | Health signal | `health`, `<source>:<id>`, as `sentry:<org>/<issue id>` | health `seen-in` release or deploy | there (#3585): `health.issue_new` and `health.issue_regressed`, matched to the release by version |
 | New issue | `issue` | issue `reports` health | there (#3586): the ready-made **File a bug from Sentry**; the bug its session labels itself with |
 

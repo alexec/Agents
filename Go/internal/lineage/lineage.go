@@ -44,6 +44,10 @@ const (
 	KindCIRun = "ci-run"
 	// KindHealth is a health signal (#3585): a Sentry issue, sentry:<org>/<issue id>.
 	KindHealth = "health"
+	// KindDeploy is a build or a version put on a deploy target (#3584), as a TestFlight build:
+	// testflight:<bundle id>/<build>. KindTarget is where it went: target:testflight:<bundle id>.
+	KindDeploy = "deploy"
+	KindTarget = "target"
 
 	RelWorksOn = "works-on"
 	RelOpens   = "opens"
@@ -61,6 +65,8 @@ const (
 	RelBuilds = "builds"
 	// RelSeenIn is a health signal seen in a release or a deploy (#3585).
 	RelSeenIn = "seen-in"
+	// RelDeployedAs is a release deployed as a deploy (#3584); the deploy is part-of its target.
+	RelDeployedAs = "deployed-as"
 	// RelReports is an issue filed for a health signal, or commented on for it (#3586).
 	RelReports = "reports"
 

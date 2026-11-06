@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -106,6 +107,57 @@ func TestRepoOfRunURL(t *testing.T) {
 		}
 		if got != want {
 			t.Errorf("%s: got %q, want %q", raw, got, want)
+		}
+	}
+}
+
+// #3584: what run.completed on a version tag says the run deployed is a deploy node: the
+// release is deployed-as it, and it is part-of its target, so a walk from an issue reaches the
+// TestFlight build that shipped it. A ref that is not <target>:<id>/<version> links nothing.
+func TestLineageReleaseDeployedAsATestFlightBuild(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	issue := wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#3584"}
+	pr := wire.LineageNode{Kind: "pr", Ref: "github:alexec/agents#9"}
+	release := wire.LineageNode{Kind: "release", Ref: "github:alexec/agents/release/v0.17.0"}
+	d.lineageDo(func() {
+		d.link(pr, issue, "fixes", "pr-body")
+		d.link(pr, release, "part-of", "forge")
+	})
+	d.lineageEvent(wire.Event{Name: "run.completed", Details: map[string]string{"payload": `{"run":{"id":500,"attempt":1,` +
+		`"workflow":"release.yml","event":"push","branch":"v0.17.0","url":"https://github.com/alexec/Agents/actions/runs/500",` +
+		`"conclusion":"success"},"completedAt":"2026-11-05T10:00:00Z",` +
+		`"deploys":["testflight:com.alexecollins.agents.remote/812","not a deploy","testflight:"]}`}})
+	deploy := "testflight:com.alexecollins.agents.remote/812"
+	wantLinks(t, active(d, release),
+		"github:alexec/agents/actions/run/500 builds "+release.Ref+" (forge)",
+		release.Ref+" deployed-as "+deploy+" (forge)",
+		pr.Ref+" part-of "+release.Ref+" (forge)")
+	wantLinks(t, active(d, wire.LineageNode{Kind: "deploy", Ref: deploy}),
+		release.Ref+" deployed-as "+deploy+" (forge)",
+		deploy+" part-of target:testflight:com.alexecollins.agents.remote (forge)")
+	// Issue, PR, release, deploy: 3 links, past the default depth of 2 (#3588 walks further).
+	reached := false
+	for _, l := range d.lineage().Walk(issue, lineage.MostDepth).Links {
+		reached = reached || (l.From == release && l.Rel == lineage.RelDeployedAs && l.To.Ref == deploy)
+	}
+	if !reached {
+		t.Fatalf("a walk from %s does not reach %s", issue.Ref, deploy)
+	}
+}
+
+func TestDeployNodes(t *testing.T) {
+	for ref, want := range map[string]string{
+		"testflight:com.example.app/42":      "target:testflight:com.example.app",
+		"cloudrun:project/service/rev-00042": "target:cloudrun:project/service",
+		"testflight:com.example.app/":        "",
+		"testflight:com.example.app":         "",
+		"com.example.app/42":                 "",
+		"testflight:a b/42":                  "",
+	} {
+		_, target, ok := deployNodes(ref)
+		if ok != (want != "") || target.Ref != want {
+			t.Errorf("deployNodes(%q) = %q, %v; want %q", ref, target.Ref, ok, want)
 		}
 	}
 }
