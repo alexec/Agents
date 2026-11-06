@@ -57,6 +57,24 @@ public enum EstimateWords {
         return "est. " + parts.joined(separator: " · ")
     }
 
+    /// A closed issue's or epic's estimate against what it took (#3561): "Estimated $3.20, 2h 10m
+    /// of work; actual $4.10, 3h of work". Nil while open, before work started, or when the
+    /// estimate then had no figures.
+    public static func actualWords(_ e: Estimate) -> String? {
+        guard let kept = e.kept, let actual = e.actual else { return nil }
+        var said: [String] = []
+        let priced = (kept.cost ?? [:]).sorted { $0.key < $1.key }
+        if !priced.isEmpty {
+            said.append(priced.map { $0.value.formatted(.currency(code: $0.key).precision(.fractionLength(2))) }
+                .joined(separator: " + "))
+        }
+        if let w = kept.workingSeconds { said.append("\(TimeChart.words(w)) of work") }
+        guard !said.isEmpty else { return nil }
+        var took = [ReportValueWords.cost(actual)]
+        if kept.workingSeconds != nil { took.append("\(TimeChart.words(actual.workingSeconds)) of work") }
+        return "Estimated \(said.joined(separator: ", ")); actual \(took.joined(separator: ", "))"
+    }
+
     /// The closed issues it was made from: "31 closed stories", "12 closed bugs", "40 closed issues".
     static func source(_ e: Estimate) -> String {
         let kind: (String, String) = switch e.matchedBy {

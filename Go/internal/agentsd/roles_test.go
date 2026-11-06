@@ -34,8 +34,6 @@ func TestRoleAllows(t *testing.T) {
 		{RoleAgent, "daemon/ping", true},
 		{RoleAgent, "agents/delete", false},
 		{RoleAgent, "folders/setHelperLimits", false},
-		{RolePairing, "devices/announce", true},
-		{RolePairing, "agents/list", false},
 		{RoleHostApp, "folders/list", true},
 		{RoleHostApp, "agents/list", true},
 		{RoleHostApp, "agents/prompt", false},

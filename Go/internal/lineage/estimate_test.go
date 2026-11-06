@@ -141,3 +141,45 @@ func TestEstimateEpic(t *testing.T) {
 		t.Fatalf("%+v %+v", a.Cost, b.Cost)
 	}
 }
+
+// #3561: an estimate kept for a start knows only the issues merged before it, and keeps its
+// medians; an epic's counts every child as open.
+func TestKeepAtTheStart(t *testing.T) {
+	var h []Past
+	for i := range 6 {
+		p := past(i, "enhancement", "task", float64(i+1), 1)
+		p.Merged = 100
+		h = append(h, p)
+	}
+	late := past(6, "enhancement", "task", 1000, 1)
+	late.Merged = 300
+	h = append(h, late)
+	k := KeepIssue(h, wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#9"}, []string{"enhancement", "task"}, 200)
+	if k.At != 200 || k.Matches != 6 || k.Cost["USD"] != 3.5 || *k.MatchedBy != MatchedByLevel || *k.WorkingSeconds != 210 {
+		t.Fatalf("%+v", k)
+	}
+	if k := KeepIssue(h, wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#9"}, nil, 50); k.Matches != 0 || k.Cost != nil {
+		t.Fatalf("%+v", k)
+	}
+	child := func(n string, open bool) EpicChild {
+		return EpicChild{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#" + n}, Labels: []string{"enhancement", "task"}, Open: open}
+	}
+	e := KeepEpic(h, wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#10"}, []string{"epic"},
+		[]EpicChild{child("11", false), child("12", true)}, 200)
+	if e.MatchedBy != nil || e.Cost["USD"] < 2 || e.Cost["USD"] > 12 {
+		t.Fatalf("%+v", e)
+	}
+}
+
+// #3561: the error is how many times too high or too low, as the backtest measured it.
+func TestErrorOf(t *testing.T) {
+	if v, ok := ErrorOf(2, 3); !ok || v != 1.5 {
+		t.Fatal(v)
+	}
+	if v, ok := ErrorOf(3, 2); !ok || v != 1.5 {
+		t.Fatal(v)
+	}
+	if _, ok := ErrorOf(0, 2); ok {
+		t.Fatal("zero")
+	}
+}

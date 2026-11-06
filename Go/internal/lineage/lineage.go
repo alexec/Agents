@@ -39,6 +39,11 @@ const (
 	KindRelease     = "release"
 	// KindDoc is a doc behind the work (#3308): a file under specs/ or docs/, or a docs page.
 	KindDoc = "doc"
+	// KindCIRun is a forge's CI run (#3581): a GitHub Actions run or a GitLab pipeline. Not
+	// KindWorkflowRun, which is an Agents workflow's run.
+	KindCIRun = "ci-run"
+	// KindHealth is a health signal (#3585): a Sentry issue, sentry:<org>/<issue id>.
+	KindHealth = "health"
 
 	RelWorksOn = "works-on"
 	RelOpens   = "opens"
@@ -52,6 +57,10 @@ const (
 	// RelReads and RelLinksTo are a session that read a doc, or named it in what it said (#3308).
 	RelReads   = "reads"
 	RelLinksTo = "links-to"
+	// RelBuilds is a CI run that builds a PR, or the release of the tag it ran on (#3581).
+	RelBuilds = "builds"
+	// RelSeenIn is a health signal seen in a release or a deploy (#3585).
+	RelSeenIn = "seen-in"
 
 	SourceStart  = "start"
 	SourceBranch = "branch"
@@ -61,6 +70,8 @@ const (
 	SourcePerson = "person"
 	// SourceForge is a link the forge says, such as an issue part-of its milestone (#2935).
 	SourceForge = "forge"
+	// SourceHealth is a link a health source says, such as Sentry's release of an issue (#3585).
+	SourceHealth = "health"
 )
 
 // The bounds (#2348; "Bound data, not concurrency"). An ended link is kept KeepEnded after

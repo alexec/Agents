@@ -84,3 +84,41 @@ func TestCycleTimeFromStartToMerge(t *testing.T) {
 		t.Fatalf("epic row %+v", e)
 	}
 }
+
+// #3561: Reports ▸ Value says how far the estimates kept at the start of work were from what
+// the issues closed in the range took: the median of how many times too high or too low.
+// An issue with no estimate, still open, or closed before the range is not counted.
+func TestValueSaysTheEstimateError(t *testing.T) {
+	str := func(s string) *string { return &s }
+	date := func(d wire.Date) *wire.Date { return &d }
+	work := func(v float64) *float64 { return &v }
+	issue := func(n string, est, actual float64, kept bool, state string) wire.LineageCostNode {
+		c := wire.LineageCostNode{Node: wire.LineageNode{Kind: "issue", Ref: "github:o/r#" + n},
+			Banked: wire.LineageCost{Cost: map[string]float64{"USD": actual}, WorkingSeconds: actual * 60}, LastAt: 500,
+			Resolved: &wire.LineageResolved{Title: n, State: str(state)}}
+		if kept {
+			c.Estimate = &wire.LineageEstimateKept{At: 100, Matches: 5, Cost: map[string]float64{"USD": est}, WorkingSeconds: work(est * 60)}
+		}
+		return c
+	}
+	pr := func(n, fixes string, ended wire.Date) wire.LineageCostNode {
+		return wire.LineageCostNode{Node: wire.LineageNode{Kind: "pr", Ref: "github:o/r#" + n},
+			Banked: wire.LineageCost{Cost: map[string]float64{}}, Fixes: []string{"github:o/r#" + fixes},
+			Outcome: str("merged"), EndedAt: date(ended), LastAt: ended}
+	}
+	v := valueOf([]wire.LineageCostNode{
+		issue("1", 2, 4, true, "closed"), pr("11", "1", 500), // x2
+		issue("2", 3, 3, true, "closed"), pr("12", "2", 500), // x1
+		issue("3", 6, 2, true, "closed"), pr("13", "3", 500), // x3
+		issue("4", 1, 50, false, "closed"), pr("14", "4", 500),
+		issue("5", 1, 50, true, "open"), pr("15", "5", 500),
+		issue("6", 1, 50, true, "closed"), pr("16", "6", 100),
+	}, 400)
+	e := v.EstimateError
+	if e == nil || e.Issues != 3 || *e.Cost != 2 || *e.WorkingSeconds != 2 {
+		t.Fatalf("%+v", e)
+	}
+	if v := valueOf(nil, 0); v.EstimateError != nil {
+		t.Fatalf("%+v", v.EstimateError)
+	}
+}

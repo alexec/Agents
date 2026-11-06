@@ -165,6 +165,10 @@ func mergeNode(have *wire.LineageCostNode, n wire.LineageCostNode) {
 			*f.have = *f.n
 		}
 	}
+	// The estimate made for the earliest start (#3561).
+	if n.Estimate != nil && (have.Estimate == nil || n.Estimate.At < have.Estimate.At) {
+		have.Estimate = n.Estimate
+	}
 	if n.LastAt > have.LastAt {
 		have.LastAt = n.LastAt
 	}
@@ -284,6 +288,7 @@ func valueOf(nodes []wire.LineageCostNode, since wire.Date) wire.ReportValue {
 		}
 	}
 	out.LeadTimeSeconds, out.CycleTimeSeconds = median(leads), median(cycles)
+	out.EstimateError = estimateError(issues, byRef, issueParts, children, since)
 	limited := false
 	out.Issues, limited = mostCostly(out.Issues)
 	var more bool
@@ -295,6 +300,47 @@ func valueOf(nodes []wire.LineageCostNode, since wire.Date) wire.ReportValue {
 		out.Limited = &t
 	}
 	return out
+}
+
+// estimateError is how far the estimates kept at the start of work were from what the issues
+// took (#3561), over the issues closed in the range: those with a merged PR that ended since,
+// that are not open and not an epic. None when no issue had an estimate.
+func estimateError(issues []string, byRef map[string]wire.LineageCostNode, issueParts func(string) []wire.LineageCostNode,
+	children map[string][]string, since wire.Date) *wire.ReportEstimateError {
+	var costs, works []float64
+	var n int64
+	for _, ref := range issues {
+		node, ok := byRef[ref]
+		if !ok || node.Estimate == nil || len(children[ref]) > 0 || (node.Level != nil && *node.Level == "epic") ||
+			(node.Resolved != nil && node.Resolved.State != nil && *node.Resolved.State == "open") {
+			continue
+		}
+		actual := wire.LineageCost{Cost: map[string]float64{}}
+		closed := false
+		for _, p := range issueParts(ref) {
+			lineage.AddCost(&actual, p.Banked)
+			if p.Node.Kind == lineage.KindPR && p.Outcome != nil && *p.Outcome == lineage.OutcomeMerged && p.EndedAt != nil &&
+				*p.EndedAt >= since {
+				closed = true
+			}
+		}
+		if !closed {
+			continue
+		}
+		n++
+		if v, ok := lineage.ErrorOf(node.Estimate.Cost["USD"], actual.Cost["USD"]); ok {
+			costs = append(costs, v)
+		}
+		if w := node.Estimate.WorkingSeconds; w != nil {
+			if v, ok := lineage.ErrorOf(*w, actual.WorkingSeconds); ok {
+				works = append(works, v)
+			}
+		}
+	}
+	if n == 0 {
+		return nil
+	}
+	return &wire.ReportEstimateError{Issues: n, Cost: median(costs), WorkingSeconds: median(works)}
 }
 
 // median is the middle of values, or none when there are none.

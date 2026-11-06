@@ -29,6 +29,8 @@ import (
 //   - Each forge issue named here is part of its milestone (lineagemilestone.go, #2935),
 //     and of its parent issue (#3582).
 //   - A session opens each forge issue it files (lineagefiled.go, #3582).
+//   - checks.passed and checks.failed link the CI run builds its PR; run.completed on a
+//     version tag links the run builds its release (lineageci.go, #3581).
 //   - pr.merged and pr.closed end the sessions' links to the PR; pr.closed also ends its
 //     fixes links, as a PR closed without a merge fixed nothing. An archived session's
 //     links end.
@@ -339,8 +341,17 @@ type prEventPayload struct {
 	} `json:"pr"`
 }
 
-// lineageEvent makes the links a raised event says: pr.opened, pr.merged and pr.closed.
+// lineageEvent makes the links a raised event says: pr.opened, pr.merged and pr.closed,
+// the CI runs of checks.* and run.completed (lineageci.go), and the health signals of
+// health.* (lineagehealth.go).
 func (d *Daemon) lineageEvent(e wire.Event) {
+	switch e.Name {
+	case "checks.failed", "checks.passed", "run.completed":
+		d.lineageCIEvent(e)
+	case "health.issue_new", "health.issue_regressed":
+		d.lineageHealthEvent(e)
+		return
+	}
 	switch e.Name {
 	case "pr.opened", "pr.merged", "pr.closed", "checks.failed":
 	default:

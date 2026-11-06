@@ -108,6 +108,21 @@ Decided: the hours are the agents' working time, not the cycle or lead time, bec
 Decided: no landing date on the pages yet, because the cycle time needs the start of work (#3562), which has only just begun to be recorded. Alex can overrule.
 Decided: a closed issue shows no estimate, because story 4 (#3561) shows the estimate against the actual there. Alex can overrule.
 
+## Estimate against actual (#3561)
+
+- **Kept at the start.** Each issue in `lineage-cost.json` gets `estimate` (`LineageEstimateKept`: the medians of dollars, output tokens and working time, the matches and the rule) once its work has started (`startedAt`, else `firstAt`) and its labels are known. It is made from the issues that merged **before** that start, so an issue banked before this change gets the same estimate it would have had (the backfill), and it is made once.
+- **An epic's** is made when `lineage/estimate` asks for it: every child of its plan estimated as open, by the simulation, from the issues merged before the first start on the epic or any child. It is kept on the epic's node when the store has one.
+- **`lineage/estimate`** adds `kept` (the estimate at the start) and, for a closed issue or epic, `actual`: an issue's own cost and its PRs'; an epic's, its own and every child's.
+- **Work's page** of a closed issue or epic: "Estimated $3.20, 2h 10m of work; actual $4.10, 3h of work" under the title (`EstimateWords.actualWords`, `actualWords` in `Web/src/model/estimate.ts`). Nothing with no estimate then.
+- **Reports ▸ Value** (the web page): "Estimates were off by ×1.5 in dollars and ×1.4 in hours of work (the median of 12 closed issues)". The error is the backtest's, the median of `max(est/actual, actual/est)`, over the issues with an estimate whose last PR merged in the report's range, not epics.
+
+Decided: the error is over the report's range (a month by default), not a fixed 30 days, because every other figure on Reports ▸ Value follows the range. Alex can overrule.
+Decided: the hours are the agents' working time, as on the open page (#3560). Alex can overrule.
+Decided: an epic's estimate at its start counts the children its plan has now, because the plan at its start is not kept; a child added later makes the estimate higher. Alex can overrule.
+- **The lead's closing summary** (#3590): the app tool `estimate_issue`, read-only, says `lineage/estimate` to an agent, with the same line once the issue or epic is closed. The `lead` skill closes the epic, asks it, and puts the line in its summary comment.
+
+Decided: an app tool (`estimate_issue`, method `issues/estimate`), not the daemon posting the line on the epic, because the lead already writes the summary and other agents (the Product Owner, when it files an epic) can ask for an estimate too. Alex can overrule.
+
 ## What the backtest does not cover
 
 - **6 days of history.** The store starts on 2026-10-30. These numbers will change as history grows. Story 4 (estimate against actual) keeps track of them.

@@ -11,6 +11,7 @@ import (
 	"github.com/alexec/agents/Go/internal/googlechatmcp"
 	"github.com/alexec/agents/Go/internal/jiramcp"
 	"github.com/alexec/agents/Go/internal/linearmcp"
+	"github.com/alexec/agents/Go/internal/sentrymcp"
 	"github.com/alexec/agents/Go/internal/slackmcp"
 	"github.com/alexec/agents/Go/internal/whatsappmcp"
 	"github.com/alexec/agents/Go/wire"
@@ -195,6 +196,28 @@ func TestWhatsAppAsksForItsSecrets(t *testing.T) {
 	}
 	if len(built.Variables) != 5 || !built.Variables[0].Required || !built.Variables[0].AlreadySet || built.Variables[1].AlreadySet ||
 		built.Variables[4].Required || built.Variables[0].Kind != wire.MCPVariableKindSecret {
+		t.Fatalf("variables: %+v", built.Variables)
+	}
+}
+
+// Sentry's events (#3583) ask for a token and the organization, kept in the person's
+// secrets, declare the events their server raises and no tools: Sentry's own server has them.
+func TestSentryEventsAskForItsToken(t *testing.T) {
+	sentry, ok := OursByID("agents/sentry")
+	if !ok || sentry.Command != "sentry-mcp" || sentry.Declares.Tools || sentry.Declares.Views ||
+		!reflect.DeepEqual(sentry.Declares.Events, sentrymcp.EventNames()) {
+		t.Fatalf("sentry: %+v %v, the server's %v", sentry, ok, sentrymcp.EventNames())
+	}
+	if sentry.NameHere() != "sentry-events" {
+		t.Fatalf("name: %s", sentry.NameHere())
+	}
+	built := BuildOurs(sentry, func(name string) bool { return name == "SENTRY_ORG" })
+	want := `{"command":"sentry-mcp","hosted":true,"env":{"SENTRY_AUTH_TOKEN":"${SENTRY_AUTH_TOKEN}","SENTRY_ORG":"${SENTRY_ORG}","SENTRY_URL":"${SENTRY_URL}"}}`
+	if got := strings.Join(strings.Fields(built.Entry.Stringified()), ""); got != want {
+		t.Fatalf("entry: %s", got)
+	}
+	if len(built.Variables) != 3 || !built.Variables[0].Required || built.Variables[0].AlreadySet || !built.Variables[1].AlreadySet ||
+		built.Variables[2].Required || built.Variables[0].Kind != wire.MCPVariableKindSecret {
 		t.Fatalf("variables: %+v", built.Variables)
 	}
 }

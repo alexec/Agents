@@ -3244,8 +3244,6 @@ type DeviceAnnouncement struct {
 
 type DeviceBinding struct {
 	ID *UUID `json:"id,omitzero"`
-
-	Pairing *bool `json:"pairing,omitzero"`
 }
 
 type DeviceForget struct {
@@ -5360,6 +5358,9 @@ type LineageCostNode struct {
 
 	// The sessions linked to the node (works-on, opens, reviews), by ref, at most 20 (#3118).
 	Sessions []string `json:"sessions,omitzero"`
+
+	// An issue's estimate when its work started (#3561), kept once made, for the estimate against the actual when it closes.
+	Estimate *LineageEstimateKept `json:"estimate,omitzero"`
 }
 
 // lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total adds its parts: an issue's PRs (the PRs that fix it); a milestone's issues, their PRs and the PRs part of it; a repo's every node (kind repo, ref github:alexec/agents). waste is the parts' PRs closed without a merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is the nodes added up, newest first, at most 500; limited says there are more.
@@ -5447,6 +5448,12 @@ type LineageEstimate struct {
 
 	// An epic's open children, each estimated as an issue, in step order.
 	Children []LineageEstimate `json:"children,omitzero"`
+
+	// The estimate when work on it started (#3561), from the issues merged before then; absent before work starts. An issue's is kept in the cost store; an epic's is made from its plan's children, all open, at the epic's start.
+	Kept *LineageEstimateKept `json:"kept,omitzero"`
+
+	// What a closed issue or epic took (#3561): an issue's own cost and its PRs'; an epic's, its own and every child's. Absent while open.
+	Actual *LineageCost `json:"actual,omitzero"`
 }
 
 // When work lands (#3559): the median and the P10 to P90 range.
@@ -5456,6 +5463,27 @@ type LineageEstimateDates struct {
 	P10 Date `json:"p10"`
 
 	P90 Date `json:"p90"`
+}
+
+// An estimate as it was when work started (#3561): the medians of lineage/estimate's figures, made from the closed issues that had merged before the start, so it can be set against what the work took when it closes.
+type LineageEstimateKept struct {
+	// The start of work it was made for: the history is the issues merged before it.
+	At Date `json:"at"`
+
+	// level, type or all, as LineageEstimate.matchedBy; absent for an epic and with too few closed issues.
+	MatchedBy *string `json:"matchedBy,omitzero"`
+
+	// The closed issues it was made from.
+	Matches int64 `json:"matches"`
+
+	// Dollars, by currency: the median.
+	Cost map[string]float64 `json:"cost,omitzero"`
+
+	// The median.
+	OutputTokens *float64 `json:"outputTokens,omitzero"`
+
+	// The agents' time at work: the median.
+	WorkingSeconds *float64 `json:"workingSeconds,omitzero"`
 }
 
 // A figure's estimate (#3559): the median and the P10 to P90 range.
@@ -7570,22 +7598,6 @@ type PagesChangedNotification struct {
 	Folders []string `json:"folders"`
 }
 
-// devices/startPairing: a one-time secret and this Mac's name, good for five minutes or one device.
-type PairingCode struct {
-	Secret Data `json:"secret"`
-
-	Name string `json:"name"`
-
-	Expires Date `json:"expires"`
-}
-
-// pairing/current: the secret the bridge's listener should take, if any.
-type PairingSecret struct {
-	Secret Data `json:"secret,omitzero"`
-
-	Expires *Date `json:"expires,omitzero"`
-}
-
 // One name in the person's own pass-through list (#998, FR-011a), as runtime-environment.json has it.
 type PassThroughName struct {
 	// A variable's name, or a prefix ending in *.
@@ -9258,6 +9270,18 @@ type ReportCounts struct {
 	WorkflowFailures int64 `json:"workflowFailures"`
 }
 
+// How far the estimates were from the actual figures (#3561), over the issues closed in the range that had an estimate when their work started: the median of max(estimate/actual, actual/estimate), so 1.5 means 1.5 times too high or too low. A figure is absent when no issue had it.
+type ReportEstimateError struct {
+	// The closed issues with an estimate.
+	Issues int64 `json:"issues"`
+
+	// In US dollars.
+	Cost *float64 `json:"cost,omitzero"`
+
+	// In the agents' time at work.
+	WorkingSeconds *float64 `json:"workingSeconds,omitzero"`
+}
+
 // reports/export's answer (#1811): the rows as CSV or JSON lines.
 type ReportExport struct {
 	Text string `json:"text"`
@@ -9512,6 +9536,8 @@ type ReportValue struct {
 
 	// The median of the issues' cycle times (#3562).
 	CycleTimeSeconds *float64 `json:"cycleTimeSeconds,omitzero"`
+
+	EstimateError *ReportEstimateError `json:"estimateError,omitzero"`
 
 	Issues []ReportValueRow `json:"issues"`
 

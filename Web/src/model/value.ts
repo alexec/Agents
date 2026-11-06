@@ -64,6 +64,19 @@ export function leadLine(v: ReportValue): string | undefined {
   return v.leadTimeSeconds === undefined ? undefined : `${timeWords(v.leadTimeSeconds)} from the first work on an issue to its merge (the median)`;
 }
 
+/** How far the estimates were from what the issues took (#3561): "Estimates were off by ×1.5 in dollars and ×1.4
+ * in hours of work (the median of 12 closed issues)". */
+export function estimateErrorLine(v: ReportValue): string | undefined {
+  const e = v.estimateError;
+  if (!e) return undefined;
+  const off: string[] = [];
+  if (e.cost !== undefined) off.push(`×${e.cost.toFixed(1)} in dollars`);
+  if (e.workingSeconds !== undefined) off.push(`×${e.workingSeconds.toFixed(1)} in hours of work`);
+  const issues = plural(e.issues, "closed issue", "closed issues");
+  return off.length === 0 ? `No estimate had a figure to set against the actual (${issues})`
+    : `Estimates were off by ${off.join(" and ")} (the median of ${issues})`;
+}
+
 /** The turns that had no issue or pull request, or nothing when there were none. */
 export function unlinkedLine(v: ReportValue): string | undefined {
   return spent(v.unlinked) ? `${costWords(v.unlinked)} on turns with no issue or pull request` : undefined;
@@ -84,5 +97,5 @@ export function rowLine(r: ReportValueRow): string {
 }
 
 export const noValue = "No work on issues or pull requests in this time. A session works on one when it has a label such as #12 or P#34, or opens a pull request on its branch.";
-export const valueNote = "An issue’s cost is its own and its pull requests’, from every machine. A pull request closed without a merge, and a merged revert, is waste. A node counts in the range when it last changed in it, with all of its cost. The lead time is from the first work on an issue to its last pull request merged.";
+export const valueNote = "An issue’s cost is its own and its pull requests’, from every machine. A pull request closed without a merge, and a merged revert, is waste. A node counts in the range when it last changed in it, with all of its cost. The lead time is from the first work on an issue to its last pull request merged. An estimate is the one an issue had when its work started.";
 export const noValueHere = "This control plane does not add up the value of the work yet. Update it to see it.";
