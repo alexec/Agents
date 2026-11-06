@@ -1,7 +1,7 @@
 // Work (#3119): on a run-app root whose folder's repo is on a fixture GitHub (AGENTS_TEST_GITHUB_URL)
 // and has issues, PRs and sessions linked by lineage/link, open Work ▸ Issues, filter by a label, open
-// Pull requests, open an issue's page (body, comments, lineage, graph), follow a link to its PR's page,
-// go Back, and open a page no agent touched. Screenshots into <out dir>.
+// Pull requests, open an issue's page (body, comments), open its PR's page, go Back, and open a page no
+// agent touched. Screenshots into <out dir>.
 //
 //   node Web/test/walk/work3119.mjs <WEB_URL> <browser code> <out dir>
 
@@ -42,28 +42,27 @@ try {
   await page.eval(`location.hash = "#/work/issue"`);
   await page.waitFor(`document.querySelectorAll(".work-row").length > 0`, 30_000);
   await page.eval(`[...document.querySelectorAll(".work-row")].find((r) => r.textContent.includes("Safari")).click()`);
-  await page.waitFor(`document.querySelector(".work-comment") && document.querySelector(".work-links") && document.querySelector(".lineage-graph")`, 30_000);
+  await page.waitFor(`document.querySelector(".work-comment")`, 30_000);
   ok(`the page's address: ${await page.eval("location.hash")}`, (await page.eval("location.hash")) === "#/work/issue/github%3Aexample%2Fshop%2312");
   await sleep(800);
   await page.shot(`${out}/web-issue-page.png`);
-  await page.eval(`document.querySelector(".work-lineage").scrollIntoView()`);
-  await sleep(300);
-  await page.shot(`${out}/web-issue-lineage.png`);
+  ok("the issue's page has no Lineage section (#3506)", await page.eval(`!document.querySelector(".work-lineage")`));
 
-  console.log("links:", await page.eval(`[...document.querySelectorAll(".work-links button")].map((b) => b.textContent).join(" | ")`));
-  await page.eval(`[...document.querySelectorAll(".work-links button")].find((b) => b.textContent.toLowerCase().includes("(pull request)")).click()`);
+  await page.eval(`location.hash = "#/work/pr"`);
+  await page.waitFor(`[...document.querySelectorAll(".work-row")].some((r) => r.textContent.includes("checkout"))`, 30_000);
+  await page.eval(`[...document.querySelectorAll(".work-row")].find((r) => r.textContent.includes("checkout")).click()`);
   await page.waitFor(`location.hash.startsWith("#/work/pr/") && document.querySelector(".work-page-head")?.textContent.includes("Checks")`, 30_000);
-  ok("a link opens the PR's page, with its checks and review", true);
+  ok("a row opens the PR's page, with its checks and review", true);
   await sleep(600);
   await page.shot(`${out}/web-pr-page.png`);
 
   await page.press("Back");
-  await page.waitFor(`location.hash === "#/work/issue/github%3Aexample%2Fshop%2312"`, 30_000);
-  ok("Back goes to the issue", true);
+  await page.waitFor(`location.hash === "#/work/pr"`, 30_000);
+  ok("Back goes to the list", true);
 
   await page.eval(`location.hash = "#/work/issue/" + encodeURIComponent("github:example/shop#17")`);
-  await page.waitFor(`document.querySelector(".work-lineage .hint")?.textContent === "No agent has worked on this yet."`, 30_000);
-  ok("a page no agent touched says so", true);
+  await page.waitFor(`document.querySelector(".work-body")`, 30_000);
+  ok("a page no agent touched opens", true);
   await sleep(400);
   await page.shot(`${out}/web-no-agent.png`);
 

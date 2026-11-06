@@ -3,7 +3,7 @@
 // (reports/nodes: cost, sessions, lead time) on top. Milestones and releases come from reports/nodes
 // alone in v1. As WorkList has it on the window.
 import type {
-  ForgeCheck, ForgeDone, ForgeItem, ForgeItemDetail, ForgeLabel, ForgeListError, ForgeListRequest, ForgeMergeMethod, LineageCostRollup, LineageLink,
+  ForgeCheck, ForgeDone, ForgeItem, ForgeItemDetail, ForgeLabel, ForgeListError, ForgeListRequest, ForgeMergeMethod,
   LineageNode, ProjectBoard, ReportNode,
 } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
@@ -331,41 +331,7 @@ export const noWork = (kind: WorkKind) => kind === "milestone" ? "No milestones 
 export const lineageOnlyNote = "Lineage lists a milestone or a release once an agent works on one of its issues or pull requests.";
 export const noForgeHere = "No machine reads issues and pull requests yet. Update Agents on a machine to see them.";
 
-// The page of one issue, PR, milestone or release (#3119): its links grouped by relation, its checks,
-// its review and its cost.
-
-/** A relation's heading, from this node's side: a PR "Fixes" an issue, the issue is "Fixed by" the PR. */
-const relWords: Record<string, [from: string, to: string]> = {
-  "works-on": ["Works on", "Worked on by"], opens: ["Opens", "Opened by"], fixes: ["Fixes", "Fixed by"],
-  started: ["Started", "Started by"], reviews: ["Reviews", "Reviewed by"], closes: ["Closes", "Closed by"],
-  "part-of": ["Part of", "Parts"],
-};
-const relOrder = ["Fixes", "Fixed by", "Closes", "Closed by", "Part of", "Parts", "Opens", "Opened by", "Reviews", "Reviewed by",
-  "Works on", "Worked on by", "Started", "Started by"];
-
-export interface LinkGroup { title: string; rows: { node: LineageNode; ended: boolean }[] }
-
-/** The node's links by relation, each other node once a group (an active link over an ended one), the
- * groups in a fixed order and any relation not known after them. */
-export function linkGroups(here: LineageNode, links: readonly LineageLink[]): LinkGroup[] {
-  const groups = new Map<string, Map<string, { node: LineageNode; ended: boolean }>>();
-  for (const l of links) {
-    const fromHere = l.from.kind === here.kind && l.from.ref === here.ref;
-    const toHere = l.to.kind === here.kind && l.to.ref === here.ref;
-    if (fromHere === toHere) continue;
-    const words = relWords[l.rel] ?? [l.rel.replaceAll("-", " "), `${l.rel.replaceAll("-", " ")} by`];
-    const title = fromHere ? words[0] : words[1];
-    const other = fromHere ? l.to : l.from;
-    const group = groups.get(title) ?? new Map();
-    const had = group.get(other.ref);
-    const ended = l.endedAt !== undefined;
-    if (!had || (had.ended && !ended)) group.set(other.ref, { node: other, ended });
-    groups.set(title, group);
-  }
-  const rank = (t: string) => { const i = relOrder.indexOf(t); return i < 0 ? relOrder.length : i; };
-  return [...groups].sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))
-    .map(([title, rows]) => ({ title, rows: [...rows.values()] }));
-}
+// The page of one issue, PR, milestone or release (#3119): its checks and its review.
 
 /** Whether a node has a page of its own in Work: an issue, a PR, a milestone or a release. */
 export const hasPage = (n: LineageNode): n is LineageNode & { kind: WorkKind } => (workKinds as readonly string[]).includes(n.kind);
@@ -384,16 +350,6 @@ const reviewTitle: Record<string, string> = {
 };
 export const reviewWords = (review: string | undefined) => review ? `Review: ${reviewTitle[review] ?? review.replaceAll("_", " ")}` : undefined;
 
-/** The cost line of a page: "Own $1.20 · total $3.40 · waste $0.30 · 2 failed checks"; undefined with nothing banked. */
-export function pageCostWords(r: LineageCostRollup): string | undefined {
-  if (!spent(r.total) && r.failedChecks === 0) return undefined;
-  const parts = [`Own ${costWords(r.own)}`, `total ${costWords(r.total)}`];
-  if (spent(r.waste)) parts.push(`waste ${costWords(r.waste)}`);
-  if (r.total.workingSeconds > 0) parts.push(`${timeWords(r.total.workingSeconds)} working`);
-  if (r.failedChecks > 0) parts.push(plural(r.failedChecks, "failed check"));
-  return parts.join(" · ");
-}
-
 /** The people line of a page: "by alexec · assigned to bob · milestone 0.14". */
 export function peopleWords(item: Pick<ForgeItem, "author" | "assignees" | "milestone">): string {
   const parts = [...item.author ? [`by ${item.author}`] : [], ...item.assignees.length > 0 ? [`assigned to ${item.assignees.join(", ")}`] : [],
@@ -401,7 +357,6 @@ export function peopleWords(item: Pick<ForgeItem, "author" | "assignees" | "mile
   return parts.join(" · ");
 }
 
-export const noAgentOnIt = "No agent has worked on this yet.";
 export const notReadHere = "No machine could read this from its forge.";
 
 // Actions (#3130), as WorkList's on the Mac.

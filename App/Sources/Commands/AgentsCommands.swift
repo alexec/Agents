@@ -197,7 +197,6 @@ struct AgentsCommands: Commands {
             Button("Docs") { model.showDocs(model.docsHistory.current ?? DocsPlace()) }
             Button("Cost") { model.showsSpending = true }
                 .keyboardShortcut("s", modifiers: [.command, .option])
-            Button("Lineage") { model.showLineage() }
             Button("Tokens") { model.showsTokens = true }
             Button("Time") { model.showsTime = true }
             Button("Milestones") { model.showsMilestones = true }

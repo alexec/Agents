@@ -1873,35 +1873,6 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .agent-config-sync { display: grid; gap: 3px; margin-bottom: 12px; }
 .agent-config-sync p { margin: 0; }
 .agent-config-project { min-width: min(760px, 90vw); max-height: 85vh; overflow: auto; }
-/* A session's Lineage tab (#2940): the nodes it is linked to, as a graph (#3019). */
-.lineage .crumbs .link { margin-left: auto; }
-/* Reports ▸ Lineage (#3087): Back, Forward and where to start, above the start's name and the graph. */
-.lineage-bar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
-.lineage-bar input { flex: 1 1 260px; min-width: 0; }
-.lineage-bar > button:not(.link) { min-width: 28px; }
-.lineage-start { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; margin: 4px 0; }
-.lineage-start .link { margin-left: auto; }
-/* Its graph (#3019): boxes and lines in an SVG, dragged or scrolled to move, zoomed by the buttons. */
-.lineage-graph { position: relative; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); overflow: hidden; margin: 4px 0 8px; }
-.lineage-graph svg { display: block; cursor: grab; touch-action: none; }
-.lineage-graph svg.dragging { cursor: grabbing; }
-.lineage-ground { fill: var(--paper-ground); }
-.lineage-zoom { position: absolute; top: 6px; right: 6px; display: flex; gap: 2px; padding: 2px; border-radius: var(--radius-control);
-  background: var(--paper-raised); box-shadow: 0 1px 3px var(--paper-shadow); }
-.lineage-zoom button { border: 0; background: transparent; color: inherit; font: inherit; font-variant-numeric: tabular-nums; min-width: 28px; padding: 2px 6px; cursor: pointer; border-radius: 5px; }
-.lineage-zoom button:hover { background: var(--paper-well); }
-.lineage-edge path { fill: none; stroke: currentColor; stroke-opacity: 0.45; stroke-width: 1.2; }
-.lineage-edge.ended path { stroke-dasharray: 4 3; }
-.lineage-verb { pointer-events: none; font-size: 10px; fill: currentColor; fill-opacity: 0.6; paint-order: stroke; stroke: var(--paper-ground); stroke-width: 4px; stroke-linejoin: round; }
-#lineage-arrow path { fill: currentColor; fill-opacity: 0.45; }
-.lineage-box .box { fill: var(--paper-raised); stroke: var(--paper-rule); }
-.lineage-box .box.here { stroke: var(--accent); stroke-width: 2; }
-.lineage-box .name { font-size: 12px; font-weight: 500; fill: currentColor; }
-.lineage-box.link .name { fill: var(--accent); }
-.lineage-box .detail { font-size: 10.5px; fill: currentColor; fill-opacity: 0.6; font-variant-numeric: tabular-nums; }
-.lineage-box.link { cursor: pointer; }
-.lineage-box.link:hover .box, .lineage-box:focus-visible .box, .lineage-box a:focus-visible .box { stroke: var(--accent); }
-
 /* Work (#3119): the lists of issues, pull requests, milestones and releases, a row each, and its page. */
 .work-filters { display: flex; gap: 8px 12px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
 .work-filters label { display: inline-flex; gap: 4px; align-items: center; }
@@ -1945,10 +1916,6 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .work-page section { margin-top: 16px; }
 .work-body { border-top: 1px solid var(--paper-rule); padding-top: 8px; }
 .work-comment { border-top: 1px solid var(--paper-rule); padding: 6px 0; }
-.work-links { display: grid; gap: 6px; margin: 8px 0; }
-.work-links > div { display: grid; grid-template-columns: 9em 1fr; gap: 2px 12px; }
-.work-links dt { color: var(--paper-ink); opacity: 0.7; }
-.work-links dd { margin: 0; grid-column: 2; }
 /* The page's actions (#3130): a row of buttons, the merge button split for its other methods. */
 .work-actions { margin-top: 8px; }
 .work-actions-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }

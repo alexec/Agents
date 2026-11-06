@@ -2,12 +2,12 @@ import AgentsKitCore
 import Foundation
 import Observation
 
-/// Which of the nine panes the column is showing.
+/// Which of the eight panes the column is showing.
 ///
-/// One column, nine panes, taking turns. The spec's assumption, and the reason a pane
+/// One column, eight panes, taking turns. The spec's assumption, and the reason a pane
 /// is a single case rather than a set.
 enum SidebarPane: String, CaseIterable, Identifiable, Sendable {
-    case files, changes, terminal, browser, artifacts, background, simulator, lineage, agentBrowser
+    case files, changes, terminal, browser, artifacts, background, simulator, agentBrowser
 
     var id: String { rawValue }
 
@@ -20,7 +20,6 @@ enum SidebarPane: String, CaseIterable, Identifiable, Sendable {
         case .artifacts: return "Exchanged"
         case .background: return "Background"
         case .simulator: return "Simulator"
-        case .lineage: return "Lineage"
         case .agentBrowser: return "Agent Browser"
         }
     }
@@ -34,7 +33,6 @@ enum SidebarPane: String, CaseIterable, Identifiable, Sendable {
         case .artifacts: return "tray.full"
         case .background: return "person.crop.circle.badge.clock"
         case .simulator: return "iphone"
-        case .lineage: return "point.3.connected.trianglepath.dotted"
         case .agentBrowser: return "cursorarrow.rays"
         }
     }

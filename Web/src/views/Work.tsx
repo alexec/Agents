@@ -4,20 +4,20 @@
 // releases lineage knows. A row opens its page.
 import { effect, useSignal } from "@preact/signals";
 import { useEffect, useMemo } from "preact/hooks";
-import type { ForgeItemDetail, ForgeLabel, LineageCostRollup, LineageEstimate, LineageLink, LineageNode } from "../protocol/generated";
+import type { ForgeItemDetail, ForgeLabel, LineageEstimate } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { Capability } from "../protocol/capabilities.generated";
 import { describe } from "../model/errors";
 import { hostAnswers } from "../model/capabilities";
 import {
-  boardChoices, boardName, checksWords, choices, errorWords, fromForge, hasPage, labelColor, labelInk, linkGroups, lineageOnlyNote,
-  lineageWords, noAgentOnIt, noAgentYet, noForgeHere, noWork, notReadHere, openOnWords, pageCostWords, peopleWords, positionWords, repoName,
+  boardChoices, boardName, checksWords, choices, errorWords, fromForge, labelColor, labelInk, lineageOnlyNote,
+  lineageWords, noAgentYet, noForgeHere, noWork, notReadHere, openOnWords, peopleWords, positionWords, repoName,
   reviewWords, shortRef, titleSaysRef, workKindTitle, workSortTitle, allProjects, projectOfFolder, projectWords, workFolderKey,
   type WorkFilter, type WorkKind, type WorkProject, type WorkRow, type WorkSort, type WorkState,
 } from "../model/work";
 import { newSessionProjects } from "../model/projects";
 import { orderedFolders } from "./Sidebar";
-import { kindWord, lineageUrl, readingTitles, sessionHost } from "../model/lineage";
+import { lineageUrl } from "../model/lineage";
 import { nodeName } from "../model/value";
 import { actualWords, estimateLine, estimateRangeWords, estimateSpentWords, showsEstimate } from "../model/estimate";
 import { ago } from "../model/connectorSetup";
@@ -25,7 +25,6 @@ import { fromWireDate } from "../protocol/dates";
 import { Markdown } from "../render/markdown";
 import { forgeMarkdown } from "../model/forgeMarkdown";
 import { ForgeTitle } from "../render/ForgeTitle";
-import { Graph, useLayout, useWalk } from "./Lineage";
 import { WorkActions, WorkCommentBox } from "./WorkActions";
 import { WorkPlan } from "./WorkPlan";
 import { WorkDocs } from "./Docs";
@@ -168,16 +167,14 @@ function WorkRowView({ row, several, open }: { row: WorkRow; several: boolean; o
 }
 
 /** The page of one issue, PR, milestone or release (#3119): the item from its forge (forge/issue,
- * forge/pull) on the first machine that reads it, and what lineage knows about it on a machine that
- * keeps links: its cost, its links by relation, and the graph centred here. An issue's and a pull
- * request's actions (#3130, WorkActions) go to the machine that read it. */
+ * forge/pull) on the first machine that reads it. An issue's and a pull request's actions (#3130,
+ * WorkActions) go to the machine that read it. */
 export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; ref: string }) {
   const node = useMemo(() => ({ kind, ref }), [kind, ref]);
   const asked = useSignal(0);
   const detail = useSignal<{ host: string; got: ForgeItemDetail } | null>(null);
   const forgeProblem = useSignal<string | null>(null);
   const older = useSignal(false);
-  const cost = useSignal<LineageCostRollup | null>(null);
   const estimate = useSignal<LineageEstimate | null>(null);
   const forgeHosts = store.hosts.value.filter((h) => hostAnswers(h.state) && store.has(h.id, Capability.forge1));
   const lineageHosts = store.hosts.value.filter((h) => hostAnswers(h.state) && store.has(h.id, Capability.lineage1));
@@ -204,13 +201,6 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
     })();
     return () => { current = false; };
   }, [kind, ref, forgeHosts.map((h) => h.id).join(","), asked.value]);
-  useEffect(() => {
-    let current = true;
-    cost.value = null;
-    if (!lineageHost) return;
-    void store.link.call("lineage/cost", { node }, lineageHost).then((r) => { if (current) cost.value = r; }, () => {});
-    return () => { current = false; };
-  }, [kind, ref, lineageHost, asked.value]);
   // An issue's estimate (#3560), from the machine that keeps its links: an open one's, and a closed one's as it
   // was when its work started, against what it took (#3561).
   const isIssue = detail.value?.got.item.node.kind === "issue";
@@ -223,10 +213,6 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
     return () => { current = false; };
   }, [kind, ref, lineageHost, isIssue, isOpen, asked.value]);
   const actual = estimate.value && !isOpen ? actualWords(estimate.value) : undefined;
-  // The walk holds the node's own links, and the titles of the nodes at their other ends.
-  const { graph, costs, failed, reading } = useWalk(store, lineageHost, node, asked.value);
-  const links: readonly LineageLink[] | null = failed.value ? [] : graph.value?.links ?? null;
-  const layout = useLayout(store, lineageHost, node, graph.value, costs.value);
 
   // The item again after a write (#3130), from the machine that read it, keeping the page until it comes.
   const reread = async () => {
@@ -259,24 +245,10 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
   };
 
   const item = detail.value?.got.item;
-  const resolved = graph.value?.resolved?.[ref];
-  const title = item?.title ?? resolved?.title ?? nodeName(node);
-  const state = item?.state ?? resolved?.state ?? "";
-  const labels: ForgeLabel[] = item?.labels ?? (resolved?.labels ?? []).map((name) => ({ name }));
+  const title = item?.title ?? nodeName(node);
+  const state = item?.state ?? "";
+  const labels: ForgeLabel[] = item?.labels ?? [];
   const url = item?.url ?? lineageUrl(node);
-  const groups = links ? linkGroups(node, links) : [];
-  const costLine = cost.value ? pageCostWords(cost.value) : undefined;
-  const none = links !== null && groups.length === 0;
-  const name = (n: LineageNode) => n.kind === "session" ? sessionName(store, n) : graph.value?.resolved?.[n.ref]?.title ?? nodeName(n);
-  const openNode = (n: LineageNode) => {
-    if (n.kind === "session") {
-      const id = n.ref.slice("session:".length);
-      const host = sessionHost(store.agents.value, id);
-      const chat = host ? store.agent(host, id) : undefined;
-      return host && chat ? () => go({ host, folder: chat.worktree?.folder || chat.cwd, session: chat.id }) : undefined;
-    }
-    return hasPage(n) ? () => go({ nav: "work", section: n.kind, item: n.ref }) : undefined;
-  };
   // The project the item was read for (#3283), when the person has more than one: with one, the page says nothing new.
   const projects = workProjects(store);
   const project = projects.length > 1 && detail.value ? projectOfFolder(item?.folder, detail.value.host, projects) : undefined;
@@ -339,36 +311,6 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
       {detail.value && (kind === "issue" || kind === "pr") && (
         <WorkDocs store={store} itemRef={ref} title={detail.value.got.item.title} body={detail.value.got.body} asked={asked.value} />
       )}
-      <section class="work-lineage" aria-label="Lineage">
-        <h3>Lineage</h3>
-        {!lineageHost ? <p class="hint">No machine keeps links yet. Update Agents on a machine to see them.</p>
-          : links === null ? <p class="hint">Reading the links…</p>
-          : none ? <p class="hint">{noAgentOnIt}</p>
-          : (
-            <>
-              {costLine && <p><span class="quiet">Cost</span> {costLine}</p>}
-              <dl class="work-links">
-                {groups.map((g) => (
-                  <div key={g.title}>
-                    <dt>{g.title}</dt>
-                    {g.rows.map((r) => {
-                      const open = openNode(r.node);
-                      const words = `${name(r.node)}${r.node.kind === "session" ? "" : ` (${kindWord(r.node.kind).toLowerCase()})`}${r.ended ? " · ended" : ""}`;
-                      return <dd key={r.node.ref}>{open
-                        ? <button type="button" class="link" onClick={open}>{words}{r.node.kind === "session" ? " ▸ chat" : " ▸"}</button>
-                        : <span>{words}</span>}</dd>;
-                    })}
-                  </div>
-                ))}
-              </dl>
-              {layout && layout.nodes.length > 0 && (
-                <Graph layout={layout} verb={(row) => row.session ? "Show the chat" : "Open its page"}
-                  show={(row) => row.node.kind === kind && row.node.ref === ref ? undefined : openNode(row.node)} />
-              )}
-              {reading.value && <p class="quiet small">{readingTitles}</p>}
-            </>
-          )}
-      </section>
     </article>
   );
 }
@@ -407,9 +349,3 @@ function Stepper({ store, kind, at }: { store: Store; kind: WorkKind; at: string
     </span>
   );
 }
-
-const sessionName = (store: Store, n: LineageNode) => {
-  const id = n.ref.slice("session:".length);
-  const host = sessionHost(store.agents.value, id);
-  return (host ? store.agent(host, id)?.title : undefined) ?? "A session";
-};

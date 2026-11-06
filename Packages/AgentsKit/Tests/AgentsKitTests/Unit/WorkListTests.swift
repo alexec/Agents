@@ -178,24 +178,12 @@ struct WorkPageTests {
     let session = Node(kind: "session", ref: "session:S1")
     let at = Date(timeIntervalSince1970: 0)
 
-    @Test func linksByRelationFromItsOwnSideEachNodeOnce() throws {
-        let links: [DaemonAPI.LineageLink] = [
-            .init(from: session, to: issue, rel: "works-on", source: "branch", at: at, endedAt: at),
-            .init(from: session, to: issue, rel: "works-on", source: "start", at: at),
-            .init(from: pr, to: issue, rel: "fixes", source: "pr-body", at: at),
-            .init(from: issue, to: milestone, rel: "part-of", source: "forge", at: at),
-            .init(from: pr, to: milestone, rel: "part-of", source: "forge", at: at),
-        ]
-        let groups = WorkList.linkGroups(issue, links)
-        try #require(groups.map(\.title) == ["Fixed by", "Part of", "Worked on by"])
-        #expect(groups[2].rows.count == 1) // index-ok: the #require above
-        #expect(groups[2].rows.first?.ended == false) // index-ok: the #require above
-        #expect(WorkList.linkGroups(pr, links).map(\.title) == ["Fixes", "Part of"])
+    @Test func aNodesPageIsInItsKindsList() {
         #expect(WorkList.kind(of: milestone) == .milestone)
         #expect(WorkList.kind(of: session) == nil)
     }
 
-    @Test func checksReviewCostAndPeopleInWords() {
+    @Test func checksReviewAndPeopleInWords() {
         let checks: [DaemonAPI.ForgeCheck] = [.init(name: "a", state: "passing"), .init(name: "b", state: "passing"),
                                               .init(name: "c", state: "failing")]
         #expect(WorkList.checksWords(checks) == "Checks: 2 passing, 1 failing")
@@ -204,8 +192,6 @@ struct WorkPageTests {
         let item = DaemonAPI.ForgeItem(node: pr, title: "T", state: "open", author: "alexec", assignees: ["bob"],
                                        milestone: "0.14", updatedAt: at)
         #expect(WorkList.peopleWords(item) == "by alexec · assigned to bob · milestone 0.14")
-        let none = DaemonAPI.LineageCostRollup(node: pr)
-        #expect(WorkList.pageCostWords(none) == nil)
     }
 
     /// #3130: the page's actions say what each does, as the web page's do.

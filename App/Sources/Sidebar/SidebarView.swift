@@ -137,18 +137,6 @@ struct SidebarView: View {
                 .opacity(frame.pane == .simulator ? 1 : 0)
                 .allowsHitTesting(frame.pane == .simulator)
             }
-            // What the session is linked to (#2940): read again each time it is shown.
-            if shows(.lineage, state) {
-                Group {
-                    if model.host(agent.host, has: Capability.lineage1) {
-                        LineagePane(agent: agent, isVisible: frame.pane == .lineage)
-                    } else {
-                        HostNeedsUpdateView()
-                    }
-                }
-                .opacity(frame.pane == .lineage ? 1 : 0)
-                .allowsHitTesting(frame.pane == .lineage)
-            }
             // The browser on the session's machine, which agents drive (#3528): frames come
             // only while it is shown.
             if shows(.agentBrowser, state) {

@@ -189,13 +189,6 @@ final class AppModel {
     /// Not persisted, unlike the selected folder. Spending is somewhere you go to
     /// answer a question — what has this cost — and a window that reopens on the bill
     /// rather than on the work would be answering a question nobody asked twice.
-    /// Whether the Cost page's place shows the Lineage page (#3087) instead of the cost. Not
-    /// persisted, as the page is not.
-    var showsLineage = false
-    /// Where the Lineage page's walk starts, and the starts before and after it (#3087). Kept
-    /// while the window is open, so going back to the page goes back to where it was.
-    var lineageHistory = LineageHistory<LineagePlace>()
-
     var showsSpending = false {
         didSet {
             guard showsSpending, showsSpending != oldValue else { return }
@@ -460,7 +453,7 @@ final class AppModel {
     }
 
     /// Work's places (#3119): the list or the item's page open, and the ones before and after it,
-    /// for Back and Forward. Kept while the window is open, as the Lineage page's starts are.
+    /// for Back and Forward. Kept while the window is open, as Docs' places are.
     var workHistory = LineageHistory<WorkPlace>()
     /// Each Work list's filters, sort and rows (#3257), so a page goes through its list and Back finds it as left.
     let workLists = WorkLists()
@@ -585,7 +578,7 @@ final class AppModel {
             if showsRuntimes { return .runtimes }
             if showsMCPServers { return .mcpServers }
             if showsWorktrees { return .worktrees }
-            if showsSpending { return showsLineage ? .lineage : .spending }
+            if showsSpending { return .spending }
             if showsTokens { return .tokens }
             if showsTime { return .time }
             if showsMilestones { return .milestones }
@@ -629,10 +622,7 @@ final class AppModel {
             case .review(let id, let key):
                 showFolderPage(.review(id), of: key)
             case .spending:
-                showsLineage = false
                 showsSpending = true
-            case .lineage:
-                showLineage()
             case .tokens:
                 showsTokens = true
             case .time:
@@ -6044,12 +6034,7 @@ final class AppModel {
 
     // MARK: Lineage
 
-    /// What a session is linked to (#2940): `lineage/walk` from it, on its host.
-    func lineageWalk(of agentID: UUID) async throws -> DaemonAPI.LineageGraph {
-        try await lineageWalk(LineageList.node(ofSession: agentID), on: host(ofAgent: agentID))
-    }
-
-    /// What a node is linked to, on a host (#3087): the Lineage page starts from any node.
+    /// What a node is linked to, on a host (#3087): an epic's plan reads its children's links.
     func lineageWalk(_ node: DaemonAPI.LineageNode, on host: MachineRef) async throws -> DaemonAPI.LineageGraph {
         try await client(for: host).call(DaemonAPI.Method.lineageWalk,
                                          DaemonAPI.LineageNodeRequest(node: node, depth: LineageList.depth),
@@ -6082,11 +6067,7 @@ final class AppModel {
         leadProgress[agent.id] = LeadProgress.words(plan)
     }
 
-    /// An issue's or a PR's cost rolled up, from the session's host; nil when it will not say.
-    func lineageCost(_ node: DaemonAPI.LineageNode, of agentID: UUID) async -> DaemonAPI.LineageCostRollup? {
-        await lineageCost(node, on: host(ofAgent: agentID))
-    }
-
+    /// An issue's or a PR's cost rolled up, from a host; nil when it will not say.
     func lineageCost(_ node: DaemonAPI.LineageNode, on host: MachineRef) async -> DaemonAPI.LineageCostRollup? {
         try? await client(for: host).call(DaemonAPI.Method.lineageCost, DaemonAPI.LineageNodeRequest(node: node),
                                           returning: DaemonAPI.LineageCostRollup.self)
@@ -6097,11 +6078,7 @@ final class AppModel {
                                           returning: DaemonAPI.LineageEstimate.self)
     }
 
-    /// The machine a Lineage page start is walked on when the person types one: the selected
-    /// folder's, as a new session's.
-    var lineageHost: MachineRef { selectedFolderHost }
-
-    /// The machines that keep links (#3157), as the Lineage page's Machine menu names them: This
+    /// The machines that keep links (#3157), for an Issue page's estimate and an epic's plan: This
     /// Mac first, then the rest by name. Empty without a control plane, where there is only one.
     var lineageMachines: [(id: MachineRef, name: String)] {
         let mine = thisMacHostID
@@ -6206,12 +6183,6 @@ final class AppModel {
         return try await controlRequests.call(DaemonAPI.Method.reportsNodes, query, returning: DaemonAPI.ReportNodes.self)
     }
 
-    /// Open the Lineage page (#3087), from a place or from where it was.
-    func showLineage(from place: LineagePlace? = nil) {
-        if let place { lineageHistory.go(place) }
-        showsLineage = true
-        showsSpending = true
-    }
 
     /// Go to a match in the open chat: earlier pages come in until its turn is in hand
     /// (`AgentsModel.reveal`, bounded), then the chat goes to it, or as near as it can.
