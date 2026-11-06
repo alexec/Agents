@@ -97,6 +97,15 @@ These rules are kept as they are:
 The legacy bare line goes to the home host only while a moved set-up still has old clients
 (research R11).
 
+**Cut-off for the bare line (#3234).** Up to v0.16 the Remote wrote bare JSON-RPC lines on its
+own connection, so the control plane kept this path (#3225). From v0.17 the Remote wraps them
+with `HomeLink`: `{"m":…control/status}` first, to learn the home host, then `{"h":<home>,…}`
+for the home host and `{"m":…}` for the control plane's own methods. The path
+(`frameBare` in `Go/internal/controlplane/router.go`, `.bare` in `ControlWire`) may go in
+v0.18 or later, after a Remote that wraps has been out for one release. The contract test
+(`Fixtures/control-wire/remote-home.jsonl`, `HomeLinkTests` and Go's
+`TestTheRemotesWrappedLinesReachTheHomeHost`) stays.
+
 ## Control plane ⇄ host (unchanged from the first build)
 
 ```jsonc
