@@ -5,7 +5,7 @@ import SwiftUI
 /// directory on one machine. What every folder of the project shares is Project Settings'
 /// (`ProjectSettingsSheet`).
 enum FolderSettingsPane: String, Hashable, CaseIterable, Identifiable {
-    case general, diskSpace, worktrees, notCommitted
+    case general, diskSpace, notCommitted
 
     var id: String { rawValue }
 
@@ -13,7 +13,6 @@ enum FolderSettingsPane: String, Hashable, CaseIterable, Identifiable {
         switch self {
         case .general: "General"
         case .diskSpace: "Disk Space"
-        case .worktrees: "Worktrees"
         case .notCommitted: "Not Committed"
         }
     }
@@ -22,7 +21,6 @@ enum FolderSettingsPane: String, Hashable, CaseIterable, Identifiable {
         switch self {
         case .general: "folder"
         case .diskSpace: "internaldrive"
-        case .worktrees: "arrow.triangle.branch"
         case .notCommitted: "eye.slash"
         }
     }
@@ -35,7 +33,7 @@ struct FolderSettingsAsk: Hashable {
 }
 
 /// One folder's settings, as a sheet over the window (#3280): the path, the machine and the
-/// project it is in, its disk space lines, its worktrees and what in its `.agents` is not committed. Smaller than Project Settings,
+/// project it is in, its disk space lines and what in its `.agents` is not committed. Smaller than Project Settings,
 /// with the same rail and Done, and a way to the project's.
 struct FolderSettingsSheet: View {
     @Environment(AppModel.self) private var model
@@ -47,10 +45,8 @@ struct FolderSettingsSheet: View {
     private var summary: DaemonAPI.FolderSummary? { ask.flatMap { model.work.folder($0.folder) } }
     private var chosen: FolderSettingsPane { ask?.pane ?? .general }
 
-    /// Worktrees are listed for this Mac's folders (#790).
-    private var panes: [FolderSettingsPane] {
-        summary?.host == .mac ? FolderSettingsPane.allCases : [.general, .diskSpace, .notCommitted]
-    }
+    /// A folder's worktrees are on its machine's page (#3627), not here.
+    private var panes: [FolderSettingsPane] { FolderSettingsPane.allCases }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -63,7 +59,6 @@ struct FolderSettingsSheet: View {
                             switch chosen {
                             case .general: FolderGeneralPane(summary: summary)
                             case .diskSpace: FolderDiskSpacePane(summary: summary)
-                            case .worktrees: FolderWorktreesPane(summary: summary)
                             case .notCommitted: FolderNotCommittedPane(summary: summary)
                             }
                         } else {
@@ -89,9 +84,6 @@ struct FolderSettingsSheet: View {
         .frame(minWidth: Self.size.width, idealWidth: Self.size.width, maxWidth: .infinity,
                minHeight: Self.size.height, idealHeight: Self.size.height, maxHeight: .infinity)
         .presentationSizing(.fitted)
-        .task(id: summary?.key) {
-            if summary?.host == .mac { await model.loadWorktrees() }
-        }
     }
 
     /// The project's settings, kept in this folder: the window shows this folder, so Project
@@ -245,29 +237,6 @@ private struct FolderDiskSpacePane: View {
         .labelsHidden()
         .fixedSize()
         .disabled(model.hosts.isOffline(summary.host))
-    }
-}
-
-/// This folder's worktrees, as Activity ▸ Worktrees lists them (#790), with Remove… and
-/// Clean up worktrees.
-private struct FolderWorktreesPane: View {
-    @Environment(AppModel.self) private var model
-    let summary: DaemonAPI.FolderSummary
-
-    private var group: DaemonAPI.FolderWorktrees? {
-        model.work.worktreesForCleanup().first { $0.folder.standardizedFileURL == summary.folder.folder.standardizedFileURL }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            SettingsPaneTitle(title: FolderSettingsPane.worktrees.title,
-                              note: "This folder's worktrees and how much each holds on disk. Idle ones come first, largest first.")
-            if let group, !group.worktrees.isEmpty {
-                WorktreesGroup(group: group)
-            } else {
-                Text("This folder has no worktrees.").foregroundStyle(.secondary)
-            }
-        }
     }
 }
 

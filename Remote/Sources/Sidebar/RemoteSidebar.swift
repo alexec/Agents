@@ -160,8 +160,6 @@ struct RemoteSidebar: View {
                     ResourcesRow().activityIcon("square.stack.3d.up").appText(.supporting).tag(SidebarItem.resources)
                     RuntimesRow().activityIcon("cpu", warns: runtimesFailing)
                         .appText(.supporting).tag(SidebarItem.runtimes)
-                    WorktreesRow().activityIcon("arrow.triangle.branch")
-                        .appText(.supporting).tag(SidebarItem.worktrees)
                 } header: {
                     Text("Status")
                 }

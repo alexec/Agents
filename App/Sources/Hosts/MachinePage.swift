@@ -3,9 +3,9 @@ import SwiftUI
 
 /// One machine's page in the main window (#3626): the place to go for its status. Its CPU
 /// and memory now, every disk its agents write to with the level the disk-low strip uses,
-/// and its processes (#3453). Read with `machine/usage` when it opens and every few seconds
-/// while it is open, never otherwise. The machine's settings stay in Settings ▸ Machines;
-/// Settings… goes there. The web page draws the same in Web/src/views/MachinePage.tsx.
+/// its worktrees, a section per folder (#3627), and its processes (#3453). Read with
+/// `machine/usage` when it opens and every few seconds while it is open, never otherwise.
+/// The machine's settings stay in Settings ▸ Machines; Settings… goes there. The web page draws the same in Web/src/views/MachinePage.tsx.
 struct MachinePage: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openSettings) private var openSettings
@@ -52,6 +52,9 @@ struct MachinePage: View {
                 } else {
                     usageSection
                     disksSection
+                }
+                if !offline {
+                    MachineWorktreesSections(host: host)
                 }
                 if !offline, model.host(host, has: Capability.processes1) {
                     MachineProcessesSection(client: model.client(for: host), hostName: name, showsTotals: false)
@@ -150,8 +153,8 @@ struct MachineRow: View {
                 Text("Offline").appText(.fine).foregroundStyle(.secondary)
             }
         }
-        .help(model.diskWarns(host) ? "\(name): a disk is low. Its CPU, memory and disks"
-            : "\(name): its CPU, memory and disks")
+        .help(model.diskWarns(host) ? "\(name): a disk is low. Its CPU, memory, disks and worktrees"
+            : "\(name): its CPU, memory, disks and worktrees")
         .accessibilityValue(offline ? "Offline" : "")
     }
 }

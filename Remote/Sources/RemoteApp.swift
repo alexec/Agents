@@ -394,7 +394,6 @@ struct RemoteView: View {
         case .events: EventsListView().paperGround()
         case .resources: ResourcesListView().paperGround()
         case .runtimes: RuntimesView().paperGround()
-        case .worktrees: WorktreesListView().paperGround()
         case .work: WorkView(model: model).paperGround()
         // Usage and connectors are Mac + web (#2798): nothing opens them here.
         default: NothingPickedPage()

@@ -220,8 +220,6 @@ struct FolderListView: View {
                     .appText(.supporting).sidebarInk(.runtimes).tag(SidebarItem.runtimes)
                 MCPServersRow().activityIcon("server.rack", warns: connectorsWarn)
                     .appText(.supporting).sidebarInk(.mcpServers).tag(SidebarItem.mcpServers)
-                WorktreesRow().activityIcon("arrow.triangle.branch")
-                    .appText(.supporting).sidebarInk(.worktrees).tag(SidebarItem.worktrees)
             } header: {
                 // The size of every other group's heading (#495).
                 Text("Status").appText(.supporting)

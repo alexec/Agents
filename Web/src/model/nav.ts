@@ -62,7 +62,6 @@ export const navPages: Record<NavSection, readonly NavPage[]> = {
     { id: "machines", title: "Machines", group: "Machines", draw: { kind: "machines" } },
     { id: "runtimes", title: "Runtimes", group: "On them", draw: { kind: "activity", page: "runtimes" } },
     { id: "resources", title: "Resources", group: "On them", draw: { kind: "activity", page: "resources" } },
-    { id: "worktrees", title: "Worktrees", group: "On them", draw: { kind: "activity", page: "worktrees" } },
     { id: "mcp", title: "Connectors", group: "On them", draw: { kind: "activity", page: "mcp" } },
   ],
   workflows: [
@@ -88,7 +87,7 @@ export const navPages: Record<NavSection, readonly NavPage[]> = {
   ],
 };
 
-/** A page per machine (#3626), after Machines ▸ Machines: its CPU, memory and disks. The Mac first, then the
+/** A page per machine (#3626), after Machines ▸ Machines: its CPU, memory, disks and worktrees (#3627). The Mac first, then the
  * others by name. */
 export function machinePages(hosts: readonly { id: string; name: string }[], macID: string): NavPage[] {
   const sorted = [...hosts].sort((a, b) => Number(b.id === macID) - Number(a.id === macID) || a.name.localeCompare(b.name));
@@ -152,7 +151,9 @@ export function movedPage(app: "console" | "a", page: string | undefined): { nav
     }
   }
   switch (page) {
-    case "runtimes": case "resources": case "worktrees": case "mcp": return { nav: "machines", section: page };
+    case "runtimes": case "resources": case "mcp": return { nav: "machines", section: page };
+    // Worktrees are on each machine's page now (#3627).
+    case "worktrees": return { nav: "machines", section: "machines" };
     case "events": case "milestones": return { nav: "reports", section: page };
     case "spending": case "tokens": case "time": return { nav: "reports", section: "usage", usage: page };
     default: return {};

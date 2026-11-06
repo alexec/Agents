@@ -1,6 +1,6 @@
 // Machines ▸ <machine> (#3626): one machine's page, the place to go for its status, as the window's MachinePage.
-// Its CPU and memory now, every disk its agents write to with the level the disk-low strip uses, and its processes
-// (#3453). Read with machine/usage when it opens and every few seconds while it is open and the tab is seen.
+// Its CPU and memory now, every disk its agents write to with the level the disk-low strip uses, its worktrees, a
+// section per folder (#3627), and its processes (#3453). Read with machine/usage when it opens and every few seconds while it is open and the tab is seen.
 import { useEffect, useState } from "preact/hooks";
 import type { Store } from "../model/store";
 import { hostAnswers, hostHas } from "../model/capabilities";
@@ -11,6 +11,8 @@ import type { MachineUsageState } from "../protocol/generated";
 import { go } from "../route";
 import { MachineProcesses } from "./settings/Processes";
 import { chooseSettingsMachine } from "./settings/SettingsMachine";
+import { WorktreesList } from "./Worktrees";
+import { forCleanup, pageLine, tally, worktreesIntro } from "../model/worktrees";
 
 export const disksFooter = "Each disk its agents write to. Low and almost full are the lines the disk-low warning uses.";
 
@@ -78,9 +80,26 @@ export function MachinePage({ store, host }: { store: Store; host: string }) {
             )}
           </>
         )}
+      {answers && <MachineWorktrees store={store} host={host} />}
       {answers && hostHas(hosts, host, Capability.processes1) && (
         <MachineProcesses store={store} host={host} name={name} showsTotals={false} />
       )}
     </>
+  );
+}
+
+/** The machine's worktrees (#3627): how much they hold, Refresh, and a section per folder. */
+function MachineWorktrees({ store, host }: { store: Store; host: string }) {
+  const groups = forCleanup(store.worktreeLists.value[host] ?? [], store.worktreeSizes.value[host]);
+  return (
+    <section aria-labelledby="machine-worktrees">
+      <h3 class="section-head" id="machine-worktrees">Worktrees</h3>
+      <div class="setting">
+        <span>{pageLine(tally(groups.flatMap((g) => g.worktrees)))}</span>
+        <button type="button" title="List the worktrees again" onClick={() => void store.loadWorktrees(host)}>Refresh</button>
+      </div>
+      <p class="hint">{worktreesIntro}</p>
+      <WorktreesList store={store} host={host} />
+    </section>
   );
 }
