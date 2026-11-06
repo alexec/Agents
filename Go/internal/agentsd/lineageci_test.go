@@ -146,10 +146,41 @@ func TestLineageReleaseDeployedAsATestFlightBuild(t *testing.T) {
 	}
 }
 
+func TestLineageTestFlightBuildDeployedAsAnAppStoreVersion(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	issue := wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#3657"}
+	pr := wire.LineageNode{Kind: "pr", Ref: "github:alexec/agents#9"}
+	release := wire.LineageNode{Kind: "release", Ref: "github:alexec/agents/release/v0.17.0"}
+	d.lineageDo(func() {
+		d.link(pr, issue, "fixes", "pr-body")
+		d.link(pr, release, "part-of", "forge")
+	})
+	d.lineageEvent(wire.Event{Name: "run.completed", Details: map[string]string{"payload": `{"run":{"id":501,"attempt":1,` +
+		`"workflow":"app-store.yml","event":"push","branch":"v0.17.0","url":"https://github.com/alexec/Agents/actions/runs/501",` +
+		`"conclusion":"success"},"completedAt":"2026-11-06T10:00:00Z",` +
+		`"deploys":["testflight:com.alexecollins.agents.remote/812","appstore:com.alexecollins.agents.remote/0.17.0",` +
+		`"testflight:com.example.other/3"]}`}})
+	build, store := "testflight:com.alexecollins.agents.remote/812", "appstore:com.alexecollins.agents.remote/0.17.0"
+	wantLinks(t, active(d, wire.LineageNode{Kind: "deploy", Ref: store}),
+		build+" deployed-as "+store+" (forge)",
+		release.Ref+" deployed-as "+store+" (forge)",
+		store+" part-of target:appstore:com.alexecollins.agents.remote (forge)")
+	// Issue, PR, release, App Store version: 3 links.
+	reached := false
+	for _, l := range d.lineage().Walk(issue, lineage.MostDepth).Links {
+		reached = reached || (l.From == release && l.To.Ref == store)
+	}
+	if !reached {
+		t.Fatalf("a walk from %s does not reach %s", issue.Ref, store)
+	}
+}
+
 func TestDeployNodes(t *testing.T) {
 	for ref, want := range map[string]string{
 		"testflight:com.example.app/42":      "target:testflight:com.example.app",
 		"cloudrun:project/service/rev-00042": "target:cloudrun:project/service",
+		"appstore:com.example.app/1.2.0":     "target:appstore:com.example.app",
 		"testflight:com.example.app/":        "",
 		"testflight:com.example.app":         "",
 		"com.example.app/42":                 "",
