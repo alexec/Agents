@@ -202,6 +202,20 @@ public enum DiskSpace {
         return "\(max(0, bytes) / 1_000_000) MB"
     }
 
+    /// A volume on a machine's page (#3626): "120.3 GB free of 500.0 GB (24%)".
+    public static func freeWords(_ reading: DiskReading) -> String {
+        "\(words(reading.freeBytes)) free of \(words(reading.totalBytes)) (\(reading.freePercent)%)"
+    }
+
+    /// A level as a machine's page says it, beside the volume (#3626).
+    public static func levelWords(_ level: DiskLevel) -> String {
+        switch level {
+        case .ok: "OK"
+        case .low: "Low"
+        case .critical: "Almost full"
+        }
+    }
+
     /// "a 12.3 GB, b over 8.0 GB".
     public static func worktreeWords(_ worktrees: some Sequence<DiskWorktree>) -> String {
         worktrees.map { "\($0.name) \($0.partial ? "over " : "")\(words($0.bytes))" }.joined(separator: ", ")

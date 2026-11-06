@@ -95,6 +95,7 @@ public enum Capability {
     public static let lockReset1 = "lock-reset/1"
     public static let lock1 = "lock/1"
     public static let mac1 = "mac/1"
+    public static let machineUsage1 = "machine.usage/1"
     public static let machine1 = "machine/1"
     public static let machines1 = "machines/1"
     public static let mailbox1 = "mailbox/1"
@@ -352,6 +353,7 @@ public enum Capability {
         "mac/open": "mac/1",
         "mac/reveal": "mac/1",
         "mac/terminal": "mac/1",
+        "machine/usage": "machine.usage/1",
         "mailbox/carry": "mailbox/1",
         "marketplaces/add": "marketplaces/1",
         "marketplaces/list": "marketplaces/1",

@@ -98,6 +98,22 @@ export class MemoryRecoveryDone implements RecoveryDone {
   }
 }
 
+/** The pins and recovery marks this browser keeps, mine and other people's, gone when the control
+ *  plane forgets it (#3670): they are not keyed by control plane, so a new pairing starts clean. */
+export function forgetPins(storage: Pick<Storage, "length" | "key" | "removeItem"> | undefined = globalThis.localStorage): void {
+  if (!storage) return;
+  try {
+    const kept: string[] = [];
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i);
+      if (key && (key === pinKey || key.startsWith(`${pinKey}:`) || key.startsWith("agents-lock-recovery-done:"))) kept.push(key);
+    }
+    for (const key of kept) storage.removeItem(key);
+  } catch {
+    // Storage that is off keeps nothing to forget.
+  }
+}
+
 /** Another person's lock, as an admin's page pins it to check the machines it seals to (D7). */
 export const localPinsOf = (person: string): PinStore => pinsAt(`${pinKey}:${person}`);
 

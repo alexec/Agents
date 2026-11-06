@@ -44,9 +44,9 @@ public enum SidebarItem: Hashable, Sendable {
     /// The person's own MCP servers (#488, #589, #753): every one in `~/.agents/mcp.json`,
     /// and how each is doing.
     case mcpServers
-    /// Every folder's worktrees and how much each holds on disk (#790), with Remove and
-    /// Remove build output. Changing, so here rather than in Folder Settings.
-    case worktrees
+    /// One machine's page (#3626): its CPU, memory and disks, from its row under Machines.
+    /// Mac + web: the Remote has no row for it (#2796).
+    case machine(MachineRef)
     /// A folder's MCP servers (#753), under its folder when its `.agents/mcp.json` has any.
     case folderMCPServers(FolderKey)
     /// A change waiting for an OK, on its Review page (#1472), by its `Approval.id`, from

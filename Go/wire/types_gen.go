@@ -156,6 +156,9 @@ type Agent struct {
 
 	RuntimeSessionID *string `json:"runtimeSessionID,omitzero"`
 
+	// Delete leaves the runtime's own copy of the conversation (#3669): its files are not known and its adapter cannot delete a session (OpenCode without session/delete). Set when the runtime's session starts; absent when Delete erases it, or nothing is known yet.
+	RuntimeKeepsCopy *bool `json:"runtimeKeepsCopy,omitzero"`
+
 	StartOptions StartOptions `json:"startOptions"`
 
 	AdvertisedOptions []ConfigOption `json:"advertisedOptions"`
@@ -6778,6 +6781,14 @@ type MachineUsage struct {
 
 	// Bytes the machine has.
 	MemoryTotal int64 `json:"memoryTotal"`
+}
+
+// machine/usage (#3626): a machine's page. Its CPU and memory now, as processes/list has them, and every disk its agents write to, ok ones too, as the last disk look (every minute) found them.
+type MachineUsageState struct {
+	Machine MachineUsage `json:"machine"`
+
+	// Each volume once: the most critical first, then the least free.
+	Disks []DiskAlarm `json:"disks"`
 }
 
 // host/user (#1761): to a machine on its channel 0, at each join and when its user changes. Its user, their kind, and the labels runs-on: matches (FR-034); for a bot at its cap, until when it starts no work (FR-033).

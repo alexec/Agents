@@ -396,9 +396,8 @@ func (m *Methods) removePerson(ctx context.Context, user string, from Caller) er
 		if p.IsAdmin() && admins(all) <= 1 {
 			return nil, fail(notPermitted, "%s is the only admin.", p.Name)
 		}
-		yes, now := true, records.Now()
-		p.Removed, p.RemovedAt = &yes, &now
-		return []records.Person{p}, nil
+		// Only what refuses their sign-ins again is kept (#3647).
+		return []records.Person{p.Tombstone(records.Now())}, nil
 	})
 	if err != nil {
 		return err
@@ -428,6 +427,10 @@ func (m *Methods) removePerson(ctx context.Context, user string, from Caller) er
 	}
 	m.s.joins.dropFor(ctx, user)
 	m.s.links.dropFor(ctx, user)
+	// Their machine lock (#3647): nothing checks it again, and its keys name their clients.
+	if err := m.s.locks.Reset(ctx, user); err != nil {
+		m.s.log("person " + user + ": their lock could not be deleted: " + err.Error())
+	}
 	// A Remove request answered, and the refresh tokens kept for them (#1002).
 	_ = m.s.cfg.Store.Delete(ctx, removeRequestKey(user))
 	m.s.signIns.dropRefreshes(ctx, user)

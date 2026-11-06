@@ -94,6 +94,7 @@ const CapLockJoin1 = "lock-join/1"
 const CapLockReset1 = "lock-reset/1"
 const CapLock1 = "lock/1"
 const CapMac1 = "mac/1"
+const CapMachineUsage1 = "machine.usage/1"
 const CapMachine1 = "machine/1"
 const CapMachines1 = "machines/1"
 const CapMailbox1 = "mailbox/1"
@@ -351,6 +352,7 @@ var HostCapabilities = pairs([][2]string{
 	{"mac/open", "mac/1"},
 	{"mac/reveal", "mac/1"},
 	{"mac/terminal", "mac/1"},
+	{"machine/usage", "machine.usage/1"},
 	{"mailbox/carry", "mailbox/1"},
 	{"marketplaces/add", "marketplaces/1"},
 	{"marketplaces/list", "marketplaces/1"},

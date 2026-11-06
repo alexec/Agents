@@ -439,8 +439,22 @@ final class RemoteModel {
         }
         note("pairing: forgot itself")
         RemoteControl.forget()
+        forgetKept()
         forgotItself = true
         return nil
+    }
+
+    /// The pairing is gone (#3670): what this device kept of that control plane goes with
+    /// it. The widget's headlines and the badge, the drafts, the Live Activity's turns, and
+    /// every banner delivered from it.
+    private func forgetKept() {
+        StartDraftKeeper.shared.forgetAll()
+        liveActivities.endAll()
+        notifier.forgetAll()
+        AttentionSnapshotStore.clear()
+        lastPublished = nil
+        notifier.setBadgeCount(0)
+        WidgetCenter.shared.reloadTimelines(ofKind: AttentionSnapshot.widgetKind)
     }
 
     // MARK: A server's key (#344)
@@ -623,7 +637,7 @@ final class RemoteModel {
                 openWorkflow = nil
                 openArchive = false
                 openReview = id
-            case .resources, .events, .runtimes, .worktrees, .work:
+            case .resources, .events, .runtimes, .work:
                 openActivity = newValue
             case .archive(let key):
                 // The folder's archive page (#495, #498), with what is opened from it
@@ -634,8 +648,9 @@ final class RemoteModel {
                 openWorkflow = nil
                 openReview = nil
                 openArchive = true
-            case .spending, .tokens, .time, .milestones, .mcpServers, .folderMCPServers, .docs:
-                // Usage, connectors and Docs are Mac + web (#2798, #3321): the Remote opens none of them.
+            case .spending, .tokens, .time, .milestones, .mcpServers, .folderMCPServers, .docs, .machine:
+                // Usage, connectors, Docs and a machine's page are Mac + web (#2798, #3321, #3626):
+                // the Remote opens none of them.
                 break
             }
         }
@@ -2109,6 +2124,7 @@ final class RemoteModel {
                 // for a new code, and stops dialling. One "unknown" alone is a control plane
                 // that could not tell yet, and is dialled again (#81).
                 RemoteControl.forget()
+                forgetKept()
                 forgottenByControlPlane = true
                 isConnected = false
                 return false
@@ -3646,65 +3662,6 @@ final class RemoteModel {
                                                returning: DaemonAPI.MCPHealthSnapshot.self) {
             work.replaceMCPHealth(health)
         }
-    }
-
-    /// Every folder's worktrees on the Mac, for Activity ▸ Worktrees (#790). Sizes not
-    /// measured yet come later, on `worktrees/sized`.
-    func loadWorktrees() async {
-        guard let listed = try? await client.call(DaemonAPI.Method.worktreesAll, DaemonAPI.Empty(),
-                                                  returning: [DaemonAPI.FolderWorktrees].self) else { return }
-        work.replaceWorktrees(listed)
-    }
-
-    /// What removing one of a folder's worktrees would lose; nil when it could not be
-    /// asked, and `problem` says why.
-    func checkWorktreeRemoval(_ root: URL, in folder: URL) async -> DaemonAPI.RemovalCheck? {
-        do {
-            return try await client.call(DaemonAPI.Method.worktreesCheck,
-                                         DaemonAPI.WorktreeRemovalRequest(folder: folder, root: root),
-                                         returning: DaemonAPI.RemovalCheck.self)
-        } catch {
-            problem = sentence(for: error)
-            return nil
-        }
-    }
-
-    /// Remove one of a folder's worktrees; the Mac checks again either way.
-    func removeWorktree(_ root: URL, in folder: URL, confirmed: Bool) async {
-        do {
-            _ = try await client.call(DaemonAPI.Method.worktreesRemove,
-                                      DaemonAPI.WorktreeRemovalRequest(folder: folder, root: root, confirmed: confirmed),
-                                      returning: DaemonAPI.WorktreeRemoved.self)
-        } catch {
-            problem = sentence(for: error)
-        }
-        await loadWorktrees()
-    }
-
-    /// Delete an idle worktree's build output, and say what it freed; nil when it could not.
-    func removeBuildOutput(_ root: URL, in folder: URL) async -> String? {
-        defer { Task { await loadWorktrees() } }
-        do {
-            let removed = try await client.call(DaemonAPI.Method.worktreesRemoveBuildOutput,
-                                                DaemonAPI.WorktreeRemovalRequest(folder: folder, root: root),
-                                                returning: DaemonAPI.BuildOutputRemoved.self)
-            return WorktreeTally.freedWords(removed)
-        } catch {
-            problem = sentence(for: error)
-            return nil
-        }
-    }
-
-    /// Clean up worktrees (030): the folder's new session, its prompt offered the words
-    /// after anything half-typed there (#1863), as the window's does.
-    func offerCleanUp(in folder: URL) {
-        let keeper = StartDraftKeeper.shared
-        let draft = Draft.givingBack(WorktreeTally.cleanUpPrompt, to: keeper.draft(in: folder))
-        keeper.note(draft.text, draft.attachments, in: folder)
-        StartDraftKeeper.shared.flush()
-        openActivity = nil
-        // With its own host: a server's folder kept as the Mac's was never found again (#2160).
-        sidebarItem = .folder(work.folder(folder)?.key ?? FolderKey(host: .mac, folder: folder))
     }
 
     /// Every volume on the Mac low on space (#196), for the strip under the banner. A Mac

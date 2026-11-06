@@ -35,6 +35,13 @@ public enum DeletionWords {
 
     public static let confirmMessage = "Its conversation and record are removed. This cannot be undone."
 
+    /// The confirmation for this agent: with a line when its runtime keeps its own copy
+    /// (#3669), "OpenCode keeps its own copy of this conversation."
+    public static func confirmMessage(_ agent: Agent) -> String {
+        guard agent.runtimeKeepsCopy else { return confirmMessage }
+        return confirmMessage + " " + PoolWords.runtimeName(agent.runtimeID) + " keeps its own copy of this conversation."
+    }
+
     /// Why Delete is refused for an agent.
     public static func refusal(_ hold: Hold) -> String {
         switch hold {

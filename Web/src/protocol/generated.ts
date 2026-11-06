@@ -222,6 +222,12 @@ export interface Agent {
   labels?: SessionLabel[];
   state: AgentState;
   runtimeSessionID?: string;
+  /**
+   * Delete leaves the runtime's own copy of the conversation (#3669): its files are not known and
+   * its adapter cannot delete a session (OpenCode without session/delete). Set when the runtime's
+   * session starts; absent when Delete erases it, or nothing is known yet.
+   */
+  runtimeKeepsCopy?: boolean;
   startOptions: StartOptions;
   advertisedOptions: ConfigOption[];
   availableCommands: SlashCommand[];
@@ -5832,6 +5838,16 @@ export interface MachineUsage {
   memoryUsed: number;
   /** Bytes the machine has. */
   memoryTotal: number;
+}
+
+/**
+ * machine/usage (#3626): a machine's page. Its CPU and memory now, as processes/list has them, and
+ * every disk its agents write to, ok ones too, as the last disk look (every minute) found them.
+ */
+export interface MachineUsageState {
+  machine: MachineUsage;
+  /** Each volume once: the most critical first, then the least free. */
+  disks: DiskAlarm[];
 }
 
 /**
@@ -11520,6 +11536,7 @@ export interface Methods {
   "lock/joinRequests": { params: Empty; result: LockJoinRequest[] };
   "lock/joinReveal": { params: LockJoinNonce; result: Empty };
   "lock/reset": { params: Empty; result: Empty };
+  "machine/usage": { params: Empty; result: MachineUsageState };
   "mcp/health": { params: Empty; result: MCPHealthSnapshot };
   "mcp/health/check": { params: MCPHealthCheckRequest; result: MCPHealthSnapshot };
   "mcp/hosted": { params: Empty; result: HostedMCPSnapshot };
@@ -11890,6 +11907,7 @@ export const MethodTarget = {
   "lock/joinRequests": "control",
   "lock/joinReveal": "control",
   "lock/reset": "control",
+  "machine/usage": "host",
   "mcp/health": "host",
   "mcp/health/check": "host",
   "mcp/hosted": "host",
@@ -12137,7 +12155,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AddFolderRequest: { required: ["folder"], optional: ["project"] },
   Admitted: { required: [], optional: ["client", "host"] },
   AdoptRequest: { required: ["runtimeID", "sessionID", "cwd"], optional: [] },
-  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "desktopControlPause", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID", "auto", "clientPermission", "levels", "voiceHungUpAt", "goal", "project"] },
+  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "runtimeKeepsCopy", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "desktopControlPause", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID", "auto", "clientPermission", "levels", "voiceHungUpAt", "goal", "project"] },
   AgentConfigEditorFile: { required: ["path", "content"], optional: [] },
   AgentConfigEditorRequest: { required: ["kind"], optional: ["folder"] },
   AgentConfigEditorSaveRequest: { required: ["kind", "path", "content"], optional: ["folder", "delete"] },
@@ -12630,6 +12648,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineTunnelChanged: { required: ["name", "tunnel"], optional: ["host"] },
   MachineUpdate: { required: ["host", "destination"], optional: ["key", "trust"] },
   MachineUsage: { required: ["cpuPercent", "cpuCount", "memoryUsed", "memoryTotal"], optional: [] },
+  MachineUsageState: { required: ["machine", "disks"], optional: [] },
   MachineUser: { required: ["user", "kind", "name", "labels"], optional: ["capReachedUntil", "bots"] },
   MachineUserSettings: { required: ["user", "settings", "secrets"], optional: [] },
   MachineWorkspace: { required: ["provider", "providerName", "workspace", "workspaceName", "workspaceState", "canStart", "canStop", "startWhenUsed", "current"], optional: ["hostState", "phase", "since", "problem", "stoppedBy", "stopWhenIdleMinutes", "cost", "startForSchedules", "tellsSchedule", "nextWorkflow", "nextWorkflowAt", "wakeAt"] },

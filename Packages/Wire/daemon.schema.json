@@ -335,6 +335,10 @@
         "runtimeSessionID": {
           "type": "string"
         },
+        "runtimeKeepsCopy": {
+          "type": "boolean",
+          "description": "Delete leaves the runtime's own copy of the conversation (#3669): its files are not known and its adapter cannot delete a session (OpenCode without session/delete). Set when the runtime's session starts; absent when Delete erases it, or nothing is known yet."
+        },
         "startOptions": {
           "$ref": "#/definitions/StartOptions"
         },
@@ -15208,6 +15212,27 @@
         "cpuCount",
         "memoryUsed",
         "memoryTotal"
+      ],
+      "additionalProperties": false
+    },
+    "MachineUsageState": {
+      "type": "object",
+      "description": "machine/usage (#3626): a machine's page. Its CPU and memory now, as processes/list has them, and every disk its agents write to, ok ones too, as the last disk look (every minute) found them.",
+      "properties": {
+        "machine": {
+          "$ref": "#/definitions/MachineUsage"
+        },
+        "disks": {
+          "type": "array",
+          "description": "Each volume once: the most critical first, then the least free.",
+          "items": {
+            "$ref": "#/definitions/DiskAlarm"
+          }
+        }
+      },
+      "required": [
+        "machine",
+        "disks"
       ],
       "additionalProperties": false
     },

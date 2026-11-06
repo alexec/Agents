@@ -1,5 +1,5 @@
 // Activity at the top of the sidebar (#151), as the window's (#145): Events, Resources, Runtimes,
-// MCP Servers (#589), Worktrees (#790) and Spending, each a row whose tooltip says what it has at a glance (#587)
+// MCP Servers (#589) and Spending, each a row whose tooltip says what it has at a glance (#587)
 // and that opens its page in the chat's place. What each page lets you change is the Mac's, but
 // for marking a runtime available and stopping a wait (#541).
 import { Fragment } from "preact";
@@ -13,10 +13,8 @@ import type { ActivityPage } from "../route";
 import { Resources } from "./Resources";
 import { MCPServersList } from "./MCPServers";
 import { YourConnections } from "./ConnectorSetup";
-import { WorktreesList } from "./Worktrees";
 import { AuditPane } from "./Audit";
 import { ReportsPane } from "./Reports";
-import { forCleanup, pageLine, tally as worktreeTally, worktreesIntro } from "../model/worktrees";
 import { BackToList } from "./BackToList";
 import { Modal } from "./Modal";
 import { folderKey, folderPath } from "../model/groups";
@@ -235,7 +233,7 @@ export function availabilityWords(availability: RuntimeAvailability): string {
 
 const onlineHosts = (store: Store): ControlMachine[] => store.hosts.value.filter((h) => hostAnswers(h.state));
 
-const pageTitles: Record<ActivityPage, string> = { events: "Events", resources: "Resources", runtimes: "Runtimes", mcp: "Connectors", worktrees: "Worktrees", spending: "Cost", tokens: "Tokens", time: "Time", milestones: "Milestones" };
+const pageTitles: Record<ActivityPage, string> = { events: "Events", resources: "Resources", runtimes: "Runtimes", mcp: "Connectors", spending: "Cost", tokens: "Tokens", time: "Time", milestones: "Milestones" };
 
 /** An Activity page in the chat's place. */
 export function ActivityPageView({ store, page }: { store: Store; page: ActivityPage }) {
@@ -368,20 +366,6 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
               {store.hosts.value.every((host) => personalServers(store.mcpHealthOf(host.id)).length === 0) && (
                 <p class="hint">{personalEmpty}</p>
               )}
-            </>
-          )}
-          {page === "worktrees" && (
-            <>
-              <p class="hint">{worktreesIntro}</p>
-              {store.hosts.value.map((host) => (
-                <section key={host.id}>
-                  {several && <h2 class="section-head">{hostName(host.id)}</h2>}
-                  <p>{pageLine(worktreeTally(forCleanup(store.worktreeLists.value[host.id] ?? [],
-                    store.worktreeSizes.value[host.id]).flatMap((g) => g.worktrees)))}</p>
-                  <WorktreesList store={store} host={host.id} />
-                </section>
-              ))}
-              <button onClick={() => { for (const host of hosts) void store.loadWorktrees(host.id); }}>Refresh</button>
             </>
           )}
           {page === "runtimes" && <p class="hint">{runtimesHint(store.hasMac.value)}</p>}
