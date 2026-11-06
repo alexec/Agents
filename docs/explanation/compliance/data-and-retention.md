@@ -55,7 +55,8 @@ that machine starts.
 
 On the hosted service, an account keeps its GitHub user id, its GitHub login and the date it
 signed up. **Delete Account** stops its control plane and deletes everything under that
-account, then the account. It does not delete the account's machines.
+account and the invite links its sign-in used, then the account. It does not delete the
+account's machines.
 
 ## Erasure
 
