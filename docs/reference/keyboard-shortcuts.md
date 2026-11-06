@@ -43,7 +43,7 @@ ones every Mac app has.
 | Command-J | **Go ▸ Next Needing Attention** | Opens the next session under **Needs you**, then the next unread finished session. |
 | Control-Command-1 to 9 | **Go ▸** a folder | Opens that folder. |
 | Option-Command-I | **View ▸ Show Inspector** or **Hide Inspector** | Opens or closes the sidebar beside the conversation. |
-| Command-1 to Command-9 | **View ▸ Files**, **Changes**, **Terminal**, **Browser**, **Exchanged**, **Background**, **Simulator**, **Lineage**, **Agent Browser** | Opens that pane of the sidebar. While a permission or question card is up, these yield to the card's answers. |
+| Command-1 to Command-8 | **View ▸ Files**, **Changes**, **Terminal**, **Browser**, **Exchanged**, **Background**, **Simulator**, **Agent Browser** | Opens that pane of the sidebar. While a permission or question card is up, these yield to the card's answers. |
 | Control-` | **View ▸ Folder Terminal** | Shows or hides the selected folder's own shells, one to a tab, in its folder under the page, with or without an agent chosen. Hiding them leaves them running. |
 | Command-+, Command-- | **View ▸ Zoom In**, **Zoom Out** | Makes the text of the Markdown page in front larger or smaller. |
 | Command-0 | **View ▸ Actual Size** | Puts the Markdown page in front back to its own size. With no page in front, Command-0 is **Window ▸ Agents (All Folders)**. |

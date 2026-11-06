@@ -105,36 +105,16 @@ test("a label's ink reads on its colour", () => {
   assert.equal(w.labelColor(undefined), undefined);
 });
 
-test("a page's links by relation, from its own side, each other node once", () => {
-  const issue = { kind: "issue", ref: "github:alexec/Agents#12" };
-  const pr = { kind: "pr", ref: "github:alexec/Agents#34" };
-  const milestone = { kind: "milestone", ref: "github:alexec/Agents/milestone/15" };
-  const session = { kind: "session", ref: "session:S1" };
-  const t = at("2026-10-30T10:00:00Z");
-  const links = [
-    { from: session, to: issue, rel: "works-on", source: "branch", at: t, endedAt: t },
-    { from: session, to: issue, rel: "works-on", source: "start", at: t },
-    { from: pr, to: issue, rel: "fixes", source: "pr-body", at: t },
-    { from: issue, to: milestone, rel: "part-of", source: "forge", at: t },
-    { from: pr, to: milestone, rel: "part-of", source: "forge", at: t },
-  ];
-  const groups = w.linkGroups(issue, links);
-  assert.deepEqual(groups.map((g) => g.title), ["Fixed by", "Part of", "Worked on by"]);
-  assert.deepEqual(groups[2].rows, [{ node: session, ended: false }], "the active link wins");
-  assert.deepEqual(w.linkGroups(pr, links).map((g) => g.title), ["Fixes", "Part of"]);
-  assert.equal(w.hasPage(milestone), true);
-  assert.equal(w.hasPage(session), false);
+test("an issue, a PR, a milestone or a release has a page; a session has none", () => {
+  assert.equal(w.hasPage({ kind: "milestone", ref: "github:alexec/Agents/milestone/15" }), true);
+  assert.equal(w.hasPage({ kind: "session", ref: "session:S1" }), false);
 });
 
-test("a PR's checks, review and a page's cost in words", () => {
+test("a PR's checks and review, and a page's people, in words", () => {
   const checks = [{ name: "a", state: "passing" }, { name: "b", state: "passing" }, { name: "c", state: "failing" }];
   assert.equal(w.checksWords(checks), "Checks: 2 passing, 1 failing");
   assert.equal(w.checksWords([], "none"), undefined);
   assert.equal(w.reviewWords("changes_requested"), "Review: Changes requested");
-  const rollup = { node: { kind: "pr", ref: "x" }, own: cost(1.2), total: cost(3.4), waste: cost(0.3), unlinked: cost(0),
-    prsMerged: 0, prsClosed: 0, prsReverted: 0, failedChecks: 2, parts: [] };
-  assert.match(w.pageCostWords(rollup), /^Own \$1\.20 · total \$3\.40 · waste \$0\.30 · 2 failed checks$/);
-  assert.equal(w.pageCostWords({ ...rollup, total: cost(0), failedChecks: 0 }), undefined);
   assert.equal(w.peopleWords({ author: "alexec", assignees: ["bob"], milestone: "0.14" }), "by alexec · assigned to bob · milestone 0.14");
 });
 

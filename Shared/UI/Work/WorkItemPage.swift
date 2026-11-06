@@ -3,9 +3,7 @@ import SwiftUI
 
 /// The page of one issue, pull request, milestone or release (#3119), as the web page's
 /// `#/work/<kind>/<ref>`: the item from its forge (`forge/issue`, `forge/pull`) on the first
-/// machine that reads it, and what lineage knows on a machine that keeps links: its cost, its
-/// links by relation and the graph centred here (#3087). It opens for any item, also one no agent
-/// touched. A link opens that node's page; a session's opens its chat. An issue's and a pull
+/// machine that reads it. It opens for any item, also one no agent touched. An issue's and a pull
 /// request's actions (#3130, `WorkItemActions`) go to the machine that read it.
 struct WorkItemPage: View {
     let model: any WorkModel
@@ -21,13 +19,8 @@ struct WorkItemPage: View {
     @State private var detail: (host: MachineRef, got: DaemonAPI.ForgeItemDetail)?
     @State private var forgeProblem: String?
     @State private var olderLoading = false
-    @State private var graph: DaemonAPI.LineageGraph?
-    @State private var costs: [DaemonAPI.LineageNode: DaemonAPI.LineageCostRollup] = [:]
-    @State private var layout: LineageLayout.Graph?
-    @State private var linksFailed = false
     @State private var estimate: DaemonAPI.LineageEstimate?
     @State private var estimateRange = false
-    @State private var reading = false
     @State private var asked = 0
 
     private var node: DaemonAPI.LineageNode { place.node ?? .init(kind: place.kind.rawValue, ref: "") }
@@ -66,7 +59,6 @@ struct WorkItemPage: View {
                     WorkDocsSection(item: detail.got.item, text: detail.got.body, asked: asked)
                 }
                 #endif
-                lineage
             }
             .padding(compact ? 16 : 20)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -75,7 +67,6 @@ struct WorkItemPage: View {
         .refreshable { asked += 1 }
         #endif
         .workTask(id: asked) { await loadForge() }
-        .workTask(id: LineageAsk(host: lineageHost, asked: asked)) { await loadLineage() }
         .workTask(id: estimateAsk) { await loadEstimate() }
     }
 
@@ -105,10 +96,9 @@ struct WorkItemPage: View {
 
     private var header: some View {
         let item = detail?.got.item
-        let resolved = graph?.resolved?[node.ref]
-        let labels = item?.labels ?? (resolved?.labels ?? []).map { DaemonAPI.ForgeLabel(name: $0) }
+        let labels = item?.labels ?? []
         let url = item?.url.flatMap(URL.init(string:)) ?? WorkList.url(node)
-        let title = item?.title ?? resolved?.title ?? ReportValueWords.name(node)
+        let title = item?.title ?? ReportValueWords.name(node)
         return VStack(alignment: .leading, spacing: 6) {
             if compact {
                 // A phone has no room beside the title: All and Refresh go above it.
@@ -122,7 +112,7 @@ struct WorkItemPage: View {
                 }
             }
             WrappingHStack(spacing: 6) {
-                WorkStatePill(state: item?.state ?? resolved?.state ?? "", draft: item?.draft ?? false, status: item?.status)
+                WorkStatePill(state: item?.state ?? "", draft: item?.draft ?? false, status: item?.status)
                 ForEach(labels, id: \.name) { WorkLabelChip(label: $0) }
             }
             // On a phone the ref takes the line, and "Open on …" goes under it.
@@ -259,77 +249,6 @@ struct WorkItemPage: View {
         }
     }
 
-    // MARK: Lineage
-
-    @ViewBuilder
-    private var lineage: some View {
-        Divider()
-        Text("Lineage").appText(.reading).fontWeight(.semibold)
-        if lineageHost == nil {
-            Text("No machine keeps links yet. Update Agents on a machine to see them.").foregroundStyle(.secondary)
-        } else if graph == nil, !linksFailed {
-            ProgressView()
-        } else {
-            let groups = WorkList.linkGroups(node, graph?.links ?? [])
-            if groups.isEmpty {
-                Text(WorkList.noAgentOnIt).foregroundStyle(.secondary)
-            } else {
-                if let words = costs[node].flatMap(WorkList.pageCostWords) {
-                    Text("\(Text("Cost").foregroundStyle(.secondary))  \(words)").monospacedDigit()
-                }
-                Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 16, verticalSpacing: 4) {
-                    ForEach(groups, id: \.title) { group in
-                        ForEach(Array(group.rows.enumerated()), id: \.offset) { i, row in
-                            GridRow {
-                                Text(i == 0 ? group.title : "").foregroundStyle(.secondary)
-                                linkRow(row.node, ended: row.ended)
-                            }
-                        }
-                    }
-                }
-                if let layout, !layout.nodes.isEmpty {
-                    LineageGraphView(graph: layout, open: { open($0.node) },
-                                     verb: { $0.session != nil ? "Show the chat" : "Open its page" })
-                        .frame(height: 360)
-                        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.separator))
-                }
-                if reading {
-                    Text(LineageList.readingTitles).appText(.fine).foregroundStyle(.secondary)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func linkRow(_ other: DaemonAPI.LineageNode, ended: Bool) -> some View {
-        let words = name(other) + (other.kind == "session" ? "" : " (\(LineageLayout.kindWord(other.kind).lowercased()))")
-            + (ended ? " · ended" : "")
-        if let go = open(other) {
-            Button(words + (other.kind == "session" ? " ▸ chat" : " ▸"), action: go).linkStyle()
-        } else {
-            Text(words)
-        }
-    }
-
-    private func sessionID(_ n: DaemonAPI.LineageNode) -> UUID? {
-        n.kind == "session" ? UUID(uuidString: String(n.ref.dropFirst("session:".count))) : nil
-    }
-
-    private func name(_ n: DaemonAPI.LineageNode) -> String {
-        if let id = sessionID(n) { return model.workSessionTitle(id) ?? "A session" }
-        return graph?.resolved?[n.ref]?.title ?? ReportValueWords.name(n)
-    }
-
-    /// A session opens its chat; an issue, a PR, a milestone or a release its page; the page itself nothing.
-    private func open(_ n: DaemonAPI.LineageNode) -> (() -> Void)? {
-        guard n != node else { return nil }
-        if let id = sessionID(n) {
-            return model.workSessionTitle(id) == nil ? nil : { model.openWorkSession(id) }
-        }
-        guard let kind = WorkList.kind(of: n) else { return nil }
-        return { model.showWork(WorkPlace(kind: kind, ref: n.ref)) }
-    }
-
     // MARK: Loading
 
     private func loadForge() async {
@@ -388,56 +307,5 @@ struct WorkItemPage: View {
         let got = await model.lineageEstimate(node, on: host)
         guard estimateAsk == mine else { return }
         estimate = got
-    }
-
-    private func loadLineage() async {
-        graph = nil
-        layout = nil
-        costs = [:]
-        linksFailed = false
-        reading = false
-        guard let host = lineageHost else { return }
-        let mine = LineageAsk(host: host, asked: asked)
-        do {
-            var walked = try await model.lineageWalk(node, on: host)
-            guard LineageAsk(host: lineageHost, asked: asked) == mine else { return }
-            graph = walked
-            lay()
-            var found: [DaemonAPI.LineageNode: DaemonAPI.LineageCostRollup] = [:]
-            await withTaskGroup(of: DaemonAPI.LineageCostRollup?.self) { group in
-                for n in Set(walked.nodes + [node]) where LineageList.costed(n) || n == node {
-                    group.addTask { await model.lineageCost(n, on: host) }
-                }
-                for await rollup in group {
-                    if let rollup { found[rollup.node] = rollup }
-                }
-            }
-            guard LineageAsk(host: lineageHost, asked: asked) == mine else { return }
-            costs = found
-            lay()
-            // The daemon resolves titles in the background (#3102): walk again while it says some are to come.
-            reading = walked.resolving == true
-            for _ in 0 ..< LineageList.resolvingAsks where walked.resolving == true {
-                do {
-                    try await Task.sleep(for: .seconds(1))
-                    walked = try await model.lineageWalk(node, on: host)
-                } catch {
-                    break
-                }
-                guard LineageAsk(host: lineageHost, asked: asked) == mine else { return }
-                graph = walked
-                lay()
-            }
-            reading = false
-        } catch {
-            guard LineageAsk(host: lineageHost, asked: asked) == mine else { return }
-            linksFailed = true
-        }
-    }
-
-    private func lay() {
-        layout = graph.map { LineageLayout.graph(of: node, graph: $0, costs: costs, title: { n in
-            sessionID(n).flatMap { model.workSessionTitle($0) }
-        }) }
     }
 }

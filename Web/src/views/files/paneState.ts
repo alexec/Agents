@@ -3,7 +3,7 @@
 // where it was.
 import { signal } from "@preact/signals";
 
-export type Tab = "files" | "changes" | "page" | "exchanged" | "simulator" | "lineage" | "browser";
+export type Tab = "files" | "changes" | "page" | "exchanged" | "simulator" | "browser";
 
 export interface PaneState {
   tab: Tab;

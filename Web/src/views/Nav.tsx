@@ -18,7 +18,6 @@ import { requestCount } from "./ConsoleRecords";
 import { policyNotSaved } from "./ConsolePolicy";
 import { orgPolicyNotSaved } from "./ConsoleOrgPolicy";
 import { ReportsPage } from "./Reports";
-import { LineagePage } from "./Lineage";
 import { WorkList, WorkPage } from "./Work";
 import { WorkFeatures } from "./WorkFeatures";
 import { DocPage, DocsList } from "./Docs";
@@ -152,7 +151,6 @@ export function PageView({ store, page, down }: { store: Store; page: NavPage; d
         : page.draw.kind === "machines" ? (admin === true ? <MachinesPage store={store} down={down} /> : <YourMachines store={store} />)
         : page.draw.kind === "workflows" ? <AllWorkflows store={store} down={down} />
         : page.draw.kind === "usage" ? <Usage store={store} />
-        : page.draw.kind === "lineage" ? <LineagePage store={store} />
         : page.draw.kind === "work" ? (route.value.item
           ? <WorkPage key={route.value.item} store={store} kind={page.draw.work} ref={route.value.item} />
           : <WorkList key={page.draw.work} store={store} kind={page.draw.work} />)

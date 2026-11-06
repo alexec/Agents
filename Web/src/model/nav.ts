@@ -26,7 +26,7 @@ export type PageDraw =
   | { kind: "work"; work: WorkKind }
   | { kind: "features" }
   | { kind: "docs" }
-  | { kind: "usage" | "lineage" | "machines" | "workflows" | "settings" };
+  | { kind: "usage" | "machines" | "workflows" | "settings" };
 
 export interface NavPage {
   id: string;
@@ -71,8 +71,6 @@ export const navPages: Record<NavSection, readonly NavPage[]> = {
   reports: [
     ...reportSections.map((s): NavPage => ({ id: s.id, title: s.title, group: s.group, draw: { kind: "report", section: s } })),
     { id: "usage", title: "Usage", group: "Yours", draw: { kind: "usage" } },
-    // The work's cost and links from any start (#3087), as the window's Cost ▸ Lineage.
-    { id: "lineage", title: "Lineage", group: "Yours", draw: { kind: "lineage" } },
     { id: "milestones", title: "Milestones", group: "Yours", draw: { kind: "activity", page: "milestones" } },
     { id: "events", title: "Events", group: "Records", draw: { kind: "activity", page: "events" } },
     adminPage("audit", "Audit", "Records"),

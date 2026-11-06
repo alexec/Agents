@@ -418,54 +418,6 @@ public enum WorkList {
     // The page of one issue, PR, milestone or release (#3119): its links grouped by relation, its
     // checks, its review and its cost.
 
-    /// A relation's heading from this node's side: a PR "Fixes" an issue, the issue is "Fixed by" the PR.
-    static let relWords: [String: (from: String, to: String)] = [
-        "works-on": ("Works on", "Worked on by"), "opens": ("Opens", "Opened by"), "fixes": ("Fixes", "Fixed by"),
-        "started": ("Started", "Started by"), "reviews": ("Reviews", "Reviewed by"), "closes": ("Closes", "Closed by"),
-        "part-of": ("Part of", "Parts"),
-    ]
-    static let relOrder = ["Fixes", "Fixed by", "Closes", "Closed by", "Part of", "Parts", "Opens", "Opened by", "Reviews",
-                           "Reviewed by", "Works on", "Worked on by", "Started", "Started by"]
-
-    public struct LinkGroup: Sendable, Hashable {
-        public var title: String
-        public var rows: [(node: DaemonAPI.LineageNode, ended: Bool)]
-
-        public static func == (a: Self, b: Self) -> Bool {
-            a.title == b.title && a.rows.map(\.node) == b.rows.map(\.node) && a.rows.map(\.ended) == b.rows.map(\.ended)
-        }
-
-        public func hash(into h: inout Hasher) {
-            h.combine(title)
-            for r in rows { h.combine(r.node); h.combine(r.ended) }
-        }
-    }
-
-    /// The node's links by relation, each other node once a group (an active link over an ended
-    /// one), the groups in a fixed order and any relation not known after them.
-    public static func linkGroups(_ here: DaemonAPI.LineageNode, _ links: [DaemonAPI.LineageLink]) -> [LinkGroup] {
-        var groups: [String: [(node: DaemonAPI.LineageNode, ended: Bool)]] = [:]
-        for l in links {
-            let fromHere = l.from == here, toHere = l.to == here
-            guard fromHere != toHere else { continue }
-            let verb = l.rel.replacingOccurrences(of: "-", with: " ")
-            let words = relWords[l.rel] ?? (verb, "\(verb) by")
-            let title = fromHere ? words.from : words.to
-            let other = fromHere ? l.to : l.from
-            let ended = l.endedAt != nil
-            var rows = groups[title] ?? []
-            if let i = rows.firstIndex(where: { $0.node.ref == other.ref }) {
-                if rows[i].ended && !ended { rows[i].ended = false }
-            } else {
-                rows.append((other, ended))
-            }
-            groups[title] = rows
-        }
-        let rank = { (t: String) in relOrder.firstIndex(of: t) ?? relOrder.count }
-        return groups.sorted { rank($0.key) != rank($1.key) ? rank($0.key) < rank($1.key) : $0.key < $1.key }
-            .map { LinkGroup(title: $0.key, rows: $0.value) }
-    }
-
     /// The Work list a node's page is in: an issue, a PR, a milestone or a release; nil for any other.
     public static func kind(of node: DaemonAPI.LineageNode) -> Kind? {
         Kind(rawValue: node.kind).flatMap { $0 == .feature ? nil : $0 }
@@ -537,15 +489,6 @@ public enum WorkList {
         return "Review: \(title[review] ?? review.replacingOccurrences(of: "_", with: " "))"
     }
 
-    /// A page's cost: "Own $1.20 · total $3.40 · waste $0.30 · 2 failed checks"; nil with nothing banked.
-    public static func pageCostWords(_ r: DaemonAPI.LineageCostRollup) -> String? {
-        guard ReportValueWords.spent(r.total) || r.failedChecks > 0 else { return nil }
-        var parts = ["Own \(ReportValueWords.cost(r.own))", "total \(ReportValueWords.cost(r.total))"]
-        if ReportValueWords.spent(r.waste) { parts.append("waste \(ReportValueWords.cost(r.waste))") }
-        if r.failedChecks > 0 { parts.append(r.failedChecks == 1 ? "1 failed check" : "\(r.failedChecks) failed checks") }
-        return parts.joined(separator: " · ")
-    }
-
     /// "by alexec · assigned to bob · milestone 0.14".
     public static func peopleWords(_ item: DaemonAPI.ForgeItem) -> String {
         var parts: [String] = []
@@ -555,7 +498,6 @@ public enum WorkList {
         return parts.joined(separator: " · ")
     }
 
-    public static let noAgentOnIt = "No agent has worked on this yet."
     public static let notReadHere = "No machine could read this from its forge."
 }
 

@@ -21,11 +21,7 @@ struct SpendingView: View {
     private var spending: Spending { Spending(model.folders) }
 
     var body: some View {
-        if model.showsLineage {
-            LineagePage().navigationTitle("Lineage")
-        } else {
-            cost.navigationTitle("Cost")
-        }
+        cost.navigationTitle("Cost")
     }
 
     private var cost: some View {
