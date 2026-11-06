@@ -1,7 +1,7 @@
 import Foundation
 
 /// How full a volume is allowed to get before the app says so (#195): `machine.disk_low` and
-/// `machine.disk_ok`, and the strip in the window.
+/// `machine.disk_ok`, and the machine's row and page (#3628).
 ///
 /// Set in a folder's `.agents/folder.json` beside `helperLimits`, or in Folder
 /// Settings. A nil field is its default. A volume holding several folders goes by the

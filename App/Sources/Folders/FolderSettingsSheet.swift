@@ -208,7 +208,7 @@ private struct FolderDiskSpacePane: View {
                         diskLine(\.criticalGB, default: DiskThresholds.defaultCriticalGB,
                                  choices: DiskThresholds.criticalChoices)
                         settingsNote("When free space on the disk holding this folder or its worktrees falls below "
-                                     + "these, the window says so and machine.disk_low is raised for agents and workflows. "
+                                     + "these, the machine's row and page say so and machine.disk_low is raised for agents and workflows. "
                                      + "Low is also below \((summary.folder.diskSpace ?? DiskThresholds()).effectiveLowPercent)% "
                                      + "of the disk. Saved in .agents/folder.json.")
                     }

@@ -2713,7 +2713,7 @@ final class AppModel {
 
     /// Each server's spending, as it last said (037).
     private(set) var serverCosts: [MachineRef: DaemonAPI.CostState] = [:]
-    /// Each server's disk alarms, kept beside the Mac's own disk strip (#263).
+    /// Each server's disk alarms, kept beside the Mac's own (#263), for its page and row (#3626).
     private(set) var serverDisks: [MachineRef: DiskState] = [:]
 
     /// What the servers have spent today, together, per currency. Empty when nothing.

@@ -1,5 +1,5 @@
 // Machines ▸ <machine> (#3626): one machine's page, the place to go for its status, as the window's MachinePage.
-// Its CPU and memory now, every disk its agents write to with the level the disk-low strip uses, its worktrees, a
+// Its CPU and memory now, every disk its agents write to with its level (low or almost full), its worktrees, a
 // section per folder (#3627), its runtimes and resources (#3629), and its processes (#3453). Read with machine/usage when it opens and every few seconds while it is open and the tab is seen.
 import { useEffect, useState } from "preact/hooks";
 import type { Store } from "../model/store";
@@ -18,7 +18,7 @@ import { machineRuntimeLine, offersMachineSignIn, signInOnTheMac } from "../mode
 import type { RuntimeStatus } from "../protocol/generated";
 import { forCleanup, pageLine, tally, worktreesIntro } from "../model/worktrees";
 
-export const disksFooter = "Each disk its agents write to. Low and almost full are the lines the disk-low warning uses.";
+export const disksFooter = "Each disk its agents write to. Low and almost full are the lines set in Folder Settings ▸ Disk Space.";
 
 export function MachinePage({ store, host }: { store: Store; host: string }) {
   const hosts = store.hosts.value;
