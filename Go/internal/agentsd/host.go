@@ -82,7 +82,7 @@ func (d *Daemon) registerHost() {
 	On(d, wire.CallSurfaceIdentify, func(ctx context.Context, c *Client, _ wire.SurfaceIdentification) (wire.Empty, error) {
 		return wire.Empty{}, nil
 	})
-	// The bridge saying a window's connection carries a device, or a phone pairing (devices.go).
+	// A window's connection saying it carries a device (devices.go).
 	On(d, wire.CallConnectionBindDevice, func(ctx context.Context, c *Client, b wire.DeviceBinding) (wire.Empty, error) {
 		return wire.Empty{}, d.bindDevice(c, b)
 	})

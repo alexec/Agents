@@ -20,9 +20,6 @@ public enum ConnectionRole: String, Sendable, Hashable {
     /// device, and may not name another. A connection becomes one only by the bridge or
     /// the uplink saying so, and never stops being one.
     case device
-    /// A phone on the direct link with a pairing code and no key yet: it may say who it
-    /// is and nothing more. Once it has, it hangs up and comes back as a device.
-    case pairing
     /// Agents Host's window, as its code signature says: whether this Mac's host is
     /// there and how much it holds, its folders and its agents, and nothing more (#168).
     /// It starts and stops the host through launchd, never over the socket.
@@ -41,10 +38,6 @@ public enum ConnectionRole: String, Sendable, Hashable {
         DaemonAPI.Method.viewsToolCall,
     ]).union(strangerMethods)
 
-    /// Announcing, and finding out a daemon is answering.
-    public static let pairingMethods: Set<String> = Set<String>([DaemonAPI.Method.devicesAnnounce])
-        .union(strangerMethods)
-
     /// Reading what Agents Host's window counts: folders, and agents working.
     public static let hostAppMethods: Set<String> = Set<String>([
         DaemonAPI.Method.foldersList,
@@ -61,7 +54,6 @@ public enum ConnectionRole: String, Sendable, Hashable {
         switch self {
         case .control, .device: true
         case .agent: Self.agentMethods.contains(method)
-        case .pairing: Self.pairingMethods.contains(method)
         case .hostApp: Self.hostAppMethods.contains(method)
         // A Linux host's git, through `agentsd git-credential` (#1122): any process of the
         // account, as git runs it for every one of them. The daemon answers it only on a

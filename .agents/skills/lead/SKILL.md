@@ -119,11 +119,15 @@ start again:
 
 When all the children are closed:
 
-1. Post one comment on the epic, starting with `<!-- agent -->`: a table of each child,
+1. Close the epic: `gh issue close $epic --reason completed`.
+2. Ask `estimate_issue` for the epic (#3590). Closed, it says the estimate the epic had
+   when its work started against what it took, in one line: "Estimated $X, Zh of work;
+   actual $A, Hh of work".
+3. Post one comment on the epic, starting with `<!-- agent -->`: a table of each child,
    its PR, and what it cost (from each lane's session, `read_session`), then the total.
-   Say what was left out and where it went.
-2. Close the epic: `gh issue close $epic --reason completed`.
-3. Archive the lanes you started that are not archived yet (their work is merged or
+   Then that line, as `estimate_issue` says it; when it says no estimate was kept, say
+   that. Say what was left out and where it went.
+4. Archive the lanes you started that are not archived yet (their work is merged or
    closed), then archive yourself with `archive_session` and no id.
 
 ## Reports

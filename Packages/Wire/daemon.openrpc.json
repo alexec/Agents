@@ -3016,46 +3016,6 @@
       }
     },
     {
-      "name": "devices/startPairing",
-      "x-capability": "devices/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/PairingCode"
-        }
-      }
-    },
-    {
-      "name": "devices/stopPairing",
-      "x-capability": "devices/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
       "name": "disk/changed",
       "x-capability": "disk/1",
       "tags": [
@@ -5571,41 +5531,6 @@
           }
         }
       ]
-    },
-    {
-      "name": "pairing/changed",
-      "x-capability": "pairing/1",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ]
-    },
-    {
-      "name": "pairing/current",
-      "x-capability": "pairing/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/PairingSecret"
-        }
-      }
     },
     {
       "name": "permissions/answer",

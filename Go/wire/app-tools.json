@@ -1031,5 +1031,29 @@
         "ref"
       ]
     }
+  },
+  {
+    "name": "estimate_issue",
+    "title": "Estimate an issue or epic",
+    "annotations": {
+      "readOnlyHint": true
+    },
+    "description": "What an issue or an epic will probably cost and take, from the closed issues like it on this machine, as Work's page says it: dollars, output tokens and the agents' working time, each the median and the range 8 in 10 like it land in, with the cycle time and when it lands if work starts today. An epic adds up its open children, step by step, and says what its closed children spent. Once the issue or epic is closed, it also says the estimate it had when its work started against what it took, in one line: \"Estimated $X, Zh of work; actual $A, Hh of work\". Say that line as it is, for example in an epic's closing summary. With fewer than 5 closed issues like it, it says there is not enough past work to estimate.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
+        },
+        "issue": {
+          "type": "string",
+          "description": "The issue or epic: #12 in this folder's repo, owner/repo#12, or a ref such as github:owner/repo#12, linear:ENG-4 or jira:KEY-1."
+        }
+      },
+      "required": [
+        "issue"
+      ]
+    }
   }
 ]

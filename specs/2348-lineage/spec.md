@@ -9,8 +9,8 @@ A graph that links the parts of the SDLC. The host keeps it. The other slices fi
 
 - **A node** is a `kind` and a `ref`.
   - `kind`: `issue`, `pr`, `session`, `workflow-run`, `commit`, `file`, `branch`,
-    `milestone`, `workflow`, `release`, `ci-run` (#3581), `deploy` and `target` (#3584). The
-    list is open.
+    `milestone`, `workflow`, `release`, `ci-run` (#3581), `health` (#3585), `deploy` and
+    `target` (#3584). The list is open.
   - `ref` names the node apart from any tracker, as `<scheme>:<id>`:
     `github:alexec/Agents#123`, `gitlab:group/repo!45`, `linear:ENG-4`, `jira:ABC-9`,
     `session:<agent id>`.
@@ -18,9 +18,9 @@ A graph that links the parts of the SDLC. The host keeps it. The other slices fi
 - **A link** has `from`, `to`, `rel`, `source`, `at`, and `endedAt` when it stops being
   active.
   - `rel`: `works-on`, `opens`, `fixes`, `started`, `reviews`, `closes`, `part-of`,
-    `shipped-in`, `builds` (#3581), `deployed-as` (#3584). The list is open.
+    `shipped-in`, `builds` (#3581), `seen-in` (#3585), `deployed-as` (#3584). The list is open.
   - `source` (how the host knows it): `start`, `branch`, `pr-body`, `helper`, `agent`,
-    `person`, `forge`. The list is open.
+    `person`, `forge`, `health` (#3585). The list is open.
   - At most one link from, to, rel is active at a time. To link it again while it is active
     changes nothing. An ended link can start again, as a new link.
   - Many-to-many needs nothing more: one session opens many PRs, and many sessions work on
@@ -358,6 +358,27 @@ requirement or design behind a change. In `Go/internal/agentsd/lineagedocs.go`.
 - **Decided: only `specs/` and `docs/`, not the folder's top `*.md`**, because every
   session reads README.md and AGENTS.md, and the issue asks for the requirement or design.
   Alex can overrule.
+
+## Health signals (#3585)
+
+The health stage of the outer loop (spec `3579-outer-loop`), in
+`Go/internal/agentsd/lineagehealth.go`. No client.
+
+- **A health node.** Kind `health`, ref `sentry:<org>/<issue id>`, from the sentry events
+  server's `health.issue_new` and `health.issue_regressed` (#3583).
+- **Health `seen-in` release**, source `health`, at the time Sentry first saw the issue
+  (or saw it come back). Sentry's release is a version string: `1.2.0`, `v1.2.0`,
+  `web@1.2.0` or `com.example.app@1.2.0+42` are all the tag `v1.2.0`. A version that is not
+  `x.y.z` links nothing. A regression in a later release is a second `seen-in` link.
+- **Which repo.** The folder the event is scoped to, when it has a forge repo: its release
+  node is linked even when the hourly tag check has not found the tag yet, because that
+  check links the PRs to the same ref later. An event with no folder links only a release
+  the graph already has, in one repo; when more than one repo has the tag, the one whose
+  name is the Sentry project's slug, else none.
+- **Health `seen-in` deploy**, when the graph has the deploy (#3584): the version
+  `com.example.app@1.2.0+42` names the build `testflight:com.example.app/42`.
+- A walk from a health node reaches the release (1 link), its PRs (2) and the issues they
+  fix (3).
 
 ## Clients
 

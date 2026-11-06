@@ -16,8 +16,6 @@ const (
 	RoleAgent Role = "agent"
 	// RoleDevice is a phone, an iPad or a browser the bridge carries: everything a window may.
 	RoleDevice Role = "device"
-	// RolePairing is a phone with a pairing code and no key yet: it may say who it is.
-	RolePairing Role = "pairing"
 	// RoleHostApp is Agents Host's window: whether the host is there and what it holds.
 	RoleHostApp Role = "hostApp"
 	// RoleWindow is the App Store window, signed by this team. On daemon.sock, which its
@@ -43,8 +41,6 @@ var agentMethods = methodSet(append([]string{
 	"resources/lease", "resources/release", "resources/list", "views/toolCall",
 }, strangerMethods...))
 
-var pairingMethods = methodSet(append([]string{"devices/announce"}, strangerMethods...))
-
 // hostAppMethods: what Agents Host's window counts, folders and agents working (#168).
 var hostAppMethods = methodSet(append([]string{"folders/list", "agents/list"}, strangerMethods...))
 
@@ -68,8 +64,6 @@ func (r Role) Allows(method string) bool {
 		return true
 	case RoleAgent:
 		return agentMethods[method]
-	case RolePairing:
-		return pairingMethods[method]
 	case RoleHostApp:
 		return hostAppMethods[method]
 	default:

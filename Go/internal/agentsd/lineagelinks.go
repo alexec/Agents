@@ -340,11 +340,15 @@ type prEventPayload struct {
 }
 
 // lineageEvent makes the links a raised event says: pr.opened, pr.merged and pr.closed,
-// and the CI runs of checks.* and run.completed (lineageci.go).
+// the CI runs of checks.* and run.completed (lineageci.go), and the health signals of
+// health.* (lineagehealth.go).
 func (d *Daemon) lineageEvent(e wire.Event) {
 	switch e.Name {
 	case "checks.failed", "checks.passed", "run.completed":
 		d.lineageCIEvent(e)
+	case "health.issue_new", "health.issue_regressed":
+		d.lineageHealthEvent(e)
+		return
 	}
 	switch e.Name {
 	case "pr.opened", "pr.merged", "pr.closed", "checks.failed":

@@ -107,7 +107,6 @@ const CapOptions1 = "options/1"
 const CapOrgIdentity1 = "org-identity/1"
 const CapOrgRoutes2 = "org-routes/2"
 const CapPages1 = "pages/1"
-const CapPairing1 = "pairing/1"
 const CapPeople1 = "people/1"
 const CapPermissions1 = "permissions/1"
 const CapPerson1 = "person/1"
@@ -276,8 +275,6 @@ var HostCapabilities = pairs([][2]string{
 	{"devices/announce", "devices/1"},
 	{"devices/forget", "devices/1"},
 	{"devices/list", "devices/1"},
-	{"devices/startPairing", "devices/1"},
-	{"devices/stopPairing", "devices/1"},
 	{"disk/state", "disk/1"},
 	{"docs/list", "docs/1"},
 	{"docs/read", "docs/1"},
@@ -377,7 +374,6 @@ var HostCapabilities = pairs([][2]string{
 	{"milestones/state", "milestones/1"},
 	{"modes/remembered", "modes/1"},
 	{"options/remembered", "options/1"},
-	{"pairing/current", "pairing/1"},
 	{"permissions/answer", "permissions/1"},
 	{"permissions/pending", "permissions/1"},
 	{"person/set", "person/1"},
@@ -544,7 +540,6 @@ var HostCapabilities = pairs([][2]string{
 	{"milestones/changed", "milestones/1"},
 	{"modes/changed", "modes/1"},
 	{"pages/changed", "pages/1"},
-	{"pairing/changed", "pairing/1"},
 	{"person/changed", "person/1"},
 	{"pins/changed", "pins/1"},
 	{"plugins/changed", "plugins/1"},
@@ -600,7 +595,6 @@ var HostNotifications = set([]string{
 	"milestones/changed",
 	"modes/changed",
 	"pages/changed",
-	"pairing/changed",
 	"person/changed",
 	"pins/changed",
 	"plugins/changed",
