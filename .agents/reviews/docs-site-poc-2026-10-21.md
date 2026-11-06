@@ -1,5 +1,8 @@
 # Docs site PoC: docs.agentloops.dev (#1914)
 
+> **Replaced (#3390).** #3390 removed the phone relay; phones reach a cloud control plane
+> directly. What this page says about the relay is kept as a record only.
+
 2026-10-21. A spike for #1549: serve the docs site at `https://docs.agentloops.dev/`.
 
 ## Result
