@@ -53,14 +53,14 @@ struct MachineProcessesSection: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(process.name).lineLimit(1)
                 if process.depth == 0 {
-                    Text("Agents’ daemon").font(.caption).foregroundStyle(.secondary)
+                    Text("Agents’ daemon").appText(.supporting).foregroundStyle(.secondary)
                 } else if let agent = process.agentId, process.isSessionsOwn(in: state?.processes ?? []) {
                     Button(process.title ?? "Untitled session") {
                         opened()
                         model.showInMainWindow(agent, opening: openWindow)
                     }
                     .buttonStyle(.link)
-                    .font(.caption)
+                    .appText(.supporting)
                 }
             }
             .padding(.leading, CGFloat(min(process.depth, 6)) * 14)
