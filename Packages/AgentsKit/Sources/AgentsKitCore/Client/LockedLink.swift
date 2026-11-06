@@ -10,7 +10,9 @@ import Foundation
 /// channel (a machine with no lock, or one away), a prompt or a start goes signed, so the
 /// control plane can keep it; and a machine the lock names gives no answer that is not MAC'd.
 /// Once the channel is open, what the machine says unasked (`agent/changed`, a question card)
-/// is taken only with its MAC too (#3541).
+/// is taken only with its MAC too (#3541). A transport with no channel opens one again when
+/// the machine refuses a request as not in its lock: the machine took its lock after the
+/// transport opened (#3642).
 /// The web page's is `Web/src/wire/link.ts`.
 public struct LockedLink: DaemonLink {
     public typealias Source = @Sendable () async -> LockChannel.Signer?
@@ -32,8 +34,7 @@ public struct LockedLink: DaemonLink {
     public func transport() async throws -> any LineTransport {
         let transport = try await inner.transport()
         guard let signer = await source() else { return transport }
-        let required = LockChannel.names(signer.state, host: host)
-        let locked = LockedTransport(inner: transport, signer: signer, host: host, required: required)
+        let locked = LockedTransport(inner: transport, signer: signer, host: host, source: source)
         await locked.open(within: 15)
         return locked
     }
@@ -44,14 +45,18 @@ let keptMethods: Set<String> = ["agents/start", "agents/prompt"]
 
 final class LockedTransport: LineTransport, @unchecked Sendable {
     private let inner: any LineTransport
-    private let signer: LockChannel.Signer
     private let host: String
-    private let required: Bool
+    private let source: LockedLink.Source
     private let lock = NSLock()
+    /// The lock key and lock of the last hello: a later one reads them again.
+    private var signer: LockChannel.Signer
+    private var required: Bool
     private var channel: LockChannel.Channel?
+    /// A hello is on its way again, after a refusal (#3642).
+    private var reopening = false
     /// The ids of requests that went to the machine, until they are answered.
     private var asked: Set<JSONRPCID> = []
-    private let helloID = JSONRPCID.string("lock-hello-" + UUID().uuidString)
+    private var helloID = JSONRPCID.string("lock-hello-" + UUID().uuidString)
     /// The hello sent, so its answer makes the channel as it is read, before the next line.
     private var hello: LockChannel.Hello?
     private var helloWait: CheckedContinuation<JSONRPCMessage?, Never>?
@@ -59,11 +64,12 @@ final class LockedTransport: LineTransport, @unchecked Sendable {
     private let continuation: AsyncThrowingStream<String, any Error>.Continuation
     private var pump: Task<Void, Never>?
 
-    init(inner: any LineTransport, signer: LockChannel.Signer, host: String, required: Bool) {
+    init(inner: any LineTransport, signer: LockChannel.Signer, host: String, source: @escaping LockedLink.Source) {
         self.inner = inner
         self.signer = signer
         self.host = host
-        self.required = required
+        self.source = source
+        required = LockChannel.names(signer.state, host: host)
         var c: AsyncThrowingStream<String, any Error>.Continuation!
         stream = AsyncThrowingStream(bufferingPolicy: .unbounded) { c = $0 }
         continuation = c
@@ -79,8 +85,9 @@ final class LockedTransport: LineTransport, @unchecked Sendable {
 
     /// `lock/hello`: the channel, when the machine answers as one its lock names in time.
     func open(within seconds: Double) async {
-        guard let hello = try? LockChannel.hello(signer.key), let params = try? JSONValue.encoding(hello.params),
-              let line = try? JSONRPCCodec.encode(.request(id: helloID, method: DaemonAPI.Method.lockHello, params: params)) else { return }
+        let (key, id) = lock.withLock { (signer.key, helloID) }
+        guard let hello = try? LockChannel.hello(key), let params = try? JSONValue.encoding(hello.params),
+              let line = try? JSONRPCCodec.encode(.request(id: id, method: DaemonAPI.Method.lockHello, params: params)) else { return }
         let reply: JSONRPCMessage? = await withCheckedContinuation { wait in
             lock.withLock {
                 helloWait = wait
@@ -99,6 +106,30 @@ final class LockedTransport: LineTransport, @unchecked Sendable {
         }
         if reply == nil || lock.withLock({ channel }) == nil {
             WireLog.write("lock: no checked channel to \(host.isEmpty ? "this Mac" : host)")
+        }
+    }
+
+    /// The machine refused a request as not in its lock, and this transport has no channel: it
+    /// took its lock after the transport opened. A hello again, with the lock as it is now, so
+    /// the next request goes on a channel (#3642), as the web page's next call opens one.
+    private func reopen() {
+        let start = lock.withLock { () -> Bool in
+            guard channel == nil, helloWait == nil, !reopening else { return false }
+            reopening = true
+            return true
+        }
+        guard start else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            if let signer = await source() {
+                lock.withLock {
+                    self.signer = signer
+                    required = LockChannel.names(signer.state, host: host)
+                    helloID = .string("lock-hello-" + UUID().uuidString)
+                }
+                await open(within: 15)
+            }
+            lock.withLock { reopening = false }
         }
     }
 
@@ -150,7 +181,7 @@ final class LockedTransport: LineTransport, @unchecked Sendable {
             continuation.yield(line)
             return
         }
-        if message.id == helloID, lock.withLock({ helloWait != nil }) {
+        if lock.withLock({ message.id == helloID && helloWait != nil }) {
             finish(message)
             resumeHello(message)
             return
@@ -179,9 +210,10 @@ final class LockedTransport: LineTransport, @unchecked Sendable {
             if let channel, let body = try? channel.open(line) { return body }
             return refusal(id, "The machine's answer does not check, so it was not taken.")
         }
-        if case .success = message, channel != nil || required {
+        if case .success = message, channel != nil || lock.withLock({ required }) {
             return refusal(id, "The machine's answer was not signed, so it was not taken.")
         }
+        if channel == nil, case .failure(_, let error) = message, error.code == DaemonAPI.Failure.notInLock { reopen() }
         return line
     }
 
