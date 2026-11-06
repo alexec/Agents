@@ -1,0 +1,4 @@
+{"m":{"id":"home-link/status","jsonrpc":"2.0","method":"control/status"}}
+{"h":"mac","m":{"id":1,"jsonrpc":"2.0","method":"daemon/ping"}}
+{"m":{"id":2,"jsonrpc":"2.0","method":"hosts/list"}}
+{"h":"mac","m":{"id":3,"jsonrpc":"2.0","method":"agents/list","params":{"includeArchived":false}}}

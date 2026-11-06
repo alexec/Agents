@@ -338,9 +338,10 @@ final class RemoteModel {
 
     init(link: any DaemonLink) {
         baseLink = link
-        // Each request to the home host checked end to end once this device is in its lock (#3492).
+        // Each request to the home host checked end to end once this device is in its lock (#3492),
+        // and each line wrapped for it, as every other client's is (#3234).
         let lock = lock
-        client = DaemonClient(link: LockedLink(link, host: .mac) { await lock.channelSigner() })
+        client = DaemonClient(link: LockedLink(HomeLink(link), host: .mac) { await lock.channelSigner() })
         files = RemoteFiles(client: client)
         pictures = PhonePictures(files: files)
         // From the start, not once connected: a banner tapped to launch or wake the app

@@ -7,8 +7,8 @@ import UIKit
 /// pin from the code and a key of this device's own.
 ///
 /// What the phone says on this connection goes to the control plane's home host, as it
-/// did to the Mac; `RemoteModel` reaches every other host over a second connection
-/// wrapped by `ControlLink`. The first build's TLS link to a Mac's bridge went in T106.
+/// did to the Mac, wrapped by `HomeLink` (#3234); `RemoteModel` reaches every other host
+/// over a second connection wrapped by `ControlLink`. The first build's TLS link to a Mac's bridge went in T106.
 /// The relay through iCloud went in #3390: the control plane's address is the only way.
 enum RemoteControl {
     private static var folder: URL {

@@ -394,6 +394,70 @@ func TestADevicesBareLinesReachTheHomeHost(t *testing.T) {
 	}
 }
 
+// remoteHome is what the Remote's HomeLink writes (#3234), checked byte for byte on the Swift
+// side by HomeLinkTests.
+const remoteHome = "../../../Packages/AgentsKit/Tests/AgentsKitTests/Fixtures/control-wire/remote-home.jsonl"
+
+// The Remote wraps its own connection's lines (#3234): each is answered from where it says,
+// wrapped the same way. A change to the router that breaks the Remote fails here.
+func TestTheRemotesWrappedLinesReachTheHomeHost(t *testing.T) {
+	t.Parallel()
+	contract, err := os.ReadFile(remoteHome)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	p.host("MACHINE-1")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	m, err := controllink.PairClientAs(ctx, p.code(false), "Test iPhone", "iPhone")
+	if err != nil {
+		t.Fatal(err)
+	}
+	key, err := controllink.ClientKey(m.Private, m.ControlKey, m.Client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	l, _, err := controllink.Join(ctx, m.URL, m.Pin, controllink.Credentials{Identity: "c:" + m.Client, Key: key, Kind: "iPhone",
+		ControlKey: m.ControlKey, Capabilities: wire.DeclaredCapabilities["client"]})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(l.Close)
+	type message struct {
+		ID     json.RawMessage `json:"id"`
+		Result json.RawMessage `json:"result"`
+	}
+	for _, sent := range strings.Split(strings.TrimSpace(string(contract)), "\n") {
+		host, msg, kind := readClientFrame(sent)
+		var asked message
+		if kind == frameBad || kind == frameBare || json.Unmarshal([]byte(msg), &asked) != nil {
+			t.Fatalf("not a wrapped request: %s", sent)
+		}
+		if err := l.Write(ctx, sent); err != nil {
+			t.Fatal(err)
+		}
+		for {
+			line, err := l.Read(ctx)
+			if err != nil {
+				t.Fatalf("no answer to %s: %v", sent, err)
+			}
+			from, said, saidKind := readClientFrame(line)
+			var answer message
+			if json.Unmarshal([]byte(said), &answer) != nil || !bytes.Equal(answer.ID, asked.ID) {
+				continue
+			}
+			if saidKind != kind || from != host || answer.Result == nil {
+				t.Fatalf("%s was answered %s", sent, line)
+			}
+			if string(asked.ID) == `"home-link/status"` && !strings.Contains(said, `"homeHost":"mac"`) {
+				t.Fatalf("no home host in %s", line)
+			}
+			break
+		}
+	}
+}
+
 // A code works once; the same key spending it again is the same join (#212).
 func TestACodeIsUsedOnce(t *testing.T) {
 	t.Parallel()

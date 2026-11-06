@@ -20,9 +20,9 @@ public enum ControlWire {
         case toHost(MachineRef, message: String)
         /// For the control plane itself.
         case toControl(message: String)
-        /// A bare JSON-RPC line: the Remote's own connection to its home host never wraps
-        /// (#3225). It is the home host's, unless it is a method the control plane answers
-        /// (R7).
+        /// A bare JSON-RPC line: a Remote from before `HomeLink` (#3234) never wrapped its
+        /// own connection to its home host (#3225). It is the home host's, unless it is a
+        /// method the control plane answers (R7).
         case bare(message: String)
     }
 

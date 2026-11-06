@@ -37,3 +37,12 @@ A real-sized archived record (051): a scratch Claude agent's `agent.json` from 2
 archived record 24 KB rather than 1.4 KB. The title and paths are rewritten under `/fixture/`, the
 id replaced, and the state set to archived by the person. `scripts/seed-archived.swift` copies it to
 fill scratch stores, and the slim record tests read it.
+
+## control-wire/remote-home.jsonl
+
+The lines the Remote's own connection writes to a control plane whose home host is `mac`
+(#3234): `HomeLink`'s `control/status` first, then a `daemon/ping` written before that answer
+came (held, then sent to the home host), a method of the control plane's own, and one more of the
+home host's. `HomeLinkTests` checks that the Swift client writes exactly these bytes, and the Go
+control plane's `TestTheRemotesWrappedLinesReachTheHomeHost` sends them to a real router and checks
+where each is answered from. A change on either side that breaks the Remote fails one of the two.
