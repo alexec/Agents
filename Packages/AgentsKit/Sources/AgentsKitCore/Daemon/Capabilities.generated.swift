@@ -113,6 +113,7 @@ public enum Capability {
     public static let permissions1 = "permissions/1"
     public static let person1 = "person/1"
     public static let personal1 = "personal/1"
+    public static let personasCatalog1 = "personas.catalog/1"
     public static let personas1 = "personas/1"
     public static let personas2 = "personas/2"
     public static let pins1 = "pins/1"
@@ -383,9 +384,16 @@ public enum Capability {
         "person/set": "person/1",
         "person/state": "person/1",
         "personal/shared": "personal/1",
+        "personas/add": "personas.catalog/1",
+        "personas/check-updates": "personas.catalog/1",
         "personas/files": "personas/2",
         "personas/list": "personas/1",
+        "personas/managed": "personas.catalog/1",
+        "personas/preview": "personas.catalog/1",
+        "personas/remove": "personas.catalog/1",
         "personas/save": "personas/2",
+        "personas/search": "personas.catalog/1",
+        "personas/update-preview": "personas.catalog/1",
         "pins/arrange": "pins/1",
         "pins/arrangeSessions": "pins/1",
         "pins/arrangeWorkflows": "pins/1",

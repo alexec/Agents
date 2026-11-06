@@ -80,6 +80,7 @@ func (d *Daemon) register() {
 	d.registerSelfUpdate()
 	d.registerMacSignIn()
 	d.registerCatalog()
+	d.registerPersonaCatalog()
 	d.registerSimulators()
 	d.registerLanguageServers()
 	d.registerMCPCatalog()
