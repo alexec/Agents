@@ -31,6 +31,17 @@ struct ReviewModelTests {
         let reviewed = Approval.Kind.allCases.filter {
             Approval(kind: $0, key: "k", title: "", digest: nil, line: "", actions: []).hasReview
         }
-        #expect(reviewed == [.mcpServer, .workflow, .plugin, .file])
+        #expect(reviewed == [.mcpServer, .workflow, .plugin, .file, .deploy])
+    }
+
+    /// A waiting deploy (#3587) is approved or rejected, and its kind says so.
+    @Test func aDeployIsApprovedOrRejected() {
+        let deploy = Approval(kind: .deploy, key: "o/r/77", title: "Release to production", digest: "1:11",
+                              line: "v0.17.0 waits for your approval", actions: [.approve, .deny])
+        #expect(deploy.kindWord == "Deploy")
+        #expect(deploy.word(for: .approve) == "Approve")
+        #expect(deploy.word(for: .deny) == "Reject")
+        #expect(!deploy.opensItsSubject)
+        #expect(!deploy.isSession)
     }
 }

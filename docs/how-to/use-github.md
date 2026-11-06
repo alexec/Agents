@@ -150,6 +150,26 @@ can call, so a person does them. Merge, auto-merge and a review carry the commit
 page shows. When the pull request has a newer commit, nothing happens and the page says so.
 Open it again to see the new commit.
 
+## Approve a waiting deploy
+
+A deploy that a GitHub environment holds for its required reviewers (for example a
+`release.yml` job with `environment: production`) shows in **Needs You** as a **Deploy** row,
+when you are one of its reviewers. The row says the tag or branch, and what it waits for:
+*Release to production · v0.17.0 waits for your approval*.
+
+- Choose the row to see what ships: the run, the environment, its reviewers, the commit,
+  and, for a version tag, each commit since the version tag before it.
+- **Approve** lets the run go on. **Reject** stops it. Both act on GitHub as you, so
+  GitHub keeps who answered, with the comment "Approved in Agents" or "Rejected in Agents".
+  The Mac and the Remote also have both in the row's menu.
+- The gate is GitHub's. Agents adds none of its own, and an agent can't answer one: only
+  a window or a device can. GitHub refuses an answer from a person who is not a reviewer.
+- Agents reads the waiting runs every two minutes. A workflow can wait on the github
+  server's `deploy.waiting` event instead.
+
+To approve here, the GitHub App `agents-loops` must have the **Deployments** permission
+(read and write). Without it, GitHub refuses the answer and the row says why.
+
 ## Open a pull request
 
 Agents open pull requests with the connector's `create_pull_request` tool. Ask the agent

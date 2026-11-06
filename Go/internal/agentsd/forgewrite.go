@@ -46,6 +46,8 @@ type forgeGitHubWrites interface {
 	CreateIssue(ctx context.Context, repo, title string, labels []string) (int, string, error)
 	AddSubIssue(ctx context.Context, repo string, number int, childRepo string, childNumber int) error
 	SetBlockedBy(ctx context.Context, repo string, number int, blockerRepo string, blockerNumber int, blocked bool) error
+	// A waiting deploy's answer (#3587).
+	ReviewDeployments(ctx context.Context, repo string, runID int, environments []int64, approve bool, comment string) error
 }
 
 // forgeGitLabWrites is what the writes ask of GitLab; a test gives a fake.

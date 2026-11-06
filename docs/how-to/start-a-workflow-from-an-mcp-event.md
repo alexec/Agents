@@ -123,6 +123,11 @@ and use `add_issue_comment` on the PR to say what you changed.
   `coderabbit_reply` answers. `coderabbit_review` asks it to review again and
   `coderabbit_resolve` resolves its comments. CodeRabbit is known by its GitHub App, so a
   person named `coderabbitai` raises nothing.
+- Its `deploy.waiting` (#3587) is raised when a GitHub Actions run waits for a reviewer of an
+  environment with required reviewers: once per run, attempt and set of environments. It
+  takes `repo`, `workflow` (a file name, as `release.yml`), `branch` (a branch or a tag) and
+  `anyone`. Its data has the run, the `environments`, the `reviewers` and `canApprove`. The
+  person answers it in Needs You, never an agent.
 - Every PR event and the issue events are raised only for the repo's owner, members and
   collaborators, never a bot (#728). A PR event is raised only for a PR from a branch of the
   repo itself, not a fork. `anyone: true` raises them for everyone.

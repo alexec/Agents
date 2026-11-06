@@ -97,6 +97,21 @@ var events = append([]event{
 			// What the run deployed, as its jobs say with ::notice title=deploy::<target>:<id>/<version> (#3584).
 			"deploys": map[string]any{"type": "array", "items": str},
 		})},
+	// A deploy held by a GitHub environment with required reviewers (#3587).
+	{name: "deploy.waiting", title: "Deploy waiting for approval",
+		description: "A GitHub Actions run is waiting for a reviewer of an environment with required reviewers, as a release.yml job with environment: production: one event per run, attempt and set of environments, so the next environment it waits on is a new one. canApprove says whether the GitHub account this server is connected as is one of its reviewers; Agents lists it in Needs You for them, with Approve and Reject. Only runs from the repo itself, started by a person, never a bot, unless anyone is true.",
+		input: schema{repoProperty,
+			property{name: "workflow", kind: "string", description: "Only runs of this workflow, by its file name, as release.yml.",
+				pattern: regexp.MustCompile(`^[A-Za-z0-9_.-]+\.ya?ml$`), looksLike: "release.yml"},
+			branchProperty("Only runs on this branch or tag, as main or v0.16.0."), anyoneProperty},
+		payload: object(map[string]any{
+			"run": object(map[string]any{"id": integer, "attempt": integer, "name": str, "workflow": str, "event": str,
+				"branch": str, "headSha": str, "url": str, "actor": str}),
+			"environments": map[string]any{"type": "array", "items": object(map[string]any{"id": integer, "name": str, "url": str})},
+			"reviewers":    map[string]any{"type": "array", "items": str},
+			"canApprove":   map[string]any{"type": "boolean"},
+			"waitingSince": str,
+		})},
 	{name: "pr.opened", title: "Pull request opened",
 		description: "A pull request was opened, or a draft was marked ready for review: a PR open and not a draft now that was not at the last poll. Drafts never count. Reopened, it is raised again." + ownPRs,
 		input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty},
@@ -683,6 +698,22 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 				}})
 		}
 		return list, truncated, nil
+	}
+	if name == "deploy.waiting" {
+		waiting, err := gh.WaitingDeploys(ctx, repo, a.workflow, a.branch)
+		if err != nil {
+			return nil, false, err
+		}
+		var list []candidate
+		for _, w := range waiting {
+			at := normalized(w.Run.Run.UpdatedAt)
+			if at == "" || (!a.anyone && !w.Run.Trusted) {
+				continue
+			}
+			list = append(list, candidate{eventID: "deploy.waiting:" + repo + ":" + w.key(), time: at,
+				data: func() (map[string]any, error) { return w.data(), nil }})
+		}
+		return list, false, nil
 	}
 	if name == "run.completed" {
 		runs, truncated, err := gh.CompletedRuns(ctx, repo, a.workflow, a.branch, a.run, since)

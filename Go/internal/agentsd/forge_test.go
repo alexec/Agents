@@ -32,6 +32,8 @@ type fakeForgeGitHub struct {
 	plans int
 	// reviews are what a list of the label needs-approval gives (#3330).
 	reviews []githubmcp.Item
+	// waiting are each repo's deploys waiting for a reviewer (#3587).
+	waiting map[string][]githubmcp.WaitingDeploy
 }
 
 func (f *fakeForgeGitHub) Search(_ context.Context, repos []string, sf githubmcp.SearchFilter, after string, first int) (githubmcp.SearchPage, error) {

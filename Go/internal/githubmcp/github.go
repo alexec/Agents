@@ -288,6 +288,9 @@ type GitHub interface {
 	// RunDeploys are what a finished run says it deployed (#3584): the message of each notice
 	// titled deploy that its jobs wrote (::notice title=deploy::testflight:<bundle id>/<build>).
 	RunDeploys(ctx context.Context, repo string, run CompletedRun) ([]string, error)
+	// WaitingDeploys are runs waiting for an environment's required reviewers (#3587): only
+	// workflow's (a file name) when it is set, only branch's (a branch or a tag) when it is set.
+	WaitingDeploys(ctx context.Context, repo, workflow, branch string) ([]WaitingDeploy, error)
 	// PRBranch is the head branch of PR number pr. checks.failed and checks.passed with a pr and
 	// no branch list only that branch's runs, not the whole repo's (#3107).
 	PRBranch(ctx context.Context, repo string, pr int) (string, error)
