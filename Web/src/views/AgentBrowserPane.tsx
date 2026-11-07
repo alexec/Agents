@@ -1,15 +1,17 @@
 // The Agent Browser tab (#3528, spike #3527; the window's AgentBrowserPane.swift): the browser on
 // the session's machine, which agents drive, as a screencast from its host. The person sees each
 // page as the agent does and can click, scroll, type and paste in it. Frames come only while the
-// tab is on screen and the page is not hidden.
+// tab is on screen and the page is not hidden. The pane shows its own session's tab, and says when
+// another session's agent holds the browser (#3916).
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { Store } from "../model/store";
-import type { BrowserInputRequest, BrowserNavigateAction } from "../protocol/generated";
+import type { BrowserInputRequest, BrowserNavigateAction, UUID } from "../protocol/generated";
 import { describe } from "../model/errors";
-import { keyInput, modifiers, pagePoint, stopped, words } from "../model/machineBrowser";
+import { keyInput, modifiers, otherHolder, pagePoint, stopped, words } from "../model/machineBrowser";
+import { openAgentLink } from "../model/agentLink";
 
-export function AgentBrowserPane({ store, host }: { store: Store; host: string }) {
+export function AgentBrowserPane({ store, host, session }: { store: Store; host: string; session: string }) {
   const area = useRef<HTMLDivElement>(null);
   const size = useSignal<{ width: number; height: number } | null>(null);
   const hidden = useSignal(document.hidden);
@@ -21,10 +23,13 @@ export function AgentBrowserPane({ store, host }: { store: Store; host: string }
   const sending = useRef(false);
   /** The button held, so a move while it is down is a drag. */
   const held = useRef<string | null>(null);
+  /** The watch for this session has answered: until then, what the host said is another session's. */
+  const answered = useSignal(false);
 
-  const state = store.browserStates.value[host] ?? stopped;
+  const state = answered.value ? store.browserStates.value[host] ?? stopped : stopped;
   const heard = store.browserFrame.value;
-  const frame = heard?.host === host && state.status === "running" ? heard.frame : null;
+  const frame = answered.value && heard?.host === host && state.status === "running" && !state.noTab ? heard.frame : null;
+  const holder = otherHolder(state, session);
 
   useEffect(() => {
     const seen = () => { hidden.value = document.hidden; };
@@ -43,16 +48,22 @@ export function AgentBrowserPane({ store, host }: { store: Store; host: string }
     return () => observer.disconnect();
   }, []);
 
+  // A frame heard before this watch is another session's tab (#3916).
+  useEffect(() => {
+    if (store.browserFrame.peek()?.host === host) store.browserFrame.value = null;
+  }, [host, session]);
+
   // Watch while shown and not hidden, at the area's size; a resize settles first.
   useEffect(() => {
     const s = size.value;
     if (hidden.value || !s || s.width <= 0 || s.height <= 0) return;
     let gone = false;
     const timer = setTimeout(() => {
-      store.link.call("browser/watch", { width: s.width, height: s.height }, host)
+      store.link.call("browser/watch", { width: s.width, height: s.height, agent: session as UUID }, host)
         .then((said) => {
           if (gone) return;
           store.browserStates.value = { ...store.browserStates.peek(), [host]: said };
+          answered.value = true;
           problem.value = null;
         })
         .catch((error) => { if (!gone) problem.value = describe(error); });
@@ -61,11 +72,11 @@ export function AgentBrowserPane({ store, host }: { store: Store; host: string }
       gone = true;
       clearTimeout(timer);
     };
-  }, [host, size.value?.width, size.value?.height, hidden.value]);
+  }, [host, session, size.value?.width, size.value?.height, hidden.value]);
   useEffect(() => {
     if (hidden.value) return;
     return () => { void store.link.call("browser/unwatch", {}, host).catch(() => {}); };
-  }, [host, hidden.value]);
+  }, [host, session, hidden.value]);
 
   useEffect(() => { if (!editing.value) typed.value = state.url ?? ""; }, [state.url]);
 
@@ -136,6 +147,9 @@ export function AgentBrowserPane({ store, host }: { store: Store; host: string }
           onFocus={() => { editing.value = true; }} onBlur={() => { editing.value = false; }}
           onInput={(e) => { typed.value = (e.currentTarget as HTMLInputElement).value; }} />
       </form>
+      {holder && <p class="agent-browser-holder small" role="status">
+        <button type="button" class="link" title="Go to this session" onClick={() => openAgentLink(holder.id)}>{holder.title}</button> {words.using}
+      </p>}
       <div ref={area} class="agent-browser-page" tabIndex={0} aria-label="The page in the machine's browser"
         onMouseDown={(e) => {
           (e.currentTarget as HTMLDivElement).focus();
@@ -172,6 +186,8 @@ export function AgentBrowserPane({ store, host }: { store: Store; host: string }
           if (text) send({ kind: "text", text });
         }}>
         {frame ? <img class="agent-browser-frame" alt="" draggable={false} src={`data:image/jpeg;base64,${frame.image}`} />
+          : !answered.value ? <p class="hint"><span class="spinner" /> {words.loading}</p>
+          : state.status === "running" && state.noTab ? <div class="agent-browser-note"><strong>{words.noTabTitle}</strong><p>{words.noTab}</p></div>
           : state.status === "running" ? <p class="hint"><span class="spinner" /> {words.loading}</p>
           : state.status === "starting" ? <p class="hint"><span class="spinner" /> {state.detail ?? words.starting}</p>
           : state.status === "failed" ? <div class="agent-browser-note"><strong>{words.failedTitle}</strong><p>{state.detail ?? words.failed}</p></div>

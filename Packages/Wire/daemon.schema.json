@@ -375,6 +375,10 @@
         "lastActivityAt": {
           "$ref": "#/definitions/WireDate"
         },
+        "browserUsedAt": {
+          "$ref": "#/definitions/WireDate",
+          "description": "When the agent's first browser call of its latest turn that used the browser came (#3916). A client opens the session's Agent Browser pane when this moves."
+        },
         "isUnread": {
           "type": "boolean"
         },
@@ -3023,6 +3027,18 @@
         },
         "title": {
           "type": "string"
+        },
+        "noTab": {
+          "type": "boolean",
+          "description": "True when the watch names a session whose agent has opened no tab in the browser (#3916): the client shows that, not a page."
+        },
+        "holder": {
+          "$ref": "#/definitions/UUID",
+          "description": "The session whose agent holds browser:agents now, when one does (#3916)."
+        },
+        "holderTitle": {
+          "type": "string",
+          "description": "That session's title."
         }
       },
       "required": [
@@ -3100,6 +3116,10 @@
         },
         "height": {
           "type": "integer"
+        },
+        "agent": {
+          "$ref": "#/definitions/UUID",
+          "description": "The session whose tab the client shows (#3916): the newest tab its agent opened. Without it, the machine's newest tab."
         }
       },
       "required": [

@@ -7,9 +7,11 @@ import SwiftUI
 /// Not the Browser pane, which is the person's own web view on this Mac. This one is a
 /// screencast of the machine's Chromium, where the agent works: the person sees each page
 /// as the agent does, and can scroll, click and type in it at any time. Frames come only
-/// while the pane is on screen.
+/// while the pane is on screen. It shows this session's own tab (#3916), and says when
+/// another session's agent holds the browser.
 struct AgentBrowserPane: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
     let agent: Agent
     let isVisible: Bool
 
@@ -25,6 +27,10 @@ struct AgentBrowserPane: View {
         VStack(spacing: 0) {
             bar
             Divider()
+            if let holder = browser.state.otherHolder(than: agent.id) {
+                holderLine(holder)
+                Divider()
+            }
             GeometryReader { geometry in
                 page
                     .onChange(of: geometry.size, initial: true) { _, size in area = size }
@@ -39,12 +45,12 @@ struct AgentBrowserPane: View {
                     .padding(.vertical, 4)
             }
         }
-        .task(id: WatchKey(visible: isVisible, width: Int(area.width), height: Int(area.height))) {
+        .task(id: WatchKey(session: agent.id, visible: isVisible, width: Int(area.width), height: Int(area.height))) {
             if isVisible, area.width > 0, area.height > 0 {
                 // A resize settles before the page is laid out again.
                 if watching { try? await Task.sleep(for: .milliseconds(250)) }
                 guard !Task.isCancelled else { return }
-                await browser.watch(width: Int(area.width), height: Int(area.height), adding: !watching)
+                await browser.watch(session: agent.id, width: Int(area.width), height: Int(area.height), adding: !watching)
                 watching = true
             } else if watching {
                 watching = false
@@ -62,7 +68,31 @@ struct AgentBrowserPane: View {
         }
     }
 
-    private var running: Bool { browser.state.status == .running }
+    private var running: Bool { browser.state.status == .running && !browser.state.sessionHasNoTab }
+
+    /// Another session's agent drives the browser now: its title goes to it. This
+    /// session's own tab stays below, to look at and use.
+    private func holderLine(_ holder: UUID) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: "cursorarrow.rays")
+                .foregroundStyle(.secondary)
+            Button {
+                if !model.showInFolderWindow(holder) { model.showInMainWindow(holder, opening: openWindow) }
+            } label: {
+                Text(browser.state.holderTitle ?? "Another session").truncationMode(.middle)
+            }
+            .buttonStyle(.link)
+            .help("Go to this session")
+            Text("is using the browser")
+                .foregroundStyle(.secondary)
+                .fixedSize()
+            Spacer(minLength: 0)
+        }
+        .appText(.supporting)
+        .lineLimit(1)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+    }
 
     private var bar: some View {
         HStack(spacing: 6) {
@@ -96,6 +126,9 @@ struct AgentBrowserPane: View {
     @ViewBuilder
     private var page: some View {
         switch browser.state.status {
+        case .running where browser.state.sessionHasNoTab:
+            Note(symbol: "cursorarrow.rays", title: "This session's agent has not used the browser",
+                 words: "When it opens a page, you see it here and can use it. To open one yourself, type an address above.")
         case .running:
             if let frame = browser.frame {
                 ZStack {
@@ -124,6 +157,7 @@ struct AgentBrowserPane: View {
 }
 
 private struct WatchKey: Hashable {
+    var session: UUID
     var visible: Bool
     var width: Int
     var height: Int

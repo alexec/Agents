@@ -71,6 +71,7 @@ type Daemon struct {
 	appToolsState
 	screenDriveState
 	browserDriveState
+	browserTabState
 	hostUserState
 	userSuspendState
 	machinePinState

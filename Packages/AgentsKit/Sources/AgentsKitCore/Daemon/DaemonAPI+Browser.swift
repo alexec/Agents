@@ -8,9 +8,13 @@ public extension DaemonAPI {
     struct BrowserWatchRequest: Codable, Sendable, Hashable {
         public var width: Int
         public var height: Int
-        public init(width: Int, height: Int) {
+        /// The session whose tab to show (#3916): the newest tab its agent opened. Without
+        /// it, the machine's newest tab.
+        public var agent: UUID?
+        public init(width: Int, height: Int, agent: UUID? = nil) {
             self.width = width
             self.height = height
+            self.agent = agent
         }
     }
 
@@ -30,11 +34,29 @@ public extension DaemonAPI {
         public var detail: String?
         public var url: String?
         public var title: String?
-        public init(status: BrowserPageStatus, detail: String? = nil, url: String? = nil, title: String? = nil) {
+        /// The watched session's agent has opened no tab in the browser (#3916).
+        public var noTab: Bool?
+        /// The session whose agent holds the browser now, and its title (#3916).
+        public var holder: UUID?
+        public var holderTitle: String?
+        public init(status: BrowserPageStatus, detail: String? = nil, url: String? = nil, title: String? = nil,
+                    noTab: Bool? = nil, holder: UUID? = nil, holderTitle: String? = nil) {
             self.status = status
             self.detail = detail
             self.url = url
             self.title = title
+            self.noTab = noTab
+            self.holder = holder
+            self.holderTitle = holderTitle
+        }
+
+        /// The browser runs, and the watched session's agent has opened no tab in it.
+        public var sessionHasNoTab: Bool { status == .running && noTab == true }
+
+        /// The session that holds the browser, when it is not `session`.
+        public func otherHolder(than session: UUID) -> UUID? {
+            guard let holder, holder != session else { return nil }
+            return holder
         }
     }
 
