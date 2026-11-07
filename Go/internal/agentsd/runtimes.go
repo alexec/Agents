@@ -378,6 +378,7 @@ func (d *Daemon) launchOn(r *runtimeDef, dir string, account *wire.AccountProfil
 		// file under that home, not a Keychain item. Neither Gemini key is in env.
 		env = append(env, "GEMINI_HOME="+d.appHomes()["antigravity"], "AGY_ACP_DISABLE_WORKSPACE_TRUST=1",
 			"AGY_ACP_FORCE_FILE_STORAGE=1")
+		excludeAntigravitySkills(dir)
 	}
 	if isOrgAccount(account) {
 		var err error
@@ -531,4 +532,22 @@ func sessionMeta(runtimeID string) map[string]any {
 			"description": "An agent hosted by the Agents app."}, "rules": grokRules()}
 	}
 	return nil
+}
+
+// excludeAntigravitySkills keeps the system skills Antigravity writes into the agent's folder
+// (<cwd>/skills/system/run-workflow in agy_acp_server 1.4.5, #3731) out of git's view of it.
+// Its harness puts them under the session's folder and the server gives no way to move them
+// (SkillsConfig.materialized_skills_dir is never set), so the line in info/exclude is the
+// only lever: an untracked skills/ would show in the person's repository and stop a
+// worktree's removal. Not a git folder, or the file not writable: left as it is.
+func excludeAntigravitySkills(dir string) {
+	repo, ok := repositoryOf(dir)
+	if !ok {
+		return
+	}
+	line := "/skills/system/"
+	if repo.prefix != "" {
+		line = "/" + repo.prefix + line
+	}
+	_ = excludeLine(repo.commonDir, "# System skills Antigravity writes into the agent's folder (#3731).", line)
 }
