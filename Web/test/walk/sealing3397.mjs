@@ -162,7 +162,7 @@ try {
   await page.shot(`${out}/web-model-access-sealed.png`);
 
   // 3. A person's secret.
-  await page.eval(`location.hash = "#/settings"`);
+  await page.eval(`location.hash = "#/setup/secrets"`);
   await sleep(1000);
   await page.eval(`document.getElementById("settings-secrets").scrollIntoView()`);
   await page.waitFor(`[...document.querySelectorAll("button")].some((b) => b.textContent === "Add a Secret…")`, 15_000);

@@ -1,6 +1,6 @@
 // The user scope's words (#1760, #2157), as the window and the Remote have them (UserScopeWords
 // in Packages/AgentsKit): the secrets and settings the control plane keeps for the person and
-// sends to each machine of theirs. Machines ▸ Secrets, and the parts at the end of Machines.
+// sends to each machine of theirs. Your setup ▸ Secrets (#3632).
 import type { SecretsLeft, UserSecretRow } from "../protocol/generated";
 
 export const secretsTitle = "Secrets";

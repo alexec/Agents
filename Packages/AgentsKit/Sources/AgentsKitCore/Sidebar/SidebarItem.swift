@@ -44,8 +44,11 @@ public enum SidebarItem: Hashable, Sendable {
     /// once, with the accounts, and a line per machine.
     case runtimes
     /// The person's own MCP servers (#488, #589, #753): every one in `~/.agents/mcp.json`,
-    /// and how each is doing.
+    /// and how each is doing. On the Mac it is under **Your setup** (#3632).
     case mcpServers
+    /// The person's secrets and cards, kept by the control plane and sent to each machine of
+    /// theirs (#1760), under **Your setup** (#3632). Mac + web: the Remote has no row for it (#2796).
+    case secrets
     /// One machine's page (#3626): its CPU, memory and disks, from its row under Machines.
     /// Mac + web: the Remote has no row for it (#2796).
     case machine(MachineRef)

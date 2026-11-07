@@ -86,7 +86,7 @@ struct RuntimesView: View {
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .navigationTitle("Your setup")
+        .navigationTitle("Runtimes")
         .overlay {
             if runtimes.isEmpty {
                 Text("No runtimes known yet.")
@@ -302,7 +302,7 @@ struct RuntimesRow: View {
         // The title alone (#587): how many work is the tooltip's, and none working turns
         // the row's icon red (`activityIcon(_:warns:)`).
         HStack(alignment: .firstTextBaseline) {
-            Text("Your setup").foregroundStyle(.primary)
+            Text("Runtimes").foregroundStyle(.primary)
             Spacer()
         }
         .help(tally.map { "\($0.working) of \($0.total) runtimes working. Your runtimes and accounts, and where each machine has them" }

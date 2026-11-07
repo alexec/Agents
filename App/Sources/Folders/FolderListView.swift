@@ -20,6 +20,7 @@ struct FolderListView: View {
     @AppStorage("showsActivity", store: WindowDefaults.store) private var showsStatus = true
     /// Machines, open until folded, and kept so (#3626).
     @AppStorage("showsMachines", store: WindowDefaults.store) private var showsMachines = true
+    @AppStorage("showsYourSetup", store: WindowDefaults.store) private var showsYourSetup = true
     /// Usage, open until folded, and kept so (#915).
     @AppStorage("showsUsage", store: WindowDefaults.store) private var showsUsage = true
     /// The smart groups turned off in Settings ▸ Sidebar (#846).
@@ -211,18 +212,26 @@ struct FolderListView: View {
             // the list, so they take its selection and keys, each with its icon in the
             // accent beside the plain title (#155), and folding as a folder does.
             // Status is what goes on now; Usage charts the past (#915).
-            // Your setup (#3630, #3631): the person's own runtimes and accounts, once, not once
-            // per machine. Where Status was; #3633 takes the rest of Status away.
-            Section {
-                RuntimesRow().activityIcon("person.crop.circle", warns: runtimesFailing)
+            // Your setup (#3630): what is the person's own, once, not once per machine: their
+            // runtimes and accounts (#3631), their connectors, and their secrets (#3632). Where
+            // Status was; #3633 takes the rest of Status away.
+            Section(isExpanded: $showsYourSetup) {
+                RuntimesRow().activityIcon("cpu", warns: runtimesFailing)
                     .appText(.supporting).sidebarInk(.runtimes).tag(SidebarItem.runtimes)
+                MCPServersRow().activityIcon("server.rack", warns: connectorsWarn)
+                    .appText(.supporting).sidebarInk(.mcpServers).tag(SidebarItem.mcpServers)
+                // The control plane keeps them (#1760): no row without one.
+                if ControlConfig.endpoint != nil {
+                    SecretsRow().activityIcon("key")
+                        .appText(.supporting).sidebarInk(.secrets).tag(SidebarItem.secrets)
+                }
+            } header: {
+                Text("Your setup").appText(.supporting)
             }
 
             Section(isExpanded: $showsStatus) {
                 EventsRow().activityIcon("list.bullet.rectangle")
                     .appText(.supporting).sidebarInk(.events).tag(SidebarItem.events)
-                MCPServersRow().activityIcon("server.rack", warns: connectorsWarn)
-                    .appText(.supporting).sidebarInk(.mcpServers).tag(SidebarItem.mcpServers)
             } header: {
                 // The size of every other group's heading (#495).
                 Text("Status").appText(.supporting)

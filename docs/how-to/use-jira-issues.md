@@ -32,7 +32,7 @@ Jira Cloud and with Jira Data Center.
 Connect Jira once, for every folder on the machine. The one Atlassian connection serves
 Confluence too (the Docs slot). On the Mac, open a folder's **Connectors** page and choose
 **Jira…** in the Tasks slot, or **Connectors ▸ Connect… ▸ Jira and Confluence**. On the web
-page, choose **Connect Jira…** in the Tasks slot or on **Machines ▸ Connectors**.
+page, choose **Connect Jira…** in the Tasks slot or on **Your setup ▸ Connectors**.
 
 - **Atlassian Cloud** signs in on atlassian.com, where you choose the site. The machine keeps
   the token and renews it. Atlassian has no public apps, so the machine needs the Agents app's

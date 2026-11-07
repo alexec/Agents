@@ -27,6 +27,7 @@ export type PageDraw =
   | { kind: "features" }
   | { kind: "docs" }
   | { kind: "machine"; host: string }
+  | { kind: "secrets" }
   | { kind: "usage" | "machines" | "workflows" | "settings" };
 
 export interface NavPage {
@@ -60,7 +61,6 @@ export const navPages: Record<NavSection, readonly NavPage[]> = {
   docs: [{ id: "docs", title: "Docs", group: "Docs", draw: { kind: "docs" } }],
   machines: [
     { id: "machines", title: "Machines", group: "Machines", draw: { kind: "machines" } },
-    { id: "mcp", title: "Connectors", group: "On them", draw: { kind: "activity", page: "mcp" } },
   ],
   workflows: [
     { id: "workflows", title: "Workflows", group: "Workflows", draw: { kind: "workflows" } },
@@ -75,8 +75,13 @@ export const navPages: Record<NavSection, readonly NavPage[]> = {
   ],
   requests: [adminPage("requests", "Requests", "Requests")],
   people: [adminPage("people", "People and Groups", "People"), adminPage("signIn", "Sign-In", "People")],
-  // The person's own setup (#3630), beside Settings: each runtime once, with the accounts, and a line per machine (#3631).
-  setup: [{ id: "runtimes", title: "Runtimes", group: "Your setup", draw: { kind: "activity", page: "runtimes" } }],
+  // The person's own setup (#3630), beside Settings: each runtime once, with the accounts, and a line per machine (#3631);
+  // their connectors, and their secrets and cards, which go to every machine of theirs (#3632).
+  setup: [
+    { id: "runtimes", title: "Runtimes", group: "Your setup", draw: { kind: "activity", page: "runtimes" } },
+    { id: "mcp", title: "Connectors", group: "Your setup", draw: { kind: "activity", page: "mcp" } },
+    { id: "secrets", title: "Secrets", group: "Your setup", draw: { kind: "secrets" } },
+  ],
   settings: [
     { id: "settings", title: "Settings", group: "Settings", draw: { kind: "settings" } },
     adminPage("policy", "Policy", "Organisation"),
@@ -151,8 +156,7 @@ export function movedPage(app: "console" | "a", page: string | undefined): { nav
     }
   }
   switch (page) {
-    case "runtimes": return { nav: "setup", section: page };
-    case "mcp": return { nav: "machines", section: page };
+    case "runtimes": case "mcp": return { nav: "setup", section: page };
     // Worktrees (#3627) and resources (#3629) are on each machine's page now.
     case "worktrees": case "resources": return { nav: "machines", section: "machines" };
     case "events": case "milestones": return { nav: "reports", section: page };

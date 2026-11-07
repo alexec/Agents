@@ -60,7 +60,7 @@ await scrub();
 await page.shot(`${out}/web-connected.png`);
 await page.press("Done");
 // Connectors ▸ Connections: the row says Atlassian, and how it signs in.
-await page.eval(`location.hash = "#/machines/mcp"`);
+await page.eval(`location.hash = "#/setup/mcp"`);
 await page.waitFor(has("Atlassian · Sam Walker"), 10_000).then(async () => {
   check(await page.eval(has("API token")), "the row says it is an API token");
   await scrub();

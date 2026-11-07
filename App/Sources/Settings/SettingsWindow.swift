@@ -152,7 +152,7 @@ struct SettingsWindow: View {
         switch each {
         // A person's own sign-ins (#995), a pane of its own as on the Remote (#2197).
         // People with no control plane would say it can't be reached: it lists Account only (#2258).
-        case .controlPlane, .clients, .secrets, .people, .channels, .signIns, .policy, .providers: control != nil
+        case .controlPlane, .clients, .people, .channels, .signIns, .policy, .providers: control != nil
         // An admin's, and a member's in a group, who sees the groups they are in (#1761, #2076).
         case .groups: control != nil && model.people.showsGroups
         // An admin's: which providers people sign in with (#995).
@@ -233,10 +233,6 @@ struct SettingsWindow: View {
             if let control { ControlSettingsView(control: control, page: .providers) }
         case .clients:
             if let control { ControlSettingsView(control: control, page: .clients) }
-        case .secrets:
-            // Through the window's own connection, which hears when they change (#1760).
-            // Then this Mac's secrets for one session (#3548), kept by its host.
-            FormColumn { SecretsPane(control: model.controlRequests, state: model.userScope) { SessionSecretsSection() } }
         case .people:
             // Through the window's own connection to the control plane, which hears when
             // people change (#994).
@@ -270,7 +266,7 @@ extension SettingsScope {
         case .thisApp: [.appearance, .sidebar, .voice]
         // What agents may do, what they spend and what they take (#2957, FR-018).
         case .agents: [.agentsPolicy, .spending, .resources]
-        case .machines: [.machines, .runtimes, .browser, .agentConfiguration, .secrets]
+        case .machines: [.machines, .runtimes, .browser, .agentConfiguration]
         // The person's account first, shown with no control plane too (#2157).
         case .controlPlane: [.account, .signIns, .people, .bots, .groups, .channels, .signIn, .policy, .providers, .clients, .controlPlane]
         }
@@ -316,10 +312,6 @@ enum SettingsPane: String, Hashable, CaseIterable {
     case signIns
     /// Was Shared (#754): the raw value is what a window left open on it kept.
     case agentConfiguration = "shared"
-    /// The secrets the control plane keeps for the person (#1760). Was On Every Machine, whose
-    /// settings moved into their own panes (#2157): its raw value is what a window left open
-    /// on it kept.
-    case secrets = "onEveryMachine"
 
     /// A pane of what this Mac's host keeps: its runtimes, settings, cost and resources.
     /// Machines is one only on its This Mac page.
@@ -327,14 +319,14 @@ enum SettingsPane: String, Hashable, CaseIterable {
         switch self {
         case .runtimes, .agentConfiguration, .spending, .resources, .browser: true
         case .appearance, .sidebar, .agentsPolicy, .voice, .account, .machines, .controlPlane, .providers, .clients, .people, .bots, .groups,
-             .channels, .signIn, .signIns, .secrets, .policy: false
+             .channels, .signIn, .signIns, .policy: false
         }
     }
 
     /// A pane drawn only with a control plane to show: a window left on one moves away when
     /// the Mac is forgotten (#2258).
     var needsControlPlane: Bool {
-        [.controlPlane, .providers, .clients, .secrets, .signIns, .people, .bots, .groups, .channels, .signIn, .policy]
+        [.controlPlane, .providers, .clients, .signIns, .people, .bots, .groups, .channels, .signIn, .policy]
             .contains(self)
     }
 
@@ -361,7 +353,6 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .signIn: SignInWords.paneTitle
         case .policy: OrgPolicyWords.title
         case .signIns: SignInWords.signInsTitle
-        case .secrets: UserScopeWords.secretsTitle
         }
     }
 
@@ -388,7 +379,6 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .signIn: SignInWords.paneSymbol
         case .policy: OrgPolicyWords.symbol
         case .signIns: "person.badge.key"
-        case .secrets: "key"
         }
     }
 }

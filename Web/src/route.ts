@@ -67,8 +67,8 @@ export function parseRoute(hash: string): Route {
   if (first && first !== "overview" && (navSections as readonly string[]).includes(first)) {
     const nav = first as Exclude<NavSection, "overview">;
     if (!section) return { nav };
-    // Runtimes moved from Machines to Your setup (#3631): an old link still opens it.
-    if (nav === "machines" && section === "runtimes") return { nav: "setup", section };
+    // Runtimes (#3631) and Connectors (#3632) moved from Machines to Your setup: an old link still opens them.
+    if (nav === "machines" && (section === "runtimes" || section === "mcp")) return { nav: "setup", section };
     // A doc's page is #/docs/<ref> (spec 3319): Docs has one page, so the ref takes its place.
     if (nav === "docs" && !item && section !== "docs") return { nav, section: "docs", item: decodeURIComponent(section) };
     return item ? { nav, section: decodeURIComponent(section), item: decodeURIComponent(item) } : { nav, section: decodeURIComponent(section) };
@@ -133,9 +133,10 @@ function sectionHash(r: Route): string {
   return `#/${r.nav}` + (r.section ? "/" + encodeURIComponent(r.section) + (r.item ? "/" + encodeURIComponent(r.item) : "") : "");
 }
 
-/** Whether an address is one from before #2141, or Machines ▸ Runtimes from before #3631, which the page writes again as its new place. */
+/** Whether an address is one from before #2141, or Machines ▸ Runtimes or Connectors from before #3631 and #3632, which the page writes
+ * again as its new place. */
 export function isOldAddress(hash: string): boolean {
-  return /^#\/?(console|a)(\/|$)/.test(hash) || /^#\/?machines\/runtimes$/.test(hash);
+  return /^#\/?(console|a)(\/|$)/.test(hash) || /^#\/?machines\/(runtimes|mcp)$/.test(hash);
 }
 
 /** The section a route is in: Agents for a host's places, the Overview for none. */
