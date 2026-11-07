@@ -69,6 +69,51 @@
   ],
   "methods": [
     {
+      "name": "achievements/changed",
+      "x-capability": "achievements/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Achievements"
+          }
+        }
+      ]
+    },
+    {
+      "name": "achievements/state",
+      "x-capability": "achievements/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Achievements"
+        }
+      }
+    },
+    {
       "name": "agent/changed",
       "x-capability": "agent/1",
       "tags": [
@@ -784,6 +829,32 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "agents/moveToMachine",
+      "x-capability": "sessions.move/1",
+      "description": "Move to Machine… (#3790): the person moves a session to another of their machines, as move_session does (#3717). Its turn stops if one runs, its branch goes there with its uncommitted changes, and it goes on there with the same id; this machine lets it go. It answers once that machine has it.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MoveToMachineRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MoveToMachineAnswer"
         }
       }
     },
@@ -2269,6 +2340,106 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "connections/bot",
+      "x-capability": "connections.bot/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ConnectionBot"
+        }
+      }
+    },
+    {
+      "name": "connections/bot/complete",
+      "x-capability": "connections.bot/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ConnectionBotCompleteRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ConnectionBot"
+        }
+      }
+    },
+    {
+      "name": "connections/bot/remove",
+      "x-capability": "connections.bot/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ConnectionBot"
+        }
+      }
+    },
+    {
+      "name": "connections/bot/start",
+      "x-capability": "connections.bot/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ConnectionBotStartRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ConnectionBotStart"
         }
       }
     },
@@ -4998,6 +5169,11 @@
     {
       "name": "marketplaces/list",
       "x-capability": "marketplaces/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -5436,51 +5612,6 @@
       }
     },
     {
-      "name": "milestones/changed",
-      "x-capability": "milestones/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Milestones"
-          }
-        }
-      ]
-    },
-    {
-      "name": "milestones/state",
-      "x-capability": "milestones/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Milestones"
-        }
-      }
-    },
-    {
       "name": "modes/changed",
       "x-capability": "modes/1",
       "tags": [
@@ -5528,6 +5659,43 @@
           "additionalProperties": {
             "$ref": "daemon.schema.json#/definitions/JSONValue"
           }
+        }
+      }
+    },
+    {
+      "name": "multiplier/changed",
+      "x-capability": "multiplier/1",
+      "description": "The Multiplier changed (#3903): a PR of the person's agents merged or a revert merged, with the PR in changedBy. The Mac window follows it; it does not poll.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Multiplier"
+          }
+        }
+      ]
+    },
+    {
+      "name": "multiplier/state",
+      "x-capability": "multiplier/1",
+      "description": "The Multiplier now (#3903): from the control plane's count of the person's machines when this machine has one, else from this machine's lineage. Cheap: the Mac window asks on each open.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Multiplier"
         }
       }
     },
@@ -5710,6 +5878,11 @@
     {
       "name": "personas/add",
       "x-capability": "personas.catalog/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "description": "Write a previewed persona to .agents/personas at the destination and name it in the lock (#3665). replace is true to put it over the one there.",
       "paramStructure": "by-name",
       "params": [
@@ -5731,6 +5904,11 @@
     {
       "name": "personas/check-updates",
       "x-capability": "personas.catalog/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "description": "Whether each persona added from a marketplace has an update, by id; each repository asked at most once an hour (#3665).",
       "paramStructure": "by-name",
       "params": [
@@ -5805,6 +5983,11 @@
     {
       "name": "personas/managed",
       "x-capability": "personas.catalog/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "description": "The personas at a destination that a lock names, added from a marketplace (#3665).",
       "paramStructure": "by-name",
       "params": [
@@ -5826,6 +6009,11 @@
     {
       "name": "personas/preview",
       "x-capability": "personas.catalog/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "description": "Fetch a persona file at its repository's current commit to show before adding (#3665).",
       "paramStructure": "by-name",
       "params": [
@@ -5847,6 +6035,11 @@
     {
       "name": "personas/remove",
       "x-capability": "personas.catalog/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "description": "Move a persona a lock names to the Trash and take it out of the lock (#3665). name is its id.",
       "paramStructure": "by-name",
       "params": [
@@ -5893,6 +6086,11 @@
     {
       "name": "personas/search",
       "x-capability": "personas.catalog/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "description": "The personas in a GitHub marketplace's personas/ folder whose id holds the query (#3665).",
       "paramStructure": "by-name",
       "params": [
@@ -5914,6 +6112,11 @@
     {
       "name": "personas/update-preview",
       "x-capability": "personas.catalog/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "description": "A persona's source at its current commit, staged, with the file as it is now and the runtime and permission-mode it changes (#3665).",
       "paramStructure": "by-name",
       "params": [

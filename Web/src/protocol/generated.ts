@@ -171,6 +171,10 @@ export interface AccountRequest {
   accountID: string;
 }
 
+export interface Achievements {
+  earned: EarnedAchievement[];
+}
+
 /**
  * clients/setActivityToken (#1744): the push token of this device's Live Activity, in hex, for one
  * session it speaks for (#2991: one activity for every turn sent from the device, so one token for
@@ -1626,7 +1630,7 @@ export interface CatchUpSnapshot {
   resuming: UUID[];
   disk?: DiskState;
   storeNotes?: StoreNotes;
-  milestones?: Milestones;
+  achievements?: Achievements;
   workflows?: WorkflowSummary[];
   pins?: FolderPins[];
   leases?: CatchUpLeases;
@@ -1974,6 +1978,71 @@ export interface Connection {
   newest?: ConnectorProof;
 }
 
+/** The person's agents' bot on this machine (#3858). Never its key. */
+export interface ConnectionBot {
+  made: boolean;
+  /** The bot's GitHub name: <slug>[bot]. */
+  name?: string;
+  slug?: string;
+  /** The account the App is on. */
+  owner?: string;
+  /** Where the person installs the App on repositories. */
+  installURL?: string;
+  /** The App's page on GitHub, where the person deletes it. */
+  appURL?: string;
+  /** Absent when GitHub could not be asked. */
+  installations?: ConnectionBotInstallation[];
+  /** What failed, in words. */
+  message?: string;
+}
+
+/**
+ * What the hand-back page gave the client after GitHub made the App: the code and the state, or
+ * GitHub's error. The host checks the state and turns the code into the App's key at once; the key
+ * stays on this machine.
+ */
+export interface ConnectionBotCompleteRequest {
+  state: string;
+  code?: string;
+  error?: string;
+}
+
+/** An account the bot is installed on. */
+export interface ConnectionBotInstallation {
+  account: string;
+  /** True when it reaches every repository of the account, false for the ones chosen. */
+  all: boolean;
+  /** Where the installation's repositories are chosen on GitHub. */
+  settingsURL?: string;
+}
+
+/**
+ * What the client posts to GitHub (#3858): an HTML form to action, method POST, with one field,
+ * manifest. GitHub sends the code and the state to the hand-back page.
+ */
+export interface ConnectionBotStart {
+  /** GitHub's page for a new App, with the state in its query. */
+  action: string;
+  /** The App manifest's JSON, with the fixed permissions. */
+  manifest: string;
+  state: string;
+  expiresAt: WireDate;
+}
+
+/**
+ * Make the person's agents' bot (#3858): the host makes the GitHub App manifest for its GitHub
+ * connection's account.
+ */
+export interface ConnectionBotStartRequest {
+  /** The web page's origin, as connections/sign-in takes it; left out on the Mac. */
+  origin?: string;
+  /**
+   * True when an organisation must install the bot: GitHub lets only the owning account install a
+   * private App (spec 3856 §4).
+   */
+  public?: boolean;
+}
+
 export interface ConnectionDisconnectAnswer {
   error?: string;
 }
@@ -2000,8 +2069,9 @@ export interface ConnectionEmailRequest {
  * OAuth on gitlab.com or a personal access token on any GitLab, email (#1780): one IMAP mailbox
  * with an app password, Atlassian (#3304): one sign-in for Jira and Confluence, with OAuth on
  * Atlassian Cloud or a token on one site, Forgejo (#3752): an access token on Codeberg or any
- * Forgejo or Gitea, and Bitbucket (#3785): an Atlassian API token with its email, or an access
- * token, on Bitbucket Cloud.
+ * Forgejo or Gitea, Bitbucket (#3785): an Atlassian API token with its email, or an access token,
+ * on Bitbucket Cloud, and Azure DevOps (#3802): a personal access token on one organization of
+ * dev.azure.com or one collection of an Azure DevOps Server.
  */
 export type ConnectionProvider =
   | "github"
@@ -2010,7 +2080,8 @@ export type ConnectionProvider =
   | "email"
   | "atlassian"
   | "forgejo"
-  | "bitbucket";
+  | "bitbucket"
+  | "azuredevops";
 
 export interface ConnectionProviderRequest {
   provider: ConnectionProvider;
@@ -2109,7 +2180,9 @@ export interface ConnectionTokenRequest {
   /**
    * The provider's address, such as gitlab.example.com, example.atlassian.net or git.example.com
    * (https:// when it names no scheme). gitlab.com, or codeberg.org for Forgejo, when left out; a
-   * Jira site must be given. Bitbucket takes none: it is Bitbucket Cloud's.
+   * Jira site must be given. Bitbucket takes none: it is Bitbucket Cloud's. Azure DevOps takes its
+   * organization (dev.azure.com/acme) or an Azure DevOps Server's collection
+   * (server/tfs/DefaultCollection), which must be given.
    */
   url?: string;
   /**
@@ -2193,31 +2266,32 @@ export interface ConnectorProof {
 }
 
 /**
- * A folder's Connectors set-up (#1336): its GitHub, GitLab, Forgejo or Bitbucket repository (#1632,
- * #3752, #3785), the person's connection to that forge, four slots that each prove themselves with
- * one read, and the events.
+ * A folder's Connectors set-up (#1336): its GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps
+ * repository (#1632, #3752, #3785, #3802), the person's connection to that forge, four slots that
+ * each prove themselves with one read, and the events.
  */
 export interface ConnectorSetup {
   folder: string;
   /**
-   * owner/name on GitHub or Forgejo, workspace/name on Bitbucket, or group/project on GitLab, from
-   * the folder's git remote (origin first). Absent with no GitHub, GitLab, Forgejo or Bitbucket
-   * remote.
+   * owner/name on GitHub or Forgejo, workspace/name on Bitbucket, organization/project/name on
+   * Azure DevOps, or group/project on GitLab, from the folder's git remote (origin first). Absent
+   * with no GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps remote.
    */
   repository?: string;
   /**
    * The forge the repository is on, which fills Tasks, Code review and CI: github, gitlab (#1632),
-   * forgejo (#3752) or bitbucket (#3785). Absent is github.
+   * forgejo (#3752), bitbucket (#3785) or azuredevops (#3802). Absent is github.
    */
   forge?: ConnectionProvider;
   /**
    * The repository's host, as the page says it before the repository: github.com, gitlab.com,
-   * codeberg.org, bitbucket.org, or a self-managed GitLab's or Forgejo's host.
+   * codeberg.org, bitbucket.org, dev.azure.com, or a self-managed GitLab's, Forgejo's or Azure
+   * DevOps Server's host.
    */
   site?: string;
   /**
    * The repository's page on its forge, where the person asks for access when a read is refused
-   * (GitLab, Forgejo, Bitbucket).
+   * (GitLab, Forgejo, Bitbucket, Azure DevOps).
    */
   repositoryURL?: string;
   connection?: Connection;
@@ -2322,8 +2396,8 @@ export type ConnectorSlotKind =
  * notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not
  * read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach
  * the provider; message says why. refused: the provider refused the read, so the person grants it
- * on the provider's site. noRemote: the folder has no GitHub, GitLab, Forgejo or Bitbucket remote.
- * skipped: the person skipped it; it counts as done.
+ * on the provider's site. noRemote: the folder has no GitHub, GitLab, Forgejo, Bitbucket or Azure
+ * DevOps remote. skipped: the person skipped it; it counts as done.
  */
 export type ConnectorSlotState =
   | "notConnected"
@@ -3153,7 +3227,7 @@ export interface DropboxPutResponse {
   path: string;
 }
 
-export interface EarnedMilestone {
+export interface EarnedAchievement {
   id: string;
   at: WireDate;
 }
@@ -3911,13 +3985,16 @@ export interface ForgeDone {
 
 /**
  * A feature (#3267): name is its label's after feature:, with the label's colour where the forge
- * gives one; epics counts its epics, open the open ones.
+ * gives one; epics counts its epics, open the open ones. issues counts its open issues that are not
+ * epics, of the newest 500 open issues (#3741); a feature with no open epic and no such issue is
+ * finished.
  */
 export interface ForgeFeature {
   name: string;
   color?: string;
   epics: number;
   open: number;
+  issues?: number;
 }
 
 /**
@@ -4090,14 +4167,15 @@ export interface ForgeLogRequest {
 }
 
 /**
- * people/setForgeLogins (#2951): the caller's own GitHub, GitLab, Linear and Jira logins (#3313),
- * for Settings ▸ You, replacing what was kept; blank clears one.
+ * people/setForgeLogins (#2951): the caller's own GitHub, GitLab, Linear, Jira (#3313) and Forgejo
+ * (#3836) logins, for Settings ▸ You, replacing what was kept; blank clears one.
  */
 export interface ForgeLogins {
   github?: string;
   gitlab?: string;
   linear?: string;
   jira?: string;
+  forgejo?: string;
 }
 
 /**
@@ -6078,10 +6156,6 @@ export type MessagingServerState =
   | "read"
   | "failed";
 
-export interface Milestones {
-  earned: EarnedMilestone[];
-}
-
 export interface MissingFolder {
   branchKept: boolean;
 }
@@ -6119,10 +6193,73 @@ export type MoveTarget =
   | { existing: { _0: URLString } }
   | { folderPath: Record<string, never> };
 
+/**
+ * What agents/moveToMachine did (#3790): the folder on that machine the session now goes on in, and
+ * whether it carries on there at once, as it was working when it moved.
+ */
+export interface MoveToMachineAnswer {
+  folder: string;
+  carriesOn: boolean;
+}
+
+/**
+ * The person moving a session to another of their machines (#3790), as move_session does (#3717).
+ * `machine` is the control plane's id or name for it, and `machineName` the name the person knows
+ * it by, for the words; `folder` is an absolute path there, or, when left out, the folder of the
+ * session's project there.
+ */
+export interface MoveToMachineRequest {
+  agentID: UUID;
+  machine: string;
+  machineName?: string;
+  folder?: string;
+}
+
 export type MoveWhen =
   | "now"
   | "afterTurn"
   | "nothing";
+
+/**
+ * The Multiplier (#3901, #3903; method in specs/3901-multiplier/spec.md): the PRs the person's
+ * agents merged in the last 7 days, less the merged reverts, against the PRs an average engineer
+ * merged in a week in 2025. With a control plane it counts all the person's machines, else this
+ * machine. multiplier and engineerHours are absent when nothing is counted: the page shows — ×, not
+ * 0×.
+ */
+export interface Multiplier {
+  /**
+   * The PRs counted: merged in the range, less the merged reverts, never below 0. A PR counts when
+   * a session of the person worked on it.
+   */
+  prsMerged: number;
+  /** The merged reverts in the range. */
+  reverts: number;
+  /** prsMerged ÷ baseline.prsPerWeek, to one decimal: 5.0 is 5.0×. */
+  multiplier?: number;
+  /** prsMerged × baseline.hoursPerWeek ÷ baseline.prsPerWeek, to the whole hour. */
+  engineerHours?: number;
+  /** This machine's agents with a turn running now. */
+  agentsWorking: number;
+  /** The start of the range: 7 days before it was counted. */
+  since: WireDate;
+  baseline: MultiplierBaseline;
+  /** On multiplier/changed: the PR whose merge or revert changed it. */
+  changedBy?: LineageNode;
+}
+
+/**
+ * What the Multiplier compares with (#3902), so that no client keeps its own copy: an engineer with
+ * no AI in 2025.
+ */
+export interface MultiplierBaseline {
+  /** Merged PRs a week: 1.4. */
+  prsPerWeek: number;
+  /** The hours of that week: 40. */
+  hoursPerWeek: number;
+  /** Where the figure is from, for the page's small line: DX 2025. */
+  source: string;
+}
 
 /**
  * A runtime's own setting for one level: config option values (mode, model, effort), a sandbox
@@ -7594,28 +7731,30 @@ export interface Project {
 }
 
 /**
- * One board in a project's Tasks slot (#3282): a GitHub Projects board, a Jira board, a Linear team
- * or a GitLab group board, by its address and a name (the team's). Work's Issues and Features lists
- * narrow to one. A client sends name and url; the control plane reads forge, key and site from the
- * url.
+ * One board in a project's Tasks slot (#3282): a GitHub Projects board, a Jira board, a Linear
+ * team, a GitLab group board or an Azure Boards board (a team's, #3816), by its address and a name
+ * (the team's). Work's Issues and Features lists narrow to one. A client sends name and url; the
+ * control plane reads forge, key and site from the url.
  */
 export interface ProjectBoard {
   name: string;
   /**
    * The board's address on the web: github.com/orgs/<org>/projects/<n> (or users/<login>),
-   * <site>/jira/software/…/boards/<id>, linear.app/<workspace>/team/<KEY>, or
-   * <gitlab>/groups/<group>/-/boards/<id>. It names the board in forge/issues' board.
+   * <site>/jira/software/…/boards/<id>, linear.app/<workspace>/team/<KEY>,
+   * <gitlab>/groups/<group>/-/boards/<id>, or dev.azure.com/<org>/<project>/_boards/board/t/<team>
+   * (or an Azure DevOps Server's). It names the board in forge/issues' board.
    */
   url: string;
-  /** github, atlassian (Jira), linear or gitlab. */
+  /** github, atlassian (Jira), linear, gitlab or azuredevops (Azure Boards). */
   forge?: ConnectionProvider;
   /**
    * The board on its forge: <owner>/<number> on GitHub, the board id on Jira, the team key on
-   * Linear, <group>#<id> on GitLab.
+   * Linear, <group>#<id> on GitLab, <org>/<project>/<team> on Azure Boards.
    */
   key?: string;
   /**
-   * The board's host: github.com, the Jira site, linear.app, gitlab.com or a self-managed GitLab.
+   * The board's host: github.com, the Jira site, linear.app, gitlab.com or a self-managed GitLab,
+   * dev.azure.com or an Azure DevOps Server.
    */
   site?: string;
 }
@@ -8713,6 +8852,11 @@ export interface ReviewPull {
   title: string;
   /** owner/name. */
   repo: string;
+  /**
+   * Its lineage ref, "github:owner/name#12" or "gitlab:group/project!12": a press opens its Work
+   * page in the app. Nil from an older host: a press opens its forge page.
+   */
+  ref?: string;
   author?: string;
   updatedAt: WireDate;
   /** The person has opened its page (reviews/open, #3464): its row is drawn read, not bold. */
@@ -10339,6 +10483,8 @@ export interface TeamPerson {
   linearLogin?: string;
   /** Their Jira login (#3313): the Atlassian account's email, account id or display name. */
   jiraLogin?: string;
+  /** Their Forgejo login (#3836): their user name on the connected Forgejo or Gitea. */
+  forgejoLogin?: string;
   you?: boolean;
 }
 
@@ -11477,6 +11623,7 @@ export interface YourPolicyState {
 
 /** Every method the web remote may call: its params and its result. */
 export interface Methods {
+  "achievements/state": { params: Empty; result: Achievements };
   "agentConfig/editorFiles": { params: AgentConfigEditorRequest; result: AgentConfigEditorFiles };
   "agentConfig/editorSave": { params: AgentConfigEditorSaveRequest; result: Empty };
   "agents/answerSandbox": { params: AnswerSandboxRequest; result: Agent };
@@ -11497,6 +11644,7 @@ export interface Methods {
   "agents/importUpload": { params: ReceiveUploadRequest; result: Empty };
   "agents/labelVocabulary": { params: LabelVocabularyRequest; result: string[] };
   "agents/list": { params: ListRequest; result: Agent[] };
+  "agents/moveToMachine": { params: MoveToMachineRequest; result: MoveToMachineAnswer };
   "agents/options": { params: OptionsRequest; result: OptionsResponse };
   "agents/prewarm": { params: PrewarmRequest; result: Empty };
   "agents/prompt": { params: PromptRequest; result: Empty };
@@ -11555,6 +11703,10 @@ export interface Methods {
   "clients/forgetSelf": { params: Empty; result: Empty };
   "clients/setWebPush": { params: WebPushSubscription; result: Empty };
   "clients/webPushKey": { params: Empty; result: WebPushKey };
+  "connections/bot": { params: Empty; result: ConnectionBot };
+  "connections/bot/complete": { params: ConnectionBotCompleteRequest; result: ConnectionBot };
+  "connections/bot/remove": { params: Empty; result: ConnectionBot };
+  "connections/bot/start": { params: ConnectionBotStartRequest; result: ConnectionBotStart };
   "connections/disconnect": { params: ConnectionProviderRequest; result: ConnectionDisconnectAnswer };
   "connections/list": { params: Empty; result: ConnectionsList };
   "connections/sign-in": { params: ConnectionProviderRequest; result: ConnectionSignIn };
@@ -11678,11 +11830,11 @@ export interface Methods {
   "machines/startEnroll": { params: MachineEnroll; result: ControlCodeShown };
   "machines/stop": { params: MachineStop; result: ControlMachine };
   "machines/unlink": { params: MachineRequest; result: ControlMachine };
+  "marketplaces/list": { params: MarketplacesListRequest; result: MarketplacesListAnswer };
   "mcp/health": { params: Empty; result: MCPHealthSnapshot };
   "mcp/health/check": { params: MCPHealthCheckRequest; result: MCPHealthSnapshot };
   "mcp/hosted": { params: Empty; result: HostedMCPSnapshot };
   "mcp/remove": { params: MCPRemoveRequest; result: MCPRemoveAnswer };
-  "milestones/state": { params: Empty; result: Milestones };
   "modes/remembered": { params: Empty; result: Record<string, JSONValue> };
   "options/remembered": { params: RememberedOptionsRequest; result: ConfigOption[] };
   "orgRoutes/check": { params: OrgRouteRequest; result: OrgRouteCheck };
@@ -11703,9 +11855,16 @@ export interface Methods {
   "people/setRole": { params: PersonRoleRequest; result: Empty };
   "permissions/answer": { params: AnswerRequest; result: Empty };
   "permissions/pending": { params: Empty; result: PermissionRequest[] };
+  "personas/add": { params: SkillAddRequest; result: PersonaAddAnswer };
+  "personas/check-updates": { params: SkillsListRequest; result: SkillUpdatesAnswer };
   "personas/files": { params: PersonasFilesRequest; result: PersonaFilesAnswer };
   "personas/list": { params: PersonasListRequest; result: Persona[] };
+  "personas/managed": { params: SkillsListRequest; result: PersonasManagedAnswer };
+  "personas/preview": { params: CatalogPreviewRequest; result: PersonaPreviewAnswer };
+  "personas/remove": { params: SkillNameRequest; result: SkillRemoveAnswer };
   "personas/save": { params: PersonaFileSaveRequest; result: Empty };
+  "personas/search": { params: CatalogSearchRequest; result: CatalogSearchAnswer };
+  "personas/update-preview": { params: SkillNameRequest; result: PersonaUpdatePreviewAnswer };
   "pins/arrange": { params: PinArrangeRequest; result: Empty };
   "pins/arrangeSessions": { params: PinArrangeSessionsRequest; result: Empty };
   "pins/arrangeWorkflows": { params: PinArrangeWorkflowsRequest; result: Empty };
@@ -11849,6 +12008,7 @@ export interface Methods {
 
 /** Whether a method goes to a host (with `h`) or to the control plane itself. */
 export const MethodTarget = {
+  "achievements/state": "host",
   "agentConfig/editorFiles": "host",
   "agentConfig/editorSave": "host",
   "agents/answerSandbox": "host",
@@ -11869,6 +12029,7 @@ export const MethodTarget = {
   "agents/importUpload": "host",
   "agents/labelVocabulary": "host",
   "agents/list": "host",
+  "agents/moveToMachine": "host",
   "agents/options": "host",
   "agents/prewarm": "host",
   "agents/prompt": "host",
@@ -11927,6 +12088,10 @@ export const MethodTarget = {
   "clients/forgetSelf": "control",
   "clients/setWebPush": "control",
   "clients/webPushKey": "control",
+  "connections/bot": "host",
+  "connections/bot/complete": "host",
+  "connections/bot/remove": "host",
+  "connections/bot/start": "host",
   "connections/disconnect": "host",
   "connections/list": "host",
   "connections/sign-in": "host",
@@ -12050,11 +12215,11 @@ export const MethodTarget = {
   "machines/startEnroll": "control",
   "machines/stop": "control",
   "machines/unlink": "control",
+  "marketplaces/list": "host",
   "mcp/health": "host",
   "mcp/health/check": "host",
   "mcp/hosted": "host",
   "mcp/remove": "host",
-  "milestones/state": "host",
   "modes/remembered": "host",
   "options/remembered": "host",
   "orgRoutes/check": "control",
@@ -12075,9 +12240,16 @@ export const MethodTarget = {
   "people/setRole": "control",
   "permissions/answer": "host",
   "permissions/pending": "host",
+  "personas/add": "host",
+  "personas/check-updates": "host",
   "personas/files": "host",
   "personas/list": "host",
+  "personas/managed": "host",
+  "personas/preview": "host",
+  "personas/remove": "host",
   "personas/save": "host",
+  "personas/search": "host",
+  "personas/update-preview": "host",
   "pins/arrange": "host",
   "pins/arrangeSessions": "host",
   "pins/arrangeWorkflows": "host",
@@ -12221,6 +12393,7 @@ export const MethodTarget = {
 
 /** Every notification the web remote hears, and its params. */
 export interface Notifications {
+  "achievements/changed": Achievements;
   "agent/changed": Agent;
   "agent/elicitation": ElicitationNotification;
   "agent/entry": EntryNotification;
@@ -12271,7 +12444,6 @@ export interface Notifications {
   "folder/removed": FolderRemovedNotification;
   "mcp/healthChanged": MCPHealthSnapshot;
   "mcp/hostedChanged": HostedMCPSnapshot;
-  "milestones/changed": Milestones;
   "modes/changed": Record<string, JSONValue>;
   "pages/changed": PagesChangedNotification;
   "pins/changed": PinsChangedNotification;
@@ -12293,6 +12465,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ACPProviderInfo: { required: ["id"], optional: ["name", "protocol", "configured"] },
   AccountProfile: { required: ["id", "runtimeID", "name", "reach", "addedAt", "signedIn"], optional: ["signedInAs", "signInCommand", "source", "isDefault", "setBy"] },
   AccountRequest: { required: ["runtimeID", "accountID"], optional: [] },
+  Achievements: { required: ["earned"], optional: [] },
   ActivityToken: { required: ["agentID", "environment", "startedAt"], optional: ["token"] },
   AddAccountRequest: { required: ["runtimeID", "name"], optional: [] },
   AddFolderRequest: { required: ["folder"], optional: ["project"] },
@@ -12415,7 +12588,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   CatalogUseRow: { required: ["kind", "name", "version", "machines", "people"], optional: ["source"] },
   CatchUpLeases: { required: ["leases", "hosted", "health"], optional: [] },
   CatchUpRequest: { required: [], optional: ["agents", "parts"] },
-  CatchUpSnapshot: { required: ["agents", "permissions", "elicitations", "attention", "resuming", "folders"], optional: ["disk", "storeNotes", "milestones", "workflows", "pins", "leases"] },
+  CatchUpSnapshot: { required: ["agents", "permissions", "elicitations", "attention", "resuming", "folders"], optional: ["disk", "storeNotes", "achievements", "workflows", "pins", "leases"] },
   ChangedFile: { required: ["path", "source", "state", "editCount", "beyondReported", "inProgress", "outsideFolder"], optional: ["relativePath", "added", "removed", "firstLine", "oldPath"] },
   ChangedFileDetail: { required: ["file", "edits"], optional: ["hunks", "whole"] },
   ChangesFileRequest: { required: ["agentID", "path", "whole"], optional: [] },
@@ -12445,6 +12618,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConfigChoiceGroup: { required: ["options"], optional: ["name", "group"] },
   ConfigOption: { required: ["id", "name", "type"], optional: ["description", "category", "currentValue", "options"] },
   Connection: { required: ["provider", "state", "connectedAt"], optional: ["login", "installURL", "workspace", "expiresAt", "byToken", "newest"] },
+  ConnectionBot: { required: ["made"], optional: ["name", "slug", "owner", "installURL", "appURL", "installations", "message"] },
+  ConnectionBotCompleteRequest: { required: ["state"], optional: ["code", "error"] },
+  ConnectionBotInstallation: { required: ["account", "all"], optional: ["settingsURL"] },
+  ConnectionBotStart: { required: ["action", "manifest", "state", "expiresAt"], optional: [] },
+  ConnectionBotStartRequest: { required: [], optional: ["origin", "public"] },
   ConnectionDisconnectAnswer: { required: [], optional: ["error"] },
   ConnectionEmailRequest: { required: ["server", "user", "password"], optional: [] },
   ConnectionProviderRequest: { required: ["provider"], optional: ["origin"] },
@@ -12536,7 +12714,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DraftStep: { required: ["at", "kind", "text"], optional: [] },
   DropboxPutRequest: { required: ["folder", "name", "data"], optional: ["subfolder"] },
   DropboxPutResponse: { required: ["path"], optional: [] },
-  EarnedMilestone: { required: ["id", "at"], optional: [] },
+  EarnedAchievement: { required: ["id", "at"], optional: [] },
   EditQueuedRequest: { required: ["agentID", "promptID", "text"], optional: [] },
   EditQueuedResult: { required: ["edited"], optional: [] },
   EffectiveLayerValue: { required: ["layer", "words", "kept"], optional: ["value"] },
@@ -12613,7 +12791,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeDiffFile: { required: ["path", "change", "additions", "deletions", "hunks"], optional: ["previousPath", "note"] },
   ForgeDiffHunk: { required: ["oldStart", "newStart", "lines"], optional: [] },
   ForgeDone: { required: [], optional: ["url", "auto", "reran"] },
-  ForgeFeature: { required: ["name", "epics", "open"], optional: ["color"] },
+  ForgeFeature: { required: ["name", "epics", "open"], optional: ["color", "issues"] },
   ForgeFeatures: { required: ["features"], optional: ["errors"] },
   ForgeFeaturesRequest: { required: [], optional: ["folder", "board"] },
   ForgeItem: { required: ["node", "title", "state", "labels", "assignees", "updatedAt", "comments"], optional: ["status", "url", "folder", "author", "milestone", "draft", "checks", "review", "mergeable", "autoMerge", "parent", "level", "feature", "progress"] },
@@ -12628,7 +12806,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeListRequest: { required: [], optional: ["folder", "state", "label", "assignee", "query", "cursor", "limit", "feature", "board"] },
   ForgeLog: { required: ["text"], optional: [] },
   ForgeLogRequest: { required: ["node"], optional: ["check"] },
-  ForgeLogins: { required: [], optional: ["github", "gitlab", "linear", "jira"] },
+  ForgeLogins: { required: [], optional: ["github", "gitlab", "linear", "jira", "forgejo"] },
   ForgeMergeRequest: { required: ["node", "sha"], optional: ["method", "auto"] },
   ForgeNodeRequest: { required: ["node"], optional: [] },
   ForgePlan: { required: ["item", "children", "steps"], optional: ["lead"] },
@@ -12809,10 +12987,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MarketplacesListRequest: { required: [], optional: ["kind", "destination"] },
   MessageSender: { required: ["agentID", "title"], optional: [] },
   MessagingServer: { required: ["name", "word", "state"], optional: ["proof", "message", "events"] },
-  Milestones: { required: ["earned"], optional: [] },
   MissingFolder: { required: ["branchKept"], optional: [] },
   MoveAnswer: { required: ["when", "message"], optional: ["agent"] },
   MoveRequest: { required: ["agentID", "removeLeft", "discardChanges"], optional: ["target"] },
+  MoveToMachineAnswer: { required: ["folder", "carriesOn"], optional: [] },
+  MoveToMachineRequest: { required: ["agentID", "machine"], optional: ["machineName", "folder"] },
+  Multiplier: { required: ["prsMerged", "reverts", "agentsWorking", "since", "baseline"], optional: ["multiplier", "engineerHours", "changedBy"] },
+  MultiplierBaseline: { required: ["prsPerWeek", "hoursPerWeek", "source"], optional: [] },
   NativeSetting: { required: [], optional: ["options", "sandbox", "clientPermission"] },
   Need: { required: ["id", "folder", "kind", "raisedAt", "headline"], optional: ["agentID"] },
   NotCommittedResponse: { required: ["isRepository", "paths", "more"], optional: [] },
@@ -13041,7 +13222,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RetentionState: { required: ["settings", "archivedCount", "archivedBytes"], optional: [] },
   ReviewDismissRequest: { required: ["folder", "url"], optional: [] },
   ReviewOpenRequest: { required: ["folder", "url"], optional: [] },
-  ReviewPull: { required: ["url", "number", "title", "repo", "updatedAt"], optional: ["author", "opened"] },
+  ReviewPull: { required: ["url", "number", "title", "repo", "updatedAt"], optional: ["ref", "author", "opened"] },
   Runtime: { required: ["id", "name", "executable", "arguments", "installPage", "usesAppCopyOnly"], optional: ["install", "accountFolderVariable"] },
   RuntimeAccount: { required: ["runtimeID", "state", "authMethods", "canLogOut", "providers", "promptCapabilities", "canSteer", "checkedAt"], optional: ["currentProviderID", "signedInAs"] },
   RuntimeAllowances: { required: ["rows", "at"], optional: ["shared"] },
@@ -13210,7 +13391,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SurfaceIdentification: { required: ["id", "name", "kind"], optional: [] },
   TeamBot: { required: ["user", "name", "spentTodayUSD", "capped", "machines", "online", "workflows", "live"], optional: ["group", "groupName", "caps"] },
   TeamBotRun: { required: ["host", "hostName", "agent"], optional: ["workflow", "since"] },
-  TeamPerson: { required: ["id", "name", "kind"], optional: ["githubLogin", "gitlabLogin", "linearLogin", "jiraLogin", "you"] },
+  TeamPerson: { required: ["id", "name", "kind"], optional: ["githubLogin", "gitlabLogin", "linearLogin", "jiraLogin", "forgejoLogin", "you"] },
   TeamTrigger: { required: ["workflow", "trigger", "runsOn"], optional: ["event", "dueAt"] },
   TeamTriggerFired: { required: ["ran"], optional: [] },
   TeamTriggerSent: { required: ["taken"], optional: [] },

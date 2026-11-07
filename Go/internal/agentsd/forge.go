@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/azureboardsmcp"
+	"github.com/alexec/agents/Go/internal/azuredevopsmcp"
+	"github.com/alexec/agents/Go/internal/bitbucketmcp"
 	"github.com/alexec/agents/Go/internal/connections"
 	"github.com/alexec/agents/Go/internal/forgejomcp"
 	"github.com/alexec/agents/Go/internal/githubmcp"
@@ -41,6 +43,9 @@ import (
 // search for every project. Azure Boards (#3815) is read the same way, of the projects the
 // folders name in "azureBoardsProjects" (forgeazure.go). Forgejo (#3753) is read with the
 // host's Forgejo connection, only on its own Forgejo, a call per repository (forgeforgejo.go).
+// Bitbucket Cloud (#3786) is read with the host's Bitbucket connection, a call per repository
+// (forgebitbucket.go). Azure Repos (#3803) is read with the Azure DevOps token here, pull
+// requests only, a call per repository (forgeazuredevops.go).
 //
 // A list is one page of every forge, merged by updatedAt: each forge is asked for a page, the
 // newest of them all are kept, and each forge's cursor goes on after the last of its own kept.
@@ -131,6 +136,11 @@ type forgeBook struct {
 	newForgeAzureBoards func(base, token string) forgeAzureBoards
 	// newForgeForgejo is the Forgejo at root as the token's owner; a test gives a fake.
 	newForgeForgejo func(root, token string) forgeForgejo
+	// newForgeBitbucket is the Bitbucket API at root as the token's owner (with email for an
+	// Atlassian API token); a test gives a fake.
+	newForgeBitbucket func(root, email, token string) forgeBitbucket
+	// newForgeAzureDevOps is the Azure DevOps at root with a token; a test gives a fake.
+	newForgeAzureDevOps func(root, token string) forgeAzureDevOps
 }
 
 func (d *Daemon) registerForge() {
@@ -156,17 +166,20 @@ func (d *Daemon) registerForge() {
 // forgeCursor is a list's cursor, one per forge, so a page goes on where each forge stopped.
 // Done are the forges whose list has ended.
 type forgeCursor struct {
-	GitHub  string   `json:"github,omitempty"`
-	GitLab  string   `json:"gitlab,omitempty"`
-	Linear  string   `json:"linear,omitempty"`
-	Jira    string   `json:"jira,omitempty"`
-	Boards  string   `json:"azureboards,omitempty"`
-	Forgejo string   `json:"forgejo,omitempty"`
-	Done    []string `json:"done,omitempty"`
+	GitHub      string   `json:"github,omitempty"`
+	GitLab      string   `json:"gitlab,omitempty"`
+	Linear      string   `json:"linear,omitempty"`
+	Jira        string   `json:"jira,omitempty"`
+	Boards      string   `json:"azureboards,omitempty"`
+	Forgejo     string   `json:"forgejo,omitempty"`
+	Bitbucket   string   `json:"bitbucket,omitempty"`
+	AzureDevOps string   `json:"azuredevops,omitempty"`
+	Done        []string `json:"done,omitempty"`
 }
 
 func (c *forgeCursor) of(forge string) *string {
-	return map[string]*string{"github": &c.GitHub, "gitlab": &c.GitLab, "linear": &c.Linear, "jira": &c.Jira, "azureboards": &c.Boards, "forgejo": &c.Forgejo}[forge]
+	return map[string]*string{"github": &c.GitHub, "gitlab": &c.GitLab, "linear": &c.Linear, "jira": &c.Jira, "azureboards": &c.Boards, "forgejo": &c.Forgejo,
+		"bitbucket": &c.Bitbucket, "azuredevops": &c.AzureDevOps}[forge]
 }
 
 func (c forgeCursor) text() *string {
@@ -272,6 +285,14 @@ func (d *Daemon) forgeList(ctx context.Context, prs bool, r wire.ForgeListReques
 		pages = append(pages, d.forgejoPage(ctx, sources, forgejomcp.SearchFilter{PRs: prs, State: state, Label: deref(r.Label),
 			Assignee: deref(r.Assignee), Query: deref(r.Query), Feature: deref(r.Feature)}, cursor.Forgejo, limit))
 	}
+	if (len(sources.bitbucket) > 0 || sources.bitbucketErr != nil) && !slices.Contains(cursor.Done, "bitbucket") {
+		pages = append(pages, d.bitbucketPage(ctx, sources, bitbucketmcp.SearchFilter{PRs: prs, State: state, Label: deref(r.Label),
+			Assignee: deref(r.Assignee), Query: deref(r.Query), Feature: deref(r.Feature)}, cursor.Bitbucket, limit))
+	}
+	if prs && (len(sources.azureDevOps) > 0 || sources.azureDevOpsErr != nil) && !slices.Contains(cursor.Done, "azuredevops") {
+		pages = append(pages, d.azureDevOpsPage(ctx, sources, azuredevopsmcp.SearchFilter{State: state, Label: deref(r.Label),
+			Assignee: deref(r.Assignee), Query: deref(r.Query), Feature: deref(r.Feature)}, cursor.AzureDevOps, limit))
+	}
 	if (len(sources.teams) > 0 || sources.workspace) && !slices.Contains(cursor.Done, "linear") {
 		p := forgePage{forge: "linear"}
 		l, err := d.forgeLinear()
@@ -315,7 +336,7 @@ func (d *Daemon) forgeList(ctx context.Context, prs bool, r wire.ForgeListReques
 		pages = append(pages, p)
 	}
 	if len(sources.boards) > 0 && !slices.Contains(cursor.Done, "azureboards") {
-		pages = append(pages, d.boardsPage(ctx, sources, azureboardsmcp.SearchFilter{State: state, Label: deref(r.Label),
+		pages = append(pages, d.boardsPage(ctx, sources, board, azureboardsmcp.SearchFilter{State: state, Label: deref(r.Label),
 			Assignee: deref(r.Assignee), Query: deref(r.Query), Feature: deref(r.Feature)}, cursor.Boards, limit))
 	}
 	var more bool
@@ -363,7 +384,8 @@ func mergeForgePages(pages []forgePage, from forgeCursor, limit int) ([]wire.For
 		items = append(items, pages[best].items[taken[best]])
 		taken[best]++
 	}
-	next := forgeCursor{GitHub: from.GitHub, GitLab: from.GitLab, Linear: from.Linear, Jira: from.Jira, Boards: from.Boards, Forgejo: from.Forgejo, Done: slices.Clone(from.Done)}
+	next := forgeCursor{GitHub: from.GitHub, GitLab: from.GitLab, Linear: from.Linear, Jira: from.Jira, Boards: from.Boards, Forgejo: from.Forgejo,
+		Bitbucket: from.Bitbucket, AzureDevOps: from.AzureDevOps, Done: slices.Clone(from.Done)}
 	more := false
 	for n, p := range pages {
 		switch {
@@ -404,11 +426,23 @@ type forgeSources struct {
 	// forgejo is the repositories on the connected Forgejo at forgejoRoot (#3753), owner/repo.
 	forgejo     []string
 	forgejoRoot string
+	// forgejoConn is the connection read with forgejoRoot.
+	forgejoConn connections.Connection
 	forgejoErr  error
+	// bitbucket is the repositories on Bitbucket Cloud (#3786), workspace/repo, read at
+	// bitbucketRoot, the connection's API.
+	bitbucket     []string
+	bitbucketRoot string
+	bitbucketErr  error
+	// azureDevOps is the repositories on Azure DevOps (#3803), organization/project/name, of
+	// pull requests only, read at azureDevOpsRoot.
+	azureDevOps     []string
+	azureDevOpsRoot string
+	azureDevOpsErr  error
 }
 
 func (s forgeSources) key() []any {
-	return []any{s.repos, s.root, s.gitlab, s.teams, s.workspace, s.linearHome, s.projects, s.boards, s.forgejoRoot, s.forgejo}
+	return []any{s.repos, s.root, s.gitlab, s.teams, s.workspace, s.linearHome, s.projects, s.boards, s.forgejoRoot, s.forgejo, s.bitbucketRoot, s.bitbucket, s.azureDevOpsRoot, s.azureDevOps}
 }
 
 func (d *Daemon) forgeSources(ctx context.Context, prs bool, folders []string) forgeSources {
@@ -458,6 +492,10 @@ func (d *Daemon) forgeSources(ctx context.Context, prs bool, folders []string) f
 		}
 	}
 	d.forgejoSources(ctx, &s, folders)
+	d.bitbucketSources(ctx, &s, folders)
+	if prs {
+		d.azureDevOpsSources(ctx, &s, folders)
+	}
 	if !prs && len(s.teams) == 0 && d.linearConnected() && !d.anyLinearTeams() {
 		s.workspace, s.linearHome = true, d.linearHome()
 	}
@@ -604,8 +642,12 @@ func (d *Daemon) forgeItem(ctx context.Context, kind string, r wire.ForgeItemReq
 		out, err = d.boardsItem(ctx, method, project, id, deref(r.Cursor))
 	} else if repo, number, ok := forgejoOfNode(r.Node); ok {
 		out, err = d.forgejoItem(ctx, method, kind, repo, number, deref(r.Cursor))
+	} else if repo, number, ok := bitbucketOfNode(r.Node); ok {
+		out, err = d.bitbucketItem(ctx, method, kind, repo, number, deref(r.Cursor))
+	} else if repo, number, ok := azureDevOpsOfNode(r.Node); ok {
+		out, err = d.azureDevOpsItem(ctx, method, repo, number, deref(r.Cursor))
 	} else if repo, number, ok := nodeOfRepo(r.Node); !ok {
-		return wire.ForgeItemDetail{}, Invalid("%s: %s is not an issue or a pull request on GitHub, GitLab, Forgejo, Linear, Jira or Azure Boards", method, r.Node.Ref)
+		return wire.ForgeItemDetail{}, Invalid("%s: %s is not an issue or a pull request on GitHub, GitLab, Forgejo, Bitbucket, Azure DevOps, Linear, Jira or Azure Boards", method, r.Node.Ref)
 	} else if repo.forge == "gitlab" {
 		out, err = d.gitlabItem(ctx, method, kind, repo, number, deref(r.Cursor))
 	} else {

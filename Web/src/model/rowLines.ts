@@ -311,6 +311,7 @@ function waitSourceName(event: string): string {
   if (subject === "workflow") return "Workflows";
   if (subject === "branch") return "Branches";
   if (subject === "dropbox") return "Drop box";
+  if (subject === "file") return "Files";
   return "Agents";
 }
 

@@ -13,11 +13,11 @@ import type {
   StartRequest, UUID, AutoMappings, AutoPreview, AutoPreviewRequest, AutoSettings, ClientPermissionMode, Levels, ModelLevel, PermissionLevel, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
   CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ReviewPull, CheckSuggestion, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, PolicySetBy, RuntimeAllowances,
-  GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
+  GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Achievements,
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, DailySummarySettings, DesktopControlSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
   PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, BudgetRequest, RemoveRequest, ClientPermissionSettings, PRCostComment,
-  Connection, ProblemReport, ProblemReportRequest } from "../protocol/generated";
+  Connection, MoveToMachineAnswer, ProblemReport, ProblemReportRequest } from "../protocol/generated";
 import { endedConnections, endedLine, hasEnded } from "./connectorSetup";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
@@ -34,7 +34,7 @@ import { artifactsIn, withArtifactsOf, type Artifact } from "./artifacts";
 import { log } from "../log";
 import { knowPublicViews } from "../place";
 import { folderKey, folderPath as agentFolderPath, folderView, type FolderView } from "./groups";
-import { decideMacHostNotice, type MacHostNotice } from "./macHostNotice";
+import { decideMacHostNotice, steadyNotice, type MacHostNotice } from "./macHostNotice";
 import { DisplayBuilder, isPersonsAsk, keepingTurns, storedTurn, turns, type ChatTurn, type Item } from "./turns";
 import { sortedRuntimes } from "./runtimes";
 import { personPrompts } from "./sessionPrompts";
@@ -48,7 +48,7 @@ import type { WhenDone } from "./workflowSettings";
 import { askID, firstAsk, waiting, type GitLendAsk } from "./gitLending";
 import { dropboxRefusal, dropboxRequest } from "./dropbox";
 import { goOnRequest } from "./limits";
-import { milestonesSeen } from "./milestones";
+import { achievementsSeen } from "./achievements";
 import { hostAnswers, hostHas } from "./capabilities";
 import { Capability } from "../protocol/capabilities.generated";
 import { providerManaged, withJoin, withoutJoin } from "./people";
@@ -423,12 +423,12 @@ export class Work {
   readonly worktreeSizes = signal<Record<string, Record<string, WorktreeSize>>>({});
   /** Each host's files it could not read in this run (#205, #223), replaced whole by each store/notesChanged. */
   readonly storeNotes = signal<Record<string, string[]>>({});
-  /** Each host's milestones (#984), replaced whole by each milestones/changed. */
-  readonly milestones = signal<Record<string, Milestones>>({});
+  /** Each host's achievements (#984), replaced whole by each achievements/changed. */
+  readonly achievements = signal<Record<string, Achievements>>({});
 
-  protected takeMilestones(host: string, milestones: Milestones): void {
-    this.milestones.value = { ...this.milestones.value, [host]: milestones };
-    milestonesSeen.take(milestones);
+  protected takeAchievements(host: string, achievements: Achievements): void {
+    this.achievements.value = { ...this.achievements.value, [host]: achievements };
+    achievementsSeen.take(achievements);
   }
   /**
    * The control plane's machine, its home host, and how this Mac's host says its join stands
@@ -460,13 +460,15 @@ export class Work {
   /** Whether the person has a Mac among their machines (#3382, #3425): with none, a line says what to do here. */
   readonly hasMac: ReadonlySignal<boolean> = computed(() => this.hosts.value.some((h) => this.isMac(h.id)));
   /** Why this Mac's host is quiet, as the window says it (#666), or nil while it is online. */
-  readonly macHostNotice: ReadonlySignal<MacHostNotice | null> = computed(() => {
+  private readonly macHostNoticeNow: ReadonlySignal<MacHostNotice | null> = computed(() => {
     const plane = this.plane.value;
     const macID = this.macHostID.value;
     const mac = this.hosts.value.find((h) => h.id === macID);
     const onThisMac = !!plane?.machineID && plane.machineID === mac?.machineID;
     return decideMacHostNotice(onThisMac, mac?.state, plane?.thisMacHost);
   });
+  /** That notice, held a few seconds after it goes, so a host that keeps dropping and joining does not flicker it. */
+  readonly macHostNotice: ReadonlySignal<MacHostNotice | null> = steadyNotice(this.macHostNoticeNow);
   /** Who this client belongs to (#994), from `control/status`: none from a control plane before it. */
   readonly person = signal<ControlPerson | null>(null);
   /** The line a server runs to ask to join as this client's person, with no code (#994), from `control/status`. */
@@ -729,8 +731,8 @@ export class Work {
       case "store/notesChanged":
         this.storeNotes.value = { ...this.storeNotes.value, [host]: (params as StoreNotes).notes };
         return true;
-      case "milestones/changed":
-        this.takeMilestones(host, params as Milestones);
+      case "achievements/changed":
+        this.takeAchievements(host, params as Achievements);
         return true;
       case "preferences/changed":
         if (this.isMac(host)) preferencesSaid(params as Record<string, JSONValue>);
@@ -1888,9 +1890,9 @@ export class Store extends Work {
       void this.link.call("preferences/get", {}, host).then((said) => preferencesSaid(said))
         .catch(failed("preferences/get"));
     }
-    // A host from before #984 doesn't know it: the Time page shows no milestones.
-    void this.link.call("milestones/state", {}, host).then((state) => this.takeMilestones(host, state))
-      .catch(failed("milestones/state"));
+    // A host from before #984 doesn't know it: the Time page shows no achievements.
+    void this.link.call("achievements/state", {}, host).then((state) => this.takeAchievements(host, state))
+      .catch(failed("achievements/state"));
     const [permissions, elicitations] = await Promise.all([
       this.link.call("permissions/pending", {}, host).catch(failed("permissions/pending")),
       this.link.call("elicitations/pending", {}, host).catch(failed("elicitations/pending")),
@@ -3112,6 +3114,17 @@ export class Store extends Work {
 
   async writeArtifact(host: string, agentID: string, path: string, text: string): Promise<boolean> {
     return (await this.act("artifact/write", { agentID: agentID as UUID, path, text }, host)) !== null;
+  }
+
+  /**
+   * Move to Machine… (#3790): `agentID` goes on on `machine`, in `folder` there, or the folder of
+   * its project there when `folder` is empty. Answers once that machine has it; throws why not.
+   */
+  async moveToMachine(host: string, agentID: string, machine: string, folder: string): Promise<MoveToMachineAnswer> {
+    const there = folder.trim();
+    const machineName = this.hosts.value.find((h) => h.id === machine)?.name;
+    return await this.link.call("agents/moveToMachine",
+      { agentID: agentID as never, machine, ...(machineName ? { machineName } : {}), ...(there ? { folder: there } : {}) }, host);
   }
 
   /**

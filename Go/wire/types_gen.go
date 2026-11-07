@@ -97,6 +97,10 @@ type AccountRequest struct {
 	AccountID string `json:"accountID"`
 }
 
+type Achievements struct {
+	Earned []EarnedAchievement `json:"earned"`
+}
+
 // clients/setActivityToken (#1744): the push token of this device's Live Activity, in hex, for one session it speaks for (#2991: one activity for every turn sent from the device, so one token for several sessions), for the control plane to update it by APNs while the Remote is not running. startedAt is when the session's turn began. No token takes the session out of it.
 type ActivityToken struct {
 	AgentID UUID `json:"agentID"`
@@ -1899,7 +1903,7 @@ type CatchUpSnapshot struct {
 
 	StoreNotes *StoreNotes `json:"storeNotes,omitzero"`
 
-	Milestones *Milestones `json:"milestones,omitzero"`
+	Achievements *Achievements `json:"achievements,omitzero"`
 
 	Workflows []WorkflowSummary `json:"workflows,omitzero"`
 
@@ -2343,6 +2347,73 @@ type Connection struct {
 	Newest *ConnectorProof `json:"newest,omitzero"`
 }
 
+// The person's agents' bot on this machine (#3858). Never its key.
+type ConnectionBot struct {
+	Made bool `json:"made"`
+
+	// The bot's GitHub name: <slug>[bot].
+	Name *string `json:"name,omitzero"`
+
+	Slug *string `json:"slug,omitzero"`
+
+	// The account the App is on.
+	Owner *string `json:"owner,omitzero"`
+
+	// Where the person installs the App on repositories.
+	InstallURL *string `json:"installURL,omitzero"`
+
+	// The App's page on GitHub, where the person deletes it.
+	AppURL *string `json:"appURL,omitzero"`
+
+	// Absent when GitHub could not be asked.
+	Installations []ConnectionBotInstallation `json:"installations,omitzero"`
+
+	// What failed, in words.
+	Message *string `json:"message,omitzero"`
+}
+
+// What the hand-back page gave the client after GitHub made the App: the code and the state, or GitHub's error. The host checks the state and turns the code into the App's key at once; the key stays on this machine.
+type ConnectionBotCompleteRequest struct {
+	State string `json:"state"`
+
+	Code *string `json:"code,omitzero"`
+
+	Error *string `json:"error,omitzero"`
+}
+
+// An account the bot is installed on.
+type ConnectionBotInstallation struct {
+	Account string `json:"account"`
+
+	// True when it reaches every repository of the account, false for the ones chosen.
+	All bool `json:"all"`
+
+	// Where the installation's repositories are chosen on GitHub.
+	SettingsURL *string `json:"settingsURL,omitzero"`
+}
+
+// What the client posts to GitHub (#3858): an HTML form to action, method POST, with one field, manifest. GitHub sends the code and the state to the hand-back page.
+type ConnectionBotStart struct {
+	// GitHub's page for a new App, with the state in its query.
+	Action string `json:"action"`
+
+	// The App manifest's JSON, with the fixed permissions.
+	Manifest string `json:"manifest"`
+
+	State string `json:"state"`
+
+	ExpiresAt Date `json:"expiresAt"`
+}
+
+// Make the person's agents' bot (#3858): the host makes the GitHub App manifest for its GitHub connection's account.
+type ConnectionBotStartRequest struct {
+	// The web page's origin, as connections/sign-in takes it; left out on the Mac.
+	Origin *string `json:"origin,omitzero"`
+
+	// True when an organisation must install the bot: GitHub lets only the owning account install a private App (spec 3856 §4).
+	Public *bool `json:"public,omitzero"`
+}
+
 type ConnectionDisconnectAnswer struct {
 	Error *string `json:"error,omitzero"`
 }
@@ -2359,7 +2430,7 @@ type ConnectionEmailRequest struct {
 	Password string `json:"password"`
 }
 
-// A tool the person connects to: GitHub (#1335) and Linear (#1343) with OAuth, GitLab (#1630) with OAuth on gitlab.com or a personal access token on any GitLab, email (#1780): one IMAP mailbox with an app password, Atlassian (#3304): one sign-in for Jira and Confluence, with OAuth on Atlassian Cloud or a token on one site, Forgejo (#3752): an access token on Codeberg or any Forgejo or Gitea, and Bitbucket (#3785): an Atlassian API token with its email, or an access token, on Bitbucket Cloud.
+// A tool the person connects to: GitHub (#1335) and Linear (#1343) with OAuth, GitLab (#1630) with OAuth on gitlab.com or a personal access token on any GitLab, email (#1780): one IMAP mailbox with an app password, Atlassian (#3304): one sign-in for Jira and Confluence, with OAuth on Atlassian Cloud or a token on one site, Forgejo (#3752): an access token on Codeberg or any Forgejo or Gitea, Bitbucket (#3785): an Atlassian API token with its email, or an access token, on Bitbucket Cloud, and Azure DevOps (#3802): a personal access token on one organization of dev.azure.com or one collection of an Azure DevOps Server.
 type ConnectionProvider string
 
 const ConnectionProviderGithub ConnectionProvider = "github"
@@ -2369,6 +2440,7 @@ const ConnectionProviderEmail ConnectionProvider = "email"
 const ConnectionProviderAtlassian ConnectionProvider = "atlassian"
 const ConnectionProviderForgejo ConnectionProvider = "forgejo"
 const ConnectionProviderBitbucket ConnectionProvider = "bitbucket"
+const ConnectionProviderAzuredevops ConnectionProvider = "azuredevops"
 
 type ConnectionProviderRequest struct {
 	Provider ConnectionProvider `json:"provider"`
@@ -2452,7 +2524,7 @@ type ConnectionTokenAnswer struct {
 type ConnectionTokenRequest struct {
 	Provider ConnectionProvider `json:"provider"`
 
-	// The provider's address, such as gitlab.example.com, example.atlassian.net or git.example.com (https:// when it names no scheme). gitlab.com, or codeberg.org for Forgejo, when left out; a Jira site must be given. Bitbucket takes none: it is Bitbucket Cloud's.
+	// The provider's address, such as gitlab.example.com, example.atlassian.net or git.example.com (https:// when it names no scheme). gitlab.com, or codeberg.org for Forgejo, when left out; a Jira site must be given. Bitbucket takes none: it is Bitbucket Cloud's. Azure DevOps takes its organization (dev.azure.com/acme) or an Azure DevOps Server's collection (server/tfs/DefaultCollection), which must be given.
 	URL *string `json:"url,omitzero"`
 
 	// Atlassian and Bitbucket: the account's email, sent with a Jira Cloud or Atlassian API token. Left out for a Jira Data Center personal access token or a Bitbucket access token.
@@ -2541,20 +2613,20 @@ type ConnectorProof struct {
 	At *Date `json:"at,omitzero"`
 }
 
-// A folder's Connectors set-up (#1336): its GitHub, GitLab, Forgejo or Bitbucket repository (#1632, #3752, #3785), the person's connection to that forge, four slots that each prove themselves with one read, and the events.
+// A folder's Connectors set-up (#1336): its GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps repository (#1632, #3752, #3785, #3802), the person's connection to that forge, four slots that each prove themselves with one read, and the events.
 type ConnectorSetup struct {
 	Folder string `json:"folder"`
 
-	// owner/name on GitHub or Forgejo, workspace/name on Bitbucket, or group/project on GitLab, from the folder's git remote (origin first). Absent with no GitHub, GitLab, Forgejo or Bitbucket remote.
+	// owner/name on GitHub or Forgejo, workspace/name on Bitbucket, organization/project/name on Azure DevOps, or group/project on GitLab, from the folder's git remote (origin first). Absent with no GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps remote.
 	Repository *string `json:"repository,omitzero"`
 
-	// The forge the repository is on, which fills Tasks, Code review and CI: github, gitlab (#1632), forgejo (#3752) or bitbucket (#3785). Absent is github.
+	// The forge the repository is on, which fills Tasks, Code review and CI: github, gitlab (#1632), forgejo (#3752), bitbucket (#3785) or azuredevops (#3802). Absent is github.
 	Forge *ConnectionProvider `json:"forge,omitzero"`
 
-	// The repository's host, as the page says it before the repository: github.com, gitlab.com, codeberg.org, bitbucket.org, or a self-managed GitLab's or Forgejo's host.
+	// The repository's host, as the page says it before the repository: github.com, gitlab.com, codeberg.org, bitbucket.org, dev.azure.com, or a self-managed GitLab's, Forgejo's or Azure DevOps Server's host.
 	Site *string `json:"site,omitzero"`
 
-	// The repository's page on its forge, where the person asks for access when a read is refused (GitLab, Forgejo, Bitbucket).
+	// The repository's page on its forge, where the person asks for access when a read is refused (GitLab, Forgejo, Bitbucket, Azure DevOps).
 	RepositoryURL *string `json:"repositoryURL,omitzero"`
 
 	Connection *Connection `json:"connection,omitzero"`
@@ -2645,7 +2717,7 @@ const ConnectorSlotKindDocs ConnectorSlotKind = "docs"
 const ConnectorSlotKindMessaging ConnectorSlotKind = "messaging"
 const ConnectorSlotKindWorkspace ConnectorSlotKind = "workspace"
 
-// notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach the provider; message says why. refused: the provider refused the read, so the person grants it on the provider's site. noRemote: the folder has no GitHub, GitLab, Forgejo or Bitbucket remote. skipped: the person skipped it; it counts as done.
+// notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach the provider; message says why. refused: the provider refused the read, so the person grants it on the provider's site. noRemote: the folder has no GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps remote. skipped: the person skipped it; it counts as done.
 type ConnectorSlotState string
 
 const ConnectorSlotStateNotConnected ConnectorSlotState = "notConnected"
@@ -3590,7 +3662,7 @@ type DropboxPutResponse struct {
 	Path string `json:"path"`
 }
 
-type EarnedMilestone struct {
+type EarnedAchievement struct {
 	ID string `json:"id"`
 
 	At Date `json:"at"`
@@ -4544,7 +4616,7 @@ type ForgeDone struct {
 	Reran *int64 `json:"reran,omitzero"`
 }
 
-// A feature (#3267): name is its label's after feature:, with the label's colour where the forge gives one; epics counts its epics, open the open ones.
+// A feature (#3267): name is its label's after feature:, with the label's colour where the forge gives one; epics counts its epics, open the open ones. issues counts its open issues that are not epics, of the newest 500 open issues (#3741); a feature with no open epic and no such issue is finished.
 type ForgeFeature struct {
 	Name string `json:"name"`
 
@@ -4553,6 +4625,8 @@ type ForgeFeature struct {
 	Epics int64 `json:"epics"`
 
 	Open int64 `json:"open"`
+
+	Issues *int64 `json:"issues,omitzero"`
 }
 
 // forge/features (#3267): the feature:<name> labels of the epics (the issues labelled epic, open or closed, the newest 500), by name; errors says a forge that could not be read, as in ForgeList.
@@ -4726,7 +4800,7 @@ type ForgeLogRequest struct {
 	Check *string `json:"check,omitzero"`
 }
 
-// people/setForgeLogins (#2951): the caller's own GitHub, GitLab, Linear and Jira logins (#3313), for Settings ▸ You, replacing what was kept; blank clears one.
+// people/setForgeLogins (#2951): the caller's own GitHub, GitLab, Linear, Jira (#3313) and Forgejo (#3836) logins, for Settings ▸ You, replacing what was kept; blank clears one.
 type ForgeLogins struct {
 	Github *string `json:"github,omitzero"`
 
@@ -4735,6 +4809,8 @@ type ForgeLogins struct {
 	Linear *string `json:"linear,omitzero"`
 
 	Jira *string `json:"jira,omitzero"`
+
+	Forgejo *string `json:"forgejo,omitzero"`
 }
 
 // How forge/merge merges a pull request (#3130): a merge commit, one squashed commit, or its commits rebased onto the base.
@@ -7045,10 +7121,6 @@ const MessagingServerStateNotRead MessagingServerState = "notRead"
 const MessagingServerStateRead MessagingServerState = "read"
 const MessagingServerStateFailed MessagingServerState = "failed"
 
-type Milestones struct {
-	Earned []EarnedMilestone `json:"earned"`
-}
-
 type MissingFolder struct {
 	BranchKept bool `json:"branchKept"`
 }
@@ -7118,11 +7190,67 @@ type MoveTargetExisting struct {
 	Value URL `json:"_0"`
 }
 
+// What agents/moveToMachine did (#3790): the folder on that machine the session now goes on in, and whether it carries on there at once, as it was working when it moved.
+type MoveToMachineAnswer struct {
+	Folder string `json:"folder"`
+
+	CarriesOn bool `json:"carriesOn"`
+}
+
+// The person moving a session to another of their machines (#3790), as move_session does (#3717). `machine` is the control plane's id or name for it, and `machineName` the name the person knows it by, for the words; `folder` is an absolute path there, or, when left out, the folder of the session's project there.
+type MoveToMachineRequest struct {
+	AgentID UUID `json:"agentID"`
+
+	Machine string `json:"machine"`
+
+	MachineName *string `json:"machineName,omitzero"`
+
+	Folder *string `json:"folder,omitzero"`
+}
+
 type MoveWhen string
 
 const MoveWhenNow MoveWhen = "now"
 const MoveWhenAfterTurn MoveWhen = "afterTurn"
 const MoveWhenNothing MoveWhen = "nothing"
+
+// The Multiplier (#3901, #3903; method in specs/3901-multiplier/spec.md): the PRs the person's agents merged in the last 7 days, less the merged reverts, against the PRs an average engineer merged in a week in 2025. With a control plane it counts all the person's machines, else this machine. multiplier and engineerHours are absent when nothing is counted: the page shows — ×, not 0×.
+type Multiplier struct {
+	// The PRs counted: merged in the range, less the merged reverts, never below 0. A PR counts when a session of the person worked on it.
+	PrsMerged int64 `json:"prsMerged"`
+
+	// The merged reverts in the range.
+	Reverts int64 `json:"reverts"`
+
+	// prsMerged ÷ baseline.prsPerWeek, to one decimal: 5.0 is 5.0×.
+	Multiplier *float64 `json:"multiplier,omitzero"`
+
+	// prsMerged × baseline.hoursPerWeek ÷ baseline.prsPerWeek, to the whole hour.
+	EngineerHours *float64 `json:"engineerHours,omitzero"`
+
+	// This machine's agents with a turn running now.
+	AgentsWorking int64 `json:"agentsWorking"`
+
+	// The start of the range: 7 days before it was counted.
+	Since Date `json:"since"`
+
+	Baseline MultiplierBaseline `json:"baseline"`
+
+	// On multiplier/changed: the PR whose merge or revert changed it.
+	ChangedBy *LineageNode `json:"changedBy,omitzero"`
+}
+
+// What the Multiplier compares with (#3902), so that no client keeps its own copy: an engineer with no AI in 2025.
+type MultiplierBaseline struct {
+	// Merged PRs a week: 1.4.
+	PrsPerWeek float64 `json:"prsPerWeek"`
+
+	// The hours of that week: 40.
+	HoursPerWeek float64 `json:"hoursPerWeek"`
+
+	// Where the figure is from, for the page's small line: DX 2025.
+	Source string `json:"source"`
+}
 
 // A runtime's own setting for one level: config option values (mode, model, effort), a sandbox choice, or the answer to permission requests.
 type NativeSetting struct {
@@ -8708,20 +8836,20 @@ type Project struct {
 	Boards []ProjectBoard `json:"boards,omitzero"`
 }
 
-// One board in a project's Tasks slot (#3282): a GitHub Projects board, a Jira board, a Linear team or a GitLab group board, by its address and a name (the team's). Work's Issues and Features lists narrow to one. A client sends name and url; the control plane reads forge, key and site from the url.
+// One board in a project's Tasks slot (#3282): a GitHub Projects board, a Jira board, a Linear team, a GitLab group board or an Azure Boards board (a team's, #3816), by its address and a name (the team's). Work's Issues and Features lists narrow to one. A client sends name and url; the control plane reads forge, key and site from the url.
 type ProjectBoard struct {
 	Name string `json:"name"`
 
-	// The board's address on the web: github.com/orgs/<org>/projects/<n> (or users/<login>), <site>/jira/software/…/boards/<id>, linear.app/<workspace>/team/<KEY>, or <gitlab>/groups/<group>/-/boards/<id>. It names the board in forge/issues' board.
+	// The board's address on the web: github.com/orgs/<org>/projects/<n> (or users/<login>), <site>/jira/software/…/boards/<id>, linear.app/<workspace>/team/<KEY>, <gitlab>/groups/<group>/-/boards/<id>, or dev.azure.com/<org>/<project>/_boards/board/t/<team> (or an Azure DevOps Server's). It names the board in forge/issues' board.
 	URL string `json:"url"`
 
-	// github, atlassian (Jira), linear or gitlab.
+	// github, atlassian (Jira), linear, gitlab or azuredevops (Azure Boards).
 	Forge *ConnectionProvider `json:"forge,omitzero"`
 
-	// The board on its forge: <owner>/<number> on GitHub, the board id on Jira, the team key on Linear, <group>#<id> on GitLab.
+	// The board on its forge: <owner>/<number> on GitHub, the board id on Jira, the team key on Linear, <group>#<id> on GitLab, <org>/<project>/<team> on Azure Boards.
 	Key *string `json:"key,omitzero"`
 
-	// The board's host: github.com, the Jira site, linear.app, gitlab.com or a self-managed GitLab.
+	// The board's host: github.com, the Jira site, linear.app, gitlab.com or a self-managed GitLab, dev.azure.com or an Azure DevOps Server.
 	Site *string `json:"site,omitzero"`
 }
 
@@ -9936,6 +10064,9 @@ type ReviewPull struct {
 
 	// owner/name.
 	Repo string `json:"repo"`
+
+	// Its lineage ref, "github:owner/name#12" or "gitlab:group/project!12": a press opens its Work page in the app. Nil from an older host: a press opens its forge page.
+	Ref *string `json:"ref,omitzero"`
 
 	Author *string `json:"author,omitzero"`
 
@@ -11802,6 +11933,9 @@ type TeamPerson struct {
 
 	// Their Jira login (#3313): the Atlassian account's email, account id or display name.
 	JiraLogin *string `json:"jiraLogin,omitzero"`
+
+	// Their Forgejo login (#3836): their user name on the connected Forgejo or Gitea.
+	ForgejoLogin *string `json:"forgejoLogin,omitzero"`
 
 	You *bool `json:"you,omitzero"`
 }

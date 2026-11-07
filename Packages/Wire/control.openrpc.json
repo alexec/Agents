@@ -3408,6 +3408,27 @@
       "description": "Update a server's host over ssh (#1766): its server and key given again, the host key checked as at an install, the server's root checked to be this host's, then the control plane's agentsd, MCP servers and toolsets copied and the host started again. The answer is an install's: {needsTrust, name} first for a key not yet trusted, then {updated: true, name}."
     },
     {
+      "name": "multiplier/count",
+      "x-capability": "multiplier/1",
+      "description": "A host, on its channel 0 (#3903): the Multiplier of the machine's person over all their machines' lineage, cached until a machine sends new lineage. agentsWorking is 0: the host gives its own.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Multiplier"
+        }
+      }
+    },
+    {
       "name": "notices/delivered",
       "x-capability": "notices/1",
       "description": "To the host whose notice it is, on its channel 0 (#2860): the control plane sent it to one of the person's devices, so the host records where on the notice's line.",
@@ -3807,7 +3828,7 @@
     {
       "name": "people/setForgeLogins",
       "x-capability": "people/1",
-      "description": "Sets the caller's own GitHub, GitLab, Linear and Jira logins (#2951, #3313), for Settings ▸ You, when they are not filled in from a machine's connection.",
+      "description": "Sets the caller's own GitHub, GitLab, Linear, Jira and Forgejo logins (#2951, #3313, #3836), for Settings ▸ You, when they are not filled in from a machine's connection.",
       "tags": [
         {
           "name": "web"

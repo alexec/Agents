@@ -49,6 +49,11 @@ struct YourConnectionsView: View {
                     ForEach(Array(connections.enumerated()), id: \.element.provider) { index, c in
                         if index > 0 { Divider().padding(.leading, 58) }
                         connectionRow(c)
+                        // The person's agents' bot (#3858), on a host that makes one.
+                        if c.provider == .github, c.state == .connected, model.host(.mac, has: Capability.connectionsBot1) {
+                            Divider().padding(.leading, 58)
+                            AgentsBotRow(host: .mac)
+                        }
                     }
                 } else if connections != nil {
                     Text(ConnectorSetupWords.noConnections)
@@ -68,8 +73,10 @@ struct YourConnectionsView: View {
             case .gitlab: ConnectGitLabSheet(host: .mac, again: again, onConnected: { Task { await load() } })
             case .email: ConnectEmailSheet(host: .mac, onConnected: { Task { await load() } })
             case .atlassian: ConnectJiraSheet(host: .mac, onConnected: { Task { await load() } })
-            case .forgejo: ConnectForgejoSheet(host: .mac, again: again, onConnected: { Task { await load() } })
-            case .bitbucket: ConnectBitbucketSheet(host: .mac, onConnected: { Task { await load() } })
+            case .forgejo, .bitbucket, .azuredevops:
+                if let words = ConnectorSetupWords.tokenSheet(p) {
+                    ConnectTokenSheet(words, host: .mac, again: again, onConnected: { Task { await load() } })
+                }
             }
         }
         .confirmationDialog(disconnectTitle, isPresented: Binding(get: { disconnecting != nil },

@@ -51,8 +51,12 @@ func main() {
 			sets = append(sets, s)
 		}
 	}
+	// The official toolsets post as the person's bot when it is installed on this folder's
+	// owner (#3858); the views, the events and the person-only tools keep the user token.
+	identity := githubmcp.NewIdentity(token, githubmcp.GitRepo())
 	upstream, issueReader, err := githubmcp.NewUpstreamWithIssueReader(ctx, githubmcp.UpstreamConfig{
-		Version: buildinfo.Version, Token: token, Toolsets: sets, ReadOnly: *readOnly, Logger: logger,
+		Version: buildinfo.Version, Token: identity.Token, Toolsets: sets, ReadOnly: *readOnly, Logger: logger,
+		Bot: identity.Bot,
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "github-mcp:", err)

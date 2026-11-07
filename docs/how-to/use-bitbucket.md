@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac, web]
-description: Connect Bitbucket with an Atlassian API token or an access token and add the bitbucket connector, so that agents read and comment on pull requests, checks and issues on Bitbucket Cloud, and a workflow or a wait starts on their events.
+description: Connect Bitbucket with an Atlassian API token or an access token and add the bitbucket connector, so that agents read and comment on pull requests, checks and issues on Bitbucket Cloud, a workflow or a wait starts on their events, the Work pages list them, and the connector's own pages show them.
 ---
 
 # Use Bitbucket
@@ -12,8 +12,10 @@ it, and every Linux host installs it beside agentsd. It is for Bitbucket Cloud
 (bitbucket.org) only, not Bitbucket Data Center.
 
 It has tools to read pull requests, their checks and issues, and to comment on them, and
-it has events that start a workflow or a wait. It has no pages yet: the Work pages do not
-list a Bitbucket repository.
+it has events that start a workflow or a wait. With the Bitbucket connection, the Work pages
+list a Bitbucket repository's issues and pull requests too (#3786). It also has three pages of
+its own (#3866): **Pull requests**, **Issues** and a pull request's page. The Mac window, the
+Remote on iPhone and iPad, and the web page show the same pages.
 
 ## Before you start
 
@@ -79,6 +81,78 @@ The set-up adds it for you. To add it to another folder:
 The connector finds the repository from the folder's git remote (`origin` first). A tool or
 an event can name another one with `repo`, as `workspace/name`.
 
+## On the Work pages
+
+With Bitbucket connected, **Work ▸ Issues** and **Work ▸ Pull requests** list the issues and
+pull requests of each folder whose remote is on bitbucket.org, beside the other forges', the
+last updated first. The repository is a choice in the **Repo** filter. Without the
+connection, the list says Bitbucket is not connected.
+
+- **An issue's page:** its description and comments, **Open on Bitbucket**, **Start Agent**
+  (the session is labelled `#12`), **Close** (Bitbucket's *resolved*) or **Reopen**,
+  **Labels** and a comment box. An issue's labels are its kind and its component: a kind
+  added changes its kind, another label is its component. A kind cannot be taken off, only
+  changed.
+- **A pull request's page:** its description and comments, its checks (the head commit's
+  statuses), **Merge** (the target branch's default first; merge, squash or rebase, as the
+  branch allows), **Approve**, **Show Diff**, **Close** (decline) and a comment box. A pull
+  request has no labels, so its page has no **Labels** (#3881). **Rerun failed** starts each failed Pipelines run again, every step,
+  and a check's log is the end of its failed steps' logs; another CI's checks run again and
+  show their logs on their own pages.
+- **Not on Bitbucket:** *Merge when checks pass* (its API has none) and **Reopen** of a
+  declined pull request (Bitbucket cannot reopen one).
+
+Each write is yours, with your token, from the machine that read the item.
+
+## See pull requests and issues on the connector's pages
+
+An agent shows a page when it calls the tool that feeds it. Ask, for example, "Show the open
+pull requests on Bitbucket".
+
+- **Pull requests** (`show_pull_requests`): the 50 newest open pull requests, each with its
+  head commit's checks, a conflict and its review. Click a title to open its page in the same
+  view.
+- **Issues** (`show_issues`): the 50 newest open issues (new, open or on hold), each with its
+  kind and component as its labels, and its assignee. Click a row to expand its rich-text
+  description. Click a label to show only those issues. **Start Agent** opens the new-agent
+  form for the issue, with its number as the label and a new worktree. Nothing starts until
+  you press Start.
+
+Each list is in sections: **Needs you** (you are a reviewer who has not approved it, the issue
+is assigned to you, or your own pull request has failed checks, a conflict or changes
+requested), **Yours**, **Team** (the people with write access to the repository or more, or
+the workspace's members for a token without admin, and bots) and **Others**.
+
+A folder's own repository is on the Work pages, so its sidebar has no row for these lists. A
+project whose Tasks or Code review slot names another Bitbucket repository gets a row for that
+repository. To keep a page, choose **Pin to Folder** in the view's menu. See
+[Pin a page to a folder](pin-a-page-to-a-folder.md).
+
+### Work on a pull request
+
+A pull request's page has five tabs: **Conversation**, **Line comments**, **Files**,
+**Checks** and **Lineage**.
+
+- **Files**: **Show Diff**, or a file's name, shows the changed lines in the app's own diff.
+- **Checks**: the head commit's statuses. A failed Pipelines run has **Show Log**, the end of
+  its failed steps' logs (`failed_log`), and **Run Again**, a new run on the same commit
+  (`retry_pipeline`: every step runs). Another CI's check opens on its own page.
+
+Under the tabs is a box for your words, and these buttons. Each one acts on Bitbucket as you:
+
+- **Comment** adds the box's words as a comment.
+- **Approve** shows only on someone else's pull request.
+- **Merge** merges into the target branch (or squashes, when the branch's default strategy is
+  squash) and deletes the branch. It asks you again first. A draft, or a pull request in
+  conflict, can't be merged. There is no **Auto-merge**: Bitbucket's API has none.
+- **Ask an Agent** sends the work to the agent on the branch: failed checks, a conflict or
+  open line comments, with the box's words. The app asks you before it sends. With no agent
+  on that branch, the new-agent form opens on the branch.
+
+Agents can't merge or approve from this page. Those tools are for a person only. They carry
+the commit that the page shows. When the pull request has a newer commit, nothing happens:
+open the page again.
+
 ## The tools
 
 - `list_pull_requests`, `get_pull_request` (with its description, reviewers, head commit and
@@ -93,6 +167,8 @@ an event can name another one with `repo`, as `workspace/name`.
   failed steps again, so every step runs. It refuses a run that has not ended, and one with
   a secured variable, whose value Bitbucket does not give back: run that one from its page.
 - `comment_on_pull_request` and `comment_on_issue`.
+- For the pages: `show_pull_requests`, `show_issues`, `show_issue_details`,
+  `show_pull_request` and `show_pull_request_diff`.
 - For the ready-made workflows: `create_pull_request`, `list_pull_request_comments` (the
   comments on lines of the diff) and `reply_to_pull_request_comment` (an answer in the
   comment's thread).
@@ -131,7 +207,15 @@ the members of the workspace instead.
 - **A repository with its issue tracker off has no issue events.**
 - **Checks and conflicts are read for the 50 open pull requests updated last.** Bitbucket
   has no list of a repository's failed checks or conflicts, so each poll reads those.
-- **Not yet:** the Work pages.
+- **The Work pages read Bitbucket on each machine.** The list asks each repository for a
+  page, as Bitbucket has no list across repositories. A label or an assignee lists no pull
+  requests: they have neither.
+- **The Pull requests page reads each pull request's checks and diffstat.** Bitbucket has
+  no list of many commits' statuses or conflicts, so the page reads four pull requests at a
+  time.
+- **Not yet:** an epic's plan, the Board filter, and lineage links from a session's `#12`
+  label to a Bitbucket issue; so a page's Lineage tab, and an issue's Lineage line, say the
+  app keeps none here.
 
 ## See also
 

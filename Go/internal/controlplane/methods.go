@@ -312,7 +312,8 @@ func (m *Methods) installCarried(params json.RawMessage, from Caller) (any, bool
 	}
 	person := m.callerPerson(from)
 	return m.s.providers.InstallCarried(request, person, func() (string, error) {
-		text, _, err := m.s.codes.HostCode(withCodeOwner(context.Background(), person), "")
+		ctx := withInstallWorkspace(withCodeOwner(context.Background(), person), request)
+		text, _, err := m.s.codes.HostCode(ctx, "")
 		return text, err
 	})
 }
@@ -521,7 +522,9 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		}
 		return m.s.codes.Issue(ctx, true, false, controllink.CodeLifetime)
 	case "machines/install":
-		return m.s.installer.Install(ctx, params)
+		var request wire.MachineInstall
+		json.Unmarshal(params, &request)
+		return m.s.installer.Install(withInstallWorkspace(ctx, request), params)
 	case "machines/detect":
 		return m.s.installer.Detect(ctx)
 	case "machines/sshHosts":
@@ -1175,6 +1178,8 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 			return nil, err
 		}
 		return m.s.keepJoined(ctx, host, joined)
+	case "multiplier/count":
+		return m.s.multiplierCount(ctx, host, time.Now())
 	case "usage/rollup":
 		rollup, err := require[wire.UsageRollup](params, "UsageRollup")
 		if err != nil {

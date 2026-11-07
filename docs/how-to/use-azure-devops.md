@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac, web]
-description: Add the azuredevops connector with a personal access token, so that agents read and comment on pull requests and their Azure Pipelines builds on Azure DevOps Repos or your own Azure DevOps Server, and a workflow or a wait starts on their events.
+description: Add the azuredevops connector with a personal access token, so that agents read and comment on pull requests and their Azure Pipelines builds on Azure DevOps Repos or your own Azure DevOps Server, a workflow or a wait starts on their events, and the Work pages list the pull requests.
 ---
 
 # Use Azure DevOps Repos
@@ -12,8 +12,8 @@ server in the shape of the gitlab one. It works with Azure DevOps Services
 Server. Agents Host carries it, and every Linux host installs it beside agentsd.
 
 It has tools to read pull requests and their builds, to read a failed build's log, and to
-comment, and it has events that start a workflow or a wait. It has no pages yet: the Work
-pages do not list an Azure DevOps repository.
+comment, and it has events that start a workflow or a wait. With the Azure DevOps connection
+(#3802), the Work pages list and act on the pull requests (#3803).
 
 Work items (Azure Boards) are not in this connector. They are the tracker's, as Linear's
 and Jira's issues are: see [Use Azure Boards work items](use-azure-boards.md).
@@ -84,6 +84,35 @@ Unless an event's `anyone` is true, a bot (a build service) and a pull request f
 never count. Azure DevOps lets only a project's members open a pull request or comment on
 one, so every other person counts.
 
+## On the Work pages
+
+With Azure DevOps connected, **Work ▸ Pull requests** lists the pull requests of each folder
+whose remote is on Azure DevOps (`dev.azure.com`, `*.visualstudio.com`, or the connected Azure
+DevOps Server), beside the other forges', the last opened or closed first. The repository,
+`organization/project/repo`, is a choice in the **Repo** filter. Without a token for that Azure
+DevOps (the connection, or the connector's `AZURE_DEVOPS_TOKEN` and `AZURE_DEVOPS_URL`), the
+list says Azure DevOps is not connected. **Work ▸ Issues** lists Azure Boards work items, not
+this connector's: see [Use Azure Boards work items](use-azure-boards.md).
+
+A pull request's page has its description and comments, its checks (the newest Azure
+Pipelines build of each pipeline of the pull request, and the newest status of each other
+service), **Open on Azure DevOps**, and:
+
+- **Merge:** merge, squash or rebase, as the target branch's *Limit merge types* policy
+  allows them (all three with no policy), and **Merge when checks pass**, which is Azure
+  DevOps's *auto-complete*. Either deletes the branch.
+- **Approve:** a vote of *approved*, at the head commit the page shows.
+- **Rerun failed:** each failed Azure Pipelines build runs its failed jobs again. A check's
+  log is the end of its build's failed steps. Another service's status runs again on its
+  own page.
+- **Show Diff:** each file's changes against the merge base with the target. Azure DevOps
+  says which lines changed, and the page reads the lines of both commits, so a diff of more
+  than 100 files lists the rest with no lines.
+- **Labels:** the pull request's tags. Azure DevOps has no list of a repository's tags, so
+  the menu offers the tags of its 100 newest pull requests.
+- **Close:** abandons the pull request; **Reopen** makes it active again.
+- A comment box: a comment is a thread of its own.
+
 ## What to know
 
 - **Comments are read for the 50 newest active pull requests,** and those closed since the
@@ -91,8 +120,15 @@ one, so every other person counts.
 - **Checks are builds and statuses.** Statuses are read for the 50 newest active pull
   requests, the newest of each context, at the pull request's newest push. A build of a branch
   that no active pull request is from (`main`, a tag) raises no event.
-- **Not yet:** the Work pages, a **Connect Azure DevOps** sheet with a sign-in, and the
-  set-up of a folder's Code review and CI from an Azure DevOps remote.
+- **The Work pages read Azure DevOps on each machine.** The list asks each repository, a
+  state at a time, as Azure DevOps has no list across repositories; it filters a tag and
+  words itself, as Azure DevOps cannot. A pull request has no time of its last change, so
+  the list is in the order each was opened or closed. An assignee lists none: a pull
+  request has reviewers, not assignees.
+- **The Work pages read one Azure DevOps on a machine:** the first folder's, with a token
+  for it. A folder on another lists nothing, and says so when none is read.
+- **Not yet:** a Microsoft Entra sign-in (a personal access token only), and lineage links
+  from a session or a pull request to its Azure Repos pull request.
 
 ## See also
 

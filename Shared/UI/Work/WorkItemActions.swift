@@ -37,7 +37,7 @@ struct WorkItemActions: View {
                             DaemonAPI.ForgeCloseRequest(node: node, reopen: item.state == "open" ? nil : true))
                     }
                 }
-                labelsMenu
+                if WorkList.takesLabels(node) { labelsMenu }
                 if busy != nil { ProgressView().controlSize(.small) }
             }
             .disabled(busy != nil)

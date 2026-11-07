@@ -380,7 +380,8 @@ public enum WorkList {
     }
 
     public static let forgeTitle = ["github": "GitHub", "gitlab": "GitLab", "linear": "Linear", "jira": "Jira",
-                                    "azureboards": "Azure Boards", "forgejo": "Forgejo"]
+                                    "azureboards": "Azure Boards", "forgejo": "Forgejo", "bitbucket": "Bitbucket",
+                                    "azuredevops": "Azure DevOps"]
 
     /// A forge that could not be read: "GitHub on Studio: not connected".
     public static func errorWords(_ e: DaemonAPI.ForgeListError, machine: String?) -> String {
@@ -394,6 +395,15 @@ public enum WorkList {
     public static func forgeName(_ ref: String) -> String {
         let forge = ref.split(separator: ":", maxSplits: 1).first.map(String.init) ?? ""
         return forgeTitle[forge] ?? "the forge"
+    }
+
+    /// The forges whose pull requests have no labels (#3881): Bitbucket's API has none.
+    public static let forgesWithoutPRLabels: Set<String> = ["bitbucket"]
+
+    /// Whether the item's page offers Labels: not on a pull request of a forge whose pull requests have none (#3881).
+    public static func takesLabels(_ node: DaemonAPI.LineageNode) -> Bool {
+        let forge = node.ref.split(separator: ":", maxSplits: 1).first.map(String.init) ?? ""
+        return !(node.kind == "pr" && forgesWithoutPRLabels.contains(forge))
     }
 
     /// Why a write failed, in the machine's own words: a JSON-RPC error's message, not Foundation's

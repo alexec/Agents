@@ -65,8 +65,9 @@ type live struct {
 	toolCalls map[string]bool
 	seen      *sync.Cond
 	// filing is the open tool calls that file a forge issue, by id (lineagefiled.go): the
-	// issue's address comes in a later update than the command.
-	filing map[string]bool
+	// issue's address comes in a later update than the command. The value is the repository
+	// an fj call files on, none for the others.
+	filing map[string]forgeRepo
 	// evidence is what this turn's commands printed and what it replied, for a sandbox
 	// that could not start (sandboxfailure.go).
 	evidence turnEvidence
@@ -153,7 +154,7 @@ func (d *Daemon) recordEntry(id, entryID wire.UUID, kind wire.TranscriptEntryKin
 	}
 	// A turn starting or ending can earn the first agent or five at once (#984).
 	if kind.StateChanged != nil {
-		d.checkMilestonesSoon()
+		d.checkAchievementsSoon()
 	}
 }
 

@@ -369,24 +369,24 @@ for (const scene of scenes) {
       say(`connectors: ${JSON.stringify(await visible(".mcp-page li.resource"))}`);
       say(`levels: ${JSON.stringify(await page.eval(`[...document.querySelectorAll(".mcp-page .connector-levels")].map((p) => p.getAttribute("aria-label"))`))}`);
       await shot("connectors");
-    } else if (scene === "milestones") {
-      // #984, #1067: the milestones on their own page, from their row in Usage, then the
+    } else if (scene === "achievements") {
+      // #984, #1067: the achievements on their own page, from their row in Usage, then the
       // one-time card for one earned while the page looks. The walker earns one meanwhile (a
       // first turn, from the socket).
       say(`usage rows: ${JSON.stringify(await visible(".activity-row .title"))}`);
-      await page.eval(`location.hash = "#/a/milestones"`);
-      await page.waitFor(`document.querySelector(".milestones li")`, 30_000);
-      say(`milestones: ${JSON.stringify(await visible(".milestones li"))}`);
-      await shot("milestones");
-      await page.waitFor(`document.querySelector(".milestone-card")`, 300_000);
+      await page.eval(`location.hash = "#/a/achievements"`);
+      await page.waitFor(`document.querySelector(".achievements li")`, 30_000);
+      say(`achievements: ${JSON.stringify(await visible(".achievements li"))}`);
+      await shot("achievements");
+      await page.waitFor(`document.querySelector(".achievement-card")`, 300_000);
       // Fixed in place, so it has no offsetParent and `visible` would skip it.
-      const card = () => page.eval(`[...document.querySelectorAll(".milestone-card")].map((el) => el.innerText.replace(/\\s+/g, " ").trim())`);
+      const card = () => page.eval(`[...document.querySelectorAll(".achievement-card")].map((el) => el.innerText.replace(/\\s+/g, " ").trim())`);
       say(`card: ${JSON.stringify(await card())}`);
-      await shot("milestone-card");
-      await page.eval(`document.querySelector(".milestone-card button.close").click()`);
+      await shot("achievement-card");
+      await page.eval(`document.querySelector(".achievement-card button.close").click()`);
       await sleep(300);
       say(`card after ✕: ${JSON.stringify(await card())}`);
-      say(`milestones after: ${JSON.stringify(await visible(".milestones li.done"))}`);
+      say(`achievements after: ${JSON.stringify(await visible(".achievements li.done"))}`);
     } else if (scene === "identity") {
       // #111: the footer names the browser, and no grant.
       say(`footer: ${JSON.stringify(await page.text(".identity"))}`);

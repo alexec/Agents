@@ -23,7 +23,7 @@ func TestCatchUpIsOneAnswer(t *testing.T) {
 	c.call(t, 2, "pins/pin", map[string]any{"folder": store.FolderURL(dir), "path": "a.md"})
 	var s map[string]json.RawMessage
 	json.Unmarshal(c.call(t, 3, "client/catchUp", map[string]any{"parts": []string{"pins", "someday"}}), &s)
-	for _, k := range []string{"folders", "agents", "permissions", "elicitations", "attention", "resuming", "disk", "storeNotes", "milestones", "pins"} {
+	for _, k := range []string{"folders", "agents", "permissions", "elicitations", "attention", "resuming", "disk", "storeNotes", "achievements", "pins"} {
 		if _, ok := s[k]; !ok {
 			t.Fatalf("no %s in %v", k, s)
 		}

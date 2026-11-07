@@ -49,6 +49,39 @@ func TestAgentOnByNumber(t *testing.T) {
 	}
 }
 
+// A Forgejo remote is a forge's too (#3882): a session labelled #n or P#n in a folder that
+// pushes to the same Codeberg repo is on it, and one whose folder pushes to another is not.
+func TestAgentOnAForgejoRemote(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	folder, worktree, other := t.TempDir(), t.TempDir(), t.TempDir()
+	for dir, remote := range map[string]string{
+		folder:   "https://codeberg.org/alex/shop.git",
+		worktree: "git@codeberg.org:alex/shop.git",
+		other:    "https://codeberg.org/alex/other.git",
+	} {
+		gitIn(t, dir, "init", "-q")
+		gitIn(t, dir, "remote", "add", "origin", remote)
+	}
+
+	title := "Fix the cart totals"
+	seeded(t, d, worktree, func(a *wire.Agent) {
+		a.Title = &title
+		a.Labels = []wire.SessionLabel{{Value: "#7"}, {Value: "P#8"}}
+	})
+	seeded(t, d, other, func(a *wire.Agent) {
+		a.Labels = []wire.SessionLabel{{Value: "#9"}}
+	})
+
+	prs, issues, _ := d.agentOnIt(folder)
+	if len(prs) != 1 || prs["8"] != title {
+		t.Errorf("prs: %+v", prs)
+	}
+	if len(issues) != 1 || issues["7"] != title {
+		t.Errorf("issues: %+v", issues)
+	}
+}
+
 // A Linear key is not one folder's own: a session labelled one is on it whichever
 // folder it is in.
 func TestAgentOnByLinearKey(t *testing.T) {
@@ -150,6 +183,27 @@ func TestTeamPeopleFillsTheViewersJiraLoginFromTheAtlassianConnection(t *testing
 	})
 	people := d.teamPeople(context.Background(), &ask)
 	if len(people) != 2 || people[0]["jira"] != "Alex Collins" || people[1]["jira"] != sam {
+		t.Fatalf("people: %+v", people)
+	}
+}
+
+// The viewer's own blank Forgejo login comes from this machine's Forgejo connection (#3836);
+// another person's login is theirs as kept.
+func TestTeamPeopleFillsTheViewersForgejoLoginFromTheForgejoConnection(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	file := &connections.File{Path: filepath.Join(t.TempDir(), connections.FileName)}
+	d.connStoreFor = func() (connections.Store, error) { return file, nil }
+	file.Put(connections.Connection{Provider: connections.Forgejo, Login: "alex", Access: "fj", ConnectedAt: time.Now()})
+	you, sam := true, "sam"
+	ask := askControl(func(context.Context, string, any) (json.RawMessage, error) {
+		return json.Marshal(wire.PeopleForViews{People: []wire.TeamPerson{
+			{ID: "a", Name: "Alex", Kind: "person", You: &you},
+			{ID: "s", Name: "Sam", Kind: "person", ForgejoLogin: &sam},
+		}})
+	})
+	people := d.teamPeople(context.Background(), &ask)
+	if len(people) != 2 || people[0]["forgejo"] != "alex" || people[1]["forgejo"] != sam {
 		t.Fatalf("people: %+v", people)
 	}
 }

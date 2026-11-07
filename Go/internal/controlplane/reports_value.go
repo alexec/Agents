@@ -58,15 +58,24 @@ func (s *Service) valueReport(ctx context.Context, r wire.ReportRange, scope *wi
 // scopeLineage is the nodes of the machines whose people keep says, each node once, its
 // machines' copies added up.
 func (s *Service) scopeLineage(ctx context.Context, keep func(person string) bool) ([]wire.LineageCostNode, error) {
-	keys, err := s.cfg.Store.List(ctx, lineagePrefix)
+	keys, read, err := s.scopeLineageKeys(ctx, keep)
 	if err != nil {
-		return nil, fail(storeUnavailable, "The reports could not be read: %v", err)
+		return nil, err
+	}
+	return s.readLineage(ctx, keys, read)
+}
+
+// scopeLineageKeys is the listing of the machines' lineage objects, and those of it whose
+// people keep says.
+func (s *Service) scopeLineageKeys(ctx context.Context, keep func(person string) bool) (keys, read []store.Key, err error) {
+	keys, err = s.cfg.Store.List(ctx, lineagePrefix)
+	if err != nil {
+		return nil, nil, fail(storeUnavailable, "The reports could not be read: %v", err)
 	}
 	known := map[string]string{}
 	for _, h := range s.records.Hosts() {
 		known[strings.ToLower(h.ID)] = h.ID
 	}
-	var read []store.Key
 	for _, k := range keys {
 		host := strings.TrimSuffix(strings.TrimPrefix(k.Key, lineagePrefix), ".json")
 		// A machine removed since: its person is not known, so only an admin sees it.
@@ -78,6 +87,12 @@ func (s *Service) scopeLineage(ctx context.Context, keep func(person string) boo
 			read = append(read, k)
 		}
 	}
+	return keys, read, nil
+}
+
+// readLineage is the nodes of the objects read, of the listing keys, each node once, its
+// machines' copies added up.
+func (s *Service) readLineage(ctx context.Context, keys, read []store.Key) ([]wire.LineageCostNode, error) {
 	// By entity tag and storeReadsAtOnce at a time (#2975), not one machine after another.
 	objects, err := s.storeReads.read(ctx, s.cfg.Store, lineagePrefix, keys, read)
 	if err != nil {

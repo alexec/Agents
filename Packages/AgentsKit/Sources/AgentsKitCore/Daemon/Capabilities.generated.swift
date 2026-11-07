@@ -4,6 +4,7 @@
 /// The capabilities that Packages/Wire names, x-capability on each method (#1748), and the
 /// capability of each method and notification. docs/explanation/versions.md says how they decide.
 public enum Capability {
+    public static let achievements1 = "achievements/1"
     public static let agent1 = "agent/1"
     public static let agentsEditQueued1 = "agents.edit-queued/1"
     public static let agentsExport1 = "agents.export/1"
@@ -32,6 +33,7 @@ public enum Capability {
     public static let clients1 = "clients/1"
     public static let clone1 = "clone/1"
     public static let connection1 = "connection/1"
+    public static let connectionsBot1 = "connections.bot/1"
     public static let connectionsEmail1 = "connections.email/1"
     public static let connections1 = "connections/1"
     public static let connectorsSetup1 = "connectors.setup/1"
@@ -99,8 +101,8 @@ public enum Capability {
     public static let mailbox1 = "mailbox/1"
     public static let marketplaces1 = "marketplaces/1"
     public static let mcp1 = "mcp/1"
-    public static let milestones1 = "milestones/1"
     public static let modes1 = "modes/1"
+    public static let multiplier1 = "multiplier/1"
     public static let mute1 = "mute/1"
     public static let notices1 = "notices/1"
     public static let options1 = "options/1"
@@ -174,6 +176,7 @@ public enum Capability {
 
     /// The capability of each method and notification in daemon.openrpc.json.
     public static let host: [String: String] = [
+        "achievements/state": "achievements/1",
         "agentConfig/editorFiles": "personal/1",
         "agentConfig/editorSave": "personal/1",
         "agents/answerSandbox": "agents/1",
@@ -198,6 +201,7 @@ public enum Capability {
         "agents/list": "agents/1",
         "agents/move": "agents/1",
         "agents/moveIn": "sessions.move/1",
+        "agents/moveToMachine": "sessions.move/1",
         "agents/options": "agents/1",
         "agents/prewarm": "agents/1",
         "agents/prompt": "agents/1",
@@ -252,6 +256,10 @@ public enum Capability {
         "clientPermissions/set": "client-permissions/1",
         "clientPermissions/state": "client-permissions/1",
         "connection/bindDevice": "connection/1",
+        "connections/bot": "connections.bot/1",
+        "connections/bot/complete": "connections.bot/1",
+        "connections/bot/remove": "connections.bot/1",
+        "connections/bot/start": "connections.bot/1",
         "connections/disconnect": "connections/1",
         "connections/list": "connections/1",
         "connections/sign-in": "connections/1",
@@ -377,8 +385,8 @@ public enum Capability {
         "mcp/sign-in/wait": "mcp/1",
         "mcp/sign-out": "mcp/1",
         "mcp/verify": "mcp/1",
-        "milestones/state": "milestones/1",
         "modes/remembered": "modes/1",
+        "multiplier/state": "multiplier/1",
         "options/remembered": "options/1",
         "permissions/answer": "permissions/1",
         "permissions/pending": "permissions/1",
@@ -525,6 +533,7 @@ public enum Capability {
         "worktrees/list": "worktrees/1",
         "worktrees/remove": "worktrees/1",
         "worktrees/removeBuildOutput": "worktrees/1",
+        "achievements/changed": "achievements/1",
         "agent/changed": "agent/1",
         "agent/elicitation": "agent/1",
         "agent/entry": "agent/1",
@@ -552,8 +561,8 @@ public enum Capability {
         "folder/removed": "folder/1",
         "mcp/healthChanged": "mcp/1",
         "mcp/hostedChanged": "mcp/1",
-        "milestones/changed": "milestones/1",
         "modes/changed": "modes/1",
+        "multiplier/changed": "multiplier/1",
         "pages/changed": "pages/1",
         "person/changed": "person/1",
         "pins/changed": "pins/1",
@@ -687,6 +696,7 @@ public enum Capability {
         "machines/summaryFacts": "summary.machines/1",
         "machines/unlink": "machines/1",
         "machines/update": "machines/1",
+        "multiplier/count": "multiplier/1",
         "notices/take": "notices/1",
         "orgRoutes/check": "org-routes/2",
         "orgRoutes/list": "org-routes/2",

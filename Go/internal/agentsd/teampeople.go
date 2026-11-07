@@ -15,13 +15,13 @@ import (
 // The control plane's people, in a feeding tool's _meta (#2951, specs/2453-team-lists.md
 // part 4): callFromView and readViewCount give show_pull_requests, show_issues and
 // show_merge_requests the control plane's people and bots, with their GitHub, GitLab,
-// Linear and Jira logins and which is the viewer's own, so a row can be named as the control
-// plane knows the person, Team can be told from Others, and the viewer's own rows can say an
-// agent is on it. The github, gitlab, linear and jira servers read it off the call; they make
-// no control-plane call of their own.
+// Linear, Jira and Forgejo (#3836) logins and which is the viewer's own, so a row can be
+// named as the control plane knows the person, Team can be told from Others, and the
+// viewer's own rows can say an agent is on it. The github, gitlab, linear, jira and forgejo
+// servers read it off the call; they make no control-plane call of their own.
 
-// teamFeedingTools are the github, gitlab, linear and jira servers' feeding tools that take the
-// control plane's people in their call's _meta (#2951).
+// teamFeedingTools are the github, gitlab, linear, jira and forgejo servers' feeding tools that
+// take the control plane's people in their call's _meta (#2951).
 var teamFeedingTools = map[string]bool{"show_pull_requests": true, "show_issues": true, "show_merge_requests": true}
 
 // teamMeta is the feeding tool's _meta: nil with no control plane, or it could not say.
@@ -125,6 +125,7 @@ func (d *Daemon) teamPeople(ctx context.Context, ask *askControl) []map[string]a
 	for _, p := range list.People {
 		you := p.You != nil && *p.You
 		github, gitlab, linear, jira := optstr(p.GithubLogin), optstr(p.GitlabLogin), optstr(p.LinearLogin), optstr(p.JiraLogin)
+		forgejo := optstr(p.ForgejoLogin)
 		if you && conns != nil {
 			if github == "" {
 				github = connectionLogin(conns, connections.GitHub)
@@ -137,6 +138,9 @@ func (d *Daemon) teamPeople(ctx context.Context, ask *askControl) []map[string]a
 			}
 			if jira == "" {
 				jira = connectionLogin(conns, atlassianConnection)
+			}
+			if forgejo == "" {
+				forgejo = connectionLogin(conns, connections.Forgejo)
 			}
 		}
 		row := map[string]any{"name": p.Name}
@@ -154,6 +158,9 @@ func (d *Daemon) teamPeople(ctx context.Context, ask *askControl) []map[string]a
 		}
 		if jira != "" {
 			row["jira"] = jira
+		}
+		if forgejo != "" {
+			row["forgejo"] = forgejo
 		}
 		if you {
 			row["you"] = true
@@ -182,7 +189,8 @@ func connectionLogin(s connections.Store, provider string) string {
 // agentOnIt is "An agent is on it" (#2951), from one pass over this machine's own
 // sessions (#3108); an archived session is not on it any more.
 //   - prs and issues: this folder's repo's own sessions labelled #n or P#n, by number,
-//     never another person's machines (this daemon's own Store is this machine's own).
+//     never another person's machines (this daemon's own Store is this machine's own). The
+//     repo is folderRepo's: on GitHub, GitLab or Forgejo (#3882).
 //   - linear: sessions labelled a Linear or Jira key (ENG-4) or an Azure Boards work item
 //     (AB#12, #3826), by label, in whichever folder they are in: a tracker's issue is not
 //     one folder's own.

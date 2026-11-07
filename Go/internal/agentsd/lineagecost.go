@@ -54,6 +54,8 @@ type costLedgerBook struct {
 	workLedger *costLedgerFile
 	workSave   *time.Timer
 	workClosed bool
+	// multiplierMerges is the merges the Multiplier counts (#3903), nil until first asked.
+	multiplierMerges map[wire.LineageNode]lineage.Merge
 }
 
 func costKey(n wire.LineageNode) string { return n.Kind + "\t" + n.Ref }
@@ -199,6 +201,10 @@ func (d *Daemon) notePROutcome(pr wire.LineageNode, event, title string) {
 		}
 	})
 	d.costChangedLocked()
+	// The Multiplier, live on the window (#3903): a merge or a merged revert the agents worked on.
+	if event != "checks.failed" && d.noteMergeLocked(d.costLedgerLocked().Nodes[costKey(pr)]) && event == "pr.merged" {
+		d.multiplierChanged(pr)
+	}
 }
 
 // refreshCostLinksLocked sets each node's fixes, partOf and sessions from the graph, and its
@@ -586,6 +592,9 @@ func forgeLabelNames(labels []wire.ForgeLabel) []string {
 func (d *Daemon) registerLineageCost() {
 	On(d, wire.CallLineageCost, func(_ context.Context, _ *Client, r wire.LineageNodeRequest) (wire.LineageCostRollup, error) {
 		return d.lineageCost(r.Node), nil
+	})
+	On(d, wire.CallMultiplierState, func(ctx context.Context, _ *Client, _ wire.Empty) (wire.Multiplier, error) {
+		return d.multiplierState(ctx), nil
 	})
 	On(d, wire.CallLineageEstimate, func(ctx context.Context, _ *Client, r wire.LineageEstimateRequest) (wire.LineageEstimate, error) {
 		return d.lineageEstimate(ctx, r)

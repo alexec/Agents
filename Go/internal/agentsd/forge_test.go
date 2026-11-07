@@ -28,6 +28,8 @@ type fakeForgeGitHub struct {
 	wrote []string
 	// epics are what a list of the label epic gives, and plan what Plan gives (#3267).
 	epics []githubmcp.Item
+	// open, when set, is what a list of the open issues with no label gives (#3741).
+	open  []githubmcp.Item
 	plan  githubmcp.Plan
 	plans int
 	// reviews are what a list of the label needs-approval gives (#3330).
@@ -45,6 +47,9 @@ func (f *fakeForgeGitHub) Search(_ context.Context, repos []string, sf githubmcp
 	f.searches = append(f.searches, strings.Join(repos, ",")+" "+githubmcp.SearchQuery(repos, sf)+" after="+after)
 	if sf.Label == "epic" {
 		return githubmcp.SearchPage{Items: f.epics}, nil
+	}
+	if f.open != nil && sf.Label == "" && sf.State == "open" && !sf.PRs {
+		return githubmcp.SearchPage{Items: f.open}, nil
 	}
 	if sf.Label == "needs-approval" {
 		return githubmcp.SearchPage{Items: f.reviews}, nil

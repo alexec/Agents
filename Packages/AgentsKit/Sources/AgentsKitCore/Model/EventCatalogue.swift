@@ -9,6 +9,8 @@ public enum EventSubject: String, Codable, Hashable, Sendable, CaseIterable {
     case branch
     /// A file arriving in a folder's drop box, `.agents/dropbox/` (#231).
     case dropbox
+    /// A file a wait or a trigger watches coming or going in a folder (#3795).
+    case file
     case lease
     case mac
     /// The machine the host runs on, whatever it is: a Mac or a Linux server (#372).
@@ -30,7 +32,7 @@ public enum EventSubject: String, Codable, Hashable, Sendable, CaseIterable {
         case .agent, .folder: return "●"
         case .workflow: return "⟳"
         case .branch: return "⎇"
-        case .dropbox: return "⇣"
+        case .dropbox, .file: return "⇣"
         case .mac, .machine, .person, .lease, .cost, .server, .system: return "⌘"
         }
     }
@@ -41,7 +43,7 @@ public enum EventSubject: String, Codable, Hashable, Sendable, CaseIterable {
         case .agent, .folder: return .agents
         case .workflow: return .workflows
         case .branch: return .branches
-        case .dropbox: return .dropbox
+        case .dropbox, .file: return .dropbox
         case .mac, .machine, .person, .lease, .cost, .server, .system: return .mac
         }
     }
@@ -177,6 +179,11 @@ public enum EventCatalogue {
                   "A branch an agent works on moved; never the default branch."),
         EventKind("dropbox.file_added", .folder, shown("path", "name", "folder", "extension", "size"),
                   "A file arrived in this folder's drop box, .agents/dropbox/, or a folder in it."),
+        // Narrowed by paths, which every wait and trigger on them names (#3795).
+        EventKind("file.added", .folder, [EventDetail("paths", isFilter: true)] + shown("count"),
+                  "Files a wait or a trigger watches appeared in this folder: made, copied, pulled or moved in. One event for every file that came at once."),
+        EventKind("file.removed", .folder, [EventDetail("paths", isFilter: true)] + shown("count"),
+                  "Files a wait or a trigger watches went from this folder: deleted or moved away. One event for every file that went at once."),
         // Narrowed by agent and resource: a place in a lease's line is a wait on its own
         // grant (#2361).
         EventKind("lease.granted", .mac, [EventDetail("resource", isFilter: true), EventDetail("agent", isFilter: true)],

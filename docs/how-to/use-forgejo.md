@@ -109,8 +109,13 @@ pull requests on Forgejo".
   number as the label and a new worktree. Nothing starts until you press Start.
 
 Each list is in sections: **Needs you** (asked to review it, assigned to you, or your own pull
-request with failed checks, a conflict or changes requested), **Yours**, **Team** (the
-repository's collaborators with write access or more, and bots) and **Others**.
+request with failed checks, a conflict or changes requested), **Yours**, **Team** and
+**Others**. With a control plane, **Team** is its people and bots, by their Forgejo login
+(see [Your Forgejo login](#your-forgejo-login)), and a row shows the name the control plane
+knows them by. With no control plane, **Team** is the repository's collaborators with write
+access or more, and bots. Your own rows say **An agent is on it** when a session on this
+machine, in a folder that pushes to the same repository, is labelled with its number (`#7`
+for an issue, `P#8` for a pull request).
 
 A folder's own repository is on the Work pages, so its sidebar has no row for these lists. A
 project whose Tasks or Code review slot names another Forgejo repository gets a row for that
@@ -143,6 +148,15 @@ Under the tabs is a box for your words, and these buttons. Each one acts on Forg
 Agents can't merge or approve from this page. Those tools are for a person only. They carry
 the commit that the page shows. When the pull request has a newer commit, nothing happens:
 open the page again.
+
+### Your Forgejo login
+
+With a control plane, **Settings ▸ Account** on the Mac (**Settings ▸ Control plane** on the
+web page) keeps your **Forgejo login**, your user name on the connected Forgejo, beside your
+GitHub, GitLab, Linear and Jira logins. The control plane gives the logins of all its people
+to the servers that draw a Team section. A Forgejo login is your user name on the connected
+Forgejo. A machine that has Forgejo connected fills in your
+login from the connection, so you give it only when that machine is not connected.
 
 ### An epic's plan and features
 
@@ -229,6 +243,14 @@ never a bot. A pull request from a fork never counts.
   `prCostComment` says so). Forgejo has no parent issues, so an issue has none. An issue's
   address on the connected Forgejo is read in a filed issue's output. A doc's address is
   `/src/HEAD/<path>`, which Forgejo sends on to the default branch.
+- **The forgejo server's pages have a Lineage section (#3850).** An issue's row and a pull
+  request's Lineage tab name the sessions that worked on it, its pull requests or issues, and
+  what they cost, as on GitHub and GitLab, also for a Forgejo whose host's name does not say
+  Forgejo.
+- **An issue filed with `tea` or `fj` is linked (#3850).** A session that runs
+  `tea issues create` (Gitea's CLI) or `fj issue create` (Forgejo's) opens the issue it
+  made. `tea` prints the issue's address. `fj` prints only `created issue #12`, so the issue
+  is on the repository its `--repo` names, or else on the folder's Forgejo repository.
 - **The Board filter has no Forgejo board.** Forgejo has project boards, but its API (11)
   cannot read them, so a list narrowed to a board lists no Forgejo items.
 

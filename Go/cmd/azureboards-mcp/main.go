@@ -2,9 +2,9 @@
 // (Go/cmd/jira-mcp): polled events of an Azure DevOps project's work items (issue.opened,
 // issue.labelled, issue.commented, issue.closed, issue.assigned), and tools that read them and
 // comment, over Azure DevOps's REST API, for the tracker slot. For dev.azure.com and an Azure
-// DevOps Server alike. As the person whose personal access token is in AZURE_DEVOPS_TOKEN,
-// the azuredevops server's, which `.agents/mcp.json` names as ${AZURE_DEVOPS_TOKEN} so its
-// value stays in ~/.agents-secrets/secrets.env. Pull requests and builds are the azuredevops
+// DevOps Server alike. As the person who connected Azure DevOps (#3802), or whose personal
+// access token is in AZURE_DEVOPS_TOKEN, the azuredevops server's, which `.agents/mcp.json`
+// names as ${AZURE_DEVOPS_TOKEN} so its value stays in ~/.agents-secrets/secrets.env. Pull requests and builds are the azuredevops
 // server's.
 //
 //	azureboards-mcp                      serve on stdio
@@ -12,7 +12,7 @@
 //	azureboards-mcp --version
 //
 //	AZURE_DEVOPS_TOKEN                   a personal access token with Work Items (read and write)
-//	AZURE_DEVOPS_URL                     as --url: an Azure DevOps Server's collections (https://dev.azure.com when empty), a fake in tests
+//	AZURE_DEVOPS_URL                     as --url: an Azure DevOps Server's collections (the connection's, else https://dev.azure.com, when empty), a fake in tests
 //	AZURE_BOARDS_PROJECT                 as --project: organization/project; the folder's Azure Repos remote's when empty
 package main
 
@@ -23,7 +23,6 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	"github.com/alexec/agents/Go/internal/azureboardsmcp"
@@ -44,8 +43,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	root := azuredevopsmcp.BaseURL(*base)
-	token := func() string { return strings.TrimSpace(os.Getenv("AZURE_DEVOPS_TOKEN")) }
+	root, token := azuredevopsmcp.Connected(*base)
 	boards := azureboardsmcp.NewRealBoards(root, token, azureboardsmcp.ProjectOf(root, *project))
 	front := &azureboardsmcp.Front{
 		Events:   &azureboardsmcp.Events{Boards: boards, SignedIn: func() bool { return token() != "" }},

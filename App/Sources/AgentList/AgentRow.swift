@@ -53,6 +53,7 @@ struct AgentRow: View {
             .task(id: LeadProgress.turn(agent)) {
                 await model.loadLeadProgress(agent)
             }
+            .sheet(isPresented: $movingToMachine) { MoveToMachineSheet(agent: agent).paperSheet() }
             .confirmationDialog(DeletionWords.confirmTitle(agent.title), isPresented: $deleting) {
                 Button("Delete", role: .destructive) {
                     Task {
@@ -370,6 +371,11 @@ struct AgentRow: View {
                 PinSessionButton(agent: agent)
                 // Branching leaves the original alone and carries the history so far.
                 Button("Branch") { Task { await model.fork(agent.id) } }
+                // To another of the person's machines, with its unpushed work (#3790).
+                if model.moveTargets(for: agent) != nil {
+                    Button("Move to Machine…") { movingToMachine = true }
+                        .disabled(isActing)
+                }
                 Button("Archive") { Task { await model.archive(agent.id, andLeave: true) } }
                     .disabled(isActing)
                 // Deny an agent's ask to be archived (#773): the session stays.
@@ -410,6 +416,7 @@ struct AgentRow: View {
     private var isActing: Bool { model.acting(agent.id) != nil }
 
     @State private var deleting = false
+    @State private var movingToMachine = false
     @State private var cannotDelete: String?
     /// Whether the daemon is bringing this chat back by itself after a restart.
     private var isComingBack: Bool { model.isComingBack(agent) }

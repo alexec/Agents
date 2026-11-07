@@ -116,7 +116,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// A forge a list could not read (not connected, a rate limit): github, gitlab, forgejo, linear, jira or azureboards.
+    /// A forge a list could not read (not connected, a rate limit): github, gitlab, forgejo, bitbucket, azuredevops, linear, jira or azureboards.
     struct ForgeListError: Codable, Sendable, Hashable {
         public var forge: String
         public var message: String
@@ -547,18 +547,21 @@ public extension DaemonAPI {
         public init(boards: [ProjectBoard] = []) { self.boards = boards }
     }
 
-    /// A feature: its label's name after `feature:`, with its colour; its epics, and the open ones.
+    /// A feature: its label's name after `feature:`, with its colour; its epics, and the open ones;
+    /// its open issues that are not epics (#3741), absent from a daemon that does not count them.
     struct ForgeFeature: Codable, Sendable, Hashable {
         public var name: String
         public var color: String?
         public var epics: Int
         public var open: Int
+        public var issues: Int?
 
-        public init(name: String, color: String? = nil, epics: Int, open: Int) {
+        public init(name: String, color: String? = nil, epics: Int, open: Int, issues: Int? = nil) {
             self.name = name
             self.color = color
             self.epics = epics
             self.open = open
+            self.issues = issues
         }
     }
 

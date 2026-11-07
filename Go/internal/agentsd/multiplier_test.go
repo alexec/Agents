@@ -1,0 +1,91 @@
+package agentsd
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"strconv"
+	"strings"
+	"testing"
+
+	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/alexec/agents/Go/wire"
+)
+
+// #3903: a PR an agent opened that merges is told to the window with the new figure and the
+// PR; one no agent worked on, and a closed one, count nothing; a merged revert takes one away.
+// With no control plane the figure is this machine's; with one, the control plane's.
+func TestMultiplierFollowsTheMerges(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	folder := t.TempDir()
+	d.repos = map[string]forgeRepo{folder: {"github", "alexec/agents"}}
+	branch := "agents/7-fix"
+	a := seeded(t, d, folder, func(a *wire.Agent) {
+		a.Worktree = &wire.AgentWorktree{Name: "7-fix", Branch: &branch, Folder: store.FolderURL(folder)}
+	})
+	d.noteLineage(nil, a)
+	event := func(name string, n int, branch, title string) wire.Event {
+		return wire.Event{Name: name, Details: map[string]string{"payload": `{"pr":{"number":` + strconv.Itoa(n) +
+			`,"branch":"` + branch + `","title":"` + title + `","url":"https://github.com/alexec/Agents/pull/` + strconv.Itoa(n) + `"}}`}}
+	}
+	state := func(id int) wire.Multiplier {
+		t.Helper()
+		var m wire.Multiplier
+		if err := json.Unmarshal(c.call(t, id, "multiplier/state", map[string]any{}), &m); err != nil {
+			t.Fatal(err)
+		}
+		return m
+	}
+	if m := state(1); m.PrsMerged != 0 || m.Multiplier != nil || m.Baseline.Source != "DX 2025" {
+		t.Fatalf("nothing merged: %+v", m)
+	}
+
+	// A person's own PR, merged: no agent worked on it.
+	d.lineageEvent(event("pr.opened", 3, "fix-by-hand", "By hand"))
+	d.lineageEvent(event("pr.merged", 3, "fix-by-hand", "By hand"))
+	d.lineageEvent(event("pr.opened", 9, branch, "Fix it"))
+	d.lineageEvent(event("pr.merged", 9, branch, "Fix it"))
+	c.until(t, "the merge told", func(m string, p json.RawMessage) bool {
+		return m == "multiplier/changed" && strings.Contains(string(p), `"github:alexec/agents#9"`) &&
+			strings.Contains(string(p), `"prsMerged":1`)
+	})
+	if m := state(2); m.PrsMerged != 1 || m.Multiplier == nil || *m.Multiplier != 0.7 || *m.EngineerHours != 29 {
+		t.Fatalf("one merged: %+v", m)
+	}
+
+	// A revert the agent opened, merged: none counted, and never below 0.
+	revert := "agents/revert-9"
+	b := seeded(t, d, folder, func(a *wire.Agent) {
+		a.Worktree = &wire.AgentWorktree{Name: "revert-9", Branch: &revert, Folder: store.FolderURL(folder)}
+	})
+	d.noteLineage(nil, b)
+	d.lineageEvent(event("pr.opened", 10, revert, "Revert \\\"Fix it\\\""))
+	d.lineageEvent(event("pr.merged", 10, revert, "Revert \\\"Fix it\\\""))
+	c.until(t, "the revert told", func(m string, p json.RawMessage) bool {
+		return m == "multiplier/changed" && strings.Contains(string(p), `"github:alexec/agents#10"`) &&
+			strings.Contains(string(p), `"reverts":1`)
+	})
+	if m := state(3); m.PrsMerged != 0 || m.Reverts != 1 || m.Multiplier != nil {
+		t.Fatalf("one revert: %+v", m)
+	}
+
+	// With a control plane: its count of the person's machines, this machine's agents.
+	d.SetControlAsk(askControl(func(_ context.Context, method string, _ any) (json.RawMessage, error) {
+		if method == wire.CallMultiplierCount.Name {
+			return json.RawMessage(`{"prsMerged":7,"reverts":0,"multiplier":5,"engineerHours":200,"agentsWorking":0,"since":0,` +
+				`"baseline":{"prsPerWeek":1.4,"hoursPerWeek":40,"source":"DX 2025"}}`), nil
+		}
+		return json.RawMessage(`{}`), nil
+	}))
+	if m := state(4); m.PrsMerged != 7 || *m.Multiplier != 5 {
+		t.Fatalf("the control plane's: %+v", m)
+	}
+	// One that cannot answer: this machine's own.
+	d.SetControlAsk(askControl(func(context.Context, string, any) (json.RawMessage, error) {
+		return nil, errors.New("offline")
+	}))
+	if m := state(5); m.PrsMerged != 0 || m.Reverts != 1 {
+		t.Fatalf("offline: %+v", m)
+	}
+}

@@ -88,6 +88,7 @@ test("projects: a board's forge in words, after its name", () => {
   assert.equal(p.boardForge({ name: "A", url: "u", forge: "github" }), "GitHub Projects");
   assert.equal(p.boardForge({ name: "A", url: "u", forge: "atlassian" }), "Jira");
   assert.equal(p.boardForge({ name: "A", url: "u", forge: "linear" }), "Linear team");
+  assert.equal(p.boardForge({ name: "A", url: "u", forge: "azuredevops" }), "Azure Boards");
   assert.equal(p.boardForge({ name: "A", url: "u" }), "");
 });
 

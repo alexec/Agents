@@ -17,6 +17,7 @@ import { NewAgent } from "./NewAgent";
 import { NewFolderDialog } from "./NewFolder";
 import { DropboxDialog } from "./DropboxDialog";
 import { ReportProblemDialog } from "./ReportProblemDialog";
+import { MoveToMachineDialog } from "./MoveToMachineDialog";
 import { GitLendDialog } from "./GitLend";
 import { ExportImportDialog } from "./ExportImport";
 import { Problem } from "./Errors";
@@ -28,7 +29,7 @@ import { MCPServersPage } from "./MCPServers";
 import { ReviewPage } from "./Review";
 import { projectNameOf, Sidebar } from "./Sidebar";
 import { ContextMenu } from "./ContextMenu";
-import { MilestoneCard } from "./MilestoneCard";
+import { AchievementCard } from "./AchievementCard";
 import { NavBar, PageView, SectionPage } from "./Nav";
 import { Overview } from "./Overview";
 import { navPages } from "../model/nav";
@@ -109,10 +110,11 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
       <NewFolderDialog store={store} />
       <DropboxDialog store={store} />
       <ReportProblemDialog store={store} />
+      <MoveToMachineDialog store={store} />
       <GitLendDialog store={store} />
       <ExportImportDialog store={store} />
       <ContextMenu />
-      <MilestoneCard store={store} />
+      <AchievementCard store={store} />
     </div>
   );
 }

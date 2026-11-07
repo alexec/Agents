@@ -460,6 +460,9 @@ type issueJSON struct {
 	Component *struct {
 		Name string `json:"name"`
 	} `json:"component"`
+	Milestone *struct {
+		Name string `json:"name"`
+	} `json:"milestone"`
 	CreatedOn string `json:"created_on"`
 	UpdatedOn string `json:"updated_on"`
 	Links     links  `json:"links"`

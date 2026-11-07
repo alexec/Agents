@@ -40,6 +40,26 @@ func codeOwnerOf(ctx context.Context) *string {
 	return nil
 }
 
+// codeWorkspaceKey carries, through a context, the workspace a host code is made for.
+type codeWorkspaceKey struct{}
+
+// withInstallWorkspace says which workspace a host code made under ctx is for: the one
+// machines/install names (Add as Machine…, #3871), if any.
+func withInstallWorkspace(ctx context.Context, request wire.MachineInstall) context.Context {
+	if request.Provider == nil || request.Workspace == nil || *request.Provider == "" || *request.Workspace == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, codeWorkspaceKey{}, codeWorkspace{Provider: string(*request.Provider),
+		Workspace: *request.Workspace, Trust: deref(request.Trust)})
+}
+
+func codeWorkspaceOf(ctx context.Context) *codeWorkspace {
+	if w, ok := ctx.Value(codeWorkspaceKey{}).(codeWorkspace); ok {
+		return &w
+	}
+	return nil
+}
+
 // localOwner is the first person: control.json's owner, or "local" before it has one.
 func (s *Service) localOwner() string {
 	if settings := s.records.Settings(); settings != nil && settings.Owner != nil && *settings.Owner != "" {
@@ -228,6 +248,9 @@ func (m *Methods) peopleMethod(ctx context.Context, method string, params json.R
 			if request.Jira != nil {
 				p.JiraLogin = *request.Jira
 			}
+			if request.Forgejo != nil {
+				p.ForgejoLogin = *request.Forgejo
+			}
 			return []records.Person{p}, nil
 		})
 		if err != nil {
@@ -364,7 +387,7 @@ func (m *Methods) peopleForViews(user string) wire.PeopleForViews {
 	for _, p := range people {
 		row := wire.TeamPerson{ID: p.ID, Name: p.Name, Kind: kindOf(p),
 			GithubLogin: optional(p.GitHubLogin), GitlabLogin: optional(p.GitLabLogin), LinearLogin: optional(p.LinearLogin),
-			JiraLogin: optional(p.JiraLogin)}
+			JiraLogin: optional(p.JiraLogin), ForgejoLogin: optional(p.ForgejoLogin)}
 		if p.ID == m.s.localOwner() && (row.Name == "" || (m.records.Settings() != nil && row.Name == m.records.Settings().Name)) {
 			row.Name = localOwnerName
 		}

@@ -1,13 +1,13 @@
 ---
 diataxis: reference
 devices: [mac, iphone, ipad, web]
-description: Every step of the Get started card and every milestone, when each is ticked, where each shows, and how to hide it.
+description: Every step of the Get started card and every achievement, when each is ticked, where each shows, and how to hide it.
 ---
 
 # The Get started checklist
 
 Agents has two checklists for a newcomer. The **Get started** card, on the Mac only,
-takes you from a fresh install to your first agent. The **Milestones** list, on every
+takes you from a fresh install to your first agent. The **Achievements** list, on every
 client, names the next main things to try. Both tick each item from what is really so,
 never from a box you tick yourself. Thus a tick always means the step is done.
 
@@ -44,15 +44,15 @@ does not come back. The **Install your agents** sheet then does not open by itse
 until the next launch.
 
 The iPhone, iPad and web page have no Get started card. Their checklist is the
-**Milestones** list.
+**Achievements** list.
 
-## Milestones
+## Achievements
 
-A milestone is a first step in Agents. The host awards it the first time you do it, and
+An achievement is a first step in Agents. The host awards it the first time you do it, and
 keeps it with its date in `achievements.json`. Every client reads the same file, so they
-all show the same list. The milestones you have not earned yet are the checklist.
+all show the same list. The achievements you have not earned yet are the checklist.
 
-| Milestone | How to earn it |
+| Achievement | How to earn it |
 | --- | --- |
 | **First agent started** | Start an agent and let it run a turn. |
 | **First phone or browser paired** | Pair a phone or a browser with **Pair a Device…**. |
@@ -62,9 +62,9 @@ all show the same list. The milestones you have not earned yet are the checklist
 | **First pull request landed with nobody watching** | Let an agent open a pull request that merges by itself. |
 | **Five agents working at once** | Have five agents in a turn at the same time. |
 
-### When a milestone is ticked
+### When an achievement is ticked
 
-The host ticks a milestone from the records it already keeps. On its first run it looks
+The host ticks an achievement from the records it already keeps. On its first run it looks
 back, so steps you took before are ticked with their own date.
 
 - **First agent started**: the first agent that has run a turn to its end.
@@ -84,15 +84,15 @@ list with how to earn them.
 
 | Client | Where |
 | --- | --- |
-| Mac | The **Milestones** row in the **Usage** group of the sidebar, or **View ▸ Milestones**. |
-| iPhone and iPad | The **Milestones** row in the **Usage** group of the sidebar. |
-| Web page | The **Milestones** row in the **Usage** group of the sidebar. |
+| Mac | The **Achievements** row in the **Usage** group of the sidebar, or **View ▸ Achievements**. |
+| iPhone and iPad | The **Achievements** row in the **Usage** group of the sidebar. |
+| Web page | The **Achievements** row in the **Usage** group of the sidebar. |
 
-The page has the heading **Milestones** and a count such as **3 of 7**. Earned milestones
+The page has the heading **Achievements** and a count such as **3 of 7**. Earned achievements
 come first, earliest first, each with its date. The rest follow, greyed, each with its
 line on how to earn it.
 
-The **Milestones** row shows only while a milestone is still to earn, as an empty smart
+The **Achievements** row shows only while an achievement is still to earn, as an empty smart
 group hides. When you have earned all seven, the row goes and the list moves under the
 charts on the **Time** page. See [See usage, cost and time](../how-to/see-usage-cost-and-time.md).
 
@@ -100,19 +100,19 @@ charts on the **Time** page. See [See usage, cost and time](../how-to/see-usage-
 
 | Client | What you see |
 | --- | --- |
-| Mac | A small card near the top of the sidebar: **Milestone**, its title, and **See Milestones**. |
+| Mac | A small card near the top of the sidebar: **Achievement**, its title, and **See Achievements**. |
 | iPad | The same card at the bottom right of the screen. |
 | Web page | The same card at the bottom right of the page. |
-| iPhone | No card. The milestone has a **New** mark on the **Milestones** page until you leave the page. |
+| iPhone | No card. The achievement has a **New** mark on the **Achievements** page until you leave the page. |
 
-**See Milestones** opens the page. Each card shows once: it goes when you close it or open
-it. Agents never sends a notification for a milestone. On the first look from a device or
-a browser, the milestones earned before are not news, so they show no card.
+**See Achievements** opens the page. Each card shows once: it goes when you close it or open
+it. Agents never sends a notification for an achievement. On the first look from a device or
+a browser, the achievements earned before are not news, so they show no card.
 
 ### Hide it
 
-Click or tap **×** on a card (**Dismiss milestone**) to close it. The list itself has no
-switch to hide it. Its sidebar row goes by itself when you have earned every milestone.
+Click or tap **×** on a card (**Dismiss achievement**) to close it. The list itself has no
+switch to hide it. Its sidebar row goes by itself when you have earned every achievement.
 
 ## See also
 

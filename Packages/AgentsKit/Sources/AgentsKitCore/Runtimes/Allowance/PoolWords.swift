@@ -63,25 +63,29 @@ public enum PoolWords {
     /// reset since, when it would say nothing true about the new one.
     public static func reading(_ reading: AllowanceReading?, now: Date) -> String? {
         guard let reading, reading.isCurrent(now: now) else { return nil }
-        let amount: String? = if let left = reading.left {
-            left <= 0 ? "None left" : "\(Int((left * 100).rounded()))% left"
-        } else if reading.nearlySpent {
-            "Nearly used up"
-        } else {
-            nil
-        }
-        let window = windowName(reading.window)
-        var parts: [String] = []
-        switch (amount, window) {
-        case (let amount?, let window?): parts.append("\(amount) \(window)")
-        case (let amount?, nil): parts.append(amount)
-        case (nil, let window?): parts.append(window.prefix(1).uppercased() + window.dropFirst())
-        case (nil, nil): break
-        }
+        let first = amount(reading, now: now)
+            ?? windowName(reading.window).map { $0.prefix(1).uppercased() + $0.dropFirst() }
+        var parts = first.map { [$0] } ?? []
         if let resetsAt = reading.resetsAt { parts.append("resets \(time(resetsAt, now: now))") }
         guard !parts.isEmpty else { return nil }
         parts.append("as of \(time(reading.at, now: now))")
         return parts.joined(separator: " · ")
+    }
+
+    /// How much is left, with no times: "28% left this week". Nil when the reading has no
+    /// amount. The short row on Your setup (#3744) says this after its state; the times are
+    /// under its Details.
+    public static func amount(_ reading: AllowanceReading?, now: Date) -> String? {
+        guard let reading, reading.isCurrent(now: now) else { return nil }
+        let amount: String
+        if let left = reading.left {
+            amount = left <= 0 ? "None left" : "\(Int((left * 100).rounded()))% left"
+        } else if reading.nearlySpent {
+            amount = "Nearly used up"
+        } else {
+            return nil
+        }
+        return windowName(reading.window).map { "\(amount) \($0)" } ?? amount
     }
 
     /// "this week", "of the 5-hour window": a window's name as it follows an amount.

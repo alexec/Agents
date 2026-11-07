@@ -29,7 +29,7 @@ public enum ConnectorSetupWords {
 
     /// The page's line under its title.
     public static func intro(folder: String, repository: String?, site: String = "github.com") -> String {
-        guard let repository else { return "What agents in \(folder) can reach. It has no GitHub, GitLab, Forgejo or Bitbucket remote." }
+        guard let repository else { return "What agents in \(folder) can reach. It has no GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps remote." }
         return "What agents in \(folder) can reach. Repository \(site)/\(repository), from its git remote."
     }
 
@@ -38,7 +38,7 @@ public enum ConnectorSetupWords {
         c.state == .signInAgain ? "\(name(c.provider)) asks you to sign in again" : "Connected to \(name(c.provider)) as \(c.login ?? "you")"
     }
 
-    // MARK: The forge (#1632, #3752, #3785): GitHub, GitLab, Forgejo or Bitbucket fills Tasks, Code review and CI
+    // MARK: The forge (#1632, #3752, #3785, #3802): GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps fills Tasks, Code review and CI
 
     /// The card's title before the forge is connected.
     public static func connectTitle(_ forge: DaemonAPI.ConnectionProvider) -> String {
@@ -46,13 +46,14 @@ public enum ConnectorSetupWords {
         case .gitlab: "Connect GitLab once: issues, merge requests and pipelines."
         case .forgejo: Forgejo.connectTitle
         case .bitbucket: Bitbucket.connectTitle
+        case .azuredevops: AzureDevOps.connectTitle
         default: connectTitle
         }
     }
 
     public static func connectNote(_ forge: DaemonAPI.ConnectionProvider) -> String {
         switch forge {
-        case .gitlab, .forgejo, .bitbucket: "Your connection, for every folder. It reaches what your \(name(forge)) account can see."
+        case .gitlab, .forgejo, .bitbucket, .azuredevops: "Your connection, for every folder. It reaches what your \(name(forge)) account can see."
         default: connectNote
         }
     }
@@ -72,10 +73,16 @@ public enum ConnectorSetupWords {
     }
 
     /// A slot's state in a word, for no remote.
-    public static let noRemote = "No GitHub, GitLab, Forgejo or Bitbucket remote"
+    public static let noRemote = "No GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps remote"
 
-    /// The button on a refused slot: GitHub's App is granted on github.com; on GitLab, Forgejo
-    /// and Bitbucket the person asks for access to the repository there.
+    /// The card in place of Connect when the folder's forge is one this client does not know
+    /// (a newer host's, #3802): the set-up is the host's, but this app can't connect it.
+    public static func unknownForge(_ setup: Setup) -> String {
+        "\(setup.siteOrGitHub) is on a forge this version of Agents can't connect (\(setup.unknownForge ?? "unknown")). Update Agents to set it up here."
+    }
+
+    /// The button on a refused slot: GitHub's App is granted on github.com; on GitLab, Forgejo,
+    /// Bitbucket and Azure DevOps the person asks for access to the repository there.
     public static func grantButton(_ setup: Setup) -> String {
         setup.forgeOrGitHub == .github ? "Grant on github.com" : "Open on \(setup.siteOrGitHub)"
     }
@@ -125,7 +132,7 @@ public enum ConnectorSetupWords {
     public static func line(_ slot: Slot, folder: String, repository: String?,
                             forge: DaemonAPI.ConnectionProvider = .github) -> String {
         let repo = repository ?? folder
-        let gitlab = forge == .gitlab, checks = forge == .forgejo || forge == .bitbucket
+        let gitlab = forge == .gitlab, checks = forge == .forgejo || forge == .bitbucket, azure = forge == .azuredevops
         switch slot.state {
         case .skipped:
             return switch slot.slot {
@@ -138,7 +145,7 @@ public enum ConnectorSetupWords {
             case .workspace: "Agents run on this Mac."
             }
         case .noRemote:
-            return "\(folder) has no GitHub, GitLab, Forgejo or Bitbucket remote, so \(slot.choice) can't be read for it."
+            return "\(folder) has no GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps remote, so \(slot.choice) can't be read for it."
         case .failed, .refused:
             return slot.message ?? "The read didn't work."
         case .notRead:
@@ -149,18 +156,19 @@ public enum ConnectorSetupWords {
             return "Nothing to set up. Other places are set up in Providers."
         case .read:
             return switch slot.slot {
-            case .tasks: "No issues yet in \(repo)."
+            case .tasks: azure ? "No work items yet in \(repo)'s project." : "No issues yet in \(repo)."
             case .codeReview: gitlab ? "No merge requests yet in \(repo)." : "No pull requests yet in \(repo)."
-            case .ci: gitlab ? "No pipelines yet in \(repo)."
+            case .ci: gitlab ? "No pipelines yet in \(repo)." : azure ? "No builds yet in \(repo)."
                 : checks ? "No checks yet on \(repo)'s default branch." : "No workflow runs yet in \(repo)."
             case .docs, .messaging, .workspace: ""
             }
         case .notConnected:
             return switch slot.slot {
-            case .tasks: "Agents read, file and close issues in \(repo). " + comesWith(forge)
+            case .tasks: azure ? "Agents read, file and close work items in \(repo)'s project. " + comesWith(forge)
+                : "Agents read, file and close issues in \(repo). " + comesWith(forge)
             case .codeReview: gitlab ? "Agents read merge requests and answer their comments. " + comesWith(forge)
                 : "Agents open pull requests and answer reviews. " + comesWith(forge)
-            case .ci: gitlab ? "Agents see pipelines pass and fail, and wait on them. " + comesWith(forge)
+            case .ci: gitlab || azure ? "Agents see pipelines pass and fail, and wait on them. " + comesWith(forge)
                 : "Agents see checks pass and fail, and wait on them. " + comesWith(forge)
             case .docs: Docs.none
             case .messaging: Messaging.noneLine(skipped: false)
@@ -313,7 +321,7 @@ public enum ConnectorSetupWords {
 
     // MARK: Connectors ▸ Connections
 
-    public static let noConnections = "No connections yet. Connect GitHub to give agents issues, pull requests and Actions in every folder, Linear or Jira for their issues, GitLab for merge requests, pipelines and issues, Forgejo for pull requests, checks and issues on Codeberg or your own Forgejo or Gitea, Bitbucket for the same on Bitbucket Cloud, and Email for the mail they wait for."
+    public static let noConnections = "No connections yet. Connect GitHub to give agents issues, pull requests and Actions in every folder, Linear or Jira for their issues, GitLab for merge requests, pipelines and issues, Forgejo for pull requests, checks and issues on Codeberg or your own Forgejo or Gitea, Bitbucket for the same on Bitbucket Cloud, Azure DevOps for pull requests, pipelines and work items on dev.azure.com or your own Azure DevOps Server, and Email for the mail they wait for."
 
     /// The provider's name: GitHub, Linear.
     public static func name(_ p: DaemonAPI.ConnectionProvider) -> String {
@@ -325,6 +333,7 @@ public enum ConnectorSetupWords {
         case .atlassian: Jira.provider
         case .forgejo: Forgejo.name
         case .bitbucket: Bitbucket.name
+        case .azuredevops: AzureDevOps.name
         }
     }
 
@@ -343,6 +352,7 @@ public enum ConnectorSetupWords {
         case .atlassian: Jira.letters
         case .forgejo: Forgejo.letters
         case .bitbucket: Bitbucket.letters
+        case .azuredevops: AzureDevOps.letters
         }
     }
 
@@ -358,8 +368,18 @@ public enum ConnectorSetupWords {
                 : "The access token ended: connect again with a new one"
         }
         let how = c.expiresAt.map { "Access token \u{00B7} " + tokenEnds($0, now: now) }
-            ?? (c.provider == .forgejo ? Forgejo.how : c.provider == .bitbucket ? Bitbucket.how : c.byToken == true ? Jira.tokenWay : "OAuth \u{00B7} renews by itself")
+            ?? tokenHow(c.provider) ?? (c.byToken == true ? Jira.tokenWay : "OAuth \u{00B7} renews by itself")
         return [c.workspace, how].compactMap { $0 }.joined(separator: " \u{00B7} ")
+    }
+
+    /// How a token sheet's connection signs in, after its host; nil for the others.
+    private static func tokenHow(_ p: DaemonAPI.ConnectionProvider) -> String? {
+        switch p {
+        case .forgejo: Forgejo.how
+        case .bitbucket: Bitbucket.how
+        case .azuredevops: AzureDevOps.how
+        default: nil
+        }
     }
 
     /// When an access token ends, such as "ends 18 Oct 2027".
@@ -405,6 +425,7 @@ public enum ConnectorSetupWords {
         case .atlassian: Jira.notConnectedNote
         case .forgejo: Forgejo.notConnectedNote
         case .bitbucket: Bitbucket.notConnectedNote
+        case .azuredevops: AzureDevOps.notConnectedNote
         }
     }
 
@@ -419,16 +440,18 @@ public enum ConnectorSetupWords {
         case .atlassian: Jira.disconnectNote
         case .forgejo: Forgejo.disconnectNote
         case .bitbucket: Bitbucket.disconnectNote
+        case .azuredevops: AzureDevOps.disconnectNote
         }
     }
 
     /// Disconnect's message: which folders lose which slots, before it goes, then the note.
     /// Only a folder on that connection's forge loses anything (#1868): GitHub fills a GitHub
-    /// folder's slots, GitLab a GitLab folder's (#1632), Forgejo a Forgejo folder's (#3752) and
-    /// Bitbucket a Bitbucket folder's (#3785); other connections fill none.
+    /// folder's slots, GitLab a GitLab folder's (#1632), Forgejo a Forgejo folder's (#3752),
+    /// Bitbucket a Bitbucket folder's (#3785) and Azure DevOps an Azure DevOps folder's (#3802);
+    /// other connections fill none.
     public static func disconnectMessage(_ p: DaemonAPI.ConnectionProvider,
                                          folders: [(name: String, setup: Setup)]) -> String {
-        guard p == .github || p == .gitlab || p == .forgejo || p == .bitbucket else { return disconnectNote(p) }
+        guard p == .github || p == .gitlab || p == .forgejo || p == .bitbucket || p == .azuredevops else { return disconnectNote(p) }
         let losing = folders.compactMap { folder -> String? in
             guard folder.setup.forgeOrGitHub == p else { return nil }
             let slots = folder.setup.slots.filter { $0.slot.isProjects && $0.state == .read }.map { heading($0.slot) }
@@ -447,6 +470,43 @@ public enum ConnectorSetupWords {
     // MARK: The sheet
 
     /// Connect Linear (#1343, frame H): the same sheet, its own list.
+    /// The person's agents' bot (#3858): a GitHub App of their own, so agents post as
+    /// <login>-agents[bot] and not as the person. The web page's words are the same
+    /// (Web/src/model/connectorSetup.ts, botWords).
+    public enum Bot {
+        public static let title = "Agents' bot"
+        public static let makeButton = "Make My Agents' Bot\u{2026}"
+        public static let sheetTitle = "Make your agents' bot"
+        public static let notMade = "Your agents post as you. A bot of their own posts as <login>-agents[bot], and names you."
+        /// What the bot can do: the manifest's fixed permissions (connections.BotPermissions).
+        public static let abilities = [
+            "Read and write code, on branches and pull requests",
+            "Open and comment on issues and pull requests",
+            "Read checks and statuses, and run workflows again",
+        ]
+        public static let never = "Never: change workflows, secrets, environments, settings or members. Those stay yours."
+        public static let publicToggle = "Organisations can install it"
+        public static let publicHelp = "Turn on to use the bot on an organisation's repositories. The organisation's owner approves the install."
+        public static let keyNote = "GitHub gives the bot's key to this machine only. It never goes to Agents' servers."
+        public static let continueButton = "Continue on github.com"
+        public static let waiting = "Waiting for github.com\u{2026} Choose Create GitHub App there, and Agents comes back by itself."
+        public static let finishing = "Taking the bot's key on this machine\u{2026}"
+        public static let installButton = "Install on Repositories\u{2026}"
+        public static let removeButton = "Forget the Bot\u{2026}"
+        public static let removeTitle = "Forget your agents' bot?"
+        public static let removeMessage = "This machine deletes the bot's key, and agents post as you again. The App stays on GitHub until you delete it there."
+
+        /// The bot's line under the GitHub row: its name, and where it is installed.
+        public static func note(_ bot: DaemonAPI.ConnectionBot) -> String {
+            guard bot.made else { return notMade }
+            let name = bot.name ?? "Your bot"
+            guard let list = bot.installations else { return bot.message ?? "\(name). GitHub could not be asked where it is installed." }
+            if list.isEmpty { return "\(name), not installed yet: install it on the repositories agents work on." }
+            let places = list.map { $0.all ? "\($0.account) (all repositories)" : "\($0.account) (chosen repositories)" }
+            return "\(name), on " + places.joined(separator: ", ") + "."
+        }
+    }
+
     public enum Linear {
         public static let abilities = [
             "Read and write issues",
@@ -575,6 +635,101 @@ public enum ConnectorSetupWords {
         public static let disconnectNote = "Disconnect deletes the machine's token. Every folder's Bitbucket slots wait for a connection again. Bitbucket's events stop until you connect again or set BITBUCKET_TOKEN. To revoke it too, go to id.atlassian.com \u{25B8} Security \u{25B8} API tokens, or the repository's Access tokens."
     }
 
+    /// Connect Azure DevOps (#3802): a personal access token on one organization of
+    /// dev.azure.com or one collection of an Azure DevOps Server, as the azuredevops and
+    /// azureboards servers take it. No device page for Agents, so the sheet has one way in.
+    public enum AzureDevOps {
+        public static let name = "Azure DevOps"
+        public static let letters = "AZ"
+        public static let title = "Connect Azure DevOps"
+        public static let connectTitle = "Connect Azure DevOps once: work items, pull requests and pipelines."
+        public static let notConnectedNote = "Pull requests, pipelines and work items on dev.azure.com or your own Azure DevOps Server."
+        public static let subtitle = "For you, in every folder. Agents talks to Azure DevOps's API directly."
+        public static let abilities = [
+            "Read and write pull requests and their comments",
+            "Read Azure Pipelines builds",
+            "Read and write Azure Boards work items",
+        ]
+        public static let tokenIntro = "In your organization, open User settings \u{25B8} Personal access tokens, make a token with Code (read and write), Build (read) and Work Items (read and write), and paste it here with the organization."
+        public static let addressLabel = "Organization"
+        public static let addressPrompt = "dev.azure.com/your-organization"
+        public static let tokenLabel = "Personal access token"
+        public static let tokenPrompt = "Paste the token"
+        public static let tokenButton = "Connect"
+        public static let newTokenButton = "Make a Token on Azure DevOps"
+        public static let checking = "Checking the token with Azure DevOps\u{2026}"
+        public static let choose = "The token ends on the date you gave it. You can take it back in User settings \u{25B8} Personal access tokens, or with Disconnect on Connectors."
+        /// The connection's note after its organization: how it signs in.
+        public static let how = "Personal access token"
+        public static let disconnectNote = "Disconnect deletes the machine's token. Every folder's Azure DevOps slots wait for a connection again. Azure DevOps's and Azure Boards' events stop until you connect again or set AZURE_DEVOPS_TOKEN. To revoke it too, go to User settings \u{25B8} Personal access tokens in the organization."
+
+        /// The organization Connect Again\u{2026} opens with: the connection's.
+        public static func again(_ c: DaemonAPI.Connection) -> String { c.workspace ?? "" }
+
+        /// Where the person makes a token in the organization at address: its User settings
+        /// \u{25B8} Personal access tokens (dev.azure.com's own when no organization is given).
+        public static func newTokenURL(_ address: String) -> String {
+            var root = address.trimmingCharacters(in: .whitespacesAndNewlines)
+            if root.isEmpty { return "https://dev.azure.com/" }
+            if !root.contains(".") && !root.contains("/") && !root.contains(":") { root = "dev.azure.com/" + root }
+            if !root.contains("://") { root = "https://" + root }
+            guard var url = URLComponents(string: root), let host = url.host?.lowercased() else { return "https://dev.azure.com/" }
+            var parts = url.path.split(separator: "/").map(String.init)
+            if host.hasSuffix(".visualstudio.com") && host != "vs-ssh.visualstudio.com" {
+                parts = [String(host.dropLast(".visualstudio.com".count))]
+                url.host = "dev.azure.com"
+            } else if host == "dev.azure.com" {
+                parts = Array(parts.prefix(1))
+            }
+            url.path = "/" + (parts + ["_usersSettings", "tokens"]).joined(separator: "/")
+            url.query = nil; url.fragment = nil
+            return url.string ?? "https://dev.azure.com/"
+        }
+    }
+
+    /// The one token sheet (#3802): Connect Forgejo, Connect Bitbucket and Connect Azure DevOps,
+    /// each with its own words and its one field beside the token (an address or an email).
+    public struct TokenSheet: Sendable {
+        /// What the field beside the token is sent as: the provider's address, or the user.
+        public enum Field: Sendable { case url, user }
+        public let provider: DaemonAPI.ConnectionProvider
+        public let title: String
+        public let intro: String
+        public let field: Field
+        public let fieldLabel: String
+        public let fieldPrompt: String
+        public let tokenLabel: String
+        public let tokenPrompt: String
+        public let newTokenButton: String
+        public let checking: String
+        /// Where the person makes a token, from what the field says.
+        public let newTokenURL: @Sendable (String) -> String
+        /// What the field opens with for Connect Again\u{2026}.
+        public let again: @Sendable (DaemonAPI.Connection) -> String
+    }
+
+    /// The token sheet of a provider that has one: Forgejo, Bitbucket and Azure DevOps.
+    public static func tokenSheet(_ p: DaemonAPI.ConnectionProvider) -> TokenSheet? {
+        switch p {
+        case .forgejo:
+            TokenSheet(provider: p, title: Forgejo.title, intro: Forgejo.tokenIntro, field: .url, fieldLabel: Forgejo.addressLabel,
+                       fieldPrompt: Forgejo.addressPrompt, tokenLabel: Forgejo.tokenLabel, tokenPrompt: Forgejo.tokenPrompt,
+                       newTokenButton: Forgejo.newTokenButton, checking: Forgejo.checking,
+                       newTokenURL: Forgejo.newTokenURL, again: Forgejo.again)
+        case .bitbucket:
+            TokenSheet(provider: p, title: Bitbucket.title, intro: Bitbucket.tokenIntro, field: .user, fieldLabel: Bitbucket.emailLabel,
+                       fieldPrompt: Bitbucket.emailPrompt, tokenLabel: Bitbucket.tokenLabel, tokenPrompt: Bitbucket.tokenPrompt,
+                       newTokenButton: Bitbucket.newTokenButton, checking: Bitbucket.checking,
+                       newTokenURL: { _ in Bitbucket.newTokenURL }, again: { _ in "" })
+        case .azuredevops:
+            TokenSheet(provider: p, title: AzureDevOps.title, intro: AzureDevOps.tokenIntro, field: .url,
+                       fieldLabel: AzureDevOps.addressLabel, fieldPrompt: AzureDevOps.addressPrompt, tokenLabel: AzureDevOps.tokenLabel,
+                       tokenPrompt: AzureDevOps.tokenPrompt, newTokenButton: AzureDevOps.newTokenButton, checking: AzureDevOps.checking,
+                       newTokenURL: AzureDevOps.newTokenURL, again: AzureDevOps.again)
+        default: nil
+        }
+    }
+
     /// Connect Jira (#3304): one Atlassian sign-in for Jira and Confluence (#3248), by Atlassian
     /// Cloud's page, or a token on one Jira site (Jira Data Center, or Cloud without the sign-in).
     /// The connection is Atlassian's; the sheet and the Tasks slot say Jira.
@@ -667,6 +822,7 @@ public enum ConnectorSetupWords {
         case .atlassian: Jira.subtitle
         case .forgejo: Forgejo.subtitle
         case .bitbucket: Bitbucket.subtitle
+        case .azuredevops: AzureDevOps.subtitle
         }
     }
 
@@ -679,6 +835,7 @@ public enum ConnectorSetupWords {
         case .atlassian: Jira.abilities
         case .forgejo: Forgejo.abilities
         case .bitbucket: Bitbucket.abilities
+        case .azuredevops: AzureDevOps.abilities
         }
     }
 
@@ -691,6 +848,7 @@ public enum ConnectorSetupWords {
         case .atlassian: Jira.choose
         case .forgejo: Forgejo.choose
         case .bitbucket: Bitbucket.choose
+        case .azuredevops: AzureDevOps.choose
         }
     }
 
@@ -703,6 +861,7 @@ public enum ConnectorSetupWords {
         case .atlassian: Jira.continueButton
         case .forgejo: Forgejo.tokenButton
         case .bitbucket: Bitbucket.tokenButton
+        case .azuredevops: AzureDevOps.tokenButton
         }
     }
 
@@ -715,8 +874,8 @@ public enum ConnectorSetupWords {
         // Email has no device page: the sheet never shows this.
         case .email: ""
         case .atlassian: Jira.site
-        // Forgejo and Bitbucket have no device page either.
-        case .forgejo, .bitbucket: ""
+        // Forgejo, Bitbucket and Azure DevOps have no device page either.
+        case .forgejo, .bitbucket, .azuredevops: ""
         }
     }
 

@@ -155,6 +155,12 @@ keeps nothing. It gives the code and the state back to the client that opened th
 The host that started the sign-in holds the PKCE verifier and spends the code, so a code that
 someone else catches is of no use to them. A token never reaches a client or this page.
 
+`/oauth/github-app` (#3858) is the other page. It makes the person's agents' bot with GitHub's
+App manifest flow. The Mac opens it with the manifest in the fragment, which the browser never
+sends, and the page posts it to github.com's "new App" page and nowhere else. GitHub sends the
+code back to `/oauth/callback`. A manifest code has no verifier, so the person's machine
+converts it at once. A code that was already used shows as a possible theft.
+
 Caddy serves it at `AGENTS_SITE_DOMAIN` with `site/site.caddy`: only the page and its two files,
 no referrer, no cache, no frames, no other script. It is on only where `site.d/site.caddy` is.
 `deploy/gcp/site.sh` turns it on at the control plane's VM: it copies `site/`, the Caddyfile and

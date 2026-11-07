@@ -147,6 +147,8 @@ type Service struct {
 	cfg Config
 	// The control key, and the one before a rotation (#997): read with currentKeys.
 	keyBook
+	// The Multiplier of each person, by their lineage objects' tags (#3903).
+	multiplierBook
 	origin  string
 	copyID  string
 	records *records.Records
@@ -231,12 +233,15 @@ type Service struct {
 	// What each machine here was last sent of its projects (#2735).
 	toldProjects toldProjects
 
-	mu       sync.Mutex
-	servers  []*http.Server
-	sockets  map[*Conn]bool
-	stop     chan struct{}
-	ready    bool
-	loopback *web.Listener
+	mu      sync.Mutex
+	servers []*http.Server
+	sockets map[*Conn]bool
+	stop    chan struct{}
+	// The TLS listener's sockets still in accept: Stop waits for them, so none logs
+	// after it returns (#3869).
+	accepting sync.WaitGroup
+	ready     bool
+	loopback  *web.Listener
 	// The page at this copy's own origin (#1459), or nil.
 	page *web.Public
 	// What an operations team scrapes (#2176): always counted, served only by ServeMetrics.
@@ -582,6 +587,7 @@ func (s *Service) Stop() {
 	for c := range sockets {
 		c.Close()
 	}
+	s.accepting.Wait()
 	if tunnels != nil {
 		tunnels.Stop()
 	}
@@ -1045,7 +1051,16 @@ func (s *Service) serveHTTP(w http.ResponseWriter, r *http.Request) {
 			proved(false)
 			return
 		}
-		go s.accept(s.adopt(newConn(ws, source)), webOrigin, proved)
+		conn := newConn(ws, source)
+		if !s.startAccept(conn) {
+			conn.Close()
+			proved(false)
+			return
+		}
+		go func() {
+			defer s.accepting.Done()
+			s.accept(conn, webOrigin, proved)
+		}()
 	default:
 		if s.page != nil && s.page.Serve(w, r) {
 			return
@@ -1077,18 +1092,39 @@ func (s *Service) mayDownload(r *http.Request) bool {
 	return false
 }
 
+// startAccept adopts a socket and counts it in accept, for Stop to close and wait for,
+// unless Stop has begun: then it says false, and the socket is closed. Both are under the
+// lock Stop takes its sockets with, so Stop closes every socket it waits for.
+func (s *Service) startAccept(c *Conn) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	select {
+	case <-s.stop:
+		return false
+	default:
+	}
+	s.accepting.Add(1)
+	s.adoptLocked(c)
+	return true
+}
+
 // adopt keeps a socket so Stop can close it.
 func (s *Service) adopt(c *Conn) *Conn {
 	s.mu.Lock()
-	s.sockets[c] = true
+	s.adoptLocked(c)
 	s.mu.Unlock()
+	return c
+}
+
+// adoptLocked is adopt, with s.mu held.
+func (s *Service) adoptLocked(c *Conn) {
+	s.sockets[c] = true
 	go func() {
 		<-c.Done()
 		s.mu.Lock()
 		delete(s.sockets, c)
 		s.mu.Unlock()
 	}()
-	return c
 }
 
 // startWeb starts the loopback listener. A build that doesn't match its manifest, or a
@@ -1353,6 +1389,12 @@ func (s *Service) acceptVia(conn *Conn, webOrigin string, proved func(failed boo
 				conn.Close()
 				return
 			}
+		}
+		// Forgotten after its key was looked up (#3893): never attached, so none of its
+		// calls is answered.
+		if s.records.Client(client.ID) == nil && s.records.WasForgotten(client.ID) {
+			conn.CloseWith(ForgottenCloseCode, "forgotten")
+			return
 		}
 		session := s.router.AttachClient(client, conn, auth.Capabilities)
 		if carried != nil {
@@ -1824,6 +1866,11 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, webOrigin
 		s.router.Know(host)
 		s.router.HoldToOwners()
 		s.log("host " + a.Name + " enrolled as " + host)
+		// A host an install made the code for a workspace for is linked to it (#3871): its
+		// name may not be the one the install asked for.
+		if w := stored.Workspace; w != nil && s.providers != nil {
+			go s.providers.LinkJoined(host, w.Provider, w.Workspace, w.Trust)
+		}
 		return result, nil
 	}
 	return nil, fail(notPermitted, "That code is not for %s.", method)

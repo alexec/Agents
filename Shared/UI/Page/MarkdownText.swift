@@ -18,11 +18,19 @@ extension EnvironmentValues {
     @Entry var textFillsWidth = true
     /// Whether a shell's code block offers Run (#1533): set on an agent's reply only.
     @Entry var codeRuns = false
+    /// Whether a table or a code block may reach past the text into the column's
+    /// margins (#3895): set on an agent's reply only, whose margins are the chat's.
+    @Entry var widensBlocks = false
+    /// How far the chat's column leaves either side of it, inside the pane's padding
+    /// (`ChatMetrics.surplus`): set by the transcript, for the pane it is in.
+    @Entry var chatSurplus: Double = 0
 }
 
 struct MarkdownText: View {
     @Environment(\.textFillsWidth) private var fillsWidth
     @Environment(\.codeRuns) private var codeRuns
+    @Environment(\.widensBlocks) private var widensBlocks
+    @Environment(\.chatSurplus) private var chatSurplus
     /// A page's zoom (#1419), which headings take as the steps do.
     @Environment(\.textZoom) private var zoom
     @Environment(\.dynamicTypeSize) private var dynamicType
@@ -106,7 +114,11 @@ struct MarkdownText: View {
                 RunCommandBar(command: command)
             }
         }
+        .modifier(Overhang(surplus: overhang))
     }
+
+    /// How far a wide block may reach past the text either side (#3895).
+    private var overhang: Double { widensBlocks ? chatSurplus : 0 }
 
     @ViewBuilder
     private func view(for block: MarkdownBlock, caret: CursorFlag?) -> some View {
@@ -180,7 +192,8 @@ struct MarkdownText: View {
                 }
                 .padding(2)
             }
-            .textSelection(.enabled), by: caret)
+            .textSelection(.enabled)
+            .modifier(Overhang(surplus: overhang)), by: caret)
 
         case .rule:
             trailed(Divider(), by: caret)
@@ -342,6 +355,53 @@ private struct LinkPointer: ViewModifier {
 /// The same to look at either way: a scroll view takes the whole width offered, so the
 /// narrow case is held to it too. Most code and tables an agent writes fit, and a
 /// scroll view each was a platform view every redraw of the chat had to visit.
+/// A block that may be wider than the column it is in (#3895): as wide as it needs,
+/// up to the column and the margin either side of it. It starts where the text starts
+/// and grows to the right; only when the right margin runs out does it slide left into
+/// the other. The column still reports its own width, so the rows around it do not
+/// move. With no surplus, it is the block as it was.
+private struct Overhang: ViewModifier {
+    let surplus: Double
+
+    func body(content: Content) -> some View {
+        if surplus > 0 {
+            OverhangLayout(surplus: surplus) { content }
+        } else {
+            content
+        }
+    }
+}
+
+private struct OverhangLayout: Layout {
+    let surplus: Double
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let block = subviews.first else { return .zero }
+        guard let column = proposal.width, column.isFinite else {
+            return block.sizeThatFits(proposal)
+        }
+        let wide = width(block.sizeThatFits(.unspecified).width, column)
+        let height = block.sizeThatFits(ProposedViewSize(width: wide, height: proposal.height)).height
+        return CGSize(width: column, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews,
+                       cache: inout ()) {
+        guard let block = subviews.first else { return }
+        let column = bounds.width
+        let wide = width(block.sizeThatFits(.unspecified).width, column)
+        let slide = max(0, wide - column - surplus)
+        block.place(at: CGPoint(x: bounds.minX - slide, y: bounds.minY), anchor: .topLeading,
+                    proposal: ProposedViewSize(width: wide, height: bounds.height))
+    }
+
+    /// At least the column, so a narrow block draws as it did; at most the column and
+    /// both margins, past which it scrolls.
+    private func width(_ natural: Double, _ column: Double) -> Double {
+        min(max(natural, column), column + surplus * 2)
+    }
+}
+
 private struct Sideways<Content: View>: View {
     @ViewBuilder let content: Content
 

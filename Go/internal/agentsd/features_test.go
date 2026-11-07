@@ -32,21 +32,21 @@ func TestFeaturesAreCountedByClient(t *testing.T) {
 	browser := &Client{Role: RoleControl, conn: deviceConn{newConn()}, d: d}
 	helper := &Client{Role: RoleAgent, conn: newConn(), d: d}
 	stranger := &Client{Role: RoleStranger, conn: newConn(), d: d}
-	d.dispatch(mac, message{JSONRPC: "2.0", Method: "milestones/state"})
-	d.dispatch(mac, message{JSONRPC: "2.0", Method: "milestones/state"})
-	d.dispatch(browser, message{JSONRPC: "2.0", Method: "milestones/state", Params: json.RawMessage(`{"secret":"never kept"}`)})
+	d.dispatch(mac, message{JSONRPC: "2.0", Method: "achievements/state"})
+	d.dispatch(mac, message{JSONRPC: "2.0", Method: "achievements/state"})
+	d.dispatch(browser, message{JSONRPC: "2.0", Method: "achievements/state", Params: json.RawMessage(`{"secret":"never kept"}`)})
 	d.dispatch(helper, message{JSONRPC: "2.0", Method: "daemon/ping"})
 	d.dispatch(stranger, message{JSONRPC: "2.0", Method: "daemon/ping"})
 	// Not served, and refused: neither is a feature used.
 	d.dispatch(mac, message{JSONRPC: "2.0", Method: "made/up"})
-	d.dispatch(stranger, message{JSONRPC: "2.0", Method: "milestones/state"})
+	d.dispatch(stranger, message{JSONRPC: "2.0", Method: "achievements/state"})
 	d.countAppTool("00000000-0000-0000-0000-000000000000", "set_session_labels")
 
 	u := d.featureUsage(time.Now())
 	if u.Days != 90 || u.Since == nil {
 		t.Fatalf("%+v", u)
 	}
-	m := featureOf(t, u, "milestones/state")
+	m := featureOf(t, u, "achievements/state")
 	if m.Week != 3 || m.Quarter != 3 || !slices.Equal(m.Clients, []string{"mac", "web"}) || m.LastUsed == nil {
 		t.Fatalf("%+v", m)
 	}
@@ -69,7 +69,7 @@ func TestFeaturesAreCountedByClient(t *testing.T) {
 
 	d.saveFeatures()
 	b, err := os.ReadFile(d.featuresPath())
-	if err != nil || !strings.Contains(string(b), `"milestones/state"`) || strings.Contains(string(b), "never kept") {
+	if err != nil || !strings.Contains(string(b), `"achievements/state"`) || strings.Contains(string(b), "never kept") {
 		t.Fatalf("%s %v", b, err)
 	}
 }
@@ -94,17 +94,17 @@ func TestFeaturesKeepNinetyDays(t *testing.T) {
 	d.featureMu.Lock()
 	f := d.featuresLocked()
 	for i := range 120 {
-		f.Days[dayStamp(now.AddDate(0, 0, -i-1))] = map[string]map[string]int64{"milestones/state": {"mac": 1}}
+		f.Days[dayStamp(now.AddDate(0, 0, -i-1))] = map[string]map[string]int64{"achievements/state": {"mac": 1}}
 	}
 	d.featureMu.Unlock()
-	d.countFeature("milestones/state", "mac")
+	d.countFeature("achievements/state", "mac")
 	d.featureMu.Lock()
 	kept := len(d.features.Days)
 	d.featureMu.Unlock()
 	if kept != 90 {
 		t.Fatalf("%d days kept", kept)
 	}
-	m := featureOf(t, d.featureUsage(now), "milestones/state")
+	m := featureOf(t, d.featureUsage(now), "achievements/state")
 	if m.Week != 7 || m.Quarter != 90 {
 		t.Fatalf("%+v", m)
 	}

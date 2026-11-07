@@ -81,4 +81,14 @@ public struct ChatMetrics: Hashable, Sendable {
         let available = max(0, width - padding * 2)
         return ChatMetrics(measure: min(measureCap, available), padding: padding)
     }
+
+    /// How far past the measure a wide block may reach each side, in a pane this wide:
+    /// the margin the centred column leaves inside the padding (#3895). Prose stays at
+    /// the measure, where a line still reads; a table or a code block has no line to
+    /// lose, and is cut off or scrolled when it cannot have the room. Zero until the
+    /// pane is wider than the cap needs.
+    public static func surplus(pane width: Double) -> Double {
+        let metrics = forPane(width: width)
+        return max(0, (width - metrics.padding * 2 - metrics.measure) / 2)
+    }
 }

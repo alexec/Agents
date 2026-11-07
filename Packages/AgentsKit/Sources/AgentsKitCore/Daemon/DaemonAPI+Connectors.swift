@@ -25,6 +25,15 @@ extension DaemonAPI.Method {
     /// An IMAP mailbox and its app password (Email, #1780): the host signs in once and keeps it.
     public static let connectionsSignInEmail = "connections/sign-in/email"
     public static let connectionsDisconnect = "connections/disconnect"
+    /// The person's agents' bot on this host (#3858), with the accounts it is installed on.
+    public static let connectionsBot = "connections/bot"
+    /// The bot's App manifest, which the client posts to GitHub.
+    public static let connectionsBotStart = "connections/bot/start"
+    /// The code and the state the hand-back page gave the client; the host turns the code into
+    /// the App's key and keeps it.
+    public static let connectionsBotComplete = "connections/bot/complete"
+    /// Forgets the bot's key on this host. The App stays on GitHub until the person deletes it.
+    public static let connectionsBotRemove = "connections/bot/remove"
     public static let connectorsSetup = "connectors/setup"
     public static let connectorsSetupSkip = "connectors/setup/skip"
     public static let connectorsCodespaces = "connectors/codespaces"
@@ -32,7 +41,7 @@ extension DaemonAPI.Method {
 
 extension DaemonAPI {
     public enum ConnectionProvider: String, Codable, Sendable, Hashable, CaseIterable, Identifiable {
-        case github, linear, gitlab, email, atlassian, forgejo, bitbucket
+        case github, linear, gitlab, email, atlassian, forgejo, bitbucket, azuredevops
         public var id: String { rawValue }
     }
 
@@ -85,7 +94,8 @@ extension DaemonAPI {
 
         public init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
-            connections = try c.decode([Connection].self, forKey: .connections)
+            // A connection to a provider this client does not know (a newer host's) is dropped.
+            connections = try c.decode([Known<Connection>].self, forKey: .connections).compactMap(\.value)
             providers = try c.decodeIfPresent([String].self, forKey: .providers)?.compactMap(ConnectionProvider.init(rawValue:))
         }
 
@@ -95,6 +105,12 @@ extension DaemonAPI {
             let takes = providers ?? [.github, .linear, .gitlab, .atlassian] + (hostHasEmail ? [.email] : [])
             return ConnectionProvider.allCases.filter(takes.contains)
         }
+    }
+
+    /// A value this client may not know, such as a newer host's provider: nil when it does not decode.
+    struct Known<Value: Decodable>: Decodable {
+        let value: Value?
+        init(from decoder: Decoder) throws { value = try? Value(from: decoder) }
     }
 
     public struct ConnectionProviderRequest: Codable, Sendable, Hashable {
@@ -211,6 +227,81 @@ extension DaemonAPI {
         public init(error: String? = nil) { self.error = error }
     }
 
+    /// Make the person's agents' bot (#3858): public is true when an organisation must install it.
+    public struct ConnectionBotStartRequest: Codable, Sendable, Hashable {
+        public var origin: String?
+        public var `public`: Bool?
+        public init(origin: String? = nil, public isPublic: Bool? = nil) { self.origin = origin; self.public = isPublic }
+    }
+
+    /// What the client posts to GitHub: a form to action, with one field, manifest.
+    public struct ConnectionBotStart: Codable, Sendable, Hashable {
+        public var action: String
+        public var manifest: String
+        public var state: String
+        public var expiresAt: Date
+        public init(action: String, manifest: String, state: String, expiresAt: Date) {
+            self.action = action; self.manifest = manifest; self.state = state; self.expiresAt = expiresAt
+        }
+
+        /// The hand-back site's page that posts the manifest to GitHub, for an authentication
+        /// session, which opens only an address (#3858). The manifest is in the fragment, which
+        /// the browser never sends.
+        public var formURL: URL? {
+            var parts = URLComponents()
+            parts.queryItems = [URLQueryItem(name: "action", value: action), URLQueryItem(name: "manifest", value: manifest)]
+            guard let fragment = parts.percentEncodedQuery else { return nil }
+            return URL(string: "https://oauth.agentloops.dev/oauth/github-app#" + fragment)
+        }
+    }
+
+    /// What the hand-back page gave the client after GitHub made the App.
+    public struct ConnectionBotCompleteRequest: Codable, Sendable, Hashable {
+        public var state: String
+        public var code: String?
+        public var error: String?
+        public init(state: String, code: String? = nil, error: String? = nil) {
+            self.state = state; self.code = code; self.error = error
+        }
+
+        /// The answer in agents://oauth/callback?code=…&state=…, or nil for another address.
+        public init?(callback: URL) {
+            guard let r = ConnectionSignInCompleteRequest(flowID: UUID(), callback: callback) else { return nil }
+            self.init(state: r.state, code: r.code, error: r.error)
+        }
+    }
+
+    /// An account the bot is installed on.
+    public struct ConnectionBotInstallation: Codable, Sendable, Hashable {
+        public var account: String
+        /// Every repository of the account, or the ones chosen.
+        public var all: Bool
+        public var settingsURL: String?
+        public init(account: String, all: Bool, settingsURL: String? = nil) {
+            self.account = account; self.all = all; self.settingsURL = settingsURL
+        }
+    }
+
+    /// The person's agents' bot on the host (#3858). Never its key.
+    public struct ConnectionBot: Codable, Sendable, Hashable {
+        public var made: Bool
+        /// <slug>[bot]
+        public var name: String?
+        public var slug: String?
+        public var owner: String?
+        public var installURL: String?
+        /// The App's page on GitHub, where the person deletes it.
+        public var appURL: String?
+        /// Nil when GitHub could not be asked.
+        public var installations: [ConnectionBotInstallation]?
+        public var message: String?
+        public init(made: Bool, name: String? = nil, slug: String? = nil, owner: String? = nil, installURL: String? = nil,
+                    appURL: String? = nil, installations: [ConnectionBotInstallation]? = nil, message: String? = nil) {
+            self.made = made; self.name = name; self.slug = slug; self.owner = owner; self.installURL = installURL
+            self.appURL = appURL; self.installations = installations; self.message = message
+        }
+    }
+
     /// One slot of a folder's set-up, in the page's order. Docs is where the folder's docs live
     /// (#3248); Messaging is where agents reach the person (#1787).
     public enum ConnectorSlotKind: String, Codable, Sendable, Hashable, CaseIterable {
@@ -231,7 +322,7 @@ extension DaemonAPI {
         case failed
         /// The provider refused the read: the person grants it on the provider's site.
         case refused
-        /// The folder has no GitHub, GitLab, Forgejo or Bitbucket remote.
+        /// The folder has no GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps remote.
         case noRemote
         /// Skipped: it counts as done.
         case skipped
@@ -366,10 +457,13 @@ extension DaemonAPI {
     public struct ConnectorSetup: Codable, Sendable, Hashable {
         public var folder: String
         /// owner/name on GitHub, group/folder on GitLab, from the folder's git remote. Nil
-        /// with no GitHub, GitLab, Forgejo or Bitbucket remote.
+        /// with no GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps remote.
         public var repository: String?
         /// The forge that fills Tasks, Code review and CI; nil is GitHub.
         public var forge: ConnectionProvider?
+        /// The forge's name when this client does not know it (a newer host's, #3802): the
+        /// set-up says to update Agents, and offers no Connect.
+        public var unknownForge: String?
         /// The repository's host: github.com, gitlab.com, or a self-managed GitLab's.
         public var site: String?
         /// The repository's page on its forge.
@@ -399,6 +493,32 @@ extension DaemonAPI {
             self.connection = connection; self.installed = installed
             self.installURL = installURL; self.repositories = repositories; self.slots = slots; self.events = events
             self.done = done; self.project = project; self.projectName = projectName
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case folder, repository, forge, site, repositoryURL, connection, installed, installURL, repositories, slots, events, done
+            case project, projectName
+        }
+
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            folder = try c.decode(String.self, forKey: .folder)
+            repository = try c.decodeIfPresent(String.self, forKey: .repository)
+            if let raw = try c.decodeIfPresent(String.self, forKey: .forge) {
+                forge = ConnectionProvider(rawValue: raw)
+                unknownForge = forge == nil ? raw : nil
+            }
+            site = try c.decodeIfPresent(String.self, forKey: .site)
+            repositoryURL = try c.decodeIfPresent(String.self, forKey: .repositoryURL)
+            connection = try c.decodeIfPresent(Known<Connection>.self, forKey: .connection)?.value
+            installed = try c.decodeIfPresent(Bool.self, forKey: .installed)
+            installURL = try c.decodeIfPresent(String.self, forKey: .installURL)
+            repositories = try c.decodeIfPresent(Int.self, forKey: .repositories)
+            slots = try c.decode([ConnectorSlot].self, forKey: .slots)
+            events = try c.decode(ConnectorEvents.self, forKey: .events)
+            done = try c.decode(Int.self, forKey: .done)
+            project = try c.decodeIfPresent(String.self, forKey: .project)
+            projectName = try c.decodeIfPresent(String.self, forKey: .projectName)
         }
 
         public func slot(_ kind: ConnectorSlotKind) -> ConnectorSlot? { slots.first { $0.slot == kind } }

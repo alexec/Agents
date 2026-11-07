@@ -26,7 +26,7 @@ stay as they are.
 | `cmd/whatsapp-mcp/`, `internal/whatsappmcp/` | The `whatsapp` MCP server (#1352): a WhatsApp Business number's messages and answers as `message.received` and `question.answered`, by Meta's signed webhook, and tools that send as the number | whatsapp |
 | `cmd/gitlab-mcp/`, `internal/gitlabmcp/` | The `gitlab` MCP server (#1629): merge requests, pipelines and issues on GitLab, tools and events on REST v4 | gitlab |
 | `cmd/forgejo-mcp/`, `internal/forgejomcp/` | The `forgejo` MCP server (#1753): pull requests, checks and issues on Forgejo or Gitea, tools, events and views on REST v1, in the gitlab server's shape | forgejo |
-| `cmd/bitbucket-mcp/`, `internal/bitbucketmcp/` | The `bitbucket` MCP server (#2828): pull requests, checks and issues on Bitbucket Cloud, tools and events on REST 2.0, in the gitlab server's shape | bitbucket |
+| `cmd/bitbucket-mcp/`, `internal/bitbucketmcp/` | The `bitbucket` MCP server (#2828): pull requests, checks and issues on Bitbucket Cloud, tools, events and views on REST 2.0, in the gitlab server's shape | bitbucket |
 | `cmd/azuredevops-mcp/`, `internal/azuredevopsmcp/` | The `azuredevops` MCP server (#2829): pull requests and Azure Pipelines builds on Azure DevOps, tools and events on REST 7.1, in the gitlab server's shape | azuredevops |
 | `cmd/azureboards-mcp/`, `internal/azureboardsmcp/` | The `azureboards` MCP server (#3804): Azure Boards work items as a tracker, tools and events on REST 7.1, in the jira server's shape | azureboards |
 | `cmd/workspace-commands/`, `internal/workspacecommands/` | The command machine provider (#691, in Go since #1364): workspaces as shell commands and presets, an MCP server the control plane runs | workspaces |
@@ -286,7 +286,14 @@ host's token check, at a fake. The connection's token goes only to the API it wa
 - **Set-up reads** (`setup.go`, #3785): the newest issue, the newest pull request and the
   main branch's statuses prove a folder's Tasks, Code review and CI slots (a tracker that is
   off says so), and `RepoAt` finds a folder's Bitbucket repository from its remotes.
-- **No views yet:** the Work pages are a follow-up.
+- **Views** (`views.go`, `pages.go`, `pages/`, #3866): the forgejo server's pages in
+  Bitbucket's words: Pull requests (`ui://bitbucket/pull-requests`), Issues
+  (`ui://bitbucket/issues`) and a pull request's page (`ui://bitbucket/pr`), fed by
+  `show_pull_requests`, `show_issues` and `show_pull_request`, with `show_issue_details` and
+  `show_pull_request_diff` (`PRDiff`, the Work pages' read). Lists in sections for the viewer;
+  a thread is a comment on a line and its answers, by `parent`; Show Log and Run Again on a
+  failed Pipelines run; no Auto-merge (Bitbucket's API has none). `bridge.js`, `common.css`,
+  `lineage.js` and `prpage.css` are the github server's, word for word; a test keeps them so.
 
 The tests run it against a fake Bitbucket over HTTP (`fake_test.go`). Agents Host carries it
 (`scripts/go-github-mcp.sh bitbucket-mcp`) and every Linux host installs

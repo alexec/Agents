@@ -149,7 +149,7 @@ func TestForgeLoginsAreSelfOnlyAndSeenByEveryone(t *testing.T) {
 
 	call(t, alexWindow, "", "people/setForgeLogins",
 		wire.ForgeLogins{Github: optional("alexec"), Gitlab: optional("alex"), Linear: optional("alex@example.com"),
-			Jira: optional("Alex Collins")})
+			Jira: optional("Alex Collins"), Forgejo: optional("alex-fj")})
 	call(t, sam.window, "", "people/setForgeLogins", wire.ForgeLogins{Github: optional("sam-gh")})
 
 	var forSam wire.PeopleForViews
@@ -170,7 +170,8 @@ func TestForgeLoginsAreSelfOnlyAndSeenByEveryone(t *testing.T) {
 		}
 	}
 	if me == nil || me.You == nil || !*me.You || me.GithubLogin == nil || *me.GithubLogin != "alexec" ||
-		me.GitlabLogin == nil || *me.GitlabLogin != "alex" || me.JiraLogin == nil || *me.JiraLogin != "Alex Collins" {
+		me.GitlabLogin == nil || *me.GitlabLogin != "alex" || me.JiraLogin == nil || *me.JiraLogin != "Alex Collins" ||
+		me.ForgejoLogin == nil || *me.ForgejoLogin != "alex-fj" {
 		t.Fatalf("alex's own row: %+v", me)
 	}
 	if them == nil || (them.You != nil && *them.You) || them.GithubLogin == nil || *them.GithubLogin != "sam-gh" {
@@ -539,6 +540,32 @@ func TestACodeMadeForAPersonMakesTheirMachine(t *testing.T) {
 	}
 	if h := p.s.Records().Host(member.Host); h == nil || h.Owner == nil || *h.Owner != "someone" {
 		t.Fatalf("%+v", h)
+	}
+}
+
+// Add as Machine…'s host code names the workspace it is for (#3871), so the host that
+// joins with it is linked to that workspace, whatever name it joins with. A code for no
+// workspace names none.
+func TestAnInstallsHostCodeNamesItsWorkspace(t *testing.T) {
+	t.Parallel()
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	ctx := context.Background()
+	provider, workspace, trust := wire.ProviderID("codespaces"), "machine-1", "SHA256:abc"
+	install := wire.MachineInstall{Destination: "machine-1", Provider: &provider, Workspace: &workspace, Trust: &trust}
+	_, id, err := p.s.Codes().HostCode(withInstallWorkspace(ctx, install), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored, err := p.s.Codes().Stored(ctx, id, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if w := stored.Workspace; w == nil || *w != (codeWorkspace{Provider: "codespaces", Workspace: "machine-1", Trust: trust}) {
+		t.Fatalf("%+v", w)
+	}
+	_, id, _ = p.s.Codes().HostCode(withInstallWorkspace(ctx, wire.MachineInstall{Destination: "devbox"}), "")
+	if stored, _ := p.s.Codes().Stored(ctx, id, false); stored == nil || stored.Workspace != nil {
+		t.Fatalf("%+v", stored)
 	}
 }
 

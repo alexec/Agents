@@ -3,6 +3,7 @@
 package wire
 
 // The capabilities that Packages/Wire names (#1748): x-capability on each method.
+const CapAchievements1 = "achievements/1"
 const CapAgent1 = "agent/1"
 const CapAgentsEditQueued1 = "agents.edit-queued/1"
 const CapAgentsExport1 = "agents.export/1"
@@ -31,6 +32,7 @@ const CapClient1 = "client/1"
 const CapClients1 = "clients/1"
 const CapClone1 = "clone/1"
 const CapConnection1 = "connection/1"
+const CapConnectionsBot1 = "connections.bot/1"
 const CapConnectionsEmail1 = "connections.email/1"
 const CapConnections1 = "connections/1"
 const CapConnectorsSetup1 = "connectors.setup/1"
@@ -98,8 +100,8 @@ const CapMachines1 = "machines/1"
 const CapMailbox1 = "mailbox/1"
 const CapMarketplaces1 = "marketplaces/1"
 const CapMcp1 = "mcp/1"
-const CapMilestones1 = "milestones/1"
 const CapModes1 = "modes/1"
+const CapMultiplier1 = "multiplier/1"
 const CapMute1 = "mute/1"
 const CapNotices1 = "notices/1"
 const CapOptions1 = "options/1"
@@ -173,6 +175,7 @@ const CapWorktrees1 = "worktrees/1"
 
 // HostCapabilities is the capability of each method and notification in daemon.openrpc.json.
 var HostCapabilities = pairs([][2]string{
+	{"achievements/state", "achievements/1"},
 	{"agentConfig/editorFiles", "personal/1"},
 	{"agentConfig/editorSave", "personal/1"},
 	{"agents/answerSandbox", "agents/1"},
@@ -197,6 +200,7 @@ var HostCapabilities = pairs([][2]string{
 	{"agents/list", "agents/1"},
 	{"agents/move", "agents/1"},
 	{"agents/moveIn", "sessions.move/1"},
+	{"agents/moveToMachine", "sessions.move/1"},
 	{"agents/options", "agents/1"},
 	{"agents/prewarm", "agents/1"},
 	{"agents/prompt", "agents/1"},
@@ -251,6 +255,10 @@ var HostCapabilities = pairs([][2]string{
 	{"clientPermissions/set", "client-permissions/1"},
 	{"clientPermissions/state", "client-permissions/1"},
 	{"connection/bindDevice", "connection/1"},
+	{"connections/bot", "connections.bot/1"},
+	{"connections/bot/complete", "connections.bot/1"},
+	{"connections/bot/remove", "connections.bot/1"},
+	{"connections/bot/start", "connections.bot/1"},
 	{"connections/disconnect", "connections/1"},
 	{"connections/list", "connections/1"},
 	{"connections/sign-in", "connections/1"},
@@ -376,8 +384,8 @@ var HostCapabilities = pairs([][2]string{
 	{"mcp/sign-in/wait", "mcp/1"},
 	{"mcp/sign-out", "mcp/1"},
 	{"mcp/verify", "mcp/1"},
-	{"milestones/state", "milestones/1"},
 	{"modes/remembered", "modes/1"},
+	{"multiplier/state", "multiplier/1"},
 	{"options/remembered", "options/1"},
 	{"permissions/answer", "permissions/1"},
 	{"permissions/pending", "permissions/1"},
@@ -524,6 +532,7 @@ var HostCapabilities = pairs([][2]string{
 	{"worktrees/list", "worktrees/1"},
 	{"worktrees/remove", "worktrees/1"},
 	{"worktrees/removeBuildOutput", "worktrees/1"},
+	{"achievements/changed", "achievements/1"},
 	{"agent/changed", "agent/1"},
 	{"agent/elicitation", "agent/1"},
 	{"agent/entry", "agent/1"},
@@ -551,8 +560,8 @@ var HostCapabilities = pairs([][2]string{
 	{"folder/removed", "folder/1"},
 	{"mcp/healthChanged", "mcp/1"},
 	{"mcp/hostedChanged", "mcp/1"},
-	{"milestones/changed", "milestones/1"},
 	{"modes/changed", "modes/1"},
+	{"multiplier/changed", "multiplier/1"},
 	{"pages/changed", "pages/1"},
 	{"person/changed", "person/1"},
 	{"pins/changed", "pins/1"},
@@ -579,6 +588,7 @@ var HostCapabilities = pairs([][2]string{
 
 // HostNotifications is each notification in daemon.openrpc.json: what its server sends, not serves.
 var HostNotifications = set([]string{
+	"achievements/changed",
 	"agent/changed",
 	"agent/elicitation",
 	"agent/entry",
@@ -606,8 +616,8 @@ var HostNotifications = set([]string{
 	"folder/removed",
 	"mcp/healthChanged",
 	"mcp/hostedChanged",
-	"milestones/changed",
 	"modes/changed",
+	"multiplier/changed",
 	"pages/changed",
 	"person/changed",
 	"pins/changed",
@@ -741,6 +751,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"machines/summaryFacts", "summary.machines/1"},
 	{"machines/unlink", "machines/1"},
 	{"machines/update", "machines/1"},
+	{"multiplier/count", "multiplier/1"},
 	{"notices/take", "notices/1"},
 	{"orgRoutes/check", "org-routes/2"},
 	{"orgRoutes/list", "org-routes/2"},

@@ -3,6 +3,7 @@
 // window's ConnectorSetupView, ConnectGitHubSheet and YourConnectionsView. The state is the host's, so all three clients
 // show the same ticks. The page draws the Mac's grid; Where agents run says the machine the
 // folder is on, and has Add a Machine… and Add Provider… in place (#2131).
+import { Fragment } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { Store } from "../model/store";
 import type {
@@ -18,6 +19,7 @@ import type { Project, ProjectBoard } from "../protocol/generated";
 import { addMachineWords, whereAgentsRun } from "../model/addMachine";
 import { Modal } from "./Modal";
 import { AddMachineDialog } from "./AddMachineDialog";
+import { AgentsBotRow } from "./AgentsBot";
 
 function why(e: unknown): string {
   if (e && typeof e === "object" && "message" in e) return String((e as { message: unknown }).message);
@@ -154,6 +156,8 @@ export function ConnectorSetupSection({ store, host, folder, folderName, go }: {
 
 function ConnectionCard({ setup, connect }: { setup: ConnectorSetup; connect: () => void }) {
   const c = setup.connection;
+  // A newer host's forge (#3802): this page can't connect it, so it offers no Connect.
+  if (words.unknownForgeOf(setup)) return <div class="setup-card connection"><p class="quiet small grow">{words.unknownForge(setup)}</p></div>;
   if (c && c.state === "connected") {
     return (
       <div class="setup-card connection">
@@ -447,19 +451,19 @@ const signInWindow = "agents-sign-in";
  * device flow on gitlab.com, or an access token on any GitLab, which goes to the host only.
  * Connect Jira (#3304): Linear's code flow on Atlassian Cloud, or a token on one Jira site, and it
  * ends on the site's newest issue, which proves it. Connect Email (#1780): an IMAP server, a user and an app password, which go to the host only.
- * Connect Forgejo (#3752): GitLab's access token way alone, on Codeberg or any Forgejo or Gitea.
- * Connect Bitbucket (#3785): Forgejo's shape on Bitbucket Cloud, with the email of an Atlassian API token in place of the address.
+ * Connect Forgejo (#3752), Connect Bitbucket (#3785) and Connect Azure DevOps (#3802): one token sheet
+ * (GitLab's access token way alone), with each provider's one field beside the token: Forgejo's
+ * address, Bitbucket's Atlassian email, Azure DevOps's organization.
  */
 export function ConnectDialog({ store, host, provider, folder, again, connected, close }: {
   store: Store; host: string; provider: ConnectionProvider; folder?: string;
   /** The ended connection Connect Again… is for: GitLab's opens the way it was made, with its address (#1865). */
   again?: Connection | undefined; connected: () => void; close: () => void;
 }) {
-  const isForgejo = provider === "forgejo";
-  const isBitbucket = provider === "bitbucket";
+  /** Forgejo, Bitbucket and Azure DevOps: the one token sheet, its field in address. */
+  const sheet = words.tokenSheet(provider);
   const opening = provider === "gitlab" && again ? words.gitlabAgain(again)
-    : isForgejo ? { withToken: true, address: again ? words.forgejoAgain(again) : "" }
-    : isBitbucket ? { withToken: true, address: "" } : undefined;
+    : sheet ? { withToken: true, address: again ? sheet.again(again) : "" } : undefined;
   type Step = { kind: "asking" } | { kind: "starting" } | { kind: "waiting"; flow: ConnectionSignIn }
     | { kind: "finishing" } | { kind: "install"; login: string; repository: string; url: string }
     | { kind: "checking" } | { kind: "jira"; connection: Connection } | { kind: "failed"; why: string };
@@ -468,7 +472,7 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
   const [withToken, setWithToken] = useState(opening?.withToken ?? false);
   const [address, setAddress] = useState(opening?.address ?? "");
   const [token, setToken] = useState("");
-  /** Jira (#3304) and Bitbucket (#3785): the account's email, for an Atlassian API token. */
+  /** Jira only (#3304): the account's email, for a Jira Cloud API token. */
   const [jiraEmail, setJiraEmail] = useState("");
   /** Email only (#1780). The app password stays in this state, and is cleared after the sign-in. */
   const [server, setServer] = useState("");
@@ -581,8 +585,8 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
     const typed = token.trim();
     if (!typed || busy) return;
     const jiraRequest = isJira ? words.jiraTokenRequest(address, jiraEmail, typed)
-      : isBitbucket ? words.bitbucketTokenRequest(jiraEmail, typed) : undefined;
-    if (isJira && !jiraRequest) return;
+      : sheet ? words.tokenRequest(sheet, address, typed) : undefined;
+    if ((isJira || sheet) && !jiraRequest) return;
     setStep({ kind: "checking" });
     const url = address.trim();
     try {
@@ -677,37 +681,23 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
             <button type="button" class="link small" onClick={() => openOut(words.jira.newTokenURL)}>{words.jira.newTokenButton}</button>
           </form>
         )}
-        {isForgejo && (
+        {sheet && (
           <form id="connect-token" class="token-form" onSubmit={(e) => { e.preventDefault(); void connectWithToken(); }}>
-            <p class="small">{words.forgejo.tokenIntro}</p>
-            <label>{words.forgejo.addressLabel}
-              <input type="url" value={address} placeholder={words.forgejo.addressPrompt} disabled={busy}
+            <p class="small">{sheet.intro}</p>
+            <label>{sheet.fieldLabel}
+              {/* One of url, email and text: Preact's types take only a single literal here. */}
+              <input type={sheet.fieldType as "text"} value={address} placeholder={sheet.fieldPrompt} disabled={busy}
                 autocomplete="off" autocapitalize="off" spellcheck={false}
                 onInput={(e) => setAddress((e.target as HTMLInputElement).value)} />
             </label>
-            <label>{words.forgejo.tokenLabel}
-              <input type="password" value={token} placeholder={words.forgejo.tokenPrompt} disabled={busy} autocomplete="off"
+            <label>{sheet.tokenLabel}
+              <input type="password" value={token} placeholder={sheet.tokenPrompt} disabled={busy} autocomplete="off"
                 onInput={(e) => setToken((e.target as HTMLInputElement).value)} />
             </label>
-            <button type="button" class="link small" onClick={() => openOut(words.newForgejoTokenURL(address))}>{words.forgejo.newTokenButton}</button>
+            <button type="button" class="link small" onClick={() => openOut(sheet.newTokenURL(address))}>{sheet.newTokenButton}</button>
           </form>
         )}
-        {isBitbucket && (
-          <form id="connect-token" class="token-form" onSubmit={(e) => { e.preventDefault(); void connectWithToken(); }}>
-            <p class="small">{words.bitbucket.tokenIntro}</p>
-            <label>{words.bitbucket.emailLabel}
-              <input type="email" value={jiraEmail} placeholder={words.bitbucket.emailPrompt} disabled={busy}
-                autocomplete="off" autocapitalize="off" spellcheck={false}
-                onInput={(e) => setJiraEmail((e.target as HTMLInputElement).value)} />
-            </label>
-            <label>{words.bitbucket.tokenLabel}
-              <input type="password" value={token} placeholder={words.bitbucket.tokenPrompt} disabled={busy} autocomplete="off"
-                onInput={(e) => setToken((e.target as HTMLInputElement).value)} />
-            </label>
-            <button type="button" class="link small" onClick={() => openOut(words.bitbucket.newTokenURL)}>{words.bitbucket.newTokenButton}</button>
-          </form>
-        )}
-        {withToken && !isJira && !isForgejo && !isBitbucket && (
+        {withToken && !isJira && !sheet && (
           <form id="connect-token" class="token-form" onSubmit={(e) => { e.preventDefault(); void connectWithToken(); }}>
             <p class="small">{words.gitlab.tokenIntro}</p>
             <label>{words.gitlab.addressLabel}
@@ -759,7 +749,7 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
           </div>
         )}
         {step.kind === "finishing" && <p class="quiet small">{words.linear.finishing}</p>}
-        {step.kind === "checking" && <p class="quiet small">{isEmail ? words.email.checking : isJira ? words.jira.checking : isForgejo ? words.forgejo.checking : isBitbucket ? words.bitbucket.checking : words.gitlab.checking}</p>}
+        {step.kind === "checking" && <p class="quiet small">{isEmail ? words.email.checking : isJira ? words.jira.checking : sheet ? sheet.checking : words.gitlab.checking}</p>}
         {step.kind === "install" && (
           <div class="sign-in-code">
             <p class="strong">Connected as {step.login}.</p>
@@ -811,7 +801,8 @@ export function YourConnections({ store, host }: { store: Store; host: string })
   const load = async () => {
     try {
       const answer = await store.link.call("connections/list", {}, host);
-      const list = answer.connections;
+      // A connection to a provider this page does not know (a newer host's) is left out, as on the Mac.
+      const list = words.knownConnections(answer.connections);
       setConnections(list);
       setHostProviders(answer.providers);
       store.knowConnections(host, list);
@@ -842,7 +833,8 @@ export function YourConnections({ store, host }: { store: Store; host: string })
       {problem && <p class="small failure">{problem}</p>}
       <ul class="setup-card list">
         {connections?.map((c) => (
-          <li key={c.provider} class="connection">
+          <Fragment key={c.provider}>
+          <li class="connection">
             <span class="connector-mark soft" aria-hidden="true">{(c.login ?? words.letters(c.provider)).slice(0, 1).toUpperCase()}</span>
             <div class="grow">
               <p class="strong">{words.connectionTitle(c)}</p>
@@ -853,7 +845,12 @@ export function YourConnections({ store, host }: { store: Store; host: string })
               : c.provider === "github" && <button class="link small" onClick={() => openOut(words.installationsURL)}>Repositories on github.com</button>}
             <button class="destructive" onClick={() => void disconnect(c)}>Disconnect</button>
           </li>
+          {/* The person's agents' bot (#3858), on a host that makes one. */}
+          {c.provider === "github" && c.state === "connected" && store.has(host, Capability.connectionsBot1)
+            && <AgentsBotRow store={store} host={host} />}
+          </Fragment>
         ))}
+
         {notConnected.map((p) => (
           <li key={p} class="connection">
             <span class="connector-mark" aria-hidden="true">{words.letters(p)}</span>

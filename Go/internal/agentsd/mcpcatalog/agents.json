@@ -389,7 +389,7 @@
       "server": {
         "name": "agents/bitbucket",
         "title": "Bitbucket",
-        "description": "Pull requests, checks and issues on Bitbucket Cloud: tools to read them and comment, and events"
+        "description": "Pull requests, checks and issues on Bitbucket Cloud: their pages, tools to read them and comment, and events"
       },
       "_meta": {
         "dev.agentloops/connector": {
@@ -411,7 +411,7 @@
               "issue.closed",
               "issue.assigned"
             ],
-            "views": false
+            "views": true
           }
         }
       }
@@ -440,19 +440,7 @@
               "review.comment"
             ],
             "views": false
-          },
-          "secrets": [
-            {
-              "name": "AZURE_DEVOPS_TOKEN",
-              "description": "A personal access token (User settings ▸ Personal access tokens) with Code (read and write) and Build (read)",
-              "required": true
-            },
-            {
-              "name": "AZURE_DEVOPS_URL",
-              "description": "Azure DevOps: https://dev.azure.com when left out, or your own Azure DevOps Server's collections, as https://server/tfs",
-              "required": false
-            }
-          ]
+          }
         }
       }
     },
@@ -478,16 +466,6 @@
             "views": true
           },
           "secrets": [
-            {
-              "name": "AZURE_DEVOPS_TOKEN",
-              "description": "A personal access token (User settings ▸ Personal access tokens) with Work Items (read and write); the azuredevops connector's, with Work Items added",
-              "required": true
-            },
-            {
-              "name": "AZURE_DEVOPS_URL",
-              "description": "Azure DevOps: https://dev.azure.com when left out, or your own Azure DevOps Server's collections, as https://server/tfs",
-              "required": false
-            },
             {
               "name": "AZURE_BOARDS_PROJECT",
               "description": "The project, as organization/project; left out, the folder's Azure Repos remote's",

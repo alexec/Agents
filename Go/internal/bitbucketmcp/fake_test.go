@@ -55,6 +55,10 @@ type fakeBitbucket struct {
 	email string
 	// branches is each branch's head commit, for refs/branches; the repository's main branch is main.
 	branches map[string]string
+	// defaultMerge is the main branch's default merge strategy, when set; diffs a pull
+	// request's git diff, by its number (the views, #3866).
+	defaultMerge string
+	diffs        map[int]string
 	status   int // answer every request with this, when set
 	server   *httptest.Server
 	// storage is where a step's log redirects to, as Bitbucket's goes to its file store.
@@ -66,7 +70,7 @@ func newFake(t *testing.T) *fakeBitbucket {
 		issueComments: map[int][]obj{}, changes: map[int][]obj{},
 		perms: map[string]string{"a-alex": "admin", "a-dev": "write", "a-reader": "read"}, members: map[string]bool{}, me: alex}
 	f.pipelines, f.steps, f.logs = map[int]obj{}, map[int][]obj{}, map[string]string{}
-	f.branches = map[string]string{}
+	f.branches, f.diffs = map[string]string{}, map[int]string{}
 	f.server = httptest.NewServer(http.HandlerFunc(f.serve))
 	t.Cleanup(f.server.Close)
 	f.storage = httptest.NewServer(http.HandlerFunc(f.serveLog))
@@ -148,6 +152,7 @@ var (
 	pullPath          = regexp.MustCompile(`^` + root + `/pullrequests/([0-9]+)$`)
 	activityPath      = regexp.MustCompile(`^` + root + `/pullrequests/([0-9]+)/activity$`)
 	diffstatPath      = regexp.MustCompile(`^` + root + `/pullrequests/([0-9]+)/diffstat$`)
+	diffPath          = regexp.MustCompile(`^` + root + `/pullrequests/([0-9]+)/diff$`)
 	prCommentsPath    = regexp.MustCompile(`^` + root + `/pullrequests/([0-9]+)/comments$`)
 	prCommentPath     = regexp.MustCompile(`^` + root + `/pullrequests/([0-9]+)/comments/([0-9]+)$`)
 	mergePath         = regexp.MustCompile(`^` + root + `/pullrequests/([0-9]+)/(merge|approve)$`)
@@ -165,6 +170,7 @@ var (
 	memberPath        = regexp.MustCompile(`^/workspaces/acme/members/([^/]+)$`)
 	sinceQuery        = regexp.MustCompile(`updated_on>=(\S+)`)
 	assigneeQuery     = regexp.MustCompile(`assignee\.uuid="([^"]+)"`)
+	kindQuery         = regexp.MustCompile(`kind="([^"]+)"`)
 )
 
 func (f *fakeBitbucket) serve(w http.ResponseWriter, r *http.Request) {
@@ -254,6 +260,10 @@ func (f *fakeBitbucket) serve(w http.ResponseWriter, r *http.Request) {
 			reply(obj{"name": branchPath.FindStringSubmatch(p)[1], "target": obj{"hash": hash}})
 			return
 		}
+		if f.defaultMerge != "" && branchPath.FindStringSubmatch(p)[1] == "main" {
+			reply(obj{"name": "main", "merge_strategies": []string{"merge_commit", "squash"}, "default_merge_strategy": f.defaultMerge})
+			return
+		}
 		notFound()
 	case pullsPath.MatchString(p):
 		out := []obj{}
@@ -278,6 +288,8 @@ func (f *fakeBitbucket) serve(w http.ResponseWriter, r *http.Request) {
 		page(f.activity[n(activityPath.FindStringSubmatch(p))])
 	case diffstatPath.MatchString(p):
 		page(f.diffstat[n(diffstatPath.FindStringSubmatch(p))])
+	case diffPath.MatchString(p):
+		_, _ = io.WriteString(w, f.diffs[n(diffPath.FindStringSubmatch(p))])
 	case prCommentsPath.MatchString(p):
 		page(newestFirst(f.prComments[n(prCommentsPath.FindStringSubmatch(p))]))
 	case prCommentPath.MatchString(p):
@@ -295,7 +307,12 @@ func (f *fakeBitbucket) serve(w http.ResponseWriter, r *http.Request) {
 	case issuesPath.MatchString(p):
 		out := []obj{}
 		since, assignee := sinceQuery.FindStringSubmatch(q.Get("q")), assigneeQuery.FindStringSubmatch(q.Get("q"))
+		kind := kindQuery.FindStringSubmatch(q.Get("q"))
 		for _, i := range f.issues {
+			// (kind="x" OR component.name="x"), as list_issues and show_issues ask.
+			if kind != nil && i["kind"] != kind[1] && (i["component"] == nil || i["component"].(obj)["name"] != kind[1]) {
+				continue
+			}
 			if since != nil && before(i["updated_on"].(string), since[1]) {
 				continue
 			}
