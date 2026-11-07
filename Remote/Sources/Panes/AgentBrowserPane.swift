@@ -5,7 +5,7 @@ import UIKit
 /// The browser on the session's machine, which agents drive (#3800), as the window's
 /// `AgentBrowserPane` shows it (#3528): a screencast of its newest tab, which the person
 /// can use at any time. A tap is a click, a drag scrolls the page, and the keyboard button
-/// types into it. Frames come only while the pane is on screen and the app is in front.
+/// types into it. Frames come only while the pane is on screen and the app is not in the background.
 struct AgentBrowserPane: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.scenePhase) private var scenePhase
@@ -46,8 +46,10 @@ struct AgentBrowserPane: View {
                     .padding(.vertical, 4)
             }
         }
-        .task(id: WatchKey(visible: scenePhase == .active, width: Int(area.width), height: Int(area.height))) {
-            if scenePhase == .active, area.width > 0, area.height > 0 {
+        // Inactive is still on screen (a notification over it, the app switcher): only the
+        // background stops the frames.
+        .task(id: WatchKey(visible: scenePhase != .background, width: Int(area.width), height: Int(area.height))) {
+            if scenePhase != .background, area.width > 0, area.height > 0 {
                 // A resize (the keyboard, a turn of the phone) settles before the page is laid out again.
                 if watching { try? await Task.sleep(for: .milliseconds(250)) }
                 guard !Task.isCancelled else { return }
