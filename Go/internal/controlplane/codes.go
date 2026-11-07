@@ -45,8 +45,19 @@ type storedCode struct {
 	// The person whose client or machine uses it (#994); none is the local owner.
 	Owner *string `json:"owner,omitempty"`
 	// An invite (#994): the client that uses it is a new person's first.
-	Invite  *invite       `json:"invite,omitempty"`
-	Expires records.Stamp `json:"expires"`
+	Invite *invite `json:"invite,omitempty"`
+	// The workspace an install made a host code for (#3871): the host that joins with it is
+	// linked to it, whatever name the host joins with.
+	Workspace *codeWorkspace `json:"workspace,omitempty"`
+	Expires   records.Stamp  `json:"expires"`
+}
+
+// codeWorkspace is a provider's workspace that a host code is for, and the host key the
+// person trusted for it at the install.
+type codeWorkspace struct {
+	Provider  string `json:"provider"`
+	Workspace string `json:"workspace"`
+	Trust     string `json:"trust,omitempty"`
 }
 
 // invite is who an invite code makes: their name and role, and the admin who asked.
@@ -112,6 +123,7 @@ func (c *Codes) issue(ctx context.Context, host, browser bool, lifetime time.Dur
 	}
 	if host {
 		stored.Purpose = "host"
+		stored.Workspace = codeWorkspaceOf(ctx)
 	} else if browser {
 		yes := true
 		stored.Browser = &yes

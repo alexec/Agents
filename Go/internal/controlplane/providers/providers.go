@@ -1819,6 +1819,22 @@ func (p *Providers) formAsksForRepository(id string) bool {
 	return ok
 }
 
+// LinkJoined links a host that joined with a host code an install made for a workspace
+// (#3871): by the code, not by the host's name, which the host can choose for itself, and
+// with no client open. A host that is linked to it already keeps its options.
+func (p *Providers) LinkJoined(host, provider, workspace, trust string) {
+	if link := LinkOf(p.records.Host(host)); link != nil && link.Provider == provider && link.Workspace == workspace {
+		return
+	}
+	request := MachineLink{Host: wire.MachineRef(host), Provider: wire.ProviderID(provider), Workspace: workspace}
+	if trust != "" {
+		request.Trust = &trust
+	}
+	if _, err := p.link(request); err != nil {
+		p.log(fmt.Sprintf("workspace: %s joined for %s/%s, but wasn't linked: %s", host, provider, workspace, errorWords(err)))
+	}
+}
+
 // linkWhenJoined links a made workspace's host once it has joined, within the start's time.
 func (p *Providers) linkWhenJoined(name string) {
 	began := time.Now()
