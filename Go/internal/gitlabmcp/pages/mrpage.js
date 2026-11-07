@@ -98,7 +98,7 @@ const mrPage = (ui, project, back) => {
     try { diff = await ui.call("show_merge_request_diff", { project: project() || mr.project, number: mr.number }); }
     catch (e) { say("Couldn't load the diff: " + e.message, true); return; }
     try {
-      await request("agents/open-diff", { title: `!${mr.number} ${mr.title}`, url: diff.url, files: diff.files, cut: !!diff.cut,
+      await request("agents/open-diff", { title: `!${mr.number} ${mr.title}`, url: diff.url, site: "GitLab", files: diff.files, cut: !!diff.cut,
         ...(path ? { path } : {}) });
       say("");
     } catch (e) {

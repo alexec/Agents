@@ -23,11 +23,11 @@ export const otherProvidersElsewhere = "Other providers are set up on the Mac.";
 export const disconnectNote = "Disconnect deletes the machine's tokens. Every folder's GitHub slots wait for a connection again. To revoke the App too, go to github.com ▸ Settings ▸ Applications.";
 
 export function intro(folder: string, repository: string | undefined, site = "github.com"): string {
-  if (!repository) return `What agents in ${folder} can reach. It has no GitHub or GitLab remote.`;
+  if (!repository) return `What agents in ${folder} can reach. It has no GitHub, GitLab, Forgejo or Bitbucket remote.`;
   return `What agents in ${folder} can reach. Repository ${site}/${repository}, from its git remote.`;
 }
 
-// The forge (#1632): GitHub or GitLab fills Tasks, Code review and CI, as the Mac's words.
+// The forge (#1632, #3752, #3785): GitHub, GitLab, Forgejo or Bitbucket fills Tasks, Code review and CI, as the Mac's words.
 
 /** The forge, GitHub when the host did not say. */
 export function forgeOf(setup: ConnectorSetup): ConnectionProvider {
@@ -35,11 +35,13 @@ export function forgeOf(setup: ConnectorSetup): ConnectionProvider {
 }
 
 export function connectTitleFor(forge: ConnectionProvider): string {
+  if (forge === "forgejo") return forgejo.connectTitle;
+  if (forge === "bitbucket") return bitbucket.connectTitle;
   return forge === "gitlab" ? "Connect GitLab once: issues, merge requests and pipelines." : connectTitle;
 }
 
 export function connectNoteFor(forge: ConnectionProvider): string {
-  return forge === "gitlab" ? "Your connection, for every folder. It reaches what your GitLab account can see." : connectNote;
+  return forge === "gitlab" || forge === "forgejo" || forge === "bitbucket" ? `Your connection, for every folder. It reaches what your ${name(forge)} account can see.` : connectNote;
 }
 
 export function connectAgain(forge: ConnectionProvider): string {
@@ -50,15 +52,15 @@ export function comesWith(forge: ConnectionProvider): string {
   return `Comes with the ${name(forge)} connection.`;
 }
 
-export const noRemote = "No GitHub or GitLab remote";
+export const noRemote = "No GitHub, GitLab, Forgejo or Bitbucket remote";
 
-/** The button on a refused slot, and where it goes: the App's install on GitHub, the folder on GitLab. */
+/** The button on a refused slot, and where it goes: the App's install on GitHub, the repository on GitLab, Forgejo and Bitbucket. */
 export function grantButton(setup: ConnectorSetup): string {
-  return forgeOf(setup) === "gitlab" ? `Open on ${setup.site ?? "gitlab.com"}` : "Grant on github.com";
+  return forgeOf(setup) === "github" ? "Grant on github.com" : `Open on ${setup.site ?? site(forgeOf(setup))}`;
 }
 
 export function grantURL(setup: ConnectorSetup): string | undefined {
-  return forgeOf(setup) === "gitlab" ? setup.repositoryURL : setup.installURL;
+  return forgeOf(setup) === "github" ? setup.installURL : setup.repositoryURL;
 }
 
 export function connected(c: Connection): string {
@@ -141,7 +143,7 @@ export function title(slot: ConnectorSlot): string {
 export function line(slot: ConnectorSlot, folder: string, repository: string | undefined, onMac: boolean,
   forge: ConnectionProvider = "github"): string {
   const repo = repository ?? folder;
-  const gitlab = forge === "gitlab";
+  const gitlab = forge === "gitlab", checks = forge === "forgejo" || forge === "bitbucket";
   switch (slot.state) {
     case "skipped":
       return {
@@ -153,7 +155,7 @@ export function line(slot: ConnectorSlot, folder: string, repository: string | u
         workspace: "Agents run on this Mac.",
       }[slot.slot];
     case "noRemote":
-      return `${folder} has no GitHub or GitLab remote, so ${slot.choice} can't be read for it.`;
+      return `${folder} has no GitHub, GitLab, Forgejo or Bitbucket remote, so ${slot.choice} can't be read for it.`;
     case "failed":
     case "refused":
       return slot.message ?? "The read didn't work.";
@@ -163,7 +165,7 @@ export function line(slot: ConnectorSlot, folder: string, repository: string | u
       return {
         tasks: `No issues yet in ${repo}.`,
         codeReview: gitlab ? `No merge requests yet in ${repo}.` : `No pull requests yet in ${repo}.`,
-        ci: gitlab ? `No pipelines yet in ${repo}.` : `No workflow runs yet in ${repo}.`,
+        ci: gitlab ? `No pipelines yet in ${repo}.` : checks ? `No checks yet on ${repo}'s default branch.` : `No workflow runs yet in ${repo}.`,
         docs: docs.none,
         messaging: "",
         workspace: onMac ? "Nothing to set up. Other places are set up in Providers." : otherProvidersElsewhere,
@@ -254,26 +256,31 @@ export function codespacesElsewhere(hasMac: boolean): string {
 }
 
 /** The providers a person connects, in the order Connectors shows them. */
-export const providers: ConnectionProvider[] = ["github", "linear", "gitlab", "email", "atlassian"];
+export const providers: ConnectionProvider[] = ["github", "linear", "gitlab", "email", "atlassian", "forgejo", "bitbucket"];
 
-/** The providers that host can connect: Email only when it has connections.email/1 (#1780). */
-export function providersFor(hasEmail: boolean): ConnectionProvider[] {
-  return hasEmail ? providers : providers.filter((p) => p !== "email");
+/**
+ * The providers that host can connect, in this page's order: the ones its connections/list says (#3824),
+ * less any this page does not know. A host older than #3824 says none: it connects GitHub, Linear,
+ * GitLab, Atlassian and, when it has connections.email/1 (#1780), Email.
+ */
+export function providersFor(hasEmail: boolean, hostProviders?: readonly string[]): ConnectionProvider[] {
+  const takes: readonly string[] = hostProviders ?? ["github", "linear", "gitlab", "atlassian", ...(hasEmail ? ["email"] : [])];
+  return providers.filter((p) => takes.includes(p));
 }
 
-/** The provider's name: GitHub, Linear, GitLab, Email, Atlassian (Jira and Confluence, #3304). */
+/** The provider's name: GitHub, Linear, GitLab, Email, Atlassian (Jira and Confluence, #3304), Forgejo, Bitbucket. */
 export function name(p: ConnectionProvider): string {
-  return { github: "GitHub", linear: "Linear", gitlab: "GitLab", email: "Email", atlassian: jira.provider }[p];
+  return { github: "GitHub", linear: "Linear", gitlab: "GitLab", email: "Email", atlassian: jira.provider, forgejo: forgejo.name, bitbucket: bitbucket.name }[p];
 }
 
 /** The provider's letters on its mark. */
 export function letters(p: ConnectionProvider): string {
-  return { github: "GH", linear: "L", gitlab: "GL", email: "EM", atlassian: jira.letters }[p];
+  return { github: "GH", linear: "L", gitlab: "GL", email: "EM", atlassian: jira.letters, forgejo: forgejo.letters, bitbucket: bitbucket.letters }[p];
 }
 
-/** The device page's site, for "Open github.com Again". Email has no device page. */
+/** The device page's site, for "Open github.com Again". Email has no device page; Forgejo's is Codeberg's, Bitbucket's bitbucket.org. */
 export function site(p: ConnectionProvider): string {
-  return { github: "github.com", linear: "linear.app", gitlab: "gitlab.com", email: "", atlassian: jira.site }[p];
+  return { github: "github.com", linear: "linear.app", gitlab: "gitlab.com", email: "", atlassian: jira.site, forgejo: "codeberg.org", bitbucket: "bitbucket.org" }[p];
 }
 
 export function connectionTitle(c: Connection): string {
@@ -288,7 +295,7 @@ export function connectionNote(c: Connection, now: Date = new Date()): string {
       : "The access token ended: connect again with a new one";
   }
   const how = c.expiresAt !== undefined ? `Access token · ${tokenEnds(fromWireDate(c.expiresAt), now)}`
-    : c.byToken ? jira.tokenWay : "OAuth · renews by itself";
+    : c.provider === "forgejo" ? forgejo.how : c.provider === "bitbucket" ? bitbucket.how : c.byToken ? jira.tokenWay : "OAuth · renews by itself";
   return [c.workspace, how].filter((x): x is string => !!x).join(" · ");
 }
 
@@ -325,6 +332,8 @@ export function notConnectedNote(p: ConnectionProvider): string {
     gitlab: "Merge requests, pipelines and issues on gitlab.com or your own GitLab.",
     email: "One mailbox for agents: they wait for mail, such as a sign-up code, and read it.",
     atlassian: jira.notConnectedNote,
+    forgejo: forgejo.notConnectedNote,
+    bitbucket: bitbucket.notConnectedNote,
   }[p];
 }
 
@@ -338,6 +347,8 @@ export function disconnectNoteFor(p: ConnectionProvider): string {
   if (p === "gitlab") return gitlab.disconnectNote;
   if (p === "email") return email.disconnectNote;
   if (p === "atlassian") return jira.disconnectNote;
+  if (p === "forgejo") return forgejo.disconnectNote;
+  if (p === "bitbucket") return bitbucket.disconnectNote;
   return "Disconnect deletes the machine's tokens. Linear's events stop until you connect again or set LINEAR_API_KEY. To revoke Agents too, go to linear.app ▸ Settings ▸ Security & access.";
 }
 
@@ -403,6 +414,96 @@ export function newGitLabTokenURL(address: string): string {
   }
   const path = root.pathname.replace(/\/+$/, "").replace(/\/api\/v4$/, "");
   return `${root.origin}${path}/-/user_settings/personal_access_tokens?name=Agents&scopes=api`;
+}
+
+/** codeberg.org: the field's example, and where Make a Token goes with no address. */
+export const codeberg = "https://codeberg.org";
+
+/**
+ * Connect Forgejo (#3752): an access token on Codeberg or any Forgejo or Gitea. Forgejo has no
+ * device page, so the dialog has one way in. The Mac's ConnectorSetupWords.Forgejo.
+ */
+export const forgejo = {
+  name: "Forgejo",
+  letters: "FJ",
+  title: "Connect Forgejo",
+  connectTitle: "Connect Forgejo once: issues, pull requests and checks.",
+  notConnectedNote: "Pull requests, checks and issues on Codeberg or your own Forgejo or Gitea.",
+  subtitle: "For you, in every folder. Agents talks to Forgejo's API directly.",
+  abilities: [
+    "Read and write pull requests and their comments",
+    "Read checks (commit statuses)",
+    "Read and write issues",
+  ],
+  tokenIntro: "Codeberg, or your own Forgejo or Gitea: make an access token with read and write on repository and issue, and read on user, and paste it here.",
+  addressLabel: "Forgejo address",
+  addressPrompt: codeberg,
+  tokenLabel: "Access token",
+  tokenPrompt: "Paste the token",
+  tokenButton: "Connect",
+  newTokenButton: "Make a Token on Forgejo",
+  checking: "Checking the token with Forgejo…",
+  choose: "The token does not end. You can take it back on Forgejo ▸ Settings ▸ Applications, or with Disconnect on Connectors.",
+  how: "Access token",
+  disconnectNote: "Disconnect deletes the machine's token. Every folder's Forgejo slots wait for a connection again. Forgejo's events stop until you connect again or set FORGEJO_TOKEN. To revoke it too, go to Forgejo ▸ Settings ▸ Applications.",
+};
+
+/** The address Connect Again… opens with: the connection's Forgejo. The Mac's ConnectorSetupWords.Forgejo.again. */
+export function forgejoAgain(c: Connection): string {
+  return c.workspace ? `${new URL(codeberg).protocol}//${c.workspace}` : "";
+}
+
+/** Where the person makes a token on the Forgejo at address (Codeberg when empty), opened in a new tab. */
+export function newForgejoTokenURL(address: string): string {
+  const typed = address.trim();
+  let root = new URL(codeberg);
+  if (typed) {
+    try {
+      root = new URL(typed.includes("://") ? typed : `${root.protocol}//${typed}`);
+    } catch {
+      // Not an address: Codeberg's page.
+    }
+  }
+  const path = root.pathname.replace(/\/+$/, "").replace(/\/api\/v1$/, "");
+  return `${root.origin}${path}/user/settings/applications`;
+}
+
+/**
+ * Connect Bitbucket (#3785): a token on Bitbucket Cloud, as the bitbucket server takes it: an
+ * Atlassian API token with its account's email, or a repository, project or workspace access
+ * token with no email. Bitbucket has no device page. The Mac's ConnectorSetupWords.Bitbucket.
+ */
+export const bitbucket = {
+  name: "Bitbucket",
+  letters: "BB",
+  title: "Connect Bitbucket",
+  connectTitle: "Connect Bitbucket once: issues, pull requests and checks.",
+  notConnectedNote: "Pull requests, checks and issues on Bitbucket Cloud.",
+  subtitle: "For you, in every folder. Agents talks to Bitbucket Cloud's API directly.",
+  abilities: [
+    "Read and write pull requests and their comments",
+    "Read checks (Pipelines and other commit statuses)",
+    "Read and write issues",
+  ],
+  tokenIntro: "Make an Atlassian API token with the Bitbucket scopes and give its account's email. Or paste a repository, project or workspace access token, and leave the email empty.",
+  emailLabel: "Atlassian email",
+  emailPrompt: "Empty for an access token",
+  tokenLabel: "Token",
+  tokenPrompt: "Paste the token",
+  tokenButton: "Connect",
+  newTokenButton: "Make an API Token on Atlassian",
+  newTokenURL: "https://id.atlassian.com/manage-profile/security/api-tokens",
+  checking: "Checking the token with Bitbucket…",
+  choose: "An API token ends on the date you gave it. You can take it back at id.atlassian.com ▸ Security ▸ API tokens (an access token in the repository's settings), or with Disconnect on Connectors.",
+  how: "Token",
+  disconnectNote: "Disconnect deletes the machine's token. Every folder's Bitbucket slots wait for a connection again. Bitbucket's events stop until you connect again or set BITBUCKET_TOKEN. To revoke it too, go to id.atlassian.com ▸ Security ▸ API tokens, or the repository's Access tokens.",
+};
+
+/** The connections/sign-in/token request for Bitbucket: the email only for an Atlassian API token. */
+export function bitbucketTokenRequest(email: string, token: string): { provider: "bitbucket"; user?: string; token: string } | undefined {
+  const user = email.trim(), typed = token.trim();
+  if (!typed) return undefined;
+  return user ? { provider: "bitbucket", user, token: typed } : { provider: "bitbucket", token: typed };
 }
 
 /** Connect Email (#1780): one IMAP mailbox, by an app password that goes to the host only. */
@@ -494,19 +595,19 @@ export function emailRequest(server: string, user: string, password: string): { 
 
 /** The sheet's subtitle, list and button, by provider. */
 export function sheetSubtitleFor(p: ConnectionProvider): string {
-  return { github: sheetSubtitle, linear: linear.subtitle, gitlab: gitlab.subtitle, email: email.subtitle, atlassian: jira.subtitle }[p];
+  return { github: sheetSubtitle, linear: linear.subtitle, gitlab: gitlab.subtitle, email: email.subtitle, atlassian: jira.subtitle, forgejo: forgejo.subtitle, bitbucket: bitbucket.subtitle }[p];
 }
 
 export function abilitiesFor(p: ConnectionProvider): string[] {
-  return { github: abilities, linear: linear.abilities, gitlab: gitlab.abilities, email: email.abilities, atlassian: jira.abilities }[p];
+  return { github: abilities, linear: linear.abilities, gitlab: gitlab.abilities, email: email.abilities, atlassian: jira.abilities, forgejo: forgejo.abilities, bitbucket: bitbucket.abilities }[p];
 }
 
 export function sheetChooseFor(p: ConnectionProvider): string {
-  return { github: sheetChoose, linear: linear.choose, gitlab: gitlab.choose, email: email.choose, atlassian: jira.choose }[p];
+  return { github: sheetChoose, linear: linear.choose, gitlab: gitlab.choose, email: email.choose, atlassian: jira.choose, forgejo: forgejo.choose, bitbucket: bitbucket.choose }[p];
 }
 
 export function continueButtonFor(p: ConnectionProvider): string {
-  return { github: continueButton, linear: linear.continueButton, gitlab: gitlab.continueButton, email: email.button, atlassian: jira.continueButton }[p];
+  return { github: continueButton, linear: linear.continueButton, gitlab: gitlab.continueButton, email: email.button, atlassian: jira.continueButton, forgejo: forgejo.tokenButton, bitbucket: bitbucket.tokenButton }[p];
 }
 
 export function sheetStatus(s: ConnectionSignIn): string {

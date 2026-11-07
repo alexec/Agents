@@ -120,7 +120,7 @@ def follow(client, runtime, agent, model, report_path, minutes):
         # A turn that ends on a wait still open is not the last: it is started again (#1432).
         wait = (record or {}).get("eventWait")
         waiting = wait and (not wait.get("ending") or record.get("queuedPrompts"))
-        # Nor is one that ends on check_again or wait_for_agents: `waiting`, with a time to
+        # Nor is one that ends on check_again or a wait on agent.ended: `waiting`, with a time to
         # start again or agents to wait on (#3698).
         block = report.get("block") or {}
         checking = (record or {}).get("state") != "archived" and report.get("outcome") == "waiting" \

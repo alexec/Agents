@@ -1824,6 +1824,11 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, webOrigin
 		s.router.Know(host)
 		s.router.HoldToOwners()
 		s.log("host " + a.Name + " enrolled as " + host)
+		// A host an install made the code for a workspace for is linked to it (#3871): its
+		// name may not be the one the install asked for.
+		if w := stored.Workspace; w != nil && s.providers != nil {
+			go s.providers.LinkJoined(host, w.Provider, w.Workspace, w.Trust)
+		}
 		return result, nil
 	}
 	return nil, fail(notPermitted, "That code is not for %s.", method)

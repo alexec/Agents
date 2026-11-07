@@ -138,10 +138,15 @@ export interface Diff {
   cut: boolean;
   /** The file to show first, when the view named one. */
   path?: string | undefined;
+  /** The forge the diff is on, for Open on and the cut line: GitHub unless the view names another,
+   *  as the gitlab server's views do (#3837). */
+  site: string;
 }
 /** The most lines a diff may have, all files together, and the most files. */
 export const diffLineLimit = 20000;
 export const diffFileLimit = 3000;
+/** The most characters of a site's name. */
+export const diffSiteLimit = 40;
 
 const count = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? Math.max(0, Math.floor(v)) : 0);
 
@@ -177,8 +182,9 @@ export function readDiff(params: Record<string, unknown>): { diff: Diff } | { re
     const u = new URL(String(params.url));
     if (u.protocol === "https:" || u.protocol === "http:") url = u.href;
   } catch { /* not a URL */ }
+  const site = typeof params.site === "string" ? params.site.trim().slice(0, diffSiteLimit) : "";
   return { diff: { title: title || "Changes", url, files, cut: params.cut === true,
-    path: typeof params.path === "string" ? params.path : undefined } };
+    path: typeof params.path === "string" ? params.path : undefined, site: site || "GitHub" } };
 }
 
 /** What a view filled the new-agent form with (#834, `agents/start-agent`): AppViewStart. The

@@ -18,6 +18,8 @@ type PR struct {
 	URL    string
 	// Fixes is the issues its body says it closes (#2349), where the list read its body.
 	Fixes []string
+	// Author is who opened it, for mine on a PR no longer open (#3797); not in its JSON.
+	Author string
 }
 
 func (p PR) json() map[string]any {

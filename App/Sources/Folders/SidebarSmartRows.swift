@@ -139,7 +139,8 @@ struct SmartFold: View {
 
 /// One thing waiting for an OK under Needs You (#773): an MCP server, a workflow, a plugin
 /// or a guarded file. A click opens its Review page in the detail column (#1472), with
-/// Approve, Deny and, where an agent made it, Request Changes; the menu answers at once.
+/// Approve, Deny and, where an agent made it, Request Changes; the menu answers at once, and
+/// so do Approve, a leading swipe, and Deny, a trailing one (#3763).
 private struct ApprovalListRow: View {
     @Environment(AppModel.self) private var model
     /// In a folder's own window, how it opens what is picked (#1090).
@@ -155,6 +156,22 @@ private struct ApprovalListRow: View {
             .help("\(approval.kindWord) · \(approval.line)")
             .sidebarInk(item)
             .tag(item)
+            .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                if approval.actions.contains(.approve) {
+                    SwipeAction { await answer(.approve) } label: {
+                        Label(approval.word(for: .approve), systemImage: "checkmark")
+                    }
+                    .tint(Paper.accent)
+                }
+            }
+            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                if approval.actions.contains(.deny) {
+                    SwipeAction { await answer(.deny) } label: {
+                        Label(approval.word(for: .deny), systemImage: "xmark")
+                    }
+                    .tint(StateTint.failure.color)
+                }
+            }
             .contextMenu {
                 Button("Review…") { open() }
                 if approval.actions.contains(.approve) {
@@ -173,9 +190,14 @@ private struct ApprovalListRow: View {
         if let windowOpen { windowOpen(item) } else { model.sidebarItem = item }
     }
 
-    /// From the menu, of the version the row was drawn from: a later change is refused.
+    /// From the menu or a swipe, of the version the row was drawn from: a later change is
+    /// refused.
     private func answerNow(_ action: Approval.Action) {
-        Task { await model.settleApproval(approval, action, for: folder) }
+        Task { await answer(action) }
+    }
+
+    private func answer(_ action: Approval.Action) async {
+        await model.settleApproval(approval, action, for: folder)
     }
 }
 

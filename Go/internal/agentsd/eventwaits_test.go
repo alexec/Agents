@@ -30,7 +30,7 @@ func TestAWaitSaysWhatIsWrongWithIt(t *testing.T) {
 		{map[string]any{"events": "agent.finsihed", "until_minutes": 5}, `"agent.finsihed" is not an event. Did you mean agent.finished? Events you can wait on: agent.started,`},
 		{map[string]any{"events": "custom.done", "until_minutes": 5}, `"custom.done" is never raised: agents no longer publish events`},
 		{map[string]any{"events": "agent.finished", "where": map[string]any{"x": 1}, "until_minutes": 5},
-			`agent.finished takes no arguments; "x" is not one of its arguments. To wait for particular agents, use wait_for_agents.`},
+			`agent.finished takes no arguments; "x" is not one of its arguments. To wait for particular agents, use agent.ended with agent.`},
 		{map[string]any{"events": "person.away", "where": map[string]any{"why": "asleep"}, "until_minutes": 5},
 			"person.away: why is one of locked, idle, not asleep."},
 		{map[string]any{"events": "pr.merged", "until_minutes": 5}, "No server here offers pr.merged. This folder has no MCP server that offers events."},
@@ -138,6 +138,43 @@ func TestAHeldWaitWakesTheAgentLater(t *testing.T) {
 		t.Fatalf("%+v", w)
 	}
 	waitFor(t, "its turn over", func() bool { return d.Store.Agent(a.ID).State == wire.AgentStateFinished })
+}
+
+// #3797: a wait on branch.moved names the branch or sets any: true; any is no detail of the
+// event, so a wait with it still wakes.
+func TestABranchWaitNamesTheBranchOrSetsAny(t *testing.T) {
+	fakeRuntimes(t)
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := t.TempDir()
+	a := seeded(t, d, dir, nil)
+	m := appClient(t, d, a.ID)
+	m.post("initialize", map[string]any{}, 1)
+	for i, events := range []string{"branch.moved", "branch.*"} {
+		text, isErr := m.tool(2+i, "wait_for_event", map[string]any{"events": events, "until_minutes": 10})
+		if want := events + ": Name the branch (`branch`), or set `any: true` to wake on every branch in the folder. Nothing is waiting."; !isErr || text != want {
+			t.Fatalf("%s: %s", events, text)
+		}
+	}
+	if d.Store.Agent(a.ID).EventWait != nil {
+		t.Fatal("a refused wait waits")
+	}
+	d.raise(wire.EventDraft{Name: "branch.moved", At: now(), Scope: folderScope(dir), Sentence: "other moved.", Details: map[string]string{"branch": "other"}})
+	answered := make(chan string, 1)
+	go func() {
+		text, _ := m.tool(9, "wait_for_event", map[string]any{"events": "branch.moved", "where": map[string]any{"any": true}, "until_minutes": 10})
+		answered <- text
+	}()
+	waitFor(t, "the wait", func() bool { w := d.Store.Agent(a.ID).EventWait; return w != nil })
+	d.raise(wire.EventDraft{Name: "branch.moved", At: now(), Scope: folderScope(dir), Sentence: "cd moved.", Details: map[string]string{"branch": "cd"}})
+	select {
+	case text := <-answered:
+		if !strings.Contains(text, "branch.moved happened at ") {
+			t.Fatal(text)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("any: true never woke")
+	}
 }
 
 func TestAWaitEnds(t *testing.T) {

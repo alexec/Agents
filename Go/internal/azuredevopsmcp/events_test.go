@@ -3,6 +3,7 @@ package azuredevopsmcp
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -12,11 +13,14 @@ import (
 // The events over the fake Azure DevOps: the gitlab server's names, the trust filter (#728),
 // and each one raised once from what Azure DevOps says.
 
-func TestTheEventsAreTheGitLabServersPullRequestEvents(t *testing.T) {
+func TestTheEventsAreTheGitLabServersPullRequestEventsChecksPassedAndRunCompleted(t *testing.T) {
 	var want []string
 	for _, name := range gitlabmcp.EventNames() {
 		if !strings.HasPrefix(name, "issue.") {
 			want = append(want, name)
+		}
+		if name == "checks.failed" {
+			want = append(want, "checks.passed", "run.completed")
 		}
 	}
 	same(t, EventNames(), want)
@@ -127,7 +131,7 @@ func TestChecksFailedForAPullRequestsHead(t *testing.T) {
 		f.builds = []obj{
 			build(11, 1, "sha1", "ci", "failed", 1),
 			build(12, 1, "sha1", "lint", "succeeded", 1),
-			build(13, 2, "old", "ci", "failed", 1), // a push since: not its head's
+			build(13, 2, "old", "ci", "failed", 1),  // a push since: not its head's
 			build(14, 8, "sha8", "ci", "failed", 1), // not an open pull request
 		}
 	})
@@ -146,6 +150,140 @@ func TestChecksFailedForAPullRequestsHead(t *testing.T) {
 	if len(ids) != 1 {
 		t.Fatalf("again: %v", ids)
 	}
+}
+
+func TestChecksFailedFromABranchBuildAtTheHead(t *testing.T) {
+	f := newFake(t)
+	f.pulls = []obj{pull(1, "feature", dev, nil), pull(2, "pushed", dev, nil),
+		pull(3, "forked", dev, obj{"forkSource": obj{"name": "fork"}})}
+	p := newPoller(t, f, "checks.failed", nil)
+	p.poll()
+	f.set(func() {
+		f.builds = []obj{
+			branchBuild(21, "feature", "sha1", "ci", "failed", 1),
+			branchBuild(22, "pushed", "old", "ci", "failed", 1),  // an older push's
+			branchBuild(23, "forked", "sha3", "ci", "failed", 1), // this repository's branch, not the fork's
+			branchBuild(24, "main", "sha1", "ci", "failed", 1),   // no pull request's branch
+		}
+	})
+	ids, result := p.poll()
+	same(t, ids, []string{"checks.failed:acme/Web App/app:sha1:" + timeString(start.Add(60e9))})
+	url := "https://ado.test/acme/Web%20App/_build/results?buildId=21"
+	same(t, data(t, result, 0)["run"], map[string]any{"id": 21, "name": "ci", "url": url})
+}
+
+func TestChecksFailedFromAnotherServicesStatus(t *testing.T) {
+	f := newFake(t)
+	f.pulls = []obj{pull(1, "feature", dev, nil), pull(2, "fixed", dev, nil), pull(3, "pushed", dev, nil)}
+	f.iterations[3] = []obj{{"id": 1}, {"id": 2}}
+	p := newPoller(t, f, "checks.failed", nil)
+	p.poll()
+	f.set(func() {
+		f.statuses[1] = []obj{prStatus(1, "scan", "deps", "failed", 1, 0), prStatus(2, "scan", "licence", "error", 1, 0)}
+		// Failed, then passed: the newest of a context counts.
+		f.statuses[2] = []obj{prStatus(3, "scan", "deps", "failed", 1, 0), prStatus(4, "scan", "deps", "succeeded", 1, 0)}
+		// Of the first push, not the head's.
+		f.statuses[3] = []obj{prStatus(5, "scan", "deps", "failed", 1, 1)}
+	})
+	ids, result := p.poll()
+	same(t, ids, []string{"checks.failed:acme/Web App/app:sha1:" + timeString(start.Add(60e9))})
+	d := data(t, result, 0)
+	same(t, d["run"], map[string]any{"id": 0, "name": "scan/deps", "url": "https://scan.test/1"})
+	same(t, d["failedJobs"], []any{map[string]any{"name": "scan/deps", "url": "https://scan.test/1"},
+		map[string]any{"name": "scan/licence", "url": "https://scan.test/2"}})
+	ids, _ = p.poll()
+	same(t, ids, []string(nil))
+	// A failed build too: the build is the run.
+	f.set(func() {
+		f.statuses[3] = append(f.statuses[3], prStatus(6, "scan", "deps", "failed", 3, 2))
+		f.builds = []obj{build(31, 1, "sha1", "ci", "failed", 3)}
+	})
+	ids, result = p.poll()
+	same(t, ids, []string{"checks.failed:acme/Web App/app:sha1:" + timeString(start.Add(180e9)),
+		"checks.failed:acme/Web App/app:sha3:" + timeString(start.Add(180e9))})
+	same(t, data(t, result, 0)["run"].(map[string]any)["id"], 31)
+}
+
+func TestChecksPassedForEachBuildAndStatusAtTheHead(t *testing.T) {
+	f := newFake(t)
+	f.pulls = []obj{pull(1, "feature", dev, nil), pull(2, "bot", renovate, nil)}
+	p := newPoller(t, f, "checks.passed", nil)
+	mine := newPoller(t, f, "checks.passed", map[string]any{"pr": 1})
+	p.poll()
+	mine.poll()
+	f.set(func() {
+		f.builds = []obj{
+			build(41, 1, "sha1", "ci", "succeeded", 1),
+			branchBuild(42, "feature", "sha1", "push", "succeeded", 1),
+			build(43, 1, "sha1", "lint", "failed", 1),
+			build(44, 1, "sha1", "flaky", "canceled", 1),
+			build(45, 2, "sha2", "ci", "succeeded", 1), // a bot's pull request
+		}
+		f.statuses[1] = []obj{prStatus(7, "scan", "deps", "succeeded", 1, 0), prStatus(8, "scan", "wait", "pending", 1, 0)}
+	})
+	ids, result := p.poll()
+	at := timeString(start.Add(60e9))
+	same(t, ids, []string{"checks.passed:acme/Web App/app:sha1:build:41:" + at, "checks.passed:acme/Web App/app:sha1:build:42:" + at,
+		"checks.passed:acme/Web App/app:sha1:status:7:" + at})
+	d := data(t, result, 0)
+	same(t, d["headSha"], "sha1")
+	same(t, d["pr"].(map[string]any)["number"], 1)
+	same(t, d["run"], map[string]any{"id": 41, "name": "ci", "url": "https://ado.test/acme/Web%20App/_build/results?buildId=41"})
+	same(t, data(t, result, 2)["run"], map[string]any{"id": 0, "name": "scan/deps", "url": "https://scan.test/7"})
+	ids, _ = mine.poll()
+	if len(ids) != 3 {
+		t.Fatalf("pr 1: %v", ids)
+	}
+	ids, _ = p.poll()
+	same(t, ids, []string(nil))
+}
+
+// run.completed (#3810) is a build of any trigger and result, main's, a tag's or a manual
+// run's, once per build and finish time, filtered by pipeline, branch and run; never a bot's
+// or a fork's pull request's unless anyone is true.
+func TestRunCompletedForABuildNoPullRequestOwns(t *testing.T) {
+	f := newFake(t)
+	p := newPoller(t, f, "run.completed", nil)
+	release := newPoller(t, f, "run.completed", map[string]any{"pipeline": "Release", "branch": "v0.16.0"})
+	anyone := newPoller(t, f, "run.completed", map[string]any{"anyone": true})
+	for _, w := range []*poller{p, release, anyone} {
+		w.poll()
+	}
+	tag := branchBuild(51, "main", "sha51", "release", "failed", 1)
+	tag["sourceBranch"], tag["reason"], tag["requestedFor"] = "refs/tags/v0.16.0", "manual", alex
+	scheduled := branchBuild(53, "main", "sha53", "nightly", "succeeded", 1)
+	scheduled["reason"], scheduled["requestedFor"] = "schedule", builder
+	forked := build(54, 7, "sha7", "ci", "canceled", 1)
+	forked["triggerInfo"].(obj)["pr.isFork"] = "True"
+	f.set(func() {
+		f.builds = []obj{tag, branchBuild(52, "main", "sha52", "release", "partiallySucceeded", 1), scheduled, forked}
+	})
+	done := timeString(start.Add(60e9))
+	id := func(n int) string { return "run.completed:acme/Web App/app:" + strconv.Itoa(n) + ":" + done }
+	ids, result := p.poll()
+	same(t, ids, []string{id(51), id(52)})
+	same(t, data(t, result, 0), map[string]any{"run": map[string]any{"id": 51, "name": "release", "number": "2026.11.51",
+		"event": "manual", "branch": "v0.16.0", "headSha": "sha51", "url": "https://ado.test/acme/Web%20App/_build/results?buildId=51",
+		"conclusion": "failed", "actor": "alex@acme.test"}, "completedAt": done})
+	same(t, data(t, result, 1)["run"].(map[string]any)["branch"], "main")
+	ids, _ = release.poll()
+	same(t, ids, []string{id(51)})
+	ids, _ = anyone.poll()
+	same(t, ids, []string{id(51), id(52), id(53), id(54)})
+	ids, _ = p.poll()
+	same(t, ids, []string(nil))
+	// Run again: a new finish time is a new event.
+	f.set(func() { tag["finishTime"], tag["result"] = at(3), "succeeded" })
+	ids, _ = release.poll()
+	same(t, ids, []string{"run.completed:acme/Web App/app:51:" + timeString(start.Add(180e9))})
+
+	one := newPoller(t, f, "run.completed", map[string]any{"run": 52})
+	one.poll()
+	f.set(func() { f.builds[1]["finishTime"] = at(5) })
+	ids, _ = one.poll()
+	same(t, ids, []string{"run.completed:acme/Web App/app:52:" + timeString(start.Add(300e9))})
+	ids, _ = one.poll()
+	same(t, ids, []string(nil))
 }
 
 func TestReviewCommentIsALineOfTheDiff(t *testing.T) {

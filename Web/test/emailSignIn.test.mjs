@@ -34,7 +34,13 @@ test("the request has all three fields, or none", () => {
   assert.equal(c.emailRequest("imap.fastmail.com", "agents@example.com", ""), undefined);
 });
 
-test("Email comes before Atlassian, and only on a host with connections.email/1", () => {
+test("A host older than #3824: Email comes before Atlassian, and only with connections.email/1; no Forgejo or Bitbucket", () => {
   assert.deepEqual(c.providersFor(true), ["github", "linear", "gitlab", "email", "atlassian"]);
   assert.deepEqual(c.providersFor(false), ["github", "linear", "gitlab", "atlassian"]);
+});
+
+test("Connect… offers only what the host says it connects, in the page's order, less names the page does not know (#3824)", () => {
+  assert.deepEqual(c.providersFor(false, ["bitbucket", "github", "email", "forgejo", "linear", "gitlab", "atlassian"]),
+    ["github", "linear", "gitlab", "email", "atlassian", "forgejo", "bitbucket"]);
+  assert.deepEqual(c.providersFor(true, ["github", "azuredevops"]), ["github"]);
 });

@@ -32,7 +32,7 @@ extension DaemonAPI.Method {
 
 extension DaemonAPI {
     public enum ConnectionProvider: String, Codable, Sendable, Hashable, CaseIterable, Identifiable {
-        case github, linear, gitlab, email, atlassian
+        case github, linear, gitlab, email, atlassian, forgejo, bitbucket
         public var id: String { rawValue }
     }
 
@@ -74,7 +74,27 @@ extension DaemonAPI {
 
     public struct ConnectionsList: Codable, Sendable, Hashable {
         public var connections: [Connection]
-        public init(connections: [Connection]) { self.connections = connections }
+        /// The providers this host connects (#3824), with the names this client does not know
+        /// dropped. Nil from a host older than #3824.
+        public var providers: [ConnectionProvider]?
+        public init(connections: [Connection], providers: [ConnectionProvider]? = nil) {
+            self.connections = connections; self.providers = providers
+        }
+
+        private enum CodingKeys: String, CodingKey { case connections, providers }
+
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            connections = try c.decode([Connection].self, forKey: .connections)
+            providers = try c.decodeIfPresent([String].self, forKey: .providers)?.compactMap(ConnectionProvider.init(rawValue:))
+        }
+
+        /// The providers Connect… offers on this host, in this client's order: the ones it says
+        /// it connects, or what a host older than #3824 connects (Email with connections.email/1).
+        public func offered(hostHasEmail: Bool) -> [ConnectionProvider] {
+            let takes = providers ?? [.github, .linear, .gitlab, .atlassian] + (hostHasEmail ? [.email] : [])
+            return ConnectionProvider.allCases.filter(takes.contains)
+        }
     }
 
     public struct ConnectionProviderRequest: Codable, Sendable, Hashable {
@@ -211,7 +231,7 @@ extension DaemonAPI {
         case failed
         /// The provider refused the read: the person grants it on the provider's site.
         case refused
-        /// The folder has no GitHub or GitLab remote.
+        /// The folder has no GitHub, GitLab, Forgejo or Bitbucket remote.
         case noRemote
         /// Skipped: it counts as done.
         case skipped
@@ -346,7 +366,7 @@ extension DaemonAPI {
     public struct ConnectorSetup: Codable, Sendable, Hashable {
         public var folder: String
         /// owner/name on GitHub, group/folder on GitLab, from the folder's git remote. Nil
-        /// with no GitHub or GitLab remote.
+        /// with no GitHub, GitLab, Forgejo or Bitbucket remote.
         public var repository: String?
         /// The forge that fills Tasks, Code review and CI; nil is GitHub.
         public var forge: ConnectionProvider?

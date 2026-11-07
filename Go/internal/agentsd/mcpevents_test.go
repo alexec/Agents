@@ -38,6 +38,10 @@ type eventsServer struct {
 	notConnected int
 	// refused is whether polls after c1 are refused for good (#2491).
 	refused bool
+	// props, when set, are pr.merged's arguments in place of repo and pr; more are other
+	// events it offers.
+	props map[string]any
+	more  []any
 }
 
 func newEventsServer(t *testing.T) *eventsServer {
@@ -61,9 +65,15 @@ func newEventsServer(t *testing.T) *eventsServer {
 		case "initialize":
 			result = map[string]any{"protocolVersion": "2026-07-28", "capabilities": map[string]any{"events": map[string]any{"listChanged": true}}}
 		case "events/list":
-			result = map[string]any{"events": []any{map[string]any{"name": "pr.merged", "delivery": []string{"poll"},
-				"inputSchema": map[string]any{"type": "object", "additionalProperties": false,
-					"properties": map[string]any{"repo": map[string]any{"type": "string"}, "pr": map[string]any{"type": "integer"}}}}}}
+			props := map[string]any{"repo": map[string]any{"type": "string"}, "pr": map[string]any{"type": "integer"}}
+			s.mu.Lock()
+			if s.props != nil {
+				props = s.props
+			}
+			more := s.more
+			s.mu.Unlock()
+			result = map[string]any{"events": append([]any{map[string]any{"name": "pr.merged", "delivery": []string{"poll"},
+				"inputSchema": map[string]any{"type": "object", "additionalProperties": false, "properties": props}}}, more...)}
 		case "events/poll":
 			var p struct {
 				Name   string  `json:"name"`
@@ -462,6 +472,77 @@ func TestAWaitOnAServersEvent(t *testing.T) {
 		defer d.mcpEvMu.Unlock()
 		return len(d.mcpSubs) == 0
 	})
+}
+
+// #3797: a wait on a server's event about one PR names it, or sets any: true, when the
+// server offers any; one that names nothing is refused with the keys that would.
+func TestAWaitOnAServersEventNamesWhatItWaitsFor(t *testing.T) {
+	was := eventHoldLimit
+	eventHoldLimit = 300 * time.Millisecond
+	defer func() { eventHoldLimit = was }()
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	ci := newEventsServer(t)
+	ci.props = map[string]any{"repo": map[string]any{"type": "string"}, "pr": map[string]any{"type": "integer"},
+		"branch": map[string]any{"type": "string"}, "fixes": map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+		"mine": map[string]any{"type": "boolean"}, "any": map[string]any{"type": "boolean"}}
+	ci.more = []any{map[string]any{"name": "issue.closed", "delivery": []string{"poll"},
+		"inputSchema": map[string]any{"type": "object", "additionalProperties": false,
+			"properties": map[string]any{"issue": map[string]any{"type": []any{"integer", "array"}, "items": map[string]any{"type": "integer"}},
+				"any": map[string]any{"type": "boolean"}}}}}
+	a := seeded(t, d, t.TempDir(), nil)
+	m := appClient(t, d, a.ID)
+	m.post("initialize", map[string]any{}, 1)
+	serverHome(t, d, ci.URL)
+	quickPolls(d)
+	d.StartMCPEvents()
+	refused := "ci's pr.merged: Name the PR (`pr`, `branch`, `fixes` or `mine`), or set `any: true` to wake on every PR in the repo. Nothing is waiting."
+	for i, where := range []map[string]any{{}, {"repo": "alexec/Agents"}, {"mine": false}, {"any": false}} {
+		if text, isErr := m.tool(10+i, "wait_for_event", map[string]any{"events": "pr.merged", "where": where, "until_minutes": 5}); !isErr || text != refused {
+			t.Errorf("%v: %s", where, text)
+		}
+	}
+	for i, where := range []map[string]any{{"fixes": []string{"#3795"}}, {"mine": true}, {"any": true}, {"branch": "agents/x"}} {
+		text, isErr := m.tool(20+i, "wait_for_event", map[string]any{"events": "pr.merged", "where": where, "until_minutes": 5})
+		if isErr || !strings.HasPrefix(text, "Subscribed to pr.merged on ci") {
+			t.Errorf("%v: %s", where, text)
+		}
+	}
+	if !strings.Contains(waitLabel(d.Store.Agent(a.ID).EventWait), "branch agents/x") {
+		t.Fatal(waitLabel(d.Store.Agent(a.ID).EventWait))
+	}
+	// One where for two events: each takes the keys it offers, as a lead's wait on its
+	// children's issues and the PRs that fix them; a key neither takes is refused.
+	text, isErr := m.tool(30, "wait_for_event", map[string]any{"events": []string{"issue.closed", "pr.merged"},
+		"where": map[string]any{"issue": []int{12, 13}, "fixes": []string{"#12", "#13"}}, "until_minutes": 5})
+	if isErr || !strings.HasPrefix(text, `Subscribed to issue.closed on ci (issue [12,13]) and pr.merged on ci (fixes ["#12","#13"]).`) {
+		t.Fatal(text)
+	}
+	text, isErr = m.tool(31, "wait_for_event", map[string]any{"events": []string{"issue.closed", "pr.merged"},
+		"where": map[string]any{"issue": 12, "fixes": []string{"#12"}, "nope": 1}, "until_minutes": 5})
+	if !isErr || !strings.Contains(text, `"nope" is not one of its arguments`) {
+		t.Fatal(text)
+	}
+}
+
+func TestUnnamedWaitWordsSayOnlyTheKeysTheServerOffers(t *testing.T) {
+	schema := json.RawMessage(`{"properties":{"pr":{},"any":{}}}`)
+	if w := unnamedWaitWords("pr.commented", map[string][]string{}, schema); w != "Name the PR (`pr`), or set `any: true` to wake on every PR in the repo." {
+		t.Fatal(w)
+	}
+	if w := unnamedWaitWords("issue.closed", map[string][]string{}, json.RawMessage(`{"properties":{"issue":{},"label":{},"any":{}}}`)); w != "Name the issue (`issue` or `label`), or set `any: true` to wake on every issue in the repo." {
+		t.Fatal(w)
+	}
+	// A server that offers no any yet (a forge added since) waits as before.
+	if w := unnamedWaitWords("pr.merged", map[string][]string{}, json.RawMessage(`{"properties":{"pr":{}}}`)); w != "" {
+		t.Fatal(w)
+	}
+	// Neither a new PR nor the person's own is about one thing.
+	for _, name := range []string{"pr.opened", "issue.opened", "review.requested", "issue.assigned"} {
+		if w := unnamedWaitWords(name, map[string][]string{}, schema); w != "" {
+			t.Fatal(name, w)
+		}
+	}
 }
 
 // #2457: a poll answered "not connected" (a sign-in that failed for a moment) is tried again

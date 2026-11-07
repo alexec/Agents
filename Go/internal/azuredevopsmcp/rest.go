@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -466,8 +467,13 @@ type buildJSON struct {
 	FinishTime   string            `json:"finishTime"`
 	SourceBranch string            `json:"sourceBranch"`
 	SourceVer    string            `json:"sourceVersion"`
+	Reason       string            `json:"reason"`
+	RequestedFor identity          `json:"requestedFor"`
 	TriggerInfo  map[string]string `json:"triggerInfo"`
-	Definition   struct {
+	Repository   struct {
+		ID string `json:"id"`
+	} `json:"repository"`
+	Definition struct {
 		ID   int    `json:"id"`
 		Name string `json:"name"`
 	} `json:"definition"`
@@ -491,8 +497,59 @@ func (b buildJSON) prNumber() int {
 	return 0
 }
 
-// failedBuild says whether a build's result is a failure.
-func failedBuild(result string) bool { return result == "failed" }
+// ref is a build's branch or tag, with no refs/heads/ or refs/tags/: main, v0.16.0.
+func (b buildJSON) ref() string {
+	if tag, ok := strings.CutPrefix(b.SourceBranch, "refs/tags/"); ok {
+		return tag
+	}
+	return branch(b.SourceBranch)
+}
+
+// fromFork says whether a build is of a pull request from a fork.
+func (b buildJSON) fromFork() bool { return strings.EqualFold(b.TriggerInfo["pr.isFork"], "true") }
+
+// buildPassed says whether a build's result passed, and done whether it passed or failed: a
+// build canceled, or partly succeeded, is neither.
+func buildPassed(result string) (passed, done bool) {
+	return result == "succeeded", result == "succeeded" || result == "failed"
+}
+
+// statusJSON is a status another service set on a pull request, of one iteration or of all.
+type statusJSON struct {
+	ID           int    `json:"id"`
+	State        string `json:"state"`
+	Description  string `json:"description"`
+	TargetURL    string `json:"targetUrl"`
+	CreationDate string `json:"creationDate"`
+	UpdatedDate  string `json:"updatedDate"`
+	IterationID  int    `json:"iterationId"`
+	Context      struct {
+		Name  string `json:"name"`
+		Genre string `json:"genre"`
+	} `json:"context"`
+}
+
+// name is a status's context, genre/name.
+func (s statusJSON) name() string {
+	if s.Context.Genre != "" {
+		return s.Context.Genre + "/" + s.Context.Name
+	}
+	return s.Context.Name
+}
+
+// at is when a status was set: its update, else its creation.
+func (s statusJSON) at() string {
+	if s.UpdatedDate != "" {
+		return s.UpdatedDate
+	}
+	return s.CreationDate
+}
+
+// statusPassed is buildPassed for a status: error is a failure; pending, notSet and
+// notApplicable are neither.
+func statusPassed(state string) (passed, done bool) {
+	return state == "succeeded", state == "succeeded" || state == "failed" || state == "error"
+}
 
 // MARK: Azure DevOps
 
@@ -635,18 +692,16 @@ func (f *RealAzureDevOps) ClosedPRs(ctx context.Context, repo, since string) ([]
 	return merged, closed, listed, nil
 }
 
-// prBuilds are the repository's pull request builds that finished at or after since, newest
-// first, at most one page: failed ones only with failed.
-func (f *RealAzureDevOps) prBuilds(ctx context.Context, repo, since string, failed bool) ([]buildJSON, bool, error) {
+// builds are the repository's builds that finished at or after since, whatever started them
+// (a pull request, a push to a branch, a person) and whatever their result, newest first, at
+// most one page: checks.failed and checks.passed share the one fetch.
+func (f *RealAzureDevOps) builds(ctx context.Context, repo, since string) ([]buildJSON, bool, error) {
 	r, err := f.repository(ctx, repo)
 	if err != nil {
 		return nil, false, err
 	}
-	q := url.Values{"repositoryId": {r.ID}, "repositoryType": {"TfsGit"}, "reasonFilter": {"pullRequest"},
-		"statusFilter": {"completed"}, "minTime": {since}, "queryOrder": {"finishTimeDescending"}, "$top": {strconv.Itoa(perPage)}}
-	if failed {
-		q.Set("resultFilter", "failed")
-	}
+	q := url.Values{"repositoryId": {r.ID}, "repositoryType": {"TfsGit"}, "statusFilter": {"completed"}, "minTime": {since},
+		"queryOrder": {"finishTimeDescending"}, "$top": {strconv.Itoa(perPage)}}
 	var list struct {
 		Value []buildJSON `json:"value"`
 	}
@@ -656,53 +711,229 @@ func (f *RealAzureDevOps) prBuilds(ctx context.Context, repo, since string, fail
 	return list.Value, len(list.Value) == perPage, nil
 }
 
-// FailedChecks reads the pull request builds that failed since, and keeps those at an active
-// pull request's head commit: a build of an older push is not its head's.
-func (f *RealAzureDevOps) FailedChecks(ctx context.Context, repo, since string) ([]FailedChecks, Listed, error) {
-	builds, truncated, err := f.prBuilds(ctx, repo, since, true)
+// statuses are the statuses other services set on a pull request, every iteration's.
+func (f *RealAzureDevOps) statuses(ctx context.Context, repo string, number int, shared bool) ([]statusJSON, error) {
+	var list struct {
+		Value []statusJSON `json:"value"`
+	}
+	err := f.get(ctx, api(fmt.Sprintf("%s/pullRequests/%d/statuses", repoPath(repo), number), nil), shared, &list)
+	return list.Value, err
+}
+
+// lastIteration is a pull request's newest iteration (push): the one its head commit is.
+func (f *RealAzureDevOps) lastIteration(ctx context.Context, repo string, number int) (int, error) {
+	var list struct {
+		Value []struct {
+			ID int `json:"id"`
+		} `json:"value"`
+	}
+	if err := f.get(ctx, api(fmt.Sprintf("%s/pullRequests/%d/iterations", repoPath(repo), number), nil), true, &list); err != nil {
+		return 0, err
+	}
+	last := 0
+	for _, i := range list.Value {
+		last = max(last, i.ID)
+	}
+	return last, nil
+}
+
+// headCheck is a build or a status that finished, passed or failed, at an active pull
+// request's head commit. key is build:<id> or status:<id>; runID is 0 for a status.
+type headCheck struct {
+	pr     pullJSON
+	at     string
+	check  Check
+	runID  int
+	key    string
+	passed bool
+}
+
+// headChecks reads what finished at an active pull request's head commit at or after since:
+// the repository's builds, a pull request's own or its branch's at its head commit, and the
+// newest status of each context on the maxChecked newest active pull requests, at its newest
+// iteration. A build or a status that neither passed nor failed (canceled, partly succeeded,
+// pending) is not one. A build of an older push is not its head's.
+func (f *RealAzureDevOps) headChecks(ctx context.Context, repo, since string) ([]headCheck, Listed, error) {
+	builds, truncated, err := f.builds(ctx, repo, since)
 	if err != nil {
 		return nil, Listed{}, err
-	}
-	listed := Listed{Truncated: truncated}
-	if len(builds) == 0 {
-		return nil, listed, nil
 	}
 	pulls, err := f.openPulls(ctx, repo)
 	if err != nil {
 		return nil, Listed{}, err
 	}
-	open := map[int]pullJSON{}
+	byNumber := map[int]pullJSON{}
+	byBranch := map[string][]pullJSON{}
 	for _, p := range pulls {
-		open[p.ID] = p
+		byNumber[p.ID] = p
+		// A fork's branch is not in this repository, so this repository's builds are not its.
+		if !p.fork() {
+			byBranch[p.SourceRefName] = append(byBranch[p.SourceRefName], p)
+		}
 	}
-	byPR := map[int]*FailedChecks{}
-	var order []int
+	listed := Listed{Truncated: truncated}
+	var out []headCheck
 	// Oldest first, so the first failed build is the run.
 	for i := len(builds) - 1; i >= 0; i-- {
 		b := builds[i]
 		listed = listed.saw(b.FinishTime)
-		p, ok := open[b.prNumber()]
-		if !ok || !failedBuild(b.Result) || before(b.FinishTime, since) {
+		passed, done := buildPassed(b.Result)
+		if !done || before(b.FinishTime, since) {
 			continue
 		}
-		if sha := b.TriggerInfo["pr.sourceSha"]; sha != "" && p.head() != "" && !strings.EqualFold(sha, p.head()) {
+		var of []pullJSON
+		if n := b.prNumber(); n != 0 {
+			p, ok := byNumber[n]
+			sha := b.TriggerInfo["pr.sourceSha"]
+			if ok && (sha == "" || p.head() == "" || strings.EqualFold(sha, p.head())) {
+				of = append(of, p)
+			}
+		} else {
+			// A push's build of a pull request's branch, as a CI trigger starts it.
+			for _, p := range byBranch[b.SourceBranch] {
+				if p.head() != "" && strings.EqualFold(b.SourceVer, p.head()) {
+					of = append(of, p)
+				}
+			}
+		}
+		for _, p := range of {
+			out = append(out, headCheck{pr: p, at: normalized(b.FinishTime), check: Check{Name: b.Definition.Name, URL: b.Links.Web.Href},
+				runID: b.ID, key: fmt.Sprintf("build:%d", b.ID), passed: passed})
+		}
+	}
+	for _, p := range pulls[:min(maxChecked, len(pulls))] {
+		statuses, err := f.statuses(ctx, repo, p.ID, true)
+		if err != nil {
+			return nil, Listed{}, err
+		}
+		newest := map[string]statusJSON{}
+		for _, s := range statuses {
+			if had, ok := newest[s.name()]; !ok || s.ID > had.ID {
+				newest[s.name()] = s
+			}
+		}
+		names := make([]string, 0, len(newest))
+		for name := range newest {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		last := -1 // not read yet: only a status that would be raised reads it
+		for _, name := range names {
+			s := newest[name]
+			listed = listed.saw(s.at())
+			passed, done := statusPassed(s.State)
+			if !done || before(s.at(), since) {
+				continue
+			}
+			// A status of an iteration is of that push's commit; one with none is of the pull request.
+			if s.IterationID != 0 {
+				if last < 0 {
+					if last, err = f.lastIteration(ctx, repo, p.ID); err != nil {
+						return nil, Listed{}, err
+					}
+				}
+				if s.IterationID != last {
+					continue
+				}
+			}
+			out = append(out, headCheck{pr: p, at: normalized(s.at()), check: Check{Name: name, URL: s.TargetURL},
+				key: fmt.Sprintf("status:%d", s.ID), passed: passed})
+		}
+	}
+	return out, listed, nil
+}
+
+// FailedChecks reads the builds and statuses that failed since at an active pull request's
+// head commit, one FailedChecks a pull request.
+func (f *RealAzureDevOps) FailedChecks(ctx context.Context, repo, since string) ([]FailedChecks, Listed, error) {
+	checks, listed, err := f.headChecks(ctx, repo, since)
+	if err != nil {
+		return nil, Listed{}, err
+	}
+	byPR := map[int]*FailedChecks{}
+	var order []int
+	for _, c := range checks {
+		if c.passed {
 			continue
 		}
-		d, ok := byPR[p.ID]
+		d, ok := byPR[c.pr.ID]
 		if !ok {
-			d = &FailedChecks{PR: f.pr(repo, p), HeadSHA: p.head(), Failed: []Check{}, Trusted: trustedPR(p),
-				RunID: b.ID, RunName: b.Definition.Name, RunURL: b.Links.Web.Href}
-			byPR[p.ID] = d
-			order = append(order, p.ID)
+			d = &FailedChecks{PR: f.pr(repo, c.pr), HeadSHA: c.pr.head(), Failed: []Check{}, Trusted: trustedPR(c.pr)}
+			byPR[c.pr.ID] = d
+			order = append(order, c.pr.ID)
 		}
-		if at := normalized(b.FinishTime); at > d.At {
-			d.At = at
+		// The run is the first failed build; with none, the first failed status.
+		if d.RunID == 0 && (c.runID != 0 || len(d.Failed) == 0) {
+			d.RunID, d.RunName, d.RunURL = c.runID, c.check.Name, c.check.URL
 		}
-		d.Failed = append(d.Failed, Check{Name: b.Definition.Name, URL: b.Links.Web.Href})
+		if c.at > d.At {
+			d.At = c.at
+		}
+		d.Failed = append(d.Failed, c.check)
 	}
 	out := make([]FailedChecks, 0, len(order))
 	for _, n := range order {
 		out = append(out, *byPR[n])
+	}
+	return out, listed, nil
+}
+
+// PassedChecks reads the builds and statuses that passed since at an active pull request's
+// head commit, one each.
+func (f *RealAzureDevOps) PassedChecks(ctx context.Context, repo, since string) ([]PassedCheck, Listed, error) {
+	checks, listed, err := f.headChecks(ctx, repo, since)
+	if err != nil {
+		return nil, Listed{}, err
+	}
+	var out []PassedCheck
+	for _, c := range checks {
+		if c.passed {
+			out = append(out, PassedCheck{PR: f.pr(repo, c.pr), HeadSHA: c.pr.head(), At: c.at, Key: c.key,
+				RunID: c.runID, RunName: c.check.Name, RunURL: c.check.URL, Trusted: trustedPR(c.pr)})
+		}
+	}
+	return out, listed, nil
+}
+
+// CompletedBuilds reads the builds that finished since, of any trigger and any result: the
+// listing checks.failed and checks.passed share (#932), or one build by its id.
+func (f *RealAzureDevOps) CompletedBuilds(ctx context.Context, repo, pipeline, branch string, run int, since string) ([]CompletedBuild, Listed, error) {
+	var builds []buildJSON
+	listed := Listed{}
+	if run != 0 {
+		r, err := f.repository(ctx, repo)
+		if err != nil {
+			return nil, Listed{}, err
+		}
+		var b buildJSON
+		if err := f.get(ctx, api(fmt.Sprintf("%sbuild/builds/%d", projectPath(repo), run), nil), true, &b); err != nil {
+			return nil, Listed{}, err
+		}
+		// A build id is the project's: one of another repository is not this one's.
+		if b.Repository.ID == r.ID {
+			builds = append(builds, b)
+		}
+	} else {
+		var err error
+		if builds, listed.Truncated, err = f.builds(ctx, repo, since); err != nil {
+			return nil, Listed{}, err
+		}
+	}
+	var out []CompletedBuild
+	for _, b := range builds {
+		listed = listed.saw(b.FinishTime)
+		if b.Status != "completed" || before(b.FinishTime, since) ||
+			(pipeline != "" && !strings.EqualFold(b.Definition.Name, pipeline)) ||
+			(branch != "" && b.ref() != branch && b.SourceBranch != branch) {
+			continue
+		}
+		head := b.SourceVer
+		if sha := b.TriggerInfo["pr.sourceSha"]; sha != "" {
+			head = sha
+		}
+		out = append(out, CompletedBuild{ID: b.ID, Name: b.Definition.Name, Number: b.BuildNumber, Reason: b.Reason, Branch: b.ref(),
+			HeadSHA: head, URL: b.Links.Web.Href, Result: b.Result, Actor: b.RequestedFor.name(), At: normalized(b.FinishTime),
+			Trusted: !b.fromFork() && b.RequestedFor.ID != "" && !isBot(b.RequestedFor)})
 	}
 	return out, listed, nil
 }

@@ -75,6 +75,12 @@ type mergeArgs struct {
 	Sha    string `json:"sha" jsonschema:"the head commit the person saw (headSha); Forgejo refuses when the pull request has a newer one"`
 }
 
+type logArgs struct {
+	Repo  string `json:"repo,omitempty" jsonschema:"owner/name; the repository this folder pushes to when left out"`
+	RunID int    `json:"runId" jsonschema:"the Forgejo Actions run's number: run.id in a checks.failed event, or the number after /actions/runs/ in a check's url"`
+	Job   string `json:"job,omitempty" jsonschema:"only the failed job with this name"`
+}
+
 type approveArgs struct {
 	Repo   string `json:"repo,omitempty" jsonschema:"owner/name; the repository this folder pushes to when left out"`
 	Number int    `json:"number" jsonschema:"the pull request's number"`
@@ -130,7 +136,8 @@ func tool[In any](server *mcp.Server, t *mcp.Tool, f func(context.Context, In) (
 	})
 }
 
-// AddTools puts the tools on server; with person, also the tools only a person may call.
+// AddTools puts the tools and the views (views.go) on server; with person, also the tools only
+// a person may call.
 func AddTools(server *mcp.Server, f *RealForgejo, person bool) {
 	repoOf := func(ctx context.Context, repo string) (string, error) {
 		if repo != "" {
@@ -143,6 +150,7 @@ func AddTools(server *mcp.Server, f *RealForgejo, person bool) {
 	}
 	readOnly := &mcp.ToolAnnotations{ReadOnlyHint: true}
 	agents := visibility("model", "app")
+	addViews(server, f, repoOf)
 
 	tool(server, &mcp.Tool{Name: "list_pull_requests", Title: "List pull requests",
 		Description: "The repository's pull requests, newest updated first, at most 50: number, title, branch, target, author, draft, " +
@@ -239,6 +247,26 @@ func AddTools(server *mcp.Server, f *RealForgejo, person bool) {
 					"url": s.TargetURL, "updatedAt": s.UpdatedAt})
 			}
 			return map[string]any{"repo": repo, "sha": c.SHA, "state": c.State, "checks": checks}, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{Name: "failed_log", Title: "Read a failed run's log",
+		Description: fmt.Sprintf("The last %d lines of each failed job's log in a Forgejo Actions run, or of one job by name; on "+
+			"Forgejo 17 or later, of the step that failed. It needs Forgejo 16 or Gitea 1.25 or later, and says so on an older "+
+			"server. Another CI's logs are on its own pages (get_checks gives their addresses).", logLines),
+		Annotations: readOnly, Meta: agents},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in logArgs) (*mcp.CallToolResult, any, error) {
+			repo, err := repoOf(ctx, in.Repo)
+			if err != nil {
+				return failed(err), nil, nil
+			}
+			if in.RunID <= 0 {
+				return failed(fmt.Errorf("runId is a Forgejo Actions run's number")), nil, nil
+			}
+			text, err := f.FailedLog(ctx, repo, in.RunID, in.Job)
+			if err != nil {
+				return failed(err), nil, nil
+			}
+			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: text}}}, nil, nil
 		})
 
 	tool(server, &mcp.Tool{Name: "list_issues", Title: "List issues",

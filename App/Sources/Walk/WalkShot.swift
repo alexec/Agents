@@ -2,6 +2,7 @@
 import AppKit
 import Foundation
 import SwiftTerm
+import WebKit
 
 /// The window drawn into a PNG by itself (#1172), with its sheet and child windows over it
 /// where they sit, at the screen's scale or at one asked for (#1855: a video's 2× on a 1×
@@ -11,7 +12,9 @@ import SwiftTerm
 /// SwiftUI draws most of a page as plain layers with no view, which `cacheDisplay` leaves
 /// out. What a layer render cannot draw is drawn again over it: glass and a scroll view's
 /// edge show their content through portals, a selected sidebar row is a material, and the
-/// terminal draws only when asked. The spike behind this is in the PR for #1172.
+/// terminal draws only when asked. A web view draws in its own process, so its picture is
+/// asked for before the shot (`snapshotWebViews`) and drawn in place (#3854). The spike
+/// behind this is in the PR for #1172.
 @MainActor
 enum WalkShot {
     /// A drawn window, made into a PNG off the main thread: the encoding was a fifth of a
@@ -131,6 +134,38 @@ enum WalkShot {
                 // The terminal and the window's buttons draw only when asked to, which a
                 // layer render does not do.
                 draw(view, view.bounds, at: canvas(view.convert(view.bounds, to: root)))
+            }
+        }
+        // Last, so no glass or scroll content drawn again goes over them.
+        for view in root.subviews(of: WKWebView.self) where isShown(view) {
+            guard let image = webShots[ObjectIdentifier(view)] else { continue }
+            let shown = view.enclosingScrollView.map { $0.contentView.convert($0.contentView.visibleRect, to: root) } ?? root.bounds
+            guard let context = NSGraphicsContext.current?.cgContext else { continue }
+            context.saveGState()
+            context.clip(to: canvas(shown))
+            image.draw(in: canvas(view.convert(view.bounds, to: root)))
+            context.restoreGState()
+        }
+    }
+
+    /// What each web view showed when last asked (#3854): a WKWebView draws in the web
+    /// content process, which a layer render cannot reach, so it is drawn blank.
+    private static var webShots: [ObjectIdentifier: NSImage] = [:]
+
+    /// Asks each web view shown on `window` (and its sheet and child windows) for its own
+    /// picture, for the next shot to draw. Each leaves `group` when its picture comes, on
+    /// the main thread: the walk socket waits on `group` off it, then takes the shot.
+    static func snapshotWebViews(in window: NSWindow, group: DispatchGroup) {
+        webShots = [:]
+        let over = [window.attachedSheet].compactMap { $0 } + (window.childWindows ?? []).filter(\.isVisible)
+        for each in [window] + over {
+            guard let root = each.contentView?.superview ?? each.contentView else { continue }
+            for view in root.subviews(of: WKWebView.self) where isShown(view) && view.bounds.width >= 1 && view.bounds.height >= 1 {
+                group.enter()
+                view.takeSnapshot(with: nil) { image, _ in
+                    MainActor.assumeIsolated { webShots[ObjectIdentifier(view)] = image }
+                    group.leave()
+                }
             }
         }
     }

@@ -128,7 +128,7 @@ func (d *Daemon) moveSessionTool(caller wire.UUID, args map[string]json.RawMessa
 	if working {
 		carries = "It was working, so it carries on there."
 	}
-	return fmt.Sprintf("Moved %s to %s, in %s, with %s and its uncommitted changes (id %s). %s list_sessions, read_session, message_session, wait_for_agents, "+
+	return fmt.Sprintf("Moved %s to %s, in %s, with %s and its uncommitted changes (id %s). %s list_sessions, read_session, message_session, wait_for_event on agent.ended, "+
 		"stop_session and archive_session reach it there by its id; the person sees it under %s.",
 		quotedTitle(target.Title), machine, folder, b.branch, target.ID, carries, machine), nil
 }

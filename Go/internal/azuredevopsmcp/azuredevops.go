@@ -84,17 +84,19 @@ type ClosedPR struct {
 	Trusted  bool
 }
 
-// Check is one failed Azure Pipelines build.
+// Check is one Azure Pipelines build, or one status another service set: its pipeline's
+// name or the status's genre/name, and its page.
 type Check struct{ Name, URL string }
 
 // FailedChecks is a checks.failed event's data: an active pull request whose head commit's
-// builds failed, and those builds. At is the newest of their finish times, so a build run
+// builds or statuses failed, and those. At is the newest of their times, so a build run
 // again that fails again is a new one.
 type FailedChecks struct {
 	PR      PR
 	HeadSHA string
 	At      string
-	// RunID is the first failed build's id, RunName its pipeline's name.
+	// RunID is the first failed build's id, RunName its pipeline's name; with no failed
+	// build, RunID is 0 and RunName the first failed status's name.
 	RunID   int
 	RunName string
 	RunURL  string
@@ -112,6 +114,44 @@ func (d FailedChecks) json() map[string]any {
 		"run":        map[string]any{"id": d.RunID, "name": d.RunName, "url": d.RunURL},
 		"failedJobs": jobs,
 	}
+}
+
+// PassedCheck is a checks.passed event's data: a build or a status that passed at an active
+// pull request's head commit. Key is build:<id> or status:<id>; RunID is 0 for a status.
+type PassedCheck struct {
+	PR      PR
+	HeadSHA string
+	At      string
+	Key     string
+	RunID   int
+	RunName string
+	RunURL  string
+	Trusted bool
+}
+
+func (d PassedCheck) json() map[string]any {
+	return map[string]any{"pr": d.PR.json(), "headSha": d.HeadSHA,
+		"run": map[string]any{"id": d.RunID, "name": d.RunName, "url": d.RunURL}}
+}
+
+// CompletedBuild is an Azure Pipelines build that finished, whatever started it and whatever
+// its result, as run.completed sees it (#3810): a build of main, a tag or a manual run, which
+// no pull request owns. Name is its pipeline's name, Number its build number, Reason what
+// started it (manual, individualCI, schedule, pullRequest…), Branch its branch or tag with no
+// refs/heads/ or refs/tags/. Trusted says whether it is the repository's own: not a fork's
+// pull request's, and asked for by a person, not a bot (#728).
+type CompletedBuild struct {
+	ID                                    int
+	Name, Number, Reason, Branch, HeadSHA string
+	URL, Result, Actor, At                string
+	Trusted                               bool
+}
+
+func (b CompletedBuild) data() map[string]any {
+	return map[string]any{"run": map[string]any{
+		"id": b.ID, "name": b.Name, "number": b.Number, "event": b.Reason, "branch": b.Branch, "headSha": b.HeadSHA,
+		"url": b.URL, "conclusion": b.Result, "actor": b.Actor,
+	}, "completedAt": b.At}
 }
 
 // ReviewComment is a comment on a line of a pull request's diff, or an answer in its thread.
@@ -159,8 +199,15 @@ type AzureDevOps interface {
 	OpenPRs(ctx context.Context, repo string) ([]OpenPR, error)
 	// ClosedPRs are pull requests completed, and abandoned, at or after since.
 	ClosedPRs(ctx context.Context, repo, since string) (merged []MergedPR, closed []ClosedPR, listed Listed, err error)
-	// FailedChecks are the active pull requests whose head commit failed a build, in any order.
+	// FailedChecks are the active pull requests whose head commit failed a build or a status
+	// at or after since, in any order.
 	FailedChecks(ctx context.Context, repo, since string) (failed []FailedChecks, listed Listed, err error)
+	// PassedChecks are the builds and statuses that passed at an active pull request's head
+	// commit at or after since, in any order.
+	PassedChecks(ctx context.Context, repo, since string) (passed []PassedCheck, listed Listed, err error)
+	// CompletedBuilds are the builds that finished at or after since, of pipeline (its name),
+	// branch (or tag) and run (a build's id) when each is set, in any order.
+	CompletedBuilds(ctx context.Context, repo, pipeline, branch string, run int, since string) (builds []CompletedBuild, listed Listed, err error)
 	// ReviewComments are the comments on pull requests' diffs made at or after since.
 	ReviewComments(ctx context.Context, repo, since string) (comments []ReviewComment, listed Listed, err error)
 	// Yours is what the token's owner has in the repository (#2034).

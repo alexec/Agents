@@ -59,12 +59,12 @@ func (s schema) lookup(name string) (property, bool) {
 	return property{}, false
 }
 
-// args are an event's checked arguments. pr is a pull request's number, named as
-// the github server names it.
+// args are an event's checked arguments. pr is a pull request's number and run a build's
+// id, named as the github server names them; pipeline is a pipeline's name.
 type args struct {
-	repo, branch string
-	pr           int
-	anyone, mine bool
+	repo, branch, pipeline string
+	pr, run                int
+	anyone, mine           bool
 }
 
 // check reads raw (null or missing as {}) and checks it: no unknown keys, types, shapes.
@@ -104,7 +104,11 @@ func (s schema) check(raw json.RawMessage) (args, *rpcError) {
 			if err != nil || i <= 0 || strings.HasPrefix(string(value), `"`) {
 				return a, invalidParams("%s must be a positive integer", key)
 			}
-			a.pr = int(i)
+			if key == "run" {
+				a.run = int(i)
+			} else {
+				a.pr = int(i)
+			}
 		case "boolean":
 			var b bool
 			if err := json.Unmarshal(value, &b); err != nil || string(value) == "null" {
@@ -123,9 +127,12 @@ func (s schema) check(raw json.RawMessage) (args, *rpcError) {
 			if p.pattern != nil && !p.pattern.MatchString(text) {
 				return a, invalidParams("%s must look like %s", key, p.looksLike)
 			}
-			if key == "repo" {
+			switch key {
+			case "repo":
 				a.repo = text
-			} else {
+			case "pipeline":
+				a.pipeline = text
+			default:
 				a.branch = text
 			}
 		}

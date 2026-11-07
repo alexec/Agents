@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/wire"
@@ -100,7 +101,12 @@ func TestHelperLimitsCountAcrossTheProject(t *testing.T) {
 		t.Fatal(text)
 	}
 
-	// The control plane gone: this machine counts alone, and says so.
+	// The control plane gone: this machine counts alone, and says so. The queue check
+	// that queueing started first ends (#3849): run after the control plane goes, it
+	// counts this machine alone, finds a place free and starts "One more".
+	if !d.waitAfterTurns(10 * time.Second) {
+		t.Fatal("the queue check did not end")
+	}
 	mu.Lock()
 	down = true
 	mu.Unlock()

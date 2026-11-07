@@ -25,9 +25,10 @@ stay as they are.
 | `cmd/betterstack-mcp/`, `internal/betterstackmcp/` | The `betterstack` events MCP server (#3655): a team's incidents as `health.incident_started` and `health.incident_resolved`, polled on Better Stack's Uptime API; no tools (Better Stack's own server has them) | betterstack |
 | `cmd/whatsapp-mcp/`, `internal/whatsappmcp/` | The `whatsapp` MCP server (#1352): a WhatsApp Business number's messages and answers as `message.received` and `question.answered`, by Meta's signed webhook, and tools that send as the number | whatsapp |
 | `cmd/gitlab-mcp/`, `internal/gitlabmcp/` | The `gitlab` MCP server (#1629): merge requests, pipelines and issues on GitLab, tools and events on REST v4 | gitlab |
-| `cmd/forgejo-mcp/`, `internal/forgejomcp/` | The `forgejo` MCP server (#1753): pull requests, checks and issues on Forgejo or Gitea, tools and events on REST v1, in the gitlab server's shape | forgejo |
+| `cmd/forgejo-mcp/`, `internal/forgejomcp/` | The `forgejo` MCP server (#1753): pull requests, checks and issues on Forgejo or Gitea, tools, events and views on REST v1, in the gitlab server's shape | forgejo |
 | `cmd/bitbucket-mcp/`, `internal/bitbucketmcp/` | The `bitbucket` MCP server (#2828): pull requests, checks and issues on Bitbucket Cloud, tools and events on REST 2.0, in the gitlab server's shape | bitbucket |
 | `cmd/azuredevops-mcp/`, `internal/azuredevopsmcp/` | The `azuredevops` MCP server (#2829): pull requests and Azure Pipelines builds on Azure DevOps, tools and events on REST 7.1, in the gitlab server's shape | azuredevops |
+| `cmd/azureboards-mcp/`, `internal/azureboardsmcp/` | The `azureboards` MCP server (#3804): Azure Boards work items as a tracker, tools and events on REST 7.1, in the jira server's shape | azureboards |
 | `cmd/workspace-commands/`, `internal/workspacecommands/` | The command machine provider (#691, in Go since #1364): workspaces as shell commands and presets, an MCP server the control plane runs | workspaces |
 
 ## Building and testing
@@ -213,9 +214,12 @@ no secret: it reads the connection, as the linear server does.
 
 The gitlab server's shape for Forgejo and Gitea, which share one REST API (v1): a stdio front
 (`forgejomcp.Front`) answers `events/list` and `events/poll` and passes everything else to a
-go-sdk server with our own tools, all with one token, `FORGEJO_TOKEN` (an access token with
-read and write on repository and issue, and read on user and organization). `FORGEJO_URL`
-(or `--url`) is the Forgejo or Gitea: `https://codeberg.org` when empty.
+go-sdk server with our own tools, all with one token: the person's Forgejo connection (#3752,
+an access token the host checked and keeps, in the store `connections.EnvName` names), or
+`FORGEJO_TOKEN` (an access token with read and write on repository and issue, and read on
+user and organization), which comes first. `FORGEJO_URL` (or `--url`) is the Forgejo or
+Gitea: the connection's, else `https://codeberg.org`. The connection's token goes only to the
+Forgejo it was made on.
 
 - **Events**, polled every 30 s, with the gitlab server's names, cursor and paging:
   `checks.failed` (an open pull request's head commit whose combined commit status is
@@ -236,23 +240,31 @@ read and write on repository and issue, and read on user and organization). `FOR
   `reply_to_pull_request_comment` (a review comment on the same file and line, which Forgejo
   keeps in that thread); and, on the host's copy only, `merge_pull_request` and
   `approve_pull_request` (a person merges, as on GitHub).
-- **No views yet**, and no connection: the Work pages, a sign-in and the folder set-up from
-  a Forgejo remote are follow-ups.
+- **Set-up reads** (`setup.go`, #3752): the newest issue, the newest pull request and the
+  default branch's combined status prove a folder's Tasks, Code review and CI slots, and
+  `RepoAt` finds a folder's Forgejo repository from its remotes.
+- **Views** (#3838), the gitlab server's page shapes in Forgejo's words (`pages/`; `bridge.js`,
+  `common.css`, `lineage.js` and `prpage.css` are the github server's, word for word, and a test
+  keeps them so): Pull requests (`show_pull_requests`), Issues (`show_issues`, with
+  `show_issue_details`) and a pull request's page (`show_pull_request`), with
+  `show_pull_request_diff` for the app's diff and `failed_log` for a failed run's log.
 
 The tests run it against a fake Forgejo over HTTP (`fake_test.go`); `walk_live_test.go`
 (`-tags live`) walks every event and tool on a real Forgejo or Gitea, a scratch one in a
 container. Agents Host carries it (`scripts/go-github-mcp.sh forgejo-mcp`) and every Linux
 host installs `forgejo-mcp-linux-<arch>`; the catalogue lists it as `agents/forgejo`, which
-asks for `FORGEJO_TOKEN` and `FORGEJO_URL`. See `docs/how-to/use-forgejo.md`.
+asks for no secret: it reads the connection, as the gitlab server does. See `docs/how-to/use-forgejo.md`.
 
 ## The bitbucket MCP server (`bitbucket-mcp`, #2828)
 
 The forgejo server's shape for Bitbucket Cloud's REST API 2.0: a stdio front
 (`bitbucketmcp.Front`) answers `events/list` and `events/poll` and passes everything else to a
-go-sdk server with our own tools, all with one token, `BITBUCKET_TOKEN`: an Atlassian API
-token with scopes (with `BITBUCKET_EMAIL`, as Basic auth) or a repository, project or
-workspace access token (as a Bearer token). Bitbucket Cloud only; `BITBUCKET_API_URL` (or
-`--api`) points it at a fake.
+go-sdk server with our own tools, all with one token: the person's Bitbucket connection
+(#3785, a token the host checked and keeps, in the store `connections.EnvName` names), or
+`BITBUCKET_TOKEN`, which comes first. Either is an Atlassian API token with scopes (with its
+email, `BITBUCKET_EMAIL`, as Basic auth) or a repository, project or workspace access token
+(as a Bearer token). Bitbucket Cloud only; `BITBUCKET_API_URL` (or `--api`) points it, and the
+host's token check, at a fake. The connection's token goes only to the API it was made on.
 
 - **Events**, polled every 30 s, with the gitlab server's names, cursor and paging:
   `checks.failed` (a FAILED commit status on an open pull request's head: Pipelines or any
@@ -267,11 +279,15 @@ workspace access token (as a Bearer token). Bitbucket Cloud only; `BITBUCKET_API
 - **Tools:** the forgejo server's, by the same names; `merge_pull_request` and
   `approve_pull_request` on the host's copy only, refused when the head is not the commit
   the person saw.
-- **No views yet**, and no connection.
+- **Set-up reads** (`setup.go`, #3785): the newest issue, the newest pull request and the
+  main branch's statuses prove a folder's Tasks, Code review and CI slots (a tracker that is
+  off says so), and `RepoAt` finds a folder's Bitbucket repository from its remotes.
+- **No views yet:** the Work pages are a follow-up.
 
 The tests run it against a fake Bitbucket over HTTP (`fake_test.go`). Agents Host carries it
 (`scripts/go-github-mcp.sh bitbucket-mcp`) and every Linux host installs
-`bitbucket-mcp-linux-<arch>`; the catalogue lists it as `agents/bitbucket`. See
+`bitbucket-mcp-linux-<arch>`; the catalogue lists it as `agents/bitbucket`, which asks for no
+secret: it reads the connection, as the forgejo server does. See
 `docs/how-to/use-bitbucket.md`.
 
 ## The azuredevops MCP server (`azuredevops-mcp`, #2829)
@@ -305,6 +321,33 @@ which need their own REST client anyway. The tests run against a fake Azure DevO
 (`fake_test.go`). Agents Host carries it (`scripts/go-github-mcp.sh azuredevops-mcp`) and
 every Linux host installs `azuredevops-mcp-linux-<arch>`; the catalogue lists it as
 `agents/azuredevops`. See `docs/how-to/use-azure-devops.md`.
+
+## The azureboards MCP server (`azureboards-mcp`, #3804)
+
+The jira server's shape for Azure Boards, the tracker of Azure DevOps (REST API 7.1): a stdio
+front (`azureboardsmcp.Front`) answers `events/list` and `events/poll` and passes everything
+else to a go-sdk server with its tools. It is its own server, not part of `azuredevops-mcp`,
+because the catalogue runs one connector a command and a tracker is chosen apart from the
+code host. It shares the azuredevops server's token, `AZURE_DEVOPS_TOKEN` (with Work Items
+read and write), and `AZURE_DEVOPS_URL`; `AZURE_BOARDS_PROJECT` (or `--project`) is
+`organization/project`, the folder's Azure Repos remote's when empty.
+
+- **Events**, polled every minute, with the jira and linear servers' names and cursor:
+  `issue.opened` (WIQL on `System.CreatedDate`), and from the 50 work items changed since
+  (WIQL on `System.ChangedDate`, `timePrecision=true`, then `workitemsbatch`):
+  `issue.labelled` (a tag added in an update), `issue.closed` (an update into a state of the
+  Completed or Removed category, from the work item types' states), `issue.assigned` (an
+  update that assigns the token's owner) and `issue.commented` (the comments API,
+  7.1-preview.4). An update's time is its `System.ChangedDate`, not its `revisedDate`.
+  Arguments `area`, `type`, `label`, `issue` and `anyone`; left out, never a bot (#728).
+- **Tools:** `list_work_items`, `get_work_item` and `comment_on_work_item` (Markdown).
+- **No views yet,** and no Work pages, Tasks slot or board.
+
+It imports only `azuredevopsmcp.BaseURL` and `GitRepo` from the azuredevops server; its HTTP
+client is its own, as each of our servers' is. The tests run against a fake Azure DevOps over
+HTTP (`fake_test.go`). Agents Host carries it (`scripts/go-github-mcp.sh azureboards-mcp`)
+and every Linux host installs `azureboards-mcp-linux-<arch>`; the catalogue lists it as
+`agents/azureboards`. See `docs/how-to/use-azure-boards.md`.
 
 ## The email MCP server (`email-mcp`, #1780)
 

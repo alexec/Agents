@@ -3,14 +3,17 @@
 import { useEffect, useState } from "preact/hooks";
 import type { Store } from "../../model/store";
 import { hostAnswers, hostHas } from "../../model/capabilities";
-import { cpuWords, isSessionsOwn, machineCPUWords, machineMemoryWords, memoryWords, processesFooter } from "../../model/processes";
+import { cpuWords, isSessionsOwn, machineCPUWords, machineMemoryWords, memoryWords, processesFooter, processesLine } from "../../model/processes";
 import { Capability } from "../../protocol/capabilities.generated";
 import type { ProcessesState, ProcessUsage } from "../../protocol/generated";
 import { go } from "../../route";
 
 /** One machine's processes, read when it opens and every few seconds while it is open and the tab is seen. Its
- * CPU and memory above them, but not on the machine's page (#3626), which says them in its own Usage. */
-export function MachineProcesses({ store, host, name, showsTotals = true }: { store: Store; host: string; name: string; showsTotals?: boolean }) {
+ * CPU and memory above them, but not on the machine's page (#3626), which says them in its summary. There they are
+ * closed under one row with their count and total (`folds`, #3743) until the person opens it. */
+export function MachineProcesses({ store, host, name, showsTotals = true, folds = false }: {
+  store: Store; host: string; name: string; showsTotals?: boolean; folds?: boolean;
+}) {
   const [state, setState] = useState<ProcessesState | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   useEffect(() => {
@@ -30,9 +33,8 @@ export function MachineProcesses({ store, host, name, showsTotals = true }: { st
     if (agent) go({ host, folder: agent.worktree?.folder || agent.cwd, session: agent.id });
   };
   const id = `settings-processes-${host}`;
-  return (
-    <section aria-labelledby={id}>
-      <h3 class="section-head" id={id}>Processes on {name}</h3>
+  const list = (
+    <>
       {!state && (failure ? <p class="hint">{failure}</p> : <p class="hint">Loading…</p>)}
       {state && (
         <>
@@ -55,6 +57,20 @@ export function MachineProcesses({ store, host, name, showsTotals = true }: { st
           {failure && <p class="hint">{failure}</p>}
         </>
       )}
+    </>
+  );
+  if (folds) {
+    return (
+      <details class="machine-fold">
+        <summary title={processesFooter}>{state ? processesLine(state) : "Processes"}</summary>
+        {list}
+      </details>
+    );
+  }
+  return (
+    <section aria-labelledby={id}>
+      <h3 class="section-head" id={id}>Processes on {name}</h3>
+      {list}
       <p class="hint">{processesFooter}</p>
     </section>
   );

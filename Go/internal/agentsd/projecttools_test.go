@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/alexec/agents/Go/internal/forgejomcp"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -32,5 +33,20 @@ func TestHeardProjectsLeavesAV011FolderListAlone(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(root, "project-tools.json")); err != nil {
 		t.Fatalf("the project's tools were not kept: %v", err)
+	}
+}
+
+// The forgejo server's list views (#3838) are the Tasks and Code review slots' pages, as the
+// gitlab server's are, pointed at the repository by its repo argument.
+func TestTheForgejoListsAreTheTasksAndCodeReviewSlotsPages(t *testing.T) {
+	for uri, want := range map[string]wire.ConnectorSlotKind{forgejomcp.IssuesURI: wire.ConnectorSlotKindTasks,
+		forgejomcp.PullsURI: wire.ConnectorSlotKindCodeReview} {
+		kind, provider, key, ok := viewSlot("agents/forgejo", uri)
+		if !ok || kind != want || provider != wire.ConnectionProviderForgejo || key != "repo" {
+			t.Errorf("%s: %v %v %q %v", uri, kind, provider, key, ok)
+		}
+	}
+	if _, _, _, ok := viewSlot("agents/gitlab", forgejomcp.PullsURI); ok {
+		t.Error("another server's view took the forgejo server's page")
 	}
 }

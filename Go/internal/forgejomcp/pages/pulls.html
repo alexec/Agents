@@ -1,0 +1,83 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Pull requests</title>
+<!-- The forgejo server's Pull requests (ui://forgejo/pull-requests, #3838): show_pull_requests's
+     result, in sections by how each relates to the viewer (#2952), each with its checks, conflict
+     and review. A pull request's title opens its page (show_pull_request) in place, with a way
+     back to the list. It has no network: it speaks only the MCP Apps bridge. -->
+<style>
+/*common.css*/
+/*prpage.css*/
+#list { display: grid; gap: 8px; }
+#list[hidden], #page[hidden] { display: none; }
+/* The Remote's narrow width (#2952): the pills are long, so they go under the title. */
+@media (max-width: 520px) {
+  #prs li:not(.section) { grid-template-columns: auto minmax(0, 1fr); }
+  #prs .pills, #mrs .meta { grid-column: 2; justify-content: flex-start; }
+}
+</style></head>
+<body><main><div id="list">
+  <header><h1>Pull requests</h1><span id="repo" class="muted"></span><span class="grow"></span>
+    <button id="refresh" type="button" disabled>Refresh</button></header>
+  <div id="state" class="muted">Waiting for the host…</div>
+  <ul id="prs"></ul>
+</div><div id="page" hidden></div></main>
+<script>
+/*bridge.js*/
+/*lineage.js*/
+/*prpage.js*/
+(() => {
+  let repo = "", viewer = "";
+  const ui = bridge("forgejo-pull-requests", {
+    input: (args) => { repo = args.repo || ""; ui.$("repo").textContent = repo; say("Listing…"); },
+    result: (result) => draw(result),
+    cancelled: (why) => say("Cancelled: " + why, true),
+    started: () => say("Waiting for the pull requests…"),
+  });
+  const { $, el, link, button } = ui;
+  const say = (text, isError) => { $("state").textContent = text; $("state").className = isError ? "error" : "muted"; ui.size(); };
+
+  const draw = (result) => {
+    const found = ui.data(result);
+    if (!found) { say("Couldn't list pull requests: " + ui.errorText(result), true); $("refresh").disabled = !repo; return; }
+    if (found.repo) { repo = found.repo; $("repo").textContent = repo; }
+    viewer = found.viewer || "";
+    const prs = Array.isArray(found.pullRequests) ? found.pullRequests : [];
+    $("prs").replaceChildren(...ui.sections(prs, row));
+    say(prs.length ? `${prs.length} open · as of ${new Date().toLocaleTimeString()}` : "No open pull requests.");
+    $("refresh").disabled = !repo;
+  };
+
+  const row = (pr) => {
+    const title = el("a", { className: "title", textContent: pr.title, title: "Open #" + pr.number, href: "#" });
+    title.onclick = (event) => { event.preventDefault(); open(pr.number); };
+    return el("li", {}, [
+      link(`#${pr.number}`, pr.url),
+      title,
+      el("span", { className: "pills" }, [yourReview(pr), ui.agentOn(pr.agentOn), ...prPills(ui, pr)]),
+      el("span", { className: "meta" }, [
+        el("span", { className: "branch", textContent: pr.branch, title: `${pr.branch} → ${pr.base}` }),
+        ...ui.who(pr.author, pr.authorBot, pr.authorName),
+        pr.updatedAt ? el("span", { textContent: ui.ago(pr.updatedAt) }) : null,
+      ]),
+    ]);
+  };
+
+  // In Needs you and not the viewer's own: the viewer is one of its reviewers (#2952).
+  const yourReview = (pr) => pr.section === "needs_you" && viewer && (pr.author || "").toLowerCase() !== viewer.toLowerCase()
+    ? el("span", { className: "pill review_required", textContent: "Your review", title: "You are a reviewer of it" }) : null;
+
+  const page = prPage(ui, () => repo, () => back());
+  const open = (number) => { $("list").hidden = true; $("page").hidden = false; page.show(number); };
+  const back = () => { $("page").hidden = true; $("list").hidden = false; list(); };
+
+  const list = async () => {
+    $("refresh").disabled = true;
+    try { draw(await ui.request("tools/call", { name: "show_pull_requests", arguments: { repo } })); }
+    catch (e) { say("Couldn't list pull requests: " + e.message, true); $("refresh").disabled = false; }
+  };
+
+  $("refresh").onclick = list;
+  ui.start();
+})();
+</script>
+</body></html>

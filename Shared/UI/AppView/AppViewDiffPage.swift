@@ -78,11 +78,11 @@ struct AppViewDiffPage: View {
                     .accessibilityLabel("\(added) lines added, \(removed) removed")
                 Spacer(minLength: 0)
                 if let url = diff.url {
-                    Button("Open on GitHub") { openLink(url) }.buttonStyle(.paper).appText(.fine)
+                    Button("Open on \(diff.site)") { openLink(url) }.buttonStyle(.paper).appText(.fine)
                 }
             }
             if diff.cut {
-                Text("The diff is too long to show every file here. A file with no lines below is on GitHub.")
+                Text("The diff is too long to show every file here. A file with no lines below is on \(diff.site).")
                     .appText(.fine)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

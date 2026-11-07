@@ -16,7 +16,7 @@ comment, and it has events that start a workflow or a wait. It has no pages yet:
 pages do not list an Azure DevOps repository.
 
 Work items (Azure Boards) are not in this connector. They are the tracker's, as Linear's
-and Jira's issues are.
+and Jira's issues are: see [Use Azure Boards work items](use-azure-boards.md).
 
 ## Before you start
 
@@ -65,8 +65,16 @@ runs for your own windows and devices, never offered to an agent.
 The events have the gitlab connector's names, so a workflow made for GitHub or GitLab works
 here too:
 
-- `checks.failed`: an Azure Pipelines build of an active pull request failed at its head
-  commit. `run.id` is the build's id, for `get_build_log`.
+- `checks.failed`: an active pull request's checks failed at its head commit: a build of the
+  pull request, a build of its branch at that commit (a CI trigger), or the newest status that
+  another service set on it. `run.id` is the first failed build's id, for `get_build_log`
+  (0 when only a status failed).
+- `checks.passed`: one of those passed at the head commit, one event per build or status.
+- `run.completed`: a build of any trigger finished, whatever its result, as the github
+  connector's: for a build no pull request owns, such as `main`'s or a tag's release, or one
+  started by hand. `pipeline` (its name), `branch` (a branch or tag, as `main` or `v0.16.0`)
+  and `run` (a build's id) narrow it. `run.conclusion` is Azure DevOps's result
+  (`succeeded`, `failed`, `canceled`, `partiallySucceeded`); a build run again is a new event.
 - `pr.opened`, `pr.merged` (completed), `pr.closed` (abandoned), `pr.conflicted`.
 - `review.requested`: for you, the token's owner: you are a reviewer and have not voted.
 - `review.comment`: a comment on a line of a pull request's diff. `comment.threadId` is
@@ -80,8 +88,9 @@ one, so every other person counts.
 
 - **Comments are read for the 50 newest active pull requests,** and those closed since the
   last poll. Azure DevOps has no list of a repository's comments.
-- **Checks are Azure Pipelines builds.** A status that another service sets on a pull
-  request shows in `get_checks`, but does not raise `checks.failed`.
+- **Checks are builds and statuses.** Statuses are read for the 50 newest active pull
+  requests, the newest of each context, at the pull request's newest push. A build of a branch
+  that no active pull request is from (`main`, a tag) raises no event.
 - **Not yet:** the Work pages, a **Connect Azure DevOps** sheet with a sign-in, and the
   set-up of a folder's Code review and CI from an Azure DevOps remote.
 

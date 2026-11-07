@@ -2107,9 +2107,10 @@ public final class AgentsModel {
     }
 
     /// The changes asked of the folder itself, on its page (#531): no session to ask them
-    /// in, because git brought them or their agents are gone.
+    /// in, because git brought them or their agents are gone. Not a workflow's file: that
+    /// is the workflow's own approval, which Needs You lists already (#3762).
     public func guardedChanges(ofFolder key: FolderKey?) -> [GuardedChange] {
-        (folder(key)?.guardedChanges ?? []).filter { $0.askedIn == nil }
+        (folder(key)?.guardedChanges ?? []).filter { $0.askedIn == nil && !$0.isWorkflow }
     }
 }
 
