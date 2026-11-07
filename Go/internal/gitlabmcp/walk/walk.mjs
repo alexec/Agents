@@ -191,6 +191,7 @@ try {
   const diff = await list.eval("window.diff");
   check(diff && diff.files.length === 2 && diff.files[0].hunks[0].lines.length === 4 && /\/diffs$/.test(diff.url),
     `Show Diff asks the app's diff (agents/open-diff) with the files: ${js(diff && diff.files.map((f) => f.path))}`);
+  check(diff && diff.site === "GitLab", `the diff names its forge, for Open on GitLab (#3837): ${js(diff && diff.site)}`);
 
   await press(list, "Pipeline");
   await waitFor(list, `[...d.querySelectorAll("button")].some((b) => b.textContent === "Show Log")`, "Show Log on the failed job");

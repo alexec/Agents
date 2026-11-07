@@ -348,6 +348,9 @@ public struct AppViewDiff: Equatable, Sendable, Identifiable {
     public var cut: Bool
     /// The file to show first, when the view named one.
     public var path: String?
+    /// The forge the diff is on, for Open on and the cut line: GitHub unless the view names
+    /// another, as the gitlab server's views do (#3837).
+    public var site: String
 
     public struct Refusal: Error, Equatable {
         public var words: String
@@ -356,17 +359,20 @@ public struct AppViewDiff: Equatable, Sendable, Identifiable {
     /// The most lines a diff may have, all files together, and the most files.
     public static let lineLimit = 20_000
     public static let fileLimit = 3000
+    /// The most characters of a site's name.
+    public static let siteLimit = 40
 
-    public init(title: String, url: URL? = nil, files: [File], cut: Bool = false, path: String? = nil) {
+    public init(title: String, url: URL? = nil, files: [File], cut: Bool = false, path: String? = nil, site: String = "GitHub") {
         self.title = title
         self.url = url
         self.files = files
         self.cut = cut
         self.path = path
+        self.site = site
     }
 
     public static func == (a: AppViewDiff, b: AppViewDiff) -> Bool {
-        a.title == b.title && a.url == b.url && a.files == b.files && a.cut == b.cut && a.path == b.path
+        a.title == b.title && a.url == b.url && a.files == b.files && a.cut == b.cut && a.path == b.path && a.site == b.site
     }
 
     /// Read from the message's parameters, or why not.
@@ -400,8 +406,10 @@ public struct AppViewDiff: Equatable, Sendable, Identifiable {
         }
         let title = (params?["title"]?.stringValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         let url = params?["url"]?.stringValue.flatMap(URL.init(string:)).flatMap { ["http", "https"].contains($0.scheme?.lowercased() ?? "") ? $0 : nil }
+        let site = (params?["site"]?.stringValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         return .success(AppViewDiff(title: title.isEmpty ? "Changes" : String(title.prefix(200)), url: url, files: files,
-                                    cut: params?["cut"]?.boolValue ?? false, path: params?["path"]?.stringValue))
+                                    cut: params?["cut"]?.boolValue ?? false, path: params?["path"]?.stringValue,
+                                    site: site.isEmpty ? "GitHub" : String(site.prefix(siteLimit))))
     }
 }
 
