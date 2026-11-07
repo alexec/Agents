@@ -1,7 +1,11 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Every runtime on this Mac and where its allowance stands (065, US4).
+/// Your setup (#3630, #3631): every runtime once, where its allowance stands, its accounts,
+/// and a line per machine that says whether it is installed and signed in there, each to that
+/// machine's page (#3626). The accounts and allowances are This Mac's, where accounts are added
+/// and signed in (#2257); what a machine installs is on its page (#3629). It was Status ▸
+/// Runtimes, drawn for one machine (065, US4).
 ///
 /// A page like Resources, reached from the foot of the sidebar. It was in Settings ▸
 /// Agent Runtimes, which is where a control belongs; what it says is the state of the
@@ -29,9 +33,11 @@ struct RuntimesView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                Text("What each runtime can be started on right now. An allowance that is "
-                     + "spent is not a fault: a chat on it still takes a message, and the "
-                     + "runtime says no until its plan comes back.")
+                Text("Runtimes").appText(.reading)
+                Text("What each runtime can be started on right now, with your accounts, and "
+                     + "where each machine has it. An allowance that is spent is not a fault: a "
+                     + "chat on it still takes a message, and the runtime says no until its plan "
+                     + "comes back.")
                     .appText(.supporting)
                     .foregroundStyle(.secondary)
                 VStack(spacing: 0) {
@@ -69,6 +75,10 @@ struct RuntimesView: View {
                                 }
                             }
                         }
+                        if !machines.isEmpty {
+                            Divider().padding(.leading, 14)
+                            MachineLines(runtimeID: status.id, machines: machines)
+                        }
                     }
                 }
                 .paperRaised(in: RoundedRectangle(cornerRadius: 10))
@@ -76,7 +86,7 @@ struct RuntimesView: View {
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .navigationTitle("Runtimes")
+        .navigationTitle("Your setup")
         .overlay {
             if runtimes.isEmpty {
                 Text("No runtimes known yet.")
@@ -87,6 +97,9 @@ struct RuntimesView: View {
             await model.refreshRuntimes()
             await model.refreshRuntimeAllowances()
             await model.refreshAccountProfiles()
+            for host in model.hosts.servers where !model.hosts.isOffline(host) {
+                await model.refreshServerRuntimes(host)
+            }
         }
         .sheet(isPresented: Binding(get: { signingIn != nil }, set: { if !$0 { signingIn = nil } })) {
             if let signingIn {
@@ -129,6 +142,12 @@ struct RuntimesView: View {
         row.accountID.flatMap { id in model.accountProfiles.first { $0.id == id && !$0.isOrganisation } }
     }
 
+    /// This Mac, when it is one of the machines, then the others by name, as the sidebar's
+    /// Machines lists them (#3626).
+    private var machines: [MachineRef] {
+        (model.hasMacHost ? [.mac] : []) + model.hosts.servers
+    }
+
     /// Every runtime the app knows, in its own order. The daemon sends the whole list
     /// whether or not a runtime is on this Mac, so a missing one is here to be read
     /// rather than guessed at from the absence of a row.
@@ -143,6 +162,41 @@ struct RuntimesView: View {
 
     private func accountRows(for runtimeID: String) -> [RuntimeAllowances.Row] {
         model.runtimeAllowances?.rows.filter { $0.runtimeID == runtimeID && $0.accountID != nil } ?? []
+    }
+}
+
+/// A runtime's line on each machine (#3631): what the machine's page says of it, each a link
+/// to that page. A server that is offline, or has not listed its runtimes yet, says so.
+private struct MachineLines: View {
+    @Environment(AppModel.self) private var model
+    let runtimeID: String
+    let machines: [MachineRef]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            ForEach(machines, id: \.self) { host in
+                Button {
+                    model.sidebarItem = .machine(host)
+                } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(model.hosts.label(host)).foregroundStyle(.tint)
+                        Text(line(host)).foregroundStyle(.secondary)
+                    }
+                    .appText(.fine)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("\(model.hosts.label(host))’s page: its runtimes, resources and disks")
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func line(_ host: MachineRef) -> String {
+        if let status = model.runtimes(on: host).first(where: { $0.id == runtimeID }) { return status.machineLine }
+        return model.hosts.isOffline(host) ? "Offline" : "Not known yet"
     }
 }
 
@@ -234,7 +288,7 @@ private struct RuntimeStatusRow<Actions: View>: View {
     private var isOut: Bool { allowance?.state.isOut == true && allowance?.unusable == nil }
 }
 
-/// The foot of the sidebar's way into Runtimes (065). It says how many runtimes on this
+/// The sidebar's way into Your setup (065, #3631). It says how many runtimes on this
 /// Mac can start a turn, out of how many are installed (#379), and a red dot only when
 /// none can: one being out does not matter, the work goes on on the others.
 struct RuntimesRow: View {
@@ -248,11 +302,11 @@ struct RuntimesRow: View {
         // The title alone (#587): how many work is the tooltip's, and none working turns
         // the row's icon red (`activityIcon(_:warns:)`).
         HStack(alignment: .firstTextBaseline) {
-            Text("Runtimes").foregroundStyle(.primary)
+            Text("Your setup").foregroundStyle(.primary)
             Spacer()
         }
-        .help(tally.map { "\($0.working) of \($0.total) working. What each runtime can be started on right now, and where its allowance stands" }
-              ?? "What each runtime can be started on right now, and where its allowance stands")
+        .help(tally.map { "\($0.working) of \($0.total) runtimes working. Your runtimes and accounts, and where each machine has them" }
+              ?? "Your runtimes and accounts, and where each machine has them")
         .accessibilityValue(tally.map { $0.noneWorking ? "None of \($0.total) working" : "\($0.working) of \($0.total) working" } ?? "")
     }
 }

@@ -462,7 +462,8 @@ final class AppModel {
         machinePage = .mac
     }
 
-    /// Runtimes, from the prompt bar's warning about starting on one that is out.
+    /// Your setup, at its Runtimes (#3631), from the prompt bar's warning about starting on one
+    /// that is out.
     func showRuntimes() {
         showsRuntimes = true
     }

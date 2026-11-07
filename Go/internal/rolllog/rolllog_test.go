@@ -94,3 +94,28 @@ func TestTwoWritersShareOneLog(t *testing.T) {
 		t.Fatalf("after a removal %q", got)
 	}
 }
+
+// What goes past Write, as a panic on the duplicated standard error does, is rolled by
+// Check (#3687), which leaves a log under its limit alone.
+func TestCheckRollsWhatWentPastWrite(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "daemon.log")
+	f, err := Open(path, 100, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	f.Write([]byte("line\n"))
+	f.Check()
+	if _, err := os.Stat(Previous(path)); !os.IsNotExist(err) {
+		t.Fatal("rolled under the limit")
+	}
+	f.File().Write([]byte(strings.Repeat("p", 200)))
+	f.Check()
+	if len(read(t, Previous(path))) != 205 {
+		t.Fatal("not rolled")
+	}
+	f.Write([]byte("after\n"))
+	if got := read(t, path); got != "after\n" {
+		t.Fatalf("current %q", got)
+	}
+}

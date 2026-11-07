@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/wire"
@@ -119,6 +120,31 @@ func TestADropBoxAndAnArtifact(t *testing.T) {
 		if e := c.callError(t, 10+i, "dropbox/put", tc.params); e.Message != tc.want {
 			t.Fatalf("%d: %s", i, e.Message)
 		}
+	}
+	// #3648: a put that takes the drop box past its total is refused; the file the put
+	// would replace does not count. A sparse file holds the bytes without the disk.
+	big := filepath.Join(real, ".agents", "dropbox", "big.bin")
+	if f, err := os.Create(big); err != nil || f.Truncate(dropboxTotal-1) != nil || f.Close() != nil {
+		t.Fatal(err)
+	}
+	if e := c.callError(t, 30, "dropbox/put", map[string]any{"folder": store.FolderURL(dir), "name": "more.txt", "data": "aGk="}); !strings.HasPrefix(e.Message, "The drop box is full") {
+		t.Fatal(e.Message)
+	}
+	c.call(t, 31, "dropbox/put", map[string]any{"folder": store.FolderURL(dir), "name": "big.bin", "data": "aGk="})
+	// What a cut-off put left goes after a day; a person's own dot file stays.
+	stale := filepath.Join(real, ".agents", "dropbox", ".x.1234abcd.part")
+	kept := filepath.Join(real, ".agents", "dropbox", ".mine")
+	writeFile(t, stale, "x")
+	writeFile(t, kept, "x")
+	old := time.Now().Add(-48 * time.Hour)
+	os.Chtimes(stale, old, old)
+	os.Chtimes(kept, old, old)
+	d.sweepDropboxParts()
+	if _, err := os.Stat(stale); !os.IsNotExist(err) {
+		t.Fatal("a day-old .part stayed")
+	}
+	if _, err := os.Stat(kept); err != nil {
+		t.Fatal(err)
 	}
 	a := seeded(t, d, dir, nil)
 	path := filepath.Join(dir, "new", "page.md")

@@ -1055,5 +1055,109 @@
         "issue"
       ]
     }
+  },
+  {
+    "name": "set_ci_secret",
+    "title": "Set a CI secret",
+    "annotations": {
+      "destructiveHint": true,
+      "openWorldHint": true
+    },
+    "description": "Put one of the person's secrets into a GitHub repository's Actions secrets, without you seeing its value. Name the secret you asked for with ask_secret (a session-only one, or one in Settings ▸ Secrets) in secret, and the CI secret's name in name. The app reads the value, seals it to the repository's public key and puts it with the person's GitHub connection; the value goes in no argument, result or transcript. It replaces a CI secret of the same name. When the secret is not set, ask for it with ask_secret first. Never put a secret's value in set_ci_variable, a file or a command.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
+        },
+        "repo": {
+          "type": "string",
+          "description": "The GitHub repository, as owner/repo. Leave it out for this folder's own."
+        },
+        "name": {
+          "type": "string",
+          "description": "The CI secret's name, as workflows read it in ${{ secrets.NAME }}: letters, digits and underscores, not starting with GITHUB_. E.g. SENTRY_AUTH_TOKEN."
+        },
+        "secret": {
+          "type": "string",
+          "description": "The name of the person's secret, as you asked for it with ask_secret. Leave it out when it is the same as name."
+        }
+      },
+      "required": [
+        "name"
+      ]
+    }
+  },
+  {
+    "name": "set_ci_variable",
+    "title": "Set a CI variable",
+    "annotations": {
+      "destructiveHint": true,
+      "openWorldHint": true
+    },
+    "description": "Make or change a GitHub repository's Actions variable, which is not secret: workflows read it as ${{ vars.NAME }}, and anyone who can see the repository's settings can read it. Use it for names and ids, such as a cloud project or a service account. For a password, a key or a token, use set_ci_secret.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
+        },
+        "repo": {
+          "type": "string",
+          "description": "The GitHub repository, as owner/repo. Leave it out for this folder's own."
+        },
+        "name": {
+          "type": "string",
+          "description": "The variable's name: letters, digits and underscores, not starting with GITHUB_. E.g. GCP_DEPLOY_SA."
+        },
+        "value": {
+          "type": "string",
+          "description": "The variable's value."
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ]
+    }
+  },
+  {
+    "name": "set_environment_gate",
+    "title": "Gate an environment",
+    "annotations": {
+      "destructiveHint": true,
+      "openWorldHint": true
+    },
+    "description": "Make a GitHub repository's environment, or change one, so that a job that deploys to it waits until one of its reviewers approves it, on GitHub or in the app. A job takes the gate with environment: NAME in its workflow. It sets the reviewers to the ones you give, in place of any before.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
+        },
+        "repo": {
+          "type": "string",
+          "description": "The GitHub repository, as owner/repo. Leave it out for this folder's own."
+        },
+        "environment": {
+          "type": "string",
+          "description": "The environment's name, e.g. production or app-store."
+        },
+        "reviewers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Who may approve a deploy: 1 to 6 GitHub logins, and teams of the repository's organisation as org/team."
+        }
+      },
+      "required": [
+        "environment",
+        "reviewers"
+      ]
+    }
   }
 ]

@@ -20,12 +20,12 @@ func TestAdminVerbs(t *testing.T) {
 		t.Fatal(out.String(), err)
 	}
 	backups := t.TempDir() + "/2026-11-01"
-	for _, args := range [][]string{{"backup", "--keep", "2", backups}, {"backup", "--keep=2", backups}, {"allow", "ana"}, {"admit", "bo"}, {"disallow", "bo"}, {"waitlist"}, {"accounts"}, {"unblock", "7"}} {
+	for _, args := range [][]string{{"backup", "--keep", "2", backups}, {"backup", "--keep=2", backups}, {"backup", backups}, {"backup", "--keep", "0", backups}, {"allow", "ana"}, {"admit", "bo"}, {"disallow", "bo"}, {"waitlist"}, {"accounts"}, {"unblock", "7"}} {
 		if err := runAdmin(ctx, a, args, &out); err != nil {
 			t.Fatal(args, err)
 		}
 	}
-	for _, args := range [][]string{{"nothing"}, {"allow"}, {"suspend", "abcdefghij"}, {"unblock", "x"}, {"invite", "-1"}, {"backup", "--keep", "0", "d"}, {"backup", "--keep=x", "d"}, {"backup", "--keep"}, {"backup", "--keep", "2"}} {
+	for _, args := range [][]string{{"nothing"}, {"allow"}, {"suspend", "abcdefghij"}, {"unblock", "x"}, {"invite", "-1"}, {"backup", "--keep", "-1", "d"}, {"backup", "--keep=x", "d"}, {"backup", "--keep"}, {"backup", "--keep", "2"}} {
 		if err := runAdmin(ctx, a, args, &out); !errors.Is(err, errUsage) {
 			t.Fatal(args, err)
 		}

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -604,6 +605,41 @@ func inScope(path string, folders []string) bool {
 
 const dropboxLimit = 25 * 1024 * 1024
 
+// dropboxTotal is the most a folder's drop box holds from dropbox/put (#3648), as
+// attachments do: one file put there by hand is the person's, and is never deleted.
+const dropboxTotal = 500 * 1024 * 1024
+
+// dropboxBytes is the bytes of every file under a drop box, but the file at but, which a
+// put replaces.
+func dropboxBytes(dir, but string) int64 {
+	var n int64
+	filepath.WalkDir(dir, func(p string, e fs.DirEntry, err error) error {
+		if err == nil && e.Type().IsRegular() && p != but {
+			if fi, err := e.Info(); err == nil {
+				n += fi.Size()
+			}
+		}
+		return nil
+	})
+	return n
+}
+
+// sweepDropboxParts removes what a put cut off left in each folder's drop box: a .part a
+// day old.
+func (d *Daemon) sweepDropboxParts() {
+	for _, p := range d.folders(true) {
+		root := filepath.Join(store.FolderPath(p.Folder.Folder), ".agents", "dropbox")
+		filepath.WalkDir(root, func(path string, e fs.DirEntry, err error) error {
+			if err == nil && e.Type().IsRegular() && strings.HasPrefix(e.Name(), ".") && strings.HasSuffix(e.Name(), ".part") {
+				if fi, err := e.Info(); err == nil && nowFunc().Sub(fi.ModTime()) > 24*time.Hour {
+					os.Remove(path)
+				}
+			}
+			return nil
+		})
+	}
+}
+
 // putInDropbox is dropbox/put: a file into a folder's .agents/dropbox, whole or not at all.
 func (d *Daemon) putInDropbox(r wire.DropboxPutRequest) (wire.DropboxPutResponse, error) {
 	folder := store.FolderPath(r.Folder)
@@ -639,6 +675,10 @@ func (d *Daemon) putInDropbox(r wire.DropboxPutRequest) (wire.DropboxPutResponse
 			}
 			dir = filepath.Join(dir, part)
 		}
+	}
+	box := filepath.Join(folder, ".agents", "dropbox")
+	if dropboxBytes(box, filepath.Join(dir, name))+int64(len(r.Data)) > dropboxTotal {
+		return wire.DropboxPutResponse{}, Invalid("The drop box is full (500 MB). Move or delete files in .agents/dropbox/ on its machine first.")
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return wire.DropboxPutResponse{}, &Error{Code: wire.FailureCouldNotSave, Message: "The file could not be put in the drop box."}

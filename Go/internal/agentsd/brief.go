@@ -124,7 +124,7 @@ func (d *Daemon) brief(a *wire.Agent) string {
 	parts := []string{d.namingBrief(a), leasesWithDeclared(d.declaredResources()), eventsBrief,
 		endingBrief(a.RuntimeID), liveDocumentBrief, escalationBrief(a.RuntimeID),
 		workflowsBrief(a.RuntimeID), helpersBrief, sessionsBrief,
-		toolsBrief(d.offersBrowser(), d.offersDriveScreen(), d.isBot())}
+		toolsBrief(d.offersBrowser(), d.offersDriveScreen(), d.isBot(), d.hasGitHub())}
 	if appToolServed("move_worktree") && runtimeCanMove(a.RuntimeID) {
 		parts = append(parts, worktreesBrief)
 	}
@@ -259,8 +259,8 @@ const sessionsBrief = "To continue another session in this folder, read it with 
 // defers MCP tools, so a tool no paragraph names is one it does not know it has; and a
 // folder's AGENTS.md and skills reach only that folder. The browser and drive_screen are
 // named only where this host lists them, as tools/list does; hand_to_person not on a bot's
-// machine, where nobody answers it.
-func toolsBrief(browser, screen, bot bool) string {
+// machine, where nobody answers it. The CI tools (#3706) only where GitHub is connected.
+func toolsBrief(browser, screen, bot, github bool) string {
 	lines := []string{
 		"- notify: tell me that something happened, when you have no question for me.",
 		"- set_session_labels: label this session #<n> for an issue or P#<n> for a pull request. This links them to it.",
@@ -268,6 +268,10 @@ func toolsBrief(browser, screen, bot bool) string {
 		"- estimate_issue: say what an issue or an epic will cost and take.",
 		"- list_machines, then start_session with machine: work on another of my machines. bring_back " +
 			"brings its branch back here. start_machine, stop_machine, make_machine and delete_machine control the machines.",
+	}
+	if github {
+		lines = append(lines, "- set_ci_secret, set_ci_variable and set_environment_gate: set up a GitHub repository's CI. "+
+			"set_ci_secret puts a secret I gave you with ask_secret into it, without you seeing the value; never put a secret's value in a variable.")
 	}
 	if browser {
 		lines = append(lines,
@@ -301,6 +305,12 @@ var residueBrief = map[string]string{
 // firstPromptCards is AppToolPreface.firstPrompt: Cursor has the app's tools from the
 // agents server itself and only needs pointing at them.
 var firstPromptCards = map[string]string{"cursor": "Call `agents` tools directly."}
+
+// hasGitHub is whether this host has a GitHub connection it can use, for the CI tools.
+func (d *Daemon) hasGitHub() bool {
+	c, ok := d.githubConnection()
+	return ok && c.Usable(nowFunc())
+}
 
 // appToolServed is whether this host serves an app tool, so the brief names none it lacks.
 func appToolServed(name string) bool {

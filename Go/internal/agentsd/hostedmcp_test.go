@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"syscall"
@@ -205,5 +206,21 @@ func (d *Daemon) hostedState(path string) wire.HostedMCPState {
 func TestEveryServerKnowsTheHostsCopyByOneName(t *testing.T) {
 	if gitlabmcp.HostedEnv != githubmcp.HostedEnv {
 		t.Fatalf("%s is not %s", gitlabmcp.HostedEnv, githubmcp.HostedEnv)
+	}
+}
+
+// One write over a server log's limit goes in parts (#3687): neither file passes it.
+func TestAWriteOverTheMCPLogLimitIsSplit(t *testing.T) {
+	l := &hostedLog{path: filepath.Join(t.TempDir(), "mcp-logs", "srv-1.log")}
+	l.write([]byte("first\n"))
+	l.write(bytes.Repeat([]byte("e"), 2*hostedLogLimit+10))
+	for _, p := range []string{l.path, l.path + ".1"} {
+		fi, err := os.Stat(p)
+		if err != nil || fi.Size() > hostedLogLimit {
+			t.Fatalf("%s: %v %v", p, fi, err)
+		}
+	}
+	if fi, _ := os.Stat(l.path); fi.Size() != 10 {
+		t.Fatalf("the current log is %d bytes", fi.Size())
 	}
 }
