@@ -25,6 +25,9 @@ func TestNodeOfURL(t *testing.T) {
 		"https://acme.atlassian.net/browse/PROJ":                      "",
 		"https://github.com/alexec/Agents/-/issues/7":                 "",
 		"https://example.com/a/b/issues/7":                            "",
+		"https://codeberg.org/kim/Notes/issues/3":                     "issue forgejo:kim/notes#3",
+		"https://codeberg.org/kim/notes/pulls/4":                      "pr forgejo:kim/notes#4",
+		"https://forgejo.example.com/kim/notes/-/issues/3":            "",
 		"javascript:alert(1)":                                         "",
 		"":                                                            "",
 	} {
@@ -158,5 +161,25 @@ func TestAJiraIssuesLineageReadsItsKeysSessions(t *testing.T) {
 	if json.Unmarshal(raw, &r) != nil || r.StructuredContent.Ref != "jira:PROJ-12" || len(r.StructuredContent.Sessions) != 1 ||
 		r.StructuredContent.Sessions[0].Title != "Fix PROJ-12" {
 		t.Fatalf("%s", raw)
+	}
+}
+
+// #3834: a node's address on each forge; a Forgejo's is on the page's own host, as its node
+// does not say one.
+func TestRefURL(t *testing.T) {
+	for _, c := range []struct {
+		kind, ref, base, want string
+	}{
+		{"pr", "github:o/r#9", "", "https://github.com/o/r/pull/9"},
+		{"issue", "gitlab:g/p#3", "", "https://gitlab.com/g/p/-/issues/3"},
+		{"pr", "gitlab:g/p!4", "https://gitlab.example.com", "https://gitlab.example.com/g/p/-/merge_requests/4"},
+		{"issue", "forgejo:kim/notes#3", "https://codeberg.org", "https://codeberg.org/kim/notes/issues/3"},
+		{"pr", "forgejo:kim/notes#4", "https://codeberg.org", "https://codeberg.org/kim/notes/pulls/4"},
+		{"pr", "forgejo:kim/notes#4", "", ""},
+		{"issue", "bitbucket:o/r#1", "https://bitbucket.org", ""},
+	} {
+		if got := refURL(wire.LineageNode{Kind: c.kind, Ref: c.ref}, c.base); got != c.want {
+			t.Errorf("%s at %q: %q, want %q", c.ref, c.base, got, c.want)
+		}
 	}
 }

@@ -11,9 +11,9 @@ server in the shape of the gitlab one. Forgejo and Gitea have the same REST API,
 connector is for both: Codeberg, your own Forgejo, or your own Gitea. Agents Host carries
 it, and every Linux host installs it beside agentsd.
 
-It has tools to read pull requests, their checks and issues, and to comment on them, and
-it has events that start a workflow or a wait. With the Forgejo connection, the Work pages
-list a Forgejo repository's issues and pull requests too (#3753).
+It has tools to read pull requests, their checks and issues, and a failed job's log, and to
+comment on them, and it has events that start a workflow or a wait. With the Forgejo
+connection, the Work pages list a Forgejo repository's issues and pull requests too (#3753).
 
 ## Before you start
 
@@ -112,6 +112,13 @@ other forges' epics.
   combined state of its checks), `get_checks` (each check of a commit or a pull request's
   head), `list_issues` and `get_issue` (with its comments).
 - `comment_on_pull_request` and `comment_on_issue`.
+- `failed_log`: the last 300 lines of each failed job's log in a Forgejo Actions run, or of
+  one job by name. `runId` is the run's number: `run.id` in a `checks.failed` event, or the
+  number after `/actions/runs/` in a check's address. On Forgejo 17 or later it gives the
+  step that failed (the whole job's log when that step wrote nothing). It needs Forgejo 16
+  or later, or Gitea 1.25 or later; an older server, such as Forgejo 11 LTS or Gitea 1.24,
+  has no API for it, and the tool says which version it needs and gives the run's address.
+  Another CI's logs are on its own pages.
 - For the ready-made workflows: `create_pull_request` (a draft's title starts `WIP:`),
   `list_pull_request_comments` (the comments on lines of the diff) and
   `reply_to_pull_request_comment` (an answer in the comment's thread).
@@ -147,10 +154,22 @@ never a bot. A pull request from a fork never counts.
   repository's failed checks, so each poll reads the head of each of those.
 - **The Work pages read Forgejo on each machine.** The list asks each repository for a page,
   as Forgejo has no list across chosen repositories.
+- **Lineage links Forgejo's issues and pull requests (#3834).** A session's `#12` or `P#12`
+  label in a folder on Forgejo works on that issue or pull request. A pull request's events
+  link it to the sessions on its branch and to the issues its description closes. A folder
+  is on Forgejo when its `origin` is on the connected Forgejo, or on a host whose name says
+  Codeberg, Forgejo or Gitea.
+- **Lineage asks the connected Forgejo (#3844),** with the Forgejo connection, about the
+  repositories of the folders on it: an issue's, a pull request's and a milestone's title
+  and state, an issue's milestone, a version tag's pull requests (from `(#12)` at the end of
+  a squash commit's title, or else the commit's pull request) and the milestone whose title
+  starts with its version, and the cost comment on a merged pull request (when the folder's
+  `prCostComment` says so). Forgejo has no parent issues, so an issue has none. An issue's
+  address on the connected Forgejo is read in a filed issue's output. A doc's address is
+  `/src/HEAD/<path>`, which Forgejo sends on to the default branch.
 - **The Board filter has no Forgejo board.** Forgejo has project boards, but its API (11)
   cannot read them, so a list narrowed to a board lists no Forgejo items.
-- **Not yet:** a failed job's log, and lineage links from a session's `#12` label to a
-  Forgejo issue.
+- **Not yet:** a failed job's log.
 
 ## See also
 

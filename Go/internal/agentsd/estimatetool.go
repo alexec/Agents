@@ -50,7 +50,7 @@ func (d *Daemon) estimateNode(caller wire.UUID, issue string) (wire.LineageNode,
 		repo.path = m[1]
 	}
 	if repo.forge == "" {
-		return wire.LineageNode{}, Invalid("Nothing estimated: this folder's repo is not on GitHub or GitLab. Give a ref such as linear:ENG-4.")
+		return wire.LineageNode{}, Invalid("Nothing estimated: this folder's repo is not on GitHub, GitLab or Forgejo. Give a ref such as linear:ENG-4.")
 	}
 	return repo.issue(n), nil
 }

@@ -37,6 +37,14 @@ type forgeForgejo interface {
 	Merge(ctx context.Context, repo string, number int, sha, method string, auto bool) error
 	Approve(ctx context.Context, repo string, number int, sha string) (string, error)
 	PRDiff(ctx context.Context, repo string, number int) (map[string]any, error)
+	// What lineage asks (lineageforgejo.go).
+	Node(ctx context.Context, repo string, number int) (forgejomcp.Node, error)
+	MilestoneNode(ctx context.Context, repo string, id int) (forgejomcp.Node, error)
+	Milestones(ctx context.Context, repo string) ([]forgejomcp.Milestone, error)
+	CommitTime(ctx context.Context, repo, ref string) (time.Time, error)
+	Compare(ctx context.Context, repo, base, head string) ([]forgejomcp.Commit, error)
+	CommitPR(ctx context.Context, repo, sha string) (int, error)
+	CostComment(ctx context.Context, repo string, number int, id, mark, body string) (string, error)
 	Plan(ctx context.Context, repo string, number int) (forgejomcp.Plan, error)
 	CreateIssue(ctx context.Context, repo, title string, labels []string) (int, string, error)
 	SetBlockedBy(ctx context.Context, repo string, number int, blockerRepo string, blockerNumber int, blocked bool) error
@@ -104,6 +112,9 @@ func (d *Daemon) forgejoRepoAt(ctx context.Context, folder, connected string) (r
 	return root, repo
 }
 
+// onGitHubOrGitLab says r is a GitHub or GitLab repo, which the Forgejo lists leave to theirs.
+func onGitHubOrGitLab(r forgeRepo) bool { return r.forge == "github" || r.forge == "gitlab" }
+
 // forgejoSources adds to s the repositories of folders on the connected Forgejo: a folder whose
 // remote is neither GitHub's nor GitLab's. A Forgejo folder elsewhere leaves a reason.
 func (d *Daemon) forgejoSources(ctx context.Context, s *forgeSources, folders []string) {
@@ -111,7 +122,7 @@ func (d *Daemon) forgejoSources(ctx context.Context, s *forgeSources, folders []
 	s.forgejoRoot = root
 	elsewhere := false
 	for _, f := range folders {
-		if d.folderRepo(f).forge != "" {
+		if onGitHubOrGitLab(d.folderRepo(f)) {
 			continue
 		}
 		at, repo := d.forgejoRepoAt(ctx, f, c.URL)
@@ -160,7 +171,7 @@ func (d *Daemon) forgejoOf(ctx context.Context, method, repo string) (forgeForge
 		return nil, "", "", errors.New(forgejomcp.NotConnected)
 	}
 	for _, f := range d.folderPaths() {
-		if d.folderRepo(f).forge != "" {
+		if onGitHubOrGitLab(d.folderRepo(f)) {
 			continue
 		}
 		if at, named := d.forgejoRepoAt(ctx, f, c.URL); at == root && strings.EqualFold(named, repo) {
@@ -275,7 +286,7 @@ func (d *Daemon) forgejoFolder(ctx context.Context, repo, named, folder string) 
 	}
 	c, root := d.forgejoRoot()
 	for _, f := range d.folderPaths() {
-		if d.folderRepo(f).forge != "" {
+		if onGitHubOrGitLab(d.folderRepo(f)) {
 			continue
 		}
 		if at, r := d.forgejoRepoAt(ctx, f, c.URL); at == root && strings.EqualFold(r, repo) {

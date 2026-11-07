@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/internal/connections"
 	"github.com/alexec/agents/Go/internal/forgejomcp"
 	"github.com/alexec/agents/Go/wire"
@@ -22,6 +23,8 @@ type fakeForgeForgejo struct {
 	searches []string
 	items    []string
 	wrote    []string
+	// asked is what lineage asked (lineageforgejo_test.go).
+	asked []string
 }
 
 func (f *fakeForgeForgejo) note(to *[]string, s string) {
@@ -383,5 +386,58 @@ func TestABoardLeavesForgejoOut(t *testing.T) {
 	narrowToBoard(&s, wire.ProjectBoard{Forge: new(wire.ConnectionProviderGithub), Key: new("alexec/1")}, []string{"/f"}, false)
 	if s.forgejo != nil || s.forgejoErr != nil {
 		t.Fatalf("sources: %+v", s)
+	}
+}
+
+// #3834: lineage takes a Forgejo folder's labels and pull request events as Forgejo nodes: a
+// folder on the connected Forgejo while it is connected, and a Codeberg folder by its host.
+// Nothing is asked of gh or glab about them.
+func TestLineageOnAForgejoFolder(t *testing.T) {
+	d, _, _, file := forgejoDaemon(t)
+	var connected, codeberg string
+	for _, f := range d.folderPaths() {
+		switch d.folderRepo(f) {
+		case forgeRepo{"forgejo", "walkalex/app"}:
+			connected = f
+		case forgeRepo{"forgejo", "kim/notes"}:
+			codeberg = f
+		}
+	}
+	if connected == "" || codeberg == "" {
+		t.Fatalf("the Forgejo folders' repos: %v", d.folderPaths())
+	}
+	branch := "agents/7-fix"
+	a := seeded(t, d, connected, func(a *wire.Agent) {
+		a.Labels = []wire.SessionLabel{{Value: "#7", Owner: wire.SessionLabelOwnerPerson}}
+		a.Worktree = &wire.AgentWorktree{Name: "7-fix", Branch: &branch, Folder: store.FolderURL(connected)}
+	})
+	d.noteLineage(nil, a)
+	s := sessionNode(a.ID)
+	d.lineageEvent(wire.Event{Name: "pr.opened", Details: map[string]string{"payload": `{"pr":{"number":8,"branch":"agents/7-fix",` +
+		`"url":"http://localhost:3753/walkalex/App/pulls/8","fixes":["#7"]}}`}})
+	pr := wire.LineageNode{Kind: "pr", Ref: "forgejo:walkalex/app#8"}
+	wantLinks(t, active(d, pr),
+		s.Ref+" opens "+pr.Ref+" (branch)",
+		pr.Ref+" fixes forgejo:walkalex/app#7 (pr-body)")
+	wantLinks(t, active(d, s),
+		s.Ref+" works-on forgejo:walkalex/app#7 (start)",
+		s.Ref+" opens "+pr.Ref+" (branch)")
+	if n, ok := d.labelNode(codeberg, "P#4"); !ok || n != (wire.LineageNode{Kind: "pr", Ref: "forgejo:kim/notes#4"}) {
+		t.Fatalf("a Codeberg folder's P#4: %+v", n)
+	}
+	if _, _, ok := nodeOfRepo(pr); ok {
+		t.Fatal("a Forgejo node is asked of gh")
+	}
+	if _, _, ok := askedNode(pr); !ok {
+		t.Fatal("a Forgejo node is not asked of its connection")
+	}
+
+	// Disconnected, the folder is on no forge lineage knows; Codeberg's is by its host.
+	file.Delete(connections.Forgejo)
+	if r := d.folderRepo(connected); r.forge != "" {
+		t.Fatalf("with no Forgejo connection: %+v", r)
+	}
+	if r := d.folderRepo(codeberg); r != (forgeRepo{"forgejo", "kim/notes"}) {
+		t.Fatalf("a Codeberg folder with no connection: %+v", r)
 	}
 }
