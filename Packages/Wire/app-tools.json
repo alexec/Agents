@@ -1159,5 +1159,51 @@
         "reviewers"
       ]
     }
+  },
+  {
+    "name": "make_app_repository",
+    "title": "Make an app's repository",
+    "annotations": {
+      "destructiveHint": false,
+      "openWorldHint": true
+    },
+    "description": "Make a new app's GitHub repository from a starter, with the person's GitHub connection, and clone it on this machine as a folder, so it shows in the session list on every client. The repository is private. The app pushes the starter as its first commit on main, with the values filled in. A step that is done already is skipped: a repository that is there is used, one with commits keeps them, and a clone already in place becomes the folder. So after a step fails, call it again. For an iPhone app and a web service, make two repositories.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "description": "The repository's name: letters, digits, '.', '-' and '_', e.g. tide-log. The folder has the same name."
+        },
+        "starter": {
+          "type": "string",
+          "enum": [
+            "iphone-app",
+            "web-service"
+          ],
+          "description": "The starter: iphone-app (TestFlight, then the App Store) or web-service (Cloud Run)."
+        },
+        "values": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "The starter's placeholders. iphone-app takes APP_NAME and BUNDLE_ID; web-service takes APP_NAME, SERVICE, GCP_PROJECT and GCP_REGION. The app fills GITHUB_REPO itself."
+        },
+        "owner": {
+          "type": "string",
+          "description": "A GitHub organisation to make it in. Leave it out for the person's own account."
+        }
+      },
+      "required": [
+        "name",
+        "starter",
+        "values"
+      ]
+    }
   }
 ]

@@ -34,6 +34,9 @@ type fakeForgeGitHub struct {
 	reviews []githubmcp.Item
 	// waiting are each repo's deploys waiting for a reviewer (#3587).
 	waiting map[string][]githubmcp.WaitingDeploy
+	// bare is the repository MakeRepository gives as the clone address, and made the ones it made (#3708).
+	bare string
+	made []string
 }
 
 func (f *fakeForgeGitHub) Search(_ context.Context, repos []string, sf githubmcp.SearchFilter, after string, first int) (githubmcp.SearchPage, error) {
