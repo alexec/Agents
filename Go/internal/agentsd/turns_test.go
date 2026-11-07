@@ -77,6 +77,19 @@ func systemPromptOf(meta any) string {
 	return s
 }
 
+// instructionsOf is the files named in OPENCODE_CONFIG_CONTENT's instructions, read as
+// OpenCode reads them on each prompt (#2612).
+func instructionsOf() string {
+	var config struct{ Instructions []string }
+	json.Unmarshal([]byte(os.Getenv("OPENCODE_CONFIG_CONTENT")), &config)
+	var out []string
+	for _, file := range config.Instructions {
+		b, _ := os.ReadFile(file)
+		out = append(out, strings.TrimSuffix(string(b), "\n"))
+	}
+	return strings.Join(out, "\n\n")
+}
+
 func (f *fakeRuntime) Initialize(context.Context, sdk.InitializeRequest) (sdk.InitializeResponse, error) {
 	// AGENTS_FAKE_STARTS names a file the fake adds a line to each time it starts.
 	if file := os.Getenv("AGENTS_FAKE_STARTS"); file != "" {
@@ -138,7 +151,7 @@ func (f *fakeRuntime) ResumeSession(_ context.Context, r sdk.ResumeSessionReques
 	}
 	b, _ := json.Marshal(r.Meta)
 	f.sandboxOff = strings.Contains(string(b), `"sandbox":{"enabled":false}`)
-	f.systemPrompt = systemPromptOf(r.Meta)
+	f.systemPrompt = systemPromptOf(r.Meta) + instructionsOf()
 	var out sdk.ResumeSessionResponse
 	if filepath.Base(r.Cwd) == "reconnecting" {
 		json.Unmarshal([]byte(`{"configOptions":[{"type":"select","id":"mode","name":"Mode","currentValue":"default",
@@ -156,7 +169,7 @@ func (f *fakeRuntime) NewSession(_ context.Context, r sdk.NewSessionRequest) (sd
 	}
 	b, _ := json.Marshal(r.Meta)
 	f.sandboxOff = strings.Contains(string(b), `"sandbox":{"enabled":false}`)
-	f.systemPrompt = systemPromptOf(r.Meta)
+	f.systemPrompt = systemPromptOf(r.Meta) + instructionsOf()
 	if filepath.Base(r.Cwd) != "offers" {
 		return sdk.NewSessionResponse{SessionId: "fake-session"}, nil
 	}
