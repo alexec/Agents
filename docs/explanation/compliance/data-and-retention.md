@@ -46,11 +46,11 @@ Mac.
 | --- | --- | --- | --- |
 | `events.jsonl` | The machine's events | 7 days, and 10,000 events (pruned when it reaches 10,500). The consequences of an event have no count limit. | At start, hourly and on write |
 | `events-state.json` | Branch tips that `branch.moved` compares, cost crossings, disk levels | The live folders, and today only | On write |
-| `usage-history.json` | Usage and cost | The newest 168 hours and 90 days that have data (keys) | On write |
-| `time-history.json` | Time, recaps and records | 168 hours, 90 days, 90 recaps | On write |
-| `spend.json` | Spend for the cost limits | The newest 7 days that have data (keys) | On write |
+| `usage-history.json` | Usage and cost | The last 168 hours and 90 days, by date | On write and hourly (#3686) |
+| `time-history.json` | Time, recaps and records | The last 168 hours, 90 days and 90 recaps, by date | On write and hourly (#3686) |
+| `spend.json` | Spend for the cost limits | The last 7 days, by date | On write and hourly (#3686) |
 | `report-hours.json` | Hourly totals sent to the control plane | 8 days | On write |
-| `features-history.json` | How often each feature is used | The newest 90 days that have data (keys) | On write |
+| `features-history.json` | How often each feature is used | The last 90 days, by date | On write and hourly (#3686) |
 | `lineage.jsonl` | Links between issues, PRs, sessions and deploys | Ended links 90 days, 20,000 links | When it opens, when it grows by 2,000, and hourly (#3649) |
 | `lineage-cost.json` | Cost of each lineage node | 90 days, 5,000 nodes | On write |
 | `lineage-comments.json` | Cost comments on PRs | 500, 30 days | On write |

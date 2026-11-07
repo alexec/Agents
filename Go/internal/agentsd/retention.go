@@ -125,6 +125,36 @@ func (d *Daemon) sweepHourly() {
 	if n := d.lineage().Prune(); n > 0 {
 		log.Printf("retention: %d ended lineage links past %v", n, lineage.KeepEnded)
 	}
+	d.sweepHistories(nowFunc())
+}
+
+// sweepHistories bounds spend, usage, time and features by age (#3686), so a machine
+// with no work does not keep old days until its next write. A store is written only when
+// a day or an hour went.
+func (d *Daemon) sweepHistories(now time.Time) {
+	d.costMu.Lock()
+	if n := pruneSpend(d.spendLocked(), now); n > 0 {
+		d.flushSpendLocked()
+	}
+	if n := pruneUsage(d.usageLocked(), now); n > 0 {
+		if err := writeStore(d.usagePath(), d.usage); err != nil {
+			log.Printf("usage-history.json: could not save: %v", err)
+		}
+	}
+	d.costMu.Unlock()
+	d.timeMu.Lock()
+	if n := pruneTime(d.timeLocked(), now); n > 0 {
+		if err := writeStore(d.timePath(), d.timeHeld); err != nil {
+			log.Printf("time-history.json: could not save: %v", err)
+		}
+	}
+	d.timeMu.Unlock()
+	d.featureMu.Lock()
+	if n := pruneFeatures(d.featuresLocked(), now); n > 0 {
+		d.featureDirty = true
+	}
+	d.featureMu.Unlock()
+	d.saveFeatures()
 }
 
 // sweepCrashLeftovers removes what a run cut off by a crash left (#3649): a restore's

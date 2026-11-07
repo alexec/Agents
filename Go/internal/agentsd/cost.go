@@ -143,25 +143,49 @@ func (d *Daemon) spendLocked() *spendFile {
 	return d.spend
 }
 
-// keepNewest is the newest n keys of a map, and the one being written.
-func keepNewest[V any](m map[string]V, n int, keep string) {
+// keepSince drops each key of a day or hour stamp older than oldest (#3686): a store is
+// bounded by age, so a quiet machine keeps no old data and a busy one loses none of the
+// days it keeps. Then at most n keys stay, and the one being written: a key from a clock
+// that was set ahead is never older than oldest, so the count still bounds it. It says how
+// many keys went.
+func keepSince[V any](m map[string]V, oldest string, n int, keep string) int {
 	keys := make([]string, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
+	gone := 0
 	for i, k := range keys {
-		if i < len(keys)-n && k != keep {
+		if k != keep && (k < oldest || i < len(keys)-n) {
 			delete(m, k)
+			gone++
 		}
 	}
+	return gone
+}
+
+// oldestDay and oldestHour are the first stamps that a store of n days or hours keeps at
+// now: today is one of the n days, this hour one of the n hours.
+func oldestDay(now time.Time, n int) string { return dayStamp(now.AddDate(0, 0, -(n - 1))) }
+func oldestHour(now time.Time, n int) string {
+	return hourStamp(now.Add(-time.Duration(n-1) * time.Hour))
+}
+
+// pruneSpend bounds spend.json to its days.
+func pruneSpend(s *spendFile, now time.Time) int {
+	today, oldest := dayStamp(now), oldestDay(now, spendDaysKept)
+	return keepSince(s.Days, oldest, spendDaysKept, today) + keepSince(s.Tokens, oldest, spendDaysKept, today)
+}
+
+// pruneUsage bounds usage-history.json to its hours and days.
+func pruneUsage(u *usageFile, now time.Time) int {
+	return keepSince(u.Hours, oldestHour(now, usageHoursKept), usageHoursKept, hourStamp(now)) +
+		keepSince(u.Days, oldestDay(now, usageDaysKept), usageDaysKept, dayStamp(now))
 }
 
 func (d *Daemon) flushSpendLocked() {
 	s := d.spendLocked()
-	today := dayStamp(time.Now())
-	keepNewest(s.Days, spendDaysKept, today)
-	keepNewest(s.Tokens, spendDaysKept, today)
+	pruneSpend(s, nowFunc())
 	if err := writeStore(d.spendPath(), s); err != nil {
 		log.Printf("spend.json: could not save: %v", err)
 	}
@@ -209,8 +233,7 @@ func (d *Daemon) recordUsageLocked(runtime string, add wire.UsageBucket) {
 	hour := hourStamp(time.Now())
 	addBucket(u.Hours, hour, runtime, add)
 	addBucket(u.Days, hour[:10], runtime, add)
-	keepNewest(u.Hours, usageHoursKept, "")
-	keepNewest(u.Days, usageDaysKept, "")
+	pruneUsage(u, nowFunc())
 	u.Now = ""
 	if err := writeStore(d.usagePath(), u); err != nil {
 		log.Printf("usage-history.json: could not save: %v", err)
@@ -416,8 +439,7 @@ func (d *Daemon) usageHistory() wire.UsageHistory {
 	d.costMu.Lock()
 	defer d.costMu.Unlock()
 	u := d.usageLocked()
-	keepNewest(u.Hours, usageHoursKept, "")
-	keepNewest(u.Days, usageDaysKept, "")
+	pruneUsage(u, nowFunc())
 	h := wire.UsageHistory{Hours: map[string]map[string]wire.UsageBucket{}, Days: map[string]map[string]wire.UsageBucket{}, Now: hourStamp(time.Now()), TimeZone: zoneName()}
 	for k, v := range u.Hours {
 		h.Hours[k] = v
