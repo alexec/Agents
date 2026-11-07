@@ -253,7 +253,7 @@ func TestBetterStackEventsAskForItsToken(t *testing.T) {
 // events its server raises: the gitlab server's.
 func TestForgejoReadsItsConnection(t *testing.T) {
 	forgejo, ok := OursByID("agents/forgejo")
-	if !ok || forgejo.Command != "forgejo-mcp" || !forgejo.Declares.Tools || forgejo.Declares.Views ||
+	if !ok || forgejo.Command != "forgejo-mcp" || !forgejo.Declares.Tools || !forgejo.Declares.Views ||
 		!reflect.DeepEqual(forgejo.Declares.Events, forgejomcp.EventNames()) {
 		t.Fatalf("forgejo: %+v %v, the server's %v", forgejo, ok, forgejomcp.EventNames())
 	}

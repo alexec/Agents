@@ -25,7 +25,7 @@ stay as they are.
 | `cmd/betterstack-mcp/`, `internal/betterstackmcp/` | The `betterstack` events MCP server (#3655): a team's incidents as `health.incident_started` and `health.incident_resolved`, polled on Better Stack's Uptime API; no tools (Better Stack's own server has them) | betterstack |
 | `cmd/whatsapp-mcp/`, `internal/whatsappmcp/` | The `whatsapp` MCP server (#1352): a WhatsApp Business number's messages and answers as `message.received` and `question.answered`, by Meta's signed webhook, and tools that send as the number | whatsapp |
 | `cmd/gitlab-mcp/`, `internal/gitlabmcp/` | The `gitlab` MCP server (#1629): merge requests, pipelines and issues on GitLab, tools and events on REST v4 | gitlab |
-| `cmd/forgejo-mcp/`, `internal/forgejomcp/` | The `forgejo` MCP server (#1753): pull requests, checks and issues on Forgejo or Gitea, tools and events on REST v1, in the gitlab server's shape | forgejo |
+| `cmd/forgejo-mcp/`, `internal/forgejomcp/` | The `forgejo` MCP server (#1753): pull requests, checks and issues on Forgejo or Gitea, tools, events and views on REST v1, in the gitlab server's shape | forgejo |
 | `cmd/bitbucket-mcp/`, `internal/bitbucketmcp/` | The `bitbucket` MCP server (#2828): pull requests, checks and issues on Bitbucket Cloud, tools and events on REST 2.0, in the gitlab server's shape | bitbucket |
 | `cmd/azuredevops-mcp/`, `internal/azuredevopsmcp/` | The `azuredevops` MCP server (#2829): pull requests and Azure Pipelines builds on Azure DevOps, tools and events on REST 7.1, in the gitlab server's shape | azuredevops |
 | `cmd/azureboards-mcp/`, `internal/azureboardsmcp/` | The `azureboards` MCP server (#3804): Azure Boards work items as a tracker, tools and events on REST 7.1, in the jira server's shape | azureboards |
@@ -243,7 +243,11 @@ Forgejo it was made on.
 - **Set-up reads** (`setup.go`, #3752): the newest issue, the newest pull request and the
   default branch's combined status prove a folder's Tasks, Code review and CI slots, and
   `RepoAt` finds a folder's Forgejo repository from its remotes.
-- **No views yet:** the Work pages are a follow-up.
+- **Views** (#3838), the gitlab server's page shapes in Forgejo's words (`pages/`; `bridge.js`,
+  `common.css`, `lineage.js` and `prpage.css` are the github server's, word for word, and a test
+  keeps them so): Pull requests (`show_pull_requests`), Issues (`show_issues`, with
+  `show_issue_details`) and a pull request's page (`show_pull_request`), with
+  `show_pull_request_diff` for the app's diff and `failed_log` for a failed run's log.
 
 The tests run it against a fake Forgejo over HTTP (`fake_test.go`); `walk_live_test.go`
 (`-tags live`) walks every event and tool on a real Forgejo or Gitea, a scratch one in a

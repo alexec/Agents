@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac, web]
-description: Connect Forgejo with an access token and add the forgejo connector, so that agents read and comment on pull requests, checks and issues on Codeberg or your own Forgejo or Gitea, a workflow or a wait starts on their events, and the Work pages list them.
+description: Connect Forgejo with an access token and add the forgejo connector, so that agents read and comment on pull requests, checks and issues on Codeberg or your own Forgejo or Gitea, a workflow or a wait starts on their events, the Work pages list them, and the connector's own pages show them.
 ---
 
 # Use Forgejo or Gitea
@@ -14,6 +14,9 @@ it, and every Linux host installs it beside agentsd.
 It has tools to read pull requests, their checks and issues, and a failed job's log, and to
 comment on them, and it has events that start a workflow or a wait. With the Forgejo
 connection, the Work pages list a Forgejo repository's issues and pull requests too (#3753).
+It also has three pages of its own (#3838): **Pull requests**, **Issues** and a pull
+request's page. The Mac window, the Remote on iPhone and iPad, and the web page show the same
+pages.
 
 ## Before you start
 
@@ -92,6 +95,54 @@ Forgejo is left out, and the list says why: the token counts only on its own For
 
 Each write is yours, with your token, from the machine that read the item.
 
+## See pull requests and issues on the connector's pages
+
+An agent shows a page when it calls the tool that feeds it. Ask, for example, "Show the open
+pull requests on Forgejo".
+
+- **Pull requests** (`show_pull_requests`): the 50 newest open pull requests, each with its
+  head commit's checks, a conflict and its review. Click a title to open its page in the same
+  view.
+- **Issues** (`show_issues`): the 50 newest open issues, each with its labels, its assignees
+  and its comment count. Click a row to expand its rich-text description. Click a label to
+  show only those issues. **Start Agent** opens the new-agent form for the issue, with its
+  number as the label and a new worktree. Nothing starts until you press Start.
+
+Each list is in sections: **Needs you** (asked to review it, assigned to you, or your own pull
+request with failed checks, a conflict or changes requested), **Yours**, **Team** (the
+repository's collaborators with write access or more, and bots) and **Others**.
+
+A folder's own repository is on the Work pages, so its sidebar has no row for these lists. A
+project whose Tasks or Code review slot names another Forgejo repository gets a row for that
+repository. To keep a page, choose **Pin to Folder** in the view's menu. See
+[Pin a page to a folder](pin-a-page-to-a-folder.md).
+
+### Work on a pull request
+
+A pull request's page has five tabs: **Conversation**, **Line comments**, **Files**,
+**Checks** and **Lineage**.
+
+- **Files**: **Show Diff**, or a file's name, shows the changed lines in the app's own diff.
+- **Checks**: the head commit's statuses. A failed Forgejo Actions run has **Show Log**, the
+  end of its failed jobs' logs (`failed_log`: Forgejo 16 or Gitea 1.25 or later). Another
+  CI's check opens on its own page.
+
+Under the tabs is a box for your words, and these buttons. Each one acts on Forgejo as you:
+
+- **Comment** adds the box's words as a comment.
+- **Approve** shows only on someone else's pull request.
+- **Merge** merges into the target branch (or squashes, when the repository's default is
+  squash) and deletes the branch. **Auto-merge** shows while the checks run: Forgejo merges
+  it once they succeed. Each one asks you again first. A draft, or a pull request in
+  conflict, can't be merged.
+- **Ask an Agent** sends the work to the agent on the branch: failed checks, a conflict or
+  open line comments, with the box's words. The app asks you before it sends. With no agent
+  on that branch, the new-agent form opens on the branch.
+
+Agents can't merge or approve from this page. Those tools are for a person only. They carry
+the commit that the page shows. When the pull request has a newer commit, nothing happens:
+open the page again.
+
 ## The tools
 
 - `list_pull_requests`, `get_pull_request` (with its description, head commit and the
@@ -105,6 +156,8 @@ Each write is yours, with your token, from the machine that read the item.
   or later, or Gitea 1.25 or later; an older server, such as Forgejo 11 LTS or Gitea 1.24,
   has no API for it, and the tool says which version it needs and gives the run's address.
   Another CI's logs are on its own pages.
+- For the pages: `show_pull_requests`, `show_issues`, `show_issue_details`,
+  `show_pull_request` and `show_pull_request_diff`.
 - For the ready-made workflows: `create_pull_request` (a draft's title starts `WIP:`),
   `list_pull_request_comments` (the comments on lines of the diff) and
   `reply_to_pull_request_comment` (an answer in the comment's thread).
@@ -140,8 +193,11 @@ never a bot. A pull request from a fork never counts.
   repository's failed checks, so each poll reads the head of each of those.
 - **The Work pages read Forgejo on each machine.** The list asks each repository for a page,
   as Forgejo has no list across chosen repositories.
-- **Not yet:** an epic's plan, the Board filter, and lineage links from a
-  session's `#12` label to a Forgejo issue.
+- **The Pull requests page reads each pull request's checks and reviews.** Forgejo has no list
+  of many commits' statuses, so the page reads four pull requests at a time.
+- **Not yet:** an epic's plan, the Board filter, Retry on the pages (#3842), and lineage links
+  from a session's `#12` label to a Forgejo issue: a page's **Lineage** tab says the app keeps
+  none there.
 
 ## See also
 
