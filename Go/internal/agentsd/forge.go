@@ -162,11 +162,11 @@ func (d *Daemon) registerForge() {
 // forgeCursor is a list's cursor, one per forge, so a page goes on where each forge stopped.
 // Done are the forges whose list has ended.
 type forgeCursor struct {
-	GitHub  string   `json:"github,omitempty"`
-	GitLab  string   `json:"gitlab,omitempty"`
-	Linear  string   `json:"linear,omitempty"`
-	Jira    string   `json:"jira,omitempty"`
-	Boards  string   `json:"azureboards,omitempty"`
+	GitHub    string   `json:"github,omitempty"`
+	GitLab    string   `json:"gitlab,omitempty"`
+	Linear    string   `json:"linear,omitempty"`
+	Jira      string   `json:"jira,omitempty"`
+	Boards    string   `json:"azureboards,omitempty"`
 	Forgejo   string   `json:"forgejo,omitempty"`
 	Bitbucket string   `json:"bitbucket,omitempty"`
 	Done      []string `json:"done,omitempty"`

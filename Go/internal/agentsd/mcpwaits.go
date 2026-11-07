@@ -162,20 +162,20 @@ var namedEvents = map[string]struct {
 	thing, every string
 	keys         []string
 }{
-	"pr.merged":      {"PR", "every PR in the repo", prNamingKeys},
-	"pr.closed":      {"PR", "every PR in the repo", prNamingKeys},
-	"pr.conflicted":  {"PR", "every PR in the repo", prNamingKeys},
-	"pr.commented":   {"PR", "every PR in the repo", prNamingKeys},
-	"pr.labelled":    {"PR", "every PR in the repo", prNamingKeys},
-	"pr.unlabelled":  {"PR", "every PR in the repo", prNamingKeys},
-	"review.posted":  {"PR", "every PR in the repo", prNamingKeys},
-	"review.comment": {"PR", "every PR in the repo", prNamingKeys},
-	"checks.failed":  {"PR", "every PR in the repo", prNamingKeys},
-	"checks.passed":  {"PR", "every PR in the repo", prNamingKeys},
-	"run.completed":  {"run", "every run in the repo", []string{"run", "branch", "workflow"}},
-	"issue.closed":   {"issue", "every issue in the repo", []string{"issue", "label"}},
+	"pr.merged":       {"PR", "every PR in the repo", prNamingKeys},
+	"pr.closed":       {"PR", "every PR in the repo", prNamingKeys},
+	"pr.conflicted":   {"PR", "every PR in the repo", prNamingKeys},
+	"pr.commented":    {"PR", "every PR in the repo", prNamingKeys},
+	"pr.labelled":     {"PR", "every PR in the repo", prNamingKeys},
+	"pr.unlabelled":   {"PR", "every PR in the repo", prNamingKeys},
+	"review.posted":   {"PR", "every PR in the repo", prNamingKeys},
+	"review.comment":  {"PR", "every PR in the repo", prNamingKeys},
+	"checks.failed":   {"PR", "every PR in the repo", prNamingKeys},
+	"checks.passed":   {"PR", "every PR in the repo", prNamingKeys},
+	"run.completed":   {"run", "every run in the repo", []string{"run", "branch", "workflow"}},
+	"issue.closed":    {"issue", "every issue in the repo", []string{"issue", "label"}},
 	"issue.commented": {"issue", "every issue in the repo", []string{"issue", "label"}},
-	"issue.labelled": {"issue", "every issue in the repo", []string{"issue", "label"}},
+	"issue.labelled":  {"issue", "every issue in the repo", []string{"issue", "label"}},
 }
 
 var prNamingKeys = []string{"pr", "branch", "fixes", "mine"}

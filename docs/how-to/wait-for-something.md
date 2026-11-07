@@ -31,8 +31,9 @@ and then carry on.
    otherwise its own. Every wait has one, from 1 minute to 24 hours, so none can last
    for ever; when it runs out the agent is started again and can wait again.
 
-   Only two of the app's own events can be narrowed: `branch.moved` by `branch`, and
-   `person.away` and `person.back` by `why` (`locked` or `idle`). Either can name more than
+   Only a few of the app's own events can be narrowed: `branch.moved` by `branch`,
+   `person.away` and `person.back` by `why` (`locked` or `idle`), and `file.added` and
+   `file.removed` by `paths`. Either can name more than
    one value, meaning any of them, such as `{"branch": ["agents/fix-640", "agents/fix-641"]}`.
    `branch.moved` is only raised for a branch an agent works on, never the folder's default
    branch (#702): this Mac's `main` moves only when someone pulls, so a merge on GitHub would
@@ -56,6 +57,12 @@ and then carry on.
    `{"any": true}`. A wait that does neither is refused, with words that say what to set,
    so an agent waiting for its own PR is not woken by every other merge. The table is in
    [Events from MCP servers](../reference/events.md#events-from-mcp-servers).
+
+   A wait on files in the folder names them (#3795): `file.added` or `file.removed` with
+   `paths`, a list of globs relative to the folder, such as
+   `{"paths": ["reports/*.csv"]}`. Only a change to a file one of them matches is raised,
+   once for every file that came (or went) together, with their paths. A wait without
+   `paths` is refused. See [Files](../reference/events.md#files).
 
 2. If the runtime asks permission to use `wait_for_event`, allow it. Claude and Cursor may
    ask, and Copilot always does.
