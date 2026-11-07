@@ -447,13 +447,16 @@ const signInWindow = "agents-sign-in";
  * device flow on gitlab.com, or an access token on any GitLab, which goes to the host only.
  * Connect Jira (#3304): Linear's code flow on Atlassian Cloud, or a token on one Jira site, and it
  * ends on the site's newest issue, which proves it. Connect Email (#1780): an IMAP server, a user and an app password, which go to the host only.
+ * Connect Forgejo (#3752): GitLab's access token way alone, on Codeberg or any Forgejo or Gitea.
  */
 export function ConnectDialog({ store, host, provider, folder, again, connected, close }: {
   store: Store; host: string; provider: ConnectionProvider; folder?: string;
   /** The ended connection Connect Again… is for: GitLab's opens the way it was made, with its address (#1865). */
   again?: Connection | undefined; connected: () => void; close: () => void;
 }) {
-  const opening = provider === "gitlab" && again ? words.gitlabAgain(again) : undefined;
+  const isForgejo = provider === "forgejo";
+  const opening = provider === "gitlab" && again ? words.gitlabAgain(again)
+    : isForgejo ? { withToken: true, address: again ? words.forgejoAgain(again) : "" } : undefined;
   type Step = { kind: "asking" } | { kind: "starting" } | { kind: "waiting"; flow: ConnectionSignIn }
     | { kind: "finishing" } | { kind: "install"; login: string; repository: string; url: string }
     | { kind: "checking" } | { kind: "jira"; connection: Connection } | { kind: "failed"; why: string };
@@ -670,7 +673,22 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
             <button type="button" class="link small" onClick={() => openOut(words.jira.newTokenURL)}>{words.jira.newTokenButton}</button>
           </form>
         )}
-        {withToken && !isJira && (
+        {isForgejo && (
+          <form id="connect-token" class="token-form" onSubmit={(e) => { e.preventDefault(); void connectWithToken(); }}>
+            <p class="small">{words.forgejo.tokenIntro}</p>
+            <label>{words.forgejo.addressLabel}
+              <input type="url" value={address} placeholder={words.forgejo.addressPrompt} disabled={busy}
+                autocomplete="off" autocapitalize="off" spellcheck={false}
+                onInput={(e) => setAddress((e.target as HTMLInputElement).value)} />
+            </label>
+            <label>{words.forgejo.tokenLabel}
+              <input type="password" value={token} placeholder={words.forgejo.tokenPrompt} disabled={busy} autocomplete="off"
+                onInput={(e) => setToken((e.target as HTMLInputElement).value)} />
+            </label>
+            <button type="button" class="link small" onClick={() => openOut(words.newForgejoTokenURL(address))}>{words.forgejo.newTokenButton}</button>
+          </form>
+        )}
+        {withToken && !isJira && !isForgejo && (
           <form id="connect-token" class="token-form" onSubmit={(e) => { e.preventDefault(); void connectWithToken(); }}>
             <p class="small">{words.gitlab.tokenIntro}</p>
             <label>{words.gitlab.addressLabel}
@@ -722,7 +740,7 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
           </div>
         )}
         {step.kind === "finishing" && <p class="quiet small">{words.linear.finishing}</p>}
-        {step.kind === "checking" && <p class="quiet small">{isEmail ? words.email.checking : isJira ? words.jira.checking : words.gitlab.checking}</p>}
+        {step.kind === "checking" && <p class="quiet small">{isEmail ? words.email.checking : isJira ? words.jira.checking : isForgejo ? words.forgejo.checking : words.gitlab.checking}</p>}
         {step.kind === "install" && (
           <div class="sign-in-code">
             <p class="strong">Connected as {step.login}.</p>

@@ -39,28 +39,32 @@ func NewGitLabFlow() *DeviceFlow {
 // GitLabRoot is the address the person typed as a GitLab's root with a trailing slash:
 // https:// when it names no scheme, without /api/v4 on the end. http is taken only for this
 // machine (a fake in a walk), so a token never crosses the network in the clear.
-func GitLabRoot(raw string) (string, error) {
+func GitLabRoot(raw string) (string, error) { return forgeRoot(raw, GitLabCom, "GitLab", "/api/v4") }
+
+// forgeRoot is raw as a forge's root with a trailing slash (def when blank), without api on the
+// end; name is the forge's, for the errors.
+func forgeRoot(raw, def, name, api string) (string, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return GitLabCom, nil
+		return def, nil
 	}
 	if !strings.Contains(raw, "://") {
 		raw = "https://" + raw
 	}
 	u, err := url.Parse(raw)
 	if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
-		return "", errors.New("that is not a GitLab address")
+		return "", errors.New("that is not a " + name + " address")
 	}
 	switch u.Scheme {
 	case "https":
 	case "http":
 		if host := u.Hostname(); host != "localhost" && !isLoopback(host) {
-			return "", errors.New("a GitLab address starts with https://")
+			return "", errors.New("a " + name + " address starts with https://")
 		}
 	default:
-		return "", errors.New("a GitLab address starts with https://")
+		return "", errors.New("a " + name + " address starts with https://")
 	}
-	path := strings.TrimSuffix(strings.TrimSuffix(u.Path, "/"), "/api/v4")
+	path := strings.TrimSuffix(strings.TrimSuffix(u.Path, "/"), api)
 	return u.Scheme + "://" + u.Host + strings.TrimSuffix(path, "/") + "/", nil
 }
 

@@ -381,19 +381,7 @@
               "issue.assigned"
             ],
             "views": false
-          },
-          "secrets": [
-            {
-              "name": "FORGEJO_TOKEN",
-              "description": "An access token (Settings ▸ Applications) with read and write on repository and issue",
-              "required": true
-            },
-            {
-              "name": "FORGEJO_URL",
-              "description": "The Forgejo or Gitea: https://codeberg.org when left out, or your own, as https://git.example.com",
-              "required": false
-            }
-          ]
+          }
         }
       }
     }

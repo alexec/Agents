@@ -211,9 +211,12 @@ no secret: it reads the connection, as the linear server does.
 
 The gitlab server's shape for Forgejo and Gitea, which share one REST API (v1): a stdio front
 (`forgejomcp.Front`) answers `events/list` and `events/poll` and passes everything else to a
-go-sdk server with our own tools, all with one token, `FORGEJO_TOKEN` (an access token with
-read and write on repository and issue, and read on user and organization). `FORGEJO_URL`
-(or `--url`) is the Forgejo or Gitea: `https://codeberg.org` when empty.
+go-sdk server with our own tools, all with one token: the person's Forgejo connection (#3752,
+an access token the host checked and keeps, in the store `connections.EnvName` names), or
+`FORGEJO_TOKEN` (an access token with read and write on repository and issue, and read on
+user and organization), which comes first. `FORGEJO_URL` (or `--url`) is the Forgejo or
+Gitea: the connection's, else `https://codeberg.org`. The connection's token goes only to the
+Forgejo it was made on.
 
 - **Events**, polled every 30 s, with the gitlab server's names, cursor and paging:
   `checks.failed` (an open pull request's head commit whose combined commit status is
@@ -234,14 +237,16 @@ read and write on repository and issue, and read on user and organization). `FOR
   `reply_to_pull_request_comment` (a review comment on the same file and line, which Forgejo
   keeps in that thread); and, on the host's copy only, `merge_pull_request` and
   `approve_pull_request` (a person merges, as on GitHub).
-- **No views yet**, and no connection: the Work pages, a sign-in and the folder set-up from
-  a Forgejo remote are follow-ups.
+- **Set-up reads** (`setup.go`, #3752): the newest issue, the newest pull request and the
+  default branch's combined status prove a folder's Tasks, Code review and CI slots, and
+  `RepoAt` finds a folder's Forgejo repository from its remotes.
+- **No views yet:** the Work pages are a follow-up.
 
 The tests run it against a fake Forgejo over HTTP (`fake_test.go`); `walk_live_test.go`
 (`-tags live`) walks every event and tool on a real Forgejo or Gitea, a scratch one in a
 container. Agents Host carries it (`scripts/go-github-mcp.sh forgejo-mcp`) and every Linux
 host installs `forgejo-mcp-linux-<arch>`; the catalogue lists it as `agents/forgejo`, which
-asks for `FORGEJO_TOKEN` and `FORGEJO_URL`. See `docs/how-to/use-forgejo.md`.
+asks for no secret: it reads the connection, as the gitlab server does. See `docs/how-to/use-forgejo.md`.
 
 ## The email MCP server (`email-mcp`, #1780)
 

@@ -245,20 +245,21 @@ func TestBetterStackEventsAskForItsToken(t *testing.T) {
 	}
 }
 
-// Forgejo (#1753) asks for a token, and the Forgejo when it is not Codeberg, kept in the
-// person's secrets, and declares the events its server raises: the gitlab server's.
-func TestForgejoAsksForItsToken(t *testing.T) {
+// Forgejo (#1753) asks for no secret: it reads the Forgejo connection (#3752), as the gitlab
+// server does, and FORGEJO_TOKEN only when the person names it by hand. It declares the
+// events its server raises: the gitlab server's.
+func TestForgejoReadsItsConnection(t *testing.T) {
 	forgejo, ok := OursByID("agents/forgejo")
 	if !ok || forgejo.Command != "forgejo-mcp" || !forgejo.Declares.Tools || forgejo.Declares.Views ||
 		!reflect.DeepEqual(forgejo.Declares.Events, forgejomcp.EventNames()) {
 		t.Fatalf("forgejo: %+v %v, the server's %v", forgejo, ok, forgejomcp.EventNames())
 	}
 	built := BuildOurs(forgejo, func(string) bool { return false })
-	want := `{"command":"forgejo-mcp","hosted":true,"env":{"FORGEJO_TOKEN":"${FORGEJO_TOKEN}","FORGEJO_URL":"${FORGEJO_URL}"}}`
+	want := `{"command":"forgejo-mcp","hosted":true}`
 	if got := strings.Join(strings.Fields(built.Entry.Stringified()), ""); got != want {
 		t.Fatalf("entry: %s", got)
 	}
-	if built.NameHere != "forgejo" || len(built.Variables) != 2 || !built.Variables[0].Required || built.Variables[1].Required {
+	if built.NameHere != "forgejo" || len(built.Variables) != 0 {
 		t.Fatalf("built: %+v", built)
 	}
 }

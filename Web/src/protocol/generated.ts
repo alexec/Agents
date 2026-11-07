@@ -1993,15 +1993,17 @@ export interface ConnectionEmailRequest {
 /**
  * A tool the person connects to: GitHub (#1335) and Linear (#1343) with OAuth, GitLab (#1630) with
  * OAuth on gitlab.com or a personal access token on any GitLab, email (#1780): one IMAP mailbox
- * with an app password, and Atlassian (#3304): one sign-in for Jira and Confluence, with OAuth on
- * Atlassian Cloud or a token on one site.
+ * with an app password, Atlassian (#3304): one sign-in for Jira and Confluence, with OAuth on
+ * Atlassian Cloud or a token on one site, and Forgejo (#3752): an access token on Codeberg or any
+ * Forgejo or Gitea.
  */
 export type ConnectionProvider =
   | "github"
   | "linear"
   | "gitlab"
   | "email"
-  | "atlassian";
+  | "atlassian"
+  | "forgejo";
 
 export interface ConnectionProviderRequest {
   provider: ConnectionProvider;
@@ -2090,15 +2092,17 @@ export interface ConnectionTokenAnswer {
 }
 
 /**
- * connections/sign-in/token (#1630, #3304): a personal access token the person made, for a provider
- * with no Agents application there (a self-managed GitLab, a Jira site). The host checks it with
- * the provider, keeps it in its own store, and never logs it or gives it back.
+ * connections/sign-in/token (#1630, #3304, #3752): a personal access token the person made, for a
+ * provider with no Agents application there (a self-managed GitLab, a Jira site, any Forgejo or
+ * Gitea). The host checks it with the provider, keeps it in its own store, and never logs it or
+ * gives it back.
  */
 export interface ConnectionTokenRequest {
   provider: ConnectionProvider;
   /**
-   * The provider's address, such as gitlab.example.com or example.atlassian.net (https:// when it
-   * names no scheme). gitlab.com when left out; a Jira site must be given.
+   * The provider's address, such as gitlab.example.com, example.atlassian.net or git.example.com
+   * (https:// when it names no scheme). gitlab.com, or codeberg.org for Forgejo, when left out; a
+   * Jira site must be given.
    */
   url?: string;
   /**
@@ -2176,29 +2180,30 @@ export interface ConnectorProof {
 }
 
 /**
- * A folder's Connectors set-up (#1336): its GitHub or GitLab repository (#1632), the person's
- * connection to that forge, four slots that each prove themselves with one read, and the events.
+ * A folder's Connectors set-up (#1336): its GitHub, GitLab or Forgejo repository (#1632, #3752),
+ * the person's connection to that forge, four slots that each prove themselves with one read, and
+ * the events.
  */
 export interface ConnectorSetup {
   folder: string;
   /**
-   * owner/name on GitHub, or group/project on GitLab, from the folder's git remote (origin first).
-   * Absent with no GitHub or GitLab remote.
+   * owner/name on GitHub or Forgejo, or group/project on GitLab, from the folder's git remote
+   * (origin first). Absent with no GitHub, GitLab or Forgejo remote.
    */
   repository?: string;
   /**
-   * The forge the repository is on, which fills Tasks, Code review and CI: github or gitlab
-   * (#1632). Absent is github.
+   * The forge the repository is on, which fills Tasks, Code review and CI: github, gitlab (#1632)
+   * or forgejo (#3752). Absent is github.
    */
   forge?: ConnectionProvider;
   /**
-   * The repository's host, as the page says it before the repository: github.com, gitlab.com, or a
-   * self-managed GitLab's host.
+   * The repository's host, as the page says it before the repository: github.com, gitlab.com,
+   * codeberg.org, or a self-managed GitLab's or Forgejo's host.
    */
   site?: string;
   /**
    * The repository's page on its forge, where the person asks for access when a read is refused
-   * (GitLab).
+   * (GitLab, Forgejo).
    */
   repositoryURL?: string;
   connection?: Connection;
@@ -2303,8 +2308,8 @@ export type ConnectorSlotKind =
  * notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not
  * read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach
  * the provider; message says why. refused: the provider refused the read, so the person grants it
- * on the provider's site. noRemote: the folder has no GitHub or GitLab remote. skipped: the person
- * skipped it; it counts as done.
+ * on the provider's site. noRemote: the folder has no GitHub, GitLab or Forgejo remote. skipped:
+ * the person skipped it; it counts as done.
  */
 export type ConnectorSlotState =
   | "notConnected"
