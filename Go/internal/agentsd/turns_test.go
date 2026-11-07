@@ -280,6 +280,25 @@ func (f *fakeRuntime) Prompt(ctx context.Context, p sdk.PromptRequest) (sdk.Prom
 	if strings.Contains(text, "a form") {
 		return f.form(ctx, p.SessionId, strings.Contains(text, "withdraw"), say)
 	}
+	// Copilot on a refused card (#3722): the call fails and the turn ends, with no word.
+	if strings.Contains(text, "deny quietly") {
+		f.conn.SessionUpdate(ctx, sdk.SessionNotification{SessionId: p.SessionId, Update: sdk.StartToolCall("call_d", "Write /tmp/out.txt",
+			sdk.WithStartKind(sdk.ToolKindEdit), sdk.WithStartStatus(sdk.ToolCallStatusPending))})
+		r, _ := f.conn.RequestPermission(ctx, sdk.RequestPermissionRequest{SessionId: p.SessionId,
+			ToolCall: sdk.ToolCallUpdate{ToolCallId: "call_d", Title: sdk.Ptr("Write /tmp/out.txt")},
+			Options: []sdk.PermissionOption{{Kind: sdk.PermissionOptionKindAllowOnce, Name: "Allow", OptionId: "allow"},
+				{Kind: sdk.PermissionOptionKindRejectOnce, Name: "Reject", OptionId: "reject"}}})
+		f.conn.SessionUpdate(ctx, sdk.SessionNotification{SessionId: p.SessionId, Update: sdk.UpdateToolCall("call_d",
+			sdk.WithUpdateStatus(sdk.ToolCallStatusFailed))})
+		if r.Outcome.Selected != nil && r.Outcome.Selected.OptionId == "allow" {
+			say("Written.")
+		}
+		return sdk.PromptResponse{StopReason: sdk.StopReasonEndTurn}, nil
+	}
+	if strings.Contains(text, "Carry on without it") {
+		say("Carrying on without it.")
+		return sdk.PromptResponse{StopReason: sdk.StopReasonEndTurn}, nil
+	}
 	// Writes "agent's\n" to the file the words name, and reports the edit (#3437).
 	if _, path, ok := strings.Cut(text, "write the file "); ok {
 		path = strings.Fields(path)[0]
@@ -443,6 +462,65 @@ func TestATurnWithACard(t *testing.T) {
 	var back wire.Agent
 	if err := diskjson.Unmarshal(b, &back); err != nil || !strings.Contains(string(b), `"createdAt":"20`) {
 		t.Fatalf("agent.json %s: %v", b, err)
+	}
+}
+
+// A card the person denies, after which the runtime ends the turn with no word, as Copilot
+// does (#3722): the app starts it again, to carry on without that call.
+func TestADeniedCardThatEndsTheTurnCarriesOn(t *testing.T) {
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	var id wire.UUID
+	json.Unmarshal(c.call(t, 1, "agents/start", map[string]any{"runtimeID": "claude", "cwd": "file://" + t.TempDir(),
+		"prompt": "deny quietly"}), &id)
+	var permission wire.PermissionRequest
+	c.until(t, "a card", func(method string, p json.RawMessage) bool {
+		var n wire.PermissionNotification
+		if method == "agent/permission" && json.Unmarshal(p, &n) == nil && n.Request != nil {
+			permission = *n.Request
+			return true
+		}
+		return false
+	})
+	c.call(t, 2, "permissions/answer", map[string]any{"permissionID": permission.ID, "optionID": "reject"})
+	waitFor(t, "the carry-on turn's end", func() bool {
+		a := d.Store.Agent(id)
+		return a.State == wire.AgentStateFinished && a.Report != nil && a.Report.Message == "Carrying on without it."
+	})
+	entries, _, _ := d.Store.Transcript(id, 0)
+	var app []string
+	for _, e := range entries {
+		if u := e.Kind.UserMessage; u != nil && u.From != nil && *u.From == wire.PromptOriginApp {
+			app = append(app, u.Value)
+		}
+	}
+	if want := carryOnAfterDenyWords("Write /tmp/out.txt"); len(app) != 1 || app[0] != want {
+		t.Fatalf("app prompts %q, want one %q", app, want)
+	}
+}
+
+// An allowed card, or a denied one the agent answers in words, sends nothing more.
+func TestACardAnsweredInWordsDoesNotCarryOn(t *testing.T) {
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	var id wire.UUID
+	json.Unmarshal(c.call(t, 1, "agents/start", map[string]any{"runtimeID": "claude", "cwd": "file://" + t.TempDir(),
+		"prompt": "Please ask, then write hi.txt"}), &id)
+	var permission wire.PermissionRequest
+	c.until(t, "a card", func(method string, p json.RawMessage) bool {
+		var n wire.PermissionNotification
+		if method == "agent/permission" && json.Unmarshal(p, &n) == nil && n.Request != nil {
+			permission = *n.Request
+			return true
+		}
+		return false
+	})
+	c.call(t, 2, "permissions/answer", map[string]any{"permissionID": permission.ID, "optionID": "reject"})
+	waitFor(t, "the end", func() bool { a := d.Store.Agent(id); return a.State == wire.AgentStateFinished })
+	if a := d.Store.Agent(id); len(a.QueuedPrompts) != 0 || a.Report == nil || a.Report.Message != "You said no." {
+		t.Fatalf("queued %v, report %+v", a.QueuedPrompts, a.Report)
 	}
 }
 
