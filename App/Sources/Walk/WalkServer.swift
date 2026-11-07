@@ -69,6 +69,10 @@ enum WalkServer {
             while let newline = pending.firstIndex(of: 0x0A) {
                 let line = pending[pending.startIndex..<newline]
                 pending = Data(pending[pending.index(after: newline)...])
+                // A web view's picture comes on the main thread, so it is waited for here.
+                let group = DispatchGroup()
+                DispatchQueue.main.sync { MainActor.assumeIsolated { WalkCommands.before(Data(line), group: group) } }
+                _ = group.wait(timeout: .now() + 5)
                 let make = DispatchQueue.main.sync { MainActor.assumeIsolated { WalkCommands.run(Data(line)) } }
                 var reply = make()
                 reply.append(0x0A)
