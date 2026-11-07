@@ -95,13 +95,14 @@ func build(id, pr int, sha, name, result string, finished int) obj {
 	return obj{"id": id, "buildNumber": "2026.11." + strconv.Itoa(id), "status": "completed", "result": result, "finishTime": at(finished),
 		"sourceBranch": "refs/pull/" + strconv.Itoa(pr) + "/merge", "sourceVersion": "merge" + strconv.Itoa(id),
 		"triggerInfo": obj{"pr.number": strconv.Itoa(pr), "pr.sourceSha": sha}, "definition": obj{"id": len(name), "name": name},
+		"reason": "pullRequest", "requestedFor": dev, "repository": obj{"id": "repo-guid", "type": "TfsGit"},
 		"_links": obj{"web": obj{"href": "https://ado.test/acme/Web%20App/_build/results?buildId=" + strconv.Itoa(id)}}}
 }
 
 // branchBuild is a build that a push to branch started (a CI trigger), of no pull request.
 func branchBuild(id int, branch, sha, name, result string, finished int) obj {
 	b := build(id, 0, sha, name, result, finished)
-	b["sourceBranch"], b["sourceVersion"], b["triggerInfo"] = "refs/heads/"+branch, sha, obj{}
+	b["sourceBranch"], b["sourceVersion"], b["triggerInfo"], b["reason"] = "refs/heads/"+branch, sha, obj{}, "individualCI"
 	return b
 }
 
@@ -125,6 +126,7 @@ var (
 	replyPath      = regexp.MustCompile(`^` + gitRoot + `/pullRequests/([0-9]+)/threads/([0-9]+)/comments$`)
 	statusesPath   = regexp.MustCompile(`^` + gitRoot + `/pullRequests/([0-9]+)/statuses$`)
 	iterationsPath = regexp.MustCompile(`^` + gitRoot + `/pullRequests/([0-9]+)/iterations$`)
+	buildPath      = regexp.MustCompile(`^/acme/Web App/_apis/build/builds/([0-9]+)$`)
 	timelinePath   = regexp.MustCompile(`^/acme/Web App/_apis/build/builds/([0-9]+)/timeline$`)
 	logPath        = regexp.MustCompile(`^/acme/Web App/_apis/build/builds/([0-9]+)/logs/([0-9]+)$`)
 )
@@ -242,6 +244,15 @@ func (f *fakeAzureDevOps) serve(w http.ResponseWriter, r *http.Request) {
 			out = append(out, b)
 		}
 		list(out)
+	case buildPath.MatchString(p):
+		for _, b := range f.builds {
+			if b["id"] == n(buildPath.FindStringSubmatch(p)) {
+				reply(b)
+				return
+			}
+		}
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"message":"The requested build could not be found."}`))
 	case timelinePath.MatchString(p):
 		reply(obj{"records": f.timeline[n(timelinePath.FindStringSubmatch(p))]})
 	case logPath.MatchString(p):

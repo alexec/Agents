@@ -467,8 +467,13 @@ type buildJSON struct {
 	FinishTime   string            `json:"finishTime"`
 	SourceBranch string            `json:"sourceBranch"`
 	SourceVer    string            `json:"sourceVersion"`
+	Reason       string            `json:"reason"`
+	RequestedFor identity          `json:"requestedFor"`
 	TriggerInfo  map[string]string `json:"triggerInfo"`
-	Definition   struct {
+	Repository   struct {
+		ID string `json:"id"`
+	} `json:"repository"`
+	Definition struct {
 		ID   int    `json:"id"`
 		Name string `json:"name"`
 	} `json:"definition"`
@@ -491,6 +496,17 @@ func (b buildJSON) prNumber() int {
 	}
 	return 0
 }
+
+// ref is a build's branch or tag, with no refs/heads/ or refs/tags/: main, v0.16.0.
+func (b buildJSON) ref() string {
+	if tag, ok := strings.CutPrefix(b.SourceBranch, "refs/tags/"); ok {
+		return tag
+	}
+	return branch(b.SourceBranch)
+}
+
+// fromFork says whether a build is of a pull request from a fork.
+func (b buildJSON) fromFork() bool { return strings.EqualFold(b.TriggerInfo["pr.isFork"], "true") }
 
 // buildPassed says whether a build's result passed, and done whether it passed or failed: a
 // build canceled, or partly succeeded, is neither.
@@ -875,6 +891,49 @@ func (f *RealAzureDevOps) PassedChecks(ctx context.Context, repo, since string) 
 			out = append(out, PassedCheck{PR: f.pr(repo, c.pr), HeadSHA: c.pr.head(), At: c.at, Key: c.key,
 				RunID: c.runID, RunName: c.check.Name, RunURL: c.check.URL, Trusted: trustedPR(c.pr)})
 		}
+	}
+	return out, listed, nil
+}
+
+// CompletedBuilds reads the builds that finished since, of any trigger and any result: the
+// listing checks.failed and checks.passed share (#932), or one build by its id.
+func (f *RealAzureDevOps) CompletedBuilds(ctx context.Context, repo, pipeline, branch string, run int, since string) ([]CompletedBuild, Listed, error) {
+	var builds []buildJSON
+	listed := Listed{}
+	if run != 0 {
+		r, err := f.repository(ctx, repo)
+		if err != nil {
+			return nil, Listed{}, err
+		}
+		var b buildJSON
+		if err := f.get(ctx, api(fmt.Sprintf("%sbuild/builds/%d", projectPath(repo), run), nil), true, &b); err != nil {
+			return nil, Listed{}, err
+		}
+		// A build id is the project's: one of another repository is not this one's.
+		if b.Repository.ID == r.ID {
+			builds = append(builds, b)
+		}
+	} else {
+		var err error
+		if builds, listed.Truncated, err = f.builds(ctx, repo, since); err != nil {
+			return nil, Listed{}, err
+		}
+	}
+	var out []CompletedBuild
+	for _, b := range builds {
+		listed = listed.saw(b.FinishTime)
+		if b.Status != "completed" || before(b.FinishTime, since) ||
+			(pipeline != "" && !strings.EqualFold(b.Definition.Name, pipeline)) ||
+			(branch != "" && b.ref() != branch && b.SourceBranch != branch) {
+			continue
+		}
+		head := b.SourceVer
+		if sha := b.TriggerInfo["pr.sourceSha"]; sha != "" {
+			head = sha
+		}
+		out = append(out, CompletedBuild{ID: b.ID, Name: b.Definition.Name, Number: b.BuildNumber, Reason: b.Reason, Branch: b.ref(),
+			HeadSHA: head, URL: b.Links.Web.Href, Result: b.Result, Actor: b.RequestedFor.name(), At: normalized(b.FinishTime),
+			Trusted: !b.fromFork() && b.RequestedFor.ID != "" && !isBot(b.RequestedFor)})
 	}
 	return out, listed, nil
 }

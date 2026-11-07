@@ -3,6 +3,7 @@ package azuredevopsmcp
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -12,14 +13,14 @@ import (
 // The events over the fake Azure DevOps: the gitlab server's names, the trust filter (#728),
 // and each one raised once from what Azure DevOps says.
 
-func TestTheEventsAreTheGitLabServersPullRequestEventsAndChecksPassed(t *testing.T) {
+func TestTheEventsAreTheGitLabServersPullRequestEventsChecksPassedAndRunCompleted(t *testing.T) {
 	var want []string
 	for _, name := range gitlabmcp.EventNames() {
 		if !strings.HasPrefix(name, "issue.") {
 			want = append(want, name)
 		}
 		if name == "checks.failed" {
-			want = append(want, "checks.passed")
+			want = append(want, "checks.passed", "run.completed")
 		}
 	}
 	same(t, EventNames(), want)
@@ -234,6 +235,54 @@ func TestChecksPassedForEachBuildAndStatusAtTheHead(t *testing.T) {
 		t.Fatalf("pr 1: %v", ids)
 	}
 	ids, _ = p.poll()
+	same(t, ids, []string(nil))
+}
+
+// run.completed (#3810) is a build of any trigger and result, main's, a tag's or a manual
+// run's, once per build and finish time, filtered by pipeline, branch and run; never a bot's
+// or a fork's pull request's unless anyone is true.
+func TestRunCompletedForABuildNoPullRequestOwns(t *testing.T) {
+	f := newFake(t)
+	p := newPoller(t, f, "run.completed", nil)
+	release := newPoller(t, f, "run.completed", map[string]any{"pipeline": "Release", "branch": "v0.16.0"})
+	anyone := newPoller(t, f, "run.completed", map[string]any{"anyone": true})
+	for _, w := range []*poller{p, release, anyone} {
+		w.poll()
+	}
+	tag := branchBuild(51, "main", "sha51", "release", "failed", 1)
+	tag["sourceBranch"], tag["reason"], tag["requestedFor"] = "refs/tags/v0.16.0", "manual", alex
+	scheduled := branchBuild(53, "main", "sha53", "nightly", "succeeded", 1)
+	scheduled["reason"], scheduled["requestedFor"] = "schedule", builder
+	forked := build(54, 7, "sha7", "ci", "canceled", 1)
+	forked["triggerInfo"].(obj)["pr.isFork"] = "True"
+	f.set(func() {
+		f.builds = []obj{tag, branchBuild(52, "main", "sha52", "release", "partiallySucceeded", 1), scheduled, forked}
+	})
+	done := timeString(start.Add(60e9))
+	id := func(n int) string { return "run.completed:acme/Web App/app:" + strconv.Itoa(n) + ":" + done }
+	ids, result := p.poll()
+	same(t, ids, []string{id(51), id(52)})
+	same(t, data(t, result, 0), map[string]any{"run": map[string]any{"id": 51, "name": "release", "number": "2026.11.51",
+		"event": "manual", "branch": "v0.16.0", "headSha": "sha51", "url": "https://ado.test/acme/Web%20App/_build/results?buildId=51",
+		"conclusion": "failed", "actor": "alex@acme.test"}, "completedAt": done})
+	same(t, data(t, result, 1)["run"].(map[string]any)["branch"], "main")
+	ids, _ = release.poll()
+	same(t, ids, []string{id(51)})
+	ids, _ = anyone.poll()
+	same(t, ids, []string{id(51), id(52), id(53), id(54)})
+	ids, _ = p.poll()
+	same(t, ids, []string(nil))
+	// Run again: a new finish time is a new event.
+	f.set(func() { tag["finishTime"], tag["result"] = at(3), "succeeded" })
+	ids, _ = release.poll()
+	same(t, ids, []string{"run.completed:acme/Web App/app:51:" + timeString(start.Add(180e9))})
+
+	one := newPoller(t, f, "run.completed", map[string]any{"run": 52})
+	one.poll()
+	f.set(func() { f.builds[1]["finishTime"] = at(5) })
+	ids, _ = one.poll()
+	same(t, ids, []string{"run.completed:acme/Web App/app:52:" + timeString(start.Add(300e9))})
+	ids, _ = one.poll()
 	same(t, ids, []string(nil))
 }
 
