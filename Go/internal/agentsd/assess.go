@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
 	"github.com/alexec/agents/Go/internal/agentsd/redact"
@@ -62,41 +63,44 @@ type appToolCall struct {
 // with two ways (list_sessions with started_by, wait_for_agents) is still one
 // method, told apart by its arguments. ask_question is a question (#2298), so `questions/ask`.
 var appToolMethods = map[string]string{
-	"start_session":       "sessions/start",
-	"stop_session":        "sessions/stop",
-	"archive_session":     "sessions/archive",
-	"list_sessions":       "sessions/list",
-	"read_session":        "sessions/read",
-	"message_session":     "sessions/message",
-	"cancel_message":      "sessions/cancelMessage",
-	"set_session_labels":  "sessions/setLabels",
-	"move_worktree":       "worktrees/move",
-	"show_file":           "files/show",
-	"ask_question":        "questions/ask",
-	"ask_secret":          "secrets/ask",
-	"suggest_next_prompt": "prompts/suggest",
-	"notify":              "people/notify",
-	"hang_up":             "calls/hangUp",
-	"manage_workflows":    "workflows/manage",
-	"lease_resource":      "resources/lease",
-	"release_resource":    "resources/release",
-	"list_resources":      "resources/list",
-	"wait_for_event":      "events/wait",
-	"wait_for_agents":     "agents/wait",
-	"check_again":         "waits/checkAgain",
-	"cancel_wait":         "events/cancel",
-	"list_machines":       "machines/list",
-	"start_machine":       "machines/start",
-	"stop_machine":        "machines/stop",
-	"make_machine":        "machines/make",
-	"delete_machine":      "machines/delete",
-	"bring_back":          "branches/bringBack",
-	"drive_screen":        "screen/drive",
-	"write_daily_summary": "summaries/write",
-	"check_folders":       "folders/check",
-	"docs_search":         "docs/search",
-	"docs_read":           "docs/read",
-	"estimate_issue":      "issues/estimate",
+	"start_session":        "sessions/start",
+	"stop_session":         "sessions/stop",
+	"archive_session":      "sessions/archive",
+	"list_sessions":        "sessions/list",
+	"read_session":         "sessions/read",
+	"message_session":      "sessions/message",
+	"cancel_message":       "sessions/cancelMessage",
+	"set_session_labels":   "sessions/setLabels",
+	"move_worktree":        "worktrees/move",
+	"show_file":            "files/show",
+	"ask_question":         "questions/ask",
+	"ask_secret":           "secrets/ask",
+	"suggest_next_prompt":  "prompts/suggest",
+	"notify":               "people/notify",
+	"hang_up":              "calls/hangUp",
+	"manage_workflows":     "workflows/manage",
+	"lease_resource":       "resources/lease",
+	"release_resource":     "resources/release",
+	"list_resources":       "resources/list",
+	"wait_for_event":       "events/wait",
+	"wait_for_agents":      "agents/wait",
+	"check_again":          "waits/checkAgain",
+	"cancel_wait":          "events/cancel",
+	"list_machines":        "machines/list",
+	"start_machine":        "machines/start",
+	"stop_machine":         "machines/stop",
+	"make_machine":         "machines/make",
+	"delete_machine":       "machines/delete",
+	"bring_back":           "branches/bringBack",
+	"drive_screen":         "screen/drive",
+	"write_daily_summary":  "summaries/write",
+	"check_folders":        "folders/check",
+	"docs_search":          "docs/search",
+	"docs_read":            "docs/read",
+	"estimate_issue":       "issues/estimate",
+	"set_ci_secret":        "secrets/setCI",
+	"set_ci_variable":      "variables/setCI",
+	"set_environment_gate": "environments/setGate",
 }
 
 // appToolMethod is the method a tool is, or the tool's own name for one not in the table.
@@ -132,7 +136,7 @@ func (d *Daemon) keepAppToolCall(agent wire.UUID, tool string, args map[string]j
 	call := appToolCall{At: wire.DateOf(began), Method: appToolMethod(tool), Ok: err == nil, Arguments: map[string]json.RawMessage{}}
 	for k, v := range args {
 		if k != "token" {
-			call.Arguments[k] = v
+			call.Arguments[k] = cutAppToolArgument(v)
 		}
 	}
 	answer := note
@@ -170,8 +174,28 @@ func (d *Daemon) keepAppToolCall(agent wire.UUID, tool string, args map[string]j
 	f.Close()
 }
 
+// cutAppToolArgument is an argument as app-tools.jsonl keeps it (#3687): whole when its
+// JSON is at most appToolAnswerMost runes, else the first appToolAnswerMost runes of its
+// text (a string's own, anything else's JSON) as a string.
+func cutAppToolArgument(v json.RawMessage) json.RawMessage {
+	if utf8.RuneCount(v) <= appToolAnswerMost {
+		return v
+	}
+	text := string(v)
+	var s string
+	if json.Unmarshal(v, &s) == nil {
+		text = s
+	}
+	if r := []rune(text); len(r) > appToolAnswerMost {
+		text = string(r[:appToolAnswerMost])
+	}
+	b, _ := json.Marshal(text)
+	return b
+}
+
 func (d *Daemon) appToolsPath(agent wire.UUID) string {
-	return filepath.Join(d.Store.Loc.Root, "agents", string(agent), "app-tools.jsonl")
+	// The agent's folder, upper case as Delete removes it (#3651): Linux is case-sensitive.
+	return filepath.Join(d.Store.Loc.Agent(string(agent)), "app-tools.jsonl")
 }
 
 func (d *Daemon) appToolCalls(agent wire.UUID) []appToolCall {

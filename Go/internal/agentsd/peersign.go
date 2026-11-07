@@ -14,7 +14,7 @@ import (
 // A machine's calls to another of its person's machines (#3492, specs/3399-machine-lock D7).
 // An agent here that starts a session on another machine, calls the session it started,
 // says one ended, or sends or brings back a folder, goes through the control plane
-// (host/machines). The other machine takes it only when a machine of the same lock signed
+// (machine/machines). The other machine takes it only when a machine of the same lock signed
 // it, so this machine writes what that machine is to get, in its own words, and signs it
 // (MachineWorkspaceCall.deliver); the control plane delivers it as it is. With no lock here,
 // nothing is signed and the control plane delivers its own words, as before.

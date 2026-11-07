@@ -25,7 +25,7 @@ import (
 // on its person's other machines. For the same reason a machine does not send its agent
 // configuration files to the person's other machines: user/setAgentConfigFile is refused.
 
-// CapHostUserSettings is what a machine says when it writes host/userSettings into its
+// CapHostUserSettings is what a machine says when it writes machine/userSettings into its
 // ~/.agents. A machine that does not say it is sent nothing. Only one that also says
 // host.user-settings/2 is sent its secrets, sealed to it, for ~/.agents-secrets.
 const CapHostUserSettings = wire.CapHostUserSettings1
@@ -33,7 +33,7 @@ const CapHostUserSettings = wire.CapHostUserSettings1
 // userDeliveryTimeout bounds reading a person's settings and secrets for one machine.
 const userDeliveryTimeout = 30 * time.Second
 
-// userDeliveryMost is the largest host/userSettings sent, with room for the frame around it
+// userDeliveryMost is the largest machine/userSettings sent, with room for the frame around it
 // under what a machine's link reads (#2730). A longer one would fail the machine's read,
 // close its link, and be sent again at the rejoin without end.
 const userDeliveryMost = controllink.MaxMessage - 1<<20
@@ -152,7 +152,7 @@ func (s *Service) userChangedHere(user string, parts []wire.UserSettingsPartName
 	}
 }
 
-// takesUserSettings says a machine writes host/userSettings.
+// takesUserSettings says a machine writes machine/userSettings.
 func (s *Service) takesUserSettings(host string) bool {
 	h := s.records.Host(host)
 	return h != nil && slices.Contains(hostCapabilities(*h), CapHostUserSettings)
@@ -204,7 +204,7 @@ func (s *Service) sendUserSettings(host string, always bool) {
 	}
 	// The person may have changed while the secrets were read: a machine that is no
 	// longer theirs is sent nothing.
-	if s.records.Host(host) == nil || s.ownerOf(host) != user || !s.router.Tell(host, wire.NewMethodName(wire.NotifyHostUserSettings.Name), delivery) {
+	if s.records.Host(host) == nil || s.ownerOf(host) != user || !s.router.Tell(host, wire.NotifyMachineUserSettings.Name, delivery) {
 		s.toldUsers.mu.Lock()
 		delete(s.toldUsers.last, host)
 		s.toldUsers.mu.Unlock()

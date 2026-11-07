@@ -23,14 +23,14 @@ func TestControlPlaneAnswersItsDocument(t *testing.T) {
 		}
 	}
 	list := capabilities()
-	for _, c := range []string{wire.CapMachines1, wire.CapMachine1, wire.CapHost1, wire.CapHosts1, wire.CapControl1} {
+	for _, c := range []string{wire.CapMachine1, wire.CapMachines1, wire.CapControl1} {
 		if !slices.Contains(list, c) {
 			t.Errorf("%s is not in the control plane's list", c)
 		}
 	}
 }
 
-// control/status says the control plane's list and its required sets; hosts/list says the
+// control/status says the control plane's list and its required sets; machines/list says the
 // list each host said.
 func TestStatusAndHostsSayCapabilities(t *testing.T) {
 	t.Parallel()
@@ -45,17 +45,11 @@ func TestStatusAndHostsSayCapabilities(t *testing.T) {
 	}
 	// The fake host says no list, as a host older than #1748: none, and nothing missing.
 	var hosts []wire.ControlMachine
-	json.Unmarshal(call(t, window, "", "hosts/list", map[string]any{}), &hosts)
+	json.Unmarshal(call(t, window, "", "machines/list", map[string]any{}), &hosts)
 	for _, h := range hosts {
 		if string(h.ID) == box.member.Host && (h.Capabilities != nil || h.Missing != nil || h.State != "online") {
 			t.Fatalf("an older host: %+v", h)
 		}
-	}
-	// machines/list is hosts/list under its new name (#2653).
-	var machines []wire.ControlMachine
-	json.Unmarshal(call(t, window, "", "machines/list", map[string]any{}), &machines)
-	if len(machines) == 0 || len(machines) != len(hosts) {
-		t.Fatalf("machines/list: %+v, hosts/list: %+v", machines, hosts)
 	}
 }
 
@@ -68,7 +62,7 @@ func TestAHostWithoutTheRequiredSetNeedsAnUpdate(t *testing.T) {
 	hello := func(list []string) {
 		params, _ := json.Marshal(wire.MachineHello{Version: "0.6.0", Platform: "linux aarch64", MachineID: "MACHINE-2",
 			Capabilities: list})
-		if _, err := p.s.methods.HostSaid(box.member.Host, "host/hello", params); err != nil {
+		if _, err := p.s.methods.HostSaid(box.member.Host, "machine/hello", params); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -79,14 +73,14 @@ func TestAHostWithoutTheRequiredSetNeedsAnUpdate(t *testing.T) {
 	}
 	_, window := p.client("Window")
 	var hosts []wire.ControlMachine
-	json.Unmarshal(call(t, window, "", "hosts/list", map[string]any{}), &hosts)
+	json.Unmarshal(call(t, window, "", "machines/list", map[string]any{}), &hosts)
 	found := false
 	for _, h := range hosts {
 		if string(h.ID) == box.member.Host {
 			found = true
 			if !slices.Equal(h.Capabilities, []string{wire.CapAgents1}) || !slices.Equal(h.Missing, []string{wire.CapHostWire1}) ||
 				h.State != "needsUpdate" {
-				t.Fatalf("hosts/list: %+v", h)
+				t.Fatalf("machines/list: %+v", h)
 			}
 		}
 	}
@@ -114,9 +108,9 @@ func TestAClientWithoutTheRequiredSetIsToldToUpdate(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(old.Close)
-	e := callError(t, old, "", "hosts/list", map[string]any{})
+	e := callError(t, old, "", "machines/list", map[string]any{})
 	if !strings.Contains(e, "-32008") || !strings.Contains(e, wire.CapClientWire1) {
-		t.Fatalf("hosts/list: %s", e)
+		t.Fatalf("machines/list: %s", e)
 	}
 	call(t, old, "", "control/status", map[string]any{})
 	if clientRefusal(nil, "0.7.0", false) != nil {
@@ -147,11 +141,11 @@ func TestOlderBuildsAreRefusedOnATeam(t *testing.T) {
 	}
 	t.Cleanup(window.Close)
 	// One person: nothing is refused.
-	call(t, window, "", "hosts/list", map[string]any{})
+	call(t, window, "", "machines/list", map[string]any{})
 	call(t, owner, older.member.Host, "daemon/ping", map[string]any{})
 
 	sam := p.invite(owner, "Sam", wire.UserRoleMember)
-	if e := callError(t, window, "", "hosts/list", map[string]any{}); !strings.Contains(e, "-32074") ||
+	if e := callError(t, window, "", "machines/list", map[string]any{}); !strings.Contains(e, "-32074") ||
 		!strings.Contains(e, "Update Agents to join this team") || !strings.Contains(e, wire.CapClientTeam1) {
 		t.Fatalf("an older client on a team: %s", e)
 	}
@@ -169,7 +163,7 @@ func TestOlderBuildsAreRefusedOnATeam(t *testing.T) {
 		t.Fatalf("required on a team: %+v", status.Required)
 	}
 	var hosts []wire.ControlMachine
-	json.Unmarshal(call(t, owner, "", "hosts/list", map[string]any{}), &hosts)
+	json.Unmarshal(call(t, owner, "", "machines/list", map[string]any{}), &hosts)
 	for _, h := range hosts {
 		if string(h.ID) == older.member.Host && !slices.Equal(h.Missing, []string{wire.CapHostTeam1}) {
 			t.Fatalf("an older host's row: %+v", h)
@@ -180,7 +174,7 @@ func TestOlderBuildsAreRefusedOnATeam(t *testing.T) {
 	}
 
 	call(t, owner, "", "people/remove", wire.PersonRequest{User: sam.id})
-	call(t, window, "", "hosts/list", map[string]any{})
+	call(t, window, "", "machines/list", map[string]any{})
 	call(t, owner, older.member.Host, "daemon/ping", map[string]any{})
 	if state, _ := p.s.Router().State(older.member.Host); state.State != "online" {
 		t.Fatalf("an older host once one person is left: %+v", state)

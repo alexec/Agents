@@ -104,14 +104,13 @@ struct ContentView: View {
     private func detail(inPaneOf width: CGFloat) -> some View {
         if model.showsEvents {
             EventsView().paperGround()
-        } else if model.showsResources {
-            ResourcesView().paperGround()
         } else if model.showsRuntimes {
             RuntimesView().paperGround()
         } else if model.showsMCPServers {
             MCPServersView().paperGround()
-        } else if model.showsWorktrees {
-            WorktreesView().paperGround()
+        } else if let host = model.machinePage {
+            // A page of its own per machine, so one machine's readings never show on another's.
+            MachinePage(host: host).id(host).paperGround()
         } else if model.showsSpending {
             SpendingView().paperGround()
         } else if model.showsTokens {
@@ -142,7 +141,6 @@ struct ContentView: View {
             // pinned view (#189), fed afresh.
             VStack(spacing: 0) {
                 OfflineStrip(host: summary.host)
-                DiskStrip(host: summary.host)
                 // Or a server's list view (#2032), whose Hide is its Unpin.
                 if let pin = model.work.pinOrView(path, in: key.folder), let view = pin.view {
                     PinnedViewPage(folder: key.folder, pin: pin, view: view,
@@ -181,8 +179,8 @@ struct ContentView: View {
     /// the selected folder, with an agent chosen or none, but not under the pages
     /// about all the work, which are no folder's.
     private var folderForTerminal: DaemonAPI.FolderSummary? {
-        guard terminal.isOpen, !model.showsEvents, !model.showsResources, !model.showsRuntimes,
-              !model.showsMCPServers, !model.showsWorktrees,
+        guard terminal.isOpen, !model.showsEvents, !model.showsRuntimes,
+              !model.showsMCPServers, model.machinePage == nil,
               !model.showsSpending, !model.showsTokens, !model.showsTime, !model.showsMilestones,
               !model.showsWork, !model.showsDocs, let folder = model.selectedFolderSummary, folder.exists else { return nil }
         return folder
@@ -196,8 +194,8 @@ struct ContentView: View {
     /// Whether `detail` shows the chat: a session is selected and nothing above it in
     /// that chain is open.
     private var showsChat: Bool {
-        model.selection != nil && !model.showsEvents && !model.showsResources
-            && !model.showsRuntimes && !model.showsMCPServers && !model.showsWorktrees
+        model.selection != nil && !model.showsEvents
+            && !model.showsRuntimes && !model.showsMCPServers && model.machinePage == nil
             && !model.showsSpending && !model.showsTime && !model.showsMilestones && !model.showsWork && !model.showsDocs
             && model.openWorkflow == nil
             && model.folderPage == nil && model.openPin == nil

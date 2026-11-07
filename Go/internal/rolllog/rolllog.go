@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Limit is the size a log rolls at: DaemonLog.limit and ControlLog.limit.
@@ -22,7 +23,13 @@ type File struct {
 	std   bool
 	out   *os.File
 	info  os.FileInfo
+	stop  chan struct{}
 }
+
+// CheckEvery is how often a log that takes the process's standard output and error is
+// looked at (#3687): what the runtime writes there (a panic, a child's output) does not go
+// through Write, so without it a log nothing else writes to would grow past its limit.
+var CheckEvery = 30 * time.Second
 
 // Open opens path for appending, rolling it first when it is already past limit. With
 // std, the process's standard output and error go to the file too, opened again at each
@@ -35,7 +42,37 @@ func Open(path string, limit int64, std bool) (*File, error) {
 	if f.info.Size() > limit {
 		f.roll()
 	}
+	if std {
+		f.stop = make(chan struct{})
+		go f.watch(f.stop)
+	}
 	return f, nil
+}
+
+func (f *File) watch(stop chan struct{}) {
+	t := time.NewTicker(CheckEvery)
+	defer t.Stop()
+	for {
+		select {
+		case <-stop:
+			return
+		case <-t.C:
+			f.Check()
+		}
+	}
+}
+
+// Check rolls the log when it is past its limit, as what was written behind Write (the
+// duplicated standard error) left it.
+func (f *File) Check() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.out == nil {
+		return
+	}
+	if now, err := os.Stat(f.path); err == nil && os.SameFile(now, f.info) && now.Size() > f.limit {
+		f.roll()
+	}
 }
 
 // Previous is where path goes when it rolls: daemon.log is daemon.previous.log.
@@ -70,6 +107,10 @@ func (f *File) File() *os.File {
 func (f *File) Close() error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.stop != nil {
+		close(f.stop)
+		f.stop = nil
+	}
 	if f.out == nil {
 		return nil
 	}

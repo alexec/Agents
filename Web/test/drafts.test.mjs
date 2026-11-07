@@ -7,6 +7,7 @@ class Memory {
   items = new Map();
   getItem(key) { return this.items.get(key) ?? null; }
   setItem(key, value) { this.items.set(key, String(value)); }
+  removeItem(key) { this.items.delete(key); }
 }
 
 const { Drafts, draftsKept, attachmentsKept } = await load("src/model/drafts.ts");
@@ -56,4 +57,14 @@ test("the empty field's words, and when what is typed waits (PromptWords)", () =
   assert.equal(willQueue({ state: "waitingOnUser" }), true);
   assert.equal(willQueue({ state: "finished", queuedPrompts: [{}] }), true);
   assert.equal(willQueue({ state: "finished" }), false);
+});
+
+test("a forget clears every draft, held and kept (#3670)", () => {
+  const storage = new Memory();
+  const drafts = new Drafts(storage);
+  drafts.set("mac|a", { text: "to the old control plane", attachments: [] });
+  drafts.clear();
+  assert.equal(drafts.get("mac|a"), undefined);
+  assert.equal(new Drafts(storage).get("mac|a"), undefined);
+  assert.equal(storage.getItem("agents.drafts"), null);
 });

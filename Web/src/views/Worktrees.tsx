@@ -1,5 +1,5 @@
-// Activity ▸ Worktrees (#790), as the window's WorktreesView and the Remote's WorktreesListView:
-// each host's folders' worktrees and how much each holds, idle ones first, largest first, sizes
+// A machine's worktrees on its page (#790, #3627), as the window's MachineWorktreesSections:
+// the host's folders' worktrees and how much each holds, idle ones first, largest first, sizes
 // filling in as the host measures them (worktrees/sized). Remove build output and Remove… on an
 // idle worktree the app made; Clean up worktrees per folder opens its new session with the words.
 import { useEffect, useState } from "preact/hooks";

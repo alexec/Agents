@@ -169,6 +169,60 @@ export function machineSignInLine(status: RuntimeStatus): string | undefined {
   return signIn.relayed ? "Uses the Mac’s sign-in" : "Not signed in on this machine";
 }
 
+/** A runtime's line on a machine's page (#3629): installed or not, its version (#3674), and signed in where the machine says.
+ * RuntimeStatus.machineLine on the Mac. Accounts and allowances are the person's, so they are not said here. */
+export function machineRuntimeLine(status: RuntimeStatus): string {
+  const a = status.availability;
+  const signIn = status.signIn;
+  const installed = status.version ? `Installed ${status.version}` : "Installed";
+  const line = "available" in a
+    ? !signIn ? installed
+      : signIn.signedIn ? `${installed} · signed in`
+      : signIn.relayed ? `${installed} · uses the Mac’s sign-in` : `${installed} · not signed in`
+    : "needsSignIn" in a ? `${installed} · not signed in`
+    : "missing" in a ? "Not installed"
+    : "failed" in a ? `Can’t be used: ${a.failed.reason}`
+    : "installing" in a ? (a.installing.progress ? `Installing: ${a.installing.progress}` : "Installing…")
+    : `Install failed: ${a.installFailed.reason}`;
+  return status.outdated ? `${line} · an update is out` : line;
+}
+
+/**
+ * One runtime on Your setup ▸ Runtimes (#3631): shown once, not once per machine. Its accounts,
+ * allowances and Reaches the Model By are read on its home machine: the Mac when it lists the
+ * runtime (accounts are added and signed in there, #2257), else the first machine that does. Then
+ * a line per machine, the Mac first and the others by name, as Machines lists them (#3626).
+ */
+export interface SetupRuntime {
+  status: RuntimeStatus;
+  home: string;
+  machines: { host: string; status?: RuntimeStatus }[];
+}
+
+export function setupRuntimes(hosts: readonly { id: string; name: string }[], macID: string,
+                              lists: Readonly<Record<string, readonly RuntimeStatus[] | undefined>>): SetupRuntime[] {
+  const ordered = [...hosts].sort((a, b) => Number(b.id === macID) - Number(a.id === macID) || a.name.localeCompare(b.name));
+  const out = new Map<string, SetupRuntime>();
+  for (const host of ordered) {
+    for (const status of lists[host.id] ?? []) {
+      if (!out.has(status.runtime.id)) out.set(status.runtime.id, { status, home: host.id, machines: [] });
+    }
+  }
+  for (const each of out.values()) {
+    each.machines = ordered.map((host) => {
+      const status = lists[host.id]?.find((s) => s.runtime.id === each.status.runtime.id);
+      return status ? { host: host.id, status } : { host: host.id };
+    });
+  }
+  return sortedRuntimes([...out.values()].map((r) => r.status)).map((s) => out.get(s.runtime.id)!);
+}
+
+/** A machine's line under a runtime on Your setup: what the machine page says, or why it says nothing. */
+export function setupMachineLine(status: RuntimeStatus | undefined, online: boolean): string {
+  if (status) return machineRuntimeLine(status);
+  return online ? "Not known yet" : "Offline";
+}
+
 /** The words of the sheet that signs a runtime in on a machine with no browser. */
 export const machineSignInWords = {
   title: (runtime: string, machine: string) => `Sign In to ${runtime} on ${machine}`,
@@ -196,13 +250,13 @@ export const machineSignInWords = {
  * Settings ▸ Agent Runtimes and Runtimes; with none, the machines' own rows on this page.
  */
 export function runtimesHint(hasMac: boolean): string {
-  return hasMac ? "Install a runtime on the Mac, in Settings ▸ Agent Runtimes. Sign it in on the Mac, in Runtimes."
+  return hasMac ? "Install a runtime on the Mac, in Settings ▸ Agent Runtimes. Sign it in on the Mac, in Your setup."
     : "Runtimes run on your machines: add one in Settings ▸ Machines, with Add a Machine…. "
       + "Sign Claude or Codex in on a machine with Sign In… in its row.";
 }
 
 /** Where an added account is signed in: the Mac's Runtimes page (#2255). */
-export const signInOnTheMac = "Sign it in on the Mac, in Runtimes.";
+export const signInOnTheMac = "Sign it in on the Mac, in Your setup.";
 
 /** What Remove does, under its question: how many sessions it stops, and that it can't be undone (#2264). */
 export function removeMessage(stopping: number, place: string): string {

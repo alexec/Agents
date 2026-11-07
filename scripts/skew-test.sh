@@ -2,10 +2,10 @@
 # Mixed versions, as a person meets them while an update rolls out (#1767, after #1748):
 #
 #   1. the last release's agentsd joined to this tree's control plane: it is not
-#      needsUpdate (unless this tree moved the required set), and hosts/list gives its
+#      needsUpdate (unless this tree moved the required set), and machines/list gives its
 #      capabilities, so the clients' generated tables can gate what it lacks;
 #   2. the last release's control plane with this tree's client: control/status and
-#      hosts/list answer, with no wrongProtocolVersion (-32008).
+#      machines/list answer, with no wrongProtocolVersion (-32008).
 #
 # Needs Go on the PATH (CI's ubuntu runner). The last release is the newest tag reachable
 # from HEAD, or SKEW_TAG; its Go module is taken with git archive, or from SKEW_OLD_SRC (a
@@ -92,13 +92,15 @@ ctl() {
 	AGENTSCTL="$dir/ctl.json" "$work/new/agentsctl" "$@"
 }
 
-# hosts/list's row for the skew host, waiting for it to join.
+# machines/list's row for the skew host, waiting for it to join and come online.
 host_row() {
 	dir=$1
 	i=0
 	while :; do
 		row=$(ctl "$dir" hosts 2>/dev/null | tr -d '\n' | grep -o '{[^{}]*"name": *"skew host"[^}]*' || true)
-		[ -n "$row" ] && case "$row" in *'"state": "joining"'* | *'"state":"joining"'*) ;; *) echo "$row" && return 0 ;; esac
+		# Joining, or offline until its first hello lands (a slow runner reads it between,
+		# with no capabilities yet): not its row yet.
+		[ -n "$row" ] && case "$row" in *'"state": "joining"'* | *'"state":"joining"'* | *'"state": "offline"'* | *'"state":"offline"'*) ;; *) echo "$row" && return 0 ;; esac
 		i=$((i + 1))
 		if [ "$i" -gt 60 ]; then
 			echo "skew-test: the host did not join" >&2
@@ -140,7 +142,7 @@ echo "skew-test: what the clients hide for $tag's host: ${lacks:-nothing}"
 case "$row" in
 *'"capabilities"'*) ;;
 *)
-	echo "skew-test: FAIL: hosts/list gives no capabilities for $tag's host" >&2
+	echo "skew-test: FAIL: machines/list gives no capabilities for $tag's host" >&2
 	failed=1
 	;;
 esac

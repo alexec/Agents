@@ -14,7 +14,7 @@ import (
 
 // A project's tools (#2669, specs/2317-projects User Story 4): the Tasks, Code review and
 // CI slots that a folder's project sets, for every folder in it. The control plane sends
-// them in projects/joined's answer and again in host/projects; this machine keeps the last
+// them in projects/joined's answer and again in machine/projects; this machine keeps the last
 // it heard in <root>/project-tools.json, so a folder keeps its project's slots while the
 // control plane is away. A slot the project does not set is the folder's own, from its git
 // remote, as before.
@@ -75,11 +75,11 @@ func (d *Daemon) heardProjects(m wire.MachineProjects) {
 	}
 }
 
-// toldProjects is host/projects.
+// toldProjects is machine/projects.
 func (d *Daemon) toldProjects(params json.RawMessage) {
 	var m wire.MachineProjects
 	if err := json.Unmarshal(params, &m); err != nil {
-		log.Printf("projects: %s: %v", wire.NotifyHostProjects.Name, err)
+		log.Printf("projects: %s: %v", wire.NotifyMachineProjects.Name, err)
 		return
 	}
 	d.heardProjects(m)

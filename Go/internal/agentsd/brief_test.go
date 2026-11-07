@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alexec/agents/Go/internal/agentsd/acp"
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 
 	"github.com/alexec/agents/Go/wire"
@@ -61,6 +62,33 @@ func TestTheBriefGoesWhereTheRuntimeTakesASystemPrompt(t *testing.T) {
 	}
 }
 
+// OpenCode's brief is a file in the agent's own folder, added to the instructions of the
+// configuration the app gives it, and only the brief's words are in the file (#2612).
+func TestOpenCodeHasTheBriefAsAnInstructionsFile(t *testing.T) {
+	folder := t.TempDir()
+	l := withToolPolicy(acp.Launch{Env: []string{"HOME=/h"}}, "opencode")
+	l, err := withBriefFile(l, "opencode", folder, "words")
+	if err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(folder, briefFileName)
+	if b, _ := os.ReadFile(file); string(b) != "words\n" {
+		t.Fatalf("%q", b)
+	}
+	var config map[string]any
+	for _, kv := range l.Env {
+		if v, ok := strings.CutPrefix(kv, "OPENCODE_CONFIG_CONTENT="); ok {
+			json.Unmarshal([]byte(v), &config)
+		}
+	}
+	if got, _ := config["instructions"].([]any); len(got) != 1 || got[0] != file || config["share"] != "disabled" {
+		t.Fatalf("%v", config)
+	}
+	if again, _ := withBriefFile(acp.Launch{Env: []string{"HOME=/h"}}, "cursor", folder, "words"); len(again.Env) != 1 {
+		t.Fatalf("%v", again.Env)
+	}
+}
+
 func agentMessages(d *Daemon, id wire.UUID) string {
 	entries, _, _ := d.Store.Transcript(id, 0)
 	var out []string
@@ -73,8 +101,8 @@ func agentMessages(d *Daemon, id wire.UUID) string {
 }
 
 // Each runtime has the brief the way it takes one: Claude as _meta.systemPrompt.append,
-// Grok as _meta.rules, Codex as session custom instructions, and the rest before the first
-// prompt. The transcript records only the person's words.
+// Grok as _meta.rules, Codex as session custom instructions, OpenCode as a file of its own
+// named in its configuration, and the rest before the first prompt. The transcript records only the person's words.
 func TestEachRuntimeHasTheBriefTheWayItTakesIt(t *testing.T) {
 	fakeRuntimes(t)
 	for _, rt := range catalog {
@@ -95,7 +123,7 @@ func TestEachRuntimeHasTheBriefTheWayItTakesIt(t *testing.T) {
 				system, before = brief, ""
 			case "grok":
 				system, before = brief+"\n\n"+grokRules(), ""
-			case "codex":
+			case "codex", "opencode":
 				system, before = brief, ""
 			}
 			if said := agentMessages(d, id); said != "System: "+system+"\nBefore: "+before {
@@ -245,7 +273,7 @@ func TestTheBriefNamesEveryAppTool(t *testing.T) {
 	}
 	d, _ := start(t, t.TempDir())
 	defer d.Shutdown()
-	full := d.brief(&wire.Agent{RuntimeID: "claude"}) + "\n" + toolsBrief(true, true, false)
+	full := d.brief(&wire.Agent{RuntimeID: "claude"}) + "\n" + toolsBrief(true, true, false, true)
 	for _, tool := range all {
 		if toolsBriefSkips[tool.Name] == "" && !strings.Contains(full, tool.Name) {
 			t.Errorf("the brief does not name %s: add a line to toolsBrief, or a reason to toolsBriefSkips", tool.Name)
@@ -260,15 +288,16 @@ func TestTheBriefNamesEveryAppTool(t *testing.T) {
 		t.Error("the brief does not name the browser tools")
 	}
 	for _, c := range []struct {
-		browser, screen, bot bool
-		named, unnamed       []string
+		browser, screen, bot, github bool
+		named, unnamed               []string
 	}{
-		{false, false, false, nil, []string{"browser_", "fill_secret", "hand_to_person", "drive_screen"}},
-		{true, false, false, []string{"browser_* tools", "fill_secret", "hand_to_person", "take the browser lease themselves"}, []string{"drive_screen"}},
-		{true, false, true, []string{"browser_* tools", "fill_secret"}, []string{"hand_to_person"}},
-		{false, true, false, []string{"drive_screen", "takes the screen lease itself"}, []string{"browser_"}},
+		{false, false, false, false, nil, []string{"browser_", "fill_secret", "hand_to_person", "drive_screen", "set_ci_secret"}},
+		{true, false, false, false, []string{"browser_* tools", "fill_secret", "hand_to_person", "take the browser lease themselves"}, []string{"drive_screen"}},
+		{true, false, true, false, []string{"browser_* tools", "fill_secret"}, []string{"hand_to_person"}},
+		{false, true, false, false, []string{"drive_screen", "takes the screen lease itself"}, []string{"browser_"}},
+		{false, false, false, true, []string{"set_ci_secret", "set_ci_variable", "set_environment_gate"}, []string{"browser_"}},
 	} {
-		got := toolsBrief(c.browser, c.screen, c.bot)
+		got := toolsBrief(c.browser, c.screen, c.bot, c.github)
 		for _, w := range c.named {
 			if !strings.Contains(got, w) {
 				t.Errorf("%+v: no %q in %q", c, w, got)

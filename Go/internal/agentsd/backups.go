@@ -66,7 +66,7 @@ var backupPartBytes = 8 << 20
 
 // backupAgentFiles are the files of an agent's folder a backup carries: the record, the
 // transcript, and what the transcript points at. Anything else there is left out.
-var backupAgentFiles = []string{"agent.json", "transcript.jsonl", "turns.jsonl", "app-tools.jsonl", "said.json"}
+var backupAgentFiles = []string{"agent.json", "transcript.jsonl", "app-tools.jsonl", "said.json"}
 
 // backupRootFiles are the root's files a backup carries.
 var backupRootFiles = []string{"usage-history.json", "time-history.json", erasedFile}
@@ -579,9 +579,15 @@ func addTarFile(tw *tar.Writer, name string, b []byte, at time.Time) error {
 	return err
 }
 
+// otherBackupsKept is how long another machine's backups stay in a shared folder after its
+// newest, as the control plane keeps a removed host's (#3648).
+const otherBackupsKept = 90 * 24 * time.Hour
+
 // pruneBackups keeps the newest keep of this machine's backups and deletes the rest,
-// with any a cut-off backup left half-written. Other machines' backups are theirs.
+// with any a cut-off backup left half-written. Other machines' backups are theirs, until
+// their newest is otherBackupsKept old: that machine is gone, or backs up elsewhere.
 func (d *Daemon) pruneBackups(keep int64) {
+	defer d.pruneOtherBackups()
 	mine := filepath.Join(d.backupFolder(), d.Store.RootID)
 	files, _ := os.ReadDir(mine)
 	var names []string
@@ -602,6 +608,43 @@ func (d *Daemon) pruneBackups(keep int64) {
 		os.Remove(filepath.Join(mine, names[0]+".json"))
 		os.Remove(filepath.Join(mine, names[0]+".tar.gz"))
 		names = names[1:]
+	}
+}
+
+// pruneOtherBackups deletes the backups of each other machine in the folder whose newest
+// was made otherBackupsKept ago, and its folder once empty. A folder with no backup this
+// reads is left as it is.
+func (d *Daemon) pruneOtherBackups() {
+	folder := d.backupFolder()
+	roots, _ := os.ReadDir(folder)
+	for _, r := range roots {
+		if !r.IsDir() || strings.HasPrefix(r.Name(), ".") || r.Name() == d.Store.RootID {
+			continue
+		}
+		dir := filepath.Join(folder, r.Name())
+		files, _ := os.ReadDir(dir)
+		var names []string
+		var newest time.Time
+		for _, f := range files {
+			name, ok := strings.CutSuffix(f.Name(), ".tar.gz")
+			if !ok || strings.HasPrefix(name, ".") {
+				continue
+			}
+			if b, ok := d.readBackup(r.Name() + "/" + name); ok {
+				names = append(names, name)
+				if at := b.MadeAt.Time(); at.After(newest) {
+					newest = at
+				}
+			}
+		}
+		if len(names) == 0 || nowFunc().Sub(newest) <= otherBackupsKept {
+			continue
+		}
+		for _, name := range names {
+			os.Remove(filepath.Join(dir, name+".json"))
+			os.Remove(filepath.Join(dir, name+".tar.gz"))
+		}
+		os.Remove(dir) // only when empty
 	}
 }
 

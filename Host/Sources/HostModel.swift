@@ -566,6 +566,7 @@ final class HostModel {
                 throw ControlService.Failure("This Mac's store could not be kept aside, so nothing was changed: \(error.localizedDescription)")
             }
             aside = name
+            pruneStoresAside()
         }
         settings.forwardingUntil = nil
         settings.store = .thisMac
@@ -584,6 +585,12 @@ final class HostModel {
         settings.receiving = false
         settings.save(paths)
         _ = await start(.control)
+    }
+
+    /// Only the newest 2 stores set aside stay, and the keys set aside with them (#3671).
+    private func pruneStoresAside() {
+        StoresAside.pruneFolders(in: paths.controlHome)
+        HostSecrets.pruneKeysAside(paths)
     }
 
     /// Cancelled before this Mac took over: its empty copy stops again.
@@ -798,6 +805,7 @@ final class HostModel {
                 await refresh()
                 return
             }
+            pruneStoresAside()
         }
         let bucket = from.needsKeys ? from : to
         let copied = await ControlTool.run(["store", "copy", "--from", from.url, "--to", to.url], paths: paths,

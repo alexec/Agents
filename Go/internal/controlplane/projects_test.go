@@ -68,7 +68,7 @@ func TestAMachinesFolderIdsAreAdopted(t *testing.T) {
 		t.Fatal("a bad id was kept")
 	}
 	// A removed machine's folder list goes with it (#3125).
-	call(t, owner, "", "hosts/remove", map[string]string{"host": box.member.Host})
+	call(t, owner, "", "machines/remove", map[string]string{"host": box.member.Host})
 	if o, _ := p.store.Get(context.Background(), projectFoldersKey(box.member.Host)); o != nil {
 		t.Fatal("a removed machine's folders stayed")
 	}
@@ -157,7 +157,7 @@ func TestOnlyTheOwnerOrAnAdminChangesAProject(t *testing.T) {
 }
 
 // US4 (#2669): the owner or an admin sets a project's Tasks, Code review and CI; a machine
-// gets its folders' projects' slots in projects/joined's answer and again in host/projects
+// gets its folders' projects' slots in projects/joined's answer and again in machine/projects
 // when one changes; a member who is neither may not set them.
 func TestAProjectsSlotsGoToItsMachines(t *testing.T) {
 	t.Parallel()
@@ -165,7 +165,7 @@ func TestAProjectsSlotsGoToItsMachines(t *testing.T) {
 	var mu sync.Mutex
 	heard := map[string][]wire.MachineProjects{}
 	p.told = func(host, method string, params json.RawMessage) {
-		if method != wire.NewMethodName(wire.NotifyHostProjects.Name) {
+		if method != wire.NotifyMachineProjects.Name {
 			return
 		}
 		var m wire.MachineProjects
@@ -277,7 +277,7 @@ func TestAProjectChangeReadsAndTellsOnlyWhatChanged(t *testing.T) {
 	var mu sync.Mutex
 	heard := map[string]int{}
 	p.told = func(host, method string, params json.RawMessage) {
-		if method == wire.NewMethodName(wire.NotifyHostProjects.Name) {
+		if method == wire.NotifyMachineProjects.Name {
 			mu.Lock()
 			heard[host]++
 			mu.Unlock()

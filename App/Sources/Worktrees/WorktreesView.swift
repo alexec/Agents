@@ -1,78 +1,71 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Every folder's worktrees on this Mac, and how much each holds on disk (#790).
+/// A machine's worktrees on its page (#790, #3627), and how much each holds on disk: a
+/// section per folder.
 ///
-/// It was Folder Settings ▸ Worktrees (030), one folder at a time and with no sizes.
-/// What a worktree holds changes without anybody setting anything, so it is a page under
-/// Activity now. On 2026-10-03 the disk filled with 80 GB of them: idle ones, with no
-/// session in them, come first, largest first, with Remove build output and Remove….
+/// They were Activity ▸ Worktrees, and before that Folder Settings ▸ Worktrees (030). A
+/// worktree is a folder's, and a folder is one machine's, so its page is where its disk
+/// and its worktrees are seen together. On 2026-10-03 the disk filled with 80 GB of them:
+/// idle ones, with no session in them, come first, largest first, with Remove build
+/// output and Remove….
 ///
 /// All of them are listed, because an agent working in one made in a terminal, or by a
 /// runtime, is still working on the folder. Only the app's own can be cleaned or
 /// removed: the others are somebody else's. Sizes are walked by the daemon in the
 /// background and fill in as they come (`worktrees/sized`); the list never waits on them.
-struct WorktreesView: View {
+struct MachineWorktreesSections: View {
     @Environment(AppModel.self) private var model
+    let host: MachineRef
     @State private var loading = false
 
-    private var groups: [DaemonAPI.FolderWorktrees] { model.work.worktreesForCleanup() }
-
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                HStack(alignment: .firstTextBaseline, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(WorktreeTally(groups).pageLine)
-                            .appText(.reading)
-                        Text(WorktreeTally.intro)
-                            .appText(.supporting)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+        let groups = model.work.worktreesForCleanup(on: host)
+        Section {
+            LabeledContent {
+                Button("Refresh") {
+                    loading = true
+                    Task {
+                        await model.loadWorktrees(on: host)
+                        loading = false
                     }
-                    Spacer(minLength: 0)
-                    Button("Refresh") {
-                        loading = true
-                        Task {
-                            await model.loadWorktrees()
-                            loading = false
-                        }
-                    }
-                    .disabled(loading)
-                    .help("List the worktrees again")
                 }
-                ForEach(groups) { group in
-                    WorktreesGroup(group: group)
-                }
+                .disabled(loading)
+                .help("List the worktrees again")
+            } label: {
+                Text(WorktreeTally(groups).pageLine)
             }
-            .padding(24)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        } header: {
+            Text("Worktrees")
+        } footer: {
+            Text(WorktreeTally.intro).foregroundStyle(.secondary)
         }
-        .navigationTitle("Worktrees")
-        .task { await model.loadWorktrees() }
+        .task(id: host) { await model.loadWorktrees(on: host) }
+        ForEach(groups) { group in
+            WorktreesGroup(group: group, host: host)
+        }
     }
 }
 
-/// One folder's worktrees under its name, with Clean up worktrees; also Folder Settings ▸ Worktrees.
+/// One folder's worktrees under its name, with Clean up worktrees.
 struct WorktreesGroup: View {
     @Environment(AppModel.self) private var model
     let group: DaemonAPI.FolderWorktrees
+    let host: MachineRef
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        Section {
+            ForEach(group.worktrees) { worktree in
+                WorktreeRow(worktree: worktree, folder: group.folder, host: host)
+            }
+        } header: {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(model.work.folder(FolderKey(folder: group.folder))?.name ?? group.folder.lastPathComponent)
-                    .appText(.supporting).fontWeight(.semibold)
-                    .foregroundStyle(.secondary)
+                Text(model.work.folder(FolderKey(host: host, folder: group.folder))?.name ?? group.folder.lastPathComponent)
                 Spacer()
-                Button("Clean up worktrees") { model.offerCleanUp(in: group.folder) }
+                Button("Clean up worktrees") { model.offerCleanUp(in: group.folder, on: host) }
                     .buttonStyle(.paper)
                     .appText(.fine)
                     .help("A new session here, offered the words to remove what has been merged")
-            }
-            .padding(.leading, 2)
-            ForEach(group.worktrees) { worktree in
-                WorktreeRow(worktree: worktree, folder: group.folder)
             }
         }
     }
@@ -84,6 +77,7 @@ struct WorktreeRow: View {
     @Environment(AppModel.self) private var model
     let worktree: DaemonAPI.WorktreeSummary
     let folder: URL
+    let host: MachineRef
 
     @State private var asking: DaemonAPI.RemovalCheck?
     @State private var isBusy = false
@@ -95,10 +89,11 @@ struct WorktreeRow: View {
     @State private var bringingBack: BringBackFromHostRequest?
 
     private var canClean: Bool { worktree.madeByApp && worktree.exists && worktree.isIdle }
+    /// Send to and Bring Back are from this Mac's worktrees only.
+    private var sendsToServers: Bool { host == .mac && worktree.exists }
 
     var body: some View {
-        // Laid out the way `AgentRow` is, so the page has one kind of
-        // card: an icon at the reading size, a semibold name, a grey line under it.
+        // An icon at the reading size, a semibold name, a grey line under it, as `AgentRow`.
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "arrow.triangle.branch")
                 .appText(.reading)
@@ -141,23 +136,19 @@ struct WorktreeRow: View {
                     .disabled(isBusy)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 13)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(RoundedRectangle(cornerRadius: 14))
-        .paperRow()
         .contextMenu {
             // This Mac's worktree, sent to a server and added there (#1123). The worktrees are
             // this Mac's host's, by its own id when it has one (#1496, #1536).
-            ForEach(worktree.exists ? model.sendTargets : [], id: \.self) { host in
-                Button("Send to \(model.hosts.label(host))…") {
-                    sending = SendToHostRequest(folder: worktree.root, from: model.thisMacHostID ?? .mac, host: host)
+            ForEach(sendsToServers ? model.sendTargets : [], id: \.self) { server in
+                Button("Send to \(model.hosts.label(server))…") {
+                    sending = SendToHostRequest(folder: worktree.root, from: model.thisMacHostID ?? .mac, host: server)
                 }
             }
             // The server's branches, brought back into this worktree's repository (#1473).
-            ForEach(worktree.exists ? model.sendTargets : [], id: \.self) { host in
-                Button("Bring Back from \(model.hosts.label(host))…") {
-                    bringingBack = BringBackFromHostRequest(folder: worktree.root, from: model.thisMacHostID ?? .mac, host: host)
+            ForEach(sendsToServers ? model.sendTargets : [], id: \.self) { server in
+                Button("Bring Back from \(model.hosts.label(server))…") {
+                    bringingBack = BringBackFromHostRequest(folder: worktree.root, from: model.thisMacHostID ?? .mac, host: server)
                 }
             }
         }
@@ -166,7 +157,7 @@ struct WorktreeRow: View {
         .alert(alertTitle, isPresented: isAsking, presenting: asking) { check in
             if check.blockedBy.isEmpty {
                 Button("Remove", role: .destructive) {
-                    Task { await model.removeWorktree(worktree.root, in: folder, confirmed: true) }
+                    Task { await model.removeWorktree(worktree.root, in: folder, on: host, confirmed: true) }
                 }
             }
             Button(check.blockedBy.isEmpty ? "Keep it" : "OK", role: .cancel) {}
@@ -196,7 +187,7 @@ struct WorktreeRow: View {
     private func removeBuildOutput() async {
         isBusy = true
         defer { isBusy = false }
-        freed = await model.removeBuildOutput(worktree.root, in: folder)
+        freed = await model.removeBuildOutput(worktree.root, in: folder, on: host)
     }
 
     /// Asked first, always; removed straight away only when nothing would be lost and
@@ -204,9 +195,9 @@ struct WorktreeRow: View {
     private func remove() async {
         isBusy = true
         defer { isBusy = false }
-        guard let check = await model.checkWorktreeRemoval(worktree.root, in: folder) else { return }
+        guard let check = await model.checkWorktreeRemoval(worktree.root, in: folder, on: host) else { return }
         if check.blockedBy.isEmpty && !check.losesWork {
-            await model.removeWorktree(worktree.root, in: folder, confirmed: false)
+            await model.removeWorktree(worktree.root, in: folder, on: host, confirmed: false)
         } else {
             asking = check
         }
@@ -228,22 +219,5 @@ struct WorktreeRow: View {
             return "Still working here: \(names.joined(separator: ", ")). Archive them first."
         }
         return WorktreeTally.removalMessage(check, branch: worktree.branch)
-    }
-}
-
-/// The way into Worktrees under Activity.
-struct WorktreesRow: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        // The title alone (#587): the count is the tooltip's.
-        let words = WorktreeTally(model.work.worktreesForCleanup()).rowWords
-        HStack(alignment: .firstTextBaseline) {
-            Text("Worktrees").foregroundStyle(.primary)
-            Spacer()
-        }
-        .help(words.map { "\($0). Every folder's worktrees, and how much each holds" }
-              ?? "Every folder's worktrees, and how much each holds")
-        .accessibilityValue(words ?? "")
     }
 }

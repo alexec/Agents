@@ -119,6 +119,20 @@ async function subscribeWebPush(to: Link): Promise<void> {
   }
 }
 
+/** The control plane forgot this browser (#3670): its push subscription goes, and what it showed. */
+export async function dropWebPush(): Promise<void> {
+  if (!("serviceWorker" in navigator)) return;
+  try {
+    const worker = await (registration ?? navigator.serviceWorker.getRegistration("/"));
+    if (!worker) return;
+    await (await worker.pushManager?.getSubscription())?.unsubscribe();
+    for (const notification of await worker.getNotifications()) notification.close();
+  } catch {
+    // A worker that can't be reached holds a subscription no control plane knows now.
+  }
+  webPush.value = "off";
+}
+
 /** Closes what Web Push showed: the person is at the page now, which shows what needs them. */
 function closePushed(): void {
   if (!registration) return;
@@ -153,6 +167,11 @@ export function pagePermissionText(permission: Permission): string {
     default:
       return "Allow notifications to see what agents tell you while this page is open and in front.";
   }
+}
+
+/** A machine's notice (#3682): a volume almost full, with no chat; a click opens the machine's page. */
+export function isMachineNotice(id: string): boolean {
+  return id.startsWith("disk:");
 }
 
 /** The notice's line, when this change posts one here; undefined when it posts nothing. */
@@ -191,6 +210,10 @@ export function startPageNotices(store: Store): void {
     shown.onclick = () => {
       shown.close();
       window.focus();
+      if (isMachineNotice(line)) {
+        go({ nav: "machines", section: `machine-${host}` });
+        return;
+      }
       const agent = agentID ? store.agent(host, agentID) : undefined;
       if (!agent) return;
       focusedEntry.value = line;

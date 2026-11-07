@@ -38,7 +38,7 @@ the recipient, the field, the seal version, and where the key goes: its kind, it
 digest of its settings (the address, the header, the region and the rest).
 
 The control plane sends each machine its own envelopes on the machine's channel 0
-(`host/orgRoutes`) within 5 seconds, from every copy.
+(`machine/orgRoutes`) within 5 seconds, from every copy.
 
 - The control plane cannot open an envelope: it has no recipient's private key.
 - A relay, a log or another copy that sees the message cannot open it.

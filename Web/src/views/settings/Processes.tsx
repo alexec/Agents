@@ -8,8 +8,9 @@ import { Capability } from "../../protocol/capabilities.generated";
 import type { ProcessesState, ProcessUsage } from "../../protocol/generated";
 import { go } from "../../route";
 
-/** One machine's processes, read when it opens and every few seconds while it is open and the tab is seen. */
-function MachineProcesses({ store, host, name }: { store: Store; host: string; name: string }) {
+/** One machine's processes, read when it opens and every few seconds while it is open and the tab is seen. Its
+ * CPU and memory above them, but not on the machine's page (#3626), which says them in its own Usage. */
+export function MachineProcesses({ store, host, name, showsTotals = true }: { store: Store; host: string; name: string; showsTotals?: boolean }) {
   const [state, setState] = useState<ProcessesState | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   useEffect(() => {
@@ -35,8 +36,8 @@ function MachineProcesses({ store, host, name }: { store: Store; host: string; n
       {!state && (failure ? <p class="hint">{failure}</p> : <p class="hint">Loading…</p>)}
       {state && (
         <>
-          <div class="setting"><span>CPU</span><span>{machineCPUWords(state.machine)}</span></div>
-          <div class="setting"><span>Memory</span><span>{machineMemoryWords(state.machine)}</span></div>
+          {showsTotals && <div class="setting"><span>CPU</span><span>{machineCPUWords(state.machine)}</span></div>}
+          {showsTotals && <div class="setting"><span>Memory</span><span>{machineMemoryWords(state.machine)}</span></div>}
           {state.processes.map((process) => (
             <div class="setting" key={process.pid} title={`Process ${process.pid}`}>
               <span style={{ paddingLeft: `${Math.min(process.depth, 6) * 14}px` }}>

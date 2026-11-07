@@ -217,6 +217,17 @@ the app sends them again on each `session/new`, `session/load` and `session/resu
 1.2.1 does not advertise this capability. With that version, the brief stays before your words
 in the first prompt.
 
+For OpenCode sessions that the app starts, the brief goes in a file of the session's own,
+`brief.md` in the agent's folder under the app's root, and the app names that file in the
+`instructions` of the `OPENCODE_CONFIG_CONTENT` it gives that OpenCode process. One process
+serves one session, so no other session reads it, and the folder's `AGENTS.md` and your
+`opencode.json` do not change. OpenCode reads the file as system instructions on every
+prompt, also after the app loads the session again, so the app writes it again at each
+start. OpenCode 1.18.33 advertises no system prompt capability and ignores
+`_meta.systemPrompt` on `session/new` (#2612), which is why the app does not use those.
+Because the brief is not in your first prompt, OpenCode makes the session's title from your
+words.
+
 For the conversations the app starts, each runtime's own tools for scheduling, starting
 other agents, sending notifications and saving documents elsewhere are taken away, so that
 the work stays where the app can see it. Reading, searching, editing, running commands,

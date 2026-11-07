@@ -57,7 +57,7 @@ try {
     return JSON.parse(await page.eval(`JSON.stringify(window.__walkReplies[${JSON.stringify(id)}])`));
   };
 
-  const hosts = await call("hosts/list", {});
+  const hosts = await call("machines/list", {});
   const host = (hosts.result?.hosts ?? hosts.result ?? []).find((h) => h.state === "online");
   check(!!host, `the scratch host is online: ${JSON.stringify(hosts).slice(0, 300)}`);
 
@@ -71,16 +71,16 @@ try {
   check(!JSON.stringify(added).includes(token), "the answer holds no token");
   check(seen.some((s) => s.method === "GET" && s.bearer), "the host listed the codespaces with the token");
 
-  const linked = await call("hosts/link", { host: host.id, provider: summary.id, workspace: "fuzzy-space" });
+  const linked = await call("machines/link", { host: host.id, provider: summary.id, workspace: "fuzzy-space" });
   check(!linked.error, `linked: ${JSON.stringify(linked).slice(0, 300)}`);
 
-  const started = await call("hosts/start", { host: host.id });
+  const started = await call("machines/start", { host: host.id });
   check(!started.error, `start: ${JSON.stringify(started).slice(0, 200)}`);
   for (let i = 0; i < 100 && state !== "Available"; i += 1) await new Promise((r) => setTimeout(r, 100));
   check(state === "Available" && seen.some((s) => s.url.endsWith("/start") && s.bearer), "started through the host, with the token");
 
   // The stop closes the host's uplink, as a stopped workspace's would be, and it joins again.
-  const stopped = await call("hosts/stop", { host: host.id });
+  const stopped = await call("machines/stop", { host: host.id });
   check(!stopped.error, `stop: ${JSON.stringify(stopped).slice(0, 200)}`);
   for (let i = 0; i < 100 && state !== "Shutdown"; i += 1) await new Promise((r) => setTimeout(r, 100));
   check(state === "Shutdown" && seen.some((s) => s.url.endsWith("/stop") && s.bearer), "stopped through the host, with the token");

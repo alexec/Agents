@@ -339,7 +339,7 @@ function ProjectSlots({ store, setup, changed }: { store: Store; setup: Connecto
     try {
       setProject(await store.link.call("projects/setSlot", { id: setup.project, slot, ...(value ? { value } : {}) }));
       setProblem(undefined);
-      // The machine hears it from the control plane (host/projects): give it a moment.
+      // The machine hears it from the control plane (machine/projects): give it a moment.
       setTimeout(changed, 400);
     } catch (e) {
       setProblem(why(e));

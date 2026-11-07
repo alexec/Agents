@@ -43,15 +43,18 @@ import (
 // be sealed again. A part from before it was sealed with a key made from the control key,
 // and still opens with the current or the previous one.
 //
-// Bounded: the newest Keep of each host's (1–10, the host's own setting), parts left by a
-// backup cut off are deleted after a day, and the backups of a host that was removed go
-// once its newest is backupOrphanAge old.
+// Bounded: the newest Keep of each host's (1–10, the host's own setting), and no more than
+// backupHostQuota bytes of them, the newest always kept (#3648); parts left by a backup cut
+// off are deleted after a day, and the backups of a host that was removed go once its
+// newest is backupOrphanAge old. A name is its time, and a host can name no time more than
+// backupStrayAge ahead, so a stray part with a time in the future goes too.
 
 const (
 	backupsPrefix   = "v1/backups/"
 	backupPartMost  = 8 << 20
 	backupPartsMost = 1024
 	backupKeepMost  = 10
+	backupHostQuota = 20 << 30
 	backupOrphanAge = 90 * 24 * time.Hour
 	backupStrayAge  = 24 * time.Hour
 	backupNameTime  = "20060102T150405Z"
@@ -79,6 +82,7 @@ type backupStore struct {
 	records *records.Records
 	keys    func() controlKeys
 	now     func() time.Time
+	quota   int64 // backupHostQuota, but in a test
 	sealMu  sync.Mutex
 	seal    cipher.AEAD // the backups' key, once read or made
 }
@@ -95,7 +99,7 @@ type sealedDataKey struct {
 }
 
 func newBackupStore(s store.Store, r *records.Records, keys func() controlKeys) *backupStore {
-	return &backupStore{store: s, records: r, keys: keys, now: time.Now}
+	return &backupStore{store: s, records: r, keys: keys, now: time.Now, quota: backupHostQuota}
 }
 
 // sealWith is AES-256-GCM under a key made from secret for info.
@@ -295,7 +299,17 @@ func (b *backupStore) upload(ctx context.Context, owner, host string, p wire.Bac
 	if len(p.Data) == 0 || len(p.Data) > backupPartMost {
 		return fail(invalidParams, "A part is 1 byte to %d MiB.", backupPartMost>>20)
 	}
+	if b.ahead(p.Name, b.now()) {
+		return fail(invalidParams, "The backup %s is named for a time that has not come.", p.Name)
+	}
 	folder := b.hostFolder(owner, host)
+	parts, err := b.store.List(ctx, folder+p.Name+"/")
+	if err != nil {
+		return err
+	}
+	if partsBytes(parts, partKey(folder, p.Name, p.Part))+int64(len(p.Data)) > b.quota {
+		return fail(invalidParams, "A backup is at most %d GiB.", b.quota>>30)
+	}
 	if o, err := b.store.Get(ctx, folder+p.Name+".json"); err != nil {
 		return err
 	} else if o != nil {
@@ -382,10 +396,11 @@ func (r storedBackup) wire(caller string) wire.Backup {
 }
 
 // hostBackups is one host's folder: its backups' names (those with a .json), and the
-// keys of the parts of each name.
+// keys and bytes of the parts of each name.
 type hostBackups struct {
 	complete []string
 	parts    map[string][]string
+	bytes    map[string]int64
 }
 
 func (b *backupStore) scan(ctx context.Context, owner string) (map[string]*hostBackups, error) {
@@ -403,13 +418,14 @@ func (b *backupStore) scan(ctx context.Context, owner string) (map[string]*hostB
 		}
 		h := out[host]
 		if h == nil {
-			h = &hostBackups{parts: map[string][]string{}}
+			h = &hostBackups{parts: map[string][]string{}, bytes: map[string]int64{}}
 			out[host] = h
 		}
 		if name, ok := strings.CutSuffix(rest, ".json"); ok && backupName.MatchString(name) {
 			h.complete = append(h.complete, name)
 		} else if name, _, ok := strings.Cut(rest, "/"); ok && backupName.MatchString(name) {
 			h.parts[name] = append(h.parts[name], k.Key)
+			h.bytes[name] += max(k.Size, 0)
 		}
 	}
 	for _, h := range out {
@@ -481,9 +497,21 @@ func (b *backupStore) download(ctx context.Context, owner string, r wire.BackupS
 	return wire.BackupStorePart{Name: name, Part: r.Part, Data: data}, nil
 }
 
-// prune keeps the newest keep of the host's backups; deletes parts a cut-off backup left
-// a day ago; and deletes the backups of a removed host once its newest is old. The .json
-// goes first, so a backup half deleted is never listed.
+// partsBytes is the bytes of keys, but for the key but, which a write replaces.
+func partsBytes(keys []store.Key, but string) int64 {
+	var n int64
+	for _, k := range keys {
+		if k.Key != but && k.Size > 0 {
+			n += k.Size
+		}
+	}
+	return n
+}
+
+// prune keeps the newest keep of the host's backups, and of those no more than
+// backupHostQuota bytes, the newest always kept; deletes parts a cut-off backup left a day
+// ago, or named for a time not yet come; and deletes the backups of a removed host once
+// its newest is old. The .json goes first, so a backup half deleted is never listed.
 func (b *backupStore) prune(ctx context.Context, owner, host string, keep int64) {
 	hosts, err := b.scan(ctx, owner)
 	if err != nil {
@@ -498,6 +526,14 @@ func (b *backupStore) prune(ctx context.Context, owner, host string, keep int64)
 			if n := len(h.complete) - int(keep); n > 0 {
 				drop = h.complete[:n]
 			}
+			var bytes int64
+			for i := len(h.complete) - 1; i >= len(drop); i-- {
+				bytes += h.bytes[h.complete[i]]
+				if bytes > b.quota && i < len(h.complete)-1 {
+					drop = h.complete[:i+1]
+					break
+				}
+			}
 		case b.records.Host(id) == nil && len(h.complete) > 0 && b.older(h.complete[len(h.complete)-1], now, backupOrphanAge):
 			drop = h.complete
 		}
@@ -509,7 +545,7 @@ func (b *backupStore) prune(ctx context.Context, owner, host string, keep int64)
 			delete(h.parts, name)
 		}
 		for name, keys := range h.parts {
-			if !contains(h.complete, name) && b.older(name, now, backupStrayAge) {
+			if !contains(h.complete, name) && (b.older(name, now, backupStrayAge) || b.ahead(name, now)) {
 				for _, k := range keys {
 					b.store.Delete(ctx, k)
 				}
@@ -547,4 +583,11 @@ func backupFolderName(id string) bool {
 func (b *backupStore) older(name string, now time.Time, age time.Duration) bool {
 	at, err := time.Parse(backupNameTime, name)
 	return err == nil && now.Sub(at) > age
+}
+
+// ahead is a name for a time more than backupStrayAge from now: no host's clock is that
+// far out, so a part with it would never age by its name.
+func (b *backupStore) ahead(name string, now time.Time) bool {
+	at, err := time.Parse(backupNameTime, name)
+	return err == nil && at.Sub(now) > backupStrayAge
 }

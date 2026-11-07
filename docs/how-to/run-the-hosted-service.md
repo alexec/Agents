@@ -251,14 +251,15 @@ the snapshot schedule on the new disk.
 every other account stays as it is.
 
 ```sh
-admin backup --keep 7 /data/backups/2026-10-22   # every account; keep the newest 7
+admin backup /data/backups/2026-10-22            # every account; keep the newest 7
 admin backup /data/backups/2026-10-22 <account>  # one
 ```
 
 Name each backup folder by its date, so the names sort oldest first. Each backup holds every
 account, so it is as large as the store. `--keep N` deletes all but the newest N backup folders
 beside the new one, after the new one is whole. It deletes only folders that `admin backup`
-wrote, and nothing else in `/data/backups`. Without `--keep`, nothing is deleted.
+wrote, and nothing else in `/data/backups`. Without `--keep`, the newest 7 are kept (#3648).
+`--keep 0` deletes none.
 
 `/data` is the service's volume, so a backup there is in the next snapshot too, but a loss of
 the disk takes it too. To keep a copy off the disk, copy each backup to a bucket in a different
@@ -293,7 +294,7 @@ Run these on the service's machine. A running service sees each change within a 
 | `agents-hosted admin unblock <sign-in>` | Lets it sign up again: `provider:subject` or a GitHub id |
 | `agents-hosted admin plan <account> free\|pro` | Puts an account on a plan by hand |
 | `agents-hosted admin delete <account>` | Deletes a suspended account and everything it keeps |
-| `agents-hosted admin backup [--keep N] <dir> [account…]` | Copies accounts' records into a folder, and keeps the newest N backups |
+| `agents-hosted admin backup [--keep N] <dir> [account…]` | Copies accounts' records into a folder, and keeps the newest N backups (7 by default) |
 | `agents-hosted admin restore <dir> <account>` | Puts one suspended or deleted account back |
 
 **Delete an account:** the person deletes their own with **Delete Account** on the account

@@ -86,7 +86,7 @@ func (m *Methods) hostLockMethod(ctx context.Context, host, method string, param
 		return nil, fail(notPermitted, "This machine is not joined.")
 	}
 	switch method {
-	case "host/lockAdd":
+	case "machine/lockAdd":
 		// Only the machine's own addMachine, signed with an invite: the lock checks the
 		// invite, and this checks that the machine adds itself and nothing else.
 		request, err := require[wire.LockAdd](params, "LockAdd")
@@ -100,17 +100,17 @@ func (m *Methods) hostLockMethod(ctx context.Context, host, method string, param
 			}
 		}
 		return m.s.addToLock(ctx, person, request.Entries, host)
-	case "host/lockAgain":
+	case "machine/lockAgain":
 		// The machine's lock was reset with agentsd lock reset (#3493): send it again.
 		go m.s.sendLock(host, true)
 		return wire.Empty{}, nil
-	case "host/lockJoin":
+	case "machine/lockJoin":
 		request, err := require[wire.LockJoin](params, "LockJoin")
 		if err != nil {
 			return nil, err
 		}
 		return m.s.lockJoins.askMachine(ctx, host, request)
-	case "host/lockJoinReveal":
+	case "machine/lockJoinReveal":
 		request, err := require[wire.LockJoinNonce](params, "LockJoinNonce")
 		if err != nil {
 			return nil, err
@@ -154,7 +154,7 @@ func (s *Service) lockChangedHere(person string) {
 	}
 }
 
-// takesLock says a machine checks host/lock.
+// takesLock says a machine checks machine/lock.
 func (s *Service) takesLock(host string) bool {
 	h := s.records.Host(host)
 	return h != nil && slices.Contains(hostCapabilities(*h), wire.CapHostLock1)
@@ -191,7 +191,7 @@ func (s *Service) sendLock(host string, always bool) {
 	if same && !always {
 		return
 	}
-	if s.ownerOf(host) != person || !s.router.Tell(host, wire.NewMethodName(wire.NotifyHostLock.Name), lock) {
+	if s.ownerOf(host) != person || !s.router.Tell(host, wire.NotifyMachineLock.Name, lock) {
 		s.toldLocks.mu.Lock()
 		delete(s.toldLocks.last, host)
 		s.toldLocks.mu.Unlock()

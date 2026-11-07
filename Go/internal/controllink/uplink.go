@@ -51,7 +51,7 @@ type Uplink struct {
 	// control plane opens to it (the lending Mac's end, T091); 0 when it lends none.
 	Lend func(runtime string) int
 	// Told is handed what the control plane tells this host on channel 0, a method and its
-	// params, such as host/clients (#1118); nil hears none of it.
+	// params, such as machine/clients (#1118); nil hears none of it.
 	Told func(method string, params json.RawMessage)
 	// Asked answers what the control plane asks this host on channel 0, such as
 	// workflows/fire (#2011): the result, or false to leave it unanswered, as a host that
@@ -347,7 +347,7 @@ func (offline) Error() string { return "this host is not connected to its contro
 
 var errOffline = offline{}
 
-// Tell sends a request on channel 0 whose answer nothing waits for (host/hello).
+// Tell sends a request on channel 0 whose answer nothing waits for (machine/hello).
 func (u *Uplink) Tell(method string, params any) {
 	id := u.nextID.Add(1)
 	p, _ := json.Marshal(params)
@@ -373,7 +373,7 @@ type askReply struct {
 // workspace, never this long.
 const askWait = 2 * time.Minute
 
-// Ask sends a request on channel 0 and waits for its answer (host/machines, #1444): the
+// Ask sends a request on channel 0 and waits for its answer (machine/machines, #1444): the
 // result, an *AskError when the control plane refused it, or an error when it is not
 // connected or did not answer.
 func (u *Uplink) Ask(ctx context.Context, method string, params any) (json.RawMessage, error) {

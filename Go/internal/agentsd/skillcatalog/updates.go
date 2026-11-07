@@ -20,7 +20,8 @@ type Updates struct {
 	Cache   *UpdateCache
 }
 
-// UpdateCache is each source's last answer: its HEAD, and each folder's tree SHA there.
+// UpdateCache is each source's last answer: its HEAD, each folder's tree SHA there and,
+// once a persona from it needed them, each file's blob SHA.
 type UpdateCache struct {
 	mu      sync.Mutex
 	answers map[string]updateAnswer
@@ -30,6 +31,7 @@ type updateAnswer struct {
 	at      time.Time
 	head    string
 	folders map[string]string
+	blobs   map[string]string
 }
 
 const updateInterval = time.Hour

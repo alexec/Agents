@@ -22,9 +22,9 @@ function planeLink(hosts, home) {
     onState: () => {},
     call: async (method, params, host) => {
       asked.push({ method, host });
-      if (method === "hosts/list") return hosts;
+      if (method === "machines/list") return hosts;
       if (method === "control/status") return { name: "Plane", version: "0.5.0", machineID: "P", ...(home ? { homeHost: home } : {}) };
-      if (method === "hosts/listKept") return { kept: [] };
+      if (method === "machines/listKept") return { kept: [] };
       throw new Error("no");
     },
   };

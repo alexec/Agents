@@ -22,7 +22,7 @@ import (
 )
 
 // Org routes on the machine (#999, spec 999 slice 2; #3397). The control plane sends each
-// machine the routes its person (or bot) may use, on channel 0 (host/orgRoutes), each
+// machine the routes its person (or bot) may use, on channel 0 (machine/orgRoutes), each
 // secret as an admin's client sealed it with HPKE to this machine's own key: the control
 // plane never had the value. A route this machine has no copy of yet comes as waiting; it
 // is no account here until a copy comes, and a session that needs it says why. The machine keeps each route as it came, still
@@ -238,21 +238,21 @@ func (d *Daemon) orgSecret(r wire.DeliveredRoute, field string) ([]byte, bool) {
 
 func (d *Daemon) askOrgRoutesAgain() {
 	if tell := d.tellControl.Load(); tell != nil {
-		(*tell)(wire.NewMethodName(wire.CallHostOrgRoutesAgain.Name), wire.Empty{})
+		(*tell)(wire.CallMachineOrgRoutesAgain.Name, wire.Empty{})
 	}
 }
 
-// toldOrgRoutes is host/orgRoutes: the routes this machine may use now. Each new one that
+// toldOrgRoutes is machine/orgRoutes: the routes this machine may use now. Each new one that
 // opens here is kept; one that does not is not, and the delivery is asked for again; one
 // that is no longer in it goes, and the sessions on it stop (FR-009, FR-018).
 func (d *Daemon) toldOrgRoutes(params json.RawMessage) {
 	var delivery wire.OrgRouteDelivery
 	if err := json.Unmarshal(params, &delivery); err != nil {
-		log.Printf("host/orgRoutes: %v", err)
+		log.Printf("machine/orgRoutes: %v", err)
 		return
 	}
 	if len(delivery.Routes) > mostOrgRoutes {
-		log.Printf("host/orgRoutes: %d routes is more than %d; refused", len(delivery.Routes), mostOrgRoutes)
+		log.Printf("machine/orgRoutes: %d routes is more than %d; refused", len(delivery.Routes), mostOrgRoutes)
 		return
 	}
 	d.orgRouteMu.Lock()
@@ -263,13 +263,13 @@ func (d *Daemon) toldOrgRoutes(params json.RawMessage) {
 	waiting := map[string]wire.DeliveredRoute{}
 	for _, r := range delivery.Routes {
 		if err := routeWellFormed(r); err != nil {
-			log.Printf("host/orgRoutes: %v", err)
+			log.Printf("machine/orgRoutes: %v", err)
 			continue
 		}
 		old, had := held[r.ID]
 		// An older seal than this machine holds is one a control plane sent back: refused.
 		if had && r.SealVersion < old.route.SealVersion {
-			log.Printf("host/orgRoutes: %s seal %d is older than the %d held here; refused", r.ID, r.SealVersion, old.route.SealVersion)
+			log.Printf("machine/orgRoutes: %s seal %d is older than the %d held here; refused", r.ID, r.SealVersion, old.route.SealVersion)
 			next[r.ID] = old
 			continue
 		}
@@ -282,7 +282,7 @@ func (d *Daemon) toldOrgRoutes(params json.RawMessage) {
 			continue
 		}
 		if err := opens(id, r); err != nil {
-			log.Printf("host/orgRoutes: %s version %d does not open here (%v); asked for again", r.ID, r.Version, err)
+			log.Printf("machine/orgRoutes: %s version %d does not open here (%v); asked for again", r.ID, r.Version, err)
 			again = true
 			if old, ok := held[r.ID]; ok {
 				next[r.ID] = old
@@ -294,7 +294,7 @@ func (d *Daemon) toldOrgRoutes(params json.RawMessage) {
 			continue
 		}
 		if err := d.keepOrgRoute(r); err != nil {
-			log.Printf("host/orgRoutes: keep %s: %v", r.ID, err)
+			log.Printf("machine/orgRoutes: keep %s: %v", r.ID, err)
 			if old, ok := held[r.ID]; ok {
 				next[r.ID] = old
 			}
@@ -316,14 +316,14 @@ func (d *Daemon) toldOrgRoutes(params json.RawMessage) {
 	}
 	d.orgRouteMu.Unlock()
 	sort.Slice(applied.Routes, func(i, j int) bool { return applied.Routes[i].ID < applied.Routes[j].ID })
-	log.Printf("host/orgRoutes: %d kept, %d removed, %d waiting for an admin's app", len(next), len(gone), len(waiting))
+	log.Printf("machine/orgRoutes: %d kept, %d removed, %d waiting for an admin's app", len(next), len(gone), len(waiting))
 	d.stopRemovedOrgSessions(gone)
 	d.dropStandInsOfGoneRoutes()
 	if len(gone) > 0 {
 		d.sweepOrgAccountFolders()
 	}
 	if tell := d.tellControl.Load(); tell != nil {
-		(*tell)(wire.NewMethodName(wire.CallHostOrgRoutesApplied.Name), applied)
+		(*tell)(wire.CallMachineOrgRoutesApplied.Name, applied)
 	}
 	if again {
 		d.askOrgRoutesAgain()

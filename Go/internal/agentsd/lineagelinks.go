@@ -375,6 +375,9 @@ func (d *Daemon) lineageEvent(e wire.Event) {
 	case "health.issue_new", "health.issue_regressed":
 		d.lineageHealthEvent(e)
 		return
+	case "health.incident_started":
+		d.lineageIncidentEvent(e)
+		return
 	}
 	switch e.Name {
 	case "pr.opened", "pr.merged", "pr.closed", "checks.failed":

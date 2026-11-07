@@ -1,5 +1,5 @@
-// Activity at the top of the sidebar (#151), as the window's (#145): Events, Resources, Runtimes,
-// MCP Servers (#589), Worktrees (#790) and Spending, each a row whose tooltip says what it has at a glance (#587)
+// Activity at the top of the sidebar (#151), as the window's (#145): Events, Runtimes,
+// MCP Servers (#589) and Spending, each a row whose tooltip says what it has at a glance (#587)
 // and that opens its page in the chat's place. What each page lets you change is the Mac's, but
 // for marking a runtime available and stopping a wait (#541).
 import { Fragment } from "preact";
@@ -9,20 +9,17 @@ import type { Store } from "../model/store";
 import type { AccountProfile, AllowanceReading, AllowanceState, Consequence, ControlMachine, CostState, Event, FolderSummary, RuntimeAvailability, RuntimeStatus } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import { who } from "../model/audit";
-import type { ActivityPage } from "../route";
-import { Resources } from "./Resources";
+import { routeHash, type ActivityPage } from "../route";
 import { MCPServersList } from "./MCPServers";
 import { YourConnections } from "./ConnectorSetup";
-import { WorktreesList } from "./Worktrees";
 import { AuditPane } from "./Audit";
 import { ReportsPane } from "./Reports";
-import { forCleanup, pageLine, tally as worktreeTally, worktreesIntro } from "../model/worktrees";
 import { BackToList } from "./BackToList";
 import { Modal } from "./Modal";
 import { folderKey, folderPath } from "../model/groups";
-import { accountChoices, accountRows, accountState, agentsHolding, allowanceLine, allowancePace, allowancePaceLine, pastWeeksLine, defaultAccountName, isOrgRow, orgAllowanceLine, ownRow, ownSignInID, reachesFoot, reachesTheModelBy, machineSignInLine, offersMachineSignIn, removeMessage, rowTitle, runtimeTime, runtimesHint, signInOnTheMac } from "../model/runtimes";
+import { accountChoices, accountRows, accountState, agentsHolding, allowanceLine, allowancePace, allowancePaceLine, pastWeeksLine, defaultAccountName, isOrgRow, orgAllowanceLine, ownRow, ownSignInID, reachesFoot, reachesTheModelBy, machineSignInLine, offersMachineSignIn, removeMessage, rowTitle, runtimeTime, runtimesHint, setupMachineLine, setupRuntimes, signInOnTheMac } from "../model/runtimes";
 import { RuntimeSignInDialog } from "./RuntimeSignInDialog";
-import { limitsHint, noResourcesHint } from "../model/onTheMac";
+import { limitsHint } from "../model/onTheMac";
 import { fromOrganisation } from "../model/orgAccounts";
 import { setBy as setByWords } from "../model/orgPolicy";
 import { personalEmpty, personalIntro, personalServers } from "../model/hostedMCP";
@@ -235,7 +232,7 @@ export function availabilityWords(availability: RuntimeAvailability): string {
 
 const onlineHosts = (store: Store): ControlMachine[] => store.hosts.value.filter((h) => hostAnswers(h.state));
 
-const pageTitles: Record<ActivityPage, string> = { events: "Events", resources: "Resources", runtimes: "Runtimes", mcp: "Connectors", worktrees: "Worktrees", spending: "Cost", tokens: "Tokens", time: "Time", milestones: "Milestones" };
+const pageTitles: Record<ActivityPage, string> = { events: "Events", runtimes: "Runtimes", mcp: "Connectors", spending: "Cost", tokens: "Tokens", time: "Time", milestones: "Milestones" };
 
 /** An Activity page in the chat's place. */
 export function ActivityPageView({ store, page }: { store: Store; page: ActivityPage }) {
@@ -251,6 +248,7 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
     }
   }, [page, online]);
   const several = store.hosts.value.length > 1;
+  const onlineIDs = new Set<string>(hosts.map((h) => h.id));
   const hostName = (host: string) => (store.isMac(host) ? "This Mac" : store.hosts.value.find((h) => h.id === host)?.name ?? host);
   // Events, or Audit: who did what through the control plane (#996).
   const pane = useSignal<"events" | "audit">("events");
@@ -275,24 +273,13 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
           )}
           {page === "events" && pane.value === "events" && <EventsList store={store} hostName={hostName} />}
           {page === "events" && pane.value === "audit" && <AuditPane store={store} hostName={hostName} />}
-          {page === "resources" && (
-            <>
-              {store.hosts.value.map((host) => (
-                <section key={host.id}>
-                  {several && <h2 class="section-head">{hostName(host.id)}</h2>}
-                  <Resources store={store} host={host.id} open />
-                </section>
-              ))}
-              {Object.values(store.leases.value).every((s) => s.resources.length === 0) && (
-                <p class="hint">{noResourcesHint(store.hasMac.value)}</p>
-              )}
-            </>
-          )}
-          {page === "runtimes" && store.hosts.value.map((host) => (
-            <section key={host.id}>
-              {several && <h2 class="section-head">{hostName(host.id)}</h2>}
+          {/* Your setup ▸ Runtimes (#3631): each runtime once, its accounts and allowances read on its home machine,
+              then a line per machine, each to that machine's page. */}
+          {page === "runtimes" && (
+            <section>
               <ul class="runtime-list">
-                {(store.runtimes.value[host.id] ?? []).map((status) => {
+                {setupRuntimes(store.hosts.value, store.macHostID.value, store.runtimes.value).map(({ status, home: hostID, machines }) => {
+                  const host = { id: hostID };
                   const allowanceSet = store.runtimeAllowances.value[host.id];
                   const allowance = allowanceSet && ownRow(allowanceSet.rows, status.runtime.id);
                   const isAllowanceOut = !!allowance && "out" in allowance.state.status && !allowance.unusable;
@@ -345,13 +332,28 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
                           place={store.isMac(host.id) ? "the Mac" : hostName(host.id)} />}
                       </li>;
                     })}
+                    <li class="setup-machines">
+                      <ul aria-label={`${status.runtime.name} on each machine`}>
+                        {machines.map((m) => (
+                          <li key={m.host}>
+                            <a href={routeHash({ nav: "machines", section: `machine-${m.host}` })}>{hostName(m.host)}</a>{" "}
+                            <span class="quiet small">{setupMachineLine(m.status, onlineIDs.has(m.host))}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </li>
                   </Fragment>;
                 })}
               </ul>
-              {/* The person's own pass-through names, a name the policy refuses dimmed (#998). */}
-              <PassThroughList names={store.passThrough.value[host.id] ?? []} />
+              {/* The person's own pass-through names, a name the policy refuses dimmed (#998), for each machine that has any. */}
+              {store.hosts.value.filter((h) => (store.passThrough.value[h.id] ?? []).length > 0).map((h) => (
+                <section key={h.id}>
+                  {several && <h2 class="section-head">{hostName(h.id)}</h2>}
+                  <PassThroughList names={store.passThrough.value[h.id] ?? []} />
+                </section>
+              ))}
             </section>
-          ))}
+          )}
           {page === "mcp" && (
             <>
               <p class="hint">{personalIntro(store.hasMac.value)}</p>
@@ -368,20 +370,6 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
               {store.hosts.value.every((host) => personalServers(store.mcpHealthOf(host.id)).length === 0) && (
                 <p class="hint">{personalEmpty}</p>
               )}
-            </>
-          )}
-          {page === "worktrees" && (
-            <>
-              <p class="hint">{worktreesIntro}</p>
-              {store.hosts.value.map((host) => (
-                <section key={host.id}>
-                  {several && <h2 class="section-head">{hostName(host.id)}</h2>}
-                  <p>{pageLine(worktreeTally(forCleanup(store.worktreeLists.value[host.id] ?? [],
-                    store.worktreeSizes.value[host.id]).flatMap((g) => g.worktrees)))}</p>
-                  <WorktreesList store={store} host={host.id} />
-                </section>
-              ))}
-              <button onClick={() => { for (const host of hosts) void store.loadWorktrees(host.id); }}>Refresh</button>
             </>
           )}
           {page === "runtimes" && <p class="hint">{runtimesHint(store.hasMac.value)}</p>}

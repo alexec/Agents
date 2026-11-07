@@ -5,6 +5,8 @@ import Foundation
 /// the machine's totals. Asked while the page is open, never kept up to date otherwise.
 extension DaemonAPI.Method {
     public static let processesList = "processes/list"
+    /// A machine's page (#3626): its CPU and memory now, and every disk its agents write to.
+    public static let machineUsage = "machine/usage"
 }
 
 extension DaemonAPI {
@@ -67,6 +69,18 @@ extension DaemonAPI {
             self.machine = machine
             self.processes = processes
             self.omitted = omitted
+        }
+    }
+
+    /// What `machine/usage` answers (#3626): the machine's totals, and every volume its
+    /// agents write to, ok ones too, the most critical first, then the least free.
+    public struct MachineUsageState: Codable, Hashable, Sendable {
+        public var machine: MachineUsage
+        public var disks: [DiskAlarm]
+
+        public init(machine: MachineUsage, disks: [DiskAlarm] = []) {
+            self.machine = machine
+            self.disks = disks
         }
     }
 }

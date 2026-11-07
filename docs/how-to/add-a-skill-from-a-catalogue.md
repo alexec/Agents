@@ -97,6 +97,14 @@ added, the app lists what `npx skills add` put in `~/.agents/skills`, and
 - **An add is interrupted,** for example if the Mac restarts part way: the next time the app
   starts, it undoes the unfinished add, so you never end up with half a skill.
 
+## Personas
+
+A GitHub marketplace can hold personas too, in a `personas/` folder next to its skills.
+Add them from **Settings ▸ Agent Configuration ▸ Personas ▸ Add persona…** (or Project
+Settings, for a folder) in the same way: choose one, read the whole file, and choose **Add**.
+They update and come out as skills do, and an update that changes a persona's runtime or
+permission mode says so first. See [Personas](../reference/personas.md#from-a-marketplace).
+
 ## Related
 
 - [Share skills, instructions and connectors with every agent](share-skills-across-agents.md)

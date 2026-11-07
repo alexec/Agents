@@ -49,7 +49,7 @@ type Handler interface {
 	Handles(method string) bool
 	// Handle answers a request from a client for the control plane itself.
 	Handle(method string, params json.RawMessage, from Caller) (any, error)
-	// HostSaid answers a request on a host's channel 0: host/hello, attention/need.
+	// HostSaid answers a request on a host's channel 0: machine/hello, attention/need.
 	HostSaid(host, method string, params json.RawMessage) (any, error)
 }
 
@@ -84,7 +84,8 @@ type Router struct {
 	asks map[string]*hostAsk
 	// Kept requests on their way to a host, by their delivery, until it answers.
 	keptWaits map[string]chan *message
-	// Where each session last said the person was, keyed by the session.
+	// Where each session last said the person was, keyed by the session; a report made at
+	// another copy is keyed by peerPresenceKey and goes when no copy links its client.
 	presence map[string]notedPresence
 	// Told when a host's real uplink here ends.
 	localEnded func(host string)
@@ -103,7 +104,7 @@ type Router struct {
 	keeper keeper
 	// Kept requests asked, in the order they came.
 	keeping chan func()
-	// Told each host's answer to a whole list (#962), for hosts/lastHeard: host, method,
+	// Told each host's answer to a whole list (#962), for machines/lastHeard: host, method,
 	// the reply line. Nil where none is kept.
 	copier func(host, method, reply string)
 	// The organisation's policy's check of a call to a machine (#998): it reads only memory.
@@ -270,7 +271,7 @@ func describe(host string, s hostState) map[string]any {
 	return params
 }
 
-// Described is a host's state as hosts/list and control/hostChanged say it, with its
+// Described is a host's state as machines/list and control/hostChanged say it, with its
 // workspace laid over it (#691).
 func (r *Router) Described(host string) map[string]any {
 	r.mu.Lock()
@@ -550,10 +551,14 @@ func (r *Router) DropPeer(id string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	delete(r.peers, id)
-	if gone := r.peerLinks[id]; len(gone) > 0 {
+	gone := r.peerLinks[id]
+	if len(gone) > 0 {
 		r.broadcastControlLocked("control/clientChanged", map[string]any{})
 	}
 	delete(r.peerLinks, id)
+	for client := range gone {
+		r.forgetPeerPresenceLocked(client)
+	}
 	for _, h := range r.hosts {
 		if !h.local {
 			continue
@@ -662,8 +667,24 @@ func (r *Router) NotePeerLink(peer, client string, connected bool) {
 		r.peerLinks[peer][client] = true
 	} else {
 		delete(r.peerLinks[peer], client)
+		r.forgetPeerPresenceLocked(client)
 	}
 	r.broadcastControlLocked("control/clientChanged", map[string]any{"client": client})
+}
+
+// peerPresenceKey is where a presence report made at another copy is kept: apart from the
+// sessions here, so the end of a session here never takes it, nor the end of a link to it.
+func peerPresenceKey(client string) string { return "peer/" + client }
+
+// forgetPeerPresenceLocked drops a client's report made at another copy once no copy links
+// it any more (#3650): it was added by client and never removed, so it grew without bound.
+func (r *Router) forgetPeerPresenceLocked(client string) {
+	for _, links := range r.peerLinks {
+		if links[client] {
+			return
+		}
+	}
+	delete(r.presence, peerPresenceKey(client))
 }
 
 // LinksHere is every client connected here, as it was said: for a peer that just linked.
@@ -697,12 +718,12 @@ func (r *Router) NotePeerPresence(client string, device bool, report json.RawMes
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	previous := r.presence[client]
+	previous := r.presence[peerPresenceKey(client)]
 	may := p.MayNotify
 	if may == nil {
 		may = previous.mayNotify
 	}
-	r.presence[client] = notedPresence{client: client, device: device, watching: (*string)(p.Watching), active: p.Active,
+	r.presence[peerPresenceKey(client)] = notedPresence{client: client, device: device, watching: (*string)(p.Watching), active: p.Active,
 		heardAt: time.Now(), mayNotify: may}
 }
 
@@ -713,7 +734,7 @@ func (r *Router) OnLocalEnded(f func(string)) {
 	r.mu.Unlock()
 }
 
-// ForgetHost is hosts/remove (FR-014): its uplink closes and it is forgotten. Its agents
+// ForgetHost is machines/remove (FR-014): its uplink closes and it is forgotten. Its agents
 // are left as they are.
 func (r *Router) ForgetHost(host string) {
 	r.mu.Lock()
@@ -1540,7 +1561,7 @@ func (r *Router) toHostLocked(host, msg, sessionID string) {
 				r.audited(s.caller, host, m.Method, m.Params)
 			}
 			// A request with a channel's MAC cannot be delivered later, on another channel:
-			// the client keeps it, signed, itself (hosts/keep). One its client signed is
+			// the client keeps it, signed, itself (machines/keep). One its client signed is
 			// kept as it came (#3492).
 			var signed *wire.LockDelivery
 			if len(m.Lock) > 0 {
@@ -1788,7 +1809,7 @@ func (r *Router) SetCopier(f func(host, method, reply string)) {
 	r.mu.Unlock()
 }
 
-// toControl answers on its own goroutine: hosts/install takes minutes, and nothing else
+// toControl answers on its own goroutine: machines/install takes minutes, and nothing else
 // this client says may wait behind it.
 func (r *Router) toControl(msg, sessionID string, wrapped bool) {
 	m, ok := decode(msg)

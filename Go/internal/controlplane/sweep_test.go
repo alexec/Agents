@@ -201,6 +201,40 @@ func TestTheSweepRemovesRemovedGroupsAndPeople(t *testing.T) {
 	}
 }
 
+// A person removed before removal cut them to a tombstone is cut by the sweep (#3647).
+func TestTheSweepCutsARemovedPersonToTheirTombstone(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	s := store.NewMemory()
+	rs := records.New(s)
+	yes, now := true, records.Now()
+	rs.ChangePeople(ctx, func(map[string]records.Person) ([]records.Person, error) {
+		return []records.Person{
+			{ID: "u-live", Name: "Live", GitHubLogin: "live"},
+			{ID: "u-refused", Name: "Refused", Removed: &yes, RemovedAt: &now, GitHubLogin: "refused",
+				SignIns: []records.SignIn{{Provider: "google", Account: "1", Email: "refused@example.com"}}},
+		}, nil
+	})
+	if report, err := sweep(ctx, rs, time.Now(), mostPerSweep, nil); err != nil || report.cut != 1 {
+		t.Fatalf("%+v %v", report, err)
+	}
+	o, _ := s.Get(ctx, records.PersonKey("u-refused"))
+	if o == nil || strings.Contains(string(o.Data), "@example.com") || strings.Contains(string(o.Data), "Refused") ||
+		strings.Contains(string(o.Data), "gitHubLogin") {
+		t.Fatalf("kept as %s", o.Data)
+	}
+	if p := rs.PersonWithSignIn("google", "1"); p == nil || !p.IsRemoved() || !p.RemovedAt.Equal(now.Time) {
+		t.Fatalf("the sign-in is no longer refused: %+v", p)
+	}
+	if p := rs.Person("u-live"); p == nil || p.GitHubLogin != "live" {
+		t.Fatalf("the live one changed: %+v", p)
+	}
+	// Once cut, the next sweep has nothing to do.
+	if report, err := sweep(ctx, rs, time.Now(), mostPerSweep, nil); err != nil || report.total() != 0 {
+		t.Fatalf("%+v %v", report, err)
+	}
+}
+
 func TestTheSweepStopsAtItsBound(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -371,7 +405,7 @@ func TestTheSweepListsOnlyTheExpiredDays(t *testing.T) {
 	}
 }
 
-// A window's whole lists of a host are kept, and said by hosts/lastHeard while the host
+// A window's whole lists of a host are kept, and said by machines/lastHeard while the host
 // is offline (#962); a narrowed list is not.
 func TestWhatAHostLastListedIsKept(t *testing.T) {
 	t.Parallel()
@@ -386,7 +420,7 @@ func TestWhatAHostLastListedIsKept(t *testing.T) {
 	}, "the copy kept")
 	box.stop()
 	var heard map[string]json.RawMessage
-	json.Unmarshal(call(t, window, "", "hosts/lastHeard", map[string]string{"host": box.member.Host}), &heard)
+	json.Unmarshal(call(t, window, "", "machines/lastHeard", map[string]string{"host": box.member.Host}), &heard)
 	if string(heard["agents"]) != "[]" || heard["heardAt"] == nil || heard["folders"] != nil {
 		t.Fatalf("%s", heard)
 	}
@@ -394,11 +428,90 @@ func TestWhatAHostLastListedIsKept(t *testing.T) {
 		t.Fatal("keeps the wrong lists")
 	}
 	// A removed host's copy goes.
-	call(t, window, "", "hosts/remove", map[string]string{"host": box.member.Host})
+	call(t, window, "", "machines/remove", map[string]string{"host": box.member.Host})
 	if o, _ := p.store.Get(context.Background(), copyKey(box.member.Host)); o != nil {
 		t.Fatal("the copy stayed")
 	}
-	if e := callError(t, window, "", "hosts/lastHeard", map[string]string{"host": box.member.Host}); !strings.Contains(e, "-32091") {
+	if e := callError(t, window, "", "machines/lastHeard", map[string]string{"host": box.member.Host}); !strings.Contains(e, "-32091") {
 		t.Fatal(e)
+	}
+}
+
+// The hour's sweep deletes the ended requests, not only a list someone asks for (#3649).
+func TestTheSweepDeletesEndedRequests(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	st := store.NewMemory()
+	p := startPlane(t, st, controllink.NewPrivateKey())
+	now := time.Now()
+	put := func(key string, v any) {
+		data, err := records.Encode(v)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := st.Put(ctx, key, data, store.Absent); err != nil {
+			t.Fatal(err)
+		}
+	}
+	old, live := records.At(now.Add(-2*linkKept)), records.At(now.Add(time.Minute))
+	oldJoin, liveJoin := newJoinID(), newJoinID()
+	put(joinKey(oldJoin), joinRecord{ID: oldJoin, Expires: old})
+	put(joinKey(liveJoin), joinRecord{ID: liveJoin, Expires: live})
+	oldLock, liveLock := newJoinID(), newJoinID()
+	put(lockJoinKey(oldLock), lockJoinRecord{ID: oldLock, Expires: old})
+	put(lockJoinKey(liveLock), lockJoinRecord{ID: liveLock, Expires: live})
+	oldSignIn, liveSignIn := newJoinID(), newJoinID()
+	put(signInRequestKey(oldSignIn), signInRequest{ID: oldSignIn, Expires: old})
+	put(signInRequestKey(liveSignIn), signInRequest{ID: liveSignIn, Expires: live})
+	oldLink, liveLink := newJoinID(), newJoinID()
+	put(linkRequestKey(oldLink), linkRequestRecord{ID: oldLink, Expires: old})
+	put(linkRequestKey(liveLink), linkRequestRecord{ID: liveLink, Expires: live})
+	yesterday, today := now.Add(-24*time.Hour).UTC().Format(time.DateOnly), now.UTC().Format(time.DateOnly)
+	put(budgetRequestKey("old"), map[string]string{"id": "old", "user": "U", "day": yesterday})
+	put(budgetRequestKey("live"), map[string]string{"id": "live", "user": "U", "day": today})
+	// Nobody lists any of them: the sweep alone deletes the ended ones.
+	p.s.sweepRequests(ctx, now)
+	for key, want := range map[string]bool{
+		joinKey(oldJoin): false, joinKey(liveJoin): true,
+		lockJoinKey(oldLock): false, lockJoinKey(liveLock): true,
+		signInRequestKey(oldSignIn): false, signInRequestKey(liveSignIn): true,
+		linkRequestKey(oldLink): false, linkRequestKey(liveLink): true,
+		budgetRequestKey("old"): false, budgetRequestKey("live"): true,
+	} {
+		object, err := st.Get(ctx, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if (object != nil) != want {
+			t.Errorf("%s: kept %v, want %v", key, object != nil, want)
+		}
+	}
+}
+
+// #3648: copies' change events go after a day, not with the audit's days.
+func TestTheSweepKeepsMeshEventsADay(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	s := store.NewMemory()
+	rs := records.New(s)
+	rs.SettingsOrMake(ctx, func() records.Settings { return records.Settings{Name: "test", MachineID: "m"} })
+	now := time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
+	for _, day := range []string{"2026-11-04", "2026-11-05", "2026-11-06"} {
+		s.Put(ctx, meshEventsPrefix+day+"/0000000000001-abcdefgh.json", []byte("{}"), store.Absent)
+	}
+	s.Put(ctx, eventsPrefix+"2026-11-04/audit.json", []byte("{}"), store.Absent)
+	if _, err := sweep(ctx, rs, now, mostPerSweep, nil); err != nil {
+		t.Fatal(err)
+	}
+	keys, _ := s.List(ctx, "v1/")
+	var got []string
+	for _, k := range keys {
+		if strings.Contains(k.Key, "events/") {
+			got = append(got, k.Key)
+		}
+	}
+	want := "v1/events/2026-11-04/audit.json v1/mesh/events/2026-11-05/0000000000001-abcdefgh.json v1/mesh/events/2026-11-06/0000000000001-abcdefgh.json"
+	if strings.Join(got, " ") != want {
+		t.Fatalf("left %v", got)
 	}
 }

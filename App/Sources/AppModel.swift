@@ -192,14 +192,13 @@ final class AppModel {
     var showsSpending = false {
         didSet {
             guard showsSpending, showsSpending != oldValue else { return }
-            showsResources = false
             showsEvents = false
             showsRuntimes = false
             showsMCPServers = false
             showsTime = false
             showsMilestones = false
             showsTokens = false
-            showsWorktrees = false
+            machinePage = nil
             showsWork = false
             showsDocs = false
             // The same rule as picking a folder: what you picked is what you see,
@@ -213,42 +212,18 @@ final class AppModel {
         }
     }
 
-    /// Whether the window is showing Resources: who holds the Mac's shared things
-    /// and who is waiting (036). A page like Spending, and not persisted for the same
-    /// reason: it is somewhere you go to answer a question.
-    var showsResources = false {
-        didSet {
-            guard showsResources, showsResources != oldValue else { return }
-            showsSpending = false
-            showsEvents = false
-            showsRuntimes = false
-            showsMCPServers = false
-            showsTime = false
-            showsMilestones = false
-            showsTokens = false
-            showsWorktrees = false
-            showsWork = false
-            showsDocs = false
-            selection = nil
-            openWorkflow = nil
-            folderPage = nil
-            composing = false
-        }
-    }
-
     /// Whether the window is showing Events: what happened, what came of it, and who
     /// is waiting (042). A page like Resources, and not persisted for the same reason.
     var showsEvents = false {
         didSet {
             guard showsEvents, showsEvents != oldValue else { return }
             showsSpending = false
-            showsResources = false
             showsRuntimes = false
             showsMCPServers = false
             showsTime = false
             showsMilestones = false
             showsTokens = false
-            showsWorktrees = false
+            machinePage = nil
             showsWork = false
             showsDocs = false
             selection = nil
@@ -267,13 +242,12 @@ final class AppModel {
         didSet {
             guard showsRuntimes, showsRuntimes != oldValue else { return }
             showsSpending = false
-            showsResources = false
             showsEvents = false
             showsMCPServers = false
             showsTime = false
             showsMilestones = false
             showsTokens = false
-            showsWorktrees = false
+            machinePage = nil
             showsWork = false
             showsDocs = false
             selection = nil
@@ -290,13 +264,12 @@ final class AppModel {
         didSet {
             guard showsMCPServers, showsMCPServers != oldValue else { return }
             showsSpending = false
-            showsResources = false
             showsEvents = false
             showsRuntimes = false
             showsTime = false
             showsMilestones = false
             showsTokens = false
-            showsWorktrees = false
+            machinePage = nil
             showsWork = false
             showsDocs = false
             selection = nil
@@ -312,13 +285,12 @@ final class AppModel {
         didSet {
             guard showsTime, showsTime != oldValue else { return }
             showsSpending = false
-            showsResources = false
             showsEvents = false
             showsRuntimes = false
             showsMCPServers = false
             showsMilestones = false
             showsTokens = false
-            showsWorktrees = false
+            machinePage = nil
             showsWork = false
             showsDocs = false
             selection = nil
@@ -334,13 +306,12 @@ final class AppModel {
         didSet {
             guard showsMilestones, showsMilestones != oldValue else { return }
             showsSpending = false
-            showsResources = false
             showsEvents = false
             showsRuntimes = false
             showsMCPServers = false
             showsTime = false
             showsTokens = false
-            showsWorktrees = false
+            machinePage = nil
             showsWork = false
             showsDocs = false
             selection = nil
@@ -356,13 +327,12 @@ final class AppModel {
         didSet {
             guard showsTokens, showsTokens != oldValue else { return }
             showsSpending = false
-            showsResources = false
             showsEvents = false
             showsRuntimes = false
             showsMCPServers = false
             showsTime = false
             showsMilestones = false
-            showsWorktrees = false
+            machinePage = nil
             showsWork = false
             showsDocs = false
             selection = nil
@@ -372,16 +342,14 @@ final class AppModel {
         }
     }
 
-    /// Whether the window is showing Worktrees: every folder's, and how much each holds
-    /// on disk (#790). A page like MCP Servers, and not persisted for the same reason; it
-    /// was in Folder Settings, which are for what a person sets, not what changes.
-    var showsWorktrees = false {
+    /// The machine whose page the window shows (#3626): its CPU, memory and disks, from its
+    /// row under Machines. Status, not a setting, so it is here rather than in Settings.
+    var machinePage: MachineRef? {
         didSet {
-            guard showsWorktrees, showsWorktrees != oldValue else { return }
+            guard machinePage != nil, machinePage != oldValue else { return }
             showsWork = false
             showsDocs = false
             showsSpending = false
-            showsResources = false
             showsEvents = false
             showsRuntimes = false
             showsMCPServers = false
@@ -403,14 +371,13 @@ final class AppModel {
             guard showsWork, showsWork != oldValue else { return }
             showsDocs = false
             showsSpending = false
-            showsResources = false
             showsEvents = false
             showsRuntimes = false
             showsMCPServers = false
             showsTime = false
             showsMilestones = false
             showsTokens = false
-            showsWorktrees = false
+            machinePage = nil
             selection = nil
             openWorkflow = nil
             folderPage = nil
@@ -424,14 +391,13 @@ final class AppModel {
         didSet {
             guard showsDocs, showsDocs != oldValue else { return }
             showsSpending = false
-            showsResources = false
             showsEvents = false
             showsRuntimes = false
             showsMCPServers = false
             showsTime = false
             showsMilestones = false
             showsTokens = false
-            showsWorktrees = false
+            machinePage = nil
             showsWork = false
             selection = nil
             openWorkflow = nil
@@ -485,32 +451,34 @@ final class AppModel {
         openWorkflow = Folder.standardize(folder).path + "/" + workflowID
     }
 
-    /// The resource a capsule in a chat asked to be shown. Scrolled to, once.
-    var resourcesFocus: ResourceName?
+    /// The resources a capsule or the Go menu asked to be shown on This Mac's page (#3629),
+    /// at one resource or the section. Scrolled to, once.
+    var resourcesAsked: ResourcesAsk?
 
-    /// Resources, at one resource if a chat's capsule asked for it.
+    /// This Mac's resources, on its machine page (#3629), at one resource if a chat's capsule
+    /// asked for it. A capsule names a lease on this Mac, where the window's agents hold them.
     func showResources(at name: ResourceName? = nil) {
-        resourcesFocus = name
-        showsResources = true
+        resourcesAsked = ResourcesAsk(name: name)
+        machinePage = .mac
     }
 
-    /// Runtimes, from the prompt bar's warning about starting on one that is out.
+    /// Your setup, at its Runtimes (#3631), from the prompt bar's warning about starting on one
+    /// that is out.
     func showRuntimes() {
         showsRuntimes = true
     }
 
-    /// An agent's chat, from the Resources page or a capsule naming its holder: its
+    /// An agent's chat, from a machine's Resources or a capsule naming its holder: its
     /// own folder first, as a banner does, so the sidebar and the page agree.
     func openAgent(_ agentID: UUID) {
         showsSpending = false
-        showsResources = false
         showsEvents = false
         showsRuntimes = false
         showsMCPServers = false
         showsTime = false
         showsMilestones = false
         showsTokens = false
-        showsWorktrees = false
+        machinePage = nil
         showsWork = false
         showsDocs = false
         if let agent = agents.first(where: { $0.id == agentID }) {
@@ -529,14 +497,13 @@ final class AppModel {
     /// change git brought to its files is asked.
     func openFolder(_ key: FolderKey) {
         showsSpending = false
-        showsResources = false
         showsEvents = false
         showsRuntimes = false
         showsMCPServers = false
         showsTime = false
         showsMilestones = false
         showsTokens = false
-        showsWorktrees = false
+        machinePage = nil
         showsWork = false
         showsDocs = false
         // Not listed yet: settling the selection would pick another, so it waits (#1055).
@@ -574,10 +541,9 @@ final class AppModel {
     var sidebarItem: SidebarItem? {
         get {
             if showsEvents { return .events }
-            if showsResources { return .resources }
             if showsRuntimes { return .runtimes }
             if showsMCPServers { return .mcpServers }
-            if showsWorktrees { return .worktrees }
+            if let machinePage { return .machine(machinePage) }
             if showsSpending { return .spending }
             if showsTokens { return .tokens }
             if showsTime { return .time }
@@ -601,14 +567,13 @@ final class AppModel {
                 openAgent(id)
             case .workflow(let id, let key):
                 showsSpending = false
-                showsResources = false
                 showsEvents = false
                 showsRuntimes = false
                 showsMCPServers = false
                 showsTime = false
                 showsMilestones = false
                 showsTokens = false
-                showsWorktrees = false
+                machinePage = nil
                 showsWork = false
                 showsDocs = false
                 select(key)
@@ -634,6 +599,7 @@ final class AppModel {
             case .docs:
                 showDocs(docsHistory.current ?? DocsPlace())
             case .resources:
+                // The Remote's row (#3629): on the Mac, This Mac's page at its Resources.
                 showResources()
             case .events:
                 showEvents()
@@ -641,18 +607,17 @@ final class AppModel {
                 showRuntimes()
             case .mcpServers:
                 showsMCPServers = true
-            case .worktrees:
-                showsWorktrees = true
+            case .machine(let host):
+                machinePage = host
             case .folder(let key):
                 showsSpending = false
-                showsResources = false
                 showsEvents = false
                 showsRuntimes = false
                 showsMCPServers = false
                 showsTime = false
                 showsMilestones = false
                 showsTokens = false
-                showsWorktrees = false
+                machinePage = nil
                 showsWork = false
                 showsDocs = false
                 showFolder(key)
@@ -668,14 +633,13 @@ final class AppModel {
     /// A folder's workflows or its archive, from its row in the sidebar (#495).
     func showFolderPage(_ page: FolderPage, of key: FolderKey) {
         showsSpending = false
-        showsResources = false
         showsEvents = false
         showsRuntimes = false
         showsMCPServers = false
         showsTime = false
         showsMilestones = false
         showsTokens = false
-        showsWorktrees = false
+        machinePage = nil
         showsWork = false
         showsDocs = false
         select(key)
@@ -699,14 +663,13 @@ final class AppModel {
         // — a new folder being added, a menu item, its New session row. And from
         // Resources, for the same reason.
         showsSpending = false
-        showsResources = false
         showsEvents = false
         showsRuntimes = false
         showsMCPServers = false
         showsTime = false
         showsMilestones = false
         showsTokens = false
-        showsWorktrees = false
+        machinePage = nil
         showsWork = false
         showsDocs = false
         select(key)
@@ -925,14 +888,13 @@ final class AppModel {
     /// A folder's pinned page, from its row.
     func showPin(_ path: String, in key: FolderKey) {
         showsSpending = false
-        showsResources = false
         showsEvents = false
         showsRuntimes = false
         showsMCPServers = false
         showsTime = false
         showsMilestones = false
         showsTokens = false
-        showsWorktrees = false
+        machinePage = nil
         showsWork = false
         showsDocs = false
         select(key)
@@ -1080,6 +1042,8 @@ final class AppModel {
             self?.openAgent(agentID)
         }
         notifier.openFolder = { [weak self] folder in self?.openFolder(FolderKey(host: .mac, folder: folder)) }
+        // The window hears only this Mac's host, so a machine's notice is this Mac's.
+        notifier.openMachine = { [weak self] in self?.machinePage = .mac }
         notifier.answer = { [weak self] token, quick, typed in await self?.answerFromBanner(token, quick, typed: typed) }
         #if DEBUG
         openFromLaunchArguments()
@@ -2194,15 +2158,26 @@ final class AppModel {
 
     /// Every resource and who holds it (036). A daemon too old to know the method
     /// leaves `leases` nil, and nothing about leases is drawn.
-    func refreshLeases() async {
-        guard let snapshot = try? await macClient.call(DaemonAPI.Method.resourcesSnapshot,
-                                                    Optional<String>.none,
-                                                    returning: DaemonAPI.LeaseSnapshot.self) else { return }
-        work.replaceLeases(snapshot)
+    func refreshLeases(on host: MachineRef = .mac) async {
+        guard let snapshot = try? await client(for: host).call(DaemonAPI.Method.resourcesSnapshot,
+                                                               Optional<String>.none,
+                                                               returning: DaemonAPI.LeaseSnapshot.self) else { return }
+        takeLeases(snapshot, from: host)
+    }
+
+    /// Each other machine's resources, as its page last read them (#3629). This Mac's are `leases`.
+    private(set) var serverLeases: [MachineRef: DaemonAPI.LeaseSnapshot] = [:]
+
+    func leases(on host: MachineRef) -> DaemonAPI.LeaseSnapshot? {
+        host == .mac ? leases : serverLeases[host]
+    }
+
+    private func takeLeases(_ snapshot: DaemonAPI.LeaseSnapshot, from host: MachineRef) {
+        if host == .mac { work.replaceLeases(snapshot) } else { serverLeases[host] = snapshot }
     }
 
     /// The MCP servers this Mac runs for every agent (#488). A daemon too old to know the
-    /// method leaves `hostedMCP` nil, and the Resources page draws no such group.
+    /// method leaves `hostedMCP` nil, and no such group is drawn.
     func refreshHostedMCP() async {
         guard let snapshot = try? await macClient.call(DaemonAPI.Method.mcpHosted, Optional<String>.none,
                                                     returning: DaemonAPI.HostedMCPSnapshot.self) else { return }
@@ -2317,12 +2292,12 @@ final class AppModel {
 
     /// The person ending a lease (036 US4): one holder's, or with none named, every
     /// one. Never a way to take one.
-    func endLease(_ name: ResourceName, holder: UUID? = nil) async {
-        guard let snapshot = try? await macClient.call(DaemonAPI.Method.resourcesEnd,
-                                                    DaemonAPI.PersonEndRequest(name: name.key,
-                                                                               agentID: holder?.uuidString),
-                                                    returning: DaemonAPI.LeaseSnapshot.self) else { return }
-        work.replaceLeases(snapshot)
+    func endLease(_ name: ResourceName, holder: UUID? = nil, on host: MachineRef = .mac) async {
+        guard let snapshot = try? await client(for: host).call(DaemonAPI.Method.resourcesEnd,
+                                                               DaemonAPI.PersonEndRequest(name: name.key,
+                                                                                          agentID: holder?.uuidString),
+                                                               returning: DaemonAPI.LeaseSnapshot.self) else { return }
+        takeLeases(snapshot, from: host)
     }
 
     /// The person adding or changing a declared resource (#116). The host's refusal,
@@ -2351,12 +2326,12 @@ final class AppModel {
     }
 
     /// The person taking one agent out of one line (036 US4).
-    func removeFromLine(_ name: ResourceName, agentID: UUID) async {
-        guard let snapshot = try? await macClient.call(
+    func removeFromLine(_ name: ResourceName, agentID: UUID, on host: MachineRef = .mac) async {
+        guard let snapshot = try? await client(for: host).call(
             DaemonAPI.Method.resourcesRemoveWaiter,
             DaemonAPI.PersonRemoveRequest(name: name.key, agentID: agentID.uuidString),
             returning: DaemonAPI.LeaseSnapshot.self) else { return }
-        work.replaceLeases(snapshot)
+        takeLeases(snapshot, from: host)
     }
 
     // MARK: The user scope (#1760)
@@ -2392,6 +2367,9 @@ final class AppModel {
     /// A Settings pane to open on, asked for by a link elsewhere (052): read and cleared
     /// by the Settings window.
     var settingsPaneAsked: SettingsPane?
+    /// The machine Settings ▸ Machines opens on, asked for by its page's Settings… (#3626):
+    /// read and cleared with `settingsPaneAsked`.
+    var settingsMachineAsked: MachineRef?
 
     /// A file for Agent Configuration's editor to open, asked for by a workflow page's Edit
     /// File… (#2803): read and cleared by the editor's page for that kind and folder.
@@ -2738,7 +2716,7 @@ final class AppModel {
 
     /// Each server's spending, as it last said (037).
     private(set) var serverCosts: [MachineRef: DaemonAPI.CostState] = [:]
-    /// Each server's disk alarms, kept beside the Mac's own disk strip (#263).
+    /// Each server's disk alarms, kept beside the Mac's own (#263), for its page and row (#3626).
     private(set) var serverDisks: [MachineRef: DiskState] = [:]
 
     /// What the servers have spent today, together, per currency. Empty when nothing.
@@ -3206,6 +3184,8 @@ final class AppModel {
         directHost = nil
         keptHost = nil
         KeptThisMacHost.forget(in: WindowDefaults.store)
+        // What was half-typed to that control plane goes too (#3670).
+        DraftKeeper.shared.forgetAll()
         client = DaemonClient(link: UnreachableLink())
         isConnected = false
     }
@@ -4300,6 +4280,80 @@ final class AppModel {
         }
     }
 
+    // MARK: Personas from a marketplace (#3665)
+
+    func personaSearch(_ query: String, marketplace: String?,
+                       destination: DaemonAPI.SkillDestination) async -> DaemonAPI.CatalogSearchAnswer {
+        do {
+            return try await macClient.call(DaemonAPI.Method.personasSearch,
+                                         DaemonAPI.CatalogSearchRequest(query: query, marketplace: marketplace,
+                                                                        destination: destination),
+                                         returning: DaemonAPI.CatalogSearchAnswer.self)
+        } catch {
+            return .init(results: [], error: Self.catalogError(error))
+        }
+    }
+
+    func personaPreview(_ result: DaemonAPI.CatalogResult,
+                        for destination: DaemonAPI.SkillDestination) async -> DaemonAPI.PersonaPreviewAnswer {
+        do {
+            return try await macClient.call(DaemonAPI.Method.personasPreview,
+                                         DaemonAPI.CatalogPreviewRequest(result: result, destination: destination),
+                                         returning: DaemonAPI.PersonaPreviewAnswer.self)
+        } catch {
+            return .init(preview: nil, error: Self.catalogError(error))
+        }
+    }
+
+    func addPersona(_ previewID: UUID, to destination: DaemonAPI.SkillDestination,
+                    replace: Bool) async -> Result<DaemonAPI.ManagedPersona, DaemonAPI.CatalogError> {
+        do {
+            let answer = try await macClient.call(DaemonAPI.Method.personasAdd,
+                                               DaemonAPI.SkillAddRequest(previewID: previewID, destination: destination,
+                                                                         replace: replace),
+                                               returning: DaemonAPI.PersonaAddAnswer.self)
+            return .success(answer.persona)
+        } catch {
+            return .failure(Self.catalogError(error))
+        }
+    }
+
+    /// The personas at a destination that were added from a marketplace.
+    func managedPersonas(at destination: DaemonAPI.SkillDestination) async -> [DaemonAPI.ManagedPersona]? {
+        try? await macClient.call(DaemonAPI.Method.personasManaged, DaemonAPI.SkillsListRequest(destination: destination),
+                               returning: DaemonAPI.PersonasManagedAnswer.self).personas
+    }
+
+    /// Whether each persona added from a marketplace has an update. Nil when it could not be
+    /// asked, so no marks rather than wrong ones.
+    func personaUpdates(at destination: DaemonAPI.SkillDestination) async -> [String: DaemonAPI.UpdateState]? {
+        try? await macClient.call(DaemonAPI.Method.personasCheckUpdates, DaemonAPI.SkillsListRequest(destination: destination),
+                               returning: DaemonAPI.SkillUpdatesAnswer.self).updates
+    }
+
+    func personaUpdatePreview(_ id: String, at destination: DaemonAPI.SkillDestination)
+        async -> Result<DaemonAPI.PersonaUpdatePreviewAnswer, DaemonAPI.CatalogError> {
+        do {
+            return .success(try await macClient.call(DaemonAPI.Method.personasUpdatePreview,
+                                                  DaemonAPI.SkillNameRequest(destination: destination, name: id),
+                                                  returning: DaemonAPI.PersonaUpdatePreviewAnswer.self))
+        } catch {
+            return .failure(Self.catalogError(error))
+        }
+    }
+
+    /// Take out a persona added from a marketplace; its file goes to the Trash.
+    func removePersona(_ id: String, at destination: DaemonAPI.SkillDestination) async -> DaemonAPI.CatalogError? {
+        do {
+            _ = try await macClient.call(DaemonAPI.Method.personasRemove,
+                                      DaemonAPI.SkillNameRequest(destination: destination, name: id),
+                                      returning: DaemonAPI.SkillRemoveAnswer.self)
+            return nil
+        } catch {
+            return Self.catalogError(error)
+        }
+    }
+
     /// The daemon's own reason when it gave one, and "can't reach" the daemon otherwise.
     private static func catalogError(_ error: any Error) -> DaemonAPI.CatalogError {
         if let rpc = error as? JSONRPCError, rpc.code == DaemonAPI.Failure.catalogRefused,
@@ -4891,19 +4945,24 @@ final class AppModel {
         }
     }
 
-    /// Every folder's worktrees on this Mac, for Activity ▸ Worktrees (#790). Sizes the
+    /// Every folder's worktrees on a machine, for its page (#790, #3627). Sizes the
     /// daemon has not measured yet come later, on `worktrees/sized`.
-    func loadWorktrees() async {
-        guard let listed = try? await macClient.call(DaemonAPI.Method.worktreesAll, DaemonAPI.Empty(),
-                                                  returning: [DaemonAPI.FolderWorktrees].self) else { return }
-        work.replaceWorktrees(listed)
+    func loadWorktrees(on host: MachineRef = .mac) async {
+        guard let listed = try? await worktreeClient(host).call(DaemonAPI.Method.worktreesAll, DaemonAPI.Empty(),
+                                                             returning: [DaemonAPI.FolderWorktrees].self) else { return }
+        work.replaceWorktrees(listed, from: host)
+    }
+
+    /// The machine a worktree is on: this Mac's own host for This Mac (#1496), else the machine's.
+    private func worktreeClient(_ host: MachineRef) -> DaemonClient {
+        host == .mac ? macClient : client(for: host)
     }
 
     /// What removing one of a folder's worktrees would lose, or nil when it could
     /// not be asked (and `problem` says why).
-    func checkWorktreeRemoval(_ root: URL, in folder: URL) async -> DaemonAPI.RemovalCheck? {
+    func checkWorktreeRemoval(_ root: URL, in folder: URL, on host: MachineRef = .mac) async -> DaemonAPI.RemovalCheck? {
         do {
-            return try await macClient.call(DaemonAPI.Method.worktreesCheck,
+            return try await worktreeClient(host).call(DaemonAPI.Method.worktreesCheck,
                                          DaemonAPI.WorktreeRemovalRequest(folder: folder, root: root),
                                          returning: DaemonAPI.RemovalCheck.self)
         } catch {
@@ -4914,25 +4973,25 @@ final class AppModel {
 
     /// Remove one of a folder's worktrees. `confirmed` is the person having seen
     /// what would be lost; the daemon checks again either way.
-    func removeWorktree(_ root: URL, in folder: URL, confirmed: Bool) async {
+    func removeWorktree(_ root: URL, in folder: URL, on host: MachineRef = .mac, confirmed: Bool) async {
         do {
-            _ = try await macClient.call(DaemonAPI.Method.worktreesRemove,
+            _ = try await worktreeClient(host).call(DaemonAPI.Method.worktreesRemove,
                                       DaemonAPI.WorktreeRemovalRequest(folder: folder, root: root,
                                                                        confirmed: confirmed),
                                       returning: DaemonAPI.WorktreeRemoved.self)
         } catch {
             problem = describe(error)
         }
-        await loadWorktrees()
+        await loadWorktrees(on: host)
         if draftCwd != nil { await loadDraftWorktrees() }
     }
 
     /// Delete an idle worktree's build output (#790), and say what it freed; nil when it
     /// could not (and `problem` says why).
-    func removeBuildOutput(_ root: URL, in folder: URL) async -> String? {
-        defer { Task { await loadWorktrees() } }
+    func removeBuildOutput(_ root: URL, in folder: URL, on host: MachineRef = .mac) async -> String? {
+        defer { Task { await loadWorktrees(on: host) } }
         do {
-            let removed = try await macClient.call(DaemonAPI.Method.worktreesRemoveBuildOutput,
+            let removed = try await worktreeClient(host).call(DaemonAPI.Method.worktreesRemoveBuildOutput,
                                                 DaemonAPI.WorktreeRemovalRequest(folder: folder, root: root),
                                                 returning: DaemonAPI.BuildOutputRemoved.self)
             return WorktreeTally.freedWords(removed)
@@ -4943,8 +5002,8 @@ final class AppModel {
     }
 
     /// Clean up worktrees (030): a new session in the folder, offered the words.
-    func offerCleanUp(in folder: URL) {
-        showFolder(FolderKey(folder: folder))
+    func offerCleanUp(in folder: URL, on host: MachineRef = .mac) {
+        showFolder(FolderKey(host: host, folder: folder))
         offeredPrompt = PromptOffer(agentID: nil, words: WorktreeTally.cleanUpPrompt)
     }
 

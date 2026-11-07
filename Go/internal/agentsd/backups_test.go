@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -313,10 +314,15 @@ func TestBackupsKeepTheNewestOfThisMachine(t *testing.T) {
 	shared := t.TempDir()
 	d, c := start(t, t.TempDir())
 	c.call(t, 1, "backups/configure", map[string]any{"every": "off", "keep": 2, "folder": shared})
-	// Another machine's backup in the same folder is never pruned.
+	// Another machine's backup in the same folder is not pruned while it is recent; one
+	// whose newest is 90 days old goes, with its folder (#3648).
 	other := filepath.Join(shared, "OTHER-ROOT")
-	writeFile(t, filepath.Join(other, "20200101T000000Z.tar.gz"), "x")
-	writeFile(t, filepath.Join(other, "20200101T000000Z.json"), `{"format":1,"rootID":"OTHER-ROOT","machine":"Other","madeAt":1,"agents":0}`)
+	writeFile(t, filepath.Join(other, "20261001T000000Z.tar.gz"), "x")
+	writeFile(t, filepath.Join(other, "20261001T000000Z.json"), fmt.Sprintf(`{"format":1,"rootID":"OTHER-ROOT","machine":"Other","madeAt":%d,"agents":0}`,
+		int64(wire.DateOf(time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)))))
+	gone := filepath.Join(shared, "GONE-ROOT")
+	writeFile(t, filepath.Join(gone, "20200101T000000Z.tar.gz"), "x")
+	writeFile(t, filepath.Join(gone, "20200101T000000Z.json"), `{"format":1,"rootID":"GONE-ROOT","machine":"Gone","madeAt":1,"agents":0}`)
 	for range 4 {
 		if _, err := d.makeBackup(); err != nil {
 			t.Fatal(err)
@@ -327,6 +333,9 @@ func TestBackupsKeepTheNewestOfThisMachine(t *testing.T) {
 	if len(s.Backups) != 3 || s.Backups[0].ID != d.Store.RootID+"/20261020T120000Z" ||
 		s.Backups[1].ID != d.Store.RootID+"/20261020T110000Z" || s.Backups[2].RootID != "OTHER-ROOT" {
 		t.Fatalf("kept %+v", s.Backups)
+	}
+	if _, err := os.Stat(gone); !os.IsNotExist(err) {
+		t.Fatalf("a machine's 2020 backups stayed: %v", err)
 	}
 	// Keeping fewer prunes now.
 	c.call(t, 3, "backups/configure", map[string]any{"every": "off", "keep": 1, "folder": shared})

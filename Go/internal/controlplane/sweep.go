@@ -29,15 +29,23 @@ const (
 	sweptDayLayout = "2006-01-02"
 )
 
+// Copies' change events (#3648): only for a copy that missed one, so a day is plenty.
+const (
+	meshEventsPrefix = "v1/mesh/events/"
+	meshEventsKept   = 24 * time.Hour
+)
+
 // sweepReport is StoreSweep.Report.
 type sweepReport struct {
 	events, codes, tombstones, leftovers, dated, usage int
 	// Leases of hosts that were removed, and org routes' tombstones (#2293).
 	orphans int
+	// Removed people cut to their tombstone (#3647).
+	cut int
 }
 
 func (r sweepReport) total() int {
-	return r.events + r.codes + r.tombstones + r.leftovers + r.usage + r.orphans
+	return r.events + r.codes + r.tombstones + r.leftovers + r.usage + r.orphans + r.cut
 }
 
 // full says whether a sweep of at most most deletions stopped at that bound, so more may
@@ -48,13 +56,13 @@ func (r sweepReport) add(o sweepReport) sweepReport {
 	return sweepReport{
 		events: r.events + o.events, codes: r.codes + o.codes, tombstones: r.tombstones + o.tombstones,
 		leftovers: r.leftovers + o.leftovers, dated: r.dated + o.dated, usage: r.usage + o.usage,
-		orphans: r.orphans + o.orphans,
+		orphans: r.orphans + o.orphans, cut: r.cut + o.cut,
 	}
 }
 
 func (r sweepReport) String() string {
-	return fmt.Sprintf("removed %d events, %d code files, %d tombstones, %d leftovers, %d usage periods, %d orphans; dated %d tombstones",
-		r.events, r.codes, r.tombstones, r.leftovers, r.usage, r.orphans, r.dated)
+	return fmt.Sprintf("removed %d events, %d code files, %d tombstones, %d leftovers, %d usage periods, %d orphans; dated %d tombstones; cut %d removed people",
+		r.events, r.codes, r.tombstones, r.leftovers, r.usage, r.orphans, r.dated, r.cut)
 }
 
 // sweep is StoreSweep.run: old events, spent and expired codes, old tombstones and a
@@ -81,6 +89,14 @@ func sweep(ctx context.Context, rs *records.Records, now time.Time, most int, ev
 	}
 	// The audit chain's seals (#1001), a day's each, go with their day's entries.
 	n, err = audit.SweepSeals(ctx, s, cutoff)
+	report.events += n
+	left -= n
+	if err != nil {
+		return report, err
+	}
+
+	// Copies' change events, by the day in their key.
+	n, err = sweepMeshEvents(ctx, s, now, left)
 	report.events += n
 	left -= n
 	if err != nil {
@@ -196,6 +212,14 @@ func sweep(ctx context.Context, rs *records.Records, now time.Time, most int, ev
 		}
 		report.tombstones++
 		left--
+	}
+
+	// Removed people kept whole from before removal cut them to a tombstone (#3647).
+	n, err = sweepRemovedPeople(ctx, rs, now, left)
+	report.cut = n
+	left -= n
+	if err != nil {
+		return report, err
 	}
 
 	// What outlived what it belonged to (#2293).
@@ -326,6 +350,36 @@ func sweepOrphans(ctx context.Context, rs *records.Records, now time.Time, most 
 	return deleted, nil
 }
 
+// sweepRequests reads each request store, so the ended requests go within the hour
+// (#3649), not only when someone next lists them: each list deletes what is past its
+// own bound on the way (joins, lock joins and sign-ins an hour after they end, link
+// requests a day after, budget requests the next day, decided governance requests after
+// 30 days, and a removed person's or machine's at once).
+func (s *Service) sweepRequests(ctx context.Context, now time.Time) {
+	failed := func(what string, err error) {
+		if err != nil {
+			s.log("store: " + what + " not swept: " + err.Error())
+		}
+	}
+	_, err := s.joins.all(ctx)
+	failed("joins", err)
+	_, err = s.lockJoins.all(ctx)
+	failed("lock joins", err)
+	_, err = s.signInApprovals.all(ctx)
+	failed("sign-in requests", err)
+	s.links.readAgain()
+	_, err = s.links.all(ctx)
+	failed("link requests", err)
+	_, err = s.budgetRequests(ctx, now)
+	failed("budget requests", err)
+	_, err = s.governanceUsage(ctx)
+	failed("governance reports", err)
+	_, err = s.governanceRequests(ctx, now)
+	failed("governance requests", err)
+	_, err = s.removeRequests(ctx)
+	failed("remove requests", err)
+}
+
 // dateTombstone gives a tombstone from before forgottenAt today's date, against the
 // version read.
 func dateTombstone(ctx context.Context, s store.Store, key string, object *store.Object, now time.Time) (bool, error) {
@@ -401,6 +455,50 @@ func (e *eventSweep) sweep(ctx context.Context, s store.Store, cutoff string, mo
 	return deleted, nil
 }
 
+// sweepMeshEvents deletes, at most most, copies' change events from the days before
+// meshEventsKept ago. They are a day or two of changes, so one list holds them.
+func sweepMeshEvents(ctx context.Context, s store.Store, now time.Time, most int) (int, error) {
+	cutoff := now.UTC().Add(-meshEventsKept).Format(sweptDayLayout)
+	keys, err := s.List(ctx, meshEventsPrefix)
+	if err != nil {
+		return 0, err
+	}
+	deleted := 0
+	for _, k := range keys {
+		day, _, _ := strings.Cut(strings.TrimPrefix(k.Key, meshEventsPrefix), "/")
+		if deleted >= most || day >= cutoff {
+			break
+		}
+		if err := s.Delete(ctx, k.Key); err != nil {
+			return deleted, err
+		}
+		deleted++
+	}
+	return deleted, nil
+}
+
+// sweepRemovedPeople cuts at most most removed people to their tombstone (#3647): each was
+// removed before removal did it, and still holds their name, emails and logins.
+func sweepRemovedPeople(ctx context.Context, rs *records.Records, now time.Time, most int) (int, error) {
+	ids := rs.RemovedToCut()
+	if len(ids) == 0 || most <= 0 {
+		return 0, nil
+	}
+	ids = ids[:min(len(ids), most)]
+	cut := 0
+	err := rs.ChangePeople(ctx, func(all map[string]records.Person) ([]records.Person, error) {
+		var out []records.Person
+		for _, id := range ids {
+			if p, ok := all[id]; ok && p.IsRemoved() && !p.IsTombstone() {
+				out = append(out, p.Tombstone(records.At(now)))
+			}
+		}
+		cut = len(out)
+		return out, nil
+	})
+	return cut, err
+}
+
 // sweepRounds is one hour's sweep (#2291): a round of at most most deletions, then, while a
 // round stops at that bound, another after pause, until nothing more has expired, the hour
 // is over, or wait says to stop. So when more expires in an hour than one round deletes
@@ -455,6 +553,13 @@ func (s *Service) sweepEveryHour() {
 					s.log("store: backups not swept: " + err.Error())
 				} else {
 					backupsSwept = day
+				}
+			}
+			s.sweepRequests(context.Background(), time.Now())
+			// Kept requests not sent for a week, with their attachments (#3647).
+			if s.providers != nil {
+				if kept := s.providers.Kept(); kept != nil {
+					kept.Expire(time.Now())
 				}
 			}
 			s.renewConnected(context.Background())

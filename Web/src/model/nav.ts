@@ -6,13 +6,13 @@ import type { ActivityPage } from "../route";
 import { reportSections, type Section } from "./console";
 import { workKinds, workKindTitle, type WorkKind } from "./work";
 
-export type NavSection = "overview" | "agents" | "work" | "docs" | "machines" | "workflows" | "reports" | "requests" | "people" | "settings";
+export type NavSection = "overview" | "agents" | "work" | "docs" | "machines" | "workflows" | "reports" | "requests" | "people" | "setup" | "settings";
 
-export const navSections: readonly NavSection[] = ["overview", "agents", "work", "docs", "machines", "workflows", "reports", "requests", "people", "settings"];
+export const navSections: readonly NavSection[] = ["overview", "agents", "work", "docs", "machines", "workflows", "reports", "requests", "people", "setup", "settings"];
 
 export const navTitle: Record<NavSection, string> = {
   overview: "Overview", agents: "Agents", work: "Work", docs: "Docs", machines: "Machines", workflows: "Workflows", reports: "Reports",
-  requests: "Requests", people: "People", settings: "Settings",
+  requests: "Requests", people: "People", setup: "Your setup", settings: "Settings",
 };
 
 /** The sections only an admin sees in the bar. */
@@ -26,6 +26,7 @@ export type PageDraw =
   | { kind: "work"; work: WorkKind }
   | { kind: "features" }
   | { kind: "docs" }
+  | { kind: "machine"; host: string }
   | { kind: "usage" | "machines" | "workflows" | "settings" };
 
 export interface NavPage {
@@ -59,9 +60,6 @@ export const navPages: Record<NavSection, readonly NavPage[]> = {
   docs: [{ id: "docs", title: "Docs", group: "Docs", draw: { kind: "docs" } }],
   machines: [
     { id: "machines", title: "Machines", group: "Machines", draw: { kind: "machines" } },
-    { id: "runtimes", title: "Runtimes", group: "On them", draw: { kind: "activity", page: "runtimes" } },
-    { id: "resources", title: "Resources", group: "On them", draw: { kind: "activity", page: "resources" } },
-    { id: "worktrees", title: "Worktrees", group: "On them", draw: { kind: "activity", page: "worktrees" } },
     { id: "mcp", title: "Connectors", group: "On them", draw: { kind: "activity", page: "mcp" } },
   ],
   workflows: [
@@ -77,6 +75,8 @@ export const navPages: Record<NavSection, readonly NavPage[]> = {
   ],
   requests: [adminPage("requests", "Requests", "Requests")],
   people: [adminPage("people", "People and Groups", "People"), adminPage("signIn", "Sign-In", "People")],
+  // The person's own setup (#3630), beside Settings: each runtime once, with the accounts, and a line per machine (#3631).
+  setup: [{ id: "runtimes", title: "Runtimes", group: "Your setup", draw: { kind: "activity", page: "runtimes" } }],
   settings: [
     { id: "settings", title: "Settings", group: "Settings", draw: { kind: "settings" } },
     adminPage("policy", "Policy", "Organisation"),
@@ -87,19 +87,34 @@ export const navPages: Record<NavSection, readonly NavPage[]> = {
   ],
 };
 
+/** A page per machine (#3626), after Machines ▸ Machines: its CPU, memory, disks, worktrees (#3627), runtimes and resources (#3629). The Mac first, then the
+ * others by name. */
+export function machinePages(hosts: readonly { id: string; name: string }[], macID: string): NavPage[] {
+  const sorted = [...hosts].sort((a, b) => Number(b.id === macID) - Number(a.id === macID) || a.name.localeCompare(b.name));
+  return sorted.map((h) => ({ id: `machine-${h.id}`, title: h.name, group: "Machines", draw: { kind: "machine", host: h.id } }));
+}
+
+/** A section's pages with the ones made from data put in: the machines' after Machines ▸ Machines. */
+export function withPages(section: NavSection, more: readonly NavPage[]): readonly NavPage[] {
+  if (section !== "machines" || more.length === 0) return navPages[section];
+  const list = navPages[section];
+  return [...list.slice(0, 1), ...more, ...list.slice(1)];
+}
+
 /** The sections in the bar: every one for an admin; for a member (or while the role is not known), not Requests or People. */
 export function sectionsShown(admin: boolean | null, current: NavSection): NavSection[] {
   return navSections.filter((s) => admin === true || !adminSections.has(s) || s === current);
 }
 
 /** The pages in a section's list: every one for an admin; a member's, and the one open. */
-export function pagesShown(section: NavSection, admin: boolean | null, open?: string): NavPage[] {
-  return navPages[section].filter((p) => admin === true || !p.admin || p.id === open);
+export function pagesShown(section: NavSection, admin: boolean | null, open?: string, more: readonly NavPage[] = []): NavPage[] {
+  return withPages(section, more).filter((p) => admin === true || !p.admin || p.id === open);
 }
 
 /** The page a route opens: the one named, or the section's first that this person may use. */
-export function openPage(section: NavSection, id: string | undefined, admin: boolean | null): NavPage | undefined {
-  const list = navPages[section];
+export function openPage(section: NavSection, id: string | undefined, admin: boolean | null,
+                         more: readonly NavPage[] = []): NavPage | undefined {
+  const list = withPages(section, more);
   return list.find((p) => p.id === id) ?? list.find((p) => admin === true || !p.admin) ?? list[0];
 }
 
@@ -136,7 +151,10 @@ export function movedPage(app: "console" | "a", page: string | undefined): { nav
     }
   }
   switch (page) {
-    case "runtimes": case "resources": case "worktrees": case "mcp": return { nav: "machines", section: page };
+    case "runtimes": return { nav: "setup", section: page };
+    case "mcp": return { nav: "machines", section: page };
+    // Worktrees (#3627) and resources (#3629) are on each machine's page now.
+    case "worktrees": case "resources": return { nav: "machines", section: "machines" };
     case "events": case "milestones": return { nav: "reports", section: page };
     case "spending": case "tokens": case "time": return { nav: "reports", section: "usage", usage: page };
     default: return {};
@@ -145,5 +163,5 @@ export function movedPage(app: "console" | "a", page: string | undefined): { nav
 
 /** The g-then-letter key for each section. */
 export const sectionKeys: Record<string, NavSection> = {
-  o: "overview", a: "agents", i: "work", d: "docs", m: "machines", w: "workflows", r: "reports", q: "requests", p: "people", s: "settings",
+  o: "overview", a: "agents", i: "work", d: "docs", m: "machines", w: "workflows", r: "reports", q: "requests", p: "people", y: "setup", s: "settings",
 };

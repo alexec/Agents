@@ -2,11 +2,13 @@ package agentsd
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -44,6 +46,7 @@ func (d *Daemon) writeAttachment(root, name string, data []byte) (string, error)
 		return "", err
 	}
 	d.boundAttachments(root, path, false)
+	d.noteAttachmentFolder(root)
 	return path, nil
 }
 
@@ -76,9 +79,45 @@ func attachmentsDir(root string, create bool) (string, error) {
 type attachmentBook struct {
 	namedMu sync.Mutex
 	namedBy map[string]map[string]wire.UUID
+	// attachmentFoldersMu guards attachment-folders.json.
+	attachmentFoldersMu sync.Mutex
 }
 
-// sweepAttachments bounds the attachments of every folder an agent here works in.
+// attachmentFoldersPath lists each folder an attachment was written in (#3649), so the
+// sweep still finds a folder's attachments once it has no agent left.
+func (d *Daemon) attachmentFoldersPath() string {
+	return filepath.Join(d.Store.Loc.Root, "attachment-folders.json")
+}
+
+func (d *Daemon) readAttachmentFolders() []string {
+	var folders []string
+	if data, err := os.ReadFile(d.attachmentFoldersPath()); err == nil {
+		_ = json.Unmarshal(data, &folders)
+	}
+	return folders
+}
+
+func (d *Daemon) writeAttachmentFolders(folders []string) {
+	data, _ := json.Marshal(folders)
+	if err := store.WriteAtomically(d.attachmentFoldersPath(), data, 0o600); err != nil {
+		log.Printf("attachments: %v", err)
+	}
+}
+
+// noteAttachmentFolder adds root to the list, once.
+func (d *Daemon) noteAttachmentFolder(root string) {
+	d.attachmentFoldersMu.Lock()
+	defer d.attachmentFoldersMu.Unlock()
+	folders := d.readAttachmentFolders()
+	if slices.Contains(folders, root) {
+		return
+	}
+	d.writeAttachmentFolders(append(folders, root))
+}
+
+// sweepAttachments bounds the attachments of every folder an agent here works in, and of
+// every folder on the list. With no agent left in it, no transcript names a file, so each
+// goes after attachmentDays; a folder with no attachments left leaves the list.
 func (d *Daemon) sweepAttachments() {
 	seen := map[string]bool{}
 	for _, a := range d.Store.Agents() {
@@ -89,6 +128,22 @@ func (d *Daemon) sweepAttachments() {
 		seen[root] = true
 		d.boundAttachments(root, "", true)
 	}
+	d.attachmentFoldersMu.Lock()
+	listed := d.readAttachmentFolders()
+	kept := listed[:0:0]
+	for _, root := range listed {
+		if !seen[root] {
+			seen[root] = true
+			d.boundAttachments(root, "", true)
+		}
+		if hasAttachments(root) {
+			kept = append(kept, root)
+		}
+	}
+	if len(kept) != len(listed) {
+		d.writeAttachmentFolders(kept)
+	}
+	d.attachmentFoldersMu.Unlock()
 	d.namedMu.Lock()
 	for root := range d.namedBy {
 		if !seen[root] {
@@ -96,6 +151,16 @@ func (d *Daemon) sweepAttachments() {
 		}
 	}
 	d.namedMu.Unlock()
+}
+
+// hasAttachments says whether root's attachments folder holds a file.
+func hasAttachments(root string) bool {
+	dir, err := attachmentsDir(root, false)
+	if err != nil {
+		return false
+	}
+	entries, _ := os.ReadDir(dir)
+	return len(entries) > 0
 }
 
 type attachment struct {
