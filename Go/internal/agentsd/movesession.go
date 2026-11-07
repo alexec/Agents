@@ -259,6 +259,79 @@ func (d *Daemon) registerMoveIn() {
 	On(d, wire.CallAgentsMoveIn, func(_ context.Context, _ *Client, r wire.SessionMoveIn) (wire.Empty, error) {
 		return wire.Empty{}, d.moveIn(r)
 	})
+	On(d, wire.CallAgentsMoveToMachine, func(_ context.Context, _ *Client, r wire.MoveToMachineRequest) (wire.MoveToMachineAnswer, error) {
+		return d.personMovesToMachine(r)
+	})
+}
+
+// personMovesToMachine is agents/moveToMachine (#3790): Move to Machine… in a client. The
+// person asked, so no card asks them again; the session itself asks the control plane, as
+// it does for its own move. A running turn stops first, and carries on there.
+func (d *Daemon) personMovesToMachine(r wire.MoveToMachineRequest) (wire.MoveToMachineAnswer, error) {
+	a := d.Store.Agent(r.AgentID)
+	if a == nil {
+		return wire.MoveToMachineAnswer{}, &Error{Code: CodeNoSuchAgent, Message: "That conversation is not open any more, so nothing was moved."}
+	}
+	machine := strings.TrimSpace(r.Machine)
+	if machine == "" {
+		return wire.MoveToMachineAnswer{}, Invalid("Nothing was moved: say which machine.")
+	}
+	if d.askControl.Load() == nil {
+		return wire.MoveToMachineAnswer{}, &Error{Code: wire.FailureNotSupported, Message: "Nothing was moved: this machine isn’t on a control plane, so it has no other machines."}
+	}
+	name := machine
+	if r.MachineName != nil && strings.TrimSpace(*r.MachineName) != "" {
+		name = strings.TrimSpace(*r.MachineName)
+	}
+	if strings.EqualFold(machine, d.ownName()) || strings.EqualFold(machine, d.ownHostID()) {
+		return wire.MoveToMachineAnswer{}, Invalid("Nothing was moved: the session is on %s already.", d.ownName())
+	}
+	switch {
+	case a.State == wire.AgentStateArchived:
+		return wire.MoveToMachineAnswer{}, Invalid("Nothing was moved: %s is archived. Unarchive it first.", quotedTitle(a.Title))
+	case a.PendingMove != nil:
+		return wire.MoveToMachineAnswer{}, Invalid("Nothing was moved: %s moves into another folder when its turn ends.", quotedTitle(a.Title))
+	}
+	if _, waiting := d.machineMoves.Load(a.ID); waiting {
+		return wire.MoveToMachineAnswer{}, Invalid("Nothing was moved: %s already moves to another machine when its turn ends.", quotedTitle(a.Title))
+	}
+	folder := ""
+	if r.Folder != nil {
+		folder = strings.TrimSpace(*r.Folder)
+	}
+	if folder == "" {
+		// The project's one folder there; else the person gives it, in the sheet.
+		there, err := d.projectFolderOn(a, machine)
+		if err != nil {
+			return wire.MoveToMachineAnswer{}, Invalid("Nothing was moved: this project has no one folder on %s. Give the folder there, as an absolute path.", name)
+		}
+		folder = there
+	}
+	if !strings.HasPrefix(folder, "/") {
+		return wire.MoveToMachineAnswer{}, Invalid("Nothing was moved: the folder on %s is an absolute path, such as /home/me/project, not %s.", name, folder)
+	}
+	folder = filepath.Clean(folder)
+	if _, err := d.branchToSend(a); err != nil {
+		_, msg := errMessage(err)
+		return wire.MoveToMachineAnswer{}, Invalid("Nothing was moved: %s", msg)
+	}
+	// Asked before the turn stops, so a move that can't be made stops nothing (#855).
+	if _, err := d.readyThere(a, machine, folder); err != nil {
+		code, msg := errMessage(err)
+		return wire.MoveToMachineAnswer{}, &Error{Code: code, Message: "Nothing was moved to " + name + ": " + msg}
+	}
+	l := d.live(a.ID)
+	l.mu.Lock()
+	working := inFlight(a.State) || l.running || l.inTurn
+	l.mu.Unlock()
+	if working {
+		d.stopHelper(a)
+	}
+	if err := d.moveToMachine(a.ID, machineMove{machine: machine, folder: folder, asker: a.ID}, working); err != nil {
+		code, msg := errMessage(err)
+		return wire.MoveToMachineAnswer{}, &Error{Code: code, Message: quotedTitle(a.Title) + " was not moved to " + name + ": " + msg + " It stays here."}
+	}
+	return wire.MoveToMachineAnswer{Folder: folder, CarriesOn: working}, nil
 }
 
 // arrival is a session moving in: what agents/moveIn asked, and the id restored.

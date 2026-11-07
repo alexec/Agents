@@ -6105,6 +6105,28 @@ export type MoveTarget =
   | { existing: { _0: URLString } }
   | { folderPath: Record<string, never> };
 
+/**
+ * What agents/moveToMachine did (#3790): the folder on that machine the session now goes on in, and
+ * whether it carries on there at once, as it was working when it moved.
+ */
+export interface MoveToMachineAnswer {
+  folder: string;
+  carriesOn: boolean;
+}
+
+/**
+ * The person moving a session to another of their machines (#3790), as move_session does (#3717).
+ * `machine` is the control plane's id or name for it, and `machineName` the name the person knows
+ * it by, for the words; `folder` is an absolute path there, or, when left out, the folder of the
+ * session's project there.
+ */
+export interface MoveToMachineRequest {
+  agentID: UUID;
+  machine: string;
+  machineName?: string;
+  folder?: string;
+}
+
 export type MoveWhen =
   | "now"
   | "afterTurn"
@@ -11483,6 +11505,7 @@ export interface Methods {
   "agents/importUpload": { params: ReceiveUploadRequest; result: Empty };
   "agents/labelVocabulary": { params: LabelVocabularyRequest; result: string[] };
   "agents/list": { params: ListRequest; result: Agent[] };
+  "agents/moveToMachine": { params: MoveToMachineRequest; result: MoveToMachineAnswer };
   "agents/options": { params: OptionsRequest; result: OptionsResponse };
   "agents/prewarm": { params: PrewarmRequest; result: Empty };
   "agents/prompt": { params: PromptRequest; result: Empty };
@@ -11855,6 +11878,7 @@ export const MethodTarget = {
   "agents/importUpload": "host",
   "agents/labelVocabulary": "host",
   "agents/list": "host",
+  "agents/moveToMachine": "host",
   "agents/options": "host",
   "agents/prewarm": "host",
   "agents/prompt": "host",
@@ -12799,6 +12823,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MissingFolder: { required: ["branchKept"], optional: [] },
   MoveAnswer: { required: ["when", "message"], optional: ["agent"] },
   MoveRequest: { required: ["agentID", "removeLeft", "discardChanges"], optional: ["target"] },
+  MoveToMachineAnswer: { required: ["folder", "carriesOn"], optional: [] },
+  MoveToMachineRequest: { required: ["agentID", "machine"], optional: ["machineName", "folder"] },
   NativeSetting: { required: [], optional: ["options", "sandbox", "clientPermission"] },
   Need: { required: ["id", "folder", "kind", "raisedAt", "headline"], optional: ["agentID"] },
   NotCommittedResponse: { required: ["isRepository", "paths", "more"], optional: [] },

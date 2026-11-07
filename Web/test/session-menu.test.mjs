@@ -108,3 +108,9 @@ test("on a host that can, Mute Notifications or Unmute before Rename; never on a
     ["Stop", "Unmute Notifications", "Rename…", "Pin", "Branch", "Archive"]);
   assert.deepEqual(sessionActions(agents["archived"], true, [], true).map((a) => a.label), ["Unarchive", "Delete…"]);
 });
+
+test("Move to Machine… follows Branch on a host that can move it, and never on an archived session (#3790)", () => {
+  assert.deepEqual(sessionActions(agents["running"], undefined, [], false, true).map((a) => a.label),
+    ["Stop", "Rename…", "Branch", "Move to Machine…", "Archive"]);
+  assert.deepEqual(sessionActions(agents["archived"], undefined, [], false, true).map((a) => a.label), ["Unarchive", "Delete…"]);
+});

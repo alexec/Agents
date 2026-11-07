@@ -220,6 +220,11 @@ enum WalkCommands {
                                                  windowNumber: window.windowNumber, context: nil, eventNumber: 0,
                                                  clickCount: 1, pressure: 1) else { throw WalkError("no event") }
             var view = root.hitTest(root.convert(point, from: nil))
+            // A list row's menu is its table's: a SwiftUI cell's own hosting view answers with
+            // the toolbar's (macOS 27), so the table is asked first.
+            var table = view
+            while let current = table, !(current is NSTableView) { table = current.superview }
+            if let table { view = table }
             while let current = view {
                 if let found = current.menu(for: event) {
                     guard path.isEmpty else { return try menu(path, in: found) }

@@ -7113,6 +7113,24 @@ type MoveTargetExisting struct {
 	Value URL `json:"_0"`
 }
 
+// What agents/moveToMachine did (#3790): the folder on that machine the session now goes on in, and whether it carries on there at once, as it was working when it moved.
+type MoveToMachineAnswer struct {
+	Folder string `json:"folder"`
+
+	CarriesOn bool `json:"carriesOn"`
+}
+
+// The person moving a session to another of their machines (#3790), as move_session does (#3717). `machine` is the control plane's id or name for it, and `machineName` the name the person knows it by, for the words; `folder` is an absolute path there, or, when left out, the folder of the session's project there.
+type MoveToMachineRequest struct {
+	AgentID UUID `json:"agentID"`
+
+	Machine string `json:"machine"`
+
+	MachineName *string `json:"machineName,omitzero"`
+
+	Folder *string `json:"folder,omitzero"`
+}
+
 type MoveWhen string
 
 const MoveWhenNow MoveWhen = "now"

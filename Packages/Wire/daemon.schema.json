@@ -15907,6 +15907,46 @@
         }
       ]
     },
+    "MoveToMachineAnswer": {
+      "type": "object",
+      "description": "What agents/moveToMachine did (#3790): the folder on that machine the session now goes on in, and whether it carries on there at once, as it was working when it moved.",
+      "properties": {
+        "folder": {
+          "type": "string"
+        },
+        "carriesOn": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "folder",
+        "carriesOn"
+      ],
+      "additionalProperties": false
+    },
+    "MoveToMachineRequest": {
+      "type": "object",
+      "description": "The person moving a session to another of their machines (#3790), as move_session does (#3717). `machine` is the control plane's id or name for it, and `machineName` the name the person knows it by, for the words; `folder` is an absolute path there, or, when left out, the folder of the session's project there.",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "machine": {
+          "type": "string"
+        },
+        "machineName": {
+          "type": "string"
+        },
+        "folder": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "agentID",
+        "machine"
+      ],
+      "additionalProperties": false
+    },
     "MoveWhen": {
       "type": "string",
       "enum": [

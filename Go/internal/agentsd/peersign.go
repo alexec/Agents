@@ -95,3 +95,11 @@ func (d *Daemon) ownName() string {
 	name, _ := os.Hostname()
 	return name
 }
+
+// ownHostID is this machine's id on the control plane, or "" before it joined one.
+func (d *Daemon) ownHostID() string {
+	if m, err := controllink.LoadMembership(d.Store.Loc.Root); err == nil {
+		return m.Host
+	}
+	return ""
+}
