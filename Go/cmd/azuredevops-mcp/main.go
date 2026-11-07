@@ -2,17 +2,18 @@
 // shape (Go/cmd/gitlab-mcp): polled events of an Azure DevOps folder's pull requests and their
 // Azure Pipelines builds (checks.failed, pr.opened, pr.merged, pr.closed, pr.conflicted,
 // review.requested, review.comment), and tools that read them and comment, over Azure
-// DevOps's REST API. For dev.azure.com and an Azure DevOps Server alike. As the person whose
-// personal access token is in AZURE_DEVOPS_TOKEN, which `.agents/mcp.json` names as
-// ${AZURE_DEVOPS_TOKEN} so its value stays in ~/.agents-secrets/secrets.env. Work items are
-// the tracker's, not this server's.
+// DevOps's REST API. For dev.azure.com and an Azure DevOps Server alike. As the person who
+// connected Azure DevOps (#3802, in the store connections.EnvName names), or whose personal
+// access token is in AZURE_DEVOPS_TOKEN, which `.agents/mcp.json` names as ${AZURE_DEVOPS_TOKEN}
+// so its value stays in ~/.agents-secrets/secrets.env. Work items are the tracker's, not this
+// server's.
 //
 //	azuredevops-mcp                      serve on stdio
 //	azuredevops-mcp --url https://server/tfs
 //	azuredevops-mcp --version
 //
 //	AZURE_DEVOPS_TOKEN                   a personal access token with Code (read and write) and Build (read)
-//	AZURE_DEVOPS_URL                     as --url: an Azure DevOps Server's collections (https://dev.azure.com when empty), a fake in tests
+//	AZURE_DEVOPS_URL                     as --url: an Azure DevOps Server's collections (the connection's, else https://dev.azure.com, when empty), a fake in tests
 package main
 
 import (
@@ -22,7 +23,6 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	"github.com/alexec/agents/Go/internal/azuredevopsmcp"
@@ -41,8 +41,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	root := azuredevopsmcp.BaseURL(*base)
-	token := func() string { return strings.TrimSpace(os.Getenv("AZURE_DEVOPS_TOKEN")) }
+	root, token := azuredevopsmcp.Connected(*base)
 	ado := azuredevopsmcp.NewRealAzureDevOps(root, token, azuredevopsmcp.GitRepo(root))
 	front := &azuredevopsmcp.Front{
 		Events:   &azuredevopsmcp.Events{AzureDevOps: ado},

@@ -15,6 +15,8 @@ import (
 
 	"github.com/alexec/agents/Go/internal/agentsd/mcpcatalog"
 	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/alexec/agents/Go/internal/azureboardsmcp"
+	"github.com/alexec/agents/Go/internal/azuredevopsmcp"
 	"github.com/alexec/agents/Go/internal/bitbucketmcp"
 	"github.com/alexec/agents/Go/internal/connections"
 	"github.com/alexec/agents/Go/internal/forgejomcp"
@@ -49,6 +51,12 @@ import (
 // Cloud (before Forgejo), and the Bitbucket connection fills the three slots, proved by the
 // newest issue, the newest pull request and the main branch's checks; the bitbucket
 // connector's events go on.
+//
+// Azure DevOps (#3802): with no GitHub, GitLab or Bitbucket remote, an Azure Repos remote
+// (dev.azure.com, *.visualstudio.com, or the connected Azure DevOps Server) picks Azure DevOps,
+// and the Azure DevOps connection fills the three slots, proved by the project's newest work
+// item on Azure Boards, the newest pull request and the newest Azure Pipelines build; the
+// azuredevops connector's events go on. The connection counts only on its own Azure DevOps.
 
 var (
 	// setupFresh is how long a read is used again before GitHub is asked again.
@@ -85,6 +93,12 @@ var bitbucketSlotChoice = map[wire.ConnectorSlotKind]string{
 	wire.ConnectorSlotKindCi:         "Bitbucket checks",
 }
 
+var azureDevOpsSlotChoice = map[wire.ConnectorSlotKind]string{
+	wire.ConnectorSlotKindTasks:      "Azure Boards work items",
+	wire.ConnectorSlotKindCodeReview: "Azure Repos pull requests",
+	wire.ConnectorSlotKindCi:         "Azure Pipelines",
+}
+
 var slotThing = map[wire.ConnectorSlotKind]string{
 	wire.ConnectorSlotKindTasks:      "issues",
 	wire.ConnectorSlotKindCodeReview: "pull requests",
@@ -95,6 +109,12 @@ var gitlabSlotThing = map[wire.ConnectorSlotKind]string{
 	wire.ConnectorSlotKindTasks:      "issues",
 	wire.ConnectorSlotKindCodeReview: "merge requests",
 	wire.ConnectorSlotKindCi:         "pipelines",
+}
+
+var azureDevOpsSlotThing = map[wire.ConnectorSlotKind]string{
+	wire.ConnectorSlotKindTasks:      "work items",
+	wire.ConnectorSlotKindCodeReview: "pull requests",
+	wire.ConnectorSlotKindCi:         "builds",
 }
 
 var forgejoSlotThing = map[wire.ConnectorSlotKind]string{
@@ -120,6 +140,8 @@ func (f forge) name() string {
 		return "Forgejo"
 	case wire.ConnectionProviderBitbucket:
 		return "Bitbucket"
+	case wire.ConnectionProviderAzuredevops:
+		return "Azure DevOps"
 	}
 	return "GitHub"
 }
@@ -134,6 +156,9 @@ func (f forge) choice(kind wire.ConnectorSlotKind) string {
 	if c, ok := bitbucketSlotChoice[kind]; ok && f.provider == wire.ConnectionProviderBitbucket {
 		return c
 	}
+	if c, ok := azureDevOpsSlotChoice[kind]; ok && f.provider == wire.ConnectionProviderAzuredevops {
+		return c
+	}
 	return slotChoice[kind]
 }
 
@@ -144,6 +169,8 @@ func (f forge) thing(kind wire.ConnectorSlotKind) string {
 	case wire.ConnectionProviderForgejo, wire.ConnectionProviderBitbucket:
 		// Bitbucket's are Forgejo's: issues, pull requests and checks.
 		return forgejoSlotThing[kind]
+	case wire.ConnectionProviderAzuredevops:
+		return azureDevOpsSlotThing[kind]
 	}
 	return slotThing[kind]
 }
@@ -157,15 +184,18 @@ func (f forge) ours() string {
 		return "agents/forgejo"
 	case wire.ConnectionProviderBitbucket:
 		return "agents/bitbucket"
+	case wire.ConnectionProviderAzuredevops:
+		return "agents/azuredevops"
 	}
 	return "agents/github"
 }
 
-// rooted is a forge whose connection counts only on its own root: GitLab, Forgejo and
-// Bitbucket (whose root is its API: Bitbucket Cloud's, or a fake's in a walk).
+// rooted is a forge whose connection counts only on its own root: GitLab, Forgejo, Bitbucket
+// (whose root is its API: Bitbucket Cloud's, or a fake's in a walk) and Azure DevOps
+// (dev.azure.com, or an Azure DevOps Server's collections).
 func (f forge) rooted() bool {
 	return f.provider == wire.ConnectionProviderGitlab || f.provider == wire.ConnectionProviderForgejo ||
-		f.provider == wire.ConnectionProviderBitbucket
+		f.provider == wire.ConnectionProviderBitbucket || f.provider == wire.ConnectionProviderAzuredevops
 }
 
 // page is the repository's page on its forge.
@@ -173,6 +203,11 @@ func (f forge) page() string {
 	switch {
 	case f.provider == wire.ConnectionProviderBitbucket:
 		return "https://" + connections.BitbucketSite + "/" + f.repo
+	case f.provider == wire.ConnectionProviderAzuredevops:
+		// organization/project/name is at organization/project/_git/name.
+		org, rest, _ := strings.Cut(f.repo, "/")
+		project, name, _ := strings.Cut(rest, "/")
+		return f.root + url.PathEscape(org) + "/" + url.PathEscape(project) + "/_git/" + url.PathEscape(name)
 	case f.rooted():
 		return f.root + f.repo
 	}
@@ -200,6 +235,27 @@ type bitbucketSetupReader interface {
 	LastChecks(ctx context.Context, repo string) (*bitbucketmcp.Newest, error)
 }
 
+// azureDevOpsSetupReader is the reads an Azure DevOps set-up makes: Tasks' of Azure Boards (of
+// the repository's project), the others' of Azure Repos and Pipelines; a test gives a fake.
+type azureDevOpsSetupReader interface {
+	NewestItem(ctx context.Context, repo string) (*azuredevopsmcp.Newest, error)
+	NewestPull(ctx context.Context, repo string) (*azuredevopsmcp.Newest, error)
+	LastChecks(ctx context.Context, repo string) (*azuredevopsmcp.Newest, error)
+}
+
+// azureDevOpsReads is the azuredevops and azureboards servers' reads as one reader.
+type azureDevOpsReads struct {
+	*azuredevopsmcp.RealAzureDevOps
+	boards *azureboardsmcp.RealBoards
+}
+
+// NewestItem is the newest work item of repo's project.
+func (a azureDevOpsReads) NewestItem(ctx context.Context, repo string) (*azuredevopsmcp.Newest, error) {
+	org, rest, _ := strings.Cut(repo, "/")
+	project, _, _ := strings.Cut(rest, "/")
+	return a.boards.NewestItem(ctx, org+"/"+project)
+}
+
 // setupReader is the reads a set-up makes; a test gives a fake GitHub.
 type setupReader interface {
 	NewestIssue(ctx context.Context, repo string) (*githubmcp.Newest, error)
@@ -220,6 +276,8 @@ type setupBook struct {
 	// newBitbucketSetupReader is the Bitbucket API at root as the token's owner (with email for
 	// an Atlassian API token); a test gives a fake.
 	newBitbucketSetupReader func(root, email, token string) bitbucketSetupReader
+	// newAzureDevOpsSetupReader is the Azure DevOps at root as the token's owner; a test gives a fake.
+	newAzureDevOpsSetupReader func(root, token string) azureDevOpsSetupReader
 	// newCodespacesClient reads and changes Codespaces as the GitHub connection owner.
 	newCodespacesClient func(token string) codespacesClient
 }
@@ -227,7 +285,7 @@ type setupBook struct {
 // setupRecord is what this host last read for one folder.
 type setupRecord struct {
 	Repo string `json:"repo"`
-	// Forge is gitlab, forgejo or bitbucket for a folder on that forge; empty is GitHub.
+	// Forge is gitlab, forgejo, bitbucket or azuredevops for a folder on that forge; empty is GitHub.
 	Forge        string                                 `json:"forge,omitempty"`
 	ReadAt       time.Time                              `json:"readAt"`
 	Installed    *bool                                  `json:"installed,omitempty"`
@@ -254,7 +312,8 @@ type slotRecord struct {
 	Messaging []wire.MessagingServer `json:"messaging,omitempty"`
 }
 
-// forgeName is the record's name for f's forge: gitlab, forgejo or bitbucket, or empty for GitHub.
+// forgeName is the record's name for f's forge: gitlab, forgejo, bitbucket or azuredevops, or
+// empty for GitHub.
 func forgeName(f forge) string {
 	if f.rooted() {
 		return string(f.provider)
@@ -435,6 +494,19 @@ func (d *Daemon) bitbucketSetupReader(root, email, token string) bitbucketSetupR
 	return bitbucketmcp.NewRealBitbucket(root, func() string { return token }, func() string { return email }, nil)
 }
 
+func (d *Daemon) azureDevOpsSetupReader(root, token string) azureDevOpsSetupReader {
+	if d.newAzureDevOpsSetupReader != nil {
+		return d.newAzureDevOpsSetupReader(root, token)
+	}
+	read := func() string { return token }
+	return azureDevOpsReads{azuredevopsmcp.NewRealAzureDevOps(root, read, nil), azureboardsmcp.NewRealBoards(root, read, nil)}
+}
+
+// azureDevOpsConnection is the person's Azure DevOps connection on this host, if any.
+func (d *Daemon) azureDevOpsConnection() (connections.Connection, bool) {
+	return d.storedConnection(connections.AzureDevOps)
+}
+
 // bitbucketConnection is the person's Bitbucket connection on this host, if any.
 func (d *Daemon) bitbucketConnection() (connections.Connection, bool) {
 	return d.storedConnection(connections.Bitbucket)
@@ -481,6 +553,12 @@ func (d *Daemon) connectionFor(f forge) (connections.Connection, bool) {
 			return connections.Connection{}, false
 		}
 		return c, true
+	case wire.ConnectionProviderAzuredevops:
+		c, connected := d.azureDevOpsConnection()
+		if !connected || azuredevopsmcp.BaseURL(c.URL) != f.root {
+			return connections.Connection{}, false
+		}
+		return c, true
 	}
 	return d.githubConnection()
 }
@@ -517,6 +595,8 @@ func (d *Daemon) atConnectedRoot(f forge) forge {
 		c, ok = d.gitlabConnection()
 	case wire.ConnectionProviderForgejo:
 		c, ok = d.forgejoConnection()
+	case wire.ConnectionProviderAzuredevops:
+		c, ok = d.azureDevOpsConnection()
 	case wire.ConnectionProviderBitbucket:
 		// Bitbucket Cloud is one site: its connection's API is the slot's (a fake's in a walk).
 		if c, ok := d.bitbucketConnection(); ok {
@@ -560,6 +640,10 @@ func (d *Daemon) forgeAt(ctx context.Context, folder string) (forge, connections
 			c, connected := d.connectionFor(f)
 			return f, c, connected
 		}
+		if f, ok := d.azureDevOpsAt(gitCtx, folder); ok {
+			c, connected := d.connectionFor(f)
+			return f, c, connected
+		}
 		if f, ok := d.forgejoAt(gitCtx, folder); ok {
 			c, connected := d.connectionFor(f)
 			return f, c, connected
@@ -587,6 +671,26 @@ func (d *Daemon) bitbucketAt(ctx context.Context, folder string) (forge, bool) {
 	}
 	return d.atConnectedRoot(forge{provider: wire.ConnectionProviderBitbucket, root: bitbucketmcp.DefaultBase, repo: repo,
 		site: connections.BitbucketSite}), true
+}
+
+// azureDevOpsAt is the Azure Repos repository the folder's git remote names, if any: on the
+// connected Azure DevOps first (an Azure DevOps Server, or a fake in a walk), else on
+// dev.azure.com.
+func (d *Daemon) azureDevOpsAt(ctx context.Context, folder string) (forge, bool) {
+	roots := []string{azuredevopsmcp.DefaultBase}
+	if c, connected := d.azureDevOpsConnection(); connected && c.URL != "" {
+		roots = append([]string{azuredevopsmcp.BaseURL(c.URL)}, roots...)
+	}
+	for _, root := range roots {
+		if repo, ok := azuredevopsmcp.RepoAt(ctx, folder, root); ok {
+			f := forge{provider: wire.ConnectionProviderAzuredevops, root: root, repo: repo, site: "dev.azure.com"}
+			if u, err := url.Parse(root); err == nil && u.Host != "" {
+				f.site = u.Host
+			}
+			return f, true
+		}
+	}
+	return forge{}, false
 }
 
 // forgejoAt is the Forgejo repository the folder's git remote names, if any.
@@ -811,6 +915,12 @@ func (d *Daemon) slotReader(f forge, conn connections.Connection, slot wire.Conn
 			wire.ConnectorSlotKindTasks: fromBitbucket(bb.NewestIssue), wire.ConnectorSlotKindCodeReview: fromBitbucket(bb.NewestPull),
 			wire.ConnectorSlotKindCi: fromBitbucket(bb.LastChecks),
 		}[slot]
+	case wire.ConnectionProviderAzuredevops:
+		ado := d.azureDevOpsSetupReader(f.root, token)
+		return map[wire.ConnectorSlotKind]slotRead{
+			wire.ConnectorSlotKindTasks: fromAzureDevOps(ado.NewestItem), wire.ConnectorSlotKindCodeReview: fromAzureDevOps(ado.NewestPull),
+			wire.ConnectorSlotKindCi: fromAzureDevOps(ado.LastChecks),
+		}[slot]
 	}
 	gh := d.setupReader(token)
 	return map[wire.ConnectorSlotKind]slotRead{
@@ -842,6 +952,17 @@ func fromForgejo(read func(context.Context, string) (*forgejomcp.Newest, error))
 
 // fromBitbucket is a Bitbucket read as a slot's read.
 func fromBitbucket(read func(context.Context, string) (*bitbucketmcp.Newest, error)) slotRead {
+	return func(ctx context.Context, repo string) (*githubmcp.Newest, error) {
+		n, err := read(ctx, repo)
+		if n == nil || err != nil {
+			return nil, err
+		}
+		return &githubmcp.Newest{Number: n.Number, Title: n.Title, URL: n.URL, At: n.At, Outcome: n.Outcome}, nil
+	}
+}
+
+// fromAzureDevOps is an Azure DevOps read as a slot's read.
+func fromAzureDevOps(read func(context.Context, string) (*azuredevopsmcp.Newest, error)) slotRead {
 	return func(ctx context.Context, repo string) (*githubmcp.Newest, error) {
 		n, err := read(ctx, repo)
 		if n == nil || err != nil {
@@ -899,6 +1020,18 @@ func readFailure(f forge, err error) (refused bool, words string) {
 			return false, "Bitbucket did not take the connection. Connect Bitbucket again."
 		case errors.As(err, &bb) && bb.Kind == bitbucketmcp.RateLimited:
 			return false, "Bitbucket's rate limit was reached. Try again in a minute."
+		}
+		return false, "Connected, but " + f.site + " can't be reached for the first read."
+	}
+	if f.provider == wire.ConnectionProviderAzuredevops {
+		var ado *azuredevopsmcp.AzureDevOpsError
+		switch {
+		case azuredevopsmcp.Refused(err):
+			return true, ""
+		case errors.As(err, &ado) && ado.Kind == azuredevopsmcp.NotSignedIn:
+			return false, "Azure DevOps did not take the connection. Connect Azure DevOps again."
+		case errors.As(err, &ado) && ado.Kind == azuredevopsmcp.RateLimited:
+			return false, "Azure DevOps's rate limit was reached. Try again in a minute."
 		}
 		return false, "Connected, but " + f.site + " can't be reached for the first read."
 	}
@@ -965,7 +1098,7 @@ func forgeSlot(f forge, kind wire.ConnectorSlotKind, connected, skipped bool, re
 	return s
 }
 
-// setupEvents is the forge's connector's events for the folder (github's, gitlab's, forgejo's or bitbucket's). With
+// setupEvents is the forge's connector's events for the folder (github's, gitlab's, forgejo's, bitbucket's or azuredevops's). With
 // turnOn, a set-up that can read turns them on: the made-by-Agents entry goes in the
 // folder's .agents/mcp.json, approved, once.
 func (d *Daemon) setupEvents(ctx context.Context, f forge, folder string, rec *setupRecord, slots []wire.ConnectorSlot, turnOn bool) wire.ConnectorEvents {

@@ -118,7 +118,7 @@ func ProjectOf(base, project string) func(ctx context.Context) (string, error) {
 // MARK: HTTP
 
 // NotConnected is what a call says with no token, or one Azure DevOps no longer takes.
-const NotConnected = "Azure DevOps is not connected, or its token ended: set AZURE_DEVOPS_TOKEN to a personal access token with Work Items (read and write)"
+const NotConnected = "Azure DevOps is not connected, or its token ended: connect Azure DevOps in Connectors, or set AZURE_DEVOPS_TOKEN to a personal access token with Work Items (read and write)"
 
 func (f *RealBoards) do(ctx context.Context, method, path string, body any) ([]byte, error) {
 	token := f.Token()
