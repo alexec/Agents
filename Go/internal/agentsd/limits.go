@@ -227,6 +227,11 @@ func wordsLimit(runtimeID string, code *int, message, said string) limitKind {
 		if says(func(s string) bool { return strings.Contains(strings.ToLower(s), "usage balance exhausted") }) {
 			return limitSpent
 		}
+	case "opencode":
+		// Its provider's refusal, read from OpenCode's log (#3736).
+		if says(func(s string) bool { return strings.HasPrefix(strings.TrimSpace(s), "Free usage limit reached") }) {
+			return limitSpent
+		}
 	}
 	if code != nil {
 		lower := strings.ToLower(message)
