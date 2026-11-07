@@ -149,6 +149,10 @@ func viewSlot(ours, uri string) (wire.ConnectorSlotKind, wire.ConnectionProvider
 		return wire.ConnectorSlotKindTasks, wire.ConnectionProviderGitlab, "project", true
 	case "agents/gitlab " + gitlabmcp.MergeRequestsURI:
 		return wire.ConnectorSlotKindCodeReview, wire.ConnectionProviderGitlab, "project", true
+	case "agents/forgejo " + forgejomcp.IssuesURI:
+		return wire.ConnectorSlotKindTasks, wire.ConnectionProviderForgejo, "repo", true
+	case "agents/forgejo " + forgejomcp.PullsURI:
+		return wire.ConnectorSlotKindCodeReview, wire.ConnectionProviderForgejo, "repo", true
 	}
 	return "", "", "", false
 }
@@ -174,7 +178,8 @@ func (d *Daemon) projectViewArguments(folder, ours, uri string) (wire.JSONValue,
 
 // projectFills says the folder's project points one of ours's views at a repository.
 func (d *Daemon) projectFills(folder, ours string) bool {
-	for _, uri := range []string{githubmcp.IssuesURI, githubmcp.PullsURI, gitlabmcp.IssuesURI, gitlabmcp.MergeRequestsURI} {
+	for _, uri := range []string{githubmcp.IssuesURI, githubmcp.PullsURI, gitlabmcp.IssuesURI, gitlabmcp.MergeRequestsURI,
+		forgejomcp.IssuesURI, forgejomcp.PullsURI} {
 		if _, ok := d.projectViewArguments(folder, ours, uri); ok {
 			return true
 		}

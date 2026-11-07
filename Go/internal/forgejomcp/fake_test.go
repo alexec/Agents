@@ -52,12 +52,17 @@ type fakeForgejo struct {
 	logs      map[string]string
 	giteaJobs bool
 	ranges    []string // each log read's Range
-	server        *httptest.Server
+	// files are a pull request's changed files, diffs its git diff, thread an issue's or a
+	// pull request's comments, by its number (the views, #3838).
+	files  map[int][]obj
+	diffs  map[int]string
+	thread map[int][]obj
+	server *httptest.Server
 }
 
 func newFake(t *testing.T) *fakeForgejo {
 	f := &fakeForgejo{t: t, timeline: map[int][]obj{}, reviews: map[int][]obj{}, lines: map[int][]obj{}, statuses: map[string]obj{},
-		jobs: map[int][]obj{}, logs: map[string]string{},
+		jobs: map[int][]obj{}, logs: map[string]string{}, files: map[int][]obj{}, diffs: map[int]string{}, thread: map[int][]obj{},
 		perms: map[string]string{"alex": "admin", "dev": "write", "reader": "read"}, me: "alex", collaborators: map[string]bool{}}
 	f.server = httptest.NewServer(http.HandlerFunc(f.serve))
 	t.Cleanup(f.server.Close)
@@ -128,6 +133,8 @@ var (
 	runJobsPath  = regexp.MustCompile(`^/api/v1/repos/acme/app/actions/runs/([0-9]+)/jobs$`)
 	jobPath      = regexp.MustCompile(`^/api/v1/repos/acme/app/actions/jobs/([0-9]+)$`)
 	jobLogPath   = regexp.MustCompile(`^/api/v1/repos/acme/app/actions/jobs/([0-9]+)/logs$`)
+	filesPath    = regexp.MustCompile(`^/api/v1/repos/acme/app/pulls/([0-9]+)/files$`)
+	diffPath     = regexp.MustCompile(`^/api/v1/repos/acme/app/pulls/([0-9]+)\.diff$`)
 )
 
 func (f *fakeForgejo) serve(w http.ResponseWriter, r *http.Request) {
@@ -230,7 +237,12 @@ func (f *fakeForgejo) serve(w http.ResponseWriter, r *http.Request) {
 	case p == "/api/v1/user":
 		reply(obj{"id": 1, "login": f.me})
 	case p == "/api/v1/repos/acme/app":
-		reply(obj{"full_name": repo, "default_branch": "main"})
+		reply(obj{"full_name": repo, "default_branch": "main", "allow_merge_commits": true, "allow_squash_merge": true,
+			"default_merge_style": "squash"})
+	case filesPath.MatchString(p):
+		reply(orEmpty(f.files[n(filesPath.FindStringSubmatch(p))]))
+	case diffPath.MatchString(p):
+		_, _ = io.WriteString(w, f.diffs[n(diffPath.FindStringSubmatch(p))])
 	case pullsPath.MatchString(p):
 		out := []obj{}
 		for _, pr := range f.pulls {
@@ -266,7 +278,8 @@ func (f *fakeForgejo) serve(w http.ResponseWriter, r *http.Request) {
 		for _, i := range f.issues {
 			if (q.Get("state") == "all" || i["state"] == q.Get("state")) &&
 				(q.Get("since") == "" || !before(i["updated_at"].(string), q.Get("since"))) &&
-				(q.Get("assigned_by") == "" || assigned(i, q.Get("assigned_by"))) {
+				(q.Get("assigned_by") == "" || assigned(i, q.Get("assigned_by"))) &&
+				(q.Get("labels") == "" || labelled(i, q.Get("labels"))) {
 				out = append(out, i)
 			}
 		}
@@ -288,7 +301,7 @@ func (f *fakeForgejo) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		reply(out)
 	case commentsPath.MatchString(p):
-		reply(orEmpty(nil))
+		reply(orEmpty(f.thread[n(commentsPath.FindStringSubmatch(p))]))
 	case timelinePath.MatchString(p):
 		reply(orEmpty(f.timeline[n(timelinePath.FindStringSubmatch(p))]))
 	case statusPath.MatchString(p):
@@ -331,6 +344,15 @@ func orEmpty(list []obj) []obj {
 func assigned(i obj, login string) bool {
 	for _, a := range i["assignees"].([]any) {
 		if a.(obj)["login"] == login {
+			return true
+		}
+	}
+	return false
+}
+
+func labelled(i obj, name string) bool {
+	for _, l := range i["labels"].([]any) {
+		if l.(obj)["name"] == name {
 			return true
 		}
 	}

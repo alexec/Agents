@@ -136,7 +136,8 @@ func tool[In any](server *mcp.Server, t *mcp.Tool, f func(context.Context, In) (
 	})
 }
 
-// AddTools puts the tools on server; with person, also the tools only a person may call.
+// AddTools puts the tools and the views (views.go) on server; with person, also the tools only
+// a person may call.
 func AddTools(server *mcp.Server, f *RealForgejo, person bool) {
 	repoOf := func(ctx context.Context, repo string) (string, error) {
 		if repo != "" {
@@ -149,6 +150,7 @@ func AddTools(server *mcp.Server, f *RealForgejo, person bool) {
 	}
 	readOnly := &mcp.ToolAnnotations{ReadOnlyHint: true}
 	agents := visibility("model", "app")
+	addViews(server, f, repoOf)
 
 	tool(server, &mcp.Tool{Name: "list_pull_requests", Title: "List pull requests",
 		Description: "The repository's pull requests, newest updated first, at most 50: number, title, branch, target, author, draft, " +
