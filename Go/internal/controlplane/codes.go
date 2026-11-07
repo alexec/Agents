@@ -70,7 +70,7 @@ func codeKey(id string) string  { return "v1/codes/" + id + ".json" }
 func spentKey(id string) string { return "v1/codes/" + id + ".spent" }
 
 // Issue makes a code and writes it to the store, for clients/startPairing,
-// hosts/startEnroll or agents-control code. What uses it is the person's that ctx names
+// machines/startEnroll or agents-control code. What uses it is the person's that ctx names
 // (withCodeOwner), else the local owner's.
 func (c *Codes) Issue(ctx context.Context, host, browser bool, lifetime time.Duration) (*wire.ControlCodeShown, error) {
 	shown, _, err := c.issue(ctx, host, browser, lifetime, c.URL)
@@ -117,7 +117,7 @@ func (c *Codes) issue(ctx context.Context, host, browser bool, lifetime time.Dur
 	return shown, id, nil
 }
 
-// HostCode is what hosts/install needs of the codes (hostinstall.CodeIssuer): a host
+// HostCode is what machines/install needs of the codes (hostinstall.CodeIssuer): a host
 // code naming url ("" for this control plane's own address), and its id.
 func (c *Codes) HostCode(ctx context.Context, url string) (string, string, error) {
 	if url == "" {
@@ -221,8 +221,8 @@ var serverFileNames = func() map[string]bool {
 	for _, arch := range []string{"x86_64", "aarch64"} {
 		// The host (Go, #1136; one name since #1381); github-mcp (#1232), linear-mcp (#839), gitlab-mcp (#1629),
 		// email-mcp (#1780), jira-mcp (#3247), slack-mcp (#3475), googlechat-mcp (#1016),
-		// whatsapp-mcp (#1352), sentry-mcp (#3583).
-		for _, program := range []string{"agentsd", "github-mcp", "linear-mcp", "gitlab-mcp", "email-mcp", "jira-mcp", "slack-mcp", "googlechat-mcp", "whatsapp-mcp", "sentry-mcp"} {
+		// whatsapp-mcp (#1352), sentry-mcp (#3583), betterstack-mcp (#3655).
+		for _, program := range []string{"agentsd", "github-mcp", "linear-mcp", "gitlab-mcp", "email-mcp", "jira-mcp", "slack-mcp", "googlechat-mcp", "whatsapp-mcp", "sentry-mcp", "betterstack-mcp"} {
 			names[program+"-linux-"+arch] = true
 			names[program+"-linux-"+arch+".sha256"] = true
 		}
@@ -253,7 +253,7 @@ func ServerFolder() string {
 	return ""
 }
 
-// ToolsetFolder is where the runtimes' toolsets are read for hosts/install (#1136):
+// ToolsetFolder is where the runtimes' toolsets are read for machines/install (#1136):
 // AGENTS_CONTROL_TOOLSETS, the app bundle's Resources/toolsets beside
 // Helpers/agents-control, or a container's /toolsets; the first with a Claude manifest.
 func ToolsetFolder() string {
@@ -277,7 +277,7 @@ func ToolsetFolder() string {
 }
 
 // toolsetFileNames are the only files /v1/toolsets/ hands out (#1312): what a Linux host
-// needs to install a Node toolset itself, for the runtimes hosts/install installs that way.
+// needs to install a Node toolset itself, for the runtimes machines/install installs that way.
 var toolsetFileNames = func() map[string]bool {
 	names := map[string]bool{}
 	for _, runtime := range []string{"claude", "codex"} {

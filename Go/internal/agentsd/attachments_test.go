@@ -201,3 +201,43 @@ func TestAttachmentsRefuseALinkedFolder(t *testing.T) {
 		})
 	}
 }
+
+// A folder with no agent left is still swept (#3649): its old attachments go, as no
+// transcript can name them, and once it holds none it leaves the list.
+func TestAttachmentsOfAFolderWithNoAgentGo(t *testing.T) {
+	clock := atTime(t, time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC))
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	root := t.TempDir()
+	write := func(name string, age time.Duration) string {
+		t.Helper()
+		path, err := d.writeAttachment(root, name, []byte("x"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		at := clock.now().Add(-age)
+		os.Chtimes(path, at, at)
+		return path
+	}
+	exists := func(path string) bool { _, err := os.Stat(path); return err == nil }
+	old, young := write("old.png", 8*24*time.Hour), write("young.png", time.Hour)
+	if got := d.readAttachmentFolders(); len(got) != 1 || got[0] != root {
+		t.Fatalf("listed %v", got)
+	}
+	d.sweepAttachments()
+	if exists(old) || !exists(young) {
+		t.Fatalf("old kept %v, young kept %v", exists(old), exists(young))
+	}
+	if got := d.readAttachmentFolders(); len(got) != 1 {
+		t.Fatalf("a folder with attachments left the list: %v", got)
+	}
+	at := clock.now().Add(-8 * 24 * time.Hour)
+	os.Chtimes(young, at, at)
+	d.sweepAttachments()
+	if exists(young) {
+		t.Fatal("the last attachment was kept")
+	}
+	if got := d.readAttachmentFolders(); len(got) != 0 {
+		t.Fatalf("an empty folder stayed on the list: %v", got)
+	}
+}

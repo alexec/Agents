@@ -19,7 +19,7 @@ import (
 // through the control plane (elsewhere.go, #2927). With send, the branch the agent is on
 // goes to that folder first (sendthere.go, #2929).
 
-// sessionOnMachine is the control plane's method for it, through host/machines.
+// sessionOnMachine is the control plane's method for it, through machine/machines.
 const sessionOnMachine = "machines/startSession"
 
 // onMachine is the machine start_session names, or "" for this folder.

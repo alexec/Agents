@@ -47,7 +47,7 @@ func TestTheHostPinsTheHeadAndRefusesNothingYet(t *testing.T) {
 
 	// The first lock is taken on trust (D9).
 	params, _ := json.Marshal(wire.Lock{Person: "sam", Entries: []wire.LockEntry{root}})
-	d.Told(wire.NotifyHostLock.Name, params)
+	d.Told(wire.NotifyMachineLock.Name, params)
 	if pin := d.LockPin(); pin.Count != 1 || pin.Person != "sam" {
 		t.Fatalf("pin after the first lock: %+v", pin)
 	}
@@ -109,7 +109,7 @@ type told struct {
 func lastOf(t *testing.T, said []told, method string) json.RawMessage {
 	t.Helper()
 	for i := len(said) - 1; i >= 0; i-- {
-		if wire.OldMethodName(said[i].method) == method {
+		if said[i].method == method {
 			return said[i].params
 		}
 	}
@@ -143,7 +143,7 @@ func TestAMachineAddsItselfWithTheInviteFromItsCode(t *testing.T) {
 		t.Fatal("the code's lock was not taken")
 	}
 	var add wire.LockAdd
-	json.Unmarshal(lastOf(t, said(), wire.CallHostLockAdd.Name), &add)
+	json.Unmarshal(lastOf(t, said(), wire.CallMachineLockAdd.Name), &add)
 	state, err := machinelock.Check([]wire.LockEntry{root, inv, add.Entries[0]})
 	if err != nil {
 		t.Fatal(err)
@@ -165,7 +165,7 @@ func TestAMachineWithNoInviteAsksAndShowsTheDigits(t *testing.T) {
 	root := lockEntry(t, mac, wire.LockEntryKindRoot, mac, nil)
 	d.TakeLock(wire.Lock{Person: "sam", Entries: []wire.LockEntry{root}})
 	var ask wire.LockJoin
-	json.Unmarshal(lastOf(t, said(), wire.CallHostLockJoin.Name), &ask)
+	json.Unmarshal(lastOf(t, said(), wire.CallMachineLockJoin.Name), &ask)
 	if string(ask.Key) != string(key) || len(ask.Commitment) != 32 {
 		t.Fatalf("%+v", ask)
 	}
@@ -173,7 +173,7 @@ func TestAMachineWithNoInviteAsksAndShowsTheDigits(t *testing.T) {
 	d.TakeLock(wire.Lock{Person: "sam", Entries: []wire.LockEntry{root}})
 	asks := 0
 	for _, s := range said() {
-		if wire.OldMethodName(s.method) == wire.CallHostLockJoin.Name {
+		if s.method == wire.CallMachineLockJoin.Name {
 			asks++
 		}
 	}
@@ -183,9 +183,9 @@ func TestAMachineWithNoInviteAsksAndShowsTheDigits(t *testing.T) {
 	signerNonce := make([]byte, machinelock.NonceSize)
 	signerNonce[0] = 7
 	row, _ := json.Marshal(wire.LockJoinRequest{Request: "r1", Client: "h-1", Key: ask.Key, Commitment: ask.Commitment, Nonce: signerNonce})
-	d.Told(wire.NotifyHostLockJoinChanged.Name, row)
+	d.Told(wire.NotifyMachineLockJoinChanged.Name, row)
 	var reveal wire.LockJoinNonce
-	json.Unmarshal(lastOf(t, said(), wire.CallHostLockJoinReveal.Name), &reveal)
+	json.Unmarshal(lastOf(t, said(), wire.CallMachineLockJoinReveal.Name), &reveal)
 	if reveal.Request != "r1" || string(machinelock.Commitment(key, reveal.Nonce)) != string(ask.Commitment) {
 		t.Fatalf("%+v", reveal)
 	}

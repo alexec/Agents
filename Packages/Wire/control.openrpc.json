@@ -15,11 +15,6 @@
       "name": "client.team/1",
       "by": "client",
       "description": "A client knows it belongs to one person of a team (#994, #1763). On a control plane with more than one person, the control plane answers a client without it -32074 updateToJoinTeam (R14)."
-    },
-    {
-      "name": "machine/1",
-      "by": "control",
-      "description": "The control plane answers each host/* method as machine/* too, and a hosts/* method as machines/*, which machines/1 names (#2653). A step of the rename over three releases: the names in this document stay host/* and hosts/* until the senders move."
     }
   ],
   "methods": [
@@ -1871,1017 +1866,6 @@
       }
     },
     {
-      "name": "host/clients",
-      "x-capability": "host/1",
-      "description": "To every host, on its channel 0, when it connects and when a window is paired or forgotten (#1118): the windows it may let in on its local socket.",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/MachineClients"
-          }
-        }
-      ]
-    },
-    {
-      "name": "host/hello",
-      "x-capability": "host/1",
-      "description": "A host, on its channel 0, on every connect.",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/MachineHello"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "host/installProgress",
-      "x-capability": "host/1",
-      "description": "A host, on its channel 0 (#3497): a step of an install it runs for the control plane over ssh, in a codespace whose provider it carries. Said to clients as control/installProgress.",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ControlInstallProgress"
-          }
-        }
-      ]
-    },
-    {
-      "name": "host/lock",
-      "x-capability": "host.lock/1",
-      "description": "To a machine that says host.lock/1, on its channel 0, at each join and when an entry is put on its person's lock (#3399): the whole lock. The machine checks it and takes it only when it grows from the head it pinned last; until #3400's later steps it only logs what it would refuse.",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Lock"
-          }
-        }
-      ]
-    },
-    {
-      "name": "host/lockAdd",
-      "x-capability": "host.lock/2",
-      "description": "A machine, on its channel 0 (#3491, specs/3399-machine-lock D3): its own addMachine, signed with the invite key from the join code it used, put on its person's lock as lock/add puts a client's. Refused with changedElsewhere when another entry took the head first; the machine signs again on the next host/lock.",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/LockAdd"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/LockHead"
-        }
-      }
-    },
-    {
-      "name": "host/lockAgain",
-      "x-capability": "host.lock/4",
-      "description": "A machine, on its channel 0 (#3493, specs/3399-machine-lock D4): its lock was reset with agentsd lock reset, so send it its person's lock again, though it was sent that one already. The machine pins it on first use.",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "host/lockJoin",
-      "x-capability": "host.lock/2",
-      "description": "A machine that is not in its person's lock and has no invite (#3491, D3: it asked to join, a provider started it with no client there, or it joined before the lock): it asks to be added, with its own key and a commitment, as lock/join does for a client. Every client of the person is shown the request; host/lockJoinChanged tells the machine how it goes on.",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/LockJoin"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/LockJoinStarted"
-        }
-      }
-    },
-    {
-      "name": "host/lockJoinChanged",
-      "x-capability": "host.lock/2",
-      "description": "To a machine that asked with host/lockJoin (#3491): its request, each time it changes. Once nonce is set, the machine reveals its own nonce and shows the six digits in its log and in agentsd status.",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/LockJoinRequest"
-          }
-        }
-      ]
-    },
-    {
-      "name": "host/lockJoinReveal",
-      "x-capability": "host.lock/2",
-      "description": "A machine, once a signer sent its nonce (host/lockJoinChanged): its own nonce, which must match its commitment, as lock/joinReveal does for a client (#3491).",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/LockJoinNonce"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "host/machines",
-      "x-capability": "host/1",
-      "description": "A host, on its channel 0, for an agent there (#691 US6).",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/MachineWorkspaceCall"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/JSONValue"
-        }
-      }
-    },
-    {
-      "name": "host/orgRouteCheck",
-      "x-capability": "host.org-routes/2",
-      "description": "To a machine that holds the route, on its channel 0: orgRoutes/check with the machine's own copy (#3397).",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/OrgRouteRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/OrgRouteCheck"
-        }
-      }
-    },
-    {
-      "name": "host/orgRoutes",
-      "x-capability": "host.org-routes/2",
-      "description": "To a machine that says host.org-routes/2, on its channel 0, at each join and within 5 seconds of a change to what it may use (#999, FR-005, #3397): every route its person may use, each secret as an admin's client sealed it to the machine's key, or waiting when none has yet. A machine without it is sent nothing.",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/OrgRouteDelivery"
-          }
-        }
-      ]
-    },
-    {
-      "name": "host/orgRoutesAgain",
-      "x-capability": "host.org-routes/2",
-      "description": "A machine, on its channel 0: a sealed route did not open; send its delivery again (#999).",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "host/orgRoutesApplied",
-      "x-capability": "host.org-routes/2",
-      "description": "A machine, on its channel 0, after it keeps a delivery of org routes (#999).",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/OrgRoutesApplied"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "host/policy",
-      "x-capability": "host.policy/1",
-      "description": "To a machine that says host.policy/1, on its channel 0, at each join and within 5 seconds of each change (#998, FR-006). A machine says host.policy/1 only once it keeps and follows the policy; one without it is sent nothing.",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/MachinePolicy"
-          }
-        }
-      ]
-    },
-    {
-      "name": "host/policyApplied",
-      "x-capability": "host.policy/1",
-      "description": "A machine, on its channel 0, after it keeps a policy (#998).",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/PolicyApplied"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "host/projects",
-      "x-capability": "projects/1",
-      "description": "To a machine, on its channel 0, when a project its folders name changes its slots or name (#2669): the projects its folders name, with their slots.",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/MachineProjects"
-          }
-        }
-      ]
-    },
-    {
-      "name": "host/providerDraft",
-      "x-capability": "host/1",
-      "description": "A host, on its channel 0, for a writing agent there (#858).",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/MachineProviderDraftCall"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/JSONValue"
-        }
-      }
-    },
-    {
-      "name": "host/release",
-      "x-capability": "host.update/1",
-      "description": "To a machine that says host.update/1, on its channel 0, at each join: the release this control plane names, its own version, when that is a release (#2178). The machine updates Agents Host to it, if it is newer, between turns.",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/MachineRelease"
-          }
-        }
-      ]
-    },
-    {
-      "name": "host/status",
-      "x-capability": "host/1",
-      "description": "A host, on its channel 0 (#691 US4).",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/MachineStatus"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "host/user",
-      "x-capability": "bots/1",
-      "description": "To a machine, on its channel 0, at each join and when its user changes (#1761): its user, their kind, its labels, and a bot's cap.",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/MachineUser"
-          }
-        }
-      ]
-    },
-    {
-      "name": "host/userSettings",
-      "x-capability": "host.user-settings/2",
-      "description": "To a machine that says host.user-settings/1, on its channel 0, at join and on each change (#1760): its user's settings. Only a machine that also says host.user-settings/2 gets its secrets, each as the person's client sealed it to the machine (#3397).",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/MachineUserSettings"
-          }
-        }
-      ]
-    },
-    {
-      "name": "hosts/announce",
-      "x-capability": "hosts/1",
-      "description": "On an enrolment connection, before any other.",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/MachineAnnounce"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Admitted"
-        }
-      }
-    },
-    {
-      "name": "hosts/approveJoin",
-      "x-capability": "hosts.join/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/JoinRequestDecide"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/JoinApproved"
-        }
-      }
-    },
-    {
-      "name": "hosts/checkAgain",
-      "x-capability": "hosts/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/MachineRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "hosts/deleteMachine",
-      "x-capability": "hosts/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/MachineRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "hosts/denyJoin",
-      "x-capability": "hosts.join/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/JoinRequestDecide"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "hosts/detect",
-      "x-capability": "hosts/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "type": "array",
-          "items": {
-            "$ref": "daemon.schema.json#/definitions/DetectedServer"
-          }
-        }
-      }
-    },
-    {
-      "name": "hosts/dropKept",
-      "x-capability": "hosts/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/KeptRequestID"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "hosts/install",
-      "x-capability": "hosts/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/MachineInstall"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/JSONValue"
-        }
-      }
-    },
-    {
-      "name": "hosts/joinRequests",
-      "x-capability": "hosts.join/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "type": "array",
-          "items": {
-            "$ref": "daemon.schema.json#/definitions/JoinRequest"
-          }
-        }
-      }
-    },
-    {
-      "name": "hosts/keep",
-      "x-capability": "hosts/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/KeepRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/JSONValue"
-        }
-      }
-    },
-    {
-      "name": "hosts/lastHeard",
-      "x-capability": "hosts/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/MachineRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/MachineLastHeard"
-        }
-      }
-    },
-    {
-      "name": "hosts/lendGit",
-      "x-capability": "hosts/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/LendGit"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "hosts/lendSignIn",
-      "x-capability": "hosts/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/LendSignIn"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "hosts/link",
-      "x-capability": "hosts/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/MachineLink"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/ControlMachine"
-        }
-      }
-    },
-    {
-      "name": "hosts/list",
-      "x-capability": "hosts/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "type": "array",
-          "items": {
-            "$ref": "daemon.schema.json#/definitions/ControlMachine"
-          }
-        }
-      }
-    },
-    {
-      "name": "hosts/listKept",
-      "x-capability": "hosts/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/KeptList"
-        }
-      }
-    },
-    {
-      "name": "hosts/remove",
-      "x-capability": "hosts/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/MachineRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "hosts/retryKept",
-      "x-capability": "hosts/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/KeptRequestID"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "hosts/setMachineOptions",
-      "x-capability": "hosts/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/MachineOptions"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/ControlMachine"
-        }
-      }
-    },
-    {
-      "name": "hosts/sshHosts",
-      "x-capability": "hosts/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/SSHHostsRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "type": "array",
-          "items": {
-            "$ref": "daemon.schema.json#/definitions/SSHHost"
-          }
-        }
-      }
-    },
-    {
-      "name": "hosts/start",
-      "x-capability": "hosts/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/MachineRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/ControlMachine"
-        }
-      }
-    },
-    {
-      "name": "hosts/startEnroll",
-      "x-capability": "hosts/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/MachineEnroll"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/ControlCodeShown"
-        }
-      }
-    },
-    {
-      "name": "hosts/stop",
-      "x-capability": "hosts/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/MachineStop"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/ControlMachine"
-        }
-      }
-    },
-    {
-      "name": "hosts/unlink",
-      "x-capability": "hosts/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/MachineRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/ControlMachine"
-        }
-      }
-    },
-    {
-      "name": "hosts/update",
-      "x-capability": "hosts/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/MachineUpdate"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/JSONValue"
-        }
-      },
-      "description": "Update a server's host over ssh (#1766): its server and key given again, the host key checked as at an install, the server's root checked to be this host's, then the control plane's agentsd, MCP servers and toolsets copied and the host started again. The answer is an install's: {needsTrust, name} first for a key not yet trusted, then {updated: true, name}."
-    },
-    {
       "name": "links/approve",
       "x-capability": "links/1",
       "tags": [
@@ -3245,9 +2229,580 @@
       }
     },
     {
+      "name": "machine/clients",
+      "x-capability": "machine/1",
+      "description": "To every host, on its channel 0, when it connects and when a window is paired or forgotten (#1118): the windows it may let in on its local socket.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineClients"
+          }
+        }
+      ]
+    },
+    {
+      "name": "machine/hello",
+      "x-capability": "machine/1",
+      "description": "A host, on its channel 0, on every connect.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineHello"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "machine/installProgress",
+      "x-capability": "machine/1",
+      "description": "A host, on its channel 0 (#3497): a step of an install it runs for the control plane over ssh, in a codespace whose provider it carries. Said to clients as control/installProgress.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ControlInstallProgress"
+          }
+        }
+      ]
+    },
+    {
+      "name": "machine/lock",
+      "x-capability": "host.lock/1",
+      "description": "To a machine that says host.lock/1, on its channel 0, at each join and when an entry is put on its person's lock (#3399): the whole lock. The machine checks it and takes it only when it grows from the head it pinned last; until #3400's later steps it only logs what it would refuse.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Lock"
+          }
+        }
+      ]
+    },
+    {
+      "name": "machine/lockAdd",
+      "x-capability": "host.lock/2",
+      "description": "A machine, on its channel 0 (#3491, specs/3399-machine-lock D3): its own addMachine, signed with the invite key from the join code it used, put on its person's lock as lock/add puts a client's. Refused with changedElsewhere when another entry took the head first; the machine signs again on the next machine/lock.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LockAdd"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LockHead"
+        }
+      }
+    },
+    {
+      "name": "machine/lockAgain",
+      "x-capability": "host.lock/4",
+      "description": "A machine, on its channel 0 (#3493, specs/3399-machine-lock D4): its lock was reset with agentsd lock reset, so send it its person's lock again, though it was sent that one already. The machine pins it on first use.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "machine/lockJoin",
+      "x-capability": "host.lock/2",
+      "description": "A machine that is not in its person's lock and has no invite (#3491, D3: it asked to join, a provider started it with no client there, or it joined before the lock): it asks to be added, with its own key and a commitment, as lock/join does for a client. Every client of the person is shown the request; machine/lockJoinChanged tells the machine how it goes on.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LockJoin"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LockJoinStarted"
+        }
+      }
+    },
+    {
+      "name": "machine/lockJoinChanged",
+      "x-capability": "host.lock/2",
+      "description": "To a machine that asked with machine/lockJoin (#3491): its request, each time it changes. Once nonce is set, the machine reveals its own nonce and shows the six digits in its log and in agentsd status.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LockJoinRequest"
+          }
+        }
+      ]
+    },
+    {
+      "name": "machine/lockJoinReveal",
+      "x-capability": "host.lock/2",
+      "description": "A machine, once a signer sent its nonce (machine/lockJoinChanged): its own nonce, which must match its commitment, as lock/joinReveal does for a client (#3491).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LockJoinNonce"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "machine/machines",
+      "x-capability": "machine/1",
+      "description": "A host, on its channel 0, for an agent there (#691 US6).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineWorkspaceCall"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/JSONValue"
+        }
+      }
+    },
+    {
+      "name": "machine/orgRouteCheck",
+      "x-capability": "host.org-routes/2",
+      "description": "To a machine that holds the route, on its channel 0: orgRoutes/check with the machine's own copy (#3397).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/OrgRouteRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/OrgRouteCheck"
+        }
+      }
+    },
+    {
+      "name": "machine/orgRoutes",
+      "x-capability": "host.org-routes/2",
+      "description": "To a machine that says host.org-routes/2, on its channel 0, at each join and within 5 seconds of a change to what it may use (#999, FR-005, #3397): every route its person may use, each secret as an admin's client sealed it to the machine's key, or waiting when none has yet. A machine without it is sent nothing.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/OrgRouteDelivery"
+          }
+        }
+      ]
+    },
+    {
+      "name": "machine/orgRoutesAgain",
+      "x-capability": "host.org-routes/2",
+      "description": "A machine, on its channel 0: a sealed route did not open; send its delivery again (#999).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "machine/orgRoutesApplied",
+      "x-capability": "host.org-routes/2",
+      "description": "A machine, on its channel 0, after it keeps a delivery of org routes (#999).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/OrgRoutesApplied"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "machine/policy",
+      "x-capability": "host.policy/1",
+      "description": "To a machine that says host.policy/1, on its channel 0, at each join and within 5 seconds of each change (#998, FR-006). A machine says host.policy/1 only once it keeps and follows the policy; one without it is sent nothing.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachinePolicy"
+          }
+        }
+      ]
+    },
+    {
+      "name": "machine/policyApplied",
+      "x-capability": "host.policy/1",
+      "description": "A machine, on its channel 0, after it keeps a policy (#998).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PolicyApplied"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "machine/projects",
+      "x-capability": "projects/1",
+      "description": "To a machine, on its channel 0, when a project its folders name changes its slots or name (#2669): the projects its folders name, with their slots.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineProjects"
+          }
+        }
+      ]
+    },
+    {
+      "name": "machine/providerDraft",
+      "x-capability": "machine/1",
+      "description": "A host, on its channel 0, for a writing agent there (#858).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineProviderDraftCall"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/JSONValue"
+        }
+      }
+    },
+    {
+      "name": "machine/release",
+      "x-capability": "host.update/1",
+      "description": "To a machine that says host.update/1, on its channel 0, at each join: the release this control plane names, its own version, when that is a release (#2178). The machine updates Agents Host to it, if it is newer, between turns.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineRelease"
+          }
+        }
+      ]
+    },
+    {
+      "name": "machine/status",
+      "x-capability": "machine/1",
+      "description": "A host, on its channel 0 (#691 US4).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineStatus"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "machine/user",
+      "x-capability": "bots/1",
+      "description": "To a machine, on its channel 0, at each join and when its user changes (#1761): its user, their kind, its labels, and a bot's cap.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineUser"
+          }
+        }
+      ]
+    },
+    {
+      "name": "machine/userSettings",
+      "x-capability": "host.user-settings/2",
+      "description": "To a machine that says host.user-settings/1, on its channel 0, at join and on each change (#1760): its user's settings. Only a machine that also says host.user-settings/2 gets its secrets, each as the person's client sealed it to the machine (#3397).",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineUserSettings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "machines/announce",
+      "x-capability": "machines/1",
+      "description": "On an enrolment connection, before any other.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineAnnounce"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Admitted"
+        }
+      }
+    },
+    {
+      "name": "machines/approveJoin",
+      "x-capability": "hosts.join/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/JoinRequestDecide"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/JoinApproved"
+        }
+      }
+    },
+    {
+      "name": "machines/checkAgain",
+      "x-capability": "machines/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "machines/deleteMachine",
+      "x-capability": "machines/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "machines/denyJoin",
+      "x-capability": "hosts.join/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/JoinRequestDecide"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "machines/detect",
+      "x-capability": "machines/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "daemon.schema.json#/definitions/DetectedServer"
+          }
+        }
+      }
+    },
+    {
+      "name": "machines/dropKept",
+      "x-capability": "machines/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/KeptRequestID"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "machines/forAgent",
       "x-capability": "machines/1",
-      "description": "Through host/machines only.",
+      "description": "Through machine/machines only.",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3266,9 +2821,230 @@
       }
     },
     {
+      "name": "machines/install",
+      "x-capability": "machines/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineInstall"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/JSONValue"
+        }
+      }
+    },
+    {
+      "name": "machines/joinRequests",
+      "x-capability": "hosts.join/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "daemon.schema.json#/definitions/JoinRequest"
+          }
+        }
+      }
+    },
+    {
+      "name": "machines/keep",
+      "x-capability": "machines/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/KeepRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/JSONValue"
+        }
+      }
+    },
+    {
+      "name": "machines/lastHeard",
+      "x-capability": "machines/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MachineLastHeard"
+        }
+      }
+    },
+    {
+      "name": "machines/lendGit",
+      "x-capability": "machines/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LendGit"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "machines/lendSignIn",
+      "x-capability": "machines/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LendSignIn"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "machines/link",
+      "x-capability": "machines/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineLink"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ControlMachine"
+        }
+      }
+    },
+    {
+      "name": "machines/list",
+      "x-capability": "machines/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "daemon.schema.json#/definitions/ControlMachine"
+          }
+        }
+      }
+    },
+    {
+      "name": "machines/listKept",
+      "x-capability": "machines/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/KeptList"
+        }
+      }
+    },
+    {
       "name": "machines/projectFolders",
       "x-capability": "sessions.project/1",
-      "description": "Through host/machines only (#3277): the project's folders on each of the person's machines, so an agent's start_session with machine alone starts in the project's folder there.",
+      "description": "Through machine/machines only (#3277): the project's folders on each of the person's machines, so an agent's start_session with machine alone starts in the project's folder there.",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3289,7 +3065,7 @@
     {
       "name": "machines/projectSessions",
       "x-capability": "sessions.project/1",
-      "description": "Through host/machines only (#3277): projects/sessions for an agent, so its list_sessions, read_session, message_session and wait_for_agents reach the project's sessions on every one of the person's machines. Refused unless the asking machine has a folder of the project.",
+      "description": "Through machine/machines only (#3277): projects/sessions for an agent, so its list_sessions, read_session, message_session and wait_for_agents reach the project's sessions on every one of the person's machines. Refused unless the asking machine has a folder of the project.",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3308,9 +3084,59 @@
       }
     },
     {
+      "name": "machines/remove",
+      "x-capability": "machines/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "machines/retryKept",
+      "x-capability": "machines/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/KeptRequestID"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "machines/sendFolder",
       "x-capability": "folders.to-machine/1",
-      "description": "Through host/machines only: one step of an agent's start_session with send (#2929), which sends this folder's branch to another of the person's machines, as Send to ‹machine›… does, or of its bring_back (#2947), which brings a branch back from there, as Bring Back from ‹machine›… does. The control plane sends that machine's folders/receiveState, folders/receiveUpload, folders/receive, folders/sendFacts, folders/sendPack or folders/sendRead; the machine has to be online.",
+      "description": "Through machine/machines only: one step of an agent's start_session with send (#2929), which sends this folder's branch to another of the person's machines, as Send to ‹machine›… does, or of its bring_back (#2947), which brings a branch back from there, as Bring Back from ‹machine›… does. The control plane sends that machine's folders/receiveState, folders/receiveUpload, folders/receive, folders/sendFacts, folders/sendPack or folders/sendRead; the machine has to be online.",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3331,7 +3157,7 @@
     {
       "name": "machines/sessionCall",
       "x-capability": "sessions.elsewhere/1",
-      "description": "Through host/machines only (#2927): an agent's call on a session it started on another of the person's machines. The control plane sends that machine's agents/fromStarter, saying which machine and agent ask.",
+      "description": "Through machine/machines only (#2927): an agent's call on a session it started on another of the person's machines. The control plane sends that machine's agents/fromStarter, saying which machine and agent ask.",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3352,7 +3178,7 @@
     {
       "name": "machines/sessionEnded",
       "x-capability": "sessions.elsewhere/1",
-      "description": "Through host/machines only (#2927): a session started from another machine ended. The control plane sends that machine's agents/endedElsewhere, naming this one; an offline one is not told, and finds out when it next asks.",
+      "description": "Through machine/machines only (#2927): a session started from another machine ended. The control plane sends that machine's agents/endedElsewhere, naming this one; an offline one is not told, and finds out when it next asks.",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3371,9 +3197,107 @@
       }
     },
     {
+      "name": "machines/setMachineOptions",
+      "x-capability": "machines/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineOptions"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ControlMachine"
+        }
+      }
+    },
+    {
+      "name": "machines/sshHosts",
+      "x-capability": "machines/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SSHHostsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "daemon.schema.json#/definitions/SSHHost"
+          }
+        }
+      }
+    },
+    {
+      "name": "machines/start",
+      "x-capability": "machines/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ControlMachine"
+        }
+      }
+    },
+    {
+      "name": "machines/startEnroll",
+      "x-capability": "machines/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineEnroll"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ControlCodeShown"
+        }
+      }
+    },
+    {
       "name": "machines/startSession",
       "x-capability": "sessions.on-machine/1",
-      "description": "Through host/machines only (#2887): an agent's start_session on another of the person's machines. The id of the session it started; kept (-32067) when the machine is stopped and is starting.",
+      "description": "Through machine/machines only (#2887): an agent's start_session on another of the person's machines. The id of the session it started; kept (-32067) when the machine is stopped and is starting.",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3392,9 +3316,34 @@
       }
     },
     {
+      "name": "machines/stop",
+      "x-capability": "machines/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineStop"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ControlMachine"
+        }
+      }
+    },
+    {
       "name": "machines/summaryFacts",
       "x-capability": "summary.machines/1",
-      "description": "Through host/machines only (#3354): the Daily summary workflow's facts from each of the person's other machines. The control plane asks each one online for its agents/summaryFacts at once; one that is off, or does not answer in time, is named with why.",
+      "description": "Through machine/machines only (#3354): the Daily summary workflow's facts from each of the person's other machines. The control plane asks each one online for its agents/summaryFacts at once; one that is off, or does not answer in time, is named with why.",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3411,6 +3360,52 @@
           "$ref": "daemon.schema.json#/definitions/MachinesSummaryFacts"
         }
       }
+    },
+    {
+      "name": "machines/unlink",
+      "x-capability": "machines/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ControlMachine"
+        }
+      }
+    },
+    {
+      "name": "machines/update",
+      "x-capability": "machines/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineUpdate"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/JSONValue"
+        }
+      },
+      "description": "Update a server's host over ssh (#1766): its server and key given again, the host key checked as at an install, the server's root checked to be this host's, then the control plane's agentsd, MCP servers and toolsets copied and the host started again. The answer is an install's: {needsTrust, name} first for a key not yet trusted, then {updated: true, name}."
     },
     {
       "name": "notices/delivered",
@@ -5713,7 +5708,7 @@
     {
       "name": "user/setPolicy",
       "x-capability": "host.policy-layers/1",
-      "description": "The keeper, on its channel 0 (#2957, research R11): your layer changed, so the part policy of your user settings takes it. The control plane checks the revision goes up, stores it unchanged, and pushes it (host/userSettings) to the person's machines that say host.policy-layers/1. Refused notKeeper when host is not the layer's own keeper.",
+      "description": "The keeper, on its channel 0 (#2957, research R11): your layer changed, so the part policy of your user settings takes it. The control plane checks the revision goes up, stores it unchanged, and pushes it (machine/userSettings) to the person's machines that say host.policy-layers/1. Refused notKeeper when host is not the layer's own keeper.",
       "paramStructure": "by-name",
       "params": [
         {

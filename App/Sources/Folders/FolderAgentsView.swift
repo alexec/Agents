@@ -54,7 +54,6 @@ struct FolderAgentsView: View {
             // The same strip as over a chat: a prompt here goes to that host too (#83).
             if let summary {
                 OfflineStrip(host: summary.host)
-                DiskStrip(host: summary.host)
             }
             // A change to the folder's own files that no session can be asked about (#531).
             if let summary {

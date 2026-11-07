@@ -17,11 +17,17 @@ const (
 	storeReadsAtOnce = 16
 	// mostCachedReads bounds the keys held: 100 machines' 90 days and 20,000 claims.
 	mostCachedReads = 40000
+	// mostCachedBytes bounds the data held (#3650): a few large records must not hold
+	// what 40,000 small ones would.
+	mostCachedBytes = 256 << 20
 )
 
 type readCache struct {
 	mu   sync.Mutex
 	held map[string]cachedRead
+
+	// The bytes of the data in held.
+	bytes int
 }
 
 type cachedRead struct {
@@ -44,6 +50,7 @@ func (c *readCache) read(ctx context.Context, st store.Store, prefix string, lis
 	}
 	for key := range c.held {
 		if strings.HasPrefix(key, prefix) && !there[key] {
+			c.bytes -= len(c.held[key].data)
 			delete(c.held, key)
 		}
 	}
@@ -83,10 +90,13 @@ func (c *readCache) read(ctx context.Context, st store.Store, prefix string, lis
 				// Kept only when what was read is what was listed.
 				if k.ETag != "" && object.ETag == k.ETag {
 					c.mu.Lock()
-					if len(c.held) >= mostCachedReads {
+					c.bytes -= len(c.held[k.Key].data)
+					if len(c.held) >= mostCachedReads || c.bytes+len(object.Data) > mostCachedBytes {
 						clear(c.held)
+						c.bytes = 0
 					}
 					c.held[k.Key] = cachedRead{etag: k.ETag, data: object.Data}
+					c.bytes += len(object.Data)
 					c.mu.Unlock()
 				}
 			}

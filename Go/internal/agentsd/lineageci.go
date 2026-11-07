@@ -27,6 +27,9 @@ import (
 //     is a deploy node. The release is deployed-as it, and it is part-of its target,
 //     target:<target>:<id>. The run says it; App Store Connect's key stays in the customer's CI
 //     (direction.md, principles 6 and 7).
+//   - The App Store (#3657): a run that submits a version for App Review says
+//     appstore:<bundle id>/<version>, and the TestFlight build it submitted,
+//     testflight:<bundle id>/<build>. That build is deployed-as the App Store version.
 
 // ciRunsPerPR is how many runs a PR keeps active.
 const ciRunsPerPR = 20
@@ -69,13 +72,17 @@ func (d *Daemon) lineageCIEvent(e wire.Event) {
 			at = t
 		}
 		run, release := repo.ciRun(p.Run.ID), repo.release(p.Run.Branch)
+		deploys := p.Deploys[:min(len(p.Deploys), mostDeploys)]
 		d.lineageDo(func() {
 			d.linkAt(run, release, lineage.RelBuilds, lineage.SourceForge, at)
-			for _, ref := range p.Deploys[:min(len(p.Deploys), mostDeploys)] {
+			for _, ref := range deploys {
 				if deploy, target, ok := deployNodes(ref); ok {
 					d.linkAt(release, deploy, lineage.RelDeployedAs, lineage.SourceForge, at)
 					d.linkAt(deploy, target, lineage.RelPartOf, lineage.SourceForge, at)
 				}
+			}
+			for _, pair := range submittedBuilds(deploys) {
+				d.linkAt(pair[0], pair[1], lineage.RelDeployedAs, lineage.SourceForge, at)
 			}
 		})
 		return
@@ -115,6 +122,25 @@ func deployNodes(ref string) (deploy, target wire.LineageNode, ok bool) {
 	}
 	return wire.LineageNode{Kind: lineage.KindDeploy, Ref: ref},
 		wire.LineageNode{Kind: lineage.KindTarget, Ref: "target:" + ref[:i]}, true
+}
+
+// submittedBuilds pairs each TestFlight build one run says with each App Store version of the
+// same bundle id that run says (#3657): the build it submitted for App Review.
+func submittedBuilds(refs []string) [][2]wire.LineageNode {
+	var pairs [][2]wire.LineageNode
+	for _, store := range refs {
+		storeDeploy, storeTarget, ok := deployNodes(store)
+		bundle, isStore := strings.CutPrefix(storeTarget.Ref, "target:appstore:")
+		if !ok || !isStore {
+			continue
+		}
+		for _, build := range refs {
+			if deploy, target, ok := deployNodes(build); ok && target.Ref == "target:testflight:"+bundle {
+				pairs = append(pairs, [2]wire.LineageNode{deploy, storeDeploy})
+			}
+		}
+	}
+	return pairs
 }
 
 // repoOfRunURL is the repo of a GitHub Actions run's web address,

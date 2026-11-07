@@ -66,8 +66,27 @@ struct PipelineTests {
         #expect(steps.last?.url == nil)
     }
 
+    @Test func aReleaseSubmittedForAppReviewSaysItsAppStoreVersion() throws {
+        let version = Node(kind: "deploy", ref: "appstore:com.example.app/1.2.0")
+        let g = DaemonAPI.LineageGraph(links: graph.links + [link(release, "deployed-as", version), link(build, "deployed-as", version)])
+        let steps = Pipeline.steps(of: issue, in: g)
+        #expect(words(steps) == ["Release v1.2.0", "CI run", "TestFlight 42", "App Store 1.2.0", "Sentry issue 4321"])
+        let store = try #require(steps.first { $0.words == "App Store 1.2.0" })
+        #expect(store.url?.absoluteString == "https://appstoreconnect.apple.com/apps")
+    }
+
     @Test func aGitLabPipelineHasItsPage() {
         #expect(Pipeline.url(Node(kind: "ci-run", ref: "gitlab:group/app/pipelines/55"))?.absoluteString
             == "https://gitlab.com/group/app/-/pipelines/55")
+    }
+
+    @Test func aCloudRunRevisionIsNamedAndHasItsServicesRevisions() {
+        let rev = Node(kind: "deploy", ref: "cloudrun:acme-prod/us-central1/web/web-42")
+        let g = DaemonAPI.LineageGraph(links: [link(pr, "part-of", release), link(release, "deployed-as", rev)])
+        let steps = Pipeline.steps(of: pr, in: g)
+        #expect(words(steps) == ["Release v1.2.0", "Cloud Run web-42"])
+        #expect(steps.last?.url?.absoluteString
+            == "https://console.cloud.google.com/run/detail/us-central1/web/revisions?project=acme-prod")
+        #expect(Pipeline.url(Node(kind: "deploy", ref: "cloudrun:acme-prod/web/web-42")) == nil)
     }
 }

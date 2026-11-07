@@ -61,7 +61,7 @@ struct AgentRow: View {
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text(DeletionWords.confirmMessage)
+                Text(DeletionWords.confirmMessage(agent))
             }
             .alert("This session cannot be deleted yet",
                    isPresented: Binding(get: { cannotDelete != nil }, set: { if !$0 { cannotDelete = nil } })) {

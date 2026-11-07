@@ -172,6 +172,31 @@ func TestEndedLinksGoAfterKeepEnded(t *testing.T) {
 	}
 }
 
+// A store left open drops an ended link on Prune once it is KeepEnded old, file and all
+// (#3649): an idle machine does not wait for its next start.
+func TestPruneDropsEndedLinksWhileOpen(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "lineage.jsonl")
+	now := t0
+	f := Open(path, func() time.Time { return now })
+	t.Cleanup(func() { f.Close() })
+	link(t, f, session("a"), issue("1"), RelWorksOn, t0)
+	link(t, f, session("b"), issue("1"), RelWorksOn, t0)
+	f.End(wire.LineageEndRequest{From: session("a"), To: issue("1"), Rel: RelWorksOn}, t0)
+	if n := f.Prune(); n != 0 {
+		t.Fatalf("pruned %d before KeepEnded", n)
+	}
+	now = t0.Add(KeepEnded + time.Hour)
+	if n := f.Prune(); n != 1 {
+		t.Fatalf("pruned %d, want 1", n)
+	}
+	if got := f.Links(issue("1")).Links; len(got) != 1 || got[0].From != session("b") {
+		t.Fatalf("%+v", got)
+	}
+	if data, _ := os.ReadFile(path); strings.Contains(string(data), "session:a") {
+		t.Fatalf("the file still holds the dropped link: %s", data)
+	}
+}
+
 // At most MostLinks are kept, the oldest ended ones first; the file does not grow past what
 // is kept by more than the margin.
 func TestTheStoreIsBounded(t *testing.T) {

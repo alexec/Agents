@@ -149,7 +149,7 @@ struct ProjectSlotsCard: View {
                                              DaemonAPI.ProjectSlotSet(id: id, slot: slot, value: value),
                                              returning: DaemonAPI.Project.self)
             problem = nil
-            // The machine hears it from the control plane (host/projects): give it a moment.
+            // The machine hears it from the control plane (machine/projects): give it a moment.
             try? await Task.sleep(for: .milliseconds(400))
             await changed()
         } catch {

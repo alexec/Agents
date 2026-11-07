@@ -575,6 +575,11 @@ func (l *live) turn() bool {
 		launch, meta := withSandbox(launch, agentSessionMeta(a), a.RuntimeID, sandbox)
 		brief := d.briefFor(a)
 		compatibilityMeta := withSystemPrompt(meta, a.RuntimeID, brief)
+		if launch, err = withBriefFile(launch, a.RuntimeID, d.Store.Loc.Agent(string(l.id)), brief); err != nil {
+			d.record(l.id, notice("error", rt.Name+" did not start", "The brief could not be written: "+err.Error()))
+			d.end(l, wire.AgentStateStopped, wire.EndedReasonRuntimeError)
+			return false
+		}
 		s, err := acp.Start(ctx, launch, l, d.mcpServersFor(l.id), meta, compatibilityMeta, continuing, brief)
 		if err != nil {
 			d.dropAppTokens(l.id)
@@ -611,7 +616,7 @@ func (l *live) turn() bool {
 		l.session = s
 		// A conversation begun, or begun again because the runtime lost it: the brief it
 		// had lived in the history that is gone.
-		l.briefDue = !s.Continued && brief != "" && !s.SupportsSystemPrompt() && compatibilitySystemPromptDelivery[a.RuntimeID] == ""
+		l.briefDue = !s.Continued && brief != "" && !s.SupportsSystemPrompt() && !briefOutOfPrompt(a.RuntimeID)
 		l.mu.Unlock()
 		// Started as the host goes, after stopAll looked (#1272): it would be left running.
 		if d.going() {
@@ -633,6 +638,10 @@ func (l *live) turn() bool {
 		sessionID := string(s.ID)
 		d.change(l.id, func(a *wire.Agent) {
 			a.RuntimeSessionID = &sessionID
+			a.RuntimeKeepsCopy = nil
+			if keepsCopy(a.RuntimeID, s.CanDelete()) {
+				a.RuntimeKeepsCopy = new(true)
+			}
 			if opts := configOptions(s.NewResult.ConfigOptions); opts != nil {
 				a.AdvertisedOptions = d.markOptions(a.RuntimeID, withAppOptions(a.RuntimeID, a.StartOptions.Values, opts))
 				a.Levels = d.matchLevels(a)

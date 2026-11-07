@@ -3,6 +3,7 @@ package controlplane
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
@@ -17,10 +18,18 @@ type Conn struct {
 	done   chan struct{}
 	once   sync.Once
 	Remote string
+
+	// The bytes of the lines in out.
+	waiting atomic.Int64
 }
 
-// queued is how many lines may wait for a slow peer before it is closed.
-const queued = 8192
+// queued is how many lines may wait for a slow peer before it is closed, and queuedBytes
+// how many bytes (#3650): a line can be tens of MiB, so a count alone does not bound it.
+// A single line larger than queuedBytes still goes when nothing waits before it.
+const (
+	queued      = 8192
+	queuedBytes = 64 << 20
+)
 
 func newConn(ws *websocket.Conn, remote string) *Conn {
 	// Until it proves a key; then by what proved one (#2150).
@@ -35,6 +44,7 @@ func (c *Conn) write() {
 	for {
 		select {
 		case line := <-c.out:
+			c.waiting.Add(-int64(len(line)))
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			err := c.ws.Write(ctx, websocket.MessageText, []byte(line))
 			cancel()
@@ -75,10 +85,17 @@ func (c *Conn) Send(line string) bool {
 		return false
 	default:
 	}
+	size := int64(len(line))
+	if held := c.waiting.Add(size); held > queuedBytes && held != size {
+		c.waiting.Add(-size)
+		c.Close()
+		return false
+	}
 	select {
 	case c.out <- line:
 		return true
 	default:
+		c.waiting.Add(-size)
 		c.Close()
 		return false
 	}

@@ -87,15 +87,15 @@ func TestEveryLineAndByteCounts(t *testing.T) {
 	now := time.Unix(1000, 0)
 	c.now = func() time.Time { return now }
 	for i := range clientLinesBurst {
-		if !c.allow("A", 10, "hosts/list") {
+		if !c.allow("A", 10, "machines/list") {
 			t.Fatalf("refused line %d", i)
 		}
 	}
-	if c.allow("A", 10, "hosts/list") {
+	if c.allow("A", 10, "machines/list") {
 		t.Fatal("a line past the burst went")
 	}
 	// A reply to a host takes no line, and another client has its own.
-	if !c.allow("A", 10, "") || !c.allow("B", 10, "hosts/list") {
+	if !c.allow("A", 10, "") || !c.allow("B", 10, "machines/list") {
 		t.Fatal("refused what is not over its rate")
 	}
 	if !c.allow("C", clientBytesBurst-1, "dropbox/put") || c.allow("C", 2<<20, "") {
@@ -372,7 +372,7 @@ func TestAStoreRefusalReachesAJoinAndAPairingInItsWords(t *testing.T) {
 	public, _ := controllink.PublicKey(controllink.NewPrivateKey())
 	params, _ := json.Marshal(wire.MachineAnnounce{PublicKey: public, Name: "Build box", Platform: "linux amd64",
 		Version: "1", MachineID: "BOX-1"})
-	l.Write(ctx, `{"jsonrpc":"2.0","id":1,"method":"hosts/announce","params":`+string(params)+`}`)
+	l.Write(ctx, `{"jsonrpc":"2.0","id":1,"method":"machines/announce","params":`+string(params)+`}`)
 	line, err := l.Read(ctx)
 	if err != nil {
 		t.Fatal(err)

@@ -100,6 +100,13 @@ public enum AttentionSnapshotStore {
         }
     }
 
+    /// Remove the file: the pairing it was written under was forgotten (#3670), so the widget
+    /// shows no one's headlines rather than the old control plane's.
+    public static func clear(in container: URL? = nil) {
+        guard let url = url(in: container) else { return }
+        try? FileManager.default.removeItem(at: url)
+    }
+
     /// The last snapshot the app wrote, or nil when there is none — which the widget says
     /// out loud rather than showing a zero (FR-009).
     public static func read(from container: URL? = nil) -> AttentionSnapshot? {

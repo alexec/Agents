@@ -20,8 +20,8 @@ folder.
 ## Steps
 
 1. In the sidebar, right-click the folder and choose **Send to ‹server›…**. For a
-   worktree, open **Activity ▸ Worktrees**, right-click the worktree and choose
-   **Send to ‹server›…**.
+   worktree, open **Machines ▸ This Mac** in the sidebar, right-click the worktree
+   under **Worktrees** and choose **Send to ‹server›…**.
 2. Check **Folder on ‹server›**. It is `~/‹name of the folder›` at first. Press Return
    after you change it, and the sheet says what is there:
    - **A new copy**: the folder is not there, or it is empty.
@@ -55,8 +55,8 @@ A send never overwrites work done on the server. The send stops, and changes not
 Work done on the server does not come to this Mac until you push it, or bring it back.
 **Bring Back from ‹server›…** brings the server's branches into the repository on this Mac.
 
-1. Right-click the folder, or the worktree on **Activity ▸ Worktrees**, and choose
-   **Bring Back from ‹server›…**.
+1. Right-click the folder, or the worktree under **Worktrees** on **Machines ▸ This
+   Mac**, and choose **Bring Back from ‹server›…**.
 2. Check **Folder on ‹server›**. It is `~/‹name of the folder›` at first: the folder that
    the send made. Press Return after you change it.
 3. Choose the branches to bring back. The branch that is checked out on the server is chosen

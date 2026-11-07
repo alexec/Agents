@@ -4,7 +4,7 @@
 // with a `control/status` every few seconds.
 import { log } from "../log";
 import type { Method, Params, Result } from "../protocol/methods";
-import { newMethodName, targetOf } from "../protocol/methods";
+import { targetOf } from "../protocol/methods";
 import { type Admitted, connect, type LineSocket, Refused, WrongControlPlane } from "./auth";
 import { type KeyRecord, type KeyStore, UnsupportedBrowser } from "./keys";
 import { type Channel, finish, type LockSigner, names, newHello, sealed, signRequest } from "./lockChannel";
@@ -89,9 +89,9 @@ const slowCallTimeout: Readonly<Record<string, number>> = {
   "agents/export": 10 * 60_000,
   "agents/import": 10 * 60_000,
   // Add as Machine… (#3377): the control plane installs Agents over ssh, about 2 min on a codespace.
-  "hosts/install": 15 * 60_000,
+  "machines/install": 15 * 60_000,
   // Link to Machine… (#3379) fetches the machine's ssh host key first, up to a minute.
-  "hosts/link": 2 * 60_000,
+  "machines/link": 2 * 60_000,
 };
 
 /** How long `method` waits. `override` is a test's one timeout for every method. */
@@ -320,10 +320,9 @@ export class Link {
   private request<M extends Method>(method: M, params: Params<M>, host?: string): { id: number; done: Promise<Result<M>> } {
     if (this.state.kind !== "open" || !this.socket) return { id: 0, done: Promise.reject(new LinkDown()) };
     const id = this.nextID++;
-    const name = newMethodName(method);
     // Written by hand, params last but for a MAC, so the bytes signed are the bytes sent.
     const paramsText = JSON.stringify(params);
-    const text = `{"jsonrpc":"2.0","id":${id},"method":${JSON.stringify(name)}${paramsText === undefined ? "" : `,"params":${paramsText}`}}`;
+    const text = `{"jsonrpc":"2.0","id":${id},"method":${JSON.stringify(method)}${paramsText === undefined ? "" : `,"params":${paramsText}`}}`;
     const route = targetOf(method) === "host" ? host ?? "mac" : null;
     const line = route !== null ? `{"h":${JSON.stringify(route)},"m":${text}}` : `{"m":${text}}`;
     const done = new Promise<Result<M>>((resolve, reject) => {
@@ -338,7 +337,7 @@ export class Link {
         reject: (error) => { clearTimeout(timer); reject(error); },
         route,
       });
-      if (route !== null && name !== "lock/hello" && this.lockSource) this.sendLocked(route, name, text, paramsText, id);
+      if (route !== null && method !== "lock/hello" && this.lockSource) this.sendLocked(route, method, text, paramsText, id);
       else this.socket?.send(line);
     });
     return { id, done };

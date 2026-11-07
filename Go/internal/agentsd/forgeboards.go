@@ -12,7 +12,7 @@ import (
 
 // Boards (#3282, specs/3273-project-unit "Boards"): a project's Tasks slot holds one or more
 // boards (a GitHub Projects board, a Jira board, a Linear team, a GitLab group board), which
-// the control plane sends with the project's slots (host/projects). forge/boards lists the
+// the control plane sends with the project's slots (machine/projects). forge/boards lists the
 // boards of this machine's folders' projects, for Work's Board filter; forge/issues' board
 // narrows a list to one board, read on the board's own forge:
 //

@@ -91,6 +91,17 @@ final class DraftKeeper {
         waiting = [:]
     }
 
+    /// The control plane was forgotten (#3670): every draft goes, the start form too, and
+    /// nothing waiting is written back after.
+    func forgetAll() {
+        pause?.cancel()
+        waiting = [:]
+        leftForm = nil
+        leftChoices = nil
+        if drafted != nil { drafted = [] }
+        store.clearAll()
+    }
+
     private func swept(_ kept: Set<UUID>, took: Duration) {
         // Anything typed while it ran is kept too.
         drafted = kept.union(waiting.keys.compactMap { if case .agent(let id) = $0 { id } else { nil } })

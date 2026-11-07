@@ -9,7 +9,7 @@ For each runtime, one at a time: `runtimes/assess` starts the assessing agent in
 that agent and the helpers it starts only — the form (a choice gets its first option, text
 gets PHRASE), the runtime's own question (its first option), and every permission card
 (allow once, except the write outside the project, which is rejected) — and follows it
-until it ends a turn that is neither `blocked` nor `partly_done` (a move). Then it prints
+until it ends a turn that waits on nothing (no event, agent or check-again time). Then it prints
 the daemon's own score (`runtimes/assessment`) and where the agent's report is.
 
 The cheapest model can be a free one whose provider is down: an assessment that stops
@@ -120,7 +120,12 @@ def follow(client, runtime, agent, model, report_path, minutes):
         # A turn that ends on a wait still open is not the last: it is started again (#1432).
         wait = (record or {}).get("eventWait")
         waiting = wait and (not wait.get("ending") or record.get("queuedPrompts"))
-        if record and record.get("state") in ("finished", "stopped", "archived") and report.get("outcome") not in ("blocked", "partly_done") and not waiting:
+        # Nor is one that ends on check_again or wait_for_agents: `waiting`, with a time to
+        # start again or agents to wait on (#3698).
+        block = report.get("block") or {}
+        checking = (record or {}).get("state") != "archived" and report.get("outcome") == "waiting" \
+            and (block.get("checkAgainAt") or block.get("waits"))
+        if record and record.get("state") in ("finished", "stopped", "archived") and report.get("outcome") not in ("blocked", "partly_done") and not waiting and not checking:
             break
     else:
         print(f"  {runtime}: not finished after {minutes} min; scoring what is there", flush=True)

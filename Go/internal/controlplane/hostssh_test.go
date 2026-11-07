@@ -37,10 +37,10 @@ func TestOnlyTheLocalOwnerUsesTheControlPlanesSSH(t *testing.T) {
 		machine *fakeHost
 	}{{sam, samMachine}, {kim, kimMachine}} {
 		calls := map[string]map[string]any{
-			"hosts/install":  {"destination": "prod-box"},
-			"hosts/detect":   {},
-			"hosts/sshHosts": {},
-			"hosts/update":   {"host": who.machine.member.Host, "destination": "prod-box"},
+			"machines/install":  {"destination": "prod-box"},
+			"machines/detect":   {},
+			"machines/sshHosts": {},
+			"machines/update":   {"host": who.machine.member.Host, "destination": "prod-box"},
 		}
 		for method, params := range calls {
 			if _, err := who.person.window.Call(context.Background(), "", method, params); err == nil || !strings.Contains(err.Error(), "Only the control plane's owner") {
@@ -50,16 +50,16 @@ func TestOnlyTheLocalOwnerUsesTheControlPlanesSSH(t *testing.T) {
 	}
 
 	// The local owner is not refused.
-	if got := string(call(t, alexWindow, "", "hosts/sshHosts", map[string]any{})); !strings.Contains(got, "prod-box") {
+	if got := string(call(t, alexWindow, "", "machines/sshHosts", map[string]any{})); !strings.Contains(got, "prod-box") {
 		t.Fatalf("the owner's ssh hosts: %s", got)
 	}
-	call(t, alexWindow, "", "hosts/detect", map[string]any{})
-	if e := callError(t, alexWindow, "", "hosts/install", map[string]any{"destination": " "}); !strings.Contains(e, "Say which server.") {
+	call(t, alexWindow, "", "machines/detect", map[string]any{})
+	if e := callError(t, alexWindow, "", "machines/install", map[string]any{"destination": " "}); !strings.Contains(e, "Say which server.") {
 		t.Fatal(e)
 	}
-	if e := callError(t, alexWindow, "", "hosts/update", map[string]any{"host": "x", "destination": "prod-box"}); !strings.Contains(e, "There is no such host.") {
+	if e := callError(t, alexWindow, "", "machines/update", map[string]any{"host": "x", "destination": "prod-box"}); !strings.Contains(e, "There is no such host.") {
 		t.Fatal(e)
 	}
 	// A bot's machine still joins with an admin's code (#1761).
-	call(t, kim.window, "", "hosts/startEnroll", map[string]any{})
+	call(t, kim.window, "", "machines/startEnroll", map[string]any{})
 }

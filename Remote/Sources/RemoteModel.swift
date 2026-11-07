@@ -307,7 +307,7 @@ final class RemoteModel {
     @ObservationIgnored private var otherHosts: [MachineRef: DaemonClient] = [:]
     @ObservationIgnored private var hostWatch: Task<Void, Never>?
     /// The watch's own client of the control plane while it is connected, for the control
-    /// plane's own requests (`hosts/start`, #691). Nil against a bridge with no control plane.
+    /// plane's own requests (`machines/start`, #691). Nil against a bridge with no control plane.
     @ObservationIgnored private(set) var controlPlane: DaemonClient?
     /// The names of the projects the sidebar groups (#3278).
     let projectNames = ProjectNames()
@@ -318,7 +318,7 @@ final class RemoteModel {
     /// This device's place in the person's machine lock, and the clients asking to join it (#3490).
     let lock = LockState(pins: LockPins(defaults: .standard, name: RemoteControl.lockPinName), name: UIDevice.current.name,
                          kind: RemoteControl.kind, account: "lock-signing-key")
-    /// What `hosts/list` last said, so the folder list can name each host (058, frame H).
+    /// What `machines/list` last said, so the folder list can name each host (058, frame H).
     /// Empty when this phone is not a client of a control plane.
     private(set) var controlHosts: [DaemonAPI.ControlMachine] = []
     /// Git asks answered on this device, until the control plane's list drops them (#1122).
@@ -332,9 +332,6 @@ final class RemoteModel {
     let workLists = WorkLists()
     /// What `control/status` last said: its version and capabilities, for Settings (#1748).
     private(set) var controlStatus: DaemonAPI.ControlStatus?
-
-    /// Each other host's disk alarms, kept separate from this Mac's strip (#263).
-    private(set) var serverDisks: [MachineRef: DiskState] = [:]
 
     init(link: any DaemonLink) {
         baseLink = link
@@ -439,8 +436,22 @@ final class RemoteModel {
         }
         note("pairing: forgot itself")
         RemoteControl.forget()
+        forgetKept()
         forgotItself = true
         return nil
+    }
+
+    /// The pairing is gone (#3670): what this device kept of that control plane goes with
+    /// it. The widget's headlines and the badge, the drafts, the Live Activity's turns, and
+    /// every banner delivered from it.
+    private func forgetKept() {
+        StartDraftKeeper.shared.forgetAll()
+        liveActivities.endAll()
+        notifier.forgetAll()
+        AttentionSnapshotStore.clear()
+        lastPublished = nil
+        notifier.setBadgeCount(0)
+        WidgetCenter.shared.reloadTimelines(ofKind: AttentionSnapshot.widgetKind)
     }
 
     // MARK: A server's key (#344)
@@ -623,7 +634,7 @@ final class RemoteModel {
                 openWorkflow = nil
                 openArchive = false
                 openReview = id
-            case .resources, .events, .runtimes, .worktrees, .work:
+            case .resources, .events, .runtimes, .work:
                 openActivity = newValue
             case .archive(let key):
                 // The folder's archive page (#495, #498), with what is opened from it
@@ -634,8 +645,9 @@ final class RemoteModel {
                 openWorkflow = nil
                 openReview = nil
                 openArchive = true
-            case .spending, .tokens, .time, .milestones, .mcpServers, .folderMCPServers, .docs:
-                // Usage, connectors and Docs are Mac + web (#2798, #3321): the Remote opens none of them.
+            case .spending, .tokens, .time, .milestones, .mcpServers, .folderMCPServers, .docs, .machine:
+                // Usage, connectors, Docs and a machine's page are Mac + web (#2798, #3321, #3626):
+                // the Remote opens none of them.
                 break
             }
         }
@@ -2109,6 +2121,7 @@ final class RemoteModel {
                 // for a new code, and stops dialling. One "unknown" alone is a control plane
                 // that could not tell yet, and is dialled again (#81).
                 RemoteControl.forget()
+                forgetKept()
                 forgottenByControlPlane = true
                 isConnected = false
                 return false
@@ -2209,12 +2222,12 @@ final class RemoteModel {
         host(work.agent(id)?.host ?? .mac, has: capability)
     }
 
-    /// A host's row as `hosts/list` last said it: its state, and the workspace it runs on (#691).
+    /// A host's row as `machines/list` last said it: its state, and the workspace it runs on (#691).
     func controlHost(_ host: MachineRef) -> DaemonAPI.ControlMachine? {
         controlHosts.first { $0.id == host }
     }
 
-    /// The hosts whose `hosts/start` is out now, so the strip's Start waits for it (#691).
+    /// The hosts whose `machines/start` is out now, so the strip's Start waits for it (#691).
     private(set) var hostsBeingStarted: Set<MachineRef> = []
     /// Prompts and starts the control plane keeps for stopped workspaces (#691 US3), every host's.
     private(set) var kept: [DaemonAPI.KeptRequest] = []
@@ -2529,7 +2542,6 @@ final class RemoteModel {
                 work.replaceAgents(agents, from: id)
             }
             await refreshServerRuntimes(id)
-            await refreshServerDisk(id)
             let notes = other.notifications()
             let shown = work.shown
             // Read off the main actor, once, and applied there (#203).
@@ -2542,12 +2554,10 @@ final class RemoteModel {
                         await self?.received(note.method, note.params, fromOther: id)
                         continue
                     }
-                    if note.method == DaemonAPI.Notification.diskChanged {
-                        await self?.received(note.method, note.params, fromOther: id)
-                        continue
-                    }
-                    // Settings ▸ Backups is the Mac's (#1810).
-                    if note.method == DaemonAPI.Notification.resourcesChanged
+                    // Settings ▸ Backups is the Mac's (#1810); a machine's disks are on its
+                    // page, which the Remote does not have (#3628).
+                    if note.method == DaemonAPI.Notification.diskChanged
+                        || note.method == DaemonAPI.Notification.resourcesChanged
                         || note.method == DaemonAPI.Notification.mcpHostedChanged
                         || note.method == DaemonAPI.Notification.eventsChanged
                         || note.method == DaemonAPI.Notification.backupsChanged { continue }
@@ -2584,7 +2594,6 @@ final class RemoteModel {
                 work.replaceFolders([], from: id)
                 work.replaceAgents([], from: id)
                 serverRuntimes[id] = nil
-                serverDisks[id] = nil
             }
         }
     }
@@ -2595,8 +2604,6 @@ final class RemoteModel {
         switch method {
         case DaemonAPI.Notification.runtimeChanged:
             await refreshServerRuntimes(host)
-        case DaemonAPI.Notification.diskChanged:
-            if let state = try? params?.decode(DiskState.self) { serverDisks[host] = state }
         case DaemonAPI.Notification.draftOptions:
             guard host == startDraftHost,
                   let change = try? params?.decode(DaemonAPI.DraftOptionsNotification.self) else { return }
@@ -2872,9 +2879,6 @@ final class RemoteModel {
         }
         // Sessions in scenes of their own (#888), as the main scene's chat.
         for chat in popouts.values { await loadTranscript(of: chat) }
-        // The low-disk strip is under the banner on every page (#196), so it is read
-        // on every catch-up, not when a page asks for it.
-        if carried?.disk == nil { await refreshDisk() }
         // The person's display choices (#1033): the sidebar and every chat read them.
         await refreshDisplayPreferences()
         // The organisation's strip is on every page (#998), so it is read on every catch-up.
@@ -2918,7 +2922,6 @@ final class RemoteModel {
         work.replaceAttention(snapshot.attention)
         work.setResuming(snapshot.resuming)
         toNotifier { [deviceID = self.deviceID] notifier in await notifier.sweep(keeping: snapshot.attention, me: .device(deviceID)) }
-        if let disk = snapshot.disk { work.replaceDisk(disk) }
         if let notes = snapshot.storeNotes { work.replaceStoreNotes(notes) }
         if let workflows = snapshot.workflows { work.replaceWorkflows(workflows) }
         if let pins = snapshot.pins { work.replacePins(pins) }
@@ -3600,13 +3603,6 @@ final class RemoteModel {
         await refreshEvents()
     }
 
-    private func refreshServerDisk(_ host: MachineRef) async {
-        guard let other = otherHosts[host], reachableHosts.contains(host),
-              let state = try? await other.call(DaemonAPI.Method.diskState,
-                                                Optional<String>.none, returning: DiskState.self) else { return }
-        serverDisks[host] = state
-    }
-
     // MARK: The pool (052)
 
     func agent(_ id: UUID) -> Agent? { work.agent(id) }
@@ -3646,73 +3642,6 @@ final class RemoteModel {
                                                returning: DaemonAPI.MCPHealthSnapshot.self) {
             work.replaceMCPHealth(health)
         }
-    }
-
-    /// Every folder's worktrees on the Mac, for Activity ▸ Worktrees (#790). Sizes not
-    /// measured yet come later, on `worktrees/sized`.
-    func loadWorktrees() async {
-        guard let listed = try? await client.call(DaemonAPI.Method.worktreesAll, DaemonAPI.Empty(),
-                                                  returning: [DaemonAPI.FolderWorktrees].self) else { return }
-        work.replaceWorktrees(listed)
-    }
-
-    /// What removing one of a folder's worktrees would lose; nil when it could not be
-    /// asked, and `problem` says why.
-    func checkWorktreeRemoval(_ root: URL, in folder: URL) async -> DaemonAPI.RemovalCheck? {
-        do {
-            return try await client.call(DaemonAPI.Method.worktreesCheck,
-                                         DaemonAPI.WorktreeRemovalRequest(folder: folder, root: root),
-                                         returning: DaemonAPI.RemovalCheck.self)
-        } catch {
-            problem = sentence(for: error)
-            return nil
-        }
-    }
-
-    /// Remove one of a folder's worktrees; the Mac checks again either way.
-    func removeWorktree(_ root: URL, in folder: URL, confirmed: Bool) async {
-        do {
-            _ = try await client.call(DaemonAPI.Method.worktreesRemove,
-                                      DaemonAPI.WorktreeRemovalRequest(folder: folder, root: root, confirmed: confirmed),
-                                      returning: DaemonAPI.WorktreeRemoved.self)
-        } catch {
-            problem = sentence(for: error)
-        }
-        await loadWorktrees()
-    }
-
-    /// Delete an idle worktree's build output, and say what it freed; nil when it could not.
-    func removeBuildOutput(_ root: URL, in folder: URL) async -> String? {
-        defer { Task { await loadWorktrees() } }
-        do {
-            let removed = try await client.call(DaemonAPI.Method.worktreesRemoveBuildOutput,
-                                                DaemonAPI.WorktreeRemovalRequest(folder: folder, root: root),
-                                                returning: DaemonAPI.BuildOutputRemoved.self)
-            return WorktreeTally.freedWords(removed)
-        } catch {
-            problem = sentence(for: error)
-            return nil
-        }
-    }
-
-    /// Clean up worktrees (030): the folder's new session, its prompt offered the words
-    /// after anything half-typed there (#1863), as the window's does.
-    func offerCleanUp(in folder: URL) {
-        let keeper = StartDraftKeeper.shared
-        let draft = Draft.givingBack(WorktreeTally.cleanUpPrompt, to: keeper.draft(in: folder))
-        keeper.note(draft.text, draft.attachments, in: folder)
-        StartDraftKeeper.shared.flush()
-        openActivity = nil
-        // With its own host: a server's folder kept as the Mac's was never found again (#2160).
-        sidebarItem = .folder(work.folder(folder)?.key ?? FolderKey(host: .mac, folder: folder))
-    }
-
-    /// Every volume on the Mac low on space (#196), for the strip under the banner. A Mac
-    /// too old to know the method leaves it empty, and no strip is drawn.
-    private func refreshDisk() async {
-        guard let state = try? await client.call(DaemonAPI.Method.diskState, Optional<String>.none,
-                                                 returning: DiskState.self) else { return }
-        work.replaceDisk(state)
     }
 
     /// The files the Mac's host could not read in this run (#205, #223), then heard as

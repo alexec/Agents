@@ -253,11 +253,15 @@ func (a *accounts) count(ctx context.Context) (int, error) {
 	return len(keys), err
 }
 
-// remove deletes the account: its control plane's whole store, then the account, then the
-// sign-in's link, so a stop part way is finished by deleting again.
+// remove deletes the account: its control plane's whole store, the invites its sign-in
+// used, then the account, then the sign-in's link, so a stop part way is finished by
+// deleting again.
 func (a *accounts) remove(ctx context.Context, acc *Account) error {
 	if _, err := store.DeleteAll(ctx, accountStore(a.store, acc.ID)); err != nil {
 		return fmt.Errorf("its store: %w", err)
+	}
+	if err := a.removeInvites(ctx, acc.SignIn); err != nil {
+		return fmt.Errorf("its invites: %w", err)
 	}
 	if err := a.store.Delete(ctx, usageKey(acc.ID)); err != nil {
 		return err
@@ -266,6 +270,42 @@ func (a *accounts) remove(ctx context.Context, acc *Account) error {
 		return err
 	}
 	return a.store.Delete(ctx, signInKey(acc.SignIn))
+}
+
+// removeInvites deletes each invite that user used (#3672), so no record keeps who they
+// were. The sign-up gate refuses a deleted invite as used, so nobody can use it again.
+func (a *accounts) removeInvites(ctx context.Context, user SignIn) error {
+	keys, err := a.store.List(ctx, hostedPrefix+"v1/invites/")
+	if err != nil {
+		return err
+	}
+	for _, k := range keys {
+		o, err := a.store.Get(ctx, k.Key)
+		if err != nil {
+			return err
+		}
+		var rec Invite
+		if o == nil || json.Unmarshal(o.Data, &rec) != nil || !rec.Used.was(user) {
+			continue
+		}
+		if err := a.store.Delete(ctx, k.Key); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// was says whether user used the invite: by their sign-in, or by their GitHub id before
+// #3386.
+func (u *Used) was(user SignIn) bool {
+	if u == nil {
+		return false
+	}
+	by := signInOf(SignIn{}, &GitHubID{ID: u.GitHub})
+	if u.By != nil {
+		by = *u.By
+	}
+	return by.Provider != "" && by.Provider == user.Provider && by.Subject == user.Subject
 }
 
 // An account's id is its control plane's host name: ten lower-case letters and digits,

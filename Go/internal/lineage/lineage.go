@@ -45,7 +45,8 @@ const (
 	// KindHealth is a health signal (#3585): a Sentry issue, sentry:<org>/<issue id>.
 	KindHealth = "health"
 	// KindDeploy is a build or a version put on a deploy target (#3584), as a TestFlight build:
-	// testflight:<bundle id>/<build>. KindTarget is where it went: target:testflight:<bundle id>.
+	// testflight:<bundle id>/<build>, or a version submitted for App Review (#3657):
+	// appstore:<bundle id>/<version>. KindTarget is where it went: target:testflight:<bundle id>.
 	KindDeploy = "deploy"
 	KindTarget = "target"
 
@@ -66,6 +67,7 @@ const (
 	// RelSeenIn is a health signal seen in a release or a deploy (#3585).
 	RelSeenIn = "seen-in"
 	// RelDeployedAs is a release deployed as a deploy (#3584); the deploy is part-of its target.
+	// A TestFlight build is deployed-as the App Store version it was submitted as (#3657).
 	RelDeployedAs = "deployed-as"
 	// RelReports is an issue filed for a health signal, or commented on for it (#3586).
 	RelReports = "reports"
@@ -109,6 +111,9 @@ type Store interface {
 	Links(n wire.LineageNode) wire.LineageLinks
 	// Walk is the graph within depth links of a node, either way.
 	Walk(n wire.LineageNode, depth int) wire.LineageGraph
+	// Prune drops what is past the bounds now, not only at open or on a long append
+	// (#3649), and says how many links it dropped.
+	Prune() int
 	// Close writes what is left and lets the file go.
 	Close() error
 }
@@ -334,6 +339,17 @@ func (f *Files) append(l line) error {
 		f.rewrite()
 	}
 	return nil
+}
+
+func (f *Files) Prune() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	before := len(f.links)
+	if !f.prune() {
+		return 0
+	}
+	f.rewrite()
+	return before - len(f.links)
 }
 
 func endsTorn(path string) bool {

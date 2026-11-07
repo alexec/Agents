@@ -13,7 +13,8 @@
 #
 # Beside it, the testflight job (#914) uploads the Universal app to TestFlight: the Mac window
 # as a .pkg and the Remote as an .ipa, version <tag> and build <run number>, and waits until App
-# Store Connect has processed both. Nothing is submitted to App Review.
+# Store Connect has processed both. Nothing is submitted to App Review here: app-store.yml
+# does that, when a person approves it (#3657).
 #
 # The release notes are the tag's message when it has one (the release skill writes them,
 # .agents/skills/release); otherwise GitHub makes them from the merged pull requests.

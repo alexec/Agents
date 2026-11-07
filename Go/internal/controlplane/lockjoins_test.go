@@ -177,7 +177,7 @@ type machineNotes struct {
 }
 
 func (n *machineNotes) heard(host, method string, params json.RawMessage) {
-	if method != wire.NewMethodName(wire.NotifyHostLockJoinChanged.Name) {
+	if method != wire.NotifyMachineLockJoinChanged.Name {
 		return
 	}
 	var r wire.LockJoinRequest
@@ -216,12 +216,12 @@ func TestAMachineJoinsTheLock(t *testing.T) {
 	// A machine asks with its own key only.
 	nonce := bytes.Repeat([]byte{3}, machinelock.NonceSize)
 	other, _ := controllink.PublicKey(controllink.NewPrivateKey())
-	if _, err := box.uplink.Ask(ctx, "host/lockJoin", wire.LockJoin{Key: other, Commitment: machinelock.Commitment(other, nonce)}); err == nil ||
+	if _, err := box.uplink.Ask(ctx, "machine/lockJoin", wire.LockJoin{Key: other, Commitment: machinelock.Commitment(other, nonce)}); err == nil ||
 		!strings.Contains(err.Error(), "this machine's key") {
 		t.Fatal(err)
 	}
 	var started wire.LockJoinStarted
-	b, err := box.uplink.Ask(ctx, "host/lockJoin", wire.LockJoin{Key: boxKey, Commitment: machinelock.Commitment(boxKey, nonce)})
+	b, err := box.uplink.Ask(ctx, "machine/lockJoin", wire.LockJoin{Key: boxKey, Commitment: machinelock.Commitment(boxKey, nonce)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -236,7 +236,7 @@ func TestAMachineJoinsTheLock(t *testing.T) {
 	if !bytes.Equal(notes.answered().Nonce, signerNonce) {
 		t.Fatalf("%+v", notes.answered())
 	}
-	if _, err := box.uplink.Ask(ctx, "host/lockJoinReveal", wire.LockJoinNonce{Request: started.Request, Nonce: nonce}); err != nil {
+	if _, err := box.uplink.Ask(ctx, "machine/lockJoinReveal", wire.LockJoinNonce{Request: started.Request, Nonce: nonce}); err != nil {
 		t.Fatal(err)
 	}
 	revealed := joinNote(t, mac, started.Request, func(r wire.LockJoinRequest) bool { return r.Reveal != nil })
@@ -263,12 +263,12 @@ func TestAMachineJoinsTheLock(t *testing.T) {
 		t.Fatal(err)
 	}
 	stolen, _ := machinelock.AddMachine(inviteKey, state, other, "", "", time.Now())
-	if _, err := dev.uplink.Ask(ctx, "host/lockAdd", wire.LockAdd{Entries: []wire.LockEntry{stolen}}); err == nil ||
+	if _, err := dev.uplink.Ask(ctx, "machine/lockAdd", wire.LockAdd{Entries: []wire.LockEntry{stolen}}); err == nil ||
 		!strings.Contains(err.Error(), "only its own") {
 		t.Fatal(err)
 	}
 	own, _ := machinelock.AddMachine(inviteKey, state, devKey, dev.member.Host, "dev", time.Now())
-	if _, err := dev.uplink.Ask(ctx, "host/lockAdd", wire.LockAdd{Entries: []wire.LockEntry{own}}); err != nil {
+	if _, err := dev.uplink.Ask(ctx, "machine/lockAdd", wire.LockAdd{Entries: []wire.LockEntry{own}}); err != nil {
 		t.Fatal(err)
 	}
 	json.Unmarshal(call(t, mac, "", "lock/get", nil), &lock)

@@ -32,6 +32,16 @@ export function worktreeWords(worktrees: readonly DiskWorktree[]): string {
   return worktrees.map((w) => `${w.name} ${w.partial ? "over " : ""}${diskWords(w.bytes)}`).join(", ");
 }
 
+/** A volume on a machine's page (#3626): "120.3 GB free of 500.0 GB (24%)", DiskSpace.freeWords. */
+export function freeWords(alarm: DiskAlarm): string {
+  return `${diskWords(alarm.reading.freeBytes)} free of ${diskWords(alarm.reading.totalBytes)} (${freePercent(alarm)}%)`;
+}
+
+/** A level as a machine's page says it, beside the volume: DiskSpace.levelWords. */
+export function levelWords(level: DiskAlarm["level"]): string {
+  return level === "critical" ? "Almost full" : level === "low" ? "Low" : "OK";
+}
+
 /** One line for the strip: DiskAlarm.line. */
 export function diskLine(alarm: DiskAlarm): string {
   const free = diskWords(alarm.reading.freeBytes);

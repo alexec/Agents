@@ -820,6 +820,10 @@ func writeRequest(asked, path, content string) sdk.RequestPermissionRequest {
 
 // MARK: terminals the runtime asks for (terminal/*)
 
+// terminalOutputMost is the most output a terminal keeps, whatever limit the runtime asks
+// for: as much as a terminal's scrollback holds.
+const terminalOutputMost = 4 << 20
+
 type terminal struct {
 	cmd    *exec.Cmd
 	mu     sync.Mutex
@@ -865,7 +869,8 @@ func (c *client) CreateTerminal(ctx context.Context, p sdk.CreateTerminalRequest
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	limit := 256 << 10
 	if p.OutputByteLimit != nil && *p.OutputByteLimit > 0 {
-		limit = *p.OutputByteLimit
+		// The runtime asks for its limit; a terminal holds at most terminalOutputMost (#3650).
+		limit = min(*p.OutputByteLimit, terminalOutputMost)
 	}
 	t := &terminal{cmd: cmd, limit: limit, done: make(chan struct{})}
 	cmd.Stdout, cmd.Stderr = t, t

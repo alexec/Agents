@@ -95,4 +95,11 @@ struct DiskSpaceTests {
         let critical = DiskAlarm(reading: almostFull, level: .critical, threshold: 2 * gb)
         #expect(critical.line == "Macintosh HD is almost full: 143 MB free. Agents’ commands will start failing.")
     }
+
+    /// A machine's page (#3626) says every volume's free of total, and its level.
+    @Test func aMachinesPageSaysFreeOfTotal() {
+        #expect(DiskSpace.freeWords(reading(240)) == "240.0 GB free of 1000.0 GB (24%)")
+        #expect(DiskSpace.levelWords(.ok) == "OK")
+        #expect(DiskSpace.levelWords(.critical) == "Almost full")
+    }
 }

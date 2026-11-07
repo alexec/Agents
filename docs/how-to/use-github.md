@@ -167,6 +167,11 @@ when you are one of its reviewers. The row says the tag or branch, and what it w
 - Agents reads the waiting runs every two minutes. A workflow can wait on the github
   server's `deploy.waiting` event instead.
 
+A release to the App Store is one of these (#3657): the **app-store** workflow waits at its
+`app-store` environment, and Approve sends the version to App Review
+([Release Agents Host](release-agents-host.md)). The version is then on the release's Work
+page as **App Store 0.17.0**, after its TestFlight build.
+
 To approve here, the GitHub App `agents-loops` must have the **Deployments** permission
 (read and write). Without it, GitHub refuses the answer and the row says why.
 

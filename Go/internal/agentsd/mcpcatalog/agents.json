@@ -303,6 +303,56 @@
           ]
         }
       }
+        },
+    {
+      "server": {
+        "name": "com.betterstack/mcp",
+        "title": "Better Stack",
+        "description": "Better Stack's official MCP server: monitors, incidents, on-call and status pages, with logs and metrics; sign in to Better Stack",
+        "remotes": [
+          {
+            "type": "streamable-http",
+            "url": "https://mcp.betterstack.com"
+          }
+        ]
+      }
+    },
+    {
+      "server": {
+        "name": "agents/betterstack",
+        "title": "Better Stack events",
+        "description": "One Better Stack team's incidents as events: a monitor behind a status page that failed, and one that works again. Add Better Stack for the tools"
+      },
+      "_meta": {
+        "dev.agentloops/connector": {
+          "command": "betterstack-mcp",
+          "hosted": true,
+          "declares": {
+            "tools": false,
+            "events": [
+              "health.incident_started",
+              "health.incident_resolved"
+            ]
+          },
+          "secrets": [
+            {
+              "name": "BETTERSTACK_API_TOKEN",
+              "description": "An Uptime API token: a team's, or a global one with BETTERSTACK_TEAM",
+              "required": true
+            },
+            {
+              "name": "BETTERSTACK_TEAM",
+              "description": "The team's name, for a global API token; leave it out for a team's own",
+              "required": false
+            },
+            {
+              "name": "BETTERSTACK_URL",
+              "description": "Better Stack's incidents API: https://incidents.betterstack.com when left out",
+              "required": false
+            }
+          ]
+        }
+      }
     }
   ]
 }
