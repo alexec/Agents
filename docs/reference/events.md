@@ -133,6 +133,37 @@ Each folder has a drop box, the folder `.agents/dropbox/` in it. See
 | --- | --- | --- | --- |
 | `dropbox.file_added` | — | path, name, folder, extension, size | A file arrived in this folder's drop box, or a folder in it. `path` is the file's full path on the folder's host. `name` is its name. `folder` is where it is inside `.agents/dropbox/`, such as `review` or `review/2026`, and empty at the top. `extension` is in lower case without the dot, and empty when there is none. `size` is in bytes. Raised once, when the file has stopped changing. A file replaced under the same name, or changed where it lies, is raised again. Files there when the app starts, and names starting with a dot, are not. |
 
+## Files
+
+`file.added` and `file.removed` are about files in the folder (#3795). A wait or a trigger
+on them names the files it watches in `paths`: a list of globs relative to the folder,
+such as `reports/*.csv`. `*` stays in one folder; `**` reaches into folders, as in
+`docs/**/*.md`. A wait or a trigger without `paths` is refused, and so is a glob that starts
+with `/` or goes up with `..`.
+
+| Event | Filter by | Details | What it means |
+| --- | --- | --- | --- |
+| `file.added` | paths (required) | paths, count | Files the globs match appeared: made, copied, pulled or moved in. |
+| `file.removed` | paths (required) | paths, count | Files the globs match went: deleted or moved away. |
+
+- **Only watched paths.** The daemon keeps the globs of the running waits and the turned-on
+  workflow triggers of each folder. A change to a file that no glob matches is dropped
+  before anything is written to the event log, so a folder with no such wait or trigger
+  writes nothing.
+- **Added and removed only.** A move is both: the old path is removed and the new one is
+  added. A file written over under the same name raises nothing. A file still being
+  written is added once, after it stays as it is for 600 ms.
+- **One event for many files.** Every file that comes (or goes) in one look is one event.
+  `paths` is a JSON list of them, relative to the folder, sorted, at most 100; `count` is
+  how many there were. A wait matches when one of the listed paths matches one of its
+  globs.
+- **Left out.** The files the folder's watch leaves out: `.git`, `.agents/worktrees` and
+  build output (`node_modules`, `.build`, `build`, `DerivedData`, `target`, `dist`).
+  `.gitignore` is not read: the glob says which files matter.
+- **From when it watches.** The files there when a wait starts, or when a workflow is read
+  or turned on, are not added.
+- **This machine.** A file event stays on the machine whose folder it is, as `dropbox.*` does.
+
 ## This Mac
 
 These belong to the machine the host runs on, not to a folder. Any agent can wait for them.
