@@ -40,19 +40,26 @@ func platformFolders(root, home string, env func(string) string) Locations {
 	if isTemporary(root) {
 		return Locations{Root: root, Cache: filepath.Join(root, "cache"), Logs: filepath.Join(root, "logs")}
 	}
+	roots := platformRootsFolders(home, env)
+	own := ownName(root)
+	return Locations{Root: root, Cache: filepath.Join(roots[0], own), Logs: filepath.Join(roots[1], own)}
+}
+
+// platformRootsFolders is where the Linux rule puts each root's own folders: the cache's,
+// then the logs'.
+func platformRootsFolders(home string, env func(string) string) [2]string {
 	xdg := func(variable, fallback string) string {
 		if v := env(variable); strings.HasPrefix(v, "/") {
 			return v
 		}
 		return filepath.Join(home, fallback)
 	}
-	own := filepath.Join("roots", fmt.Sprintf("%s-%s", filepath.Base(root), PathHash(root)))
-	return Locations{
-		Root:  root,
-		Cache: filepath.Join(xdg("XDG_CACHE_HOME", ".cache"), "agents", own),
-		Logs:  filepath.Join(xdg("XDG_STATE_HOME", ".local/state"), "agents", "logs", own),
-	}
+	return [2]string{filepath.Join(xdg("XDG_CACHE_HOME", ".cache"), "agents", "roots"),
+		filepath.Join(xdg("XDG_STATE_HOME", ".local/state"), "agents", "logs", "roots")}
 }
+
+// ownName is the name of root's own folder under roots/: <name>-<hash>.
+func ownName(root string) string { return fmt.Sprintf("%s-%s", filepath.Base(root), PathHash(root)) }
 
 func isTemporary(root string) bool {
 	resolved, err := filepath.EvalSymlinks(root)

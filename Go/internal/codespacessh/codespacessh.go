@@ -66,6 +66,50 @@ func Merge(path, label string, generated []byte) error {
 	return nil
 }
 
+// Remove takes the block for label out of the ssh config at path, as Merge put it there,
+// and leaves every other line as it was (#3746). It says whether there was one; with
+// none, the file is not written.
+func Remove(path, label string) (bool, error) {
+	mu.Lock()
+	defer mu.Unlock()
+	current, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("Could not read SSH configuration")
+	}
+	lines := strings.Split(string(current), "\n")
+	first, last := -1, -1
+	for i, line := range lines {
+		if first < 0 && line == Begin(label) {
+			first = i
+		} else if first >= 0 && line == End(label) {
+			last = i
+			break
+		}
+	}
+	if first < 0 || last < 0 {
+		return false, nil
+	}
+	// The blank line Merge put before the block goes with it.
+	if first > 0 && lines[first-1] == "" {
+		first--
+	}
+	text := strings.Join(append(append([]string{}, lines[:first]...), lines[last+1:]...), "\n")
+	if strings.TrimSpace(text) == "" {
+		text = ""
+	}
+	mode := os.FileMode(0o600)
+	if info, err := os.Stat(path); err == nil {
+		mode = info.Mode().Perm()
+	}
+	if err := store.WriteAtomically(path, []byte(text), mode); err != nil {
+		return false, fmt.Errorf("Could not save the SSH configuration")
+	}
+	return true, nil
+}
+
 // replace puts block in place of the lines from begin to end, each a whole line, or after
 // the text when there are none.
 func replace(text, begin, end, block string) string {
