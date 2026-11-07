@@ -1,6 +1,6 @@
 ---
 name: release
-description: Take main to a new version with nobody watching (#914), started by Alex. Every release is a minor (x.y.0), with no patch after it (#3212). Run the three checks once each (runtimes, competitors, the feature matrix; the five reviews are paused until 1.0, #3215), read the Dependabot alerts, have the high issues fixed through the Scrum Master's lanes, check the gate, choose the version, check its milestone, write the notes, tag and push, check the GitHub release and both TestFlight builds, deploy the live control plane, close the milestone, and review how the release went. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
+description: Take main to a new version with nobody watching (#914), started by Alex. Every release is a minor (x.y.0), with no patch after it (#3212). Run the three checks once each (runtimes, competitors, the feature matrix; the five reviews are paused until 1.0, #3215), read the Dependabot alerts, have the high issues fixed through the Scrum Master's lanes, check the gate, choose the version, write the notes with the milestones finished, tag and push, check the GitHub release and both TestFlight builds, deploy the live control plane, close the finished milestones, and review how the release went. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
 ---
 
 # Release
@@ -37,14 +37,15 @@ Alex decided (2026-10-13, #914):
   `priority:medium`, listed as known issues, and worked by the ordinary lanes after the
   release (a bug with no milestone, for the bug lane; the rest as labelled). Low is recorded and not
   worked.
-- **A version has a milestone** (#1348): `0.5.0` is the milestone whose title starts
-  with `0.5 `. The milestone
-  is done when its release has shipped, and this skill closes it then (step 9).
-- **A milestone ships when all its items are closed** (Alex, 2026-11-04, #3465). The
-  open milestone (the earliest) is ready when every issue in it is closed; an open one
-  blocks the release (step 1, gate item 2). It does not move to a later milestone: only
-  Alex takes an issue out of the milestone to ship without it. Work from later milestones
-  merges as usual, and the release ships what is on `main`.
+- **Milestones are themes, not versions** (Alex, 2026-11-06, #3760; replaces #1348). A
+  milestone is named by its theme (`Projects`, `Channels`), and its GitHub due date gives
+  the order. No milestone blocks a release: a release goes out from `main` when something
+  merged since the last tag, at most one a day (step 0). The one exception is
+  `1.0 Public release`: the release that takes the version 1.0.0, which Alex starts, waits
+  until all its items are closed.
+- **A milestone is done when its last item closes** (#3760), not when a release ships. It
+  reaches people in the next release: the notes name it under `## Milestones finished`
+  (step 6), and this skill closes it (step 9).
 - **Security findings stay private** until they ship: a draft GitHub security advisory
   per finding, fixed on its private fork. The paused security review made them; the
   release no longer makes new ones, and hands the unfixed drafts to the Scrum Master as
@@ -89,12 +90,10 @@ calendar day in America/Los_Angeles, not 24 hours since the tag.
 1. Note the time T0, then `git fetch --quiet --tags origin main`.
 2. `.agents/skills/release/scripts/release-plan.py`. It prints the last tag and the next
    version. If it says nothing merged since the last tag, end with `nothing_to_do`.
-3. **Is the milestone done?** (#3465) Find the open milestone, the one the plan names
-   (`gh api 'repos/alexec/Agents/milestones?state=open' --jq '.[]|[.number,.title]|@tsv'`),
-   and its open issues (`gh issue list --milestone "<title>" --state open`). If any is
-   open, end with `nothing_to_do` and the line "milestone <title> not done: #N, #M open".
-   Change nothing and start nothing. Only a prompt from Alex that says to release with
-   them open goes on; then they are known issues (step 6).
+3. No milestone holds the release (#3760). Only for 1.0.0, which Alex's prompt names:
+   when `1.0 Public release` has an open issue
+   (`gh issue list --milestone "1.0 Public release" --state open`), end with `nothing_to_do`
+   and the line "1.0 Public release not done: #N, #M open".
 
 ## 2. Checks, once each
 
@@ -158,7 +157,7 @@ lanes after the release as their label and milestone say (a bug to the bug lane)
 40 minutes with no owner): start one when there are high issues or unfixed draft
 security advisories. Call `start_session` with the persona in
 `.agents/personas/scrum-master.md` (its prompt, `runtime:` and `labels:`), the title
-`<x.y> scrum master` for the version being released, and a prompt that names the milestone,
+`<x.y> scrum master` for the version being released, and a prompt that names the version,
 the high issues in the order above, then the draft security advisory URLs as priority
 work, that the release waits for high issues but not for draft advisories, and that it
 reports to the release session (this one, by its id). The release still starts no fix
@@ -236,9 +235,9 @@ open for item 2 and for the notes' known issues (`git merge-base --is-ancestor <
    one: when the pin's CI was replaced and never ran, start over on the newest main. If a
    run on `<sha>` failed, end with `partly_done`; main broken is fixed by its own PR,
    through the Scrum Master.
-2. **No open high, and the milestone is done:** none of step 3's high issues is open, and
-   none of the milestone's issues is open at the pin (step 1, item 3; #3465). When one
-   closed by a PR that merged after the pin, start over on the newest main from item 1.
+2. **No open high:** none of step 3's high issues is open at the pin (for 1.0.0, none of
+   `1.0 Public release`'s issues either, step 1, item 3). When one closed by a PR that
+   merged after the pin, start over on the newest main from item 1.
 3. **No tag today** (#2462): look again as in step 0. The release can run past midnight, so a
    tag pushed today by another run ends this one with `nothing_to_do` and "released today
    (vX.Y.Z at HH:MM); next release tomorrow", unless Alex's prompt says to release again today.
@@ -276,16 +275,15 @@ open for item 2 and for the notes' known issues (`git merge-base --is-ancestor <
 ## 6. Version and notes
 
 1. Run `release-plan.py --ref <sha>` again, so the plan lists what the pin holds and nothing
-   merged after it. Its `next:` is the version, when it agrees with the open
-   milestone's version beside it. When the plan prints `differs:`, stop before the
-   tag and ask Alex by form which version to use, with the `differs:` line's reason.
-   Renumber the milestones only when Alex says.
-2. **Milestone:** find the version's milestone
-   (`gh api 'repos/alexec/Agents/milestones?state=open' --jq '.[]|[.number,.title]|@tsv'`)
-   and its open issues (`gh issue list --milestone "<title>" --state open`). There should
-   be none (gate item 2). Only when Alex's prompt said to release with them open does
-   each one go into the notes as a known issue.
+   merged after it. Its `next:` is the version (1.0.0 only when Alex's prompt says).
+2. **Milestones finished:** each `finished:` line of the plan is an open milestone whose
+   items are all closed (#3760). Its last item closed since the last tag, as this skill
+   closes each finished milestone in step 9. An item whose closing PR merged after the pin
+   is not in the tag: then the milestone is not finished in this release (`git merge-base
+   --is-ancestor <merge commit> <sha>`).
 3. Write the notes in Markdown, in plain short sentences:
+   - `## Milestones finished`, first, when step 2 found any: a line per milestone, its
+     title and link, `- [Projects](https://github.com/alexec/Agents/milestone/N)`;
    - one heading per kind that has changes, in this order: `## New` (the plan's
      `[enhancement]`), `## Fixed` (`[bug]`) and `## Changed` (the rest, `[tooling]` too), with a line per
      change, from the pull requests the plan lists. A line names the pull request:
@@ -295,8 +293,7 @@ open for item 2 and for the notes' known issues (`git merge-base --is-ancestor <
      workflows) unless they change what a person does;
    - `## Security fixes` with only "This release fixes security problems found by our
      own review." when an advisory was fixed since the last tag. Nothing more;
-   - `## Known issues`: the medium issues still open and the milestone's open issues,
-     one line each with its number.
+   - `## Known issues`: the medium issues still open, one line each with its number.
    - `## Capabilities`, as `python3 .agents/skills/release/scripts/capability-changes.py
      <last tag> <sha>` writes it: the capabilities added, deprecated and removed (#1748,
      `docs/explanation/versions.md`). Nothing when it writes nothing. A minor before 1.0 may
@@ -378,25 +375,20 @@ A tag that already exists for this version means another release ran: end with
    its note. Do not wait for it: it is not part of the gate, and its result is not in
    your report.
 
-## 9. Close the milestone
+## 9. Close the finished milestones
 
-When step 8 found the GitHub release and both TestFlight builds, close the version's
-milestone:
+When step 8 found the GitHub release and both TestFlight builds, close each milestone
+that the notes name under `## Milestones finished` (#3760):
 
-0. **The next milestone** is the open one with the next lowest version. Make no patch
-   milestone (#3212).
-1. Take every open issue out of it (#2455, #3212):
-   `gh issue list --milestone "<title>" --state open --json number --jq '.[].number'`,
-   then `gh issue edit N --remove-milestone` for each one. A milestone never closes with
-   open issues: nothing schedules an issue in a closed milestone. A bug goes to no
-   milestone, where the standing bug lane takes it. A non-bug goes to the backlog, not the
-   next milestone, because an issue gets a milestone only when it serves that milestone's
-   goal (#1340). There is one here only when Alex said to release with it open (step 1).
-2. Look again: the list in 1 is empty. Then close it:
-   `gh api -X PATCH repos/alexec/Agents/milestones/<number> -f state=closed`.
+1. Look again that it has no open issue (#2455):
+   `gh issue list --milestone "<title>" --state open --json number --jq '.[].number'`
+   is empty. A milestone never closes with open issues: nothing schedules an issue in a
+   closed milestone. If one was added since the plan, leave the milestone open and say so
+   in the report.
+2. Close it: `gh api -X PATCH repos/alexec/Agents/milestones/<number> -f state=closed`.
 
-Then the next milestone becomes the open one. Its work did not wait for this release
-(#3465), so there is nothing to unpark. The Scrum Master may not read a message from you
+Make no new milestone. The next milestone is the open one with the earliest due date. Its
+work did not wait for this release (#3465), so there is nothing to unpark. The Scrum Master may not read a message from you
 until Alex speaks to it (#1728), so do the rest yourself:
 
 3. **Lift a hold:** there should be none, as nothing is held for a milestone (#3465) or a
@@ -411,14 +403,14 @@ until Alex speaks to it (#1728), so do the rest yourself:
 4. Tell the Scrum Master (`message_session`) that the release shipped, which PRs you
    released and which you could not.
 
-If step 8 failed, leave the milestone open and say so in the report.
+If step 8 failed, leave the milestones open and say so in the report.
 
 ## 10. Review the release
 
 Decided in #1659: every release reviews itself, briefly, while its times are still in
 this session. Write `~/.agents/reviews/releases/v<version>.md` (outside the folder, so
 nothing is pushed): a timeline from T0 (checks done, highs fixed, gate, tag, GitHub
-release, TestFlight, milestone closed), and a table of each step where a person did
+release, TestFlight, milestones closed), and a table of each step where a person did
 something, why, and the issue that would make it run without one. Search the issues
 first (`gh issue list --state all --search "<words> in:title"`); file a new one, at most
 three, only for a step that has no issue yet, with no milestone. Name no security
@@ -427,6 +419,6 @@ finding. `.agents/reviews/releases/v0.6.0.md` is the first, and the model.
 ## 11. Report
 
 End with `done` and a short table: version, tag, the GitHub release URL, the iOS and
-macOS builds' states, the control plane deploy (healthz, the version served, its bug if it failed), the milestone and whether it is closed, the checks you ran, the issues fixed for this release, the known
+macOS builds' states, the control plane deploy (healthz, the version served, its bug if it failed), the milestones finished and whether each is closed, the checks you ran, the issues fixed for this release, the known
 issues, the advisories that are fixed and ready for Alex to publish, the held PRs you
 released, and the release review's file and issues.
