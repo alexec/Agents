@@ -7,9 +7,12 @@ in memory so the next read shows them; and the project's own WIQL, workitemsbatc
 connectionData (Kim Lee is the token's owner), which the azureboards server's Azure Boards page
 reads (#3826); and the repository acme/Web Shop/shop with one pull request and one Azure
 Pipelines build, which an Azure DevOps folder's set-up reads (#3802), and a no to the token
-"wrong-token"; and that repository's pull requests on the Work pages (#3803): three of them, a
-pull request's threads, builds, a status, its files and their diff, tags, and the writes the
-pages make (a comment, tags, abandon, complete, a vote, a build run again). Scratch data only. Point a run-app host at it with a
+"wrong-token"; the team Payments, whose area path Web Shop\\Payments holds the wallet's
+work items, for a project's board (#3816):
+http://127.0.0.1:<port>/acme/Web%20Shop/_boards/board/t/Payments; and that repository's pull
+requests on the Work pages (#3803): three of them, a pull request's threads, builds, a status,
+its files and their diff, tags, and the writes the pages make (a comment, tags, abandon,
+complete, a vote, a build run again). Scratch data only. Point a run-app host at it with a
 scratch AGENTS_PERSONAL_HOME whose .agents-secrets/secrets.env says
 
     AZURE_DEVOPS_URL=http://127.0.0.1:<port>
@@ -45,15 +48,16 @@ STATES = [("New", "Proposed"), ("Active", "InProgress"), ("Resolved", "Resolved"
 TYPES = {"User Story": STATES, "Bug": STATES[:4], "Task": [("New", "Proposed"), ("Active", "InProgress"), ("Closed", "Completed")],
          "Epic": STATES}
 TAGS = ["checkout", "mobile", "payments", "ux"]
+PAYMENTS = PROJECT + "\\Payments"
 KIM = {"id": "u-kim", "displayName": "Kim Lee", "uniqueName": "kim@example.com", "descriptor": "aad.a2lt"}
 SAM = {"id": "u-sam", "displayName": "Sam Ortiz", "uniqueName": "sam@example.com", "descriptor": "aad.c2Ft"}
 BOT = {"id": "u-bot", "displayName": "Project Collection Build Service (acme)", "uniqueName": "Build\\acme", "descriptor": "svc.YnVpbGQ"}
 
 
-def item(title, kind, state, tags, creator, assignee, changed, description, comments=(), relations=()):
+def item(title, kind, state, tags, creator, assignee, changed, description, comments=(), relations=(), area=PROJECT):
     fields = {"System.Title": title, "System.WorkItemType": kind, "System.State": state, "System.Tags": "; ".join(tags),
               "System.CreatedBy": creator, "System.CreatedDate": ago(150), "System.ChangedDate": changed,
-              "System.TeamProject": PROJECT, "System.AreaPath": PROJECT, "System.Description": description,
+              "System.TeamProject": PROJECT, "System.AreaPath": area, "System.Description": description,
               "System.CommentCount": len(comments)}
     if assignee:
         fields["System.AssignedTo"] = assignee
@@ -67,7 +71,8 @@ def link(rel, n):
 ITEMS = {
     40: item("Pay with a wallet", "Epic", "Active", ["payments"], SAM, SAM, ago(3),
              "<p>Apple Pay and Google Pay at checkout.</p>",
-             relations=[link("System.LinkTypes.Hierarchy-Forward", 41), link("System.LinkTypes.Hierarchy-Forward", 42)]),
+             relations=[link("System.LinkTypes.Hierarchy-Forward", 41), link("System.LinkTypes.Hierarchy-Forward", 42)],
+             area=PAYMENTS),
     41: item("Apple Pay sheet closes before the payment is confirmed", "Bug", "Active", ["payments", "mobile"], SAM, KIM,
              ago(1),
              "<h3>Steps</h3><ol><li>Add an item to the cart</li><li>Pay with <b>Apple Pay</b></li></ol>"
@@ -75,10 +80,11 @@ ITEMS = {
              comments=[{"id": 1, "text": "<p>Seen on iOS 19.1 only.</p>", "createdBy": KIM, "createdDate": ago(2)},
                        {"id": 2, "text": "Build **2.4.1** has the fix.", "format": "markdown", "createdBy": BOT,
                         "createdDate": ago(1.5)}],
-             relations=[link("System.LinkTypes.Hierarchy-Reverse", 40)]),
+             relations=[link("System.LinkTypes.Hierarchy-Reverse", 40)], area=PAYMENTS),
     42: item("Log the payment sheet's dismiss reason", "User Story", "New", ["payments"], KIM, None, ago(4),
              "<p>So we can tell a cancel from a timeout.</p>",
-             relations=[link("System.LinkTypes.Hierarchy-Reverse", 40), link("System.LinkTypes.Dependency-Reverse", 41)]),
+             relations=[link("System.LinkTypes.Hierarchy-Reverse", 40), link("System.LinkTypes.Dependency-Reverse", 41)],
+             area=PAYMENTS),
     43: item("Coupon field hides behind the keyboard", "User Story", "Resolved", ["checkout", "ux"], SAM, SAM,
              ago(1.25), "<p>On a small phone the coupon field is under the keyboard.</p>"),
 }
@@ -140,6 +146,11 @@ def wiql(query):
         ids = [n for n in ids if ITEMS[n]["fields"]["System.WorkItemType"] == m.group(1)]
     for tag in re.findall(r"\[System\.Tags\] CONTAINS '([^']*)'", query):
         ids = [n for n in ids if tag.lower() in [t.strip().lower() for t in ITEMS[n]["fields"]["System.Tags"].split(";")]]
+    areas = re.findall(r"\[System\.AreaPath\] (UNDER|=) '([^']*)'", query)
+    if areas:
+        def within(path):
+            return any(path == a or (op == "UNDER" and path.startswith(a + "\\")) for op, a in areas)
+        ids = [n for n in ids if within(ITEMS[n]["fields"]["System.AreaPath"])]
     m = re.search(r"\[System\.Title\] CONTAINS '([^']*)'", query)
     if m:
         ids = [n for n in ids if m.group(1).lower() in ITEMS[n]["fields"]["System.Title"].lower()]
@@ -202,6 +213,9 @@ class Handler(BaseHTTPRequestHandler):
         if method == "GET" and m:
             n = int(m.group(1))
             return self.answer(full(n)) if n in ITEMS else self.answer({"message": "TF401232: Work item does not exist"}, 404)
+        if method == "GET" and lower == f"/acme/{PROJECT}/Payments/_apis/work/teamsettings/teamfieldvalues".lower():
+            return self.answer({"field": {"referenceName": "System.AreaPath"}, "defaultValue": PAYMENTS,
+                                "values": [{"value": PAYMENTS, "includeChildren": True}]})
         if not lower.startswith(project):
             return self.answer({"message": f"the fixture has no {method} {path}"}, 404)
         rest = path[len(project):]

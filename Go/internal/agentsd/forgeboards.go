@@ -11,7 +11,8 @@ import (
 )
 
 // Boards (#3282, specs/3273-project-unit "Boards"): a project's Tasks slot holds one or more
-// boards (a GitHub Projects board, a Jira board, a Linear team, a GitLab group board), which
+// boards (a GitHub Projects board, a Jira board, a Linear team, a GitLab group board, an Azure
+// Boards board), which
 // the control plane sends with the project's slots (machine/projects). forge/boards lists the
 // boards of this machine's folders' projects, for Work's Board filter; forge/issues' board
 // narrows a list to one board, read on the board's own forge:
@@ -21,6 +22,8 @@ import (
 //     under the board's group, on the connected GitLab.
 //   - Linear: the team.
 //   - Jira: the board's filter.
+//   - Azure Boards (#3816): the work items under the team's area paths, in its project, on the
+//     connected Azure DevOps.
 //
 // Forgejo has project boards, but its API (11) cannot read them, so a list narrowed to a board
 // lists no Forgejo items (#3835).
@@ -87,13 +90,16 @@ type forgeBoard struct {
 	id    int
 	// jira is a Jira board's id.
 	jira string
+	// azureProject and azureTeam are an Azure Boards board's: organization/project in lower
+	// case, and the team's name. azureSite is the Azure DevOps it is on.
+	azureProject, azureTeam, azureSite string
 }
 
 func (b *forgeBoard) key() []any {
 	if b == nil {
 		return nil
 	}
-	return []any{b.project, b.group, b.id, b.jira}
+	return []any{b.project, b.group, b.id, b.jira, b.azureProject, b.azureTeam, b.azureSite}
 }
 
 // narrowToBoard keeps of s only what is on the board's forge, and says what to read there.
@@ -103,6 +109,8 @@ func narrowToBoard(s *forgeSources, b wire.ProjectBoard, in []string, prs bool) 
 	repos, gitlab := s.repos, s.gitlab
 	s.repos, s.gitlab, s.teams, s.projects, s.workspace, s.gitlabErr = nil, nil, nil, nil, false, nil
 	s.forgejo, s.forgejoErr = nil, nil
+	boards := s.boards
+	s.boards = nil
 	switch *b.Forge {
 	case wire.ConnectionProviderGithub:
 		s.repos, board.project = repos, key
@@ -128,6 +136,18 @@ func narrowToBoard(s *forgeSources, b wire.ProjectBoard, in []string, prs bool) 
 	case wire.ConnectionProviderAtlassian:
 		if !prs {
 			board.jira = key
+		}
+	case wire.ConnectionProviderAzuredevops:
+		at := strings.LastIndex(key, "/")
+		if prs || at < 0 {
+			break
+		}
+		project := strings.ToLower(key[:at])
+		board.azureProject, board.azureTeam, board.azureSite = project, key[at+1:], deref(b.Site)
+		s.boards = []string{project}
+		if !slices.Contains(boards, project) {
+			// No folder names the project: its work items act from the board's first folder.
+			s.boardsFolder[project] = board.home
 		}
 	}
 	return board

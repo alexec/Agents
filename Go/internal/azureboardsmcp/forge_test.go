@@ -101,6 +101,11 @@ func (f *fakeBoards) serveForge(w http.ResponseWriter, r *http.Request, answer f
 		f.apply(it, ops)
 		f.items[id] = it
 		answer(full(id, it))
+	case r.URL.Path == "/acme/Web App/Payments/_apis/work/teamsettings/teamfieldvalues" && q.Get("api-version") == apiVersion:
+		answer(obj{"field": obj{"referenceName": fieldArea}, "defaultValue": `Web App\Payments`,
+			"values": []obj{{"value": `Web App\Payments`, "includeChildren": true}, {"value": "Web App", "includeChildren": false}}})
+	case r.URL.Path == "/acme/Web App/Custom/_apis/work/teamsettings/teamfieldvalues":
+		answer(obj{"field": obj{"referenceName": "Acme.Team"}, "values": []obj{{"value": "Custom"}}})
 	case r.URL.Path == "/acme/Web App/_apis/wit/tags" && q.Get("api-version") == tagsVersion:
 		answer(obj{"count": 2, "value": []obj{{"id": "t1", "name": "billing"}, {"id": "t2", "name": "ux"}}})
 	default:
@@ -347,5 +352,23 @@ func TestForgePlanAndItsWrites(t *testing.T) {
 	}
 	if !slices.Equal(blockers, []string{"3", "5"}) {
 		t.Fatalf("4's predecessors: %v", blockers)
+	}
+}
+
+// #3816: a board's team is its area paths, and a list narrowed to it is the work items in them;
+// a team by another field is refused.
+func TestForgeTeamAreas(t *testing.T) {
+	_, b := forgeFake(t)
+	ctx := context.Background()
+	areas, err := b.TeamAreas(ctx, "acme/Web App", "Payments")
+	if err != nil || !slices.Equal(areas, []Area{{Path: `Web App\Payments`, Under: true}, {Path: "Web App"}}) {
+		t.Fatalf("areas: %v %+v", err, areas)
+	}
+	got := SearchWhere([]string{"acme/Web App"}, SearchFilter{State: "all", Areas: areas}, []string{"Closed"})
+	if want := `[System.TeamProject] IN ('Web App') AND ([System.AreaPath] UNDER 'Web App\Payments' OR [System.AreaPath] = 'Web App')`; got != want {
+		t.Fatalf("where:\n%s\nnot\n%s", got, want)
+	}
+	if _, err := b.TeamAreas(ctx, "acme/Web App", "Custom"); err == nil || !strings.Contains(err.Error(), "Acme.Team") {
+		t.Fatalf("a custom team field: %v", err)
 	}
 }

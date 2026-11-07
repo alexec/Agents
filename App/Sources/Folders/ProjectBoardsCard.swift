@@ -2,7 +2,7 @@ import AgentsKitCore
 import SwiftUI
 
 /// The boards in a project's Tasks slot (#3282, specs/3273-project-unit "Boards"): a GitHub
-/// Projects board, a Jira board, a Linear team or a GitLab group board, each with a name (the
+/// Projects board, a Jira board, a Linear team, a GitLab group board or an Azure Boards board, each with a name (the
 /// team's). Work ▸ Issues and Features show one board at a time. The owner or an admin adds and
 /// removes them; the control plane reads each board from its address. Mac + web: the Remote
 /// keeps no settings (#2798).
