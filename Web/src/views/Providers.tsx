@@ -1,12 +1,13 @@
 // Settings ▸ Machine providers (#1808), the window's Settings ▸ Machine Providers: each
 // provider as a card of its workspaces, Add Provider… (kind first, then its short form), Edit…,
-// List Again and Remove…, and on a workspace Add as Machine…, Link to Host…, Start, Stop and Unlink.
+// List Again and Remove…, and on a workspace Add as Machine…, Link to Host…, Start, Stop, Stop when
+// idle and Unlink.
 // Add and Edit… choose the machine that carries it, and its card says which (#3496).
 import { useEffect, useState } from "preact/hooks";
 import type { ControlMachine, ProviderSummary, MachineInfo } from "../protocol/generated";
 import type { Store } from "../model/store";
 import {
-  addAsMachine, carrierChoices, carrierLine, carrierStart, defaultIdleMinutes, idleChoices, kindChip, kindFields, kindNeeds,
+  addAsMachine, carrierChoices, carrierLine, carrierStart, defaultIdleMinutes, idleChoices, idleRowWords, kindChip, kindFields, kindNeeds,
   kindOfPreset, kindTitle, linkableHosts, mayBe, movesTo, noHostLine, providerKinds, providerLine, providerRequest, providerWords as words, sshDestination, workspaceLine, type ProviderKind,
 } from "../model/machineProviders";
 import { Modal } from "./Modal";
@@ -125,6 +126,7 @@ function WorkspaceRow({ store, provider, workspace, hosts, say, link, install }:
     if (!host || !window.confirm(`Unlink ${host.name} from ${workspace.name}? ${provider.name} can no longer start or stop it.`)) return;
     say(await store.providers.unlink(host.id));
   };
+  const setIdle = async (minutes: number) => { if (host) say(await store.providers.setIdle(host.id, minutes)); };
   const free = linkableHosts(workspace, hosts);
   const noHost = noHostLine(workspace, hosts);
   const adding = addAsMachine(workspace);
@@ -140,6 +142,12 @@ function WorkspaceRow({ store, provider, workspace, hosts, say, link, install }:
         <button type="button" disabled={starting} onClick={() => void store.startHost(host.id)}>{starting ? "Starting…" : "Start"}</button>
       )}
       {host && linked?.canStop && <button type="button" onClick={() => void stop()}>Stop</button>}
+      {host && linked && (
+        <select aria-label={`${host.name}: Stop when idle`} title="Stop when idle" value={String(linked.stopWhenIdleMinutes ?? 0)}
+          onChange={(e) => void setIdle(Number((e.currentTarget as HTMLSelectElement).value))}>
+          {idleChoices.map((c) => <option key={c.minutes} value={String(c.minutes)}>{idleRowWords(c.minutes)}</option>)}
+        </select>
+      )}
       {host && <button type="button" class="link small" onClick={() => void unlink()}>Unlink</button>}
       {!workspace.host && free.length > 0 && (
         <button type="button" onClick={link}>

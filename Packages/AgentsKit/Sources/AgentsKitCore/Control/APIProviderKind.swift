@@ -221,8 +221,8 @@ public enum MachineProviderWords {
         return free.filter { mayBe(workspace, hostName: $0.name) } + free.filter { !mayBe(workspace, hostName: $0.name) }
     }
 
-    /// The Stop when idle choices, in minutes; 0 is Off.
+    /// The Stop when idle choices, in minutes; 0 is Never.
     public static let idleChoices: [(minutes: Int, label: String)] = [
-        (0, "Off"), (15, "After 15 minutes"), (30, "After 30 minutes"), (60, "After 1 hour"), (120, "After 2 hours"),
+        (0, "Never"), (15, "After 15 minutes"), (30, "After 30 minutes"), (60, "After 1 hour"), (120, "After 2 hours"),
     ]
 }
