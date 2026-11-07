@@ -20,7 +20,7 @@ import (
 
 // movesFolders is RuntimeCatalog.canMoveFolders: the runtimes that carry a conversation
 // into another folder (053 research R3).
-var movesFolders = map[string]bool{"claude": true, "copilot": true, "cursor": true, "codex": true}
+var movesFolders = map[string]bool{"claude": true, "copilot": true, "cursor": true, "codex": true, "antigravity": true}
 
 // runtimeCanMove is whether a runtime carries its conversation into another folder.
 func runtimeCanMove(id string) bool { return movesFolders[id] }

@@ -286,3 +286,46 @@ func TestBackupsFromBeforeTheirOwnKeyStillOpen(t *testing.T) {
 		}
 	}
 }
+
+// #3648: a host's backups take at most its quota, the newest always kept; one backup
+// bigger than the quota is refused; and a name for a time not yet come is refused, and
+// a stray part with one goes, so no part outlives its age by its name.
+func TestBackupsKeepToTheQuotaAndNoNameAhead(t *testing.T) {
+	t.Parallel()
+	b, st, owner := backupPlane(t)
+	b.now = func() time.Time { return time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC) }
+	// A part of four bytes is 32 sealed: two backups fit, three do not.
+	b.quota = 70
+	four := []byte("four")
+	for _, name := range []string{"20261019T010000Z", "20261019T020000Z", "20261019T030000Z"} {
+		if _, err := putBackup(t, b, "a", name, [][]byte{four}, 10); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var mine []string
+	for _, l := range storedList(t, b, "a") {
+		mine = append(mine, l.ID)
+	}
+	if strings.Join(mine, " ") != "a/20261019T030000Z a/20261019T020000Z" {
+		t.Fatalf("kept %v under a quota of 70 bytes", mine)
+	}
+	if _, err := putBackup(t, b, "a", "20261019T040000Z", [][]byte{four, four, four, four}, 10); err == nil {
+		t.Fatal("a backup over the quota went up")
+	}
+	if _, err := b.said("backups/upload", "a", raw(t, wire.BackupStorePart{Name: "20261022T000000Z", Part: 0, Data: four})); err == nil {
+		t.Fatal("a part named two days ahead went up")
+	}
+	// One put there by a host whose clock was out, before the refusal: the next prune
+	// deletes it.
+	folder := b.hostFolder(owner, "a")
+	st.Put(context.Background(), partKey(folder, "20271020T000000Z", 0), four, store.Always)
+	if _, err := putBackup(t, b, "a", "20261020T110000Z", [][]byte{four}, 10); err != nil {
+		t.Fatal(err)
+	}
+	keys, _ := st.List(context.Background(), folder)
+	for _, k := range keys {
+		if strings.Contains(k.Key, "20271020T000000Z") || strings.Contains(k.Key, "20261019T040000Z") {
+			t.Fatalf("a's folder still holds %s", k.Key)
+		}
+	}
+}

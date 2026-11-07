@@ -32,7 +32,7 @@ Mac.
 
 | Store | What it keeps | How long, how large | Applied |
 | --- | --- | --- | --- |
-| `agents/<id>/agent.json`, `transcript.jsonl` | Each agent's record and its whole conversation | Until the agent is deleted. An archived agent is deleted after **Archived agents** (7, 14, 30 or 90 days, or Forever; 30 by default). A pinned agent is kept. A conversation has no size limit. | At start, then hourly |
+| `agents/<id>/agent.json`, `transcript.jsonl` | Each agent's record and its whole conversation | Until the agent is deleted. An archived agent is deleted after **Archived agents** (7, 14, 30 or 90 days, or Forever; 30 by default). A pinned agent is kept. A conversation has no size limit, on purpose: Archived agents bounds it (#3648). | At start, then hourly |
 | `agents/<id>/app-tools.jsonl` | Each call to the app's own tools | With the agent. Each argument and the answer are cut to 2,000 characters. | With the agent |
 | `agents/<id>/said.json` | A search index of what was said | 32 KiB, with the agent | On write |
 | `turns/<id>.jsonl`, in the cache folder | A summary of each turn | With the agent. Made again from the transcript when it is missing. | With the agent |
@@ -76,7 +76,7 @@ Mac.
 | `guarded-files.json` | Guarded file states | The folders that exist | On write |
 | `org-routes/`, `runtimes/org/` | Org key routes and their stand-in homes | 50 routes | On delivery |
 | `runtimes/accounts/<runtime>/<id>/` | The home of each runtime account you added, **with that runtime's own transcripts** | Until the account is removed | On remove |
-| `browser/profile/` | One browser profile for every browser sign-in | **None** | Never |
+| `browser/profile/` | One browser profile for every browser sign-in, and its caches | Sign-ins until the site ends them or you clear the site in Settings ▸ Browser. The caches are emptied before each start, and the HTTP cache stays under 64 MB while it runs (#3727). | At each browser start |
 | `folders.json`, `policy*.json`, `backup-settings.json`, `settings/`, and other small files | Configuration | A fixed shape | — |
 | `<file>.unreadable-<time>`, `<file>.corrupt-<time>` | A store that could not be read, set aside | The newest 3 of each kind for each file | On write |
 
@@ -84,7 +84,7 @@ Mac.
 
 | Store | What it keeps | How long, how large | Applied |
 | --- | --- | --- | --- |
-| `backups/<machine>/` | This machine's backups | The newest **Keep** (1 to 10, 3 by default); a `.tmp` after 24 hours. **Another machine's backups in a shared backup folder are never pruned.** | After each backup |
+| `backups/<machine>/` | This machine's backups | The newest **Keep** (1 to 10, 3 by default); a `.tmp` after 24 hours. Another machine's backups in a shared backup folder go 90 days after its newest (#3648). | After each backup |
 | `backups-upload/`, `backups-download/` | A server backup on its way | Removed after use | On use |
 | `.restore-*` | A restore in progress | Removed when it ends; one a crash left goes at the next start (#3649) | At end; at start |
 | `Outgoing/`, `Incoming/` | Exports, sends and imports | 1 hour untouched | On the next transfer, at start and hourly (#3649) |
@@ -98,6 +98,7 @@ Mac.
 | `mcp-logs/`, in the log folder | What each hosted MCP server wrote to stderr | 1 MB and one older file a server, and the newest 32 servers. A larger write is split, so no file passes 1 MB. | When a server starts |
 | `tools/<runtime>/`, in the cache folder | Pinned runtime toolsets | The current one | At start |
 | `browser/`, in the cache folder | The browser that agents drive, and its output | Old browser versions are left to Playwright. Output goes when the session ends; what a crash left goes at the next start (#3649) | On install; at session end; at start |
+| The Mac browser pane's website data (WebKit's default store) | The sign-ins of every site the pane opened, and its caches | Sign-ins until the site ends them. The caches are emptied once each time the app starts (#3727). | At the first pane of each launch |
 | `catalog-staging/`, in the cache folder | Skill previews | 8 previews, 30 minutes; folders left by a restart go at the next start (#3649) | On use; at start |
 | `option-cache.json`, in the cache folder | Runtime options | 50 | On write |
 | Cache and log folders of each other data folder (`roots/<name>-<hash>`) | As above, for a second copy | **None.** Not removed when that data folder is deleted. | Never |
@@ -120,7 +121,7 @@ These are in `<folder>/.agents/`.
 | Store | What it keeps | How long, how large | Applied |
 | --- | --- | --- | --- |
 | `attachments/` | Files attached to prompts | A file that no kept conversation names goes after 7 days. The folder stays under 500 MB, oldest first. A folder with no agent left is swept too: `attachment-folders.json` lists each folder an attachment was written in, until it holds none (#3649). | At start, hourly and on write |
-| `dropbox/` | Files handed to a workflow | 25 MB a file. **No total, count or age limit.** | Never |
+| `dropbox/` | Files handed to a workflow | 25 MB a file and 500 MB a folder from **dropbox/put**; a put past the total is refused. A cut-off put's `.part` after 24 hours. **A file put there is the person's: no age limit** (#3648). | On put; hourly |
 | `worktrees/<name>`, and branch `agents/<name>` | Git worktrees that agents made | **None.** Archive and delete leave them. | Only when removed |
 | `reviews/runtimes/`, `workflows/assess-<id>.md` | Runtime assessment reports | **None** | Never |
 | `pins.json` | Pinned sessions and hidden views | 10 sessions, 50 hidden views | On write |
@@ -205,10 +206,10 @@ the other copies of the control plane learn that it went.
 | Records | What they keep | How long, how large | Applied |
 | --- | --- | --- | --- |
 | Audit events | Who did what (see [Security overview](security-overview.md#who-did-what)) | 90 days by default; an admin sets 1 to 3,650 days (hosted: 7 or 90). No size limit a day. | Hourly, by day |
-| Change events between copies | What changed, when the control plane has several copies | **As long as the audit, so up to 10 years** | Hourly, by day |
+| Change events between copies | What changed, when the control plane has several copies | 1 day, in `v1/mesh/events/` (#3648) | Hourly, by day |
 | Audit seals and sinks | Each day's chain head; up to 4 SIEM sinks with sealed tokens | With the day; 4 sinks | Hourly |
 | Keys | The sealed control key and the previous one; the sealed key for server backups | 2; the previous one 30 days | — |
-| Server backups | Servers' sealed backups (their transcripts) | The newest **Keep** of each server (1 to 10). Up to 8 GiB a backup, **so up to about 80 GiB a server.** A removed server's for 90 days after its newest. | After each backup, and daily |
+| Server backups | Servers' sealed backups (their transcripts) | The newest **Keep** of each server (1 to 10). At most 20 GiB a server, the newest always kept; a backup over 20 GiB is refused (#3648). A removed server's for 90 days after its newest. A cut-off backup's parts after a day; a name more than a day ahead is refused, and its parts deleted. | After each backup, and daily |
 | Leases and heartbeats | Which copy holds what | 30 seconds | Hourly |
 | Move forwarding and marks | Where a moved control plane went | Forwarding 30 days. **A mark left by a move that stopped stays.** | — |
 
@@ -226,7 +227,7 @@ service keeps these records.
 | Invites | Expiry, and **who used it** | 14 days to use it. Kept after use, until **Delete Account**. |
 | Waitlist | Who asked to join | 10,000; removed on sign-up |
 | Stripe events | Stripe event IDs already seen | 30 days, swept daily |
-| Operator backups | Each account's store, on the operator's disk | **None, unless the operator sets `--keep`** |
+| Operator backups | Each account's store, on the operator's disk | The newest 7 by default; `--keep N` sets it, `--keep 0` keeps all (#3648) |
 
 The service keeps nothing for a signed-in browser: a session is a signed cookie for 30 days.
 
