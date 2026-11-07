@@ -25,9 +25,10 @@ const adminUsage = `usage: agents-hosted admin <verb> …
   accounts                   every account
   suspend <account> <why>    stop its control plane; the person reads why
   unsuspend <account>        let it start again
-  block <sign-in> [why]      refuse a sign-in, and suspend its account: provider:subject
-                             (apple:…, google:…, github:…), a GitHub id or a GitHub login
-  unblock <sign-in>          let it sign up again: provider:subject or a GitHub id
+  block <sign-in> [why]      refuse a sign-in and its account's email, and suspend its
+                             account: provider:subject (apple:…, google:…, github:…), a
+                             GitHub id or a GitHub login; or an email, from every provider
+  unblock <sign-in>          let it sign up again: provider:subject, a GitHub id or an email
   plan <account> free|pro    put an account on a plan by hand
   backup [--keep N] <dir> [account…]
                              copy accounts (every one when none is named) into dir;
@@ -36,7 +37,8 @@ const adminUsage = `usage: agents-hosted admin <verb> …
   restore <dir> <account>    put one suspended or deleted account back from dir
   delete <account>           delete a suspended account and everything it keeps
 
-It reads AGENTS_STORE and AGENTS_HOSTED_DOMAIN, as serve does.`
+It reads AGENTS_STORE and AGENTS_HOSTED_DOMAIN, as serve does, and AGENTS_CONTROL_KMS
+for a block by email.`
 
 // backupKeepDefault is backup's --keep when none is given.
 const backupKeepDefault = 7
@@ -57,7 +59,7 @@ func admin(args []string, out, errOut io.Writer) int {
 		fmt.Fprintln(errOut, "agents-hosted admin: "+err.Error())
 		return 1
 	}
-	a := hosted.Admin{Store: st, Domain: strings.ToLower(os.Getenv("AGENTS_HOSTED_DOMAIN"))}
+	a := hosted.Admin{Store: st, Domain: strings.ToLower(os.Getenv("AGENTS_HOSTED_DOMAIN")), Keeper: os.Getenv("AGENTS_CONTROL_KMS")}
 	limit := 2 * time.Minute
 	if args[0] == "backup" || args[0] == "restore" {
 		limit = 6 * time.Hour
@@ -157,7 +159,9 @@ func runAdmin(ctx context.Context, a hosted.Admin, args []string, out io.Writer)
 			return err
 		}
 		user, err := a.Block(ctx, rest[0], strings.Join(rest[1:], " "))
-		if err == nil {
+		if err == nil && user.Provider == "" {
+			fmt.Fprintln(out, "blocked that email")
+		} else if err == nil {
 			fmt.Fprintf(out, "blocked %s\n", user)
 		}
 		return err

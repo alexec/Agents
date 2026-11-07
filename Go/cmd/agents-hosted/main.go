@@ -36,7 +36,7 @@
 //
 // Who may sign up, and the limits that keep the service whole (#2152, spec 1003):
 //
-//	AGENTS_HOSTED_SIGNUP               invite (the default), open or closed
+//	AGENTS_HOSTED_SIGNUP               invite (the default), open (a verified email, #3388) or closed
 //	AGENTS_HOSTED_MAX_ACCOUNTS         the most accounts, 100; then a waitlist
 //	AGENTS_HOSTED_MIN_GITHUB_AGE       the youngest GitHub account, in days, 30
 //	AGENTS_HOSTED_SIGNUPS_PER_ADDRESS  new accounts and waitlist entries an hour from one address, 3
@@ -46,6 +46,8 @@
 //	AGENTS_HOSTED_CERTS_PER_WEEK       new certificates a week, 40
 //	AGENTS_HOSTED_STORAGE_TOTAL_GB     the most the plans' storage may add up to over all
 //	                                   accounts (#3121); a file store's disk to 90% when unset
+//	AGENTS_HOSTED_TURNSTILE_SITE_KEY   Cloudflare Turnstile on the sign-up page (#3388), with
+//	AGENTS_HOSTED_TURNSTILE_SECRET     its secret key; both or neither, and neither is off
 //
 // Billing (#2225), off without a key:
 //
@@ -128,7 +130,8 @@ func serve() error {
 		ViewsDomain: os.Getenv("AGENTS_HOSTED_VIEWS_DOMAIN"), TrustedProxies: trusted, Log: logf,
 		SignUp:    strings.ToLower(os.Getenv("AGENTS_HOSTED_SIGNUP")),
 		StripeKey: os.Getenv("AGENTS_HOSTED_STRIPE_KEY"), StripePrice: os.Getenv("AGENTS_HOSTED_STRIPE_PRICE"),
-		StripeWebhookSecret: os.Getenv("AGENTS_HOSTED_STRIPE_WEBHOOK_SECRET")}
+		StripeWebhookSecret: os.Getenv("AGENTS_HOSTED_STRIPE_WEBHOOK_SECRET"),
+		TurnstileSiteKey:    os.Getenv("AGENTS_HOSTED_TURNSTILE_SITE_KEY"), TurnstileSecret: os.Getenv("AGENTS_HOSTED_TURNSTILE_SECRET")}
 	for name, into := range map[string]*int{"AGENTS_HOSTED_MAX_ACCOUNTS": &cfg.MaxAccounts,
 		"AGENTS_HOSTED_SIGNUPS_PER_ADDRESS": &cfg.SignUpsPerAddress, "AGENTS_HOSTED_SIGNUPS_PER_HOUR": &cfg.SignUpsPerHour,
 		"AGENTS_HOSTED_MAX_COPIES": &cfg.MaxCopies, "AGENTS_HOSTED_CERTS_PER_HOUR": &cfg.CertsPerHour,

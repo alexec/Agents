@@ -21,7 +21,7 @@ import (
 //	agents_hosted_waitlist                    people on the waitlist
 //	agents_hosted_copies_running              control planes running now
 //	agents_hosted_signups_total{kind}         new accounts and waitlist entries
-//	agents_hosted_refusals_total{kind}        refusals: blocked, closed, rate, waitlist_full,
+//	agents_hosted_refusals_total{kind}        refusals: blocked, closed, no_email, turnstile, rate, waitlist_full,
 //	                                          store, full, suspended, certificates, upgrade_full,
 //	                                          disk, and each plan limit (machines, clients,
 //	                                          storage, connections)
