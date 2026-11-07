@@ -48,6 +48,10 @@ import (
 // Email (#1780) has no sign-in page: the person gives an IMAP server, a user and an app
 // password (connections/sign-in/email). The host signs in once to check them, and keeps them
 // for the email server. An app password does not end.
+//
+// Forgejo (#3752) has no device flow either: the person makes an access token on Codeberg or
+// any Forgejo or Gitea (connections/sign-in/token), and the host checks it with that Forgejo
+// and keeps it with its address. A Forgejo token does not end.
 
 var (
 	// connectionWaitLimit is one long poll of connections/sign-in/wait.
@@ -71,6 +75,8 @@ type connectionBook struct {
 	connStoreFor func() (connections.Store, error)
 	// gitlabHTTP checks a GitLab access token; a test gives a fake GitLab's client.
 	gitlabHTTP *http.Client
+	// forgejoHTTP checks a Forgejo access token; a test gives a fake Forgejo's client.
+	forgejoHTTP *http.Client
 	// emailCheck signs in to an IMAP server once; emailmcp.Check when nil.
 	emailCheck func(context.Context, emailmcp.Account) error
 	// jiraHTTP reads a Jira site; a test gives a fake Jira's client.
@@ -165,7 +171,7 @@ func (d *Daemon) registerConnections() {
 
 func knownProvider(p wire.ConnectionProvider) bool {
 	return p == wire.ConnectionProviderGithub || p == wire.ConnectionProviderLinear || p == wire.ConnectionProviderGitlab ||
-		p == wire.ConnectionProviderEmail || p == wire.ConnectionProviderAtlassian
+		p == wire.ConnectionProviderEmail || p == wire.ConnectionProviderAtlassian || p == wire.ConnectionProviderForgejo
 }
 
 // codeFlowProvider is a provider whose sign-in is the authorization code with PKCE.
@@ -285,6 +291,9 @@ func (d *Daemon) connectionSignIn(ctx context.Context, p wire.ConnectionProvider
 	}
 	if p == wire.ConnectionProviderEmail {
 		return wire.ConnectionSignIn{}, invalid("Email has no sign-in page: connect it with its IMAP server, user and app password.")
+	}
+	if p == wire.ConnectionProviderForgejo {
+		return wire.ConnectionSignIn{}, invalid("Forgejo has no sign-in page: connect it with an access token.")
 	}
 	if origin != "" {
 		o, err := connections.CleanOrigin(origin)
@@ -506,11 +515,14 @@ func (d *Daemon) spendCode(ctx context.Context, f *connectionFlow, code string) 
 // connectionSignInToken checks a personal access token with the GitLab at r.URL and keeps it.
 // The token is in no log and no answer; a failure says what failed, in words.
 func (d *Daemon) connectionSignInToken(ctx context.Context, r wire.ConnectionTokenRequest) (wire.ConnectionTokenAnswer, error) {
-	if r.Provider == wire.ConnectionProviderAtlassian {
+	switch r.Provider {
+	case wire.ConnectionProviderAtlassian:
 		return d.connectionSignInJiraToken(ctx, r)
-	}
-	if r.Provider != wire.ConnectionProviderGitlab {
-		return wire.ConnectionTokenAnswer{}, invalid("Agents takes an access token only for GitLab and Jira.")
+	case wire.ConnectionProviderForgejo:
+		return d.connectionSignInForgejoToken(ctx, r)
+	case wire.ConnectionProviderGitlab:
+	default:
+		return wire.ConnectionTokenAnswer{}, invalid("Agents takes an access token only for GitLab, Forgejo and Jira.")
 	}
 	fail := func(why string) (wire.ConnectionTokenAnswer, error) {
 		log.Printf("connections: %s token not taken", r.Provider)
@@ -539,6 +551,44 @@ func (d *Daemon) connectionSignInToken(ctx context.Context, r wire.ConnectionTok
 		return fail(sentence(err.Error()))
 	}
 	c := connections.GitLabConnection(root, token, t, time.Now())
+	d.connRenew.Lock()
+	err = s.Put(c)
+	d.connRenew.Unlock()
+	if err != nil {
+		return fail(sentence(err.Error()))
+	}
+	log.Printf("connections: %s connected with a token", r.Provider)
+	w := wireConnection(c)
+	return wire.ConnectionTokenAnswer{Connection: &w}, nil
+}
+
+// connectionSignInForgejoToken checks an access token with the Forgejo at r.URL (Codeberg when
+// it is left out) and keeps it. The token is in no log and no answer; a failure says what
+// failed, in words.
+func (d *Daemon) connectionSignInForgejoToken(ctx context.Context, r wire.ConnectionTokenRequest) (wire.ConnectionTokenAnswer, error) {
+	fail := func(why string) (wire.ConnectionTokenAnswer, error) {
+		log.Printf("connections: %s token not taken", r.Provider)
+		return wire.ConnectionTokenAnswer{Error: &why}, nil
+	}
+	token := strings.TrimSpace(r.Token)
+	if token == "" || strings.ContainsAny(token, " \t\r\n") {
+		return fail("Paste the access token: one word.")
+	}
+	root, err := connections.ForgejoRoot(deref(r.URL))
+	if err != nil {
+		return fail(sentence(err.Error()))
+	}
+	s, err := d.connectionStore()
+	if err != nil {
+		return wire.ConnectionTokenAnswer{}, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	login, err := connections.CheckForgejoToken(ctx, d.forgejoHTTP, root, token)
+	if err != nil {
+		return fail(sentence(err.Error()))
+	}
+	c := connections.ForgejoConnection(root, token, login, time.Now())
 	d.connRenew.Lock()
 	err = s.Put(c)
 	d.connRenew.Unlock()
