@@ -1,6 +1,11 @@
 ---
 name: Runtime check
-on: manual
+on:
+  - schedule:
+      at: [":00"]
+      between: "02:00-02:00"
+      days: [tue, fri]
+cooldown: 60h
 agent: new
 runtime: claude
 runs-on: [8AB85821-9D24-59CE-9737-8FC556923733]
@@ -9,8 +14,8 @@ when-done: archive
 permission-mode: auto
 ---
 
-You run once per release, started by the Release run (#1462). Update each agent runtime
-to its latest release and test it against the app (#39), with
+You run on Tuesday and Friday, and once per release, started by the Release run
+(#1462). Update each agent runtime to its latest release and test it against the app (#39), with
 `scripts/nightly-runtimes.py`. Run every command from the folder, and change no file
 or branch yourself: the script works in a tree of its own.
 
