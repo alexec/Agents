@@ -208,11 +208,11 @@ public enum EventPatternProblem: Error, Hashable, Sendable {
                 + "or a subject with .* such as agent.*."
         case .retiredCustom(let name):
             return "\"\(name)\" is never raised: agents no longer publish events, so there are no custom.* "
-                + "events to wait or trigger on. Use one the app raises, such as agent.finished or "
-                + "branch.moved; to wait for particular agents, use wait_for_agents."
+                + "events to wait or trigger on. Use one the app raises, such as agent.ended or "
+                + "branch.moved; to wait for particular agents, use agent.ended with agent."
         case .badArguments(let name, let message):
             let agents = EventSubject(name: name) == .agent
-                ? " To wait for particular agents, use wait_for_agents." : ""
+                ? " To wait for particular agents, use agent.ended with agent." : ""
             return message + agents
         }
     }

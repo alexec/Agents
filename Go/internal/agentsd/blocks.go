@@ -2,6 +2,7 @@ package agentsd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -13,7 +14,8 @@ import (
 )
 
 // Waiting on other agents (039, #481, #1915), as DaemonCore+Blocks keeps it on the Swift host:
-// wait_for_agents ends the turn waiting, with a block naming them on the report;
+// wait_for_event on agent.ended with agent (#3799) ends the turn waiting, with a block naming
+// them on the report;
 // as each ends its wait closes, and when they have (all, or any with wake_on any) or the
 // time to check again comes, the agent is started again with what they said.
 
@@ -27,6 +29,19 @@ func isOpenBlock(r *wire.WorkReport) bool {
 }
 
 func blockRefusal(why string) error { return Invalid("Nothing was recorded: %s", why) }
+
+// endedAlready is a session a wait names that has already ended (#3799): it is answered at
+// once, with how it ended, and not waited on.
+type endedAlready struct {
+	id    wire.UUID
+	title string
+	there string // " on <machine>", or ""
+	how   string
+}
+
+func (e *endedAlready) Error() string {
+	return quotedTitle(&e.title) + e.there + " has already ended (" + e.how + ")."
+}
 
 // hasEnded is DaemonCore.hasEnded: how an agent has already ended, or "".
 func (d *Daemon) hasEnded(a *wire.Agent) string {
@@ -124,7 +139,11 @@ func (d *Daemon) waitTarget(name string, caller *wire.Agent) (*wire.Agent, error
 		return nil, blockRefusal("you can't wait on yourself.")
 	}
 	if how := d.hasEnded(target); how != "" {
-		return nil, blockRefusal(quotedTitle(target.Title) + " has already ended (" + how + "). Use what it said rather than waiting on it.")
+		title := "Untitled"
+		if target.Title != nil {
+			title = *target.Title
+		}
+		return nil, &endedAlready{id: target.ID, title: title, how: how}
 	}
 	return target, nil
 }
@@ -215,12 +234,9 @@ func (d *Daemon) blockedNote(b *wire.Block) string {
 	return note
 }
 
-// waitForAgents is wait_for_agents: the turn ends waiting on the named sessions.
-func (d *Daemon) waitForAgents(caller wire.UUID, args map[string]json.RawMessage) (string, error) {
-	list, err := stringList(args, "agents")
-	if err != nil {
-		return "", err
-	}
+// waitForEnded is wait_for_event on agent.ended with agent (#3799): the turn ends waiting on
+// the named sessions, by id or exact title.
+func (d *Daemon) waitForEnded(caller wire.UUID, list []string, wakeOn string, minutes int, message string) (string, error) {
 	var names []string
 	for _, n := range list {
 		if n = strings.TrimSpace(n); n != "" {
@@ -228,13 +244,9 @@ func (d *Daemon) waitForAgents(caller wire.UUID, args map[string]json.RawMessage
 		}
 	}
 	if len(names) == 0 {
-		return "", Invalid("Nothing is waited for: name the sessions in agents, by id or exact title.")
+		return "", eventRefused("agent.ended: name the sessions in agent, by id or exact title. Nothing is waiting.")
 	}
-	var minutes *int
-	if n, ok := argInt(args, "until_minutes"); ok {
-		minutes = &n
-	}
-	return d.waitOn(caller, names, argString(args, "wake_on"), minutes, argString(args, "message"), "until_minutes")
+	return d.waitOn(caller, names, wakeOn, &minutes, message, "until_minutes")
 }
 
 // checkAgain is check_again: the turn ends waiting until in_minutes.
@@ -286,11 +298,23 @@ func (d *Daemon) waitOn(caller wire.UUID, names []string, wakeOn string, minutes
 	}
 	at := now()
 	block := wire.Block{Waits: []wire.Wait{}}
+	var ended []endedAlready
 	for _, n := range names {
 		if n = strings.TrimSpace(n); n == "" {
 			continue
 		}
 		t, err := d.waitTarget(n, me)
+		var gone *endedAlready
+		if errors.As(err, &gone) {
+			dup := false
+			for _, e := range ended {
+				dup = dup || e.id == gone.id
+			}
+			if !dup {
+				ended = append(ended, *gone)
+			}
+			continue
+		}
 		if err != nil {
 			return "", err
 		}
@@ -318,6 +342,13 @@ func (d *Daemon) waitOn(caller wire.UUID, names []string, wakeOn string, minutes
 			}
 		}
 		return "", blockRefusal("waiting on " + ns[0] + " would close a circle: " + strings.Join(ns, " waits on ") + " waits on you.")
+	}
+	// A session that has already ended answers at once (#3799): with wake_on any, or with
+	// nothing left to wait on, the call comes back now, so no turn ends on a wait that
+	// cannot wake.
+	onAny := wake != nil && *wake == wire.BlockWakeOnAny
+	if len(ended) > 0 && (onAny || len(block.Waits) == 0) {
+		return d.endedAtOnceWords(ended, block.Waits, onAny), nil
 	}
 	check := wire.DateOf(at.Time().Add(time.Duration(*minutes) * time.Minute))
 	block.CheckAgainAt = &check
@@ -350,10 +381,40 @@ func (d *Daemon) waitOn(caller wire.UUID, names []string, wakeOn string, minutes
 	}
 	d.armBlockTimer()
 	note := d.blockedNote(&block)
+	if len(ended) > 0 {
+		var each []string
+		for _, e := range ended {
+			each = append(each, e.Error())
+		}
+		note = strings.Join(each, " ") + " It is not waited on. " + note
+	}
 	if prevWait != nil {
 		note = replacedWords(prevWait) + note
 	}
 	return note, nil
+}
+
+// endedAtOnceWords is the answer to a wait whose named sessions have already ended (all
+// of them, or one with wake_on any): how each ended, and nothing is waited for.
+func (d *Daemon) endedAtOnceWords(ended []endedAlready, going []wire.Wait, anyOf bool) string {
+	var lines []string
+	switch {
+	case anyOf && len(going) > 0:
+		lines = append(lines, "Not waiting: you asked to wake when any of them ended, and one has already ended.")
+	case len(ended) == 1:
+		lines = append(lines, "Not waiting: the session you named has already ended.")
+	default:
+		lines = append(lines, "Not waiting: every session you named has already ended.")
+	}
+	lines = append(lines, "")
+	for _, e := range ended {
+		lines = append(lines, "- “"+e.title+"”"+e.there+" (id "+string(e.id)+"): "+e.how)
+	}
+	for _, w := range going {
+		lines = append(lines, "- “"+d.waitName(w)+"” (id "+string(w.AgentID)+"): still working")
+	}
+	lines = append(lines, "", "Carry on from here, and read what each said with read_session.")
+	return strings.Join(lines, "\n")
 }
 
 // waitEndingHow is how an agent's end closes the waits on it, or nil while it goes on.
@@ -499,7 +560,7 @@ func (d *Daemon) resumePrompt(b *wire.Block, message string, why wire.BlockClear
 	case why == wire.BlockClearingWaits && len(going) == 0:
 		lines = append(lines, "Carry on from here.")
 	case why == wire.BlockClearingWaits:
-		lines = append(lines, "Carry on from here. To wait on the rest, call wait_for_agents again, naming them.")
+		lines = append(lines, "Carry on from here. To wait on the rest, call wait_for_event on agent.ended again, naming them in agent.")
 	default:
 		lines = append(lines, "Check on it, and carry on or call check_again.")
 	}

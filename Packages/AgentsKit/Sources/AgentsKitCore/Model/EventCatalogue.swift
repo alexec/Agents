@@ -152,6 +152,10 @@ public enum EventCatalogue {
                   "An agent in this folder was stopped before finishing."),
         EventKind("agent.failed", .folder, about(EventDetail("reason", values: EndedReason.allCases.map(\.code))),
                   "An agent in this folder ended in an error."),
+        EventKind("agent.ended", .folder,
+                  [EventDetail("agent", isFilter: true), EventDetail("how", values: ["done", "nothing_to_do", "needs_answer", "stopped", "failed"])]
+                      + shown("labels", "runtime") + [EventDetail("started_by", values: ["agent", "workflow", "person"])],
+                  "An agent in this folder ended: it finished its turn, was stopped, or failed. A wait that names it in agent reaches every session of the project, on every machine."),
         EventKind("agent.archive_requested", .folder, about(outcome),
                   "An agent in this folder archived itself, and waits for the person to approve it."),
         EventKind("agent.messaged", .folder, about(EventDetail("from"), EventDetail("from_title")),
@@ -327,7 +331,7 @@ public enum EventList {
         lines += unlisted
         lines.append("A subject with .* matches all of its events, e.g. agent.*; for an MCP server's noun, all of "
                      + "that noun's events. A list in where matches any of its values, e.g. why: [locked, idle]. "
-                     + "To wait for particular agents, use wait_for_agents.")
+                     + "To wait for particular sessions, use agent.ended with agent, by id or exact title, and wake_on all or any.")
         return lines.joined(separator: "\n")
     }
 

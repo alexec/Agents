@@ -14,7 +14,7 @@ import (
 )
 
 // The agent tools scoped to the project (#3277): list_sessions, read_session,
-// message_session and wait_for_agents reach every session of the agent's project, in this
+// message_session and wait_for_event on agent.ended reach every session of the agent's project, in this
 // machine's other folders of it and on the person's other machines; start_session with
 // machine alone finds the project's folder there; stop and archive stay the starter's.
 
@@ -51,10 +51,10 @@ func TestSessionToolsReachTheProjectOnThisMachine(t *testing.T) {
 	if text, _ := m.tool(4, "read_session", map[string]any{"session": "another project"}); text != "There is no session named “another project” in this project." {
 		t.Fatal(text)
 	}
-	if text, isErr := m.tool(5, "wait_for_agents", map[string]any{"agents": []string{string(lane.ID)}, "until_minutes": 30}); isErr {
+	if text, isErr := m.tool(5, "wait_for_event", map[string]any{"events": []string{"agent.ended"}, "where": map[string]any{"agent": []string{string(lane.ID)}}, "until_minutes": 30}); isErr {
 		t.Fatal(text)
 	}
-	if text, isErr := m.tool(6, "wait_for_agents", map[string]any{"agents": []string{string(stranger.ID)}, "until_minutes": 30}); !isErr ||
+	if text, isErr := m.tool(6, "wait_for_event", map[string]any{"events": []string{"agent.ended"}, "where": map[string]any{"agent": []string{string(stranger.ID)}}, "until_minutes": 30}); !isErr ||
 		!strings.Contains(text, "is in another folder, not in this project") {
 		t.Fatal(text)
 	}
@@ -124,7 +124,7 @@ func TestSessionToolsReachTheProjectOnOtherMachines(t *testing.T) {
 	}
 
 	// A wait on it asks its machine to say when it ends, and closes when it does.
-	if text, isErr := m.tool(5, "wait_for_agents", map[string]any{"agents": []string{"lane on the pc"}, "until_minutes": 30}); isErr {
+	if text, isErr := m.tool(5, "wait_for_event", map[string]any{"events": []string{"agent.ended"}, "where": map[string]any{"agent": []string{"lane on the pc"}}, "until_minutes": 30}); isErr {
 		t.Fatal(text)
 	}
 	if s := last(); s.Call.Op != "status" || s.Call.Watch == nil || !*s.Call.Watch || deref(s.Call.Project) != "p-agents" {

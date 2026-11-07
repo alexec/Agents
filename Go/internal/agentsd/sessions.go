@@ -722,7 +722,7 @@ func (d *Daemon) messageSession(caller wire.UUID, args map[string]json.RawMessag
 		}
 		if int64(running) >= limit {
 			return "", refusedMessage(fmt.Sprintf("waking %s would take a running place, and %s already has %d of %d sessions "+
-				"started by sessions running. Send it once one finishes; wait with wait_for_agents.", name, scopeWords(folder), running, limit))
+				"started by sessions running. Send it once one finishes; wait with wait_for_event on agent.ended, naming them in agent.", name, scopeWords(folder), running, limit))
 		}
 	}
 	d.messageMu.Lock()
