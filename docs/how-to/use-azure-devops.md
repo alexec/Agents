@@ -16,7 +16,7 @@ comment, and it has events that start a workflow or a wait. It has no pages yet:
 pages do not list an Azure DevOps repository.
 
 Work items (Azure Boards) are not in this connector. They are the tracker's, as Linear's
-and Jira's issues are.
+and Jira's issues are: see [Use Azure Boards work items](use-azure-boards.md).
 
 ## Before you start
 

@@ -28,6 +28,7 @@ stay as they are.
 | `cmd/forgejo-mcp/`, `internal/forgejomcp/` | The `forgejo` MCP server (#1753): pull requests, checks and issues on Forgejo or Gitea, tools and events on REST v1, in the gitlab server's shape | forgejo |
 | `cmd/bitbucket-mcp/`, `internal/bitbucketmcp/` | The `bitbucket` MCP server (#2828): pull requests, checks and issues on Bitbucket Cloud, tools and events on REST 2.0, in the gitlab server's shape | bitbucket |
 | `cmd/azuredevops-mcp/`, `internal/azuredevopsmcp/` | The `azuredevops` MCP server (#2829): pull requests and Azure Pipelines builds on Azure DevOps, tools and events on REST 7.1, in the gitlab server's shape | azuredevops |
+| `cmd/azureboards-mcp/`, `internal/azureboardsmcp/` | The `azureboards` MCP server (#3804): Azure Boards work items as a tracker, tools and events on REST 7.1, in the jira server's shape | azureboards |
 | `cmd/workspace-commands/`, `internal/workspacecommands/` | The command machine provider (#691, in Go since #1364): workspaces as shell commands and presets, an MCP server the control plane runs | workspaces |
 
 ## Building and testing
@@ -305,6 +306,33 @@ which need their own REST client anyway. The tests run against a fake Azure DevO
 (`fake_test.go`). Agents Host carries it (`scripts/go-github-mcp.sh azuredevops-mcp`) and
 every Linux host installs `azuredevops-mcp-linux-<arch>`; the catalogue lists it as
 `agents/azuredevops`. See `docs/how-to/use-azure-devops.md`.
+
+## The azureboards MCP server (`azureboards-mcp`, #3804)
+
+The jira server's shape for Azure Boards, the tracker of Azure DevOps (REST API 7.1): a stdio
+front (`azureboardsmcp.Front`) answers `events/list` and `events/poll` and passes everything
+else to a go-sdk server with its tools. It is its own server, not part of `azuredevops-mcp`,
+because the catalogue runs one connector a command and a tracker is chosen apart from the
+code host. It shares the azuredevops server's token, `AZURE_DEVOPS_TOKEN` (with Work Items
+read and write), and `AZURE_DEVOPS_URL`; `AZURE_BOARDS_PROJECT` (or `--project`) is
+`organization/project`, the folder's Azure Repos remote's when empty.
+
+- **Events**, polled every minute, with the jira and linear servers' names and cursor:
+  `issue.opened` (WIQL on `System.CreatedDate`), and from the 50 work items changed since
+  (WIQL on `System.ChangedDate`, `timePrecision=true`, then `workitemsbatch`):
+  `issue.labelled` (a tag added in an update), `issue.closed` (an update into a state of the
+  Completed or Removed category, from the work item types' states), `issue.assigned` (an
+  update that assigns the token's owner) and `issue.commented` (the comments API,
+  7.1-preview.4). An update's time is its `System.ChangedDate`, not its `revisedDate`.
+  Arguments `area`, `type`, `label`, `issue` and `anyone`; left out, never a bot (#728).
+- **Tools:** `list_work_items`, `get_work_item` and `comment_on_work_item` (Markdown).
+- **No views yet,** and no Work pages, Tasks slot or board.
+
+It imports only `azuredevopsmcp.BaseURL` and `GitRepo` from the azuredevops server; its HTTP
+client is its own, as each of our servers' is. The tests run against a fake Azure DevOps over
+HTTP (`fake_test.go`). Agents Host carries it (`scripts/go-github-mcp.sh azureboards-mcp`)
+and every Linux host installs `azureboards-mcp-linux-<arch>`; the catalogue lists it as
+`agents/azureboards`. See `docs/how-to/use-azure-boards.md`.
 
 ## The email MCP server (`email-mcp`, #1780)
 

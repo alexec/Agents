@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alexec/agents/Go/internal/azureboardsmcp"
 	"github.com/alexec/agents/Go/internal/azuredevopsmcp"
 	"github.com/alexec/agents/Go/internal/bitbucketmcp"
 	"github.com/alexec/agents/Go/internal/emailmcp"
@@ -298,6 +299,24 @@ func TestAzureDevOpsAsksForItsToken(t *testing.T) {
 		t.Fatalf("entry: %s", got)
 	}
 	if built.NameHere != "azure-devops" || len(built.Variables) != 2 || !built.Variables[0].Required || built.Variables[1].Required {
+		t.Fatalf("built: %+v", built)
+	}
+}
+
+// Azure Boards (#3804) is the tracker's: it asks for the azuredevops connector's token, the
+// server and the project, and declares the jira and linear servers' issue events.
+func TestAzureBoardsAsksForItsTokenAndProject(t *testing.T) {
+	boards, ok := OursByID("agents/azureboards")
+	if !ok || boards.Command != "azureboards-mcp" || !boards.Declares.Tools || boards.Declares.Views ||
+		!reflect.DeepEqual(boards.Declares.Events, azureboardsmcp.EventNames()) {
+		t.Fatalf("azureboards: %+v %v, the server's %v", boards, ok, azureboardsmcp.EventNames())
+	}
+	built := BuildOurs(boards, func(string) bool { return false })
+	want := `{"command":"azureboards-mcp","hosted":true,"env":{"AZURE_DEVOPS_TOKEN":"${AZURE_DEVOPS_TOKEN}","AZURE_DEVOPS_URL":"${AZURE_DEVOPS_URL}","AZURE_BOARDS_PROJECT":"${AZURE_BOARDS_PROJECT}"}}`
+	if got := strings.Join(strings.Fields(built.Entry.Stringified()), ""); got != want {
+		t.Fatalf("entry: %s", got)
+	}
+	if built.NameHere != "azure-boards" || len(built.Variables) != 3 || !built.Variables[0].Required || built.Variables[1].Required || built.Variables[2].Required {
 		t.Fatalf("built: %+v", built)
 	}
 }
