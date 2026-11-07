@@ -155,6 +155,7 @@ func (m *Machine) Endpoint(progress func(string)) (string, error) {
 		return "", err
 	}
 	m.endLeftover()
+	dropCaches(m.Profile)
 	progress("Starting the browser")
 	p, err := m.launch(exe, m.Profile, env)
 	if err != nil {
@@ -349,6 +350,9 @@ func launchChromium(exe, profile string, env []string) (*process, error) {
 		// The browser is for people's sign-ins, not a test run: it keeps history and
 		// does not say it is automated in every page.
 		chromedp.Flag("enable-automation", false),
+		// The profile's bound (#3727): the HTTP cache stays under this while it runs, and
+		// dropCaches empties every cache before the next start.
+		chromedp.Flag("disk-cache-size", strconv.Itoa(diskCacheBytes)),
 	)
 	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), opts...)
 	ctx, cancelCtx := chromedp.NewContext(allocCtx)
@@ -399,6 +403,36 @@ func activePort(profile string) (string, error) {
 		return "", fmt.Errorf("Chromium's DevToolsActivePort has no browser path: %q", path)
 	}
 	return "ws://127.0.0.1:" + strconv.Itoa(port) + path, nil
+}
+
+// diskCacheBytes is the most the HTTP cache holds while Chromium runs.
+const diskCacheBytes = 64 << 20
+
+// cacheDirs are the profile's caches, relative to it: what Chromium makes again, and
+// what grows with each site an agent opens. Sign-ins (cookies, Local Storage,
+// IndexedDB) are not in them; Settings ▸ Browser clears those by site.
+var cacheDirs = []string{
+	"Default/Cache",
+	"Default/Code Cache",
+	"Default/GPUCache",
+	"Default/DawnGraphiteCache",
+	"Default/DawnWebGPUCache",
+	"Default/Service Worker/CacheStorage",
+	"Default/Service Worker/ScriptCache",
+	"GrShaderCache",
+	"GraphiteDawnCache",
+	"ShaderCache",
+	"component_crx_cache",
+}
+
+// dropCaches empties the profile's caches before Chromium starts, so the profile keeps
+// only its sign-ins from one start to the next (#3727). Chromium is not running then.
+func dropCaches(profile string) {
+	for _, dir := range cacheDirs {
+		if err := os.RemoveAll(filepath.Join(profile, filepath.FromSlash(dir))); err != nil {
+			log.Printf("browser: couldn't empty %s: %v", dir, err)
+		}
+	}
 }
 
 func (m *Machine) pidFile() string { return filepath.Join(filepath.Dir(m.Profile), "chromium.pid") }

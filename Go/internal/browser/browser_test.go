@@ -140,6 +140,39 @@ func TestAFailedDownloadSaysWhy(t *testing.T) {
 	}
 }
 
+func TestAStartEmptiesTheCachesAndKeepsTheSignIns(t *testing.T) {
+	f := newFake(t)
+	profile := f.m.Profile
+	write := func(rel string) string {
+		path := filepath.Join(profile, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	cache := write("Default/Cache/Cache_Data/data_0")
+	code := write("Default/Code Cache/js/index")
+	workers := write("Default/Service Worker/CacheStorage/abc/index")
+	cookies := write("Default/Cookies")
+	storage := write("Default/Local Storage/leveldb/000003.log")
+	if _, err := f.m.Endpoint(nil); err != nil {
+		t.Fatal(err)
+	}
+	for _, gone := range []string{cache, code, workers} {
+		if _, err := os.Stat(gone); !os.IsNotExist(err) {
+			t.Errorf("%s is still there after a start (%v)", gone, err)
+		}
+	}
+	for _, kept := range []string{cookies, storage} {
+		if _, err := os.Stat(kept); err != nil {
+			t.Errorf("a start removed the sign-in %s: %v", kept, err)
+		}
+	}
+}
+
 func TestActivePort(t *testing.T) {
 	dir := t.TempDir()
 	for _, c := range []struct{ file, want, err string }{

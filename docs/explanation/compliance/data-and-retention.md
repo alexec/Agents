@@ -76,7 +76,7 @@ Mac.
 | `guarded-files.json` | Guarded file states | The folders that exist | On write |
 | `org-routes/`, `runtimes/org/` | Org key routes and their stand-in homes | 50 routes | On delivery |
 | `runtimes/accounts/<runtime>/<id>/` | The home of each runtime account you added, **with that runtime's own transcripts** | Until the account is removed | On remove |
-| `browser/profile/` | One browser profile for every browser sign-in | **None** | Never |
+| `browser/profile/` | One browser profile for every browser sign-in, and its caches | Sign-ins until the site ends them or you clear the site in Settings ▸ Browser. The caches are emptied before each start, and the HTTP cache stays under 64 MB while it runs (#3727). | At each browser start |
 | `folders.json`, `policy*.json`, `backup-settings.json`, `settings/`, and other small files | Configuration | A fixed shape | — |
 | `<file>.unreadable-<time>`, `<file>.corrupt-<time>` | A store that could not be read, set aside | The newest 3 of each kind for each file | On write |
 
@@ -98,6 +98,7 @@ Mac.
 | `mcp-logs/`, in the log folder | What each hosted MCP server wrote to stderr | 1 MB and one older file a server, and the newest 32 servers. A larger write is split, so no file passes 1 MB. | When a server starts |
 | `tools/<runtime>/`, in the cache folder | Pinned runtime toolsets | The current one | At start |
 | `browser/`, in the cache folder | The browser that agents drive, and its output | Old browser versions are left to Playwright. Output goes when the session ends; what a crash left goes at the next start (#3649) | On install; at session end; at start |
+| The Mac browser pane's website data (WebKit's default store) | The sign-ins of every site the pane opened, and its caches | Sign-ins until the site ends them. The caches are emptied once each time the app starts (#3727). | At the first pane of each launch |
 | `catalog-staging/`, in the cache folder | Skill previews | 8 previews, 30 minutes; folders left by a restart go at the next start (#3649) | On use; at start |
 | `option-cache.json`, in the cache folder | Runtime options | 50 | On write |
 | Cache and log folders of each other data folder (`roots/<name>-<hash>`) | As above, for a second copy | **None.** Not removed when that data folder is deleted. | Never |
