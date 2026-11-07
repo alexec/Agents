@@ -332,6 +332,11 @@ Go/cmd/forgejo-mcp/                                    forgejo
 Go/internal/forgejomcp/                                forgejo
 docs/how-to/use-forgejo.md                             forgejo
 
+# azuredevops: the azuredevops MCP server (#2829): pull requests and Azure Pipelines builds on Azure DevOps.
+Go/cmd/azuredevops-mcp/                                azuredevops
+Go/internal/azuredevopsmcp/                            azuredevops
+docs/how-to/use-azure-devops.md                        azuredevops
+
 # email: the email MCP server (#1780): one IMAP mailbox's new mail, read, never sent.
 Go/cmd/email-mcp/                                      email
 Go/internal/emailmcp/                                  email

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alexec/agents/Go/internal/azuredevopsmcp"
 	"github.com/alexec/agents/Go/internal/emailmcp"
 	"github.com/alexec/agents/Go/internal/forgejomcp"
 	"github.com/alexec/agents/Go/internal/githubmcp"
@@ -259,6 +260,25 @@ func TestForgejoAsksForItsToken(t *testing.T) {
 		t.Fatalf("entry: %s", got)
 	}
 	if built.NameHere != "forgejo" || len(built.Variables) != 2 || !built.Variables[0].Required || built.Variables[1].Required {
+		t.Fatalf("built: %+v", built)
+	}
+}
+
+// Azure DevOps (#2829) asks for a personal access token, and the server when it is not
+// dev.azure.com, kept in the person's secrets, and declares the events its server raises:
+// the gitlab server's pull request events.
+func TestAzureDevOpsAsksForItsToken(t *testing.T) {
+	ado, ok := OursByID("agents/azuredevops")
+	if !ok || ado.Command != "azuredevops-mcp" || !ado.Declares.Tools || ado.Declares.Views ||
+		!reflect.DeepEqual(ado.Declares.Events, azuredevopsmcp.EventNames()) {
+		t.Fatalf("azuredevops: %+v %v, the server's %v", ado, ok, azuredevopsmcp.EventNames())
+	}
+	built := BuildOurs(ado, func(string) bool { return false })
+	want := `{"command":"azuredevops-mcp","hosted":true,"env":{"AZURE_DEVOPS_TOKEN":"${AZURE_DEVOPS_TOKEN}","AZURE_DEVOPS_URL":"${AZURE_DEVOPS_URL}"}}`
+	if got := strings.Join(strings.Fields(built.Entry.Stringified()), ""); got != want {
+		t.Fatalf("entry: %s", got)
+	}
+	if built.NameHere != "azure-devops" || len(built.Variables) != 2 || !built.Variables[0].Required || built.Variables[1].Required {
 		t.Fatalf("built: %+v", built)
 	}
 }
