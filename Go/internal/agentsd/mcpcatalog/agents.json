@@ -396,6 +396,49 @@
           ]
         }
       }
+    },
+    {
+      "server": {
+        "name": "agents/bitbucket",
+        "title": "Bitbucket",
+        "description": "Pull requests, checks and issues on Bitbucket Cloud: tools to read them and comment, and events"
+      },
+      "_meta": {
+        "dev.agentloops/connector": {
+          "command": "bitbucket-mcp",
+          "hosted": true,
+          "declares": {
+            "tools": true,
+            "events": [
+              "checks.failed",
+              "pr.opened",
+              "pr.merged",
+              "pr.closed",
+              "pr.conflicted",
+              "review.requested",
+              "review.comment",
+              "issue.opened",
+              "issue.labelled",
+              "issue.commented",
+              "issue.closed",
+              "issue.assigned"
+            ],
+            "views": false
+          },
+          "secrets": [
+            {
+              "name": "BITBUCKET_TOKEN",
+              "description": "An Atlassian API token with scopes for Bitbucket (read and write on repositories, pull requests and issues; read on account and workspace membership), or a repository, project or workspace access token",
+              "required": true
+            },
+            {
+              "name": "BITBUCKET_EMAIL",
+              "description": "Your Atlassian account's email, for an API token; left out for an access token",
+              "required": false
+            }
+          ]
+        }
+      }
     }
   ]
 }

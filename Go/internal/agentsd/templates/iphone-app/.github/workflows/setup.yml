@@ -28,5 +28,5 @@ jobs:
             echo "::error::Set the secrets ASC_KEY_P8, ASC_KEY_ID and ASC_ISSUER_ID."
             exit 1
           fi
-          echo "$ASC_KEY_P8" > "$RUNNER_TEMP/asc.p8"
+          bash scripts/asc-key.sh "$RUNNER_TEMP/asc.p8"
           ASC_KEY_PATH="$RUNNER_TEMP/asc.p8" swift scripts/asc.swift register

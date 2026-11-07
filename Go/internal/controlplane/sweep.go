@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controlplane/audit"
+	"github.com/alexec/agents/Go/internal/controlplane/providers"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 )
@@ -34,6 +35,11 @@ const (
 	meshEventsPrefix = "v1/mesh/events/"
 	meshEventsKept   = 24 * time.Hour
 )
+
+// What a copy leaves outside v1/ when it stops part way (#3748): a start-up probe, and a
+// move's check mark. A folder store deletes its probes as leftovers; a bucket has no
+// time on a key, so the sweep goes by when it first saw one.
+var straysPrefixes = []string{"probe/", "handover/mark-"}
 
 // sweepReport is StoreSweep.Report.
 type sweepReport struct {
@@ -214,6 +220,15 @@ func sweep(ctx context.Context, rs *records.Records, now time.Time, most int, ev
 		left--
 	}
 
+	// Removed providers' tombstones (#3748), as a client's.
+	n, dated, err := sweepProviders(ctx, s, now, left)
+	report.tombstones += n
+	report.dated += dated
+	left -= n
+	if err != nil {
+		return report, err
+	}
+
 	// Removed people kept whole from before removal cut them to a tombstone (#3647).
 	n, err = sweepRemovedPeople(ctx, rs, now, left)
 	report.cut = n
@@ -251,6 +266,12 @@ func sweep(ctx context.Context, rs *records.Records, now time.Time, most int, ev
 
 	if folder, ok := s.(*store.Folder); ok {
 		report.leftovers = folder.RemoveLeftovers(now.Add(-leftoversKept))
+	}
+	// Probes and marks an hour after the sweep first saw them, on any store (#3748).
+	n, err = events.sweepStrays(ctx, s, now, left-report.usage)
+	report.leftovers += n
+	if err != nil {
+		return report, err
 	}
 	// The records forget the tombstones that went, and see the dated ones.
 	if report.tombstones+report.dated > 0 {
@@ -354,7 +375,8 @@ func sweepOrphans(ctx context.Context, rs *records.Records, now time.Time, most 
 // (#3649), not only when someone next lists them: each list deletes what is past its
 // own bound on the way (joins, lock joins and sign-ins an hour after they end, link
 // requests a day after, budget requests the next day, decided governance requests after
-// 30 days, and a removed person's or machine's at once).
+// 30 days, and a removed person's or machine's at once), and the governance approvals of
+// a person or group that is gone (#3748).
 func (s *Service) sweepRequests(ctx context.Context, now time.Time) {
 	failed := func(what string, err error) {
 		if err != nil {
@@ -376,6 +398,7 @@ func (s *Service) sweepRequests(ctx context.Context, now time.Time) {
 	failed("governance reports", err)
 	_, err = s.governanceRequests(ctx, now)
 	failed("governance requests", err)
+	failed("governance approvals", s.sweepApprovals(ctx))
 	_, err = s.removeRequests(ctx)
 	failed("remove requests", err)
 }
@@ -413,10 +436,45 @@ func dateTombstone(ctx context.Context, s store.Store, key string, object *store
 	return true, nil
 }
 
-// eventSweep is the oldest day that may still hold events, so a sweep lists only the
-// days that have expired, a day each, not every day the audit keeps (#2053). The first
-// sweep finds it from one list of every event.
-type eventSweep struct{ oldest string }
+// eventSweep is what one sweep leaves the next. oldest is the oldest day that may still
+// hold events, so a sweep lists only the days that have expired, a day each, not every
+// day the audit keeps (#2053); the first sweep finds it from one list of every event.
+// strays is when the sweep first saw each probe and mark (#3748), only those still there.
+type eventSweep struct {
+	oldest string
+	strays map[string]time.Time
+}
+
+// sweepStrays deletes, at most most, the probes and move marks the sweep first saw
+// leftoversKept ago or more: each lives for seconds, so one an hour old was left by a copy
+// that stopped part way. A copy started again since forgets what it saw, and waits an
+// hour more.
+func (e *eventSweep) sweepStrays(ctx context.Context, s store.Store, now time.Time, most int) (int, error) {
+	seen := map[string]time.Time{}
+	deleted := 0
+	for _, prefix := range straysPrefixes {
+		keys, err := s.List(ctx, prefix)
+		if err != nil {
+			return deleted, err
+		}
+		for _, k := range keys {
+			first, ok := e.strays[k.Key]
+			if !ok {
+				first = now
+			}
+			if deleted < most && now.Sub(first) >= leftoversKept {
+				if err := s.Delete(ctx, k.Key); err != nil {
+					return deleted, err
+				}
+				deleted++
+				continue
+			}
+			seen[k.Key] = first
+		}
+	}
+	e.strays = seen
+	return deleted, nil
+}
 
 // sweep deletes, at most most, the events of each day before cutoff, from the oldest,
 // and says how many it deleted.
@@ -475,6 +533,52 @@ func sweepMeshEvents(ctx context.Context, s store.Store, now time.Time, most int
 		deleted++
 	}
 	return deleted, nil
+}
+
+// sweepProviders deletes, at most most, removed machine providers' tombstones a week
+// after their removal (#3748), and dates one written before forgottenAt was kept, so it
+// goes a week on. It says how many it deleted, and how many it dated.
+func sweepProviders(ctx context.Context, s store.Store, now time.Time, most int) (int, int, error) {
+	keys, err := s.List(ctx, providers.ProvidersPrefix)
+	if err != nil {
+		return 0, 0, err
+	}
+	deleted, dated := 0, 0
+	for _, k := range keys {
+		if deleted >= most {
+			break
+		}
+		object, err := s.Get(ctx, k.Key)
+		if err != nil {
+			return deleted, dated, err
+		}
+		var record providers.ProviderRecord
+		if object == nil || json.Unmarshal(object.Data, &record) != nil || record.Forgotten == nil || !*record.Forgotten {
+			continue
+		}
+		if record.ForgottenAt == nil {
+			at := records.At(now)
+			record.ForgottenAt, record.Rev = &at, record.Rev+1
+			data, err := records.Encode(record)
+			if err != nil {
+				return deleted, dated, err
+			}
+			if _, err := s.Put(ctx, k.Key, data, store.Matching(object.ETag)); err == nil {
+				dated++
+			} else if !store.IsConflict(err) {
+				return deleted, dated, err
+			}
+			continue
+		}
+		if !record.ForgottenAt.Before(now.Add(-tombstonesKept)) {
+			continue
+		}
+		if err := s.Delete(ctx, k.Key); err != nil {
+			return deleted, dated, err
+		}
+		deleted++
+	}
+	return deleted, dated, nil
 }
 
 // sweepRemovedPeople cuts at most most removed people to their tombstone (#3647): each was
@@ -563,6 +667,7 @@ func (s *Service) sweepEveryHour() {
 				}
 			}
 			s.renewConnected(context.Background())
+			s.forgetExpired(context.Background(), time.Now(), mostPerSweep)
 			s.dropPreviousKey(context.Background())
 		}
 		switch {
