@@ -30,6 +30,15 @@ enum WalkCommands {
         }
     }
 
+    /// Before `run`, on the main thread: a shot first asks the window's web views for their
+    /// pictures (#3854), which come back on the main thread, so the socket waits on `group`
+    /// off it.
+    static func before(_ line: Data, group: DispatchGroup) {
+        guard let request = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
+              request["cmd"] as? String == "shot", let window = try? target(request) else { return }
+        WalkShot.snapshotWebViews(in: window, group: group)
+    }
+
     private static func perform(_ verb: String, _ request: [String: Any]) throws -> [String: Any] {
         switch verb {
         // Voice mode with no microphone and no sound (#2322).

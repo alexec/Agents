@@ -358,7 +358,7 @@
       "server": {
         "name": "agents/forgejo",
         "title": "Forgejo",
-        "description": "Pull requests, checks and issues on Codeberg or your own Forgejo or Gitea: tools to read them and comment, and events"
+        "description": "Pull requests, checks and issues on Codeberg or your own Forgejo or Gitea: their pages, tools to read them and comment, and events"
       },
       "_meta": {
         "dev.agentloops/connector": {
@@ -380,7 +380,7 @@
               "issue.closed",
               "issue.assigned"
             ],
-            "views": false
+            "views": true
           }
         }
       }
@@ -412,19 +412,7 @@
               "issue.assigned"
             ],
             "views": false
-          },
-          "secrets": [
-            {
-              "name": "BITBUCKET_TOKEN",
-              "description": "An Atlassian API token with scopes for Bitbucket (read and write on repositories, pull requests and issues; read on account and workspace membership), or a repository, project or workspace access token",
-              "required": true
-            },
-            {
-              "name": "BITBUCKET_EMAIL",
-              "description": "Your Atlassian account's email, for an API token; left out for an access token",
-              "required": false
-            }
-          ]
+          }
         }
       }
     },

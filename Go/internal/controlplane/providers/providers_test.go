@@ -553,6 +553,25 @@ func TestAWorkspaceThatInstallsOnFirstBootJoinsAndIsLinked(t *testing.T) {
 	}
 }
 
+// A host that joined with a code made for a workspace is linked to it, whatever name it
+// joined with (#3871): a codespace's host joins with its own hostname.
+func TestAHostThatJoinedForAWorkspaceIsLinkedToItWhateverItsName(t *testing.T) {
+	h := newHarness(t)
+	id := h.add()
+	h.enroll("host-1", "codespaces-d724f9")
+	h.providers.LinkJoined("host-1", id, "machine-1", "")
+	link := LinkOf(h.records.Host("host-1"))
+	if link == nil || link.Provider != id || link.Workspace != "machine-1" {
+		t.Fatalf("not linked: %+v", link)
+	}
+	// Joined again, a host already linked to it keeps its options.
+	h.must(MethodHostsSetOptions, map[string]any{"host": "host-1", "startWhenUsed": false})
+	h.providers.LinkJoined("host-1", id, "machine-1", "")
+	if l := LinkOf(h.records.Host("host-1")); l == nil || l.StartWhenUsed == nil || *l.StartWhenUsed {
+		t.Errorf("options not kept: %+v", l)
+	}
+}
+
 func TestANewWorkspaceClonesItsFoldersOnceItJoins(t *testing.T) {
 	h := newHarness(t)
 	h.add()

@@ -242,7 +242,9 @@ button or the row instead).
 and the window's own render while it is locked: on screen, a window's layers are on the GPU,
 and its own render draws the sidebar and the terminal black. The locked render draws the
 glass and materials as plain fills, the selected row in the grey of a window that is not
-key, and no traffic lights. `--render` takes the window's own render either way.
+key, and no traffic lights. A web view (a pinned MCP App, an HTML page, the browser pane)
+draws in its own process: the render asks it for its picture first and draws that in its
+place (#3854). `--render` takes the window's own render either way.
 
 ```sh
 $S/shot.sh $ROOT out.png            # window server capture, behind the user's window; unlocked only

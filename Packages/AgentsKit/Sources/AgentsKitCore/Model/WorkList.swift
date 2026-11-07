@@ -380,7 +380,7 @@ public enum WorkList {
     }
 
     public static let forgeTitle = ["github": "GitHub", "gitlab": "GitLab", "linear": "Linear", "jira": "Jira",
-                                    "azureboards": "Azure Boards", "forgejo": "Forgejo"]
+                                    "azureboards": "Azure Boards", "forgejo": "Forgejo", "bitbucket": "Bitbucket"]
 
     /// A forge that could not be read: "GitHub on Studio: not connected".
     public static func errorWords(_ e: DaemonAPI.ForgeListError, machine: String?) -> String {

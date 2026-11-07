@@ -663,8 +663,9 @@ func cleanProjectSlot(slot wire.ConnectorSlotKind, value *wire.ProjectSlot) (*wi
 	if value.Forge != nil {
 		forge = *value.Forge
 	}
-	if forge != wire.ConnectionProviderGithub && forge != wire.ConnectionProviderGitlab && forge != wire.ConnectionProviderForgejo {
-		return nil, fail(invalidParams, "A project's slot is on GitHub, GitLab or Forgejo.")
+	if forge != wire.ConnectionProviderGithub && forge != wire.ConnectionProviderGitlab && forge != wire.ConnectionProviderForgejo &&
+		forge != wire.ConnectionProviderBitbucket {
+		return nil, fail(invalidParams, "A project's slot is on GitHub, GitLab, Forgejo or Bitbucket.")
 	}
 	repo := strings.Trim(strings.TrimSpace(deref(value.Repository)), "/")
 	site := strings.ToLower(strings.TrimSpace(deref(value.Site)))
@@ -674,6 +675,10 @@ func cleanProjectSlot(slot wire.ConnectorSlotKind, value *wire.ProjectSlot) (*wi
 	}
 	if forge == wire.ConnectionProviderGithub {
 		site = "github.com"
+	}
+	if forge == wire.ConnectionProviderBitbucket {
+		// Bitbucket Cloud only (#3785).
+		site = "bitbucket.org"
 	}
 	parts := strings.Split(repo, "/")
 	if len(parts) < 2 || (forge != wire.ConnectionProviderGitlab && len(parts) != 2) || slices.Contains(parts, "") ||

@@ -3,15 +3,17 @@
 // and its issues (checks.failed, pr.opened, pr.merged, pr.closed, pr.conflicted,
 // review.requested, review.comment, issue.opened, issue.labelled, issue.commented,
 // issue.closed, issue.assigned), and tools that read them and comment, over the REST API 2.0.
-// As the person whose token is in BITBUCKET_TOKEN, which `.agents/mcp.json` names as
-// ${BITBUCKET_TOKEN} so its value stays in ~/.agents-secrets/secrets.env.
+// As the person who connected Bitbucket (#3785, in the store connections.EnvName names), or
+// whose token is in BITBUCKET_TOKEN, which `.agents/mcp.json` names as ${BITBUCKET_TOKEN} so
+// its value stays in ~/.agents-secrets/secrets.env. The connection's token goes only to the
+// API it was made on: with --api naming another, only BITBUCKET_TOKEN is used.
 //
 //	bitbucket-mcp                    serve on stdio
 //	bitbucket-mcp --version
 //
 //	BITBUCKET_TOKEN                  an Atlassian API token with the Bitbucket scopes, or an access token
 //	BITBUCKET_EMAIL                  the Atlassian account's email, for an API token; left out for an access token
-//	BITBUCKET_API_URL                as --api: Bitbucket Cloud's API when empty, a fake in tests and walks
+//	BITBUCKET_API_URL                as --api: the connection's API, else Bitbucket Cloud's, a fake in tests and walks
 package main
 
 import (
@@ -26,6 +28,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/bitbucketmcp"
 	"github.com/alexec/agents/Go/internal/buildinfo"
+	"github.com/alexec/agents/Go/internal/connections"
 )
 
 func main() {
@@ -40,9 +43,26 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	token := func() string { return strings.TrimSpace(os.Getenv("BITBUCKET_TOKEN")) }
-	email := func() string { return strings.TrimSpace(os.Getenv("BITBUCKET_EMAIL")) }
-	bb := bitbucketmcp.NewRealBitbucket(*api, token, email, bitbucketmcp.GitRepo())
+	connected := connections.Reader(connections.FromEnv(), connections.Bitbucket)
+	if *api == "" {
+		if c, ok := connected(); ok {
+			*api = c.URL
+		}
+	}
+	root := bitbucketmcp.BaseURL(*api)
+	// The token and its email come together: BITBUCKET_TOKEN's, else the connection's.
+	pair := func() (token, email string) {
+		if t := strings.TrimSpace(os.Getenv("BITBUCKET_TOKEN")); t != "" {
+			return t, strings.TrimSpace(os.Getenv("BITBUCKET_EMAIL"))
+		}
+		if c, ok := connected(); ok && bitbucketmcp.BaseURL(c.URL) == root {
+			return c.Access, c.User
+		}
+		return "", ""
+	}
+	token := func() string { t, _ := pair(); return t }
+	email := func() string { _, e := pair(); return e }
+	bb := bitbucketmcp.NewRealBitbucket(root, token, email, bitbucketmcp.GitRepo())
 	front := &bitbucketmcp.Front{
 		Events:   &bitbucketmcp.Events{Bitbucket: bb},
 		Upstream: bitbucketmcp.NewServer(buildinfo.Version, bb, os.Getenv(bitbucketmcp.HostedEnv) == "1"), Version: buildinfo.Version, Logger: logger,
