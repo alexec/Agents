@@ -69,7 +69,11 @@ enum WalkCommands {
             return try act(request, verb: "pressed") { $0.press() }
         case "set":
             guard let value = request["value"] as? String else { throw WalkError("set wants a value") }
-            guard let match = try matches(request).last else { throw WalkError("nothing matched \(request["text"] ?? "")") }
+            // A field before a text with the same words (#3825): a field's label is often a
+            // text beside it, and a text's own view can hold a different field.
+            let found = try matches(request)
+            guard let match = found.last(where: { $0.element.object is UITextField || $0.element.object is UITextView })
+                ?? found.last else { throw WalkError("nothing matched \(request["text"] ?? "")") }
             guard let field = WalkAX.textInput(at: match.element, in: match.window) else {
                 throw WalkError("\(match.element.line(in: match.window)) takes no text")
             }
