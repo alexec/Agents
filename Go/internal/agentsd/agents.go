@@ -556,6 +556,7 @@ func (d *Daemon) deleteArchivedThen(a *wire.Agent, because string, erase func(*w
 	d.raiseAbout(a, "agent.deleted", "was deleted with its conversation.", map[string]string{"because": because, "runtimeCopy": copyOf})
 	d.takeActor(a.ID) // a helper's deletion raises nothing to take it
 	d.folderChanged(folderPath(a))
+	d.sweepWorktreeSoon(*a, sweepDeleted)
 	return nil
 }
 

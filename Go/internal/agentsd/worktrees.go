@@ -108,6 +108,9 @@ type worktreeState struct {
 	sizeMu     sync.Mutex
 	sizes      map[string]sizedAt
 	sizing     map[string]bool
+	// sweepMu takes one worktree sweep at a time (worktreesweep.go).
+	sweepMu sync.Mutex
+	sweeps  sync.WaitGroup
 }
 
 type sizedAt struct {
