@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
 	"github.com/alexec/agents/Go/internal/agentsd/redact"
@@ -132,7 +133,7 @@ func (d *Daemon) keepAppToolCall(agent wire.UUID, tool string, args map[string]j
 	call := appToolCall{At: wire.DateOf(began), Method: appToolMethod(tool), Ok: err == nil, Arguments: map[string]json.RawMessage{}}
 	for k, v := range args {
 		if k != "token" {
-			call.Arguments[k] = v
+			call.Arguments[k] = cutAppToolArgument(v)
 		}
 	}
 	answer := note
@@ -168,6 +169,25 @@ func (d *Daemon) keepAppToolCall(agent wire.UUID, tool string, args map[string]j
 	b, _ = redact.Bytes(b) // a call's arguments or answer can hold a token (#1001)
 	f.Write(append(b, '\n'))
 	f.Close()
+}
+
+// cutAppToolArgument is an argument as app-tools.jsonl keeps it (#3687): whole when its
+// JSON is at most appToolAnswerMost runes, else the first appToolAnswerMost runes of its
+// text (a string's own, anything else's JSON) as a string.
+func cutAppToolArgument(v json.RawMessage) json.RawMessage {
+	if utf8.RuneCount(v) <= appToolAnswerMost {
+		return v
+	}
+	text := string(v)
+	var s string
+	if json.Unmarshal(v, &s) == nil {
+		text = s
+	}
+	if r := []rune(text); len(r) > appToolAnswerMost {
+		text = string(r[:appToolAnswerMost])
+	}
+	b, _ := json.Marshal(text)
+	return b
 }
 
 func (d *Daemon) appToolsPath(agent wire.UUID) string {

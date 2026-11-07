@@ -33,7 +33,7 @@ Mac.
 | Store | What it keeps | How long, how large | Applied |
 | --- | --- | --- | --- |
 | `agents/<id>/agent.json`, `transcript.jsonl` | Each agent's record and its whole conversation | Until the agent is deleted. An archived agent is deleted after **Archived agents** (7, 14, 30 or 90 days, or Forever; 30 by default). A pinned agent is kept. A conversation has no size limit. | At start, then hourly |
-| `agents/<id>/app-tools.jsonl` | Each call to the app's own tools | With the agent. Answers are cut to 2,000 characters; the arguments are not cut. | With the agent |
+| `agents/<id>/app-tools.jsonl` | Each call to the app's own tools | With the agent. Each argument and the answer are cut to 2,000 characters. | With the agent |
 | `agents/<id>/said.json` | A search index of what was said | 32 KiB, with the agent | On write |
 | `turns/<id>.jsonl`, in the cache folder | A summary of each turn | With the agent. Made again from the transcript when it is missing. | With the agent |
 | `erasures.json` | Runtime copies of deleted agents still to erase | 1,000 entries, 3 tries, 7 days | On write |
@@ -94,8 +94,8 @@ Mac.
 
 | Store | What it keeps | How long, how large | Applied |
 | --- | --- | --- | --- |
-| `daemon.log`, in the log folder | What the machine did | 4 MB, and one older file. Output from a crash is not checked until the next write. | On write |
-| `mcp-logs/`, in the log folder | What each hosted MCP server wrote to stderr | 1 MB and one older file a server, and the newest 32 servers. A single write over 1 MB is kept whole. | When a server starts |
+| `daemon.log`, in the log folder | What the machine did | 4 MB, and one older file. Output from a crash is checked against the limit within 30 seconds. | On write |
+| `mcp-logs/`, in the log folder | What each hosted MCP server wrote to stderr | 1 MB and one older file a server, and the newest 32 servers. A larger write is split, so no file passes 1 MB. | When a server starts |
 | `tools/<runtime>/`, in the cache folder | Pinned runtime toolsets | The current one | At start |
 | `browser/`, in the cache folder | The browser that agents drive, and its output | Old browser versions are left to Playwright. Output goes when the session ends; what a crash left goes at the next start (#3649) | On install; at session end; at start |
 | `catalog-staging/`, in the cache folder | Skill previews | 8 previews, 30 minutes; folders left by a restart go at the next start (#3649) | On use; at start |
