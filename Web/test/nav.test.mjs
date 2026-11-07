@@ -88,6 +88,8 @@ test("an address from before #2141 opens its page's new place", async () => {
     }
     assert.equal(r.usageAsked.value, "tokens", "Usage opens on the pane the old address named");
     assert.equal(r.isOldAddress("#/reports/spend"), false);
+    assert.equal(r.isOldAddress("#/machines/runtimes"), true, "Runtimes went to Your setup (#3631)");
+    assert.equal(r.isOldAddress("#/machines/machines"), false);
     assert.equal(r.isOldAddress("#/h/mac/p/x"), false);
     // Every page an old address names is a page of its section.
     for (const now of Object.values(moved)) {

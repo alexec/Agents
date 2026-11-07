@@ -133,9 +133,9 @@ function sectionHash(r: Route): string {
   return `#/${r.nav}` + (r.section ? "/" + encodeURIComponent(r.section) + (r.item ? "/" + encodeURIComponent(r.item) : "") : "");
 }
 
-/** Whether an address is one from before #2141, which the page writes again as its new place. */
+/** Whether an address is one from before #2141, or Machines ▸ Runtimes from before #3631, which the page writes again as its new place. */
 export function isOldAddress(hash: string): boolean {
-  return /^#\/?(console|a)(\/|$)/.test(hash);
+  return /^#\/?(console|a)(\/|$)/.test(hash) || /^#\/?machines\/runtimes$/.test(hash);
 }
 
 /** The section a route is in: Agents for a host's places, the Overview for none. */
