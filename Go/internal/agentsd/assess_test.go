@@ -203,3 +203,35 @@ func TestAppToolCallsGoInTheAgentsUpperCaseFolder(t *testing.T) {
 		t.Fatalf("%+v", calls)
 	}
 }
+
+// ask_question is scored on the brief's form, not on should_ask's question by ask_question
+// before it, and workspaces on list_machines, which says when there are no providers (#1356).
+func TestAskQuestionAndWorkspacesAfterTheShelfQuestion(t *testing.T) {
+	text := func(s string) *string { return &s }
+	shelf := appToolCall{At: 10, Method: "questions/ask", Ok: true, Answer: text("They answered:\n- Which shelf?: kept"), Arguments: map[string]json.RawMessage{
+		"questions": json.RawMessage(`[{"id":"shelf","prompt":"Which shelf?","options":[{"id":"kept"},{"id":"scratch"}]}]`)}}
+	form := appToolCall{At: 20, Method: "questions/ask", Ok: true, Answer: text("They answered:\n- Pick one: Alpha\n- Type any short phrase: plum lantern 47"), Arguments: map[string]json.RawMessage{
+		"questions": json.RawMessage(`[{"id":"pick","prompt":"Pick one","options":[{"id":"a"}]},{"id":"words","prompt":"Type any short phrase"}]`)}}
+	machines := appToolCall{At: 5, Method: "machines/list", Ok: true, Answer: text("This control plane has no machine providers. The person adds them in Settings ▸ Machine Providers.")}
+	answered := func(at wire.Date, answers ...wire.ElicitationAnswer) wire.TranscriptEntry {
+		return wire.TranscriptEntry{At: at, Kind: wire.TranscriptEntryKind{ElicitationAnswered: &wire.TranscriptEntryKindElicitationAnswered{Answers: answers}}}
+	}
+	report := "Shelf: kept\n| ask_question | passed | plum lantern 47 |\n"
+	r := assessRecord{calls: []appToolCall{machines, shelf, form}, reportText: &report, transcript: []wire.TranscriptEntry{
+		answered(11, wire.ElicitationAnswer{Question: "Which shelf?", Answer: "kept"}),
+		answered(21, wire.ElicitationAnswer{Question: "Pick one", Answer: "Alpha"}, wire.ElicitationAnswer{Question: "Type any short phrase", Answer: "plum lantern 47"}),
+	}}
+	if v, why := r.askQuestion(); v != passed {
+		t.Fatal(why)
+	}
+	if v, why := r.workspaces(); v != passed || why != "`list_machines` answered" {
+		t.Fatal(v, why)
+	}
+	r.calls = []appToolCall{shelf}
+	if v, why := r.askQuestion(); v != failedStep || why != "`ask_question` was not asked with both a choice and a text field" {
+		t.Fatal(v, why)
+	}
+	if v, why := r.workspaces(); v != failedStep || why != "`list_machines` never called" {
+		t.Fatal(v, why)
+	}
+}
