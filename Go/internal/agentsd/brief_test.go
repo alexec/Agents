@@ -204,6 +204,11 @@ func TestTheBriefSaysWhatToAskAndWhatToDecide(t *testing.T) {
 		!strings.Contains(got, "write `Decided: <what>, because <why>.`") {
 		t.Fatal(got)
 	}
+	// A choice the task says is the person's is asked, also when it is easy to undo (#3699).
+	if got := escalationBrief("claude"); !strings.Contains(got, "a choice that I or your task say is mine") ||
+		!strings.Contains(got, "Never decide and tell a choice that is mine") {
+		t.Fatal(got)
+	}
 	// Antigravity's own tool has the app's name (#2298): said by whose it is.
 	if got := escalationBrief("antigravity"); !strings.Contains(got, "ask me with your runtime's own ask_question (or the app's ask_question, from the agents server, if yours is missing) rather than guessing") {
 		t.Fatal(got)
