@@ -13,6 +13,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/azureboardsmcp"
 	"github.com/alexec/agents/Go/internal/connections"
+	"github.com/alexec/agents/Go/internal/forgejomcp"
 	"github.com/alexec/agents/Go/internal/githubmcp"
 	"github.com/alexec/agents/Go/internal/gitlabmcp"
 	"github.com/alexec/agents/Go/internal/jiramcp"
@@ -38,7 +39,8 @@ import (
 // sign-in (JIRA_URL, JIRA_EMAIL and JIRA_API_TOKEN in the secrets) through jiramcp.RealJira,
 // issues only, of the projects the folders' .agents/folder.json name in "jiraProjects": one
 // search for every project. Azure Boards (#3815) is read the same way, of the projects the
-// folders name in "azureBoardsProjects" (forgeazure.go).
+// folders name in "azureBoardsProjects" (forgeazure.go). Forgejo (#3753) is read with the
+// host's Forgejo connection, only on its own Forgejo, a call per repository (forgeforgejo.go).
 //
 // A list is one page of every forge, merged by updatedAt: each forge is asked for a page, the
 // newest of them all are kept, and each forge's cursor goes on after the last of its own kept.
@@ -127,6 +129,8 @@ type forgeBook struct {
 	newForgeJira func(auth jiramcp.Auth) forgeJira
 	// newForgeAzureBoards is Azure Boards at base with a token; a test gives a fake.
 	newForgeAzureBoards func(base, token string) forgeAzureBoards
+	// newForgeForgejo is the Forgejo at root as the token's owner; a test gives a fake.
+	newForgeForgejo func(root, token string) forgeForgejo
 }
 
 func (d *Daemon) registerForge() {
@@ -152,16 +156,17 @@ func (d *Daemon) registerForge() {
 // forgeCursor is a list's cursor, one per forge, so a page goes on where each forge stopped.
 // Done are the forges whose list has ended.
 type forgeCursor struct {
-	GitHub string   `json:"github,omitempty"`
-	GitLab string   `json:"gitlab,omitempty"`
-	Linear string   `json:"linear,omitempty"`
-	Jira   string   `json:"jira,omitempty"`
-	Boards string   `json:"azureboards,omitempty"`
-	Done   []string `json:"done,omitempty"`
+	GitHub  string   `json:"github,omitempty"`
+	GitLab  string   `json:"gitlab,omitempty"`
+	Linear  string   `json:"linear,omitempty"`
+	Jira    string   `json:"jira,omitempty"`
+	Boards  string   `json:"azureboards,omitempty"`
+	Forgejo string   `json:"forgejo,omitempty"`
+	Done    []string `json:"done,omitempty"`
 }
 
 func (c *forgeCursor) of(forge string) *string {
-	return map[string]*string{"github": &c.GitHub, "gitlab": &c.GitLab, "linear": &c.Linear, "jira": &c.Jira, "azureboards": &c.Boards}[forge]
+	return map[string]*string{"github": &c.GitHub, "gitlab": &c.GitLab, "linear": &c.Linear, "jira": &c.Jira, "azureboards": &c.Boards, "forgejo": &c.Forgejo}[forge]
 }
 
 func (c forgeCursor) text() *string {
@@ -263,6 +268,10 @@ func (d *Daemon) forgeList(ctx context.Context, prs bool, r wire.ForgeListReques
 		}
 		pages = append(pages, p)
 	}
+	if (len(sources.forgejo) > 0 || sources.forgejoErr != nil) && !slices.Contains(cursor.Done, "forgejo") {
+		pages = append(pages, d.forgejoPage(ctx, sources, forgejomcp.SearchFilter{PRs: prs, State: state, Label: deref(r.Label),
+			Assignee: deref(r.Assignee), Query: deref(r.Query), Feature: deref(r.Feature)}, cursor.Forgejo, limit))
+	}
 	if (len(sources.teams) > 0 || sources.workspace) && !slices.Contains(cursor.Done, "linear") {
 		p := forgePage{forge: "linear"}
 		l, err := d.forgeLinear()
@@ -354,7 +363,7 @@ func mergeForgePages(pages []forgePage, from forgeCursor, limit int) ([]wire.For
 		items = append(items, pages[best].items[taken[best]])
 		taken[best]++
 	}
-	next := forgeCursor{GitHub: from.GitHub, GitLab: from.GitLab, Linear: from.Linear, Jira: from.Jira, Boards: from.Boards, Done: slices.Clone(from.Done)}
+	next := forgeCursor{GitHub: from.GitHub, GitLab: from.GitLab, Linear: from.Linear, Jira: from.Jira, Boards: from.Boards, Forgejo: from.Forgejo, Done: slices.Clone(from.Done)}
 	more := false
 	for n, p := range pages {
 		switch {
@@ -392,10 +401,14 @@ type forgeSources struct {
 	// boards is the Azure Boards projects (#3815), organization/project.
 	boards       []string
 	boardsFolder map[string]string
+	// forgejo is the repositories on the connected Forgejo at forgejoRoot (#3753), owner/repo.
+	forgejo     []string
+	forgejoRoot string
+	forgejoErr  error
 }
 
 func (s forgeSources) key() []any {
-	return []any{s.repos, s.root, s.gitlab, s.teams, s.workspace, s.linearHome, s.projects, s.boards}
+	return []any{s.repos, s.root, s.gitlab, s.teams, s.workspace, s.linearHome, s.projects, s.boards, s.forgejoRoot, s.forgejo}
 }
 
 func (d *Daemon) forgeSources(ctx context.Context, prs bool, folders []string) forgeSources {
@@ -444,6 +457,7 @@ func (d *Daemon) forgeSources(ctx context.Context, prs bool, folders []string) f
 			}
 		}
 	}
+	d.forgejoSources(ctx, &s, folders)
 	if !prs && len(s.teams) == 0 && d.linearConnected() && !d.anyLinearTeams() {
 		s.workspace, s.linearHome = true, d.linearHome()
 	}
@@ -588,8 +602,10 @@ func (d *Daemon) forgeItem(ctx context.Context, kind string, r wire.ForgeItemReq
 		out, err = d.jiraItem(ctx, method, key, deref(r.Cursor))
 	} else if project, id, ok := boardsOfNode(r.Node); ok && kind == lineage.KindIssue {
 		out, err = d.boardsItem(ctx, method, project, id, deref(r.Cursor))
+	} else if repo, number, ok := forgejoOfNode(r.Node); ok {
+		out, err = d.forgejoItem(ctx, method, kind, repo, number, deref(r.Cursor))
 	} else if repo, number, ok := nodeOfRepo(r.Node); !ok {
-		return wire.ForgeItemDetail{}, Invalid("%s: %s is not an issue or a pull request on GitHub, GitLab, Linear, Jira or Azure Boards", method, r.Node.Ref)
+		return wire.ForgeItemDetail{}, Invalid("%s: %s is not an issue or a pull request on GitHub, GitLab, Forgejo, Linear, Jira or Azure Boards", method, r.Node.Ref)
 	} else if repo.forge == "gitlab" {
 		out, err = d.gitlabItem(ctx, method, kind, repo, number, deref(r.Cursor))
 	} else {

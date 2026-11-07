@@ -14,7 +14,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// The forge writes (#3130): the actions of the GitHub, GitLab, Linear, Jira (#3260) and Azure
+// The forge writes (#3130): the actions of the GitHub, GitLab, Forgejo (#3753), Linear, Jira (#3260) and Azure
 // Boards (#3815) views, on the Work pages' issue and pull request pages: comment, labels (a work
 // item's tags), close and reopen (a Jira issue's move by a transition of its workflow, a work
 // item's to another state of its type), and a pull request's merge, approve, rerun of its failed
@@ -115,7 +115,7 @@ func (d *Daemon) registerForgeWrites() {
 }
 
 // forgeTarget is the item a write is on, and the forge to write it with: one of github, gitlab
-// (with its project there), linear (with its identifier), jira (with its key, in identifier) or
+// (with its project there), forgejo (with its repository there, in project), linear (with its identifier), jira (with its key, in identifier) or
 // boards (with its project and its id, in number).
 type forgeTarget struct {
 	repo       forgeRepo
@@ -127,6 +127,7 @@ type forgeTarget struct {
 	linear     forgeLinear
 	jira       forgeJira
 	boards     forgeAzureBoards
+	forgejo    forgeForgejo
 	identifier string
 }
 
@@ -156,9 +157,16 @@ func (d *Daemon) forgeTargetOf(ctx context.Context, method string, node wire.Lin
 		}
 		return forgeTarget{boards: b, project: project, number: id}, nil
 	}
+	if repo, number, ok := forgejoOfNode(node); ok {
+		fj, named, _, err := d.forgejoOf(ctx, method, repo)
+		if err != nil {
+			return forgeTarget{}, err
+		}
+		return forgeTarget{forgejo: fj, project: named, number: number, pr: node.Kind == lineage.KindPR}, nil
+	}
 	repo, number, ok := nodeOfRepo(node)
 	if !ok {
-		return forgeTarget{}, Invalid("%s: %s is not an issue or a pull request on GitHub, GitLab, Linear, Jira or Azure Boards", method, node.Ref)
+		return forgeTarget{}, Invalid("%s: %s is not an issue or a pull request on GitHub, GitLab, Forgejo, Linear, Jira or Azure Boards", method, node.Ref)
 	}
 	t := forgeTarget{repo: repo, number: number, pr: node.Kind == lineage.KindPR}
 	if repo.forge == "gitlab" {
@@ -205,6 +213,8 @@ func (d *Daemon) forgeComment(ctx context.Context, r wire.ForgeCommentRequest) (
 		url, err = t.jira.Comment(ctx, t.identifier, body)
 	case t.boards != nil:
 		url, err = t.boards.Comment(ctx, t.project, t.number, body)
+	case t.forgejo != nil:
+		url, err = t.forgejo.Comment(ctx, t.project, t.number, body)
 	case t.gitlab != nil:
 		err = t.gitlab.Comment(ctx, t.project, t.number, t.pr, body)
 	default:
@@ -257,6 +267,8 @@ func (d *Daemon) forgeLabel(ctx context.Context, r wire.ForgeLabelRequest) (wire
 		err = t.jira.SetLabels(ctx, t.identifier, add, remove)
 	case t.boards != nil:
 		err = t.boards.SetTags(ctx, t.project, t.number, add, remove)
+	case t.forgejo != nil:
+		err = t.forgejo.SetLabels(ctx, t.project, t.number, add, remove)
 	case t.gitlab != nil:
 		err = t.gitlab.SetLabels(ctx, t.project, t.number, t.pr, add, remove)
 	default:
@@ -283,6 +295,8 @@ func (d *Daemon) forgeLabels(ctx context.Context, r wire.ForgeNodeRequest) (wire
 		names, colors, err = t.jira.Labels(ctx, t.identifier)
 	case t.boards != nil:
 		names, colors, err = t.boards.Labels(ctx, t.project, t.number)
+	case t.forgejo != nil:
+		names, colors, err = t.forgejo.RepoLabels(ctx, t.project)
 	case t.gitlab != nil:
 		names, colors, err = t.gitlab.ProjectLabels(ctx, t.project)
 	default:
@@ -316,6 +330,8 @@ func (d *Daemon) forgeClose(ctx context.Context, r wire.ForgeCloseRequest) (wire
 		err = t.jira.SetState(ctx, t.identifier, closed)
 	case t.linear != nil:
 		err = t.linear.SetState(ctx, t.identifier, closed)
+	case t.forgejo != nil:
+		err = t.forgejo.SetState(ctx, t.project, t.number, closed)
 	case t.gitlab != nil:
 		err = t.gitlab.SetState(ctx, t.project, t.number, t.pr, closed)
 	default:
@@ -342,6 +358,13 @@ func (d *Daemon) forgeMerge(ctx context.Context, r wire.ForgeMergeRequest) (wire
 		how = string(*r.Method)
 	}
 	auto := r.Auto != nil && *r.Auto
+	if t.forgejo != nil {
+		if err := d.forgejoMerge(ctx, method, t, r.Sha, how, auto); err != nil {
+			return wire.ForgeDone{}, err
+		}
+		d.forgeWrote()
+		return wire.ForgeDone{Auto: optionalTrue(auto)}, nil
+	}
 	if t.gitlab != nil {
 		methods, err := t.gitlab.MergeMethods(ctx, t.project)
 		if err != nil {
@@ -388,9 +411,12 @@ func (d *Daemon) forgeApprove(ctx context.Context, r wire.ForgeApproveRequest) (
 		return wire.ForgeDone{}, err
 	}
 	var url string
-	if t.gitlab != nil {
+	switch {
+	case t.forgejo != nil:
+		url, err = t.forgejo.Approve(ctx, t.project, t.number, r.Sha)
+	case t.gitlab != nil:
 		_, err = t.gitlab.Approve(ctx, t.project, t.number, r.Sha)
-	} else {
+	default:
 		var out map[string]any
 		out, err = t.github.ReviewPR(ctx, t.repo.path, t.number, r.Sha, true, "")
 		url, _ = out["url"].(string)
@@ -443,6 +469,9 @@ func (d *Daemon) forgeRerun(ctx context.Context, r wire.ForgeNodeRequest) (wire.
 	if err != nil {
 		return wire.ForgeDone{}, err
 	}
+	if t.forgejo != nil {
+		return wire.ForgeDone{}, Invalid("%s: %s", method, forgejoNoChecksAPI)
+	}
 	if t.gitlab != nil {
 		p, err := t.gitlab.ItemPage(ctx, t.project, t.number, true, "")
 		if err != nil {
@@ -485,6 +514,9 @@ func (d *Daemon) forgeLog(ctx context.Context, r wire.ForgeLogRequest) (wire.For
 		return wire.ForgeLog{}, err
 	}
 	check := strings.TrimSpace(deref(r.Check))
+	if t.forgejo != nil {
+		return wire.ForgeLog{Text: forgejoNoChecksAPI + "."}, nil
+	}
 	if t.gitlab != nil {
 		p, err := t.gitlab.ItemPage(ctx, t.project, t.number, true, "")
 		if err != nil {
@@ -524,9 +556,12 @@ func (d *Daemon) forgeDiff(ctx context.Context, r wire.ForgeNodeRequest) (wire.F
 		return wire.ForgeDiff{}, err
 	}
 	var out map[string]any
-	if t.gitlab != nil {
+	switch {
+	case t.forgejo != nil:
+		out, err = t.forgejo.PRDiff(ctx, t.project, t.number)
+	case t.gitlab != nil:
 		out, err = t.gitlab.MRDiff(ctx, t.project, t.number)
-	} else {
+	default:
 		out, err = t.github.PRDiff(ctx, t.repo.path, t.number, "")
 	}
 	if err != nil {
@@ -573,6 +608,9 @@ func forgeStartOf(i wire.ForgeItem) *wire.ForgeStart {
 		return &wire.ForgeStart{Prompt: fmt.Sprintf("%s: %s\n\nWork on this Azure Boards work item: %s\n\n"+
 			"Name %s in the pull request's title, so Azure Boards links it.", key, i.Title, url, key),
 			Labels: []string{key}, Worktree: optional(strconv.Itoa(id) + " " + i.Title)}
+	}
+	if _, n, ok := forgejoOfNode(i.Node); ok {
+		return forgejoStart(i, n)
 	}
 	repo, n, ok := nodeOfRepo(i.Node)
 	if !ok {

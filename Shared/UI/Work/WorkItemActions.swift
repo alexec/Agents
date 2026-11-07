@@ -52,7 +52,7 @@ struct WorkItemActions: View {
         }
         .sheet(item: $log) { log in WorkLogSheet(log: log) }
         .sheet(item: $diff) { diff in
-            AppViewDiffPage(diff: diff, openLink: { openURL($0) })
+            AppViewDiffPage(diff: diff, site: WorkList.forgeName(node.ref), openLink: { openURL($0) })
         }
     }
 
@@ -130,7 +130,7 @@ struct WorkItemActions: View {
                                             returning: DaemonAPI.ForgeLog.self, on: host)
             log = WorkLog(title: check, text: got.text)
         } catch {
-            said = (error.localizedDescription, true)
+            said = (WorkList.failureWords(error), true)
         }
     }
 
@@ -142,7 +142,7 @@ struct WorkItemActions: View {
                                             returning: DaemonAPI.ForgeDiff.self, on: host)
             diff = got.appViewDiff(title: "\(WorkList.shortRef(node.ref)) \(item.title)")
         } catch {
-            said = (error.localizedDescription, true)
+            said = (WorkList.failureWords(error), true)
         }
     }
 
@@ -205,7 +205,7 @@ struct WorkItemActions: View {
                 said = (WorkList.doneWords(method, done, reopened: close?.reopen == true, moved: close?.transition != nil), false)
                 wrote()
             } catch {
-                said = (error.localizedDescription, true)
+                said = (WorkList.failureWords(error), true)
             }
         }
     }
