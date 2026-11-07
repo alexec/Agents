@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -35,6 +36,33 @@ func TestShutdownWaitsForTheWritesAfterATurn(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 	if after, _ := os.ReadFile(d.eventsPath()); string(after) != string(b) {
 		t.Fatalf("events.jsonl was written after Shutdown returned:\n%s", after[len(b):])
+	}
+}
+
+// What follows a turn and tells the clients as the host goes is done when Shutdown
+// returns, also with a client that reads nothing (#3828): each line to it waited the
+// conn's 5 s, so a workflow's run that told three things outlived Shutdown's wait and
+// wrote into a test's folder as it was deleted.
+func TestShutdownWaitsForWhatTellsAClientThatReadsNothing(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	for len(c.out) < cap(c.out) {
+		c.out <- ""
+	}
+	var done atomic.Bool
+	d.goAfterTurn("tells as the host goes", func() {
+		for !d.going() {
+			time.Sleep(time.Millisecond)
+		}
+		for range 3 {
+			Broadcast(d, wire.NotifyWorkflowRemoved, wire.WorkflowRemovedNotification{WorkflowID: "x"})
+		}
+		done.Store(true)
+	})
+
+	d.Shutdown()
+
+	if !done.Load() {
+		t.Fatal("what told the clients was not done when Shutdown returned")
 	}
 }
 
