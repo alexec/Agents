@@ -37,13 +37,57 @@
 | Plans and billing | **One Free plan with limits, one paid plan (Pro) through Stripe Checkout.** Billing is off when no Stripe key is set, and every account is then on Free. | Decided on #2223, 2026-10-22 |
 | How an invitation works | **Two ways:** an operator allows a GitHub login (the allowlist), or makes a one-use invite link. Both are admin commands. | Decided 2026-10-22, see Clarifications |
 | Minimum GitHub account age | **30 days**, also for an invited person. An invite link does not skip it; an allowlist entry does. | Decided 2026-10-22 |
-| A CAPTCHA (Turnstile) | **Not in 0.12.** Sign-up is invite only, so the rates, the age rule and the cap are enough. The open sign-up setting adds Turnstile when it is built. | Decided 2026-10-22 |
+| A CAPTCHA (Turnstile) | **Not in 0.12.** Sign-up is invite only, so the rates, the age rule and the cap are enough. The open sign-up setting adds Turnstile when it is built. | Decided 2026-10-22; built for open sign-up, below (#3388) |
+| What open sign-up checks | **A verified email, one account per email, blocks by email, and Turnstile on the sign-up page**, beside the rates, the cap, the age rule and the blocks. See [Open sign-up](#open-sign-up-3388). | Decided on #3387, 2026-11-05; built in #3388 |
 | Where limits are enforced | **In `agents-hosted`**, around each account's control plane: in its store, in the proxy, and in a sweep. The control plane is not changed in 0.12, because 0.11 holds its area. | Decided 2026-10-22 |
 | Agents running at the same time | **Recorded in the plan, not enforced in 0.12.** Only the control plane knows which agents run. A later slice adds the hook, after v0.11.0 ships. | Decided 2026-10-22 |
 | Workspace providers on a hosted account | **Off.** A provider runs commands and holds cloud keys on the service's machine. Machines join by code or join command. | Decided 2026-10-22 |
 | At a limit | **Refuse the new thing, keep everything there.** Nothing is deleted at a limit or at a downgrade, except events older than the plan keeps. | Decided 2026-10-22 |
 | Many certificates | **A cap below Let's Encrypt's limits**, and a wildcard certificate later (Alex's DNS token, #2227) when the cap is too small. | Decided 2026-10-22 |
 | The admin tool | **A command, `agents-hosted admin …`, on the service's machine**, against the same store. No admin web page in 0.12. | Decided 2026-10-22 |
+
+## Open sign-up (#3388)
+
+The spike #3387 decided these checks (its comment of 2026-11-05), from the code and the
+principles in `docs/explanation/direction.md`. Principle 6 makes a fake account cheap: the
+service holds no AI key and no compute, so a fake account costs only its store and its
+connections, which the Free plan bounds (2 machines, 5 clients, 20 connections, 1 GB) and
+the idle sweep stops (15 minutes).
+
+`AGENTS_HOSTED_SIGNUP=open` lets anyone with Apple, Google or GitHub sign up with no invite
+(principle 4), and these checks hold:
+
+| Check | Value | Provider |
+|---|---|---|
+| Rates per address and per hour (had them) | 3 per address, 30 per hour | all |
+| Cap on accounts, then the waitlist (had it) | 100 at first (`AGENTS_HOSTED_MAX_ACCOUNTS`), raised as the VM allows | all |
+| Email verified by the provider (new) | Google: `email_verified` is true. Apple: the token has an email (Apple gives only verified ones; a private relay address is accepted). GitHub: a verified primary email (the App's Email addresses permission). With none: refused, with a line that says why, and no waitlist entry | all |
+| One account per verified email (new) | The email's mark keys a second index, `hosted/v1/emails/<mark>.json`; a second sign-up with the same email gets the account it has | all |
+| GitHub account age (had it) | 30 days | GitHub |
+| Cloudflare Turnstile (new) | On the sign-up page only; off when no key is set, so a self-hosted or local copy needs no Cloudflare | all |
+| Blocks (had them; by email is new) | By sign-in (issuer, subject, #3386), and by email: a block of a sign-in blocks its account's email too | all |
+
+- **The email is not kept (principle 7).** The service keeps only its mark: HMAC-SHA256 of
+  the address in lower case, under a key made from the service's own key, which the KMS
+  seals. A store alone cannot be tried against a list of addresses. `admin block <email>`
+  makes the mark with the same keeper (`AGENTS_CONTROL_KMS`).
+- **Everyone signs in (principle 3).** Each check is on a sign-in with Apple, Google or
+  GitHub; nobody signs up with an email and a password.
+- **An invite or an allowed login needs no email.** The operator vouched for that person.
+- **Apple answers by a form post** once the email scope is asked for, so the callback takes
+  a POST, and the sign-in's state and invite cookies are `SameSite=None` (signed, ten
+  minutes, and they sign nobody in).
+- **Turnstile:** with its keys, the page's buttons are one form with the widget, posted to
+  `/signin`; the service asks Cloudflare's siteverify before it sends the browser to the
+  provider, and a GET of `/signin` goes back to the page. Cloudflare not answering refuses,
+  with words to try again.
+
+Not chosen: an account age for Apple or Google (they give none); Turnstile on a control
+plane's join and sign-in (#3066), because those paths need a person who has an account
+already, and the in-process limits (#2150) and the edge rules (#2151) bound them.
+
+Open sign-up ships off: `invite` stays the default. Turning it on at agentloops.dev, the
+Turnstile keys and the GitHub App's email permission are Alex's steps in #2227.
 
 ## Words
 

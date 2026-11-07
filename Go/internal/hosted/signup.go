@@ -2,6 +2,7 @@ package hosted
 
 import (
 	"context"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -14,19 +15,23 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/signin"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 )
 
 // Who may sign up (#2152, spec 1003 FR-001–FR-012). A person with an account signs in as
-// before, never limited. A new one is checked in order: blocked, the mode, allowed (the
-// allowlist, an invite, or open), the GitHub account's age, the cap on accounts. One who
-// may not have an account yet goes on the waitlist. Making an account or a waitlist entry
-// counts against the rates; showing a place already kept does not.
+// before, never limited. A new one is checked in order: blocked (by sign-in or by email),
+// an account for their email already, the mode, allowed (the allowlist, an invite, or open
+// with a verified email), the GitHub account's age, the cap on accounts. One who may not
+// have an account yet goes on the waitlist. Making an account or a waitlist entry counts
+// against the rates; showing a place already kept does not.
 //
-// Apple and Google (#3386) have no account age, and no login for the allowlist: they sign
-// up only with an invite, also when sign-up is open, until the open sign-up spike (#3387)
-// says what checks them instead.
+// Open sign-up (#3388, decided in #3387) needs an email the provider verified: Google's
+// email_verified, Apple's email (Apple gives only verified ones, a private relay address
+// too), GitHub's verified primary. One email has one account, whichever provider signs up
+// with it. The service keeps only the email's keyed hash, its mark (direction.md principle
+// 7). Cloudflare Turnstile, when its keys are set, is on the sign-up page (turnstile.go).
 
 // The modes of Config.SignUp.
 const (
@@ -64,6 +69,9 @@ func allowKey(login string) string {
 func inviteKey(code string) string { return hostedPrefix + "v1/invites/" + code + ".json" }
 func waitingKey(user SignIn) string { return hostedPrefix + "v1/waiting/" + user.who() + ".json" }
 func blockedKey(user SignIn) string { return hostedPrefix + "v1/blocked/" + user.who() + ".json" }
+func blockedEmailKey(mark string) string {
+	return hostedPrefix + "v1/blocked/email/" + mark + ".json"
+}
 func waitlistKey(place string) string { return hostedPrefix + "v1/waitlist/" + place + ".json" }
 
 const waitlistFolder = hostedPrefix + "v1/waitlist/"
@@ -106,7 +114,25 @@ func (l waitlistLink) signIn() SignIn {
 	return signInOf(SignIn{}, &GitHubID{ID: l.GitHub})
 }
 
-// Block is a sign-in that may not sign up.
+// emailMark is an email's mark: HMAC-SHA256 of the address in lower case, under a key made
+// from the service's own key, so the store says nothing of who signed up, and a list of
+// addresses cannot be tried against it without the keeper. "" for no email.
+func emailMark(key []byte, email string) string {
+	email = strings.ToLower(strings.TrimSpace(email))
+	if email == "" {
+		return ""
+	}
+	m := hmac.New(sha256.New, key)
+	m.Write([]byte(email))
+	return hex.EncodeToString(m.Sum(nil))
+}
+
+// emailMarkKey is the key of emailMark, from the service's own key.
+func emailMarkKey(own []byte) []byte {
+	return controllink.HKDF(own, []byte("agents-hosted-email-v1"), nil, 32)
+}
+
+// Block is a sign-in, or an email, that may not sign up.
 type Block struct {
 	Login  string    `json:"login,omitempty"`
 	Reason string    `json:"reason,omitempty"`
@@ -167,10 +193,27 @@ func (s *Service) gate(ctx context.Context, from string, user SignIn, invite str
 	if !user.valid() {
 		return unreadable(fmt.Errorf("%s is not a sign-in", user))
 	}
+	blocked := signUpResult{refused: "Sign-up is not open to this " + signin.Title(user.Provider) + " account.", status: http.StatusForbidden, kind: "blocked"}
 	if o, err := st.Get(ctx, blockedKey(user)); err != nil {
 		return unreadable(err)
 	} else if o != nil {
-		return signUpResult{refused: "Sign-up is not open to this " + signin.Title(user.Provider) + " account.", status: http.StatusForbidden, kind: "blocked"}
+		return blocked
+	}
+	mark := emailMark(s.markKey, user.Email)
+	if mark != "" {
+		if o, err := st.Get(ctx, blockedEmailKey(mark)); err != nil {
+			return unreadable(err)
+		} else if o != nil {
+			return blocked
+		}
+		// One account per email (#3388): another provider's sign-in with the same email
+		// gets the account that email has.
+		if acc, err := s.accounts.byEmail(ctx, mark); err != nil {
+			return unreadable(err)
+		} else if acc != nil {
+			s.leaveWaitlist(ctx, user)
+			return signUpResult{account: acc}
+		}
 	}
 	if s.cfg.SignUp == SignUpClosed {
 		return signUpResult{refused: "Sign-up is not open yet.", status: http.StatusServiceUnavailable, kind: "closed"}
@@ -184,9 +227,9 @@ func (s *Service) gate(ctx context.Context, from string, user SignIn, invite str
 		}
 		listed = o != nil
 	}
-	// Open is open to GitHub alone: its account's age is the check (#3387 decides Apple's
-	// and Google's).
-	allowed := s.cfg.SignUp == SignUpOpen && gitHub || listed
+	// Open is open to a sign-in with a verified email (#3387); GitHub's age is checked too.
+	open := s.cfg.SignUp == SignUpOpen
+	allowed := open && mark != "" || listed
 	var inv *store.Object
 	if !allowed && validInvite(invite) {
 		o, err := st.Get(ctx, inviteKey(invite))
@@ -197,6 +240,9 @@ func (s *Service) gate(ctx context.Context, from string, user SignIn, invite str
 		if o != nil && json.Unmarshal(o.Data, &rec) == nil && rec.Used == nil && s.cfg.Now().Before(rec.Expires) {
 			allowed, inv = true, o
 		}
+	}
+	if !allowed && open && mark == "" && invite == "" {
+		return signUpResult{refused: noEmailText(user.Provider), status: http.StatusForbidden, kind: "no_email"}
 	}
 	why := ""
 	switch {
@@ -238,7 +284,7 @@ func (s *Service) gate(ctx context.Context, from string, user SignIn, invite str
 				return s.wait(ctx, from, user, whyInviteUsed, false, true)
 			}
 		}
-		acc, made, err := s.accounts.make(ctx, user)
+		acc, made, err := s.accounts.makeMarked(ctx, user, mark)
 		if err != nil || acc == nil {
 			return unreadable(err)
 		}
@@ -338,6 +384,15 @@ func whyText(why string, minAge time.Duration) string {
 	default:
 		return "Sign-up is by invitation while Agents is in beta."
 	}
+}
+
+// noEmailText says why a sign-in with no verified email cannot sign up.
+func noEmailText(provider string) string {
+	title := signin.Title(provider)
+	if provider == signin.GitHub {
+		return "Sign-up needs an email address that GitHub has verified, as your primary email. Verify one at github.com/settings/emails, then sign up again."
+	}
+	return "Sign-up needs an email address that " + title + " has verified, and " + title + " gave none. Sign up with another account."
 }
 
 func unreadable(err error) signUpResult {

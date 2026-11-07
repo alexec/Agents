@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controlplane/signin"
@@ -16,8 +17,9 @@ import (
 //	/                  Sign up (or Sign in) with Apple, Google or GitHub (#3386); an account
 //	                   signed in goes to /account; ?invite=<code> carries an invite link to
 //	                   the sign-in (#2152)
-//	/signin?with=<provider>  to Apple, Google or GitHub (none is GitHub, as links before)
-//	/signin/callback   back from the provider: a new account gets its control plane, whose
+//	/signin?with=<provider>  to Apple, Google or GitHub (none is GitHub, as links before);
+//	                   with Turnstile on (#3388), a POST from the page's form, after the check
+//	/signin/callback   back from the provider (Apple's by a POST): a new account gets its control plane, whose
 //	                   first person signs in with the same provider, and this browser is
 //	                   sent to it to pair, with nothing to type
 //	/account           the control plane's address, Open in This Browser, Sign Out, Delete
@@ -28,12 +30,7 @@ import (
 
 func (s *Service) pages(w http.ResponseWriter, r *http.Request) {
 	h := w.Header()
-	// A form's redirect counts for form-action: Upgrade and Manage Billing go on to Stripe.
-	formAction := "'self'"
-	if s.billingOn() {
-		formAction += " https://checkout.stripe.com https://billing.stripe.com"
-	}
-	h.Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; form-action "+formAction+"; frame-ancestors 'none'; base-uri 'none'")
+	h.Set("Content-Security-Policy", s.policy())
 	h.Set("X-Content-Type-Options", "nosniff")
 	h.Set("Referrer-Policy", "no-referrer")
 	h.Set("Cache-Control", "no-store")
@@ -48,26 +45,40 @@ func (s *Service) pages(w http.ResponseWriter, r *http.Request) {
 		if !validInvite(invite) {
 			invite = ""
 		}
-		s.page(w, http.StatusOK, page{Title: "Agents", Welcome: true, Invite: invite, Providers: s.offered()})
+		s.page(w, http.StatusOK, s.welcome(page{Invite: invite}))
 	case r.URL.Path == "/signin" && r.Method == http.MethodGet:
-		provider := r.URL.Query().Get("with")
-		if provider == "" {
-			provider = signin.GitHub
-		}
-		if !s.offers(provider) {
-			s.page(w, http.StatusServiceUnavailable, page{Title: "Agents", Problem: "Sign-up is not open yet."})
+		invite := r.URL.Query().Get("invite")
+		if s.turnstile != nil {
+			// The check is on the page: back to it.
+			to := "/"
+			if validInvite(invite) {
+				to += "?invite=" + invite
+			}
+			http.Redirect(w, r, to, http.StatusSeeOther)
 			return
 		}
-		if invite := r.URL.Query().Get("invite"); validInvite(invite) {
-			setCookie(w, inviteCookie, s.sessions.sign(invite), stateLife)
+		s.startSignIn(w, r, r.URL.Query().Get("with"), invite)
+	case r.URL.Path == "/signin" && r.Method == http.MethodPost && s.turnstile != nil:
+		invite := r.PostFormValue("invite")
+		if !validInvite(invite) {
+			invite = ""
 		}
-		state := s.sessions.newState(w, provider)
-		to := s.github.authorize(state)
-		if o := s.oidc[provider]; o != nil {
-			to = o.authorize(state, s.sessions.derived("nonce", state), s.sessions.derived("pkce", state))
+		ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+		err := s.turnstile.check(ctx, r.PostFormValue(turnstileField), s.clientOf(r))
+		cancel()
+		if err != nil {
+			s.metrics.refused("turnstile")
+			s.log("sign-up page: " + err.Error())
+			problem := "The check that you are a person did not pass. Try again."
+			status := http.StatusForbidden
+			if !errors.Is(err, errNotPerson) {
+				problem, status = "The check that you are a person could not be made just now. Try again in a moment.", http.StatusServiceUnavailable
+			}
+			s.page(w, status, s.welcome(page{Invite: invite, Problem: problem}))
+			return
 		}
-		http.Redirect(w, r, to, http.StatusSeeOther)
-	case r.URL.Path == "/signin/callback" && r.Method == http.MethodGet:
+		s.startSignIn(w, r, r.PostFormValue("with"), invite)
+	case r.URL.Path == "/signin/callback" && (r.Method == http.MethodGet || r.Method == http.MethodPost):
 		s.callback(w, r)
 	case r.URL.Path == "/account" && r.Method == http.MethodGet:
 		s.accountPage(w, r, account, "")
@@ -100,6 +111,72 @@ func (s *Service) pages(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// policy is the pages' Content-Security-Policy. A form's redirect counts for form-action:
+// Upgrade and Manage Billing go on to Stripe, and with Turnstile on (#3388) the sign-up
+// form goes on to each provider; Turnstile's widget is a script and a frame of its own.
+func (s *Service) policy() string {
+	formAction := "'self'"
+	if s.billingOn() {
+		formAction += " https://checkout.stripe.com https://billing.stripe.com"
+	}
+	extra := ""
+	if s.turnstile != nil {
+		for _, p := range signin.Providers {
+			if s.offers(p) {
+				formAction += " " + origin(s.authorizeAt(p))
+			}
+		}
+		extra = "; script-src " + turnstileOrigin + "; frame-src " + turnstileOrigin
+	}
+	return "default-src 'none'; style-src 'unsafe-inline'; form-action " + formAction + "; frame-ancestors 'none'; base-uri 'none'" + extra
+}
+
+// authorizeAt is where a provider's sign-in starts.
+func (s *Service) authorizeAt(provider string) string {
+	if o := s.oidc[provider]; o != nil {
+		return o.at.Authorize
+	}
+	return s.github.web + "/login/oauth/authorize"
+}
+
+// origin is a URL's scheme and host.
+func origin(at string) string {
+	u, err := url.Parse(at)
+	if err != nil {
+		return ""
+	}
+	return u.Scheme + "://" + u.Host
+}
+
+// welcome is the sign-up page, with p's invite and problem.
+func (s *Service) welcome(p page) page {
+	p.Title, p.Welcome, p.Providers, p.Open = "Agents", true, s.offered(), s.cfg.SignUp == SignUpOpen
+	if s.turnstile != nil {
+		p.TurnstileKey, p.TurnstileScript = s.turnstile.siteKey, turnstileScript
+	}
+	return p
+}
+
+// startSignIn sends the browser to a provider, with an invite's code kept for the callback.
+func (s *Service) startSignIn(w http.ResponseWriter, r *http.Request, provider, invite string) {
+	if provider == "" {
+		provider = signin.GitHub
+	}
+	if !s.offers(provider) {
+		s.page(w, http.StatusServiceUnavailable, page{Title: "Agents", Problem: "Sign-up is not open yet."})
+		return
+	}
+	if validInvite(invite) {
+		setFlowCookie(w, inviteCookie, s.sessions.sign(invite))
+	}
+	state := s.sessions.newState(w, provider)
+	to := s.github.authorize(state)
+	if o := s.oidc[provider]; o != nil {
+		to = o.authorize(state, s.sessions.derived("nonce", state), s.sessions.derived("pkce", state))
+	}
+	http.Redirect(w, r, to, http.StatusSeeOther)
+}
+
 // offers says a provider's web sign-in is set up.
 func (s *Service) offers(provider string) bool {
 	if provider == signin.GitHub {
@@ -122,18 +199,19 @@ func (s *Service) offered() []offer {
 
 // callback is the provider's answer: the account the person has, or a new one.
 func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
-	q := r.URL.Query()
+	// The query, or Apple's form post.
+	_ = r.ParseForm()
+	q := r.Form
 	state := q.Get("state")
 	if !s.sessions.stateOK(r, state) || !s.offers(providerOf(state)) {
-		s.page(w, http.StatusBadRequest, page{Title: "Agents", Welcome: true, Providers: s.offered(),
-			Problem: "That sign-in was not started here, or took too long. Sign in again."})
+		s.page(w, http.StatusBadRequest, s.welcome(page{Problem: "That sign-in was not started here, or took too long. Sign in again."}))
 		return
 	}
 	endCookie(w, stateCookie)
 	provider := providerOf(state)
 	title := signin.Title(provider)
 	if q.Get("error") != "" || q.Get("code") == "" {
-		s.page(w, http.StatusOK, page{Title: "Agents", Welcome: true, Providers: s.offered(), Problem: title + " did not sign you in. Try again."})
+		s.page(w, http.StatusOK, s.welcome(page{Problem: title + " did not sign you in. Try again."}))
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
@@ -147,13 +225,13 @@ func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		s.log("sign-in with " + title + ": " + err.Error())
-		s.page(w, http.StatusBadGateway, page{Title: "Agents", Welcome: true, Providers: s.offered(), Problem: title + " could not be asked who you are. Try again."})
+		s.page(w, http.StatusBadGateway, s.welcome(page{Problem: title + " could not be asked who you are. Try again."}))
 		return
 	}
 	acc, err := s.accounts.bySignIn(ctx, user)
 	if err != nil {
 		s.log("accounts: " + errText(err))
-		s.page(w, http.StatusServiceUnavailable, page{Title: "Agents", Welcome: true, Providers: s.offered(), Problem: "Your account could not be read or made. Try again in a moment."})
+		s.page(w, http.StatusServiceUnavailable, s.welcome(page{Problem: "Your account could not be read or made. Try again in a moment."}))
 		return
 	}
 	made := false
@@ -169,7 +247,7 @@ func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
 		case got.refused != "":
 			s.metrics.refused(got.kind)
 			s.log(fmt.Sprintf("sign-up refused: %s: %s", user, got.refused))
-			s.page(w, got.status, page{Title: "Agents", Welcome: true, Providers: s.offered(), Problem: got.refused})
+			s.page(w, got.status, s.welcome(page{Problem: got.refused}))
 			return
 		case got.account == nil:
 			s.page(w, http.StatusOK, page{Title: "The waitlist", Place: got.place, Why: whyText(got.why, s.cfg.MinGitHubAge)})
@@ -234,7 +312,7 @@ func (s *Service) accountPage(w http.ResponseWriter, r *http.Request, account, p
 	acc, err := s.accounts.get(r.Context(), account)
 	if err != nil || acc == nil {
 		endCookie(w, sessionCookie)
-		s.page(w, http.StatusOK, page{Title: "Agents", Welcome: true, Providers: s.offered(), Problem: "That account is gone. Sign up again."})
+		s.page(w, http.StatusOK, s.welcome(page{Problem: "That account is gone. Sign up again."}))
 		return
 	}
 	if problem == "" && acc.Certificate == nil && !s.certificateRoom() {
@@ -276,7 +354,7 @@ func (s *Service) deleteAccount(w http.ResponseWriter, r *http.Request, account 
 	}
 	s.log("deleted: " + account)
 	endCookie(w, sessionCookie)
-	s.page(w, http.StatusOK, page{Title: "Agents", Welcome: true, Providers: s.offered(), Problem: "Your account and its control plane are deleted."})
+	s.page(w, http.StatusOK, s.welcome(page{Problem: "Your account and its control plane are deleted."}))
 }
 
 func errText(err error) string {
@@ -295,6 +373,10 @@ type page struct {
 	Token   string
 	// An invite link's code, carried to the sign-in.
 	Invite string
+	// Open sign-up (#3388): the page says what it needs instead of an invite.
+	Open bool
+	// Turnstile's site key and widget, when it is on (#3388).
+	TurnstileKey, TurnstileScript string
 	// The providers to sign up with, one button each.
 	Providers []offer
 	// A place on the waitlist, and why, when not 0.
@@ -331,7 +413,8 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!doctype html>
   h1 { font-size: 1.6rem; margin-bottom: .25rem; }
   .quiet { color: #6e6e73; }
   .problem { color: #b3261e; }
-  a.signup { min-width: 14rem; text-align: center; }
+  a.signup, button.signup { min-width: 14rem; text-align: center; }
+  form.signup { display: block; }
   a.button, button { display: inline-block; font: inherit; padding: .5rem 1rem; border-radius: .5rem; border: 1px solid #c7c7cc; background: #fff; color: inherit; text-decoration: none; cursor: pointer; }
   a.prominent, button.prominent { background: #2c5fd6; border-color: #2c5fd6; color: #fff; }
   button.destructive { color: #b3261e; }
@@ -355,10 +438,17 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!doctype html>
 <p>Sign up and you get a control plane of your own. You type no command and hold no key.</p>
 {{if .Problem}}<p class="problem" role="alert">{{.Problem}}</p>{{end}}
 {{if .Invite}}<p>You have an invite.</p>{{end}}
-{{range .Providers}}<p><a class="button prominent signup" href="/signin?with={{.With}}{{if $.Invite}}&amp;invite={{$.Invite}}{{end}}">Sign Up with {{.Title}}</a></p>
+{{if and .TurnstileKey .Providers}}<form class="signup" method="post" action="/signin">
+{{if .Invite}}<input type="hidden" name="invite" value="{{.Invite}}">{{end}}
+{{range .Providers}}<p><button class="prominent signup" name="with" value="{{.With}}">Sign Up with {{.Title}}</button></p>
+{{end}}<div class="cf-turnstile" data-sitekey="{{.TurnstileKey}}"></div>
+</form>
+<script src="{{.TurnstileScript}}" async defer></script>
+{{else}}{{range .Providers}}<p><a class="button prominent signup" href="/signin?with={{.With}}{{if $.Invite}}&amp;invite={{$.Invite}}{{end}}">Sign Up with {{.Title}}</a></p>
 {{else}}<p>Sign-up is not open yet.</p>
-{{end}}
-{{if not .Invite}}<p class="quiet">Sign-up is by invitation while Agents is in beta. Without an invite, you join the waitlist.</p>{{end}}
+{{end}}{{end}}
+{{if .Open}}<p class="quiet">You need an email address that Apple, Google or GitHub has verified. Agents does not keep the address. It keeps only a mark of it, so that one email has one account.</p>
+{{else if not .Invite}}<p class="quiet">Sign-up is by invitation while Agents is in beta. Without an invite, you join the waitlist.</p>{{end}}
 <p class="quiet">Signed up before? The same button signs you in.</p>
 {{else if .Account.Suspended}}
 <h1>Your account</h1>

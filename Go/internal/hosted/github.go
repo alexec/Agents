@@ -14,7 +14,8 @@ import (
 
 // The GitHub App's web sign-in (#1807): the browser goes to GitHub, and comes back to
 // /signin/callback on this service's own domain with a code. The service trades the code
-// for a user token with the App's client secret, asks who it is, and forgets the token.
+// for a user token with the App's client secret, asks who it is and its verified primary
+// email (#3388; the App's "Email addresses" permission), and forgets the token.
 
 type gitHub struct {
 	clientID, secret string
@@ -66,7 +67,30 @@ func (g gitHub) user(ctx context.Context, code string) (SignIn, error) {
 	}
 	user := gitHubSignIn(who.ID, who.Login)
 	user.Created = who.Created
+	user.Email = primaryEmail(ctx, g.api, token.AccessToken)
 	return user, nil
+}
+
+// primaryEmail is a GitHub user's primary email, in lower case, when GitHub verified it;
+// "" when it did not, or the App may not read emails.
+func primaryEmail(ctx context.Context, api, token string) string {
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, api+"/user/emails", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	var emails []struct {
+		Email    string `json:"email"`
+		Primary  bool   `json:"primary"`
+		Verified bool   `json:"verified"`
+	}
+	if err := call(req, &emails); err != nil {
+		return ""
+	}
+	for _, e := range emails {
+		if e.Primary && e.Verified {
+			return strings.ToLower(e.Email)
+		}
+	}
+	return ""
 }
 
 func call(req *http.Request, into any) error {

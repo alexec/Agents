@@ -24,8 +24,11 @@ import (
 //	hosted/v1/waiting/<who>.json   a sign-in on the waitlist: its place's key below
 //	hosted/v1/waitlist/<place>.json  the waitlist, in order of its keys
 //	hosted/v1/blocked/<who>.json   a sign-in that may not sign up
+//	hosted/v1/emails/<mark>.json   a verified email's account, one each (#3388)
+//	hosted/v1/blocked/email/<mark>.json  an email that may not sign up
 //
-// <who> is a GitHub user's id, as before #3386, or apple/<sub> or google/<sub>.
+// <who> is a GitHub user's id, as before #3386, or apple/<sub> or google/<sub>. <mark> is
+// an email's keyed hash (emailMark), never the address.
 //	hosted/v1/stripe/<event>.json  a Stripe event acted on, so once (#2225, billing.go)
 //	accounts/<id>/v1/…             the account's control plane's store, its sealed key too
 const (
@@ -39,8 +42,11 @@ type Account struct {
 	// Who signed up: their control plane's first person signs in with it too (#3386).
 	SignIn SignIn `json:"signIn"`
 	// The GitHub user of an account made before #3386, read as its SignIn.
-	GitHub  *GitHubID `json:"github,omitempty"`
-	Created time.Time `json:"created"`
+	GitHub *GitHubID `json:"github,omitempty"`
+	// The keyed hash of the email the provider verified (#3388), for one account per
+	// email and blocks by email; "" when there was none.
+	EmailMark string    `json:"emailMark,omitempty"`
+	Created   time.Time `json:"created"`
 	// The plan whose limits hold (spec 1003 FR-020): "" is free.
 	Plan string `json:"plan,omitempty"`
 	// Set by the operator: the control plane is stopped and refuses every request.
@@ -62,12 +68,14 @@ type Suspension struct {
 // which never changes, as the control plane keys a person's sign-in. GitHub's subject is
 // its numeric id, and Login its login when they signed in, for the page and the allowlist;
 // Apple and Google give no login, and none is asked for. Created is when a GitHub account
-// was made, for the minimum age (#2152); it is not kept.
+// was made, for the minimum age (#2152); it is not kept. Email is the address the
+// provider verified (#3388), in lower case, or "": it is not kept either, only its mark.
 type SignIn struct {
 	Provider string    `json:"provider"`
 	Subject  string    `json:"subject"`
 	Login    string    `json:"login,omitempty"`
 	Created  time.Time `json:"-"`
+	Email    string    `json:"-"`
 }
 
 // gitHubSignIn is a GitHub user's sign-in.
@@ -143,6 +151,7 @@ func accountKey(id string) string { return hostedPrefix + "v1/accounts/" + id + 
 func signInKey(si SignIn) string {
 	return hostedPrefix + "v1/" + si.Provider + "/" + si.Subject + ".json"
 }
+func emailKey(mark string) string { return hostedPrefix + "v1/emails/" + mark + ".json" }
 func accountStore(st store.Store, id string) *store.Prefixed {
 	return store.NewPrefixed(st, accountsPrefix+id+"/")
 }
@@ -153,6 +162,24 @@ func (a *accounts) bySignIn(ctx context.Context, user SignIn) (*Account, error) 
 		return nil, nil
 	}
 	o, err := a.store.Get(ctx, signInKey(user))
+	if err != nil || o == nil {
+		return nil, err
+	}
+	var link struct {
+		Account string `json:"account"`
+	}
+	if err := json.Unmarshal(o.Data, &link); err != nil {
+		return nil, err
+	}
+	return a.get(ctx, link.Account)
+}
+
+// byEmail is the account an email's mark signed up with, or nil.
+func (a *accounts) byEmail(ctx context.Context, mark string) (*Account, error) {
+	if mark == "" {
+		return nil, nil
+	}
+	o, err := a.store.Get(ctx, emailKey(mark))
 	if err != nil || o == nil {
 		return nil, err
 	}
@@ -181,13 +208,21 @@ func (a *accounts) get(ctx context.Context, id string) (*Account, error) {
 	return &acc, nil
 }
 
-// make is a sign-up: the sign-in's link first, written only if absent, so a person gets
-// one account however many times they sign up at once. It says whether it was made.
+// make is a sign-up with no email: makeMarked with none.
 func (a *accounts) make(ctx context.Context, user SignIn) (*Account, bool, error) {
+	return a.makeMarked(ctx, user, "")
+}
+
+// makeMarked is a sign-up: the sign-in's link first, then the email's (mark, when not ""), each
+// written only if absent, so a person gets one account however many times they sign up at
+// once, and an email one however many providers it signs up with (#3388). It says whether
+// it was made.
+func (a *accounts) makeMarked(ctx context.Context, user SignIn, mark string) (*Account, bool, error) {
 	if !user.valid() {
 		return nil, false, fmt.Errorf("%s is not a sign-in", user)
 	}
-	acc := Account{ID: newID(), SignIn: user, Created: a.now().UTC()}
+	user.Email = ""
+	acc := Account{ID: newID(), SignIn: user, EmailMark: mark, Created: a.now().UTC()}
 	link, _ := json.Marshal(map[string]string{"account": acc.ID})
 	if _, err := a.store.Put(ctx, signInKey(user), link, store.Absent); err != nil {
 		if store.IsConflict(err) {
@@ -195,6 +230,17 @@ func (a *accounts) make(ctx context.Context, user SignIn) (*Account, bool, error
 			return existing, false, err
 		}
 		return nil, false, err
+	}
+	if mark != "" {
+		if _, err := a.store.Put(ctx, emailKey(mark), link, store.Absent); err != nil {
+			// Another sign-in with the same email made its account first: that one is theirs.
+			_ = a.store.Delete(ctx, signInKey(user))
+			if store.IsConflict(err) {
+				existing, err := a.byEmail(ctx, mark)
+				return existing, false, err
+			}
+			return nil, false, err
+		}
 	}
 	data, _ := json.MarshalIndent(acc, "", "  ")
 	if _, err := a.store.Put(ctx, accountKey(acc.ID), data, store.Absent); err != nil {
@@ -254,7 +300,7 @@ func (a *accounts) count(ctx context.Context) (int, error) {
 }
 
 // remove deletes the account: its control plane's whole store, the invites its sign-in
-// used, then the account, then the sign-in's link, so a stop part way is finished by
+// used, its email's link, then the account, then the sign-in's link, so a stop part way is finished by
 // deleting again.
 func (a *accounts) remove(ctx context.Context, acc *Account) error {
 	if _, err := store.DeleteAll(ctx, accountStore(a.store, acc.ID)); err != nil {
@@ -265,6 +311,15 @@ func (a *accounts) remove(ctx context.Context, acc *Account) error {
 	}
 	if err := a.store.Delete(ctx, usageKey(acc.ID)); err != nil {
 		return err
+	}
+	if mark := acc.EmailMark; mark != "" {
+		if other, err := a.byEmail(ctx, mark); err != nil {
+			return err
+		} else if other == nil || other.ID == acc.ID {
+			if err := a.store.Delete(ctx, emailKey(mark)); err != nil {
+				return err
+			}
+		}
 	}
 	if err := a.store.Delete(ctx, accountKey(acc.ID)); err != nil {
 		return err

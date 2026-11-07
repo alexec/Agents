@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/controlplane/kms"
 	"github.com/alexec/agents/Go/internal/controlplane/signin"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 )
@@ -20,8 +21,26 @@ type Admin struct {
 	Store store.Store
 	// Where the pages are, for an invite link.
 	Domain string
+	// The service's keeper (AGENTS_CONTROL_KMS), for an email's mark: only a block or an
+	// unblock by email needs it.
+	Keeper string
 	Now    func() time.Time
 }
+
+// markOf is an email's mark, as the service makes it.
+func (a Admin) markOf(ctx context.Context, email string) (string, error) {
+	if a.Keeper == "" {
+		return "", errors.New("an email's mark needs the service's keeper: AGENTS_CONTROL_KMS, as serve has")
+	}
+	own, err := kms.Kept{Store: store.NewPrefixed(a.Store, hostedPrefix), Keeper: a.Keeper}.ControlKey(ctx)
+	if err != nil {
+		return "", fmt.Errorf("the hosted service's own key: %w", err)
+	}
+	return emailMark(emailMarkKey(own), email), nil
+}
+
+// isEmail says the operator typed an email, not a sign-in.
+func isEmail(who string) bool { return strings.Contains(who, "@") }
 
 func (a Admin) now() time.Time {
 	if a.Now == nil {
@@ -117,14 +136,34 @@ func (a Admin) Unsuspend(ctx context.Context, id string) error {
 }
 
 // Block refuses a sign-in, by provider:subject, a GitHub user's numeric id, or a GitHub
-// login (looked up in the accounts and the waitlist), and suspends their account. It says
-// the sign-in it blocked.
+// login (looked up in the accounts and the waitlist), and suspends their account; its
+// email, when the account has one, is blocked too (#3388). Given an email, it blocks
+// that email, from every provider, and suspends the email's account. It says the sign-in
+// it blocked (none for an email).
 func (a Admin) Block(ctx context.Context, who, reason string) (SignIn, error) {
+	data, _ := json.Marshal(Block{Reason: reason, At: a.now()})
+	if reason == "" {
+		reason = "Blocked by the operator."
+	}
+	if isEmail(who) {
+		mark, err := a.markOf(ctx, who)
+		if err != nil {
+			return SignIn{}, err
+		}
+		if _, err := a.Store.Put(ctx, blockedEmailKey(mark), data, store.Always); err != nil {
+			return SignIn{}, err
+		}
+		acc, err := a.accounts().byEmail(ctx, mark)
+		if err != nil || acc == nil {
+			return SignIn{}, err
+		}
+		return SignIn{}, a.Suspend(ctx, acc.ID, reason)
+	}
 	user, err := a.resolve(ctx, who)
 	if err != nil {
 		return SignIn{}, err
 	}
-	data, _ := json.Marshal(Block{Login: user.Login, Reason: reason, At: a.now()})
+	data, _ = json.Marshal(Block{Login: user.Login, Reason: reason, At: a.now()})
 	if _, err := a.Store.Put(ctx, blockedKey(user), data, store.Always); err != nil {
 		return SignIn{}, err
 	}
@@ -132,20 +171,36 @@ func (a Admin) Block(ctx context.Context, who, reason string) (SignIn, error) {
 	if acc, err := a.accounts().bySignIn(ctx, user); err != nil {
 		return user, err
 	} else if acc != nil {
-		if reason == "" {
-			reason = "Blocked by the operator."
+		if acc.EmailMark != "" {
+			if _, err := a.Store.Put(ctx, blockedEmailKey(acc.EmailMark), data, store.Always); err != nil {
+				return user, err
+			}
 		}
 		return user, a.Suspend(ctx, acc.ID, reason)
 	}
 	return user, nil
 }
 
-// Unblock lets a sign-in, provider:subject or a GitHub id, sign up again. Its account, if
-// any, stays suspended until Unsuspend.
+// Unblock lets a sign-in, provider:subject or a GitHub id, and its account's email, or an
+// email alone, sign up again. Its account, if any, stays suspended until Unsuspend.
 func (a Admin) Unblock(ctx context.Context, who string) error {
+	if isEmail(who) {
+		mark, err := a.markOf(ctx, who)
+		if err != nil {
+			return err
+		}
+		return a.Store.Delete(ctx, blockedEmailKey(mark))
+	}
 	user, ok := parseSignIn(who)
 	if !ok {
 		return fmt.Errorf("%q: %w", who, ErrNotSignIn)
+	}
+	if acc, err := a.accounts().bySignIn(ctx, user); err != nil {
+		return err
+	} else if acc != nil && acc.EmailMark != "" {
+		if err := a.Store.Delete(ctx, blockedEmailKey(acc.EmailMark)); err != nil {
+			return err
+		}
 	}
 	return a.Store.Delete(ctx, blockedKey(user))
 }
