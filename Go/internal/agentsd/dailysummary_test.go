@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -226,11 +227,82 @@ func TestDailySummaryHasTheOtherMachines(t *testing.T) {
 
 	// What this machine answers another's summary: each list cut, with a count of the rest.
 	work := t.TempDir()
+	died := wire.EndedReasonProcessDied
 	for range summaryLines + 5 {
-		seeded(t, d, work, func(a *wire.Agent) { a.State = wire.AgentStateFinished })
+		seeded(t, d, work, func(a *wire.Agent) { a.State, a.EndedReason = wire.AgentStateStopped, &died })
 	}
 	sent := sentSummaryFacts(d.machineSummaryFacts("", time.Now().Add(-time.Hour)))
-	if len(sent.Landed) != summaryLines+1 || sent.Landed[summaryLines] != "and 5 more" || sent.Waiting == nil || sent.Checked == nil {
-		t.Fatalf("%d %v", len(sent.Landed), sent.Landed[len(sent.Landed)-1])
+	if len(sent.Failed) != summaryLines+1 || sent.Failed[summaryLines] != "and 5 more" || sent.Waiting == nil || sent.Checked == nil {
+		t.Fatalf("%d %v", len(sent.Failed), sent.Failed[len(sent.Failed)-1])
+	}
+}
+
+// The facts are about the person (#3720): what waits on them on GitHub, the outcomes that
+// landed with the sessions that made them under them, a workflow's runs as one line, and at
+// most a few other sessions.
+func TestDailySummaryIsAboutThePerson(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	home := t.TempDir()
+	d.PersonalHome = home
+	work := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(work, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(work, ".git", "config"), []byte("[remote \"origin\"]\n\turl = https://github.com/o/r.git\n"), 0o644)
+	since := time.Now().Add(-time.Hour)
+	stamp := func(d time.Duration) string { return since.Add(d).UTC().Format(time.RFC3339) }
+	gh := filepath.Join(t.TempDir(), "gh")
+	script := `#!/bin/sh
+case "$*" in
+"repo view"*) echo '{"nameWithOwner":"o/r","url":"https://github.com/o/r"}' ;;
+"search prs --label needs-approval"*) echo '[{"number":5,"title":"New button","url":"https://github.com/o/r/pull/5","createdAt":"` + stamp(-48*time.Hour) + `","repository":{"nameWithOwner":"o/r"}}]' ;;
+"search prs --review-requested"*) echo '[{"number":5,"title":"New button","url":"https://github.com/o/r/pull/5","createdAt":"` + stamp(-48*time.Hour) + `","repository":{"nameWithOwner":"o/r"}},
+  {"number":6,"title":"Review me","url":"https://github.com/o/r/pull/6","createdAt":"` + stamp(-24*time.Hour) + `","repository":{"nameWithOwner":"o/r"}}]' ;;
+"search issues"*) echo '[{"number":7,"title":"Sign up","url":"https://github.com/o/r/issues/7","createdAt":"` + stamp(-72*time.Hour) + `","repository":{"nameWithOwner":"o/r"}}]' ;;
+"pr list"*) echo '[{"number":12,"title":"Fix login","url":"https://github.com/o/r/pull/12","mergedAt":"` + stamp(time.Minute) + `","headRefName":"agents/12-login"}]' ;;
+"issue list"*) echo '[{"number":9,"title":"Projects","url":"https://github.com/o/r/issues/9","closedAt":"` + stamp(time.Minute) + `","stateReason":"COMPLETED","labels":[{"name":"epic"}]},
+  {"number":10,"title":"Dup","url":"https://github.com/o/r/issues/10","closedAt":"` + stamp(time.Minute) + `","stateReason":"NOT_PLANNED","labels":[]}]' ;;
+"release list"*) echo '[{"tagName":"v0.17.0","name":"v0.17.0","publishedAt":"` + stamp(time.Minute) + `"}]' ;;
+esac
+`
+	if err := os.WriteFile(gh, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	needs, branch := "Fix the login", "agents/12-login"
+	maker := seeded(t, d, work, func(a *wire.Agent) {
+		a.Title = &needs
+		a.Worktree = &wire.AgentWorktree{Name: "12-login", Branch: &branch, Folder: store.FolderURL(work)}
+	})
+	ship := "ship-app"
+	for range 5 {
+		seeded(t, d, work, func(a *wire.Agent) { a.StartedByWorkflow = &ship })
+	}
+	for range otherSessionLines + 2 {
+		seeded(t, d, work, nil)
+	}
+
+	f := d.machineSummaryFactsWith("", since, gh)
+	if len(f.Waiting) != 3 || !strings.HasPrefix(f.Waiting[0], assignedLine+`#7 "Sign up"`) ||
+		!strings.HasPrefix(f.Waiting[1], approvalLine+"#5") || !strings.HasPrefix(f.Waiting[2], reviewLine+"#6") {
+		t.Fatalf("waits on you:\n%s", strings.Join(f.Waiting, "\n"))
+	}
+	landed := strings.Join(f.Landed, "\n")
+	for _, want := range []string{
+		epicLine, `#9 "Projects" in o/r. https://github.com/o/r/issues/9`,
+		`#12 "Fix login" in o/r. https://github.com/o/r/pull/12` + "\n  - session \"Fix the login\": " + sessionLink(maker.ID),
+		releaseLine, "https://github.com/o/r/releases/tag/v0.17.0",
+		`Workflow "ship-app" in ` + filepath.Base(work) + " ran 5 times",
+		"and 2 other sessions done",
+	} {
+		if !strings.Contains(landed, want) {
+			t.Fatalf("no %q in:\n%s", want, landed)
+		}
+	}
+	if strings.Contains(landed, "Dup") || strings.Contains(landed, `Session "Fix the login"`) || strings.Count(landed, "Workflow ") != 1 {
+		t.Fatalf("landed:\n%s", landed)
+	}
+	if got := personLine(f.Waiting, f.Landed); got != "3 things wait on you. 1 pull request merged, 1 epic closed, 1 release published." {
+		t.Fatal(got)
 	}
 }
