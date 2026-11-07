@@ -112,6 +112,23 @@ func (f *RealForgejo) now() time.Time {
 const NotConnected = "Forgejo is not connected, or its token ended: set FORGEJO_TOKEN to an access token with read and write on repository and issue"
 
 func (f *RealForgejo) do(ctx context.Context, method, path string, body any) ([]byte, error) {
+	res, err := f.request(ctx, method, path, body, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	data, err := io.ReadAll(io.LimitReader(res.Body, 64<<20))
+	if err != nil {
+		return nil, &ForgejoError{Kind: Failed, Message: "Forgejo: " + err.Error()}
+	}
+	if res.StatusCode >= 200 && res.StatusCode < 300 {
+		return data, nil
+	}
+	return nil, failure(res, data)
+}
+
+// request is Forgejo's response to path, with header's too, for the caller to read and close.
+func (f *RealForgejo) request(ctx context.Context, method, path string, body any, header http.Header) (*http.Response, error) {
 	token := f.Token()
 	if token == "" {
 		return nil, &ForgejoError{Kind: NotSignedIn, Message: NotConnected}
@@ -135,19 +152,14 @@ func (f *RealForgejo) do(ctx context.Context, method, path string, body any) ([]
 	// Go drops it on a redirect to another host.
 	req.Header.Set("Authorization", "token "+token)
 	req.Header.Set("User-Agent", "agents-forgejo-mcp")
+	for k, v := range header {
+		req.Header[k] = v
+	}
 	res, err := f.Client.Do(req)
 	if err != nil {
 		return nil, &ForgejoError{Kind: Failed, Message: "Forgejo: " + err.Error()}
 	}
-	defer res.Body.Close()
-	data, err := io.ReadAll(io.LimitReader(res.Body, 64<<20))
-	if err != nil {
-		return nil, &ForgejoError{Kind: Failed, Message: "Forgejo: " + err.Error()}
-	}
-	if res.StatusCode >= 200 && res.StatusCode < 300 {
-		return data, nil
-	}
-	return nil, failure(res, data)
+	return res, nil
 }
 
 // failure is a response Forgejo refused, as what went wrong.

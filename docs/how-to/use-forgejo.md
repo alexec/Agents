@@ -11,8 +11,8 @@ server in the shape of the gitlab one. Forgejo and Gitea have the same REST API,
 connector is for both: Codeberg, your own Forgejo, or your own Gitea. Agents Host carries
 it, and every Linux host installs it beside agentsd.
 
-It has tools to read pull requests, their checks and issues, and to comment on them, and
-it has events that start a workflow or a wait. It has no pages yet: the Work pages do not
+It has tools to read pull requests, their checks and issues, and a failed job's log, and to
+comment on them, and it has events that start a workflow or a wait. It has no pages yet: the Work pages do not
 list a Forgejo repository.
 
 ## Before you start
@@ -45,6 +45,13 @@ an event can name another one with `repo`, as `owner/name`.
   combined state of its checks), `get_checks` (each check of a commit or a pull request's
   head), `list_issues` and `get_issue` (with its comments).
 - `comment_on_pull_request` and `comment_on_issue`.
+- `failed_log`: the last 300 lines of each failed job's log in a Forgejo Actions run, or of
+  one job by name. `runId` is the run's number: `run.id` in a `checks.failed` event, or the
+  number after `/actions/runs/` in a check's address. On Forgejo 17 or later it gives the
+  step that failed (the whole job's log when that step wrote nothing). It needs Forgejo 16
+  or later, or Gitea 1.25 or later; an older server, such as Forgejo 11 LTS or Gitea 1.24,
+  has no API for it, and the tool says which version it needs and gives the run's address.
+  Another CI's logs are on its own pages.
 - For the ready-made workflows: `create_pull_request` (a draft's title starts `WIP:`),
   `list_pull_request_comments` (the comments on lines of the diff) and
   `reply_to_pull_request_comment` (an answer in the comment's thread).
@@ -79,7 +86,7 @@ never a bot. A pull request from a fork never counts.
 - **Checks are read for the 50 open pull requests updated last.** Forgejo has no list of a
   repository's failed checks, so each poll reads the head of each of those.
 - **Not yet:** the Work pages, a **Connect Forgejo** sheet with a sign-in, the set-up of a
-  folder's Tasks, Code review and CI from a Forgejo remote, and a failed job's log.
+  folder's Tasks, Code review and CI from a Forgejo remote.
 
 ## See also
 
