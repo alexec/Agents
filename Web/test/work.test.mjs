@@ -43,8 +43,17 @@ test("a Forgejo pull request's row has its repo and Open on Forgejo (#3753)", ()
   assert.equal(w.shortRef(row.node.ref), "#8");
   assert.equal(w.openOnWords(row.node.ref), "Open on Forgejo");
   assert.equal(w.forgeName(row.node.ref), "Forgejo");
-  assert.equal(w.forgeName("bitbucket:a/b#1"), "the forge");
+  assert.equal(w.forgeName("pagure:a/b#1"), "the forge");
   assert.equal(w.errorWords({ forge: "forgejo", message: "not connected" }, "Studio"), "Forgejo on Studio: not connected");
+});
+
+test("a Bitbucket issue's row has its repo and Open on Bitbucket (#3786)", () => {
+  const row = w.forgeRow(item(0, { node: { kind: "issue", ref: "bitbucket:walkalex/app#3" } }), "mac");
+  assert.equal(row.repo, "bitbucket:walkalex/app");
+  assert.equal(w.repoName(row.repo), "walkalex/app");
+  assert.equal(w.shortRef(row.node.ref), "#3");
+  assert.equal(w.openOnWords(row.node.ref), "Open on Bitbucket");
+  assert.equal(w.errorWords({ forge: "bitbucket", message: "not connected" }, "Studio"), "Bitbucket on Studio: not connected");
 });
 
 test("one row per ref, the last updated copy, with its lineage", () => {

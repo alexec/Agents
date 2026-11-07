@@ -3,6 +3,7 @@ package agentsd
 import (
 	"context"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -12,9 +13,12 @@ import (
 
 // Issues an agent files (#3582), so a dictated idea reaches the issues it became:
 //
-//   - A tool call that files a forge issue (`gh issue create`, `glab issue create`, or a
-//     forge server's create-issue tool) links session opens issue, source agent, for each
-//     issue address in what the call gave back.
+//   - A tool call that files a forge issue (`gh issue create`, `glab issue create`, Gitea's
+//     `tea issues create`, Forgejo's `fj issue create` (#3850), or a forge server's
+//     create-issue tool) links session opens issue, source agent, for each
+//     issue address in what the call gave back. fj gives back no address, only
+//     `created issue #12`: its issue is on its `--repo`, or else on the folder's Forgejo
+//     repository.
 //   - The issue is asked of the forge at once and again filedRecheck later
 //     (lineagemilestone.go), for its milestone, its parent and its sub-issues: an epic's
 //     children are often filed, and made its sub-issues, just after it.
@@ -30,8 +34,13 @@ const (
 var filedRecheck = 5 * time.Minute
 
 var (
-	issueCreateCommand = regexp.MustCompile(`\b(?:gh|glab)\s+issue\s+create\b`)
+	// issueCreateCommand lets flags stand before the command, as fj's --host and tea's --login.
+	issueCreateCommand = regexp.MustCompile(`\b(?:gh|glab|tea|fj)(?:\s+--?[\w-]+(?:[= ][^-\s]\S*)?)*\s+issues?\s+create\b`)
 	issueCreateTool    = regexp.MustCompile(`(?i)\bcreate[_ -]?issue\b|\bissue[_ -]?create\b`)
+	// fjIssueCreate is Forgejo's fj, which says `created issue #12: Title`, with no address.
+	fjIssueCreate = regexp.MustCompile(`\bfj(?:\s+--?[\w-]+(?:[= ][^-\s]\S*)?)*\s+issues?\s+create\b`)
+	fjRepoFlag    = regexp.MustCompile(`(?:^|\s)(?:--repo|-r)[= ]['"]?([\w.-]+/[\w.-]+)`)
+	fjCreated     = regexp.MustCompile(`\bcreated issue #([0-9]{1,9})\b`)
 	// issueWriteCreate is GitHub's own server's issue_write, asked to create.
 	issueWriteCreate = regexp.MustCompile(`"method"\s*:\s*"create"`)
 )
@@ -88,26 +97,77 @@ func (d *Daemon) noteIssueFiled(l *live, call wire.ToolCall) {
 		return
 	}
 	id := *call.ToolCallID
+	// fjRepo may ask git, so not under l.mu.
+	starts := filesIssue(call)
+	var fj forgeRepo
+	if starts {
+		fj = d.fjRepo(l.id, call)
+	}
 	l.mu.Lock()
-	filing := l.filing[id] || filesIssue(call)
+	held, filing := l.filing[id]
+	if filing {
+		fj = held
+	}
+	filing = filing || starts
 	switch {
 	case !filing:
 	case toolEnded(call.Status):
 		delete(l.filing, id)
-	case !l.filing[id] && len(l.filing) < filingHeld:
+	case len(l.filing) < filingHeld:
 		if l.filing == nil {
-			l.filing = map[string]bool{}
+			l.filing = map[string]forgeRepo{}
 		}
-		l.filing[id] = true
+		l.filing[id] = fj
 	}
 	l.mu.Unlock()
 	if !filing {
 		return
 	}
 	_, root := d.forgejoRoot()
-	if issues := issuesIn(call, root); len(issues) > 0 {
+	issues := issuesIn(call, root)
+	if fj.path != "" {
+		issues = append(issues, fjIssuesIn(call, fj)...)
+	}
+	if len(issues) > 0 {
 		d.noteFiledIssues(l.id, issues)
 	}
+}
+
+// fjRepo is the Forgejo repository an `fj issue create` call files on: its --repo, or else
+// the session's folder's, when that is on Forgejo. It is none for any other call.
+func (d *Daemon) fjRepo(id wire.UUID, call wire.ToolCall) forgeRepo {
+	text := string(call.RawInput) + "\n" + call.Title
+	at := fjIssueCreate.FindStringIndex(text)
+	if at == nil {
+		return forgeRepo{}
+	}
+	if m := fjRepoFlag.FindStringSubmatch(strings.SplitN(text[at[0]:], "\n", 2)[0]); m != nil {
+		return forgeRepo{"forgejo", repoPath(m[1])}
+	}
+	if a := d.Store.Agent(id); a != nil {
+		if r := d.folderRepo(folderPath(a)); r.forge == "forgejo" {
+			return r
+		}
+	}
+	return forgeRepo{}
+}
+
+// fjIssuesIn is the issue that fj's `created issue #12` names, on repo.
+func fjIssuesIn(call wire.ToolCall, repo forgeRepo) []wire.LineageNode {
+	texts := []string{string(call.RawOutput)}
+	for _, c := range call.Content {
+		if c.Content != nil && c.Content.Text != nil {
+			texts = append(texts, *c.Content.Text)
+		}
+	}
+	for _, text := range texts {
+		if m := fjCreated.FindStringSubmatch(text); m != nil {
+			if n, err := strconv.Atoi(m[1]); err == nil && n > 0 {
+				return []wire.LineageNode{repo.issue(n)}
+			}
+		}
+	}
+	return nil
 }
 
 // noteFiledIssues links session id opens each issue, and asks the forge for each now and

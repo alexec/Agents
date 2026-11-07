@@ -97,6 +97,14 @@ func TestFilesIssue(t *testing.T) {
 		{wire.ToolCall{Title: "issue_write", RawInput: json.RawMessage(`{"method": "create"}`)}, true},
 		{wire.ToolCall{Title: "issue_write", RawInput: json.RawMessage(`{"method":"update"}`)}, false},
 		{wire.ToolCall{Title: "gh issue list"}, false},
+		// Gitea's tea and Forgejo's fj (#3850), with flags before the command.
+		{wire.ToolCall{Title: "Bash", RawInput: json.RawMessage(`{"command":"tea issues create --title T --repo o/r"}`)}, true},
+		{wire.ToolCall{Title: "tea issue create -t T"}, true},
+		{wire.ToolCall{Title: "fj issue create T --body B"}, true},
+		{wire.ToolCall{Title: "fj --host https://git.example.com issue create T"}, true},
+		{wire.ToolCall{Title: "fj -H git.example.com issue create T"}, true},
+		{wire.ToolCall{Title: "tea issues list"}, false},
+		{wire.ToolCall{Title: "fj issue view 3"}, false},
 		{wire.ToolCall{Title: "Read", RawInput: json.RawMessage(`{"file_path":"/x/recreate_issues.md"}`)}, false},
 	} {
 		if got := filesIssue(c.call); got != c.want {

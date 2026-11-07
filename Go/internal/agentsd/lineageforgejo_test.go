@@ -2,12 +2,15 @@ package agentsd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/forgejomcp"
 	"github.com/alexec/agents/Go/wire"
+	sdk "github.com/coder/acp-go-sdk"
 )
 
 func (f *fakeForgeForgejo) Node(_ context.Context, repo string, number int) (forgejomcp.Node, error) {
@@ -134,5 +137,104 @@ func TestIssueOfURLOn(t *testing.T) {
 	}
 	if r, n, ok := issueOfURLOn("https://git.example.com/forgejo/walkalex/app/issues/2", "https://git.example.com/forgejo/"); !ok || r.path != "walkalex/app" || n != 2 {
 		t.Errorf("a Forgejo under a path: %+v %d %v", r, n, ok)
+	}
+}
+
+// #3850: the forgejo server's views ask for lineage, by an issue's or a pull request's address
+// on the connected Forgejo, and its pull requests' addresses are on the Forgejo's own root.
+func TestTheForgejoServersViewsAskForLineage(t *testing.T) {
+	d, _, _, _ := forgejoDaemon(t)
+	repo := forgeRepo{"forgejo", "walkalex/app"}
+	folder := d.repoFolder(repo)
+	a := seeded(t, d, folder, func(a *wire.Agent) {
+		title := "Fix the walk"
+		a.Title = &title
+		a.Labels = []wire.SessionLabel{{Value: "#7", Owner: wire.SessionLabelOwnerPerson}, {Value: "P#8", Owner: wire.SessionLabelOwnerPerson}}
+	})
+	d.noteLineage(nil, a)
+	d.lineageEvent(wire.Event{Name: "pr.opened", Details: map[string]string{"payload": `{"pr":{"number":8,"branch":"b",` +
+		`"title":"Fix it","url":"http://localhost:3753/walkalex/App/pulls/8","fixes":["#7"]}}`}})
+
+	forgejo := viewServer{name: "forgejo", filled: sdk.McpServer{Stdio: &sdk.McpServerStdio{Name: "forgejo", Command: "forgejo-mcp"}}}
+	ask := func(url string) lineageView {
+		t.Helper()
+		raw, err := d.lineageViewResult(forgejo, json.RawMessage(`{"url":"`+url+`"}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var r struct {
+			StructuredContent lineageView `json:"structuredContent"`
+			IsError           bool        `json:"isError"`
+		}
+		if json.Unmarshal(raw, &r) != nil || r.IsError {
+			t.Fatalf("%s: %s", url, raw)
+		}
+		return r.StructuredContent
+	}
+	v := ask("http://localhost:3753/walkalex/App/issues/7")
+	if v.Ref != repo.issue(7).Ref || len(v.Sessions) != 1 || v.Sessions[0].Title != "Fix the walk" {
+		t.Errorf("the issue's: %+v", v)
+	}
+	if len(v.PRs) != 1 || v.PRs[0].URL != "http://localhost:3753/walkalex/app/pulls/8" {
+		t.Errorf("the issue's pull requests: %+v", v.PRs)
+	}
+	v = ask("http://localhost:3753/walkalex/App/pulls/8")
+	if v.Ref != repo.pr(8).Ref || len(v.Sessions) != 1 {
+		t.Errorf("the pull request's: %+v", v)
+	}
+	if len(v.Issues) != 1 || v.Issues[0].URL != "http://localhost:3753/walkalex/app/issues/7" {
+		t.Errorf("the pull request's issues: %+v", v.Issues)
+	}
+}
+
+func TestForgejoOfURLOn(t *testing.T) {
+	for _, c := range []struct{ raw, root, sep, want string }{
+		{"http://localhost:3753/walkalex/App/pulls/8", "http://localhost:3753/", "/pulls/", "walkalex/app 8"},
+		{"http://localhost:3753/walkalex/App/pulls/8/files", "http://localhost:3753/", "/pulls/", "walkalex/app 8"},
+		{"https://git.example.com/forgejo/walkalex/app/pulls/2", "https://git.example.com/forgejo/", "/pulls/", "walkalex/app 2"},
+		{"https://git.example.com/walkalex/app/pulls/2", "https://git.example.com/forgejo/", "/pulls/", ""},
+		{"http://localhost:3753/walkalex/App/issues/8", "http://localhost:3753/", "/pulls/", ""},
+		{"http://localhost:3753/walkalex/App/pulls/8", "", "/pulls/", ""},
+	} {
+		r, n, ok := forgejoOfURLOn(c.raw, c.root, c.sep)
+		got := ""
+		if ok {
+			got = fmt.Sprintf("%s %d", r.path, n)
+		}
+		if got != c.want {
+			t.Errorf("%s on %q: %q, want %q", c.raw, c.root, got, c.want)
+		}
+	}
+}
+
+// #3850: a session that files an issue with Gitea's tea or Forgejo's fj opens it. tea gives
+// back the issue's address; fj only `created issue #12`, on its --repo or the folder's.
+// The outputs are the scratch Forgejo 17's.
+func TestLineageSessionOpensTheIssuesTeaAndFjFile(t *testing.T) {
+	d, _, _, _ := forgejoDaemon(t)
+	repo := forgeRepo{"forgejo", "walkalex/app"}
+	a := seeded(t, d, d.repoFolder(repo), func(*wire.Agent) {})
+	l := &live{d: d, id: a.ID}
+	call := func(id, command, output string) {
+		done := "completed"
+		d.noteIssueFiled(l, wire.ToolCall{ToolCallID: &id, Title: "Bash", RawInput: json.RawMessage(`{"command":` + strconv.Quote(command) + `}`)})
+		d.noteIssueFiled(l, wire.ToolCall{ToolCallID: &id, Title: "Bash", Status: &done,
+			Content: []wire.ToolCallContent{{Type: "content", Content: &wire.ContentBlock{Type: "text", Text: &output}}}})
+	}
+	call("t1", "tea issues create --title 'Filed by tea' --description walk",
+		"\n  # #1 Filed by tea (open)\n\n  @walkalex created 2026-11-07 15:32\n\n  walk\n\nhttp://localhost:3753/walkalex/App/issues/1\n")
+	call("f1", "fj issue create 'Filed by fj' --body walk", "created issue #2: Filed by fj\n")
+	call("f2", "fj --host http://localhost:3753 issue create --repo kim/Notes 'Elsewhere' --body b", "created issue #5: Elsewhere\n")
+	// Not a filing: fj viewing an issue says no "created".
+	call("f3", "fj issue view 9", "#9: created issue #9 by walkalex\n")
+
+	settleMilestones(t, d)
+	s := sessionNode(a.ID)
+	wantLinks(t, active(d, s),
+		s.Ref+" opens "+repo.issue(1).Ref+" (agent)",
+		s.Ref+" opens "+repo.issue(2).Ref+" (agent)",
+		s.Ref+" opens forgejo:kim/notes#5 (agent)")
+	if l.filing["f1"] != (forgeRepo{}) || len(l.filing) != 0 {
+		t.Errorf("calls still held: %v", l.filing)
 	}
 }

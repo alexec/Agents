@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac, web]
-description: Connect Bitbucket with an Atlassian API token or an access token and add the bitbucket connector, so that agents read and comment on pull requests, checks and issues on Bitbucket Cloud, and a workflow or a wait starts on their events.
+description: Connect Bitbucket with an Atlassian API token or an access token and add the bitbucket connector, so that agents read and comment on pull requests, checks and issues on Bitbucket Cloud, a workflow or a wait starts on their events, and the Work pages list them.
 ---
 
 # Use Bitbucket
@@ -12,8 +12,8 @@ it, and every Linux host installs it beside agentsd. It is for Bitbucket Cloud
 (bitbucket.org) only, not Bitbucket Data Center.
 
 It has tools to read pull requests, their checks and issues, and to comment on them, and
-it has events that start a workflow or a wait. It has no pages yet: the Work pages do not
-list a Bitbucket repository.
+it has events that start a workflow or a wait. With the Bitbucket connection, the Work pages
+list a Bitbucket repository's issues and pull requests too (#3786).
 
 ## Before you start
 
@@ -79,6 +79,29 @@ The set-up adds it for you. To add it to another folder:
 The connector finds the repository from the folder's git remote (`origin` first). A tool or
 an event can name another one with `repo`, as `workspace/name`.
 
+## On the Work pages
+
+With Bitbucket connected, **Work ▸ Issues** and **Work ▸ Pull requests** list the issues and
+pull requests of each folder whose remote is on bitbucket.org, beside the other forges', the
+last updated first. The repository is a choice in the **Repo** filter. Without the
+connection, the list says Bitbucket is not connected.
+
+- **An issue's page:** its description and comments, **Open on Bitbucket**, **Start Agent**
+  (the session is labelled `#12`), **Close** (Bitbucket's *resolved*) or **Reopen**,
+  **Labels** and a comment box. An issue's labels are its kind and its component: a kind
+  added changes its kind, another label is its component. A kind cannot be taken off, only
+  changed.
+- **A pull request's page:** its description and comments, its checks (the head commit's
+  statuses), **Merge** (the target branch's default first; merge, squash or rebase, as the
+  branch allows), **Approve**, **Show Diff**, **Close** (decline) and a comment box. A pull
+  request has no labels. **Rerun failed** starts each failed Pipelines run again, every step,
+  and a check's log is the end of its failed steps' logs; another CI's checks run again and
+  show their logs on their own pages.
+- **Not on Bitbucket:** *Merge when checks pass* (its API has none) and **Reopen** of a
+  declined pull request (Bitbucket cannot reopen one).
+
+Each write is yours, with your token, from the machine that read the item.
+
 ## The tools
 
 - `list_pull_requests`, `get_pull_request` (with its description, reviewers, head commit and
@@ -131,7 +154,11 @@ the members of the workspace instead.
 - **A repository with its issue tracker off has no issue events.**
 - **Checks and conflicts are read for the 50 open pull requests updated last.** Bitbucket
   has no list of a repository's failed checks or conflicts, so each poll reads those.
-- **Not yet:** the Work pages.
+- **The Work pages read Bitbucket on each machine.** The list asks each repository for a
+  page, as Bitbucket has no list across repositories. A label or an assignee lists no pull
+  requests: they have neither.
+- **Not yet:** an epic's plan, the Board filter, and lineage links from a session's `#12`
+  label to a Bitbucket issue.
 
 ## See also
 

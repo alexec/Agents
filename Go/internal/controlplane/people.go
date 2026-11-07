@@ -40,6 +40,26 @@ func codeOwnerOf(ctx context.Context) *string {
 	return nil
 }
 
+// codeWorkspaceKey carries, through a context, the workspace a host code is made for.
+type codeWorkspaceKey struct{}
+
+// withInstallWorkspace says which workspace a host code made under ctx is for: the one
+// machines/install names (Add as Machine…, #3871), if any.
+func withInstallWorkspace(ctx context.Context, request wire.MachineInstall) context.Context {
+	if request.Provider == nil || request.Workspace == nil || *request.Provider == "" || *request.Workspace == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, codeWorkspaceKey{}, codeWorkspace{Provider: string(*request.Provider),
+		Workspace: *request.Workspace, Trust: deref(request.Trust)})
+}
+
+func codeWorkspaceOf(ctx context.Context) *codeWorkspace {
+	if w, ok := ctx.Value(codeWorkspaceKey{}).(codeWorkspace); ok {
+		return &w
+	}
+	return nil
+}
+
 // localOwner is the first person: control.json's owner, or "local" before it has one.
 func (s *Service) localOwner() string {
 	if settings := s.records.Settings(); settings != nil && settings.Owner != nil && *settings.Owner != "" {
