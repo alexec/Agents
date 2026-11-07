@@ -102,7 +102,7 @@ type Daemon struct {
 	lineageBook
 	projectBook
 	projectToolsBook
-	milestoneBook
+	achievementBook
 	afterTurnState
 	attentionState
 	worktreeState
@@ -187,7 +187,7 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	if done := ctx.Done(); done != nil {
 		safe.Go("folder watches end", func() { <-done; d.stopFolderWatches() })
 	}
-	d.checkMilestonesSoon()
+	d.checkAchievementsSoon()
 	d.countMergedPRsEveryHour()
 	d.checkReleaseTagsEveryHour()
 	d.saveFeaturesEveryMinute()

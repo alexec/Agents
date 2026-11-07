@@ -66,6 +66,13 @@ struct WorkListTests {
         #expect(WorkList.errorWords(.init(forge: "bitbucket", message: "not connected"), machine: "Studio") == "Bitbucket on Studio: not connected")
     }
 
+    @Test func aBitbucketPullRequestsPageHasNoLabels() {
+        #expect(!WorkList.takesLabels(Node(kind: "pr", ref: "bitbucket:walkalex/app#3")))
+        #expect(WorkList.takesLabels(Node(kind: "issue", ref: "bitbucket:walkalex/app#3")))
+        #expect(WorkList.takesLabels(Node(kind: "pr", ref: "github:alexec/Agents#12")))
+        #expect(WorkList.takesLabels(Node(kind: "pr", ref: "forgejo:walkalex/app#2")))
+    }
+
     @Test func oneRowPerRefTheLastUpdatedCopyWithItsLineage() {
         let rows = WorkList.merge([
             (host: .mac, items: [item(1), item(2, title: "Old")]),

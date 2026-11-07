@@ -13,7 +13,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// The milestones (#984): earned once, when the facts first say so, kept in
+// The achievements (#984): earned once, when the facts first say so, kept in
 // <root>/achievements.json and told to every client. A host earns those its own work
 // shows: the first agent to run a turn, the first workflow, five agents at once and the
 // first pull request landed (counted with the person's gh, mergedprs.go). A phone or a
@@ -22,11 +22,11 @@ import (
 // A cloud machine is started when an agent starts one, or when the control plane lists
 // one running, asked with the hourly count of merged pull requests.
 
-type milestoneBook struct {
-	milestoneMu    sync.Mutex
-	milestonesHeld *wire.Milestones
-	milestoneCheck bool // a check is under way
-	milestoneAgain bool // and another is wanted after it
+type achievementBook struct {
+	achievementMu    sync.Mutex
+	achievementsHeld *wire.Achievements
+	achievementCheck bool // a check is under way
+	achievementAgain bool // and another is wanted after it
 }
 
 const (
@@ -43,31 +43,31 @@ func (d *Daemon) achievementsPath() string {
 	return filepath.Join(d.Store.Loc.Root, "achievements.json")
 }
 
-// milestonesLocked is what achievements.json says has been earned, read once.
-func (d *Daemon) milestonesLocked() *wire.Milestones {
-	if d.milestonesHeld == nil {
-		var m wire.Milestones
+// achievementsLocked is what achievements.json says has been earned, read once.
+func (d *Daemon) achievementsLocked() *wire.Achievements {
+	if d.achievementsHeld == nil {
+		var m wire.Achievements
 		if b, err := os.ReadFile(d.achievementsPath()); err == nil {
 			diskjson.Unmarshal(b, &m)
 		}
 		if m.Earned == nil {
-			m.Earned = []wire.EarnedMilestone{}
+			m.Earned = []wire.EarnedAchievement{}
 		}
-		d.milestonesHeld = &m
+		d.achievementsHeld = &m
 	}
-	return d.milestonesHeld
+	return d.achievementsHeld
 }
 
-// milestones is milestones/state.
-func (d *Daemon) milestones() wire.Milestones {
-	d.milestoneMu.Lock()
-	defer d.milestoneMu.Unlock()
-	m := *d.milestonesLocked()
-	m.Earned = append([]wire.EarnedMilestone{}, m.Earned...)
+// achievements is achievements/state.
+func (d *Daemon) achievements() wire.Achievements {
+	d.achievementMu.Lock()
+	defer d.achievementMu.Unlock()
+	m := *d.achievementsLocked()
+	m.Earned = append([]wire.EarnedAchievement{}, m.Earned...)
 	return m
 }
 
-func hasMilestone(m *wire.Milestones, id string) bool {
+func hasAchievement(m *wire.Achievements, id string) bool {
 	for _, e := range m.Earned {
 		if e.ID == id {
 			return true
@@ -76,44 +76,44 @@ func hasMilestone(m *wire.Milestones, id string) bool {
 	return false
 }
 
-// checkMilestonesSoon looks at the facts away from the caller, which may hold the
+// checkAchievementsSoon looks at the facts away from the caller, which may hold the
 // agent's or the workflows' locks; a check asked for during one runs again after it.
-func (d *Daemon) checkMilestonesSoon() {
-	d.milestoneMu.Lock()
-	if d.milestoneCheck {
-		d.milestoneAgain = true
-		d.milestoneMu.Unlock()
+func (d *Daemon) checkAchievementsSoon() {
+	d.achievementMu.Lock()
+	if d.achievementCheck {
+		d.achievementAgain = true
+		d.achievementMu.Unlock()
 		return
 	}
-	d.milestoneCheck = true
-	d.milestoneMu.Unlock()
-	started := d.goAfterTurn("milestones", func() {
+	d.achievementCheck = true
+	d.achievementMu.Unlock()
+	started := d.goAfterTurn("achievements", func() {
 		for {
-			d.checkMilestones()
-			d.milestoneMu.Lock()
-			if !d.milestoneAgain {
-				d.milestoneCheck = false
-				d.milestoneMu.Unlock()
+			d.checkAchievements()
+			d.achievementMu.Lock()
+			if !d.achievementAgain {
+				d.achievementCheck = false
+				d.achievementMu.Unlock()
 				return
 			}
-			d.milestoneAgain = false
-			d.milestoneMu.Unlock()
+			d.achievementAgain = false
+			d.achievementMu.Unlock()
 		}
 	})
 	if !started {
-		d.milestoneMu.Lock()
-		d.milestoneCheck, d.milestoneAgain = false, false
-		d.milestoneMu.Unlock()
+		d.achievementMu.Lock()
+		d.achievementCheck, d.achievementAgain = false, false
+		d.achievementMu.Unlock()
 	}
 }
 
-// checkMilestones is DaemonCore.checkMilestones: each one not yet earned, earned at the
+// checkAchievements is DaemonCore.checkAchievements: each one not yet earned, earned at the
 // date the facts give for it (never ahead of now).
-func (d *Daemon) checkMilestones() {
-	d.milestoneMu.Lock()
-	held := *d.milestonesLocked()
-	d.milestoneMu.Unlock()
-	want := func(id string) bool { return !hasMilestone(&held, id) }
+func (d *Daemon) checkAchievements() {
+	d.achievementMu.Lock()
+	held := *d.achievementsLocked()
+	d.achievementMu.Unlock()
+	want := func(id string) bool { return !hasAchievement(&held, id) }
 	if !want(firstAgent) && !want(firstPairing) && !want(firstWorkflow) && !want(firstLandedPR) && !want(fiveAtOnce) {
 		return
 	}
@@ -178,7 +178,7 @@ func (d *Daemon) checkMilestones() {
 			}
 		}
 	}
-	d.earnMilestones(found, at)
+	d.earnAchievements(found, at)
 }
 
 // earnNow earns each of ids, now, when it is not yet.
@@ -188,17 +188,17 @@ func (d *Daemon) earnNow(ids ...string) {
 	for _, id := range ids {
 		found[id] = at
 	}
-	d.earnMilestones(found, at)
+	d.earnAchievements(found, at)
 }
 
-// earnMilestones earns each found that is not yet, at its date (never ahead of at), keeps
+// earnAchievements earns each found that is not yet, at its date (never ahead of at), keeps
 // them and tells every client.
-func (d *Daemon) earnMilestones(found map[string]time.Time, at time.Time) {
+func (d *Daemon) earnAchievements(found map[string]time.Time, at time.Time) {
 	if len(found) == 0 {
 		return
 	}
-	d.milestoneMu.Lock()
-	m := d.milestonesLocked()
+	d.achievementMu.Lock()
+	m := d.achievementsLocked()
 	ids := make([]string, 0, len(found))
 	for id := range found {
 		ids = append(ids, id)
@@ -206,39 +206,39 @@ func (d *Daemon) earnMilestones(found map[string]time.Time, at time.Time) {
 	sort.Strings(ids)
 	earned := false
 	for _, id := range ids {
-		if hasMilestone(m, id) {
+		if hasAchievement(m, id) {
 			continue
 		}
 		t := found[id]
 		if t.After(at) {
 			t = at
 		}
-		m.Earned = append(m.Earned, wire.EarnedMilestone{ID: id, At: wire.DateOf(t)})
+		m.Earned = append(m.Earned, wire.EarnedAchievement{ID: id, At: wire.DateOf(t)})
 		earned = true
 	}
 	if !earned {
-		d.milestoneMu.Unlock()
+		d.achievementMu.Unlock()
 		return
 	}
 	if err := writeStore(d.achievementsPath(), m); err != nil {
 		log.Printf("achievements.json: could not save: %v", err)
 	}
 	out := *m
-	out.Earned = append([]wire.EarnedMilestone{}, m.Earned...)
-	d.milestoneMu.Unlock()
-	Broadcast(d, wire.NotifyMilestonesChanged, out)
+	out.Earned = append([]wire.EarnedAchievement{}, m.Earned...)
+	d.achievementMu.Unlock()
+	Broadcast(d, wire.NotifyAchievementsChanged, out)
 }
 
-// noteMilestones is what a call says once it has been answered: a phone, an iPad or a
+// noteAchievements is what a call says once it has been answered: a phone, an iPad or a
 // browser is paired when one calls at all, and answering a question from one is answering
 // from away from the Mac. A browser on this Mac's own page (pagerelay.go) is the Mac.
-func (d *Daemon) noteMilestones(c *Client, method string) {
+func (d *Daemon) noteAchievements(c *Client, method string) {
 	answer := method == wire.CallElicitationsAnswer.Name || method == wire.CallPermissionsAnswer.Name ||
 		method == wire.CallAgentsAnswerSandbox.Name
-	d.milestoneMu.Lock()
-	m := d.milestonesLocked()
-	wanted := !hasMilestone(m, firstPairing) || answer && !hasMilestone(m, firstRemoteAnswer)
-	d.milestoneMu.Unlock()
+	d.achievementMu.Lock()
+	m := d.achievementsLocked()
+	wanted := !hasAchievement(m, firstPairing) || answer && !hasAchievement(m, firstRemoteAnswer)
+	d.achievementMu.Unlock()
 	if !wanted || !d.fromDevice(c) {
 		return
 	}
@@ -265,9 +265,9 @@ func (d *Daemon) fromDevice(c *Client) bool {
 // running, as the control plane lists them: a machine started from a window, which this
 // host is not told of, is found within the hour.
 func (d *Daemon) checkCloudHosts() {
-	d.milestoneMu.Lock()
-	held := hasMilestone(d.milestonesLocked(), firstCloudHost)
-	d.milestoneMu.Unlock()
+	d.achievementMu.Lock()
+	held := hasAchievement(d.achievementsLocked(), firstCloudHost)
+	d.achievementMu.Unlock()
 	ask := d.askControl.Load()
 	if held || ask == nil {
 		return

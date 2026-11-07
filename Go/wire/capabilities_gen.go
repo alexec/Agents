@@ -3,6 +3,7 @@
 package wire
 
 // The capabilities that Packages/Wire names (#1748): x-capability on each method.
+const CapAchievements1 = "achievements/1"
 const CapAgent1 = "agent/1"
 const CapAgentsEditQueued1 = "agents.edit-queued/1"
 const CapAgentsExport1 = "agents.export/1"
@@ -98,7 +99,6 @@ const CapMachines1 = "machines/1"
 const CapMailbox1 = "mailbox/1"
 const CapMarketplaces1 = "marketplaces/1"
 const CapMcp1 = "mcp/1"
-const CapMilestones1 = "milestones/1"
 const CapModes1 = "modes/1"
 const CapMute1 = "mute/1"
 const CapNotices1 = "notices/1"
@@ -173,6 +173,7 @@ const CapWorktrees1 = "worktrees/1"
 
 // HostCapabilities is the capability of each method and notification in daemon.openrpc.json.
 var HostCapabilities = pairs([][2]string{
+	{"achievements/state", "achievements/1"},
 	{"agentConfig/editorFiles", "personal/1"},
 	{"agentConfig/editorSave", "personal/1"},
 	{"agents/answerSandbox", "agents/1"},
@@ -377,7 +378,6 @@ var HostCapabilities = pairs([][2]string{
 	{"mcp/sign-in/wait", "mcp/1"},
 	{"mcp/sign-out", "mcp/1"},
 	{"mcp/verify", "mcp/1"},
-	{"milestones/state", "milestones/1"},
 	{"modes/remembered", "modes/1"},
 	{"options/remembered", "options/1"},
 	{"permissions/answer", "permissions/1"},
@@ -525,6 +525,7 @@ var HostCapabilities = pairs([][2]string{
 	{"worktrees/list", "worktrees/1"},
 	{"worktrees/remove", "worktrees/1"},
 	{"worktrees/removeBuildOutput", "worktrees/1"},
+	{"achievements/changed", "achievements/1"},
 	{"agent/changed", "agent/1"},
 	{"agent/elicitation", "agent/1"},
 	{"agent/entry", "agent/1"},
@@ -552,7 +553,6 @@ var HostCapabilities = pairs([][2]string{
 	{"folder/removed", "folder/1"},
 	{"mcp/healthChanged", "mcp/1"},
 	{"mcp/hostedChanged", "mcp/1"},
-	{"milestones/changed", "milestones/1"},
 	{"modes/changed", "modes/1"},
 	{"pages/changed", "pages/1"},
 	{"person/changed", "person/1"},
@@ -580,6 +580,7 @@ var HostCapabilities = pairs([][2]string{
 
 // HostNotifications is each notification in daemon.openrpc.json: what its server sends, not serves.
 var HostNotifications = set([]string{
+	"achievements/changed",
 	"agent/changed",
 	"agent/elicitation",
 	"agent/entry",
@@ -607,7 +608,6 @@ var HostNotifications = set([]string{
 	"folder/removed",
 	"mcp/healthChanged",
 	"mcp/hostedChanged",
-	"milestones/changed",
 	"modes/changed",
 	"pages/changed",
 	"person/changed",

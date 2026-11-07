@@ -22,6 +22,7 @@ import { WorkList, WorkPage } from "./Work";
 import { WorkFeatures } from "./WorkFeatures";
 import { DocPage, DocsList } from "./Docs";
 import { MachinePage } from "./MachinePage";
+import { machineNeed, machineNeedLine, offersStart } from "./OfflineStrip";
 import { SettingsPage } from "./Settings";
 import { SecretsSection } from "./UserScope";
 import { SessionSecretsSection } from "./settings/SessionSecrets";
@@ -115,6 +116,23 @@ function PageMark({ store, page }: { store: Store; page: NavPage }) {
   return null;
 }
 
+/** Under a machine's row (#3764), in grey: the most urgent thing it needs, with Start for a stopped workspace.
+ * Nothing when it needs nothing. The window's MachineRow. A sign-in is what its runtimes last said. */
+function MachineNeedLine({ store, host }: { store: Store; host: string }) {
+  const row = store.hosts.value.find((h) => h.id === host);
+  const need = row ? machineNeed(row, store.hostIsOnline(host), store.runtimes.value[host] ?? []) : null;
+  if (!row || !need) return null;
+  return (
+    <p class="machine-need quiet small" role="status">
+      {machineNeedLine(need, row)}
+      {need.kind === "stopped" && row.workspace && offersStart(row.state, row.workspace) ? (
+        <button type="button" class="foot-start" disabled={store.hostsBeingStarted.value.includes(host)}
+          aria-label={`Start ${row.name}`} onClick={() => void store.startHost(host)}>Start</button>
+      ) : null}
+    </p>
+  );
+}
+
 /** A section's list of pages on the left, the page open on the right. */
 export function SectionPage({ store, section, down }: { store: Store; section: Exclude<NavSection, "overview" | "agents">; down: boolean }) {
   const admin = adminOf(store);
@@ -130,13 +148,14 @@ export function SectionPage({ store, section, down }: { store: Store; section: E
           {groupedPages(list).map(([group, pages]) => (
             <div key={group} class="sub-app-group">
               <h2 class="section-head">{group}</h2>
-              {pages.map((p) => (
+              {pages.map((p) => [
                 <button key={p.id} type="button" class={`sub-app-row${p.id === open?.id ? " on" : ""}`}
                   aria-current={p.id === open?.id ? "page" : undefined} onClick={() => go({ nav: section, section: p.id })}>
                   {p.title}
                   <PageMark store={store} page={p} />
-                </button>
-              ))}
+                </button>,
+                p.draw.kind === "machine" ? <MachineNeedLine key={`${p.id}-need`} store={store} host={p.draw.host} /> : null,
+              ])}
             </div>
           ))}
         </nav>

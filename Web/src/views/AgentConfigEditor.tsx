@@ -6,6 +6,8 @@ import { DailySummaryControl } from "./settings/DailySummary";
 import { agentConfigurationFollows, thisMacOnly } from "../model/userScope";
 import { machineKeepsItsOwn, machineOnly } from "../model/settingsMachine";
 import { useSettingsMachine } from "./settings/SettingsMachine";
+import { MarketplacePersonasSection } from "./PersonaCatalog";
+import { Capability } from "../protocol/capabilities.generated";
 
 export type AgentConfigKind = "skills" | "personas" | "workflows";
 const kinds: AgentConfigKind[] = ["skills", "personas", "workflows"];
@@ -141,16 +143,24 @@ function UserScopeLines({ name }: { name?: string | undefined }) {
   </div>;
 }
 
+/** Settings' own personas: `~/.agents/personas` on the chosen machine. */
+const personal = { kind: "personal" } as const;
+
 export function AgentConfigSettingsSection({ store, down, kind }: {
   store: Store; down: boolean; kind: AgentConfigKind;
 }) {
   const { host, name, isMac, picker } = useSettingsMachine(store);
+  // A persona added, updated or removed from a marketplace: the editor reads its files again.
+  const [read, setRead] = useState(0);
   return <section aria-label={title(kind)}>
     <h3 class="section-head">{title(kind)}</h3>
     {picker}
     {host && <UserScopeLines name={isMac ? undefined : name} />}
     {kind === "workflows" && <DailySummaryControl store={store} />}
-    {host && <AgentConfigEditor store={store} host={host} kind={kind} down={down} />}
+    {host && kind === "personas" && store.has(host, Capability.personasCatalog1) &&
+      <MarketplacePersonasSection store={store} host={host} destination={personal} down={down}
+        changed={() => setRead(read + 1)} />}
+    {host && <AgentConfigEditor key={read} store={store} host={host} kind={kind} down={down} />}
   </section>;
 }
 

@@ -2,7 +2,7 @@ import Foundation
 
 /// A first step in Agents (#984), awarded the first time a person does it. The set is
 /// also the newcomer checklist: the ones not earned yet say what to try next.
-public enum Milestone: String, CaseIterable, Codable, Hashable, Sendable, Identifiable {
+public enum Achievement: String, CaseIterable, Codable, Hashable, Sendable, Identifiable {
     case firstAgent
     case firstPairing
     case firstRemoteAnswer
@@ -39,9 +39,9 @@ public enum Milestone: String, CaseIterable, Codable, Hashable, Sendable, Identi
     }
 }
 
-/// One milestone the person has earned, and when.
-public struct EarnedMilestone: Codable, Hashable, Sendable {
-    /// A `Milestone`'s raw value. A string, so a milestone a newer host knows is kept and
+/// One achievement the person has earned, and when.
+public struct EarnedAchievement: Codable, Hashable, Sendable {
+    /// An `Achievement`'s raw value. A string, so an achievement a newer host knows is kept and
     /// passed on by an older one.
     public var id: String
     public var at: Date
@@ -52,45 +52,45 @@ public struct EarnedMilestone: Codable, Hashable, Sendable {
     }
 }
 
-/// The milestones a person has earned (#984), kept on the host in `achievements.json`
-/// so every client shows the same set. Bounded: one entry for each milestone, never
+/// The achievements a person has earned (#984), kept on the host in `achievements.json`
+/// so every client shows the same set. Bounded: one entry for each achievement, never
 /// more, and an entry is never changed once made.
-public struct Milestones: Codable, Hashable, Sendable {
-    public var earned: [EarnedMilestone]
+public struct Achievements: Codable, Hashable, Sendable {
+    public var earned: [EarnedAchievement]
 
-    public init(earned: [EarnedMilestone] = []) {
+    public init(earned: [EarnedAchievement] = []) {
         self.earned = earned
     }
 
-    public func at(_ milestone: Milestone) -> Date? {
-        earned.first { $0.id == milestone.rawValue }?.at
+    public func at(_ achievement: Achievement) -> Date? {
+        earned.first { $0.id == achievement.rawValue }?.at
     }
 
-    public func has(_ milestone: Milestone) -> Bool { at(milestone) != nil }
+    public func has(_ achievement: Achievement) -> Bool { at(achievement) != nil }
 
-    /// Whether every milestone this build knows is earned: nothing is left to look for.
-    public var isComplete: Bool { Milestone.allCases.allSatisfy(has) }
+    /// Whether every achievement this build knows is earned: nothing is left to look for.
+    public var isComplete: Bool { Achievement.allCases.allSatisfy(has) }
 
-    /// Earn a milestone, once. Returns whether it is new.
+    /// Earn an achievement, once. Returns whether it is new.
     @discardableResult
-    public mutating func earn(_ milestone: Milestone, at date: Date) -> Bool {
-        guard !has(milestone) else { return false }
-        earned.append(EarnedMilestone(id: milestone.rawValue, at: date))
+    public mutating func earn(_ achievement: Achievement, at date: Date) -> Bool {
+        guard !has(achievement) else { return false }
+        earned.append(EarnedAchievement(id: achievement.rawValue, at: date))
         return true
     }
 
-    /// The milestones in the order the page lists them: earned first, earliest first,
+    /// The achievements in the order the page lists them: earned first, earliest first,
     /// then the rest in the order a newcomer meets them.
-    public var ordered: [(milestone: Milestone, at: Date?)] {
-        let done = Milestone.allCases.compactMap { m in at(m).map { (milestone: m, at: Optional($0)) } }
+    public var ordered: [(achievement: Achievement, at: Date?)] {
+        let done = Achievement.allCases.compactMap { m in at(m).map { (achievement: m, at: Optional($0)) } }
             .sorted { $0.at! < $1.at! }
-        let open = Milestone.allCases.filter { !has($0) }.map { (milestone: $0, at: Date?.none) }
+        let open = Achievement.allCases.filter { !has($0) }.map { (achievement: $0, at: Date?.none) }
         return done + open
     }
 
     // MARK: Deriving
 
-    /// What the host already keeps that says a milestone was earned, and when, for the
+    /// What the host already keeps that says an achievement was earned, and when, for the
     /// ones it can tell from records: on the first run, so what was earned before #984
     /// shipped is back-filled, and whenever those records change.
     public struct Facts: Sendable {
@@ -132,8 +132,8 @@ public struct Milestones: Codable, Hashable, Sendable {
 
     /// Earn whatever `facts` says was earned and is not yet. Returns the new ones.
     @discardableResult
-    public mutating func earn(from facts: Facts, now: Date) -> [Milestone] {
-        let found: [(Milestone, Date?)] = [
+    public mutating func earn(from facts: Facts, now: Date) -> [Achievement] {
+        let found: [(Achievement, Date?)] = [
             (.firstAgent, facts.firstAgent),
             (.firstPairing, facts.firstPairing),
             (.firstWorkflow, facts.hasWorkflow ? now : nil),
@@ -141,22 +141,22 @@ public struct Milestones: Codable, Hashable, Sendable {
             (.fiveAtOnce, facts.fiveAtOnce),
         ]
         // A date ahead of now (a day stamp read as its start, a clock moved) is now.
-        return found.compactMap { milestone, at in
-            guard let at, earn(milestone, at: min(at, now)) else { return nil }
-            return milestone
+        return found.compactMap { achievement, at in
+            guard let at, earn(achievement, at: min(at, now)) else { return nil }
+            return achievement
         }
     }
 
     // MARK: The card
 
-    /// Which earned milestones a client shows its one-time card for, and what it keeps as
+    /// Which earned achievements a client shows its one-time card for, and what it keeps as
     /// seen after. `seen` is nil the first time a client looks: everything earned so far,
     /// back-filled or not, is taken as seen, so the card is only ever for something the
     /// person just did.
-    public func unseen(_ seen: Set<String>?) -> (show: [Milestone], seen: Set<String>) {
+    public func unseen(_ seen: Set<String>?) -> (show: [Achievement], seen: Set<String>) {
         let ids = Set(earned.map(\.id))
         guard let seen else { return ([], ids) }
-        let show = ordered.compactMap { $0.at != nil && !seen.contains($0.milestone.rawValue) ? $0.milestone : nil }
+        let show = ordered.compactMap { $0.at != nil && !seen.contains($0.achievement.rawValue) ? $0.achievement : nil }
         return (show, seen)
     }
 }

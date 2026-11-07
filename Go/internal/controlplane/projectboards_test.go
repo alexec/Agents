@@ -23,6 +23,11 @@ func TestABoardsAddressNamesItsForge(t *testing.T) {
 		{"https://linear.app/acme/team/eng/active", "https://linear.app/acme/team/ENG", "linear", "ENG", "linear.app"},
 		{"https://gitlab.com/groups/acme/web/-/boards/5", "https://gitlab.com/groups/acme/web/-/boards/5", "gitlab", "acme/web#5", "gitlab.com"},
 		{"https://GitLab.Acme.com/groups/platform/-/boards/9?label_name[]=x", "https://gitlab.acme.com/groups/platform/-/boards/9", "gitlab", "platform#9", "gitlab.acme.com"},
+		// #3816: a team's Azure Boards board or backlog, on dev.azure.com, *.visualstudio.com or a server.
+		{"https://dev.azure.com/acme/Web%20App/_boards/board/t/Web%20App%20Team/Stories", "https://dev.azure.com/acme/Web%20App/_boards/board/t/Web%20App%20Team", "azuredevops", "acme/Web App/Web App Team", "dev.azure.com"},
+		{"https://dev.azure.com/acme/Web%20App/_backlogs/backlog/Payments/Backlog%20items/?showParents=true", "https://dev.azure.com/acme/Web%20App/_boards/board/t/Payments", "azuredevops", "acme/Web App/Payments", "dev.azure.com"},
+		{"https://acme.visualstudio.com/Web%20App/_boards/board/t/Payments", "https://dev.azure.com/acme/Web%20App/_boards/board/t/Payments", "azuredevops", "acme/Web App/Payments", "dev.azure.com"},
+		{"https://ado.acme.com/DefaultCollection/Shop/_boards/board/t/Shop%20Team/Issues", "https://ado.acme.com/DefaultCollection/Shop/_boards/board/t/Shop%20Team", "azuredevops", "DefaultCollection/Shop/Shop Team", "ado.acme.com"},
 	} {
 		b, ok := boardFromAddress(c.address)
 		if !ok || b.URL != c.url || string(*b.Forge) != c.forge || *b.Key != c.key || *b.Site != c.site {
@@ -31,7 +36,9 @@ func TestABoardsAddressNamesItsForge(t *testing.T) {
 	}
 	for _, bad := range []string{"", "acme/7", "ftp://github.com/orgs/acme/projects/7", "https://github.com/acme/Agents",
 		"https://github.com/orgs/acme/projects/x", "https://linear.app/acme/issue/ENG-1", "https://gitlab.com/acme/web/-/boards/5",
-		"https://example.com/boards/3", "https://u:p@github.com/orgs/acme/projects/7"} {
+		"https://example.com/boards/3", "https://u:p@github.com/orgs/acme/projects/7",
+		"https://dev.azure.com/acme/Web%20App/_boards/board/t/", "https://dev.azure.com/acme/_boards/board/t/Payments",
+		"https://dev.azure.com/acme/Web%20App/_boards/board/t/A%2FB", "https://dev.azure.com/acme/Web%20App/_workitems/edit/12"} {
 		if b, ok := boardFromAddress(bad); ok {
 			t.Errorf("%s: %+v", bad, b)
 		}

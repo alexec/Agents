@@ -127,11 +127,11 @@ func (d *Daemon) catchUp(r wire.CatchUpRequest) wire.CatchUpSnapshot {
 	}
 	disk := d.diskState()
 	notes := wire.StoreNotes{Notes: []string{}}
-	milestones := d.milestones()
+	achievements := d.achievements()
 	s := wire.CatchUpSnapshot{Folders: d.folders(false), Agents: d.listAgents(list), Permissions: d.pendingPermissions(),
 		Elicitations: d.pendingElicitations(),
 		Attention:    d.attentionPending(),
-		Resuming:     []wire.UUID{}, Disk: &disk, StoreNotes: &notes, Milestones: &milestones}
+		Resuming:     []wire.UUID{}, Disk: &disk, StoreNotes: &notes, Achievements: &achievements}
 	for _, part := range r.Parts {
 		if part == "pins" {
 			s.Pins = []wire.FolderPins{}

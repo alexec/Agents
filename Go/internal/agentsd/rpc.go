@@ -179,7 +179,7 @@ func (d *Daemon) dispatch(c *Client, m message) {
 		err = &Error{Code: CodeInternal, Message: fmt.Sprintf("the machine hit a bug in %s: %v", m.Method, v)}
 	}
 	if err == nil && h != nil {
-		d.noteMilestones(c, m.Method)
+		d.noteAchievements(c, m.Method)
 		d.countCall(c, m.Method)
 	}
 	if m.ID == nil {

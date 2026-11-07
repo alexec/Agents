@@ -95,7 +95,19 @@ GitLab, Linear and Jira issues. Name them in the folder's `.agents/folder.json`:
 ```
 
 Each project is `organization/project` (on a server, `collection/project`). The Work pages
-use the connector's `AZURE_DEVOPS_TOKEN` and `AZURE_DEVOPS_URL`.
+use the connector's `AZURE_DEVOPS_TOKEN` and `AZURE_DEVOPS_URL`, else the Azure DevOps
+connection.
+
+A folder on Azure Repos does not need this by hand (#3816): once its Connectors set-up's
+Tasks slot reads Azure Boards, the set-up writes the project of the folder's remote there,
+once. It does not when the folder already names Azure Boards projects, Jira projects or
+Linear teams, and it does not write it again after you take it out.
+
+**A board:** a team's board is one of a project's boards (Project Settings ▸ Tools ▸ Boards).
+Give its address, as `https://dev.azure.com/acme/Web%20App/_boards/board/t/Payments` (or the
+team's backlog, or an Azure DevOps Server's). With the board chosen, Work ▸ Issues lists the
+work items under the team's area paths. A team set by a field other than its area path is
+not read.
 
 - **A row** says the work item's state (as Active), in the colour of open or closed, and its
   tags. **Azure Boards · acme/web app** is a choice in the Repo filter.

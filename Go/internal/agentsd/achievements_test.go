@@ -13,26 +13,26 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Ports MilestoneTests: the first agent to run a turn and the first workflow are earned
+// Ports AchievementTests: the first agent to run a turn and the first workflow are earned
 // once, said to the clients and kept.
 
-func TestMilestonesEarned(t *testing.T) {
+func TestAchievementsEarned(t *testing.T) {
 	fakeRuntimes(t)
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
 	var id wire.UUID
 	json.Unmarshal(c.call(t, 1, "agents/start", map[string]any{"runtimeID": "claude", "cwd": "file://" + t.TempDir(), "prompt": "hello"}), &id)
 	c.until(t, "the first agent earned", func(m string, p json.RawMessage) bool {
-		return m == "milestones/changed" && strings.Contains(string(p), `"firstAgent"`)
+		return m == "achievements/changed" && strings.Contains(string(p), `"firstAgent"`)
 	})
 	dir := folder(t, c, 2)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "tidy.md"), []byte("---\non: agent.finished\n---\nTidy.\n"), 0o644)
 	c.call(t, 3, "workflows/list", map[string]any{"folder": store.FolderURL(dir)})
 	waitFor(t, "the first workflow", func() bool {
-		var m wire.Milestones
-		json.Unmarshal(c.call(t, 4, "milestones/state", map[string]any{}), &m)
-		return hasMilestone(&m, firstWorkflow) && hasMilestone(&m, firstAgent)
+		var m wire.Achievements
+		json.Unmarshal(c.call(t, 4, "achievements/state", map[string]any{}), &m)
+		return hasAchievement(&m, firstWorkflow) && hasAchievement(&m, firstAgent)
 	})
 	b, _ := os.ReadFile(d.achievementsPath())
 	if strings.Count(string(b), `"firstAgent"`) != 1 {
@@ -44,32 +44,32 @@ func TestMilestonesEarned(t *testing.T) {
 // started, and a pull request from the app's branch lands.
 
 func earned(d *Daemon, id string) bool {
-	m := d.milestones()
-	return hasMilestone(&m, id)
+	m := d.achievements()
+	return hasAchievement(&m, id)
 }
 
 func TestADeviceEarnsPairingAndAnsweringAway(t *testing.T) {
 	d, _ := start(t, t.TempDir())
 	defer d.Shutdown()
 	mac := &Client{Role: RoleControl, conn: newConn(), d: d}
-	d.dispatch(mac, message{JSONRPC: "2.0", Method: "milestones/state"})
-	d.noteMilestones(mac, "permissions/answer")
+	d.dispatch(mac, message{JSONRPC: "2.0", Method: "achievements/state"})
+	d.noteAchievements(mac, "permissions/answer")
 	if earned(d, firstPairing) || earned(d, firstRemoteAnswer) {
-		t.Fatal("the Mac's own window earned a device's milestone")
+		t.Fatal("the Mac's own window earned a device's achievement")
 	}
 	phone := &Client{Role: RoleControl, conn: deviceConn{newConn()}, d: d}
-	d.dispatch(phone, message{JSONRPC: "2.0", Method: "milestones/state"})
+	d.dispatch(phone, message{JSONRPC: "2.0", Method: "achievements/state"})
 	if !earned(d, firstPairing) || earned(d, firstRemoteAnswer) {
-		t.Fatalf("%+v", d.milestones())
+		t.Fatalf("%+v", d.achievements())
 	}
 	// A call that failed answered nothing.
 	d.dispatch(phone, message{JSONRPC: "2.0", Method: "permissions/answer", Params: json.RawMessage(`{"permissionID":"00000000-0000-0000-0000-000000000000","optionID":"x"}`)})
 	if earned(d, firstRemoteAnswer) {
 		t.Fatal("a refused answer earned it")
 	}
-	d.noteMilestones(phone, "elicitations/answer")
+	d.noteAchievements(phone, "elicitations/answer")
 	if !earned(d, firstRemoteAnswer) {
-		t.Fatalf("%+v", d.milestones())
+		t.Fatalf("%+v", d.achievements())
 	}
 	b, _ := os.ReadFile(d.achievementsPath())
 	if !strings.Contains(string(b), `"firstRemoteAnswer"`) {
@@ -84,7 +84,7 @@ func TestAPairedDeviceIsBackFilled(t *testing.T) {
 	d, _ := start(t, root)
 	defer d.Shutdown()
 	waitFor(t, "the pairing back-filled", func() bool { return earned(d, firstPairing) })
-	for _, e := range d.milestones().Earned {
+	for _, e := range d.achievements().Earned {
 		if e.ID == firstPairing && !e.At.Time().Equal(time.Date(2001, 1, 1, 0, 0, 1, 0, time.UTC)) {
 			t.Fatalf("earned at %v", e.At.Time())
 		}
@@ -144,9 +144,9 @@ func TestALandedPullRequestIsCounted(t *testing.T) {
 	if r := h.Recap[dayStamp(time.Now())]; r.PrsMerged == nil || *r.PrsMerged != 0 {
 		t.Fatalf("today: %+v", r)
 	}
-	d.checkMilestones()
+	d.checkAchievements()
 	if !earned(d, firstLandedPR) {
-		t.Fatalf("%+v", d.milestones())
+		t.Fatalf("%+v", d.achievements())
 	}
 }
 

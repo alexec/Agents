@@ -56,8 +56,8 @@ func TestCostIsBankedAndLimitsKept(t *testing.T) {
 	if st.Limits.Daily != nil || st.Limits.PerAgentTokens == nil {
 		t.Fatalf("%+v", st.Limits)
 	}
-	var m wire.Milestones
-	json.Unmarshal(c.call(t, 5, "milestones/state", nil), &m)
+	var m wire.Achievements
+	json.Unmarshal(c.call(t, 5, "achievements/state", nil), &m)
 	var th wire.TimeHistory
 	json.Unmarshal(c.call(t, 6, "time/history", nil), &th)
 	if m.Earned == nil || th.Hours == nil || th.Now == "" || !sameZone(th.TimeZone) {

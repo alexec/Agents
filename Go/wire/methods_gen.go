@@ -3,6 +3,7 @@
 package wire
 
 // What a host answers (daemon.openrpc.json).
+var CallAchievementsState = Method[Empty, Achievements]{"achievements/state"}
 var CallAgentConfigEditorFiles = Method[AgentConfigEditorRequest, AgentConfigEditorFiles]{"agentConfig/editorFiles"}
 var CallAgentConfigEditorSave = Method[AgentConfigEditorSaveRequest, Empty]{"agentConfig/editorSave"}
 var CallAgentsAnswerSandbox = Method[AnswerSandboxRequest, Agent]{"agents/answerSandbox"}
@@ -207,7 +208,6 @@ var CallMCPSignInCancel = Method[MCPSignInFlowRequest, MCPSignInWaitAnswer]{"mcp
 var CallMCPSignInWait = Method[MCPSignInFlowRequest, MCPSignInWaitAnswer]{"mcp/sign-in/wait"}
 var CallMCPSignOut = Method[MCPSignOutRequest, MCPSignOutAnswer]{"mcp/sign-out"}
 var CallMCPVerify = Method[MCPVerifyRequest, MCPVerifyAnswer]{"mcp/verify"}
-var CallMilestonesState = Method[Empty, Milestones]{"milestones/state"}
 var CallModesRemembered = Method[Empty, map[string]JSONValue]{"modes/remembered"}
 var CallOptionsRemembered = Method[RememberedOptionsRequest, []ConfigOption]{"options/remembered"}
 var CallPermissionsAnswer = Method[AnswerRequest, Empty]{"permissions/answer"}
@@ -355,6 +355,7 @@ var CallWorktreesCheck = Method[WorktreeRemovalRequest, RemovalCheck]{"worktrees
 var CallWorktreesList = Method[WorktreesListRequest, WorktreesListResponse]{"worktrees/list"}
 var CallWorktreesRemove = Method[WorktreeRemovalRequest, WorktreeRemoved]{"worktrees/remove"}
 var CallWorktreesRemoveBuildOutput = Method[WorktreeRemovalRequest, BuildOutputRemoved]{"worktrees/removeBuildOutput"}
+var NotifyAchievementsChanged = Notification[Achievements]{"achievements/changed"}
 var NotifyAgentChanged = Notification[Agent]{"agent/changed"}
 var NotifyAgentElicitation = Notification[ElicitationNotification]{"agent/elicitation"}
 var NotifyAgentEntry = Notification[EntryNotification]{"agent/entry"}
@@ -382,7 +383,6 @@ var NotifyFolderChanged = Notification[FolderSummary]{"folder/changed"}
 var NotifyFolderRemoved = Notification[FolderRemovedNotification]{"folder/removed"}
 var NotifyMCPHealthChanged = Notification[MCPHealthSnapshot]{"mcp/healthChanged"}
 var NotifyMCPHostedChanged = Notification[HostedMCPSnapshot]{"mcp/hostedChanged"}
-var NotifyMilestonesChanged = Notification[Milestones]{"milestones/changed"}
 var NotifyModesChanged = Notification[map[string]JSONValue]{"modes/changed"}
 var NotifyPagesChanged = Notification[PagesChangedNotification]{"pages/changed"}
 var NotifyPersonChanged = Notification[PersonSettings]{"person/changed"}

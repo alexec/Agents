@@ -125,6 +125,21 @@ public extension DaemonAPI {
                 Row(Method.personasList, params: PersonasListRequest.self, result: [Persona].self, kind: .hostRequest),
                 Row(Method.personasFiles, params: PersonasFilesRequest.self, result: [PersonaFile].self, kind: .hostRequest),
                 Row(Method.personasSave, params: PersonaFileSaveRequest.self, result: Empty.self, kind: .hostRequest),
+                // Personas from a marketplace (#3665, #3678): Settings ▸ Agent Configuration ▸ Personas.
+                Row(Method.marketplacesList, params: MarketplacesListRequest.self, result: MarketplacesListAnswer.self,
+                    kind: .hostRequest),
+                Row(Method.personasSearch, params: CatalogSearchRequest.self, result: CatalogSearchAnswer.self,
+                    kind: .hostRequest),
+                Row(Method.personasPreview, params: CatalogPreviewRequest.self, result: PersonaPreviewAnswer.self,
+                    kind: .hostRequest),
+                Row(Method.personasAdd, params: SkillAddRequest.self, result: PersonaAddAnswer.self, kind: .hostRequest),
+                Row(Method.personasManaged, params: SkillsListRequest.self, result: PersonasManagedAnswer.self,
+                    kind: .hostRequest),
+                Row(Method.personasCheckUpdates, params: SkillsListRequest.self, result: SkillUpdatesAnswer.self,
+                    kind: .hostRequest),
+                Row(Method.personasUpdatePreview, params: SkillNameRequest.self, result: PersonaUpdatePreviewAnswer.self,
+                    kind: .hostRequest),
+                Row(Method.personasRemove, params: SkillNameRequest.self, result: SkillRemoveAnswer.self, kind: .hostRequest),
                 Row(Method.filesList, params: FilesListRequest.self, result: DirectoryListing.self, kind: .hostRequest),
                 Row(Method.filesRead, params: FilesReadRequest.self, result: FileReading.self, kind: .hostRequest),
                 Row(Method.changesList, params: ChangesListRequest.self, result: ChangesList.self, kind: .hostRequest),
@@ -140,8 +155,8 @@ public extension DaemonAPI {
                 // Reports ▸ Features (#2165).
                 Row(Method.reportsFeatures, params: Empty.self, result: FeatureUsage.self, kind: .hostRequest),
                 Row(Method.reportsProblem, params: ProblemReportRequest.self, result: ProblemReport.self, kind: .hostRequest),
-                // The Time page's milestones (#984).
-                Row(Method.milestonesState, params: Empty.self, result: Milestones.self, kind: .hostRequest),
+                // The Time page's achievements (#984).
+                Row(Method.achievementsState, params: Empty.self, result: Achievements.self, kind: .hostRequest),
                 Row(Method.eventsList, params: EventsListRequest.self, result: EventsPage.self, kind: .hostRequest),
                 Row(Method.resourcesSnapshot, params: Empty.self, result: LeaseSnapshot.self, kind: .hostRequest),
                 // The MCP servers the host runs for every agent (#488), for the Resources page.
@@ -628,7 +643,7 @@ public extension DaemonAPI {
                 Row(Notification.diskChanged, params: DiskState.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.backupsChanged, params: BackupState.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.worktreesSized, params: WorktreesSized.self, result: Empty.self, kind: .hostNotification),
-                Row(Notification.milestonesChanged, params: Milestones.self, result: Empty.self, kind: .hostNotification),
+                Row(Notification.achievementsChanged, params: Achievements.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.storeNotesChanged, params: StoreNotes.self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.pinsChanged, params: PinsChangedNotification.self, result: Empty.self,

@@ -273,6 +273,8 @@ func (d *Daemon) keepBytes(text string) (string, bool) {
 // scanLocked reads every folder's workflows afresh, and on the first start approves
 // every file as it stands.
 func (d *Daemon) scanLocked() {
+	// A trigger on a file event watches its paths from when it is read (#3795).
+	defer d.kickFileWatches()
 	files := map[string]map[string]*workflowFile{}
 	d.ensureReadyMadeUserWorkflowsLocked()
 	home := d.personalHome()
@@ -328,7 +330,7 @@ func (d *Daemon) scanLocked() {
 	// A folder added, archived or gone since: the watches follow it.
 	d.kickFolderWatches()
 	// A workflow made here can earn the first workflow (#984).
-	defer d.checkMilestonesSoon()
+	defer d.checkAchievementsSoon()
 	r := d.recordsLocked()
 	if r.ApprovalsBegan == nil && !d.workflowRecsBad {
 		t := now()
@@ -824,6 +826,7 @@ func strPtr(s string) *string { return &s }
 
 // enableWorkflow is workflows/enable.
 func (d *Daemon) enableWorkflow(r wire.WorkflowEnableRequest, by string) (wire.WorkflowSummary, error) {
+	defer d.kickFileWatches()
 	folder := store.FolderPath(r.Folder)
 	d.workflowMu.Lock()
 	d.scanLocked()

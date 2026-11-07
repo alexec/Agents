@@ -31,6 +31,8 @@ import (
 type SearchFilter struct {
 	State                           string
 	Label, Assignee, Query, Feature string
+	// Areas narrows the list to a board's team (#3816): the work items in its area paths.
+	Areas []Area
 }
 
 // Item is a work item as the forge reads list it.
@@ -211,6 +213,9 @@ func SearchWhere(projects []string, f SearchFilter, closed []string) string {
 	}
 	if f.Assignee != "" {
 		where = append(where, "[System.AssignedTo] = "+wiqlQuoted(f.Assignee))
+	}
+	if len(f.Areas) > 0 {
+		where = append(where, areasWhere(f.Areas))
 	}
 	if q := strings.TrimSpace(f.Query); q != "" {
 		where = append(where, "([System.Title] CONTAINS "+wiqlQuoted(q)+" OR [System.Description] CONTAINS WORDS "+wiqlQuoted(q)+")")

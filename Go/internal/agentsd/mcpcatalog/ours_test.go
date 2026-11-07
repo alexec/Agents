@@ -286,39 +286,40 @@ func TestBitbucketReadsItsConnection(t *testing.T) {
 	}
 }
 
-// Azure DevOps (#2829) asks for a personal access token, and the server when it is not
-// dev.azure.com, kept in the person's secrets, and declares the events its server raises:
-// the gitlab server's pull request events.
-func TestAzureDevOpsAsksForItsToken(t *testing.T) {
+// Azure DevOps (#2829) asks for no secret: it reads the Azure DevOps connection (#3802), as the
+// bitbucket server does, and AZURE_DEVOPS_TOKEN (with AZURE_DEVOPS_URL) only when the person
+// names it by hand. It declares the events its server raises: the gitlab server's pull
+// request events.
+func TestAzureDevOpsReadsItsConnection(t *testing.T) {
 	ado, ok := OursByID("agents/azuredevops")
 	if !ok || ado.Command != "azuredevops-mcp" || !ado.Declares.Tools || ado.Declares.Views ||
 		!reflect.DeepEqual(ado.Declares.Events, azuredevopsmcp.EventNames()) {
 		t.Fatalf("azuredevops: %+v %v, the server's %v", ado, ok, azuredevopsmcp.EventNames())
 	}
 	built := BuildOurs(ado, func(string) bool { return false })
-	want := `{"command":"azuredevops-mcp","hosted":true,"env":{"AZURE_DEVOPS_TOKEN":"${AZURE_DEVOPS_TOKEN}","AZURE_DEVOPS_URL":"${AZURE_DEVOPS_URL}"}}`
+	want := `{"command":"azuredevops-mcp","hosted":true}`
 	if got := strings.Join(strings.Fields(built.Entry.Stringified()), ""); got != want {
 		t.Fatalf("entry: %s", got)
 	}
-	if built.NameHere != "azure-devops" || len(built.Variables) != 2 || !built.Variables[0].Required || built.Variables[1].Required {
+	if built.NameHere != "azure-devops" || len(built.Variables) != 0 {
 		t.Fatalf("built: %+v", built)
 	}
 }
 
-// Azure Boards (#3804) is the tracker's: it asks for the azuredevops connector's token, the
-// server and the project, and declares the jira and linear servers' issue events.
-func TestAzureBoardsAsksForItsTokenAndProject(t *testing.T) {
+// Azure Boards (#3804) is the tracker's: it reads the Azure DevOps connection (#3802), asks
+// only for the project, and declares the jira and linear servers' issue events.
+func TestAzureBoardsReadsItsConnectionAndAsksForItsProject(t *testing.T) {
 	boards, ok := OursByID("agents/azureboards")
 	if !ok || boards.Command != "azureboards-mcp" || !boards.Declares.Tools || !boards.Declares.Views ||
 		!reflect.DeepEqual(boards.Declares.Events, azureboardsmcp.EventNames()) {
 		t.Fatalf("azureboards: %+v %v, the server's %v", boards, ok, azureboardsmcp.EventNames())
 	}
 	built := BuildOurs(boards, func(string) bool { return false })
-	want := `{"command":"azureboards-mcp","hosted":true,"env":{"AZURE_DEVOPS_TOKEN":"${AZURE_DEVOPS_TOKEN}","AZURE_DEVOPS_URL":"${AZURE_DEVOPS_URL}","AZURE_BOARDS_PROJECT":"${AZURE_BOARDS_PROJECT}"}}`
+	want := `{"command":"azureboards-mcp","hosted":true,"env":{"AZURE_BOARDS_PROJECT":"${AZURE_BOARDS_PROJECT}"}}`
 	if got := strings.Join(strings.Fields(built.Entry.Stringified()), ""); got != want {
 		t.Fatalf("entry: %s", got)
 	}
-	if built.NameHere != "azure-boards" || len(built.Variables) != 3 || !built.Variables[0].Required || built.Variables[1].Required || built.Variables[2].Required {
+	if built.NameHere != "azure-boards" || len(built.Variables) != 1 || built.Variables[0].Required {
 		t.Fatalf("built: %+v", built)
 	}
 }

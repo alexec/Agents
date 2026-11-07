@@ -432,8 +432,11 @@ button.link {
 :is(.markdown pre, pre.code) .code-type { color: var(--code-type, #246b8a); }
 :is(.markdown pre, pre.code) :is(.code-operator, .code-punctuation) { color: var(--code-operator, #8656a3); }
 .markdown blockquote { border-left: 2px solid var(--paper-rule); padding-left: 10px; opacity: 0.8; }
+.markdown .table-scroll { overflow-x: auto; max-width: 100%; margin: 0 0 8px; }
 .markdown table { border-collapse: collapse; }
 .markdown th, .markdown td { border: 1px solid var(--paper-rule); padding: 3px 8px; }
+/* Its columns keep their width, as the Mac's grid does, so a wide table scrolls rather than wraps to a column of single words (#3895). */
+.markdown .table-scroll table { width: max-content; }
 .image-placeholder { opacity: 0.6; font-style: italic; }
 
 .quiet { opacity: 0.65; margin: 0; }
@@ -1232,6 +1235,9 @@ button.remove:hover { opacity: 1; }
 .sub-app .settings-body .settings-scope { margin-bottom: 20px; }
 .sub-app .settings-body .scope-head { font-size: 0.875rem; font-weight: 600; margin: 8px 8px 4px; }
 .sub-app-row { display: flex; justify-content: space-between; align-items: center; }
+/* A machine's need under its row (#3764), as the window's grey line. */
+.machine-need { padding: 0 20px 6px; margin-top: -6px; font-size: 0.75rem; line-height: 1.35; }
+.machine-need .foot-start { margin-left: 6px; font-size: inherit; }
 .team-workflows { display: flex; flex-direction: column; gap: 12px; max-width: 720px; }
 .bot-card { border: 1px solid var(--paper-rule); border-radius: var(--radius-card); padding: 10px 12px; background: var(--paper-raised); }
 .bot-card h3 { margin: 0 0 2px; font-size: 0.875rem; }
@@ -1729,17 +1735,17 @@ button.plain:hover { opacity: 1; }
 .time-bar.others { fill: color-mix(in srgb, currentColor 35%, transparent); }
 .time-bar.person { fill: var(--tint-attention); }
 .time-charts g.dim { opacity: 0.35; }
-/* The milestones (#984): the Time page's checklist, and the one-time card at the bottom right. */
-.milestones { margin-bottom: 24px; }
-.milestones ul { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.milestones li, .milestone-card-head { display: flex; gap: 8px; align-items: baseline; }
-.milestones li > span:last-child, .milestone-card-head > span:nth-child(2) { display: flex; flex-direction: column; gap: 2px; flex: 1; }
-.milestones li.done .milestone-title { opacity: 0.65; }
-.milestone-mark { color: var(--accent); font-weight: 600; }
-.milestones li:not(.done) .milestone-mark { color: inherit; opacity: 0.5; }
-.milestones-count { font-weight: normal; margin-left: 6px; font-variant-numeric: tabular-nums; }
-.milestone-card { position: fixed; right: 20px; bottom: 20px; max-width: 320px; z-index: 20; }
-.milestone-card > button.link { align-self: flex-start; }
+/* The achievements (#984): the Time page's checklist, and the one-time card at the bottom right. */
+.achievements { margin-bottom: 24px; }
+.achievements ul { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.achievements li, .achievement-card-head { display: flex; gap: 8px; align-items: baseline; }
+.achievements li > span:last-child, .achievement-card-head > span:nth-child(2) { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.achievements li.done .achievement-title { opacity: 0.65; }
+.achievement-mark { color: var(--accent); font-weight: 600; }
+.achievements li:not(.done) .achievement-mark { color: inherit; opacity: 0.5; }
+.achievements-count { font-weight: normal; margin-left: 6px; font-variant-numeric: tabular-nums; }
+.achievement-card { position: fixed; right: 20px; bottom: 20px; max-width: 320px; z-index: 20; }
+.achievement-card > button.link { align-self: flex-start; }
 .time-swatch { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 8px; vertical-align: baseline; }
 .time-swatch.agent { background: var(--accent); }
 .time-swatch.tools { background: color-mix(in srgb, var(--accent) 50%, transparent); }
@@ -1995,3 +2001,33 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
 
 /* Settings ▸ Processes (#3453): the numbers line up. */
 .process-usage { white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* Personas from a marketplace (#3678), as the Mac's AddPersonaSheet. */
+.persona-catalog { display: grid; gap: 6px; margin-bottom: 14px; }
+.persona-catalog-head { display: flex; align-items: center; gap: 8px; }
+.persona-catalog-head h4 { margin: 0; flex: 1; }
+.persona-catalog-head button { margin-left: auto; }
+.persona-catalog-row { display: flex; align-items: baseline; gap: 10px; padding: 10px 14px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); min-width: 0; }
+.persona-catalog-row .hint { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.persona-catalog-row .spacer, .persona-sheet-head .spacer { flex: 1; }
+.persona-sheet .sheet-actions { align-items: center; }
+.persona-sheet .sheet-actions .hint { margin-right: auto; }
+.chip.attention { background: color-mix(in srgb, var(--tint-attention) 22%, var(--paper-ground)); opacity: 1; }
+dialog.sheet:has(.persona-sheet) { width: min(900px, calc(100vw - 32px)); max-height: calc(100vh - 64px); }
+.persona-sheet { min-width: 0; }
+.persona-sheet h2 { margin: 0; }
+.persona-sheet-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.persona-sheet input[type="search"] { width: 100%; box-sizing: border-box; }
+.persona-results { display: grid; gap: 6px; max-height: 50vh; overflow: auto; }
+.persona-result { display: grid; gap: 2px; text-align: left; padding: 8px 12px; }
+.persona-result .chip { margin-left: 6px; }
+.persona-preview { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 14px; min-height: 0; }
+.persona-facts { display: grid; gap: 5px; margin: 0 0 10px; }
+.persona-facts div { display: grid; grid-template-columns: 8.5em 1fr; gap: 10px; }
+.persona-facts dt { opacity: 0.7; }
+.persona-facts dd { margin: 0; overflow-wrap: anywhere; }
+.persona-file { border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); padding: 14px; overflow: auto; max-height: 55vh; }
+.persona-file pre { margin: 6px 0 0; white-space: pre-wrap; font-family: var(--font-mono); }
+.persona-note { margin: 0 0 8px; padding: 10px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.persona-note.attention { background: color-mix(in srgb, var(--tint-attention) 14%, transparent); }
+.persona-diff { max-height: 55vh; overflow: auto; }
+@media (max-width: 640px) { .persona-preview { grid-template-columns: 1fr; } }

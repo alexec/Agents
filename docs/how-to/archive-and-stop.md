@@ -41,8 +41,9 @@ An agent that has finished can also archive itself. A chat you started does so w
 
    An agent still working is stopped first. The chat moves under **Archived** at the
    bottom of the folder's page, folded away.
-2. If the agent worked in a worktree the app made, and everything there is committed,
-   archiving also removes the worktree. See
+2. If the agent worked in a worktree the app made, archiving also removes the
+   worktree, with any changes there that are not committed. Its branch, with its
+   commits, stays unless it is merged. See
    [Start an agent in its own worktree](start-in-a-worktree.md).
 3. To unarchive it, open **Archived**, then right-click the card and choose **Unarchive**.
    On iPhone and iPad, open **Archived**, open the chat, and choose **Unarchive** from

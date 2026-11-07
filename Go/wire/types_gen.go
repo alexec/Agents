@@ -97,6 +97,10 @@ type AccountRequest struct {
 	AccountID string `json:"accountID"`
 }
 
+type Achievements struct {
+	Earned []EarnedAchievement `json:"earned"`
+}
+
 // clients/setActivityToken (#1744): the push token of this device's Live Activity, in hex, for one session it speaks for (#2991: one activity for every turn sent from the device, so one token for several sessions), for the control plane to update it by APNs while the Remote is not running. startedAt is when the session's turn began. No token takes the session out of it.
 type ActivityToken struct {
 	AgentID UUID `json:"agentID"`
@@ -1899,7 +1903,7 @@ type CatchUpSnapshot struct {
 
 	StoreNotes *StoreNotes `json:"storeNotes,omitzero"`
 
-	Milestones *Milestones `json:"milestones,omitzero"`
+	Achievements *Achievements `json:"achievements,omitzero"`
 
 	Workflows []WorkflowSummary `json:"workflows,omitzero"`
 
@@ -2359,7 +2363,7 @@ type ConnectionEmailRequest struct {
 	Password string `json:"password"`
 }
 
-// A tool the person connects to: GitHub (#1335) and Linear (#1343) with OAuth, GitLab (#1630) with OAuth on gitlab.com or a personal access token on any GitLab, email (#1780): one IMAP mailbox with an app password, Atlassian (#3304): one sign-in for Jira and Confluence, with OAuth on Atlassian Cloud or a token on one site, Forgejo (#3752): an access token on Codeberg or any Forgejo or Gitea, and Bitbucket (#3785): an Atlassian API token with its email, or an access token, on Bitbucket Cloud.
+// A tool the person connects to: GitHub (#1335) and Linear (#1343) with OAuth, GitLab (#1630) with OAuth on gitlab.com or a personal access token on any GitLab, email (#1780): one IMAP mailbox with an app password, Atlassian (#3304): one sign-in for Jira and Confluence, with OAuth on Atlassian Cloud or a token on one site, Forgejo (#3752): an access token on Codeberg or any Forgejo or Gitea, Bitbucket (#3785): an Atlassian API token with its email, or an access token, on Bitbucket Cloud, and Azure DevOps (#3802): a personal access token on one organization of dev.azure.com or one collection of an Azure DevOps Server.
 type ConnectionProvider string
 
 const ConnectionProviderGithub ConnectionProvider = "github"
@@ -2369,6 +2373,7 @@ const ConnectionProviderEmail ConnectionProvider = "email"
 const ConnectionProviderAtlassian ConnectionProvider = "atlassian"
 const ConnectionProviderForgejo ConnectionProvider = "forgejo"
 const ConnectionProviderBitbucket ConnectionProvider = "bitbucket"
+const ConnectionProviderAzuredevops ConnectionProvider = "azuredevops"
 
 type ConnectionProviderRequest struct {
 	Provider ConnectionProvider `json:"provider"`
@@ -2452,7 +2457,7 @@ type ConnectionTokenAnswer struct {
 type ConnectionTokenRequest struct {
 	Provider ConnectionProvider `json:"provider"`
 
-	// The provider's address, such as gitlab.example.com, example.atlassian.net or git.example.com (https:// when it names no scheme). gitlab.com, or codeberg.org for Forgejo, when left out; a Jira site must be given. Bitbucket takes none: it is Bitbucket Cloud's.
+	// The provider's address, such as gitlab.example.com, example.atlassian.net or git.example.com (https:// when it names no scheme). gitlab.com, or codeberg.org for Forgejo, when left out; a Jira site must be given. Bitbucket takes none: it is Bitbucket Cloud's. Azure DevOps takes its organization (dev.azure.com/acme) or an Azure DevOps Server's collection (server/tfs/DefaultCollection), which must be given.
 	URL *string `json:"url,omitzero"`
 
 	// Atlassian and Bitbucket: the account's email, sent with a Jira Cloud or Atlassian API token. Left out for a Jira Data Center personal access token or a Bitbucket access token.
@@ -2541,20 +2546,20 @@ type ConnectorProof struct {
 	At *Date `json:"at,omitzero"`
 }
 
-// A folder's Connectors set-up (#1336): its GitHub, GitLab, Forgejo or Bitbucket repository (#1632, #3752, #3785), the person's connection to that forge, four slots that each prove themselves with one read, and the events.
+// A folder's Connectors set-up (#1336): its GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps repository (#1632, #3752, #3785, #3802), the person's connection to that forge, four slots that each prove themselves with one read, and the events.
 type ConnectorSetup struct {
 	Folder string `json:"folder"`
 
-	// owner/name on GitHub or Forgejo, workspace/name on Bitbucket, or group/project on GitLab, from the folder's git remote (origin first). Absent with no GitHub, GitLab, Forgejo or Bitbucket remote.
+	// owner/name on GitHub or Forgejo, workspace/name on Bitbucket, organization/project/name on Azure DevOps, or group/project on GitLab, from the folder's git remote (origin first). Absent with no GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps remote.
 	Repository *string `json:"repository,omitzero"`
 
-	// The forge the repository is on, which fills Tasks, Code review and CI: github, gitlab (#1632), forgejo (#3752) or bitbucket (#3785). Absent is github.
+	// The forge the repository is on, which fills Tasks, Code review and CI: github, gitlab (#1632), forgejo (#3752), bitbucket (#3785) or azuredevops (#3802). Absent is github.
 	Forge *ConnectionProvider `json:"forge,omitzero"`
 
-	// The repository's host, as the page says it before the repository: github.com, gitlab.com, codeberg.org, bitbucket.org, or a self-managed GitLab's or Forgejo's host.
+	// The repository's host, as the page says it before the repository: github.com, gitlab.com, codeberg.org, bitbucket.org, dev.azure.com, or a self-managed GitLab's, Forgejo's or Azure DevOps Server's host.
 	Site *string `json:"site,omitzero"`
 
-	// The repository's page on its forge, where the person asks for access when a read is refused (GitLab, Forgejo, Bitbucket).
+	// The repository's page on its forge, where the person asks for access when a read is refused (GitLab, Forgejo, Bitbucket, Azure DevOps).
 	RepositoryURL *string `json:"repositoryURL,omitzero"`
 
 	Connection *Connection `json:"connection,omitzero"`
@@ -2645,7 +2650,7 @@ const ConnectorSlotKindDocs ConnectorSlotKind = "docs"
 const ConnectorSlotKindMessaging ConnectorSlotKind = "messaging"
 const ConnectorSlotKindWorkspace ConnectorSlotKind = "workspace"
 
-// notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach the provider; message says why. refused: the provider refused the read, so the person grants it on the provider's site. noRemote: the folder has no GitHub, GitLab, Forgejo or Bitbucket remote. skipped: the person skipped it; it counts as done.
+// notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach the provider; message says why. refused: the provider refused the read, so the person grants it on the provider's site. noRemote: the folder has no GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps remote. skipped: the person skipped it; it counts as done.
 type ConnectorSlotState string
 
 const ConnectorSlotStateNotConnected ConnectorSlotState = "notConnected"
@@ -3590,7 +3595,7 @@ type DropboxPutResponse struct {
 	Path string `json:"path"`
 }
 
-type EarnedMilestone struct {
+type EarnedAchievement struct {
 	ID string `json:"id"`
 
 	At Date `json:"at"`
@@ -7049,10 +7054,6 @@ const MessagingServerStateNotRead MessagingServerState = "notRead"
 const MessagingServerStateRead MessagingServerState = "read"
 const MessagingServerStateFailed MessagingServerState = "failed"
 
-type Milestones struct {
-	Earned []EarnedMilestone `json:"earned"`
-}
-
 type MissingFolder struct {
 	BranchKept bool `json:"branchKept"`
 }
@@ -8730,20 +8731,20 @@ type Project struct {
 	Boards []ProjectBoard `json:"boards,omitzero"`
 }
 
-// One board in a project's Tasks slot (#3282): a GitHub Projects board, a Jira board, a Linear team or a GitLab group board, by its address and a name (the team's). Work's Issues and Features lists narrow to one. A client sends name and url; the control plane reads forge, key and site from the url.
+// One board in a project's Tasks slot (#3282): a GitHub Projects board, a Jira board, a Linear team, a GitLab group board or an Azure Boards board (a team's, #3816), by its address and a name (the team's). Work's Issues and Features lists narrow to one. A client sends name and url; the control plane reads forge, key and site from the url.
 type ProjectBoard struct {
 	Name string `json:"name"`
 
-	// The board's address on the web: github.com/orgs/<org>/projects/<n> (or users/<login>), <site>/jira/software/…/boards/<id>, linear.app/<workspace>/team/<KEY>, or <gitlab>/groups/<group>/-/boards/<id>. It names the board in forge/issues' board.
+	// The board's address on the web: github.com/orgs/<org>/projects/<n> (or users/<login>), <site>/jira/software/…/boards/<id>, linear.app/<workspace>/team/<KEY>, <gitlab>/groups/<group>/-/boards/<id>, or dev.azure.com/<org>/<project>/_boards/board/t/<team> (or an Azure DevOps Server's). It names the board in forge/issues' board.
 	URL string `json:"url"`
 
-	// github, atlassian (Jira), linear or gitlab.
+	// github, atlassian (Jira), linear, gitlab or azuredevops (Azure Boards).
 	Forge *ConnectionProvider `json:"forge,omitzero"`
 
-	// The board on its forge: <owner>/<number> on GitHub, the board id on Jira, the team key on Linear, <group>#<id> on GitLab.
+	// The board on its forge: <owner>/<number> on GitHub, the board id on Jira, the team key on Linear, <group>#<id> on GitLab, <org>/<project>/<team> on Azure Boards.
 	Key *string `json:"key,omitzero"`
 
-	// The board's host: github.com, the Jira site, linear.app, gitlab.com or a self-managed GitLab.
+	// The board's host: github.com, the Jira site, linear.app, gitlab.com or a self-managed GitLab, dev.azure.com or an Azure DevOps Server.
 	Site *string `json:"site,omitzero"`
 }
 
@@ -9958,6 +9959,9 @@ type ReviewPull struct {
 
 	// owner/name.
 	Repo string `json:"repo"`
+
+	// Its lineage ref, "github:owner/name#12" or "gitlab:group/project!12": a press opens its Work page in the app. Nil from an older host: a press opens its forge page.
+	Ref *string `json:"ref,omitzero"`
 
 	Author *string `json:"author,omitzero"`
 

@@ -160,7 +160,7 @@ func (d *Daemon) settleMerged(a wire.Agent, number int64) {
 	}
 	if mayArchiveMerged(&a) {
 		d.record(a.ID, runtimeNote(pr+" merged, so it was archived, as this folder's settings say."))
-		if err := d.archiveSweeping(a.ID, wire.AgentArchivedReasonByAgent, sweepArchivedMerged); err != nil {
+		if err := d.archiveSweeping(a.ID, wire.AgentArchivedReasonByAgent, sweepArchived); err != nil {
 			return
 		}
 		log.Printf("archive when merged: %s archived", a.ID)

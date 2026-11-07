@@ -171,12 +171,12 @@ struct FolderListView: View {
                         .selectionDisabled()
                 }
             }
-            // A milestone just earned (#984): once, until closed or opened.
-            if let milestone = model.milestoneCard {
+            // An achievement just earned (#984): once, until closed or opened.
+            if let achievement = model.achievementCard {
                 Section {
-                    MilestoneCard(milestone: milestone,
-                                  open: { model.dismissMilestone(milestone); picked = [.milestones] },
-                                  dismiss: { model.dismissMilestone(milestone) })
+                    AchievementCard(achievement: achievement,
+                                  open: { model.dismissAchievement(achievement); picked = [.achievements] },
+                                  dismiss: { model.dismissAchievement(achievement) })
                         .listRowSeparator(.hidden)
                         .selectionDisabled()
                 }
@@ -250,11 +250,11 @@ struct FolderListView: View {
                 // A record of what happened, as the web's Reports ▸ Records (#3633).
                 EventsRow().activityIcon("list.bullet.rectangle")
                     .appText(.supporting).sidebarInk(.events).tag(SidebarItem.events)
-                // The newcomer's checklist (#1067), only while a milestone is still to earn,
+                // The newcomer's checklist (#1067), only while an achievement is still to earn,
                 // as an empty smart group hides (#507). Then the list is under Time's charts.
-                if model.work.milestones?.isComplete == false {
-                    MilestonesRow().activityIcon("checkmark.seal")
-                        .appText(.supporting).sidebarInk(.milestones).tag(SidebarItem.milestones)
+                if model.work.achievements?.isComplete == false {
+                    AchievementsRow().activityIcon("checkmark.seal")
+                        .appText(.supporting).sidebarInk(.achievements).tag(SidebarItem.achievements)
                 }
             } header: {
                 // The size of every other group's heading (#495).
@@ -1003,6 +1003,8 @@ private extension FolderMenu {
 /// both have nothing to say.
 private struct SidebarFoot: View {
     @Environment(AppModel.self) private var model
+    /// Machines' group open: its rows say why a server is quiet, so the foot does not (#3764).
+    @AppStorage("showsMachines", store: WindowDefaults.store) private var showsMachines = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -1023,9 +1025,10 @@ private struct SidebarFoot: View {
                 }
                 .padding(.horizontal, 14)
             }
-            ForEach(model.hosts.servers.filter { model.hostUnreachable($0) }, id: \.self) { host in
-                // A server gone quiet greys its folders; this says why, once, where the
-                // Mac's own state is said. One on a stopped workspace says so, with Start (#961).
+            ForEach(showsMachines ? [] : model.hosts.servers.filter { model.hostUnreachable($0) }, id: \.self) { host in
+                // A server gone quiet greys its folders; its row under Machines says why (#3764).
+                // With that group folded, this says it, once, where the Mac's own state is said.
+                // One on a stopped workspace says so, with Start (#961).
                 let row = model.hosts.controlRows[host]
                 HStack(spacing: 8) {
                     Label(OfflineWords.footLine(name: model.hosts.label(host), row: row),

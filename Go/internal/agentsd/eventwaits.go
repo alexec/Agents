@@ -64,7 +64,7 @@ func kindNamed(name string) *eventKind {
 	return nil
 }
 
-var eventSubjects = []string{"agent", "folder", "workflow", "branch", "dropbox", "lease", "mac", "machine", "person", "cost", "server", "system"}
+var eventSubjects = []string{"agent", "folder", "workflow", "branch", "dropbox", "file", "lease", "mac", "machine", "person", "cost", "server", "system"}
 
 func isSubject(s string) bool {
 	for _, x := range eventSubjects {
@@ -284,6 +284,20 @@ func (p waitPattern) matches(e wire.Event) bool {
 		return false
 	}
 	for k, vs := range p.filters {
+		// A file event's paths are globs, and it matches when one of its files does (#3795).
+		if k == "paths" && strings.HasPrefix(e.Name, "file.") {
+			matched := false
+			for _, rel := range eventPaths(e) {
+				if matchesAnyGlob(rel, vs) {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				return false
+			}
+			continue
+		}
 		v, ok := e.Details[k]
 		if !ok || !contains(vs, v) {
 			return false
@@ -392,6 +406,10 @@ func parsePattern(given string, filters map[string][]string) (waitPattern, strin
 			return p, ""
 		}
 		return unknown()
+	}
+	// A file event says which files it watches (#3795): only those are raised.
+	if words := fileGlobsWords(p); words != "" {
+		return p, words
 	}
 	schema := inputSchemaFor(name)
 	first := map[string]string{}
@@ -921,6 +939,8 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 		d.takeOpenWait(agent)
 		return "", &Error{Code: CodeNoSuchAgent, Message: "That agent is not here."}
 	}
+	// What the files it watches are now is not raised as added (#3795).
+	d.followFileGlobs(folderPath(a))
 	d.startMCPWait(servers)
 	d.tellEvents(nil)
 	d.armWaitTimer()

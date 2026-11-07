@@ -96,7 +96,7 @@ connection, the list says Bitbucket is not connected.
 - **A pull request's page:** its description and comments, its checks (the head commit's
   statuses), **Merge** (the target branch's default first; merge, squash or rebase, as the
   branch allows), **Approve**, **Show Diff**, **Close** (decline) and a comment box. A pull
-  request has no labels. **Rerun failed** starts each failed Pipelines run again, every step,
+  request has no labels, so its page has no **Labels** (#3881). **Rerun failed** starts each failed Pipelines run again, every step,
   and a check's log is the end of its failed steps' logs; another CI's checks run again and
   show their logs on their own pages.
 - **Not on Bitbucket:** *Merge when checks pass* (its API has none) and **Reopen** of a

@@ -42,5 +42,5 @@ test("A host older than #3824: Email comes before Atlassian, and only with conne
 test("Connect… offers only what the host says it connects, in the page's order, less names the page does not know (#3824)", () => {
   assert.deepEqual(c.providersFor(false, ["bitbucket", "github", "email", "forgejo", "linear", "gitlab", "atlassian"]),
     ["github", "linear", "gitlab", "email", "atlassian", "forgejo", "bitbucket"]);
-  assert.deepEqual(c.providersFor(true, ["github", "azuredevops"]), ["github"]);
+  assert.deepEqual(c.providersFor(true, ["github", "sourcehut"]), ["github"]);
 });

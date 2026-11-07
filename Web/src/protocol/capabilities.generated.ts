@@ -4,6 +4,7 @@
 // capability of each method and notification. docs/explanation/versions.md says how they decide.
 
 export const Capability = {
+  achievements1: "achievements/1",
   agent1: "agent/1",
   agentsEditQueued1: "agents.edit-queued/1",
   agentsExport1: "agents.export/1",
@@ -99,7 +100,6 @@ export const Capability = {
   mailbox1: "mailbox/1",
   marketplaces1: "marketplaces/1",
   mcp1: "mcp/1",
-  milestones1: "milestones/1",
   modes1: "modes/1",
   mute1: "mute/1",
   notices1: "notices/1",
@@ -177,6 +177,7 @@ export type Capability = (typeof Capability)[keyof typeof Capability];
 
 /** The capability of each method and notification in daemon.openrpc.json. */
 export const HostCapabilities: Readonly<Record<string, Capability>> = {
+  "achievements/state": "achievements/1",
   "agentConfig/editorFiles": "personal/1",
   "agentConfig/editorSave": "personal/1",
   "agents/answerSandbox": "agents/1",
@@ -381,7 +382,6 @@ export const HostCapabilities: Readonly<Record<string, Capability>> = {
   "mcp/sign-in/wait": "mcp/1",
   "mcp/sign-out": "mcp/1",
   "mcp/verify": "mcp/1",
-  "milestones/state": "milestones/1",
   "modes/remembered": "modes/1",
   "options/remembered": "options/1",
   "permissions/answer": "permissions/1",
@@ -529,6 +529,7 @@ export const HostCapabilities: Readonly<Record<string, Capability>> = {
   "worktrees/list": "worktrees/1",
   "worktrees/remove": "worktrees/1",
   "worktrees/removeBuildOutput": "worktrees/1",
+  "achievements/changed": "achievements/1",
   "agent/changed": "agent/1",
   "agent/elicitation": "agent/1",
   "agent/entry": "agent/1",
@@ -556,7 +557,6 @@ export const HostCapabilities: Readonly<Record<string, Capability>> = {
   "folder/removed": "folder/1",
   "mcp/healthChanged": "mcp/1",
   "mcp/hostedChanged": "mcp/1",
-  "milestones/changed": "milestones/1",
   "modes/changed": "modes/1",
   "pages/changed": "pages/1",
   "person/changed": "person/1",

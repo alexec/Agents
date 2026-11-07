@@ -8,7 +8,7 @@ import { useEffect, useMemo } from "preact/hooks";
 import type { ForgeDone, ForgeItemDetail, ForgeLabel, ForgeMergeMethod, LineageNode } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { describe } from "../model/errors";
-import { closeTitle, doneWords, failedChecks, forgeName, mergeButton, mergeWaits, shortRef } from "../model/work";
+import { closeTitle, doneWords, failedChecks, forgeName, mergeButton, mergeWaits, shortRef, takesLabels } from "../model/work";
 import type { Diff } from "./chat/appViewBridge";
 import { ViewDiff } from "./chat/ViewDiff";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
@@ -35,6 +35,7 @@ export function WorkActions({ store, host, detail, wrote }: {
   useEffect(() => {
     let current = true;
     labelChoices.value = null;
+    if (!takesLabels(node)) return;
     store.link.call("forge/labels", { node }, host).then((r) => { if (current) labelChoices.value = r.labels; }, () => {
       if (current) labelChoices.value = [];
     });
@@ -117,8 +118,8 @@ export function WorkActions({ store, host, detail, wrote }: {
           <button type="button" disabled={busy.value}
             onClick={() => void act("forge/close", { node, ...item.state === "open" ? {} : { reopen: true } })}>{closeTitle(item.state)}</button>
         )}
-        <button type="button" disabled={busy.value || !labelChoices.value?.length} onClick={labelMenu}
-          title={labelChoices.value === null ? "Loading…" : labelChoices.value.length === 0 ? "No labels" : undefined}>Labels ▾</button>
+        {takesLabels(node) && <button type="button" disabled={busy.value || !labelChoices.value?.length} onClick={labelMenu}
+          title={labelChoices.value === null ? "Loading…" : labelChoices.value.length === 0 ? "No labels" : undefined}>Labels ▾</button>}
         {busy.value && <span class="quiet small">Working…</span>}
       </div>
       {failed.length > 0 && (

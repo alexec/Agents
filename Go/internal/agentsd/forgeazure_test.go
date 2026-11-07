@@ -97,6 +97,11 @@ func (f *fakeForgeBoards) SetBlockedBy(_ context.Context, project string, id, bl
 	return f.note(fmt.Sprintf("blocked %s#%d %d %v", project, id, blocker, blocked))
 }
 
+func (f *fakeForgeBoards) TeamAreas(_ context.Context, project, team string) ([]azureboardsmcp.Area, error) {
+	return []azureboardsmcp.Area{{Path: `Web App\Payments`, Under: true}, {Path: "Web App", Under: false}},
+		f.note(fmt.Sprintf("areas %s %s", project, team))
+}
+
 func (f *fakeForgeBoards) asked() ([]string, []string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -221,7 +226,7 @@ func TestForgeAzureBoardsNotSignedIn(t *testing.T) {
 	os.Remove(filepath.Join(os.Getenv("AGENTS_PERSONAL_HOME"), ".agents-secrets", "secrets.env"))
 	var list wire.ForgeList
 	json.Unmarshal(c.call(t, 1, "forge/issues", wire.ForgeListRequest{}), &list)
-	if len(list.Errors) != 1 || list.Errors[0].Forge != "azureboards" || !strings.Contains(list.Errors[0].Message, "Azure DevOps is not signed in") {
+	if len(list.Errors) != 1 || list.Errors[0].Forge != "azureboards" || !strings.Contains(list.Errors[0].Message, "Azure DevOps is not connected") {
 		t.Fatalf("errors: %+v", list.Errors)
 	}
 }
@@ -283,5 +288,55 @@ func TestAzureBoardsKeysInLabelsTitlesAndURLs(t *testing.T) {
 	}
 	if refName(boardsItem.Ref, "") != "AB#12" {
 		t.Fatalf("name: %q", refName(boardsItem.Ref, ""))
+	}
+}
+
+// #3816: an Azure Boards board narrows Work to its team: the work items under the team's area
+// paths, in its project, on the connected Azure DevOps; a board on another Azure DevOps says
+// so; another forge's board asks Azure Boards nothing.
+func TestAnAzureBoardsBoardNarrowsWorkToItsTeam(t *testing.T) {
+	d, c, b, app := boardsDaemon(t)
+	id, _, _ := d.folderProject(app)
+	payments := board("Payments", "https://tfs.acme.test/acme/Web%20App/_boards/board/t/Payments", wire.ConnectionProviderAzuredevops,
+		"acme/Web App/Payments", "tfs.acme.test")
+	shop := board("Shop", "https://tfs.acme.test/acme/Shop/_boards/board/t/Shop%20Team", wire.ConnectionProviderAzuredevops,
+		"acme/Shop/Shop Team", "tfs.acme.test")
+	cloud := board("Cloud", "https://dev.azure.com/acme/Web%20App/_boards/board/t/Payments", wire.ConnectionProviderAzuredevops,
+		"acme/Web App/Payments", "dev.azure.com")
+	web := board("Web", "https://github.com/orgs/acme/projects/7", wire.ConnectionProviderGithub, "acme/7", "github.com")
+	d.heardProjects(wire.MachineProjects{Projects: []wire.ProjectTools{
+		{ID: id, Name: "App", Slots: []wire.ProjectSlot{}, Boards: []wire.ProjectBoard{payments, shop, cloud, web}},
+	}})
+
+	var list wire.ForgeList
+	json.Unmarshal(c.call(t, 1, "forge/issues", wire.ForgeListRequest{Board: &payments.URL}), &list)
+	searches, wrote := b.asked()
+	if !slices.Equal(wrote, []string{"areas acme/web app Payments"}) || len(searches) != 1 ||
+		searches[0] != `[System.TeamProject] IN ('web app') AND [System.State] NOT IN ('Closed') AND `+
+			`([System.AreaPath] UNDER 'Web App\Payments' OR [System.AreaPath] = 'Web App') after=` {
+		t.Fatalf("areas %q searches %q", wrote, searches)
+	}
+	if len(list.Items) != 1 || deref(list.Items[0].Folder) != app || len(list.Errors) != 0 {
+		t.Fatalf("list %+v", list)
+	}
+
+	// A project no folder names: its work items act from the board's folder.
+	json.Unmarshal(c.call(t, 2, "forge/issues", wire.ForgeListRequest{Board: &shop.URL}), &list)
+	searches, wrote = b.asked()
+	if wrote[len(wrote)-1] != "areas acme/shop Shop Team" || !strings.HasPrefix(searches[len(searches)-1], "[System.TeamProject] IN ('shop')") {
+		t.Fatalf("areas %q searches %q", wrote, searches)
+	}
+
+	// On another Azure DevOps than the connected one: not read, and the list says why.
+	json.Unmarshal(c.call(t, 3, "forge/issues", wire.ForgeListRequest{Board: &cloud.URL}), &list)
+	if after, _ := b.asked(); len(after) != len(searches) || len(list.Errors) != 1 || list.Errors[0].Forge != "azureboards" ||
+		!strings.Contains(list.Errors[0].Message, "connected at tfs.acme.test") {
+		t.Fatalf("searches %q list %+v", after, list)
+	}
+
+	// A GitHub board: Azure Boards is not asked.
+	c.call(t, 4, "forge/issues", wire.ForgeListRequest{Board: &web.URL})
+	if after, _ := b.asked(); len(after) != len(searches) {
+		t.Fatalf("a GitHub board asked Azure Boards: %q", after[len(searches):])
 	}
 }
