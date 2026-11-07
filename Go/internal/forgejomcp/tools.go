@@ -81,6 +81,11 @@ type logArgs struct {
 	Job   string `json:"job,omitempty" jsonschema:"only the failed job with this name"`
 }
 
+type retryArgs struct {
+	Repo  string `json:"repo,omitempty" jsonschema:"owner/name; the repository this folder pushes to when left out"`
+	RunID int    `json:"runId" jsonschema:"the Forgejo Actions run's number: run.id in a checks.failed event, or the number after /actions/runs/ in a check's url"`
+}
+
 type approveArgs struct {
 	Repo   string `json:"repo,omitempty" jsonschema:"owner/name; the repository this folder pushes to when left out"`
 	Number int    `json:"number" jsonschema:"the pull request's number"`
@@ -267,6 +272,21 @@ func AddTools(server *mcp.Server, f *RealForgejo, person bool) {
 				return failed(err), nil, nil
 			}
 			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: text}}}, nil, nil
+		})
+
+	tool(server, &mcp.Tool{Name: "retry_pipeline", Title: "Retry a run's failed jobs",
+		Description: "Runs a finished Forgejo Actions run's failed jobs again, and the jobs that need them. Use it for a failure that is " +
+			"known to be flaky, not to hide a real one. It needs Forgejo 17 or Gitea 1.26 or later, and says so on an older server.",
+		Meta: agents},
+		func(ctx context.Context, in retryArgs) (map[string]any, error) {
+			repo, err := repoOf(ctx, in.Repo)
+			if err != nil {
+				return nil, err
+			}
+			if in.RunID <= 0 {
+				return nil, fmt.Errorf("runId is a Forgejo Actions run's number")
+			}
+			return f.RetryRun(ctx, repo, in.RunID)
 		})
 
 	tool(server, &mcp.Tool{Name: "list_issues", Title: "List issues",

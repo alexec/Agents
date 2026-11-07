@@ -52,6 +52,8 @@ type fakeForgejo struct {
 	logs      map[string]string
 	giteaJobs bool
 	ranges    []string // each log read's Range
+	// rerunning are the jobs whose rerun Forgejo refuses as still running.
+	rerunning map[int]bool
 	// files are a pull request's changed files, diffs its git diff, thread an issue's or a
 	// pull request's comments, by its number (the views, #3838).
 	files  map[int][]obj
@@ -62,7 +64,7 @@ type fakeForgejo struct {
 
 func newFake(t *testing.T) *fakeForgejo {
 	f := &fakeForgejo{t: t, timeline: map[int][]obj{}, reviews: map[int][]obj{}, lines: map[int][]obj{}, statuses: map[string]obj{},
-		jobs: map[int][]obj{}, logs: map[string]string{}, files: map[int][]obj{}, diffs: map[int]string{}, thread: map[int][]obj{},
+		jobs: map[int][]obj{}, logs: map[string]string{}, rerunning: map[int]bool{}, files: map[int][]obj{}, diffs: map[int]string{}, thread: map[int][]obj{},
 		perms: map[string]string{"alex": "admin", "dev": "write", "reader": "read"}, me: "alex", collaborators: map[string]bool{}}
 	f.server = httptest.NewServer(http.HandlerFunc(f.serve))
 	t.Cleanup(f.server.Close)
@@ -135,6 +137,8 @@ var (
 	jobLogPath   = regexp.MustCompile(`^/api/v1/repos/acme/app/actions/jobs/([0-9]+)/logs$`)
 	filesPath    = regexp.MustCompile(`^/api/v1/repos/acme/app/pulls/([0-9]+)/files$`)
 	diffPath     = regexp.MustCompile(`^/api/v1/repos/acme/app/pulls/([0-9]+)\.diff$`)
+	jobRerunPath = regexp.MustCompile(`^/api/v1/repos/acme/app/actions/jobs/([0-9]+)/rerun$`)
+	runRerunPath = regexp.MustCompile(`^/api/v1/repos/acme/app/actions/runs/([0-9]+)/rerun-failed-jobs$`)
 )
 
 func (f *fakeForgejo) serve(w http.ResponseWriter, r *http.Request) {
@@ -162,7 +166,7 @@ func (f *fakeForgejo) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	p := r.URL.Path
 	if r.Method == http.MethodPost {
-		var body obj
+		body := obj{}
 		data, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(data, &body)
 		body["_path"] = p
@@ -176,6 +180,16 @@ func (f *fakeForgejo) serve(w http.ResponseWriter, r *http.Request) {
 			reply(obj{"id": 55, "html_url": "https://forgejo.test/acme/app/issues/2#issuecomment-55"})
 		case mergePath.MatchString(p):
 			w.WriteHeader(http.StatusOK)
+		case jobRerunPath.MatchString(p):
+			// A job waiting again, after a job it needs was sent, is still running.
+			if f.rerunning[n(jobRerunPath.FindStringSubmatch(p))] {
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte(`{"message":"job is still running"}`))
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+		case runRerunPath.MatchString(p):
+			w.WriteHeader(http.StatusCreated)
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}

@@ -5,17 +5,23 @@ description: Find why a pull request's checks or a merge request's pipeline fail
 
 # Fix failed checks
 
-A pull request's checks (GitHub) or a merge request's pipeline (GitLab) failed. You find
-why, and fix it on its own branch. The event's server says which forge: use the `github`
-server's tools for GitHub and the `gitlab` server's tools for GitLab, not `gh` or `glab`.
+A pull request's checks (GitHub, Forgejo) or a merge request's pipeline (GitLab) failed.
+You find why, and fix it on its own branch. The event's server says which forge: use the
+`github`, `gitlab` or `forgejo` server's tools, not `gh` or `glab`.
 On GitLab a merge request is `pr` in the event, and its number is its iid (`!12`).
 
-| Step | GitHub (`github` server) | GitLab (`gitlab` server) |
-|---|---|---|
-| Read the failure | `get_job_logs` with `run_id` (the event's `run.id`) and `failed_only: true` | `failed_log` with `pipelineId` (the event's `run.id`) |
-| See the change | `pull_request_read` (`method: get_diff`) | `git diff` of the branch against its target, after step 3 |
-| Run the failed jobs again | `actions_run_trigger` (`method: rerun_failed_jobs`, `run_id`) | `retry_pipeline` with `pipelineId` |
-| Comment | `add_issue_comment` on the pull request | `comment_on_merge_request` |
+| Step | GitHub (`github` server) | GitLab (`gitlab` server) | Forgejo or Gitea (`forgejo` server) |
+|---|---|---|---|
+| Read the failure | `get_job_logs` with `run_id` (the event's `run.id`) and `failed_only: true` | `failed_log` with `pipelineId` (the event's `run.id`) | `failed_log` with `runId` (the event's `run.id`) |
+| See the change | `pull_request_read` (`method: get_diff`) | `git diff` of the branch against its target, after step 3 | `git diff` of the branch against its target, after step 3 |
+| Run the failed jobs again | `actions_run_trigger` (`method: rerun_failed_jobs`, `run_id`) | `retry_pipeline` with `pipelineId` | `retry_pipeline` with `runId` |
+| Comment | `add_issue_comment` on the pull request | `comment_on_merge_request` | `comment_on_pull_request` |
+
+On Forgejo, a `run.id` of 0 is a check from another CI than Forgejo Actions (Woodpecker,
+say): `failed_log` and `retry_pipeline` cannot read or run it. Read its page (`get_checks`
+gives the address), and comment when you cannot get to the log. `failed_log` needs Forgejo
+16 or Gitea 1.25, and `retry_pipeline` Forgejo 17 or Gitea 1.26; on an older server each
+says so and gives the run's address.
 
 1. **Read the failure.** Use the tools in the table.
 2. **Decide.** When the failure is not caused by the change (a test that fails on the
