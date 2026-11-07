@@ -40,7 +40,7 @@ Open issues: `is:open label:integration runtime`.
 <!-- runtimes:begin -->
 | Integration | Clients that show it | State | Last checked | Where | Gaps |
 | --- | --- | --- | --- | --- | --- |
-| Claude | Mac, Remote, web, server | tested on a real account | 2026-10-30, 0.99.1: a real turn passed, not assessed, in `.agents/reviews/runtimes/claude-2026-10-30.md` | `RuntimeCatalog.swift`, `runtimes.go` | |
+| Claude | Mac, Remote, web, server | tested on a real account | 2026-11-06, 0.81.2 on Haiku: assessed on the Go agentsd, 14 of 16 passed, in `.agents/reviews/runtimes/claude-2026-11-06.md` | `RuntimeCatalog.swift`, `runtimes.go` | `workspaces` failed by a scorer bug (#3697); `should_ask` chose alone (#3699) |
 | Grok | Mac, Remote, web, server | tested on a real account | 2026-10-27, 1.0.67: a real turn passed, not assessed, in `.agents/reviews/runtimes/grok-2026-10-27.md` | `RuntimeCatalog.swift`, `runtimes.go` | Sandbox control unavailable until Grok supports it over ACP |
 | Copilot | Mac, Remote, web, server | broken (fails at tools) | 2026-10-31, 1.0.105: failed at tools, in `.agents/reviews/runtimes/copilot-2026-10-31.md` | `RuntimeCatalog.swift`, `runtimes.go` | |
 | Cursor | Mac, Remote, web, server | broken (fails at turn) | 2026-10-17, 2026.10.01-e373342: failed at turn, in `.agents/reviews/runtimes/cursor-2026-10-17.md` | `RuntimeCatalog.swift`, `runtimes.go` | |
