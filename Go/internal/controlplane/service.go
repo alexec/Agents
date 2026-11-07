@@ -1050,14 +1050,14 @@ func (s *Service) serveHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		conn := newConn(ws, source)
-		if !s.startAccept() {
+		if !s.startAccept(conn) {
 			conn.Close()
 			proved(false)
 			return
 		}
 		go func() {
 			defer s.accepting.Done()
-			s.accept(s.adopt(conn), webOrigin, proved)
+			s.accept(conn, webOrigin, proved)
 		}()
 	default:
 		if s.page != nil && s.page.Serve(w, r) {
@@ -1090,9 +1090,10 @@ func (s *Service) mayDownload(r *http.Request) bool {
 	return false
 }
 
-// startAccept counts one more socket in accept, for Stop to wait for, unless Stop has
-// begun: then it says false, and the socket is closed.
-func (s *Service) startAccept() bool {
+// startAccept adopts a socket and counts it in accept, for Stop to close and wait for,
+// unless Stop has begun: then it says false, and the socket is closed. Both are under the
+// lock Stop takes its sockets with, so Stop closes every socket it waits for.
+func (s *Service) startAccept(c *Conn) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	select {
@@ -1101,21 +1102,27 @@ func (s *Service) startAccept() bool {
 	default:
 	}
 	s.accepting.Add(1)
+	s.adoptLocked(c)
 	return true
 }
 
 // adopt keeps a socket so Stop can close it.
 func (s *Service) adopt(c *Conn) *Conn {
 	s.mu.Lock()
-	s.sockets[c] = true
+	s.adoptLocked(c)
 	s.mu.Unlock()
+	return c
+}
+
+// adoptLocked is adopt, with s.mu held.
+func (s *Service) adoptLocked(c *Conn) {
+	s.sockets[c] = true
 	go func() {
 		<-c.Done()
 		s.mu.Lock()
 		delete(s.sockets, c)
 		s.mu.Unlock()
 	}()
-	return c
 }
 
 // startWeb starts the loopback listener. A build that doesn't match its manifest, or a
