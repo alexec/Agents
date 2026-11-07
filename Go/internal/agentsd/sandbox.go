@@ -39,6 +39,10 @@ var sandboxCatalog = map[string]sandboxRoute{
 const (
 	codexFullAccess     = "agent-full-access"
 	codexAskForApproval = "read-only"
+	// codexAskThePerson is the mode a Codex agent starts in when the person chose none
+	// (#3701): codex-acp 2.5.0's own default, "agent" (Auto review), has Codex's reviewer
+	// approve a write outside the folder, so no card reached the person.
+	codexAskThePerson = "workspace-write"
 )
 
 // sandboxChoices is SandboxCatalog.choices: what the app can set for a runtime.
@@ -130,6 +134,7 @@ func mergeMeta(a, b map[string]any) map[string]any {
 }
 
 // codexStartMode is the mode a Codex agent starts in for a choice, when it changes it.
+// A mode the person chose is kept, Auto review too, unless the sandbox choice rules it out.
 func codexStartMode(runtimeID string, choice wire.SandboxChoice, mode string) (string, bool) {
 	if runtimeID != "codex" {
 		return "", false
@@ -139,6 +144,8 @@ func codexStartMode(runtimeID string, choice wire.SandboxChoice, mode string) (s
 		return codexFullAccess, mode != codexFullAccess
 	case choice == wire.SandboxChoiceOn && mode == codexFullAccess:
 		return codexAskForApproval, true
+	case mode == "":
+		return codexAskThePerson, true
 	}
 	return "", false
 }

@@ -26,7 +26,8 @@ type helperQueueState struct {
 }
 
 // modeRanks is ModeLooseness: how much each mode lets an agent do without asking.
-var modeRanks = map[string]int{"plan": 0, "ask": 0, "default": 1, "read-only": 1, "acceptEdits": 2, "agent": 2, "auto": 3,
+var modeRanks = map[string]int{"plan": 0, "ask": 0, "default": 1, "read-only": 1, "acceptEdits": 2, "workspace-write": 2,
+	"agent": 3, "auto": 3,
 	"bypassPermissions": 4, "autopilot": 4, "agent-full-access": 4}
 
 func modeRank(m string) (int, bool) {

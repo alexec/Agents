@@ -36,6 +36,18 @@ func TestEachRuntimesSandboxAsItTakesIt(t *testing.T) {
 	if _, ok := codexStartMode("codex", wire.SandboxChoiceOn, "auto"); ok {
 		t.Fatal("changed a mode already sandboxed")
 	}
+	// No mode chosen: not Codex's own Auto review, whose reviewer answers for the person (#3701).
+	for _, choice := range []wire.SandboxChoice{wire.SandboxChoiceRuntime, wire.SandboxChoiceOn} {
+		if m, ok := codexStartMode("codex", choice, ""); !ok || m != "workspace-write" {
+			t.Fatal(choice, m)
+		}
+	}
+	if _, ok := codexStartMode("codex", wire.SandboxChoiceRuntime, "agent"); ok {
+		t.Fatal("changed the mode the person chose")
+	}
+	if !noLooser("workspace-write", "agent") || noLooser("agent", "workspace-write") {
+		t.Fatal("Auto review is no looser than Workspace access")
+	}
 }
 
 func TestAnAgentsSandbox(t *testing.T) {
