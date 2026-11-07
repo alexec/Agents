@@ -88,7 +88,7 @@ func TestFailedRunsAndTheirDetails(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	equal(t, details.PR, PR{Number: 9, Title: "From a fork", Branch: "fork/main", URL: "p9"}, "a fork's PR is found by its commit")
+	equal(t, details.PR, PR{Number: 9, Title: "From a fork", Branch: "fork/main", URL: "p9", Author: "stranger"}, "a fork's PR is found by its commit")
 	equal(t, details.FailedJobs, []Job{{Name: "test", URL: "j"}}, "failed jobs only")
 	equal(t, details.Trusted, false, "a first-time contributor is not one of the repo's own")
 }

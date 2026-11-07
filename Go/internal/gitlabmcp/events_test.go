@@ -208,7 +208,10 @@ func TestIssueEvents(t *testing.T) {
 	opened := newPoller(t, f, "issue.opened", map[string]any{"label": "bug"})
 	closed := newPoller(t, f, "issue.closed", nil)
 	commented := newPoller(t, f, "issue.commented", map[string]any{"issue": 1})
-	for _, p := range []*poller{opened, closed, commented} {
+	// A lead waits on all its open children at once (#3797).
+	listed := newPoller(t, f, "issue.closed", map[string]any{"issue": []any{3, 4}, "anyone": true})
+	notListed := newPoller(t, f, "issue.closed", map[string]any{"issue": []any{3}, "anyone": true})
+	for _, p := range []*poller{opened, closed, commented, listed, notListed} {
 		p.poll()
 	}
 	f.set(func() {
@@ -237,6 +240,10 @@ func TestIssueEvents(t *testing.T) {
 	if d := data(t, result, 0); d["by"] != "dev" || d["closedAt"] != at(2) {
 		t.Fatalf("closed %v", d)
 	}
+	ids, _ = listed.poll()
+	same(t, ids, []string{"issue.closed:group/app:4:" + at(2)})
+	ids, _ = notListed.poll()
+	same(t, ids, nil)
 	ids, result = commented.poll()
 	same(t, ids, []string{"issue.commented:group/app:10"})
 	comment := data(t, result, 0)["comment"].(map[string]any)
@@ -564,4 +571,107 @@ func TestClosingRefs(t *testing.T) {
 	if len(got) != 2 || got[0] != "#4" || got[1] != "group/sub/project#9" {
 		t.Fatalf("got %v", got)
 	}
+}
+
+// #3797: every event about one merge request names it by pr, branch, fixes or mine, or takes
+// any; an issue event takes one issue or a list of them.
+func TestEventsListGivesWhichArgumentsNameOne(t *testing.T) {
+	named := map[string]bool{"checks.failed": true, "pr.merged": true, "pr.closed": true, "pr.conflicted": true, "review.comment": true}
+	for _, e := range eventsList()["events"].([]any) {
+		e := e.(map[string]any)
+		name := e["name"].(string)
+		props := e["inputSchema"].(map[string]any)["properties"].(map[string]any)
+		_, hasMine := props["mine"]
+		_, hasFixes := props["fixes"]
+		_, hasAny := props["any"]
+		if hasMine != named[name] || hasFixes != named[name] {
+			t.Fatalf("%s: mine %v, fixes %v", name, hasMine, hasFixes)
+		}
+		if want := named[name] || name == "issue.closed" || name == "issue.commented" || name == "issue.labelled"; hasAny != want {
+			t.Fatalf("%s: any %v", name, hasAny)
+		}
+		if hasFixes {
+			items := props["fixes"].(map[string]any)["items"].(map[string]any)
+			if props["fixes"].(map[string]any)["type"] != "array" || items["pattern"] == nil {
+				t.Fatalf("%s: fixes %v", name, props["fixes"])
+			}
+		}
+		if issue, ok := props["issue"].(map[string]any); ok {
+			list := fmt.Sprint(issue["type"]) == "[integer array]"
+			if list != (name != "issue.assigned") {
+				t.Fatalf("%s: issue %v", name, issue)
+			}
+		}
+		if strings.HasPrefix(name, "pr.") || name == "checks.failed" || name == "review.comment" {
+			pr := e["payloadSchema"].(map[string]any)["properties"].(map[string]any)["pr"].(map[string]any)["properties"].(map[string]any)
+			if _, ok := pr["fixes"]; !ok {
+				t.Fatalf("%s: no fixes in pr", name)
+			}
+		}
+	}
+	for _, ref := range []string{"#12", "group/app#12", "group/sub/app#12"} {
+		if !issueRefPattern.MatchString(ref) {
+			t.Fatalf("refused %s", ref)
+		}
+	}
+	for _, ref := range []string{"12", "app#12", "#0", "group/app#"} {
+		if issueRefPattern.MatchString(ref) {
+			t.Fatalf("took %s", ref)
+		}
+	}
+}
+
+func TestUnknownArgumentSaysWhatItTakes(t *testing.T) {
+	f := newFake(t)
+	_, err := newPoller(t, f, "pr.merged", map[string]any{"sha": "x"}).try()
+	if err == nil || err.Code != -32602 || err.Message != "unknown argument sha; takes project, branch, pr, fixes, anyone, mine, any" {
+		t.Fatalf("unknown: %v", err)
+	}
+	for _, bad := range []map[string]any{{"fixes": []any{"12"}}, {"fixes": []any{}}, {"fixes": "#12"}, {"any": "yes"}} {
+		if _, err := newPoller(t, f, "pr.merged", bad).try(); err == nil || err.Code != -32602 {
+			t.Fatalf("%v: %v", bad, err)
+		}
+	}
+	for _, bad := range []any{[]any{}, []any{1, "2"}, []any{0}, "3"} {
+		if _, err := newPoller(t, f, "issue.closed", map[string]any{"issue": bad}).try(); err == nil || err.Code != -32602 {
+			t.Fatalf("issue %v: %v", bad, err)
+		}
+	}
+}
+
+// #3797: a lead knows the issue a lane's merge request fixes before it is opened, so fixes
+// narrows by the issues a description closes, "#12" being the project's own; mine is the
+// owner's merge request also once it is merged and no longer open.
+func TestFixesAndMineNarrowMergedMRs(t *testing.T) {
+	f := newFake(t)
+	f.addMembers()
+	f.mrs = []obj{
+		mrJSON(1, "a", alex, obj{"description": "Closes #37."}),
+		mrJSON(2, "b", dev, obj{"description": "Fixes group/sub/other#37"}),
+		mrJSON(3, "c", dev, nil),
+	}
+	fixes := newPoller(t, f, "pr.merged", map[string]any{"fixes": []any{"#37"}})
+	full := newPoller(t, f, "pr.merged", map[string]any{"fixes": []any{"Group/App#37", "group/sub/other#37"}})
+	mine := newPoller(t, f, "pr.merged", map[string]any{"mine": true})
+	all := newPoller(t, f, "pr.merged", map[string]any{"any": true})
+	for _, p := range []*poller{fixes, full, mine, all} {
+		p.poll()
+	}
+	f.set(func() {
+		for _, m := range f.mrs {
+			m["state"], m["merged_at"], m["updated_at"] = "merged", at(5), at(5)
+		}
+	})
+	id := func(n int) string { return fmt.Sprintf("pr.merged:%s:%d", project, n) }
+	ids, result := fixes.poll()
+	same(t, ids, []string{id(1)})
+	if got := fmt.Sprint(data(t, result, 0)["pr"].(map[string]any)["fixes"]); got != "[#37]" {
+		t.Fatalf("fixes in the payload: %s", got)
+	}
+	ids, _ = full.poll()
+	same(t, ids, []string{id(1), id(2)})
+	ids, _ = mine.poll()
+	same(t, ids, []string{id(1)})
+	ids, _ = all.poll()
+	same(t, ids, []string{id(1), id(2), id(3)})
 }
