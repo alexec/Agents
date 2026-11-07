@@ -192,6 +192,13 @@ func (u *Uplink) problem(err error) string {
 			"; if that is not the installed app, start the installed one; if it is, another" +
 			" host may have enrolled under that id: make a new host code and join again"
 	}
+	// Go's own words for a cut or slow attempt mean nothing to a person (#3760).
+	switch {
+	case errors.Is(err, context.Canceled):
+		return "the connection was cut before it was made"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "it did not answer in time"
+	}
 	return err.Error()
 }
 
