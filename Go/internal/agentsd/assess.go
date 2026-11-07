@@ -60,7 +60,7 @@ type appToolCall struct {
 
 // appToolMethods is the method each app tool is (#2172), as app-tools.jsonl, the audit and
 // Events name it: `<the tool's noun, plural>/<its verb>`, in camelCase, one a tool. A tool
-// with two ways (list_sessions with started_by, wait_for_agents) is still one
+// with two ways (list_sessions with started_by, wait_for_event on agent.ended) is still one
 // method, told apart by its arguments. ask_question is a question (#2298), so `questions/ask`.
 var appToolMethods = map[string]string{
 	"start_session":        "sessions/start",
@@ -83,7 +83,6 @@ var appToolMethods = map[string]string{
 	"release_resource":     "resources/release",
 	"list_resources":       "resources/list",
 	"wait_for_event":       "events/wait",
-	"wait_for_agents":      "agents/wait",
 	"check_again":          "waits/checkAgain",
 	"cancel_wait":          "events/cancel",
 	"list_machines":        "machines/list",

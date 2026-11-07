@@ -154,8 +154,12 @@ func TestAnAgentsLifeIsOnTheLog(t *testing.T) {
 	dir := t.TempDir()
 	id := startAgent(t, c, 1, dir, "Write it")
 	waitFor(t, "it finished", func() bool { a := d.Store.Agent(id); return a.State == wire.AgentStateFinished })
-	waitFor(t, "the finish on the log", func() bool { n := names(d); return len(n) > 0 && n[len(n)-1] == "agent.finished" })
-	fin := logged(d)[0]
+	// agent.ended comes right after the finish (#3799), with how.
+	waitFor(t, "the finish on the log", func() bool { n := names(d); return len(n) > 1 && n[len(n)-2] == "agent.finished" && n[len(n)-1] == "agent.ended" })
+	if end := logged(d)[0]; end.Details["how"] != string(d.Store.Agent(id).Report.Outcome) || end.Details["agent"] != string(id) {
+		t.Fatalf("%+v", end)
+	}
+	fin := logged(d)[1]
 	if fin.Details["agent"] != string(id) || fin.Details["afterwards"] != "stay" || fin.Details["outcome"] != string(d.Store.Agent(id).Report.Outcome) ||
 		fin.Details["started_by"] != "person" || fin.Details["runtime"] != "claude" || !strings.Contains(fin.Sentence, "finished: ") ||
 		fin.Scope.Folder == nil {
@@ -182,8 +186,12 @@ func TestEndingsSayStoppedOrFailed(t *testing.T) {
 	d.raiseAgentEnding(a.ID, wire.AgentStateStopped, reason(wire.EndedReasonCancelled))
 	d.raiseAgentEnding(a.ID, wire.AgentStateStopped, reason(wire.EndedReasonAllowanceSpent))
 	es := logged(d)
-	if es[1].Name != "agent.stopped" || es[1].Details["by"] != "you" ||
-		es[0].Name != "agent.failed" || es[0].Details["reason"] != "allowance_spent" || !strings.HasSuffix(es[0].Sentence, "ended in an error: its allowance ran out.") {
+	if es[3].Name != "agent.stopped" || es[3].Details["by"] != "you" ||
+		es[1].Name != "agent.failed" || es[1].Details["reason"] != "allowance_spent" || !strings.HasSuffix(es[1].Sentence, "ended in an error: its allowance ran out.") {
+		t.Fatalf("%+v", es)
+	}
+	// Each is agent.ended too, with how (#3799).
+	if es[2].Name != "agent.ended" || es[2].Details["how"] != "stopped" || es[0].Name != "agent.ended" || es[0].Details["how"] != "failed" {
 		t.Fatalf("%+v", es)
 	}
 }

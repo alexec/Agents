@@ -20,7 +20,7 @@ import (
 // with start_session (#2887) is in that machine's Store, not this one, so this host keeps a
 // record of it in <root>/elsewhere.json: the machine, its id, and the starter's folder,
 // whose helper limits count it. list_sessions, read_session, message_session,
-// wait_for_agents, stop_session and archive_session reach it through the control plane
+// wait_for_event on agent.ended, stop_session and archive_session reach it through the control plane
 // (machines/sessionCall), which sends that machine's agents/fromStarter; that machine
 // answers only the agent that started it (#1695, #1728), from its own record of who did.
 // When it ends, that machine says so (machines/sessionEnded), the control plane tells this
@@ -406,7 +406,7 @@ func (d *Daemon) listThere(caller wire.UUID) []string {
 	return lines
 }
 
-// waitThere is the session on another machine wait_for_agents names, as a record waitOn
+// waitThere is the session on another machine a wait on agent.ended names, as a record waitOn
 // can wait on, or nil when name is none of caller's.
 func (d *Daemon) waitThere(name string, caller wire.UUID) (*wire.Agent, error) {
 	s := d.thereNamed(caller, name)
@@ -420,7 +420,7 @@ func (d *Daemon) waitThere(name string, caller wire.UUID) (*wire.Agent, error) {
 	}
 	if ended != nil {
 		e := wire.WaitEnding{How: *ended}
-		return nil, blockRefusal(quotedTitle(&s.Title) + " on " + s.Machine + " has already ended (" + endingSummary(&e) + "). Read it with read_session rather than waiting on it.")
+		return nil, &endedAlready{id: s.Session, title: s.Title, there: " on " + s.Machine, how: endingSummary(&e)}
 	}
 	title := s.Title
 	return &wire.Agent{ID: s.Session, Title: &title}, nil
@@ -433,7 +433,7 @@ func (d *Daemon) messageThere(me *wire.Agent, s *startedThere, text string, repl
 		running, _, _ := d.helperLimitsIn(s.Folder)
 		if r := len(d.runningHelpers(s.Folder)); int64(r) >= running {
 			return "", refusedMessage(fmt.Sprintf("waking %s would take a running place, and %s already has %d of %d sessions "+
-				"started by sessions running. Send it once one finishes; wait with wait_for_agents.", quotedTitle(&s.Title), scopeWords(s.Folder), r, running))
+				"started by sessions running. Send it once one finishes; wait with wait_for_event on agent.ended, naming them in agent.", quotedTitle(&s.Title), scopeWords(s.Folder), r, running))
 		}
 	}
 	if !replace && !d.spendMessage(me.ID) {
@@ -673,7 +673,7 @@ func (d *Daemon) messageFromStarter(t *wire.Agent, from wire.StartedFrom, text s
 		return "Sent to " + name + ", but it could not be started: " + msg + " The message waits in its chat and goes with its next turn.", nil
 	}
 	l.kick()
-	return "Sent to " + name + ", which is working on it now. Wait for it with wait_for_agents, and read its answer with read_session.", nil
+	return "Sent to " + name + ", which is working on it now. Wait for it with wait_for_event on agent.ended, naming it in agent, and read its answer with read_session.", nil
 }
 
 // sortedByAge is the records oldest first, as helpersIn gives them.

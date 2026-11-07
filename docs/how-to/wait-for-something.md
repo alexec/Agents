@@ -39,7 +39,8 @@ and then carry on.
    never wake it, and a wait on it is refused. Anything else, such as
    `agent.finished` with `{"labels": "deploy"}`, is refused saying what the event takes, so
    the agent fixes it rather than waiting for something that never comes. To wait for
-   particular agents to finish, the agent calls `wait_for_agents`.
+   particular sessions to end, the agent waits on `agent.ended` with `agent`: see
+   [Wait for sessions](#wait-for-sessions), below.
 
    An agent can also wait on a connector's event, such as `pr.merged` or `pr.closed`
    from a `github` server. Then `where` is what the server is asked for, such as `{"pr": 640}`
@@ -104,9 +105,35 @@ tell it to wait for that agent:
 Wait for the agent titled "Build" to finish, then deploy the docs.
 ```
 
-It calls `wait_for_agents`, and is started again with how the other agent
-ended. A workflow can start when an agent finishes too, on `agent.finished`: see
+It calls `wait_for_event` on `agent.ended` with `where` `{"agent": ["Build"]}`, and is
+started again with how the other agent ended. A workflow can start when an agent finishes too, on `agent.finished`: see
 [Workflow triggers and actions](../reference/workflows.md).
+
+## Wait for sessions
+
+`agent.ended` is raised when a session ends: it finished its turn, was stopped, or failed
+(#3799). Its `how` is `done`, `nothing_to_do`, `needs_answer`, `stopped` or `failed`. A turn
+that ends waiting has not ended.
+
+A wait on it names the sessions in `agent`, by id or exact title, and waits on
+`agent.ended` alone:
+
+```json
+{"events": ["agent.ended"], "where": {"agent": ["Build", "Docs"]}, "until_minutes": 60,
+ "wake_on": "all", "message": "Waiting for the build and the docs."}
+```
+
+- **The whole project.** It reaches every session of the folder's project, on this machine
+  and on your other machines, through the control plane.
+- **All or any.** `wake_on: all` (the default) wakes once every named session has ended;
+  `wake_on: any` wakes at the first. `wake_on` is only for `agent.ended` with `agent`.
+- **Already ended.** A session that has already ended answers at once, with how it ended,
+  and is not waited on. When nothing is left to wait on (or one has ended, with `any`), the
+  call comes back at once, and nothing waits.
+- **The turn ends at once.** The agent shows as **Waiting**, with `message` on its row, and
+  is started again told how each session ended.
+- **Name them.** A wait on `agent.ended` with no `agent` is refused, unless it sets
+  `any: true`; then it wakes when any session in the folder ends.
 
 ## See also
 

@@ -49,7 +49,7 @@ agent event, nor a drop box arrival's, a lease's, the disk's, a cost's or a serv
   event's, so the sentences read alike. Any other key is an error naming what the event
   takes: *branch.moved takes branch; "to" is not one of its arguments.* For an agent event
   it says how to wait for particular agents instead: *agent.finished takes no arguments;
-  "outcome" is not one of its arguments. To wait for particular agents, use wait_for_agents.* A workflow file with one is unreadable, and says so, rather than firing for
+  "outcome" is not one of its arguments. To wait for particular agents, use agent.ended with agent.* A workflow file with one is unreadable, and says so, rather than firing for
   every event of its kind.
 - **A wrong value is an error too**: *person.away: why is one of locked, idle, not asleep.*
   `branch` takes any value.
@@ -65,13 +65,14 @@ Serving the app's own events over `events/poll` from the app's MCP endpoint, so 
 client could subscribe to them, would be possible in this shape; it is not done.
 
 An agent can wait for its own folder's events and for this Mac's. It cannot wait for
-another folder's events. To wait for particular sessions, it calls `wait_for_agents`. To
+another folder's events. To wait for particular sessions, it waits on `agent.ended` with `agent`, which reaches every
+session of the project, on every machine. To
 resume at a time, it calls `check_again`.
 
 ## Agents
 
-All are about agents in the same folder. None takes a filter: to wait for particular
-agents, use `wait_for_agents`. Each shows:
+All are about agents in the same folder. Only `agent.ended` takes a filter: `agent`, the
+sessions to wait for (#3799). Each shows:
 
 - `agent`, the agent's id;
 - `labels`, the agent's labels;
@@ -91,6 +92,7 @@ an event already on the log.
 | `agent.waiting` | — | agent, waiting_on | An agent ended its turn waiting on something. When `waiting_on` names agents or a time to check again, the agent resumes by itself. See [Statuses and groups](statuses.md). |
 | `agent.stopped` | — | agent, by | An agent was stopped before finishing. `by` is `you`, `admin` (an admin in the Console, #2435), `cost_limit` or `unknown`. |
 | `agent.failed` | — | agent, reason | An agent ended in an error. `reason` is `allowance_spent`, `rate_limited`, `process_died`, `sign_in_refused`, `runtime_error`, `sandbox_failed`, `max_tokens`, `max_turn_requests`, `refusal`, `daemon_gone`, `stopped_by_agent` or `unrecognised`. |
+| `agent.ended` | agent | agent, how | An agent ended: it finished its turn, was stopped, or failed. `how` is `done`, `nothing_to_do`, `needs_answer`, `stopped` or `failed`; a turn that ends waiting is not raised. A wait on it names the sessions in `agent`, by id or exact title, or sets `any: true`, and waits on it alone; it reaches every session of the project, on every machine, and wakes when all have ended or, with `wake_on: any`, at the first. One that has already ended answers at once. See [Wait for sessions](../how-to/wait-for-something.md#wait-for-sessions). |
 | `agent.archive_requested` | — | agent, outcome | An agent's turn ended after `archive_session`, and its session waits for you to approve archiving it. `outcome` is its last report's, when it made one. |
 | `agent.messaged` | — | agent, from, from_title | An agent was sent a message by another agent with `message_session`. `agent` is the one it was sent to; `from` is the sender's id and `from_title` its title. |
 | `agent.archived` | — | agent, by, outcome | An agent was archived. `by` is `you`, or `agent` when the agent that started it archived it with `archive_session`. `outcome` is its last report's, when it made one. |
@@ -192,7 +194,7 @@ that they were caught up. To be woken by the restart itself, wait on `system.res
 Agents do not raise events of their own. The `publish_event` tool and the `custom.` events it
 raised were removed (#639). A wait on a `custom.` name is refused, saying why, and a workflow
 whose `on:` names one does not run: its page says what is wrong. To wait for another agent,
-use `wait_for_agents`. A `custom.` event already on the log still shows, with the
+wait on `agent.ended` with `agent`. A `custom.` event already on the log still shows, with the
 agent that published it.
 
 ## Events from MCP servers

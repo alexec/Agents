@@ -3065,7 +3065,7 @@
     {
       "name": "machines/projectSessions",
       "x-capability": "sessions.project/1",
-      "description": "Through machine/machines only (#3277): projects/sessions for an agent, so its list_sessions, read_session, message_session and wait_for_agents reach the project's sessions on every one of the person's machines. Refused unless the asking machine has a folder of the project.",
+      "description": "Through machine/machines only (#3277): projects/sessions for an agent, so its list_sessions, read_session, message_session and waits on agent.ended reach the project's sessions on every one of the person's machines. Refused unless the asking machine has a folder of the project.",
       "paramStructure": "by-name",
       "params": [
         {
