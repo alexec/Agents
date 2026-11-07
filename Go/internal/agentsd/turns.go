@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode"
 
@@ -88,6 +89,8 @@ type live struct {
 	// denied is the title of the tool call the person last refused on a card this turn,
 	// until the agent says or calls something after it (#3722).
 	denied string
+	// lastUpdate is when the runtime last sent a session/update (opencoderefusal.go).
+	lastUpdate atomic.Int64
 }
 
 type pendingPermission struct {
@@ -830,9 +833,25 @@ func (l *live) turn() bool {
 		}
 		return false
 	}
-	r, err := s.Prompt(ctx, acpBlocks(bs))
+	// An OpenCode turn its provider refused never ends by itself (#3736): its log says why.
+	promptCtx, endPrompt := context.WithCancel(ctx)
+	var refused atomic.Pointer[string]
+	if a.RuntimeID == "opencode" {
+		go watchOpenCodeRefusal(promptCtx, openCodeLog(openCodeLogDir(s.Getenv)), string(s.ID),
+			func() time.Time { return time.Unix(0, l.lastUpdate.Load()) },
+			func(said string) {
+				refused.Store(&said)
+				_ = s.Cancel(promptCtx)
+				endPrompt()
+			})
+	}
+	r, err := s.Prompt(promptCtx, acpBlocks(bs))
+	endPrompt()
 	// The turn is over: what a message chunk held back goes now (#1001).
 	l.flushHeld()
+	if said := refused.Load(); said != nil && ctx.Err() == nil {
+		return d.openCodeRefused(l, a, *said)
+	}
 	if err != nil {
 		if ctx.Err() != nil {
 			d.end(l, wire.AgentStateStopped, wire.EndedReasonCancelled)
@@ -1298,6 +1317,7 @@ func configOptions(v any) []wire.ConfigOption {
 // Update turns one ACP session update into today's transcript records.
 func (l *live) Update(n sdk.SessionNotification) {
 	d := l.d
+	l.lastUpdate.Store(time.Now().UnixNano())
 	u := n.Update
 	// What a message chunk held back goes before any other update (#1001).
 	if u.AgentMessageChunk == nil {

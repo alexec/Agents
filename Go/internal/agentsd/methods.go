@@ -392,6 +392,12 @@ func (d *Daemon) archive(id wire.UUID) error {
 
 // archiveBy archives an agent, by the person or by an agent (Agent.ArchivedReason).
 func (d *Daemon) archiveBy(id wire.UUID, by wire.AgentArchivedReason) error {
+	return d.archiveSweeping(id, by, sweepArchived)
+}
+
+// archiveSweeping is archiveBy, with its worktree then removed on the terms of sweep
+// (#3726).
+func (d *Daemon) archiveSweeping(id wire.UUID, by wire.AgentArchivedReason, sweep worktreeSweep) error {
 	if d.Store.Agent(id) == nil {
 		return &Error{Code: CodeNoSuchAgent, Message: "no agent " + string(id)}
 	}
@@ -426,6 +432,7 @@ func (d *Daemon) archiveBy(id wire.UUID, by wire.AgentArchivedReason) error {
 	// An archived session is not kept pinned (unpinArchived).
 	if a := d.Store.Agent(id); a != nil {
 		d.unpinSession(folderPath(a), id)
+		d.sweepWorktreeSoon(*a, sweep)
 	}
 	return nil
 }

@@ -10,7 +10,7 @@ Product Owner do.
 
 Follow AGENTS.md, above all "Landing a change" (one lane per area, `.agents/areas`, when
 an issue is taken, conflicting PRs one at a time) and "Questions that already have an
-answer". The order of work is in AGENTS.md, "Work by epic, release by milestone" only: follow it there.
+answer". The order of work is in AGENTS.md, "Work by epic, release from main" only: follow it there.
 
 **Starting a lane:**
 
@@ -86,7 +86,7 @@ Rules from Alex (2026-10-12/13) that are not in AGENTS.md:
   pushed) to free a place. Archive finished helpers at once.
 - **Work goes by epic** (#3465; replaces #2309). Give places to epics' leads, several
   epics at once; a later milestone's epic can run and merge before an earlier milestone
-  ships. With more epics than places: the earliest milestone first, then core usability
+  ships. With more epics than places: the earliest milestone (by due date) first, then core usability
   (#2800), then RICE.
 - **Order of places** (#3212, #3465): `priority:high` first; then UI changes (below); then
   the milestones' epics and the bug lane together; then `polish` and `competitor`; then the
@@ -97,9 +97,9 @@ Rules from Alex (2026-10-12/13) that are not in AGENTS.md:
   must review each UI change, so it must get to `main` and TestFlight early. A UI
   enhancement gets its place early too; one that adds a screen, control or layout merges
   after Alex approves it (#2811, #3474).
-- **A milestone ships when its items are closed** (#3465): the release tags only when
-  every issue in the open milestone is closed. Check its report; land anything it could not
-  release.
+- **No milestone holds a release** (#3760): a release goes out from `main` when something
+  merged since the last tag, and its notes name the milestones finished. Check its report;
+  land anything it could not release.
 - **Open questions get an agent.** An issue with open questions is not held back: start
   an agent that settles them: it decides the easy-to-undo ones and tells Alex
   (AGENTS.md, "Decide and tell"), and asks Alex the rest.

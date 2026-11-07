@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// The window's one sidebar (#145): Status and Usage at the top, then every folder, each a row
+/// The window's one sidebar (#145): Your setup, Machines and Usage at the top, then every folder, each a row
 /// that folds open on its sessions and workflows, and at the foot what this Mac and its
 /// hosts are doing.
 ///
@@ -15,9 +15,6 @@ struct FolderListView: View {
     @Binding var selection: SidebarItem?
 
     @AppStorage("showsArchivedFolders", store: WindowDefaults.store) private var showsArchived = false
-    /// Status, open until folded, and kept so. It keeps Activity's key (#915), so it
-    /// opens as Activity was left.
-    @AppStorage("showsActivity", store: WindowDefaults.store) private var showsStatus = true
     /// Machines, open until folded, and kept so (#3626).
     @AppStorage("showsMachines", store: WindowDefaults.store) private var showsMachines = true
     @AppStorage("showsYourSetup", store: WindowDefaults.store) private var showsYourSetup = true
@@ -211,10 +208,9 @@ struct FolderListView: View {
             // groups (Alex, #495): rows of
             // the list, so they take its selection and keys, each with its icon in the
             // accent beside the plain title (#155), and folding as a folder does.
-            // Status is what goes on now; Usage charts the past (#915).
             // Your setup (#3630): what is the person's own, once, not once per machine: their
-            // runtimes and accounts (#3631), their connectors, and their secrets (#3632). Where
-            // Status was; #3633 takes the rest of Status away.
+            // runtimes and accounts (#3631), their connectors, and their secrets (#3632). It,
+            // Machines and Usage took the place of Status (#3633).
             Section(isExpanded: $showsYourSetup) {
                 RuntimesRow().activityIcon("cpu", warns: runtimesFailing)
                     .appText(.supporting).sidebarInk(.runtimes).tag(SidebarItem.runtimes)
@@ -227,14 +223,6 @@ struct FolderListView: View {
                 }
             } header: {
                 Text("Your setup").appText(.supporting)
-            }
-
-            Section(isExpanded: $showsStatus) {
-                EventsRow().activityIcon("list.bullet.rectangle")
-                    .appText(.supporting).sidebarInk(.events).tag(SidebarItem.events)
-            } header: {
-                // The size of every other group's heading (#495).
-                Text("Status").appText(.supporting)
             }
 
             // A row per machine (#3626), each its page: CPU, memory and disks. Red when a
@@ -259,6 +247,9 @@ struct FolderListView: View {
                     .appText(.supporting).sidebarInk(.tokens).tag(SidebarItem.tokens)
                 TimeRow().activityIcon("clock")
                     .appText(.supporting).sidebarInk(.time).tag(SidebarItem.time)
+                // A record of what happened, as the web's Reports ▸ Records (#3633).
+                EventsRow().activityIcon("list.bullet.rectangle")
+                    .appText(.supporting).sidebarInk(.events).tag(SidebarItem.events)
                 // The newcomer's checklist (#1067), only while a milestone is still to earn,
                 // as an empty smart group hides (#507). Then the list is under Time's charts.
                 if model.work.milestones?.isComplete == false {
@@ -266,6 +257,7 @@ struct FolderListView: View {
                         .appText(.supporting).sidebarInk(.milestones).tag(SidebarItem.milestones)
                 }
             } header: {
+                // The size of every other group's heading (#495).
                 Text("Usage").appText(.supporting)
             }
 

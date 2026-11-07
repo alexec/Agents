@@ -95,8 +95,10 @@ func TestAStartInANewWorktreeAndItsRemoval(t *testing.T) {
 	if e := c.callError(t, 5, "worktrees/remove", req); e.Code != wire.FailureWorktreeInUse || !strings.HasPrefix(e.Message, "Still in use by ") {
 		t.Fatalf("%+v", e)
 	}
-	c.call(t, 6, "agents/archive", map[string]any{"agentID": id})
+	// Untracked before the archive, so the archive keeps it (#3726).
 	os.WriteFile(filepath.Join(root, "new.txt"), []byte("x"), 0o644)
+	c.call(t, 6, "agents/archive", map[string]any{"agentID": id})
+	d.sweeps.Wait()
 	if e := c.callError(t, 7, "worktrees/remove", req); !strings.Contains(e.Message, "would lose 1 uncommitted change. Confirm") {
 		t.Fatal(e.Message)
 	}

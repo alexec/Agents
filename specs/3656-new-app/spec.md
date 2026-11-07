@@ -164,8 +164,8 @@ The lead owns the plan from here.
 | 1 | #3706 CI secrets, variables and gates as app tools: `set_ci_secret`, `set_ci_variable`, `set_environment_gate` (GitHub) | task | — |
 | 1 | #3707 Starters: an iPhone app (TestFlight and App Store with cloud-managed signing) and a web service (Cloud Run), each with Sentry, under `templates/` | task | — |
 | 2 | #3708 A repository from a starter: made on GitHub, cloned on the machine, shown as a folder | story | #3707 |
-| 3 | #3709 Apple: the cards, the key as a CI secret, the bundle id from a one-time CI job | story | #3706, #3708 |
-| 3 | #3710 Google Cloud: the Cloud Shell card and the two variables | story | #3706, #3708 |
+| 3 | #3709 Apple: the cards, the key as a CI secret, the bundle id from a one-time CI job ([apple.md](apple.md)) | story | #3706, #3708 |
+| 3 | #3710 Google Cloud: the Cloud Shell card and the two variables ([google-cloud.md](google-cloud.md)) | story | #3706, #3708 |
 | 3 | #3711 Sentry: the cards, the project and DSN, the token as a CI secret | story | #3706, #3708 |
 | 4 | #3712 `start-a-new-app`: the ready-made skill and its brief line, from the first question to the approved first deploy | story | #3709, #3710, #3711 |
 

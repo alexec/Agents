@@ -204,6 +204,11 @@ func TestTheBriefSaysWhatToAskAndWhatToDecide(t *testing.T) {
 		!strings.Contains(got, "write `Decided: <what>, because <why>.`") {
 		t.Fatal(got)
 	}
+	// A choice the task says is the person's is asked, also when it is easy to undo (#3699).
+	if got := escalationBrief("claude"); !strings.Contains(got, "a choice that I or your task say is mine") ||
+		!strings.Contains(got, "Never decide and tell a choice that is mine") {
+		t.Fatal(got)
+	}
 	// Antigravity's own tool has the app's name (#2298): said by whose it is.
 	if got := escalationBrief("antigravity"); !strings.Contains(got, "ask me with your runtime's own ask_question (or the app's ask_question, from the agents server, if yours is missing) rather than guessing") {
 		t.Fatal(got)
@@ -291,11 +296,11 @@ func TestTheBriefNamesEveryAppTool(t *testing.T) {
 		browser, screen, bot, github bool
 		named, unnamed               []string
 	}{
-		{false, false, false, false, nil, []string{"browser_", "fill_secret", "hand_to_person", "drive_screen", "set_ci_secret"}},
+		{false, false, false, false, nil, []string{"browser_", "fill_secret", "hand_to_person", "drive_screen", "set_ci_secret", "make_app_repository"}},
 		{true, false, false, false, []string{"browser_* tools", "fill_secret", "hand_to_person", "take the browser lease themselves"}, []string{"drive_screen"}},
 		{true, false, true, false, []string{"browser_* tools", "fill_secret"}, []string{"hand_to_person"}},
 		{false, true, false, false, []string{"drive_screen", "takes the screen lease itself"}, []string{"browser_"}},
-		{false, false, false, true, []string{"set_ci_secret", "set_ci_variable", "set_environment_gate"}, []string{"browser_"}},
+		{false, false, false, true, []string{"set_ci_secret", "set_ci_variable", "set_environment_gate", "make_app_repository"}, []string{"browser_"}},
 	} {
 		got := toolsBrief(c.browser, c.screen, c.bot, c.github)
 		for _, w := range c.named {
