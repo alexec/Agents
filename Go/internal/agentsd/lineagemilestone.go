@@ -297,13 +297,19 @@ func issueOfURLOn(raw, root string) (forgeRepo, int, bool) {
 	if repo, n, ok := issueOfURL(raw); ok || root == "" {
 		return repo, n, ok
 	}
+	return forgejoOfURLOn(raw, root, "/issues/")
+}
+
+// forgejoOfURLOn is the repo and number at raw on the Forgejo whose root is root, under its
+// owner/repo, then sep (/issues/ or /pulls/), then the number.
+func forgejoOfURLOn(raw, root, sep string) (forgeRepo, int, bool) {
 	u, err := url.Parse(raw)
 	r, rerr := url.Parse(root)
-	if err != nil || rerr != nil || !strings.EqualFold(u.Scheme, r.Scheme) || !strings.EqualFold(u.Host, r.Host) {
+	if err != nil || rerr != nil || root == "" || !strings.EqualFold(u.Scheme, r.Scheme) || !strings.EqualFold(u.Host, r.Host) {
 		return forgeRepo{}, 0, false
 	}
 	rest, ok := strings.CutPrefix(u.Path, r.Path)
-	repo, num, cut := strings.Cut(strings.Trim(rest, "/"), "/issues/")
+	repo, num, cut := strings.Cut(strings.Trim(rest, "/"), sep)
 	n, nerr := strconv.Atoi(strings.SplitN(num, "/", 2)[0])
 	if !ok || !cut || nerr != nil || n <= 0 || strings.Count(repo, "/") != 1 || strings.HasPrefix(repo, "/") || strings.HasSuffix(repo, "/") {
 		return forgeRepo{}, 0, false
