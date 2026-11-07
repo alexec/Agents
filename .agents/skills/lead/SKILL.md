@@ -34,7 +34,8 @@ not start a second one.
 - **Follow AGENTS.md** for the order of work, the area limit (#873), "Questions that
   already have an answer" and "Decide and tell". The lead does not count as a lane; its
   lanes count towards the folder's lane and open-PR limits.
-- **Wait with `wait_for_event` or `wait_for_agents`, never by polling.**
+- **Wait with `wait_for_event`, never by polling.** To wait on lanes themselves, wait on
+  `agent.ended` alone, with `agent` their ids and `wake_on: any`.
 - **Name people in questions:** "Claude (the epic's lead) will…", "Alex, do you want…?".
 
 ## 1. Read the plan

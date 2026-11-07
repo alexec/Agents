@@ -72,13 +72,16 @@ struct EventPatternFinerTests {
 
     @Test func anAgentEventCannotBeNarrowedAndSaysHowToWaitForAgents() {
         for (name, key) in [("agent.finished", "outcome"), ("agent.finished", "labels"), ("agent.failed", "runtime"),
-                            ("agent.finished", "agent"), ("agent.stopped", "by"), ("agent.*", "started_by"),
+                            ("agent.finished", "agent"), ("agent.stopped", "by"),
                             ("agent.messaged", "from"), ("agent.deleted", "because")] {
             let problem = EventPattern.parse(name, filters: [key: "x"]).failure
             #expect(problem?.isBadFilter == true, "\(name) \(key)")
             #expect(problem?.message == "\(name) takes no arguments; \"\(key)\" is not one of its arguments. "
-                    + "To wait for particular agents, use wait_for_agents.")
+                    + "To wait for particular agents, use agent.ended with agent.")
         }
+        // agent.* takes agent.ended's agent (#3799), and nothing else.
+        #expect(EventPattern.parse("agent.*", filters: ["started_by": "x"]).failure?.message
+                == "agent.* takes agent; \"started_by\" is not one of its arguments. To wait for particular agents, use agent.ended with agent.")
     }
 
     @Test func otherEventsNameTheFiltersTheyTakeOrSayNone() {

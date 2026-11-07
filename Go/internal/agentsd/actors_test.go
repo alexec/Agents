@@ -35,7 +35,7 @@ func TestAPersonsCallsPutTheirActorOnTheLog(t *testing.T) {
 
 	id := startAgent(t, c.conn, 1, t.TempDir(), "Write it")
 	waitFor(t, "it finished", func() bool { return d.Store.Agent(id).State == wire.AgentStateFinished })
-	waitFor(t, "the finish on the log", func() bool { n := names(d); return len(n) > 0 && n[len(n)-1] == "agent.finished" })
+	waitFor(t, "the end on the log", func() bool { n := names(d); return len(n) > 1 && n[len(n)-1] == "agent.ended" })
 	c.call(t, 2, "agents/archive", map[string]any{"agentID": id})
 	c.call(t, 3, "agents/delete", map[string]any{"agentID": id})
 
