@@ -245,6 +245,13 @@ account's machines. It leaves the operator's backups of it, and Stripe's own rec
 | `~/Library/Logs/Agents/control.log` | What the control plane did | 4 MB, and one older file |
 | The Web Push key | The key that signs browser push | One. In `agents-control backup` as `webpush-key.pem` (#3651). |
 
+## On each client
+
+| Client | Store | What it keeps | How long, how large | Applied |
+| --- | --- | --- | --- | --- |
+| Mac, Remote | Defaults `draft.agent.<uuid>`, `draft.new.<folder>` (and the Mac's `draft.start`) | Prompts not sent, with their attachments | 512 KiB of attachments a draft. Deleted after 30 days without an edit, when its agent is archived, on send, and on Forget (#3749). | At start; on archive |
+| Web | `localStorage` `agents.drafts` | Prompts not sent, with their attachments | The newest 40 drafts; attachments only while they are under 256 KiB. Deleted on send and on Forget. | On write |
+
 ## In memory
 
 What a process holds while it runs, and goes when it stops. Each has a bound (#3650).
