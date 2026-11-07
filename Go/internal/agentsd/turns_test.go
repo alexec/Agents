@@ -654,6 +654,35 @@ func TestAntigravityLaunchesInItsOwnHome(t *testing.T) {
 	}
 }
 
+// Antigravity 1.4.5 writes skills/system/run-workflow into the session's folder (#3731):
+// info/exclude keeps it out of git status, also in a subfolder, and once only.
+func TestAntigravityLaunchKeepsItsSkillsOutOfGit(t *testing.T) {
+	fakeRuntimes(t)
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := repo(t)
+	sub := filepath.Join(dir, "app")
+	os.MkdirAll(filepath.Join(dir, "skills", "system", "run-workflow"), 0o755)
+	os.WriteFile(filepath.Join(dir, "skills", "system", "run-workflow", "SKILL.md"), []byte("x"), 0o644)
+	os.MkdirAll(filepath.Join(sub, "skills", "system", "run-workflow"), 0o755)
+	os.WriteFile(filepath.Join(sub, "skills", "system", "run-workflow", "SKILL.md"), []byte("x"), 0o644)
+	for _, at := range []string{dir, sub, dir} {
+		if _, err := d.launchFor(runtimeByID("antigravity"), at); err != nil {
+			t.Fatal(err)
+		}
+	}
+	b, _ := os.ReadFile(filepath.Join(dir, ".git", "info", "exclude"))
+	if strings.Count(string(b), "\n/skills/system/\n") != 1 || strings.Count(string(b), "\n/app/skills/system/\n") != 1 {
+		t.Fatalf("%s", b)
+	}
+	if out, err := git(dir, "status", "--porcelain", "--untracked-files=all"); err != nil || out != "" {
+		t.Fatalf("%q %v", out, err)
+	}
+	if _, err := d.launchFor(runtimeByID("antigravity"), t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestRuntimesList(t *testing.T) {
 	_, c := start(t, t.TempDir())
 	var rs []wire.RuntimeStatus

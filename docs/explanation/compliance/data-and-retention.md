@@ -122,7 +122,7 @@ These are in `<folder>/.agents/`.
 | --- | --- | --- | --- |
 | `attachments/` | Files attached to prompts | A file that no kept conversation names goes after 7 days. The folder stays under 500 MB, oldest first. A folder with no agent left is swept too: `attachment-folders.json` lists each folder an attachment was written in, until it holds none (#3649). | At start, hourly and on write |
 | `dropbox/` | Files handed to a workflow | 25 MB a file and 500 MB a folder from **dropbox/put**; a put past the total is refused. A cut-off put's `.part` after 24 hours. **A file put there is the person's: no age limit** (#3648). | On put; hourly |
-| `worktrees/<name>`, and branch `agents/<name>` | Git worktrees that agents made | **None.** Archive and delete leave them. | Only when removed |
+| `worktrees/<name>`, and branch `agents/<name>` | Git worktrees that agents made | The worktree goes when its agent is deleted, or archived with its branch merged into its base (or archived because its pull request merged, when no commit of its branch is missing from a remote). The branch goes only when it is merged. A worktree with uncommitted or untracked changes, one that another agent's record names, and one the app did not make are always kept (#3726). | On archive and delete; when removed |
 | `reviews/runtimes/`, `workflows/assess-<id>.md` | Runtime assessment reports | **None** | Never |
 | `pins.json` | Pinned sessions and hidden views | 10 sessions, 50 hidden views | On write |
 | `folder.json`, `policy.json`, `mcp.json`, `personas/`, `skills/`, `workflows/` and the like | The folder's configuration, meant to be committed | Small | — |
@@ -244,6 +244,19 @@ account's machines. It leaves the operator's backups of it, and Stripe's own rec
 | Keychain `com.alexecollins.agentshost` | The control key, bucket keys, and `control-key-before-<time>` | One of each; the newest 2 `control-key-before-*` items, deleted with the old stores (#3671) |
 | `~/Library/Logs/Agents/control.log` | What the control plane did | 4 MB, and one older file |
 | The Web Push key | The key that signs browser push | One. In `agents-control backup` as `webpush-key.pem` (#3651). |
+
+## On each client
+
+What the Mac window and the Remote keep in their defaults, and the web page in
+`localStorage`, by folder and by control plane (#3750).
+
+| Store | What it keeps | How long, how large | Applied |
+| --- | --- | --- | --- |
+| Sidebar folds (`sidebar.folds`, `sidebar.folded`, each scope; `agents.sidebar.folds`, `agents.sidebar.folded` on the web page) | Which folders and folds are open | The folders that exist. A folder that its machine no longer lists goes; all of a machine's go when the control plane no longer lists the machine. An offline machine's stay. The Remote lists no archived folders, so their folds go there. | When a machine lists its folders, and when it leaves |
+| Open sessions (`sidebar.openSessions`) | Sessions whose children are shown | 200 | On write |
+| `sidebar.folder.<folder>.width`, `.pane` (Mac only) | A folder window's inspector width and pane | As the folds | As the folds |
+| `newSessionProjectFolders` (`agents.newSession.projectFolders` on the web page) | New Session's last folder for each project | As the folds | As the folds |
+| `machineLockPin.<key>` (`agents-lock-pin.<key>` on the web page) | The machine-lock pins, the lock and each person's | This control plane's only: another control plane's go once the client is paired (#3750), and all go on **Forget** (#3670) | When the control plane answers |
 
 ## In memory
 

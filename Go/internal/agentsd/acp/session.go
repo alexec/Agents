@@ -243,6 +243,17 @@ func (s *Session) Prompt(ctx context.Context, blocks []sdk.ContentBlock) (sdk.Pr
 	return r, err
 }
 
+// Getenv is a variable as the runtime was launched with it, "" when it has none.
+func (s *Session) Getenv(key string) string {
+	v := ""
+	for _, e := range s.client.env {
+		if k, val, ok := strings.Cut(e, "="); ok && k == key {
+			v = val
+		}
+	}
+	return v
+}
+
 func (s *Session) Cancel(ctx context.Context) error {
 	return s.conn.Cancel(ctx, sdk.CancelNotification{SessionId: s.ID})
 }

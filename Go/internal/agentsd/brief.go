@@ -211,16 +211,21 @@ func askToolWords(runtimeID string) string {
 // runtime's own question tool where the app keeps one, and decide-and-tell for the rest
 // (#601, #1083). Of 196 forms answered by 2026-10-15, 79% of questions took the
 // recommended option, and agents waited 65 hours on them. A secret has a tool of its own,
-// so its value stays out of the chat (#2885).
+// so its value stays out of the chat (#2885). A choice said to be the person's, or one
+// that turns on what they want, is asked even when it is easy to undo: Haiku and
+// Antigravity took the assessment's shelf choice as decide-and-tell (#3699).
 func escalationBrief(runtimeID string) string {
 	named := askToolWords(runtimeID)
 	return "When something is mine to decide (anything hard to undo, money or an outside " +
 		"account, a restart or an install on my devices, a missing credential, a choice with " +
-		"no clear best answer), ask me with " + named + " rather than guessing or asking in your " +
-		"reply. That question reaches me anywhere and waits for me; a question inside a reply " +
-		"may go unread. Any other choice, scope or design included, whose answer you would mark " +
-		"recommended and is easy to undo: take it, write `Decided: <what>, because <why>.` (I can " +
-		"overrule it) in the issue or pull request and in your reply, and carry on. Do not ask " +
+		"no clear best answer, a choice that I or your task say is mine, a choice that turns on " +
+		"what I want when nothing you can read says it), ask me with " + named + " rather than " +
+		"guessing or asking in your reply. That question reaches me anywhere and waits for me; a " +
+		"question inside a reply may go unread. Any other choice, scope or design included, " +
+		"whose answer you would mark recommended and is easy to undo: take it, write `Decided: " +
+		"<what>, because <why>.` (I can overrule it) in the issue or pull request and in your " +
+		"reply, and carry on. Never decide and tell a choice that is mine, also when it is easy " +
+		"to undo. Do not ask " +
 		"about the next step of what I asked for, a report with nothing to choose, anything you " +
 		"can find out yourself, or the same thing twice. Ask for a missing secret (an API key, a " +
 		"token) with ask_secret, never in a question or a reply, where what is typed goes into the chat."
@@ -259,7 +264,7 @@ const sessionsBrief = "To continue another session in this folder, read it with 
 // defers MCP tools, so a tool no paragraph names is one it does not know it has; and a
 // folder's AGENTS.md and skills reach only that folder. The browser and drive_screen are
 // named only where this host lists them, as tools/list does; hand_to_person not on a bot's
-// machine, where nobody answers it. The CI tools (#3706) only where GitHub is connected.
+// machine, where nobody answers it. The CI tools (#3706) and make_app_repository (#3708) only where GitHub is connected.
 func toolsBrief(browser, screen, bot, github bool) string {
 	lines := []string{
 		"- notify: tell me that something happened, when you have no question for me.",
@@ -271,7 +276,9 @@ func toolsBrief(browser, screen, bot, github bool) string {
 	}
 	if github {
 		lines = append(lines, "- set_ci_secret, set_ci_variable and set_environment_gate: set up a GitHub repository's CI. "+
-			"set_ci_secret puts a secret I gave you with ask_secret into it, without you seeing the value; never put a secret's value in a variable.")
+			"set_ci_secret puts a secret I gave you with ask_secret into it, without you seeing the value; never put a secret's value in a variable.",
+			"- make_app_repository: make a new app's private GitHub repository from a starter, cloned here and added as a folder. "+
+				"Call it again after a step fails: it skips what is there.")
 	}
 	if browser {
 		lines = append(lines,

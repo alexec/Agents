@@ -98,16 +98,7 @@ public final class SidebarFolds {
     }
 
     public func set(_ folder: FolderKey, _ fold: Fold = .folder, open isOpen: Bool) {
-        let name = Self.name(folder, fold)
-        if fold.startsOpen {
-            guard closed.contains(name) == isOpen else { return }
-            if isOpen { closed.remove(name) } else { closed.insert(name) }
-            defaults.set(closed.sorted(), forKey: closedKey)
-        } else {
-            guard open.contains(name) != isOpen else { return }
-            if isOpen { open.insert(name) } else { open.remove(name) }
-            defaults.set(open.sorted(), forKey: key)
-        }
+        change(Self.name(folder, fold), startsOpen: fold.startsOpen, open: isOpen)
     }
 
     /// Whether one of the smart rows (#495) is open: not a folder's, so kept by name alone.
@@ -117,15 +108,24 @@ public final class SidebarFolds {
     }
 
     public func set(_ row: SidebarSmartRow, open isOpen: Bool) {
-        let name = Fold.smart(row).name
-        if row.startsOpen {
+        change(Fold.smart(row).name, startsOpen: row.startsOpen, open: isOpen)
+    }
+
+    /// Kept from what defaults hold now, not from this copy alone: a fold of a folder that
+    /// is gone, pruned there (`ClientDefaults`, #3750), is not written back.
+    private func change(_ name: String, startsOpen: Bool, open isOpen: Bool) {
+        if startsOpen {
             guard closed.contains(name) == isOpen else { return }
-            if isOpen { closed.remove(name) } else { closed.insert(name) }
-            defaults.set(closed.sorted(), forKey: closedKey)
+            var kept = Set(defaults.stringArray(forKey: closedKey) ?? [])
+            if isOpen { kept.remove(name) } else { kept.insert(name) }
+            closed = kept
+            defaults.set(kept.sorted(), forKey: closedKey)
         } else {
             guard open.contains(name) != isOpen else { return }
-            if isOpen { open.insert(name) } else { open.remove(name) }
-            defaults.set(open.sorted(), forKey: key)
+            var kept = Set(defaults.stringArray(forKey: key) ?? [])
+            if isOpen { kept.insert(name) } else { kept.remove(name) }
+            open = kept
+            defaults.set(kept.sorted(), forKey: key)
         }
     }
 

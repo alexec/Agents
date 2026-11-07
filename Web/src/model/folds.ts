@@ -128,6 +128,33 @@ export class Folds {
     else this.change(this.open, storageKey, smartName(row), isOpen);
   }
 
+  /**
+   * A host listed its folders, or left the control plane (`folders` empty): each fold of a folder
+   * there that it no longer has goes (#3750), as `ClientDefaults.pruneFolders` on the Mac and the
+   * Remote. An offline host lists nothing, so its folds stay.
+   */
+  prune(host: string, folders: readonly string[]): void {
+    const kept = new Set(folders.map((folder) => foldName(host, folder)));
+    const gone = (name: string) => {
+      const bar = name.indexOf("|");
+      if (bar < 0) return false;
+      const colon = name.slice(0, bar).indexOf(":");
+      const folder = colon < 0 ? name : name.slice(colon + 1);
+      return folder.startsWith(`${host}|`) && !kept.has(folder);
+    };
+    for (const [held, key] of [[this.open, storageKey], [this.closed, closedKey]] as const) {
+      const now = held.peek();
+      const next = new Set([...now].filter((name) => !gone(name)));
+      if (next.size === now.size) continue;
+      held.value = next;
+      try {
+        this.storage?.setItem(key, JSON.stringify([...next].sort()));
+      } catch {
+        // A private window may refuse to store; the folds still hold for this visit.
+      }
+    }
+  }
+
   private change(kept: typeof this.open, key: string, name: string, has: boolean): void {
     if (kept.peek().has(name) === has) return;
     const next = new Set(kept.peek());
