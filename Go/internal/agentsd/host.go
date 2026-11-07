@@ -506,9 +506,13 @@ func (d *Daemon) checkDisk() {
 	d.eventMu.Unlock()
 	for _, a := range crossedLow {
 		d.raiseDiskLow(a, noticed)
+		if a.Level == wire.DiskLevelCritical {
+			d.postDiskNotice(a)
+		}
 	}
 	for _, c := range crossedBack {
 		d.raiseDiskOK(c.reading, c.threshold, noticed)
+		d.withdrawDiskNotice(c.reading.Mount)
 	}
 	if changed {
 		Broadcast(d, wire.NotifyDiskChanged, wire.DiskState{Alarms: alarms})
