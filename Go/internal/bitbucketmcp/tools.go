@@ -155,7 +155,8 @@ func prStates(state string) (string, error) {
 	return "", fmt.Errorf("state is open, merged, declined, closed or all")
 }
 
-// AddTools puts the tools on server; with person, also the tools only a person may call.
+// AddTools puts the tools and the views (views.go) on server; with person, also the tools only
+// a person may call.
 func AddTools(server *mcp.Server, b *RealBitbucket, person bool) {
 	repoOf := func(ctx context.Context, repo string) (string, error) {
 		if repo != "" {
@@ -173,6 +174,7 @@ func AddTools(server *mcp.Server, b *RealBitbucket, person bool) {
 	}
 	readOnly := &mcp.ToolAnnotations{ReadOnlyHint: true}
 	agents := visibility("model", "app")
+	addViews(server, b, repoOf)
 
 	tool(server, &mcp.Tool{Name: "list_pull_requests", Title: "List pull requests",
 		Description: "The repository's pull requests, newest updated first, at most 50: number, title, branch, target, author, draft, " +

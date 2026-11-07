@@ -27,6 +27,7 @@ const Instructions = "This repository's pull requests, their checks, and its iss
 	"comment_on_pull_request and comment_on_issue comment. " +
 	"create_pull_request opens a pull request from a pushed branch; list_pull_request_comments lists its line comments, and " +
 	"reply_to_pull_request_comment answers one in its thread. " +
+	"show_pull_requests, show_issues and show_pull_request draw this server's pages: Pull requests, Issues and a pull request's page. " +
 	"Merging and approving a pull request are a person's: those tools are not for agents."
 
 // HostedEnv is set to "1" in the environment of an MCP server that the host runs for its

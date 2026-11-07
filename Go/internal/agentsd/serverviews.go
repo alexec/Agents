@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/alexec/agents/Go/internal/agentsd/mcpcatalog"
+	"github.com/alexec/agents/Go/internal/bitbucketmcp"
 	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -49,7 +50,7 @@ func (d *Daemon) serverViews(folder string, f pinsFile) []wire.PinView {
 				host, hostRead = originHost(folder), true
 			}
 			// Work has the folder's own repo's issues and pull requests (#3119, #3131) and
-			// Linear's (#3311), so GitHub's, GitLab's, Forgejo's (#3753) and Linear's rows for it go. A project's
+			// Linear's (#3311), so GitHub's, GitLab's, Forgejo's (#3753), Bitbucket's (#3786) and Linear's rows for it go. A project's
 			// other repo keeps its row (#2669): Work lists only the folders' own.
 			fits = oursFits(ours, host) && !inWork(ours)
 		}
@@ -112,11 +113,14 @@ func oursForServer(s viewServer) (mcpcatalog.Ours, bool) {
 }
 
 // oursFits says ours's views belong in a folder whose origin is on host: GitHub's on
-// github.com, GitLab's and Forgejo's on any other host, the rest everywhere.
+// github.com, Bitbucket's on bitbucket.org (Bitbucket Cloud only), GitLab's and Forgejo's on
+// any other host, the rest everywhere.
 func oursFits(o mcpcatalog.Ours, host string) bool {
 	switch o.ID {
 	case "agents/github":
 		return host == "github.com"
+	case "agents/bitbucket":
+		return host == bitbucketmcp.Host
 	case "agents/gitlab", "agents/forgejo":
 		return host != "" && host != "github.com"
 	}
@@ -124,10 +128,11 @@ func oursFits(o mcpcatalog.Ours, host string) bool {
 }
 
 // inWork says Work lists what ours's list views list, in every folder they fit: GitHub's
-// and GitLab's (#3131), Forgejo's (#3753), and Linear's, the whole workspace when no folder
-// names linearTeams (#3311).
+// and GitLab's (#3131), Forgejo's (#3753), Bitbucket's (#3786), and Linear's, the whole
+// workspace when no folder names linearTeams (#3311).
 func inWork(o mcpcatalog.Ours) bool {
-	return o.ID == "agents/github" || o.ID == "agents/gitlab" || o.ID == "agents/forgejo" || o.ID == "agents/linear"
+	return o.ID == "agents/github" || o.ID == "agents/gitlab" || o.ID == "agents/forgejo" || o.ID == "agents/bitbucket" ||
+		o.ID == "agents/linear"
 }
 
 // serverTitle is the catalogue's title for one of ours, the server's own, or its name.
