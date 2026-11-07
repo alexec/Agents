@@ -21,7 +21,7 @@ import { keep, rememberOptions, rememberedOptions } from "../model/startMemory";
 import { folderKey } from "../model/groups";
 import { fromWireDate } from "../protocol/dates";
 import { accountChoices, accountRows, choiceNote, defaultAccountName, formRuntime, newSessionRuntime, ownRow, ownSignInID, runtimeRuns, unavailableReason } from "../model/runtimes";
-import { formFor, keepForm, keptForm } from "../model/startForm";
+import { formFor, keepForm, keepLevels, keptForm, keptLevels } from "../model/startForm";
 import { personaChoices, withPersonaLabels } from "../model/personas";
 import { sandboxCardTitle, sandboxChoiceWords, sandboxChoices, sandboxExplanation, sandboxOverrideWords, sandboxState,
   sandboxStateWords, sandboxWhy, startWithout, fixedSandbox, sandboxRefusedBy } from "../model/sandbox";
@@ -102,7 +102,7 @@ export function NewAgent({ store, host, folder, folderName, down }: {
   /** This session's own sandbox; none follows the runtime's default. */
   const sandbox = useSignal<SandboxChoice | undefined>(undefined);
   /** The values in the shared words (#2658), kept when the runtime changes. */
-  const levels = useSignal<Levels>({ model: "balanced", permission: "ask" });
+  const levels = useSignal<Levels>(keptLevels());
   /** This session's own answer to permission requests; none follows Settings (FR-019). */
   const clientPermission = useSignal<ClientPermissionMode | undefined>(undefined);
   /** What Auto would pick now, and why the last start on Auto did not happen. */
@@ -333,6 +333,7 @@ export function NewAgent({ store, host, folder, folderName, down }: {
     cell: (field, level) => cellOf(mappings, (isAuto ? autoPreview.value?.runtimeID : chosenRuntime) ?? "", field, level),
     choose: (field, level) => {
       levels.value = { ...levels.value, [field]: level };
+      if (field === "model" || field === "permission") keepLevels(levels.value);
       autoRefusal.value = null;
       if (!isAuto) {
         const set = levelOptions(form.value.options, field);

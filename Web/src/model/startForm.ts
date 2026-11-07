@@ -2,7 +2,7 @@
 // folders it may also reach, kept across starts and a reload, as the window's DraftKeeper keeps
 // its start form. The runtime and choices follow the person to every client (#1033). One form, as the window has one; a runtime that is gone takes its choices
 // with it, since they were that runtime's.
-import type { JSONValue } from "../protocol/generated";
+import type { JSONValue, Levels, ModelLevel, PermissionLevel } from "../protocol/generated";
 import { preferenceKeys, preferences, setPreferences } from "./preferences";
 
 export interface StartForm {
@@ -54,4 +54,27 @@ export function formFor(form: StartForm, startable: readonly string[]): StartFor
   if (form.runtimeID && startable.includes(form.runtimeID)) return form;
   const { runtimeID: _gone, ...rest } = form;
   return { ...rest, chosen: {} };
+}
+
+const modelLevels: readonly string[] = ["fast", "balanced", "smart"] satisfies ModelLevel[];
+const permissionLevels: readonly string[] = ["plan", "ask", "approveForMe", "bypassPermissions"] satisfies PermissionLevel[];
+
+/** The model and permission levels last chosen on any client's start form (#3798), so a new
+ *  session does not fall back to Ask; a level not kept, or not known, is Balanced or Ask. */
+export function keptLevels(): Levels {
+  const kept = preferences.peek()[preferenceKeys.startLevels];
+  const said = kept && typeof kept === "object" && !Array.isArray(kept) ? kept : {};
+  const model = typeof said.model === "string" && modelLevels.includes(said.model) ? said.model as ModelLevel : "balanced";
+  const permission = typeof said.permission === "string" && permissionLevels.includes(said.permission)
+    ? said.permission as PermissionLevel : "ask";
+  return { model, permission };
+}
+
+/** Keep levels' model and permission for the next session, on every client (#3798). */
+export function keepLevels(levels: Levels): void {
+  const kept: Record<string, JSONValue> = {};
+  if (levels.model) kept.model = levels.model;
+  if (levels.permission) kept.permission = levels.permission;
+  if (JSON.stringify(preferences.peek()[preferenceKeys.startLevels]) === JSON.stringify(kept)) return;
+  setPreferences({ [preferenceKeys.startLevels]: kept });
 }

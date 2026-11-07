@@ -2643,6 +2643,11 @@ final class AppModel {
         case .permissionRequests: draftClientPermission = ClientPermissionMode(rawValue: level)
         case .sandbox: draftSandbox = SandboxChoice(rawValue: level)
         }
+        if field == .model || field == .permission {
+            // Kept for the next session, on every client (#3798).
+            let change = DisplayPreference.keeping(draftLevels, in: displayMirror.preferences)
+            if !change.isEmpty { displayMirror.set(change) }
+        }
         draftAutoRefusal = nil
         if isAutoDraft {
             Task { await refreshDraftAutoPreview() }
