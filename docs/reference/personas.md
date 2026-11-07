@@ -106,5 +106,7 @@ them alone.
   **edited**, and an update asks again before your edits go to the Trash.
 - **Remove…** moves the file to the Trash and takes it out of the lock.
 
-This is on the Mac. The web page and the Remote do not add personas from a marketplace yet;
-they still pick and edit them.
+This is on the Mac, and on the web page in **Settings ▸ Agent Configuration ▸ Personas**
+for the machine you choose (#3678). The web page chooses from the marketplaces that are on;
+add or turn one on in the Mac app. The Remote does not add personas from a marketplace; it
+still picks them.

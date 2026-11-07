@@ -11707,6 +11707,7 @@ export interface Methods {
   "machines/startEnroll": { params: MachineEnroll; result: ControlCodeShown };
   "machines/stop": { params: MachineStop; result: ControlMachine };
   "machines/unlink": { params: MachineRequest; result: ControlMachine };
+  "marketplaces/list": { params: MarketplacesListRequest; result: MarketplacesListAnswer };
   "mcp/health": { params: Empty; result: MCPHealthSnapshot };
   "mcp/health/check": { params: MCPHealthCheckRequest; result: MCPHealthSnapshot };
   "mcp/hosted": { params: Empty; result: HostedMCPSnapshot };
@@ -11732,9 +11733,16 @@ export interface Methods {
   "people/setRole": { params: PersonRoleRequest; result: Empty };
   "permissions/answer": { params: AnswerRequest; result: Empty };
   "permissions/pending": { params: Empty; result: PermissionRequest[] };
+  "personas/add": { params: SkillAddRequest; result: PersonaAddAnswer };
+  "personas/check-updates": { params: SkillsListRequest; result: SkillUpdatesAnswer };
   "personas/files": { params: PersonasFilesRequest; result: PersonaFilesAnswer };
   "personas/list": { params: PersonasListRequest; result: Persona[] };
+  "personas/managed": { params: SkillsListRequest; result: PersonasManagedAnswer };
+  "personas/preview": { params: CatalogPreviewRequest; result: PersonaPreviewAnswer };
+  "personas/remove": { params: SkillNameRequest; result: SkillRemoveAnswer };
   "personas/save": { params: PersonaFileSaveRequest; result: Empty };
+  "personas/search": { params: CatalogSearchRequest; result: CatalogSearchAnswer };
+  "personas/update-preview": { params: SkillNameRequest; result: PersonaUpdatePreviewAnswer };
   "pins/arrange": { params: PinArrangeRequest; result: Empty };
   "pins/arrangeSessions": { params: PinArrangeSessionsRequest; result: Empty };
   "pins/arrangeWorkflows": { params: PinArrangeWorkflowsRequest; result: Empty };
@@ -12080,6 +12088,7 @@ export const MethodTarget = {
   "machines/startEnroll": "control",
   "machines/stop": "control",
   "machines/unlink": "control",
+  "marketplaces/list": "host",
   "mcp/health": "host",
   "mcp/health/check": "host",
   "mcp/hosted": "host",
@@ -12105,9 +12114,16 @@ export const MethodTarget = {
   "people/setRole": "control",
   "permissions/answer": "host",
   "permissions/pending": "host",
+  "personas/add": "host",
+  "personas/check-updates": "host",
   "personas/files": "host",
   "personas/list": "host",
+  "personas/managed": "host",
+  "personas/preview": "host",
+  "personas/remove": "host",
   "personas/save": "host",
+  "personas/search": "host",
+  "personas/update-preview": "host",
   "pins/arrange": "host",
   "pins/arrangeSessions": "host",
   "pins/arrangeWorkflows": "host",

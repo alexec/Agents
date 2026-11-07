@@ -5024,6 +5024,11 @@
     {
       "name": "marketplaces/list",
       "x-capability": "marketplaces/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -5736,6 +5741,11 @@
     {
       "name": "personas/add",
       "x-capability": "personas.catalog/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "description": "Write a previewed persona to .agents/personas at the destination and name it in the lock (#3665). replace is true to put it over the one there.",
       "paramStructure": "by-name",
       "params": [
@@ -5757,6 +5767,11 @@
     {
       "name": "personas/check-updates",
       "x-capability": "personas.catalog/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "description": "Whether each persona added from a marketplace has an update, by id; each repository asked at most once an hour (#3665).",
       "paramStructure": "by-name",
       "params": [
@@ -5831,6 +5846,11 @@
     {
       "name": "personas/managed",
       "x-capability": "personas.catalog/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "description": "The personas at a destination that a lock names, added from a marketplace (#3665).",
       "paramStructure": "by-name",
       "params": [
@@ -5852,6 +5872,11 @@
     {
       "name": "personas/preview",
       "x-capability": "personas.catalog/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "description": "Fetch a persona file at its repository's current commit to show before adding (#3665).",
       "paramStructure": "by-name",
       "params": [
@@ -5873,6 +5898,11 @@
     {
       "name": "personas/remove",
       "x-capability": "personas.catalog/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "description": "Move a persona a lock names to the Trash and take it out of the lock (#3665). name is its id.",
       "paramStructure": "by-name",
       "params": [
@@ -5919,6 +5949,11 @@
     {
       "name": "personas/search",
       "x-capability": "personas.catalog/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "description": "The personas in a GitHub marketplace's personas/ folder whose id holds the query (#3665).",
       "paramStructure": "by-name",
       "params": [
@@ -5940,6 +5975,11 @@
     {
       "name": "personas/update-preview",
       "x-capability": "personas.catalog/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "description": "A persona's source at its current commit, staged, with the file as it is now and the runtime and permission-mode it changes (#3665).",
       "paramStructure": "by-name",
       "params": [

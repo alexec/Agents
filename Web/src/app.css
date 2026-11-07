@@ -1995,3 +1995,33 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
 
 /* Settings ▸ Processes (#3453): the numbers line up. */
 .process-usage { white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* Personas from a marketplace (#3678), as the Mac's AddPersonaSheet. */
+.persona-catalog { display: grid; gap: 6px; margin-bottom: 14px; }
+.persona-catalog-head { display: flex; align-items: center; gap: 8px; }
+.persona-catalog-head h4 { margin: 0; flex: 1; }
+.persona-catalog-head button { margin-left: auto; }
+.persona-catalog-row { display: flex; align-items: baseline; gap: 10px; padding: 10px 14px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); min-width: 0; }
+.persona-catalog-row .hint { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.persona-catalog-row .spacer, .persona-sheet-head .spacer { flex: 1; }
+.persona-sheet .sheet-actions { align-items: center; }
+.persona-sheet .sheet-actions .hint { margin-right: auto; }
+.chip.attention { background: color-mix(in srgb, var(--tint-attention) 22%, var(--paper-ground)); opacity: 1; }
+dialog.sheet:has(.persona-sheet) { width: min(900px, calc(100vw - 32px)); max-height: calc(100vh - 64px); }
+.persona-sheet { min-width: 0; }
+.persona-sheet h2 { margin: 0; }
+.persona-sheet-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.persona-sheet input[type="search"] { width: 100%; box-sizing: border-box; }
+.persona-results { display: grid; gap: 6px; max-height: 50vh; overflow: auto; }
+.persona-result { display: grid; gap: 2px; text-align: left; padding: 8px 12px; }
+.persona-result .chip { margin-left: 6px; }
+.persona-preview { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 14px; min-height: 0; }
+.persona-facts { display: grid; gap: 5px; margin: 0 0 10px; }
+.persona-facts div { display: grid; grid-template-columns: 8.5em 1fr; gap: 10px; }
+.persona-facts dt { opacity: 0.7; }
+.persona-facts dd { margin: 0; overflow-wrap: anywhere; }
+.persona-file { border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); padding: 14px; overflow: auto; max-height: 55vh; }
+.persona-file pre { margin: 6px 0 0; white-space: pre-wrap; font-family: var(--font-mono); }
+.persona-note { margin: 0 0 8px; padding: 10px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.persona-note.attention { background: color-mix(in srgb, var(--tint-attention) 14%, transparent); }
+.persona-diff { max-height: 55vh; overflow: auto; }
+@media (max-width: 640px) { .persona-preview { grid-template-columns: 1fr; } }
