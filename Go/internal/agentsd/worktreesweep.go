@@ -10,23 +10,19 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// The bound on agents' worktrees (#3726): an agent's worktree goes when the agent is
-// deleted, or when it is archived with its branch merged. Strict, as this removes a
-// person's files: only a worktree this app made, on a branch, with nothing uncommitted or
-// untracked, that no other agent's record names. Its branch goes only when it is merged
-// into the base; otherwise it stays and holds the commits. git worktree remove without
-// --force refuses a dirty or locked worktree as well.
+// The bound on agents' worktrees (#3726, #3877): an agent's worktree goes when the agent
+// is archived or deleted, merged or not, with its uncommitted and untracked changes too
+// (Alex, 2026-11-07). Only a worktree this app made, on a branch that is still there, that
+// no agent not archived works in or names. Its branch goes only when it is merged into the
+// base; otherwise it stays and holds the commits. A locked worktree is kept: one --force
+// does not remove it.
 
 type worktreeSweep int
 
 const (
-	// sweepArchived is an archive: the worktree goes only when its branch is merged.
+	// sweepArchived is an archive: the agent must still be archived when the sweep runs.
 	sweepArchived worktreeSweep = iota
-	// sweepArchivedMerged is an archive because the forge said its pull request merged:
-	// a squash leaves the branch out of the base, so the worktree goes when the branch has
-	// no commits a remote lacks.
-	sweepArchivedMerged
-	// sweepDeleted is a delete: the worktree goes whether merged or not; the branch stays.
+	// sweepDeleted is a delete.
 	sweepDeleted
 )
 
@@ -71,31 +67,19 @@ func (d *Daemon) sweepWorktree(a wire.Agent, why worktreeSweep) (said, kept stri
 		return "", name + " was not made by this app on a branch"
 	}
 	if others := d.othersIn(f.root, a.ID); len(others) > 0 {
-		return "", name + " is named by another agent too"
+		return "", name + " is used by another agent that is not archived"
 	}
 	folder := store.FolderPath(wt.Folder)
 	if _, err := git(folder, "show-ref", "--verify", "-q", "refs/heads/"+branch); err != nil {
 		return "", name + "'s branch " + branch + " is not there, so its commits would be on no branch"
 	}
-	exists := isDir(f.root) && !f.entry.prunable
-	if exists {
-		if out, err := git(f.root, "status", "--porcelain"); err != nil || out != "" {
-			return "", name + " has uncommitted or untracked changes"
+	lost := ""
+	if isDir(f.root) && !f.entry.prunable {
+		if out, _ := git(f.root, "status", "--porcelain"); out != "" {
+			lines := strings.Split(out, "\n")
+			lost = " It had " + uncommittedWords(lines, int64(len(lines))) + "."
 		}
-	}
-	merged := mergedInto(folder, branch, wt.Base, f.base)
-	switch why {
-	case sweepArchived:
-		if !merged {
-			return "", name + "'s branch is not merged"
-		}
-	case sweepArchivedMerged:
-		if !merged && unpushed(folder, branch) > 0 {
-			return "", name + "'s branch has commits no remote has"
-		}
-	}
-	if exists {
-		if _, err := git(folder, "worktree", "remove", f.root); err != nil {
+		if _, err := git(folder, "worktree", "remove", "--force", f.root); err != nil {
 			return "", "git worktree remove: " + err.Error()
 		}
 	} else if _, err := git(folder, "worktree", "prune"); err != nil {
@@ -106,23 +90,20 @@ func (d *Daemon) sweepWorktree(a wire.Agent, why worktreeSweep) (said, kept stri
 	d.sizeMu.Unlock()
 	d.noteFolders()
 	d.folderChanged(folder)
-	if merged && strings.HasPrefix(branch, branchPrefix) {
+	if mergedInto(folder, branch, wt.Base, f.base) && strings.HasPrefix(branch, branchPrefix) {
 		if _, err := git(folder, "branch", "-d", branch); err == nil {
-			return "Removed the worktree " + name + " and its branch " + branch + ", as the branch is merged.", ""
+			return "Removed the worktree " + name + " and its branch " + branch + ", as the branch is merged." + lost, ""
 		}
 	}
-	if why == sweepDeleted {
-		return "Removed the worktree " + name + "; its branch " + branch + " is kept.", ""
-	}
-	return "Removed the worktree " + name + ", as its pull request merged; its branch " + branch + " is kept.", ""
+	return "Removed the worktree " + name + "; its branch " + branch + " is kept." + lost, ""
 }
 
-// othersIn is the agents, archived or not, other than id, that work in root or name it as
-// their worktree.
+// othersIn is the agents not archived, other than id, that work in root or name it as
+// their worktree. An archived agent's record does not keep a worktree (#3877).
 func (d *Daemon) othersIn(root string, id wire.UUID) []wire.UUID {
 	var out []wire.UUID
 	for _, a := range d.Store.Agents() {
-		if a.ID == id {
+		if a.ID == id || a.State == wire.AgentStateArchived {
 			continue
 		}
 		if inside(root, canonical(store.FolderPath(a.Cwd))) ||

@@ -198,11 +198,13 @@ admin: a session on another person's machine is theirs.
 
 Without a control plane, a project is the folders on this machine.
 
-## Worktrees are never removed by accident
+## Archiving removes the worktree, not the branch
 
-Archiving an agent never throws work away. When you archive the last agent in a worktree
-the app made, the worktree's folder goes only if everything in it is committed, and its
-branch goes only if it has been merged. Otherwise both are left exactly as they are.
+When you archive the last agent that is not archived in a worktree the app made, the
+worktree's folder goes, merged or not, and changes in it that are not committed go with
+it (#3877). The agent's chat says which changes went. Its branch, and so every commit,
+stays unless it has been merged. A worktree that you made yourself, one on no branch, and
+one another agent still works in are left exactly as they are.
 
 You can also remove a worktree yourself. The app refuses while an agent is working in it,
 and tells you what would be lost, and asks you to confirm, if it has changes that are not

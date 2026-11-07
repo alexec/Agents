@@ -70,16 +70,17 @@ tooltip says why. Start a new agent in a worktree instead.
    would.
 2. Archive the agent. See [Stop and archive agents](archive-and-stop.md).
 
-   If the app made the worktree, no other agent is working in it, and everything in it
-   is committed, archiving removes the worktree. Its branch is deleted too if it has
-   been merged; otherwise the branch is kept, with its commits. The conversation says
-   which, for example *Removed the worktree fix-login. Its branch agents/fix-login is
-   kept, since everything in it was committed.*
-3. A worktree that still has uncommitted changes, or has other agents in it, is left
-   where it is. It is listed under **Worktrees** on the folder's page (on iPhone and
-   iPad too). When you are done with it, archive the agents in it, then click
-   **Remove…** beside it. If removing it would lose uncommitted changes or unmerged
-   commits, the app says what would be lost and asks first.
+   If the app made the worktree and no other agent is working in it, archiving removes
+   the worktree, also with changes that are not committed: commit what you want to keep
+   first. Its branch is deleted too if it has been merged; otherwise the branch is
+   kept, with its commits. The conversation says which, for example *Removed the
+   worktree fix-login; its branch agents/fix-login is kept.* When changes were not
+   committed, it names them.
+3. A worktree that has other agents in it is left where it is. It is listed under
+   **Worktrees** on the folder's page (on iPhone and iPad too). When you are done with
+   it, archive the agents in it, or click **Remove…** beside it. If removing it would
+   lose uncommitted changes or unmerged commits, the app says what would be lost and
+   asks first.
 
    Only worktrees the app made have **Remove…**. Ones you made yourself in Terminal are
    listed but left for you to remove.
