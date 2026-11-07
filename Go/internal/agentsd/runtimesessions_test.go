@@ -2,8 +2,10 @@ package agentsd
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"testing"
 
+	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -46,5 +48,36 @@ func TestTheirConversationsTakenOver(t *testing.T) {
 	c.call(t, 6, "sessions/delete", map[string]any{"runtimeID": "claude", "sessionID": "theirs", "confirmed": true})
 	if a := d.Store.Agent(id); a.RuntimeSessionID != nil {
 		t.Fatal(*a.RuntimeSessionID)
+	}
+}
+
+// Another tool's worktree of the folder's repository, as Conductor makes one (#3716): its
+// conversations are listed with the folder's, and one taken over keeps its worktree and
+// sits under the folder.
+func TestConversationsInAnotherToolsWorktreeAreTheFolders(t *testing.T) {
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := repo(t)
+	other := filepath.Join(canonical(t.TempDir()), "workspace-oslo")
+	run(t, dir, "git", "worktree", "add", "-q", "-b", "oslo", other)
+	var list []wire.RuntimeSession
+	json.Unmarshal(c.call(t, 1, "sessions/list", map[string]any{"runtimeID": "claude", "cwd": "file://" + dir}), &list)
+	if len(list) != 2 || list[0].SessionID != "theirs" || list[1].SessionID != "theirs-oslo" || store.FolderPath(list[1].Cwd) != other {
+		t.Fatalf("%+v", list)
+	}
+	var id wire.UUID
+	json.Unmarshal(c.call(t, 2, "sessions/adopt", map[string]any{"runtimeID": "claude", "sessionID": "theirs-oslo", "cwd": list[1].Cwd}), &id)
+	a := d.Store.Agent(id)
+	if a == nil || a.Worktree == nil || store.FolderPath(a.Worktree.Root) != other || *a.Worktree.Branch != "oslo" || a.Worktree.MadeByApp {
+		t.Fatalf("%+v", a)
+	}
+	if folderPath(a) != canonical(dir) {
+		t.Fatalf("%s, want %s", folderPath(a), dir)
+	}
+	// One in the main checkout has no worktree.
+	json.Unmarshal(c.call(t, 3, "sessions/adopt", map[string]any{"runtimeID": "claude", "sessionID": "theirs", "cwd": "file://" + dir}), &id)
+	if a := d.Store.Agent(id); a.Worktree != nil {
+		t.Fatalf("%+v", a.Worktree)
 	}
 }

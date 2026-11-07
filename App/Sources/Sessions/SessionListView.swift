@@ -82,6 +82,10 @@ struct SessionListView: View {
                     if let updatedAt = session.updatedAt {
                         Text(updatedAt.formatted(.relative(presentation: .named)))
                     }
+                    // Another worktree of this folder, such as a Conductor workspace (#3716).
+                    if session.cwd.standardizedFileURL.path != cwd.standardizedFileURL.path {
+                        Text("in \(session.cwd.lastPathComponent)")
+                    }
                     if session.isHeld {
                         Text("already here")
                     }

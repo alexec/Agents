@@ -2,6 +2,7 @@ package agentsd
 
 import (
 	"context"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -50,9 +51,27 @@ func (d *Daemon) listRuntimeSessions(ctx context.Context, r wire.SessionsListReq
 		return nil, &Error{Code: CodeNotSupported, Message: rt.Name + " cannot list the conversations it holds."}
 	}
 	path := store.FolderPath(r.Cwd)
-	infos, err := s.ListSessions(ctx, path)
-	if err != nil {
-		return nil, &Error{Code: CodeServer, Message: err.Error()}
+	// The folder's other worktrees too (#3716): another tool's, such as Conductor's
+	// workspaces, keep conversations the folder itself does not.
+	var infos []sdk.SessionInfo
+	seen := map[sdk.SessionId]bool{}
+	for i, dir := range append([]string{path}, otherWorktrees(path)...) {
+		got, err := s.ListSessions(ctx, dir)
+		if err != nil {
+			if i == 0 {
+				return nil, &Error{Code: CodeServer, Message: err.Error()}
+			}
+			continue
+		}
+		for _, g := range got {
+			if !seen[g.SessionId] {
+				seen[g.SessionId] = true
+				if g.Cwd == "" {
+					g.Cwd = dir
+				}
+				infos = append(infos, g)
+			}
+		}
 	}
 	held := map[string]bool{}
 	for _, a := range d.Store.Agents() {
@@ -154,7 +173,7 @@ func (d *Daemon) adoptSession(ctx context.Context, r wire.AdoptRequest) (wire.UU
 	a := wire.Agent{ID: id, RuntimeID: r.RuntimeID, Cwd: store.FolderURL(path), State: wire.AgentStateFinished,
 		EndedReason: &ended, RuntimeSessionID: &sid, StartOptions: wire.StartOptions{Values: map[string]wire.JSONValue{}, ExtraArguments: []string{}},
 		AdvertisedOptions: []wire.ConfigOption{}, AvailableCommands: []wire.SlashCommand{},
-		CreatedAt: t, LastActivityAt: t, MadeInRoot: &d.Store.RootID}
+		CreatedAt: t, LastActivityAt: t, MadeInRoot: &d.Store.RootID, Worktree: linkedWorktree(path)}
 	if err := d.Store.Save(a); err != nil {
 		return "", err
 	}
@@ -175,6 +194,57 @@ func (d *Daemon) adoptSession(ctx context.Context, r wire.AdoptRequest) (wire.UU
 		})
 	}
 	return id, nil
+}
+
+// otherWorktrees is the working folders of the folder's repository in its other worktrees,
+// those that are still there; none outside a repository.
+func otherWorktrees(folder string) []string {
+	repo, ok := repositoryOf(folder)
+	if !ok {
+		return nil
+	}
+	list, _ := worktreeList(folder)
+	top := canonical(repo.toplevel)
+	var out []string
+	for _, e := range list {
+		root := canonical(e.root)
+		if root != top && !e.prunable && isDir(root) {
+			out = append(out, workingFolder(root, repo.prefix))
+		}
+	}
+	return out
+}
+
+// linkedWorktree is the worktree a taken-over conversation was in, when dir is in one that
+// is not its repository's main checkout (#3716): the agent then sits under the main
+// checkout's folder, as one started in that worktree does. Nil in the main checkout.
+func linkedWorktree(dir string) *wire.AgentWorktree {
+	repo, ok := repositoryOf(dir)
+	if !ok {
+		return nil
+	}
+	list, err := worktreeList(dir)
+	if err != nil || len(list) == 0 {
+		return nil
+	}
+	main, root := canonical(list[0].root), canonical(repo.toplevel)
+	if main == root {
+		return nil
+	}
+	for _, e := range list {
+		if canonical(e.root) != root {
+			continue
+		}
+		var branch *string
+		if e.branch != "" {
+			b := e.branch
+			branch = &b
+		}
+		made := strings.HasPrefix(root, canonical(filepath.Join(main, ".agents", "worktrees"))+"/") && branch != nil
+		return &wire.AgentWorktree{Name: filepath.Base(root), Root: store.FolderURL(root), Branch: branch,
+			Folder: store.FolderURL(workingFolder(main, repo.prefix)), MadeByApp: made}
+	}
+	return nil
 }
 
 // replaySink records a loaded conversation's replay on the agent, the person's words with

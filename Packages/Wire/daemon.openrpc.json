@@ -7814,6 +7814,11 @@
     {
       "name": "sessions/adopt",
       "x-capability": "sessions/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -7834,6 +7839,11 @@
     {
       "name": "sessions/delete",
       "x-capability": "sessions/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -7854,6 +7864,11 @@
     {
       "name": "sessions/list",
       "x-capability": "sessions/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {

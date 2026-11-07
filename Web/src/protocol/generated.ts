@@ -11709,6 +11709,9 @@ export interface Methods {
   "secrets/sessionList": { params: Empty; result: SessionSecrets };
   "secrets/sessionRemove": { params: SessionSecretRemoveRequest; result: SessionSecrets };
   "secrets/sessionSet": { params: SessionSecretSetRequest; result: SessionSecrets };
+  "sessions/adopt": { params: AdoptRequest; result: UUID };
+  "sessions/delete": { params: DeleteSessionRequest; result: Empty };
+  "sessions/list": { params: SessionsListRequest; result: RuntimeSession[] };
   "settings/passThrough": { params: Empty; result: PassThroughState };
   "signIn/approve": { params: SignInDecide; result: Empty };
   "signIn/configure": { params: SignInConfigure; result: SignInProviders };
@@ -12080,6 +12083,9 @@ export const MethodTarget = {
   "secrets/sessionList": "host",
   "secrets/sessionRemove": "host",
   "secrets/sessionSet": "host",
+  "sessions/adopt": "host",
+  "sessions/delete": "host",
+  "sessions/list": "host",
   "settings/passThrough": "host",
   "signIn/approve": "control",
   "signIn/configure": "control",

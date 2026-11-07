@@ -1,39 +1,46 @@
 ---
 diataxis: how-to
-devices: [mac]
+devices: [mac, web]
 description: Pick up a conversation a runtime already holds, such as one you started in Terminal, or delete one.
 ---
 
 # Pick up a conversation started somewhere else
 
 A runtime keeps its own list of conversations, including ones you started in Terminal or
-in another app. From a new session you can see what a runtime holds in a folder, pick one
-up so it carries on in Agents, or delete one you no longer want.
+in another app. From a new session you can see what a runtime holds in a folder and in the
+folder's other git worktrees, pick one up so it carries on in Agents, or delete one you no
+longer want. A conversation in another tool's worktree, such as a Conductor workspace, is
+in the list too. To move all your work from Conductor, see
+[Move from Conductor to Agents](move-from-conductor.md).
 
 ## Before you start
 
-- A folder on this Mac with the runtime you used. See [Add a folder](add-a-folder.md).
+- A folder with the runtime you used, on this Mac or on a machine the web page reaches.
+  See [Add a folder](add-a-folder.md).
 - A runtime that lists its conversations. One that does not says it is holding nothing.
 
 ## Steps
 
-1. Unfold the folder in the sidebar and click **New session**, the first row under it (or press ⌘N).
+1. Unfold the folder in the sidebar and click **New session**, the first row under it (or
+   press ⌘N on the Mac).
 2. Above the prompt, choose the runtime you used, such as **Claude**, and the folder the
    conversation was in.
 3. Click the clock button beside the runtime (**Conversations this runtime is already
-   holding here**).
+   holding here**). On the web page, the button is **↺**.
 
    A sheet opens, **Conversations in** the folder's name, listing each conversation with
-   its title and when it last changed. One already in Agents says **already here**.
+   its title and when it last changed. One in another worktree of the folder says
+   **in** and the worktree's name. One already in Agents says **already here**.
 4. Click **Pick up** beside the one you want.
 
    The sheet closes and the conversation opens as an agent in the folder, with what was
-   said so far. Send a prompt to carry on.
+   said so far. One from another worktree works in that worktree. Send a prompt to carry
+   on: the runtime resumes its own conversation, so the agent keeps what it knew.
 5. Click **Done** to close the sheet without picking anything.
 
 **Delete a conversation**
 
-1. In the same sheet, click the bin beside it.
+1. In the same sheet, click the bin beside it (**Delete** on the web page).
 2. Confirm with **Delete**. This removes it from the runtime as well as from the app, and
    cannot be undone.
 
@@ -51,5 +58,7 @@ that prompt.
 
 - **The runtime is holding nothing here.** The runtime has no conversation in that folder,
   or cannot list its conversations. Check the folder: a conversation belongs to the
-  folder it was started in.
-- **The clock button is greyed out.** Choose a folder and a runtime first.
+  folder it was started in, or to one of its git worktrees. A worktree that was removed
+  is not searched.
+- **The clock button is greyed out.** Choose a folder and a runtime first. On **Auto**,
+  choose the runtime you used instead.

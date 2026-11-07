@@ -34,6 +34,7 @@ import { go } from "../route";
 import { sizeWords } from "../model/worktrees";
 import { LabelField } from "./Labels";
 import { Huddle } from "./Huddle";
+import { SessionsDialog } from "./SessionsDialog";
 import { Reach } from "./Reach";
 import { Prompt } from "./Prompt";
 import { OfflineStrip } from "./OfflineStrip";
@@ -132,6 +133,8 @@ export function NewAgent({ store, host, folder, folderName, down }: {
   const filled = useSignal(0);
   /** Whether the prompt has focus and how much it holds, for the Blobs over the page (#987). */
   const promptFocused = useSignal(false);
+  // The runtime's own conversations here, to pick one up (#3716): the window's Sessions sheet.
+  const showingSessions = useSignal(false);
   const typed = useSignal(0);
   const placeOffered = () => {
     const offered = offeredWorktree.current;
@@ -467,6 +470,10 @@ export function NewAgent({ store, host, folder, folderName, down }: {
     : null;
   return (
     <section class="chat new-agent" aria-label="New session">
+      {showingSessions.value && chosenRuntime && !isAuto && (
+        <SessionsDialog store={store} host={host} folder={folder} folderName={folderName} runtimeID={chosenRuntime}
+          runtimeName={runtimeName} close={() => (showingSessions.value = false)} />
+      )}
       <header class="column-head narrow-only">
         <BackToList />
       </header>
@@ -551,6 +558,11 @@ export function NewAgent({ store, host, folder, folderName, down }: {
             </>
           )}
           runtime={(<>
+            {/* What else this runtime is holding in this folder and its worktrees, including work
+                started somewhere else entirely (#3716), as the window's clock button. */}
+            <button type="button" class="pill" title="Conversations this runtime is already holding here" aria-label="Sessions"
+              disabled={down || !chosenRuntime || isAuto} onClick={() => (showingSessions.value = true)}>
+              <span aria-hidden="true">↺</span></button>
             <label class="pill select" title="Runtime">
               <span aria-hidden="true">{chosenRuntime ? runtimeName : "Runtime"} ▾</span>
               <select aria-label="Runtime" value={chosenRuntime ?? ""} disabled={!runtimes.length || down}

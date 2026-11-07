@@ -111,15 +111,20 @@ func (f *fakeRuntime) Initialize(context.Context, sdk.InitializeRequest) (sdk.In
 				Fork: &sdk.SessionForkCapabilities{}, List: &sdk.SessionListCapabilities{}, Delete: del}}}, nil
 }
 
-// The fake holds one conversation the app did not start, "theirs", in any folder.
+// The fake holds one conversation the app did not start, "theirs", in any folder; in a
+// folder called workspace-<name> (another tool's worktree, #3716) it is "theirs-<name>".
 func (f *fakeRuntime) ListSessions(_ context.Context, r sdk.ListSessionsRequest) (sdk.ListSessionsResponse, error) {
 	title, at := "Their talk", "2026-10-16T09:00:00Z"
-	return sdk.ListSessionsResponse{Sessions: []sdk.SessionInfo{{SessionId: "theirs", Cwd: *r.Cwd, Title: &title, UpdatedAt: &at}}}, nil
+	id := sdk.SessionId("theirs")
+	if name, ok := strings.CutPrefix(filepath.Base(*r.Cwd), "workspace-"); ok {
+		id = sdk.SessionId("theirs-" + name)
+	}
+	return sdk.ListSessionsResponse{Sessions: []sdk.SessionInfo{{SessionId: id, Cwd: *r.Cwd, Title: &title, UpdatedAt: &at}}}, nil
 }
 
 // LoadSession replays "theirs": the person's words in two chunks, then the reply.
 func (f *fakeRuntime) LoadSession(ctx context.Context, r sdk.LoadSessionRequest) (sdk.LoadSessionResponse, error) {
-	if r.SessionId != "theirs" {
+	if !strings.HasPrefix(string(r.SessionId), "theirs") {
 		return sdk.LoadSessionResponse{}, fmt.Errorf("no session %s", r.SessionId)
 	}
 	<-f.ready

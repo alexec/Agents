@@ -70,6 +70,8 @@ something particular done.
   what order, and read or change what each value is on each runtime.
 - [Pick up a conversation started somewhere else](pick-up-a-conversation.md): carry on
   in Agents with one you began in Terminal, or delete one.
+- [Move from Conductor to Agents](move-from-conductor.md): bring Conductor's workspaces
+  and their conversations into Agents, and carry on.
 - [Answer a question or a permission request](answer-a-question.md): from the Mac, the
   iPhone or iPad, or a notification.
 - [Read a chat](read-a-chat.md): open a chat at its latest message, follow the plan card,

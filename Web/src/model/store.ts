@@ -10,7 +10,7 @@ import type {
   Agent, AgentRemovedNotification, ResumingNotification, BrowserFrame, BrowserPageState, DesktopControlLiveFrame, ControlMachine, MachineRef, MachineWorkspace, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, FolderSummary, HelperLimits, DiskThresholds, NotCommittedResponse, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, FolderRemovedNotification, DraftOptionsNotification, JSONValue, Methods, AccountProfile, RuntimeAccount, RuntimeSignInStep, RuntimeStatus,
-  StartRequest, UUID, AutoMappings, AutoPreview, AutoPreviewRequest, AutoSettings, ClientPermissionMode, Levels, ModelLevel, PermissionLevel, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
+  StartRequest, UUID, AutoMappings, AutoPreview, AutoPreviewRequest, AutoSettings, ClientPermissionMode, Levels, ModelLevel, PermissionLevel, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, RuntimeSession, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
   CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ReviewPull, CheckSuggestion, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, PolicySetBy, RuntimeAllowances,
   GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
@@ -3451,6 +3451,22 @@ export class Store extends Work {
   async personas(host: string, folder: string): Promise<Persona[] | null> {
     return this.link.call("personas/list", { folder: folder as never }, host)
       .catch((error: unknown) => (error instanceof CallFailed && error.code === methodNotFound ? [] : null));
+  }
+
+  /** What a runtime holds in a folder and its worktrees that this host did not start (#3716),
+   *  as the window's Sessions list: `sessions/list`. Throws, for the list to say why. */
+  async runtimeSessions(host: string, runtimeID: string, cwd: string): Promise<RuntimeSession[]> {
+    return this.link.call("sessions/list", { runtimeID, cwd: cwd as never }, host);
+  }
+
+  /** One of them taken over as a session of the app's, its id: `sessions/adopt`. */
+  async adoptSession(host: string, runtimeID: string, session: RuntimeSession): Promise<string> {
+    return this.link.call("sessions/adopt", { runtimeID, sessionID: session.sessionID, cwd: session.cwd }, host);
+  }
+
+  /** One deleted from the runtime too, once the person said yes: `sessions/delete`. */
+  async deleteRuntimeSession(host: string, runtimeID: string, sessionID: string): Promise<void> {
+    await this.link.call("sessions/delete", { runtimeID, sessionID, confirmed: true }, host);
   }
 
   async worktrees(host: string, folder: string): Promise<WorktreesListResponse | null> {
