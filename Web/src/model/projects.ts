@@ -25,7 +25,7 @@ export const projectWords = {
 /** A project's boards (#3282), on the Connectors page and in Work's Board menu, as ProjectBoardWords on the window. */
 export const boardWords = {
   heading: "Boards",
-  note: "A board is a GitHub Projects board, a Jira board, a Linear team or a GitLab group board. "
+  note: "A board is a GitHub Projects board, a Jira board, a Linear team, a GitLab group board or an Azure Boards board. "
     + "Work ▸ Issues and Features can show one board.",
   none: "No boards. Work shows every issue of the project.",
   onlyOwner: "Only the project's owner or an admin can change its boards.",
@@ -42,6 +42,7 @@ export function boardForge(board: ProjectBoard): string {
     case "atlassian": return "Jira";
     case "linear": return "Linear team";
     case "gitlab": return "GitLab";
+    case "azuredevops": return "Azure Boards";
     default: return "";
   }
 }

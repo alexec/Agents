@@ -8731,20 +8731,20 @@ type Project struct {
 	Boards []ProjectBoard `json:"boards,omitzero"`
 }
 
-// One board in a project's Tasks slot (#3282): a GitHub Projects board, a Jira board, a Linear team or a GitLab group board, by its address and a name (the team's). Work's Issues and Features lists narrow to one. A client sends name and url; the control plane reads forge, key and site from the url.
+// One board in a project's Tasks slot (#3282): a GitHub Projects board, a Jira board, a Linear team, a GitLab group board or an Azure Boards board (a team's, #3816), by its address and a name (the team's). Work's Issues and Features lists narrow to one. A client sends name and url; the control plane reads forge, key and site from the url.
 type ProjectBoard struct {
 	Name string `json:"name"`
 
-	// The board's address on the web: github.com/orgs/<org>/projects/<n> (or users/<login>), <site>/jira/software/…/boards/<id>, linear.app/<workspace>/team/<KEY>, or <gitlab>/groups/<group>/-/boards/<id>. It names the board in forge/issues' board.
+	// The board's address on the web: github.com/orgs/<org>/projects/<n> (or users/<login>), <site>/jira/software/…/boards/<id>, linear.app/<workspace>/team/<KEY>, <gitlab>/groups/<group>/-/boards/<id>, or dev.azure.com/<org>/<project>/_boards/board/t/<team> (or an Azure DevOps Server's). It names the board in forge/issues' board.
 	URL string `json:"url"`
 
-	// github, atlassian (Jira), linear or gitlab.
+	// github, atlassian (Jira), linear, gitlab or azuredevops (Azure Boards).
 	Forge *ConnectionProvider `json:"forge,omitzero"`
 
-	// The board on its forge: <owner>/<number> on GitHub, the board id on Jira, the team key on Linear, <group>#<id> on GitLab.
+	// The board on its forge: <owner>/<number> on GitHub, the board id on Jira, the team key on Linear, <group>#<id> on GitLab, <org>/<project>/<team> on Azure Boards.
 	Key *string `json:"key,omitzero"`
 
-	// The board's host: github.com, the Jira site, linear.app, gitlab.com or a self-managed GitLab.
+	// The board's host: github.com, the Jira site, linear.app, gitlab.com or a self-managed GitLab, dev.azure.com or an Azure DevOps Server.
 	Site *string `json:"site,omitzero"`
 }
 

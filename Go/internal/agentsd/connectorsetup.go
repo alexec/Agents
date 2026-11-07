@@ -293,6 +293,8 @@ type setupRecord struct {
 	Slots        map[wire.ConnectorSlotKind]*slotRecord `json:"slots"`
 	// EventsAdded is set once the set-up wrote the github entry, so it is never written again.
 	EventsAdded bool `json:"eventsAdded,omitempty"`
+	// BoardsNamed is set once the set-up named the folder's Azure Boards project (#3816).
+	BoardsNamed bool `json:"boardsNamed,omitempty"`
 }
 
 type slotRecord struct {
@@ -813,7 +815,57 @@ func (d *Daemon) connectorSetup(ctx context.Context, folder string, reading wire
 		}
 	}
 	out.Events = d.setupEvents(ctx, f, folder, rec, out.Slots, reading != wire.ConnectorSetupReadingStored)
+	if reading != wire.ConnectorSetupReadingStored {
+		d.nameBoardsProject(folder, sources[wire.ConnectorSlotKindTasks], rec, out.Slots)
+	}
 	return out, nil
+}
+
+// nameBoardsProject names the Azure Boards project of the folder's Azure Repos remote in its
+// .agents/folder.json ("azureBoardsProjects", which the Work pages read, #3815) once its own
+// Tasks slot reads Azure Boards (#3816). Once only, and only where the folder names no tracker
+// (Azure Boards projects, Jira projects or Linear teams): a person who takes it out, or names
+// another, is not overruled.
+func (d *Daemon) nameBoardsProject(folder string, tasks slotSource, rec *setupRecord, slots []wire.ConnectorSlot) {
+	if tasks.f.provider != wire.ConnectionProviderAzuredevops || tasks.fromProject || rec.BoardsNamed {
+		return
+	}
+	read := false
+	for _, s := range slots {
+		read = read || (s.Slot == wire.ConnectorSlotKindTasks && s.State == wire.ConnectorSlotStateRead)
+	}
+	org, rest, _ := strings.Cut(tasks.f.repo, "/")
+	project, _, _ := strings.Cut(rest, "/")
+	if !read || org == "" || project == "" {
+		return
+	}
+	m, err := d.approvedConfig(folder)
+	if err != nil || !d.settled(folder, ".agents/folder.json") {
+		return
+	}
+	for _, tracker := range []string{"azureBoardsProjects", "jiraProjects", "linearTeams"} {
+		if _, named := m[tracker]; named {
+			return
+		}
+	}
+	func() {
+		defer d.approveWrite(folder, ".agents/folder.json")
+		err = setFolderConfig(folder, "azureBoardsProjects", []string{org + "/" + project})
+	}()
+	if err != nil {
+		log.Printf("connectors: the Azure Boards project was not named: %v", err)
+		return
+	}
+	log.Printf("connectors: the folder's Azure Boards project was named for Work")
+	d.setupMu.Lock()
+	if r := d.setupRecordsLocked()[folder]; r != nil {
+		r.BoardsNamed = true
+	} else {
+		rec.BoardsNamed = true
+		d.setupRecords[folder] = rec
+	}
+	d.saveSetupLocked()
+	d.setupMu.Unlock()
 }
 
 func cloneRecord(r *setupRecord) *setupRecord {

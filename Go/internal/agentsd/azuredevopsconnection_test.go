@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -176,6 +177,49 @@ func TestAnAzureDevOpsFoldersConnectorSetUp(t *testing.T) {
 	}
 	if b, _ := os.ReadFile(filepath.Join(folder, ".agents", "mcp.json")); !strings.Contains(string(b), "azuredevops-mcp") {
 		t.Fatalf("mcp.json: %s", b)
+	}
+	// #3816: the Tasks slot names the remote's Azure Boards project for the Work pages, once,
+	// approved; a person who takes it out is not overruled.
+	if got := d.folderBoardsProjects(folder); !slices.Equal(got, []string{"acme/web"}) || !d.settled(folder, ".agents/folder.json") {
+		b, _ := os.ReadFile(filepath.Join(folder, ".agents", "folder.json"))
+		t.Fatalf("Azure Boards projects %q, folder.json %s", got, b)
+	}
+	if err := setFolderConfig(folder, "azureBoardsProjects", nil); err != nil {
+		t.Fatal(err)
+	}
+	d.approveWrite(folder, ".agents/folder.json")
+	c.call(t, 4, "connectors/setup", map[string]any{"folder": folder, "reading": "fresh"})
+	if got := d.folderBoardsProjects(folder); len(got) != 0 {
+		t.Fatalf("named again: %q", got)
+	}
+}
+
+// #3816: a folder that names its Azure Boards projects already keeps them; one that names Jira
+// projects or Linear teams for its tasks is given none.
+func TestAnAzureDevOpsSetUpKeepsTheFoldersBoardsProjects(t *testing.T) {
+	t.Setenv("AGENTS_PERSONAL_HOME", t.TempDir())
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	file := &connections.File{Path: filepath.Join(t.TempDir(), ".agents-secrets", connections.FileName)}
+	d.connStoreFor = func() (connections.Store, error) { return file, nil }
+	d.newAzureDevOpsSetupReader = func(string, string) azureDevOpsSetupReader { return &fakeSetupAzureDevOps{} }
+	file.Put(connections.AzureDevOpsConnection(connections.AzureDevOpsServices, "acme", "ado-secret", "Agents Test", time.Now()))
+	named := gitFolder(t, "https://dev.azure.com/acme/Web/_git/app")
+	os.MkdirAll(filepath.Join(named, ".agents"), 0o755)
+	os.WriteFile(filepath.Join(named, ".agents", "folder.json"), []byte(`{"azureBoardsProjects": ["acme/Plans"]}`), 0o644)
+	c.call(t, 1, "folders/add", map[string]any{"folder": "file://" + named})
+	c.call(t, 2, "connectors/setup", map[string]any{"folder": named, "reading": "fresh"})
+	if got := d.folderBoardsProjects(named); !slices.Equal(got, []string{"acme/plans"}) {
+		t.Fatalf("named: %q", got)
+	}
+
+	jira := gitFolder(t, "https://dev.azure.com/acme/Web/_git/other")
+	os.MkdirAll(filepath.Join(jira, ".agents"), 0o755)
+	os.WriteFile(filepath.Join(jira, ".agents", "folder.json"), []byte(`{"jiraProjects": ["WEB"]}`), 0o644)
+	c.call(t, 3, "folders/add", map[string]any{"folder": "file://" + jira})
+	c.call(t, 4, "connectors/setup", map[string]any{"folder": jira, "reading": "fresh"})
+	if b, _ := os.ReadFile(filepath.Join(jira, ".agents", "folder.json")); strings.Contains(string(b), "azureBoardsProjects") {
+		t.Fatalf("a folder on Jira was given Azure Boards: %s", b)
 	}
 }
 
