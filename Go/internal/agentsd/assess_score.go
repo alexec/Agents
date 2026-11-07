@@ -320,7 +320,7 @@ func (r assessRecord) leases() (verdict, string) {
 }
 
 func (r assessRecord) workspaces() (verdict, string) {
-	all := r.callsOf("workspaces/list")
+	all := r.callsOf("machines/list")
 	var listed []appToolCall
 	for _, c := range all {
 		if a := arg(c, "action"); a == "" || a == "list" {
@@ -334,7 +334,7 @@ func (r assessRecord) workspaces() (verdict, string) {
 	if last.Ok {
 		return passed, "`list_machines` answered"
 	}
-	if strings.Contains(strings.ToLower(answerOfCall(last)), "has no workspaces") {
+	if a := strings.ToLower(answerOfCall(last)); strings.Contains(a, "has no workspaces") || strings.Contains(a, "has no machine providers") {
 		return passed, "`list_machines` answered that this machine has no workspaces"
 	}
 	return failedStep, "`list_machines` refused: " + clip(answerOfCall(last), 160)
@@ -562,27 +562,35 @@ func questionsOf(c appToolCall) []formQuestion {
 
 func (r assessRecord) askQuestion() (verdict, string) {
 	asked := r.callsOf("questions/ask")
+	// The first form with both a choice and a text field: should_ask's question can come
+	// first, by ask_question too (#1356).
 	var call *appToolCall
+	var text *formQuestion
+	answered := false
 	for i := range asked {
-		if asked[i].Ok {
-			call = &asked[i]
+		if !asked[i].Ok {
+			continue
+		}
+		answered = true
+		var choice bool
+		var field *formQuestion
+		for _, q := range questionsOf(asked[i]) {
+			q := q
+			if q.choices {
+				choice = true
+			} else if field == nil {
+				field = &q
+			}
+		}
+		if choice && field != nil {
+			call, text = &asked[i], field
 			break
 		}
 	}
-	if call == nil {
+	if !answered {
 		return failedStep, said(asked, "ask_question")
 	}
-	var choice bool
-	var text *formQuestion
-	for _, q := range questionsOf(*call) {
-		q := q
-		if q.choices {
-			choice = true
-		} else if text == nil {
-			text = &q
-		}
-	}
-	if !choice || text == nil {
+	if call == nil {
 		return failedStep, "`ask_question` was not asked with both a choice and a text field"
 	}
 	given := ""
