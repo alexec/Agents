@@ -2,13 +2,14 @@ import AgentsKitCore
 import Foundation
 import Observation
 
-/// The panes the phone can open beside a conversation: the Mac's, less its browser (034).
+/// The panes the phone can open beside a conversation: the Mac's, less its own browser (034).
 ///
-/// No Browser case, on purpose, rather than one kept disabled. The Mac's browser shows
-/// the agent's local servers, which only listen on the Mac, and a pane that could never
-/// show anything is not offered (FR-030).
+/// No case for the Mac's Browser pane, on purpose, rather than one kept disabled. That
+/// browser shows the agent's local servers, which only listen on the Mac, and a pane that
+/// could never show anything is not offered (FR-030). `browser` is the Agent Browser: the
+/// browser on the session's machine, which agents drive (#3800).
 enum Pane: String, CaseIterable, Identifiable, Hashable {
-    case page, files, changes, terminal, exchanged, simulator
+    case page, files, changes, terminal, browser, exchanged, simulator
 
     var id: String { rawValue }
 
@@ -18,6 +19,7 @@ enum Pane: String, CaseIterable, Identifiable, Hashable {
         case .files: "Files"
         case .changes: "Changes"
         case .terminal: "Terminal"
+        case .browser: "Browser"
         case .exchanged: "Exchanged"
         case .simulator: "Simulator"
         }
