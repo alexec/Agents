@@ -20,12 +20,9 @@ import (
 // runtimeDef is a RuntimeCatalog entry, and what RuntimeLaunch passes it.
 type runtimeDef struct {
 	wire.Runtime
-	// passed is the variables, beyond the allow-list, this runtime is given (a trailing _
-	// is a prefix).
-	passed []string
 }
 
-func runtime(id, name, exe string, args []string, page string, appCopyOnly bool, passed ...string) runtimeDef {
+func runtime(id, name, exe string, args []string, page string, appCopyOnly bool) runtimeDef {
 	if args == nil {
 		args = []string{}
 	}
@@ -35,20 +32,20 @@ func runtime(id, name, exe string, args []string, page string, appCopyOnly bool,
 		v := k.variable
 		r.AccountFolderVariable = &v
 	}
-	return runtimeDef{Runtime: r, passed: passed}
+	return runtimeDef{Runtime: r}
 }
 
 // catalog is RuntimeCatalog.builtIn, sorted by name. A server is given no installer
 // (install is nil there).
 var catalog = func() []runtimeDef {
 	c := []runtimeDef{
-		runtime("claude", "Claude", "npx", []string{"--prefer-offline", "-y", "@agentclientprotocol/claude-agent-acp"}, "https://code.claude.com/docs/en/setup", false, "ANTHROPIC_", "CLAUDE_CONFIG_DIR"),
-		runtime("grok", "Grok", "grok", []string{"--permission-mode", "default", "agent", "stdio"}, "https://x.ai/cli", false, "GROK_", "XAI_"),
-		runtime("copilot", "Copilot", "copilot", []string{"--acp"}, "https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli", false, "COPILOT_", "GH_TOKEN", "GITHUB_TOKEN"),
-		runtime("cursor", "Cursor", "cursor-agent", []string{"acp"}, "https://cursor.com/docs/cli/installation", false, "CURSOR_"),
-		runtime("codex", "Codex", "codex-acp", nil, "https://github.com/agentclientprotocol/codex-acp", true, "OPENAI_", "CODEX_HOME"),
+		runtime("claude", "Claude", "npx", []string{"--prefer-offline", "-y", "@agentclientprotocol/claude-agent-acp"}, "https://code.claude.com/docs/en/setup", false),
+		runtime("grok", "Grok", "grok", []string{"--permission-mode", "default", "agent", "stdio"}, "https://x.ai/cli", false),
+		runtime("copilot", "Copilot", "copilot", []string{"--acp"}, "https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli", false),
+		runtime("cursor", "Cursor", "cursor-agent", []string{"acp"}, "https://cursor.com/docs/cli/installation", false),
+		runtime("codex", "Codex", "codex-acp", nil, "https://github.com/agentclientprotocol/codex-acp", true),
 		runtime("antigravity", "Antigravity", "agy_acp_server", nil, "https://antigravity.google/docs/ide/extensions", true),
-		runtime("opencode", "OpenCode", "opencode", []string{"acp"}, "https://opencode.ai/docs/", true, "OPENCODE_"),
+		runtime("opencode", "OpenCode", "opencode", []string{"acp"}, "https://opencode.ai/docs/", true),
 	}
 	sort.Slice(c, func(i, j int) bool { return c[i].Name < c[j].Name })
 	return c
@@ -289,35 +286,6 @@ func (d *Daemon) runtimeStatuses() []wire.RuntimeStatus {
 	return out
 }
 
-// allowed is RuntimeEnvironment.allowed: a runtime gets these and its own, never this
-// process's whole environment. A trailing _ is a prefix.
-var allowed = []string{"PATH", "HOME", "USER", "LOGNAME", "SHELL", "TMPDIR", "TZ", "LANG", "LANGUAGE", "LC_", "TERM",
-	"COLORTERM", "XDG_", "EDITOR", "VISUAL", "PAGER", "SSH_AUTH_SOCK", "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "ALL_PROXY",
-	"http_proxy", "https_proxy", "no_proxy", "all_proxy", "SSL_CERT_FILE", "SSL_CERT_DIR", "NODE_EXTRA_CA_CERTS",
-	"REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE", "JAVA_HOME", "GOPATH", "GOROOT", "CARGO_HOME", "RUSTUP_HOME", "PYENV_ROOT",
-	"NVM_DIR", "AGENTS_"}
-
-// environment is the launch environment: the built-in allowlist, the runtime's own names,
-// and the person's own pass-through names (passthrough.go), as the policy allows them.
-func environment(r *runtimeDef, from []string, person ...string) []string {
-	names := append(append([]string{}, allowed...), r.passed...)
-	var env []string
-	for _, kv := range from {
-		name, _, _ := strings.Cut(kv, "=")
-		if passedThrough(person, name) {
-			env = append(env, kv)
-			continue
-		}
-		for _, a := range names {
-			if name == a || strings.HasSuffix(a, "_") && strings.HasPrefix(name, a) {
-				env = append(env, kv)
-				break
-			}
-		}
-	}
-	return env
-}
-
 // locateFor finds a runtime; a test sets it to start a fake one.
 var locateFor = func(r *runtimeDef) (string, []string, []string) { return r.locate() }
 
@@ -338,7 +306,7 @@ func (d *Daemon) launchOn(r *runtimeDef, dir string, account *wire.AccountProfil
 	if path == "" {
 		return acp.Launch{}, &Error{Code: CodeRuntimeNotFound, Message: r.Name + " is not installed on this machine (looked in " + strings.Join(looked, ", ") + ")"}
 	}
-	env := environment(r, loginEnvironment(), d.passThrough(r.ID)...)
+	env := loginEnvironment()
 	// Under "the org path only", nothing of the person's own way to the model reaches the
 	// runtime (#999, D9), also for a handshake on the own sign-in.
 	if account == nil && d.signInRefusedHere(r.ID) {

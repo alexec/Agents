@@ -37,7 +37,7 @@ Mac window passes to a server with `policy/applyYours`.
 | `workflows` | `{mostOn?}` | The most workflows turned on at once in each folder (#2957). |
 | `noticeLimits` | `{burst?, waitMinutes?}` | How many notices an agent may send in a burst, and the minutes it waits after one (#2957). With no layer that sets them: 3 and 10. |
 | `archiveMyChats` | `false` | Agents may not archive a person's finished chats (#2957). Absent or `true` allows it. |
-| `environment` | `{passThrough: [name]}` | The variable names that a person's own pass-through list can name; `*` at the end allowed. |
+| `environment` | `{passThrough: [name]}` | The variable names that a person's own pass-through list can name; `*` at the end allowed. A runtime now gets agentsd's whole environment, so the list no longer cuts what a launch receives; an org account still takes the runtime's own variables out. |
 | `notices` | `{antigravityTerms?: show \| accepted \| refuse}` | Google's terms notice for Antigravity (#999): `show` (as absent), `accepted` (your organisation reviewed the terms; members see no notice, and the Policy pane says so), `refuse` (Antigravity is refused). Console ▸ Policy names them **Show the notice**, **Reviewed by your organisation** and **Do not allow**. |
 | `stopAll` | `{on, by, at, note?}` | The kill switch. Only `policy/stopAll` changes it. |
 | `requireFollowing` | `true` | The control plane refuses to start work on a machine that has not kept this version. |

@@ -8,8 +8,8 @@ import (
 
 // The person's own pass-through list (#727, #998 FR-011a; #2957): your layer's
 // environment.passThrough and environment.runtimes name the variables of this machine's
-// environment that runtimes get beyond the built-in allowlist (allowed in runtimes.go) and
-// each runtime's own names. Names only, never values. names go to every runtime, the
+// environment that runtimes get (no longer read at launch: a runtime now gets this process's whole
+// environment). Names only, never values. names go to every runtime, the
 // runtimes map to that runtime only; * at the end is a prefix. Before this slice these were
 // <settings>/runtime-environment.json, read once into your layer on the first start
 // (FR-012) and not read again. The organisation's policy (environment.passThrough) cuts
@@ -45,17 +45,6 @@ func (d *Daemon) passThrough(runtimeID string) []string {
 		}
 	}
 	return out
-}
-
-// passedThrough is environment's test for one of the person's names: the same name, or a
-// prefix with * at the end.
-func passedThrough(names []string, name string) bool {
-	for _, n := range names {
-		if nameMatches(n, name) {
-			return true
-		}
-	}
-	return false
 }
 
 // passThroughState is settings/passThrough: every name of the person's list, each marked

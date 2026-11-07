@@ -634,7 +634,6 @@ func TestAStartWithNoSignIn(t *testing.T) {
 // Antigravity gets its own home in the root and the switches Swift gave it (049 D8).
 func TestAntigravityLaunchesInItsOwnHome(t *testing.T) {
 	fakeRuntimes(t)
-	t.Setenv("GEMINI_API_KEY", "not-for-antigravity")
 	root := t.TempDir()
 	d, _ := start(t, root)
 	defer d.Shutdown()
@@ -648,9 +647,6 @@ func TestAntigravityLaunchesInItsOwnHome(t *testing.T) {
 		if !strings.Contains(env, want) {
 			t.Fatalf("no %s in\n%s", want, env)
 		}
-	}
-	if strings.Contains(env, "GEMINI_API_KEY") {
-		t.Fatal(env)
 	}
 }
 
