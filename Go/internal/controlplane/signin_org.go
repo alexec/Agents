@@ -47,6 +47,8 @@ const (
 	stateLife      = 10 * time.Minute
 	ticketLife     = 2 * time.Minute
 	oidcSweepAfter = time.Hour
+	// How many started flows the store holds at most; each makes at most one ticket.
+	oidcStatesMost = 1000
 	usedSuffix     = ".used"
 )
 
@@ -745,6 +747,12 @@ func (si *signIns) orgStart(ctx context.Context, start wire.SignInOrgStart, b bi
 	hint := strings.TrimSpace(deref(start.LoginHint))
 	if len(hint) > 254 {
 		hint = ""
+	}
+	// The started flows, at most oidcStatesMost (#3748), until the sweep deletes them.
+	if keys, err := si.s.cfg.Store.List(ctx, oidcStatePrefix); err != nil {
+		return wire.SignInOrgStarted{}, fail(storeUnavailable, "The sign-in could not be started: %v", err)
+	} else if started := countSuffix(keys, ".json"); started >= oidcStatesMost {
+		return wire.SignInOrgStarted{}, fail(tooManyRequests, "Too many sign-ins were started in the last hour. Try again later.")
 	}
 	id := randomToken(16)
 	key := storeKeyHash(oidcStatePrefix, id)

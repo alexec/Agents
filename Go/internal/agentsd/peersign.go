@@ -61,6 +61,10 @@ func (d *Daemon) signedDelivery(agent wire.UUID, method string, params any) *wir
 			deliver, out = "folders/sendPack", p.Pack
 		case p.Read != nil:
 			deliver, out = "folders/sendRead", p.Read
+		case p.MoveIn != nil:
+			in := *p.MoveIn
+			in.From.Machine, in.From.Who = name, who
+			deliver, out = wire.CallAgentsMoveIn.Name, in
 		default:
 			return nil
 		}

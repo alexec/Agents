@@ -54,6 +54,8 @@ type ProviderRecord struct {
 	Contract     int
 	Rev          int
 	Forgotten    *bool
+	// When it was removed, so the sweep deletes its tombstone a week on (#3748).
+	ForgottenAt *records.Stamp
 	// Set when the map or commands were kept as an agent wrote them (#858).
 	WrittenBy *WrittenBy
 	// The group whose users may see it and start machines from it (#1761, FR-028); nil
@@ -87,6 +89,7 @@ type providerJSON struct {
 	Contract     int               `json:"contract"`
 	Rev          int               `json:"rev"`
 	Forgotten    *bool             `json:"forgotten,omitempty"`
+	ForgottenAt  *records.Stamp    `json:"forgottenAt,omitempty"`
 	WrittenBy    *WrittenBy        `json:"writtenBy,omitempty"`
 	Group        *string           `json:"group,omitempty"`
 	Machine      *string           `json:"machine,omitempty"`
@@ -94,7 +97,7 @@ type providerJSON struct {
 
 func (p ProviderRecord) MarshalJSON() ([]byte, error) {
 	j := providerJSON{p.ID, p.Name, p.Kind, p.Command, p.Args, p.URL, p.Headers, p.Commands, p.SecretNames, p.Map,
-		p.Capabilities, p.Contract, p.Rev, p.Forgotten, p.WrittenBy, p.Group, p.Machine}
+		p.Capabilities, p.Contract, p.Rev, p.Forgotten, p.ForgottenAt, p.WrittenBy, p.Group, p.Machine}
 	if j.SecretNames == nil {
 		j.SecretNames = []string{}
 	}
@@ -114,7 +117,7 @@ func (p *ProviderRecord) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("no provider kind %q", j.Kind)
 	}
 	*p = ProviderRecord{j.ID, j.Name, j.Kind, j.Command, j.Args, j.URL, j.Headers, j.Commands, j.SecretNames, j.Map,
-		j.Capabilities, j.Contract, j.Rev, j.Forgotten, j.WrittenBy, j.Group, j.Machine, extra}
+		j.Capabilities, j.Contract, j.Rev, j.Forgotten, j.ForgottenAt, j.WrittenBy, j.Group, j.Machine, extra}
 	return nil
 }
 

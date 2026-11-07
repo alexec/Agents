@@ -37,10 +37,16 @@ enum WindowDefaults {
     /// outside its container to see, so it goes by when that copy last ran.
     static let rootKept: TimeInterval = 7 * 24 * 3600
 
+    /// A copy of a background task's output, opened in TextEdit, is kept this long (#3747).
+    static let outputKept: TimeInterval = 24 * 3600
+
     /// Run once at launch, by every copy, off the main thread: the domains of walks whose
-    /// folder has gone (`stop.sh` removes it) and of roots not run for `rootKept` go.
-    /// The copy's own domain is never one of them.
+    /// folder has gone (`stop.sh` removes it), with the walk's keys in the keychain, and of
+    /// roots not run for `rootKept` go. The copy's own domain is never one of them. So do
+    /// the `agents-output-*` copies older than `outputKept` (#3747).
     static func sweep(now: Date = Date()) {
+        Leftovers.removeOld(in: FileManager.default.temporaryDirectory, prefix: BackgroundOutput.prefix,
+                            olderThan: outputKept, now: now)
         let bundle = Bundle.main.bundleIdentifier ?? "com.alexecollins.agents"
         let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
         let preferences = library.appendingPathComponent("Preferences", isDirectory: true)
@@ -62,6 +68,11 @@ enum WindowDefaults {
             // Emptied by the first, and the empty file left behind goes with the second.
             UserDefaults.standard.removePersistentDomain(forName: name)
             try? FileManager.default.removeItem(at: preferences.appendingPathComponent(file))  // store-ok: the container's own Preferences
+        }
+        // Also the keys of a walk whose domain an older copy removed.
+        ControlClientKey.deleteWalkKeys { walk in
+            walk != ControlConfig.walk
+                && !FileManager.default.fileExists(atPath: walks.appendingPathComponent(walk).path)  // store-ok: a walk's folder in the container
         }
     }
 }

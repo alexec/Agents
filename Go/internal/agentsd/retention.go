@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
@@ -128,6 +129,18 @@ func (d *Daemon) sweepHourly() {
 	}
 	d.sweepHistories(nowFunc())
 	d.sweepSmallStores(nowFunc())
+	d.sweepGoneRoots()
+}
+
+// sweepGoneRoots removes the cache and log folders of each root that is gone (#3746). A
+// root in a temporary folder, a scratch one, leaves the person's folders alone.
+func (d *Daemon) sweepGoneRoots() {
+	if d.Store.Loc.Cache == filepath.Join(d.Store.Loc.Root, "cache") {
+		return
+	}
+	for _, dir := range store.SweepGoneRoots() {
+		log.Printf("retention: removed %s, whose root is gone", dir)
+	}
 }
 
 // sweepHistories bounds spend, usage, time and features by age (#3686), so a machine

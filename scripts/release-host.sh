@@ -27,8 +27,8 @@ servers=$root/App/Resources/servers
 cd $root
 
 for arch in x86_64 aarch64; do
-    [[ -f $servers/agentsd-linux-$arch && -f $servers/github-mcp-linux-$arch && -f $servers/linear-mcp-linux-$arch && -f $servers/gitlab-mcp-linux-$arch && -f $servers/email-mcp-linux-$arch && -f $servers/jira-mcp-linux-$arch && -f $servers/slack-mcp-linux-$arch && -f $servers/googlechat-mcp-linux-$arch && -f $servers/whatsapp-mcp-linux-$arch && -f $servers/sentry-mcp-linux-$arch && -f $servers/betterstack-mcp-linux-$arch && -f $servers/forgejo-mcp-linux-$arch ]] || {
-        print -u2 "No $servers/agentsd-linux-$arch, github-mcp-linux-$arch, linear-mcp-linux-$arch, gitlab-mcp-linux-$arch, email-mcp-linux-$arch, jira-mcp-linux-$arch, slack-mcp-linux-$arch, googlechat-mcp-linux-$arch, whatsapp-mcp-linux-$arch, sentry-mcp-linux-$arch, betterstack-mcp-linux-$arch or forgejo-mcp-linux-$arch: run scripts/build-linux-agentsd.sh first (with Docker or Go)."
+    [[ -f $servers/agentsd-linux-$arch && -f $servers/github-mcp-linux-$arch && -f $servers/linear-mcp-linux-$arch && -f $servers/gitlab-mcp-linux-$arch && -f $servers/email-mcp-linux-$arch && -f $servers/jira-mcp-linux-$arch && -f $servers/slack-mcp-linux-$arch && -f $servers/googlechat-mcp-linux-$arch && -f $servers/whatsapp-mcp-linux-$arch && -f $servers/sentry-mcp-linux-$arch && -f $servers/betterstack-mcp-linux-$arch && -f $servers/forgejo-mcp-linux-$arch && -f $servers/bitbucket-mcp-linux-$arch && -f $servers/azuredevops-mcp-linux-$arch ]] || {
+        print -u2 "No $servers/agentsd-linux-$arch, github-mcp-linux-$arch, linear-mcp-linux-$arch, gitlab-mcp-linux-$arch, email-mcp-linux-$arch, jira-mcp-linux-$arch, slack-mcp-linux-$arch, googlechat-mcp-linux-$arch, whatsapp-mcp-linux-$arch, sentry-mcp-linux-$arch, betterstack-mcp-linux-$arch, forgejo-mcp-linux-$arch, bitbucket-mcp-linux-$arch or azuredevops-mcp-linux-$arch: run scripts/build-linux-agentsd.sh first (with Docker or Go)."
         exit 1
     }
 done
@@ -78,7 +78,7 @@ fi
 
 # What the bundle must hold, signed: the helpers, the MCP servers it ships (#700) and the
 # Linux agentsd.
-for helper in agentsd agents-control github-mcp linear-mcp gitlab-mcp email-mcp jira-mcp slack-mcp googlechat-mcp whatsapp-mcp sentry-mcp betterstack-mcp forgejo-mcp workspace-commands; do
+for helper in agentsd agents-control github-mcp linear-mcp gitlab-mcp email-mcp jira-mcp slack-mcp googlechat-mcp whatsapp-mcp sentry-mcp betterstack-mcp forgejo-mcp bitbucket-mcp azuredevops-mcp workspace-commands; do
     [[ -e "$app/Contents/Helpers/$helper" ]] || { print -u2 "Agents Host has no Helpers/$helper"; exit 1 }
 done
 codesign --verify --deep --strict "$app"
@@ -119,7 +119,9 @@ for arch in x86_64 aarch64; do
         whatsapp-mcp-linux-$arch whatsapp-mcp-linux-$arch.sha256 \
         sentry-mcp-linux-$arch sentry-mcp-linux-$arch.sha256 \
         betterstack-mcp-linux-$arch betterstack-mcp-linux-$arch.sha256 \
-        forgejo-mcp-linux-$arch forgejo-mcp-linux-$arch.sha256 VERSION
+        forgejo-mcp-linux-$arch forgejo-mcp-linux-$arch.sha256 \
+        bitbucket-mcp-linux-$arch bitbucket-mcp-linux-$arch.sha256 \
+        azuredevops-mcp-linux-$arch azuredevops-mcp-linux-$arch.sha256 VERSION
 done
 (cd $out && shasum -a 256 *.dmg *.zip *.tar.gz > SHA256SUMS)
 print "\n$out:"

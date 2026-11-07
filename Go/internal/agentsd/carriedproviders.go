@@ -170,7 +170,11 @@ func (c *carriedProviders) call(request wire.ProviderCarry) wire.ProviderCarried
 		made, runs, err := connection.Create(name, options, request.FirstBoot)
 		return carriedResult(providers.CarriedCreate{Made: made, Runs: runs}, err)
 	case "delete":
-		return carriedResult(nil, connection.Delete(workspace))
+		err := connection.Delete(workspace)
+		if err == nil {
+			forgetCodespaceSSH(workspace)
+		}
+		return carriedResult(nil, err)
 	case "tools":
 		return carriedResult(connection.Tools())
 	}
@@ -303,6 +307,21 @@ func (c *carriedProviders) ssh(request wire.ProviderSSH, progress func(name, ste
 			carriedResult(wire.ProviderSSHResult{KnownHosts: optionalString(known)}, err))
 	}
 	return carriedError("No ssh call is called " + request.Op + ".")
+}
+
+// forgetCodespaceSSH takes a deleted workspace's block out of the ssh config here, the one
+// providers/ssh put there for a codespace (#3746). Another workspace has none.
+func forgetCodespaceSSH(workspace string) {
+	if workspace == "" {
+		return
+	}
+	removed, err := codespacessh.Remove(sshConfigPath(), workspace)
+	switch {
+	case err != nil:
+		log.Printf("providers: %s's ssh block: %v", workspace, err)
+	case removed:
+		log.Printf("providers: removed %s's ssh block", workspace)
+	}
 }
 
 // sshConfigPath is the ssh config ssh reads here: AGENTS_SSH_CONFIG, else ~/.ssh/config.

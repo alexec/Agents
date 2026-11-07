@@ -110,6 +110,10 @@ How step 4 is built (#3492):
   steps of `start_session` (#2887, #2927) and of send and bring_back (#2929, #2947), which
   would stop working with D7's two methods alone. Terminals and every other file method stay
   out.
+- Decided: a peer machine may also call `agents/moveIn` (#3717), because it is the last step
+  of `move_session`, after the steps of send: it restores one session from an export the same
+  machine uploaded with `folders/receiveUpload`, and starts nothing but that session's next
+  turn there.
 - Decided: the control plane may ask, unsigned, `daemon/ping`, `daemon/status`,
   `agents/list`, `worktrees/all`, `agents/summaryFacts`, `backups/make` and `folders/clone`,
   because the Console, projects, reports, a backup before a delete and a new workspace's

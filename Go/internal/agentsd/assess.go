@@ -92,6 +92,7 @@ var appToolMethods = map[string]string{
 	"make_machine":         "machines/make",
 	"delete_machine":       "machines/delete",
 	"bring_back":           "branches/bringBack",
+	"move_session":         "sessions/move",
 	"drive_screen":         "screen/drive",
 	"write_daily_summary":  "summaries/write",
 	"check_folders":        "folders/check",

@@ -208,6 +208,31 @@ The agent can't reach a session that started later because its machine was stopp
 session has no id when the agent asks. If the asking machine is offline when the session
 ends, the agent learns of the end the next time it asks for the session.
 
+## Let an agent move a session to another machine
+
+An agent can move a session that already exists to another machine, with its unpushed work,
+with `move_session` (#3717): itself, for example when the work needs more CPU or your laptop
+is about to close, or a session it started. It names the machine, and a folder there, or
+leaves the folder out for the project's folder on that machine.
+
+1. The agent asks first, as for a start on another machine. Its question card says which
+   session goes where, with which branch. The same **Agents may start sessions on my other
+   machines without asking** switch lets it go without asking.
+2. Choose **Move it**. The branch the session works on goes to the folder there, with its
+   commits and its uncommitted changes, as a send does. Agents makes the folder if it is not
+   there, and a folder with work of its own there stops the move before you are asked.
+3. The session goes on on that machine with the same id, labels, transcript and runtime, in
+   that folder on that branch, and shows in your list under that machine. Its chat says where
+   it came from. This machine lets it go, so it is listed once.
+
+An agent that moves itself moves when its turn ends, and carries on there. A session it
+started is stopped first if it is working, and carries on there; one that was not working
+waits there for its next prompt. The runtime's own copy of the conversation stays on the old
+machine, so the runtime there reads the app's record of the conversation ahead of its next
+prompt. The machine must be running, and the session must be in a Git repository, on a
+branch. A worktree the session worked in stays on the old machine as it was; its branch is
+checked out in the folder there.
+
 ## If it doesn't work
 
 - **The provider can't list.** Its card says why, and shows what it last listed. Check its
