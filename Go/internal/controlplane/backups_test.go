@@ -294,7 +294,8 @@ func TestBackupsKeepToTheQuotaAndNoNameAhead(t *testing.T) {
 	t.Parallel()
 	b, st, owner := backupPlane(t)
 	b.now = func() time.Time { return time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC) }
-	b.quota = 10
+	// A part of four bytes is 32 sealed: two backups fit, three do not.
+	b.quota = 70
 	four := []byte("four")
 	for _, name := range []string{"20261019T010000Z", "20261019T020000Z", "20261019T030000Z"} {
 		if _, err := putBackup(t, b, "a", name, [][]byte{four}, 10); err != nil {
@@ -306,9 +307,9 @@ func TestBackupsKeepToTheQuotaAndNoNameAhead(t *testing.T) {
 		mine = append(mine, l.ID)
 	}
 	if strings.Join(mine, " ") != "a/20261019T030000Z a/20261019T020000Z" {
-		t.Fatalf("kept %v under a quota of 10 bytes", mine)
+		t.Fatalf("kept %v under a quota of 70 bytes", mine)
 	}
-	if _, err := putBackup(t, b, "a", "20261019T040000Z", [][]byte{four, four, four}, 10); err == nil {
+	if _, err := putBackup(t, b, "a", "20261019T040000Z", [][]byte{four, four, four, four}, 10); err == nil {
 		t.Fatal("a backup over the quota went up")
 	}
 	if _, err := b.said("backups/upload", "a", raw(t, wire.BackupStorePart{Name: "20261022T000000Z", Part: 0, Data: four})); err == nil {
