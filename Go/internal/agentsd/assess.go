@@ -171,7 +171,8 @@ func (d *Daemon) keepAppToolCall(agent wire.UUID, tool string, args map[string]j
 }
 
 func (d *Daemon) appToolsPath(agent wire.UUID) string {
-	return filepath.Join(d.Store.Loc.Root, "agents", string(agent), "app-tools.jsonl")
+	// The agent's folder, upper case as Delete removes it (#3651): Linux is case-sensitive.
+	return filepath.Join(d.Store.Loc.Agent(string(agent)), "app-tools.jsonl")
 }
 
 func (d *Daemon) appToolCalls(agent wire.UUID) []appToolCall {
