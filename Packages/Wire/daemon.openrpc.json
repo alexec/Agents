@@ -9,7 +9,7 @@
     {
       "name": "host.wire/1",
       "by": "host",
-      "description": "A host says host/hello with its capabilities on each connect (#1748). The control plane requires it of hosts."
+      "description": "A host says machine/hello with its capabilities on each connect (#1748). The control plane requires it of hosts."
     },
     {
       "name": "agents.move-worktree/1",
@@ -49,22 +49,22 @@
     {
       "name": "host.org-routes/2",
       "by": "host",
-      "description": "The host keeps org routes as an admin's client sealed them to its own key (#3397, specs/3397-client-sealing): it opens each with associated data orgroute.v3, refuses a lower seal version than it holds, shows a route it has no copy of as waiting, makes its own token from a cloud credential, and answers host/orgRouteCheck. The control plane sends host/orgRoutes only to a host that says it. Declared: its methods are the control plane's (control.openrpc.json)."
+      "description": "The host keeps org routes as an admin's client sealed them to its own key (#3397, specs/3397-client-sealing): it opens each with associated data orgroute.v3, refuses a lower seal version than it holds, shows a route it has no copy of as waiting, makes its own token from a cloud credential, and answers machine/orgRouteCheck. The control plane sends machine/orgRoutes only to a host that says it. Declared: its methods are the control plane's (control.openrpc.json)."
     },
     {
       "name": "host.user-settings/2",
       "by": "host",
-      "description": "The host opens its person's secrets as their client sealed them to its own key (#3397), with associated data usersecret.v1, and refuses a lower version than it holds. Only a host that says it is sent its secrets in host/userSettings. Declared: host/userSettings is the control plane's (control.openrpc.json)."
+      "description": "The host opens its person's secrets as their client sealed them to its own key (#3397), with associated data usersecret.v1, and refuses a lower version than it holds. Only a host that says it is sent its secrets in machine/userSettings. Declared: machine/userSettings is the control plane's (control.openrpc.json)."
     },
     {
       "name": "host.lock/1",
       "by": "host",
-      "description": "The host checks its person's machine lock (#3399, specs/3399-machine-lock) as host/lock sends it, and pins the head: it takes a lock only when it grows from the head it pinned last. Until #3400's later steps it refuses nothing and only logs what it would refuse. Declared: host/lock is the control plane's (control.openrpc.json)."
+      "description": "The host checks its person's machine lock (#3399, specs/3399-machine-lock) as machine/lock sends it, and pins the head: it takes a lock only when it grows from the head it pinned last. Until #3400's later steps it refuses nothing and only logs what it would refuse. Declared: machine/lock is the control plane's (control.openrpc.json)."
     },
     {
       "name": "host.lock/2",
       "by": "host",
-      "description": "The host joins its person's lock (#3491, specs/3399-machine-lock D3): with an invite key from its join code it signs its own addMachine (host/lockAdd); with none it asks (host/lockJoin), and shows the six digits once a signer answered (host/lockJoinChanged). Declared: those methods are the control plane's (control.openrpc.json)."
+      "description": "The host joins its person's lock (#3491, specs/3399-machine-lock D3): with an invite key from its join code it signs its own addMachine (machine/lockAdd); with none it asks (machine/lockJoin), and shows the six digits once a signer answered (machine/lockJoinChanged). Declared: those methods are the control plane's (control.openrpc.json)."
     }
   ],
   "methods": [
@@ -7903,7 +7903,7 @@
     {
       "name": "settings/userPart",
       "x-capability": "host.user-settings/1",
-      "description": "A part of the user settings as this machine has it (#1760), for Use This Mac's under You. This machine also writes host/userSettings into its files.",
+      "description": "A part of the user settings as this machine has it (#1760), for Use This Mac's under You. This machine also writes machine/userSettings into its files.",
       "paramStructure": "by-name",
       "params": [
         {

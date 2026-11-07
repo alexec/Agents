@@ -243,7 +243,7 @@ func deliver(t *testing.T, d *Daemon, routes ...wire.DeliveredRoute) {
 		routes = []wire.DeliveredRoute{}
 	}
 	b, _ := json.Marshal(wire.OrgRouteDelivery{Routes: routes, At: now()})
-	d.Told(wire.NotifyHostOrgRoutes.Name, b)
+	d.Told(wire.NotifyMachineOrgRoutes.Name, b)
 }
 
 // fakeProvider is a model provider on loopback: it keeps each request's headers, path and
@@ -381,7 +381,7 @@ func TestNoOrgRouteChangesNothing(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if !slices.Contains(told, wire.NewMethodName(wire.CallHostOrgRoutesApplied.Name)) {
+	if !slices.Contains(told, wire.CallMachineOrgRoutesApplied.Name) {
 		t.Fatalf("%v", told)
 	}
 	if !slices.Contains(d.Capabilities(), wire.CapHostOrgRoutes1) || !slices.Contains(d.Capabilities(), wire.CapHostOrgRoutes2) ||
@@ -662,7 +662,7 @@ func TestTheRelaySendsOnOnlyWhatATurnMay(t *testing.T) {
 
 	// A model the policy does not allow is refused, by the body or the path; a cloud's id
 	// of an allowed model goes on.
-	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 1, map[string]any{"runtimes": map[string]any{"claude": map[string]any{"models": []string{"claude-sonnet-*"}}},
+	d.Told(wire.NotifyMachinePolicy.Name, k.signed(t, 1, map[string]any{"runtimes": map[string]any{"claude": map[string]any{"models": []string{"claude-sonnet-*"}}},
 		"requires": []string{wire.CapHostPolicy1, wire.CapHostOrgRoutes1}}))
 	if got := send("POST", "acme", token, "/v1/messages", `{"model":"claude-opus-4-1"}`); got != 403 {
 		t.Fatalf("a refused model: %d", got)
@@ -684,7 +684,7 @@ func TestTheRelaySendsOnOnlyWhatATurnMay(t *testing.T) {
 	}
 
 	// The kill switch: nothing goes on, for a session or a handshake.
-	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 2, map[string]any{"stopAll": map[string]any{"on": true, "by": map[string]any{"user": "priya"}, "at": now()},
+	d.Told(wire.NotifyMachinePolicy.Name, k.signed(t, 2, map[string]any{"stopAll": map[string]any{"on": true, "by": map[string]any{"user": "priya"}, "at": now()},
 		"requires": []string{wire.CapHostPolicy1, wire.CapHostOrgRoutes1}}))
 	n = p.count()
 	if got := send("POST", "acme", token, "/v1/messages", `{}`); got != 403 {
@@ -696,7 +696,7 @@ func TestTheRelaySendsOnOnlyWhatATurnMay(t *testing.T) {
 	if p.count() != n {
 		t.Fatal("a request was sent on with the kill switch on")
 	}
-	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 3, map[string]any{"requires": []string{wire.CapHostPolicy1, wire.CapHostOrgRoutes1}}))
+	d.Told(wire.NotifyMachinePolicy.Name, k.signed(t, 3, map[string]any{"requires": []string{wire.CapHostPolicy1, wire.CapHostOrgRoutes1}}))
 	if got := send("POST", "acme", token, "/v1/messages", `{}`); got != 200 {
 		t.Fatalf("the kill switch off: %d", got)
 	}
@@ -881,7 +881,7 @@ func TestTheOrgPathOnly(t *testing.T) {
 	root := t.TempDir()
 	d, c, public := orgMachine(t, root, k)
 	os.MkdirAll(d.SettingsDir, 0o755)
-	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 1, map[string]any{
+	d.Told(wire.NotifyMachinePolicy.Name, k.signed(t, 1, map[string]any{
 		"runtimes": map[string]any{"claude": map[string]any{"reach": []string{"orgKey", "gateway"}}}, "requires": []string{wire.CapHostPolicy1, wire.CapHostOrgRoutes1}}))
 	dir := t.TempDir()
 	// No route here yet: refused with orgRouteMissing.
@@ -954,7 +954,7 @@ func TestTheOrgPathOnly(t *testing.T) {
 		t.Fatalf("%v", e)
 	}
 	// A looser policy: the own sign-in comes back.
-	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 2, map[string]any{}))
+	d.Told(wire.NotifyMachinePolicy.Name, k.signed(t, 2, map[string]any{}))
 	p := startParams(dir, "claude", nil)
 	p["accountID"] = "default"
 	c.call(t, 30, "agents/start", p)
@@ -1100,7 +1100,7 @@ func TestOrgRoutesOffline(t *testing.T) {
 	deadline := time.Now().Add(5 * time.Second)
 	for {
 		mu.Lock()
-		ok := slices.Contains(asked, wire.NewMethodName(wire.CallHostOrgRoutesAgain.Name))
+		ok := slices.Contains(asked, wire.CallMachineOrgRoutesAgain.Name)
 		mu.Unlock()
 		if ok {
 			break
@@ -1184,13 +1184,13 @@ func TestAntigravityTermsByPolicy(t *testing.T) {
 	d, c, _ := orgMachine(t, root, k)
 	dir := t.TempDir()
 	for i, terms := range []string{"show", "accepted"} {
-		d.Told(wire.NotifyHostPolicy.Name, k.signed(t, int64(1+i), map[string]any{"notices": map[string]any{"antigravityTerms": terms},
+		d.Told(wire.NotifyMachinePolicy.Name, k.signed(t, int64(1+i), map[string]any{"notices": map[string]any{"antigravityTerms": terms},
 			"requires": []string{wire.CapHostPolicy1, wire.CapHostOrgRoutes1}}))
 		if err := d.runtimeRefusal(d.orgPolicy(), "antigravity"); err != nil {
 			t.Fatalf("%s: %v", terms, err)
 		}
 	}
-	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 3, map[string]any{"notices": map[string]any{"antigravityTerms": "refuse"},
+	d.Told(wire.NotifyMachinePolicy.Name, k.signed(t, 3, map[string]any{"notices": map[string]any{"antigravityTerms": "refuse"},
 		"requires": []string{wire.CapHostPolicy1, wire.CapHostOrgRoutes1}}))
 	e := c.callError(t, 1, "agents/start", startParams(dir, "antigravity", nil))
 	refused(t, e, "policy", "notices.antigravityTerms")
@@ -1435,7 +1435,7 @@ func TestAWaitingRouteAndAnOlderSeal(t *testing.T) {
 	root := t.TempDir()
 	d, c, public := orgMachine(t, root, k)
 	os.MkdirAll(d.SettingsDir, 0o755)
-	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 1, map[string]any{
+	d.Told(wire.NotifyMachinePolicy.Name, k.signed(t, 1, map[string]any{
 		"runtimes": map[string]any{"claude": map[string]any{"reach": []string{"orgKey", "gateway"}}}, "requires": []string{wire.CapHostPolicy1, wire.CapHostOrgRoutes2}}))
 	waiting := testRoute(t, public, "acme", 1, wire.OrgRouteKindKey, wire.OrgRouteVendorAnthropic, "", map[string]string{"apiKey": "k1"}, "claude")
 	waiting.Sealed, waiting.Waiting = map[string]wire.SealedEnvelope{}, new(true)
@@ -1517,7 +1517,7 @@ func TestTheMachineMakesItsOwnTokens(t *testing.T) {
 	}
 }
 
-// #3397: host/orgRouteCheck checks a route with this machine's copy.
+// #3397: machine/orgRouteCheck checks a route with this machine's copy.
 func TestAMachineChecksARoute(t *testing.T) {
 	root := t.TempDir()
 	d, _, public := orgMachine(t, root, newControlKeys(t))
@@ -1535,7 +1535,7 @@ func TestAMachineChecksARoute(t *testing.T) {
 	deliver(t, d, testRoute(t, public, "acme", 1, wire.OrgRouteKindKey, wire.OrgRouteVendorAnthropic, "", map[string]string{"apiKey": key}, "claude"),
 		testRoute(t, public, "wrong", 1, wire.OrgRouteKindKey, wire.OrgRouteVendorAnthropic, "", map[string]string{"apiKey": "sk-ant-wrong"}, "claude"))
 	ask := func(id string) wire.OrgRouteCheck {
-		got, ok := d.Asked(wire.NewMethodName(wire.CallHostOrgRouteCheck.Name), []byte(`{"id":"`+id+`"}`))
+		got, ok := d.Asked(wire.CallMachineOrgRouteCheck.Name, []byte(`{"id":"`+id+`"}`))
 		if !ok {
 			t.Fatal("not answered")
 		}

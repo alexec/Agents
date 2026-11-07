@@ -2783,7 +2783,7 @@ type ControlAuth struct {
 
 	Epoch *int64 `json:"epoch,omitzero"`
 
-	// The capabilities this client has (#1748). None from a client older than #1748, or from a host, which says its own in host/hello.
+	// The capabilities this client has (#1748). None from a client older than #1748, or from a host, which says its own in machine/hello.
 	Capabilities []string `json:"capabilities,omitzero"`
 
 	// With a `w:<host>` identity (#1480): the port of that host's loopback listener. The socket then carries a page from the loopback origin on port <page>, whose own exchange follows the ok, bound to that origin.
@@ -2800,7 +2800,7 @@ type ControlClientChanged struct {
 	Removed *bool `json:"removed,omitzero"`
 }
 
-// clients/startPairing, hosts/startEnroll: the code, until when it works, and for a host the one line to run on the server.
+// clients/startPairing, machines/startEnroll: the code, until when it works, and for a host the one line to run on the server.
 type ControlCodeShown struct {
 	Text string `json:"text"`
 
@@ -2873,7 +2873,7 @@ type ControlMachine struct {
 
 	Implementation *string `json:"implementation,omitzero"`
 
-	// The capabilities this host said in its last host/hello (#1748). None from a host older than #1748.
+	// The capabilities this host said in its last machine/hello (#1748). None from a host older than #1748.
 	Capabilities []string `json:"capabilities,omitzero"`
 
 	// Of the control plane's required capabilities for hosts, the ones this host does not have (#1748). Its state is then needsUpdate.
@@ -3207,7 +3207,7 @@ type DestinationStateRequest struct {
 	Destination SkillDestination `json:"destination"`
 }
 
-// One host in the ssh config, and what hosts/detect did with it (#429).
+// One host in the ssh config, and what machines/detect did with it (#429).
 type DetectedServer struct {
 	Alias string `json:"alias"`
 
@@ -4245,7 +4245,7 @@ type FleetBoard struct {
 	Machines []FleetMachine `json:"machines"`
 }
 
-// One machine on Console ▸ Machines (#1804): its hosts/list row, whose it is, and how many of its agents were running when it last listed them. Numbers only, never what the agents said.
+// One machine on Console ▸ Machines (#1804): its machines/list row, whose it is, and how many of its agents were running when it last listed them. Numbers only, never what the agents said.
 type FleetMachine struct {
 	Host ControlMachine `json:"host"`
 
@@ -5126,7 +5126,7 @@ type JoinDecided struct {
 	Result string `json:"result"`
 }
 
-// hosts/joinRequests, control/joinRequested (#994): a machine waiting for approval, with the code it shows.
+// machines/joinRequests, control/joinRequested (#994): a machine waiting for approval, with the code it shows.
 type JoinRequest struct {
 	Request string `json:"request"`
 
@@ -5143,7 +5143,7 @@ type JoinRequest struct {
 	ForName *string `json:"forName,omitzero"`
 }
 
-// hosts/approveJoin, hosts/denyJoin (#994).
+// machines/approveJoin, machines/denyJoin (#994).
 type JoinRequestDecide struct {
 	Request string `json:"request"`
 }
@@ -5157,7 +5157,7 @@ type JoinedFolder struct {
 	Project string `json:"project"`
 }
 
-// hosts/keep: a request for a stopped host, kept until it is up. signed is the same request signed by the client (#3492, D6): a host that holds its person's lock takes only that, so the control plane keeps and delivers it as it is.
+// machines/keep: a request for a stopped host, kept until it is up. signed is the same request signed by the client (#3492, D6): a host that holds its person's lock takes only that, so the control plane keeps and delivers it as it is.
 type KeepRequest struct {
 	Host MachineRef `json:"host"`
 
@@ -5264,7 +5264,7 @@ type LendGit struct {
 	Allowed bool `json:"allowed"`
 }
 
-// hosts/lendSignIn (T091).
+// machines/lendSignIn (T091).
 type LendSignIn struct {
 	Host MachineRef `json:"host"`
 
@@ -5658,7 +5658,7 @@ type LiveBoard struct {
 	Agents []LiveAgent `json:"agents"`
 }
 
-// A person's machine lock (#3399, specs/3399-machine-lock): its chain of entries, the root first. lock/get, and host/lock to a machine.
+// A person's machine lock (#3399, specs/3399-machine-lock): its chain of entries, the root first. lock/get, and machine/lock to a machine.
 type Lock struct {
 	Person string `json:"person"`
 
@@ -6446,7 +6446,7 @@ type MacTerminalRequest struct {
 	Path *string `json:"path,omitzero"`
 }
 
-// hosts/announce, on an enrolment connection.
+// machines/announce, on an enrolment connection.
 type MachineAnnounce struct {
 	PublicKey Data `json:"publicKey"`
 
@@ -6478,7 +6478,7 @@ type MachineClient struct {
 	Person *string `json:"person,omitzero"`
 }
 
-// host/clients: every window paired with the control plane, which a host checks its local socket against (#1118).
+// machine/clients: every window paired with the control plane, which a host checks its local socket against (#1118).
 type MachineClients struct {
 	Clients []MachineClient `json:"clients"`
 
@@ -6486,12 +6486,12 @@ type MachineClients struct {
 	User *string `json:"user,omitzero"`
 }
 
-// hosts/startEnroll (#1761): with as, a bot's machine code, an admin's only. Without, the caller's own, as before.
+// machines/startEnroll (#1761): with as, a bot's machine code, an admin's only. Without, the caller's own, as before.
 type MachineEnroll struct {
 	As *string `json:"as,omitzero"`
 }
 
-// machines/sendFolder, through host/machines: one step of an agent's start_session with send (#2929), which sends this folder's branch to another of the person's machines first, or of its bring_back (#2947), which brings a branch back from there. Exactly one of state, upload, receive, facts, pack and read; the control plane sends that machine's folders/receiveState, folders/receiveUpload, folders/receive, folders/sendFacts, folders/sendPack or folders/sendRead.
+// machines/sendFolder, through machine/machines: one step of an agent's start_session with send (#2929), which sends this folder's branch to another of the person's machines first, or of its bring_back (#2947), which brings a branch back from there. Exactly one of state, upload, receive, facts, pack and read; the control plane sends that machine's folders/receiveState, folders/receiveUpload, folders/receive, folders/sendFacts, folders/sendPack or folders/sendRead.
 type MachineFolderSend struct {
 	Host string `json:"host"`
 
@@ -6521,7 +6521,7 @@ type MachineFolderSent struct {
 	Read *SendRead `json:"read,omitzero"`
 }
 
-// host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134).
+// machine/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134).
 type MachineHello struct {
 	Host *MachineRef `json:"host,omitzero"`
 
@@ -6559,7 +6559,7 @@ type MachineInfo struct {
 	Host *MachineRef `json:"host,omitzero"`
 }
 
-// hosts/install (MachineInstall.Request): a server over ssh, with its key, the fingerprint trusted, a tunnel. Add as Machine… names the provider and the workspace too (#3497): a codespace whose provider a machine carries is installed from that machine, with the token kept there.
+// machines/install (MachineInstall.Request): a server over ssh, with its key, the fingerprint trusted, a tunnel. Add as Machine… names the provider and the workspace too (#3497): a codespace whose provider a machine carries is installed from that machine, with the token kept there.
 type MachineInstall struct {
 	Destination string `json:"destination"`
 
@@ -6633,7 +6633,7 @@ type MachineLastHeard struct {
 	HeardAt *Date `json:"heardAt,omitzero"`
 }
 
-// hosts/link. A machine whose ssh host key the control plane has not trusted yet (one that joined with the command, #3379) is refused -32069 hostKeyToTrust, data {fingerprint}, until trust is that fingerprint: the key is then kept for the machine's ssh start.
+// machines/link. A machine whose ssh host key the control plane has not trusted yet (one that joined with the command, #3379) is refused -32069 hostKeyToTrust, data {fingerprint}, until trust is that fingerprint: the key is then kept for the machine's ssh start.
 type MachineLink struct {
 	Host MachineRef `json:"host"`
 
@@ -6648,7 +6648,7 @@ type MachineLink struct {
 	Trust *string `json:"trust,omitzero"`
 }
 
-// hosts/setMachineOptions. stopWhenIdleMinutes 0 turns it off.
+// machines/setMachineOptions. stopWhenIdleMinutes 0 turns it off.
 type MachineOptions struct {
 	Host MachineRef `json:"host"`
 
@@ -6659,7 +6659,7 @@ type MachineOptions struct {
 	StartForSchedules *bool `json:"startForSchedules,omitzero"`
 }
 
-// host/policy (#998, FR-006): to a machine that says host.policy/1, on its channel 0, at each join and within 5 seconds of each change. A signed policy, or none when no policy was ever set.
+// machine/policy (#998, FR-006): to a machine that says host.policy/1, on its channel 0, at each join and within 5 seconds of each change. A signed policy, or none when no policy was ever set.
 type MachinePolicy struct {
 	Policy *OrgPolicy `json:"policy,omitzero"`
 
@@ -6668,12 +6668,12 @@ type MachinePolicy struct {
 	None *bool `json:"none,omitzero"`
 }
 
-// projects/joined's answer and host/projects (#2669): the projects that this machine's folders name, with their slots, all of them each time.
+// projects/joined's answer and machine/projects (#2669): the projects that this machine's folders name, with their slots, all of them each time.
 type MachineProjects struct {
 	Projects []ProjectTools `json:"projects"`
 }
 
-// host/providerDraft: a writing agent called one of the writer's tools (#858).
+// machine/providerDraft: a writing agent called one of the writer's tools (#858).
 type MachineProviderDraftCall struct {
 	AgentID UUID `json:"agentID"`
 
@@ -6686,7 +6686,7 @@ type MachineProviderDraftCall struct {
 
 type MachineRef string
 
-// host/release (#2178): the release the control plane names, as X.Y.Z.
+// machine/release (#2178): the release the control plane names, as X.Y.Z.
 type MachineRelease struct {
 	Version string `json:"version"`
 }
@@ -6704,21 +6704,21 @@ type MachineSchedule struct {
 	Workflow *string `json:"workflow,omitzero"`
 }
 
-// machines/sessionCall, through host/machines (#2927): an agent's read_session, message_session, stop_session, archive_session, or list_sessions and wait_for_agents status, on a session it started on another of the person's machines with start_session. The control plane sends that machine's agents/fromStarter, with call.from in its own words.
+// machines/sessionCall, through machine/machines (#2927): an agent's read_session, message_session, stop_session, archive_session, or list_sessions and wait_for_agents status, on a session it started on another of the person's machines with start_session. The control plane sends that machine's agents/fromStarter, with call.from in its own words.
 type MachineSessionCall struct {
 	Host string `json:"host"`
 
 	Call SessionCall `json:"call"`
 }
 
-// machines/startSession, through host/machines (#2887): an agent's start_session on another of the person's machines, by its name. The control plane sends that machine's agents/start.
+// machines/startSession, through machine/machines (#2887): an agent's start_session on another of the person's machines, by its name. The control plane sends that machine's agents/start.
 type MachineSessionStart struct {
 	Host string `json:"host"`
 
 	Start StartRequest `json:"start"`
 }
 
-// host/status on channel 0 (#691 US4): each agent working or waiting on a person, and the next scheduled workflow.
+// machine/status on channel 0 (#691 US4): each agent working or waiting on a person, and the next scheduled workflow.
 type MachineStatus struct {
 	Idle bool `json:"idle"`
 
@@ -6758,7 +6758,7 @@ type MachineTunnelChanged struct {
 	Tunnel MachineTunnel `json:"tunnel"`
 }
 
-// hosts/update (#1766): a host the control plane installed over ssh, updated the same way. The server and its key are given again, as at the install, because the control plane keeps neither; the host's own root and membership stay.
+// machines/update (#1766): a host the control plane installed over ssh, updated the same way. The server and its key are given again, as at the install, because the control plane keeps neither; the host's own root and membership stay.
 type MachineUpdate struct {
 	Host MachineRef `json:"host"`
 
@@ -6791,7 +6791,7 @@ type MachineUsageState struct {
 	Disks []DiskAlarm `json:"disks"`
 }
 
-// host/user (#1761): to a machine on its channel 0, at each join and when its user changes. Its user, their kind, and the labels runs-on: matches (FR-034); for a bot at its cap, until when it starts no work (FR-033).
+// machine/user (#1761): to a machine on its channel 0, at each join and when its user changes. Its user, their kind, and the labels runs-on: matches (FR-034); for a bot at its cap, until when it starts no work (FR-033).
 type MachineUser struct {
 	User string `json:"user"`
 
@@ -6807,7 +6807,7 @@ type MachineUser struct {
 	Bots []string `json:"bots,omitzero"`
 }
 
-// host/userSettings (#1760, FR-024, FR-025): to a machine, on its channel 0, when it joins and when its user's settings or secrets change. Sent only on the links of that user's own machines. secrets is every secret the user has that is sealed to this machine (#3397): a name missing from it was removed, or waits for the person's client to seal it.
+// machine/userSettings (#1760, FR-024, FR-025): to a machine, on its channel 0, when it joins and when its user's settings or secrets change. Sent only on the links of that user's own machines. secrets is every secret the user has that is sealed to this machine (#3397): a name missing from it was removed, or waits for the person's client to seal it.
 type MachineUserSettings struct {
 	User string `json:"user"`
 
@@ -6860,7 +6860,7 @@ type MachineWorkspace struct {
 	WakeAt *Date `json:"wakeAt,omitzero"`
 }
 
-// host/machines, for an agent there: who asked, for the log, and its call. deliver is what the other machine is to get, signed by this one (#3492, D7): the control plane delivers it as it is, in place of its own words.
+// machine/machines, for an agent there: who asked, for the log, and its call. deliver is what the other machine is to get, signed by this one (#3492, D7): the control plane delivers it as it is, in place of its own words.
 type MachineWorkspaceCall struct {
 	Agent string `json:"agent"`
 
@@ -7463,7 +7463,7 @@ type OrgRoute struct {
 
 	Changed *OrgRouteStamp `json:"changed,omitzero"`
 
-	// How many machines said they keep this version (host/orgRoutesApplied). Only in orgRoutes/list.
+	// How many machines said they keep this version (machine/orgRoutesApplied). Only in orgRoutes/list.
 	Machines *int64 `json:"machines,omitzero"`
 
 	// One more each time the secrets, the kind, the vendor or the settings change: what each secret's associated data binds (#3397). 0 with no secret.
@@ -7480,7 +7480,7 @@ type OrgRouteCheck struct {
 	Words string `json:"words"`
 }
 
-// host/orgRoutes (#999): every route the machine's person (or bot) may use. An empty list removes every route.
+// machine/orgRoutes (#999): every route the machine's person (or bot) may use. An empty list removes every route.
 type OrgRouteDelivery struct {
 	Routes []DeliveredRoute `json:"routes"`
 
@@ -7608,7 +7608,7 @@ type OrgRouteVersion struct {
 	Version int64 `json:"version"`
 }
 
-// host/orgRoutesApplied (#999): the routes a machine keeps, after a delivery.
+// machine/orgRoutesApplied (#999): the routes a machine keeps, after a delivery.
 type OrgRoutesApplied struct {
 	Routes []OrgRouteVersion `json:"routes"`
 }
@@ -8239,7 +8239,7 @@ type PluginsListRequest struct {
 	Folder URL `json:"folder"`
 }
 
-// host/policyApplied (#998): a machine kept this version of the policy.
+// machine/policyApplied (#998): a machine kept this version of the policy.
 type PolicyApplied struct {
 	Version int64 `json:"version"`
 }
@@ -10258,7 +10258,7 @@ type SSHHost struct {
 	Known bool `json:"known"`
 }
 
-// hosts/sshHosts (#610): with a destination, just that, as typed.
+// machines/sshHosts (#610): with a destination, just that, as typed.
 type SSHHostsRequest struct {
 	Destination *string `json:"destination,omitzero"`
 }
@@ -10341,7 +10341,7 @@ type SealedEnvelope struct {
 	Ciphertext Data `json:"ciphertext"`
 }
 
-// One secret in host/userSettings (#3397): sealed to this machine by its person's client.
+// One secret in machine/userSettings (#3397): sealed to this machine by its person's client.
 type SealedUserSecret struct {
 	Name UserSecretName `json:"name"`
 
@@ -10629,7 +10629,7 @@ type SessionCallReply struct {
 	Ended *WaitEndingHow `json:"ended,omitzero"`
 }
 
-// machines/sessionEnded through host/machines, then agents/endedElsewhere (#2927): a session started from another machine has ended, so its starter's wait_for_agents can wake. The host sends machine as the starter's machine; the control plane sends it on as the ended session's.
+// machines/sessionEnded through machine/machines, then agents/endedElsewhere (#2927): a session started from another machine has ended, so its starter's wait_for_agents can wake. The host sends machine as the starter's machine; the control plane sends it on as the ended session's.
 type SessionEnded struct {
 	Machine string `json:"machine"`
 

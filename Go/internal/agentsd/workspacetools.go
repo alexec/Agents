@@ -22,10 +22,10 @@ import (
 // What an agent may ask of the control plane through machine/machines.
 const (
 	machinesForAgent   = "machines/forAgent"
-	hostsStart         = "hosts/start"
-	hostsStop          = "hosts/stop"
+	hostsStart         = "machines/start"
+	hostsStop          = "machines/stop"
 	providersCreate    = "providers/create"
-	hostsDeleteMachine = "hosts/deleteMachine"
+	hostsDeleteMachine = "machines/deleteMachine"
 )
 
 // askControl is a request of the control plane on channel 0, and its answer.

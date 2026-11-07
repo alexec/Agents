@@ -105,7 +105,7 @@ export class Providers {
   async link(host: string, provider: string, workspace: string, startWhenUsed: boolean, stopWhenIdleMinutes: number,
     trust?: string): Promise<LinkOutcome> {
     try {
-      await this.caller.call("hosts/link", {
+      await this.caller.call("machines/link", {
         host: host as MachineRef, provider: provider as ProviderID, workspace, startWhenUsed, stopWhenIdleMinutes,
         ...(trust ? { trust } : {}),
       });
@@ -137,7 +137,7 @@ export class Providers {
     try {
       // The provider and workspace let the control plane install a carried codespace from its
       // carrying machine, with the token kept there (#3497).
-      const answer = await this.caller.call("hosts/install", {
+      const answer = await this.caller.call("machines/install", {
         destination, name, provider: provider as ProviderID, workspace, ...(trust ? { trust } : {}),
       }) as
         { needsTrust?: string; name?: string } | null;
@@ -158,7 +158,7 @@ export class Providers {
       const host = hosts.find((h) => h.name === name && !h.workspace);
       if (!host) continue;
       this.linkOnJoin.delete(name);
-      void this.caller.call("hosts/link", {
+      void this.caller.call("machines/link", {
         host: host.id as MachineRef, provider: wanted.provider as ProviderID, workspace: wanted.workspace,
         ...(wanted.trust ? { trust: wanted.trust } : {}),
       })
@@ -168,7 +168,7 @@ export class Providers {
 
   async unlink(host: string): Promise<string | null> {
     try {
-      await this.caller.call("hosts/unlink", { host: host as MachineRef });
+      await this.caller.call("machines/unlink", { host: host as MachineRef });
       return null;
     } catch (error) {
       return describe(error);
@@ -181,7 +181,7 @@ export class Providers {
    */
   async stop(host: string, confirmed = false): Promise<StopAsk | string | null> {
     try {
-      await this.caller.call("hosts/stop", confirmed ? { host: host as MachineRef, confirmRunning: true } : { host: host as MachineRef });
+      await this.caller.call("machines/stop", confirmed ? { host: host as MachineRef, confirmRunning: true } : { host: host as MachineRef });
       return null;
     } catch (error) {
       if (!confirmed && error instanceof CallFailed && error.code === Failure.agentsWorking) return { host, question: error.message };

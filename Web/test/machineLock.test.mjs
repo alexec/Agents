@@ -133,7 +133,7 @@ function controlPlane(person = "alex") {
         }
         case "lock/joinRequests": return [...requests.values()].filter((r) => !r.result).map(row);
         case "lock/joinRequests:machine": {
-          // A machine asks on its channel 0 (#3491): host/lockJoin, as lockjoins.go's askMachine.
+          // A machine asks on its channel 0 (#3491): machine/lockJoin, as lockjoins.go's askMachine.
           const r = { request: `r${++n}`, client: params.host, machine: params.host, name: params.name, kind: "unknown",
             key: params.key, commitment: params.commitment, expires: m.wireNow() + 600 };
           requests.set(r.request, r);
@@ -294,7 +294,7 @@ test("a lock that forks from the pin is broken, and says so", async () => {
   assert.equal(model.brokenWords({ forked: false, why: "entry 1: x" }), "Your lock does not check: entry 1: x.");
 });
 
-/** A machine's key and a request it makes on the fake plane, as agentsd's host/lockJoin does. */
+/** A machine's key and a request it makes on the fake plane, as agentsd's machine/lockJoin does. */
 async function machineAsks(plane, host, name) {
   const { publicRaw } = await m.makeSigningKey();
   const nonce = m.newNonce();

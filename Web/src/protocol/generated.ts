@@ -2414,7 +2414,7 @@ export interface ControlAuth {
   epoch?: number;
   /**
    * The capabilities this client has (#1748). None from a client older than #1748, or from a host,
-   * which says its own in host/hello.
+   * which says its own in machine/hello.
    */
   capabilities?: string[];
   /**
@@ -2440,7 +2440,7 @@ export interface ControlClientChanged {
 }
 
 /**
- * clients/startPairing, hosts/startEnroll: the code, until when it works, and for a host the one
+ * clients/startPairing, machines/startEnroll: the code, until when it works, and for a host the one
  * line to run on the server.
  */
 export interface ControlCodeShown {
@@ -2499,7 +2499,7 @@ export interface ControlMachine {
   workspace?: MachineWorkspace;
   implementation?: string;
   /**
-   * The capabilities this host said in its last host/hello (#1748). None from a host older than
+   * The capabilities this host said in its last machine/hello (#1748). None from a host older than
    * #1748.
    */
   capabilities?: string[];
@@ -2799,7 +2799,7 @@ export interface DestinationStateRequest {
   destination: SkillDestination;
 }
 
-/** One host in the ssh config, and what hosts/detect did with it (#429). */
+/** One host in the ssh config, and what machines/detect did with it (#429). */
 export interface DetectedServer {
   alias: string;
   resolved: string;
@@ -3631,8 +3631,8 @@ export interface FleetBoard {
 }
 
 /**
- * One machine on Console ▸ Machines (#1804): its hosts/list row, whose it is, and how many of its
- * agents were running when it last listed them. Numbers only, never what the agents said.
+ * One machine on Console ▸ Machines (#1804): its machines/list row, whose it is, and how many of
+ * its agents were running when it last listed them. Numbers only, never what the agents said.
  */
 export interface FleetMachine {
   host: ControlMachine;
@@ -4431,8 +4431,8 @@ export interface JoinDecided {
 }
 
 /**
- * hosts/joinRequests, control/joinRequested (#994): a machine waiting for approval, with the code
- * it shows.
+ * machines/joinRequests, control/joinRequested (#994): a machine waiting for approval, with the
+ * code it shows.
  */
 export interface JoinRequest {
   request: string;
@@ -4444,7 +4444,7 @@ export interface JoinRequest {
   forName?: string;
 }
 
-/** hosts/approveJoin, hosts/denyJoin (#994). */
+/** machines/approveJoin, machines/denyJoin (#994). */
 export interface JoinRequestDecide {
   request: string;
 }
@@ -4457,9 +4457,9 @@ export interface JoinedFolder {
 }
 
 /**
- * hosts/keep: a request for a stopped host, kept until it is up. signed is the same request signed
- * by the client (#3492, D6): a host that holds its person's lock takes only that, so the control
- * plane keeps and delivers it as it is.
+ * machines/keep: a request for a stopped host, kept until it is up. signed is the same request
+ * signed by the client (#3492, D6): a host that holds its person's lock takes only that, so the
+ * control plane keeps and delivers it as it is.
  */
 export interface KeepRequest {
   host: MachineRef;
@@ -4540,7 +4540,7 @@ export interface LendGit {
   allowed: boolean;
 }
 
-/** hosts/lendSignIn (T091). */
+/** machines/lendSignIn (T091). */
 export interface LendSignIn {
   host: MachineRef;
   from: MachineRef;
@@ -4940,7 +4940,7 @@ export interface LiveBoard {
 
 /**
  * A person's machine lock (#3399, specs/3399-machine-lock): its chain of entries, the root first.
- * lock/get, and host/lock to a machine.
+ * lock/get, and machine/lock to a machine.
  */
 export interface Lock {
   person: string;
@@ -5514,7 +5514,7 @@ export interface MacTerminalRequest {
   path?: string;
 }
 
-/** hosts/announce, on an enrolment connection. */
+/** machines/announce, on an enrolment connection. */
 export interface MachineAnnounce {
   publicKey: Base64;
   name: string;
@@ -5548,7 +5548,7 @@ export interface MachineClient {
 }
 
 /**
- * host/clients: every window paired with the control plane, which a host checks its local socket
+ * machine/clients: every window paired with the control plane, which a host checks its local socket
  * against (#1118).
  */
 export interface MachineClients {
@@ -5561,15 +5561,15 @@ export interface MachineClients {
 }
 
 /**
- * hosts/startEnroll (#1761): with as, a bot's machine code, an admin's only. Without, the caller's
- * own, as before.
+ * machines/startEnroll (#1761): with as, a bot's machine code, an admin's only. Without, the
+ * caller's own, as before.
  */
 export interface MachineEnroll {
   as?: string;
 }
 
 /**
- * machines/sendFolder, through host/machines: one step of an agent's start_session with send
+ * machines/sendFolder, through machine/machines: one step of an agent's start_session with send
  * (#2929), which sends this folder's branch to another of the person's machines first, or of its
  * bring_back (#2947), which brings a branch back from there. Exactly one of state, upload, receive,
  * facts, pack and read; the control plane sends that machine's folders/receiveState,
@@ -5597,7 +5597,7 @@ export interface MachineFolderSent {
   read?: SendRead;
 }
 
-/** host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134). */
+/** machine/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134). */
 export interface MachineHello {
   host?: MachineRef;
   version: string;
@@ -5632,9 +5632,9 @@ export interface MachineInfo {
 }
 
 /**
- * hosts/install (MachineInstall.Request): a server over ssh, with its key, the fingerprint trusted,
- * a tunnel. Add as Machine… names the provider and the workspace too (#3497): a codespace whose
- * provider a machine carries is installed from that machine, with the token kept there.
+ * machines/install (MachineInstall.Request): a server over ssh, with its key, the fingerprint
+ * trusted, a tunnel. Add as Machine… names the provider and the workspace too (#3497): a codespace
+ * whose provider a machine carries is installed from that machine, with the token kept there.
  */
 export interface MachineInstall {
   destination: string;
@@ -5694,9 +5694,9 @@ export interface MachineLastHeard {
 }
 
 /**
- * hosts/link. A machine whose ssh host key the control plane has not trusted yet (one that joined
- * with the command, #3379) is refused -32069 hostKeyToTrust, data {fingerprint}, until trust is
- * that fingerprint: the key is then kept for the machine's ssh start.
+ * machines/link. A machine whose ssh host key the control plane has not trusted yet (one that
+ * joined with the command, #3379) is refused -32069 hostKeyToTrust, data {fingerprint}, until trust
+ * is that fingerprint: the key is then kept for the machine's ssh start.
  */
 export interface MachineLink {
   host: MachineRef;
@@ -5707,7 +5707,7 @@ export interface MachineLink {
   trust?: string;
 }
 
-/** hosts/setMachineOptions. stopWhenIdleMinutes 0 turns it off. */
+/** machines/setMachineOptions. stopWhenIdleMinutes 0 turns it off. */
 export interface MachineOptions {
   host: MachineRef;
   startWhenUsed?: boolean;
@@ -5716,8 +5716,8 @@ export interface MachineOptions {
 }
 
 /**
- * host/policy (#998, FR-006): to a machine that says host.policy/1, on its channel 0, at each join
- * and within 5 seconds of each change. A signed policy, or none when no policy was ever set.
+ * machine/policy (#998, FR-006): to a machine that says host.policy/1, on its channel 0, at each
+ * join and within 5 seconds of each change. A signed policy, or none when no policy was ever set.
  */
 export interface MachinePolicy {
   policy?: OrgPolicy;
@@ -5726,14 +5726,14 @@ export interface MachinePolicy {
 }
 
 /**
- * projects/joined's answer and host/projects (#2669): the projects that this machine's folders
+ * projects/joined's answer and machine/projects (#2669): the projects that this machine's folders
  * name, with their slots, all of them each time.
  */
 export interface MachineProjects {
   projects: ProjectTools[];
 }
 
-/** host/providerDraft: a writing agent called one of the writer's tools (#858). */
+/** machine/providerDraft: a writing agent called one of the writer's tools (#858). */
 export interface MachineProviderDraftCall {
   agentID: UUID;
   draft: UUID;
@@ -5741,7 +5741,7 @@ export interface MachineProviderDraftCall {
   arguments?: JSONValue;
 }
 
-/** host/release (#2178): the release the control plane names, as X.Y.Z. */
+/** machine/release (#2178): the release the control plane names, as X.Y.Z. */
 export interface MachineRelease {
   version: string;
 }
@@ -5758,7 +5758,7 @@ export interface MachineSchedule {
 }
 
 /**
- * machines/sessionCall, through host/machines (#2927): an agent's read_session, message_session,
+ * machines/sessionCall, through machine/machines (#2927): an agent's read_session, message_session,
  * stop_session, archive_session, or list_sessions and wait_for_agents status, on a session it
  * started on another of the person's machines with start_session. The control plane sends that
  * machine's agents/fromStarter, with call.from in its own words.
@@ -5769,8 +5769,8 @@ export interface MachineSessionCall {
 }
 
 /**
- * machines/startSession, through host/machines (#2887): an agent's start_session on another of the
- * person's machines, by its name. The control plane sends that machine's agents/start.
+ * machines/startSession, through machine/machines (#2887): an agent's start_session on another of
+ * the person's machines, by its name. The control plane sends that machine's agents/start.
  */
 export interface MachineSessionStart {
   host: string;
@@ -5778,7 +5778,7 @@ export interface MachineSessionStart {
 }
 
 /**
- * host/status on channel 0 (#691 US4): each agent working or waiting on a person, and the next
+ * machine/status on channel 0 (#691 US4): each agent working or waiting on a person, and the next
  * scheduled workflow.
  */
 export interface MachineStatus {
@@ -5815,7 +5815,7 @@ export interface MachineTunnelChanged {
 }
 
 /**
- * hosts/update (#1766): a host the control plane installed over ssh, updated the same way. The
+ * machines/update (#1766): a host the control plane installed over ssh, updated the same way. The
  * server and its key are given again, as at the install, because the control plane keeps neither;
  * the host's own root and membership stay.
  */
@@ -5851,7 +5851,7 @@ export interface MachineUsageState {
 }
 
 /**
- * host/user (#1761): to a machine on its channel 0, at each join and when its user changes. Its
+ * machine/user (#1761): to a machine on its channel 0, at each join and when its user changes. Its
  * user, their kind, and the labels runs-on: matches (FR-034); for a bot at its cap, until when it
  * starts no work (FR-033).
  */
@@ -5870,8 +5870,8 @@ export interface MachineUser {
 }
 
 /**
- * host/userSettings (#1760, FR-024, FR-025): to a machine, on its channel 0, when it joins and when
- * its user's settings or secrets change. Sent only on the links of that user's own machines.
+ * machine/userSettings (#1760, FR-024, FR-025): to a machine, on its channel 0, when it joins and
+ * when its user's settings or secrets change. Sent only on the links of that user's own machines.
  * secrets is every secret the user has that is sealed to this machine (#3397): a name missing from
  * it was removed, or waits for the person's client to seal it.
  */
@@ -5906,7 +5906,7 @@ export interface MachineWorkspace {
 }
 
 /**
- * host/machines, for an agent there: who asked, for the log, and its call. deliver is what the
+ * machine/machines, for an agent there: who asked, for the log, and its call. deliver is what the
  * other machine is to get, signed by this one (#3492, D7): the control plane delivers it as it is,
  * in place of its own words.
  */
@@ -6450,7 +6450,8 @@ export interface OrgRoute {
   created?: OrgRouteStamp;
   changed?: OrgRouteStamp;
   /**
-   * How many machines said they keep this version (host/orgRoutesApplied). Only in orgRoutes/list.
+   * How many machines said they keep this version (machine/orgRoutesApplied). Only in
+   * orgRoutes/list.
    */
   machines?: number;
   /**
@@ -6475,8 +6476,8 @@ export interface OrgRouteCheck {
 }
 
 /**
- * host/orgRoutes (#999): every route the machine's person (or bot) may use. An empty list removes
- * every route.
+ * machine/orgRoutes (#999): every route the machine's person (or bot) may use. An empty list
+ * removes every route.
  */
 export interface OrgRouteDelivery {
   routes: DeliveredRoute[];
@@ -6602,7 +6603,7 @@ export interface OrgRouteVersion {
   version: number;
 }
 
-/** host/orgRoutesApplied (#999): the routes a machine keeps, after a delivery. */
+/** machine/orgRoutesApplied (#999): the routes a machine keeps, after a delivery. */
 export interface OrgRoutesApplied {
   routes: OrgRouteVersion[];
 }
@@ -7108,7 +7109,7 @@ export interface PluginsListRequest {
   folder: URLString;
 }
 
-/** host/policyApplied (#998): a machine kept this version of the policy. */
+/** machine/policyApplied (#998): a machine kept this version of the policy. */
 export interface PolicyApplied {
   version: number;
 }
@@ -8930,7 +8931,7 @@ export interface SSHHost {
   known: boolean;
 }
 
-/** hosts/sshHosts (#610): with a destination, just that, as typed. */
+/** machines/sshHosts (#610): with a destination, just that, as typed. */
 export interface SSHHostsRequest {
   destination?: string;
 }
@@ -9017,7 +9018,7 @@ export interface SealedEnvelope {
   ciphertext: Base64;
 }
 
-/** One secret in host/userSettings (#3397): sealed to this machine by its person's client. */
+/** One secret in machine/userSettings (#3397): sealed to this machine by its person's client. */
 export interface SealedUserSecret {
   name: UserSecretName;
   version: number;
@@ -9260,7 +9261,7 @@ export interface SessionCallReply {
 }
 
 /**
- * machines/sessionEnded through host/machines, then agents/endedElsewhere (#2927): a session
+ * machines/sessionEnded through machine/machines, then agents/endedElsewhere (#2927): a session
  * started from another machine has ended, so its starter's wait_for_agents can wake. The host sends
  * machine as the starter's machine; the control plane sends it on as the ended session's.
  */
@@ -11563,23 +11564,6 @@ export interface Methods {
   "groups/remove": { params: GroupRequest; result: Empty };
   "groups/set": { params: GroupSet; result: Group };
   "groups/setRole": { params: GroupRoleSet; result: Group };
-  "hosts/approveJoin": { params: JoinRequestDecide; result: JoinApproved };
-  "hosts/denyJoin": { params: JoinRequestDecide; result: Empty };
-  "hosts/dropKept": { params: KeptRequestID; result: Empty };
-  "hosts/install": { params: MachineInstall; result: JSONValue };
-  "hosts/joinRequests": { params: Empty; result: JoinRequest[] };
-  "hosts/lastHeard": { params: MachineRequest; result: MachineLastHeard };
-  "hosts/lendGit": { params: LendGit; result: Empty };
-  "hosts/link": { params: MachineLink; result: ControlMachine };
-  "hosts/list": { params: Empty; result: ControlMachine[] };
-  "hosts/listKept": { params: Empty; result: KeptList };
-  "hosts/remove": { params: MachineRequest; result: Empty };
-  "hosts/retryKept": { params: KeptRequestID; result: Empty };
-  "hosts/setMachineOptions": { params: MachineOptions; result: ControlMachine };
-  "hosts/start": { params: MachineRequest; result: ControlMachine };
-  "hosts/startEnroll": { params: MachineEnroll; result: ControlCodeShown };
-  "hosts/stop": { params: MachineStop; result: ControlMachine };
-  "hosts/unlink": { params: MachineRequest; result: ControlMachine };
   "lineage/cost": { params: LineageNodeRequest; result: LineageCostRollup };
   "lineage/estimate": { params: LineageEstimateRequest; result: LineageEstimate };
   "lineage/walk": { params: LineageNodeRequest; result: LineageGraph };
@@ -11598,6 +11582,23 @@ export interface Methods {
   "lock/joinReveal": { params: LockJoinNonce; result: Empty };
   "lock/reset": { params: Empty; result: Empty };
   "machine/usage": { params: Empty; result: MachineUsageState };
+  "machines/approveJoin": { params: JoinRequestDecide; result: JoinApproved };
+  "machines/denyJoin": { params: JoinRequestDecide; result: Empty };
+  "machines/dropKept": { params: KeptRequestID; result: Empty };
+  "machines/install": { params: MachineInstall; result: JSONValue };
+  "machines/joinRequests": { params: Empty; result: JoinRequest[] };
+  "machines/lastHeard": { params: MachineRequest; result: MachineLastHeard };
+  "machines/lendGit": { params: LendGit; result: Empty };
+  "machines/link": { params: MachineLink; result: ControlMachine };
+  "machines/list": { params: Empty; result: ControlMachine[] };
+  "machines/listKept": { params: Empty; result: KeptList };
+  "machines/remove": { params: MachineRequest; result: Empty };
+  "machines/retryKept": { params: KeptRequestID; result: Empty };
+  "machines/setMachineOptions": { params: MachineOptions; result: ControlMachine };
+  "machines/start": { params: MachineRequest; result: ControlMachine };
+  "machines/startEnroll": { params: MachineEnroll; result: ControlCodeShown };
+  "machines/stop": { params: MachineStop; result: ControlMachine };
+  "machines/unlink": { params: MachineRequest; result: ControlMachine };
   "mcp/health": { params: Empty; result: MCPHealthSnapshot };
   "mcp/health/check": { params: MCPHealthCheckRequest; result: MCPHealthSnapshot };
   "mcp/hosted": { params: Empty; result: HostedMCPSnapshot };
@@ -11934,23 +11935,6 @@ export const MethodTarget = {
   "groups/remove": "control",
   "groups/set": "control",
   "groups/setRole": "control",
-  "hosts/approveJoin": "control",
-  "hosts/denyJoin": "control",
-  "hosts/dropKept": "control",
-  "hosts/install": "control",
-  "hosts/joinRequests": "control",
-  "hosts/lastHeard": "control",
-  "hosts/lendGit": "control",
-  "hosts/link": "control",
-  "hosts/list": "control",
-  "hosts/listKept": "control",
-  "hosts/remove": "control",
-  "hosts/retryKept": "control",
-  "hosts/setMachineOptions": "control",
-  "hosts/start": "control",
-  "hosts/startEnroll": "control",
-  "hosts/stop": "control",
-  "hosts/unlink": "control",
   "lineage/cost": "host",
   "lineage/estimate": "host",
   "lineage/walk": "host",
@@ -11969,6 +11953,23 @@ export const MethodTarget = {
   "lock/joinReveal": "control",
   "lock/reset": "control",
   "machine/usage": "host",
+  "machines/approveJoin": "control",
+  "machines/denyJoin": "control",
+  "machines/dropKept": "control",
+  "machines/install": "control",
+  "machines/joinRequests": "control",
+  "machines/lastHeard": "control",
+  "machines/lendGit": "control",
+  "machines/link": "control",
+  "machines/list": "control",
+  "machines/listKept": "control",
+  "machines/remove": "control",
+  "machines/retryKept": "control",
+  "machines/setMachineOptions": "control",
+  "machines/start": "control",
+  "machines/startEnroll": "control",
+  "machines/stop": "control",
+  "machines/unlink": "control",
   "mcp/health": "host",
   "mcp/health/check": "host",
   "mcp/hosted": "host",

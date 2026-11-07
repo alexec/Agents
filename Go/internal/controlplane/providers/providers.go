@@ -33,7 +33,7 @@ type MachineRecords interface {
 type Router interface {
 	// Online says whether a host's uplink is up (HostState.isOnline).
 	Online(host string) bool
-	// HostState is the state hosts/list shows for a host, its workspace laid over it.
+	// HostState is the state machines/list shows for a host, its workspace laid over it.
 	HostState(host string) string
 	// SetWorkspace is ControlRouter.setWorkspace: a linked host's workspace changed, or the
 	// link went (nil). Said to every client in control/hostChanged when it differs, and laid
@@ -57,15 +57,15 @@ type Router interface {
 	// Ask is a request of a host on its channel 0, which only the control plane writes:
 	// its result, or nil when it is not here, goes or takes longer than patience (#3398).
 	Ask(host, method string, params any, patience time.Duration) json.RawMessage
-	// HostCan says a host said the capability in its host/hello (#1748).
+	// HostCan says a host said the capability in its machine/hello (#1748).
 	HostCan(host, capability string) bool
 }
 
 // Methods is what Providers needs of ControlMethods.
 type Methods interface {
-	// HostRow is one hosts/list row, as it stands now (DaemonAPI.ControlMachine).
+	// HostRow is one machines/list row, as it stands now (DaemonAPI.ControlMachine).
 	HostRow(h records.MachineRecord) any
-	// RemoveHost is hosts/remove, as that client asked it.
+	// RemoveHost is machines/remove, as that client asked it.
 	RemoveHost(host string, from Caller) error
 }
 
@@ -239,7 +239,7 @@ type Providers struct {
 	broughtBack map[string]bool
 	joining     map[string]*joining
 	// The machines installing Agents in a codespace for Add as Machine… (#3497), by how
-	// many installs: only their host/installProgress is said to clients.
+	// many installs: only their machine/installProgress is said to clients.
 	installing map[string]int
 	done       chan struct{}
 	stopOnce    sync.Once
@@ -418,7 +418,7 @@ func (p *Providers) Answer(method string, params json.RawMessage, from Caller) (
 	return p.answer(method, params, from, "client "+shortID(from.Client))
 }
 
-// HostSaid answers host/machines, host/providerDraft, host/status and host/installProgress, which a host says
+// HostSaid answers machine/machines, machine/providerDraft, machine/status and machine/installProgress, which a host says
 // on its channel 0, as ControlMethods.hostSaid does for them.
 func (p *Providers) HostSaid(host, method string, params json.RawMessage) (any, error) {
 	switch method {
@@ -446,7 +446,7 @@ func (p *Providers) HostSaid(host, method string, params json.RawMessage) (any, 
 			p.Heard(host, status)
 		}
 		return map[string]any{}, nil
-	case wire.NotifyHostInstallProgress.Name:
+	case wire.NotifyMachineInstallProgress.Name:
 		var step wire.ControlInstallProgress
 		if requireParams(params, &step, "ControlInstallProgress", "name", "step") == nil {
 			p.installProgress(host, step)
@@ -1981,7 +1981,7 @@ func shellQuoted(value string) string { return "'" + strings.ReplaceAll(value, "
 
 // MARK: Stop when idle (US4)
 
-// Heard is WorkspaceHandling.heard: a host said whether it is idle (host/status).
+// Heard is WorkspaceHandling.heard: a host said whether it is idle (machine/status).
 func (p *Providers) Heard(host string, status MachineStatus) {
 	p.mu.Lock()
 	was, hadStatus := p.statuses[host]
