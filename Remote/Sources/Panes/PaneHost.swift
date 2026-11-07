@@ -31,6 +31,15 @@ struct PaneHost<Chat: View>: View {
         }
         .animation(.snappy(duration: 0.2), value: state.pane)
         .onGeometryChange(for: Double.self) { $0.size.width } action: { width = $0 }
+        // The Agent Browser pane opens when this session's agent starts to use the browser
+        // (#3916): at once when it is on screen, else when the person comes back to it.
+        .onChange(of: BrowserUseKey(agent: agent.id, usedAt: agent.browserUsedAt), initial: true) { _, key in
+            let state = model.panes.state(for: key.agent)
+            defer { state.browserUseSeen = key.usedAt ?? state.browserUseSeen }
+            guard model.host(agent.host, has: Capability.browser1),
+                  BrowserUse.opensPane(usedAt: key.usedAt, seen: state.browserUseSeen) else { return }
+            state.show(.browser)
+        }
         .navigationDestination(isPresented: fullScreen) {
             PaneView(agent: agent, isColumn: false)
                 .paperGround()
@@ -43,6 +52,12 @@ struct PaneHost<Chat: View>: View {
         Binding(get: { placement == .fullScreen && state.pane != nil },
                 set: { if !$0 && placement == .fullScreen { state.pane = nil } })
     }
+}
+
+/// A session and its agent's last use of the machine's browser (#3916).
+private struct BrowserUseKey: Equatable {
+    var agent: UUID
+    var usedAt: Date?
 }
 
 /// The rule between the conversation and the column, which can be dragged to size it.

@@ -173,6 +173,9 @@ type Agent struct {
 
 	LastActivityAt Date `json:"lastActivityAt"`
 
+	// When the agent's first browser call of its latest turn that used the browser came (#3916). A client opens the session's Agent Browser pane when this moves.
+	BrowserUsedAt *Date `json:"browserUsedAt,omitzero"`
+
 	IsUnread *bool `json:"isUnread,omitzero"`
 
 	// Mute Notifications (#2003): the session still goes under Needs you and counts in the badge, but sends no push, no Mac notification and no banner. A muted workflow's runs start muted.
@@ -1492,6 +1495,15 @@ type BrowserPageState struct {
 	URL *string `json:"url,omitzero"`
 
 	Title *string `json:"title,omitzero"`
+
+	// True when the watch names a session whose agent has opened no tab in the browser (#3916): the client shows that, not a page.
+	NoTab *bool `json:"noTab,omitzero"`
+
+	// The session whose agent holds browser:agents now, when one does (#3916).
+	Holder *UUID `json:"holder,omitzero"`
+
+	// That session's title.
+	HolderTitle *string `json:"holderTitle,omitzero"`
 }
 
 // One site that keeps cookies in the machine's browser (#3535), which is how a site remembers a sign-in.
@@ -1530,6 +1542,9 @@ type BrowserWatchRequest struct {
 	Width int64 `json:"width"`
 
 	Height int64 `json:"height"`
+
+	// The session whose tab the client shows (#3916): the newest tab its agent opened. Without it, the machine's newest tab.
+	Agent *UUID `json:"agent,omitzero"`
 }
 
 // A budget raised for one person for one UTC day (#998, FR-019), kept in the policy and swept the day after.

@@ -19,8 +19,10 @@ import (
 
 // The page a person watches (#3528, spike #3527): a CDP screencast of one tab of the
 // machine's browser, and the person's input sent back to it. The cast attaches to a tab
-// and leaves it open when it ends, so watching never closes an agent's page. It follows
-// the newest tab: when an agent opens one, the person sees it.
+// and leaves it open when it ends, so watching never closes an agent's page. A cast of one
+// session shows that session's tab (#3916): Watch names it, and agentsd starts another
+// cast when the session's agent opens a new one. A cast that names no tab follows the
+// machine's newest tab: when an agent opens one, the person sees it.
 
 // Frame is one JPEG of the page. Ack it with Cast.Ack once a client has drawn it:
 // Chromium sends the next only then, so a slow client gets fewer frames, not a backlog.
@@ -65,10 +67,12 @@ type Cast struct {
 	root       context.Context
 	cancelRoot context.CancelFunc
 
-	mu      sync.Mutex
-	width   int64
-	height  int64
-	tab     target.ID
+	mu     sync.Mutex
+	width  int64
+	height int64
+	tab    target.ID
+	// pinned is true for a cast of one named tab: it does not follow new tabs.
+	pinned  bool
 	tabCtx  context.Context
 	stopTab context.CancelFunc
 	done    bool
@@ -77,14 +81,14 @@ type Cast struct {
 	known map[target.ID]bool
 }
 
-// Watch starts a screencast of the newest tab of the browser at endpoint, laid out at
-// width by height. frame hears each frame, page each change of address or title, and
-// closed once, when the browser goes away (not after Close).
-func Watch(endpoint string, width, height int64, frame func(Frame), page func(Page), closed func()) (*Cast, error) {
+// Watch starts a screencast of tab, or of the newest tab when tab is "", of the browser at
+// endpoint, laid out at width by height. frame hears each frame, page each change of
+// address or title, and closed once, when the browser goes away (not after Close).
+func Watch(endpoint string, tab target.ID, width, height int64, frame func(Frame), page func(Page), closed func()) (*Cast, error) {
 	alloc, cancelAlloc := remote.NewAllocator(context.Background(), endpoint, remote.NoModifyURL)
 	root, cancelRoot := chromedp.NewContext(alloc)
 	c := &Cast{frame: frame, page: page, closed: closed, root: root,
-		cancelRoot: func() { cancelRoot(); cancelAlloc() }}
+		cancelRoot: func() { cancelRoot(); cancelAlloc() }, pinned: tab != ""}
 	c.width, c.height = clampSide(width), clampSide(height)
 	// chromedp ties the connection's life to the context of its first call, so that one
 	// is root itself, with no time limit; the browser is on this machine.
@@ -94,10 +98,13 @@ func Watch(endpoint string, width, height int64, frame func(Frame), page func(Pa
 	}
 	setup, cancel := context.WithTimeout(root, 15*time.Second)
 	defer cancel()
-	tab, err := c.newestTab(setup)
+	newest, err := c.newestTab(setup)
 	if err != nil {
 		c.cancelRoot()
 		return nil, err
+	}
+	if tab == "" {
+		tab = newest
 	}
 	if err := c.attach(tab); err != nil {
 		c.cancelRoot()
@@ -107,7 +114,8 @@ func Watch(endpoint string, width, height int64, frame func(Frame), page func(Pa
 	return c, nil
 }
 
-// newestTab is the last page the browser lists, or a new blank one when it has none.
+// newestTab is the last page the browser lists, or a new blank one when it has none and
+// the cast follows the newest.
 func (c *Cast) newestTab(ctx context.Context) (target.ID, error) {
 	res, err := chromedp.CallBrowser(ctx, target.GetTargets, target.GetTargetsParams{})
 	if err != nil {
@@ -121,7 +129,7 @@ func (c *Cast) newestTab(ctx context.Context) (target.ID, error) {
 		}
 	}
 	c.mu.Unlock()
-	if id := pickTab(res.TargetInfos, ""); id != "" {
+	if id := pickTab(res.TargetInfos, ""); id != "" || c.pinned {
 		return id, nil
 	}
 	made, err := chromedp.CallBrowser(ctx, target.CreateTarget, target.CreateTargetParams{URL: "about:blank"})
@@ -279,7 +287,7 @@ func (c *Cast) followTabs() {
 
 func (c *Cast) handleTarget(ev any) {
 	c.mu.Lock()
-	tab := c.tab
+	tab, pinned := c.tab, c.pinned
 	var fresh bool
 	if e, ok := ev.(target.EventTargetCreated); ok && e.TargetInfo != nil {
 		fresh = !c.known[e.TargetInfo.TargetID]
@@ -288,11 +296,12 @@ func (c *Cast) handleTarget(ev any) {
 	c.mu.Unlock()
 	switch e := ev.(type) {
 	case target.EventTargetCreated:
-		if i := e.TargetInfo; fresh && i.Type == "page" && i.TargetID != tab {
+		if i := e.TargetInfo; fresh && !pinned && i.Type == "page" && i.TargetID != tab {
 			_ = c.attach(i.TargetID)
 		}
 	case target.EventTargetDestroyed:
-		if e.TargetID != tab {
+		// A pinned cast's tab that closed is agentsd's to move: it knows the session's next.
+		if e.TargetID != tab || pinned {
 			return
 		}
 		ctx, cancel := context.WithTimeout(c.root, 15*time.Second)

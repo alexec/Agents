@@ -1,4 +1,5 @@
 import CoreGraphics
+import Darwin
 import Foundation
 import Observation
 
@@ -7,7 +8,8 @@ import Observation
 /// buttons sent back to it.
 ///
 /// One per host per window. Each pane that shows it says `watch` while on screen and
-/// `unwatch` when it goes; the host sends frames while any does. A frame is acked as it
+/// `unwatch` when it goes; the host sends frames while any does. A watch names the pane's
+/// session, and the host shows that session's own tab (#3916). A frame is acked as it
 /// lands, so the host sends the next only then, and a slow link gets fewer frames rather
 /// than a backlog.
 @MainActor
@@ -24,6 +26,8 @@ public final class MachineBrowser {
     /// How many panes watch, and the size the last one asked for.
     @ObservationIgnored private var watchers = 0
     @ObservationIgnored private var size: (width: Int, height: Int) = (0, 0)
+    /// The session whose tab the last watch asked for.
+    @ObservationIgnored private var session: UUID?
     /// The person's input, sent one call at a time, in order.
     @ObservationIgnored private var outbox: [DaemonAPI.BrowserInputRequest] = []
     @ObservationIgnored private var sender: Task<Void, Never>?
@@ -33,19 +37,25 @@ public final class MachineBrowser {
         self.describe = describe
     }
 
-    /// A pane came on screen at this size, in points, or changed size.
-    public func watch(width: Int, height: Int, adding: Bool) async {
+    /// A pane of `session` came on screen at this size, in points, or changed size.
+    public func watch(session: UUID, width: Int, height: Int, adding: Bool) async {
         if adding { watchers += 1 }
         guard watchers > 0, width > 0, height > 0 else { return }
         size = (width, height)
+        if self.session != session {
+            // Another session's page is not this one's.
+            self.session = session
+            frame = nil
+        }
         await sayWatch()
     }
 
     private func sayWatch() async {
         do {
             state = try await client.call(DaemonAPI.Method.browserWatch,
-                                          DaemonAPI.BrowserWatchRequest(width: size.width, height: size.height),
+                                          DaemonAPI.BrowserWatchRequest(width: size.width, height: size.height, agent: session),
                                           returning: DaemonAPI.BrowserPageState.self)
+            if state.sessionHasNoTab { frame = nil }
             problem = nil
         } catch {
             problem = describe(error)
@@ -77,7 +87,7 @@ public final class MachineBrowser {
         case DaemonAPI.Notification.browserPageChanged:
             guard let s = try? params?.decode(DaemonAPI.BrowserPageState.self) else { return }
             state = s
-            if s.status != .running { frame = nil }
+            if s.status != .running || s.sessionHasNoTab { frame = nil }
         default:
             break
         }
@@ -139,6 +149,29 @@ public final class MachineBrowser {
         let size = CGSize(width: page.width * scale, height: page.height * scale)
         return CGRect(x: (view.width - size.width) / 2, y: (view.height - size.height) / 2,
                       width: size.width, height: size.height)
+    }
+}
+
+/// When a session's Agent Browser pane opens by itself (#3916): when its agent starts to
+/// use the browser. The host moves the agent's `browserUsedAt` at the first browser call of
+/// each turn that uses it; a pane opens for a use newer than the last one it acted on, or,
+/// when it has acted on none, newer than when this client started, so a launch does not
+/// open the pane of every session that used the browser once.
+public enum BrowserUse {
+    /// When the kernel started this client's process: not the first read of this, which
+    /// may come after the use it is compared with.
+    public static let clientStarted: Date = {
+        var info = kinfo_proc()
+        var size = MemoryLayout<kinfo_proc>.stride
+        var name: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid()]
+        guard sysctl(&name, 4, &info, &size, nil, 0) == 0 else { return Date() }
+        let start = info.kp_proc.p_un.__p_starttime
+        return Date(timeIntervalSince1970: Double(start.tv_sec) + Double(start.tv_usec) / 1_000_000)
+    }()
+
+    public static func opensPane(usedAt: Date?, seen: Date?, since started: Date = clientStarted) -> Bool {
+        guard let usedAt else { return false }
+        return usedAt > (seen ?? started)
     }
 }
 

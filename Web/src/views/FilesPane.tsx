@@ -160,7 +160,7 @@ export function FilesPane({ store, host, session }: { store: Store; host: string
           ? <SimulatorPane store={store} host={host} />
           : <p class="hint">{hostNeedsUpdate}</p>)}
         {pane.tab === "browser" && (store.has(host, Capability.browser1)
-          ? <AgentBrowserPane store={store} host={host} />
+          ? <AgentBrowserPane key={session} store={store} host={host} session={session} />
           : <p class="hint">{hostNeedsUpdate}</p>)}
       </div>
     </aside>

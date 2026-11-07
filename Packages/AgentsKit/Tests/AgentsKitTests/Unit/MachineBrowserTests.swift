@@ -60,7 +60,43 @@ struct MachineBrowserTests {
         try check(BrowserKeys.input(down: true, characters: "a", bare: "a", macKeyCode: 0, modifiers: 0), "BrowserInputRequest")
         try check(DaemonAPI.BrowserInputRequest(kind: .text, text: "pasted"), "BrowserInputRequest")
         try check(DaemonAPI.BrowserPageState(status: .starting, detail: "Downloading Chromium"), "BrowserPageState")
+        try check(DaemonAPI.BrowserWatchRequest(width: 400, height: 600, agent: UUID()), "BrowserWatchRequest")
+        try check(DaemonAPI.BrowserPageState(status: .running, noTab: true, holder: UUID(), holderTitle: "Sign up"),
+                  "BrowserPageState")
         try check(DaemonAPI.BrowserFrame(image: Data([0xFF, 0xD8]), ack: 1, width: 800, height: 600), "BrowserFrame")
+    }
+
+    /// #3916: a session's pane shows its own tab, says who else holds the browser, and
+    /// opens when its agent starts to use it.
+    @Test func aPaneSaysWhoElseHoldsTheBrowser() {
+        let me = UUID(), other = UUID()
+        #expect(DaemonAPI.BrowserPageState(status: .running, holder: other).otherHolder(than: me) == other)
+        #expect(DaemonAPI.BrowserPageState(status: .running, holder: me).otherHolder(than: me) == nil)
+        #expect(DaemonAPI.BrowserPageState(status: .running).otherHolder(than: me) == nil)
+        #expect(DaemonAPI.BrowserPageState(status: .running, noTab: true).sessionHasNoTab)
+        #expect(!DaemonAPI.BrowserPageState(status: .stopped, noTab: true).sessionHasNoTab)
+    }
+
+    @Test func thePaneOpensForANewerUseOfTheBrowser() {
+        let started = Date(timeIntervalSince1970: 1000)
+        let before = started.addingTimeInterval(-60), after = started.addingTimeInterval(60)
+        // A use from before this client started opens nothing; one after it does.
+        #expect(!BrowserUse.opensPane(usedAt: before, seen: nil, since: started))
+        #expect(BrowserUse.opensPane(usedAt: after, seen: nil, since: started))
+        #expect(!BrowserUse.opensPane(usedAt: nil, seen: nil, since: started))
+        // Once seen, only a newer one: a pane the person closed stays closed for this turn.
+        #expect(!BrowserUse.opensPane(usedAt: after, seen: after, since: started))
+        #expect(BrowserUse.opensPane(usedAt: after.addingTimeInterval(1), seen: after, since: started))
+        // This client started when its process did, before anything here read it.
+        #expect(BrowserUse.clientStarted < Date())
+        #expect(Date().timeIntervalSince(BrowserUse.clientStarted) < 24 * 3600)
+    }
+
+    @Test func anAgentKeepsWhenItUsedTheBrowser() throws {
+        var agent = Agent(runtimeID: "claude", cwd: URL(fileURLWithPath: "/tmp/x"))
+        agent.browserUsedAt = Date(timeIntervalSince1970: 1_800_000_000)
+        let back = try StoreCoding.decoder.decode(Agent.self, from: StoreCoding.encoder.encode(agent))
+        #expect(back.browserUsedAt == agent.browserUsedAt)
     }
 
     @Test func aStatusThisBuildDoesNotKnowIsStopped() throws {
