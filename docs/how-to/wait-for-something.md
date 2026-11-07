@@ -48,6 +48,14 @@ and then carry on.
    no server here offers, or a filter the server doesn't take, is refused with what the
    server does take. See [Events from MCP servers](../reference/events.md#events-from-mcp-servers).
 
+   A wait on an event about one thing names that thing (#3797). For a PR, that is `pr`,
+   `branch`, `fixes` (the issues its body closes, such as `{"fixes": ["#640"]}`) or
+   `mine`. For an issue, it is `issue` or `label`. For a run, it is `run`, `branch` or
+   `workflow`. For `branch.moved`, it is `branch`. To wake on every one in the repo, set
+   `{"any": true}`. A wait that does neither is refused, with words that say what to set,
+   so an agent waiting for its own PR is not woken by every other merge. The table is in
+   [Events from MCP servers](../reference/events.md#events-from-mcp-servers).
+
 2. If the runtime asks permission to use `wait_for_event`, allow it. Claude and Cursor may
    ask, and Copilot always does.
 

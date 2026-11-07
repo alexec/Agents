@@ -455,6 +455,7 @@
             "events": [
               "checks.failed",
               "checks.passed",
+              "run.completed",
               "pr.opened",
               "pr.merged",
               "pr.closed",

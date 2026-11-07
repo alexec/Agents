@@ -145,7 +145,7 @@ func TestOnlyOneWaitAtATime(t *testing.T) {
 	}
 
 	// wait_for_event closes the open block: it is replaced, not stacked.
-	text, _ = m.tool(3, "wait_for_event", map[string]any{"events": "branch.moved", "until_minutes": 10})
+	text, _ = m.tool(3, "wait_for_event", map[string]any{"events": "branch.moved", "where": map[string]any{"any": true}, "until_minutes": 10})
 	if !strings.HasPrefix(text, "Still waiting for branch.moved") {
 		t.Fatal(text)
 	}

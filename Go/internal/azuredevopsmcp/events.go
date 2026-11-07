@@ -76,7 +76,8 @@ func prInput() schema {
 var fixesSchema = map[string]any{"type": "array", "items": str}
 
 // events are the events this server offers, in the gitlab server's order, and checks.passed
-// as the github server's (#3805); the gitlab server's issue events are the tracker's here.
+// and run.completed as the github server's (#3805, #3810); the gitlab server's issue events
+// are the tracker's here.
 var events = []event{
 	{name: "checks.failed", title: "Checks failed",
 		description: "An open pull request's checks failed at its head commit: an Azure Pipelines build of it (its build validation, or any pipeline it triggers), a build of its branch at that commit (a CI trigger's), or the newest status that another service set on it (failed or error). One event per commit and failure time, so a build run again that fails again is a new one. failedJobs are the failed builds and statuses; run is the first failed build (get_build_log reads its failed steps), or the first failed status with id 0 when no build failed." + ownPRs,
@@ -92,6 +93,18 @@ var events = []event{
 		payload: object(map[string]any{
 			"pr": prSchema(nil), "headSha": str,
 			"run": object(map[string]any{"id": integer, "name": str, "url": str}),
+		})},
+	// A build no pull request owns, as main's or a tag's, as the github server's (#3444, #3810).
+	{name: "run.completed", title: "Pipeline build finished",
+		description: "An Azure Pipelines build of the repository finished, whatever started it (a push, a tag, a person, a schedule) and whatever its result (succeeded, failed, canceled, partiallySucceeded): one event per build and finish time, so a build run again is a new one. For a build no pull request owns, such as main's or a tag's release; a pull request's own builds are checks.failed and checks.passed. run.name is its pipeline's name, run.number its build number, run.event what started it (manual, individualCI, batchedCI, schedule, pullRequest…). Only builds asked for by a person, never a bot (a build service), and never a fork's pull request's, unless anyone is true.",
+		input: schema{repoProperty,
+			property{name: "pipeline", kind: "string", description: "Only builds of this pipeline, by its name, as release."},
+			branchProperty("Only builds of this branch or tag, as main or v0.16.0."),
+			property{name: "run", kind: "integer", description: "Only this build, by its id."}, anyoneProperty},
+		payload: object(map[string]any{
+			"run": object(map[string]any{"id": integer, "name": str, "number": str, "event": str, "branch": str, "headSha": str,
+				"url": str, "conclusion": str, "actor": str}),
+			"completedAt": str,
 		})},
 	{name: "pr.opened", title: "Pull request opened",
 		description: "A pull request was opened, or a draft was published: a pull request active and not a draft now that was not at the last poll. Drafts never count. Reactivated, it is raised again." + ownPRs,
@@ -462,6 +475,20 @@ func candidates(ctx context.Context, f AzureDevOps, name string, a args, yours *
 		return (a.pr == 0 || m.Number == a.pr) && (a.branch == "" || m.Branch == a.branch) && who
 	}
 	switch name {
+	case "run.completed":
+		builds, listed, err := f.CompletedBuilds(ctx, repo, a.pipeline, a.branch, a.run, since)
+		if err != nil {
+			return nil, Listed{}, err
+		}
+		// Its finish time in the id: a build run again (its failed jobs) is a new event.
+		var list []candidate
+		for _, b := range builds {
+			if b.At != "" && (a.anyone || b.Trusted) {
+				list = append(list, candidate{eventID: fmt.Sprintf("run.completed:%s:%d:%s", repo, b.ID, b.At), time: b.At,
+					data: func() (map[string]any, error) { return b.data(), nil }})
+			}
+		}
+		return list, listed, nil
 	case "review.comment":
 		comments, listed, err := f.ReviewComments(ctx, repo, since)
 		if err != nil {

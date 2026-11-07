@@ -110,7 +110,7 @@ func (c CodeRabbitComment) data() map[string]any {
 // last reviews: one call for review.posted, whatever the number of PRs.
 const reviewedQuery = `query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) {
   pullRequests(states: OPEN, first: 100, orderBy: {field: UPDATED_AT, direction: DESC}) { nodes {
-    number title headRefName headRefOid url isCrossRepository authorAssociation author { login __typename }
+    number title body headRefName headRefOid url isCrossRepository authorAssociation author { login __typename }
     reviews(last: 20) { nodes { author { login __typename } body state url databaseId commit { oid } } }
     commits(last: 1) { nodes { commit { oid status { context(name: "` + codeRabbitStatus + `") { state description createdAt } } } } } } } } }`
 
@@ -133,6 +133,7 @@ func (g *RealGitHub) CodeRabbitPRs(ctx context.Context, repo string) ([]Reviewed
 					Nodes []struct {
 						Number      int       `json:"number"`
 						Title       string    `json:"title"`
+						Body        string    `json:"body"`
 						HeadRefName string    `json:"headRefName"`
 						HeadRefOid  string    `json:"headRefOid"`
 						URL         string    `json:"url"`
@@ -185,7 +186,10 @@ func (g *RealGitHub) CodeRabbitPRs(ctx context.Context, repo string) ([]Reviewed
 	}
 	var out []ReviewedPR
 	for _, n := range answer.Data.Repository.PullRequests.Nodes {
-		r := ReviewedPR{PR: PR{Number: n.Number, Title: n.Title, Branch: n.HeadRefName, URL: n.URL}, HeadSHA: n.HeadRefOid}
+		r := ReviewedPR{PR: PR{Number: n.Number, Title: n.Title, Branch: n.HeadRefName, URL: n.URL, Fixes: closingRefs(n.Body)}, HeadSHA: n.HeadRefOid}
+		if n.Author != nil {
+			r.PR.Author = n.Author.Login
+		}
 		if n.Author != nil && !n.CrossRepo {
 			r.Trusted = isTrusted(n.Association, n.Author.Login, n.Author.Typename)
 		}
