@@ -115,6 +115,30 @@ func TestStartersSayTheirDeploys(t *testing.T) {
 	}
 }
 
+// setup-gcp.sh names the pool, the provider and the account the same every time, so an agent
+// that reads only the project's number builds the two variables (#3710,
+// specs/3656-new-app/google-cloud.md, step 5).
+func TestSetupGCPNamesAreFixed(t *testing.T) {
+	files, err := starterFiles("web-service", starterValues["web-service"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := string(files["setup-gcp.sh"])
+	for _, l := range []string{"pool=github\n", "provider=github\n", "account=deploy\n", "repo=someone/tidelog\n",
+		"project=${1:-tidelog-1234}\n",
+		`echo "GCP_WIF_PROVIDER=projects/$number/locations/global/workloadIdentityPools/$pool/providers/$provider"`,
+		`sa="$account@$project.iam.gserviceaccount.com"`, `echo "GCP_DEPLOY_SA=$sa"`} {
+		if !strings.Contains(script, l) {
+			t.Errorf("setup-gcp.sh does not say %q", l)
+		}
+	}
+	// The two names are the script's last output, which the agent reads from the page.
+	lines := strings.Split(strings.TrimSpace(script), "\n")
+	if !strings.HasPrefix(lines[len(lines)-1], `echo "GCP_DEPLOY_SA=`) || !strings.HasPrefix(lines[len(lines)-2], `echo "GCP_WIF_PROVIDER=`) {
+		t.Errorf("setup-gcp.sh does not end with the two names: %q", lines[len(lines)-2:])
+	}
+}
+
 // The iPhone app's icon is an image, so it is not filled, and it is there: App Store Connect
 // refuses a build with no icon.
 func TestStarterKeepsTheIcon(t *testing.T) {
