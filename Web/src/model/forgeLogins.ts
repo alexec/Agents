@@ -4,7 +4,7 @@ import type { ForgeLogins, PeopleForViews } from "../protocol/generated";
 
 export const forgeLoginsTitle = "GitHub, GitLab, Linear, Jira and Forgejo";
 export const forgeLoginsFooter =
-  "Named on the Pull requests, Merge requests and Issues pages’ Team section, and used to say an agent is on one of your own. Filled in from each machine’s own connection (Activity ▸ Connectors) when it is signed in; given here only when it is not. A Jira login is your Atlassian account’s email, account id or display name.";
+  "Named on the Pull requests, Merge requests and Issues pages’ Team section, and used to say an agent is on one of your own. Filled in from each machine’s own connection (Activity ▸ Connectors) when it is signed in; given here only when it is not. A Jira login is your Atlassian account’s email, account id or display name. A Forgejo login is your user name on the connected Forgejo.";
 export const forgeLoginsNotSaved = "Your logins were not saved.";
 
 export const forgeLoginFields = [
