@@ -490,6 +490,10 @@ targets:
       - name: Build the bitbucket MCP server
         script: sh "$SRCROOT/scripts/go-github-mcp.sh" bitbucket-mcp
         basedOnDependencyAnalysis: false
+      # The azuredevops MCP server (#2829), built and carried the same way.
+      - name: Build the azuredevops MCP server
+        script: sh "$SRCROOT/scripts/go-github-mcp.sh" azuredevops-mcp
+        basedOnDependencyAnalysis: false
       # The command machine provider (#691, in Go since #1364), which agents-control looks
       # for beside itself, built and carried the same way.
       - name: Build the command machine provider
@@ -539,6 +543,9 @@ targets:
         basedOnDependencyAnalysis: false
       - name: Carry the bitbucket MCP server
         script: sh "$SRCROOT/scripts/go-github-mcp.sh" --carry bitbucket-mcp
+        basedOnDependencyAnalysis: false
+      - name: Carry the azuredevops MCP server
+        script: sh "$SRCROOT/scripts/go-github-mcp.sh" --carry azuredevops-mcp
         basedOnDependencyAnalysis: false
       - name: Carry the command machine provider
         script: sh "$SRCROOT/scripts/go-github-mcp.sh" --carry workspace-commands
