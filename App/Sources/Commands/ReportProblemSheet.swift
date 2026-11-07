@@ -60,7 +60,7 @@ struct ReportProblemSheet: View {
             // The editor says it to VoiceOver.
             Text(label).appText(.fine).accessibilityHidden(true)
             TextEditor(text: text)
-                .font(.body)
+                .appText(.reading)
                 .frame(height: 72)
                 .scrollContentBackground(.hidden)
                 .padding(4)
@@ -77,7 +77,7 @@ struct ReportProblemSheet: View {
             Text(report.title).fontWeight(.semibold)
             ScrollView {
                 Text(report.body)
-                    .font(.system(.callout, design: .monospaced))
+                    .appText(.code)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(8)
