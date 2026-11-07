@@ -264,5 +264,6 @@ func docURL(ref, base string) string {
 		}
 		return base + "/" + repo + "/-/blob/HEAD/" + rel
 	}
+	// A Forgejo's doc has none: its address names the default branch, which its node does not say.
 	return ""
 }

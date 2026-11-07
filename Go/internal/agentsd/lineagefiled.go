@@ -120,7 +120,7 @@ func (d *Daemon) noteFiledIssues(id wire.UUID, issues []wire.LineageNode) {
 		for _, issue := range issues {
 			d.link(s, issue, lineage.RelOpens, lineage.SourceAgent)
 			repo, n, ok := issueOfNode(issue)
-			if !ok {
+			if !ok || !repo.asks() {
 				continue
 			}
 			folder := d.repoFolder(repo)

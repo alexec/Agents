@@ -22,8 +22,8 @@ import (
 // lookup already does (lineagemilestone.go, #2935). Resolved on demand, not polled: a
 // lineage walk is read far less often than a sidebar list, so each node is asked again only
 // when it is walked again after resolveRecheck, and never when no folder is signed in to ask
-// with. Linear and releases are not resolved yet; a GitHub or GitLab issue, pull request or
-// milestone is. A milestone is sent to be resolved when an issue's milestone is found
+// with. Linear, Forgejo and releases are not resolved yet (a Forgejo item the Work pages show
+// is); a GitHub or GitLab issue, pull request or milestone is. A milestone is sent to be resolved when an issue's milestone is found
 // (lineagemilestone.go), as no walk asks for it before Work lists it.
 //
 // Never on the walk's own path (#3102): a walk answers at once with what the cache holds
@@ -161,8 +161,8 @@ func (d *Daemon) resolveSettle(wait time.Duration) {
 }
 
 // resolveNode asks for n's title, state and labels and caches them; the answer is not ok when
-// n is not a GitHub or GitLab issue, pull request or milestone, or no folder is signed in to
-// ask with.
+// n is not an issue, pull request or milestone of a forge lineage asks (nodeOfRepo), or no
+// folder is signed in to ask with.
 func (d *Daemon) resolveNode(ctx context.Context, n wire.LineageNode) {
 	repo, num, ok := nodeOfRepo(n)
 	if !ok {
@@ -209,22 +209,24 @@ func (d *Daemon) dropOldestResolvedLocked() {
 	delete(d.resolveCache, oldest)
 }
 
-// nodeOfRepo is the repo and number of a GitHub or GitLab issue, pull request or milestone
-// node: github:o/r#12, gitlab:g/p!4, github:o/r/milestone/3 (GitLab: the milestone's iid).
+// nodeOfRepo is the repo and number of an issue, pull request or milestone node of a forge
+// lineage asks by its CLI (forgeKind.cli): github:o/r#12, gitlab:g/p!4, github:o/r/milestone/3
+// (GitLab: the milestone's iid). The Work pages ask the other forges by their own nodes first.
 func nodeOfRepo(n wire.LineageNode) (forgeRepo, int, bool) {
 	if n.Kind != lineage.KindIssue && n.Kind != lineage.KindPR && n.Kind != lineage.KindMilestone {
 		return forgeRepo{}, 0, false
 	}
 	forge, rest, ok := strings.Cut(n.Ref, ":")
-	if !ok || (forge != "github" && forge != "gitlab") {
+	if !ok || !(forgeRepo{forge: forge}).asks() {
 		return forgeRepo{}, 0, false
 	}
+	k, _ := kindOf(forge)
 	sep := "#"
-	switch {
-	case n.Kind == lineage.KindMilestone:
+	switch n.Kind {
+	case lineage.KindMilestone:
 		sep = "/milestone/"
-	case n.Kind == lineage.KindPR && forge == "gitlab":
-		sep = "!"
+	case lineage.KindPR:
+		sep = k.prMark
 	}
 	path, num, ok := strings.Cut(rest, sep)
 	i, err := strconv.Atoi(num)

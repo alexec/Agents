@@ -133,8 +133,13 @@ never a bot. A pull request from a fork never counts.
   repository's failed checks, so each poll reads the head of each of those.
 - **The Work pages read Forgejo on each machine.** The list asks each repository for a page,
   as Forgejo has no list across chosen repositories.
-- **Not yet:** a failed job's log, an epic's plan, the Board filter, and lineage links from a
-  session's `#12` label to a Forgejo issue.
+- **Lineage links Forgejo's issues and pull requests (#3834).** A session's `#12` or `P#12`
+  label in a folder on Forgejo works on that issue or pull request. A pull request's events
+  link it to the sessions on its branch and to the issues its description closes. A folder
+  is on Forgejo when its `origin` is on the connected Forgejo, or on a host whose name says
+  Codeberg, Forgejo or Gitea. Lineage does not ask Forgejo for an issue's milestone,
+  parent or title, for a release's pull requests, or to post a merged pull request's cost.
+- **Not yet:** a failed job's log, an epic's plan, and the Board filter.
 
 ## See also
 

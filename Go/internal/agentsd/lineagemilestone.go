@@ -85,9 +85,9 @@ func (r forgeRepo) milestone(n int) wire.LineageNode {
 }
 
 // noteIssueMilestone asks, unless it asked within milestoneRecheck, for an issue's
-// milestone, and links the issue to it.
+// milestone, and links the issue to it: on a forge lineage asks (forgeKind.cli).
 func (d *Daemon) noteIssueMilestone(folder string, repo forgeRepo, n int) {
-	if repo.forge == "" || n <= 0 {
+	if !repo.asks() || n <= 0 {
 		return
 	}
 	issue := repo.issue(n)
@@ -277,25 +277,14 @@ func issueOfAPIURL(raw string) (forgeRepo, int, bool) {
 	return issueOfURL("https://github.com/" + rest)
 }
 
-// issueOfURL is the repo and number of an issue's web address: github.com/o/r/issues/5, or
-// <gitlab>/group/project/-/issues/5.
+// issueOfURL is the repo and number of an issue's web address: github.com/o/r/issues/5,
+// <gitlab>/group/project/-/issues/5, or codeberg.org/o/r/issues/5.
 func issueOfURL(raw string) (forgeRepo, int, bool) {
 	u, err := url.Parse(raw)
 	if err != nil || (u.Scheme != "https" && u.Scheme != "http") {
 		return forgeRepo{}, 0, false
 	}
-	path := strings.Trim(u.Path, "/")
-	for _, sep := range []string{"/-/issues/", "/issues/"} {
-		if repo, num, ok := strings.Cut(path, sep); ok {
-			n, err := strconv.Atoi(strings.SplitN(num, "/", 2)[0])
-			r := forgeOf(u.Host, repo)
-			if err != nil || n <= 0 || r.forge == "" || (sep == "/issues/") != (r.forge == "github") {
-				return forgeRepo{}, 0, false
-			}
-			return r, n, true
-		}
-	}
-	return forgeRepo{}, 0, false
+	return ofURL(u.Host, strings.Trim(u.Path, "/"), false)
 }
 
 // issueMilestoneOf is the milestone of an issue as the forge's API says it: number on
@@ -322,10 +311,10 @@ func issueMilestoneOf(out []byte) (int, error) {
 	return 0, errors.New("the forge did not say the milestone's number")
 }
 
-// issueOfNode is the repo and number of a forge issue node: github:o/r#12.
+// issueOfNode is the repo and number of a forge issue node: github:o/r#12, forgejo:o/r#12.
 func issueOfNode(n wire.LineageNode) (forgeRepo, int, bool) {
 	forge, rest, ok := strings.Cut(n.Ref, ":")
-	if n.Kind != lineage.KindIssue || !ok || (forge != "github" && forge != "gitlab") {
+	if _, known := kindOf(forge); n.Kind != lineage.KindIssue || !ok || !known {
 		return forgeRepo{}, 0, false
 	}
 	path, num, ok := strings.Cut(rest, "#")

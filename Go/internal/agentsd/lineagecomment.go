@@ -108,6 +108,10 @@ func (d *Daemon) prCostCommentOf(folder string) wire.PRCostComment {
 // prMerged notes a merged PR of repo for its comment, when a folder of that repo says to.
 // It runs on the linker's goroutine, after the merge's own links.
 func (d *Daemon) prMerged(repo forgeRepo, n int, pr wire.LineageNode) {
+	// The comment is written by the forge's CLI (prCommenter).
+	if !repo.asks() {
+		return
+	}
 	folder := ""
 	for _, f := range d.folderPaths() {
 		if d.folderRepo(f) == repo && d.prCostCommentOf(f) != wire.PRCostCommentOff {

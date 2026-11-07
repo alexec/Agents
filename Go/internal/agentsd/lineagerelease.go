@@ -144,11 +144,12 @@ func (d *Daemon) checkReleaseTagsEveryHour() {
 	})
 }
 
-// checkReleaseTags looks at every folder with a forge repo for a tag not yet linked.
+// checkReleaseTags looks at every folder with a repo on a forge lineage asks for a tag not yet linked.
 func (d *Daemon) checkReleaseTags(ctx context.Context) {
 	for _, folder := range d.folderPaths() {
+		// A release's commits and milestones are asked by the forge's CLI (forgeKind.cli).
 		repo := d.folderRepo(folder)
-		if repo.forge == "" {
+		if !repo.asks() {
 			continue
 		}
 		d.checkReleaseTagsForFolder(ctx, folder, repo)
