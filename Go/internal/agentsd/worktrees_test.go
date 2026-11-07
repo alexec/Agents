@@ -95,21 +95,31 @@ func TestAStartInANewWorktreeAndItsRemoval(t *testing.T) {
 	if e := c.callError(t, 5, "worktrees/remove", req); e.Code != wire.FailureWorktreeInUse || !strings.HasPrefix(e.Message, "Still in use by ") {
 		t.Fatalf("%+v", e)
 	}
-	// Untracked before the archive, so the archive keeps it (#3726).
+	// Untracked before the archive, and the archive removes it all the same (#3877).
 	os.WriteFile(filepath.Join(root, "new.txt"), []byte("x"), 0o644)
 	c.call(t, 6, "agents/archive", map[string]any{"agentID": id})
 	d.sweeps.Wait()
+	if isDir(root) {
+		t.Fatal("the archive kept the worktree")
+	}
+	if out, _ := git(dir, "branch", "--list", "agents/fix-login-bug"); out != "" {
+		t.Fatal(out)
+	}
+	// worktrees/remove still asks before it loses changes in a worktree no agent has.
+	loose := filepath.Join(dir, ".agents", "worktrees", "loose")
+	if _, err := git(dir, "worktree", "add", "-q", "-b", "agents/loose", loose, "HEAD"); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(loose, "new.txt"), []byte("x"), 0o644)
+	req["root"] = store.FolderURL(loose)
 	if e := c.callError(t, 7, "worktrees/remove", req); !strings.Contains(e.Message, "would lose 1 uncommitted change. Confirm") {
 		t.Fatal(e.Message)
 	}
 	req["confirmed"] = true
 	var removed wire.WorktreeRemoved
 	json.Unmarshal(c.call(t, 8, "worktrees/remove", req), &removed)
-	if !removed.RemovedBranch || isDir(root) {
+	if !removed.RemovedBranch || isDir(loose) {
 		t.Fatalf("%+v", removed)
-	}
-	if out, _ := git(dir, "branch", "--list", "agents/fix-login-bug"); out != "" {
-		t.Fatal(out)
 	}
 }
 
