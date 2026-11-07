@@ -4093,14 +4093,15 @@ export interface ForgeLogRequest {
 }
 
 /**
- * people/setForgeLogins (#2951): the caller's own GitHub, GitLab, Linear and Jira logins (#3313),
- * for Settings ▸ You, replacing what was kept; blank clears one.
+ * people/setForgeLogins (#2951): the caller's own GitHub, GitLab, Linear, Jira (#3313) and Forgejo
+ * (#3836) logins, for Settings ▸ You, replacing what was kept; blank clears one.
  */
 export interface ForgeLogins {
   github?: string;
   gitlab?: string;
   linear?: string;
   jira?: string;
+  forgejo?: string;
 }
 
 /**
@@ -10364,6 +10365,8 @@ export interface TeamPerson {
   linearLogin?: string;
   /** Their Jira login (#3313): the Atlassian account's email, account id or display name. */
   jiraLogin?: string;
+  /** Their Forgejo login (#3836): their user name on the connected Forgejo or Gitea. */
+  forgejoLogin?: string;
   you?: boolean;
 }
 
@@ -12655,7 +12658,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeListRequest: { required: [], optional: ["folder", "state", "label", "assignee", "query", "cursor", "limit", "feature", "board"] },
   ForgeLog: { required: ["text"], optional: [] },
   ForgeLogRequest: { required: ["node"], optional: ["check"] },
-  ForgeLogins: { required: [], optional: ["github", "gitlab", "linear", "jira"] },
+  ForgeLogins: { required: [], optional: ["github", "gitlab", "linear", "jira", "forgejo"] },
   ForgeMergeRequest: { required: ["node", "sha"], optional: ["method", "auto"] },
   ForgeNodeRequest: { required: ["node"], optional: [] },
   ForgePlan: { required: ["item", "children", "steps"], optional: ["lead"] },
@@ -13239,7 +13242,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SurfaceIdentification: { required: ["id", "name", "kind"], optional: [] },
   TeamBot: { required: ["user", "name", "spentTodayUSD", "capped", "machines", "online", "workflows", "live"], optional: ["group", "groupName", "caps"] },
   TeamBotRun: { required: ["host", "hostName", "agent"], optional: ["workflow", "since"] },
-  TeamPerson: { required: ["id", "name", "kind"], optional: ["githubLogin", "gitlabLogin", "linearLogin", "jiraLogin", "you"] },
+  TeamPerson: { required: ["id", "name", "kind"], optional: ["githubLogin", "gitlabLogin", "linearLogin", "jiraLogin", "forgejoLogin", "you"] },
   TeamTrigger: { required: ["workflow", "trigger", "runsOn"], optional: ["event", "dueAt"] },
   TeamTriggerFired: { required: ["ran"], optional: [] },
   TeamTriggerSent: { required: ["taken"], optional: [] },
