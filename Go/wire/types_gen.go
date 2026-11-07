@@ -2331,7 +2331,7 @@ type Connection struct {
 
 	ConnectedAt Date `json:"connectedAt"`
 
-	// Where the person installs the provider's App: a GitHub user token reaches only the repositories where it is installed.
+	// Where the person installs the provider's App: a GitHub user token reaches only the repositories where it is installed. Set only for GitHub's App user token, the default (#3857).
 	InstallURL *string `json:"installURL,omitzero"`
 
 	// The part of the provider the token reaches, such as a Linear workspace's name, or a self-managed GitLab's host.
@@ -2340,7 +2340,7 @@ type Connection struct {
 	// When a token the host cannot renew ends: a GitLab personal access token's expiry. The person makes a new one before then.
 	ExpiresAt *Date `json:"expiresAt,omitzero"`
 
-	// The connection is a token the person made and the host does not renew, with no end it knows: a Jira API token or Data Center personal access token (#3304). Left out for OAuth.
+	// The connection is a token the person made and the host does not renew: a Jira API token or Data Center personal access token (#3304), or a GitHub personal access token, the fallback for the App's user token (#3857), whose end, when it has one, is expiresAt. Left out for OAuth and for GitHub's App user token.
 	ByToken *bool `json:"byToken,omitzero"`
 
 	// Only in the answer that made the connection: the one real read that proves it, such as Jira's newest issue (#3304). Left out when the read found nothing or failed.
@@ -2520,7 +2520,7 @@ type ConnectionTokenAnswer struct {
 	Error *string `json:"error,omitzero"`
 }
 
-// connections/sign-in/token (#1630, #3304, #3752, #3785): a personal access token the person made, for a provider with no Agents application there (a self-managed GitLab, a Jira site, any Forgejo or Gitea, Bitbucket Cloud). The host checks it with the provider, keeps it in its own store, and never logs it or gives it back.
+// connections/sign-in/token (#1630, #3304, #3752, #3785, #3857): a personal access token the person made, for a provider with no Agents application there (a self-managed GitLab, a Jira site, any Forgejo or Gitea, Bitbucket Cloud), or on github.com in place of the App's user token. The host checks it with the provider, keeps it in its own store, and never logs it or gives it back.
 type ConnectionTokenRequest struct {
 	Provider ConnectionProvider `json:"provider"`
 
