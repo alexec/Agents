@@ -36,6 +36,12 @@ type checksArgs struct {
 	PR   int    `json:"number,omitempty" jsonschema:"a pull request's number: its head's checks"`
 }
 
+type logArgs struct {
+	Repo       string `json:"repo,omitempty" jsonschema:"workspace/name; the repository this folder pushes to when left out"`
+	PipelineID int    `json:"pipelineId" jsonschema:"the Pipelines run's build number (run.id in a checks.failed event)"`
+	Step       string `json:"step,omitempty" jsonschema:"only the failed step with this name"`
+}
+
 type listIssuesArgs struct {
 	Repo  string `json:"repo,omitempty" jsonschema:"workspace/name; the repository this folder pushes to when left out"`
 	State string `json:"state,omitempty" jsonschema:"open (new, open or on hold; when left out), closed or all"`
@@ -254,6 +260,25 @@ func AddTools(server *mcp.Server, b *RealBitbucket, person bool) {
 					"url": s.URL, "updatedAt": s.UpdatedOn})
 			}
 			return map[string]any{"repo": repo, "sha": ref, "state": combined(statuses), "checks": checks}, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{Name: "failed_log", Title: "Read a failed pipeline's log",
+		Description: fmt.Sprintf("The last %d lines of each failed step's log in a Bitbucket Pipelines run, or of one step by name. "+
+			"Another CI's logs are on its own pages (get_checks gives their addresses).", logLines),
+		Annotations: readOnly, Meta: agents},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in logArgs) (*mcp.CallToolResult, any, error) {
+			repo, err := repoOf(ctx, in.Repo)
+			if err != nil {
+				return failed(err), nil, nil
+			}
+			if in.PipelineID <= 0 {
+				return failed(fmt.Errorf("pipelineId is a Pipelines run's build number")), nil, nil
+			}
+			text, err := b.FailedLog(ctx, repo, in.PipelineID, in.Step)
+			if err != nil {
+				return failed(err), nil, nil
+			}
+			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: text}}}, nil, nil
 		})
 
 	tool(server, &mcp.Tool{Name: "list_issues", Title: "List issues",

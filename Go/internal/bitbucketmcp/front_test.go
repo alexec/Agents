@@ -115,8 +115,8 @@ func TestTheFrontOffersEventsAndTools(t *testing.T) {
 		t.Fatalf("poll: %v", polled)
 	}
 
-	same(t, toolNames(c), []string{"comment_on_issue", "comment_on_pull_request", "create_pull_request", "get_checks", "get_issue",
-		"get_pull_request", "list_issues", "list_pull_request_comments", "list_pull_requests", "reply_to_pull_request_comment"})
+	same(t, toolNames(c), []string{"comment_on_issue", "comment_on_pull_request", "create_pull_request", "failed_log", "get_checks",
+		"get_issue", "get_pull_request", "list_issues", "list_pull_request_comments", "list_pull_requests", "reply_to_pull_request_comment"})
 
 	prs, ok := c.tool("list_pull_requests", map[string]any{})
 	if !ok || len(prs["pullRequests"].([]any)) != 1 || prs["pullRequests"].([]any)[0].(map[string]any)["state"] != "open" {
@@ -182,7 +182,7 @@ func TestMergeAndApproveAreOnlyThePersons(t *testing.T) {
 		"repository": obj{"full_name": repo}}})}
 	c := serve(t, f, true)
 	names := toolNames(c)
-	if len(names) != 12 {
+	if len(names) != 13 {
 		t.Fatalf("person's tools: %v", names)
 	}
 	if _, ok := c.tool("merge_pull_request", map[string]any{"number": 1}); ok {
