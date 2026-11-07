@@ -1,5 +1,6 @@
 // Why this Mac's host is quiet, in the window's words (MacHostNotice.swift, #303, #666): the
 // process is down, it is up and has no membership, its uplink keeps failing, or it isn't answering.
+import { effect, signal, type ReadonlySignal } from "@preact/signals";
 import type { MachineJoinStatus } from "../protocol/generated";
 import { hostAnswers } from "./capabilities";
 
@@ -60,4 +61,25 @@ function sentence(problem: string): string {
   if (!trimmed) return "";
   const head = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
   return head.endsWith(".") ? head : `${head}.`;
+}
+
+/** How long a notice stays once the host reports it is back: a host that connects and drops again
+ *  every few seconds would otherwise draw and remove the notice as fast as it retries. */
+export const noticeHoldMs = 8000;
+
+/**
+ * `now`, but a notice that goes is kept for `holdMs` first, and goes only if none comes back
+ * meanwhile: the footer line stays put while the uplink flaps, instead of flickering.
+ */
+export function steadyNotice(now: ReadonlySignal<MacHostNotice | null>, holdMs: number = noticeHoldMs): ReadonlySignal<MacHostNotice | null> {
+  const shown = signal<MacHostNotice | null>(now.peek());
+  let clearing: ReturnType<typeof setTimeout> | undefined;
+  effect(() => {
+    const notice = now.value;
+    if (clearing !== undefined) { clearTimeout(clearing); clearing = undefined; }
+    if (notice) { shown.value = notice; return; }
+    if (shown.peek() === null) return;
+    clearing = setTimeout(() => { clearing = undefined; shown.value = null; }, holdMs);
+  });
+  return shown;
 }
