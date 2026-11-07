@@ -6,7 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -184,5 +186,35 @@ func TestShouldAskCountsOnlyTheQuestionsBeforeTheBriefSaysToAsk(t *testing.T) {
 	r.calls = append([]appToolCall{{At: 10, Method: "questions/ask", Ok: true}}, r.calls...)
 	if v, why := r.shouldAsk(); v != passed || why != "asked the person with the app's `ask_question`" {
 		t.Fatal(v, why)
+	}
+}
+
+// One call's arguments are cut as its answer is (#3687): a long one keeps its first
+// appToolAnswerMost runes as text, a short one is kept as it was, the token never.
+func TestAnAppToolCallsArgumentsAreCut(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	agent := wire.UUID("6F1C6E2A-3B57-4D0E-9C61-3D8A1F0B2C11")
+	long := strings.Repeat("é", appToolAnswerMost+500)
+	list, _ := json.Marshal(strings.Split(strings.Repeat("x,", appToolAnswerMost), ","))
+	d.keepAppToolCall(agent, "notify", map[string]json.RawMessage{
+		"body": json.RawMessage(`"` + long + `"`), "ids": list, "title": json.RawMessage(`"Done"`), "token": json.RawMessage(`"t"`),
+	}, "ok", nil, time.Now())
+	b, err := os.ReadFile(d.appToolsPath(agent))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var call appToolCall
+	if err := diskjson.Unmarshal(b, &call); err != nil {
+		t.Fatal(err)
+	}
+	if got := argString(call.Arguments, "body"); got != long[:len("é")*appToolAnswerMost] {
+		t.Fatalf("body is %d runes", len([]rune(got)))
+	}
+	if got := argString(call.Arguments, "ids"); len([]rune(got)) != appToolAnswerMost || !strings.HasPrefix(got, `["x","x"`) {
+		t.Fatalf("ids %q", got)
+	}
+	if string(call.Arguments["title"]) != `"Done"` || call.Arguments["token"] != nil {
+		t.Fatalf("%v", call.Arguments)
 	}
 }

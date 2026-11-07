@@ -866,15 +866,20 @@ func (l *hostedLog) write(p []byte) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	os.MkdirAll(filepath.Dir(l.path), 0o700)
-	if fi, err := os.Stat(l.path); err == nil && fi.Size()+int64(len(p)) > hostedLogLimit {
-		os.Rename(l.path, l.path+".1")
+	// A write over the limit goes in parts of the limit (#3687), so no file passes it.
+	for len(p) > 0 {
+		part := p[:min(len(p), hostedLogLimit)]
+		p = p[len(part):]
+		if fi, err := os.Stat(l.path); err == nil && fi.Size()+int64(len(part)) > hostedLogLimit {
+			os.Rename(l.path, l.path+".1")
+		}
+		f, err := os.OpenFile(l.path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+		if err != nil {
+			return
+		}
+		f.Write(part)
+		f.Close()
 	}
-	f, err := os.OpenFile(l.path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
-	if err != nil {
-		return
-	}
-	f.Write(p)
-	f.Close()
 }
 
 type hostedStderr struct {

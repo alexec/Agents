@@ -19,7 +19,7 @@ command). Only its user can read it (mode 0700).
 | Store | What it keeps | How long, how large |
 | --- | --- | --- |
 | `agents/<id>/agent.json`, `transcript.jsonl` | Each agent's record and its whole conversation | Until the agent is deleted. An archived agent is deleted after **Archived agents** (7, 14, 30 or 90 days, or Forever; 30 by default). A pinned agent is kept. |
-| `agents/<id>/app-tools.jsonl` | Each call to the app's own tools, with answers cut to 2,000 characters | With the agent |
+| `agents/<id>/app-tools.jsonl` | Each call to the app's own tools, with each argument and the answer cut to 2,000 characters | With the agent |
 | Turn summaries, in the cache folder | A line for each turn | With the agent |
 | `events.jsonl` | The machine's events | 7 days, and 10,000 events at most |
 | `usage-history.json`, `time-history.json` | Usage, cost and time | 168 hours by the hour, 90 days by the day |
@@ -27,13 +27,13 @@ command). Only its user can read it (mode 0700).
 | `workflows.json` | Workflows and their runs | A run is kept 7 days, or until its agent is archived or gone |
 | `workflow-copies/` | The approved text of each workflow and its skills | The copies that `workflows.json` names; an older version goes when it is saved |
 | `assessments/` | Each runtime assessment's start, score and scope | The newest 50 |
-| `mcp-logs/`, in the log folder | What each hosted MCP server wrote to stderr | 1 MB and one older file a server, and the newest 32 servers |
+| `mcp-logs/`, in the log folder | What each hosted MCP server wrote to stderr | 1 MB and one older file a server, and the newest 32 servers; a larger write is split, so no file passes 1 MB |
 | `events-state.json` | The branch tips that `branch.moved` compares | The live folders only |
 | `<file>.unreadable-<time>`, `<file>.corrupt-<time>` | A store that could not be read, set aside | The newest 3 of each kind for each file |
 | `<folder>/.agents/attachments` | Files attached to prompts | A file that no kept conversation names goes after 7 days. The folder stays under 500 MB, oldest first. |
 | `<folder>/.agents/dropbox` | Files handed to a workflow | 25 MB a file. Not swept. |
 | Terminal scrollback | What a terminal showed | In memory only, 4 MiB a terminal |
-| `daemon.log` | What the machine did | 4 MB, and one older file |
+| `daemon.log` | What the machine did, and what the daemon wrote to stderr (a panic) | 4 MB, and one older file; stderr output is checked against the limit every 30 seconds |
 | `erasures.json`, `erased.json` | Runtime copies of deleted agents still to erase; every agent deleted here | 1,000 entries for 7 days; 10,000 IDs for 400 days |
 | `~/.agents-secrets` | Secrets (see [Security overview](security-overview.md#where-secrets-live)) | Until you remove them |
 
