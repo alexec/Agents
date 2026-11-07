@@ -198,7 +198,7 @@ public extension DaemonAPI.Notification {
 
 /// The words for settings with a fixed scope (#2410) and the Secrets page.
 public enum UserScopeWords {
-    /// Machines ▸ Secrets.
+    /// Your setup ▸ Secrets (#3632).
     public static let secretsTitle = "Secrets"
     public static let yoursOnEveryMachine = "Yours, on every machine"
     /// Under "This Mac's" at the top of the `~/.agents` pages and editors (#2704): what goes to

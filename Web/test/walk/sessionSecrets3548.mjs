@@ -47,7 +47,7 @@ try {
     await page.waitFor(`document.body.innerText.includes("Agents")`, 20_000);
   }
   if (settings) {
-    await page.eval(`location.hash = "#/settings"`);
+    await page.eval(`location.hash = "#/setup/secrets"`);
     const section = `section[aria-labelledby=settings-session-secrets]`;
     await page.waitFor(`document.querySelector(${JSON.stringify(section)})?.innerText.includes("Add for a Session")`, 30_000);
     await shoot("web-settings", section);

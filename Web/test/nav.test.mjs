@@ -31,9 +31,11 @@ test("a member sees no admin page in a list, and opens the first they may use", 
 test("every page has a title, and its group headings come in order", () => {
   for (const s of n.navSections) for (const p of n.navPages[s]) assert.ok(p.title, `${s}/${p.id}`);
   assert.deepEqual(n.groupedPages(n.navPages.reports).map(([g]) => g), ["Reports", "Saved", "Yours", "Records"]);
-  assert.deepEqual(n.groupedPages(n.navPages.machines).map(([g]) => g), ["Machines", "On them"]);
-  assert.deepEqual(n.navPages.setup.map((p) => p.id), ["runtimes"], "Runtimes is the person's, once (#3631)");
-  assert.ok(n.navPages.machines.every((p) => p.id !== "runtimes"));
+  assert.deepEqual(n.groupedPages(n.navPages.machines).map(([g]) => g), ["Machines"]);
+  assert.deepEqual(n.navPages.setup.map((p) => p.id), ["runtimes", "mcp", "secrets"],
+    "Runtimes (#3631), Connectors and Secrets (#3632) are the person's, once");
+  assert.ok(n.navPages.machines.every((p) => p.id !== "runtimes" && p.id !== "mcp"));
+  assert.ok(n.navPages.settings.every((p) => p.id !== "secrets"));
 });
 
 test("each section is its own address, and #/ is the Overview", async () => {
@@ -47,6 +49,8 @@ test("each section is its own address, and #/ is the Overview", async () => {
     assert.deepEqual(r.parseRoute("#/agents/live"), { nav: "agents", section: "live" });
     assert.deepEqual(r.parseRoute("#/setup/runtimes"), { nav: "setup", section: "runtimes" });
     assert.deepEqual(r.parseRoute("#/machines/runtimes"), { nav: "setup", section: "runtimes" }, "an old link opens its new place (#3631)");
+    assert.deepEqual(r.parseRoute("#/machines/mcp"), { nav: "setup", section: "mcp" }, "an old link opens its new place (#3632)");
+    assert.deepEqual(r.parseRoute("#/setup/secrets"), { nav: "setup", section: "secrets" });
     assert.deepEqual(r.parseRoute("#/reports/spend"), { nav: "reports", section: "spend" });
     assert.equal(r.routeHash({ nav: "settings", section: "policy" }, undefined), "#/settings/policy");
     assert.equal(r.routeHash({}, undefined), "#/");
@@ -78,7 +82,7 @@ test("an address from before #2141 opens its page's new place", async () => {
       "#/console/audit": { nav: "reports", section: "audit" }, "#/console/requests": { nav: "requests" },
       "#/console/people": { nav: "people", section: "people" }, "#/console/signIn": { nav: "people", section: "signIn" },
       "#/console/policy": { nav: "settings", section: "policy" }, "#/console/readApi": { nav: "settings", section: "readApi" },
-      "#/a/runtimes": { nav: "setup", section: "runtimes" }, "#/a/mcp": { nav: "machines", section: "mcp" },
+      "#/a/runtimes": { nav: "setup", section: "runtimes" }, "#/a/mcp": { nav: "setup", section: "mcp" },
       "#/a/events": { nav: "reports", section: "events" }, "#/a/milestones": { nav: "reports", section: "milestones" },
       "#/a/tokens": { nav: "reports", section: "usage" },
     };
@@ -89,6 +93,7 @@ test("an address from before #2141 opens its page's new place", async () => {
     assert.equal(r.usageAsked.value, "tokens", "Usage opens on the pane the old address named");
     assert.equal(r.isOldAddress("#/reports/spend"), false);
     assert.equal(r.isOldAddress("#/machines/runtimes"), true, "Runtimes went to Your setup (#3631)");
+    assert.equal(r.isOldAddress("#/machines/mcp"), true, "Connectors went to Your setup (#3632)");
     assert.equal(r.isOldAddress("#/machines/machines"), false);
     assert.equal(r.isOldAddress("#/h/mac/p/x"), false);
     // Every page an old address names is a page of its section.

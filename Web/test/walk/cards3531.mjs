@@ -29,7 +29,7 @@ try {
   await page.press("Connect");
   await page.waitFor(`!document.querySelector("textarea") && document.body.innerText.includes("Settings")`, 30_000);
   await sleep(1500);
-  await page.eval(`location.hash = "#/settings"`);
+  await page.eval(`location.hash = "#/setup/secrets"`);
   await sleep(1000);
   await page.waitFor(`[...document.querySelectorAll("button")].some((b) => b.textContent === "Add a Card…")`, 15_000);
   await page.eval(`document.getElementById("settings-secrets").scrollIntoView()`);

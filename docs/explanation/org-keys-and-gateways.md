@@ -60,7 +60,7 @@ envelopes (`sealing/work`, `sealing/add`). Console ▸ Model Access says how man
 wait, and a person's Organisation Policy says that a route waits for one of their machines.
 An app paired later gets its copy the same way.
 
-A person's own secrets (Machines ▸ Secrets) are sealed the same way, by the person's app, to
+A person's own secrets (Your setup ▸ Secrets) are sealed the same way, by the person's app, to
 the person's machines and apps.
 
 ## Cloud credentials go to the machine, sealed
@@ -106,7 +106,7 @@ because the control plane cannot open the key.
 
 The routes and the secrets that an older control plane sealed with its keeper do not open
 with this one. Enter each route's key again in Console ▸ Model Access, and each of your
-secrets again in Machines ▸ Secrets.
+secrets again in Your setup ▸ Secrets.
 
 ## The policy
 

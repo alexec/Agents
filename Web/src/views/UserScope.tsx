@@ -1,7 +1,5 @@
-// Machines ▸ Secrets and the parts at the end of Machines (#1760, #2157), as the window's and the
-// Remote's (Shared/UI/UserScope): the person's secrets, by name only, and which settings are the
-// same on every machine of theirs. Turning one on is the Mac's, at the top of its pane: the
-// settings are a machine's files.
+// Your setup ▸ Secrets (#1760, #3632), as the window's (Shared/UI/UserScope): the person's secrets
+// and cards, by name only, which go to every machine of theirs.
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";

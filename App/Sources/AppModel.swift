@@ -195,6 +195,7 @@ final class AppModel {
             showsEvents = false
             showsRuntimes = false
             showsMCPServers = false
+            showsSecrets = false
             showsTime = false
             showsMilestones = false
             showsTokens = false
@@ -220,6 +221,7 @@ final class AppModel {
             showsSpending = false
             showsRuntimes = false
             showsMCPServers = false
+            showsSecrets = false
             showsTime = false
             showsMilestones = false
             showsTokens = false
@@ -244,6 +246,7 @@ final class AppModel {
             showsSpending = false
             showsEvents = false
             showsMCPServers = false
+            showsSecrets = false
             showsTime = false
             showsMilestones = false
             showsTokens = false
@@ -263,9 +266,33 @@ final class AppModel {
     var showsMCPServers = false {
         didSet {
             guard showsMCPServers, showsMCPServers != oldValue else { return }
+            showsSecrets = false
             showsSpending = false
             showsEvents = false
             showsRuntimes = false
+            showsTime = false
+            showsMilestones = false
+            showsTokens = false
+            machinePage = nil
+            showsWork = false
+            showsDocs = false
+            selection = nil
+            openWorkflow = nil
+            folderPage = nil
+            composing = false
+        }
+    }
+
+    /// Whether the window is showing Secrets: the person's secrets and cards, kept by the control
+    /// plane and sent to each machine of theirs (#1760), under Your setup (#3632). Was Settings ▸
+    /// Machines ▸ Secrets. A page like Connectors, and not persisted for the same reason.
+    var showsSecrets = false {
+        didSet {
+            guard showsSecrets, showsSecrets != oldValue else { return }
+            showsSpending = false
+            showsEvents = false
+            showsRuntimes = false
+            showsMCPServers = false
             showsTime = false
             showsMilestones = false
             showsTokens = false
@@ -288,6 +315,7 @@ final class AppModel {
             showsEvents = false
             showsRuntimes = false
             showsMCPServers = false
+            showsSecrets = false
             showsMilestones = false
             showsTokens = false
             machinePage = nil
@@ -309,6 +337,7 @@ final class AppModel {
             showsEvents = false
             showsRuntimes = false
             showsMCPServers = false
+            showsSecrets = false
             showsTime = false
             showsTokens = false
             machinePage = nil
@@ -330,6 +359,7 @@ final class AppModel {
             showsEvents = false
             showsRuntimes = false
             showsMCPServers = false
+            showsSecrets = false
             showsTime = false
             showsMilestones = false
             machinePage = nil
@@ -353,6 +383,7 @@ final class AppModel {
             showsEvents = false
             showsRuntimes = false
             showsMCPServers = false
+            showsSecrets = false
             showsTime = false
             showsMilestones = false
             showsTokens = false
@@ -374,6 +405,7 @@ final class AppModel {
             showsEvents = false
             showsRuntimes = false
             showsMCPServers = false
+            showsSecrets = false
             showsTime = false
             showsMilestones = false
             showsTokens = false
@@ -394,6 +426,7 @@ final class AppModel {
             showsEvents = false
             showsRuntimes = false
             showsMCPServers = false
+            showsSecrets = false
             showsTime = false
             showsMilestones = false
             showsTokens = false
@@ -475,6 +508,7 @@ final class AppModel {
         showsEvents = false
         showsRuntimes = false
         showsMCPServers = false
+        showsSecrets = false
         showsTime = false
         showsMilestones = false
         showsTokens = false
@@ -500,6 +534,7 @@ final class AppModel {
         showsEvents = false
         showsRuntimes = false
         showsMCPServers = false
+        showsSecrets = false
         showsTime = false
         showsMilestones = false
         showsTokens = false
@@ -543,6 +578,7 @@ final class AppModel {
             if showsEvents { return .events }
             if showsRuntimes { return .runtimes }
             if showsMCPServers { return .mcpServers }
+            if showsSecrets { return .secrets }
             if let machinePage { return .machine(machinePage) }
             if showsSpending { return .spending }
             if showsTokens { return .tokens }
@@ -570,6 +606,7 @@ final class AppModel {
                 showsEvents = false
                 showsRuntimes = false
                 showsMCPServers = false
+                showsSecrets = false
                 showsTime = false
                 showsMilestones = false
                 showsTokens = false
@@ -607,6 +644,8 @@ final class AppModel {
                 showRuntimes()
             case .mcpServers:
                 showsMCPServers = true
+            case .secrets:
+                showsSecrets = true
             case .machine(let host):
                 machinePage = host
             case .folder(let key):
@@ -614,6 +653,7 @@ final class AppModel {
                 showsEvents = false
                 showsRuntimes = false
                 showsMCPServers = false
+                showsSecrets = false
                 showsTime = false
                 showsMilestones = false
                 showsTokens = false
@@ -636,6 +676,7 @@ final class AppModel {
         showsEvents = false
         showsRuntimes = false
         showsMCPServers = false
+        showsSecrets = false
         showsTime = false
         showsMilestones = false
         showsTokens = false
@@ -666,6 +707,7 @@ final class AppModel {
         showsEvents = false
         showsRuntimes = false
         showsMCPServers = false
+        showsSecrets = false
         showsTime = false
         showsMilestones = false
         showsTokens = false
@@ -891,6 +933,7 @@ final class AppModel {
         showsEvents = false
         showsRuntimes = false
         showsMCPServers = false
+        showsSecrets = false
         showsTime = false
         showsMilestones = false
         showsTokens = false

@@ -1,4 +1,4 @@
-// Settings ▸ Machines ▸ Secrets ▸ For One Session (#3548): a machine's secrets for one session only, each
+// Your setup ▸ Secrets ▸ For One Session (#3548, #3632): a machine's secrets for one session only, each
 // with the session it belongs to and a Remove, and Add for a Session…. Listed in ./sections.ts, after the
 // person's secrets. As the window's SessionSecretsSection.
 import { signal, useSignal } from "@preact/signals";
