@@ -262,6 +262,9 @@ type Agent struct {
 	// The session this one was branched from at one of its prompts (#1658). Until it has a conversation of its own, its runtime reads the record it was given ahead of its first prompt.
 	BranchedFrom *UUID `json:"branchedFrom,omitzero"`
 
+	// The machine it moved here from with move_session (#3717). Until it has a conversation of its own on this machine, its runtime reads the app's record ahead of its next prompt.
+	MovedFrom *SessionMovedFrom `json:"movedFrom,omitzero"`
+
 	// The last file it showed with show_file that the person has not looked at (#1802): a mark on its row, never a group or a badge. Cleared when the person opens the conversation or marks it read.
 	FileToSee *ShownFile `json:"fileToSee,omitzero"`
 
@@ -6491,7 +6494,7 @@ type MachineEnroll struct {
 	As *string `json:"as,omitzero"`
 }
 
-// machines/sendFolder, through machine/machines: one step of an agent's start_session with send (#2929), which sends this folder's branch to another of the person's machines first, or of its bring_back (#2947), which brings a branch back from there. Exactly one of state, upload, receive, facts, pack and read; the control plane sends that machine's folders/receiveState, folders/receiveUpload, folders/receive, folders/sendFacts, folders/sendPack or folders/sendRead.
+// machines/sendFolder, through machine/machines: one step of an agent's start_session with send (#2929), which sends this folder's branch to another of the person's machines first, or of its bring_back (#2947), which brings a branch back from there, or of its move_session (#3717), which moves a session there with its branch. Exactly one of state, upload, receive, facts, pack, read and moveIn; the control plane sends that machine's folders/receiveState, folders/receiveUpload, folders/receive, folders/sendFacts, folders/sendPack, folders/sendRead or agents/moveIn.
 type MachineFolderSend struct {
 	Host string `json:"host"`
 
@@ -6506,6 +6509,8 @@ type MachineFolderSend struct {
 	Pack *SendPackRequest `json:"pack,omitzero"`
 
 	Read *SendReadRequest `json:"read,omitzero"`
+
+	MoveIn *SessionMoveIn `json:"moveIn,omitzero"`
 }
 
 // What machines/sendFolder's step answered (#2929, #2947): state for state, folder for receive, facts for facts, pack for pack, read for read, none for upload.
@@ -10654,6 +10659,24 @@ type SessionLabelOwner string
 
 const SessionLabelOwnerPerson SessionLabelOwner = "person"
 const SessionLabelOwnerAgent SessionLabelOwner = "agent"
+
+// agents/moveIn (#3717): a session moving here from another of the person's machines, with move_session. `upload` is the export of its record and its transcript, sent with folders/receiveUpload; `folder` is the folder here it goes on in, where its branch was sent first. It keeps its id, labels and times, and goes on in this machine's root; its runtime reads the app's record ahead of its next prompt (`movedFrom`). `from` is the machine it leaves (the control plane writes `machine`), and the agent there that started it, when that agent stays there. With `carryOn`, it starts again here at once, as it was working when it moved.
+type SessionMoveIn struct {
+	Upload UUID `json:"upload"`
+
+	Folder string `json:"folder"`
+
+	From StartedFrom `json:"from"`
+
+	CarryOn *bool `json:"carryOn,omitzero"`
+}
+
+// The machine a session moved here from with move_session (#3717), and when.
+type SessionMovedFrom struct {
+	Machine string `json:"machine"`
+
+	At Date `json:"at"`
+}
 
 type SessionNotice struct {
 	Severity string `json:"severity"`

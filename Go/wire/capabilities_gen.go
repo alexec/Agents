@@ -145,6 +145,7 @@ const CapRuntimes1 = "runtimes/1"
 const CapSandbox1 = "sandbox/1"
 const CapSealing1 = "sealing/1"
 const CapSessionsElsewhere1 = "sessions.elsewhere/1"
+const CapSessionsMove1 = "sessions.move/1"
 const CapSessionsOnMachine1 = "sessions.on-machine/1"
 const CapSessionsProject1 = "sessions.project/1"
 const CapSessions1 = "sessions/1"
@@ -194,6 +195,7 @@ var HostCapabilities = pairs([][2]string{
 	{"agents/labelVocabulary", "agents/1"},
 	{"agents/list", "agents/1"},
 	{"agents/move", "agents/1"},
+	{"agents/moveIn", "sessions.move/1"},
 	{"agents/options", "agents/1"},
 	{"agents/prewarm", "agents/1"},
 	{"agents/prompt", "agents/1"},

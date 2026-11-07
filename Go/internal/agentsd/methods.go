@@ -66,6 +66,7 @@ func (d *Daemon) register() {
 	d.registerDesktopControlPause()
 	d.registerAuto()
 	d.registerMoves()
+	d.registerMoveIn()
 	d.registerRuntimeSessions()
 	d.registerRuntimeAuth()
 	d.registerHeadlessSignIn()

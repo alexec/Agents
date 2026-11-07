@@ -272,7 +272,8 @@ func toolsBrief(browser, screen, bot, github bool) string {
 		"- docs_search, then docs_read: find the docs for your work, in this folder and its docs connectors.",
 		"- estimate_issue: say what an issue or an epic will cost and take.",
 		"- list_machines, then start_session with machine: work on another of my machines. bring_back " +
-			"brings its branch back here. start_machine, stop_machine, make_machine and delete_machine control the machines.",
+			"brings its branch back here. move_session moves a session there with its unpushed work. " +
+			"start_machine, stop_machine, make_machine and delete_machine control the machines.",
 	}
 	if github {
 		lines = append(lines, "- set_ci_secret, set_ci_variable and set_environment_gate: set up a GitHub repository's CI. "+
