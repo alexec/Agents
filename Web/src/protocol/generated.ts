@@ -1972,7 +1972,7 @@ export interface Connection {
   connectedAt: WireDate;
   /**
    * Where the person installs the provider's App: a GitHub user token reaches only the repositories
-   * where it is installed.
+   * where it is installed. Set only for GitHub's App user token, the default (#3857).
    */
   installURL?: string;
   /**
@@ -1986,8 +1986,10 @@ export interface Connection {
    */
   expiresAt?: WireDate;
   /**
-   * The connection is a token the person made and the host does not renew, with no end it knows: a
-   * Jira API token or Data Center personal access token (#3304). Left out for OAuth.
+   * The connection is a token the person made and the host does not renew: a Jira API token or Data
+   * Center personal access token (#3304), or a GitHub personal access token, the fallback for the
+   * App's user token (#3857), whose end, when it has one, is expiresAt. Left out for OAuth and for
+   * GitHub's App user token.
    */
   byToken?: boolean;
   /**
@@ -2189,10 +2191,10 @@ export interface ConnectionTokenAnswer {
 }
 
 /**
- * connections/sign-in/token (#1630, #3304, #3752, #3785): a personal access token the person made,
- * for a provider with no Agents application there (a self-managed GitLab, a Jira site, any Forgejo
- * or Gitea, Bitbucket Cloud). The host checks it with the provider, keeps it in its own store, and
- * never logs it or gives it back.
+ * connections/sign-in/token (#1630, #3304, #3752, #3785, #3857): a personal access token the person
+ * made, for a provider with no Agents application there (a self-managed GitLab, a Jira site, any
+ * Forgejo or Gitea, Bitbucket Cloud), or on github.com in place of the App's user token. The host
+ * checks it with the provider, keeps it in its own store, and never logs it or gives it back.
  */
 export interface ConnectionTokenRequest {
   provider: ConnectionProvider;

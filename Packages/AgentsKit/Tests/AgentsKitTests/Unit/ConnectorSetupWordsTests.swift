@@ -133,6 +133,19 @@ struct ConnectorSetupWordsTests {
         #expect(ConnectorSetupWords.connectionNote(c) == "Loops \u{00B7} OAuth \u{00B7} renews by itself")
     }
 
+    /// GitHub's token (#3857): the row says the App's user token, the default, or the person's
+    /// own personal access token and when it ends, as the web page's.
+    @Test func githubTokenWords() throws {
+        let now = try Date("2026-11-07T00:00:00Z", strategy: .iso8601)
+        let app = DaemonAPI.Connection(provider: .github, login: "octocat", connectedAt: now,
+                                       installURL: ConnectorSetupWords.installURL)
+        #expect(ConnectorSetupWords.connectionNote(app) == "App user token \u{00B7} renews by itself \u{00B7} posts show the App")
+        var own = DaemonAPI.Connection(provider: .github, login: "octocat", connectedAt: now, byToken: true)
+        #expect(ConnectorSetupWords.connectionNote(own) == "Personal access token \u{00B7} posts show no App")
+        own.expiresAt = try Date("2027-02-01T16:00:00Z", strategy: .iso8601)
+        #expect(ConnectorSetupWords.connectionNote(own, now: now) == "Personal access token \u{00B7} posts show no App \u{00B7} ends 1 Feb 2027")
+    }
+
     /// Connect GitLab (#1630): a token's row says its GitLab and when it ends, as the web page's.
     @Test func gitlabWords() throws {
         let now = try Date("2026-10-20T00:00:00Z", strategy: .iso8601)

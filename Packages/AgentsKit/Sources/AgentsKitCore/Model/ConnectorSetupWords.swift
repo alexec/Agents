@@ -367,9 +367,22 @@ public enum ConnectorSetupWords {
             return c.expiresAt == nil ? "\(name(c.provider)) refused the renewal: sign in again"
                 : "The access token ended: connect again with a new one"
         }
+        // GitHub says which token it uses (#3857): the App's user token, or the person's own.
+        if c.provider == .github {
+            let ends = c.expiresAt.map { " \u{00B7} " + tokenEnds($0, now: now) } ?? ""
+            return c.byToken == true ? GitHubTokens.personal + ends : GitHubTokens.app
+        }
         let how = c.expiresAt.map { "Access token \u{00B7} " + tokenEnds($0, now: now) }
             ?? tokenHow(c.provider) ?? (c.byToken == true ? Jira.tokenWay : "OAuth \u{00B7} renews by itself")
         return [c.workspace, how].compactMap { $0 }.joined(separator: " \u{00B7} ")
+    }
+
+    /// The kind of token a GitHub connection uses (#3857). The App's user token is the default:
+    /// it can do only what both the person and the App can, and each post shows the App's badge.
+    /// A personal access token, the fallback, has all the rights the person gave it, and no badge.
+    public enum GitHubTokens {
+        public static let app = "App user token \u{00B7} renews by itself \u{00B7} posts show the App"
+        public static let personal = "Personal access token \u{00B7} posts show no App"
     }
 
     /// How a token sheet's connection signs in, after its host; nil for the others.

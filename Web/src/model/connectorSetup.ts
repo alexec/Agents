@@ -305,12 +305,27 @@ export function connectionTitle(c: Connection): string {
   return c.login ? `${name(c.provider)} · ${c.login}` : name(c.provider);
 }
 
+/**
+ * The kind of token a GitHub connection uses (#3857), as the Mac's `GitHubTokens`. The App's user
+ * token is the default: it can do only what both the person and the App can, and each post shows
+ * the App's badge. A personal access token, the fallback, has all the rights the person gave it.
+ */
+export const githubTokens = {
+  app: "App user token · renews by itself · posts show the App",
+  personal: "Personal access token · posts show no App",
+};
+
 export function connectionNote(c: Connection, now: Date = new Date()): string {
   // An email connection: the IMAP server and an app password, which does not end (#1780).
   if (c.provider === "email") return [c.workspace, email.passwordLabel].filter((x): x is string => !!x).join(" · ");
   if (c.state === "signInAgain") {
     return c.expiresAt === undefined ? `${name(c.provider)} refused the renewal: sign in again`
       : "The access token ended: connect again with a new one";
+  }
+  // GitHub says which token it uses (#3857): the App's user token, or the person's own.
+  if (c.provider === "github") {
+    return c.byToken ? githubTokens.personal + (c.expiresAt !== undefined ? ` · ${tokenEnds(fromWireDate(c.expiresAt), now)}` : "")
+      : githubTokens.app;
   }
   const how = c.expiresAt !== undefined ? `Access token · ${tokenEnds(fromWireDate(c.expiresAt), now)}`
     : c.provider === "forgejo" ? forgejo.how : c.provider === "bitbucket" ? bitbucket.how
