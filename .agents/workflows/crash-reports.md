@@ -4,12 +4,12 @@ on:
   - schedule:
       at: [":00"]
       between: "07:00-07:00"
+      days: [mon, wed, fri]
 agent: new
-cooldown: 20h
+cooldown: 40h
 runs-on: [8AB85821-9D24-59CE-9737-8FC556923733]
 labels: [crashes, review]
 when-done: archive
-enabled: false
 permission-mode: approve-for-me
 ---
 

@@ -90,3 +90,15 @@ test("projects: a board's forge in words, after its name", () => {
   assert.equal(p.boardForge({ name: "A", url: "u", forge: "linear" }), "Linear team");
   assert.equal(p.boardForge({ name: "A", url: "u" }), "");
 });
+
+test("projects: a host's list prunes the last folder of a project there that is gone (#3750)", () => {
+  const items = new Map();
+  const storage = { getItem: (key) => items.get(key) ?? null, setItem: (key, value) => items.set(key, String(value)) };
+  p.rememberProjectFolder(storage, "p-1", "mac|file:///w/a");
+  p.rememberProjectFolder(storage, "p-2", "mac|file:///w/gone");
+  p.rememberProjectFolder(storage, "p-3", "box|file:///w/gone");
+  p.pruneProjectFolders(storage, "mac", ["file:///w/a/"]);
+  assert.deepEqual(p.rememberedProjectFolders(storage), { "p-1": "mac|file:///w/a", "p-3": "box|file:///w/gone" });
+  p.pruneProjectFolders(storage, "box", []);
+  assert.deepEqual(p.rememberedProjectFolders(storage), { "p-1": "mac|file:///w/a" });
+});

@@ -823,6 +823,35 @@
     "title": "Bring a branch back"
   },
   {
+    "description": "Move a session, with its unpushed work, to another of the person's machines (list_machines names them), where it goes on: yourself when your work needs that machine (more CPU, a machine that stays on, the person's laptop closing), or a session you started here. The person is asked first, on your question card, unless the folder's settings let agents start sessions on machines without asking.\n\nThe branch it works on goes there first, with its commits and its uncommitted changes, into the folder there, as start_session with send does: the folder is made there when it is not there yet, and a folder there with work of its own stops the move before anything changes. Then the session goes on there with the same id, labels, transcript and runtime, in that folder on that branch; its runtime reads the app's record of the conversation, since the runtime's own copy stays here. This machine then lets it go. Yourself, you move when this turn ends, and carry on there; a session you started is stopped first if it is working, and carries on there if it was. The machine has to be running; start it with start_machine first. Only a session in a Git repository, on a branch, can move.",
+    "inputSchema": {
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
+        },
+        "folder": {
+          "description": "Optional. The folder on that machine, as an absolute path, such as /home/me/project. Leave it out for the project's folder there.",
+          "type": "string"
+        },
+        "machine": {
+          "description": "The machine, by its name as list_machines gives it.",
+          "type": "string"
+        },
+        "session": {
+          "description": "Optional. The id of a session you started here, from start_session or list_sessions. Leave it out to move yourself.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "machine"
+      ],
+      "type": "object"
+    },
+    "name": "move_session",
+    "title": "Move a session to another machine"
+  },
+  {
     "description": "Take back the one message you have waiting for another session in this project on this machine, by its id or exact title. It says when nothing is waiting: already read, or nothing was sent. Only your own queued message is removed.",
     "inputSchema": {
       "properties": {
@@ -1157,6 +1186,52 @@
       "required": [
         "environment",
         "reviewers"
+      ]
+    }
+  },
+  {
+    "name": "make_app_repository",
+    "title": "Make an app's repository",
+    "annotations": {
+      "destructiveHint": false,
+      "openWorldHint": true
+    },
+    "description": "Make a new app's GitHub repository from a starter, with the person's GitHub connection, and clone it on this machine as a folder, so it shows in the session list on every client. The repository is private. The app pushes the starter as its first commit on main, with the values filled in. A step that is done already is skipped: a repository that is there is used, one with commits keeps them, and a clone already in place becomes the folder. So after a step fails, call it again. For an iPhone app and a web service, make two repositories.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "description": "Why you are making this call, in one short sentence for the person.",
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "description": "The repository's name: letters, digits, '.', '-' and '_', e.g. tide-log. The folder has the same name."
+        },
+        "starter": {
+          "type": "string",
+          "enum": [
+            "iphone-app",
+            "web-service"
+          ],
+          "description": "The starter: iphone-app (TestFlight, then the App Store) or web-service (Cloud Run)."
+        },
+        "values": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "The starter's placeholders. iphone-app takes APP_NAME and BUNDLE_ID; web-service takes APP_NAME, SERVICE, GCP_PROJECT and GCP_REGION. The app fills GITHUB_REPO itself."
+        },
+        "owner": {
+          "type": "string",
+          "description": "A GitHub organisation to make it in. Leave it out for the person's own account."
+        }
+      },
+      "required": [
+        "name",
+        "starter",
+        "values"
       ]
     }
   }

@@ -91,6 +91,10 @@ struct RemoteApp: App {
                     }
                 }
                 #endif
+                // An agent archived, here or anywhere, or more of them arrived: its draft goes,
+                // as on the Mac (#3749). Only the drafts that exist are looked at.
+                .onChange(of: model.work.archivals) { StartDraftKeeper.shared.sweep(agents: model.work) }
+                .onChange(of: model.work.agentCount) { StartDraftKeeper.shared.sweep(agents: model.work) }
                 .onChange(of: model.pairedWithControlPlane) { _, paired in
                     guard paired else { return }
                     // The old pairing's connections end with it rather than dialling on (#175).

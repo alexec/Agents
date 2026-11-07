@@ -147,6 +147,7 @@ public enum Capability {
     public static let sandbox1 = "sandbox/1"
     public static let sealing1 = "sealing/1"
     public static let sessionsElsewhere1 = "sessions.elsewhere/1"
+    public static let sessionsMove1 = "sessions.move/1"
     public static let sessionsOnMachine1 = "sessions.on-machine/1"
     public static let sessionsProject1 = "sessions.project/1"
     public static let sessions1 = "sessions/1"
@@ -196,6 +197,7 @@ public enum Capability {
         "agents/labelVocabulary": "agents/1",
         "agents/list": "agents/1",
         "agents/move": "agents/1",
+        "agents/moveIn": "sessions.move/1",
         "agents/options": "agents/1",
         "agents/prewarm": "agents/1",
         "agents/prompt": "agents/1",

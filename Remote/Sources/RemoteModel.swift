@@ -701,6 +701,19 @@ final class RemoteModel {
 
     static let newSessionProjectFoldersDefault = "newSessionProjectFolders"
 
+    /// A machine listed its folders, or left the control plane (`listed` empty): what the
+    /// Remote keeps by folder there goes for each folder it no longer has (#3750). An offline
+    /// machine lists nothing, so its folds stay. The Remote lists no archived folders and
+    /// shows none, so theirs go too.
+    private func pruneFolderDefaults(of host: MachineRef, listed: [DaemonAPI.FolderSummary]) {
+        let keys = listed.map { FolderKey(host: host, folder: $0.folder.folder) }
+        ClientDefaults.pruneFolders(.standard, host: host, listed: keys)
+        let kept = ClientDefaults.pruneProjectFolders(rememberedProjectFolders, host: host, listed: keys)
+        guard kept != rememberedProjectFolders else { return }
+        rememberedProjectFolders = kept
+        UserDefaults.standard.set(kept, forKey: Self.newSessionProjectFoldersDefault)
+    }
+
     private func rememberProjectFolder(_ key: FolderKey) {
         guard let summary = work.folder(key) else { return }
         let id = NewSessionProject.id(of: summary)
@@ -2531,6 +2544,7 @@ final class RemoteModel {
                                                     DaemonAPI.FoldersListRequest(includeArchived: false),
                                                     returning: [DaemonAPI.FolderSummary].self) {
                 work.replaceFolders(folders, from: id)
+                pruneFolderDefaults(of: id, listed: folders)
                 startHostMoved()
             }
             // Its folders' MCP servers, for their rows in the sidebar (#753).
@@ -2594,6 +2608,7 @@ final class RemoteModel {
                 work.replaceFolders([], from: id)
                 work.replaceAgents([], from: id)
                 serverRuntimes[id] = nil
+                pruneFolderDefaults(of: id, listed: [])
             }
         }
     }
@@ -2915,6 +2930,7 @@ final class RemoteModel {
             return nil
         }
         work.replaceFolders(snapshot.folders, from: .mac)
+        pruneFolderDefaults(of: .mac, listed: snapshot.folders)
         startHostMoved()
         takeLiveAgents(snapshot.agents, page: DaemonAPI.CatchUpRequest.firstPage)
         work.replacePermissions(snapshot.permissions)

@@ -292,6 +292,11 @@ export interface Agent {
    */
   branchedFrom?: UUID;
   /**
+   * The machine it moved here from with move_session (#3717). Until it has a conversation of its
+   * own on this machine, its runtime reads the app's record ahead of its next prompt.
+   */
+  movedFrom?: SessionMovedFrom;
+  /**
    * The last file it showed with show_file that the person has not looked at (#1802): a mark on its
    * row, never a group or a badge. Cleared when the person opens the conversation or marks it read.
    */
@@ -5571,9 +5576,10 @@ export interface MachineEnroll {
 /**
  * machines/sendFolder, through machine/machines: one step of an agent's start_session with send
  * (#2929), which sends this folder's branch to another of the person's machines first, or of its
- * bring_back (#2947), which brings a branch back from there. Exactly one of state, upload, receive,
- * facts, pack and read; the control plane sends that machine's folders/receiveState,
- * folders/receiveUpload, folders/receive, folders/sendFacts, folders/sendPack or folders/sendRead.
+ * bring_back (#2947), which brings a branch back from there, or of its move_session (#3717), which
+ * moves a session there with its branch. Exactly one of state, upload, receive, facts, pack, read
+ * and moveIn; the control plane sends that machine's folders/receiveState, folders/receiveUpload,
+ * folders/receive, folders/sendFacts, folders/sendPack, folders/sendRead or agents/moveIn.
  */
 export interface MachineFolderSend {
   host: string;
@@ -5583,6 +5589,7 @@ export interface MachineFolderSend {
   facts?: SendFactsRequest;
   pack?: SendPackRequest;
   read?: SendReadRequest;
+  moveIn?: SessionMoveIn;
 }
 
 /**
@@ -9319,6 +9326,28 @@ export type SessionLabelOwner =
   | "person"
   | "agent";
 
+/**
+ * agents/moveIn (#3717): a session moving here from another of the person's machines, with
+ * move_session. `upload` is the export of its record and its transcript, sent with
+ * folders/receiveUpload; `folder` is the folder here it goes on in, where its branch was sent
+ * first. It keeps its id, labels and times, and goes on in this machine's root; its runtime reads
+ * the app's record ahead of its next prompt (`movedFrom`). `from` is the machine it leaves (the
+ * control plane writes `machine`), and the agent there that started it, when that agent stays
+ * there. With `carryOn`, it starts again here at once, as it was working when it moved.
+ */
+export interface SessionMoveIn {
+  upload: UUID;
+  folder: string;
+  from: StartedFrom;
+  carryOn?: boolean;
+}
+
+/** The machine a session moved here from with move_session (#3717), and when. */
+export interface SessionMovedFrom {
+  machine: string;
+  at: WireDate;
+}
+
 export interface SessionNotice {
   severity: string;
   title: string;
@@ -12255,7 +12284,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AddFolderRequest: { required: ["folder"], optional: ["project"] },
   Admitted: { required: [], optional: ["client", "host"] },
   AdoptRequest: { required: ["runtimeID", "sessionID", "cwd"], optional: [] },
-  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "runtimeKeepsCopy", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "desktopControlPause", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID", "auto", "clientPermission", "levels", "voiceHungUpAt", "goal", "project"] },
+  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "runtimeKeepsCopy", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "desktopControlPause", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "movedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID", "auto", "clientPermission", "levels", "voiceHungUpAt", "goal", "project"] },
   AgentConfigEditorFile: { required: ["path", "content"], optional: [] },
   AgentConfigEditorRequest: { required: ["kind"], optional: ["folder"] },
   AgentConfigEditorSaveRequest: { required: ["kind", "path", "content"], optional: ["folder", "delete"] },
@@ -12721,7 +12750,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineClient: { required: ["id", "kind", "publicKey"], optional: ["person"] },
   MachineClients: { required: ["clients"], optional: ["user"] },
   MachineEnroll: { required: [], optional: ["as"] },
-  MachineFolderSend: { required: ["host"], optional: ["state", "upload", "receive", "facts", "pack", "read"] },
+  MachineFolderSend: { required: ["host"], optional: ["state", "upload", "receive", "facts", "pack", "read", "moveIn"] },
   MachineFolderSent: { required: [], optional: ["state", "folder", "facts", "pack", "read"] },
   MachineHello: { required: ["version", "platform", "machineID"], optional: ["host", "name", "implementation", "capabilities"] },
   MachineInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "hostKeyRenews", "cost", "host"] },
@@ -13056,6 +13085,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SessionCallReply: { required: ["said"], optional: ["title", "ended"] },
   SessionEnded: { required: ["machine", "session", "starter", "how"], optional: ["title"] },
   SessionLabel: { required: ["value", "owner", "addedAt"], optional: [] },
+  SessionMoveIn: { required: ["upload", "folder", "from"], optional: ["carryOn"] },
+  SessionMovedFrom: { required: ["machine", "at"], optional: [] },
   SessionNotice: { required: ["severity", "title"], optional: ["detail"] },
   SessionSecret: { required: ["agentID", "title", "name", "setAt"], optional: [] },
   SessionSecretRemoveRequest: { required: ["agentID", "name"], optional: [] },

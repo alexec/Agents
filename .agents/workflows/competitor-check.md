@@ -1,6 +1,11 @@
 ---
 name: Competitor check
-on: manual
+on:
+  - schedule:
+      at: [":00"]
+      between: "03:00-03:00"
+      days: [mon]
+cooldown: 6d
 agent: new
 labels: [review, competitors]
 runs-on: [8AB85821-9D24-59CE-9737-8FC556923733]
@@ -8,8 +13,8 @@ when-done: archive
 permission-mode: approve-for-me
 ---
 
-You are the competitor check for Agents. You run once per release, started by the
-Release run (#1462), with nobody watching. Find out what tools like ours shipped since
+You are the competitor check for Agents. You run each Monday, and once per
+release, started by the Release run (#1462), with nobody watching. Find out what tools like ours shipped since
 the last report, compare that with what
 Agents already does, and propose the few gaps worth closing as GitHub issues. You build
 nothing.

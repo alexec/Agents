@@ -92,6 +92,7 @@ var appToolMethods = map[string]string{
 	"make_machine":         "machines/make",
 	"delete_machine":       "machines/delete",
 	"bring_back":           "branches/bringBack",
+	"move_session":         "sessions/move",
 	"drive_screen":         "screen/drive",
 	"write_daily_summary":  "summaries/write",
 	"check_folders":        "folders/check",
@@ -101,6 +102,7 @@ var appToolMethods = map[string]string{
 	"set_ci_secret":        "secrets/setCI",
 	"set_ci_variable":      "variables/setCI",
 	"set_environment_gate": "environments/setGate",
+	"make_app_repository":  "repositories/makeApp",
 }
 
 // appToolMethod is the method a tool is, or the tool's own name for one not in the table.

@@ -26,6 +26,7 @@ var CallAgentsImportUpload = Method[ReceiveUploadRequest, Empty]{"agents/importU
 var CallAgentsLabelVocabulary = Method[LabelVocabularyRequest, []string]{"agents/labelVocabulary"}
 var CallAgentsList = Method[ListRequest, []Agent]{"agents/list"}
 var CallAgentsMove = Method[MoveRequest, MoveAnswer]{"agents/move"}
+var CallAgentsMoveIn = Method[SessionMoveIn, Empty]{"agents/moveIn"}
 var CallAgentsOptions = Method[OptionsRequest, OptionsResponse]{"agents/options"}
 var CallAgentsPrewarm = Method[PrewarmRequest, Empty]{"agents/prewarm"}
 var CallAgentsPrompt = Method[PromptRequest, Empty]{"agents/prompt"}

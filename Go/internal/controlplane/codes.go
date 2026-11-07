@@ -66,6 +66,21 @@ type spent struct {
 	replayed bool
 }
 
+// codesMost is how many codes the store holds at most, live or expired, until the sweep
+// deletes them (#3748): a code is made only so fast (limits.go), but there was no count.
+const codesMost = 1000
+
+// countSuffix is how many of keys end in suffix.
+func countSuffix(keys []store.Key, suffix string) int {
+	n := 0
+	for _, k := range keys {
+		if strings.HasSuffix(k.Key, suffix) {
+			n++
+		}
+	}
+	return n
+}
+
 func codeKey(id string) string  { return "v1/codes/" + id + ".json" }
 func spentKey(id string) string { return "v1/codes/" + id + ".spent" }
 
@@ -104,6 +119,13 @@ func (c *Codes) issue(ctx context.Context, host, browser bool, lifetime time.Dur
 	data, err := records.Encode(stored)
 	if err != nil {
 		return nil, "", err
+	}
+	keys, err := c.Store.List(ctx, codesPrefix)
+	if err != nil {
+		return nil, "", err
+	}
+	if made := countSuffix(keys, ".json"); made >= codesMost {
+		return nil, "", fail(tooManyRequests, "There are %d codes already. Try again when older ones have run out.", made)
 	}
 	if _, err := c.Store.Put(ctx, codeKey(id), data, store.Absent); err != nil {
 		return nil, "", err
@@ -221,8 +243,9 @@ var serverFileNames = func() map[string]bool {
 	for _, arch := range []string{"x86_64", "aarch64"} {
 		// The host (Go, #1136; one name since #1381); github-mcp (#1232), linear-mcp (#839), gitlab-mcp (#1629),
 		// email-mcp (#1780), jira-mcp (#3247), slack-mcp (#3475), googlechat-mcp (#1016),
-		// whatsapp-mcp (#1352), sentry-mcp (#3583), betterstack-mcp (#3655), forgejo-mcp (#1753).
-		for _, program := range []string{"agentsd", "github-mcp", "linear-mcp", "gitlab-mcp", "email-mcp", "jira-mcp", "slack-mcp", "googlechat-mcp", "whatsapp-mcp", "sentry-mcp", "betterstack-mcp", "forgejo-mcp"} {
+		// whatsapp-mcp (#1352), sentry-mcp (#3583), betterstack-mcp (#3655), forgejo-mcp (#1753),
+		// bitbucket-mcp (#2828).
+		for _, program := range []string{"agentsd", "github-mcp", "linear-mcp", "gitlab-mcp", "email-mcp", "jira-mcp", "slack-mcp", "googlechat-mcp", "whatsapp-mcp", "sentry-mcp", "betterstack-mcp", "forgejo-mcp", "bitbucket-mcp"} {
 			names[program+"-linux-"+arch] = true
 			names[program+"-linux-"+arch+".sha256"] = true
 		}

@@ -1,6 +1,7 @@
 // A folder's Project (#2317): the words of ProjectWords in Packages/AgentsKit
 // (Model/Project.swift), the same on the Mac, the Remote and the web page.
 import { CallFailed, describe, methodNotFound } from "./errors";
+import { folderKey } from "./groups";
 import type { ConnectorSetup, ConnectorSlot, PersonRow, Project, ProjectBoard, ProjectFolder, ProjectSlot } from "../protocol/generated";
 
 export const projectWords = {
@@ -181,6 +182,21 @@ export function rememberedProjectFolders(storage: Storage | undefined): Record<s
     return stored && typeof stored === "object" ? stored as Record<string, string> : {};
   } catch {
     return {};
+  }
+}
+
+/**
+ * A host listed its folders, or left the control plane (`folders` empty): a project's last folder
+ * there that it no longer has goes (#3750), as on the Mac and the Remote.
+ */
+export function pruneProjectFolders(storage: Storage | undefined, host: string, folders: readonly string[]): void {
+  try {
+    const kept = new Set(folders.map((folder) => `${host}|${folderKey(folder)}`));
+    const held = rememberedProjectFolders(storage);
+    const left = Object.fromEntries(Object.entries(held).filter(([, folder]) => !folder.startsWith(`${host}|`) || kept.has(folder)));
+    if (Object.keys(left).length !== Object.keys(held).length) storage?.setItem(projectFoldersKey, JSON.stringify(left));
+  } catch {
+    // A private window may refuse to store; the map stays as it was.
   }
 }
 

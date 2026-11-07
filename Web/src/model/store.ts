@@ -52,6 +52,9 @@ import { milestonesSeen } from "./milestones";
 import { hostAnswers, hostHas } from "./capabilities";
 import { Capability } from "../protocol/capabilities.generated";
 import { providerManaged, withJoin, withoutJoin } from "./people";
+import { folds } from "./folds";
+import { pruneProjectFolders } from "./projects";
+
 import { orgNames } from "./signIn";
 import { withRequest, withoutRequest } from "./channelLinks";
 import { withSignIn, withoutSignIn } from "./signIn";
@@ -59,6 +62,12 @@ import type { ChartHint } from "./chart";
 import { Providers } from "./providers";
 import { MachineLock } from "./machineLock";
 import { isLead, leadEpic, leadProgressWords } from "./leadProgress";
+
+/** What this page keeps by folder on a host, kept to the folders it lists (#3750). */
+function pruneFolderKeys(host: string, folders: readonly string[]): void {
+  folds.prune(host, folders);
+  pruneProjectFolders(globalThis.window?.localStorage, host, folders);
+}
 
 export { folderKey } from "./groups";
 
@@ -1734,6 +1743,7 @@ export class Store extends Work {
   /** A host removed: what was held of it goes with it, the runtimes included (#291). */
   private forgetHost(host: string): void {
     const prefix = `${host}|`;
+    pruneFolderKeys(host, []);
     const without = <T,>(held: Record<string, T>) => Object.fromEntries(Object.entries(held).filter(([key]) => key !== host));
     const notOf = <T,>(held: Record<string, T>) => Object.fromEntries(Object.entries(held).filter(([key]) => !key.startsWith(prefix)));
     this.dropHostRecords(host);
@@ -1819,7 +1829,10 @@ export class Store extends Work {
     // Archived ones too, as the window lists them: the sidebar folds them under Archived folders
     // (#343), and Spending still counts what they cost.
     const folders = await this.link.call("folders/list", { includeArchived: true }, host).catch(failed("folders/list"));
-    if (folders) this.folders.value = { ...this.folders.value, [host]: folders };
+    if (folders) {
+      this.folders.value = { ...this.folders.value, [host]: folders };
+      pruneFolderKeys(host, folders.map((p) => p.folder.folder));
+    }
     const clones = await this.link.call("folders/clones", {}, host).catch(failed("folders/clones"));
     if (clones) this.clones.value = { ...this.clones.value, [host]: clones };
     void this.loadRuntimes(host);

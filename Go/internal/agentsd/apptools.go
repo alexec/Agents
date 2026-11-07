@@ -96,6 +96,7 @@ func appToolCalls() []appTool {
 		{"make_machine", (*Daemon).makeMachine},
 		{"delete_machine", (*Daemon).deleteMachine},
 		{"bring_back", (*Daemon).bringBackTool},
+		{"move_session", (*Daemon).moveSessionTool},
 		{"move_worktree", (*Daemon).moveWorktree},
 		{"drive_screen", (*Daemon).driveScreen},
 		{"write_daily_summary", (*Daemon).dailySummary},
@@ -106,6 +107,7 @@ func appToolCalls() []appTool {
 		{"set_ci_secret", (*Daemon).setCISecret},
 		{"set_ci_variable", (*Daemon).setCIVariable},
 		{"set_environment_gate", (*Daemon).setEnvironmentGate},
+		{"make_app_repository", (*Daemon).makeAppRepository},
 	}
 }
 

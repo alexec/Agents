@@ -37,6 +37,10 @@ type Daemon struct {
 	carriedOnce sync.Once
 	carriedHeld *carriedProviders
 
+	// machineMoves is the moves to another machine agents asked for, made when their turn
+	// ends (move_session, #3717), by agent.
+	machineMoves sync.Map
+
 	mu      sync.Mutex
 	clients map[int64]*Client
 	unknown map[string]int
@@ -151,6 +155,10 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 		SettingsDir: filepath.Join(st.Loc.Root, "settings"), HostKey: controllink.HostKeyFile{Root: st.Loc.Root},
 		PersonKey: controllink.PersonKeyFile{Root: st.Loc.Root}}
 	st.OnGap = d.tellEntry
+	// The sweep of roots that are gone finds this root's own folders by this (#3746).
+	if err := store.MarkOwnFolders(st.Loc); err != nil {
+		log.Printf("store: could not mark this root's cache and log folders: %v", err)
+	}
 	d.setToolsHome()
 	d.register()
 	d.startBrowser()

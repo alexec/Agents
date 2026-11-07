@@ -763,6 +763,18 @@ final class AppModel {
 
     static let newSessionProjectFoldersDefault = "newSessionProjectFolders"
 
+    /// A machine listed its folders, or left the control plane (`listed` empty): what the
+    /// window keeps by folder there goes for each folder it no longer has (#3750). An
+    /// offline machine lists nothing, so its folds stay.
+    private func pruneFolderDefaults(of host: MachineRef, listed: [DaemonAPI.FolderSummary]) {
+        let keys = listed.map { FolderKey(host: host, folder: $0.folder.folder) }
+        ClientDefaults.pruneFolders(WindowDefaults.store, host: host, listed: keys)
+        let kept = ClientDefaults.pruneProjectFolders(rememberedProjectFolders, host: host, listed: keys)
+        guard kept != rememberedProjectFolders else { return }
+        rememberedProjectFolders = kept
+        WindowDefaults.store.set(kept, forKey: Self.newSessionProjectFoldersDefault)
+    }
+
     private func rememberProjectFolder(_ key: FolderKey) {
         guard let summary = liveFolders.first(where: { $0.key == key }) else { return }
         let id = NewSessionProject.id(of: summary)
@@ -2799,6 +2811,7 @@ final class AppModel {
             let listed = try await client.call(DaemonAPI.Method.foldersList, DaemonAPI.FoldersListRequest(),
                                                returning: [DaemonAPI.FolderSummary].self)
             work.replaceFolders(listed, from: .mac)
+            pruneFolderDefaults(of: .mac, listed: listed)
             hasLoadedFolders = true
             settleFolderSelection()
             weighGetStarted()
@@ -3870,6 +3883,7 @@ final class AppModel {
             await controlHosts.removeValue(forKey: id)?.disconnect()
             work.replaceFolders([], from: id)
             work.replaceAgents([], from: id)
+            pruneFolderDefaults(of: id, listed: [])
         }
     }
 
@@ -4070,6 +4084,7 @@ final class AppModel {
                                                returning: [DaemonAPI.FolderSummary].self) {
             work.replaceFolders(listed, from: host)
             hosts.noteFolders(host, listed: listed)
+            pruneFolderDefaults(of: host, listed: listed)
             settleFolderSelection()
         }
         // Its folders' MCP servers, for their rows in the sidebar (#753).

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alexec/agents/Go/internal/codespacessh"
 	"github.com/alexec/agents/Go/internal/controlplane/providers"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -91,5 +92,22 @@ func TestACarriedAnswerHoldsNoSecret(t *testing.T) {
 	}
 	if !json.Valid(out.Result) {
 		t.Fatalf("%s", out.Result)
+	}
+}
+
+// A deleted codespace's ssh block goes from the ssh config here (#3746).
+func TestADeletedCodespaceLeavesNoSSHBlock(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config")
+	t.Setenv("AGENTS_SSH_CONFIG", path)
+	for _, name := range []string{"gone-cs", "kept-cs"} {
+		if err := codespacessh.Merge(path, name, []byte("Host cs."+name+".main")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	forgetCodespaceSSH("gone-cs")
+	forgetCodespaceSSH("")
+	if codespacessh.Has(path, "gone-cs", "cs.gone-cs.main") || !codespacessh.Has(path, "kept-cs", "cs.kept-cs.main") {
+		data, _ := os.ReadFile(path)
+		t.Fatalf("%s", data)
 	}
 }
