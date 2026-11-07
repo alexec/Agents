@@ -239,8 +239,8 @@ account's machines. It leaves the operator's backups of it, and Stripe's own rec
 | Store | What it keeps | How long, how large |
 | --- | --- | --- |
 | `~/Library/Application Support/Agents Control/` | The control plane's store, TLS certificate, `secrets-key`, push key, web settings | One of each |
-| `Agents Control/store-before-<…>` | A whole old store, set aside when you change the store or move back. Each holds the audit, sealed secrets and server backups. | **Never pruned** |
-| Keychain `com.alexecollins.agentshost` | The control key, bucket keys, and `control-key-before-<time>` | **A `control-key-before-*` item is added on each move back and never deleted** |
+| `Agents Control/store-before-<…>` | A whole old store, set aside when you change the store or move back. Each holds the audit, sealed secrets and server backups. | The newest 2; an older one is deleted when another is set aside (#3671) |
+| Keychain `com.alexecollins.agentshost` | The control key, bucket keys, and `control-key-before-<time>` | One of each; the newest 2 `control-key-before-*` items, deleted with the old stores (#3671) |
 | `~/Library/Logs/Agents/control.log` | What the control plane did | 4 MB, and one older file |
 | The Web Push key | The key that signs browser push | One. In `agents-control backup` as `webpush-key.pem` (#3651). |
 
