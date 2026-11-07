@@ -294,33 +294,11 @@ func changeRecap(h *wire.TimeHistory, day string, change func(r *wire.DayRecap))
 	beat(&h.Records.LongestClear, r.LongestClear)
 }
 
-func pruneTime(h *wire.TimeHistory) {
-	keep := func(keys []string, n int) map[string]bool {
-		sort.Strings(keys)
-		out := map[string]bool{}
-		for _, k := range keys[max(0, len(keys)-n):] {
-			out[k] = true
-		}
-		return out
-	}
-	hk := keep(slices.Collect(maps.Keys(h.Hours)), usageHoursKept)
-	for k := range h.Hours {
-		if !hk[k] {
-			delete(h.Hours, k)
-		}
-	}
-	dk := keep(slices.Collect(maps.Keys(h.Days)), usageDaysKept)
-	for k := range h.Days {
-		if !dk[k] {
-			delete(h.Days, k)
-		}
-	}
-	rk := keep(slices.Collect(maps.Keys(h.Recap)), usageDaysKept)
-	for k := range h.Recap {
-		if !rk[k] {
-			delete(h.Recap, k)
-		}
-	}
+// pruneTime bounds time-history.json to its hours, days and recaps (#3686).
+func pruneTime(h *wire.TimeHistory, now time.Time) int {
+	day, oldest := dayStamp(now), oldestDay(now, usageDaysKept)
+	return keepSince(h.Hours, oldestHour(now, usageHoursKept), usageHoursKept, hourStamp(now)) +
+		keepSince(h.Days, oldest, usageDaysKept, day) + keepSince(h.Recap, oldest, usageDaysKept, day)
 }
 
 // MARK: the ledger
@@ -362,7 +340,7 @@ func (d *Daemon) noteTime(e wire.TranscriptEntry, agent wire.UUID, runtime strin
 	d.noteRecapLocked(m, agent)
 	if ended {
 		h := d.timeLocked()
-		pruneTime(h)
+		pruneTime(h, nowFunc())
 		if err := writeStore(d.timePath(), h); err != nil {
 			log.Printf("time-history.json: could not save: %v", err)
 		}
@@ -482,7 +460,7 @@ func (d *Daemon) timeHistory() wire.TimeHistory {
 	d.timeMu.Lock()
 	defer d.timeMu.Unlock()
 	h := cloneTime(*d.timeLocked())
-	pruneTime(&h)
+	pruneTime(&h, nowFunc())
 	at := time.Now()
 	h.Now, h.TimeZone = hourStamp(at), zoneName()
 	if d.clearSince != nil && at.After(*d.clearSince) {
