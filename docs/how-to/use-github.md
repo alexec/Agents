@@ -61,7 +61,7 @@ The connection's row on **Connectors ▸ Connections** says which kind of token 
   post shows no badge. The row says when it ends. To use one, choose **Personal access
   token** on the **Connect GitHub** sheet, on the Mac or the web page. **Make a Token on
   GitHub** opens github.com's page for a classic token, named Agents, with the `repo` and
-  `codespace` scopes. Paste the token (`ghp_…` or `github_pat_…`) and choose **Connect**. The
+  `codespace` scopes. Paste the token (it starts with `ghp` or `github_pat`) and choose **Connect**. The
   host checks the token with github.com and keeps it; the host does not renew it, so make a
   new one when it ends. Agents connects only github.com, not a GitHub Enterprise Server.
 
