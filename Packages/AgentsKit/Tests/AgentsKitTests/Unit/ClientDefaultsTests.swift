@@ -68,10 +68,10 @@ struct ClientDefaultsTests {
     }
 
     @Test func aProjectsLastFolderGoesWithItsFolder() {
-        let map = ["p1": FolderKey(folder: api).stored, "p2": FolderKey(folder: gone).stored,
-                   "p3": FolderKey(host: devbox, folder: gone).stored]
+        let (p1, p3) = (FolderKey(folder: api).stored, FolderKey(host: devbox, folder: gone).stored)
+        let map = ["p1": p1, "p2": FolderKey(folder: gone).stored, "p3": p3]
         #expect(ClientDefaults.pruneProjectFolders(map, host: .mac, listed: [FolderKey(folder: api)])
-                == ["p1": map["p1"]!, "p3": map["p3"]!])
+                == ["p1": p1, "p3": p3])
         #expect(ClientDefaults.pruneProjectFolders(map, host: devbox, listed: []).keys.sorted() == ["p1", "p2"])
     }
 

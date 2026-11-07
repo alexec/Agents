@@ -245,6 +245,19 @@ account's machines. It leaves the operator's backups of it, and Stripe's own rec
 | `~/Library/Logs/Agents/control.log` | What the control plane did | 4 MB, and one older file |
 | The Web Push key | The key that signs browser push | One. In `agents-control backup` as `webpush-key.pem` (#3651). |
 
+## On each client
+
+What the Mac window and the Remote keep in their defaults, and the web page in
+`localStorage`, by folder and by control plane (#3750).
+
+| Store | What it keeps | How long, how large | Applied |
+| --- | --- | --- | --- |
+| Sidebar folds (`sidebar.folds`, `sidebar.folded`, each scope; `agents.sidebar.folds`, `agents.sidebar.folded` on the web page) | Which folders and folds are open | The folders that exist. A folder that its machine no longer lists goes; all of a machine's go when the control plane no longer lists the machine. An offline machine's stay. The Remote lists no archived folders, so their folds go there. | When a machine lists its folders, and when it leaves |
+| Open sessions (`sidebar.openSessions`) | Sessions whose children are shown | 200 | On write |
+| `sidebar.folder.<folder>.width`, `.pane` (Mac only) | A folder window's inspector width and pane | As the folds | As the folds |
+| `newSessionProjectFolders` (`agents.newSession.projectFolders` on the web page) | New Session's last folder for each project | As the folds | As the folds |
+| `machineLockPin.<key>` (`agents-lock-pin.<key>` on the web page) | The machine-lock pins, the lock and each person's | This control plane's only: another control plane's go once the client is paired (#3750), and all go on **Forget** (#3670) | When the control plane answers |
+
 ## In memory
 
 What a process holds while it runs, and goes when it stops. Each has a bound (#3650).
