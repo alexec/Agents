@@ -29,6 +29,12 @@ const (
 	sweptDayLayout = "2006-01-02"
 )
 
+// Copies' change events (#3648): only for a copy that missed one, so a day is plenty.
+const (
+	meshEventsPrefix = "v1/mesh/events/"
+	meshEventsKept   = 24 * time.Hour
+)
+
 // sweepReport is StoreSweep.Report.
 type sweepReport struct {
 	events, codes, tombstones, leftovers, dated, usage int
@@ -83,6 +89,14 @@ func sweep(ctx context.Context, rs *records.Records, now time.Time, most int, ev
 	}
 	// The audit chain's seals (#1001), a day's each, go with their day's entries.
 	n, err = audit.SweepSeals(ctx, s, cutoff)
+	report.events += n
+	left -= n
+	if err != nil {
+		return report, err
+	}
+
+	// Copies' change events, by the day in their key.
+	n, err = sweepMeshEvents(ctx, s, now, left)
 	report.events += n
 	left -= n
 	if err != nil {
@@ -437,6 +451,28 @@ func (e *eventSweep) sweep(ctx context.Context, s store.Store, cutoff string, mo
 			deleted++
 		}
 		e.oldest = audit.NextDay(e.oldest)
+	}
+	return deleted, nil
+}
+
+// sweepMeshEvents deletes, at most most, copies' change events from the days before
+// meshEventsKept ago. They are a day or two of changes, so one list holds them.
+func sweepMeshEvents(ctx context.Context, s store.Store, now time.Time, most int) (int, error) {
+	cutoff := now.UTC().Add(-meshEventsKept).Format(sweptDayLayout)
+	keys, err := s.List(ctx, meshEventsPrefix)
+	if err != nil {
+		return 0, err
+	}
+	deleted := 0
+	for _, k := range keys {
+		day, _, _ := strings.Cut(strings.TrimPrefix(k.Key, meshEventsPrefix), "/")
+		if deleted >= most || day >= cutoff {
+			break
+		}
+		if err := s.Delete(ctx, k.Key); err != nil {
+			return deleted, err
+		}
+		deleted++
 	}
 	return deleted, nil
 }

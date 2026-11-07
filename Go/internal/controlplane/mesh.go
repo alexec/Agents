@@ -23,7 +23,8 @@ import (
 // a heartbeat every 10 s) has one WebSocket, dialled by the smaller id and proved as
 // x:<copy>. A copy reaches a host another holds through a stream on that link, which its
 // router takes for the host's uplink. Changes people make go out on every link, and into
-// v1/events/ for a copy that missed them.
+// v1/mesh/events/ for a copy that missed them, kept meshEventsKept (#3648), not as long
+// as the audit.
 
 // The lease's and the copy record's times (HostLease, CopyRecord).
 const (
@@ -661,8 +662,8 @@ func (p *proxyUplink) finish() { p.once.Do(func() { close(p.done) }) }
 
 // MARK: Changes made here, applied at every copy
 
-// announce is a change made here: on every peer link first, then into v1/events/ for a
-// copy that missed it.
+// announce is a change made here: on every peer link first, then into v1/mesh/events/ for
+// a copy that missed it.
 func (s *Service) announce(kind, subject, by string) {
 	if s.mesh == nil {
 		return
@@ -670,7 +671,7 @@ func (s *Service) announce(kind, subject, by string) {
 	at := time.Now().UTC()
 	event := controlEvent{Kind: kind, Subject: subject, At: at.Format("2006-01-02T15:04:05Z"), By: by}
 	s.mesh.broadcast(encodePeer("event", event))
-	key := fmt.Sprintf("v1/events/%s/%013d-%s.json", at.Format("2006-01-02"), at.UnixMilli(), strings.ToLower(records.NewUUID()[:8]))
+	key := fmt.Sprintf("%s%s/%013d-%s.json", meshEventsPrefix, at.Format(sweptDayLayout), at.UnixMilli(), strings.ToLower(records.NewUUID()[:8]))
 	if data, err := records.Encode(map[string]any{"kind": kind, "subject": subject, "at": records.At(at), "by": by}); err == nil {
 		s.cfg.Store.Put(context.Background(), key, data, store.Absent)
 	}
