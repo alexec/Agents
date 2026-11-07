@@ -319,6 +319,15 @@ export function forgeName(ref: string): string {
   return forgeTitle[forge] ?? "the forge";
 }
 
+/** The forges whose pull requests have no labels (#3881): Bitbucket's API has none. */
+export const forgesWithoutPRLabels = new Set(["bitbucket"]);
+
+/** Whether the item's page offers Labels: not on a pull request of a forge whose pull requests have none (#3881). */
+export function takesLabels(node: Pick<LineageNode, "kind" | "ref">): boolean {
+  const forge = /^([a-z][a-z0-9-]*):/.exec(node.ref)?.[1] ?? "";
+  return !(node.kind === "pr" && forgesWithoutPRLabels.has(forge));
+}
+
 /** The text colour that reads on a label's colour (#2956): black on a light one, white on a dark one. */
 export function labelInk(color: string | undefined): string | undefined {
   const m = /^#?([0-9a-f]{6})$/i.exec(color ?? "");

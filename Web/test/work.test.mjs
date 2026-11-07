@@ -56,6 +56,13 @@ test("a Bitbucket issue's row has its repo and Open on Bitbucket (#3786)", () =>
   assert.equal(w.errorWords({ forge: "bitbucket", message: "not connected" }, "Studio"), "Bitbucket on Studio: not connected");
 });
 
+test("a Bitbucket pull request's page has no Labels (#3881)", () => {
+  assert.equal(w.takesLabels({ kind: "pr", ref: "bitbucket:walkalex/app#3" }), false);
+  assert.equal(w.takesLabels({ kind: "issue", ref: "bitbucket:walkalex/app#3" }), true);
+  assert.equal(w.takesLabels({ kind: "pr", ref: "github:alexec/Agents#12" }), true);
+  assert.equal(w.takesLabels({ kind: "pr", ref: "forgejo:walkalex/app#2" }), true);
+});
+
 test("one row per ref, the last updated copy, with its lineage", () => {
   const rows = w.mergeForge([
     { host: "mac", items: [item(1), item(2, { title: "Old" })] },

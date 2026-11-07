@@ -396,6 +396,15 @@ public enum WorkList {
         return forgeTitle[forge] ?? "the forge"
     }
 
+    /// The forges whose pull requests have no labels (#3881): Bitbucket's API has none.
+    public static let forgesWithoutPRLabels: Set<String> = ["bitbucket"]
+
+    /// Whether the item's page offers Labels: not on a pull request of a forge whose pull requests have none (#3881).
+    public static func takesLabels(_ node: DaemonAPI.LineageNode) -> Bool {
+        let forge = node.ref.split(separator: ":", maxSplits: 1).first.map(String.init) ?? ""
+        return !(node.kind == "pr" && forgesWithoutPRLabels.contains(forge))
+    }
+
     /// Why a write failed, in the machine's own words: a JSON-RPC error's message, not Foundation's
     /// "The operation couldn't be completed".
     public static func failureWords(_ error: any Error) -> String {
