@@ -3,7 +3,9 @@
 types), with four work items, as forge/* reads them over Azure DevOps's REST API 7.1 (WIQL and
 workitemsbatch of the organization, a work item with its links, its comments, the project's work
 item types and tags) and the writes the pages make (a comment, tags, a state, a new child), kept
-in memory so the next read shows them. Scratch data only. Point a run-app host at it with a
+in memory so the next read shows them; and the project's own WIQL, workitemsbatch and
+connectionData (Kim Lee is the token's owner), which the azureboards server's Azure Boards page
+reads (#3826). Scratch data only. Point a run-app host at it with a
 scratch AGENTS_PERSONAL_HOME whose .agents-secrets/secrets.env says
 
     AZURE_DEVOPS_URL=http://127.0.0.1:<port>
@@ -88,10 +90,12 @@ def closed_states():
 
 def wiql(query):
     ids = list(ITEMS)
-    m = re.search(r"\[System\.State\] (NOT IN|IN) \(([^)]*)\)", query)
-    if m:
+    for m in re.finditer(r"\[System\.State\] (NOT IN|IN) \(([^)]*)\)", query):
         names = set(re.findall(r"'([^']*)'", m.group(2)))
         ids = [n for n in ids if (ITEMS[n]["fields"]["System.State"] in names) == (m.group(1) == "IN")]
+    m = re.search(r"\[System\.WorkItemType\] = '([^']*)'", query)
+    if m:
+        ids = [n for n in ids if ITEMS[n]["fields"]["System.WorkItemType"] == m.group(1)]
     for tag in re.findall(r"\[System\.Tags\] CONTAINS '([^']*)'", query):
         ids = [n for n in ids if tag.lower() in [t.strip().lower() for t in ITEMS[n]["fields"]["System.Tags"].split(";")]]
     m = re.search(r"\[System\.Title\] CONTAINS '([^']*)'", query)
@@ -126,10 +130,12 @@ class Handler(BaseHTTPRequestHandler):
         path, q = unquote(u.path), parse_qs(u.query)
         project = f"/acme/{PROJECT}/_apis/wit/".lower()
         lower = path.lower()
-        if method == "POST" and path == "/acme/_apis/wit/wiql":
+        if method == "GET" and path == "/acme/_apis/connectionData":
+            return self.answer({"authenticatedUser": {"id": KIM["id"]}})
+        if method == "POST" and lower in ("/acme/_apis/wit/wiql", project + "wiql"):
             ids = wiql(self.body()["query"])[: int(q.get("$top", ["200"])[0])]
             return self.answer({"workItems": [{"id": n} for n in ids]})
-        if method == "POST" and path == "/acme/_apis/wit/workitemsbatch":
+        if method == "POST" and lower in ("/acme/_apis/wit/workitemsbatch", project + "workitemsbatch"):
             b = self.body()
             out = []
             for n in b["ids"]:

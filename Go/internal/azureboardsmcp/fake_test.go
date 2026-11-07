@@ -272,18 +272,21 @@ func (f *fakeBoards) serve(w http.ResponseWriter, r *http.Request) {
 }
 
 // wiql is the work items a query finds, changed last first, at most top: by its time, its
-// states, a tag and @Me, the parts of WIQL the server writes.
+// states (every state clause), a tag and @Me, the parts of WIQL the server writes.
 func (f *fakeBoards) wiql(query string, top int) []obj {
 	var ids []int
 	for id, it := range f.items {
 		if m := sinceWIQL.FindStringSubmatch(query); m != nil && normalized(it.fields[m[1]].(string)) < m[2] {
 			continue
 		}
-		if m := stateWIQL.FindStringSubmatch(query); m != nil {
-			in := strings.Contains(m[2], "'"+it.fields[fieldState].(string)+"'")
-			if in != (m[1] == "IN") {
-				continue
+		kept := true
+		for _, m := range stateWIQL.FindAllStringSubmatch(query, -1) {
+			if in := strings.Contains(m[2], "'"+it.fields[fieldState].(string)+"'"); in != (m[1] == "IN") {
+				kept = false
 			}
+		}
+		if !kept {
+			continue
 		}
 		if m := tagWIQL.FindStringSubmatch(query); m != nil {
 			tag, _ := it.fields[fieldTags].(string)
