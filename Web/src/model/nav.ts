@@ -6,13 +6,13 @@ import type { ActivityPage } from "../route";
 import { reportSections, type Section } from "./console";
 import { workKinds, workKindTitle, type WorkKind } from "./work";
 
-export type NavSection = "overview" | "agents" | "work" | "docs" | "machines" | "workflows" | "reports" | "requests" | "people" | "settings";
+export type NavSection = "overview" | "agents" | "work" | "docs" | "machines" | "workflows" | "reports" | "requests" | "people" | "setup" | "settings";
 
-export const navSections: readonly NavSection[] = ["overview", "agents", "work", "docs", "machines", "workflows", "reports", "requests", "people", "settings"];
+export const navSections: readonly NavSection[] = ["overview", "agents", "work", "docs", "machines", "workflows", "reports", "requests", "people", "setup", "settings"];
 
 export const navTitle: Record<NavSection, string> = {
   overview: "Overview", agents: "Agents", work: "Work", docs: "Docs", machines: "Machines", workflows: "Workflows", reports: "Reports",
-  requests: "Requests", people: "People", settings: "Settings",
+  requests: "Requests", people: "People", setup: "Your setup", settings: "Settings",
 };
 
 /** The sections only an admin sees in the bar. */
@@ -60,7 +60,6 @@ export const navPages: Record<NavSection, readonly NavPage[]> = {
   docs: [{ id: "docs", title: "Docs", group: "Docs", draw: { kind: "docs" } }],
   machines: [
     { id: "machines", title: "Machines", group: "Machines", draw: { kind: "machines" } },
-    { id: "runtimes", title: "Runtimes", group: "On them", draw: { kind: "activity", page: "runtimes" } },
     { id: "mcp", title: "Connectors", group: "On them", draw: { kind: "activity", page: "mcp" } },
   ],
   workflows: [
@@ -76,6 +75,8 @@ export const navPages: Record<NavSection, readonly NavPage[]> = {
   ],
   requests: [adminPage("requests", "Requests", "Requests")],
   people: [adminPage("people", "People and Groups", "People"), adminPage("signIn", "Sign-In", "People")],
+  // The person's own setup (#3630), beside Settings: each runtime once, with the accounts, and a line per machine (#3631).
+  setup: [{ id: "runtimes", title: "Runtimes", group: "Your setup", draw: { kind: "activity", page: "runtimes" } }],
   settings: [
     { id: "settings", title: "Settings", group: "Settings", draw: { kind: "settings" } },
     adminPage("policy", "Policy", "Organisation"),
@@ -150,7 +151,8 @@ export function movedPage(app: "console" | "a", page: string | undefined): { nav
     }
   }
   switch (page) {
-    case "runtimes": case "mcp": return { nav: "machines", section: page };
+    case "runtimes": return { nav: "setup", section: page };
+    case "mcp": return { nav: "machines", section: page };
     // Worktrees (#3627) and resources (#3629) are on each machine's page now.
     case "worktrees": case "resources": return { nav: "machines", section: "machines" };
     case "events": case "milestones": return { nav: "reports", section: page };
@@ -161,5 +163,5 @@ export function movedPage(app: "console" | "a", page: string | undefined): { nav
 
 /** The g-then-letter key for each section. */
 export const sectionKeys: Record<string, NavSection> = {
-  o: "overview", a: "agents", i: "work", d: "docs", m: "machines", w: "workflows", r: "reports", q: "requests", p: "people", s: "settings",
+  o: "overview", a: "agents", i: "work", d: "docs", m: "machines", w: "workflows", r: "reports", q: "requests", p: "people", y: "setup", s: "settings",
 };

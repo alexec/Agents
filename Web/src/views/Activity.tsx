@@ -9,7 +9,7 @@ import type { Store } from "../model/store";
 import type { AccountProfile, AllowanceReading, AllowanceState, Consequence, ControlMachine, CostState, Event, FolderSummary, RuntimeAvailability, RuntimeStatus } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import { who } from "../model/audit";
-import type { ActivityPage } from "../route";
+import { routeHash, type ActivityPage } from "../route";
 import { MCPServersList } from "./MCPServers";
 import { YourConnections } from "./ConnectorSetup";
 import { AuditPane } from "./Audit";
@@ -17,7 +17,7 @@ import { ReportsPane } from "./Reports";
 import { BackToList } from "./BackToList";
 import { Modal } from "./Modal";
 import { folderKey, folderPath } from "../model/groups";
-import { accountChoices, accountRows, accountState, agentsHolding, allowanceLine, allowancePace, allowancePaceLine, pastWeeksLine, defaultAccountName, isOrgRow, orgAllowanceLine, ownRow, ownSignInID, reachesFoot, reachesTheModelBy, machineSignInLine, offersMachineSignIn, removeMessage, rowTitle, runtimeTime, runtimesHint, signInOnTheMac } from "../model/runtimes";
+import { accountChoices, accountRows, accountState, agentsHolding, allowanceLine, allowancePace, allowancePaceLine, pastWeeksLine, defaultAccountName, isOrgRow, orgAllowanceLine, ownRow, ownSignInID, reachesFoot, reachesTheModelBy, machineSignInLine, offersMachineSignIn, removeMessage, rowTitle, runtimeTime, runtimesHint, setupMachineLine, setupRuntimes, signInOnTheMac } from "../model/runtimes";
 import { RuntimeSignInDialog } from "./RuntimeSignInDialog";
 import { limitsHint } from "../model/onTheMac";
 import { fromOrganisation } from "../model/orgAccounts";
@@ -248,6 +248,7 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
     }
   }, [page, online]);
   const several = store.hosts.value.length > 1;
+  const onlineIDs = new Set<string>(hosts.map((h) => h.id));
   const hostName = (host: string) => (store.isMac(host) ? "This Mac" : store.hosts.value.find((h) => h.id === host)?.name ?? host);
   // Events, or Audit: who did what through the control plane (#996).
   const pane = useSignal<"events" | "audit">("events");
@@ -272,11 +273,13 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
           )}
           {page === "events" && pane.value === "events" && <EventsList store={store} hostName={hostName} />}
           {page === "events" && pane.value === "audit" && <AuditPane store={store} hostName={hostName} />}
-          {page === "runtimes" && store.hosts.value.map((host) => (
-            <section key={host.id}>
-              {several && <h2 class="section-head">{hostName(host.id)}</h2>}
+          {/* Your setup ▸ Runtimes (#3631): each runtime once, its accounts and allowances read on its home machine,
+              then a line per machine, each to that machine's page. */}
+          {page === "runtimes" && (
+            <section>
               <ul class="runtime-list">
-                {(store.runtimes.value[host.id] ?? []).map((status) => {
+                {setupRuntimes(store.hosts.value, store.macHostID.value, store.runtimes.value).map(({ status, home: hostID, machines }) => {
+                  const host = { id: hostID };
                   const allowanceSet = store.runtimeAllowances.value[host.id];
                   const allowance = allowanceSet && ownRow(allowanceSet.rows, status.runtime.id);
                   const isAllowanceOut = !!allowance && "out" in allowance.state.status && !allowance.unusable;
@@ -329,13 +332,28 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
                           place={store.isMac(host.id) ? "the Mac" : hostName(host.id)} />}
                       </li>;
                     })}
+                    <li class="setup-machines">
+                      <ul aria-label={`${status.runtime.name} on each machine`}>
+                        {machines.map((m) => (
+                          <li key={m.host}>
+                            <a href={routeHash({ nav: "machines", section: `machine-${m.host}` })}>{hostName(m.host)}</a>{" "}
+                            <span class="quiet small">{setupMachineLine(m.status, onlineIDs.has(m.host))}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </li>
                   </Fragment>;
                 })}
               </ul>
-              {/* The person's own pass-through names, a name the policy refuses dimmed (#998). */}
-              <PassThroughList names={store.passThrough.value[host.id] ?? []} />
+              {/* The person's own pass-through names, a name the policy refuses dimmed (#998), for each machine that has any. */}
+              {store.hosts.value.filter((h) => (store.passThrough.value[h.id] ?? []).length > 0).map((h) => (
+                <section key={h.id}>
+                  {several && <h2 class="section-head">{hostName(h.id)}</h2>}
+                  <PassThroughList names={store.passThrough.value[h.id] ?? []} />
+                </section>
+              ))}
             </section>
-          ))}
+          )}
           {page === "mcp" && (
             <>
               <p class="hint">{personalIntro(store.hasMac.value)}</p>

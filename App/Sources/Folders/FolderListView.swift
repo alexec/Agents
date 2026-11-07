@@ -66,7 +66,7 @@ struct FolderListView: View {
         (model.hasMacHost ? [.mac] : []) + model.hosts.servers
     }
 
-    /// No runtime can be started on: Runtimes' icon says so in red (#587).
+    /// No runtime can be started on: Your setup's icon says so in red (#587).
     private var runtimesFailing: Bool {
         RuntimeTally(model.runtimes, allowances: model.runtimeAllowances)?.noneWorking == true
     }
@@ -211,11 +211,16 @@ struct FolderListView: View {
             // the list, so they take its selection and keys, each with its icon in the
             // accent beside the plain title (#155), and folding as a folder does.
             // Status is what goes on now; Usage charts the past (#915).
+            // Your setup (#3630, #3631): the person's own runtimes and accounts, once, not once
+            // per machine. Where Status was; #3633 takes the rest of Status away.
+            Section {
+                RuntimesRow().activityIcon("person.crop.circle", warns: runtimesFailing)
+                    .appText(.supporting).sidebarInk(.runtimes).tag(SidebarItem.runtimes)
+            }
+
             Section(isExpanded: $showsStatus) {
                 EventsRow().activityIcon("list.bullet.rectangle")
                     .appText(.supporting).sidebarInk(.events).tag(SidebarItem.events)
-                RuntimesRow().activityIcon("cpu", warns: runtimesFailing)
-                    .appText(.supporting).sidebarInk(.runtimes).tag(SidebarItem.runtimes)
                 MCPServersRow().activityIcon("server.rack", warns: connectorsWarn)
                     .appText(.supporting).sidebarInk(.mcpServers).tag(SidebarItem.mcpServers)
             } header: {

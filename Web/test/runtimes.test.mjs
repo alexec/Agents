@@ -227,3 +227,23 @@ test("a runtime's line on a machine's page: installed, and signed in where the m
   assert.equal(r.machineRuntimeLine(s(path, { version: "2.1.4", signIn: { signedIn: true } })), "Installed 2.1.4 · signed in");
   assert.equal(r.machineRuntimeLine(s(path, { version: "2.5.0", outdated: true })), "Installed 2.5.0 · an update is out");
 });
+
+test("Your setup: each runtime once, read on the Mac, with a line per machine, the Mac first (#3631)", () => {
+  const hosts = [{ id: "z", name: "zeta" }, { id: "mac", name: "Studio" }, { id: "d", name: "devbox" }];
+  const lists = {
+    z: [status("codex", "Codex"), status("claude", "Claude")],
+    mac: [status("claude", "Claude")],
+    d: [status("claude", "Claude", false)],
+  };
+  const got = r.setupRuntimes(hosts, "mac", lists);
+  assert.deepEqual(got.map((x) => [x.status.runtime.id, x.home]), [["claude", "mac"], ["codex", "z"]],
+    "by name; the Mac's when it lists it, else the first machine that does");
+  assert.deepEqual(got[0].machines.map((m) => [m.host, m.status && r.machineRuntimeLine(m.status)]),
+    [["mac", "Installed"], ["d", "Not installed"], ["z", "Installed"]]);
+  assert.deepEqual(got[1].machines.map((m) => m.host), ["mac", "d", "z"]);
+  assert.equal(got[1].machines[0].status, undefined, "the Mac does not list Codex");
+  assert.deepEqual(r.setupRuntimes(hosts, "mac", {}), []);
+  assert.equal(r.setupMachineLine(undefined, true), "Not known yet");
+  assert.equal(r.setupMachineLine(undefined, false), "Offline");
+  assert.equal(r.setupMachineLine(status("claude", "Claude", false), true), "Not installed");
+});
