@@ -67,6 +67,7 @@ struct YourConnectionsView: View {
             case .email: ConnectEmailSheet(host: .mac, onConnected: { Task { await load() } })
             case .atlassian: ConnectJiraSheet(host: .mac, onConnected: { Task { await load() } })
             case .forgejo: ConnectForgejoSheet(host: .mac, again: again, onConnected: { Task { await load() } })
+            case .bitbucket: ConnectBitbucketSheet(host: .mac, onConnected: { Task { await load() } })
             }
         }
         .confirmationDialog(disconnectTitle, isPresented: Binding(get: { disconnecting != nil },

@@ -110,7 +110,7 @@ struct ConnectorSetupWordsTests {
         let slot = DaemonAPI.ConnectorSlot(slot: .tasks, choice: "GitHub Issues", state: .noRemote)
         #expect(ConnectorSetupWords.title(slot) == "Choose a tracker")
         #expect(ConnectorSetupWords.line(slot, folder: "Blog", repository: nil)
-                == "Blog has no GitHub, GitLab or Forgejo remote, so GitHub Issues can't be read for it.")
+                == "Blog has no GitHub, GitLab, Forgejo or Bitbucket remote, so GitHub Issues can't be read for it.")
     }
 
     /// Connect Linear (#1343): the hand-back page's agents://oauth/callback, read for the host.
@@ -180,6 +180,21 @@ struct ConnectorSetupWordsTests {
         let ci = DaemonAPI.ConnectorSlot(slot: .ci, choice: "Forgejo checks", state: .read)
         #expect(ConnectorSetupWords.line(ci, folder: "App", repository: "team/app", forge: .forgejo)
                 == "No checks yet on team/app's default branch.")
+    }
+
+    /// Connect Bitbucket (#3785): a token's row says bitbucket.org, and a Bitbucket folder says
+    /// pull requests and checks and opens the repository on a refusal, as the web page's.
+    @Test func bitbucketWords() {
+        let c = DaemonAPI.Connection(provider: .bitbucket, login: "agentstest", connectedAt: Date(), workspace: "bitbucket.org")
+        #expect(ConnectorSetupWords.connectionTitle(c) == "Bitbucket \u{00B7} agentstest")
+        #expect(ConnectorSetupWords.connectionNote(c) == "bitbucket.org \u{00B7} Token")
+        #expect(ConnectorSetupWords.letters(.bitbucket) == "BB")
+        #expect(ConnectorSetupWords.connectTitle(.bitbucket) == "Connect Bitbucket once: issues, pull requests and checks.")
+        #expect(ConnectorSetupWords.connectButton(.bitbucket) == "Connect Bitbucket\u{2026}")
+        let ci = DaemonAPI.ConnectorSlot(slot: .ci, choice: "Bitbucket checks", state: .read)
+        #expect(ConnectorSetupWords.line(ci, folder: "App", repository: "team/app", forge: .bitbucket)
+                == "No checks yet on team/app's default branch.")
+        #expect(ConnectorSetupWords.disconnectNote(.bitbucket).hasPrefix("Disconnect deletes the machine's token. Every folder's Bitbucket slots"))
     }
 
     /// A connection that ended turns the Connectors rows red (#3407): a refused renewal, or a

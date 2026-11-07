@@ -7,6 +7,8 @@ import (
 	"sync"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/alexec/agents/Go/internal/bitbucketmcp"
+	"github.com/alexec/agents/Go/internal/connections"
 	"github.com/alexec/agents/Go/internal/forgejomcp"
 	"github.com/alexec/agents/Go/internal/githubmcp"
 	"github.com/alexec/agents/Go/internal/gitlabmcp"
@@ -127,6 +129,10 @@ func projectForge(s wire.ProjectSlot) forge {
 			f.site = *s.Site
 		}
 		f.root = forgejomcp.BaseURL(f.site)
+	}
+	if s.Forge != nil && *s.Forge == wire.ConnectionProviderBitbucket {
+		// Bitbucket Cloud only: its site is bitbucket.org, its root the API.
+		f.provider, f.site, f.root = wire.ConnectionProviderBitbucket, connections.BitbucketSite, bitbucketmcp.DefaultBase
 	}
 	return f
 }
