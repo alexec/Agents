@@ -95,10 +95,10 @@ func TestLineageCIRunBuildsItsRelease(t *testing.T) {
 
 func TestRepoOfRunURL(t *testing.T) {
 	for raw, want := range map[string]string{
-		"https://github.com/alexec/Agents/actions/runs/12":            "github:alexec/agents",
+		"https://github.com/alexec/Agents/actions/runs/12":           "github:alexec/agents",
 		"https://github.com/alexec/Agents/actions/runs/12/attempts/2": "github:alexec/agents",
-		"https://github.com/alexec/Agents/pull/12":                    "",
-		"https://gitlab.com/g/p/-/pipelines/12":                       "",
+		"https://github.com/alexec/Agents/pull/12":                   "",
+		"https://gitlab.com/g/p/-/pipelines/12":                      "",
 	} {
 		r, ok := repoOfRunURL(raw)
 		got := ""
