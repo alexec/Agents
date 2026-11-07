@@ -14,8 +14,10 @@ when a person approves it, submits it for App Review. Crashes go to Sentry.
    Environments**), each with **Required reviewers**. Nothing ships before a reviewer
    approves it.
 2. In App Store Connect, make a team API key (**Users and Access ▸ Integrations ▸ Team
-   Keys**) and download it. Put it in the repository's secrets:
-   - `ASC_KEY_P8`: the text of the `.p8` file.
+   Keys**) with the role **Admin**, and download it. Cloud-managed signing refuses a key with
+   a smaller role. Put it in the repository's secrets:
+   - `ASC_KEY_P8`: the text of the `.p8` file. Its line breaks can go: the workflows put
+     them back (`scripts/asc-key.sh`).
    - `ASC_KEY_ID`: the key's ID.
    - `ASC_ISSUER_ID`: the issuer ID, above the list of keys.
 3. Put your team ID (**Membership details** on developer.apple.com) in the repository
@@ -25,7 +27,10 @@ when a person approves it, submits it for App Review. Crashes go to Sentry.
 5. In App Store Connect, make the app's record (**Apps ▸ + ▸ New App**) with that bundle
    id.
 6. For Sentry, put the project's DSN in the repository variable `SENTRY_DSN`. With no DSN,
-   the app sends nothing.
+   the app sends nothing. For crashes with names and lines, also put the project's slug in
+   the variable `SENTRY_PROJECT`, and an organization token (Sentry's **Settings ▸
+   Organization Tokens**) in the secret `SENTRY_AUTH_TOKEN`: `release.yml` then uploads the
+   debug symbols.
 
 Signing is Xcode's cloud-managed signing: Apple makes the certificate and the profile from
 the key, so there is no certificate or profile to keep.

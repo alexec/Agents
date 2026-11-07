@@ -155,6 +155,10 @@ something particular done.
   token, set up a folder from it, and work with merge requests, issues and pipelines.
 - [Use Forgejo or Gitea](use-forgejo.md): add the forgejo connector with an access token,
   and work with pull requests, checks and issues on Codeberg or your own Forgejo or Gitea.
+- [Use Bitbucket](use-bitbucket.md): add the bitbucket connector with an API token or an
+  access token, and work with pull requests, checks and issues on Bitbucket Cloud.
+- [Use Azure DevOps Repos](use-azure-devops.md): add the azuredevops connector with a
+  personal access token, and work with pull requests and Azure Pipelines builds.
 - [Use Linear issues](use-linear-issues.md): Linear's own tools, and an agent when an
   issue is opened, labelled, commented on or closed.
 - [Use Jira issues](use-jira-issues.md): the Jira issues page with Start Agent, Atlassian's

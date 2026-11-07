@@ -56,10 +56,10 @@ var controlAsks = methodSet([]string{
 var clientSigned = methodSet([]string{wire.CallAgentsStart.Name, wire.CallAgentsPrompt.Name})
 
 // machineSigned is what another of the person's machines may ask (D7): the steps of
-// start_session (#2887, #2927), and of send and bring_back (#2929, #2947). Not terminals,
-// nor any other file.
+// start_session (#2887, #2927), of send and bring_back (#2929, #2947), and of move_session
+// (#3717). Not terminals, nor any other file.
 var machineSigned = methodSet([]string{
-	wire.CallAgentsStart.Name, "agents/fromStarter", "agents/endedElsewhere",
+	wire.CallAgentsStart.Name, "agents/fromStarter", "agents/endedElsewhere", wire.CallAgentsMoveIn.Name,
 	"folders/receiveState", "folders/receiveUpload", "folders/receive",
 	"folders/sendFacts", "folders/sendPack", "folders/sendRead",
 })

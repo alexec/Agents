@@ -84,7 +84,7 @@ struct PaneView: View {
     private var state: PaneState { model.panes.state(for: agent.id) }
 
     /// What can be switched to. The Page once there is a page; the Terminal while the
-    /// Mac can give one; never a Browser (FR-030).
+    /// Mac can give one; never the Mac's own Browser (FR-030).
     private var offered: [Pane] {
         if model.macLacksPanes { return [.exchanged] }
         return Pane.allCases.filter { $0 != .page || state.pagePath != nil }
@@ -148,6 +148,13 @@ struct PaneView: View {
                 RemoteChangesPane(agent: agent)
             case .terminal:
                 TerminalPane(agent: agent)
+            case .browser:
+                // The browser on the session's machine (#3800); not on a host too old to have one.
+                if model.host(agent.host, has: Capability.browser1) {
+                    AgentBrowserPane(agent: agent)
+                } else {
+                    HostNeedsUpdateView()
+                }
             case .exchanged:
                 ArtifactsList()
             case .simulator:

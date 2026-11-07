@@ -7,6 +7,9 @@
 #   secrets    ASC_KEY_P8, ASC_KEY_ID, ASC_ISSUER_ID   the App Store Connect team key
 #   variables  APPLE_TEAM_ID                           the team that signs
 #              SENTRY_DSN                              where the app sends crashes (optional)
+#              SENTRY_PROJECT                          the Sentry project's slug (optional)
+#   secret     SENTRY_AUTH_TOKEN                       a Sentry organization token, to upload the
+#                                                      debug symbols (optional)
 name: release
 
 on:
@@ -22,6 +25,7 @@ concurrency:
 env:
   BUNDLE_ID: __BUNDLE_ID__
   XCODEGEN: 2.46.0
+  SENTRY_CLI: 3.8.2
 
 jobs:
   testflight:
@@ -42,7 +46,7 @@ jobs:
             echo "::error::Set the secrets ASC_KEY_P8, ASC_KEY_ID and ASC_ISSUER_ID and the variable APPLE_TEAM_ID. Nothing was uploaded."
             exit 1
           fi
-          echo "$ASC_KEY_P8" > "$RUNNER_TEMP/asc.p8"
+          bash scripts/asc-key.sh "$RUNNER_TEMP/asc.p8"
 
       - name: Make the Xcode project
         run: |
@@ -93,3 +97,22 @@ jobs:
       # run and shows the build beside the release it came from.
       - name: Say the deploy
         run: echo "::notice title=deploy::testflight:$BUNDLE_ID/${{ github.run_number }}"
+
+      # The debug symbols, so that Sentry shows each crash's stack with names and lines. Only
+      # with the SENTRY_AUTH_TOKEN secret and the SENTRY_PROJECT variable: without them, crashes
+      # still reach Sentry, with addresses in place of names. The build is out already, so a
+      # failure here does not fail the release.
+      - name: Upload the debug symbols to Sentry
+        continue-on-error: true
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+        run: |
+          if [[ -z $SENTRY_AUTH_TOKEN || -z $SENTRY_PROJECT ]]; then
+            echo "No SENTRY_AUTH_TOKEN secret or SENTRY_PROJECT variable: no debug symbols were uploaded."
+            exit 0
+          fi
+          curl -sSfL "https://github.com/getsentry/sentry-cli/releases/download/$SENTRY_CLI/sentry-cli-Darwin-universal" -o "$RUNNER_TEMP/sentry-cli"
+          chmod +x "$RUNNER_TEMP/sentry-cli"
+          # An organization token names its organization, so only the project is given.
+          "$RUNNER_TEMP/sentry-cli" debug-files upload --project "$SENTRY_PROJECT" "$RUNNER_TEMP/App.xcarchive/dSYMs"

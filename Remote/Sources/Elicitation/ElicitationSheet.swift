@@ -45,9 +45,10 @@ struct ElicitationSheet: View {
             }
 
             if let handOff = request.handOff {
-                // A step on the page in the machine's browser (#3529). The Remote does not
-                // show that browser (tier mac+web, #3528), so it says where to do it.
-                HandOffCard(handOff: handOff, open: nil, elsewhere: "Do it on your Mac or the web page, in the Agent Browser.",
+                // A step on the page in the machine's browser (#3529), done in the Browser pane
+                // (#3800); a host too old to have one says where to do it.
+                HandOffCard(handOff: handOff, open: model.agent(request.agentID, has: Capability.browser1) ? openAgentBrowser : nil,
+                            elsewhere: "Do it on your Mac or the web page, in the Agent Browser.",
                             host: model.answerRecipient(request.agentID), sending: chosen != nil) { done, note in
                     send(done ? "Done" : "Can't do it", action: .accept, content: ElicitationRequest.handOffAnswer(done: done, note: note))
                 }
@@ -77,6 +78,10 @@ struct ElicitationSheet: View {
         // (033, #723).
         .chatColumn()
         .animation(.snappy(duration: 0.2), value: chosen)
+    }
+
+    private func openAgentBrowser() {
+        model.panes.state(for: request.agentID).show(.browser)
     }
 
     @ViewBuilder
