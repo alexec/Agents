@@ -349,7 +349,7 @@ type pull struct {
 }
 
 func (p pull) pr() PR {
-	return PR{Number: p.Number, Title: p.Title, Branch: p.Head.Ref, URL: p.HTMLURL, Fixes: closingRefs(p.Body)}
+	return PR{Number: p.Number, Title: p.Title, Branch: p.Head.Ref, URL: p.HTMLURL, Fixes: closingRefs(p.Body), Author: p.User.Login}
 }
 
 // trusted says whether the PR is the repo's own: its branch in repo, not a fork, and its
@@ -369,6 +369,7 @@ type issueJSON struct {
 	Number      int             `json:"number"`
 	Title       string          `json:"title"`
 	HTMLURL     string          `json:"html_url"`
+	Body        string          `json:"body"`
 	User        user            `json:"user"`
 	Association string          `json:"author_association"`
 	Labels      []label         `json:"labels"`
@@ -707,7 +708,7 @@ func (g *RealGitHub) OpenPRs(ctx context.Context, repo string) ([]OpenPR, error)
 // conflictQuery is the open PRs and whether each can merge: REST's listing does not say.
 const conflictQuery = `query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) {
   pullRequests(states: OPEN, first: 100, orderBy: {field: CREATED_AT, direction: DESC}) {
-    nodes { number title headRefName url mergeable isCrossRepository authorAssociation author { login __typename } } } } }`
+    nodes { number title body headRefName url mergeable isCrossRepository authorAssociation author { login __typename } } } } }`
 
 func (g *RealGitHub) ConflictPRs(ctx context.Context, repo string) ([]ConflictPR, error) {
 	owner, name, ok := strings.Cut(repo, "/")
@@ -728,6 +729,7 @@ func (g *RealGitHub) ConflictPRs(ctx context.Context, repo string) ([]ConflictPR
 					Nodes []struct {
 						Number      int    `json:"number"`
 						Title       string `json:"title"`
+						Body        string `json:"body"`
 						HeadRefName string `json:"headRefName"`
 						URL         string `json:"url"`
 						Mergeable   string `json:"mergeable"`
@@ -760,7 +762,10 @@ func (g *RealGitHub) ConflictPRs(ctx context.Context, repo string) ([]ConflictPR
 	}
 	var out []ConflictPR
 	for _, n := range answer.Data.Repository.PullRequests.Nodes {
-		c := ConflictPR{PR: PR{Number: n.Number, Title: n.Title, Branch: n.HeadRefName, URL: n.URL}}
+		c := ConflictPR{PR: PR{Number: n.Number, Title: n.Title, Branch: n.HeadRefName, URL: n.URL, Fixes: closingRefs(n.Body)}}
+		if n.Author != nil {
+			c.PR.Author = n.Author.Login
+		}
 		// A deleted account is no author: not trusted.
 		if n.Author != nil && !n.CrossRepo {
 			c.Trusted = isTrusted(n.Association, n.Author.Login, n.Author.Typename)
@@ -1014,7 +1019,8 @@ func (g *RealGitHub) PRLabelActivity(ctx context.Context, repo string, kind PRLa
 		out = append(out, PRLabelActivity{
 			ID:      strconv.Itoa(e.ID),
 			At:      e.CreatedAt,
-			PR:      PR{Number: e.Issue.Number, Title: e.Issue.Title, URL: e.Issue.HTMLURL},
+			PR: PR{Number: e.Issue.Number, Title: e.Issue.Title, URL: e.Issue.HTMLURL,
+				Fixes: closingRefs(e.Issue.Body), Author: e.Issue.User.Login},
 			Kind:    kind,
 			Label:   e.Label.Name,
 			By:      e.Actor.Login,

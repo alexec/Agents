@@ -371,7 +371,7 @@ type pullJSON struct {
 var wipPrefixes = []string{"wip:", "[wip]"}
 
 func (p pullJSON) pr() PR {
-	return PR{Number: p.Number, Title: p.Title, Branch: p.Head.Ref, URL: p.HTMLURL, Fixes: closingRefs(p.Body)}
+	return PR{Number: p.Number, Title: p.Title, Branch: p.Head.Ref, URL: p.HTMLURL, Fixes: closingRefs(p.Body), Author: p.User.Login}
 }
 
 func (p pullJSON) draft() bool {

@@ -198,8 +198,9 @@ Until the gate can pass:
 - Recount what is still open of what step 3 collected: its issues.
 - Go on as soon as nothing high is open. Never wait for a medium one or a draft advisory:
   the medium issues still open go into the notes as known issues.
-- Otherwise wait with `wait_for_event` for `issue.closed` and `pr.merged`, with
-  `until_minutes` at most the time left to T0 + 1 day.
+- Otherwise wait with `wait_for_event` for `issue.closed` and `pr.merged`, `where:
+  {"issue": [<the open high issues>], "any": true}`, with `until_minutes` at most the time
+  left to T0 + 1 day. `any: true` is for `pr.merged`: any merge moves `main` (#3797).
 - High always blocks. At T0 + 1 day with a high one still open, end with `partly_done`,
   naming what is open. The next run is a new day (a new T0); it skips the checks that
   already ran (step 2) and picks up the same issues.
@@ -231,9 +232,11 @@ open for item 2 and for the notes' known issues (`git merge-base --is-ancestor <
    shows every run `success` (or `skipped`). If one is still running, wait for it: a push
    to `main` is never a pull request, so `checks.failed` and `checks.passed` (a PR's own
    runs) never fire for it. Wait instead with `wait_for_event` on the `github` server's
-   `run.completed` (`where: {"branch": "main"}`, #3444) and `pr.merged`, `until_minutes: 10`,
-   since a PR landing is what would cancel this run by moving main past `<sha>`, then look
-   again however it woke (run `--after` as above if it did move).
+   `run.completed`, `where: {"branch": "main"}` (#3444), `until_minutes: 10`. Do not add
+   `pr.merged` to this wait: one `where` goes to every event that takes its keys, and
+   `branch` on `pr.merged` means a PR *from* `main` (#3797). A PR landing moves main past
+   `<sha>` and starts a run on main, so its runs wake this wait too; look again however it
+   woke (run `--after` as above if it did move).
    A newer push never cancels a running run on `main` (#2218), but it replaces a pending
    one: when the pin's CI was replaced and never ran, start over on the newest main. If a
    run on `<sha>` failed, end with `partly_done`; main broken is fixed by its own PR,
@@ -249,8 +252,9 @@ open for item 2 and for the notes' known issues (`git merge-base --is-ancestor <
    databaseId,displayTitle,status --jq '.[] | select(.displayTitle == "release dry run <sha>")'`)
    and wait until it is `completed` (it takes up to an hour). It runs by
    `workflow_dispatch`, not a pull request, so `checks.*` never fire for it: wait with
-   `wait_for_event` on the `github` server's `run.completed`, `where: {"run": <id>}`
-   (#3444), with `pr.merged` beside it and `until_minutes: 20` as a back-stop. The event's
+   `wait_for_event` on the `github` server's `run.completed`, with `pr.merged` beside it,
+   `where: {"run": <id>, "any": true}` (#3444; `any` is for `pr.merged`, #3797) and
+   `until_minutes: 20` as a back-stop. The event's
    `run.conclusion` is the result. However it woke, look again (run `--after` as above if
    main moved meanwhile; with `keep the pin`, the same run goes on). Never wait on a
    background shell or a timer alone: a background shell ends with the session's process. It runs release.yml's `mac` and `testflight` archives as dry runs on a

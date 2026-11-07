@@ -422,7 +422,24 @@ func parsePattern(given string, filters map[string][]string) (waitPattern, strin
 		}
 		return p, problem
 	}
+	// any says which ones (#3797), every one; no event carries it as a detail.
+	delete(p.filters, "any")
 	return p, ""
+}
+
+// unnamedBranchWords is why a wait on branch.moved that names no branch, and does not set
+// any: true, is refused (#3797), or "": it woke on every branch an agent works on.
+func unnamedBranchWords(p waitPattern, filters map[string][]string) string {
+	if p.name != "branch.moved" && p.name != "branch.*" {
+		return ""
+	}
+	if _, named := filters["branch"]; named {
+		return ""
+	}
+	if all := filters["any"]; len(all) == 1 && all[0] == "true" {
+		return ""
+	}
+	return p.name + ": Name the branch (`branch`), or set `any: true` to wake on every branch in the folder. Nothing is waiting."
 }
 
 // The wait on the agent's record, and its words.
@@ -739,6 +756,9 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 		p, problem := parsePattern(n, filters)
 		if problem != "" {
 			return "", eventRefused(problem)
+		}
+		if words := unnamedBranchWords(p, filters); words != "" {
+			return "", eventRefused(words)
 		}
 		if isServerPattern(p.name) {
 			// A server's event is matched by its subscription, not its details: `where`
