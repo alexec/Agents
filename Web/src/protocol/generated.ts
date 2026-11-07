@@ -6221,6 +6221,47 @@ export type MoveWhen =
   | "nothing";
 
 /**
+ * The Multiplier (#3901, #3903; method in specs/3901-multiplier/spec.md): the PRs the person's
+ * agents merged in the last 7 days, less the merged reverts, against the PRs an average engineer
+ * merged in a week in 2025. With a control plane it counts all the person's machines, else this
+ * machine. multiplier and engineerHours are absent when nothing is counted: the page shows — ×, not
+ * 0×.
+ */
+export interface Multiplier {
+  /**
+   * The PRs counted: merged in the range, less the merged reverts, never below 0. A PR counts when
+   * a session of the person worked on it.
+   */
+  prsMerged: number;
+  /** The merged reverts in the range. */
+  reverts: number;
+  /** prsMerged ÷ baseline.prsPerWeek, to one decimal: 5.0 is 5.0×. */
+  multiplier?: number;
+  /** prsMerged × baseline.hoursPerWeek ÷ baseline.prsPerWeek, to the whole hour. */
+  engineerHours?: number;
+  /** This machine's agents with a turn running now. */
+  agentsWorking: number;
+  /** The start of the range: 7 days before it was counted. */
+  since: WireDate;
+  baseline: MultiplierBaseline;
+  /** On multiplier/changed: the PR whose merge or revert changed it. */
+  changedBy?: LineageNode;
+}
+
+/**
+ * What the Multiplier compares with (#3902), so that no client keeps its own copy: an engineer with
+ * no AI in 2025.
+ */
+export interface MultiplierBaseline {
+  /** Merged PRs a week: 1.4. */
+  prsPerWeek: number;
+  /** The hours of that week: 40. */
+  hoursPerWeek: number;
+  /** Where the figure is from, for the page's small line: DX 2025. */
+  source: string;
+}
+
+/**
  * A runtime's own setting for one level: config option values (mode, model, effort), a sandbox
  * choice, or the answer to permission requests.
  */
@@ -12951,6 +12992,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MoveRequest: { required: ["agentID", "removeLeft", "discardChanges"], optional: ["target"] },
   MoveToMachineAnswer: { required: ["folder", "carriesOn"], optional: [] },
   MoveToMachineRequest: { required: ["agentID", "machine"], optional: ["machineName", "folder"] },
+  Multiplier: { required: ["prsMerged", "reverts", "agentsWorking", "since", "baseline"], optional: ["multiplier", "engineerHours", "changedBy"] },
+  MultiplierBaseline: { required: ["prsPerWeek", "hoursPerWeek", "source"], optional: [] },
   NativeSetting: { required: [], optional: ["options", "sandbox", "clientPermission"] },
   Need: { required: ["id", "folder", "kind", "raisedAt", "headline"], optional: ["agentID"] },
   NotCommittedResponse: { required: ["isRepository", "paths", "more"], optional: [] },

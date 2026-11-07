@@ -147,6 +147,8 @@ type Service struct {
 	cfg Config
 	// The control key, and the one before a rotation (#997): read with currentKeys.
 	keyBook
+	// The Multiplier of each person, by their lineage objects' tags (#3903).
+	multiplierBook
 	origin  string
 	copyID  string
 	records *records.Records
