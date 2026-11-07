@@ -159,6 +159,9 @@ something particular done.
   access token, and work with pull requests, checks and issues on Bitbucket Cloud.
 - [Use Azure DevOps Repos](use-azure-devops.md): add the azuredevops connector with a
   personal access token, and work with pull requests and Azure Pipelines builds.
+- [Use Azure Boards work items](use-azure-boards.md): add the azureboards connector with a
+  personal access token, and an agent when a work item is opened, tagged, commented on,
+  closed or assigned to you.
 - [Use Linear issues](use-linear-issues.md): Linear's own tools, and an agent when an
   issue is opened, labelled, commented on or closed.
 - [Use Jira issues](use-jira-issues.md): the Jira issues page with Start Agent, Atlassian's
