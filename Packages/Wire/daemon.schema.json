@@ -5061,6 +5061,13 @@
           "items": {
             "$ref": "#/definitions/Connection"
           }
+        },
+        "providers": {
+          "type": "array",
+          "description": "The providers this host connects (#3824), so a client newer than its host offers only those. A client drops a name it does not know. Absent from a host older than #3824: it connects GitHub, Linear, GitLab, Atlassian and, with connections.email/1, Email.",
+          "items": {
+            "$ref": "#/definitions/ConnectionProvider"
+          }
         }
       },
       "required": [

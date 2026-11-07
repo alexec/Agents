@@ -280,4 +280,18 @@ struct ConnectorSetupWordsTests {
         #expect(ConnectorSetupWords.disconnectMessage(.linear, folders: folders)
                 == ConnectorSetupWords.disconnectNote(.linear))
     }
+
+    /// Connect… offers only what the host connects (#3824): its list, in this client's order,
+    /// less names this client does not know; an older host's list is what it connected then.
+    @Test func connectOffersOnlyWhatTheHostConnects() throws {
+        let raw = #"{"connections":[],"providers":["bitbucket","github","azuredevops","forgejo"]}"#
+        let list = try JSONDecoder().decode(DaemonAPI.ConnectionsList.self, from: Data(raw.utf8))
+        #expect(list.providers == [.bitbucket, .github, .forgejo])
+        #expect(list.offered(hostHasEmail: true) == [.github, .forgejo, .bitbucket])
+
+        let older = try JSONDecoder().decode(DaemonAPI.ConnectionsList.self, from: Data(#"{"connections":[]}"#.utf8))
+        #expect(older.providers == nil)
+        #expect(older.offered(hostHasEmail: false) == [.github, .linear, .gitlab, .atlassian])
+        #expect(older.offered(hostHasEmail: true) == [.github, .linear, .gitlab, .email, .atlassian])
+    }
 }
