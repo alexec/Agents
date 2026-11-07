@@ -5774,7 +5774,7 @@ export interface MachineSchedule {
 
 /**
  * machines/sessionCall, through machine/machines (#2927): an agent's read_session, message_session,
- * stop_session, archive_session, or list_sessions and wait_for_agents status, on a session it
+ * stop_session, archive_session, or list_sessions and agent.ended wait status, on a session it
  * started on another of the person's machines with start_session. The control plane sends that
  * machine's agents/fromStarter, with call.from in its own words.
  */
@@ -9295,8 +9295,8 @@ export interface SessionCall {
    */
   project?: string;
   /**
-   * With op status and project (#3277): the asker waits on it with wait_for_agents, so the host
-   * tells the asker's machine when it ends, as it tells a starter.
+   * With op status and project (#3277): the asker waits on it with wait_for_event on agent.ended,
+   * so the host tells the asker's machine when it ends, as it tells a starter.
    */
   watch?: boolean;
 }
@@ -9313,8 +9313,8 @@ export interface SessionCallReply {
 
 /**
  * machines/sessionEnded through machine/machines, then agents/endedElsewhere (#2927): a session
- * started from another machine has ended, so its starter's wait_for_agents can wake. The host sends
- * machine as the starter's machine; the control plane sends it on as the ended session's.
+ * started from another machine has ended, so its starter's wait on agent.ended can wake. The host
+ * sends machine as the starter's machine; the control plane sends it on as the ended session's.
  */
 export interface SessionEnded {
   machine: string;

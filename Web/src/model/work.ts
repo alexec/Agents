@@ -306,12 +306,17 @@ export function errorWords(e: ForgeListError, machine: string | undefined): stri
 }
 
 export const forgeTitle: Record<string, string> = { github: "GitHub", gitlab: "GitLab", linear: "Linear", jira: "Jira",
-  azureboards: "Azure Boards" };
+  azureboards: "Azure Boards", forgejo: "Forgejo" };
 
 /** "Open on GitHub", by the ref's forge. */
 export function openOnWords(ref: string): string {
+  return `Open on ${forgeName(ref)}`;
+}
+
+/** "GitHub" of "github:alexec/Agents#12", by the ref's forge; "the forge" of one it does not know. */
+export function forgeName(ref: string): string {
   const forge = /^([a-z][a-z0-9-]*):/.exec(ref)?.[1] ?? "";
-  return `Open on ${forgeTitle[forge] ?? "the forge"}`;
+  return forgeTitle[forge] ?? "the forge";
 }
 
 /** The text colour that reads on a label's colour (#2956): black on a light one, white on a dark one. */

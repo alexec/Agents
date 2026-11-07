@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac, web]
-description: Connect Forgejo with an access token and add the forgejo connector, so that agents read and comment on pull requests, checks and issues on Codeberg or your own Forgejo or Gitea, and a workflow or a wait starts on their events.
+description: Connect Forgejo with an access token and add the forgejo connector, so that agents read and comment on pull requests, checks and issues on Codeberg or your own Forgejo or Gitea, a workflow or a wait starts on their events, and the Work pages list them.
 ---
 
 # Use Forgejo or Gitea
@@ -11,9 +11,9 @@ server in the shape of the gitlab one. Forgejo and Gitea have the same REST API,
 connector is for both: Codeberg, your own Forgejo, or your own Gitea. Agents Host carries
 it, and every Linux host installs it beside agentsd.
 
-It has tools to read pull requests, their checks and issues, and to comment on them, and
-it has events that start a workflow or a wait. It has no pages yet: the Work pages do not
-list a Forgejo repository.
+It has tools to read pull requests, their checks and issues, and a failed job's log, and to
+comment on them, and it has events that start a workflow or a wait. With the Forgejo
+connection, the Work pages list a Forgejo repository's issues and pull requests too (#3753).
 
 ## Before you start
 
@@ -74,12 +74,51 @@ The set-up adds it for you. To add it to another folder:
 The connector finds the repository from the folder's git remote (`origin` first). A tool or
 an event can name another one with `repo`, as `owner/name`.
 
+## On the Work pages
+
+With Forgejo connected, **Work ▸ Issues** and **Work ▸ Pull requests** list the issues and pull
+requests of each folder whose remote is on the connected Forgejo, beside the other forges',
+the last updated first. The repository is a choice in the **Repo** filter. A folder on another
+Forgejo is left out, and the list says why: the token counts only on its own Forgejo.
+
+- **An issue's page:** its description and comments, **Open on Forgejo**, **Start Agent**
+  (the session is labelled `#12`), **Close** or **Reopen**, **Labels** (the repository's) and a
+  comment box.
+- **A pull request's page:** the same, and its checks (the head commit's statuses), **Merge**
+  (the repository's default method first; merge, squash or rebase, as the repository allows;
+  and *Merge when checks pass*), **Approve** and **Show Diff**. Forgejo's API cannot run a
+  check again or give its log, so **Rerun failed** and a check's log say to open the check on
+  Forgejo.
+
+Each write is yours, with your token, from the machine that read the item.
+
+### An epic's plan and features
+
+Forgejo has no sub-issues, so an epic's children are the issues it **depends on** (Forgejo's
+issue dependencies, *This issue depends on*), and a child waits for the issues it depends on
+in turn. An issue labelled `epic` has a **Plan** on its page, its children step by step, as on
+GitHub. **Add child** makes the epic depend on a new issue (with its level and the epic's
+`feature:<name>` label) or on one that is there (`#12`, `owner/repo#12` or its address on the
+connected Forgejo); **Blocked by** makes a child depend on another child, or no longer.
+Forgejo keeps an issue with open dependencies from being closed, so an epic closes after its
+children.
+
+**Work ▸ Features** counts a Forgejo epic under its `feature:<name>` label, as it counts the
+other forges' epics.
+
 ## The tools
 
 - `list_pull_requests`, `get_pull_request` (with its description, head commit and the
   combined state of its checks), `get_checks` (each check of a commit or a pull request's
   head), `list_issues` and `get_issue` (with its comments).
 - `comment_on_pull_request` and `comment_on_issue`.
+- `failed_log`: the last 300 lines of each failed job's log in a Forgejo Actions run, or of
+  one job by name. `runId` is the run's number: `run.id` in a `checks.failed` event, or the
+  number after `/actions/runs/` in a check's address. On Forgejo 17 or later it gives the
+  step that failed (the whole job's log when that step wrote nothing). It needs Forgejo 16
+  or later, or Gitea 1.25 or later; an older server, such as Forgejo 11 LTS or Gitea 1.24,
+  has no API for it, and the tool says which version it needs and gives the run's address.
+  Another CI's logs are on its own pages.
 - For the ready-made workflows: `create_pull_request` (a draft's title starts `WIP:`),
   `list_pull_request_comments` (the comments on lines of the diff) and
   `reply_to_pull_request_comment` (an answer in the comment's thread).
@@ -113,7 +152,24 @@ never a bot. A pull request from a fork never counts.
   After the host starts again, a conflict that was already there is raised once more.
 - **Checks are read for the 50 open pull requests updated last.** Forgejo has no list of a
   repository's failed checks, so each poll reads the head of each of those.
-- **Not yet:** the Work pages and a failed job's log.
+- **The Work pages read Forgejo on each machine.** The list asks each repository for a page,
+  as Forgejo has no list across chosen repositories.
+- **Lineage links Forgejo's issues and pull requests (#3834).** A session's `#12` or `P#12`
+  label in a folder on Forgejo works on that issue or pull request. A pull request's events
+  link it to the sessions on its branch and to the issues its description closes. A folder
+  is on Forgejo when its `origin` is on the connected Forgejo, or on a host whose name says
+  Codeberg, Forgejo or Gitea.
+- **Lineage asks the connected Forgejo (#3844),** with the Forgejo connection, about the
+  repositories of the folders on it: an issue's, a pull request's and a milestone's title
+  and state, an issue's milestone, a version tag's pull requests (from `(#12)` at the end of
+  a squash commit's title, or else the commit's pull request) and the milestone whose title
+  starts with its version, and the cost comment on a merged pull request (when the folder's
+  `prCostComment` says so). Forgejo has no parent issues, so an issue has none. An issue's
+  address on the connected Forgejo is read in a filed issue's output. A doc's address is
+  `/src/HEAD/<path>`, which Forgejo sends on to the default branch.
+- **The Board filter has no Forgejo board.** Forgejo has project boards, but its API (11)
+  cannot read them, so a list narrowed to a board lists no Forgejo items.
+- **Not yet:** a failed job's log.
 
 ## See also
 

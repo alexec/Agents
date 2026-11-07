@@ -31,7 +31,7 @@ import (
 //   - Our store is the master; the comment is a copy (Alex, 2026-10-22). The numbers are
 //     this machine's, as lineage/cost's are.
 //   - The person's own gh (GitHub) or glab (GitLab) posts it, in the folder, as the Time
-//     page asks gh for merged PRs.
+//     page asks gh for merged PRs; on Forgejo, the person's connection (lineageforgejo.go).
 //   - The comment starts with prCommentMark, so a host that lost its record, or another
 //     machine, finds the comment and edits it.
 //   - The setting is read at each post and edit: turned off, the host stops editing.
@@ -108,6 +108,10 @@ func (d *Daemon) prCostCommentOf(folder string) wire.PRCostComment {
 // prMerged notes a merged PR of repo for its comment, when a folder of that repo says to.
 // It runs on the linker's goroutine, after the merge's own links.
 func (d *Daemon) prMerged(repo forgeRepo, n int, pr wire.LineageNode) {
+	// The comment is written by the forge's CLI (prCommenter), or Forgejo's connection.
+	if !repo.asks() {
+		return
+	}
 	folder := ""
 	for _, f := range d.folderPaths() {
 		if d.folderRepo(f) == repo && d.prCostCommentOf(f) != wire.PRCostCommentOff {
@@ -199,7 +203,11 @@ func (d *Daemon) flushPRComments() {
 		if body == r.Body {
 			continue
 		}
-		id, err := prCommenter(d.ctx, r, body)
+		commenter := prCommenter
+		if r.Forge == "forgejo" {
+			commenter = d.forgejoCostComment
+		}
+		id, err := commenter(d.ctx, r, body)
 		if err != nil {
 			log.Printf("lineage: the cost comment on %s was not posted: %v", pr.Ref, err)
 			continue

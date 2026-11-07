@@ -83,7 +83,7 @@ func TestTheStarterReachesItsSessionOnAnotherMachine(t *testing.T) {
 	}
 
 	// A wait on it closes when its machine says it has ended.
-	if text, isErr := m.tool(6, "wait_for_agents", map[string]any{"agents": []string{string(there)}, "until_minutes": 30}); isErr ||
+	if text, isErr := m.tool(6, "wait_for_event", map[string]any{"events": []string{"agent.ended"}, "where": map[string]any{"agent": []string{string(there)}}, "until_minutes": 30}); isErr ||
 		!strings.Contains(text, "You will be resumed when “Check the Windows bug” has finished") {
 		t.Fatal(text)
 	}
@@ -101,12 +101,12 @@ func TestTheStarterReachesItsSessionOnAnotherMachine(t *testing.T) {
 		t.Fatal(p)
 	}
 
-	// An ended one is not waited on; an archived one is let go.
+	// An ended one answers at once and is not waited on; an archived one is let go.
 	mu.Lock()
 	reply.Ended = &wire.WaitEndingHow{Archived: &struct{}{}}
 	mu.Unlock()
-	if text, isErr := m.tool(9, "wait_for_agents", map[string]any{"agents": []string{string(there)}, "until_minutes": 30}); !isErr ||
-		!strings.Contains(text, "has already ended (archived)") {
+	if text, isErr := m.tool(9, "wait_for_event", map[string]any{"events": []string{"agent.ended"}, "where": map[string]any{"agent": []string{string(there)}}, "until_minutes": 30}); isErr ||
+		!strings.Contains(text, "on pc (id "+string(there)+"): archived") {
 		t.Fatal(text)
 	}
 	if p := d.helperPlaces(dir); p != "0 of 3 running, 0 of 5 not archived" {
@@ -206,7 +206,7 @@ func TestOnlyTheStarterReachesASessionFromAnotherMachine(t *testing.T) {
 	ended = nil
 	mu.Unlock()
 	json.Unmarshal(c.call(t, 7, "agents/fromStarter", map[string]any{"from": from, "session": string(id), "op": "message", "message": "Try the 32-bit build too."}), &reply)
-	if reply.Said != "Sent to “Check the Windows bug”, which is working on it now. Wait for it with wait_for_agents, and read its answer with read_session." {
+	if reply.Said != "Sent to “Check the Windows bug”, which is working on it now. Wait for it with wait_for_event on agent.ended, naming it in agent, and read its answer with read_session." {
 		t.Fatal(reply.Said)
 	}
 	waitFor(t, "the message's turn", func() bool {

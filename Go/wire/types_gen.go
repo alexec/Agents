@@ -6711,7 +6711,7 @@ type MachineSchedule struct {
 	Workflow *string `json:"workflow,omitzero"`
 }
 
-// machines/sessionCall, through machine/machines (#2927): an agent's read_session, message_session, stop_session, archive_session, or list_sessions and wait_for_agents status, on a session it started on another of the person's machines with start_session. The control plane sends that machine's agents/fromStarter, with call.from in its own words.
+// machines/sessionCall, through machine/machines (#2927): an agent's read_session, message_session, stop_session, archive_session, or list_sessions and agent.ended wait status, on a session it started on another of the person's machines with start_session. The control plane sends that machine's agents/fromStarter, with call.from in its own words.
 type MachineSessionCall struct {
 	Host string `json:"host"`
 
@@ -10655,7 +10655,7 @@ type SessionCall struct {
 	// The asking agent's project (#3277). The host also answers status, read and message for a session that from did not start, when its folder is in this project now; stop and archive stay the starter's. The control plane checks that the asking machine has a folder of it.
 	Project *string `json:"project,omitzero"`
 
-	// With op status and project (#3277): the asker waits on it with wait_for_agents, so the host tells the asker's machine when it ends, as it tells a starter.
+	// With op status and project (#3277): the asker waits on it with wait_for_event on agent.ended, so the host tells the asker's machine when it ends, as it tells a starter.
 	Watch *bool `json:"watch,omitzero"`
 }
 
@@ -10668,7 +10668,7 @@ type SessionCallReply struct {
 	Ended *WaitEndingHow `json:"ended,omitzero"`
 }
 
-// machines/sessionEnded through machine/machines, then agents/endedElsewhere (#2927): a session started from another machine has ended, so its starter's wait_for_agents can wake. The host sends machine as the starter's machine; the control plane sends it on as the ended session's.
+// machines/sessionEnded through machine/machines, then agents/endedElsewhere (#2927): a session started from another machine has ended, so its starter's wait on agent.ended can wake. The host sends machine as the starter's machine; the control plane sends it on as the ended session's.
 type SessionEnded struct {
 	Machine string `json:"machine"`
 

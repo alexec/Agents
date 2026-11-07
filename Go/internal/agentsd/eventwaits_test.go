@@ -30,7 +30,7 @@ func TestAWaitSaysWhatIsWrongWithIt(t *testing.T) {
 		{map[string]any{"events": "agent.finsihed", "until_minutes": 5}, `"agent.finsihed" is not an event. Did you mean agent.finished? Events you can wait on: agent.started,`},
 		{map[string]any{"events": "custom.done", "until_minutes": 5}, `"custom.done" is never raised: agents no longer publish events`},
 		{map[string]any{"events": "agent.finished", "where": map[string]any{"x": 1}, "until_minutes": 5},
-			`agent.finished takes no arguments; "x" is not one of its arguments. To wait for particular agents, use wait_for_agents.`},
+			`agent.finished takes no arguments; "x" is not one of its arguments. To wait for particular agents, use agent.ended with agent.`},
 		{map[string]any{"events": "person.away", "where": map[string]any{"why": "asleep"}, "until_minutes": 5},
 			"person.away: why is one of locked, idle, not asleep."},
 		{map[string]any{"events": "pr.merged", "until_minutes": 5}, "No server here offers pr.merged. This folder has no MCP server that offers events."},

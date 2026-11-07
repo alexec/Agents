@@ -116,7 +116,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// A forge a list could not read (not connected, a rate limit): github, gitlab, linear or jira.
+    /// A forge a list could not read (not connected, a rate limit): github, gitlab, forgejo, linear, jira or azureboards.
     struct ForgeListError: Codable, Sendable, Hashable {
         public var forge: String
         public var message: String
@@ -439,8 +439,8 @@ public extension DaemonAPI {
             self.cut = cut
         }
 
-        /// The same diff as a view's `agents/open-diff` gives it, for the app's diff page.
-        public func appViewDiff(title: String) -> AppViewDiff {
+        /// The same diff as a view's `agents/open-diff` gives it, for the app's diff page; site is the forge it is on.
+        public func appViewDiff(title: String, site: String = "GitHub") -> AppViewDiff {
             AppViewDiff(title: title, url: url.flatMap(URL.init(string:)), files: files.map { f in
                 AppViewDiff.File(path: f.path, previousPath: f.previousPath, change: f.change, additions: f.additions,
                                  deletions: f.deletions, hunks: f.hunks.map { h in
@@ -448,7 +448,7 @@ public extension DaemonAPI {
                                          AppViewDiff.Line(kind: AppViewDiff.Kind(rawValue: $0.kind.rawValue) ?? .context, text: $0.text)
                                      })
                                  }, note: f.note)
-            }, cut: cut)
+            }, cut: cut, site: site)
         }
     }
 }
