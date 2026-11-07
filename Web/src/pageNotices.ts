@@ -169,6 +169,11 @@ export function pagePermissionText(permission: Permission): string {
   }
 }
 
+/** A machine's notice (#3682): a volume almost full, with no chat; a click opens the machine's page. */
+export function isMachineNotice(id: string): boolean {
+  return id.startsWith("disk:");
+}
+
 /** The notice's line, when this change posts one here; undefined when it posts nothing. */
 export function noticeToPost(change: AttentionNotification, permission: Permission, inFront: boolean): string | undefined {
   if (!("notice" in change.needID) || change.need?.kind !== "notice" || !change.alert) return undefined;
@@ -205,6 +210,10 @@ export function startPageNotices(store: Store): void {
     shown.onclick = () => {
       shown.close();
       window.focus();
+      if (isMachineNotice(line)) {
+        go({ nav: "machines", section: `machine-${host}` });
+        return;
+      }
       const agent = agentID ? store.agent(host, agentID) : undefined;
       if (!agent) return;
       focusedEntry.value = line;

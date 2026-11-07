@@ -1041,6 +1041,8 @@ final class AppModel {
             self?.openAgent(agentID)
         }
         notifier.openFolder = { [weak self] folder in self?.openFolder(FolderKey(host: .mac, folder: folder)) }
+        // The window hears only this Mac's host, so a machine's notice is this Mac's.
+        notifier.openMachine = { [weak self] in self?.machinePage = .mac }
         notifier.answer = { [weak self] token, quick, typed in await self?.answerFromBanner(token, quick, typed: typed) }
         #if DEBUG
         openFromLaunchArguments()
