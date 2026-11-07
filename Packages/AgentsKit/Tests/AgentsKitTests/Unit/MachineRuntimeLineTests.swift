@@ -56,4 +56,13 @@ struct MachineRuntimeLineTests {
         #expect(!status(.missing(lookedIn: []), install: nil).offersInstall)
         #expect(!status(.available(path: "/p", supportsResume: true)).offersInstall)
     }
+
+    /// A machine's page lists only what is on the machine (#3743); Your setup lists the rest.
+    @Test func thePageListsOnlyTheInstalledOnes() {
+        #expect(status(.available(path: "/p", supportsResume: true)).isInstalled)
+        #expect(status(.needsSignIn(authMethods: [], fixCommand: nil)).isInstalled)
+        #expect(status(.installing(progress: nil)).isInstalled)
+        #expect(!status(.missing(lookedIn: [])).isInstalled)
+        #expect(!status(.installFailed(reason: "x")).isInstalled)
+    }
 }
