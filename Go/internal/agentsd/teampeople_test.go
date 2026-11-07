@@ -153,3 +153,24 @@ func TestTeamPeopleFillsTheViewersJiraLoginFromTheAtlassianConnection(t *testing
 		t.Fatalf("people: %+v", people)
 	}
 }
+
+// The viewer's own blank Forgejo login comes from this machine's Forgejo connection (#3836);
+// another person's login is theirs as kept.
+func TestTeamPeopleFillsTheViewersForgejoLoginFromTheForgejoConnection(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	file := &connections.File{Path: filepath.Join(t.TempDir(), connections.FileName)}
+	d.connStoreFor = func() (connections.Store, error) { return file, nil }
+	file.Put(connections.Connection{Provider: connections.Forgejo, Login: "alex", Access: "fj", ConnectedAt: time.Now()})
+	you, sam := true, "sam"
+	ask := askControl(func(context.Context, string, any) (json.RawMessage, error) {
+		return json.Marshal(wire.PeopleForViews{People: []wire.TeamPerson{
+			{ID: "a", Name: "Alex", Kind: "person", You: &you},
+			{ID: "s", Name: "Sam", Kind: "person", ForgejoLogin: &sam},
+		}})
+	})
+	people := d.teamPeople(context.Background(), &ask)
+	if len(people) != 2 || people[0]["forgejo"] != "alex" || people[1]["forgejo"] != sam {
+		t.Fatalf("people: %+v", people)
+	}
+}

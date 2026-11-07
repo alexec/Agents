@@ -92,6 +92,14 @@ Forgejo is left out, and the list says why: the token counts only on its own For
 
 Each write is yours, with your token, from the machine that read the item.
 
+### Your Forgejo login
+
+With a control plane, **Settings ▸ Account** on the Mac (**Settings ▸ Control plane** on the
+web page) keeps your **Forgejo login**, your user name on the connected Forgejo, beside your
+GitHub, GitLab, Linear and Jira logins. The control plane gives the logins of all its people
+to the servers that draw a Team section. A machine that has Forgejo connected fills in your
+login from the connection, so you give it only when that machine is not connected.
+
 ### An epic's plan and features
 
 Forgejo has no sub-issues, so an epic's children are the issues it **depends on** (Forgejo's

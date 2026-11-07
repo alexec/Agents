@@ -3807,7 +3807,7 @@
     {
       "name": "people/setForgeLogins",
       "x-capability": "people/1",
-      "description": "Sets the caller's own GitHub, GitLab, Linear and Jira logins (#2951, #3313), for Settings ▸ You, when they are not filled in from a machine's connection.",
+      "description": "Sets the caller's own GitHub, GitLab, Linear, Jira and Forgejo logins (#2951, #3313, #3836), for Settings ▸ You, when they are not filled in from a machine's connection.",
       "tags": [
         {
           "name": "web"

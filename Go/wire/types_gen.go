@@ -4722,7 +4722,7 @@ type ForgeLogRequest struct {
 	Check *string `json:"check,omitzero"`
 }
 
-// people/setForgeLogins (#2951): the caller's own GitHub, GitLab, Linear and Jira logins (#3313), for Settings ▸ You, replacing what was kept; blank clears one.
+// people/setForgeLogins (#2951): the caller's own GitHub, GitLab, Linear, Jira (#3313) and Forgejo (#3836) logins, for Settings ▸ You, replacing what was kept; blank clears one.
 type ForgeLogins struct {
 	Github *string `json:"github,omitzero"`
 
@@ -4731,6 +4731,8 @@ type ForgeLogins struct {
 	Linear *string `json:"linear,omitzero"`
 
 	Jira *string `json:"jira,omitzero"`
+
+	Forgejo *string `json:"forgejo,omitzero"`
 }
 
 // How forge/merge merges a pull request (#3130): a merge commit, one squashed commit, or its commits rebased onto the base.
@@ -11798,6 +11800,9 @@ type TeamPerson struct {
 
 	// Their Jira login (#3313): the Atlassian account's email, account id or display name.
 	JiraLogin *string `json:"jiraLogin,omitzero"`
+
+	// Their Forgejo login (#3836): their user name on the connected Forgejo or Gitea.
+	ForgejoLogin *string `json:"forgejoLogin,omitzero"`
 
 	You *bool `json:"you,omitzero"`
 }

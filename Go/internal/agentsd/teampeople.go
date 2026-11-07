@@ -15,9 +15,9 @@ import (
 // The control plane's people, in a feeding tool's _meta (#2951, specs/2453-team-lists.md
 // part 4): callFromView and readViewCount give show_pull_requests, show_issues and
 // show_merge_requests the control plane's people and bots, with their GitHub, GitLab,
-// Linear and Jira logins and which is the viewer's own, so a row can be named as the control
-// plane knows the person, Team can be told from Others, and the viewer's own rows can say an
-// agent is on it. The github, gitlab, linear and jira servers read it off the call; they make
+// Linear, Jira and Forgejo (#3836) logins and which is the viewer's own, so a row can be
+// named as the control plane knows the person, Team can be told from Others, and the
+// viewer's own rows can say an agent is on it. The github, gitlab, linear and jira servers read it off the call; they make
 // no control-plane call of their own.
 
 // teamFeedingTools are the github, gitlab, linear and jira servers' feeding tools that take the
@@ -125,6 +125,7 @@ func (d *Daemon) teamPeople(ctx context.Context, ask *askControl) []map[string]a
 	for _, p := range list.People {
 		you := p.You != nil && *p.You
 		github, gitlab, linear, jira := optstr(p.GithubLogin), optstr(p.GitlabLogin), optstr(p.LinearLogin), optstr(p.JiraLogin)
+		forgejo := optstr(p.ForgejoLogin)
 		if you && conns != nil {
 			if github == "" {
 				github = connectionLogin(conns, connections.GitHub)
@@ -137,6 +138,9 @@ func (d *Daemon) teamPeople(ctx context.Context, ask *askControl) []map[string]a
 			}
 			if jira == "" {
 				jira = connectionLogin(conns, atlassianConnection)
+			}
+			if forgejo == "" {
+				forgejo = connectionLogin(conns, connections.Forgejo)
 			}
 		}
 		row := map[string]any{"name": p.Name}
@@ -154,6 +158,9 @@ func (d *Daemon) teamPeople(ctx context.Context, ask *askControl) []map[string]a
 		}
 		if jira != "" {
 			row["jira"] = jira
+		}
+		if forgejo != "" {
+			row["forgejo"] = forgejo
 		}
 		if you {
 			row["you"] = true
