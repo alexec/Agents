@@ -190,7 +190,7 @@ func placeholders(text string) []string {
 func (p *ProviderRecord) preset() string { return strOr(get(p.Commands, "preset")) }
 
 // DefaultIdleMinutes is WorkspaceLink.defaultIdleMinutes.
-const DefaultIdleMinutes = 30
+const DefaultIdleMinutes = 120
 
 // WorkspaceLink is WorkspaceLink: a host and the workspace it runs on, kept in the host's
 // own record (MachineRecord.Workspace).

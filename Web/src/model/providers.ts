@@ -166,6 +166,16 @@ export class Providers {
     }
   }
 
+  /** Stop when idle, in minutes, of a linked machine; 0 is Never (#3729). */
+  async setIdle(host: string, stopWhenIdleMinutes: number): Promise<string | null> {
+    try {
+      await this.caller.call("machines/setMachineOptions", { host: host as MachineRef, stopWhenIdleMinutes });
+      return null;
+    } catch (error) {
+      return describe(error);
+    }
+  }
+
   async unlink(host: string): Promise<string | null> {
     try {
       await this.caller.call("machines/unlink", { host: host as MachineRef });

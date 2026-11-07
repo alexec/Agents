@@ -122,7 +122,7 @@ func TestALinkedHostWhoseWorkspaceIsStoppedIsShownStopped(t *testing.T) {
 	r := h.row(devbox)
 	if r.State != "stopped" || r.Workspace == nil || r.Workspace.WorkspaceName != "agents-devbox" ||
 		r.Workspace.ProviderName != "DigitalOcean" || !r.Workspace.CanStart || !r.Workspace.StartWhenUsed ||
-		r.Workspace.StopWhenIdleMinutes == nil || *r.Workspace.StopWhenIdleMinutes != 30 {
+		r.Workspace.StopWhenIdleMinutes == nil || *r.Workspace.StopWhenIdleMinutes != DefaultIdleMinutes {
 		t.Fatalf("%+v %+v", r, r.Workspace)
 	}
 	// The link is the host's record, so it is there after a restart.

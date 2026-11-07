@@ -140,7 +140,7 @@ Agents starts these tools. It does not own what they keep.
 | OpenCode's `opencode.db` | OpenCode's copies, all in one SQLite file | **Not erased**, unless OpenCode can delete a conversation (ACP `session/delete`). When it cannot, the Delete confirmation says so on every client (#3669) |
 | `~/.claude/history.jsonl`, Codex's history and indexes | Each runtime's own history | **Not erased** |
 | Docker images and named volumes | What Docker workspaces pulled and kept | **Delete Machine** removes the workspace's container, its volumes and its image, when no other container uses them (#3728). Docker keeps an image with a second tag or a child image. |
-| DigitalOcean, Codespaces, EC2 and GCP machines | Cloud machines | **No limit in count or time, and no stop when idle.** Only **Delete Machine** removes one. |
+| DigitalOcean, Codespaces, EC2 and GCP machines | Cloud machines | **No limit in count.** A linked machine stops after **2 hours** idle by default: no turn running, no answer waited on, no terminal open (#3729). Each machine's **Stop when idle** sets the time, or **Never**, on the Mac and the web. A stopped machine keeps its disk; only **Delete Machine** removes one. |
 | `~/.ssh/config` | A block for each codespace | **Never removed** |
 | `/tmp/agents-tunnels-<uid>-<pid>` | ssh control sockets | Removed at a clean stop; one whose process is gone goes when a control plane's tunnels start (#3649) |
 | `$TMPDIR/agents-output-*` | Output that the Mac window opened in TextEdit | **None**; macOS clears its temporary folder |

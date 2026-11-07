@@ -84,10 +84,11 @@ there, Agents names them and asks first. The row says **Stopping…** and then *
 A linked server's `···` menu has three settings:
 
 - **Start when used**, on by default.
-- **Stop when idle**, after 30 minutes by default.
+- **Stop when idle**, after 2 hours by default (#3729), or **Never**.
 - **Start for scheduled workflows**, on by default.
 
-All three are kept with the link.
+All three are kept with the link. On the web page, **Stop when idle** is on the server's row in
+**Settings ▸ Machine providers**.
 
 ### Start when used
 
@@ -115,7 +116,8 @@ offers **Start**.
 ### Stop when idle
 
 A machine costs money while it runs. With **Stop when idle** on, Agents stops it once its
-server has been idle for the whole time you chose: 15, 30 or 60 minutes, or 2 hours. Idle
+server has been idle for the whole time you chose: 15, 30 or 60 minutes, or 2 hours (the
+default). With **Never**, Agents does not stop it. Idle
 means:
 
 - no turn running,
@@ -123,7 +125,7 @@ means:
 - and no terminal or folder shell open.
 
 A turn starting in that time starts the count again. When Agents stops it, its row and the
-strip over its chats say **devbox was stopped by Agents after 30 minutes idle**. With **Start
+strip over its chats say **devbox was stopped by Agents after 2 hours idle**. With **Start
 when used** on as well, your next prompt starts it again.
 
 A server on a build of Agents from before this never says whether it is idle, so it is never
