@@ -9960,6 +9960,9 @@ type ReviewPull struct {
 	// owner/name.
 	Repo string `json:"repo"`
 
+	// Its lineage ref, "github:owner/name#12" or "gitlab:group/project!12": a press opens its Work page in the app. Nil from an older host: a press opens its forge page.
+	Ref *string `json:"ref,omitzero"`
+
 	Author *string `json:"author,omitzero"`
 
 	UpdatedAt Date `json:"updatedAt"`

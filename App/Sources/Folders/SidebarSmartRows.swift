@@ -202,7 +202,8 @@ private struct ApprovalListRow: View {
 }
 
 /// A pull request waiting for the person's approval, under For Review (#3330). A click opens
-/// its page, with its screenshots, in the browser; Dismiss, a trailing swipe as Archive is on a
+/// its Work page, with its screenshots in its body, or its forge page in the browser when the
+/// host said no ref; Dismiss, a trailing swipe as Archive is on a
 /// session's row, and in its menu, takes it out for good.
 private struct ReviewPullListRow: View {
     @Environment(AppModel.self) private var model
@@ -236,9 +237,9 @@ private struct ReviewPullListRow: View {
         await model.dismissReview(pull, in: folder)
     }
 
-    /// Opens its page, and draws it read from then on (#3464).
+    /// Opens its Work page, else its forge page, and draws it read from then on (#3464).
     private func open() {
-        openURL(pull.url)
+        if let ref = pull.ref { model.showWork(WorkPlace(kind: .pr, ref: ref)) } else { openURL(pull.url) }
         Task { await model.openReview(pull, in: folder) }
     }
 }

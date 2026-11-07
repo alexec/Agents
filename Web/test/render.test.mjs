@@ -61,6 +61,12 @@ test("the usual Markdown is drawn", () => {
   assert.equal(md("1. one\n2. two"), "<ol><li>one</li><li>two</li></ol>");
 });
 
+test("a table scrolls sideways in its own box rather than squeezing its cells (#3895)", () => {
+  const drawn = md("| a | b |\n|---|---|\n| 1 | 2 |");
+  assert.match(drawn, /^<div class="table-scroll"><table>/);
+  assert.match(drawn, /<\/table><\/div>$/);
+});
+
 test("known fenced code is coloured as inert token spans; unknown fences stay plain", () => {
   const code = md('```swift\nlet answer = "yes" // ready\n```');
   assert.match(code, /class="code-keyword">let<\/span>/);

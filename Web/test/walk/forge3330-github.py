@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """A fixture GitHub for For Review's pull requests (#3330): the repo example/shop with four open pull
 requests, three labelled needs-approval and one of those approved too, as forge/pulls reads them
-(GraphQL search). Scratch data only. Point a run-app host at it with
+(GraphQL search), and each one's Work page (issueOrPullRequest). Scratch data only. Point a run-app host at it with
 --env AGENTS_TEST_GITHUB_URL=http://127.0.0.1:<port>.
 
     python3 Web/test/walk/forge3330-github.py <port>
@@ -55,6 +55,12 @@ class Handler(BaseHTTPRequestHandler):
                   and all(f'label:"{l}"' not in words or l in i["labels"] for l in LABELS)]
             return self.answer(200, {"data": {"search": {"pageInfo": {"hasNextPage": False, "endCursor": None},
                                                          "edges": [{"cursor": f"c{n}", "node": node(n)} for n in ns]}}})
+        if "issueOrPullRequest(" in q and v.get("number") in ITEMS:
+            # One pull request's Work page (forge/pull): its body says what Alex looks at.
+            item = dict(node(v["number"]), body="The screenshots, one per client and per state, are below.",
+                        comments={"pageInfo": {"hasPreviousPage": False, "startCursor": None}, "nodes": []},
+                        reviewThreads={"totalCount": 0}, changedFiles=3, headRefOid="0" * 40, commits={"nodes": []})
+            return self.answer(200, {"data": {"repository": {"issueOrPullRequest": item}}})
         return self.answer(200, {"data": {}})
 
     def do_GET(self):
