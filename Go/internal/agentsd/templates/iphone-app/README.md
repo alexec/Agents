@@ -25,7 +25,10 @@ when a person approves it, submits it for App Review. Crashes go to Sentry.
 5. In App Store Connect, make the app's record (**Apps ▸ + ▸ New App**) with that bundle
    id.
 6. For Sentry, put the project's DSN in the repository variable `SENTRY_DSN`. With no DSN,
-   the app sends nothing.
+   the app sends nothing. For crashes with names and lines, also put the project's slug in
+   the variable `SENTRY_PROJECT`, and an organization token (Sentry's **Settings ▸
+   Organization Tokens**) in the secret `SENTRY_AUTH_TOKEN`: `release.yml` then uploads the
+   debug symbols.
 
 Signing is Xcode's cloud-managed signing: Apple makes the certificate and the profile from
 the key, so there is no certificate or profile to keep.
