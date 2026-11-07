@@ -1,11 +1,11 @@
 ---
 name: ci-speed
-description: Measure how long the checks on this repo's recent pull requests took to go green, and when the median is over 15 minutes, make one change to .github/workflows/ci.yml that makes them faster, on a pull request of its own. Never weaken a check. Use when the Nightly CI speed check workflow runs, or when Alex asks why CI is slow.
+description: Measure how long the checks on this repo's recent pull requests took to go green, and when the median is over 15 minutes, make one change to .github/workflows/ci.yml that makes them faster, on a pull request of its own. Never weaken a check. Use when the CI speed check workflow runs, or when Alex asks why CI is slow.
 ---
 
 # CI speed check
 
-This is the method of the Nightly CI speed check workflow
+This is the method of the CI speed check workflow
 (`.agents/workflows/ci-speed.md`). The workflow says what the method is for and starts it.
 A person or an agent can also follow it by hand. Where it says that nobody is at the
 keyboard, that is true only of a run of the workflow.
@@ -34,7 +34,7 @@ keyboard, that is true only of a run of the workflow.
   title on a command line: find runs by the head commit's hash.
 - **Questions.** Nobody is at the keyboard. Do not ask; if a fix needs a decision (a
   bigger runner, a paid service, a split of required checks), write it in your ending.
-  If you must ever ask, name yourself ("The nightly CI speed check recommends… Alex,
+  If you must ever ask, name yourself ("The CI speed check recommends… Alex,
   which…?"), never a bare "I" or "you".
 
 ## 1. Measure
