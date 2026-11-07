@@ -3911,13 +3911,16 @@ export interface ForgeDone {
 
 /**
  * A feature (#3267): name is its label's after feature:, with the label's colour where the forge
- * gives one; epics counts its epics, open the open ones.
+ * gives one; epics counts its epics, open the open ones. issues counts its open issues that are not
+ * epics, of the newest 500 open issues (#3741); a feature with no open epic and no such issue is
+ * finished.
  */
 export interface ForgeFeature {
   name: string;
   color?: string;
   epics: number;
   open: number;
+  issues?: number;
 }
 
 /**
@@ -12613,7 +12616,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeDiffFile: { required: ["path", "change", "additions", "deletions", "hunks"], optional: ["previousPath", "note"] },
   ForgeDiffHunk: { required: ["oldStart", "newStart", "lines"], optional: [] },
   ForgeDone: { required: [], optional: ["url", "auto", "reran"] },
-  ForgeFeature: { required: ["name", "epics", "open"], optional: ["color"] },
+  ForgeFeature: { required: ["name", "epics", "open"], optional: ["color", "issues"] },
   ForgeFeatures: { required: ["features"], optional: ["errors"] },
   ForgeFeaturesRequest: { required: [], optional: ["folder", "board"] },
   ForgeItem: { required: ["node", "title", "state", "labels", "assignees", "updatedAt", "comments"], optional: ["status", "url", "folder", "author", "milestone", "draft", "checks", "review", "mergeable", "autoMerge", "parent", "level", "feature", "progress"] },
