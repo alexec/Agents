@@ -471,7 +471,8 @@ private struct RemoteApprovalRow: View {
 }
 
 /// A pull request waiting for the person's approval, under For Review (#3330), the window's
-/// `ReviewPullListRow`: a tap opens its page, with its screenshots; Dismiss is a swipe and in
+/// `ReviewPullListRow`: a tap opens its Work page, with its screenshots, or its forge page when
+/// the host said no ref; Dismiss is a swipe and in
 /// the long press, and takes it out for good.
 private struct RemoteReviewPullRow: View {
     @Environment(RemoteModel.self) private var model
@@ -500,9 +501,9 @@ private struct RemoteReviewPullRow: View {
         Task { await model.dismissReview(pull, in: folder.folder) }
     }
 
-    /// Opens its page, and draws it read from then on (#3464).
+    /// Opens its Work page, else its forge page, and draws it read from then on (#3464).
     private func open() {
-        openURL(pull.url)
+        if let ref = pull.ref { model.showWork(WorkPlace(kind: .pr, ref: ref)) } else { openURL(pull.url) }
         Task { await model.openReview(pull, in: folder.folder) }
     }
 }
