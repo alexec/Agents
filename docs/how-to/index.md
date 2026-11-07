@@ -153,6 +153,8 @@ something particular done.
   and CI, work with pull requests and issues on their pages, and use CodeRabbit.
 - [Use GitLab](use-gitlab.md): connect GitLab with the gitlab.com sign-in or an access
   token, set up a folder from it, and work with merge requests, issues and pipelines.
+- [Use Forgejo or Gitea](use-forgejo.md): add the forgejo connector with an access token,
+  and work with pull requests, checks and issues on Codeberg or your own Forgejo or Gitea.
 - [Use Linear issues](use-linear-issues.md): Linear's own tools, and an agent when an
   issue is opened, labelled, commented on or closed.
 - [Use Jira issues](use-jira-issues.md): the Jira issues page with Start Agent, Atlassian's

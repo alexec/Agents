@@ -303,7 +303,7 @@
           ]
         }
       }
-        },
+    },
     {
       "server": {
         "name": "com.betterstack/mcp",
@@ -348,6 +348,49 @@
             {
               "name": "BETTERSTACK_URL",
               "description": "Better Stack's incidents API: https://incidents.betterstack.com when left out",
+              "required": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "server": {
+        "name": "agents/forgejo",
+        "title": "Forgejo",
+        "description": "Pull requests, checks and issues on Codeberg or your own Forgejo or Gitea: tools to read them and comment, and events"
+      },
+      "_meta": {
+        "dev.agentloops/connector": {
+          "command": "forgejo-mcp",
+          "hosted": true,
+          "declares": {
+            "tools": true,
+            "events": [
+              "checks.failed",
+              "pr.opened",
+              "pr.merged",
+              "pr.closed",
+              "pr.conflicted",
+              "review.requested",
+              "review.comment",
+              "issue.opened",
+              "issue.labelled",
+              "issue.commented",
+              "issue.closed",
+              "issue.assigned"
+            ],
+            "views": false
+          },
+          "secrets": [
+            {
+              "name": "FORGEJO_TOKEN",
+              "description": "An access token (Settings ▸ Applications) with read and write on repository and issue",
+              "required": true
+            },
+            {
+              "name": "FORGEJO_URL",
+              "description": "The Forgejo or Gitea: https://codeberg.org when left out, or your own, as https://git.example.com",
               "required": false
             }
           ]

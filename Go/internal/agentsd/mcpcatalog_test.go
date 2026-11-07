@@ -255,10 +255,11 @@ func TestOursAreListedAndAddedLikeAnyConnector(t *testing.T) {
 
 	var ours wire.MCPSearchAnswer
 	json.Unmarshal(c.call(t, 2, "catalog/search", map[string]any{"query": "", "kind": "mcp", "marketplace": "provided:agents"}), &ours)
-	if len(ours.Results) != 12 || ours.Results[0].Title != "GitHub" || ours.Results[1].Title != "Linear" || ours.Results[2].Title != "Jira" ||
+	if len(ours.Results) != 13 || ours.Results[0].Title != "GitHub" || ours.Results[1].Title != "Linear" || ours.Results[2].Title != "Jira" ||
 		ours.Results[3].Title != "GitLab" || ours.Results[4].Title != "Email" || ours.Results[5].Title != "Slack" ||
 		ours.Results[6].Title != "Google Chat" || ours.Results[7].Title != "WhatsApp" || ours.Results[8].Title != "Sentry" ||
-		ours.Results[9].Title != "Sentry events" || ours.Results[10].Title != "Better Stack" || ours.Results[11].Title != "Better Stack events" {
+		ours.Results[9].Title != "Sentry events" || ours.Results[10].Title != "Better Stack" || ours.Results[11].Title != "Better Stack events" ||
+		ours.Results[12].Title != "Forgejo" {
 		t.Fatalf("%+v", ours)
 	}
 	// Better Stack's own server is a remote one on its host (#3655); its events are ours.
