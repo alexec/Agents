@@ -421,7 +421,7 @@ var terminalOSC = regexp.MustCompile(`\x1b\][^\x07\x1b]*(\x07|\x1b\\)?|[\x00-\x0
 // signInEnvironment is the runtime's launch environment without the sign-in a sign-in
 // replaces, and with a terminal for Claude's.
 func (d *Daemon) signInEnvironment(rt *runtimeDef) []string {
-	env := without(environment(rt, loginEnvironment(), d.passThrough(rt.ID)...),
+	env := without(loginEnvironment(),
 		"CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY", "TERM", "BROWSER")
 	return append(env, "TERM=xterm-256color", "BROWSER=true")
 }
