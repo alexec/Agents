@@ -52,7 +52,7 @@ struct WorkItemActions: View {
         }
         .sheet(item: $log) { log in WorkLogSheet(log: log) }
         .sheet(item: $diff) { diff in
-            AppViewDiffPage(diff: diff, site: WorkList.forgeName(node.ref), openLink: { openURL($0) })
+            AppViewDiffPage(diff: diff, openLink: { openURL($0) })
         }
     }
 
@@ -140,7 +140,7 @@ struct WorkItemActions: View {
         do {
             let got = try await model.forge(DaemonAPI.Method.forgeDiff, DaemonAPI.ForgeNodeRequest(node: node),
                                             returning: DaemonAPI.ForgeDiff.self, on: host)
-            diff = got.appViewDiff(title: "\(WorkList.shortRef(node.ref)) \(item.title)")
+            diff = got.appViewDiff(title: "\(WorkList.shortRef(node.ref)) \(item.title)", site: WorkList.forgeName(node.ref))
         } catch {
             said = (WorkList.failureWords(error), true)
         }
