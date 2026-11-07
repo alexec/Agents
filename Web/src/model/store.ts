@@ -17,7 +17,7 @@ import type {
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, DailySummarySettings, DesktopControlSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
   PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, BudgetRequest, RemoveRequest, ClientPermissionSettings, PRCostComment,
-  Connection, ProblemReport, ProblemReportRequest } from "../protocol/generated";
+  Connection, MoveToMachineAnswer, ProblemReport, ProblemReportRequest } from "../protocol/generated";
 import { endedConnections, endedLine, hasEnded } from "./connectorSetup";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
@@ -3112,6 +3112,17 @@ export class Store extends Work {
 
   async writeArtifact(host: string, agentID: string, path: string, text: string): Promise<boolean> {
     return (await this.act("artifact/write", { agentID: agentID as UUID, path, text }, host)) !== null;
+  }
+
+  /**
+   * Move to Machine… (#3790): `agentID` goes on on `machine`, in `folder` there, or the folder of
+   * its project there when `folder` is empty. Answers once that machine has it; throws why not.
+   */
+  async moveToMachine(host: string, agentID: string, machine: string, folder: string): Promise<MoveToMachineAnswer> {
+    const there = folder.trim();
+    const machineName = this.hosts.value.find((h) => h.id === machine)?.name;
+    return await this.link.call("agents/moveToMachine",
+      { agentID: agentID as never, machine, ...(machineName ? { machineName } : {}), ...(there ? { folder: there } : {}) }, host);
   }
 
   /**

@@ -17,6 +17,7 @@ import { NewAgent } from "./NewAgent";
 import { NewFolderDialog } from "./NewFolder";
 import { DropboxDialog } from "./DropboxDialog";
 import { ReportProblemDialog } from "./ReportProblemDialog";
+import { MoveToMachineDialog } from "./MoveToMachineDialog";
 import { GitLendDialog } from "./GitLend";
 import { ExportImportDialog } from "./ExportImport";
 import { Problem } from "./Errors";
@@ -109,6 +110,7 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
       <NewFolderDialog store={store} />
       <DropboxDialog store={store} />
       <ReportProblemDialog store={store} />
+      <MoveToMachineDialog store={store} />
       <GitLendDialog store={store} />
       <ExportImportDialog store={store} />
       <ContextMenu />

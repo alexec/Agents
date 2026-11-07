@@ -45,7 +45,7 @@ import { CloningRows, EmptyFolders, NewFolderMenu } from "./NewFolder";
 import { putFilesInDropbox, useDropboxDrop } from "./DropboxDialog";
 import { exportFromMenu, importFromMenu } from "../model/exports";
 import { rowExtras, SessionRow } from "./SessionRow";
-import { openInNewTab, RenameInput, runSessionAction, sessionActions, startedBy } from "./SessionMenu";
+import { canMoveOn, openInNewTab, RenameInput, runSessionAction, sessionActions, startedBy } from "./SessionMenu";
 import { markAgentOf, treeRows, type TreeRow } from "../model/tree";
 import { WorkflowRow } from "./WorkflowRow";
 import { footLine, offersStart } from "./OfflineStrip";
@@ -980,7 +980,7 @@ export const SidebarSession = memo(function SidebarSession({ store, host, folder
     // Beside this tab or in a window of its own (#826), as the Mac's Open in New Window.
     { label: "Open in New Tab", help: "Open this session in a new browser tab", run: () => openInNewTab(host, agent) },
     ...sessionActions(agent, store.sessionPinsIn(host, folder).includes(agent.id), startedBy(store, host, agent),
-      store.has(host, Capability.mute1)).map(({ action, label: words, help }) => ({
+      store.has(host, Capability.mute1), canMoveOn(store, host)).map(({ action, label: words, help }) => ({
       label: words, help, disabled: down || !!store.onItsWay.value[agent.id],
       run: () => runSessionAction(store, host, agent, action),
     })),

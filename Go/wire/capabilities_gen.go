@@ -197,6 +197,7 @@ var HostCapabilities = pairs([][2]string{
 	{"agents/list", "agents/1"},
 	{"agents/move", "agents/1"},
 	{"agents/moveIn", "sessions.move/1"},
+	{"agents/moveToMachine", "sessions.move/1"},
 	{"agents/options", "agents/1"},
 	{"agents/prewarm", "agents/1"},
 	{"agents/prompt", "agents/1"},

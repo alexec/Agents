@@ -232,3 +232,50 @@ func TestMoveSessionMovesItselfWhenTheTurnEnds(t *testing.T) {
 		t.Fatalf("no carry-on: %v %+v", userMessages(there, me.ID), a.QueuedPrompts)
 	}
 }
+
+// Move to Machine… (#3790): the person moves a session with agents/moveToMachine, with no
+// card, and an archived one is refused before anything is asked.
+func TestPersonMovesASessionToAMachine(t *testing.T) {
+	here, there, c, steps := movingPair(t)
+	src := repo(t)
+	sendGit(t, src, nil, "checkout", "-q", "-b", "fix-login")
+	os.WriteFile(filepath.Join(src, "notes.txt"), []byte("not committed\n"), 0o644)
+	a := seeded(t, here, src, nil)
+	folder := filepath.Join(canonical(t.TempDir()), "app")
+
+	var answer wire.MoveToMachineAnswer
+	if err := json.Unmarshal(c.call(t, 1, "agents/moveToMachine", map[string]any{"agentID": a.ID, "machine": "pc", "folder": folder}), &answer); err != nil {
+		t.Fatal(err)
+	}
+	if answer.Folder != folder || answer.CarriesOn {
+		t.Fatalf("%+v", answer)
+	}
+	if got := strings.Join(steps(), ","); got != "state,state,upload,upload,receive,upload,moveIn" {
+		t.Fatal(got)
+	}
+	if here.Store.Agent(a.ID) != nil || there.Store.Agent(a.ID) == nil {
+		t.Fatal("the session did not move")
+	}
+	if b, _ := os.ReadFile(filepath.Join(folder, "notes.txt")); string(b) != "not committed\n" {
+		t.Fatalf("notes.txt there: %q", b)
+	}
+
+	// No folder, and none of the project's there: the person is asked for one, by the machine's name.
+	other := seeded(t, here, src, nil)
+	if msg := c.callError(t, 3, "agents/moveToMachine", map[string]any{"agentID": other.ID, "machine": "7d4aih78", "machineName": "Workstation"}).Message; msg !=
+		"Nothing was moved: this project has no one folder on Workstation. Give the folder there, as an absolute path." {
+		t.Fatal(msg)
+	}
+
+	archived := seeded(t, here, src, func(a *wire.Agent) {
+		r := wire.AgentArchivedReasonByUser
+		a.State, a.ArchivedReason = wire.AgentStateArchived, &r
+	})
+	before := len(steps())
+	if msg := c.callError(t, 2, "agents/moveToMachine", map[string]any{"agentID": archived.ID, "machine": "pc", "folder": folder}).Message; !strings.HasSuffix(msg, "is archived. Unarchive it first.") {
+		t.Fatal(msg)
+	}
+	if len(steps()) != before {
+		t.Fatal(steps())
+	}
+}

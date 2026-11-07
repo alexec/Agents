@@ -92,6 +92,8 @@ const slowCallTimeout: Readonly<Record<string, number>> = {
   "machines/install": 15 * 60_000,
   // Link to Machine… (#3379) fetches the machine's ssh host key first, up to a minute.
   "machines/link": 2 * 60_000,
+  // Move to Machine… (#3790) sends the session's branch there first, through the control plane.
+  "agents/moveToMachine": 15 * 60_000,
 };
 
 /** How long `method` waits. `override` is a test's one timeout for every method. */

@@ -1,5 +1,5 @@
 // A session's actions (071 FR-027): Carry on while it sits in an open block (#250), Stop while it
-// holds a runtime or a block, Branch (#342), and Archive, with Keep Session while an agent asks to
+// holds a runtime or a block, Branch (#342), Move to Machine… (#3790), and Archive, with Keep Session while an agent asks to
 // have it archived (#773), or Unarchive and Delete (#398). In the chat header's ··· menu, and the
 // sidebar row's menu. The chat's has Find in Chat (#1677), Prompts… (#1658) and Open File… first, as the Remote's ···
 // menu does (#543), for a page with no keyboard to press ⌘F or ⌘P on. Below 760 it has the header's Turns and Files too, so the
@@ -19,16 +19,17 @@ import { canStop, liveDescendants } from "../model/tree";
 import { isMuted, muteHelp, muteLabel, unmuteLabel } from "../model/mute";
 import { Capability } from "../protocol/capabilities.generated";
 import { setShowsThoughts, showsThoughts, thoughtsItem } from "../model/thoughts";
+import { moveToMachine } from "./MoveToMachineDialog";
 
 export type Action = "carryOn" | "agents/stop" | "stopAll" | "agents/archive" | "agents/unarchive"
-  | "markRead" | "markUnread" | "mute" | "unmute" | "rename" | "pin" | "unpin" | "fork" | "delete" | "keep";
+  | "markRead" | "markUnread" | "mute" | "unmute" | "rename" | "pin" | "unpin" | "fork" | "moveToMachine" | "delete" | "keep";
 
 /**
  * What the menu offers, in order, with the window's words (AgentRow's menu). Given
  * whether it is pinned, Pin or Unpin too (#180); given the sessions it started, Stop All
- * while one of them can stop (#835).
+ * while one of them can stop (#835); given a host that can move it, Move to Machine… (#3790).
  */
-export function sessionActions(agent: Agent, pinned?: boolean, started: readonly Agent[] = [], canMute = false)
+export function sessionActions(agent: Agent, pinned?: boolean, started: readonly Agent[] = [], canMute = false, canMove = false)
   : { action: Action; label: string; help: string }[] {
   const found: { action: Action; label: string; help: string }[] = [];
   const holds = agent.state === "starting" || agent.state === "running" || agent.state === "waitingOnUser";
@@ -69,6 +70,10 @@ export function sessionActions(agent: Agent, pinned?: boolean, started: readonly
   // Branching leaves the original alone and carries the history so far (#342), as the window's row.
   if (agent.state !== "archived") {
     found.push({ action: "fork", label: "Branch", help: "A new session that carries this one's history so far" });
+  }
+  // To another of the person's machines, with its unpushed work (#3790), as the window's row.
+  if (canMove && agent.state !== "archived") {
+    found.push({ action: "moveToMachine", label: "Move to Machine…", help: "Carry on with this session on another of your machines, with its branch and uncommitted changes" });
   }
   if (agent.state === "archived") {
     found.push({ action: "agents/unarchive", label: "Unarchive", help: "Unarchive this session" });
@@ -227,7 +232,7 @@ export function SessionMenu({ store, host, agent, disabled, find, findsOnHost = 
               }}>{thoughtsItem(showsThoughts.value).label}</button>
           )}
           {sessionActions(agent, store.sessionPinsIn(host, folderPath(agent)).includes(agent.id), startedBy(store, host, agent),
-            store.has(host, Capability.mute1)).map(({ action, label, help }) => (
+            store.has(host, Capability.mute1), canMoveOn(store, host)).map(({ action, label, help }) => (
             <button key={action} role="menuitem" title={help}
               onClick={() => {
                 open.value = false;
@@ -262,11 +267,17 @@ export function runSessionAction(store: Store, host: string, agent: Agent, actio
   else if (action === "mute" || action === "unmute") void store.setMuted(host, agent.id, action === "mute");
   else if (action === "pin" || action === "unpin") void store.setPinned(host, folderPath(agent), agent.id, action === "pin");
   else if (action === "fork") void branch(store, host, agent);
+  else if (action === "moveToMachine") moveToMachine(host, agent);
   else if (action === "keep") void store.keepSession(host, agent);
   else if (action === "agents/archive") void archiveWithChildren(store, host, agent);
   else if (action === "stopAll") void stopAll(store, host, agent);
   else if (action === "delete") { if (confirm(`${deleteTitle(agent.title)}\n\n${deleteMessageFor(agent)}`)) void remove(store, host, agent); }
   else void store.perform(host, agent.id, action);
+}
+
+/** Whether a session on `host` can be moved (#3790): the host can, and answers now. */
+export function canMoveOn(store: Store, host: string): boolean {
+  return store.has(host, Capability.sessionsMove1) && store.hostIsOnline(host);
 }
 
 /** DeletionWords.confirmTitle: "Delete “Fix the build”?". */

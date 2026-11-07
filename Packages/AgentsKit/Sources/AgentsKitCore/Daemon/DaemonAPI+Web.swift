@@ -187,6 +187,8 @@ public extension DaemonAPI {
                     kind: .hostRequest),
                 // Export and import of an agent or a folder (#1001).
                 Row(Method.agentsExport, params: AgentsExportRequest.self, result: AgentsExport.self, kind: .hostRequest),
+                // Move to Machine… (#3790).
+                Row(Method.agentsMoveToMachine, params: MoveToMachineRequest.self, result: MoveToMachineAnswer.self, kind: .hostRequest),
                 Row(Method.agentsExportRead, params: SendReadRequest.self, result: SendRead.self, kind: .hostRequest),
                 Row(Method.agentsImportUpload, params: ReceiveUploadRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsImport, params: AgentsImportRequest.self, result: BackupRestoreResult.self,
