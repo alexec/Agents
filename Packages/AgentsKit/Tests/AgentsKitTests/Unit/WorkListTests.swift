@@ -66,6 +66,18 @@ struct WorkListTests {
         #expect(WorkList.errorWords(.init(forge: "bitbucket", message: "not connected"), machine: "Studio") == "Bitbucket on Studio: not connected")
     }
 
+    @Test func anAzureDevOpsPullRequestsRowHasItsRepoOpenOnAzureDevOpsAndLabels() {
+        let row = WorkList.Row(.init(node: Node(kind: "pr", ref: "azuredevops:acme/web app/app#3"), title: "Export", state: "open",
+                                     updatedAt: day), on: .mac)
+        #expect(row.repo == "azuredevops:acme/web app/app")
+        #expect(WorkList.repoName(row.repo) == "acme/web app/app")
+        #expect(WorkList.shortRef(row.node.ref) == "#3")
+        #expect(WorkList.openOnWords(row.node.ref) == "Open on Azure DevOps")
+        #expect(WorkList.errorWords(.init(forge: "azuredevops", message: "not connected"), machine: "Studio") ==
+            "Azure DevOps on Studio: not connected")
+        #expect(WorkList.takesLabels(row.node))
+    }
+
     @Test func aBitbucketPullRequestsPageHasNoLabels() {
         #expect(!WorkList.takesLabels(Node(kind: "pr", ref: "bitbucket:walkalex/app#3")))
         #expect(WorkList.takesLabels(Node(kind: "issue", ref: "bitbucket:walkalex/app#3")))

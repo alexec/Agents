@@ -15,7 +15,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// The forge writes (#3130): the actions of the GitHub, GitLab, Forgejo (#3753), Bitbucket (#3786), Linear, Jira (#3260) and Azure
+// The forge writes (#3130): the actions of the GitHub, GitLab, Forgejo (#3753), Bitbucket (#3786), Azure DevOps (#3803), Linear, Jira (#3260) and Azure
 // Boards (#3815) views, on the Work pages' issue and pull request pages: comment, labels (a work
 // item's tags), close and reopen (a Jira issue's move by a transition of its workflow, a work
 // item's to another state of its type), and a pull request's merge, approve, rerun of its failed
@@ -116,21 +116,22 @@ func (d *Daemon) registerForgeWrites() {
 }
 
 // forgeTarget is the item a write is on, and the forge to write it with: one of github, gitlab
-// (with its project there), forgejo or bitbucket (with its repository there, in project), linear (with its identifier), jira (with its key, in identifier) or
+// (with its project there), forgejo, bitbucket or azureDevOps (with its repository there, in project), linear (with its identifier), jira (with its key, in identifier) or
 // boards (with its project and its id, in number).
 type forgeTarget struct {
-	repo       forgeRepo
-	number     int
-	pr         bool
-	github     forgeGitHub
-	gitlab     forgeGitLab
-	project    string
-	linear     forgeLinear
-	jira       forgeJira
-	boards     forgeAzureBoards
-	forgejo    forgeForgejo
-	bitbucket  forgeBitbucket
-	identifier string
+	repo        forgeRepo
+	number      int
+	pr          bool
+	github      forgeGitHub
+	gitlab      forgeGitLab
+	project     string
+	linear      forgeLinear
+	jira        forgeJira
+	boards      forgeAzureBoards
+	forgejo     forgeForgejo
+	bitbucket   forgeBitbucket
+	azureDevOps forgeAzureDevOps
+	identifier  string
 }
 
 // forgeTargetOf is node's forge, or why there is none. prOnly refuses an issue.
@@ -173,9 +174,16 @@ func (d *Daemon) forgeTargetOf(ctx context.Context, method string, node wire.Lin
 		}
 		return forgeTarget{bitbucket: bb, project: named, number: number, pr: node.Kind == lineage.KindPR}, nil
 	}
+	if repo, number, ok := azureDevOpsOfNode(node); ok {
+		ado, named, _, err := d.azureDevOpsOf(ctx, method, repo)
+		if err != nil {
+			return forgeTarget{}, err
+		}
+		return forgeTarget{azureDevOps: ado, project: named, number: number, pr: true}, nil
+	}
 	repo, number, ok := nodeOfRepo(node)
 	if !ok {
-		return forgeTarget{}, Invalid("%s: %s is not an issue or a pull request on GitHub, GitLab, Forgejo, Bitbucket, Linear, Jira or Azure Boards", method, node.Ref)
+		return forgeTarget{}, Invalid("%s: %s is not an issue or a pull request on GitHub, GitLab, Forgejo, Bitbucket, Azure DevOps, Linear, Jira or Azure Boards", method, node.Ref)
 	}
 	t := forgeTarget{repo: repo, number: number, pr: node.Kind == lineage.KindPR}
 	if repo.forge == "gitlab" {
@@ -226,6 +234,8 @@ func (d *Daemon) forgeComment(ctx context.Context, r wire.ForgeCommentRequest) (
 		url, err = t.forgejo.Comment(ctx, t.project, t.number, body)
 	case t.bitbucket != nil:
 		url, err = t.bitbucket.Comment(ctx, t.project, t.number, t.pr, body)
+	case t.azureDevOps != nil:
+		url, err = t.azureDevOps.Comment(ctx, t.project, t.number, body)
 	case t.gitlab != nil:
 		err = t.gitlab.Comment(ctx, t.project, t.number, t.pr, body)
 	default:
@@ -284,6 +294,8 @@ func (d *Daemon) forgeLabel(ctx context.Context, r wire.ForgeLabelRequest) (wire
 		err = Invalid("%s: %s", method, bitbucketmcp.NoPRLabels)
 	case t.bitbucket != nil:
 		err = t.bitbucket.SetLabels(ctx, t.project, t.number, add, remove)
+	case t.azureDevOps != nil:
+		err = t.azureDevOps.SetLabels(ctx, t.project, t.number, add, remove)
 	case t.gitlab != nil:
 		err = t.gitlab.SetLabels(ctx, t.project, t.number, t.pr, add, remove)
 	default:
@@ -316,6 +328,8 @@ func (d *Daemon) forgeLabels(ctx context.Context, r wire.ForgeNodeRequest) (wire
 		err = Invalid("forge/labels: %s", bitbucketmcp.NoPRLabels)
 	case t.bitbucket != nil:
 		names, err = t.bitbucket.RepoLabels(ctx, t.project)
+	case t.azureDevOps != nil:
+		names, err = t.azureDevOps.RepoLabels(ctx, t.project)
 	case t.gitlab != nil:
 		names, colors, err = t.gitlab.ProjectLabels(ctx, t.project)
 	default:
@@ -353,6 +367,8 @@ func (d *Daemon) forgeClose(ctx context.Context, r wire.ForgeCloseRequest) (wire
 		err = t.forgejo.SetState(ctx, t.project, t.number, closed)
 	case t.bitbucket != nil:
 		err = t.bitbucket.SetState(ctx, t.project, t.number, t.pr, closed)
+	case t.azureDevOps != nil:
+		err = t.azureDevOps.SetState(ctx, t.project, t.number, closed)
 	case t.gitlab != nil:
 		err = t.gitlab.SetState(ctx, t.project, t.number, t.pr, closed)
 	default:
@@ -392,6 +408,13 @@ func (d *Daemon) forgeMerge(ctx context.Context, r wire.ForgeMergeRequest) (wire
 		}
 		d.forgeWrote()
 		return wire.ForgeDone{}, nil
+	}
+	if t.azureDevOps != nil {
+		if err := d.azureDevOpsMerge(ctx, method, t, r.Sha, how, auto); err != nil {
+			return wire.ForgeDone{}, err
+		}
+		d.forgeWrote()
+		return wire.ForgeDone{Auto: optionalTrue(auto)}, nil
 	}
 	if t.gitlab != nil {
 		methods, err := t.gitlab.MergeMethods(ctx, t.project)
@@ -444,6 +467,8 @@ func (d *Daemon) forgeApprove(ctx context.Context, r wire.ForgeApproveRequest) (
 		url, err = t.forgejo.Approve(ctx, t.project, t.number, r.Sha)
 	case t.bitbucket != nil:
 		url, err = t.bitbucket.Approve(ctx, t.project, t.number, r.Sha)
+	case t.azureDevOps != nil:
+		url, err = t.azureDevOps.Approve(ctx, t.project, t.number, r.Sha)
 	case t.gitlab != nil:
 		_, err = t.gitlab.Approve(ctx, t.project, t.number, r.Sha)
 	default:
@@ -505,6 +530,9 @@ func (d *Daemon) forgeRerun(ctx context.Context, r wire.ForgeNodeRequest) (wire.
 	if t.bitbucket != nil {
 		return d.bitbucketRerun(ctx, method, t, r.Node.Ref)
 	}
+	if t.azureDevOps != nil {
+		return d.azureDevOpsRerun(ctx, method, t, r.Node.Ref)
+	}
 	if t.gitlab != nil {
 		p, err := t.gitlab.ItemPage(ctx, t.project, t.number, true, "")
 		if err != nil {
@@ -553,6 +581,9 @@ func (d *Daemon) forgeLog(ctx context.Context, r wire.ForgeLogRequest) (wire.For
 	if t.bitbucket != nil {
 		return bitbucketLog(ctx, t, check)
 	}
+	if t.azureDevOps != nil {
+		return azureDevOpsLog(ctx, t, check)
+	}
 	if t.gitlab != nil {
 		p, err := t.gitlab.ItemPage(ctx, t.project, t.number, true, "")
 		if err != nil {
@@ -597,6 +628,8 @@ func (d *Daemon) forgeDiff(ctx context.Context, r wire.ForgeNodeRequest) (wire.F
 		out, err = t.forgejo.PRDiff(ctx, t.project, t.number)
 	case t.bitbucket != nil:
 		out, err = t.bitbucket.PRDiff(ctx, t.project, t.number)
+	case t.azureDevOps != nil:
+		out, err = t.azureDevOps.PRDiff(ctx, t.project, t.number)
 	case t.gitlab != nil:
 		out, err = t.gitlab.MRDiff(ctx, t.project, t.number)
 	default:

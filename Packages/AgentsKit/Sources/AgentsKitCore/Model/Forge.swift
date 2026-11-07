@@ -116,7 +116,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// A forge a list could not read (not connected, a rate limit): github, gitlab, forgejo, bitbucket, linear, jira or azureboards.
+    /// A forge a list could not read (not connected, a rate limit): github, gitlab, forgejo, bitbucket, azuredevops, linear, jira or azureboards.
     struct ForgeListError: Codable, Sendable, Hashable {
         public var forge: String
         public var message: String
