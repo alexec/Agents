@@ -102,4 +102,20 @@ struct DiskSpaceTests {
         #expect(DiskSpace.levelWords(.ok) == "OK")
         #expect(DiskSpace.levelWords(.critical) == "Almost full")
     }
+
+    /// Its summary (#3743) names one disk: the worst, then the folders' own, then the fullest.
+    @Test func aMachinesSummaryNamesOneDisk() {
+        func disk(_ mount: String, _ freeGB: Int64, _ level: DiskLevel = .ok) -> DiskAlarm {
+            DiskAlarm(reading: DiskReading(volume: mount, mount: mount, freeBytes: freeGB * DiskSpace.gigabyte,
+                                           totalBytes: 1000 * DiskSpace.gigabyte), level: level, threshold: 0)
+        }
+        let root = disk("/", 400), data = disk("/Volumes/Data", 100), low = disk("/Volumes/Old", 900, .low)
+        #expect(DiskSpace.headline([root, data, low], folders: ["/Users/a/x"])?.id == "/Volumes/Old")
+        #expect(DiskSpace.headline([root, data], folders: ["/Users/a/x", "/Volumes/Data2/y"])?.id == "/")
+        #expect(DiskSpace.headline([root, data], folders: ["/Volumes/Data/y"])?.id == "/Volumes/Data")
+        #expect(DiskSpace.headline([root, data], folders: [])?.id == "/Volumes/Data", "no folders: the one with least free")
+        #expect(DiskSpace.headline([], folders: []) == nil)
+        #expect(DiskSpace.summaryWords(root) == "Disk 400.0 GB free")
+        #expect(DiskSpace.summaryWords(low) == "Disk 900.0 GB free · Low")
+    }
 }

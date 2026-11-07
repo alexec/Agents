@@ -1,10 +1,11 @@
 import AgentsKitCore
 import SwiftUI
 
-/// One machine's page in the main window (#3626): the place to go for its status. Its CPU
-/// and memory now, every disk its agents write to with its level (low or almost full),
-/// its worktrees, a section per folder (#3627), its runtimes and resources (#3629), and its
-/// processes (#3453). Read with
+/// One machine's page in the main window (#3626): the place to go for its status. A summary
+/// first (#3743): its CPU, memory and worst disk on one line. Then the detail, most of it
+/// closed until the person opens it: the disk that matters with the others folded, a row
+/// per folder's worktrees (#3627), the runtimes installed there (#3629), resources only
+/// when one is declared or held, and its processes (#3453). Read with
 /// `machine/usage` when it opens and every few seconds while it is open, never otherwise.
 /// The machine's settings stay in Settings ▸ Machines; Settings… goes there. The web page draws the same in Web/src/views/MachinePage.tsx.
 struct MachinePage: View {
@@ -52,7 +53,7 @@ struct MachinePage: View {
                                 .foregroundStyle(.secondary)
                         }
                     } else {
-                        usageSection
+                        summarySection
                         disksSection
                     }
                     if !offline {
@@ -61,7 +62,7 @@ struct MachinePage: View {
                         MachineResourcesSection(host: host)
                     }
                     if !offline, model.host(host, has: Capability.processes1) {
-                        MachineProcessesSection(client: model.client(for: host), hostName: name, showsTotals: false)
+                        MachineProcessesSection(client: model.client(for: host), hostName: name, showsTotals: false, folds: true)
                     }
                 }
                 .paperForm()
@@ -71,6 +72,10 @@ struct MachinePage: View {
             }
         }
         .navigationTitle(name)
+        .task(id: offline ? nil : host) {
+            guard !offline else { return }
+            await MachineResourcesSection.read(model, on: host)
+        }
         .task(id: host) {
             usage = nil
             failure = nil
@@ -82,12 +87,29 @@ struct MachinePage: View {
         }
     }
 
+    /// The disk the summary names and the Disks section shows open (#3743).
+    private var headline: DiskAlarm? {
+        guard let usage else { return nil }
+        let folders = model.work.worktreesForCleanup(on: host).map { $0.folder.path(percentEncoded: false) }
+        return DiskSpace.headline(usage.disks, folders: folders)
+    }
+
+    /// "Is this machine OK?" in one line (#3743): CPU, memory and the worst disk, in its tint.
     @ViewBuilder
-    private var usageSection: some View {
-        Section("Usage") {
+    private var summarySection: some View {
+        Section {
             if let usage {
-                LabeledContent("CPU", value: ProcessWords.machineCPU(usage.machine))
-                LabeledContent("Memory", value: ProcessWords.machineMemory(usage.machine))
+                HStack(spacing: 0) {
+                    Text("CPU \(ProcessWords.cpu(usage.machine.cpuPercent)) · Memory \(ProcessWords.machineMemory(usage.machine))")
+                    if let disk = headline {
+                        Text(" · ")
+                        Text(DiskSpace.summaryWords(disk))
+                            .foregroundStyle(Self.tint(disk.level).style(or: .primary))
+                            .help(disk.level == .ok ? disk.reading.volume : disk.line)
+                    }
+                }
+                .monospacedDigit()
+                .help(ProcessWords.machineCPU(usage.machine))
             } else if let failure {
                 Text(failure).foregroundStyle(.secondary)
             } else {
@@ -96,6 +118,8 @@ struct MachinePage: View {
         }
     }
 
+    /// The disk that is low, or the folders' own when all are OK, with the others closed under
+    /// Other disks (#3743).
     @ViewBuilder
     private var disksSection: some View {
         if let usage {
@@ -103,26 +127,32 @@ struct MachinePage: View {
                 if usage.disks.isEmpty {
                     Text("No disk looked at yet. \(name) looks every minute.").foregroundStyle(.secondary)
                 }
-                ForEach(usage.disks) { disk in
-                    LabeledContent {
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text(DiskSpace.freeWords(disk.reading)).monospacedDigit().fixedSize()
-                            Text(DiskSpace.levelWords(disk.level))
-                                .foregroundStyle(Self.tint(disk.level).style(or: .secondary))
-                        }
-                    } label: {
-                        Text(disk.reading.volume)
-                        Text(disk.reading.mount)
+                let shown = usage.disks.filter { $0.level != .ok || $0.id == headline?.id }
+                ForEach(shown) { disk in diskRow(disk) }
+                let others = usage.disks.filter { disk in !shown.contains { $0.id == disk.id } }
+                if !others.isEmpty {
+                    DisclosureGroup("Other disks (\(others.count))") {
+                        ForEach(others) { disk in diskRow(disk) }
                     }
-                    .help(disk.level == .ok ? disk.reading.mount : disk.line)
                 }
             } header: {
                 Text("Disks")
-            } footer: {
-                Text("Each disk its agents write to. Low and almost full are the lines set in Folder Settings ▸ Disk Space.")
-                    .foregroundStyle(.secondary)
+                    .help("Each disk its agents write to. Low and almost full are the lines set in Folder Settings ▸ Disk Space.")
             }
         }
+    }
+
+    private func diskRow(_ disk: DiskAlarm) -> some View {
+        LabeledContent {
+            HStack(spacing: 8) {
+                Text(DiskSpace.freeWords(disk.reading)).monospacedDigit().fixedSize()
+                Text(DiskSpace.levelWords(disk.level))
+                    .foregroundStyle(Self.tint(disk.level).style(or: .secondary))
+            }
+        } label: {
+            Text(disk.reading.volume)
+        }
+        .help(disk.level == .ok ? disk.reading.mount : "\(disk.reading.mount): \(disk.line)")
     }
 
     static func tint(_ level: DiskLevel) -> StateTint {

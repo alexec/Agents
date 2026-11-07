@@ -216,6 +216,31 @@ public enum DiskSpace {
         }
     }
 
+    /// The disk a machine's page shows open (#3743): the worst; of equal levels, the one
+    /// most of `folders` are on; then the one with least free. The others fold away.
+    public static func headline(_ disks: [DiskAlarm], folders: [String]) -> DiskAlarm? {
+        let on = Dictionary(grouping: folders.compactMap { mount(of: $0, in: disks) }, by: { $0 }).mapValues(\.count)
+        return disks.max { a, b in
+            if a.level != b.level { return a.level < b.level }
+            let (x, y) = (on[a.reading.mount] ?? 0, on[b.reading.mount] ?? 0)
+            if x != y { return x < y }
+            return a.reading.freeBytes > b.reading.freeBytes
+        }
+    }
+
+    /// The mount a path is on: the longest of `disks`' mounts that holds it.
+    static func mount(of path: String, in disks: [DiskAlarm]) -> String? {
+        disks.map(\.reading.mount)
+            .filter { $0 == "/" || path == $0 || path.hasPrefix($0.hasSuffix("/") ? $0 : $0 + "/") }
+            .max { $0.count < $1.count }
+    }
+
+    /// A disk in a machine's summary (#3743): "Disk 48.0 GB free", and its level when it is not OK.
+    public static func summaryWords(_ disk: DiskAlarm) -> String {
+        let free = "Disk \(words(disk.reading.freeBytes)) free"
+        return disk.level == .ok ? free : "\(free) · \(levelWords(disk.level))"
+    }
+
     /// "a 12.3 GB, b over 8.0 GB".
     public static func worktreeWords(_ worktrees: some Sequence<DiskWorktree>) -> String {
         worktrees.map { "\($0.name) \($0.partial ? "over " : "")\(words($0.bytes))" }.joined(separator: ", ")

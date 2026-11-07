@@ -63,6 +63,11 @@ export function pageLine(t: WorktreeTally): string {
   return `Worktrees hold ${t.partial ? "over " : ""}${diskWords(t.bytes)}, ${diskWords(t.idleBytes)} of it idle.`;
 }
 
+/** A folder's closed row on a machine's page (#3743): "Agents · 4 worktrees", WorktreeTally.folderLine. */
+export function folderLine(folder: string, count: number): string {
+  return `${folder} · ${count === 1 ? "1 worktree" : `${count} worktrees`}`;
+}
+
 /** After Remove build output. */
 export function freedWords(removed: BuildOutputRemoved): string {
   if (removed.removed.length === 0) return "No build output to remove.";

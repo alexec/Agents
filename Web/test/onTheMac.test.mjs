@@ -12,7 +12,7 @@ const attachments = await load("src/model/attachments.ts");
 const diff = await load("src/model/diff.ts");
 
 const noMac = () => [
-  mac.resourcesHint(false), mac.noResourcesHint(false), mac.limitsHint(false), mac.terminalOutput(false),
+  mac.resourcesHint(false), mac.limitsHint(false), mac.terminalOutput(false),
   connectors.otherTrackers(true, false), connectors.otherTrackers(false, false), connectors.docs.addElsewhere(false),
   connectors.jira.tasksNote(false), connectors.codespacesElsewhere(false),
   providers.providerWords.footer(false), hosted.personalIntro(false),

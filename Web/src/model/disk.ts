@@ -51,3 +51,36 @@ export function diskLine(alarm: DiskAlarm): string {
   if (alarm.worktrees.length === 0) return what;
   return `${what} Largest worktrees: ${worktreeWords(alarm.worktrees.slice(0, 3))}.`;
 }
+
+/** The disk a machine's page shows open (#3743): the worst; of equal levels, the one most of `folders` are on; then the
+ * one with least free. DiskSpace.headline. */
+export function headline(disks: readonly DiskAlarm[], folders: readonly string[]): DiskAlarm | undefined {
+  const rank = { ok: 0, low: 1, critical: 2 } as const;
+  const on = new Map<string, number>();
+  for (const folder of folders) {
+    const mount = mountOf(folder, disks);
+    if (mount !== undefined) on.set(mount, (on.get(mount) ?? 0) + 1);
+  }
+  let best: DiskAlarm | undefined;
+  for (const disk of disks) {
+    if (!best) { best = disk; continue; }
+    const by = rank[disk.level] - rank[best.level]
+      || (on.get(disk.reading.mount) ?? 0) - (on.get(best.reading.mount) ?? 0)
+      || best.reading.freeBytes - disk.reading.freeBytes;
+    if (by > 0) best = disk;
+  }
+  return best;
+}
+
+/** The mount a path is on: the longest of the disks' mounts that holds it. */
+function mountOf(path: string, disks: readonly DiskAlarm[]): string | undefined {
+  return disks.map((d) => d.reading.mount)
+    .filter((m) => m === "/" || path === m || path.startsWith(m.endsWith("/") ? m : `${m}/`))
+    .reduce<string | undefined>((a, m) => (a === undefined || m.length > a.length ? m : a), undefined);
+}
+
+/** A disk in a machine's summary (#3743): "Disk 48.0 GB free", and its level when it is not OK. DiskSpace.summaryWords. */
+export function summaryWords(disk: DiskAlarm): string {
+  const free = `Disk ${diskWords(disk.reading.freeBytes)} free`;
+  return disk.level === "ok" ? free : `${free} · ${levelWords(disk.level)}`;
+}
