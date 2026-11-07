@@ -25,6 +25,9 @@ struct AgentsBotRow: View {
                     .tinted(problem == nil ? .none : .failure)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                if problem == nil, let keyOn = bot.flatMap(ConnectorSetupWords.Bot.keyOn) {
+                    Text(keyOn).appText(.fine).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
             }
             Spacer(minLength: 8)
             if let bot, bot.made {

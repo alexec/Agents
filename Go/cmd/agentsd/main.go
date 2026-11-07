@@ -375,6 +375,15 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 	up.OnChange = func(connected bool, problem string) {
 		writeJoinStatus(loc.Root, connected, problem)
 		safe.Go("attention uplink", func() { d.ControlUplinkChanged(connected) })
+		if connected {
+			d.ShareBotKey()
+		}
+	}
+	// A machine the person removed keeps no key of their bot's (#3950).
+	up.OnRefused = func(reason string) {
+		if reason == controllink.Forgotten {
+			d.BotMachineRemoved()
+		}
 	}
 	up.Told = d.Told
 	up.Asked = d.Asked

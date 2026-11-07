@@ -2394,6 +2394,27 @@
       }
     },
     {
+      "name": "connections/bot/drop",
+      "x-capability": "connections.botkey/1",
+      "description": "From another of the person's machines only, signed by it (#3950): that machine forgot the bot, so this one deletes its copy of the App's key and takes no copy of it again.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ConnectionBotDrop"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "connections/bot/remove",
       "x-capability": "connections.bot/1",
       "tags": [
@@ -2440,6 +2461,27 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/ConnectionBotStart"
+        }
+      }
+    },
+    {
+      "name": "connections/bot/take",
+      "x-capability": "connections.botkey/1",
+      "description": "From another of the person's machines only, signed by it (#3950): the bot's key, sealed to this machine's key from the person's lock. This machine opens it and keeps it in its own store. Refused with no lock, or for an App it was told to forget.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ConnectionBotCopy"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
         }
       }
     },

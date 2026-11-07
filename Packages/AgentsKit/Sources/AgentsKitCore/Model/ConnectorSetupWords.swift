@@ -487,14 +487,14 @@ public enum ConnectorSetupWords {
         public static let never = "Never: change workflows, secrets, environments, settings or members. Those stay yours."
         public static let publicToggle = "Organisations can install it"
         public static let publicHelp = "Turn on to use the bot on an organisation's repositories. The organisation's owner approves the install."
-        public static let keyNote = "GitHub gives the bot's key to this machine only. It never goes to Agents' servers."
+        public static let keyNote = "GitHub gives the bot's key to this machine. It goes to your other machines sealed to each one, and Agents' servers cannot read it."
         public static let continueButton = "Continue on github.com"
         public static let waiting = "Waiting for github.com\u{2026} Choose Create GitHub App there, and Agents comes back by itself."
         public static let finishing = "Taking the bot's key on this machine\u{2026}"
         public static let installButton = "Install on Repositories\u{2026}"
         public static let removeButton = "Forget the Bot\u{2026}"
         public static let removeTitle = "Forget your agents' bot?"
-        public static let removeMessage = "This machine deletes the bot's key, and agents post as you again. The App stays on GitHub until you delete it there."
+        public static let removeMessage = "Your machines delete the bot's key, and agents post as you again. The App stays on GitHub until you delete it there."
 
         /// The bot's line under the GitHub row: its name, and where it is installed.
         public static func note(_ bot: DaemonAPI.ConnectionBot) -> String {
@@ -504,6 +504,25 @@ public enum ConnectorSetupWords {
             if list.isEmpty { return "\(name), not installed yet: install it on the repositories agents work on." }
             let places = list.map { $0.all ? "\($0.account) (all repositories)" : "\($0.account) (chosen repositories)" }
             return "\(name), on " + places.joined(separator: ", ") + "."
+        }
+
+        /// Which of the person's machines hold the bot's key (#3950); nil before it is made.
+        public static func keyOn(_ bot: DaemonAPI.ConnectionBot) -> String? {
+            guard bot.made else { return nil }
+            guard let machines = bot.keyOn else { return "Its key is on this machine only." }
+            let has = machines.filter(\.has).map { $0.here == true ? "\($0.name) (here)" : $0.name }
+            let waiting = machines.filter { !$0.has }.map(\.name)
+            var words = "Its key is on " + both(has) + "."
+            if !waiting.isEmpty {
+                words += " " + both(waiting) + (waiting.count == 1 ? " gets it when it is online." : " get it when they are online.")
+            }
+            return words
+        }
+
+        /// a, b and c.
+        static func both(_ names: [String]) -> String {
+            guard let last = names.last, names.count > 1 else { return names.first ?? "" }
+            return names.dropLast().joined(separator: ", ") + " and " + last
         }
     }
 

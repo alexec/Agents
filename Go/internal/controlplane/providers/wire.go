@@ -139,6 +139,7 @@ const (
 	MethodProjectSessions   = "machines/projectSessions"
 	MethodSummaryFacts      = "machines/summaryFacts"
 	MethodSendFolder        = "machines/sendFolder"
+	MethodBotKey            = "machines/botKey"
 	MethodHostMachines      = "machine/machines"
 	MethodHostProviderDraft = "machine/providerDraft"
 	MethodHostStatus        = "machine/status"
@@ -155,6 +156,8 @@ const (
 	MethodSendPack          = "folders/sendPack"
 	MethodSendRead          = "folders/sendRead"
 	MethodAgentsMoveIn      = "agents/moveIn"
+	MethodBotTake           = "connections/bot/take"
+	MethodBotDrop           = "connections/bot/drop"
 )
 
 // Notification names (DaemonAPI.Notification).
@@ -181,7 +184,7 @@ var AgentWorkspaceMethods = map[string]bool{
 	MethodWorkspacesAgent: true, MethodHostsStart: true, MethodHostsStop: true, MethodProvidersOptions: true,
 	MethodProvidersCreate: true, MethodHostsDelete: true, MethodSessionOnMachine: true, MethodSessionCall: true,
 	MethodSessionEnded: true, MethodSendFolder: true, MethodProjectFolders: true, MethodProjectSessions: true,
-	MethodSummaryFacts: true,
+	MethodSummaryFacts: true, MethodBotKey: true,
 }
 
 // KeptMethods is DaemonAPI.Method.keptMethods: the only requests that are kept.

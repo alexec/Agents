@@ -30,6 +30,8 @@ type botBook struct {
 	botSetups map[string]time.Time
 	// newBotClient is GitHub's API for the bot; a test gives a fake GitHub's.
 	newBotClient func() *connections.BotClient
+	// botRound is held while this machine gives the bot's key to the others (githubbotcopy.go).
+	botRound sync.Mutex
 }
 
 func (d *Daemon) botClient() *connections.BotClient {
@@ -55,6 +57,7 @@ func (d *Daemon) registerGitHubBot() {
 			return wire.ConnectionBot{}, err
 		}
 		d.connRenew.Lock()
+		held, _, _ := s.Get(connections.GitHubBot)
 		err = s.Delete(connections.GitHubBot)
 		d.connRenew.Unlock()
 		if err != nil {
@@ -62,6 +65,10 @@ func (d *Daemon) registerGitHubBot() {
 			return wire.ConnectionBot{}, err
 		}
 		log.Printf("connections: github bot removed")
+		// The person's other machines forget it too (#3950).
+		if bot, ok := connections.BotOf(held); ok {
+			d.forgetBotEverywhere(bot.AppID)
+		}
 		return wire.ConnectionBot{Made: false}, nil
 	})
 }
@@ -163,7 +170,11 @@ func (d *Daemon) githubBotComplete(ctx context.Context, r wire.ConnectionBotComp
 		return wire.ConnectionBot{Made: false, Message: &why}, nil
 	}
 	log.Printf("connections: github bot made")
-	return wireBot(bot, nil, nil), nil
+	// To the person's other machines, sealed to each (#3950).
+	d.goShareBotKey(true)
+	w := wireBot(bot, nil, nil)
+	w.KeyOn = d.botKeyOn(bot.AppID)
+	return w, nil
 }
 
 // githubBot is the bot this host keeps, with the accounts it is installed on (asked of GitHub).
@@ -183,11 +194,15 @@ func (d *Daemon) githubBot(ctx context.Context) (wire.ConnectionBot, error) {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 	list, err := d.botClient().Installations(ctx, bot)
+	var w wire.ConnectionBot
 	if err != nil {
 		why := err.Error() + "."
-		return wireBot(bot, nil, &why), nil
+		w = wireBot(bot, nil, &why)
+	} else {
+		w = wireBot(bot, list, nil)
 	}
-	return wireBot(bot, list, nil), nil
+	w.KeyOn = d.botKeyOn(bot.AppID)
+	return w, nil
 }
 
 func wireBot(b connections.Bot, list []connections.Installation, message *string) wire.ConnectionBot {

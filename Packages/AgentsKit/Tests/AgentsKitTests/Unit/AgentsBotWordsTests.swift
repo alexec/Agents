@@ -23,6 +23,20 @@ struct AgentsBotWordsTests {
         #expect(Words.note(none).contains("could not be asked"))
     }
 
+    /// Which of the person's machines hold the bot's key (#3950); the web page says the same.
+    @Test func theBotsKeyLineSaysWhichMachinesHaveIt() throws {
+        #expect(Words.keyOn(DaemonAPI.ConnectionBot(made: false)) == nil)
+        #expect(Words.keyOn(DaemonAPI.ConnectionBot(made: true)) == "Its key is on this machine only.")
+        let json = """
+        {"made":true,"keyOn":[{"name":"mac-mini","here":true,"has":true},{"name":"devbox","has":true},
+         {"name":"laptop","has":false}]}
+        """
+        var bot = try JSONDecoder().decode(DaemonAPI.ConnectionBot.self, from: Data(json.utf8))
+        #expect(Words.keyOn(bot) == "Its key is on mac-mini (here) and devbox. laptop gets it when it is online.")
+        bot.keyOn?.append(DaemonAPI.ConnectionBotMachine(name: "pi", has: false))
+        #expect(Words.keyOn(bot) == "Its key is on mac-mini (here) and devbox. laptop and pi get it when they are online.")
+    }
+
     /// The Mac opens the manifest page with the manifest in the fragment, never in the query.
     @Test func theFormAddressKeepsTheManifestInTheFragment() throws {
         let start = DaemonAPI.ConnectionBotStart(action: "https://github.com/settings/apps/new?state=ab12",

@@ -2368,6 +2368,9 @@ type ConnectionBot struct {
 	// Absent when GitHub could not be asked.
 	Installations []ConnectionBotInstallation `json:"installations,omitzero"`
 
+	// The person's machines in their lock and whether each holds the bot's key, as this machine knows (#3950). Absent with no lock: then the key is on this machine only.
+	KeyOn []ConnectionBotMachine `json:"keyOn,omitzero"`
+
 	// What failed, in words.
 	Message *string `json:"message,omitzero"`
 }
@@ -2381,6 +2384,21 @@ type ConnectionBotCompleteRequest struct {
 	Error *string `json:"error,omitzero"`
 }
 
+// The bot's key, sealed by one of the person's machines to another (#3950): HPKE to the receiving machine's sealing key from the person's lock, under com.alexecollins.agents.githubbot.v1, with the associated data githubbot.v1|<person>|m:<machine>|<appId>|<version>. Delivered as connections/bot/take, signed by the giving machine. No client and not the control plane can open it.
+type ConnectionBotCopy struct {
+	AppId int64 `json:"appId"`
+
+	// When the bot was made, in Unix milliseconds: a machine keeps the newest bot.
+	Version int64 `json:"version"`
+
+	Sealed SealedEnvelope `json:"sealed"`
+}
+
+// Forget the Bot on one machine, sent to the others (#3950): each deletes its copy of that App's key, and takes no copy of it again.
+type ConnectionBotDrop struct {
+	AppId int64 `json:"appId"`
+}
+
 // An account the bot is installed on.
 type ConnectionBotInstallation struct {
 	Account string `json:"account"`
@@ -2390,6 +2408,17 @@ type ConnectionBotInstallation struct {
 
 	// Where the installation's repositories are chosen on GitHub.
 	SettingsURL *string `json:"settingsURL,omitzero"`
+}
+
+// One of the person's machines, and whether it holds the bot's key (#3950).
+type ConnectionBotMachine struct {
+	Name string `json:"name"`
+
+	// The machine that answered.
+	Here *bool `json:"here,omitzero"`
+
+	// False while it waits: it gets the key when it and a machine with the key are both online.
+	Has bool `json:"has"`
 }
 
 // What the client posts to GitHub (#3858): an HTML form to action, method POST, with one field, manifest. GitHub sends the code and the state to the hand-back page.
@@ -6543,6 +6572,16 @@ type MachineAnnounce struct {
 	MachineID string `json:"machineID"`
 
 	Implementation *string `json:"implementation,omitzero"`
+}
+
+// machines/botKey through machine/machines (#3950): one of the person's machines gives the bot's key, sealed, to another of theirs (copy), or tells it to forget it (drop). Exactly one of them.
+type MachineBotKey struct {
+	// The machine's id, as the person's lock names it.
+	Host string `json:"host"`
+
+	Copy *ConnectionBotCopy `json:"copy,omitzero"`
+
+	Drop *ConnectionBotDrop `json:"drop,omitzero"`
 }
 
 // governance/report (#2019, M5): the MCP servers and skills a machine has from a catalogue, personal and in its folders, at most 500. Sent at start and each hour; each replaces the last.

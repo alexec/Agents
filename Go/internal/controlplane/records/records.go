@@ -371,6 +371,15 @@ func (r *Records) WasForgotten(id string) bool {
 	return ok
 }
 
+// WasRemoved says the host of that id was removed (machines/remove), and its tombstone is
+// still kept.
+func (r *Records) WasRemoved(id string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	_, ok := r.tombstones[HostKey(id)]
+	return ok
+}
+
 // Host is the host of that id, or nil.
 func (r *Records) Host(id string) *MachineRecord {
 	r.mu.Lock()

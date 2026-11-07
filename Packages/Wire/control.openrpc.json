@@ -2687,6 +2687,27 @@
       }
     },
     {
+      "name": "machines/botKey",
+      "x-capability": "connections.botkey/1",
+      "description": "Through machine/machines only, signed by the asking machine (#3950): the bot's key, sealed to another of the person's machines, or the word to forget it. The control plane sends that machine's connections/bot/take or connections/bot/drop as the asking machine signed it, and can open nothing; the machine has to be online. Refused unsigned.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MachineBotKey"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "machines/checkAgain",
       "x-capability": "machines/1",
       "paramStructure": "by-name",

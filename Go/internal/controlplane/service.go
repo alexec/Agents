@@ -1558,6 +1558,11 @@ func (s *Service) keyWith(id controllink.Identity, private []byte) ([]byte, *rec
 		if h == nil && s.records.HostUnreadable(id.ID) {
 			return nil, nil, "", notTheirs{controllink.Refuse(controllink.Unavailable)}
 		}
+		// A machine the person removed hears it, and deletes what it keeps of theirs, such as
+		// the bot's key (#3950).
+		if h == nil && id.Kind == 'h' && s.records.WasRemoved(id.ID) {
+			return nil, nil, "", controllink.Refuse(controllink.Forgotten)
+		}
 		if h == nil || len(h.PublicKey) == 0 {
 			return nil, nil, "", controllink.Refuse(controllink.Unknown)
 		}

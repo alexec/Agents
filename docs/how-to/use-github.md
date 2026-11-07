@@ -76,10 +76,21 @@ workflows again. It can never change workflows, secrets, environments, settings 
 connection.
 
 GitHub gives the bot's key to the machine that made it. The key stays in that machine's
-Keychain, or in `~/.agents-secrets` on Linux. It never goes to Agents' servers or to another
-machine. The github server on that machine uses the bot when the bot is installed on the owner
-of the folder's repository. **Forget the Bot…** deletes the key and opens the App's page on
-GitHub, where you delete the App.
+Keychain, or in `~/.agents-secrets` on Linux. The github server on a machine uses the bot when
+the bot is installed on the owner of the folder's repository.
+
+Your other machines get the key from that machine, sealed to each one (#3950). The machine seals
+it to the key that your machine lock gives for each of your machines, and signs it. Agents'
+servers pass it on and cannot read it, and no app or browser sees it. A machine of another
+person never gets it. A machine that is offline gets the key when it and a machine with the key
+are both online. The bot's row says which machines have the key. With no machine lock, the key
+stays on the machine that made it.
+
+**Forget the Bot…** deletes the key on all your machines and opens the App's page on GitHub,
+where you delete the App. A machine that you remove deletes its key when Agents' servers tell
+it that it was removed. A removed machine that is not honest can keep a copy: when you remove a
+machine that you do not trust, also make a new private key for the App on its GitHub page, and
+delete the old one.
 
 ## Set up a folder's tools
 
