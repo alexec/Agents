@@ -157,7 +157,7 @@ public struct ProviderRecord: Codable, Hashable, Sendable, Identifiable {
 /// executable. Absent on a control plane with several copies (research R4).
 public protocol WorkspaceHandling: Sendable {
     func answer(method: String, params: JSONValue?, from caller: ControlRouter.Caller) async throws -> JSONValue
-    /// A host said whether it is idle (`host/status`, #691 US4).
+    /// A host said whether it is idle (`machine/status`, #691 US4).
     func heard(_ host: MachineRef, status: DaemonAPI.MachineStatus) async
     /// An agent on `host` asked through its workspace tools (US6): one of
     /// `agentWorkspaceMethods`, logged as that agent's.
@@ -185,21 +185,21 @@ public extension DaemonAPI.Method {
     /// `{id?}`: list again, said as `control/providersChanged`.
     static let providersRefresh = "providers/refresh"
     /// `MachineLink` → `ControlMachine`. A workspace linked to another host moves here.
-    static let hostsLink = "hosts/link"
+    static let hostsLink = "machines/link"
     /// `MachineRequest` → `ControlMachine`.
-    static let hostsUnlink = "hosts/unlink"
+    static let hostsUnlink = "machines/unlink"
     /// `MachineOptions` → `ControlMachine`.
-    static let hostsSetMachineOptions = "hosts/setMachineOptions"
+    static let hostsSetMachineOptions = "machines/setMachineOptions"
     /// `MachineRequest` → `ControlMachine`, at once; the start goes on, said as `control/hostChanged`.
-    static let hostsStart = "hosts/start"
+    static let hostsStart = "machines/start"
     /// `MachineStop` → `ControlMachine`, at once.
-    static let hostsStop = "hosts/stop"
+    static let hostsStop = "machines/stop"
     /// `ProviderRequest` → `ProviderOptions`: the New Machine form (US5).
     static let providersOptions = "providers/options"
     /// `ProviderCreate` → `ProviderCreated`, once the provider has made it (US5).
     static let providersCreate = "providers/create"
     /// `MachineRequest` → `{}`: its workspace deleted, then the host removed (US5).
-    static let hostsDeleteMachine = "hosts/deleteMachine"
+    static let hostsDeleteMachine = "machines/deleteMachine"
 
     /// Every method the control plane's workspace part answers.
     static let workspaceMethods: Set<String> = [
@@ -225,7 +225,7 @@ public extension DaemonAPI.Failure {
     static let providerFailed = -32066
     /// Stop while agents are working there, not confirmed (US4 AS4). `data` is `{running: [names]}`.
     static let agentsWorking = -32068
-    /// hosts/link for a machine whose ssh host key nobody has trusted yet: one that joined
+    /// machines/link for a machine whose ssh host key nobody has trusted yet: one that joined
     /// with the command (#3379). `data` is `{fingerprint}`, given back as `trust`.
     static let hostKeyToTrust = -32069
 }
@@ -334,7 +334,7 @@ public extension DaemonAPI {
         public var usable: Bool { mayUse ?? true }
     }
 
-    /// A linked host's workspace, on its `hosts/list` row and in `control/hostChanged`.
+    /// A linked host's workspace, on its `machines/list` row and in `control/hostChanged`.
     struct MachineWorkspace: Codable, Sendable, Hashable {
         public var provider: ProviderID
         public var providerName: String
@@ -451,7 +451,7 @@ public extension DaemonAPI {
         public init(id: ProviderID?) { self.id = id }
     }
 
-    /// `hosts/link`.
+    /// `machines/link`.
     struct MachineLink: Codable, Sendable, Hashable {
         public var host: MachineRef
         public var provider: ProviderID
@@ -473,7 +473,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// `hosts/setMachineOptions`. `stopWhenIdleMinutes` 0 turns it off.
+    /// `machines/setMachineOptions`. `stopWhenIdleMinutes` 0 turns it off.
     struct MachineOptions: Codable, Sendable, Hashable {
         public var host: MachineRef
         public var startWhenUsed: Bool?
@@ -530,7 +530,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// `hosts/stop`.
+    /// `machines/stop`.
     struct MachineStop: Codable, Sendable, Hashable {
         public var host: MachineRef
         /// Stop even though turns are running there (US4).

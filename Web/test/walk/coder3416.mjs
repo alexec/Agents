@@ -41,7 +41,7 @@ try {
   };
   const providers = async () => { const r = (await call("providers/list", {})).result; return r?.providers ?? r ?? []; };
   const coder = async () => (await providers()).find((p) => p.name === "Coder");
-  const hosts = async () => { const h = await call("hosts/list", {}); return h.result?.hosts ?? h.result ?? []; };
+  const hosts = async () => { const h = await call("machines/list", {}); return h.result?.hosts ?? h.result ?? []; };
   const settings = async (name) => {
     await page.goto(`${new URL(webURL).origin}/#/settings`);
     await page.waitFor(`document.querySelector("[aria-labelledby=settings-providers]")?.textContent.includes("Coder")`, 30_000);
@@ -82,13 +82,13 @@ try {
     const destination = `coder.${workspace}`;
     const there = (await hosts()).find((h) => h.name === workspace && h.state === "online");
     let trust;
-    let installed = there ? { result: { name: workspace } } : await call("hosts/install", { destination, name: workspace }, 600_000);
+    let installed = there ? { result: { name: workspace } } : await call("machines/install", { destination, name: workspace }, 600_000);
     // A second run links the machine the first installed, with the key the first trusted.
     if (there) trust = process.env.TRUST;
     if (installed.result?.needsTrust) {
       trust = installed.result.needsTrust;
       console.log(`needsTrust ${installed.result.needsTrust}`);
-      installed = await call("hosts/install", { destination, name: workspace, trust: installed.result.needsTrust }, 600_000);
+      installed = await call("machines/install", { destination, name: workspace, trust: installed.result.needsTrust }, 600_000);
     }
     check(!installed.error, `installed: ${JSON.stringify(installed).slice(0, 400)}`);
     let joined;
@@ -98,7 +98,7 @@ try {
     }
     check(!!joined, `the workspace joined: ${JSON.stringify(joined).slice(0, 300)}`);
     if (joined) {
-      const linked = await call("hosts/link", { host: joined.id, provider: provider.id, workspace: ws.id, ...(trust ? { trust } : {}) });
+      const linked = await call("machines/link", { host: joined.id, provider: provider.id, workspace: ws.id, ...(trust ? { trust } : {}) });
       check(!linked.error, `linked: ${JSON.stringify(linked).slice(0, 300)}`);
     }
     await settings("machine-added");
@@ -109,7 +109,7 @@ try {
     const host = (await hosts()).find((h) => h.name === workspace && h.state === "online");
     check(!!host, `the machine ${workspace} is online`);
     const mac = (await hosts()).find((h) => h.name !== workspace && h.state === "online");
-    const lent = process.env.AGENT ? {} : await call("hosts/lendSignIn", { host: host.id, from: mac.id, runtime: "claude", allowed: true });
+    const lent = process.env.AGENT ? {} : await call("machines/lendSignIn", { host: host.id, from: mac.id, runtime: "claude", allowed: true });
     check(!lent.error, `Claude's sign-in lent from ${mac.name}: ${JSON.stringify(lent).slice(0, 200)}`);
     // Then as the window's Lending.swift: the Mac's host grants its relay, the server is offered it.
     const grant = process.env.AGENT ? { result: {} } : await call("relay/grant", { runtime: "claude" }, 30_000, mac.id);
@@ -151,7 +151,7 @@ try {
   if (step === "cycle" || step === "all") {
     const host = (await hosts()).find((h) => h.name === workspace);
     check(!!host, `the machine ${workspace}: ${JSON.stringify(host).slice(0, 300)}`);
-    const stopped = await call("hosts/stop", { host: host.id, confirmRunning: true });
+    const stopped = await call("machines/stop", { host: host.id, confirmRunning: true });
     check(!stopped.error, `stop: ${JSON.stringify(stopped).slice(0, 300)}`);
     check(await waitState("stopped", 180) === "stopped", `stopped through the provider (${await stateOf()})`);
     await settings("stopped");
@@ -162,7 +162,7 @@ try {
     }
     check(!!offline, `the machine went offline: ${offline?.state}`);
 
-    const started = await call("hosts/start", { host: host.id });
+    const started = await call("machines/start", { host: host.id });
     check(!started.error, `start: ${JSON.stringify(started).slice(0, 300)}`);
     check(await waitState("running", 300) === "running", `started through the provider (${await stateOf()})`);
     let back;

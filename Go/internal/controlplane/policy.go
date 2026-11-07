@@ -109,7 +109,7 @@ type keptPolicy struct {
 	signature *wire.PolicySignature
 }
 
-// signedPolicyLine is host/policy with the document's own bytes, so a machine checks the
+// signedPolicyLine is machine/policy with the document's own bytes, so a machine checks the
 // signature over what was signed, a field this build does not know included.
 type signedPolicyLine struct {
 	Policy    json.RawMessage      `json:"policy"`
@@ -746,7 +746,7 @@ func (s *Service) sendPolicy(host string, always bool) {
 	if same && !always {
 		return
 	}
-	if !s.router.Tell(host, wire.NewMethodName(wire.NotifyHostPolicy.Name), json.RawMessage(b)) {
+	if !s.router.Tell(host, wire.NotifyMachinePolicy.Name, json.RawMessage(b)) {
 		s.policies.mu.Lock()
 		delete(s.policies.told, host)
 		s.policies.mu.Unlock()
@@ -757,7 +757,7 @@ func (s *Service) sendPolicy(host string, always bool) {
 	s.policies.mu.Unlock()
 }
 
-// policyApplied is host/policyApplied: the machine kept this version, noted on its record
+// policyApplied is machine/policyApplied: the machine kept this version, noted on its record
 // for policy/get, the Console and the gate at every copy.
 func (s *Service) policyApplied(ctx context.Context, host string, applied wire.PolicyApplied) error {
 	if applied.Version < 1 {

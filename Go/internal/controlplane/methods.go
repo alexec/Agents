@@ -96,20 +96,20 @@ var own = methodSet(
 	"groups/remove",
 	"groups/set",
 	"groups/setRole",
-	"hosts/approveJoin",
-	"hosts/checkAgain",
-	"hosts/denyJoin",
-	"hosts/detect",
-	"hosts/install",
-	"hosts/joinRequests",
-	"hosts/lastHeard",
-	"hosts/lendGit",
-	"hosts/lendSignIn",
-	"hosts/list",
-	"hosts/remove",
-	"hosts/sshHosts",
-	"hosts/startEnroll",
-	"hosts/update",
+	"machines/approveJoin",
+	"machines/checkAgain",
+	"machines/denyJoin",
+	"machines/detect",
+	"machines/install",
+	"machines/joinRequests",
+	"machines/lastHeard",
+	"machines/lendGit",
+	"machines/lendSignIn",
+	"machines/list",
+	"machines/remove",
+	"machines/sshHosts",
+	"machines/startEnroll",
+	"machines/update",
 	"links/approve",
 	"links/deny",
 	"links/list",
@@ -242,15 +242,15 @@ var writes = methodSet(
 	"groups/remove",
 	"groups/set",
 	"groups/setRole",
-	"hosts/approveJoin",
-	"hosts/denyJoin",
-	"hosts/detect",
-	"hosts/install",
-	"hosts/lendGit",
-	"hosts/lendSignIn",
-	"hosts/remove",
-	"hosts/startEnroll",
-	"hosts/update",
+	"machines/approveJoin",
+	"machines/denyJoin",
+	"machines/detect",
+	"machines/install",
+	"machines/lendGit",
+	"machines/lendSignIn",
+	"machines/remove",
+	"machines/startEnroll",
+	"machines/update",
 	"links/approve",
 	"links/deny",
 	"links/remove",
@@ -303,7 +303,7 @@ var writes = methodSet(
 	"user/setSettings",
 )
 
-// installCarried is hosts/install from the machine that carries a codespace's provider,
+// installCarried is machines/install from the machine that carries a codespace's provider,
 // with a host code that makes the codespace the caller's; false for any other install.
 func (m *Methods) installCarried(params json.RawMessage, from Caller) (any, bool, error) {
 	var request wire.MachineInstall
@@ -322,14 +322,14 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 	m.mu.Lock()
 	frozen := m.frozen
 	m.mu.Unlock()
-	readsOnly := method == "providers/list" || method == "providers/refresh" || method == "hosts/listKept"
+	readsOnly := method == "providers/list" || method == "providers/refresh" || method == "machines/listKept"
 	if frozen && (writes[method] || workspaceMethods[method] && !readsOnly) {
 		return nil, fail(storeUnavailable, "The control plane is moving to another machine. Nothing was changed; try again in a minute.")
 	}
 	// Add as Machine… on a codespace whose provider a machine carries (#3497): that
 	// machine's ssh installs it, not this one's, so neither a hosted copy's refusal nor the
 	// owner's ssh applies.
-	if method == "hosts/install" && m.s.providers != nil {
+	if method == "machines/install" && m.s.providers != nil {
 		if answer, carried, err := m.installCarried(params, from); carried {
 			return answer, err
 		}
@@ -360,7 +360,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return map[string]any{}, nil
 	case "control/status":
 		return m.status(from), nil
-	case "hosts/list":
+	case "machines/list":
 		return m.hostList(from), nil
 	case "clients/list", "devices/list":
 		// The caller's person's own clients (#994).
@@ -408,14 +408,14 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 	case "user/settings", "user/setAgentConfigFile", "user/setSettings", "user/setSecret", "user/removeSecret", "user/secretNames",
 		"user/secretRecipients":
 		return m.userMethod(ctx, method, params, from)
-	case "hosts/joinRequests":
+	case "machines/joinRequests":
 		return m.s.joins.list(ctx, m.callerPerson(from))
-	case "hosts/approveJoin", "hosts/denyJoin":
+	case "machines/approveJoin", "machines/denyJoin":
 		request, err := require[wire.JoinRequestDecide](params, "JoinRequestDecide")
 		if err != nil {
 			return nil, err
 		}
-		approved, err := m.s.joins.decide(ctx, request.Request, m.callerPerson(from), method == "hosts/approveJoin")
+		approved, err := m.s.joins.decide(ctx, request.Request, m.callerPerson(from), method == "machines/approveJoin")
 		if err != nil || approved == nil {
 			return map[string]any{}, err
 		}
@@ -506,7 +506,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 			return nil, err
 		}
 		return map[string]any{}, nil
-	case "hosts/startEnroll":
+	case "machines/startEnroll":
 		// With as, a machine for a bot, which an admin enrols (#1761, FR-030).
 		var enroll wire.MachineEnroll
 		json.Unmarshal(params, &enroll)
@@ -520,15 +520,15 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 			ctx = withCodeOwner(ctx, bot)
 		}
 		return m.s.codes.Issue(ctx, true, false, controllink.CodeLifetime)
-	case "hosts/install":
+	case "machines/install":
 		return m.s.installer.Install(ctx, params)
-	case "hosts/detect":
+	case "machines/detect":
 		return m.s.installer.Detect(ctx)
-	case "hosts/sshHosts":
+	case "machines/sshHosts":
 		var p wire.SSHHostsRequest
 		json.Unmarshal(params, &p)
 		return m.s.installer.SSHHosts(ctx, strings.TrimSpace(deref(p.Destination)))
-	case "hosts/update":
+	case "machines/update":
 		request, err := require[wire.MachineUpdate](params, "MachineUpdate")
 		if err != nil {
 			return nil, err
@@ -538,7 +538,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 			return nil, &RPCError{Code: wire.FailureNoSuchHost, Message: "There is no such host."}
 		}
 		return m.s.installer.Update(ctx, request, h.Name)
-	case "hosts/checkAgain":
+	case "machines/checkAgain":
 		request, err := require[wire.MachineRequest](params, "MachineRequest")
 		if err != nil {
 			return nil, err
@@ -571,7 +571,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 			return nil, err
 		}
 		return request, nil
-	case "hosts/lendSignIn":
+	case "machines/lendSignIn":
 		request, err := require[wire.LendSignIn](params, "LendSignIn")
 		if err != nil {
 			return nil, err
@@ -598,7 +598,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		}
 		m.s.announce("hostEnrolled", string(request.Host), from.Client)
 		return map[string]any{}, nil
-	case "hosts/lendGit":
+	case "machines/lendGit":
 		request, err := require[wire.LendGit](params, "LendGit")
 		if err != nil {
 			return nil, err
@@ -608,7 +608,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		}
 		m.s.announce("hostEnrolled", string(request.Host), from.Client)
 		return map[string]any{}, nil
-	case "hosts/remove":
+	case "machines/remove":
 		request, err := require[wire.MachineRequest](params, "MachineRequest")
 		if err != nil {
 			return nil, err
@@ -625,7 +625,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 			return nil, fail(noSuchHost, "No machine is called %s.", host)
 		}
 		return map[string]any{}, nil
-	case "hosts/lastHeard":
+	case "machines/lastHeard":
 		request, err := require[wire.MachineRequest](params, "MachineRequest")
 		if err != nil {
 			return nil, err
@@ -732,7 +732,7 @@ func (m *Methods) ownHostNamed(from Caller, named string) (string, error) {
 	return found, nil
 }
 
-// removeHost takes a machine off the control plane: hosts/remove, or with its person.
+// removeHost takes a machine off the control plane: machines/remove, or with its person.
 func (m *Methods) removeHost(ctx context.Context, host string, from Caller) (bool, error) {
 	owner, name := m.s.ownerOf(host), host
 	var held []wire.OrgRouteVersion
@@ -764,7 +764,7 @@ func (m *Methods) removeHost(ctx context.Context, host string, from Caller) (boo
 	return true, nil
 }
 
-// hostRow is one hosts/list row, as it stands now.
+// hostRow is one machines/list row, as it stands now.
 func (m *Methods) hostRow(h records.MachineRecord) wire.ControlMachine {
 	state, _ := m.router.Described(h.ID)["state"].(string)
 	row := wire.ControlMachine{ID: wire.MachineRef(h.ID), Name: h.Name, Platform: h.Platform, Version: h.Version, State: state,
@@ -1083,7 +1083,7 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 		return map[string]any{}, nil
 	case "user/setAgentConfigFile":
 		return nil, agentConfigFileRefused()
-	case "host/hello":
+	case "machine/hello":
 		hello, err := require[wire.MachineHello](params, "MachineHello")
 		if err != nil {
 			return nil, err
@@ -1139,22 +1139,22 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 			m.s.userChanged(user, []wire.UserSettingsPartName{wire.UserSettingsPartNamePolicy}, false, host)
 		}
 		return map[string]any{}, nil
-	case "host/policyApplied":
+	case "machine/policyApplied":
 		applied, err := require[wire.PolicyApplied](params, "PolicyApplied")
 		if err != nil {
 			return nil, err
 		}
 		return map[string]any{}, m.s.policyApplied(ctx, host, applied)
-	case "host/orgRoutesApplied":
+	case "machine/orgRoutesApplied":
 		applied, err := require[wire.OrgRoutesApplied](params, "OrgRoutesApplied")
 		if err != nil {
 			return nil, err
 		}
 		return map[string]any{}, m.s.orgRoutesApplied(ctx, host, applied)
-	case "host/orgRoutesAgain":
+	case "machine/orgRoutesAgain":
 		m.s.orgRoutesAgain(host)
 		return map[string]any{}, nil
-	case "host/lockAdd", "host/lockAgain", "host/lockJoin", "host/lockJoinReveal":
+	case "machine/lockAdd", "machine/lockAgain", "machine/lockJoin", "machine/lockJoinReveal":
 		return m.hostLockMethod(ctx, host, method, params)
 	case "attention/turn":
 		turn, err := require[wire.AttentionTurn](params, "AttentionTurn")
@@ -1211,9 +1211,9 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 			return nil, err
 		}
 		return m.s.links.check(ctx, sender)
-	case "host/machines", "host/providerDraft", "host/status", "host/installProgress":
+	case "machine/machines", "machine/providerDraft", "machine/status", "machine/installProgress":
 		if m.s.providers == nil {
-			if method == "host/status" || method == "host/installProgress" {
+			if method == "machine/status" || method == "machine/installProgress" {
 				return map[string]any{}, nil
 			}
 			return nil, m.s.providersOff()
@@ -1254,7 +1254,7 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 	return nil, notFound(method)
 }
 
-// hello is host/hello: what the host says it is now, written only when it changed
+// hello is machine/hello: what the host says it is now, written only when it changed
 // something, and the home host settled.
 func (m *Methods) hello(ctx context.Context, host string, hello wire.MachineHello) error {
 	known := m.records.Host(host)
@@ -1407,7 +1407,7 @@ func (m *Methods) sameUsers(host string, lends map[string]string) map[string]str
 	return out
 }
 
-// lendGit is hosts/lendGit: kept for a yes, taken back for a no; either ends a waiting ask.
+// lendGit is machines/lendGit: kept for a yes, taken back for a no; either ends a waiting ask.
 func (m *Methods) lendGit(ctx context.Context, request wire.LendGit) error {
 	if !isGitServer(request.Server) {
 		return fail(invalidParams, "That is not a git server.")

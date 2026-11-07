@@ -143,7 +143,7 @@ public struct MachineRecord: Codable, Hashable, Sendable, Identifiable {
     public var reach: MachineReach
     public var platform: String
     public var version: String
-    /// Whether `hosts/install` put it there, so removing it can offer to take it away.
+    /// Whether `machines/install` put it there, so removing it can offer to take it away.
     public var installed: Bool
     /// The machine it runs on, so a window can tell a host on its own Mac (R11).
     public var machineID: String?
@@ -168,7 +168,7 @@ public struct MachineRecord: Codable, Hashable, Sendable, Identifiable {
     /// The provider's workspace this host runs on, which the control plane can start and stop
     /// (#691). Nil for a host nothing can start.
     public var workspace: WorkspaceLink?
-    /// `swift` or `go`, as the host last said in `host/hello` (#1134). Nil until it says.
+    /// `swift` or `go`, as the host last said in `machine/hello` (#1134). Nil until it says.
     public var implementation: String?
 
     public init(id: MachineRef, name: String, publicKey: Data? = nil, reach: MachineReach = .dialOut,

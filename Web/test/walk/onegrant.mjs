@@ -81,7 +81,7 @@ for (const [label, base, code, kind] of [["phone (iPhone, TLS)", controlURL, pho
   const calls = [
     ["clients/list", {}, null],
     ["clients/startPairing", {}, null],
-    ["hosts/startEnroll", {}, null],
+    ["machines/startEnroll", {}, null],
     ["clients/stopPairing", {}, null],
     ["folders/setHelperLimits", { folder: `file://${folder}`, limits: { running: 4, notArchived: 6 } }, "mac"],
     ["files/browse", { path: folder.replace(/\/[^/]+\/?$/, "") }, "mac"],

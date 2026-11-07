@@ -304,7 +304,7 @@ func TestLockResetOnDaemonSockAsksForTheLockAgain(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if !slices.ContainsFunc(said, func(m string) bool { return wire.OldMethodName(m) == wire.CallHostLockAgain.Name }) {
+	if !slices.ContainsFunc(said, func(m string) bool { return m == wire.CallMachineLockAgain.Name }) {
 		t.Fatalf("the machine did not ask for its lock again: %v", said)
 	}
 	if RoleAgent.Allows(wire.CallDaemonLockReset.Name) {

@@ -30,10 +30,10 @@ const KeptFailedFor = 7 * 24 * time.Hour
 // agent's first prompt; Failed, that it was not sent, and why (US3 AS4).
 type KeptRequest = wire.KeptRequest
 
-// KeepRequest is DaemonAPI.KeepRequest: hosts/keep.
+// KeepRequest is DaemonAPI.KeepRequest: machines/keep.
 type KeepRequest = wire.KeepRequest
 
-// KeptRequestID is DaemonAPI.KeptRequestID: hosts/dropKept, hosts/retryKept.
+// KeptRequestID is DaemonAPI.KeptRequestID: machines/dropKept, machines/retryKept.
 type KeptRequestID = wire.KeptRequestID
 
 // KeptList is DaemonAPI.KeptList.
@@ -316,7 +316,7 @@ func (k *Kept) listLocked(shown func(host string) bool) []KeptRequest {
 	return out
 }
 
-// Answer is hosts/listKept, hosts/dropKept and hosts/retryKept, for the person who asked:
+// Answer is machines/listKept, machines/dropKept and machines/retryKept, for the person who asked:
 // only of their own hosts.
 func (k *Kept) Answer(method string, params json.RawMessage, person string) (any, error) {
 	k.Load()

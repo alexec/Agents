@@ -153,7 +153,7 @@ func freeProjectName(names map[string]string, name, id string) string {
 
 // keepJoined is projects/joined: the machine's list written over its last, and each id
 // that no project has, or a removed one has, adopted with its folder's name (FR-007). Its
-// answer is the folders' projects, which the machine then has: host/projects tells it
+// answer is the folders' projects, which the machine then has: machine/projects tells it
 // again only when they change.
 func (s *Service) keepJoined(ctx context.Context, host string, joined wire.ProjectsJoined) (wire.MachineProjects, error) {
 	if s.records.Host(host) == nil {
@@ -498,7 +498,7 @@ func (s *Service) tellProjectsChanged(id string, removed bool) {
 
 // The project's slots (#2669, specs/2317-projects User Story 4): Tasks, Code review and
 // CI, one per slot, set by the project's owner or an admin, for every folder in the
-// project. A machine gets them in projects/joined's answer, and again (host/projects) when
+// project. A machine gets them in projects/joined's answer, and again (machine/projects) when
 // a project changes; a slot the project does not set is each folder's own.
 
 // projectSlots is the slots a project may set, in the page's order.
@@ -595,7 +595,7 @@ func (t *toldProjects) soon(send func()) {
 		return
 	}
 	t.running = true
-	safe.Go("host/projects", func() {
+	safe.Go("machine/projects", func() {
 		defer func() {
 			t.mu.Lock()
 			t.running = false
@@ -636,7 +636,7 @@ func (s *Service) tellMachinesProjects() {
 		if s.toldProjects.same(host, projects) {
 			continue
 		}
-		if s.router.Tell(host, wire.NewMethodName(wire.NotifyHostProjects.Name), projects) {
+		if s.router.Tell(host, wire.NotifyMachineProjects.Name, projects) {
 			s.toldProjects.note(host, projects)
 		} else {
 			s.toldProjects.forget(host)

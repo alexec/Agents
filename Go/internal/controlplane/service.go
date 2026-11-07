@@ -67,7 +67,7 @@ type Config struct {
 	HostJoinFile string
 	// Where the Linux hosts it hands out are (ServerFiles.folder).
 	ServerFolder string
-	// Where the runtimes' toolsets hosts/install puts on a server are (#1136): "" puts none.
+	// Where the runtimes' toolsets machines/install puts on a server are (#1136): "" puts none.
 	ToolsetFolder string
 	// The web remote's loopback listener (071): Web/dist and the port, or nil for none,
 	// which is a container's default.
@@ -167,7 +167,7 @@ type Service struct {
 	pushes *pushes
 	// This copy's Web Push to browsers (#1486); nil with no VAPID key.
 	webPush *webPushes
-	// What each host last listed (#962), for hosts/lastHeard.
+	// What each host last listed (#962), for machines/lastHeard.
 	copies *hostCopies
 	// The reverse tunnels this copy holds for servers behind a bastion (#435): a single
 	// copy's, whose ssh is the person's on this machine.
@@ -180,7 +180,7 @@ type Service struct {
 	peerOrigin string
 	// Where this copy is in a handover (R16): serving, receiving, frozen or forwarding.
 	phase *phaseBox
-	// hosts/install, detect and sshHosts (T072, #429, #610): with the person's own ssh.
+	// machines/install, detect and sshHosts (T072, #429, #610): with the person's own ssh.
 	installer *hostinstall.Installer
 
 	// One read of the store's records at a time, at most one every readAgainEvery
@@ -193,7 +193,7 @@ type Service struct {
 	downloads   *addressRates
 	socketsMost int
 	refusals    *refusalLog
-	// The host/clients each host here was told last (#1528).
+	// The machine/clients each host here was told last (#1528).
 	told toldClients
 	// Machines asking to join with no code (#994).
 	joins *joins
@@ -696,7 +696,7 @@ func (s *Service) watchJoinFile() {
 	}
 }
 
-// hostClients is host/clients: every paired window of the host's owner and its key,
+// hostClients is machine/clients: every paired window of the host's owner and its key,
 // which a host checks its local socket against (#1118). Only a Mac's window is on the
 // same machine as a host, and only its own person's reaches it there (FR-020).
 func (s *Service) hostClients(host string) wire.MachineClients {
@@ -733,7 +733,7 @@ func (s *Service) macWindows() map[string][]wire.MachineClient {
 	return out
 }
 
-// toldClients is a hash of the host/clients each host whose uplink ends here was told last.
+// toldClients is a hash of the machine/clients each host whose uplink ends here was told last.
 type toldClients struct {
 	mu   sync.Mutex
 	last map[string][sha256.Size]byte
@@ -742,7 +742,7 @@ type toldClients struct {
 // tellHostClients tells each host whose uplink ends here which windows it may let in on its
 // local socket, so a window forgotten here is cut off there too. A host hears the list only
 // when it differs from the one it heard last, not on every refresh (#1528). The hosts named
-// (a host that says host/hello, after a new uplink) hear it in any case.
+// (a host that says machine/hello, after a new uplink) hear it in any case.
 func (s *Service) tellHostClients(only ...string) {
 	s.told.mu.Lock()
 	defer s.told.mu.Unlock()
@@ -771,7 +771,7 @@ func (s *Service) tellHostClients(only ...string) {
 		if len(only) == 0 && s.told.last[host] == sum {
 			continue
 		}
-		if s.router.Tell(host, wire.NewMethodName(wire.NotifyHostClients.Name), clients) {
+		if s.router.Tell(host, wire.NotifyMachineClients.Name, clients) {
 			s.told.last[host] = sum
 		} else {
 			delete(s.told.last, host)
@@ -1621,7 +1621,7 @@ func (g *readGate) read(read func() error) (ran bool, err error) {
 	return true, r.err
 }
 
-// hostArrived takes a host's uplink: its first line is host/hello on channel 0 (kept
+// hostArrived takes a host's uplink: its first line is machine/hello on channel 0 (kept
 // from the first build), then the router reads it.
 func (s *Service) hostArrived(host string, conn *Conn) {
 	first, err := conn.ReadWithin(15 * time.Second)
@@ -1630,7 +1630,7 @@ func (s *Service) hostArrived(host string, conn *Conn) {
 	if err == nil && ok && f.channel == 0 && !f.close && !f.open && f.channels == nil {
 		m, ok = decode(f.msg)
 	}
-	if err != nil || !ok || m == nil || m.Method != "host/hello" || !m.isRequest() {
+	if err != nil || !ok || m == nil || m.Method != "machine/hello" || !m.isRequest() {
 		s.log("host " + host + " connected without saying hello; closing it")
 		conn.Close()
 		return
@@ -1645,7 +1645,7 @@ func (s *Service) hostArrived(host string, conn *Conn) {
 			s.log("the store would not give " + host + "'s lease to this copy; serving it anyway")
 		}
 	}
-	result, err := s.methods.HostSaid(host, "host/hello", m.Params)
+	result, err := s.methods.HostSaid(host, "machine/hello", m.Params)
 	if err != nil {
 		conn.Send(channelFrame(0, replyError(m.ID, err)))
 	} else {
@@ -1764,7 +1764,7 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, webOrigin
 		// Known at every copy at once.
 		s.announce("clientPaired", client, "code")
 		return result, nil
-	case stored.Purpose == "host" && method == "hosts/announce":
+	case stored.Purpose == "host" && method == "machines/announce":
 		var a wire.MachineAnnounce
 		if json.Unmarshal(params, &a) != nil {
 			return nil, fail(invalidParams, "Say which host you are.")

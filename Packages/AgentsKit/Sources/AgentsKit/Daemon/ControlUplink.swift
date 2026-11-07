@@ -6,7 +6,7 @@ import Foundation
 /// The control plane opens a channel on it for each client, and each channel becomes a
 /// virtual connection to this daemon's `DaemonServer`, with everything a socket
 /// connection has. Channel 0 is the host's own conversation with the control plane:
-/// `host/hello` on every connect.
+/// `machine/hello` on every connect.
 ///
 /// Losing the uplink closes every channel and nothing else: agents carry on, and it
 /// dials again, waiting a second, then twice as long each time up to half a minute, each
@@ -132,7 +132,7 @@ public final class ControlUplink: @unchecked Sendable {
             return (uplink, id)
         }
         guard let transport,
-              let line = try? JSONRPCCodec.encode(.request(id: .number(id), method: DaemonAPI.newMethodName(method), params: params))
+              let line = try? JSONRPCCodec.encode(.request(id: .number(id), method: method, params: params))
         else { return }
         try? transport.write(line: ControlWire.channel(0, message: line))
     }
@@ -145,7 +145,7 @@ public final class ControlUplink: @unchecked Sendable {
             nextHello += 1
             return (uplink, id)
         }
-        guard let transport, let line = try? JSONRPCCodec.encode(.request(id: .number(id), method: DaemonAPI.newMethodName(method), params: params)) else {
+        guard let transport, let line = try? JSONRPCCodec.encode(.request(id: .number(id), method: method, params: params)) else {
             throw JSONRPCError(code: DaemonAPI.Failure.hostOffline, message: "This host can’t reach its control plane now.")
         }
         let timer = Task { [weak self] in
@@ -176,7 +176,7 @@ public final class ControlUplink: @unchecked Sendable {
 
     private func sayHello(on transport: any LineTransport) throws {
         let id = lock.withLock { () -> Int in defer { nextHello += 1 }; return nextHello }
-        let line = try JSONRPCCodec.encode(.request(id: .number(id), method: DaemonAPI.newMethodName(DaemonAPI.Method.hostHello),
+        let line = try JSONRPCCodec.encode(.request(id: .number(id), method: DaemonAPI.Method.hostHello,
                                                     params: try JSONValue.encoding(hello)))
         try transport.write(line: ControlWire.channel(0, message: line))
     }
@@ -210,7 +210,7 @@ public final class ControlUplink: @unchecked Sendable {
                 tell(DaemonAPI.Method.foldersDetected, ["added": .int(0)])
                 return
             }
-            // Replies to `host/hello` and `control/ping`, which nothing waits on.
+            // Replies to `machine/hello` and `control/ping`, which nothing waits on.
             let decoded = try? JSONRPCCodec.decode(line: message)
             // The control plane's own request (#1122), answered on channel 0.
             if case .request(let id, let method, _)? = decoded {

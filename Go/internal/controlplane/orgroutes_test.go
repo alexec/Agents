@@ -20,7 +20,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// routesTold is every host/orgRoutes each machine was told, by machine.
+// routesTold is every machine/orgRoutes each machine was told, by machine.
 type routesTold struct {
 	mu  sync.Mutex
 	got map[string][]wire.OrgRouteDelivery
@@ -29,7 +29,7 @@ type routesTold struct {
 func newRoutesTold() *routesTold { return &routesTold{got: map[string][]wire.OrgRouteDelivery{}} }
 
 func (d *routesTold) heard(host, method string, params json.RawMessage) {
-	if method != wire.NewMethodName(wire.NotifyHostOrgRoutes.Name) {
+	if method != wire.NotifyMachineOrgRoutes.Name {
 		return
 	}
 	var delivery wire.OrgRouteDelivery
@@ -445,7 +445,7 @@ func TestARouteReachesOnlyTheMachinesAllowed(t *testing.T) {
 
 	// Each machine says it keeps it; the list counts them, and none waits.
 	for _, m := range []*fakeHost{samAtA, samAtB} {
-		if _, err := m.uplink.Ask(t.Context(), wire.CallHostOrgRoutesApplied.Name,
+		if _, err := m.uplink.Ask(t.Context(), wire.CallMachineOrgRoutesApplied.Name,
 			wire.OrgRoutesApplied{Routes: []wire.OrgRouteVersion{{ID: "platform-openai", Version: 1}}}); err != nil {
 			t.Fatal(err)
 		}
@@ -482,7 +482,7 @@ func TestARouteReachesOnlyTheMachinesAllowed(t *testing.T) {
 	}
 	// One that asks again gets it again.
 	n := told.count(later.member.Host)
-	if _, err := later.uplink.Ask(t.Context(), wire.CallHostOrgRoutesAgain.Name, wire.Empty{}); err != nil {
+	if _, err := later.uplink.Ask(t.Context(), wire.CallMachineOrgRoutesAgain.Name, wire.Empty{}); err != nil {
 		t.Fatal(err)
 	}
 	a.waitFor(func() bool { return told.count(later.member.Host) > n }, "the machine told again")
@@ -583,7 +583,7 @@ func TestReplaceAndRemoveARoute(t *testing.T) {
 	}, "the add and the replaced key in the audit")
 
 	// Sam's machine is removed: Alex, an admin, and Sam hear which routes it held.
-	if _, err := spare.uplink.Ask(t.Context(), wire.CallHostOrgRoutesApplied.Name,
+	if _, err := spare.uplink.Ask(t.Context(), wire.CallMachineOrgRoutesApplied.Name,
 		wire.OrgRoutesApplied{Routes: []wire.OrgRouteVersion{{ID: "acme", Version: 2}}}); err != nil {
 		t.Fatal(err)
 	}
@@ -591,7 +591,7 @@ func TestReplaceAndRemoveARoute(t *testing.T) {
 		h := p.s.records.Host(spare.member.Host)
 		return h != nil && len(appliedOrgRoutes(*h)) == 1
 	}, "the machine's routes noted")
-	call(t, sam.window, "", "hosts/remove", map[string]string{"host": spare.member.Host})
+	call(t, sam.window, "", "machines/remove", map[string]string{"host": spare.member.Host})
 	for _, s := range []*controllink.Session{window, sam.window} {
 		var left wire.OrgRoutesLeft
 		json.Unmarshal(waitNote(t, s, wire.NotifyControlOrgRoutesLeft.Name).Params, &left)
@@ -633,7 +633,7 @@ func TestAControlPlaneWithNoKeyStillDeliversARoute(t *testing.T) {
 	_, window := p.client("Alex's Mac")
 	alex := &person{id: p.s.localOwner(), window: window}
 	box := p.machineSaying(alex, routesHello("MACHINE-2"))
-	// host/hello is told, not asked, so it can land after the machine is online: a route
+	// machine/hello is told, not asked, so it can land after the machine is online: a route
 	// set before it is noted is sealed to no machine, and with no keeper stays so (#3636).
 	p.waitFor(func() bool { _, ok := told.last(box.member.Host); return ok }, "the machine told at its join")
 	const awsSecret = "aws-long-lived-secret-key"
@@ -662,7 +662,7 @@ func TestCheckARouteOnAMachine(t *testing.T) {
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	var asked sync.Map
 	p.asked = func(host, method string, params json.RawMessage) (any, bool) {
-		if wire.OldMethodName(method) != wire.CallHostOrgRouteCheck.Name {
+		if method != wire.CallMachineOrgRouteCheck.Name {
 			return nil, false
 		}
 		asked.Store(host, string(params))
@@ -678,7 +678,7 @@ func TestCheckARouteOnAMachine(t *testing.T) {
 		t.Fatalf("%+v", check)
 	}
 	box := p.machineSaying(alex, routesHello("MACHINE-2"))
-	if _, err := box.uplink.Ask(t.Context(), wire.CallHostOrgRoutesApplied.Name,
+	if _, err := box.uplink.Ask(t.Context(), wire.CallMachineOrgRoutesApplied.Name,
 		wire.OrgRoutesApplied{Routes: []wire.OrgRouteVersion{{ID: "acme", Version: 1}}}); err != nil {
 		t.Fatal(err)
 	}
