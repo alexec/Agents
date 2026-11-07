@@ -92,6 +92,20 @@ Forgejo is left out, and the list says why: the token counts only on its own For
 
 Each write is yours, with your token, from the machine that read the item.
 
+### An epic's plan and features
+
+Forgejo has no sub-issues, so an epic's children are the issues it **depends on** (Forgejo's
+issue dependencies, *This issue depends on*), and a child waits for the issues it depends on
+in turn. An issue labelled `epic` has a **Plan** on its page, its children step by step, as on
+GitHub. **Add child** makes the epic depend on a new issue (with its level and the epic's
+`feature:<name>` label) or on one that is there (`#12`, `owner/repo#12` or its address on the
+connected Forgejo); **Blocked by** makes a child depend on another child, or no longer.
+Forgejo keeps an issue with open dependencies from being closed, so an epic closes after its
+children.
+
+**Work ▸ Features** counts a Forgejo epic under its `feature:<name>` label, as it counts the
+other forges' epics.
+
 ## The tools
 
 - `list_pull_requests`, `get_pull_request` (with its description, head commit and the
@@ -153,7 +167,9 @@ never a bot. A pull request from a fork never counts.
   `prCostComment` says so). Forgejo has no parent issues, so an issue has none. An issue's
   address on the connected Forgejo is read in a filed issue's output. A doc's address is
   `/src/HEAD/<path>`, which Forgejo sends on to the default branch.
-- **Not yet:** an epic's plan and the Board filter.
+- **The Board filter has no Forgejo board.** Forgejo has project boards, but its API (11)
+  cannot read them, so a list narrowed to a board lists no Forgejo items.
+- **Not yet:** a failed job's log.
 
 ## See also
 
