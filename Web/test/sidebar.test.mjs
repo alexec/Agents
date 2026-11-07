@@ -688,3 +688,28 @@ test("a waiting deploy is approved or rejected, and its row says Deploy (#3587)"
   assert.equal(opensItsSubject(deploy), false);
   assert.equal(isSessionApproval(deploy), false);
 });
+
+test("a host's list prunes the folds of its folders that are gone, and no other host's (#3750)", async () => {
+  const { Folds } = await load("src/model/folds.ts");
+  const storage = new Memory();
+  const first = new Folds(storage);
+  for (const [host, folder] of [["mac", "file:///w/a/"], ["mac", "file:///w/gone"], ["box", "file:///w/gone"]]) {
+    first.set(host, folder, true);
+    first.setWorkflows(host, folder, true);
+    first.setSessions(host, folder, false);
+  }
+  first.setSmart("needsYou", false);
+  first.prune("mac", ["file:///w/a"]);
+  for (const folds of [first, new Folds(storage)]) {
+    assert.equal(folds.isOpen("mac", "file:///w/a"), true, "a listed folder keeps its folds");
+    assert.equal(folds.isSessionsOpen("mac", "file:///w/a"), false);
+    assert.equal(folds.isOpen("mac", "file:///w/gone"), false, "one not listed loses them");
+    assert.equal(folds.isWorkflowsOpen("mac", "file:///w/gone"), false);
+    assert.equal(folds.isSessionsOpen("mac", "file:///w/gone"), true);
+    assert.equal(folds.isOpen("box", "file:///w/gone"), true, "another host's stay: it did not list");
+    assert.equal(folds.isSmartOpen("needsYou"), false, "a smart group is no folder's");
+  }
+  first.prune("box", []);
+  assert.equal(new Folds(storage).isSessionsOpen("box", "file:///w/gone"), true, "a host that left takes its own");
+  assert.equal(new Folds(storage).isOpen("box", "file:///w/gone"), false);
+});
